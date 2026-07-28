@@ -29,7 +29,7 @@ func TestDyncfgConfigReturnsAfterQueuedCommandCompletes(t *testing.T) {
 	discovery.ctx = context.Background()
 	done := make(chan struct{})
 	go func() {
-		discovery.dyncfgConfig(dyncfg.NewFunction(functions.Function{
+		discovery.dyncfgConfig(dyncfg.NewFunction(t.Context(), functions.Function{
 			UID:  "queued",
 			Name: "config",
 			Args: []string{
@@ -79,7 +79,7 @@ func TestDyncfgAdmissionRejectsCommandsAfterShutdown(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		discovery.enqueueDyncfgFunction(dyncfg.NewFunction(functions.Function{
+		discovery.enqueueDyncfgFunction(dyncfg.NewFunction(t.Context(), functions.Function{
 			UID:  "late",
 			Name: "config",
 			Args: []string{"test:sd:type:name", string(dyncfg.CommandRestart)},

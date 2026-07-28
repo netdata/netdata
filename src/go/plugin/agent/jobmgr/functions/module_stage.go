@@ -155,7 +155,6 @@ func startModulePlanStage(
 ) (modulePlanStage, error) {
 	result := make(chan modulePlanResult, 1)
 	settled := make(chan error, 1)
-	attemptReady := make(chan jobmgr.ProcessAttempt, 1)
 	attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptFunctionBundle,
@@ -163,8 +162,7 @@ func startModulePlanStage(
 			Resource:  candidateFunctionResource(module),
 		},
 		Target: epoch,
-		Work: func(ctx context.Context) error {
-			owned := <-attemptReady
+		Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
 			plan, buildErr := buildControllerModulePlan(module, creator)
 			if buildErr != nil {
 				result <- modulePlanResult{err: buildErr}
@@ -181,7 +179,7 @@ func startModulePlanStage(
 				result <- modulePlanResult{err: errors.Join(bindErr, cleanupErr)}
 				return errors.Join(bindErr, cleanupErr)
 			}
-			if admitErr := owned.Admit(); admitErr != nil {
+			if admitErr := admission.Admit(); admitErr != nil {
 				plan.agentBundle.retire()
 				cleanupErr := plan.agentBundle.wait(context.Background())
 				return errors.Join(admitErr, cleanupErr)
@@ -215,7 +213,6 @@ func startModulePlanStage(
 	if err != nil {
 		return modulePlanStage{}, err
 	}
-	attemptReady <- attempt
 	go func() {
 		settled <- attempt.Await(context.Background())
 	}()

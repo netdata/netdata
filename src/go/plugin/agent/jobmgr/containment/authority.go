@@ -24,71 +24,9 @@ const (
 	maximumDiagnosticResourceNameBytes = 256
 )
 
-var (
-	ErrIdentityBusy        = jobmgr.ErrProcessAttemptBusy
-	ErrContainmentDeadline = jobmgr.ErrProcessAttemptDeadline
-	ErrSuperseded          = jobmgr.ErrProcessAttemptSuperseded
-	ErrTargetRetired       = jobmgr.ErrProcessAttemptRetired
-	ErrAuthorityStopped    = jobmgr.ErrProcessAttemptStopped
-	ErrAttemptSettled      = jobmgr.ErrProcessAttemptSettled
-	ErrWorkerPanic         = jobmgr.ErrProcessAttemptWorkerPanic
-)
-
-// Namespace keeps operational work and same-payload tests in independent
-// identity domains.
-type Namespace uint8
-
-const (
-	NamespaceJob Namespace = iota + 1
-	NamespaceJobRuntime
-	NamespaceJobTest
-	NamespaceStore
-	NamespaceStoreTest
-	NamespaceFunctionBundle
-	NamespaceFunctionPoll
-	NamespaceFunctionInvocation
-	NamespaceServiceDiscovery
-)
-
-func (namespace Namespace) valid() bool {
-	return namespace >= NamespaceJob && namespace <= NamespaceServiceDiscovery
-}
-
-func (namespace Namespace) String() string {
-	switch namespace {
-	case NamespaceJob:
-		return "job"
-	case NamespaceJobRuntime:
-		return "job-runtime"
-	case NamespaceJobTest:
-		return "job-test"
-	case NamespaceStore:
-		return "store"
-	case NamespaceStoreTest:
-		return "store-test"
-	case NamespaceFunctionBundle:
-		return "function-bundle"
-	case NamespaceFunctionPoll:
-		return "function-poll"
-	case NamespaceFunctionInvocation:
-		return "function-invocation"
-	case NamespaceServiceDiscovery:
-		return "service-discovery"
-	default:
-		return "invalid"
-	}
-}
-
-// Identity contains an opaque equality key and a separately supplied,
-// diagnostic-safe resource name. Key is memory-only and is never observed.
-type Identity struct {
-	Namespace Namespace
-	Key       string
-	Resource  string
-}
-
-func (identity Identity) valid() bool {
-	return identity.Namespace.valid() &&
+func validIdentity(identity jobmgr.ProcessAttemptIdentity) bool {
+	return identity.Namespace >= jobmgr.ProcessAttemptJob &&
+		identity.Namespace <= jobmgr.ProcessAttemptServiceDiscovery &&
 		identity.Key != "" &&
 		len(identity.Key) <= maximumIdentityKeyBytes &&
 		validDiagnosticResource(identity.Resource)
@@ -109,23 +47,15 @@ func validDiagnosticResource(resource string) bool {
 }
 
 type identityKey struct {
-	namespace Namespace
+	namespace jobmgr.ProcessAttemptNamespace
 	key       string
 }
 
-func (identity Identity) mapKey() identityKey {
+func mapKey(identity jobmgr.ProcessAttemptIdentity) identityKey {
 	return identityKey{
 		namespace: identity.Namespace,
 		key:       identity.Key,
 	}
-}
-
-// Plan describes one complete physical lifetime. Work must include any
-// required cleanup before returning.
-type Plan struct {
-	Identity Identity
-	Target   uint64
-	Work     func(context.Context) error
 }
 
 type policy struct {
@@ -145,14 +75,13 @@ type Census struct {
 	Contained int
 }
 
-// AttemptState is the current physical ownership state.
-type AttemptState uint8
+type attemptState uint8
 
 const (
-	AttemptStateProbing AttemptState = iota + 1
-	AttemptStateAdmitted
-	AttemptStateContained
-	AttemptStateReleased
+	attemptStateProbing attemptState = iota + 1
+	attemptStateAdmitted
+	attemptStateContained
+	attemptStateReleased
 )
 
 // Authority owns the identity registry and the complete physical lifetime of
@@ -161,24 +90,24 @@ type Authority struct {
 	mu             sync.Mutex
 	diagnostics    jobmgr.DiagnosticObserver
 	policy         policy
-	attempts       map[identityKey]*Attempt
+	attempts       map[identityKey]*attempt
 	census         Census
 	retiredThrough uint64
 	stopping       bool
 	drained        chan struct{}
 }
 
-// Attempt is a process-owned worker and its logical settlement.
-type Attempt struct {
+// attempt is a process-owned worker and its logical settlement.
+type attempt struct {
 	authority *Authority
-	identity  Identity
+	identity  jobmgr.ProcessAttemptIdentity
 	target    uint64
 	started   time.Time
 
 	ctx      context.Context
 	cancel   context.CancelCauseFunc
 	timer    *time.Timer
-	state    AttemptState
+	state    attemptState
 	result   error
 	settled  chan struct{}
 	released chan struct{}
@@ -198,39 +127,39 @@ func newAuthority(diagnostics jobmgr.DiagnosticObserver, policy policy) (*Author
 	return &Authority{
 		diagnostics: diagnostics,
 		policy:      policy,
-		attempts:    make(map[identityKey]*Attempt),
+		attempts:    make(map[identityKey]*attempt),
 		drained:     make(chan struct{}),
 	}, nil
 }
 
 // Start reserves identity before starting exactly one worker.
-func (authority *Authority) Start(plan Plan) (*Attempt, error) {
-	if authority == nil || !plan.Identity.valid() || plan.Work == nil {
+func (authority *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
+	if authority == nil || !validIdentity(plan.Identity) || plan.Work == nil {
 		return nil, errors.New("jobmgr containment: invalid attempt plan")
 	}
 	authority.mu.Lock()
 	if authority.stopping {
 		authority.mu.Unlock()
-		return nil, ErrAuthorityStopped
+		return nil, jobmgr.ErrProcessAttemptStopped
 	}
 	if plan.Target != 0 && plan.Target <= authority.retiredThrough {
 		authority.mu.Unlock()
-		return nil, ErrTargetRetired
+		return nil, jobmgr.ErrProcessAttemptRetired
 	}
-	key := plan.Identity.mapKey()
+	key := mapKey(plan.Identity)
 	if authority.attempts[key] != nil {
 		authority.mu.Unlock()
-		return nil, ErrIdentityBusy
+		return nil, jobmgr.ErrProcessAttemptBusy
 	}
 	ctx, cancel := context.WithCancelCause(context.Background())
-	attempt := &Attempt{
+	attempt := &attempt{
 		authority: authority,
 		identity:  plan.Identity,
 		target:    plan.Target,
 		started:   time.Now(),
 		ctx:       ctx,
 		cancel:    cancel,
-		state:     AttemptStateProbing,
+		state:     attemptStateProbing,
 		settled:   make(chan struct{}),
 		released:  make(chan struct{}),
 	}
@@ -247,44 +176,40 @@ func (authority *Authority) Start(plan Plan) (*Attempt, error) {
 func (authority *Authority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
-	return authority.Start(Plan{
-		Identity: Identity{
-			Namespace: Namespace(plan.Identity.Namespace),
-			Key:       plan.Identity.Key,
-			Resource:  plan.Identity.Resource,
-		},
-		Target: plan.Target,
-		Work:   plan.Work,
-	})
+	return authority.start(plan)
 }
 
-func (attempt *Attempt) run(work func(context.Context) error) {
-	err := callWork(attempt.ctx, work)
+func (attempt *attempt) run(work func(context.Context, jobmgr.ProcessAttemptAdmission) error) {
+	err := callWork(attempt.ctx, attempt, work)
 	attempt.authority.finish(attempt, err)
 }
 
-func callWork(ctx context.Context, work func(context.Context) error) (err error) {
+func callWork(
+	ctx context.Context,
+	admission jobmgr.ProcessAttemptAdmission,
+	work func(context.Context, jobmgr.ProcessAttemptAdmission) error,
+) (err error) {
 	defer func() {
 		if recover() != nil {
-			err = ErrWorkerPanic
+			err = jobmgr.ErrProcessAttemptWorkerPanic
 		}
 	}()
-	return work(ctx)
+	return work(ctx, admission)
 }
 
 // Admit atomically stops the preparation fuse. The identity remains occupied
 // until the complete physical worker and cleanup lifetime returns.
-func (attempt *Attempt) Admit() error {
+func (attempt *attempt) Admit() error {
 	if attempt == nil || attempt.authority == nil {
 		return errors.New("jobmgr containment: invalid attempt admission")
 	}
 	authority := attempt.authority
 	authority.mu.Lock()
-	if attempt.state != AttemptStateProbing {
+	if attempt.state != attemptStateProbing {
 		authority.mu.Unlock()
-		return ErrAttemptSettled
+		return jobmgr.ErrProcessAttemptSettled
 	}
-	attempt.state = AttemptStateAdmitted
+	attempt.state = attemptStateAdmitted
 	authority.census.Probing--
 	authority.census.Admitted++
 	attempt.timer.Stop()
@@ -294,7 +219,7 @@ func (attempt *Attempt) Admit() error {
 
 // Cut settles logical waiting immediately and cancels the worker. The identity
 // stays occupied until Work returns.
-func (attempt *Attempt) Cut(cause error) bool {
+func (attempt *attempt) Cut(cause error) bool {
 	if attempt == nil || attempt.authority == nil {
 		return false
 	}
@@ -304,27 +229,27 @@ func (attempt *Attempt) Cut(cause error) bool {
 	return attempt.authority.cut(attempt, cause, false)
 }
 
-func (attempt *Attempt) cutFuse() {
-	attempt.authority.cut(attempt, ErrContainmentDeadline, true)
+func (attempt *attempt) cutFuse() {
+	attempt.authority.cut(attempt, jobmgr.ErrProcessAttemptDeadline, true)
 }
 
-func (authority *Authority) cut(attempt *Attempt, cause error, probingOnly bool) bool {
+func (authority *Authority) cut(attempt *attempt, cause error, probingOnly bool) bool {
 	authority.mu.Lock()
 	if attempt.authority != authority ||
-		(probingOnly && attempt.state != AttemptStateProbing) {
+		(probingOnly && attempt.state != attemptStateProbing) {
 		authority.mu.Unlock()
 		return false
 	}
 	switch attempt.state {
-	case AttemptStateProbing:
+	case attemptStateProbing:
 		authority.census.Probing--
-	case AttemptStateAdmitted:
+	case attemptStateAdmitted:
 		authority.census.Admitted--
 	default:
 		authority.mu.Unlock()
 		return false
 	}
-	attempt.state = AttemptStateContained
+	attempt.state = attemptStateContained
 	attempt.result = cause
 	authority.census.Contained++
 	attempt.timer.Stop()
@@ -351,14 +276,14 @@ func (authority *Authority) cut(attempt *Attempt, cause error, probingOnly bool)
 
 func safeCutError(cause error) error {
 	switch {
-	case errors.Is(cause, ErrContainmentDeadline):
-		return ErrContainmentDeadline
-	case errors.Is(cause, ErrSuperseded):
-		return ErrSuperseded
-	case errors.Is(cause, ErrTargetRetired):
-		return ErrTargetRetired
-	case errors.Is(cause, ErrAuthorityStopped):
-		return ErrAuthorityStopped
+	case errors.Is(cause, jobmgr.ErrProcessAttemptDeadline):
+		return jobmgr.ErrProcessAttemptDeadline
+	case errors.Is(cause, jobmgr.ErrProcessAttemptSuperseded):
+		return jobmgr.ErrProcessAttemptSuperseded
+	case errors.Is(cause, jobmgr.ErrProcessAttemptRetired):
+		return jobmgr.ErrProcessAttemptRetired
+	case errors.Is(cause, jobmgr.ErrProcessAttemptStopped):
+		return jobmgr.ErrProcessAttemptStopped
 	case errors.Is(cause, context.DeadlineExceeded):
 		return context.DeadlineExceeded
 	default:
@@ -366,7 +291,7 @@ func safeCutError(cause error) error {
 	}
 }
 
-func (authority *Authority) finish(attempt *Attempt, result error) {
+func (authority *Authority) finish(attempt *attempt, result error) {
 	authority.mu.Lock()
 	if attempt.timer != nil {
 		attempt.timer.Stop()
@@ -374,22 +299,22 @@ func (authority *Authority) finish(attempt *Attempt, result error) {
 	attempt.cancel(nil)
 	previous := attempt.state
 	switch previous {
-	case AttemptStateProbing:
+	case attemptStateProbing:
 		authority.census.Probing--
 		attempt.result = result
 		close(attempt.settled)
-	case AttemptStateAdmitted:
+	case attemptStateAdmitted:
 		authority.census.Admitted--
 		attempt.result = result
 		close(attempt.settled)
-	case AttemptStateContained:
+	case attemptStateContained:
 		authority.census.Contained--
-	case AttemptStateReleased:
+	case attemptStateReleased:
 		authority.mu.Unlock()
 		return
 	}
-	attempt.state = AttemptStateReleased
-	key := attempt.identity.mapKey()
+	attempt.state = attemptStateReleased
+	key := mapKey(attempt.identity)
 	if authority.attempts[key] == attempt {
 		delete(authority.attempts, key)
 	}
@@ -403,7 +328,7 @@ func (authority *Authority) finish(attempt *Attempt, result error) {
 	age := time.Since(attempt.started)
 	authority.mu.Unlock()
 
-	if errors.Is(result, ErrWorkerPanic) {
+	if errors.Is(result, jobmgr.ErrProcessAttemptWorkerPanic) {
 		jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{
 			Level:      jobmgr.DiagnosticError,
 			Name:       "job manager attempt worker panicked",
@@ -411,10 +336,10 @@ func (authority *Authority) finish(attempt *Attempt, result error) {
 			State:      identity.Namespace.String(),
 			Generation: target,
 			Age:        age,
-			Err:        ErrWorkerPanic,
+			Err:        jobmgr.ErrProcessAttemptWorkerPanic,
 		})
 	}
-	if previous == AttemptStateContained {
+	if previous == attemptStateContained {
 		jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{
 			Level:      jobmgr.DiagnosticInfo,
 			Name:       "job manager contained attempt released",
@@ -428,7 +353,7 @@ func (authority *Authority) finish(attempt *Attempt, result error) {
 
 // Await returns the first logical disposition. Caller cancellation cuts the
 // attempt but never waits for physical worker return.
-func (attempt *Attempt) Await(ctx context.Context) error {
+func (attempt *attempt) Await(ctx context.Context) error {
 	if attempt == nil || attempt.authority == nil || ctx == nil {
 		return errors.New("jobmgr containment: invalid attempt wait")
 	}
@@ -453,14 +378,14 @@ func (attempt *Attempt) Await(ctx context.Context) error {
 }
 
 // Released closes only after Work, including required cleanup, has returned.
-func (attempt *Attempt) Released() <-chan struct{} {
+func (attempt *attempt) Released() <-chan struct{} {
 	if attempt == nil {
 		return nil
 	}
 	return attempt.released
 }
 
-func (attempt *Attempt) State() AttemptState {
+func (attempt *attempt) stateSnapshot() attemptState {
 	if attempt == nil || attempt.authority == nil {
 		return 0
 	}
@@ -478,36 +403,30 @@ func (authority *Authority) Census() Census {
 	return authority.census
 }
 
-// CutIdentity logically settles one identity without waiting for its physical
-// worker to return.
-func (authority *Authority) CutIdentity(identity Identity, cause error) bool {
-	if authority == nil || !identity.valid() {
-		return false
-	}
-	authority.mu.Lock()
-	attempt := authority.attempts[identity.mapKey()]
-	authority.mu.Unlock()
-	return attempt != nil && attempt.Cut(cause)
-}
-
+// CutProcessAttempt logically settles one identity without waiting for its
+// physical worker to return.
 func (authority *Authority) CutProcessAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	cause error,
 ) bool {
-	return authority.CutIdentity(Identity{
-		Namespace: Namespace(identity.Namespace),
-		Key:       identity.Key,
-		Resource:  identity.Resource,
-	}, cause)
+	if authority == nil || !validIdentity(identity) {
+		return false
+	}
+	authority.mu.Lock()
+	attempt := authority.attempts[mapKey(identity)]
+	authority.mu.Unlock()
+	return attempt != nil && attempt.Cut(cause)
 }
 
-// IdentityReleased returns the current physical owner's release signal.
-func (authority *Authority) IdentityReleased(identity Identity) (<-chan struct{}, bool) {
-	if authority == nil || !identity.valid() {
+// ProcessAttemptReleased returns the current physical owner's release signal.
+func (authority *Authority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	if authority == nil || !validIdentity(identity) {
 		return nil, false
 	}
 	authority.mu.Lock()
-	attempt := authority.attempts[identity.mapKey()]
+	attempt := authority.attempts[mapKey(identity)]
 	authority.mu.Unlock()
 	if attempt == nil {
 		return nil, false
@@ -515,29 +434,22 @@ func (authority *Authority) IdentityReleased(identity Identity) (<-chan struct{}
 	return attempt.Released(), true
 }
 
-func (authority *Authority) ProcessAttemptReleased(
-	identity jobmgr.ProcessAttemptIdentity,
-) (<-chan struct{}, bool) {
-	return authority.IdentityReleased(Identity{
-		Namespace: Namespace(identity.Namespace),
-		Key:       identity.Key,
-		Resource:  identity.Resource,
-	})
-}
-
 // Supersede cancels one identity and waits only the fixed grace for physical
 // release. A still-live worker remains the exclusive owner.
-func (authority *Authority) Supersede(ctx context.Context, identity Identity) error {
-	if authority == nil || ctx == nil || !identity.valid() {
+func (authority *Authority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	if authority == nil || ctx == nil || !validIdentity(identity) {
 		return errors.New("jobmgr containment: invalid supersession")
 	}
 	authority.mu.Lock()
-	attempt := authority.attempts[identity.mapKey()]
+	attempt := authority.attempts[mapKey(identity)]
 	authority.mu.Unlock()
 	if attempt == nil {
 		return nil
 	}
-	attempt.Cut(ErrSuperseded)
+	attempt.Cut(jobmgr.ErrProcessAttemptSuperseded)
 	timer := time.NewTimer(authority.policy.supersessionGrace)
 	defer timer.Stop()
 	select {
@@ -546,19 +458,8 @@ func (authority *Authority) Supersede(ctx context.Context, identity Identity) er
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-timer.C:
-		return ErrIdentityBusy
+		return jobmgr.ErrProcessAttemptBusy
 	}
-}
-
-func (authority *Authority) SupersedeProcessAttempt(
-	ctx context.Context,
-	identity jobmgr.ProcessAttemptIdentity,
-) error {
-	return authority.Supersede(ctx, Identity{
-		Namespace: Namespace(identity.Namespace),
-		Key:       identity.Key,
-		Resource:  identity.Resource,
-	})
 }
 
 // CutTarget permanently fences every live attempt associated with target.
@@ -568,7 +469,7 @@ func (authority *Authority) CutTarget(target uint64) int {
 	}
 	authority.mu.Lock()
 	authority.retiredThrough = max(authority.retiredThrough, target)
-	attempts := make([]*Attempt, 0)
+	attempts := make([]*attempt, 0)
 	for _, attempt := range authority.attempts {
 		if attempt.target != 0 && attempt.target <= authority.retiredThrough {
 			attempts = append(attempts, attempt)
@@ -577,7 +478,7 @@ func (authority *Authority) CutTarget(target uint64) int {
 	authority.mu.Unlock()
 	cut := 0
 	for _, attempt := range attempts {
-		if attempt.Cut(ErrTargetRetired) {
+		if attempt.Cut(jobmgr.ErrProcessAttemptRetired) {
 			cut++
 		}
 	}
@@ -598,7 +499,7 @@ func (authority *Authority) BeginShutdown() {
 			close(authority.drained)
 		}
 	}
-	attempts := make([]*Attempt, 0, len(authority.attempts))
+	attempts := make([]*attempt, 0, len(authority.attempts))
 	for _, attempt := range authority.attempts {
 		attempts = append(attempts, attempt)
 	}
@@ -619,7 +520,7 @@ func (authority *Authority) BeginShutdown() {
 		return lhs.Key < rhs.Key
 	})
 	for _, attempt := range attempts {
-		attempt.Cut(ErrAuthorityStopped)
+		attempt.Cut(jobmgr.ErrProcessAttemptStopped)
 	}
 	if total > 0 {
 		jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{

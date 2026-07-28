@@ -397,7 +397,7 @@ func (d *ServiceDiscovery) unregisterDyncfgTemplates() {
 
 // autoEnableConfig enables a config without waiting for netdata's enable command.
 func (d *ServiceDiscovery) autoEnableConfig(cfg sdConfig) {
-	fn := dyncfg.NewFunction(functions.Function{
+	fn := dyncfg.NewFunction(d.ctx, functions.Function{
 		Args: []string{d.dyncfgJobID(cfg.DiscovererType(), cfg.Name()), "enable"},
 	})
 	d.handler.CmdEnable(fn)

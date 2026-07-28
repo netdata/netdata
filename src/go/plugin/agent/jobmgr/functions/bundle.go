@@ -121,7 +121,7 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 			Resource:  resource,
 		},
 		Target: target,
-		Work: func(ctx context.Context) error {
+		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
 			availability, pollErr := bundle.evaluateAvailability()
 			if cause := context.Cause(ctx); cause != nil {
 				return cause
@@ -166,10 +166,6 @@ func (bundle *functionBundle) invoke(
 		bundle.mu.Unlock()
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
-	if bundle.attempts == nil {
-		bundle.mu.Unlock()
-		return call(ctx)
-	}
 	bundle.invocationID++
 	if bundle.invocationID == 0 {
 		bundle.quarantined = true
@@ -193,7 +189,10 @@ func (bundle *functionBundle) invoke(
 			Resource:  resource,
 		},
 		Target: target,
-		Work: func(attemptCtx context.Context) error {
+		Work: func(
+			attemptCtx context.Context,
+			_ jobmgr.ProcessAttemptAdmission,
+		) error {
 			defer invocation.complete()
 			callCtx, cancel := context.WithCancelCause(attemptCtx)
 			stop := context.AfterFunc(ctx, func() {

@@ -17,13 +17,13 @@ import (
 
 func TestAuthorityContainsOnlyTheOccupiedIdentity(t *testing.T) {
 	authority := newTestAuthority(t, time.Second, 20*time.Millisecond, nil)
-	identity := testIdentity(NamespaceJob, "module/job", "module/job")
+	identity := testIdentity(jobmgr.ProcessAttemptJob, "module/job", "module/job")
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	attempt, err := authority.Start(Plan{
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Target:   7,
-		Work: func(context.Context) error {
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
 			close(entered)
 			<-release
 			return nil
@@ -32,34 +32,38 @@ func TestAuthorityContainsOnlyTheOccupiedIdentity(t *testing.T) {
 	require.NoError(t, err)
 	<-entered
 
-	_, err = authority.Start(Plan{
+	_, err = authority.start(jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Target:   7,
-		Work:     func(context.Context) error { return nil },
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
 	})
-	require.ErrorIs(t, err, ErrIdentityBusy)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptBusy)
 
-	other, err := authority.Start(Plan{
-		Identity: testIdentity(NamespaceJob, "module/other", "module/other"),
+	other, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: testIdentity(jobmgr.ProcessAttemptJob, "module/other", "module/other"),
 		Target:   7,
-		Work:     func(context.Context) error { return nil },
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
 	})
 	require.NoError(t, err)
 	require.NoError(t, other.Await(context.Background()))
 	<-other.Released()
 
-	require.ErrorIs(t, authority.Supersede(context.Background(), identity), ErrIdentityBusy)
-	require.ErrorIs(t, attempt.Await(context.Background()), ErrSuperseded)
+	require.ErrorIs(
+		t,
+		authority.SupersedeProcessAttempt(context.Background(), identity),
+		jobmgr.ErrProcessAttemptBusy,
+	)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptSuperseded)
 	require.Equal(t, Census{Active: 1, Contained: 1}, authority.Census())
 
 	close(release)
 	<-attempt.Released()
 	require.Equal(t, Census{}, authority.Census())
 
-	successor, err := authority.Start(Plan{
+	successor, err := authority.start(jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Target:   8,
-		Work:     func(context.Context) error { return nil },
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
 	})
 	require.NoError(t, err)
 	require.NoError(t, successor.Await(context.Background()))
@@ -70,29 +74,29 @@ func TestAuthorityFuseWinsLateCompletionAndRedactsDiagnostics(t *testing.T) {
 	diagnostics := &recordingAttemptDiagnostics{}
 	authority := newTestAuthority(t, 20*time.Millisecond, 10*time.Millisecond, diagnostics)
 	identity := testIdentity(
-		NamespaceStore,
+		jobmgr.ProcessAttemptStore,
 		"raw-config-sensitive-fingerprint",
 		"vault/main",
 	)
 	release := make(chan struct{})
-	attempt, err := authority.Start(Plan{
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Target:   11,
-		Work: func(context.Context) error {
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
 			<-release
 			return errors.New("provider-sensitive-detail")
 		},
 	})
 	require.NoError(t, err)
 
-	require.ErrorIs(t, attempt.Await(context.Background()), ErrContainmentDeadline)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptDeadline)
 	require.Equal(t, Census{Active: 1, Contained: 1}, authority.Census())
-	require.Equal(t, AttemptStateContained, attempt.State())
+	require.Equal(t, attemptStateContained, attempt.stateSnapshot())
 
 	close(release)
 	<-attempt.Released()
 	require.Equal(t, Census{}, authority.Census())
-	require.Equal(t, AttemptStateReleased, attempt.State())
+	require.Equal(t, attemptStateReleased, attempt.stateSnapshot())
 
 	wire := diagnostics.String()
 	require.Contains(t, wire, "vault/main")
@@ -104,10 +108,10 @@ func TestAuthorityAdmissionStopsFuseButTargetCutStillContainsLifetime(t *testing
 	authority := newTestAuthority(t, 20*time.Millisecond, 10*time.Millisecond, nil)
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	attempt, err := authority.Start(Plan{
-		Identity: testIdentity(NamespaceJob, "module/job", "module/job"),
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: testIdentity(jobmgr.ProcessAttemptJob, "module/job", "module/job"),
 		Target:   23,
-		Work: func(context.Context) error {
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
 			close(entered)
 			<-release
 			return nil
@@ -120,7 +124,7 @@ func TestAuthorityAdmissionStopsFuseButTargetCutStillContainsLifetime(t *testing
 	time.Sleep(40 * time.Millisecond)
 	require.Equal(t, Census{Active: 1, Admitted: 1}, authority.Census())
 	require.EqualValues(t, 1, authority.CutTarget(23))
-	require.ErrorIs(t, attempt.Await(context.Background()), ErrTargetRetired)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptRetired)
 	require.Equal(t, Census{Active: 1, Contained: 1}, authority.Census())
 
 	close(release)
@@ -133,22 +137,22 @@ func TestAuthorityTargetCutPermanentlyRejectsRetiredTargets(t *testing.T) {
 
 	require.Zero(t, authority.CutTarget(23))
 	for _, target := range []uint64{22, 23} {
-		_, err := authority.Start(Plan{
+		_, err := authority.start(jobmgr.ProcessAttemptPlan{
 			Identity: testIdentity(
-				NamespaceJob,
+				jobmgr.ProcessAttemptJob,
 				fmt.Sprintf("module/job-%d", target),
 				fmt.Sprintf("module/job-%d", target),
 			),
 			Target: target,
-			Work:   func(context.Context) error { return nil },
+			Work:   func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
 		})
-		require.ErrorIs(t, err, ErrTargetRetired)
+		require.ErrorIs(t, err, jobmgr.ErrProcessAttemptRetired)
 	}
 
-	successor, err := authority.Start(Plan{
-		Identity: testIdentity(NamespaceJob, "module/successor", "module/successor"),
+	successor, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: testIdentity(jobmgr.ProcessAttemptJob, "module/successor", "module/successor"),
 		Target:   24,
-		Work:     func(context.Context) error { return nil },
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
 	})
 	require.NoError(t, err)
 	require.NoError(t, successor.Await(context.Background()))
@@ -159,14 +163,14 @@ func TestAuthorityCallerCancellationPrecedesUnobservedCompletion(t *testing.T) {
 	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
 
 	for index := range 200 {
-		attempt, err := authority.Start(Plan{
+		attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
 			Identity: testIdentity(
-				NamespaceFunctionInvocation,
+				jobmgr.ProcessAttemptFunctionInvocation,
 				fmt.Sprintf("function-%d", index),
 				fmt.Sprintf("function-%d", index),
 			),
 			Target: 1,
-			Work:   func(context.Context) error { return nil },
+			Work:   func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
 		})
 		require.NoError(t, err)
 		<-attempt.Released()
@@ -182,9 +186,9 @@ func TestAuthorityCompletionAndCutHaveOneTerminalOwner(t *testing.T) {
 		authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
 		entered := make(chan struct{})
 		release := make(chan struct{})
-		attempt, err := authority.Start(Plan{
-			Identity: testIdentity(NamespaceJobTest, "module/job/config", "module/job"),
-			Work: func(context.Context) error {
+		attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+			Identity: testIdentity(jobmgr.ProcessAttemptJobTest, "module/job/config", "module/job"),
+			Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
 				close(entered)
 				<-release
 				return nil
@@ -195,7 +199,7 @@ func TestAuthorityCompletionAndCutHaveOneTerminalOwner(t *testing.T) {
 
 		cut := make(chan bool, 1)
 		go func() {
-			cut <- attempt.Cut(ErrSuperseded)
+			cut <- attempt.Cut(jobmgr.ErrProcessAttemptSuperseded)
 		}()
 		close(release)
 
@@ -204,7 +208,7 @@ func TestAuthorityCompletionAndCutHaveOneTerminalOwner(t *testing.T) {
 		switch {
 		case err == nil:
 			require.False(t, cutWon)
-		case errors.Is(err, ErrSuperseded):
+		case errors.Is(err, jobmgr.ErrProcessAttemptSuperseded):
 			require.True(t, cutWon)
 		default:
 			require.NoError(t, err)
@@ -217,14 +221,14 @@ func TestAuthorityCompletionAndCutHaveOneTerminalOwner(t *testing.T) {
 func TestAuthorityContainsPanicsWithoutPublishingPanicValues(t *testing.T) {
 	diagnostics := &recordingAttemptDiagnostics{}
 	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, diagnostics)
-	attempt, err := authority.Start(Plan{
-		Identity: testIdentity(NamespaceFunctionPoll, "module/job", "module/job"),
-		Work: func(context.Context) error {
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: testIdentity(jobmgr.ProcessAttemptFunctionPoll, "module/job", "module/job"),
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
 			panic("provider-sensitive-panic")
 		},
 	})
 	require.NoError(t, err)
-	require.ErrorIs(t, attempt.Await(context.Background()), ErrWorkerPanic)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptWorkerPanic)
 	<-attempt.Released()
 	require.NotContains(t, diagnostics.String(), "provider-sensitive-panic")
 }
@@ -233,17 +237,17 @@ func TestAuthorityShutdownReportsBoundedRetainedSample(t *testing.T) {
 	diagnostics := &recordingAttemptDiagnostics{}
 	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, diagnostics)
 	releases := make([]chan struct{}, 0, 12)
-	attempts := make([]*Attempt, 0, 12)
+	attempts := make([]*attempt, 0, 12)
 	for index := range 12 {
 		release := make(chan struct{})
 		releases = append(releases, release)
-		attempt, err := authority.Start(Plan{
+		attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
 			Identity: testIdentity(
-				NamespaceFunctionInvocation,
+				jobmgr.ProcessAttemptFunctionInvocation,
 				fmt.Sprintf("private-%d", index),
 				fmt.Sprintf("module/job/%d", index),
 			),
-			Work: func(context.Context) error {
+			Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
 				<-release
 				return nil
 			},
@@ -307,8 +311,11 @@ func newTestAuthority(
 	return authority
 }
 
-func testIdentity(namespace Namespace, key, resource string) Identity {
-	return Identity{
+func testIdentity(
+	namespace jobmgr.ProcessAttemptNamespace,
+	key, resource string,
+) jobmgr.ProcessAttemptIdentity {
+	return jobmgr.ProcessAttemptIdentity{
 		Namespace: namespace,
 		Key:       key,
 		Resource:  resource,

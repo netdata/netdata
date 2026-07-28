@@ -32,7 +32,7 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 
 				require.Eventually(t, sd.handler.WaitingForDecision, time.Second, 10*time.Millisecond)
 
-				sd.dyncfgCh <- dyncfg.NewFunction(functions.Function{
+				sd.dyncfgCh <- dyncfg.NewFunction(t.Context(), functions.Function{
 					UID:  "enable-job1",
 					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
 				})
@@ -82,7 +82,7 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				require.True(t, sd.handler.WaitingForDecision(), "wait gate should still be open before decision")
 
 				// Send the matching enable for cfg1 — this clears the wait gate.
-				sd.dyncfgCh <- dyncfg.NewFunction(functions.Function{
+				sd.dyncfgCh <- dyncfg.NewFunction(t.Context(), functions.Function{
 					UID:  "enable-job1",
 					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
 				})
@@ -179,8 +179,8 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 
 type waitTestFunctionRegistry struct{}
 
-func (waitTestFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
-func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                         {}
+func (waitTestFunctionRegistry) RegisterPrefix(string, string, functions.Handler) {}
+func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                  {}
 
 func stopWaitTestServiceDiscovery(t *testing.T, sd *ServiceDiscovery, cancel context.CancelFunc, done <-chan struct{}) {
 	t.Helper()

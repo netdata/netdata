@@ -21,15 +21,12 @@ import (
 
 const dynCfgServiceDiscoveryClaim = "dyncfg:service-discovery"
 
-var errServiceDiscoveryInvocationBusy = errors.New(
-	"jobmgr composition: service discovery invocation unavailable",
-)
-
 type serviceDiscoveryBinding struct {
 	mu sync.Mutex // guards handler/registered/active/dirty
 
 	pluginName  string // owning plugin name
 	epoch       uint64 // run generation
+	attemptKey  string // one physical invocation owner per binding
 	attempts    jobmgr.ProcessAttemptAuthority
 	frames      *lifecycle.FrameOwner       // the one wire frame writer
 	diagnostics jobmgr.DiagnosticObserver   // operational log sink
@@ -71,6 +68,7 @@ func newServiceDiscoveryBinding(
 	return &serviceDiscoveryBinding{
 		pluginName:  pluginName,
 		epoch:       epoch,
+		attemptKey:  fmt.Sprintf("%d/%s", epoch, pluginName),
 		attempts:    attempts,
 		frames:      frames,
 		diagnostics: diagnostics,
@@ -84,22 +82,12 @@ func (sdb *serviceDiscoveryBinding) prefix() string {
 func (sdb *serviceDiscoveryBinding) RegisterPrefix(
 	name string,
 	prefix string,
-	fn func(frameworkfunctions.Function),
+	fn frameworkfunctions.Handler,
 ) {
 	if fn == nil {
 		sdb.recordRegistrationError(errors.New("nil service discovery prefix Function"))
 		return
 	}
-	sdb.registerPrefix(
-		name,
-		prefix,
-		func(_ context.Context, input frameworkfunctions.Function) {
-			fn(input)
-		},
-	)
-}
-
-func (sdb *serviceDiscoveryBinding) registerPrefix(name string, prefix string, fn frameworkfunctions.Handler) {
 	sdb.mu.Lock()
 	if sdb.dirty != nil {
 		sdb.mu.Unlock()
@@ -216,7 +204,6 @@ func (psdt *preparedServiceDiscoveryTransaction) Apply(
 		function,
 		serviceDiscoveryMutationCommand(command),
 		func(callCtx context.Context) {
-			function.Context = callCtx
 			handler(callCtx, function)
 		},
 	)
@@ -288,11 +275,14 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 	attempt, err := sdb.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptServiceDiscovery,
-			Key:       "function\x00" + function.UID,
+			Key:       sdb.attemptKey,
 			Resource:  serviceDiscoveryDiagnosticResource(resource),
 		},
 		Target: sdb.epoch,
-		Work: func(attemptCtx context.Context) error {
+		Work: func(
+			attemptCtx context.Context,
+			_ jobmgr.ProcessAttemptAdmission,
+		) error {
 			result, cleanup, invokeErr := sdb.invoke(
 				function.UID,
 				captureNotifications,
@@ -325,8 +315,7 @@ func (sdb *serviceDiscoveryBinding) serviceDiscoveryContainmentResult(
 	err error,
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
-		errors.Is(err, errServiceDiscoveryInvocationBusy) {
+		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
 		return mustDynCfgMessage(
 				503,
 				"Service discovery configuration is busy; retry the command.",
@@ -358,10 +347,16 @@ func (sdb *serviceDiscoveryBinding) invoke(
 		captureNotifications: captureNotifications,
 	}
 	sdb.mu.Lock()
-	if sdb.dirty != nil || sdb.active != nil {
-		err := errors.Join(sdb.dirty, errServiceDiscoveryInvocationBusy)
+	if sdb.dirty != nil {
+		err := sdb.dirty
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil, err
+	}
+	if sdb.active != nil {
+		sdb.mu.Unlock()
+		return lifecycle.SealedResult{}, nil, errors.New(
+			"jobmgr composition: concurrent service discovery invocation escaped containment",
+		)
 	}
 	sdb.active = invocation
 	sdb.mu.Unlock()

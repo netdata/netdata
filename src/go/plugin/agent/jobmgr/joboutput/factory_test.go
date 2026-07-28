@@ -72,20 +72,20 @@ func TestCreatorDeclaresFunctions(t *testing.T) {
 
 func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 	tests := map[string]struct {
-		configure     func(*factoryTestState, *collectorapi.Creator) JobHooks
+		configure     func(*factoryTestState, *collectorapi.Creator) factoryTestJobHooks
 		wantClose     int
 		wantRetained  bool
 		wantNoCleanup bool
 	}{
 		"creator panic": {
-			configure: func(*factoryTestState, *collectorapi.Creator) JobHooks {
+			configure: func(*factoryTestState, *collectorapi.Creator) factoryTestJobHooks {
 				return nil
 			},
 			wantRetained:  true,
 			wantNoCleanup: true,
 		},
 		"autodetection failure": {
-			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
+			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {
 				creator.Create = func() collectorapi.CollectorV1 {
 					return state.module(func(context.Context) error {
 						return errors.New("check failed")
@@ -95,7 +95,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			},
 		},
 		"autodetection panic": {
-			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
+			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {
 				creator.Create = func() collectorapi.CollectorV1 {
 					return state.module(func(context.Context) error {
 						panic("check failed")
@@ -105,7 +105,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			},
 		},
 		"collector cleanup panic": {
-			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
+			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {
 				creator.Create = func() collectorapi.CollectorV1 {
 					return state.module(func(context.Context) error {
 						return errors.New("check failed")
@@ -115,7 +115,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			},
 		},
 		"function-bearing job without hooks": {
-			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
+			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {
 				creator.FunctionOnly = true
 				creator.SharedFunctions = func() []funcapi.FunctionConfig { return nil }
 				creator.Create = func() collectorapi.CollectorV1 {
@@ -125,7 +125,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			},
 		},
 		"partial handler preparation failure": {
-			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
+			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {
 				creator.FunctionOnly = true
 				creator.SharedFunctions = func() []funcapi.FunctionConfig { return nil }
 				creator.Create = func() collectorapi.CollectorV1 {
@@ -142,7 +142,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			wantClose: 1,
 		},
 		"handler preparation panic": {
-			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
+			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {
 				creator.FunctionOnly = true
 				creator.SharedFunctions = func() []funcapi.FunctionConfig { return nil }
 				creator.Create = func() collectorapi.CollectorV1 {
@@ -207,7 +207,7 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 	tests := map[string]struct {
 		functionOnly bool
 		checkErr     error
-		hooks        JobHooks
+		hooks        factoryTestJobHooks
 	}{
 		"autodetection failure":              {checkErr: errors.New("check failed")},
 		"function-bearing job without hooks": {functionOnly: true},
@@ -368,14 +368,14 @@ func TestFactoryCandidateStageOwnsProbeUntilInstallationAcknowledgement(t *testi
 	factory.config.Attempts = attempts
 	factory.config.Runtime = runtime
 
-	stage, err := factory.newCandidate(factoryTestConfig(false), false)
+	stage, err := factory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	stage.Start()
 	<-stage.Ready()
 	require.Zero(t, runtime.registrations)
 
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
-	prepared, failure, err := factory.PrepareCandidate(
+	prepared, failure, err := factory.prepareCandidate(
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
 			Generation: 1,
@@ -426,7 +426,7 @@ func TestFactoryCandidateStageOwnsProbeUntilInstallationAcknowledgement(t *testi
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
-func TestFactoryAwaitCandidateYieldsGraphClaimForWholeMaterialization(t *testing.T) {
+func TestFactoryCandidateWaitYieldsGraphClaimForWholeMaterialization(t *testing.T) {
 	var outsideClaims atomic.Bool
 	var callbacks atomic.Int32
 	var violations atomic.Int32
@@ -463,14 +463,14 @@ func TestFactoryAwaitCandidateYieldsGraphClaimForWholeMaterialization(t *testing
 		return work(ctx), nil
 	}
 
-	stage, err := factory.newCandidate(factoryTestConfig(false), false)
+	stage, err := factory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
-	require.NoError(t, factory.AwaitCandidate(context.Background(), stage))
+	require.NoError(t, factory.awaitCandidate(context.Background(), stage))
 	require.EqualValues(t, 2, callbacks.Load())
 	require.Zero(t, violations.Load())
 
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
-	prepared, failure, err := factory.PrepareCandidate(
+	prepared, failure, err := factory.prepareCandidate(
 		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
 		permit,
 		stage,
@@ -512,14 +512,14 @@ func TestFactoryCandidateStageSettlesWhileNonCooperativeProbeRemainsOwned(t *tes
 	factory.config.Epoch = 1
 	factory.config.Attempts = attempts
 
-	stage, err := factory.newCandidate(factoryTestConfig(false), false)
+	stage, err := factory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	stage.Start()
 	<-entered
 	stage.Cancel(jobmgr.ErrProcessAttemptSuperseded)
 	<-stage.Ready()
 
-	_, failure, err := factory.PrepareCandidate(
+	_, failure, err := factory.prepareCandidate(
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
 			Generation: 1,
@@ -559,7 +559,7 @@ func TestFactoryCandidateRejectsFailureReturnedAfterLogicalCut(t *testing.T) {
 	factory, _ := newFactoryTestHarness(t, creator, nil)
 	factory.config.Attempts = &delayedDispositionAuthority{}
 
-	stage, err := factory.newCandidate(factoryTestConfig(false), false)
+	stage, err := factory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	stage.Start()
 	<-entered
@@ -572,7 +572,7 @@ func TestFactoryCandidateRejectsFailureReturnedAfterLogicalCut(t *testing.T) {
 	stage.Cancel(jobmgr.ErrProcessAttemptSuperseded)
 	close(release)
 	<-stage.Ready()
-	prepared, failure, err := factory.PrepareCandidate(
+	prepared, failure, err := factory.prepareCandidate(
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
 			Generation: 1,
@@ -606,7 +606,7 @@ func TestFactoryCandidateIdentityRemainsExclusiveAcrossRunEpochs(t *testing.T) {
 	secondFactory.config.Epoch = 2
 	secondFactory.config.Attempts = attempts
 
-	first, err := firstFactory.newCandidate(factoryTestConfig(false), false)
+	first, err := firstFactory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	first.Start()
 	<-first.Ready()
@@ -615,12 +615,13 @@ func TestFactoryCandidateIdentityRemainsExclusiveAcrossRunEpochs(t *testing.T) {
 		Admitted: 1,
 	}, attempts.Census())
 
-	second, err := secondFactory.newCandidate(factoryTestConfig(false), false)
+	secondFactory.config.Attempts = busySupersessionAuthority{ProcessAttemptAuthority: attempts}
+	second, err := secondFactory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	require.Equal(t, first.identity.Key, second.identity.Key)
 	second.Start()
 	<-second.Ready()
-	_, failure, err := secondFactory.PrepareCandidate(
+	_, failure, err := secondFactory.prepareCandidate(
 		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
 		lifecycle.LongLivedPermit{},
 		second,
@@ -667,12 +668,12 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	secondFactory.config.Epoch = 2
 	secondFactory.config.Attempts = attempts
 
-	firstStage, err := firstFactory.newCandidate(factoryTestConfig(false), false)
+	firstStage, err := firstFactory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	firstStage.Start()
 	<-firstStage.Ready()
 	firstPermit, firstTasks := issueTestJobPermit(t, "module_job", 1)
-	firstPrepared, failure, err := firstFactory.PrepareCandidate(
+	firstPrepared, failure, err := firstFactory.prepareCandidate(
 		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
 		firstPermit,
 		firstStage,
@@ -686,12 +687,12 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	require.NoError(t, firstGeneration.reserveInstallation())
 	require.NoError(t, firstGeneration.acknowledgeInstallation())
 
-	secondStage, err := secondFactory.NewSupersedingCandidate(factoryTestConfig(false))
+	secondStage, err := secondFactory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	secondStage.Start()
 	<-secondStage.Ready()
 	secondPermit, secondTasks := issueTestJobPermit(t, "module_job", 2)
-	secondPrepared, failure, err := secondFactory.PrepareCandidate(
+	secondPrepared, failure, err := secondFactory.prepareCandidate(
 		lifecycle.ResourceIdentity{ID: "module_job", Generation: 2},
 		secondPermit,
 		secondStage,
@@ -1079,8 +1080,8 @@ func (fth factoryTestHooks) Stage(job RuntimeJob) (StagedHandlerLifecycle, error
 func (factoryTestHooks) Attach(
 	_ lifecycle.ResourceIdentity,
 	staged StagedHandlerLifecycle,
-) (HandlerLifecycle, error) {
-	handle, ok := staged.(HandlerLifecycle)
+) (ProcessHandlerLifecycle, error) {
+	handle, ok := staged.(ProcessHandlerLifecycle)
 	if !ok {
 		return nil, errors.New("test staged handler is not attachable")
 	}
@@ -1094,11 +1095,39 @@ type factoryTestHandlers struct {
 func (*factoryTestHandlers) Publish() error { return nil }
 
 func (fth *factoryTestHandlers) CloseAndDrain(context.Context) error {
+	return fth.Finalize(context.Background())
+}
+
+func (*factoryTestHandlers) Detach(context.Context) error {
+	return nil
+}
+
+func (fth *factoryTestHandlers) Finalize(context.Context) error {
 	fth.state.handlerClose++
 	return nil
 }
 
-func newFactoryTestHarness(t *testing.T, creator collectorapi.Creator, hooks JobHooks) (*Factory, *bytes.Buffer) {
+type factoryTestJobHooks interface {
+	JobHandlerStager
+	JobHandlerAttacher
+}
+
+type busySupersessionAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+}
+
+func (busySupersessionAuthority) SupersedeProcessAttempt(
+	context.Context,
+	jobmgr.ProcessAttemptIdentity,
+) error {
+	return jobmgr.ErrProcessAttemptBusy
+}
+
+func newFactoryTestHarness(
+	t *testing.T,
+	creator collectorapi.Creator,
+	hooks factoryTestJobHooks,
+) (*Factory, *bytes.Buffer) {
 	t.Helper()
 	output := &bytes.Buffer{}
 	frames, err := lifecycle.NewFrameOwner(output)
@@ -1146,15 +1175,15 @@ func prepareFactoryTestCandidate(
 	identity lifecycle.ResourceIdentity,
 	permit lifecycle.LongLivedPermit,
 ) (PreparedJob, *autoDetectionFailure, error) {
-	stage, err := factory.newCandidate(config, false)
+	stage, err := factory.newCandidate(config)
 	if err != nil {
 		return PreparedJob{}, nil, err
 	}
 	defer stage.Release()
-	if err := factory.AwaitCandidate(ctx, stage); err != nil {
+	if err := factory.awaitCandidate(ctx, stage); err != nil {
 		return PreparedJob{}, nil, err
 	}
-	return factory.PrepareCandidate(identity, permit, stage)
+	return factory.prepareCandidate(identity, permit, stage)
 }
 
 func requireFactoryAttemptsIdle(t *testing.T, factory *Factory) {

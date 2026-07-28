@@ -198,15 +198,21 @@ func (p *Process) Run(ctx context.Context) error {
 }
 
 func (p *Process) Restart(ctx context.Context) error {
-	return p.send(ctx, processRestart)
+	if p == nil {
+		return errors.New("jobmgr composition: invalid process command")
+	}
+	return p.send(ctx, p.controls.restart)
 }
 
 func (p *Process) Terminate(ctx context.Context) error {
-	return p.send(ctx, processTerminate)
+	if p == nil {
+		return errors.New("jobmgr composition: invalid process command")
+	}
+	return p.send(ctx, p.controls.terminate)
 }
 
-func (p *Process) send(ctx context.Context, command processCommand) error {
-	if p == nil || ctx == nil {
+func (p *Process) send(ctx context.Context, controls chan<- processControl) error {
+	if p == nil || ctx == nil || controls == nil {
 		return errors.New("jobmgr composition: invalid process command")
 	}
 	select {
@@ -222,14 +228,9 @@ func (p *Process) send(ctx context.Context, command processCommand) error {
 		return ctx.Err()
 	}
 	result := make(chan error, 1)
-	controls := p.controls.channel(command)
-	if controls == nil {
-		return errors.New("jobmgr composition: invalid process command")
-	}
 	select {
 	case controls <- processControl{
-		command: command,
-		result:  result,
+		result: result,
 	}:
 	case <-p.done:
 		return ErrProcessStopped

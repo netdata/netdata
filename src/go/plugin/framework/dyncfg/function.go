@@ -11,13 +11,15 @@ import (
 
 // Function wraps functions.Function with dyncfg-specific accessor and helper methods.
 type Function struct {
-	fn functions.Function
+	ctx context.Context
+	fn  functions.Function
 }
 
 // NewFunction creates a new dyncfg Function wrapper.
-func NewFunction(fn functions.Function) Function {
+func NewFunction(ctx context.Context, fn functions.Function) Function {
 	return Function{
-		fn: fn,
+		ctx: ctx,
+		fn:  fn,
 	}
 }
 
@@ -27,10 +29,7 @@ func (f Function) UID() string {
 }
 
 func (f Function) Context() context.Context {
-	if f.fn.Context == nil {
-		return context.Background()
-	}
-	return f.fn.Context
+	return f.ctx
 }
 
 // Source returns the function's source field.

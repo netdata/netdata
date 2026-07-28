@@ -179,7 +179,7 @@ func (stage *preparedConfigOperation) start() {
 	attempt, err := stage.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: stage.identity,
 		Target:   stage.target,
-		Work: func(ctx context.Context) error {
+		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
 			stage.mu.Lock()
 			config := stage.config
 			operation := stage.operation

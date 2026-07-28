@@ -2,10 +2,7 @@
 
 package functions
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
 // Function is one parsed Function-protocol request.
 type Function struct {
@@ -17,5 +14,4 @@ type Function struct {
 	Permissions string
 	Source      string
 	ContentType string
-	Context     context.Context
 }

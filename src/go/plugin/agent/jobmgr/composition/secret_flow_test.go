@@ -305,7 +305,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	default:
 	}
 
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -451,7 +451,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 
 	require.EqualValues(t, 1, cleanups.Load())
 
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -550,7 +550,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	require.Contains(t, output.String(), `"Value":"initial"`)
 	require.NotContains(t, output.String(), "backend-sensitive-detail")
 
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -675,7 +675,7 @@ release:
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-blocked 499 application/json")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN job-add-while-store-blocked 202 application/json")
 
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -734,8 +734,8 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 		require.FailNow(t, "test failed", "old-epoch Store provider did not enter blocking Init")
 	}
 
-	restart := testProcessControl(processRestart)
-	controls.send(restart)
+	restart := testProcessControl()
+	controls.sendRestart(restart)
 	select {
 	case err := <-restart.result:
 		require.NoError(t, err)
@@ -765,8 +765,8 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 	require.Contains(t, output.String(), `"Value":"replacement"`)
 
 	gate.release()
-	terminate := testProcessControl(processTerminate)
-	controls.send(terminate)
+	terminate := testProcessControl()
+	controls.sendTerminate(terminate)
 	require.NoError(t, <-terminate.result)
 	require.NoError(t, <-done)
 }
@@ -855,7 +855,7 @@ func TestProcessCoreStoreRemovalCancelsPendingMaterializationAuthoritatively(t *
 	require.NoError(t, err)
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-get 404 application/json")
 
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -937,7 +937,7 @@ func TestProcessCoreRetriesLatestPendingStoreAfterStuckIdentityReleases(t *testi
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-get 200 application/json")
 	require.Contains(t, output.String(), `"Value":"replacement"`)
 
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -1069,7 +1069,7 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 	releaseOnce.Do(func() { close(releaseRestart) })
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-rotation 200 application/json")
 
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)

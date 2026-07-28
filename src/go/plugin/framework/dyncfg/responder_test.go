@@ -3,6 +3,7 @@
 package dyncfg
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"testing"
@@ -33,7 +34,7 @@ func (w *writeRecorder) snapshot() []string {
 }
 
 func testResponderFn(uid string) Function {
-	return NewFunction(functions.Function{UID: uid})
+	return NewFunction(context.Background(), functions.Function{UID: uid})
 }
 
 type typedOutputRecorder struct {

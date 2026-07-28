@@ -23,22 +23,6 @@ type FunctionAssembly struct {
 	jobStager   *functionadapter.JobStager   // run-detached job Function staging
 }
 
-func NewFunctionAssembly(
-	epoch uint64,
-	modules collectorapi.Registry,
-	frames *lifecycle.FrameOwner,
-	initial ...functionadapter.InitialRoute,
-) (*FunctionAssembly, error) {
-	if epoch == 0 || modules == nil || frames == nil {
-		return nil, errors.New("jobmgr composition: invalid Function assembly")
-	}
-	controller, catalog, err := functionadapter.NewController(epoch, modules, initial...)
-	if err != nil {
-		return nil, err
-	}
-	return newFunctionAssembly(epoch, controller, catalog, frames)
-}
-
 func NewContainedFunctionAssembly(
 	ctx context.Context,
 	epoch uint64,
@@ -190,7 +174,7 @@ type functionJobAttacher struct {
 func (fja functionJobAttacher) Attach(
 	identity lifecycle.ResourceIdentity,
 	staged joboutput.StagedHandlerLifecycle,
-) (joboutput.HandlerLifecycle, error) {
+) (joboutput.ProcessHandlerLifecycle, error) {
 	if fja.controller == nil || !identity.Valid() || staged == nil {
 		return nil, errors.New("jobmgr composition: invalid Function job attachment")
 	}

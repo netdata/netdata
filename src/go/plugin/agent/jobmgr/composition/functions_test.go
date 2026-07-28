@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -58,6 +59,37 @@ func stopFunctionAssembly(fa *FunctionAssembly, epoch uint64) error {
 	return fa.FinalizeRun(context.Background(), epoch)
 }
 
+func newTestFunctionAssembly(
+	t *testing.T,
+	epoch uint64,
+	modules collectorapi.Registry,
+	frames *lifecycle.FrameOwner,
+	initial ...functionadapter.InitialRoute,
+) (*FunctionAssembly, error) {
+	t.Helper()
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	assembly, buildErr := NewContainedFunctionAssembly(
+		t.Context(),
+		epoch,
+		attempts,
+		modules,
+		frames,
+		initial...,
+	)
+	t.Cleanup(func() {
+		_ = stopFunctionAssembly(assembly, epoch)
+		if assembly != nil {
+			_ = assembly.abortConstruction()
+		}
+		attempts.BeginShutdown()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(ctx))
+	})
+	return assembly, buildErr
+}
+
 func TestFunctionAssemblyLifecycle(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
@@ -72,7 +104,7 @@ func TestFunctionAssemblyLifecycle(t *testing.T) {
 			},
 		},
 	}
-	assembly, err := NewFunctionAssembly(7, modules, frames)
+	assembly, err := newTestFunctionAssembly(t, 7, modules, frames)
 	require.NoError(t, err)
 	catalog, ok := assembly.Catalog().(*functionadapter.Catalog)
 	require.True(t, ok)
@@ -162,7 +194,7 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 			require.NoError(t, err)
-			assembly, err := NewFunctionAssembly(1, collectorapi.Registry{}, frames)
+			assembly, err := newTestFunctionAssembly(t, 1, collectorapi.Registry{}, frames)
 			require.NoError(t, err)
 			catalog := assembly.Catalog().(*functionadapter.Catalog)
 
@@ -176,7 +208,7 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	assembly, err := NewFunctionAssembly(1, collectorapi.Registry{
+	assembly, err := newTestFunctionAssembly(t, 1, collectorapi.Registry{
 		"module": {},
 	}, frames)
 	require.NoError(t, err)
@@ -255,7 +287,7 @@ type shutdownFunctionHarness struct {
 	tasks  *lifecycle.TaskSupervisor
 	output *bytes.Buffer
 	job    *assemblyTestJob
-	handle joboutput.HandlerLifecycle
+	handle joboutput.ProcessHandlerLifecycle
 	permit lifecycle.LongLivedPlan
 	probe  compositionShutdownProbe
 }
@@ -275,7 +307,7 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 			},
 		},
 	}
-	assembly, err := NewFunctionAssembly(1, modules, frames)
+	assembly, err := newTestFunctionAssembly(t, 1, modules, frames)
 	require.NoError(t, err)
 	clock := lifecycle.RealClock{}
 	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
@@ -439,7 +471,7 @@ func (*assemblyTestJob) StartManaged(ready chan<- struct{}) {
 type shutdownFunctionReadyResource struct {
 	identity    lifecycle.ResourceIdentity
 	permit      lifecycle.LongLivedPermit
-	handle      joboutput.HandlerLifecycle
+	handle      joboutput.ProcessHandlerLifecycle
 	stopEntered chan<- struct{}
 	stopRelease <-chan struct{}
 }
@@ -471,7 +503,7 @@ func (sfrr *shutdownFunctionReadyResource) Finalize() error {
 type shutdownFunctionPreparedTransaction struct {
 	scope   lifecycle.ResourceTransactionScope
 	permit  lifecycle.LongLivedPermit
-	handle  joboutput.HandlerLifecycle
+	handle  joboutput.ProcessHandlerLifecycle
 	entered chan<- struct{}
 	release <-chan struct{}
 }

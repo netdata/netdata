@@ -226,21 +226,12 @@ func finalizeProcessOwnedConstructed(constructed ConstructedJob) (resultErr erro
 		}
 	}()
 	if handlers := constructed.Handlers; handlers != nil {
-		if split, ok := handlers.(ProcessHandlerLifecycle); ok {
-			resultErr = errors.Join(
-				resultErr,
-				callJobLifecycle("process-owned handler finalization", func() error {
-					return split.Finalize(context.Background())
-				}),
-			)
-		} else {
-			resultErr = errors.Join(
-				resultErr,
-				callJobLifecycle("process-owned handler close/drain", func() error {
-					return handlers.CloseAndDrain(context.Background())
-				}),
-			)
-		}
+		resultErr = errors.Join(
+			resultErr,
+			callJobLifecycle("process-owned handler finalization", func() error {
+				return handlers.Finalize(context.Background())
+			}),
+		)
 	}
 	if staged := constructed.StagedHandlers; staged != nil {
 		resultErr = errors.Join(

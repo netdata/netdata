@@ -155,7 +155,7 @@ func newTestFn(id, cmd, name string, payload []byte) Function {
 	if name != "" {
 		args = append(args, name)
 	}
-	return NewFunction(functions.Function{
+	return NewFunction(context.Background(), functions.Function{
 		UID:     "test-uid",
 		Args:    args,
 		Payload: payload,

@@ -31,6 +31,31 @@ const (
 	ProcessAttemptServiceDiscovery
 )
 
+func (namespace ProcessAttemptNamespace) String() string {
+	switch namespace {
+	case ProcessAttemptJob:
+		return "job"
+	case ProcessAttemptJobRuntime:
+		return "job-runtime"
+	case ProcessAttemptJobTest:
+		return "job-test"
+	case ProcessAttemptStore:
+		return "store"
+	case ProcessAttemptStoreTest:
+		return "store-test"
+	case ProcessAttemptFunctionBundle:
+		return "function-bundle"
+	case ProcessAttemptFunctionPoll:
+		return "function-poll"
+	case ProcessAttemptFunctionInvocation:
+		return "function-invocation"
+	case ProcessAttemptServiceDiscovery:
+		return "service-discovery"
+	default:
+		return "invalid"
+	}
+}
+
 type ProcessAttemptIdentity struct {
 	Namespace ProcessAttemptNamespace
 	Key       string
@@ -40,11 +65,16 @@ type ProcessAttemptIdentity struct {
 type ProcessAttemptPlan struct {
 	Identity ProcessAttemptIdentity
 	Target   uint64
-	Work     func(context.Context) error
+	Work     func(context.Context, ProcessAttemptAdmission) error
+}
+
+// ProcessAttemptAdmission is the only attempt control available to its worker.
+// Admission ends the preparation fuse without releasing physical ownership.
+type ProcessAttemptAdmission interface {
+	Admit() error
 }
 
 type ProcessAttempt interface {
-	Admit() error
 	Cut(error) bool
 	Await(context.Context) error
 	Released() <-chan struct{}

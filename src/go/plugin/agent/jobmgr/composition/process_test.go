@@ -36,8 +36,8 @@ func TestProcessCoreRestartSupersedesInitialStartup(t *testing.T) {
 	}()
 	require.EqualValues(t, 1, waitStartupControlStore(t, entered))
 
-	restart := testProcessControl(processRestart)
-	controls.send(restart)
+	restart := testProcessControl()
+	controls.sendRestart(restart)
 	select {
 	case err := <-restart.result:
 		require.NoError(t, err)
@@ -45,8 +45,8 @@ func TestProcessCoreRestartSupersedesInitialStartup(t *testing.T) {
 		require.FailNow(t, "test failed", "restart was unavailable during initial startup")
 	}
 
-	terminate := testProcessControl(processTerminate)
-	controls.send(terminate)
+	terminate := testProcessControl()
+	controls.sendTerminate(terminate)
 	require.NoError(t, <-terminate.result)
 	require.NoError(t, <-done)
 	close(release)
@@ -61,8 +61,8 @@ func TestProcessCoreTerminateInterruptsInitialStartup(t *testing.T) {
 	}()
 	require.EqualValues(t, 1, waitStartupControlStore(t, entered))
 
-	terminate := testProcessControl(processTerminate)
-	controls.send(terminate)
+	terminate := testProcessControl()
+	controls.sendTerminate(terminate)
 	select {
 	case err := <-terminate.result:
 		require.NoError(t, err)
@@ -82,12 +82,12 @@ func TestProcessCoreTerminateInterruptsSuccessorStartup(t *testing.T) {
 	}()
 	require.EqualValues(t, 1, waitStartupControlStore(t, entered))
 
-	restart := testProcessControl(processRestart)
-	controls.send(restart)
+	restart := testProcessControl()
+	controls.sendRestart(restart)
 	require.EqualValues(t, 2, waitStartupControlStore(t, entered))
 
-	terminate := testProcessControl(processTerminate)
-	controls.send(terminate)
+	terminate := testProcessControl()
+	controls.sendTerminate(terminate)
 	select {
 	case err := <-terminate.result:
 		require.NoError(t, err)
@@ -153,8 +153,8 @@ func TestProcessCoreRotationRetainsOldStoreScopeOutsideRun(t *testing.T) {
 	scope, err := oldEpoch.acquireScope([]string{key})
 	require.NoError(t, err)
 
-	restart := testProcessControl(processRestart)
-	controls.send(restart)
+	restart := testProcessControl()
+	controls.sendRestart(restart)
 	select {
 	case err := <-restart.result:
 		require.NoError(t, err)
@@ -181,8 +181,8 @@ func TestProcessCoreRotationRetainsOldStoreScopeOutsideRun(t *testing.T) {
 		require.FailNow(t, "test failed", "old Store epoch was retained after its scope drained")
 	}
 
-	terminate := testProcessControl(processTerminate)
-	controls.send(terminate)
+	terminate := testProcessControl()
+	controls.sendTerminate(terminate)
 	require.NoError(t, <-terminate.result)
 	require.NoError(t, <-done)
 }
@@ -252,7 +252,7 @@ func TestProcessCoreServiceDiscoveryMutationSendsFunctionResultBeforeStatus(t *t
 	result := strings.Index(wire, "FUNCTION_RESULT_BEGIN sd-enable 200 application/json")
 	notification := strings.Index(wire, "CONFIG go.d:sd:test:job status running")
 	require.False(t, result < 0 || notification < 0 || result >= notification)
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -314,7 +314,7 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 			wire[getResult:],
 			`"name":"db","hostname":"db","guid":"22222222-2222-2222-2222-222222222222"`,
 		))
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -383,12 +383,12 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 		}
 		return false
 	}, time.Second, time.Millisecond)
-	restart := testProcessControl(processRestart)
-	controls.send(restart)
+	restart := testProcessControl()
+	controls.sendRestart(restart)
 	waitProcessEvent(t, events, "withdraw")
 	waitProcessEvent(t, events, "publish")
 	require.NoError(t, <-restart.result)
-	controls.send(testProcessControl(processTerminate))
+	controls.sendTerminate(testProcessControl())
 	waitProcessEvent(t, events, "withdraw")
 	select {
 	case err := <-done:
@@ -456,8 +456,8 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "discovery provider did not start")
 	}
-	control := testProcessControl(processRestart)
-	controls.send(control)
+	control := testProcessControl()
+	controls.sendRestart(control)
 	select {
 	case err := <-control.result:
 		require.False(t, err == nil ||
@@ -761,7 +761,7 @@ func (psd processServiceDiscovery) Run(ctx context.Context, _ chan<- []*confgrou
 	psd.registry.RegisterPrefix(
 		"config",
 		"go.d:sd:",
-		func(function frameworkfunctions.Function) {
+		func(_ context.Context, function frameworkfunctions.Function) {
 			psd.output.FunctionResult(dyncfg.Result{
 				UID:         function.UID,
 				Code:        200,
@@ -794,10 +794,9 @@ func waitProcessEvent(t *testing.T, events <-chan string, want string) {
 	}
 }
 
-func testProcessControl(command processCommand) processControl {
+func testProcessControl() processControl {
 	return processControl{
-		command: command,
-		result:  make(chan error, 1),
+		result: make(chan error, 1),
 	}
 }
 
@@ -808,6 +807,10 @@ func newTestProcessControls(capacity int) processControls {
 	}
 }
 
-func (controls processControls) send(control processControl) {
-	controls.channel(control.command) <- control
+func (controls processControls) sendRestart(control processControl) {
+	controls.restart <- control
+}
+
+func (controls processControls) sendTerminate(control processControl) {
+	controls.terminate <- control
 }

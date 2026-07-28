@@ -194,12 +194,11 @@ type controlledModuleAdmissionAuthority struct {
 	delegate         *containment.Authority
 	admitted         chan struct{}
 	allowAdmitReturn chan struct{}
-	attempt          *controlledModuleAdmissionAttempt
+	attempt          jobmgr.ProcessAttempt
 }
 
-type controlledModuleAdmissionAttempt struct {
-	jobmgr.ProcessAttempt
-
+type controlledModuleAdmission struct {
+	jobmgr.ProcessAttemptAdmission
 	authority *controlledModuleAdmissionAuthority
 	admitOnce sync.Once
 }
@@ -217,16 +216,22 @@ func newControlledModuleAdmissionAuthority(
 func (authority *controlledModuleAdmissionAuthority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
+	work := plan.Work
+	plan.Work = func(
+		ctx context.Context,
+		admission jobmgr.ProcessAttemptAdmission,
+	) error {
+		return work(ctx, &controlledModuleAdmission{
+			ProcessAttemptAdmission: admission,
+			authority:               authority,
+		})
+	}
 	delegate, err := authority.delegate.StartProcessAttempt(plan)
 	if err != nil {
 		return nil, err
 	}
-	attempt := &controlledModuleAdmissionAttempt{
-		ProcessAttempt: delegate,
-		authority:      authority,
-	}
-	authority.attempt = attempt
-	return attempt, nil
+	authority.attempt = delegate
+	return delegate, nil
 }
 
 func (authority *controlledModuleAdmissionAuthority) SupersedeProcessAttempt(
@@ -249,13 +254,13 @@ func (authority *controlledModuleAdmissionAuthority) ProcessAttemptReleased(
 	return authority.delegate.ProcessAttemptReleased(identity)
 }
 
-func (attempt *controlledModuleAdmissionAttempt) Admit() error {
-	if err := attempt.ProcessAttempt.Admit(); err != nil {
+func (admission *controlledModuleAdmission) Admit() error {
+	if err := admission.ProcessAttemptAdmission.Admit(); err != nil {
 		return err
 	}
-	attempt.admitOnce.Do(func() {
-		close(attempt.authority.admitted)
+	admission.admitOnce.Do(func() {
+		close(admission.authority.admitted)
 	})
-	<-attempt.authority.allowAdmitReturn
+	<-admission.authority.allowAdmitReturn
 	return nil
 }

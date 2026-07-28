@@ -20,20 +20,19 @@ type stagedJobResult struct {
 	err       error
 }
 
-// PreparedJobCandidate contains no run-owned attachment capability. The
+// preparedJobCandidate contains no run-owned attachment capability. The
 // process attempt owns its collector and staged Function state until the
 // transaction acknowledges installation or rejects the candidate.
-type PreparedJobCandidate struct {
+type preparedJobCandidate struct {
 	mu sync.Mutex
 
-	factory   *Factory
-	attempts  jobmgr.ProcessAttemptAuthority
-	identity  jobmgr.ProcessAttemptIdentity
-	target    uint64
-	config    confgroup.Config
-	supersede bool
-	attempt   jobmgr.ProcessAttempt
-	result    stagedJobResult
+	factory  *Factory
+	attempts jobmgr.ProcessAttemptAuthority
+	identity jobmgr.ProcessAttemptIdentity
+	target   uint64
+	config   confgroup.Config
+	attempt  jobmgr.ProcessAttempt
+	result   stagedJobResult
 
 	ctx      context.Context
 	cancel   context.CancelCauseFunc
@@ -186,14 +185,12 @@ func (owner *stagedJobOwner) Promote(ctx context.Context) error {
 	}
 	owner.ownership = stagedJobPromotionActive
 	start := func() (jobmgr.ProcessAttempt, <-chan error, error) {
-		attemptReady := make(chan jobmgr.ProcessAttempt, 1)
 		admitted := make(chan error, 1)
 		attempt, err := owner.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 			Identity: owner.runtimeIdentity,
 			Target:   owner.target,
-			Work: func(ctx context.Context) error {
-				owned := <-attemptReady
-				admitErr := owned.Admit()
+			Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+				admitErr := admission.Admit()
 				admitted <- admitErr
 				if admitErr != nil {
 					return admitErr
@@ -204,7 +201,6 @@ func (owner *stagedJobOwner) Promote(ctx context.Context) error {
 		if err != nil {
 			return nil, nil, err
 		}
-		attemptReady <- attempt
 		return attempt, admitted, nil
 	}
 	_, admitted, err := start()
@@ -460,14 +456,9 @@ func (owner *stagedJobOwner) finalize() error {
 	return finalizeProcessOwnedConstructed(resources)
 }
 
-func (f *Factory) NewSupersedingCandidate(config confgroup.Config) (*PreparedJobCandidate, error) {
-	return f.newCandidate(config, true)
-}
-
 func (f *Factory) newCandidate(
 	config confgroup.Config,
-	supersede bool,
-) (*PreparedJobCandidate, error) {
+) (*preparedJobCandidate, error) {
 	if f == nil ||
 		config == nil ||
 		f.config.Epoch == 0 ||
@@ -480,7 +471,6 @@ func (f *Factory) newCandidate(
 		return nil, err
 	}
 	detached := f.config
-	detached.RuntimeStaging = detached.Runtime != nil
 	detached.Runtime = nil
 	detached.HandlerAttacher = nil
 	detached.Scheduler = nil
@@ -498,9 +488,10 @@ func (f *Factory) newCandidate(
 		}
 	}
 	ctx, cancel := context.WithCancelCause(context.Background())
-	return &PreparedJobCandidate{
+	return &preparedJobCandidate{
 		factory: &Factory{
-			config: detached,
+			config:         detached,
+			runtimeStaging: f.config.Runtime != nil,
 		},
 		attempts: f.config.Attempts,
 		identity: jobmgr.ProcessAttemptIdentity{
@@ -508,19 +499,18 @@ func (f *Factory) newCandidate(
 			Key:       config.FullName(),
 			Resource:  candidateDiagnosticResource(config.FullName()),
 		},
-		target:    f.config.Epoch,
-		config:    config,
-		supersede: supersede,
-		ctx:       ctx,
-		cancel:    cancel,
-		ready:     make(chan struct{}),
+		target: f.config.Epoch,
+		config: config,
+		ctx:    ctx,
+		cancel: cancel,
+		ready:  make(chan struct{}),
 	}, nil
 }
 
-// AwaitCandidate starts process-owned materialization while the transaction's
+// awaitCandidate starts process-owned materialization while the transaction's
 // graph claim is yielded, then returns only after the stage is logically
 // settled and the claim has been reacquired.
-func (f *Factory) AwaitCandidate(ctx context.Context, stage *PreparedJobCandidate) error {
+func (f *Factory) awaitCandidate(ctx context.Context, stage *preparedJobCandidate) error {
 	if f == nil || ctx == nil || stage == nil || f.config.RunWithoutClaims == nil {
 		return errors.New("job output: invalid candidate wait")
 	}
@@ -550,7 +540,7 @@ func candidateDiagnosticResource(name string) string {
 	return name
 }
 
-func (stage *PreparedJobCandidate) Start() {
+func (stage *preparedJobCandidate) Start() {
 	if stage == nil {
 		return
 	}
@@ -562,14 +552,14 @@ func (stage *PreparedJobCandidate) Start() {
 	})
 }
 
-func (stage *PreparedJobCandidate) Ready() <-chan struct{} {
+func (stage *preparedJobCandidate) Ready() <-chan struct{} {
 	if stage == nil {
 		return nil
 	}
 	return stage.ready
 }
 
-func (stage *PreparedJobCandidate) Cancel(cause error) {
+func (stage *preparedJobCandidate) Cancel(cause error) {
 	if stage == nil {
 		return
 	}
@@ -585,7 +575,7 @@ func (stage *PreparedJobCandidate) Cancel(cause error) {
 	}
 }
 
-func (stage *PreparedJobCandidate) Release() {
+func (stage *preparedJobCandidate) Release() {
 	if stage == nil {
 		return
 	}
@@ -616,25 +606,24 @@ func (stage *PreparedJobCandidate) Release() {
 	}
 }
 
-func (stage *PreparedJobCandidate) start() {
+func (stage *preparedJobCandidate) start() {
 	if cause := context.Cause(stage.ctx); cause != nil {
 		stage.publish(stagedJobResult{err: cause})
 		return
 	}
-	if stage.supersede {
-		if err := stage.attempts.SupersedeProcessAttempt(stage.ctx, stage.identity); err != nil {
-			stage.publish(stagedJobResult{err: err})
-			return
-		}
+	if err := stage.attempts.SupersedeProcessAttempt(stage.ctx, stage.identity); err != nil {
+		stage.publish(stagedJobResult{err: err})
+		return
 	}
 	workerResult := make(chan stagedJobResult, 1)
-	attemptReady := make(chan jobmgr.ProcessAttempt, 1)
 	attempt, err := stage.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: stage.identity,
 		Target:   stage.target,
-		Work: func(ctx context.Context) error {
-			owned := <-attemptReady
-			return stage.run(ctx, owned, workerResult)
+		Work: func(
+			ctx context.Context,
+			admission jobmgr.ProcessAttemptAdmission,
+		) error {
+			return stage.run(ctx, admission, workerResult)
 		},
 	})
 	if err != nil {
@@ -644,7 +633,6 @@ func (stage *PreparedJobCandidate) start() {
 	stage.mu.Lock()
 	stage.attempt = attempt
 	stage.mu.Unlock()
-	attemptReady <- attempt
 	if cause := context.Cause(stage.ctx); cause != nil {
 		attempt.Cut(cause)
 	}
@@ -668,9 +656,9 @@ func (stage *PreparedJobCandidate) start() {
 	}
 }
 
-func (stage *PreparedJobCandidate) run(
+func (stage *preparedJobCandidate) run(
 	ctx context.Context,
-	attempt jobmgr.ProcessAttempt,
+	admission jobmgr.ProcessAttemptAdmission,
 	workerResult chan<- stagedJobResult,
 ) error {
 	stage.mu.Lock()
@@ -710,7 +698,7 @@ func (stage *PreparedJobCandidate) run(
 		workerResult <- stagedJobResult{err: probeErr}
 		return nil
 	}
-	if err := attempt.Admit(); err != nil {
+	if err := admission.Admit(); err != nil {
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		return errors.Join(err, cleanupErr)
 	}
@@ -731,7 +719,7 @@ func (stage *PreparedJobCandidate) run(
 	return owner.finishCandidate(ctx)
 }
 
-func (stage *PreparedJobCandidate) publish(result stagedJobResult) {
+func (stage *preparedJobCandidate) publish(result stagedJobResult) {
 	stage.readyOnce.Do(func() {
 		stage.mu.Lock()
 		if stage.released {
@@ -748,7 +736,7 @@ func (stage *PreparedJobCandidate) publish(result stagedJobResult) {
 	})
 }
 
-func (stage *PreparedJobCandidate) take() (stagedJobResult, error) {
+func (stage *preparedJobCandidate) take() (stagedJobResult, error) {
 	if stage == nil {
 		return stagedJobResult{}, errors.New("job output: nil candidate stage")
 	}
@@ -768,10 +756,10 @@ func (stage *PreparedJobCandidate) take() (stagedJobResult, error) {
 	return result, nil
 }
 
-func (f *Factory) PrepareCandidate(
+func (f *Factory) prepareCandidate(
 	identity lifecycle.ResourceIdentity,
 	permit lifecycle.LongLivedPermit,
-	stage *PreparedJobCandidate,
+	stage *preparedJobCandidate,
 ) (PreparedJob, *autoDetectionFailure, error) {
 	if f == nil || stage == nil || !identity.Valid() {
 		return PreparedJob{}, nil, errors.New("job output: invalid staged candidate preparation")
@@ -805,13 +793,13 @@ func (dcjc *DynCfgJobController) prepareContainedJob(
 	if dcjc == nil || dcjc.factory == nil {
 		return PreparedJob{}, nil, errors.New("job output: invalid contained job preparation")
 	}
-	stage, err := dcjc.factory.NewSupersedingCandidate(config)
+	stage, err := dcjc.factory.newCandidate(config)
 	if err != nil {
 		return PreparedJob{}, nil, err
 	}
 	defer stage.Release()
-	if err := dcjc.factory.AwaitCandidate(ctx, stage); err != nil {
+	if err := dcjc.factory.awaitCandidate(ctx, stage); err != nil {
 		return PreparedJob{}, nil, err
 	}
-	return dcjc.factory.PrepareCandidate(identity, permit, stage)
+	return dcjc.factory.prepareCandidate(identity, permit, stage)
 }

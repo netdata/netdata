@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/require"
@@ -85,7 +86,7 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 			},
 		},
 	}
-	controller, catalog, err := NewController(1, modules)
+	controller, catalog, err := newContainedControllerTest(t, 1, modules)
 	require.NoError(t, err)
 	mutations := controllerTestMutationPort{
 		catalog: catalog,
@@ -104,7 +105,7 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 		name:     "job",
 		running:  true,
 	}
-	handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+	handle, err := prepareControllerTestJob(t, controller, lifecycle.ResourceIdentity{
 		ID:         job.FullName(),
 		Generation: 1,
 	}, job)
@@ -155,7 +156,7 @@ func TestFunctionControllerDetachesJobBeforePhysicalHandlerCleanup(t *testing.T)
 		cleanupEntered: cleanupEntered,
 		cleanupRelease: cleanupRelease,
 	}
-	controller, catalog, err := NewController(1, collectorapi.Registry{
+	controller, catalog, err := newContainedControllerTest(t, 1, collectorapi.Registry{
 		"module": {
 			SharedFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{ID: "method"}}
@@ -178,7 +179,9 @@ func TestFunctionControllerDetachesJobBeforePhysicalHandlerCleanup(t *testing.T)
 		name:     "job",
 		running:  true,
 	}
-	handle, err := controller.PrepareJob(
+	handle, err := prepareControllerTestJob(
+		t,
+		controller,
 		lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1},
 		job,
 	)
@@ -218,7 +221,7 @@ func TestFunctionControllerDetachesJobBeforePhysicalHandlerCleanup(t *testing.T)
 
 func TestFunctionControllerReusesSiblingJobHandler(t *testing.T) {
 	constructions := make(map[string]int)
-	controller, catalog, err := NewController(1, collectorapi.Registry{
+	controller, catalog, err := newContainedControllerTest(t, 1, collectorapi.Registry{
 		"module": {
 			SharedFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{ID: "method"}}
@@ -238,7 +241,9 @@ func TestFunctionControllerReusesSiblingJobHandler(t *testing.T) {
 	require.NoError(t, controller.Activate())
 
 	jobA := &controllerTestJob{fullName: "module_a", module: "module", name: "a", running: true}
-	handleA, err := controller.PrepareJob(
+	handleA, err := prepareControllerTestJob(
+		t,
+		controller,
 		lifecycle.ResourceIdentity{ID: jobA.FullName(), Generation: 1},
 		jobA,
 	)
@@ -246,7 +251,9 @@ func TestFunctionControllerReusesSiblingJobHandler(t *testing.T) {
 	require.NoError(t, handleA.Publish())
 
 	jobB := &controllerTestJob{fullName: "module_b", module: "module", name: "b", running: true}
-	handleB, err := controller.PrepareJob(
+	handleB, err := prepareControllerTestJob(
+		t,
+		controller,
 		lifecycle.ResourceIdentity{ID: jobB.FullName(), Generation: 2},
 		jobB,
 	)
@@ -260,7 +267,7 @@ func TestFunctionControllerReusesSiblingJobHandler(t *testing.T) {
 
 func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T) {
 	handler := &controllerTestHandler{}
-	controller, catalog, err := NewController(1, collectorapi.Registry{
+	controller, catalog, err := newContainedControllerTest(t, 1, collectorapi.Registry{
 		"module": {
 			SharedFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{ID: "method"}}
@@ -292,7 +299,7 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 		name:     "job",
 		running:  true,
 	}
-	handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+	handle, err := prepareControllerTestJob(t, controller, lifecycle.ResourceIdentity{
 		ID:         job.FullName(),
 		Generation: 1,
 	}, job)
@@ -324,7 +331,7 @@ func TestFunctionControllerWithdrawalFailureCleansUnpublishedSuccessor(t *testin
 	available := false
 	predecessor := &controllerTestHandler{}
 	constructions := 0
-	controller, catalog, err := NewController(1, collectorapi.Registry{
+	controller, catalog, err := newContainedControllerTest(t, 1, collectorapi.Registry{
 		"module": {
 			AgentFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{
@@ -351,8 +358,12 @@ func TestFunctionControllerWithdrawalFailureCleansUnpublishedSuccessor(t *testin
 	withdrawErr := errors.New("withdraw failed")
 	publicationPort.withdrawErr = withdrawErr
 	available = true
-	err = controller.ReconcileModule(context.Background(), "module")
-	require.ErrorIs(t, err, withdrawErr)
+	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
+	require.Eventually(t, func() bool {
+		controller.mu.Lock()
+		defer controller.mu.Unlock()
+		return errors.Is(controller.dirty, withdrawErr)
+	}, time.Second, time.Millisecond)
 	require.EqualValues(t, 1, constructions)
 	require.Zero(t, predecessor.cleanupCount())
 
@@ -380,7 +391,9 @@ func TestFunctionControllerWithdrawalFailureCleansUnpublishedSuccessor(t *testin
 		}
 	}
 	require.ErrorIs(t, controller.Stop(1), withdrawErr)
-	require.EqualValues(t, 1, predecessor.cleanupCount())
+	require.Eventually(t, func() bool {
+		return predecessor.cleanupCount() == 1
+	}, time.Second, time.Millisecond)
 }
 
 func TestFunctionControllerRawRequestFidelity(t *testing.T) {
@@ -395,7 +408,7 @@ func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 			},
 		},
 	}
-	controller, catalog, err := NewController(1, modules)
+	controller, catalog, err := newContainedControllerTest(t, 1, modules)
 	require.NoError(t, err)
 	mutations := controllerTestMutationPort{
 		catalog: catalog,
@@ -457,7 +470,7 @@ func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
 			},
 		},
 	}
-	controller, catalog, err := NewController(1, modules)
+	controller, catalog, err := newContainedControllerTest(t, 1, modules)
 	require.NoError(t, err)
 	mutations := controllerTestMutationPort{
 		catalog: catalog,
@@ -474,10 +487,16 @@ func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
 	available = true
 
 	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
+	require.Eventually(t, func() bool {
+		return len(publicationPort.events) == 1
+	}, time.Second, time.Millisecond)
 
 	available = false
 
 	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
+	require.Eventually(t, func() bool {
+		return !controller.plans["module"].agentBundle.available("delayed")
+	}, time.Second, time.Millisecond)
 
 	got := publicationPort.events
 	require.Equal(t, []string{"publish:module:delayed"}, got)
@@ -524,7 +543,7 @@ func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := NewController(1, collectorapi.Registry{
+			_, _, err := newContainedControllerTest(t, 1, collectorapi.Registry{
 				"module": {
 					AgentFunctions: func() []funcapi.FunctionConfig {
 						return test.methods
@@ -542,7 +561,7 @@ func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
 func TestFunctionControllerRejectsInvalidInstanceMetadataBeforeMutation(t *testing.T) {
 	handler := &controllerTestHandler{}
 	constructions := 0
-	controller, catalog, err := NewController(1, collectorapi.Registry{
+	controller, catalog, err := newContainedControllerTest(t, 1, collectorapi.Registry{
 		"module": {
 			InstanceFunctions: func(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
 				help := "valid help"
@@ -573,7 +592,7 @@ func TestFunctionControllerRejectsInvalidInstanceMetadataBeforeMutation(t *testi
 		name:     "invalid",
 		running:  true,
 	}
-	invalidHandle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+	invalidHandle, err := prepareControllerTestJob(t, controller, lifecycle.ResourceIdentity{
 		ID:         invalidJob.FullName(),
 		Generation: 1,
 	}, invalidJob)
@@ -588,7 +607,7 @@ func TestFunctionControllerRejectsInvalidInstanceMetadataBeforeMutation(t *testi
 		name:     "valid",
 		running:  true,
 	}
-	validHandle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+	validHandle, err := prepareControllerTestJob(t, controller, lifecycle.ResourceIdentity{
 		ID:         validJob.FullName(),
 		Generation: 1,
 	}, validJob)
@@ -616,7 +635,7 @@ func TestFunctionControllerCleansNewGenerationWhenLaterGroupBuildFails(t *testin
 		t.Run(name, func(t *testing.T) {
 			handlers := make(map[string][]*controllerTestHandler)
 			failZ := false
-			controller, catalog, err := NewController(1, collectorapi.Registry{
+			controller, catalog, err := newContainedControllerTest(t, 1, collectorapi.Registry{
 				"module": {
 					InstanceFunctions: func(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
 						return []funcapi.FunctionConfig{{ID: job.Name() + ":method"}}
@@ -666,7 +685,7 @@ func TestFunctionControllerCleansNewGenerationWhenLaterGroupBuildFails(t *testin
 			handles := make(map[string]*JobHandle, len(jobs)-1)
 			for _, jobName := range []string{"a", "m"} {
 				job := jobs[jobName]
-				handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+				handle, err := prepareControllerTestJob(t, controller, lifecycle.ResourceIdentity{
 					ID:         job.FullName(),
 					Generation: 1,
 				}, job)
@@ -677,7 +696,7 @@ func TestFunctionControllerCleansNewGenerationWhenLaterGroupBuildFails(t *testin
 			}
 
 			failZ = true
-			failed, prepareErr := controller.PrepareJob(lifecycle.ResourceIdentity{
+			failed, prepareErr := prepareControllerTestJob(t, controller, lifecycle.ResourceIdentity{
 				ID:         jobs["z"].FullName(),
 				Generation: 1,
 			}, jobs["z"])
@@ -780,21 +799,22 @@ func TestFunctionControllerReportsInitialRouteCleanupFailure(t *testing.T) {
 			invalid := valid
 			invalid.Declaration.PublicName = ""
 
-			_, _, err := NewController(1, collectorapi.Registry{}, valid, invalid)
+			_, _, err := newContainedControllerTest(t, 1, collectorapi.Registry{}, valid, invalid)
 			require.ErrorContains(t, err, "invalid declaration")
 			test.assert(t, err)
 		})
 	}
 }
 
-func TestFunctionControllerReportsUnpublishedGroupCleanupFailure(t *testing.T) {
-	_, _, err := NewController(1, collectorapi.Registry{
+func TestFunctionControllerRejectsLaterModuleAfterContainedSiblingConstruction(t *testing.T) {
+	sibling := &controllerTestHandler{}
+	_, _, err := newContainedControllerTest(t, 1, collectorapi.Registry{
 		"a": {
 			AgentFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &controllerPanickingCleanupHandler{}
+				return sibling
 			},
 		},
 		"z": {
@@ -807,8 +827,79 @@ func TestFunctionControllerReportsUnpublishedGroupCleanupFailure(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "nil method handler")
-	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
-	require.ErrorContains(t, err, "test handler cleanup panic")
+	require.Eventually(t, func() bool {
+		return sibling.cleanupCount() == 1
+	}, time.Second, time.Millisecond)
+}
+
+func newContainedControllerTest(
+	t *testing.T,
+	epoch uint64,
+	modules collectorapi.Registry,
+	initial ...InitialRoute,
+) (*Controller, *Catalog, error) {
+	t.Helper()
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	controller, catalog, buildErr := NewContainedController(
+		t.Context(),
+		epoch,
+		attempts,
+		modules,
+		initial...,
+	)
+	t.Cleanup(func() {
+		if controller != nil {
+			if abortErr := controller.AbortConstruction(context.Background()); abortErr != nil {
+				_ = controller.BeginShutdown(epoch)
+				if catalog != nil {
+					if closeErr := catalog.BeginClose(); closeErr == nil {
+						for {
+							cleanups, more, stepErr := catalog.CloseStep(jobmgr.MaximumFunctionCloseQuantum)
+							if stepErr != nil {
+								break
+							}
+							for _, cleanup := range cleanups {
+								_, _ = cleanup.Work()(context.Background())
+								_ = catalog.CompleteCleanup(cleanup.Ref())
+							}
+							if !more {
+								break
+							}
+						}
+					}
+				}
+				_ = controller.Stop(epoch)
+			}
+		}
+		attempts.BeginShutdown()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(ctx))
+	})
+	return controller, catalog, buildErr
+}
+
+func prepareControllerTestJob(
+	t *testing.T,
+	controller *Controller,
+	identity lifecycle.ResourceIdentity,
+	job collectorapi.RuntimeJob,
+) (*JobHandle, error) {
+	t.Helper()
+	stager, err := controller.JobStager()
+	if err != nil {
+		return nil, err
+	}
+	staged, err := stager.StageJob(job)
+	if err != nil {
+		return nil, err
+	}
+	handle, err := controller.AttachJob(identity, staged)
+	if err != nil {
+		return nil, errors.Join(err, staged.CloseAndDrain(context.Background()))
+	}
+	return handle, nil
 }
 
 type controllerTestMutationPort struct {
@@ -890,10 +981,6 @@ type controllerTestHandler struct {
 	cleanups int
 }
 
-type controllerPanickingCleanupHandler struct {
-	controllerTestHandler
-}
-
 type blockingControllerTestHandler struct {
 	controllerTestHandler
 	cleanupEntered chan<- struct{}
@@ -904,11 +991,6 @@ func (handler *blockingControllerTestHandler) Cleanup(ctx context.Context) {
 	close(handler.cleanupEntered)
 	<-handler.cleanupRelease
 	handler.controllerTestHandler.Cleanup(ctx)
-}
-
-func (handler *controllerPanickingCleanupHandler) Cleanup(ctx context.Context) {
-	handler.controllerTestHandler.Cleanup(ctx)
-	panic("test handler cleanup panic")
 }
 
 type blockingWithdrawPublicationPort struct {

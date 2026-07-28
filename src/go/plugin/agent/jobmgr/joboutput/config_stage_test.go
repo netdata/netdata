@@ -222,13 +222,19 @@ func (*delayedDispositionAuthority) StartProcessAttempt(
 		released: make(chan struct{}),
 	}
 	go func() {
-		workErr := plan.Work(ctx)
+		workErr := plan.Work(ctx, successfulProcessAttemptAdmission{})
 		attempt.mu.Lock()
 		attempt.workErr = workErr
 		attempt.mu.Unlock()
 		close(attempt.released)
 	}()
 	return attempt, nil
+}
+
+type successfulProcessAttemptAdmission struct{}
+
+func (successfulProcessAttemptAdmission) Admit() error {
+	return nil
 }
 
 func (*delayedDispositionAuthority) SupersedeProcessAttempt(

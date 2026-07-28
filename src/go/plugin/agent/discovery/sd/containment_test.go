@@ -70,12 +70,11 @@ func TestDescriptorParsingIsContainedPerConfigurationIdentity(t *testing.T) {
 		"services":[{"id":"service","match":"true"}]
 	}`)
 	ctx, cancel := context.WithCancel(context.Background())
-	blockedFn := dyncfg.NewFunction(functions.Function{
+	blockedFn := dyncfg.NewFunction(ctx, functions.Function{
 		UID:     "blocked",
 		Args:    []string{"test:sd:fixture", "test", "job"},
 		Payload: blockedPayload,
 		Source:  "user=test",
-		Context: ctx,
 	})
 	done := make(chan error, 1)
 	go func() {
@@ -96,7 +95,7 @@ func TestDescriptorParsingIsContainedPerConfigurationIdentity(t *testing.T) {
 	}
 
 	_, err = discovery.prepareDyncfgConfig(
-		dyncfg.NewFunction(functions.Function{
+		dyncfg.NewFunction(t.Context(), functions.Function{
 			UID:     "duplicate",
 			Args:    []string{"test:sd:fixture", "test", "job"},
 			Payload: blockedPayload,
@@ -114,7 +113,7 @@ func TestDescriptorParsingIsContainedPerConfigurationIdentity(t *testing.T) {
 		"services":[{"id":"service","match":"true"}]
 	}`)
 	config, err := discovery.prepareDyncfgConfig(
-		dyncfg.NewFunction(functions.Function{
+		dyncfg.NewFunction(t.Context(), functions.Function{
 			UID:     "healthy",
 			Args:    []string{"test:sd:fixture", "test", "job"},
 			Payload: healthyPayload,
@@ -280,7 +279,10 @@ func TestPersistentPipelineRetainsOnlyLatestDesiredUntilIdentityReleases(t *test
 		Cfg:    first,
 		Status: dyncfg.StatusFailed,
 	})
-	require.Error(t, discovery.sdCb.Start(dyncfg.Function{}, first))
+	require.Error(t, discovery.sdCb.Start(
+		dyncfg.NewFunction(t.Context(), functions.Function{}),
+		first,
+	))
 
 	busy.release.Store(secondRelease)
 	discovery.seen.Remove(first)
@@ -289,25 +291,37 @@ func TestPersistentPipelineRetainsOnlyLatestDesiredUntilIdentityReleases(t *test
 		Cfg:    second,
 		Status: dyncfg.StatusFailed,
 	})
-	require.Error(t, discovery.sdCb.Start(dyncfg.Function{}, second))
+	require.Error(t, discovery.sdCb.Start(
+		dyncfg.NewFunction(t.Context(), functions.Function{}),
+		second,
+	))
 
 	close(firstRelease)
-	select {
-	case <-discovery.pending.retry:
-		require.FailNow(t, "test failed", "superseded pending pipeline retried")
-	case <-time.After(20 * time.Millisecond):
+	staleWindow := time.NewTimer(20 * time.Millisecond)
+staleRetries:
+	for {
+		select {
+		case token := <-discovery.pending.retry:
+			discovery.retryPendingPipeline(token)
+			require.False(t, discovery.mgr.IsRunning(second.PipelineKey()))
+		case <-staleWindow.C:
+			break staleRetries
+		}
 	}
 
 	healthyAttempts := newTestAttemptAuthority(t)
 	discovery.attempts = healthyAttempts
 	close(secondRelease)
-	var token pendingPipelineToken
-	select {
-	case token = <-discovery.pending.retry:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "latest pending pipeline was not retried")
+	deadline := time.NewTimer(time.Second)
+	for !discovery.mgr.IsRunning(second.PipelineKey()) {
+		select {
+		case token := <-discovery.pending.retry:
+			discovery.retryPendingPipeline(token)
+		case <-deadline.C:
+			require.FailNow(t, "test failed", "latest pending pipeline was not retried")
+		}
 	}
-	discovery.retryPendingPipeline(token)
+	deadline.Stop()
 
 	entry, exists := discovery.exposed.LookupByKey(second.ExposedKey())
 	require.True(t, exists)

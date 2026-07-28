@@ -5,7 +5,6 @@ package composition
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -203,11 +202,17 @@ func TestProductionProcessQuitHasOneCleanTerminalDisposition(t *testing.T) {
 
 func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T) {
 	tests := map[string]struct {
-		call func(*Process, context.Context) error
-		want processCommand
+		call     func(*Process, context.Context) error
+		controls func(processControls) <-chan processControl
 	}{
-		"restart":   {call: (*Process).Restart, want: processRestart},
-		"terminate": {call: (*Process).Terminate, want: processTerminate},
+		"restart": {
+			call:     (*Process).Restart,
+			controls: func(controls processControls) <-chan processControl { return controls.restart },
+		},
+		"terminate": {
+			call:     (*Process).Terminate,
+			controls: func(controls processControls) <-chan processControl { return controls.terminate },
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -221,11 +226,7 @@ func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T)
 			accepted := make(chan struct{})
 			release := make(chan struct{})
 			go func() {
-				control := <-process.controls.channel(test.want)
-				if control.command != test.want {
-					control.result <- errors.New("unexpected command")
-					return
-				}
+				control := <-test.controls(process.controls)
 				close(accepted)
 				<-release
 				control.result <- nil

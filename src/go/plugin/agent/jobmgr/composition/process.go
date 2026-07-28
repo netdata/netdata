@@ -16,16 +16,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-type processCommand uint8
-
-const (
-	processRestart processCommand = iota + 1
-	processTerminate
-)
-
 type processControl struct {
-	command processCommand
-	result  chan error
+	result chan error
 }
 
 type processControls struct {
@@ -42,17 +34,6 @@ func newProcessControls() processControls {
 
 func (controls processControls) valid() bool {
 	return controls.restart != nil && controls.terminate != nil
-}
-
-func (controls processControls) channel(command processCommand) chan processControl {
-	switch command {
-	case processRestart:
-		return controls.restart
-	case processTerminate:
-		return controls.terminate
-	default:
-		return nil
-	}
 }
 
 type processInputCompletion struct {
@@ -127,22 +108,14 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 
 var errProcessTransitionInterrupted = errors.New("jobmgr composition: process transition interrupted")
 
-type processTransitionKind uint8
-
-const (
-	processTransitionStart processTransitionKind = iota + 1
-	processTransitionRotate
-)
-
 type processTransitionResult struct {
 	generation *runGeneration
 	err        error
 }
 
 type processTransition struct {
-	kind    processTransitionKind
 	target  uint64
-	control *processControl
+	control *processControl // nil only for the initial process startup
 	cancel  context.CancelCauseFunc
 	done    <-chan processTransitionResult
 }
@@ -188,8 +161,7 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 		var tick <-chan int
 		if transition != nil {
 			transitionDone = transition.done
-			if transition.kind == processTransitionStart &&
-				transition.control == nil &&
+			if transition.control == nil &&
 				supersedingInitial == nil &&
 				!terminating {
 				restartControls = controls.restart
@@ -271,11 +243,8 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 				active.control.result <- nil
 			}
 		case control := <-restartControls:
-			if control.result == nil || control.command != processRestart {
+			if control.result == nil {
 				finalErr := pc.finalize(generation, errors.New("jobmgr composition: invalid restart control"))
-				if control.result != nil {
-					control.result <- finalErr
-				}
 				return finalErr
 			}
 			if transition != nil {
@@ -292,14 +261,10 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 			transition = pc.beginRotateTransition(ctx, generation, nextID, markQuit, control)
 			generation = nil
 		case control := <-terminateControls:
-			if control.result == nil || control.command != processTerminate {
+			if control.result == nil {
 				cause := errors.New("jobmgr composition: invalid terminate control")
 				if transition == nil {
-					finalErr := pc.finalize(generation, cause)
-					if control.result != nil {
-						control.result <- finalErr
-					}
-					return finalErr
+					return pc.finalize(generation, cause)
 				}
 				terminalCause = cause
 			} else {
@@ -413,7 +378,6 @@ func (pc *processCore) beginStartTransition(
 		}
 	}()
 	return &processTransition{
-		kind:    processTransitionStart,
 		target:  target,
 		control: control,
 		cancel:  cancel,
@@ -438,7 +402,6 @@ func (pc *processCore) beginRotateTransition(
 		}
 	}()
 	return &processTransition{
-		kind:    processTransitionRotate,
 		target:  target,
 		control: &control,
 		cancel:  cancel,

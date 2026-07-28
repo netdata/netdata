@@ -134,7 +134,8 @@ func (stager *JobStager) StageJob(
 	job collectorapi.RuntimeJob,
 ) (*StagedJobHandle, error) {
 	if stager == nil || job == nil || job.FullName() == "" ||
-		job.ModuleName() == "" || job.Name() == "" {
+		job.ModuleName() == "" || job.Name() == "" ||
+		stager.attempts == nil || stager.epoch == 0 {
 		return nil, errors.New("jobmgr Function controller: invalid job preparation")
 	}
 	creator, ok := stager.modules.Lookup(job.ModuleName())
@@ -155,16 +156,14 @@ func (stager *JobStager) StageJob(
 	if err != nil {
 		return nil, err
 	}
-	if stager.attempts != nil {
-		if err := bundle.bindContainment(
-			stager.attempts,
-			stager.epoch,
-			fmt.Sprintf("%d/%s/job", stager.epoch, job.FullName()),
-			candidateFunctionResource(job.FullName()),
-		); err != nil {
-			bundle.retire()
-			return nil, errors.Join(err, bundle.wait(context.Background()))
-		}
+	if err := bundle.bindContainment(
+		stager.attempts,
+		stager.epoch,
+		fmt.Sprintf("%d/%s/job", stager.epoch, job.FullName()),
+		candidateFunctionResource(job.FullName()),
+	); err != nil {
+		bundle.retire()
+		return nil, errors.Join(err, bundle.wait(context.Background()))
 	}
 	return &StagedJobHandle{
 		job:     job,
@@ -198,25 +197,6 @@ func (c *Controller) AttachJob(
 	staged.job = nil
 	staged.bundle = nil
 	staged.methods = nil
-	return handle, nil
-}
-
-func (c *Controller) PrepareJob(
-	identity lifecycle.ResourceIdentity,
-	job collectorapi.RuntimeJob,
-) (*JobHandle, error) {
-	stager, err := c.JobStager()
-	if err != nil {
-		return nil, err
-	}
-	staged, err := stager.StageJob(job)
-	if err != nil {
-		return nil, err
-	}
-	handle, err := c.AttachJob(identity, staged)
-	if err != nil {
-		return nil, errors.Join(err, staged.CloseAndDrain(context.Background()))
-	}
 	return handle, nil
 }
 
@@ -307,26 +287,6 @@ func (jh *JobHandle) CloseAndDrain(ctx context.Context) error {
 	return jh.Finalize(ctx)
 }
 
-func NewController(
-	epoch uint64,
-	modules collectorapi.Registry,
-	initial ...InitialRoute,
-) (*Controller, *Catalog, error) {
-	if epoch == 0 || modules == nil {
-		return nil, nil, errors.New("jobmgr Function controller: invalid construction")
-	}
-	plans := make(map[string]controllerModulePlan, len(modules))
-	names := slices.Sorted(maps.Keys(modules))
-	for _, module := range names {
-		plan, err := buildControllerModulePlan(module, modules[module])
-		if err != nil {
-			return nil, nil, errors.Join(err, cleanupControllerModulePlans(plans))
-		}
-		plans[module] = plan
-	}
-	return newControllerWithPlans(epoch, nil, modules, plans, initial...)
-}
-
 func NewContainedController(
 	ctx context.Context,
 	epoch uint64,
@@ -352,7 +312,7 @@ func newControllerWithPlans(
 	plans map[string]controllerModulePlan,
 	initial ...InitialRoute,
 ) (*Controller, *Catalog, error) {
-	if epoch == 0 || modules == nil || len(plans) != len(modules) {
+	if epoch == 0 || attempts == nil || modules == nil || len(plans) != len(modules) {
 		return nil, nil, errors.Join(
 			errors.New("jobmgr Function controller: invalid staged construction"),
 			cleanupControllerModulePlans(plans),
@@ -678,45 +638,23 @@ func (c *Controller) ReconcileModule(ctx context.Context, module string) error {
 			bundles = append(bundles, job.bundle)
 		}
 	}
-	contained := c.attempts != nil
 	c.mu.Unlock()
 
-	if contained {
-		for _, bundle := range bundles {
-			poll, err := bundle.startAvailabilityPoll()
-			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptStopped) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
-			if poll.attempt == nil {
-				continue
-			}
-			go c.finishAvailabilityPoll(module, creator, poll)
-		}
-		return nil
-	}
-
-	changed := false
 	for _, bundle := range bundles {
-		currentChanged, err := bundle.refreshAvailability()
+		poll, err := bundle.startAvailabilityPoll()
+		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+			errors.Is(err, jobmgr.ErrProcessAttemptStopped) {
+			continue
+		}
 		if err != nil {
 			return err
 		}
-		changed = changed || currentChanged
+		if poll.attempt == nil {
+			continue
+		}
+		go c.finishAvailabilityPoll(module, creator, poll)
 	}
-	if !changed {
-		return nil
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if err := c.usableLocked(); err != nil {
-		return err
-	}
-	_, err := c.reconcileModuleLocked(ctx, module, creator)
-	return err
+	return nil
 }
 
 func (c *Controller) finishAvailabilityPoll(

@@ -92,7 +92,7 @@ func (js JobState) String() string {
 
 type ConstructedJob struct {
 	Runtime            jobruntime.Runtime          // collector run loop wrapped as a jobruntime.Runtime
-	Handlers           HandlerLifecycle            // Function-handler lifecycle; nil when the job has no Functions
+	Handlers           ProcessHandlerLifecycle     // Function-handler lifecycle; nil when the job has no Functions
 	StagedHandlers     StagedHandlerLifecycle      // run-detached Function handlers before attachment
 	Observer           lifecycle.RuntimeObserver   // runtime gauge sink for active-job accounting
 	CollectorCleanup   func(context.Context) error // opaque collector teardown; swapped reject->final on Accept
@@ -599,14 +599,9 @@ func (jg *JobGeneration) stopProcessOwned(ctx context.Context) error {
 	jg.resources.outputGate.Fence()
 	var detachErr error
 	if handlers := jg.resources.Handlers; handlers != nil {
-		split, ok := handlers.(ProcessHandlerLifecycle)
-		if !ok {
-			detachErr = errors.New("job output: process-owned handler does not support detach")
-		} else {
-			detachErr = callJobLifecycle("handler detach", func() error {
-				return split.Detach(ctx)
-			})
-		}
+		detachErr = callJobLifecycle("handler detach", func() error {
+			return handlers.Detach(ctx)
+		})
 	}
 	runtimeErr := callJobLifecycle("runtime Stop", func() error {
 		return jg.resources.Runtime.Stop(ctx)
@@ -640,14 +635,9 @@ func (jg *JobGeneration) abortProcessOwned(ctx context.Context) error {
 	jg.processOwner.Retire()
 	var detachErr error
 	if handlers := jg.resources.Handlers; handlers != nil {
-		split, ok := handlers.(ProcessHandlerLifecycle)
-		if !ok {
-			detachErr = errors.New("job output: process-owned handler does not support detach")
-		} else {
-			detachErr = callJobLifecycle("handler detach", func() error {
-				return split.Detach(ctx)
-			})
-		}
+		detachErr = callJobLifecycle("handler detach", func() error {
+			return handlers.Detach(ctx)
+		})
 	}
 	runtimeErr := callJobLifecycle("runtime Abort", func() error {
 		return jg.resources.Runtime.Abort(ctx)

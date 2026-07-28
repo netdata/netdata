@@ -140,7 +140,7 @@ func TestServiceDiscoveryReadOnlyInvocationDoesNotCaptureConfigNotifications(t *
 			close(release)
 		}
 	}()
-	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
+	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, function frameworkfunctions.Function) {
 		close(entered)
 		<-release
 		binding.FunctionResult(dyncfg.Result{
@@ -257,7 +257,7 @@ func TestServiceDiscoveryTransactionDisposeDoesNotInvokeHandler(t *testing.T) {
 	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
 
 	invoked := false
-	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
+	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, function frameworkfunctions.Function) {
 		invoked = true
 		binding.FunctionResult(dyncfg.Result{
 			UID:         function.UID,
@@ -296,7 +296,7 @@ func TestServiceDiscoveryTransactionContainsNonCooperativeHandler(t *testing.T) 
 	attempts := binding.attempts.(*containment.Authority)
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
+	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, function frameworkfunctions.Function) {
 		close(entered)
 		<-release
 		binding.FunctionResult(dyncfg.Result{
@@ -367,7 +367,7 @@ func TestServiceDiscoveryDiagnosticsFollowAppliedCommandWithoutPayload(t *testin
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	binding := newServiceDiscoveryTestBinding(t, 3, frames, diagnostics)
-	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
+	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, function frameworkfunctions.Function) {
 		binding.FunctionResult(dyncfg.Result{
 			UID:         function.UID,
 			Code:        200,

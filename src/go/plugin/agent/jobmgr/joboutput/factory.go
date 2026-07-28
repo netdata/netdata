@@ -32,13 +32,9 @@ type RuntimeJob interface {
 	Tick(int)
 }
 
-type HandlerLifecycle interface {
+type ProcessHandlerLifecycle interface {
 	Publish() error
 	CloseAndDrain(context.Context) error
-}
-
-type ProcessHandlerLifecycle interface {
-	HandlerLifecycle
 	Detach(context.Context) error
 	Finalize(context.Context) error
 }
@@ -52,12 +48,7 @@ type JobHandlerStager interface {
 }
 
 type JobHandlerAttacher interface {
-	Attach(lifecycle.ResourceIdentity, StagedHandlerLifecycle) (HandlerLifecycle, error)
-}
-
-type JobHooks interface {
-	JobHandlerStager
-	JobHandlerAttacher
+	Attach(lifecycle.ResourceIdentity, StagedHandlerLifecycle) (ProcessHandlerLifecycle, error)
 }
 
 type jobNamedModule interface {
@@ -72,7 +63,6 @@ type FactoryConfig struct {
 	Frames           *lifecycle.FrameOwner                                             // frame owner used as the collector output sink
 	ConfigModules    *ConfigModuleFactory                                              // resolved config application and short-lived probes
 	Runtime          runtimecomp.Service                                               // V2 runtime service dependency
-	RuntimeStaging   bool                                                              // construct a private V2 staging capability
 	Vnodes           *vnoderegistry.Registry                                           // vnode registry for V2 jobs
 	Vnode            func(string) (jobruntime.VnodeSnapshot, bool)                     // vnode snapshot lookup by name
 	HandlerStager    JobHandlerStager                                                  // run-detached Function-handler staging
@@ -85,7 +75,8 @@ type FactoryConfig struct {
 // Factory owns collector construction, validation, and transfer. It does not
 // own current-job indexing or lifecycle state.
 type Factory struct {
-	config FactoryConfig
+	config         FactoryConfig
+	runtimeStaging bool
 }
 
 type factoryAttachment struct {
@@ -175,9 +166,6 @@ func (attachment factoryAttachment) attach(
 		}
 		if handlers == nil {
 			return attached, errors.New("job output: nil attached handler lifecycle")
-		}
-		if _, ok := handlers.(ProcessHandlerLifecycle); !ok {
-			return attached, errors.New("job output: attached handler lifecycle cannot detach")
 		}
 	}
 	return attached, nil
@@ -390,7 +378,7 @@ func callAttachHandlers(
 	attacher JobHandlerAttacher,
 	identity lifecycle.ResourceIdentity,
 	staged StagedHandlerLifecycle,
-) (handlers HandlerLifecycle, err error) {
+) (handlers ProcessHandlerLifecycle, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			handlers = nil
@@ -523,7 +511,7 @@ func (f *Factory) buildV2(
 	if err != nil {
 		return nil, nil, redactLifecycle, err
 	}
-	if f.config.Runtime != nil || f.config.RuntimeStaging {
+	if f.config.Runtime != nil || f.runtimeStaging {
 		runtimeStage = newStagedRuntimeService()
 	}
 	jobConfig := jobruntime.JobV2Config{

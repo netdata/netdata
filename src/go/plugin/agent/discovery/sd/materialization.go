@@ -63,7 +63,10 @@ func runMaterialization[T any](
 	attempt, err := discovery.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Target:   discovery.epoch,
-		Work: func(attemptCtx context.Context) error {
+		Work: func(
+			attemptCtx context.Context,
+			_ jobmgr.ProcessAttemptAdmission,
+		) error {
 			value, workErr := work(attemptCtx)
 			resultCh <- materializationResult[T]{value: value, err: workErr}
 			return workErr

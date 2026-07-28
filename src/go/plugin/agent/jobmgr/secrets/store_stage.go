@@ -282,19 +282,19 @@ func (operation *PreparedStoreOperation) startAttempt(
 	config secretstore.Config,
 ) (jobmgr.ProcessAttempt, error) {
 	start := func() (jobmgr.ProcessAttempt, error) {
-		attemptReady := make(chan jobmgr.ProcessAttempt, 1)
 		attempt, err := operation.operations.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 			Identity: identity,
 			Target:   operation.operations.epoch,
-			Work: func(ctx context.Context) error {
-				owned := <-attemptReady
-				return operation.runAttempt(ctx, owned, config)
+			Work: func(
+				ctx context.Context,
+				admission jobmgr.ProcessAttemptAdmission,
+			) error {
+				return operation.runAttempt(ctx, admission, config)
 			},
 		})
 		if err != nil {
 			return nil, err
 		}
-		attemptReady <- attempt
 		return attempt, nil
 	}
 
@@ -310,7 +310,7 @@ func (operation *PreparedStoreOperation) startAttempt(
 
 func (operation *PreparedStoreOperation) runAttempt(
 	ctx context.Context,
-	attempt jobmgr.ProcessAttempt,
+	admission jobmgr.ProcessAttemptAdmission,
 	config secretstore.Config,
 ) error {
 	result := storeOperationResult{
@@ -333,7 +333,7 @@ func (operation *PreparedStoreOperation) runAttempt(
 			operation.spec.expected,
 		)
 	}
-	if err := attempt.Admit(); err != nil {
+	if err := admission.Admit(); err != nil {
 		if result.mutation != nil {
 			_ = result.mutation.Abort()
 		}

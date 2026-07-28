@@ -225,7 +225,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 // sendDyncfgCmd sends a dyncfg command and waits for processing
 func sendDyncfgCmd(sd *ServiceDiscovery, uid string, args []string, payload []byte, source string) {
-	fn := dyncfg.NewFunction(functions.Function{
+	fn := dyncfg.NewFunction(context.Background(), functions.Function{
 		UID:         uid,
 		Args:        args,
 		Payload:     payload,
