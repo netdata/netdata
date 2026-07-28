@@ -116,10 +116,9 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_net_udp_send)        rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_udp_send);
     if(cg->st_net_udp_recv)        rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_udp_recv);
 
-    if (cg->ebpf_procs_ff) {
-        procfile_close(cg->ebpf_procs_ff);
-        cg->ebpf_procs_ff = NULL;
-    }
+    freez(cg->ebpf_pids);
+    cg->ebpf_pids       = NULL;
+    cg->ebpf_pids_count = 0;
 
     freez(cg->filename_cpuset_cpus);
     freez(cg->filename_cpu_cfs_period);

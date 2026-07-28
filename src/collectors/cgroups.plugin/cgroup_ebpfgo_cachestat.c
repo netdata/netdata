@@ -192,14 +192,11 @@ static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
     cg->cachestat.miss = 0;
     cg->cachestat.ct = 0;
 
-    procfile *ff = cg->ebpf_procs_ff;
-    if (!ff)
+    if (!cg->ebpf_pids_count)
         goto calculate;
 
-    for (size_t l = 0; l < procfile_lines(ff); l++) {
-        pid_t pid = (pid_t)str2l(procfile_lineword(ff, l, 0));
-        if (pid <= 0)
-            continue;
+    for (size_t i = 0; i < cg->ebpf_pids_count; i++) {
+        pid_t pid = cg->ebpf_pids[i];
 
         const struct ebpf_pid_stat *item = cgroup_ebpfgo_shared_memory_lookup(pid);
         if (!item)
@@ -281,20 +278,45 @@ void cgroup_ebpfgo_refresh_pid_lists(void)
 {
     char path_buf[FILENAME_MAX + 1];
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
+        cg->ebpf_pids       = NULL;
+        cg->ebpf_pids_count = 0;
+
         if (unlikely(!cg->enabled || cg->pending_renames))
             continue;
-        cg->ebpf_procs_ff = cgroup_ebpfgo_open_nonempty_procs_file(
+
+        procfile *ff = cgroup_ebpfgo_open_nonempty_procs_file(
             path_buf, sizeof(path_buf), cg->id);
+        if (!ff)
+            continue;
+
+        size_t lines = procfile_lines(ff);
+        if (lines > 0) {
+            pid_t *pids = mallocz(lines * sizeof(pid_t));
+            size_t count = 0;
+            for (size_t l = 0; l < lines; l++) {
+                pid_t pid = (pid_t)str2l(procfile_lineword(ff, l, 0));
+                if (pid > 0)
+                    pids[count++] = pid;
+            }
+            if (count > 0) {
+                cg->ebpf_pids       = pids;
+                cg->ebpf_pids_count = count;
+            } else {
+                freez(pids);
+            }
+        }
+
+        /* Procfile closed immediately — data is in ebpf_pids; no FD held. */
+        procfile_close(ff);
     }
 }
 
 void cgroup_ebpfgo_release_pid_lists(void)
 {
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
-        if (cg->ebpf_procs_ff) {
-            procfile_close(cg->ebpf_procs_ff);
-            cg->ebpf_procs_ff = NULL;
-        }
+        freez(cg->ebpf_pids);
+        cg->ebpf_pids       = NULL;
+        cg->ebpf_pids_count = 0;
     }
 }
 
@@ -317,6 +339,13 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         return;
 
     if (unlikely(!cgroup_ebpfgo_cachestat_snapshot_ready))
+        return;
+
+    // Don't create charts until the cgroup has actual page-cache activity.
+    // Once st_cachestat_ratio exists the guard is skipped — charts persist even on idle.
+    if (!cg->st_cachestat_ratio &&
+        !cg->cachestat.ratio && !cg->cachestat.dirty &&
+        !cg->cachestat.hit && !cg->cachestat.miss)
         return;
 
     const bool is_service = is_cgroup_systemd_service(cg);

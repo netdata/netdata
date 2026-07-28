@@ -260,10 +260,13 @@ struct cgroup {
     RRDSET *st_net_udp_send;
     RRDSET *st_net_udp_recv;
 
-    // Cached cgroup.procs procfile shared by all eBPFGo modules for one tick.
-    // Populated by cgroup_ebpfgo_refresh_pid_lists(), freed by
-    // cgroup_ebpfgo_release_pid_lists(); both called from sys_fs_cgroup.c.
-    procfile *ebpf_procs_ff;
+    // PIDs from cgroup.procs, extracted once per tick and shared across all
+    // eBPFGo modules.  Populated by cgroup_ebpfgo_refresh_pid_lists() and
+    // freed by cgroup_ebpfgo_release_pid_lists(); both called from
+    // sys_fs_cgroup.c.  The procfile is closed immediately after extraction
+    // so no FDs are held during collection.
+    pid_t  *ebpf_pids;
+    size_t  ebpf_pids_count;
 #endif
 
     struct cgroup_network_interface *interfaces;
@@ -542,8 +545,8 @@ void update_io_full_pressure_stall_time_chart(struct cgroup *cg);
 // Shared helper: find the best non-empty cgroup.procs file across mount points.
 procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id);
 
-// Pre-pass: open cgroup.procs once per cgroup and store in cg->ebpf_procs_ff.
-// Post-pass: close and NULL all cg->ebpf_procs_ff entries.
+// Pre-pass: open cgroup.procs per cgroup, extract PIDs into cg->ebpf_pids, close procfile immediately.
+// Post-pass: free cg->ebpf_pids for each cgroup.
 // Call refresh before any eBPFGo module update, release after all modules finish.
 void cgroup_ebpfgo_refresh_pid_lists(void);
 void cgroup_ebpfgo_release_pid_lists(void);

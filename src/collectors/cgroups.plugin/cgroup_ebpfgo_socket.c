@@ -22,14 +22,11 @@ static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
 {
     memset(&cg->net, 0, sizeof(cg->net));
 
-    procfile *ff = cg->ebpf_procs_ff;
-    if (!ff)
+    if (!cg->ebpf_pids_count)
         return;
 
-    for (size_t l = 0; l < procfile_lines(ff); l++) {
-        pid_t pid = (pid_t)str2l(procfile_lineword(ff, l, 0));
-        if (pid <= 0)
-            continue;
+    for (size_t i = 0; i < cg->ebpf_pids_count; i++) {
+        pid_t pid = cg->ebpf_pids[i];
 
         const struct ebpf_pid_stat *item = cgroup_ebpfgo_shared_memory_lookup(pid);
         if (!item)
@@ -107,6 +104,15 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
         return;
 
     if (unlikely(!cgroup_ebpfgo_socket_snapshot_ready))
+        return;
+
+    // Don't create charts until the cgroup has actual socket activity.
+    // Once st_net_conn_ipv4 exists the guard is skipped — charts persist even on idle.
+    if (!cg->st_net_conn_ipv4 &&
+        !cg->net.call_tcp_v4_connection && !cg->net.call_tcp_v6_connection &&
+        !cg->net.bytes_received && !cg->net.bytes_sent &&
+        !cg->net.call_tcp_received && !cg->net.call_tcp_sent &&
+        !cg->net.retransmit && !cg->net.call_udp_received && !cg->net.call_udp_sent)
         return;
 
     const bool is_service = is_cgroup_systemd_service(cg);
