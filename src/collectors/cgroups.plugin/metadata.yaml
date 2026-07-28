@@ -500,7 +500,6 @@ modules:
         link: https://kubernetes.io/
         icon_filename: kubernetes.svg
         categories:
-          #- data-collection.containers-and-vms
           - data-collection.containers-and-vms
       keywords:
         - k8s
