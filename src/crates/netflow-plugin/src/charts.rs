@@ -17,13 +17,13 @@ mod metrics;
 mod process_maps;
 mod runtime;
 mod snapshot;
-mod udp;
+pub(crate) mod udp;
 
 use metrics::*;
 pub(crate) use process_maps::*;
 pub(crate) use runtime::*;
 use snapshot::*;
-use udp::*;
+use udp::sample_udp_kernel_drops;
 
 #[cfg(test)]
 mod tests;

@@ -1643,19 +1643,10 @@ fn socket_kernel_drops(listener_inodes: &[u64]) -> Option<u64> {
         let Ok(contents) = fs::read_to_string(path) else {
             continue;
         };
-        for line in contents.lines().skip(1) {
-            let mut columns = line.split_ascii_whitespace();
-            let (Some(inode), Some(socket_drops)) = (columns.nth(9), columns.nth(2)) else {
-                continue;
-            };
-            let (Ok(inode), Ok(socket_drops)) = (inode.parse::<u64>(), socket_drops.parse::<u64>())
-            else {
-                continue;
-            };
-            if listener_inodes.contains(&inode) && found.insert(inode) {
-                drops = drops.saturating_add(socket_drops);
-            }
-        }
+        let (file_drops, file_found) =
+            crate::charts::udp::parse_udp_socket_drops(&contents, &listener_inodes);
+        drops = drops.saturating_add(file_drops);
+        found.extend(file_found);
     }
     (found.len() == listener_inodes.len()).then_some(drops)
 }

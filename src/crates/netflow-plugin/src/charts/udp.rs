@@ -5,7 +5,10 @@ use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 
 #[cfg(any(target_os = "linux", test))]
-fn parse_udp_socket_drops(contents: &str, listener_inodes: &HashSet<u64>) -> (u64, HashSet<u64>) {
+pub(crate) fn parse_udp_socket_drops(
+    contents: &str,
+    listener_inodes: &HashSet<u64>,
+) -> (u64, HashSet<u64>) {
     let mut drops = 0_u64;
     let mut found = HashSet::with_capacity(listener_inodes.len());
 
