@@ -110,7 +110,7 @@ modules:
 
               Like the configuration warnings, this message repeats every hour because the script exits and is restarted by Netdata every 3600 seconds (`qos_exit_every=3600`), re-running the FireQOS presence check on each start.
 
-              FireQOS is only required to apply QoS and expose human-readable class names to Netdata. Without it the plugin still collects `tc` qdisc/class metrics directly from the `tc` command. To map numeric class IDs to readable names without FireQOS, list them in `/etc/iproute2/tc_cls` and set `tc_show="class"` in `/etc/netdata/tc-qos-helper.conf`.
+              FireQOS is only required to apply QoS and expose human-readable class names to Netdata. Without it the plugin still collects `tc` qdisc/class metrics directly from the `tc` command. To expose FireQOS class names, install FireQOS from `https://firehol.org`. To map numeric class IDs to readable names without FireQOS, list them in `/etc/iproute2/tc_cls` and set `tc_show="class"` in `/etc/netdata/tc-qos-helper.conf`.
     alerts: []
     metrics:
       folding:
