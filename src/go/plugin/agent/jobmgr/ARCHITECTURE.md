@@ -302,7 +302,8 @@ stateDiagram-v2
 
 `Census` reports these counts exactly (`Active`, `Probing`, `Admitted`, `Contained`). Containment is loud and success is
 quiet: entering `Contained`, releasing a contained worker, and a worker panic each emit a diagnostic event, while an
-attempt that admits or returns in time emits none.
+attempt that admits or returns in time emits none. In long-lived mode, `jobmgr.runtime` also projects the current census
+as aggregate process-attempt gauges.
 
 ### What the fuse actually bounds
 
@@ -884,6 +885,7 @@ process exit can reclaim a permanently blocked goroutine.
 In long-lived agent mode, one component — `jobmgr.runtime` — projects live orchestration counts
 (`composition/runtime_metrics.go`):
 
+- process attempts: active, probing, admitted, and contained;
 - operations: admitted, active, rejected, timed out, duplicate-UID rejected, shutdown-rejected, results disposed;
 - claims: keys tracked, waiters, oldest wait age;
 - tasks: active, queued, oldest wait age, panics;
@@ -891,9 +893,13 @@ In long-lived agent mode, one component — `jobmgr.runtime` — projects live o
 - frames: commits and failures;
 - runs: dirty runs; plus the oldest live operation age.
 
-Mutation owners write metric-owned atomics; the producer only snapshots them — it never reads kernel-private state.
+Mutation owners write metric-owned atomics; the producer snapshots those atomics and the process authority's exact
+attempt census once per update. It never reads kernel-private state.
+
 The component is registered before external admission opens and unregistered (with a final projection) when its
-generation retires, strictly before the successor re-registers, so no predecessor sample crosses a reload.
+generation retires, strictly before the successor re-registers. Run-owned samples do not cross a reload. Process-attempt
+gauges deliberately can: the authority survives reload, so a new run continues to expose an older physically retained
+attempt until it releases.
 
 ## Package Map
 

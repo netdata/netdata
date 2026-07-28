@@ -108,7 +108,10 @@ func newRunGeneration(
 	}
 	var metrics *runMetrics
 	if config.Jobs.Runtime != nil {
-		metrics = newRunMetrics()
+		metrics, err = newRunMetrics(config.Attempts)
+		if err != nil {
+			return nil, err
+		}
 	}
 	metricsRegistration := newRunMetricsRegistration(metrics, config.Jobs.Runtime)
 	tasks, err := lifecycle.NewTaskSupervisor(config.Frames)
