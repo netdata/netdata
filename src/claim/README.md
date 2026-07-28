@@ -318,7 +318,7 @@ docker exec netdata cat /var/lib/netdata/netdata_random_session_id   # Docker (d
 more <VARLIB>\netdata_random_session_id                              # Windows (Command Prompt)
 ```
 
-Use the exact command the dialog shows — it fills in the correct path and container name for your install. Replace `/var/lib/netdata` with your Netdata library directory if it differs from the default. After pasting the UUID, the claim is rejected with `invalid key`, even though the value was copied exactly.
+Use the exact command the dialog shows — it fills in the correct path for your install. The `docker exec netdata` form assumes the default container name (`--name=netdata`); adjust it if your container uses a different name. After pasting the UUID, the claim is rejected with `invalid key`, even though the value was copied exactly.
 
 **Why this happens:** The UUID in `netdata_random_session_id` is **single-use**. The Agent generates a new UUID and overwrites the file on **every** claim attempt — including failed ones — as a brute-force defense. The UUID is regenerated on the `invalid key` response, the `invalid parameters` response, and on every attempt that passes those checks (whether the claiming call to Cloud then succeeds or fails). So if any claim attempt occurred after you read the file (an earlier submit with a wrong or missing Space token/Rooms, a retry from another browser tab, or a concurrent claiming script), the value you copied is already stale.
 
