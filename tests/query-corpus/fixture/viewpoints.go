@@ -125,3 +125,48 @@ func (d Dimension) DBPoints(ue int64) []DBPoint {
 	}
 	return out
 }
+
+// ViewSumVolume is what a sum-over-time bucket must hold: the VOLUME the
+// fixture put inside it. Every stored record contributes its value in
+// proportion to the share of ITS OWN width that falls inside the bucket,
+// and gap records contribute nothing.
+//
+// sum does NOT use the view oracle above. That oracle answers "what was
+// the LEVEL at this instant", which is the right model for average, min,
+// max and stddev - a bucket boundary that cuts a record is served an
+// interpolated reading of it. sum asks a different question, and the
+// level model answers it wrongly in both directions at once: over the
+// l9 fixture (30s records valued 4..14, buckets of 300s), the bucket
+// (t0+100, t0+400] is handed record 4 WHOLE though only two thirds of it
+// lies inside, and then a blend of records 13 and 14 worth 13.33 for a
+// record contributing 4.67 - 98.33 where the fixture put 88.33.
+//
+// The consequence is not a rounding difference. A quantity built that way
+// is not conserved: the same span answers differently at every zoom, which
+// is exactly what the L10 and L11 conservation contracts forbid.
+func ViewSumVolume(points []DBPoint, after, ueView int64, lines int) []TGResult {
+	out := make([]TGResult, lines)
+	for line := range lines {
+		end := after + int64(line+1)*ueView
+		start := end - ueView
+
+		sum := 0.0
+		held := false
+		for _, p := range points {
+			width := p.End - p.Start
+			if p.Gap || width <= 0 || p.End <= start || p.Start >= end {
+				continue
+			}
+			from, to := max(p.Start, start), min(p.End, end)
+			sum += p.Value * float64(to-from) / float64(width)
+			held = true
+		}
+
+		if !held {
+			out[line] = TGResult{Empty: true}
+			continue
+		}
+		out[line] = TGResult{Value: sum}
+	}
+	return out
+}

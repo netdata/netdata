@@ -46,6 +46,17 @@ corpus belongs to one of three classes, with different rules:
     cardinal sin of this suite ("fit-to-engine") and is prohibited.
   - Where a port could hide drift, bound it independently (e.g. L2 pins the
     SN quantization error envelope against the ORIGINAL values).
+  - A port MUST NOT be the oracle for a quantity that obeys an independent
+    law. Where one exists — conservation, monotonicity, additivity — that
+    law is derivable, so the check is Class A and the port has nothing to
+    contribute but the engine's own opinion. `sum` is the worked example:
+    `viewpoints.go` faithfully ports the virtual-points loop, which is the
+    right model for average/min/max/stddev (each answers "the LEVEL at this
+    instant"), and the wrong one for a volume — it served L9 a bucket
+    holding 98.33 where the fixture had put 88.33, agreeing with the engine
+    while both broke the L10/L11 totals. `fixture.ViewSumVolume` replaces it
+    for `sum`. Ask of every Class B use: is there a law here the port could
+    contradict? If yes, assert the law instead.
 - **Class C — byte-pins and parity checks.** Formatter byte-pins (L7/L8,
   options) capture engine output once and pin **stability** — they detect
   contract regressions, not first-principles correctness. Parity checks
