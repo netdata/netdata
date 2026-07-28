@@ -326,11 +326,7 @@ pub(super) fn try_sample_open_tier_state(
 }
 
 fn open_tier_counts(open_tiers: &OpenTierState) -> (u64, u64, u64) {
-    (
-        open_tiers.minute_1.len() as u64,
-        open_tiers.minute_5.len() as u64,
-        open_tiers.hour_1.len() as u64,
-    )
+    open_tiers.counts()
 }
 
 pub(super) fn sample_open_tier_state(

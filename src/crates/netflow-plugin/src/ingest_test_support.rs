@@ -3,11 +3,38 @@ use crate::local_journal_host::load_local_journal_provider;
 use crate::plugin_config::DecapsulationMode as ConfigDecapsulationMode;
 use etherparse::{NetSlice, SlicedPacket, TransportSlice};
 use pcap_file::pcap::PcapReader;
+use serde::Serialize;
 use std::fs::File;
+use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
+
+pub(super) fn write_unique_json<T: Serialize>(
+    root: &Path,
+    prefix: &str,
+    value: &T,
+) -> Result<PathBuf> {
+    let mut report = tempfile::Builder::new()
+        .prefix(prefix)
+        .suffix(".json")
+        .tempfile_in(root)
+        .with_context(|| format!("create JSON report in {}", root.display()))?;
+    serde_json::to_writer_pretty(report.as_file_mut(), value).context("serialize JSON report")?;
+    report
+        .as_file_mut()
+        .write_all(b"\n")
+        .context("finish JSON report")?;
+    report
+        .as_file_mut()
+        .sync_all()
+        .context("sync JSON report")?;
+    let (_, path) = report
+        .keep()
+        .map_err(|error| anyhow!("persist JSON report: {}", error.error))?;
+    Ok(path)
+}
 
 pub(super) fn new_test_ingest_service(
     decapsulation_mode: ConfigDecapsulationMode,
@@ -263,12 +290,7 @@ pub(super) fn extract_udp_payloads(path: &Path) -> Vec<UdpPayload> {
 }
 
 fn new_disk_benchmark_tempdir(prefix: &str) -> TempDir {
-    let base = std::env::current_dir()
-        .expect("resolve current dir")
-        .join("src/crates/target/netflow-resource-bench");
-    std::fs::create_dir_all(&base)
-        .unwrap_or_else(|e| panic!("create disk benchmark root {}: {e}", base.display()));
-
+    let base = std::env::temp_dir();
     tempfile::Builder::new()
         .prefix(prefix)
         .tempdir_in(&base)
@@ -299,5 +321,11 @@ mod tests {
             new_production_benchmark_ingest_service(ConfigDecapsulationMode::None);
         assert_eq!(service.cfg.listener.sync_every_entries, 0);
         assert_eq!(service.cfg.listener.sync_interval, Duration::from_secs(1));
+    }
+
+    #[test]
+    fn disk_benchmark_helpers_use_the_system_temporary_directory() {
+        let (tmp, _service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert!(tmp.path().starts_with(std::env::temp_dir()));
     }
 }

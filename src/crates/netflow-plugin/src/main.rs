@@ -12,6 +12,7 @@ mod flow_index;
 mod ingest;
 mod local_journal_host;
 mod memory_allocator;
+mod memory_estimation;
 #[cfg(test)]
 mod memory_tests;
 mod network_sources;

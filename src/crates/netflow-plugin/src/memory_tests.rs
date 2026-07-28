@@ -201,9 +201,9 @@ async fn run_memory_stress_profile(total_flows: usize) -> anyhow::Result<MemoryS
     let (minute_1_rows, minute_5_rows, hour_1_rows) = {
         let guard = open_tiers.read().expect("open tiers read lock");
         (
-            guard.minute_1.len(),
-            guard.minute_5.len(),
-            guard.hour_1.len(),
+            guard.minute_1_rows as usize,
+            guard.minute_5_rows as usize,
+            guard.hour_1_rows as usize,
         )
     };
 
