@@ -544,8 +544,21 @@ func TGOracleDES(buckets [][]float64, group, pointsWanted int) []TGResult {
 
 // TGOracleIncrementalSum computes per-bucket incremental-sum results:
 // bucket value = last - first, where first carries from the previous
-// bucket's last; an empty bucket (or a leading single-value bucket)
-// yields EMPTY and resets the carry.
+// bucket's last. A bucket with nothing to measure against yields EMPTY,
+// but it does NOT throw the baseline away.
+//
+// The baseline has to survive a bucket that produced no answer, because
+// the quantity is a CHANGE and change does not stop happening while the
+// collector is silent. Dropping it loses everything that accumulated in
+// the gap: over the canonical fixture (values 1..60, samples 21..30
+// missing, buckets of 10) a dropped baseline totals 48 across the window
+// while the series actually moved 59. Carrying it hands the gap's change
+// to the first bucket that can see it - late, but never lost.
+//
+// It is the same reason a leading single-sample bucket keeps its sample:
+// it has no PREDECESSOR to measure against, not nothing to offer its
+// SUCCESSOR. Dropping it there is what made a chart drawn at the
+// collection interval come back blank for its whole length.
 func TGOracleIncrementalSum(buckets [][]float64) []TGResult {
 	first := math.NaN()
 	out := make([]TGResult, 0, len(buckets))
@@ -569,7 +582,9 @@ func TGOracleIncrementalSum(buckets [][]float64) []TGResult {
 		} else {
 			out = append(out, TGResult{Value: last - first})
 		}
-		first = last
+		if !math.IsNaN(last) {
+			first = last
+		}
 	}
 	return out
 }

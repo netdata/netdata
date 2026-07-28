@@ -96,7 +96,12 @@ func TestLayer9InterpolatedBuckets(t *testing.T) {
 			if len(col) != lines {
 				t.Fatalf("got %d buckets, want %d", len(col), lines)
 			}
+			// sum is a volume, not a reading of the level at the
+			// bucket's end - see fixture.ViewSumVolume
 			exp := fixture.TGOracle(tg, "", buckets, group, lines)
+			if tg == "sum" {
+				exp = fixture.ViewSumVolume(ch.Dimensions[0].DBPoints(l9UE), anchor, span, lines)
+			}
 			for i, pt := range col {
 				want := exp[i]
 				bucketT := anchor + int64(i+1)*span
