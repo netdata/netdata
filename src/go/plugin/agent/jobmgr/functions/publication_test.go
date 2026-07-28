@@ -5,12 +5,15 @@ package functions
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 type recordingPublicationPort struct {
+	mu sync.Mutex
+
 	published   []PublicationRecord
 	withdrawn   []string
 	events      []string
@@ -25,6 +28,8 @@ func newRecordingPublicationPort() *recordingPublicationPort {
 }
 
 func (rpp *recordingPublicationPort) Publish(record PublicationRecord) error {
+	rpp.mu.Lock()
+	defer rpp.mu.Unlock()
 	if _, ok := rpp.active[record.Name]; ok {
 		return errors.New("duplicate publish")
 	}
@@ -35,6 +40,8 @@ func (rpp *recordingPublicationPort) Publish(record PublicationRecord) error {
 }
 
 func (rpp *recordingPublicationPort) Withdraw(name string) error {
+	rpp.mu.Lock()
+	defer rpp.mu.Unlock()
 	if rpp.withdrawErr != nil {
 		return rpp.withdrawErr
 	}
@@ -45,6 +52,12 @@ func (rpp *recordingPublicationPort) Withdraw(name string) error {
 	rpp.withdrawn = append(rpp.withdrawn, name)
 	rpp.events = append(rpp.events, "withdraw:"+name)
 	return nil
+}
+
+func (rpp *recordingPublicationPort) eventsSnapshot() []string {
+	rpp.mu.Lock()
+	defer rpp.mu.Unlock()
+	return append([]string(nil), rpp.events...)
 }
 
 func publicationRecord(name string, generation uint64) PublicationRecord {

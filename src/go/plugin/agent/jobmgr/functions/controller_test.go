@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -456,13 +457,13 @@ func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 }
 
 func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
-	available := false
+	var available atomic.Bool
 	handler := &controllerTestHandler{}
 	modules := collectorapi.Registry{
 		"module": {
 			AgentFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{
-					ID: "delayed", Available: func() bool { return available },
+					ID: "delayed", Available: available.Load,
 				}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
@@ -483,22 +484,22 @@ func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
 
 	require.NoError(t, controller.Activate())
 
-	require.EqualValues(t, 0, len(publicationPort.events))
-	available = true
+	require.Empty(t, publicationPort.eventsSnapshot())
+	available.Store(true)
 
 	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
 	require.Eventually(t, func() bool {
-		return len(publicationPort.events) == 1
+		return len(publicationPort.eventsSnapshot()) == 1
 	}, time.Second, time.Millisecond)
 
-	available = false
+	available.Store(false)
 
 	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
 	require.Eventually(t, func() bool {
 		return !controller.plans["module"].agentBundle.available("delayed")
 	}, time.Second, time.Millisecond)
 
-	got := publicationPort.events
+	got := publicationPort.eventsSnapshot()
 	require.Equal(t, []string{"publish:module:delayed"}, got)
 
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
