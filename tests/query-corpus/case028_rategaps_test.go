@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	c028Rate    = 10   // units per second, on every second that was measured
+	c028Rate    = 10    // units per second, on every second that was measured
 	c028Samples = 17200 // enough whole tier2 windows to roll up (cf. L2/tier2)
 )
 
