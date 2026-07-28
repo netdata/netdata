@@ -191,6 +191,119 @@ func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 	require.EqualValues(t, 1, calls)
 }
 
+func TestFunctionBundleQuarantineRejectsAvailabilityPoll(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	var availabilityCalls atomic.Int32
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &controllerTestHandler{}
+			},
+		},
+		[]funcapi.FunctionConfig{{
+			ID: "method",
+			Available: func() bool {
+				availabilityCalls.Add(1)
+				return true
+			},
+		}},
+	)
+	require.NoError(t, err)
+	require.NoError(t, bundle.bindContainment(attempts, 1, "1/module/agent", "module"))
+	baseline := availabilityCalls.Load()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, invokeErr := bundle.invoke(ctx, func(context.Context) (lifecycle.SealedResult, error) {
+			close(entered)
+			<-release
+			return lifecycle.NewSealedResult(200, "application/json", nil)
+		})
+		done <- invokeErr
+	}()
+	<-entered
+	cancel()
+	require.NoError(t, <-done)
+	require.True(t, bundle.quarantined)
+
+	poll, err := bundle.startAvailabilityPoll()
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptBusy)
+	require.Nil(t, poll.attempt)
+	require.Equal(t, baseline, availabilityCalls.Load())
+
+	close(release)
+	require.Eventually(t, func() bool {
+		return !functionBundleQuarantined(bundle)
+	}, time.Second, time.Millisecond)
+	bundle.retire()
+	require.NoError(t, bundle.wait(context.Background()))
+}
+
+func TestRetainedAvailabilityPollQuarantinesInvocations(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	var blocking atomic.Bool
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &controllerTestHandler{}
+			},
+		},
+		[]funcapi.FunctionConfig{{
+			ID: "method",
+			Available: func() bool {
+				if blocking.Load() {
+					close(entered)
+					<-release
+				}
+				return true
+			},
+		}},
+	)
+	require.NoError(t, err)
+	require.NoError(t, bundle.bindContainment(attempts, 1, "1/module/agent", "module"))
+	blocking.Store(true)
+
+	poll, err := bundle.startAvailabilityPoll()
+	require.NoError(t, err)
+	<-entered
+	require.True(t, poll.attempt.Cut(jobmgr.ErrProcessAttemptSuperseded))
+	require.ErrorIs(t, poll.attempt.Await(context.Background()), jobmgr.ErrProcessAttemptSuperseded)
+	require.Eventually(t, func() bool {
+		return functionBundleQuarantined(bundle)
+	}, time.Second, time.Millisecond)
+
+	calls := 0
+	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
+		calls++
+		return lifecycle.NewSealedResult(200, "application/json", nil)
+	})
+	require.NoError(t, err)
+	require.Zero(t, calls)
+
+	close(release)
+	require.ErrorIs(t, (<-poll.result).err, jobmgr.ErrProcessAttemptSuperseded)
+	require.Eventually(t, func() bool {
+		return !functionBundleQuarantined(bundle)
+	}, time.Second, time.Millisecond)
+	bundle.retire()
+	require.NoError(t, bundle.wait(context.Background()))
+}
+
+func functionBundleQuarantined(bundle *functionBundle) bool {
+	bundle.mu.Lock()
+	defer bundle.mu.Unlock()
+	return bundle.quarantined
+}
+
 func TestFunctionBundleAvailabilityPollIsPerBundleBusy(t *testing.T) {
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
@@ -230,14 +343,12 @@ func TestFunctionBundleAvailabilityPollIsPerBundleBusy(t *testing.T) {
 	close(release)
 	<-poll.attempt.Released()
 	require.ErrorIs(t, (<-poll.result).err, jobmgr.ErrProcessAttemptSuperseded)
-	poll.bundle.release()
 	blocking.Store(false)
 
 	poll, err = bundle.startAvailabilityPoll()
 	require.NoError(t, err)
 	require.NoError(t, poll.attempt.Await(context.Background()))
 	require.NoError(t, (<-poll.result).err)
-	poll.bundle.release()
 	bundle.retire()
 	require.NoError(t, bundle.wait(context.Background()))
 }
@@ -279,7 +390,6 @@ func TestFunctionBundleCutAvailabilityPollCannotPublishLateResult(t *testing.T) 
 	close(release)
 	<-poll.attempt.Released()
 	require.ErrorIs(t, (<-poll.result).err, jobmgr.ErrProcessAttemptSuperseded)
-	poll.bundle.release()
 
 	require.False(t, bundle.available("method"))
 	bundle.retire()
@@ -325,7 +435,6 @@ func TestFunctionBundleAvailabilityPollPreventsConcurrentCleanup(t *testing.T) {
 	close(release)
 	<-poll.attempt.Released()
 	require.NoError(t, (<-poll.result).err)
-	poll.bundle.release()
 	require.Eventually(t, func() bool {
 		return handler.cleanupCount() == 1
 	}, time.Second, time.Millisecond)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
@@ -262,6 +263,155 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			require.NoError(t, graph.Abort(next))
 		})
 	}
+}
+
+func TestPreparedResourceTransactionReturnsRetainedPendingSuccessorOnFailure(t *testing.T) {
+	startFailure := errors.New("successor start failed")
+	abortFailure := errors.New("successor abort failed")
+	tests := map[string]struct {
+		disposition lifecycle.ResourceTransactionDisposition
+		currentID   lifecycle.ResourceIdentity
+		generation  uint64
+	}{
+		"installation": {
+			disposition: lifecycle.ResourceTransactionInstalled,
+			generation:  1,
+		},
+		"replacement": {
+			disposition: lifecycle.ResourceTransactionReplaced,
+			currentID:   lifecycle.ResourceIdentity{ID: "job", Generation: 1},
+			generation:  2,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var events []string
+			var current lifecycle.ReadyResource
+			if test.currentID.Valid() {
+				current = &transactionTestReadyResource{
+					identity: test.currentID,
+					prefix:   "current",
+					events:   &events,
+				}
+			}
+			successorID := lifecycle.ResourceIdentity{ID: "job", Generation: test.generation}
+			successor, releaseSuccessor := newRetainedTransactionSuccessor(
+				t,
+				successorID,
+				startFailure,
+				abortFailure,
+			)
+			defer releaseSuccessor()
+			result, err := lifecycle.NewSealedResult(500, "application/json", nil)
+			require.NoError(t, err)
+			scope := lifecycle.ResourceTransactionScope{
+				ID:        "job",
+				Current:   test.currentID,
+				Successor: successorID,
+			}
+			transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+				Scope:       scope,
+				Disposition: test.disposition,
+				Current:     current,
+				Successor:   successor,
+				Result:      result,
+				Cleanup:     func() error { return nil },
+			})
+			require.NoError(t, err)
+
+			applied, err := transaction.Apply(context.Background())
+
+			require.ErrorIs(t, err, startFailure)
+			require.ErrorIs(t, err, abortFailure)
+			gotScope, gotDisposition, owned := applied.Ownership()
+			require.Equal(t, scope, gotScope)
+			require.Equal(t, test.disposition, gotDisposition)
+			retained, ok := owned.(*JobGeneration)
+			require.True(t, ok)
+			require.Equal(t, JobRetained, retained.State())
+		})
+	}
+}
+
+func newRetainedTransactionSuccessor(
+	t *testing.T,
+	identity lifecycle.ResourceIdentity,
+	startErr error,
+	abortErr error,
+) (PreparedJob, func()) {
+	t.Helper()
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	candidate := ConstructedJob{
+		Variant:          JobVariantV1,
+		CollectorCleanup: func(context.Context) error { return nil },
+		finalCleanup:     func(context.Context) error { return nil },
+	}
+	owner := newStagedJobOwner(
+		candidate,
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       identity.ID,
+			Resource:  identity.ID,
+		},
+	)
+	candidate.attach = func(
+		lifecycle.ResourceIdentity,
+		*stagedJobOwner,
+	) (ConstructedJob, error) {
+		if err := owner.BindAttachment(); err != nil {
+			return ConstructedJob{}, err
+		}
+		attached := candidate
+		attached.Runtime = transactionTestRuntime{
+			startErr: startErr,
+			abortErr: abortErr,
+		}
+		attached.processOwner = owner
+		return attached, nil
+	}
+	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
+	prepared := PreparedJob{state: &preparedJobState{
+		id:          identity.ID,
+		generation:  identity.Generation,
+		constructed: candidate,
+		permit:      permit,
+		owner:       owner,
+	}}
+	release := func() {
+		owner.Detached()
+		owner.Reject()
+		<-owner.done
+		require.NoError(t, permit.ReleaseExternal())
+		require.NoError(t, permit.Return())
+		require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+		attempts.BeginShutdown()
+		require.NoError(t, attempts.Shutdown(context.Background()))
+	}
+	return prepared, release
+}
+
+type transactionTestRuntime struct {
+	startErr error
+	abortErr error
+}
+
+func (runtime transactionTestRuntime) Start(context.Context) error {
+	return runtime.startErr
+}
+
+func (runtime transactionTestRuntime) Abort(context.Context) error {
+	return runtime.abortErr
+}
+
+func (transactionTestRuntime) Stop(context.Context) error {
+	return nil
+}
+
+func (transactionTestRuntime) ReleaseAfterCleanup(context.Context) error {
+	return nil
 }
 
 func TestPreparedResourceTransactionCommitsBusyFallbackAfterIncumbentRemoval(t *testing.T) {

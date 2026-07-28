@@ -26,26 +26,26 @@ const (
 type functionBundle struct {
 	mu sync.Mutex
 
-	kind         functionBundleKind
-	module       string
-	job          collectorapi.RuntimeJob
-	handler      funcapi.MethodHandler
-	methods      []funcapi.FunctionConfig
-	availability map[string]bool
-	pollable     bool
-	references   int
-	retired      bool
-	cleanupStart bool
-	cleanupErr   error
-	cleanupDone  chan struct{}
-	attempts     jobmgr.ProcessAttemptAuthority
-	identityKey  string
-	resource     string
-	target       uint64
-	invocationID uint64
-	activeCalls  int
-	quarantined  bool
-	idExhausted  bool
+	kind            functionBundleKind
+	module          string
+	job             collectorapi.RuntimeJob
+	handler         funcapi.MethodHandler
+	methods         []funcapi.FunctionConfig
+	availability    map[string]bool
+	pollable        bool
+	references      int
+	retired         bool
+	cleanupStart    bool
+	cleanupErr      error
+	cleanupDone     chan struct{}
+	attempts        jobmgr.ProcessAttemptAuthority
+	identityKey     string
+	resource        string
+	target          uint64
+	invocationID    uint64
+	activeCallbacks int
+	quarantined     bool
+	idExhausted     bool
 }
 
 type functionAvailabilityPoll struct {
@@ -59,7 +59,7 @@ type functionAvailabilityResult struct {
 	err          error
 }
 
-type functionInvocation struct {
+type functionCallback struct {
 	bundle    *functionBundle
 	completed bool
 }
@@ -103,6 +103,12 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 		bundle.mu.Unlock()
 		return functionAvailabilityPoll{}, nil
 	}
+	if bundle.quarantined {
+		bundle.mu.Unlock()
+		return functionAvailabilityPoll{}, jobmgr.ErrProcessAttemptBusy
+	}
+	callback := &functionCallback{bundle: bundle}
+	bundle.activeCallbacks++
 	bundle.references++
 	attempts := bundle.attempts
 	key := bundle.identityKey
@@ -110,7 +116,7 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 	target := bundle.target
 	bundle.mu.Unlock()
 	if attempts == nil {
-		bundle.release()
+		callback.complete()
 		return functionAvailabilityPoll{}, errors.New("jobmgr Function bundle: availability containment is not bound")
 	}
 	workerResult := make(chan functionAvailabilityResult, 1)
@@ -122,6 +128,7 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 		},
 		Target: target,
 		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
+			defer callback.complete()
 			availability, pollErr := bundle.evaluateAvailability()
 			if cause := context.Cause(ctx); cause != nil {
 				return cause
@@ -134,12 +141,19 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 		},
 	})
 	if err != nil {
-		bundle.release()
+		callback.complete()
 		return functionAvailabilityPoll{}, err
 	}
 	result := make(chan functionAvailabilityResult, 1)
 	go func() {
 		settledErr := attempt.Await(context.Background())
+		if settledErr != nil {
+			select {
+			case <-attempt.Released():
+			default:
+				callback.quarantineIfActive()
+			}
+		}
 		<-attempt.Released()
 		if settledErr != nil {
 			result <- functionAvailabilityResult{err: settledErr}
@@ -174,13 +188,13 @@ func (bundle *functionBundle) invoke(
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
 	invocationID := bundle.invocationID
-	bundle.activeCalls++
+	bundle.activeCallbacks++
 	bundle.references++
 	attempts := bundle.attempts
 	key := bundle.identityKey
 	resource := bundle.resource
 	target := bundle.target
-	invocation := &functionInvocation{bundle: bundle}
+	callback := &functionCallback{bundle: bundle}
 	bundle.mu.Unlock()
 
 	result := make(chan functionInvocationResult, 1)
@@ -195,7 +209,7 @@ func (bundle *functionBundle) invoke(
 			attemptCtx context.Context,
 			_ jobmgr.ProcessAttemptAdmission,
 		) error {
-			defer invocation.complete()
+			defer callback.complete()
 			callCtx, cancel := context.WithCancelCause(attemptCtx)
 			stop := context.AfterFunc(ctx, func() {
 				cancel(context.Cause(ctx))
@@ -211,14 +225,14 @@ func (bundle *functionBundle) invoke(
 		},
 	})
 	if err != nil {
-		invocation.complete()
+		callback.complete()
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
 	if err := attempt.Await(ctx); err != nil {
 		select {
 		case <-attempt.Released():
 		default:
-			invocation.quarantineIfActive()
+			callback.quarantineIfActive()
 		}
 		if ctx.Err() != nil || errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
 			return functionErrorResult(503, "Function handler did not complete before its deadline")
@@ -229,46 +243,46 @@ func (bundle *functionBundle) invoke(
 	return response.result, response.err
 }
 
-func (invocation *functionInvocation) quarantineIfActive() {
-	if invocation == nil || invocation.bundle == nil {
+func (callback *functionCallback) quarantineIfActive() {
+	if callback == nil || callback.bundle == nil {
 		return
 	}
-	bundle := invocation.bundle
+	bundle := callback.bundle
 	bundle.mu.Lock()
-	if !invocation.completed {
+	if !callback.completed {
 		bundle.quarantined = true
 	}
 	bundle.mu.Unlock()
 }
 
-func (invocation *functionInvocation) complete() {
-	if invocation == nil || invocation.bundle == nil {
+func (callback *functionCallback) complete() {
+	if callback == nil || callback.bundle == nil {
 		return
 	}
-	bundle := invocation.bundle
+	bundle := callback.bundle
 	bundle.mu.Lock()
-	if invocation.completed {
+	if callback.completed {
 		bundle.mu.Unlock()
 		return
 	}
-	invocation.completed = true
-	if bundle.activeCalls <= 0 {
+	callback.completed = true
+	if bundle.activeCallbacks <= 0 {
 		bundle.mu.Unlock()
-		panic("jobmgr Function bundle: active invocation underflow")
+		panic("jobmgr Function bundle: active callback underflow")
 	}
-	bundle.activeCalls--
+	bundle.activeCallbacks--
 	// A sibling can cross its logical deadline before its caller records
 	// retained ownership. Once established, quarantine therefore stays closed
 	// until every callback admitted before it has physically returned.
 	if bundle.quarantined &&
-		bundle.activeCalls == 0 &&
+		bundle.activeCallbacks == 0 &&
 		!bundle.retired &&
 		!bundle.idExhausted {
 		bundle.quarantined = false
 	}
 	if bundle.references <= 0 {
 		bundle.mu.Unlock()
-		panic("jobmgr Function bundle: invocation reference underflow")
+		panic("jobmgr Function bundle: callback reference underflow")
 	}
 	bundle.references--
 	start := bundle.startCleanupLocked()

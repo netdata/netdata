@@ -179,7 +179,8 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 		config.Frames == nil ||
 		config.ConfigModules == nil ||
 		config.Vnodes == nil ||
-		config.Scheduler == nil {
+		config.Scheduler == nil ||
+		(config.HandlerStager == nil) != (config.HandlerAttacher == nil) {
 		return nil, errors.New("job output: incomplete factory configuration")
 	}
 	if config.RunWithoutClaims == nil {

@@ -186,7 +186,9 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 
 			require.NoError(t, generation.Wait(context.Background()))
 
-			require.EqualValues(t, int32(test.jobs), cleanupCalls.Load())
+			require.Eventually(t, func() bool {
+				return cleanupCalls.Load() == int32(test.jobs)
+			}, time.Second, time.Millisecond)
 
 			closeRunTestUIDs(t, uids)
 		})

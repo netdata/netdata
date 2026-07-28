@@ -519,8 +519,10 @@ flowchart TD
 5. **Promote, attach, and start** — the candidate acquires the separate `job-runtime` identity only after logical
    retirement. Candidate `Init`/`Check` may overlap the incumbent, but two installed runtimes for one job cannot.
    After promotion the staged runtime/vnode/Function projections attach, the permit and output gate activate, and the
-   managed loop starts. If the old runtime does not release within the supersession grace, the candidate is rejected
-   and the source-specific busy/pending policy applies.
+   managed loop starts. The resource transaction owns this successor until installation acknowledgement: an
+   apply failure aborts it when possible, or returns the still-live retained generation to the kernel for fail-closed
+   ownership. If the old runtime does not release within the supersession grace, the candidate is rejected and the
+   source-specific busy/pending policy applies.
 6. **Emit** — installation activates the generation output gate. Retirement fences it before detaching projections, so
    a retained old runtime cannot interleave late frames with its successor. Whole active frames still commit through
    the process's one `FrameOwner`. `joboutput/output_gate.go`.
@@ -806,12 +808,13 @@ agent-level module) stages one stable process-owned handler bundle outside contr
 
 - immutable catalog generations acquire cheap references to an existing bundle;
 - replacing one job never reconstructs handlers for its siblings;
-- retirement closes route admission first, then cleanup waits for every catalog and in-flight invocation reference to
+- retirement closes route admission first, then cleanup waits for every catalog and in-flight callback reference to
   drain;
 - availability polling and handler invocation run as contained attempts outside the controller and process-control
   loops;
-- a call that crosses its caller deadline has late output fenced and quarantines only its bundle until every call
-  already active when quarantine was established physically returns; unrelated bundles remain available.
+- a handler invocation or availability poll that settles while its callback remains physically live quarantines only
+  its bundle; new callbacks for that bundle are rejected until every callback covered by quarantine physically
+  returns, while unrelated bundles remain available.
 
 `functions/bundle.go`, `functions/module_stage.go`, `functions/controller.go`.
 

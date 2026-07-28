@@ -26,6 +26,8 @@ func Run(a *agent.Agent) error {
 	return runSignals(a, ch)
 }
 
+const hostedControlTimeout = 10 * time.Second
+
 type hostedAgent interface {
 	RunContext(context.Context) error
 	Restart(context.Context) error
@@ -36,7 +38,11 @@ type hostedAgent interface {
 }
 
 func runSignals(a hostedAgent, signals <-chan os.Signal) error {
-	if a == nil || signals == nil {
+	return runSignalsWithTimeout(a, signals, hostedControlTimeout)
+}
+
+func runSignalsWithTimeout(a hostedAgent, signals <-chan os.Signal, timeout time.Duration) error {
+	if a == nil || signals == nil || timeout <= 0 {
 		return errors.New("agent host: invalid signal loop")
 	}
 	collectorapi.ObsoleteCharts(true)
@@ -51,15 +57,24 @@ func runSignals(a hostedAgent, signals <-chan os.Signal) error {
 		done := make(chan error, 1)
 		restartDone = done
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			done <- a.Restart(ctx)
 		}()
 	}
 	terminate := func(restartErr error) error {
 		collectorapi.ObsoleteCharts(false)
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		err := a.Terminate(ctx)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		done := make(chan error, 1)
+		go func() {
+			done <- a.Terminate(ctx)
+		}()
+		var err error
+		select {
+		case err = <-done:
+		case <-ctx.Done():
+			err = context.Cause(ctx)
+		}
 		cancel()
 		if err != nil && !errors.Is(err, agent.ErrNotRunning) {
 			a.Errorf("terminating the Agent failed: %v", err)
@@ -67,7 +82,7 @@ func runSignals(a hostedAgent, signals <-chan os.Signal) error {
 		if errors.Is(err, agent.ErrNotRunning) {
 			err = nil
 		}
-		runErr := waitForRun(runDone, 10*time.Second)
+		runErr := waitForRun(runDone, timeout)
 		if runErr != nil {
 			a.Errorf("agent shutdown failed: %v", runErr)
 		}

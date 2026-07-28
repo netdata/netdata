@@ -125,6 +125,35 @@ func (owner *stagedJobOwner) Replace(resources ConstructedJob) error {
 	return nil
 }
 
+// AcceptResources linearizes permit activation with freezing the accepted
+// cleanup contract, then returns the same resource value to the generation.
+func (owner *stagedJobOwner) AcceptResources(
+	permit lifecycle.LongLivedPermit,
+) (ConstructedJob, error) {
+	if owner == nil {
+		return ConstructedJob{}, errors.New("job output: nil staged job acceptance")
+	}
+	owner.mu.Lock()
+	defer owner.mu.Unlock()
+	if owner.ownership != stagedJobOwnedByRuntime ||
+		!owner.attached ||
+		owner.decided ||
+		owner.retiring ||
+		owner.finalized {
+		return ConstructedJob{}, errors.New("job output: invalid staged job acceptance")
+	}
+	if err := permit.ActivateExternal(); err != nil {
+		return ConstructedJob{}, err
+	}
+	resources := owner.resources
+	if resources.finalCleanup != nil {
+		resources.CollectorCleanup = resources.finalCleanup
+		resources.finalCleanup = nil
+	}
+	owner.resources = resources
+	return resources, nil
+}
+
 func (owner *stagedJobOwner) BindAttachment() error {
 	if owner == nil {
 		return errors.New("job output: nil staged job owner")

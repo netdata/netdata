@@ -235,9 +235,17 @@ func (prt *PreparedResourceTransaction) Apply(
 			)
 		}
 		if resultErr != nil && pendingInstallation != nil {
+			remaining, settleErr := pendingInstallation.settleFailedInstallation(
+				context.WithoutCancel(ctx),
+			)
+			pendingInstallation = nil
+			if remaining != nil {
+				ownershipCurrent = remaining
+				ownershipDisposition = spec.Disposition
+			}
 			resultErr = errors.Join(
 				resultErr,
-				pendingInstallation.abortPendingInstallation(context.WithoutCancel(ctx)),
+				settleErr,
 			)
 		}
 		if mutationOwned {
@@ -305,12 +313,12 @@ func (prt *PreparedResourceTransaction) Apply(
 		lifecycle.ResourceTransactionReplaced:
 		current, err = spec.Successor.AcceptStart(ctx, spec.Scope.Successor.Generation)
 		if current != nil {
-			pending, _ := current.(interface{ installationPending() bool })
-			if pending == nil || !pending.installationPending() {
+			generation, isJobGeneration := current.(*JobGeneration)
+			if !isJobGeneration || !generation.installationPending() {
 				ownershipCurrent = current
 				ownershipDisposition = spec.Disposition
 			} else {
-				pendingInstallation, _ = current.(*JobGeneration)
+				pendingInstallation = generation
 			}
 		}
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -131,12 +132,7 @@ func prepareContainedModulePlans(
 			stage.attempt.Cut(ctx.Err())
 			result.err = ctx.Err()
 		}
-		if result.err == nil && result.transfer != nil && !result.transfer.Accept() {
-			result.err = context.Cause(ctx)
-			if result.err == nil {
-				result.err = jobmgr.ErrProcessAttemptSettled
-			}
-		}
+		result.err = acceptModulePlanResult(ctx, &result)
 		if result.err != nil {
 			cleanupErr := cleanupControllerModulePlans(plans)
 			releaseModulePlanStages(stages[index:])
@@ -145,6 +141,25 @@ func prepareContainedModulePlans(
 		plans[stage.module] = result.plan
 	}
 	return plans, nil
+}
+
+func acceptModulePlanResult(ctx context.Context, result *modulePlanResult) error {
+	if ctx == nil || result == nil {
+		return errors.New("jobmgr Function controller: invalid module-plan result")
+	}
+	if cause := context.Cause(ctx); cause != nil {
+		if result.transfer != nil {
+			result.transfer.Abandon()
+		}
+		return errors.Join(result.err, cause)
+	}
+	if result.err != nil {
+		return result.err
+	}
+	if result.transfer != nil && !result.transfer.Accept() {
+		return jobmgr.ErrProcessAttemptSettled
+	}
+	return nil
 }
 
 func startModulePlanStage(
@@ -272,7 +287,7 @@ func releaseModulePlanStages(stages []modulePlanStage) {
 }
 
 func candidateFunctionResource(module string) string {
-	if module == "" || len(module) > 256 {
+	if module == "" || len(module) > 256 || !utf8.ValidString(module) {
 		return "collector module"
 	}
 	for _, char := range module {

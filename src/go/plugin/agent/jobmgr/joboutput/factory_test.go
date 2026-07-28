@@ -70,6 +70,28 @@ func TestCreatorDeclaresFunctions(t *testing.T) {
 	}
 }
 
+func TestNewFactoryRejectsMismatchedHandlerLifecycleDependencies(t *testing.T) {
+	hooks := factoryTestHooks{}
+	factory, _ := newFactoryTestHarness(t, collectorapi.Creator{}, hooks)
+	tests := map[string]FactoryConfig{
+		"stager only":   factory.config,
+		"attacher only": factory.config,
+	}
+	stagerOnly := tests["stager only"]
+	stagerOnly.HandlerAttacher = nil
+	tests["stager only"] = stagerOnly
+	attacherOnly := tests["attacher only"]
+	attacherOnly.HandlerStager = nil
+	tests["attacher only"] = attacherOnly
+
+	for name, config := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewFactory(config)
+			require.ErrorContains(t, err, "incomplete factory configuration")
+		})
+	}
+}
+
 func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 	tests := map[string]struct {
 		configure     func(*factoryTestState, *collectorapi.Creator) factoryTestJobHooks

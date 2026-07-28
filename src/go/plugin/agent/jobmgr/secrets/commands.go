@@ -382,6 +382,25 @@ func (c *Controller) prepareRemove(
 		)
 	}
 	expected := c.store.Generation(target.key)
+	if expected == 0 &&
+		current == nil &&
+		!scope.Current.Valid() &&
+		entry.status == dyncfg.StatusFailed {
+		return newPreparedSecretTransaction(
+			preparedSecretSpec{
+				scope:      scope,
+				current:    current,
+				storeKey:   target.key,
+				remove:     true,
+				result:     mustSecretMessage(200, ""),
+				cleanup:    c.configDeleteCleanup(target.key),
+				controller: c,
+				commit: func() {
+					c.clearPendingThrough(target.key, result.desiredVersion)
+				},
+			},
+		)
+	}
 	if expected == 0 || current == nil || !scope.Current.Valid() {
 		return c.noopMessage(scope, current, 409, "Secretstore has no active generation.")
 	}

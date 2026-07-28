@@ -117,7 +117,6 @@ func (cb *sdCallbacks) Start(fn dyncfg.Function, cfg sdConfig) error {
 func (cb *sdCallbacks) Update(fn dyncfg.Function, oldCfg, newCfg sdConfig) error {
 	prepared, err := cb.sd.preparePipeline(fn.Context(), newCfg)
 	if err != nil {
-		cb.sd.retainPendingPipeline(newCfg, err)
 		return dyncfg.MarkNonDisruptiveUpdate(err)
 	}
 	if err := cb.sd.mgr.RestartPrepared(cb.sd.ctx, newCfg.PipelineKey(), prepared); err != nil {

@@ -244,13 +244,12 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 			return nil, errors.Join(err, state.permit.AbortUnused())
 		}
 	}
-	if err := state.permit.ActivateExternal(); err != nil {
+	accepted, err := state.owner.AcceptResources(state.permit)
+	if err != nil {
 		state.owner.Reject()
 		return nil, errors.Join(err, state.permit.AbortUnused())
 	}
-	if state.constructed.finalCleanup != nil {
-		state.constructed.CollectorCleanup = state.constructed.finalCleanup
-	}
+	state.constructed = accepted
 	return &JobGeneration{
 		ID:           state.id,
 		Generation:   state.generation,
@@ -422,21 +421,26 @@ func (jg *JobGeneration) installationPending() bool {
 	return jg.owner != nil
 }
 
-func (jg *JobGeneration) abortPendingInstallation(ctx context.Context) error {
+func (jg *JobGeneration) settleFailedInstallation(
+	ctx context.Context,
+) (*JobGeneration, error) {
 	if jg == nil || ctx == nil {
-		return errors.New("job output: invalid pending installation abort")
+		return jg, errors.New("job output: invalid pending installation settlement")
 	}
 	jg.mu.Lock()
 	if jg.owner == nil {
 		jg.mu.Unlock()
-		return nil
+		return jg, errors.New("job output: pending installation lost its process owner")
 	}
 	switch jg.state {
 	case JobReady, JobActive:
+	case JobRetained:
+		jg.mu.Unlock()
+		return jg, nil
 	default:
 		state := jg.state
 		jg.mu.Unlock()
-		return fmt.Errorf("job output: pending installation abort from state %s", state)
+		return jg, fmt.Errorf("job output: pending installation settlement from state %s", state)
 	}
 	observer := jg.resources.Observer
 	wasActive := jg.observedActive
@@ -451,7 +455,11 @@ func (jg *JobGeneration) abortPendingInstallation(ctx context.Context) error {
 	if err != nil {
 		state = JobRetained
 	}
-	return jg.finish(state, err)
+	err = jg.finish(state, err)
+	if state == JobRetained {
+		return jg, err
+	}
+	return nil, err
 }
 
 func (jg *JobGeneration) Identity() lifecycle.ResourceIdentity {

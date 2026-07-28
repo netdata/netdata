@@ -306,6 +306,62 @@ func TestInvalidStoreCommandClearsOlderPendingDesiredConfig(t *testing.T) {
 	require.False(t, controller.pendingVersion(pending.ExposedKey(), version))
 }
 
+func TestRemoveFailedAbsentDynCfgStoreWithdrawsPendingDesiredState(t *testing.T) {
+	controller, store := newSecretControllerTestHarness(t, nil)
+	require.NoError(t, controller.Bind(restartTestJobs{}))
+	commands := &initialStoreTestCommands{
+		publishTemplates: controller.templateCleanup(),
+	}
+	require.NoError(t, controller.PublishInitial(t.Context(), commands))
+	t.Cleanup(func() {
+		require.NoError(t, controller.CloseProjection())
+		require.NoError(t, store.Close(context.Background()))
+	})
+
+	config := secretTestConfig(confgroup.TypeDyncfg, "pending")
+	key := config.ExposedKey()
+	controller.commitEntry(key, &secretEntry{
+		config: config,
+		status: dyncfg.StatusFailed,
+	})
+	version, err := controller.allocateDesiredVersion()
+	require.NoError(t, err)
+	release := make(chan struct{})
+	controller.retainPending(config, version, release)
+	require.True(t, controller.pendingVersion(key, version))
+
+	input := CommandInput{
+		Args: []string{"go.d:secretstore:vault:main", "remove"},
+	}
+	stage, err := controller.Stage(input)
+	require.NoError(t, err)
+	stage.Start()
+	<-stage.Ready()
+	defer stage.Release()
+	prepared, err := controller.PrepareStaged(
+		t.Context(),
+		input,
+		nil,
+		lifecycle.ResourceTransactionScope{ID: secretResourceID(key)},
+		lifecycle.LongLivedPermit{},
+		stage,
+	)
+	require.NoError(t, err)
+
+	applied, err := prepared.Apply(t.Context())
+
+	require.NoError(t, err)
+	require.Equal(t, 200, applied.ResultStatus())
+	_, exists := controller.entry(key)
+	require.False(t, exists)
+	require.False(t, controller.pendingVersion(key, version))
+	close(release)
+	require.Never(t, func() bool {
+		_, ok := controller.entry(key)
+		return ok
+	}, 50*time.Millisecond, time.Millisecond)
+}
+
 func TestPendingStoreRestartsInactiveWorkerForLaterDesiredState(t *testing.T) {
 	controller, store := newSecretControllerTestHarness(t, nil)
 	diagnostics := &secretRecordingDiagnosticObserver{}

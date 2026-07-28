@@ -14,6 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSignalLoopTerminatesWhileRestartIsInProgress(t *testing.T) {
@@ -46,6 +47,32 @@ func TestSignalLoopTerminatesWhileRestartIsInProgress(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("host did not stop")
+	}
+}
+
+func TestSignalLoopBoundsNonCooperativeTermination(t *testing.T) {
+	hosted := newBlockingTerminateAgent()
+	signals := make(chan os.Signal, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- runSignalsWithTimeout(hosted, signals, 20*time.Millisecond)
+	}()
+	t.Cleanup(func() {
+		hosted.release()
+	})
+
+	signals <- syscall.SIGTERM
+	select {
+	case <-hosted.terminateEntered:
+	case <-time.After(time.Second):
+		t.Fatal("termination did not start")
+	}
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(time.Second):
+		t.Fatal("host waited indefinitely for non-cooperative termination")
 	}
 }
 
@@ -158,3 +185,48 @@ func (agent *blockingRestartAgent) Terminate(context.Context) error {
 func (*blockingRestartAgent) Info(...any)           {}
 func (*blockingRestartAgent) Infof(string, ...any)  {}
 func (*blockingRestartAgent) Errorf(string, ...any) {}
+
+type blockingTerminateAgent struct {
+	terminateEntered chan struct{}
+	terminateRelease chan struct{}
+	runDone          chan struct{}
+	enterOnce        sync.Once
+	releaseOnce      sync.Once
+}
+
+func newBlockingTerminateAgent() *blockingTerminateAgent {
+	return &blockingTerminateAgent{
+		terminateEntered: make(chan struct{}),
+		terminateRelease: make(chan struct{}),
+		runDone:          make(chan struct{}),
+	}
+}
+
+func (agent *blockingTerminateAgent) RunContext(context.Context) error {
+	<-agent.runDone
+	return nil
+}
+
+func (*blockingTerminateAgent) Restart(context.Context) error {
+	return nil
+}
+
+func (agent *blockingTerminateAgent) Terminate(ctx context.Context) error {
+	agent.enterOnce.Do(func() {
+		close(agent.terminateEntered)
+	})
+	<-ctx.Done()
+	<-agent.terminateRelease
+	return ctx.Err()
+}
+
+func (agent *blockingTerminateAgent) release() {
+	agent.releaseOnce.Do(func() {
+		close(agent.terminateRelease)
+		close(agent.runDone)
+	})
+}
+
+func (*blockingTerminateAgent) Info(...any)           {}
+func (*blockingTerminateAgent) Infof(string, ...any)  {}
+func (*blockingTerminateAgent) Errorf(string, ...any) {}

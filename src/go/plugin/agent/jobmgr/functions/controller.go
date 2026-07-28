@@ -663,7 +663,6 @@ func (c *Controller) finishAvailabilityPoll(
 	poll functionAvailabilityPoll,
 ) {
 	result := <-poll.result
-	defer poll.bundle.release()
 	if result.err != nil {
 		return
 	}

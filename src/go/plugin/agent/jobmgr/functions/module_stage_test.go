@@ -16,6 +16,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestModulePlanResultDoesNotAcceptAfterCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	transfer := newModulePlanTransfer()
+	result := modulePlanResult{transfer: transfer}
+
+	err := acceptModulePlanResult(ctx, &result)
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.False(t, transfer.wasAccepted())
+}
+
+func TestContainedControllerAcceptsInvalidUTF8ModuleIdentity(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	module := string([]byte{0xff})
+
+	controller, catalog, err := NewContainedController(
+		context.Background(),
+		1,
+		attempts,
+		collectorapi.Registry{module: {}},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, controller)
+	require.NotNil(t, catalog)
+	require.NoError(t, controller.AbortConstruction(context.Background()))
+	attempts.BeginShutdown()
+	require.NoError(t, attempts.Shutdown(context.Background()))
+}
+
 func TestContainedControllerConsumesPlanPublishedBeforeSuccessfulSettlement(t *testing.T) {
 	for index := range 64 {
 		t.Run(strconv.Itoa(index), func(t *testing.T) {
