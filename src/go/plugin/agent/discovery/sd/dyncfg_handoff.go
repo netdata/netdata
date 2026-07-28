@@ -14,6 +14,7 @@ type pendingDyncfgFunction struct {
 	fn        dyncfg.Function
 	done      chan struct{}
 	abandoned bool
+	started   bool
 }
 
 type dyncfgAdmission uint8
@@ -57,9 +58,17 @@ func (d *ServiceDiscovery) enqueueDyncfgFunction(fn dyncfg.Function) {
 	select {
 	case <-pending.done:
 	case <-fnCtx.Done():
-		d.abandonDyncfg(fn)
+		_, started := d.abandonDyncfg(fn)
+		if started {
+			// The outer contained attempt owns logical timeout. Keep this
+			// physical response authority until the serial command returns.
+			<-pending.done
+		}
 	case <-ctx.Done():
-		if d.abandonDyncfg(fn) {
+		exists, started := d.abandonDyncfg(fn)
+		if started {
+			<-pending.done
+		} else if exists {
 			d.dyncfgApi.SendCodef(fn, 503, sdShuttingDownMsg)
 		}
 	}
@@ -129,19 +138,33 @@ func (d *ServiceDiscovery) cancelDyncfg(fn dyncfg.Function) bool {
 
 // abandonDyncfg preserves a queued UID until the run loop drains it. Removing
 // it here would let that stale command complete a newer request reusing the UID.
-func (d *ServiceDiscovery) abandonDyncfg(fn dyncfg.Function) bool {
+func (d *ServiceDiscovery) startDyncfg(fn dyncfg.Function) {
 	if fn.UID() == "" {
-		return true
+		return
 	}
 	d.dyncfgMu.Lock()
 	defer d.dyncfgMu.Unlock()
 	pending, exists := d.dyncfgPending[fn.UID()]
 	if !exists {
-		return false
+		return
+	}
+	pending.started = true
+	d.dyncfgPending[fn.UID()] = pending
+}
+
+func (d *ServiceDiscovery) abandonDyncfg(fn dyncfg.Function) (bool, bool) {
+	if fn.UID() == "" {
+		return true, false
+	}
+	d.dyncfgMu.Lock()
+	defer d.dyncfgMu.Unlock()
+	pending, exists := d.dyncfgPending[fn.UID()]
+	if !exists {
+		return false, false
 	}
 	pending.abandoned = true
 	d.dyncfgPending[fn.UID()] = pending
-	return true
+	return true, pending.started
 }
 
 func (d *ServiceDiscovery) failPendingDyncfg() {

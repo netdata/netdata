@@ -175,6 +175,9 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 
 // dyncfgSeqExec executes state-changing dyncfg commands serially.
 func (d *ServiceDiscovery) dyncfgSeqExec(fn dyncfg.Function) {
+	// Linearize physical start before checking cancellation: cancellation
+	// either wins first, or its response owner must wait for completion.
+	d.startDyncfg(fn)
 	if dyncfgFunctionContext(fn).Err() != nil {
 		return
 	}

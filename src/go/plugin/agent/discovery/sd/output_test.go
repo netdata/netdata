@@ -140,6 +140,112 @@ func TestCanceledQueuedDyncfgCommandReturnsWithoutApplying(t *testing.T) {
 	require.Empty(t, output.String())
 }
 
+func TestCanceledExecutingDyncfgCommandKeepsResponseOwnership(t *testing.T) {
+	var output bytes.Buffer
+	discovery, err := NewServiceDiscovery(Config{
+		Epoch:        1,
+		Attempts:     newTestAttemptAuthority(t),
+		PluginName:   "test",
+		DyncfgOutput: dyncfg.NewProtocolOutput(&output),
+		Discoverers:  NewRegistry(),
+	})
+	require.NoError(t, err)
+	discovery.ctx = context.Background()
+	discovery.mgr = NewPipelineManager(discovery.Logger, func(context.Context, []*confgroup.Group) {})
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	callbacks := &blockingSDCallbacks{
+		sdCallbacks: discovery.sdCb,
+		entered:     entered,
+		release:     release,
+	}
+	discovery.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
+		API:       discovery.dyncfgApi,
+		Seen:      discovery.seen,
+		Exposed:   discovery.exposed,
+		Callbacks: callbacks,
+		Path:      fmt.Sprintf(dyncfgSDPath, discovery.pluginName),
+		ConfigCommands: []dyncfg.Command{
+			dyncfg.CommandDisable,
+		},
+	})
+
+	config, err := newSDConfigFromJSON(
+		[]byte(`{
+			"discoverer":{"fixture":{}},
+			"services":[{"id":"service","match":"true"}]
+		}`),
+		"job",
+		"user=test",
+		"dyncfg",
+		"fixture",
+		pipelineKey("fixture", "job"),
+	)
+	require.NoError(t, err)
+	discovery.handler.AddDiscoveredConfig(config, dyncfg.StatusRunning)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	fn := dyncfg.NewFunction(ctx, functions.Function{
+		UID:  "executing-disable",
+		Name: "config",
+		Args: []string{
+			discovery.dyncfgJobID("fixture", "job"),
+			string(dyncfg.CommandDisable),
+		},
+	})
+	handlerDone := make(chan struct{})
+	go func() {
+		discovery.dyncfgConfig(fn)
+		close(handlerDone)
+	}()
+
+	var command dyncfg.Function
+	select {
+	case command = <-discovery.dyncfgCh:
+	case <-time.After(time.Second):
+		t.Fatal("dyncfg command was not queued")
+	}
+	executionDone := make(chan struct{})
+	go func() {
+		discovery.dyncfgSeqExec(command)
+		discovery.completeDyncfg(command)
+		close(executionDone)
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("dyncfg command did not start executing")
+	}
+
+	cancel()
+	select {
+	case <-handlerDone:
+		t.Fatal("canceled dyncfg handler detached while serial execution was active")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(release)
+	released = true
+	select {
+	case <-executionDone:
+	case <-time.After(time.Second):
+		t.Fatal("dyncfg execution did not finish")
+	}
+	select {
+	case <-handlerDone:
+	case <-time.After(time.Second):
+		t.Fatal("dyncfg handler did not observe physical completion")
+	}
+	require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN executing-disable 200 application/json")
+}
+
 func TestDyncfgAdmissionRejectsCommandsAfterShutdown(t *testing.T) {
 	var output bytes.Buffer
 	discovery, err := NewServiceDiscovery(Config{
@@ -196,4 +302,17 @@ func TestNewServiceDiscoveryUsesConfiguredDyncfgOutput(t *testing.T) {
 	})
 
 	assert.Contains(t, buf.String(), "CONFIG test:sd:discoverer create accepted template /collectors/test/ServiceDiscovery")
+}
+
+type blockingSDCallbacks struct {
+	*sdCallbacks
+
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (callbacks *blockingSDCallbacks) Stop(config sdConfig) {
+	close(callbacks.entered)
+	<-callbacks.release
+	callbacks.sdCallbacks.Stop(config)
 }
