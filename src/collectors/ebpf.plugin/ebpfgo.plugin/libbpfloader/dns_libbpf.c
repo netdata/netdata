@@ -37,6 +37,25 @@
 #ifndef SO_ATTACH_FILTER
 #  define SO_ATTACH_FILTER 26
 #endif
+#ifndef SO_RCVBUF
+#  define SO_RCVBUF 8
+#endif
+#ifndef SOL_PACKET
+#  define SOL_PACKET 263
+#endif
+#ifndef PACKET_STATISTICS
+#  define PACKET_STATISTICS 6
+#endif
+
+/* Mirror of struct tpacket_stats from <linux/if_packet.h> — stable Linux ABI.
+ * Prefixed to avoid collision if a kernel header is in scope. */
+struct netdata_tpacket_stats {
+    uint32_t tp_packets;
+    uint32_t tp_drops;
+};
+
+/* Log at most once per minute when the flow socket drops frames. */
+#define DNS_FLOW_DROP_LOG_INTERVAL_USEC (60ULL * 1000000ULL)
 
 /* Ethernet protocol IDs (network byte order values) */
 #define DNS_ETH_P_ALL   0x0003u
@@ -154,6 +173,7 @@ struct netdata_dns_runtime {
     int sock_fd;   /* BPF-attached socket (base: carries packets; ringbuf: empty) */
     int flow_fd;   /* dedicated AF_PACKET + classic-BPF socket (ringbuf mode only) */
     int per_query; /* when false, skip the flow socket and per-query tracking */
+    uint64_t flow_drop_last_log_usec; /* last time flow socket drops were logged */
     struct netdata_dns_pending    pending[DNS_PENDING_CAP];
     struct netdata_dns_flow_ring  flows;
 };
@@ -635,6 +655,23 @@ static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
 
     while ((n = recv(rt->flow_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0)
         dns_parse_raw_packet(rt, buf, n, now_us, NULL, NULL, NULL);
+
+    /* Read kernel-side drop counter.  PACKET_STATISTICS resets tp_drops on each
+     * getsockopt call so this always reports drops since the previous drain. */
+    struct netdata_tpacket_stats stats;
+    socklen_t stats_len = sizeof(stats);
+    if (getsockopt(rt->flow_fd, SOL_PACKET, PACKET_STATISTICS, &stats, &stats_len) == 0 &&
+        stats.tp_drops > 0) {
+        uint64_t now = dns_now_us();
+        if (rt->flow_drop_last_log_usec == 0 ||
+            now - rt->flow_drop_last_log_usec >= DNS_FLOW_DROP_LOG_INTERVAL_USEC) {
+            fprintf(stderr,
+                    "ebpf-go: dns: flow socket dropped %u frame(s) this interval;"
+                    " consider raising net.core.rmem_max\n",
+                    (unsigned)stats.tp_drops);
+            rt->flow_drop_last_log_usec = now;
+        }
+    }
 }
 
 /* -------------------------------------------------------------------------
@@ -716,6 +753,17 @@ static int dns_open_flow_socket(void)
         fprintf(stderr, "ebpf-go: dns: flow socket() failed (errno %d)\n", errno);
         return -1;
     }
+
+    /* Large receive buffer so the kernel can queue ~10 s of peak DNS traffic
+     * between drains.  The cBPF filter limits this socket to port-53/5353 only,
+     * so 4 MB covers roughly 27,000 small DNS frames — enough for ~2,700 qps.
+     * The kernel silently caps the value at net.core.rmem_max; log and continue
+     * on failure rather than aborting — a smaller default buffer still works. */
+    int rcvbuf = 4 * 1024 * 1024;
+    if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0)
+        fprintf(stderr,
+                "ebpf-go: dns: SO_RCVBUF(%d) failed (errno %d); using default\n",
+                rcvbuf, errno);
 
     if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
                    &flow_filter, sizeof(flow_filter)) < 0) {
