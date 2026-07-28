@@ -392,8 +392,6 @@ When cgroups.plugin cannot read the cgroup filesystem, Netdata logs:
 CGROUP: cannot open directory '/sys/fs/cgroup': <reason>
 ```
 
-`<reason>` is the `opendir()` error — usually `No such file or directory` (not mounted) or `Permission denied` (the `netdata` user can't read or traverse it).
-
 ### What the error disables
 
 Netdata opens the cgroup base mount once per discovery cycle — `/sys/fs/cgroup` on v2, or a separate base mount per subsystem (`cpuacct`, `blkio`, `memory`) on v1. A failed open disables that subsystem's statistics, for example:
@@ -418,10 +416,7 @@ Permission errors on cgroup **subdirectories** (not the base mount) are logged a
 
 ### Resolving the error
 
-**`No such file or directory`** — the cgroup filesystem isn't mounted or visible to Netdata. Confirm with `stat -fc %T /sys/fs/cgroup` (same check as [Monitoring systemd services](#monitoring-systemd-services)): it prints `cgroup2fs` on v2 or `tmpfs` on v1.
-
-- On a host install, the cgroup filesystem itself isn't mounted.
-- In a container, Netdata needs the host's `/proc` and `/sys` (see [Monitoring ephemeral containers](#monitoring-ephemeral-containers)). The official Docker image already binds these under `/host` (for example `-v /sys:/host/sys:ro`). A custom or reduced image must mount the host's `/sys` (matching the official image) or `/sys/fs/cgroup` directly.
+**`No such file or directory`** — the cgroup filesystem isn't mounted or visible to Netdata. Confirm with `stat -fc %T /sys/fs/cgroup` (same check as [Monitoring systemd services](#monitoring-systemd-services)): it prints `cgroup2fs` on v2 or `tmpfs` on v1. In a container, Netdata needs the host's `/proc` and `/sys` (see [Monitoring ephemeral containers](#monitoring-ephemeral-containers)); the official Docker image already binds these under `/host` (for example `-v /sys:/host/sys:ro`), but a custom or reduced image must mount the host's `/sys` (matching the official image) or `/sys/fs/cgroup` directly.
 
 **`Permission denied`** — rarely a real Unix permissions issue: `/sys/fs/cgroup` is normally `0555 root:root` (world-readable and traversable). Check for a Mandatory Access Control (MAC) denial instead:
 
