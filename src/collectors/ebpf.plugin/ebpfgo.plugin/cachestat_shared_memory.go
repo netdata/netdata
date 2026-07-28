@@ -24,8 +24,10 @@ type cachestatSharedMemoryStore struct {
 	nextPrevCt    map[uint32]uint64
 	nextMiss      map[uint32]int
 	stalePIDs     []uint32
-	socketData    map[uint32]ebpfSocketPublishApps // latest per-PID socket snapshot from tbl_nd_socket
-	activeModules uint32                           // EBPFGO_SHM_FLAG_* bits set when a module writes data
+	socketData        map[uint32]ebpfSocketPublishApps // per-interval deltas written to SHM this cycle
+	prevSocketData    map[uint32]ebpfSocketPublishApps // raw cumulative counters from the previous cycle
+	nextPrevSocketData map[uint32]ebpfSocketPublishApps // scratch buffer for the next prevSocketData
+	activeModules uint32                               // EBPFGO_SHM_FLAG_* bits set when a module writes data
 	// cachestatOwnsEntries is true when UpdateApps last populated s.entries.
 	// When false (socket is the sole publisher), UpdateSocketApps must rebuild
 	// s.entries from scratch each cycle rather than merging in-place, so
@@ -35,13 +37,15 @@ type cachestatSharedMemoryStore struct {
 
 func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
 	return &cachestatSharedMemoryStore{
-		prev:       make(map[uint32]netdataCachestat),
-		prevCt:     make(map[uint32]uint64),
-		missCount:  make(map[uint32]int),
-		nextPrev:   make(map[uint32]netdataCachestat),
-		nextPrevCt: make(map[uint32]uint64),
-		nextMiss:   make(map[uint32]int),
-		socketData: make(map[uint32]ebpfSocketPublishApps),
+		prev:               make(map[uint32]netdataCachestat),
+		prevCt:             make(map[uint32]uint64),
+		missCount:          make(map[uint32]int),
+		nextPrev:           make(map[uint32]netdataCachestat),
+		nextPrevCt:         make(map[uint32]uint64),
+		nextMiss:           make(map[uint32]int),
+		socketData:         make(map[uint32]ebpfSocketPublishApps),
+		prevSocketData:     make(map[uint32]ebpfSocketPublishApps),
+		nextPrevSocketData: make(map[uint32]ebpfSocketPublishApps),
 	}
 }
 
@@ -294,8 +298,38 @@ func sortedEntriesContainPID(entries []ebpfPidStat, pid uint32) bool {
 	return false
 }
 
+// socketIntervalDelta returns the per-field difference between consecutive raw
+// BPF counter readings.  Counter resets (current < prev) are clamped to zero.
+func socketIntervalDelta(curr, prev ebpfSocketPublishApps) ebpfSocketPublishApps {
+	clamp := func(c, p uint64) uint64 {
+		if c >= p {
+			return c - p
+		}
+		return 0
+	}
+	return ebpfSocketPublishApps{
+		BytesSent:           clamp(curr.BytesSent, prev.BytesSent),
+		BytesReceived:       clamp(curr.BytesReceived, prev.BytesReceived),
+		CallTCPSent:         clamp(curr.CallTCPSent, prev.CallTCPSent),
+		CallTCPReceived:     clamp(curr.CallTCPReceived, prev.CallTCPReceived),
+		Retransmit:          clamp(curr.Retransmit, prev.Retransmit),
+		CallUDPSent:         clamp(curr.CallUDPSent, prev.CallUDPSent),
+		CallUDPReceived:     clamp(curr.CallUDPReceived, prev.CallUDPReceived),
+		CallClose:           clamp(curr.CallClose, prev.CallClose),
+		CallTCPV4Connection: clamp(curr.CallTCPV4Connection, prev.CallTCPV4Connection),
+		CallTCPV6Connection: clamp(curr.CallTCPV6Connection, prev.CallTCPV6Connection),
+	}
+}
+
 // UpdateSocketApps stores the latest per-PID socket snapshot and applies it to
 // the current entries.  Called by the socket collector each cycle.
+//
+// On the success path (entries != nil) this function computes per-interval
+// deltas (raw BPF counter - previous raw BPF counter) before writing to
+// socketData.  New PIDs emit zero on their first cycle to suppress the initial
+// spike that would otherwise appear when they first enter the BPF map.  Exited
+// PIDs are absent from entries and therefore absent from socketData; the apply
+// path zeroes their SHM row automatically.
 //
 // When cachestat is also running as publisher (cachestatOwnsEntries == true),
 // socket data is merged into the cachestat-populated entries via
@@ -315,25 +349,34 @@ func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.Soc
 	for k := range s.socketData {
 		delete(s.socketData, k)
 	}
-	for _, e := range entries {
-		s.socketData[e.PID] = ebpfSocketPublishApps{
-			BytesSent:           e.BytesSent,
-			BytesReceived:       e.BytesReceived,
-			CallTCPSent:         e.CallTCPSent,
-			CallTCPReceived:     e.CallTCPReceived,
-			Retransmit:          e.Retransmit,
-			CallUDPSent:         e.CallUDPSent,
-			CallUDPReceived:     e.CallUDPReceived,
-			CallClose:           e.CallClose,
-			CallTCPV4Connection: e.CallTCPV4Connection,
-			CallTCPV6Connection: e.CallTCPV6Connection,
-		}
-	}
 	// Set the SOCKET flag only on the success path (entries != nil).
 	// clearSocketApps() passes nil to signal a failed collection cycle;
 	// the caller clears the flag via MarkSocketInactive() before calling here.
 	if entries != nil {
 		s.activeModules |= ebpfgoSHMFlagSocket
+		clear(s.nextPrevSocketData)
+		for _, e := range entries {
+			raw := ebpfSocketPublishApps{
+				BytesSent:           e.BytesSent,
+				BytesReceived:       e.BytesReceived,
+				CallTCPSent:         e.CallTCPSent,
+				CallTCPReceived:     e.CallTCPReceived,
+				Retransmit:          e.Retransmit,
+				CallUDPSent:         e.CallUDPSent,
+				CallUDPReceived:     e.CallUDPReceived,
+				CallClose:           e.CallClose,
+				CallTCPV4Connection: e.CallTCPV4Connection,
+				CallTCPV6Connection: e.CallTCPV6Connection,
+			}
+			s.nextPrevSocketData[e.PID] = raw
+			if prev, ok := s.prevSocketData[e.PID]; ok {
+				s.socketData[e.PID] = socketIntervalDelta(raw, prev)
+			} else {
+				// New PID: emit zero this cycle; first-cycle spike suppressed.
+				s.socketData[e.PID] = ebpfSocketPublishApps{}
+			}
+		}
+		s.prevSocketData, s.nextPrevSocketData = s.nextPrevSocketData, s.prevSocketData
 	}
 	if len(s.socketData) == 0 {
 		s.clearSocketDataFromEntriesLocked()

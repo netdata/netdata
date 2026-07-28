@@ -157,6 +157,11 @@ func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsMergedSocketData(t *tes
 		{Pid: 10, Ppid: 1, Ct: 100},
 		{Pid: 20, Ppid: 1, Ct: 200},
 	})
+	// Cycle 1: establish raw-counter baseline so cycle 2 produces a delta.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 10, BytesSent: 0, BytesReceived: 0, CallTCPSent: 0},
+	})
+	// Cycle 2: delta = cycle2 value - cycle1 value = 1000, 2000, 3.
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
 		{PID: 10, BytesSent: 1000, BytesReceived: 2000, CallTCPSent: 3},
 	})
@@ -232,6 +237,7 @@ func TestCachestatSharedMemoryStoreSolePublisherEjectsExitedPIDs(t *testing.T) {
 	}
 
 	// Cycle 2: PID 10 has exited; PID 30 is new.
+	// PID 20: delta = 201 - 200 = 1.  PID 30: new PID, first cycle suppressed to 0.
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
 		{PID: 20, BytesSent: 201},
 		{PID: 30, BytesSent: 300},
@@ -243,8 +249,8 @@ func TestCachestatSharedMemoryStoreSolePublisherEjectsExitedPIDs(t *testing.T) {
 	if snap2[0].pid != 20 || snap2[1].pid != 30 {
 		t.Fatalf("cycle 2: Snapshot() pids = %d,%d, want 20,30", snap2[0].pid, snap2[1].pid)
 	}
-	if snap2[0].socket.BytesSent != 201 {
-		t.Fatalf("cycle 2: PID 20 BytesSent = %d, want 201", snap2[0].socket.BytesSent)
+	if snap2[0].socket.BytesSent != 1 {
+		t.Fatalf("cycle 2: PID 20 BytesSent = %d, want 1 (delta from 200 to 201)", snap2[0].socket.BytesSent)
 	}
 
 	// Cycle 3: PID 20 exits too; only PID 30 remains.

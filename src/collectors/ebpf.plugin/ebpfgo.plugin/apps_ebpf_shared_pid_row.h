@@ -105,6 +105,9 @@ struct ebpf_publish_swap {
     uint32_t write;
 };
 
+/* Per-interval delta counts published each collection cycle.
+ * The Go producer diffs consecutive BPF map readings before writing here;
+ * consumers sum these values directly without further diffing. */
 struct ebpf_socket_publish_apps {
     uint64_t bytes_sent;
     uint64_t bytes_received;

@@ -18,19 +18,13 @@ void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready)
     cgroup_ebpfgo_socket_snapshot_ready = ready;
 }
 
-static inline uint64_t cgroup_ebpfgo_socket_delta(uint64_t current, uint64_t prev)
-{
-    return (current >= prev) ? (current - prev) : 0;
-}
-
 static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
 {
-    cg->net.prev = cg->net.current;
-    memset(&cg->net.current, 0, sizeof(cg->net.current));
+    memset(&cg->net, 0, sizeof(cg->net));
 
     procfile *ff = cg->ebpf_procs_ff;
     if (!ff)
-        goto done;
+        return;
 
     for (size_t l = 0; l < procfile_lines(ff); l++) {
         pid_t pid = (pid_t)str2l(procfile_lineword(ff, l, 0));
@@ -41,31 +35,20 @@ static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
         if (!item)
             continue;
 
+        /* SHM holds per-interval deltas pre-computed by the Go producer;
+         * sum directly without further diffing. */
         const struct ebpf_socket_publish_apps *s = &item->socket;
-        cg->net.current.bytes_sent             += s->bytes_sent;
-        cg->net.current.bytes_received         += s->bytes_received;
-        cg->net.current.call_tcp_sent          += s->call_tcp_sent;
-        cg->net.current.call_tcp_received      += s->call_tcp_received;
-        cg->net.current.retransmit             += s->retransmit;
-        cg->net.current.call_udp_sent          += s->call_udp_sent;
-        cg->net.current.call_udp_received      += s->call_udp_received;
-        cg->net.current.call_close             += s->call_close;
-        cg->net.current.call_tcp_v4_connection += s->call_tcp_v4_connection;
-        cg->net.current.call_tcp_v6_connection += s->call_tcp_v6_connection;
+        cg->net.bytes_sent             += s->bytes_sent;
+        cg->net.bytes_received         += s->bytes_received;
+        cg->net.call_tcp_sent          += s->call_tcp_sent;
+        cg->net.call_tcp_received      += s->call_tcp_received;
+        cg->net.retransmit             += s->retransmit;
+        cg->net.call_udp_sent          += s->call_udp_sent;
+        cg->net.call_udp_received      += s->call_udp_received;
+        cg->net.call_close             += s->call_close;
+        cg->net.call_tcp_v4_connection += s->call_tcp_v4_connection;
+        cg->net.call_tcp_v6_connection += s->call_tcp_v6_connection;
     }
-
-done:
-    /* On the first sample, after a plugin restart, or after container
-     * re-discovery, prev is all zeros while current holds the full
-     * cumulative eBPF counters.  Setting prev = current here makes every
-     * delta zero for this cycle, preventing the spike that would otherwise
-     * occur.  Mirrors the guard in cgroup_ebpfgo_cachestat.c:244. */
-    if (!cg->net.prev.bytes_sent && !cg->net.prev.bytes_received &&
-        !cg->net.prev.call_tcp_sent && !cg->net.prev.call_tcp_received &&
-        !cg->net.prev.retransmit && !cg->net.prev.call_udp_sent &&
-        !cg->net.prev.call_udp_received && !cg->net.prev.call_close &&
-        !cg->net.prev.call_tcp_v4_connection && !cg->net.prev.call_tcp_v6_connection)
-        cg->net.prev = cg->net.current;
 }
 
 static void cgroup_ebpfgo_socket_update_single_chart(
@@ -129,24 +112,15 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
     const bool is_service = is_cgroup_systemd_service(cg);
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5300;
 
-    uint64_t call_v4  = cgroup_ebpfgo_socket_delta(cg->net.current.call_tcp_v4_connection,
-                                                    cg->net.prev.call_tcp_v4_connection);
-    uint64_t call_v6  = cgroup_ebpfgo_socket_delta(cg->net.current.call_tcp_v6_connection,
-                                                    cg->net.prev.call_tcp_v6_connection);
-    uint64_t bytes_rx = cgroup_ebpfgo_socket_delta(cg->net.current.bytes_received,
-                                                    cg->net.prev.bytes_received);
-    uint64_t bytes_tx = cgroup_ebpfgo_socket_delta(cg->net.current.bytes_sent,
-                                                    cg->net.prev.bytes_sent);
-    uint64_t tcp_rx   = cgroup_ebpfgo_socket_delta(cg->net.current.call_tcp_received,
-                                                    cg->net.prev.call_tcp_received);
-    uint64_t tcp_tx   = cgroup_ebpfgo_socket_delta(cg->net.current.call_tcp_sent,
-                                                    cg->net.prev.call_tcp_sent);
-    uint64_t retrans  = cgroup_ebpfgo_socket_delta(cg->net.current.retransmit,
-                                                    cg->net.prev.retransmit);
-    uint64_t udp_rx   = cgroup_ebpfgo_socket_delta(cg->net.current.call_udp_received,
-                                                    cg->net.prev.call_udp_received);
-    uint64_t udp_tx   = cgroup_ebpfgo_socket_delta(cg->net.current.call_udp_sent,
-                                                    cg->net.prev.call_udp_sent);
+    uint64_t call_v4  = cg->net.call_tcp_v4_connection;
+    uint64_t call_v6  = cg->net.call_tcp_v6_connection;
+    uint64_t bytes_rx = cg->net.bytes_received;
+    uint64_t bytes_tx = cg->net.bytes_sent;
+    uint64_t tcp_rx   = cg->net.call_tcp_received;
+    uint64_t tcp_tx   = cg->net.call_tcp_sent;
+    uint64_t retrans  = cg->net.retransmit;
+    uint64_t udp_rx   = cg->net.call_udp_received;
+    uint64_t udp_tx   = cg->net.call_udp_sent;
 
     cgroup_ebpfgo_socket_update_single_chart(
         cg, &cg->st_net_conn_ipv4, "outbound_conn_v4",

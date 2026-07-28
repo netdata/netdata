@@ -280,6 +280,12 @@ func TestApplySocketDataLocked_ZeroesSocketForPIDsGone(t *testing.T) {
 
 func TestApplySocketDataLocked_AppendsSocketOnlyPIDs(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
+	// Cycle 1: establish raw-counter baseline (deltas suppressed on first cycle).
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 30, BytesSent: 0, CallUDPSent: 0},
+		{PID: 10, BytesReceived: 0, CallTCPReceived: 0},
+	})
+	// Cycle 2: delta = cycle2 - cycle1 = the values below.
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
 		{PID: 30, BytesSent: 3000, CallUDPSent: 4},
 		{PID: 10, BytesReceived: 1000, CallTCPReceived: 2},

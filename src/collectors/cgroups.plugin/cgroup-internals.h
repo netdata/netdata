@@ -63,10 +63,6 @@ typedef struct cgroup_ebpfgo_socket {
     uint64_t call_tcp_v6_connection;
 } cgroup_ebpfgo_socket_t;
 
-typedef struct cgroup_ebpfgo_publish_socket {
-    cgroup_ebpfgo_socket_t current;
-    cgroup_ebpfgo_socket_t prev;
-} cgroup_ebpfgo_publish_socket_t;
 #endif
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
@@ -251,7 +247,7 @@ struct cgroup {
     RRDSET *st_cachestat_misses;
 
     // eBPF socket snapshot from ebpfgo.plugin SHM.
-    cgroup_ebpfgo_publish_socket_t net;
+    cgroup_ebpfgo_socket_t net;
 
     RRDSET *st_net_conn_ipv4;
     RRDSET *st_net_conn_ipv6;
