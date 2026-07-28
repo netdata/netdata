@@ -300,6 +300,7 @@ fn bench_allocated_storage_matrix() {
 }
 
 #[test]
+#[ignore = "manual disk-backed storage component benchmark smoke test"]
 fn storage_component_smoke_measures_completed_archived_artifacts() {
     let artifact_root = tempfile::tempdir().expect("create test artifact root");
     let report = run_storage_component(

@@ -1073,6 +1073,7 @@ fn capacity_bench_sender_child() {
 }
 
 #[test]
+#[ignore = "manual real-UDP capacity benchmark smoke test"]
 fn capacity_smoke_uses_real_udp_and_final_journal_readback() {
     for protocol in [WireProtocol::Ipfix, WireProtocol::CiscoNsel] {
         let report = run_capacity_case(CapacityCaseSpec {
@@ -1108,6 +1109,7 @@ fn capacity_smoke_uses_real_udp_and_final_journal_readback() {
 }
 
 #[test]
+#[ignore = "manual real-UDP capacity benchmark readback test"]
 fn capacity_peak_case_reads_raw_without_redecoding_rollup_artifacts() {
     let report = run_capacity_peak_case(CapacityCaseSpec {
         protocol: WireProtocol::Ipfix,
@@ -1128,6 +1130,7 @@ fn capacity_peak_case_reads_raw_without_redecoding_rollup_artifacts() {
 }
 
 #[test]
+#[ignore = "manual real-UDP capacity benchmark telemetry test"]
 fn capacity_discovery_case_uses_telemetry_without_journal_readback() {
     let report = run_capacity_discovery_case(CapacityCaseSpec {
         protocol: WireProtocol::Ipfix,
@@ -1223,7 +1226,7 @@ fn run_capacity_case_inner(
         let collector_shutdown_started = Instant::now();
         fs::write(artifact.path().join("shutdown"), b"complete")
             .context("request collector shutdown")?;
-        wait_for_child(&mut collector, sender_timeout(&spec))?;
+        wait_for_child(&mut collector, collector_shutdown_timeout(&spec))?;
         let collector_report: CollectorReport =
             read_json(&artifact.path().join("collector-report.json"))?;
         let collector_shutdown_millis = collector_shutdown_started.elapsed().as_millis();
@@ -1985,6 +1988,13 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
 }
 
 fn sender_timeout(spec: &CapacityCaseSpec) -> Duration {
+    let warmup_secs = NonZeroU64::new(spec.target_records_per_sec).map_or(0, |rate| {
+        spec.effective_warmup_records().div_ceil(rate.get())
+    });
+    collector_shutdown_timeout(spec).saturating_add(Duration::from_secs(warmup_secs))
+}
+
+fn collector_shutdown_timeout(spec: &CapacityCaseSpec) -> Duration {
     Duration::from_secs(spec.active_duration_secs).saturating_add(CHILD_TIMEOUT_MARGIN)
 }
 
@@ -2156,6 +2166,42 @@ fn unix_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod capacity_harness_policy_tests {
+    use super::*;
+
+    #[test]
+    fn readback_scopes_select_only_their_declared_artifacts() {
+        assert!(CapacityReadbackScope::RawAndTiers.includes_raw());
+        assert!(CapacityReadbackScope::RawAndTiers.includes_tiers());
+        assert!(CapacityReadbackScope::RawOnly.includes_raw());
+        assert!(!CapacityReadbackScope::RawOnly.includes_tiers());
+        assert!(!CapacityReadbackScope::TelemetryOnly.includes_raw());
+        assert!(!CapacityReadbackScope::TelemetryOnly.includes_tiers());
+    }
+
+    #[test]
+    fn sender_timeout_includes_paced_warmup_without_extending_shutdown() {
+        let spec = CapacityCaseSpec {
+            protocol: WireProtocol::NetFlowV5,
+            packet_shape: PacketShape::OneRecordPerDatagram,
+            cardinality: CardinalityProfile::Repeating256,
+            target_records_per_sec: 2,
+            active_duration_secs: 3,
+            warmup_records: 5,
+        };
+
+        assert_eq!(
+            collector_shutdown_timeout(&spec),
+            Duration::from_secs(3).saturating_add(CHILD_TIMEOUT_MARGIN)
+        );
+        assert_eq!(
+            sender_timeout(&spec),
+            Duration::from_secs(3 + 3).saturating_add(CHILD_TIMEOUT_MARGIN)
+        );
+    }
 }
 
 #[cfg(test)]
