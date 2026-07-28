@@ -221,6 +221,12 @@ var manifest = map[string]ManifestCase{
 	"CASE-024/zoom-into-slow-metrics": {
 		Proves: "a metric collected once a minute, once per ten minutes or once an hour still answers when the dashboard zooms BELOW its collection interval: a 60-point request over a window shorter than one sample interval, fully inside the collected span, returns rows that carry the value - a chart that empties out when the user zooms in is indistinguishable from an outage",
 	},
+	"CASE-025/carry-survives-gaps": {
+		Proves: "a stored record wider than a bucket owes its remainder to the NEXT bucket, and that debt is paid even when the next bucket collects nothing of its own. The engine settles a carry only while handing a numeric record to a bucket, so a bucket that is a gap - or the synthetic point at the end of the data - never asks, and the seconds owed to it are paid nowhere at all. A window total then drops by up to one stored record at every gap edge and at the end of retention. Invisible to L10 and L11, whose conservation checks allow one record of slack at each edge, which is precisely where this lives",
+	},
+	"CASE-025/anomaly-bit-not-blended": {
+		Proves: "a bucket lying entirely inside one stored window reports THAT window's anomaly rate, un-blended. options=anomaly-bit answers about the anomaly RATE, so sum's seconds-owed arithmetic is skipped for it - and the other half of the boundary machinery must not reach it either. A bucket carved inside a fully-anomalous window contains no sample from the window before it, so blending would report the metric as less anomalous than every sample under the bucket actually was. Asserted under average, min, max and sum over a hard 0 -> 100 step on a stored window boundary: all three buckets read 100, and a blended 33/67/100 would be the step smeared backwards into seconds it never touched. Records the ruling that refuted a review finding which had assumed the blended answer was the correct one",
+	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves:  "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
 		FixedBy: "#23216",
