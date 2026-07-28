@@ -316,36 +316,111 @@ from DynCfg commands, and are retried after a failed autodetection.
 ### Configuration source ownership
 
 Go plugin configurations use one source order: **DynCfg > user > discovered >
-stock > internal/unknown**. Each domain keeps its own lifecycle authority, and
-the collector graph rechecks that order when committing a discovered change;
-candidate selection alone is not authoritative.
+stock > internal/unknown**.
+
+The order is shared, but there is no single generic "configuration manager."
+Each domain applies the order at the boundary that owns its lifecycle:
+
+| Configuration domain | Identity | Where the winner is enforced |
+| --- | --- | --- |
+| Collector job | canonical `FullName` (module + job name) | discovery selection, then again before the collector graph changes |
+| SecretStore | exposed `kind:name` | initial/pending selection and the Store generation transaction |
+| Service discovery | exposed config key | before materialization and pipeline start |
+| Configured vnode | vnode name | startup files seed the live registry; a DynCfg upsert replaces that name |
+
+This distinction matters. Collector-job retries and fallback rules do not
+implicitly apply to SecretStores, service-discovery pipelines, or vnodes.
+Configured vnodes do not keep a stack of competing candidates: file config
+seeds the registry, a DynCfg upsert replaces that name, and removing the DynCfg
+vnode does not reveal the old file value.
 
 A plugin-side DynCfg `add` is replay/upsert-capable because the daemon uses it
 to restore persisted configurations. Ordinary user duplicate adds remain
 create-only at the daemon boundary. Removal targets only the current DynCfg
 override and does not immediately reactivate a masked lower-priority source.
 
-The central guarantee is that **reconfiguring a job never disrupts the running
-one until the replacement is proven ready**. Candidate work is process-owned
-and run-detached; only a timely successful candidate can attach to the current
-run and compete for installed-runtime ownership.
+### Collector source-priority event flow
+
+One collector-job identity has one selected desired configuration. A lower
+source may remain known to discovery while a higher source owns the graph, but
+it is not allowed to probe or run.
+
+```mermaid
+flowchart TD
+    Event("Config event for one module/job")
+    Select("Select highest source priority")
+    Lane("Serialize on that job identity")
+    Recheck{"Higher-priority graph<br/>owner exists?"}
+    Noop("Acknowledge source state<br/>no Check · graph unchanged")
+    Probe("Prepare and Check<br/>selected config")
+    Commit("Commit selected outcome")
+
+    Event --> Select --> Lane --> Recheck
+    Recheck -->|"yes"| Noop
+    Recheck -->|"no"| Probe --> Commit
+
+    classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    classDef quiet fill:#f3f4f6,stroke:#6b7280,color:#0b1021;
+    class Event ext;
+    class Select,Lane,Recheck,Probe,Commit core;
+    class Noop quiet;
+```
+
+Common event sequences:
+
+| Event | Outcome |
+| --- | --- |
+| DynCfg config is checking; a lower source arrives | Work for that job identity is serialized. If DynCfg establishes graph ownership, the lower reconciliation becomes a no-op before `Check`. |
+| Higher source is `Accepted`, `Running`, `Failed`, or `Disabled` | Its graph record still owns the identity. A lower source cannot replace it merely because it is not running. |
+| Higher proposal is invalid or rejected before graph mutation | It never becomes the owner. The selected valid lower source may proceed. |
+| A stale pending attempt or retry becomes runnable | It revalidates the source winner, desired config, token, and graph state. If any changed, it becomes a no-op. |
+| DynCfg `test` runs | It uses a separate, memory-only attempt identity. It never owns the graph and never masks another source. |
+| DynCfg override is removed | The override and its runtime, if running, are removed. A masked lower source is **not** activated automatically; it needs a later source-state transition that produces a new reconciliation. An unchanged masked candidate is not installed merely because DynCfg disappeared. |
+
+Here, "no-op" means **do not execute the collector**. Discovery may still
+remember the lower candidate as source state.
+
+`framework/confgroup/config.go`, `discovery/decision.go`,
+`joboutput/discovery.go`, `joboutput/pending_job.go`.
+
+### Candidate lifecycle
+
+Two different guarantees apply during replacement:
+
+- **While the candidate is preparing and probing, the incumbent keeps
+  running.**
+- **After a valid selected candidate settles, the selected desired state wins.**
+  Success installs it; a transient construction failure or probe failure
+  retires the incumbent and commits the source-specific `Failed` or removed
+  outcome.
+
+A proposal rejected before it establishes desired state, or an attempt that
+cannot start because its physical identity is still busy, leaves the incumbent
+unchanged. Persistent sources retain only their latest desired retry; a
+synchronous DynCfg command reports busy and is not applied later.
 
 ```mermaid
 flowchart TD
     Cmd("add / update / discovered / retry")
     Stage("Process-owned candidate<br/>clone · secrets · construct · Init")
     AutoD{"Check + post-check<br/>yield global jobs claim"}
+    Keep("Reject / supersede / busy<br/>incumbent unchanged")
     Reserve("Reserve inactive<br/>run permit")
     Retire("Fence + detach<br/>prior generation")
     Promote{"Acquire installed-runtime<br/>identity"}
     Attach("Attach live projections<br/>activate permit + output")
     Live("Start + publish Running")
-    Fail("Commit Failed / busy<br/>latest pending when persistent")
+    RetireFailed("Retire incumbent")
+    Fail("Commit Failed / removed<br/>schedule retry by source policy")
 
-    Cmd --> Stage --> AutoD
+    Cmd --> Stage
+    Stage -->|"busy / proposal rejected"| Keep
+    Stage -->|"transient preparation<br/>failure / contained"| RetireFailed
+    Stage --> AutoD
     AutoD -->|"ready"| Reserve --> Retire --> Promote
     Promote -->|"acquired"| Attach --> Live
-    AutoD -->|"failed / contained"| Fail
+    AutoD -->|"failed / contained"| RetireFailed --> Fail
     Promote -->|"old runtime retained"| Fail
     Fail -. "identity release / retry due" .-> Stage
 
@@ -353,8 +428,8 @@ flowchart TD
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
     classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
     class Cmd ext;
-    class AutoD,Reserve,Retire,Promote,Attach core;
-    class Stage,Live,Fail job;
+    class AutoD,Reserve,Retire,RetireFailed,Promote,Attach core;
+    class Stage,Keep,Live,Fail job;
 ```
 
 1. **Stage config** — validation, DynCfg `test`, and configuration rendering
@@ -391,6 +466,160 @@ flowchart TD
    fences it before detaching projections, so a retained old runtime cannot
    interleave late frames with its successor. Whole active frames still commit
    through the process's one `FrameOwner`.
+
+### Dependency event flows
+
+A job may use no external dependency, secrets, a configured vnode, or both.
+All variants pass through the same source selection and candidate lifecycle.
+
+```mermaid
+flowchart TD
+    Raw("Selected raw config<br/>secret refs stay unresolved")
+    Vnode{"Configured vnode<br/>named?"}
+    Snapshot("Capture revisioned<br/>vnode snapshot")
+    Secrets{"Secret refs<br/>present?"}
+    Resolve("Pin Store generations<br/>resolve cloned config")
+    Check("Collector Init + Check<br/>private candidate state")
+    Settle("Commit graph + dependency index<br/>then attach live vnode lookup")
+    Run("Running job")
+    Transient("Selected job Failed / removed<br/>normal retry policy")
+    Reject("Invalid proposal rejected<br/>incumbent unchanged")
+
+    Raw --> Vnode
+    Vnode -->|"yes and found"| Snapshot --> Secrets
+    Vnode -->|"yes but missing"| Transient
+    Vnode -->|"no"| Secrets
+    Secrets -->|"yes"| Resolve
+    Resolve -->|"all resolve"| Check
+    Resolve -->|"provider / scope unavailable"| Transient
+    Resolve -->|"invalid reference / config"| Reject
+    Secrets -->|"no"| Check
+    Check -->|"ready"| Settle --> Run
+    Check -->|"fails / contained"| Transient
+
+    classDef cfg fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef dep fill:#fee2e2,stroke:#dc2626,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
+    class Raw cfg;
+    class Vnode,Snapshot,Secrets,Resolve dep;
+    class Check,Settle core;
+    class Run,Transient,Reject job;
+```
+
+#### Secret-dependent job
+
+- The collector graph stores the **raw config with references**, never resolved
+  credential values.
+- Candidate preparation resolves a clone atomically: either every reference is
+  resolved under one pinned Store scope, or no resolved config reaches the
+  collector.
+- An unavailable provider or reader scope is a transient activation failure.
+  An invalid reference or invalid resolved config is a proposal rejection and
+  leaves the incumbent unchanged.
+- The raw dependency set and the graph mutation commit together. This prevents
+  a running job from becoming invisible to a later Store update.
+- `${store:...}` dependencies participate in live Store restart orchestration.
+  `${env:...}`, `${file:...}`, and `${cmd:...}` are resolved at build time but
+  have no live Store generation to watch.
+- A Store update restarts only `Running` dependents. Non-running graph configs
+  keep their raw references and resolve the current generation when next
+  started.
+- Removing a Store is rejected while **any graph config** references it. Only
+  DynCfg-sourced Stores are removable.
+
+When a referenced Store changes, Job Manager performs one composite operation:
+
+```mermaid
+flowchart LR
+    Change("Prepare new Store generation")
+    Stop("Stop affected<br/>running jobs")
+    Store("Commit Store generation")
+    Restart("Rebuild each job from<br/>its raw graph config")
+    Outcome{"Restart outcome"}
+    Running("Running with new secrets")
+    Failed("Job remains Failed<br/>retry by job policy")
+    Restore("Attempt to restore stopped jobs<br/>old generation remains")
+
+    Change --> Stop --> Store
+    Store -->|"commit succeeds"| Restart --> Outcome
+    Store -->|"commit fails"| Restore
+    Outcome -->|"ready"| Running
+    Outcome -->|"fails / busy"| Failed
+
+    classDef sec fill:#fee2e2,stroke:#dc2626,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
+    class Change,Store sec;
+    class Stop,Restart,Outcome core;
+    class Running,Failed,Restore job;
+```
+
+The Store change remains committed if a later job restart fails. The graph
+truthfully shows that job as `Failed`. A retained busy/contained restart
+revalidates the Store dependency, source winner, desired config, resource
+absence, and run generation. A normal probe failure follows the collector's
+ordinary autodetection-retry policy.
+
+#### Vnode-dependent job
+
+- A named configured vnode must exist when the candidate is built. If it is
+  missing, construction fails transiently and the selected job follows its
+  normal retry policy.
+- The candidate uses a private, revisioned vnode snapshot during `Init` and
+  `Check`. Only a successfully installed job switches that lookup to the live
+  vnode authority.
+- Updating a vnode does **not** restart its jobs. Running jobs adopt a newer
+  revision at their runtime refresh point and re-emit host metadata when needed.
+- Adding a previously missing vnode does not directly push a job restart. Its
+  retained retry or a later config event must reconcile the job.
+- Removing a vnode is rejected while **any graph config** references it, not
+  only while a dependent job is currently running. Only DynCfg-sourced vnodes
+  are removable.
+- A collector-supplied vnode takes precedence over a configured vnode. The
+  runtime advances past configured revisions without replacing the
+  collector-owned identity.
+
+#### Job that uses both secrets and a vnode
+
+The two dependencies are staged independently, then join the same candidate.
+This matters when a vnode update overlaps a slow collector `Check`:
+
+```mermaid
+sequenceDiagram
+    participant S as Selected raw config
+    participant J as Candidate
+    participant V as Vnode authority
+    participant K as SecretStore
+    participant C as Collector
+    participant R as Installed runtime
+
+    S->>J: Start selected job attempt
+    J->>V: Capture current vnode revision
+    J->>K: Pin generations and resolve a clone
+    K-->>J: Complete resolved config
+    J->>C: Init and Check with private staging
+    V-->>V: A newer vnode revision may commit
+    C-->>J: Ready
+    J->>R: Install and attach live vnode lookup
+    R->>V: Refresh after attachment
+    V-->>R: Return newest committed revision
+```
+
+Consequences:
+
+- A Store update restarts the job from its raw graph config. The replacement
+  resolves the new Store generation and captures the current vnode snapshot.
+- A vnode update alone does not restart the job or re-resolve secrets.
+- A vnode update during `Check` is not lost: the candidate sees its staged
+  snapshot while detached, then the installed runtime catches up through the
+  live revisioned lookup.
+- If either dependency cannot be prepared, no half-resolved or half-attached
+  candidate becomes live.
+
+`joboutput/config_factory.go`, `joboutput/runtime_staging.go`,
+`secrets/dependency.go`, `secrets/restart.go`, `discovery/vnode.go`,
+`framework/jobruntime`.
 
 ### Job generations and fencing
 
@@ -467,7 +696,7 @@ flowchart TD
     Scope("Acquire ONE reader scope<br/>pin current store generations")
     Resolve("Resolve the clone")
     Release("Release scope · drain readers")
-    Post("Complete postimage → build job")
+    Post("Complete in-memory clone → build job")
 
     Ref --> Clone --> Compile --> Scope --> Resolve --> Release --> Post
 
