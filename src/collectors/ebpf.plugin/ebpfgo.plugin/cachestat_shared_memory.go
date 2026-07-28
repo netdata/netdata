@@ -370,12 +370,15 @@ func entryHasCachestatData(entry ebpfPidStat) bool {
 // snapshot when cachestat has no entries to merge into.  Must be called with
 // s.mu held for writing.
 func (s *cachestatSharedMemoryStore) buildEntriesFromSocketLocked() {
-	entries := make([]ebpfPidStat, 0, len(s.socketData))
-	for pid, data := range s.socketData {
-		entries = append(entries, ebpfPidStat{pid: pid, socket: data})
+	nextEntries := s.nextEntries[:0]
+	if cap(nextEntries) < len(s.socketData) {
+		nextEntries = make([]ebpfPidStat, 0, len(s.socketData))
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].pid < entries[j].pid
+	for pid, data := range s.socketData {
+		nextEntries = append(nextEntries, ebpfPidStat{pid: pid, socket: data})
+	}
+	sort.Slice(nextEntries, func(i, j int) bool {
+		return nextEntries[i].pid < nextEntries[j].pid
 	})
-	s.entries = entries
+	s.entries, s.nextEntries = nextEntries, s.entries
 }
