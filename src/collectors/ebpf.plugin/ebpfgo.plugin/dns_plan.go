@@ -1,16 +1,23 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
 const (
-	dnsKernelMask          uint32 = (1 << 12) - 1
-	// dnsDefaultUpdateEvery is intentionally half of DNS_FLOW_TTL_US (20 s) so
-	// the SHM stays fresh mid-window; NV_DNS_UPDATE_EVERY must equal the TTL to
-	// keep consecutive NV snapshots non-overlapping (each query counted once).
+	dnsKernelMask uint32 = (1 << 12) - 1
+	// dnsDefaultUpdateEvery is intentionally half of dnsDefaultFlowTTL so the SHM
+	// stays fresh mid-window; NV_DNS_UPDATE_EVERY must equal the TTL to keep
+	// consecutive NV snapshots non-overlapping (each query counted once).
 	dnsDefaultUpdateEvery = 10
-	dnsDefaultObjectFlavor        = "buffer"
+	// dnsDefaultFlowTTL is the default DNS flow record lifetime in seconds.
+	// Must match DNS_FLOW_TTL_US in dns_libbpf.c.  update every must not exceed
+	// this value or records expire in the kernel ring before Go collects them.
+	dnsDefaultFlowTTL      = 20
+	dnsDefaultObjectFlavor = "buffer"
 	// dnsMaxBaseSelector is the highest SelectKernelName index for which a
 	// base-flavor (no suffix) dns object file is shipped.
 	dnsMaxBaseSelector = 7 // 5.14
@@ -31,6 +38,10 @@ type DNSLegacyConfig struct {
 	// empty and the dns-queries network-viewer function returns no rows.
 	// Configurable via "per query tracking" in ebpf.d/dns.conf [global].
 	PerQueryTracking bool
+	// FlowTTL is the DNS flow record lifetime in seconds; must match
+	// DNS_FLOW_TTL_US in dns_libbpf.c.  UpdateEvery is clamped to this value.
+	// Configurable via "flow ttl" in ebpf.d/dns.conf [global].
+	FlowTTL int
 }
 
 type DNSLegacyHandle struct {
@@ -58,6 +69,7 @@ func defaultDNSLegacyConfig() DNSLegacyConfig {
 		ObjectFlavor:     dnsDefaultObjectFlavor,
 		Enabled:          false, // stock ebpf.d.conf: dns = no
 		PerQueryTracking: true,
+		FlowTTL:          dnsDefaultFlowTTL,
 	}
 }
 
@@ -80,6 +92,18 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 	}
 	if fileCfg.PerQueryTracking != nil {
 		cfg.PerQueryTracking = *fileCfg.PerQueryTracking
+	}
+	if fileCfg.FlowTTL != nil && *fileCfg.FlowTTL > 0 {
+		cfg.FlowTTL = *fileCfg.FlowTTL
+	}
+
+	// Clamp update_every to the flow TTL: records expire in the kernel ring after
+	// FlowTTL seconds, so a longer collection interval causes silent data loss.
+	if cfg.UpdateEvery > cfg.FlowTTL {
+		fmt.Fprintf(os.Stderr,
+			"ebpf-go.plugin: dns: update every %d exceeds flow ttl %d; clamping to %d\n",
+			cfg.UpdateEvery, cfg.FlowTTL, cfg.FlowTTL)
+		cfg.UpdateEvery = cfg.FlowTTL
 	}
 
 	kver, isRHF, err := resolveKernelAndRH()

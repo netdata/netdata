@@ -31,6 +31,7 @@ type pluginConfigFile struct {
 	ObjectFlavor              *string
 	CollectPidLevel           *int  // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
 	PerQueryTracking          *bool // "per query tracking" key → DNS per-query flow capture
+	FlowTTL                   *int  // "flow ttl" key → DNS flow record lifetime in seconds (dns.conf only)
 }
 
 // loadPluginConfigFiles loads the plugin-wide ebpf.d.conf from stock then
@@ -302,6 +303,14 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				cfg.PerQueryTracking = boolPtr(b)
 			}
 			found = true
+		case "flow ttl":
+			n, err := strconv.Atoi(value)
+			if err != nil || n <= 0 {
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid flow ttl %q, using default\n", path, value)
+			} else {
+				cfg.FlowTTL = intPtr(n)
+			}
+			found = true
 		}
 	}
 
@@ -357,6 +366,9 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 	if other.PerQueryTracking != nil {
 		c.PerQueryTracking = other.PerQueryTracking
+	}
+	if other.FlowTTL != nil {
+		c.FlowTTL = other.FlowTTL
 	}
 }
 

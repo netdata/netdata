@@ -187,13 +187,16 @@ func main() {
 	wg.Wait()
 }
 
-// resolveUpdateEvery returns the first positive value from: CLI arg, config, default.
+// resolveUpdateEvery returns the first positive value from: config file, CLI arg, fallback.
+// Config wins over argv so that per-plugin defaults (e.g. "update every = 10" in ebpf.d.conf)
+// are not silently overridden by the Netdata global update_every passed in argv[1] (default 1).
+// argv is still honoured when no config value is set, giving the operator a fallback path.
 func resolveUpdateEvery(cliArg, cfgVal, fallback int) int {
-	if cliArg > 0 {
-		return cliArg
-	}
 	if cfgVal > 0 {
 		return cfgVal
+	}
+	if cliArg > 0 {
+		return cliArg
 	}
 	return fallback
 }
