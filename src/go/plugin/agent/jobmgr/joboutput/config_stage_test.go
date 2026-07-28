@@ -159,9 +159,130 @@ func TestConfigValidationSupersedesEarlierSameJobOperation(t *testing.T) {
 	require.EqualValues(t, 1, attempts.started.Load())
 }
 
+func TestConfigOperationRejectsSuccessReturnedAfterLogicalCut(t *testing.T) {
+	attempts := &delayedConfigDispositionAuthority{}
+	factory := &Factory{
+		config: FactoryConfig{
+			Epoch:    1,
+			Attempts: attempts,
+		},
+	}
+	config := factoryTestConfig(false)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	stage, err := newPreparedConfigOperation(
+		factory,
+		config,
+		configOperationTest,
+		func(context.Context, confgroup.Config) ([]byte, error) {
+			close(entered)
+			<-release
+			return []byte(`{"accepted":true}`), nil
+		},
+	)
+	require.NoError(t, err)
+	stage.Start()
+	<-entered
+	require.Eventually(t, func() bool {
+		stage.mu.Lock()
+		defer stage.mu.Unlock()
+		return stage.attempt != nil
+	}, time.Second, time.Millisecond)
+
+	stage.Cancel(jobmgr.ErrProcessAttemptSuperseded)
+	close(release)
+	require.NoError(t, stage.Await(context.Background()))
+	payload, err := stage.take()
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptSuperseded)
+	require.Nil(t, payload)
+	stage.Release()
+}
+
 type validationSupersedeAuthority struct {
 	superseded atomic.Int32
 	started    atomic.Int32
+}
+
+type delayedConfigDispositionAuthority struct{}
+
+type delayedConfigDispositionAttempt struct {
+	mu       sync.Mutex
+	cancel   context.CancelCauseFunc
+	cut      error
+	workErr  error
+	released chan struct{}
+}
+
+func (*delayedConfigDispositionAuthority) StartProcessAttempt(
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	attempt := &delayedConfigDispositionAttempt{
+		cancel:   cancel,
+		released: make(chan struct{}),
+	}
+	go func() {
+		workErr := plan.Work(ctx)
+		attempt.mu.Lock()
+		attempt.workErr = workErr
+		attempt.mu.Unlock()
+		close(attempt.released)
+	}()
+	return attempt, nil
+}
+
+func (*delayedConfigDispositionAuthority) SupersedeProcessAttempt(
+	context.Context,
+	jobmgr.ProcessAttemptIdentity,
+) error {
+	return nil
+}
+
+func (*delayedConfigDispositionAuthority) CutProcessAttempt(
+	jobmgr.ProcessAttemptIdentity,
+	error,
+) bool {
+	return false
+}
+
+func (*delayedConfigDispositionAuthority) ProcessAttemptReleased(
+	jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return nil, false
+}
+
+func (*delayedConfigDispositionAttempt) Admit() error {
+	return nil
+}
+
+func (attempt *delayedConfigDispositionAttempt) Cut(cause error) bool {
+	attempt.mu.Lock()
+	defer attempt.mu.Unlock()
+	if attempt.cut != nil {
+		return false
+	}
+	attempt.cut = cause
+	attempt.cancel(cause)
+	return true
+}
+
+func (attempt *delayedConfigDispositionAttempt) Await(ctx context.Context) error {
+	select {
+	case <-attempt.released:
+	case <-ctx.Done():
+		attempt.Cut(context.Cause(ctx))
+		<-attempt.released
+	}
+	attempt.mu.Lock()
+	defer attempt.mu.Unlock()
+	if attempt.cut != nil {
+		return attempt.cut
+	}
+	return attempt.workErr
+}
+
+func (attempt *delayedConfigDispositionAttempt) Released() <-chan struct{} {
+	return attempt.released
 }
 
 func (authority *validationSupersedeAuthority) StartProcessAttempt(

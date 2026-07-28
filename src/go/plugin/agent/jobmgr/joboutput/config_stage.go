@@ -175,6 +175,7 @@ func (stage *preparedConfigOperation) start() {
 			return
 		}
 	}
+	workerResult := make(chan configOperationResult, 1)
 	attempt, err := stage.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: stage.identity,
 		Target:   stage.target,
@@ -187,11 +188,14 @@ func (stage *preparedConfigOperation) start() {
 				return context.Canceled
 			}
 			payload, workErr := operation(ctx, config)
-			stage.publish(configOperationResult{
+			if cause := context.Cause(ctx); cause != nil {
+				return cause
+			}
+			workerResult <- configOperationResult{
 				payload: payload,
 				err:     workErr,
-			})
-			return workErr
+			}
+			return nil
 		},
 	})
 	if err != nil {
@@ -204,8 +208,11 @@ func (stage *preparedConfigOperation) start() {
 	if cause := context.Cause(stage.ctx); cause != nil {
 		attempt.Cut(cause)
 	}
-	err = attempt.Await(context.Background())
-	stage.publish(configOperationResult{err: err})
+	if err := attempt.Await(context.Background()); err != nil {
+		stage.publish(configOperationResult{err: err})
+		return
+	}
+	stage.publish(<-workerResult)
 }
 
 func (stage *preparedConfigOperation) publish(result configOperationResult) {

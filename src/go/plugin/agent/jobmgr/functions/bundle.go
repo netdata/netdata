@@ -50,12 +50,12 @@ type functionBundle struct {
 type functionAvailabilityPoll struct {
 	attempt jobmgr.ProcessAttempt
 	result  <-chan functionAvailabilityResult
-	settled <-chan error
+	bundle  *functionBundle
 }
 
 type functionAvailabilityResult struct {
-	changed bool
-	err     error
+	availability map[string]bool
+	err          error
 }
 
 type functionInvocation struct {
@@ -103,15 +103,17 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 		bundle.mu.Unlock()
 		return functionAvailabilityPoll{}, nil
 	}
+	bundle.references++
 	attempts := bundle.attempts
 	key := bundle.identityKey
 	resource := bundle.resource
 	target := bundle.target
 	bundle.mu.Unlock()
 	if attempts == nil {
+		bundle.release()
 		return functionAvailabilityPoll{}, errors.New("jobmgr Function bundle: availability containment is not bound")
 	}
-	result := make(chan functionAvailabilityResult, 1)
+	workerResult := make(chan functionAvailabilityResult, 1)
 	attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptFunctionPoll,
@@ -120,28 +122,35 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 		},
 		Target: target,
 		Work: func(ctx context.Context) error {
-			changed, pollErr := bundle.refreshAvailability()
+			availability, pollErr := bundle.evaluateAvailability()
 			if cause := context.Cause(ctx); cause != nil {
 				return cause
 			}
-			result <- functionAvailabilityResult{
-				changed: changed,
-				err:     pollErr,
+			workerResult <- functionAvailabilityResult{
+				availability: availability,
+				err:          pollErr,
 			}
-			return pollErr
+			return nil
 		},
 	})
 	if err != nil {
+		bundle.release()
 		return functionAvailabilityPoll{}, err
 	}
-	settled := make(chan error, 1)
+	result := make(chan functionAvailabilityResult, 1)
 	go func() {
-		settled <- attempt.Await(context.Background())
+		settledErr := attempt.Await(context.Background())
+		<-attempt.Released()
+		if settledErr != nil {
+			result <- functionAvailabilityResult{err: settledErr}
+			return
+		}
+		result <- <-workerResult
 	}()
 	return functionAvailabilityPoll{
 		attempt: attempt,
 		result:  result,
-		settled: settled,
+		bundle:  bundle,
 	}, nil
 }
 
@@ -484,8 +493,16 @@ func (bundle *functionBundle) wait(ctx context.Context) error {
 }
 
 func (bundle *functionBundle) refreshAvailability() (bool, error) {
+	next, err := bundle.evaluateAvailability()
+	if err != nil {
+		return false, err
+	}
+	return bundle.commitAvailability(next), nil
+}
+
+func (bundle *functionBundle) evaluateAvailability() (map[string]bool, error) {
 	if bundle == nil {
-		return false, errors.New("jobmgr Function bundle: nil availability refresh")
+		return nil, errors.New("jobmgr Function bundle: nil availability refresh")
 	}
 	next := make(map[string]bool, len(bundle.methods))
 	for _, method := range bundle.methods {
@@ -506,14 +523,21 @@ func (bundle *functionBundle) refreshAvailability() (bool, error) {
 			err = errors.New("jobmgr Function bundle: invalid availability kind")
 		}
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		next[method.ID] = available
+	}
+	return next, nil
+}
+
+func (bundle *functionBundle) commitAvailability(next map[string]bool) bool {
+	if bundle == nil {
+		return false
 	}
 	bundle.mu.Lock()
 	defer bundle.mu.Unlock()
 	if bundle.retired {
-		return false, nil
+		return false
 	}
 	changed := len(bundle.availability) != len(next)
 	if !changed {
@@ -525,7 +549,7 @@ func (bundle *functionBundle) refreshAvailability() (bool, error) {
 		}
 	}
 	bundle.availability = next
-	return changed, nil
+	return changed
 }
 
 func (bundle *functionBundle) available(method string) bool {

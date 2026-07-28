@@ -120,6 +120,70 @@ func TestDiscoveredBusyRetainsPendingDesiredAndRetriesOnRelease(t *testing.T) {
 	require.Equal(t, config.FullName(), plans[0].Transaction.ID)
 }
 
+func TestFreshDesiredConfigCancelsDifferentPendingReplacement(t *testing.T) {
+	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+	incumbent := autoDetectionRetryTestConfig("job")
+	incumbent.SetSourceType(confgroup.TypeUser)
+	incumbent.SetSource("user-a")
+	incumbent.SetProvider("user")
+	incumbent["version"] = 1
+	replacement := autoDetectionRetryTestConfig("job")
+	replacement.SetSourceType(confgroup.TypeUser)
+	replacement.SetSource("user-b")
+	replacement.SetProvider("user")
+	replacement["version"] = 2
+	seedDynCfgJobGraphRecord(t, graph, incumbent, dyncfg.StatusRunning)
+
+	token := pendingJobToken{
+		uid:         replacement.UID(),
+		baselineUID: incumbent.UID(),
+		version:     1,
+	}
+	controller.scheduler.pending.entries[incumbent.FullName()] = &pendingJob{
+		config: replacement,
+		token:  token,
+		update: make(chan struct{}, 1),
+	}
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID:         incumbent.FullName(),
+		Generation: 1,
+	}
+	events := []string{}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
+	permit, tasks := issueTestJobPermit(t, incumbent.FullName(), 2)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:      incumbent.FullName(),
+		Current: currentIdentity,
+		Successor: lifecycle.ResourceIdentity{
+			ID:         incumbent.FullName(),
+			Generation: 2,
+		},
+	}
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{
+			Config: incumbent,
+			Status: dyncfg.StatusRunning,
+		},
+		current,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, owned := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Same(t, current, owned)
+	require.False(t, controller.scheduler.pending.isCurrent(incumbent.FullName(), token))
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
 func TestPendingDiscoveredJobDoesNotReplaceNewerEqualPriorityWinner(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	attempts := &unexpectedPendingJobAuthority{}

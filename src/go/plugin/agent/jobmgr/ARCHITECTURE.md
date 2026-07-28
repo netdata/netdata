@@ -296,12 +296,14 @@ rendering, `ParseJSONConfig`, discoverer construction, and `pipeline.New`; the
 manager accepts only an already-prepared pipeline through
 `StartPrepared`/`RestartPrepared`.
 
-Different configuration identities materialize concurrently under one
-aggregate two-minute batch barrier. Results are applied serially after
-deterministic source-winner selection. File-backed stock/user state keeps one
-latest pending retry after a busy/contained result; synchronous DynCfg commands
-do not. The complete service-discovery DynCfg Function is also contained, so a
-non-cooperative command cannot pin the Function catalog or Job Manager run.
+The service-discovery controller materializes and applies configurations
+serially after deterministic source-winner selection. Each materialization is
+individually contained by the process authority, so a non-cooperative identity
+cannot occupy the controller loop beyond its logical containment deadline.
+File-backed stock/user state keeps one latest pending retry after a
+busy/contained result; synchronous DynCfg commands do not. The complete
+service-discovery DynCfg Function is also contained, so a non-cooperative
+command cannot pin the Function catalog or Job Manager run.
 `agent/discovery/sd/materialization.go`, `agent/discovery/sd/pending.go`,
 `composition/service_discovery.go`.
 

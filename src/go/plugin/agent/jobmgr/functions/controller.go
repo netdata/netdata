@@ -724,18 +724,17 @@ func (c *Controller) finishAvailabilityPoll(
 	creator collectorapi.Creator,
 	poll functionAvailabilityPoll,
 ) {
-	var result functionAvailabilityResult
-	select {
-	case result = <-poll.result:
-	case <-poll.settled:
-		return
-	}
-	if result.err != nil || !result.changed {
+	result := <-poll.result
+	defer poll.bundle.release()
+	if result.err != nil {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.usableLocked() != nil {
+		return
+	}
+	if !poll.bundle.commitAvailability(result.availability) {
 		return
 	}
 	_, _ = c.reconcileModuleLocked(context.Background(), module, creator)

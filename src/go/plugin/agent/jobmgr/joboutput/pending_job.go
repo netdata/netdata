@@ -221,19 +221,6 @@ func (index *pendingJobIndex) cancel(id string) {
 	index.mu.Unlock()
 }
 
-func (index *pendingJobIndex) cancelUID(id, uid string) {
-	if index == nil || id == "" || uid == "" {
-		return
-	}
-	index.mu.Lock()
-	entry := index.entries[id]
-	if entry != nil && entry.config.UID() == uid {
-		delete(index.entries, id)
-		notifyPendingJob(entry.update)
-	}
-	index.mu.Unlock()
-}
-
 func (index *pendingJobIndex) stopWorker() {
 	if index == nil {
 		return
@@ -378,6 +365,6 @@ func (dcjc *DynCfgJobController) pendingDesiredSettlement(
 		return dcjc.pendingSettlement(config.FullName(), token)
 	}
 	return func() {
-		dcjc.scheduler.pending.cancelUID(config.FullName(), config.UID())
+		dcjc.scheduler.pending.cancel(config.FullName())
 	}
 }

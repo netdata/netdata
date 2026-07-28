@@ -279,7 +279,10 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			current,
 			permit,
 			result,
-			settlement,
+			composeAfterApply(
+				settlement,
+				dcjc.pendingDesiredSettlement(change.Config, change.pending),
+			),
 			cleanup,
 		)
 	}
