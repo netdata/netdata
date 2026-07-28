@@ -33,7 +33,7 @@ become directional traffic rows; create, teardown, deny, malformed, and counterl
 events remain diagnostics and do not enter the flow database.
 
 For full documentation including vendor configuration examples, sampling caveats, template
-handling and verification steps, see the [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
+handling and verification steps, see the [Network Flows Overview](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/README.md).
 
 
 The plugin listens on configurable UDP listener sockets for NetFlow datagrams.
@@ -163,9 +163,9 @@ journal:
 
 ### Verifying flow data is arriving and diagnosing failures
 
-See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
+See [Troubleshooting](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/troubleshooting.md) for
 the full diagnostic recipe -- including UDP path checks, template-error analysis,
 Cisco ASA NSEL event handling, and the "looks like a bug but isn't" section
 (doubling, mirroring, internal-IP geolocation).
-See also [Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality)
-and [Anti-patterns](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns).
+See also [Validation and Data Quality](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/validation.md)
+and [Anti-patterns](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/anti-patterns.md).

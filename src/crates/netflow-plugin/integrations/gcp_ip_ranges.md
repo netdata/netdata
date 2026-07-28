@@ -46,7 +46,7 @@ Two upstream files exist and they are NOT interchangeable:
 For the cross-cutting network-identity behavior (merge order with GeoIP and
 static config, jq output contract, TLS rules, single-page fetch, failure /
 backoff handling), see
-[Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[Network Identity](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 Periodic HTTPS GET against the chosen `gstatic.com` URL. The body is parsed
