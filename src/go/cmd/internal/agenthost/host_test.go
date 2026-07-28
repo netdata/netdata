@@ -76,6 +76,38 @@ func TestSignalLoopBoundsNonCooperativeTermination(t *testing.T) {
 	}
 }
 
+func TestSignalLoopBoundsNonCooperativeRestart(t *testing.T) {
+	hosted := newBlockingRestartAgent()
+	signals := make(chan os.Signal, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- runSignalsWithTimeout(hosted, signals, 20*time.Millisecond)
+	}()
+	t.Cleanup(func() {
+		close(hosted.releaseRestart)
+	})
+
+	signals <- syscall.SIGHUP
+	select {
+	case <-hosted.restartEntered:
+	case <-time.After(time.Second):
+		t.Fatal("restart did not start")
+	}
+
+	select {
+	case <-hosted.terminateCalled:
+	case <-time.After(time.Second):
+		t.Fatal("restart deadline did not initiate termination")
+	}
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(time.Second):
+		t.Fatal("host waited indefinitely for non-cooperative restart")
+	}
+}
+
 func TestRestartControlErrorTreatsStoppedProcessAsBenign(t *testing.T) {
 	sentinel := errors.New("restart failed")
 	tests := map[string]struct {

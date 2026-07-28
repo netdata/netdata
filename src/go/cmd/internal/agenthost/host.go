@@ -51,18 +51,27 @@ func runSignalsWithTimeout(a hostedAgent, signals <-chan os.Signal, timeout time
 		runDone <- a.RunContext(context.Background())
 	}()
 	var restartDone <-chan error
+	var restartCancel context.CancelFunc
 	restartPending := false
 	startRestart := func(sig os.Signal) {
 		a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
-		done := make(chan error, 1)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		done := make(chan error, 2)
 		restartDone = done
+		restartCancel = cancel
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
 			done <- a.Restart(ctx)
+		}()
+		go func() {
+			<-ctx.Done()
+			done <- context.Cause(ctx)
 		}()
 	}
 	terminate := func(restartErr error) error {
+		if restartCancel != nil {
+			restartCancel()
+			restartCancel = nil
+		}
 		collectorapi.ObsoleteCharts(false)
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		done := make(chan error, 1)
@@ -103,6 +112,8 @@ func runSignalsWithTimeout(a hostedAgent, signals <-chan os.Signal, timeout time
 			return terminate(nil)
 		case err := <-restartDone:
 			restartDone = nil
+			restartCancel()
+			restartCancel = nil
 			if err == nil {
 				if restartPending {
 					restartPending = false
