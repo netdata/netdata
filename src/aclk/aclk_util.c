@@ -579,12 +579,6 @@ int aclk_timeout_remaining_ms(usec_t start_ut, int timeout_ms)
     return aclk_timeout_remaining_ms_at(start_ut, timeout_ms, now_monotonic_usec());
 }
 
-int aclk_timeout_unittest(void)
-{
-    int errors = 0;
-
-    fprintf(stderr, "\nrunning aclk timeout unittest\n");
-
 #define ACLK_TIMEOUT_TEST(condition, msg) do {                                   \
         if(!(condition)) {                                                       \
             fprintf(stderr, "aclk timeout unittest FAILED: %s (%s:%d)\n",        \
@@ -592,6 +586,12 @@ int aclk_timeout_unittest(void)
             errors++;                                                            \
         }                                                                        \
     } while(0)
+
+int aclk_timeout_unittest(void)
+{
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning aclk timeout unittest\n");
 
     const usec_t start_ut = 100 * USEC_PER_SEC;
 
@@ -633,7 +633,6 @@ int aclk_timeout_unittest(void)
                           INT_MAX - 5,
                       "maximum budget did not round-trip through int");
 
-#undef ACLK_TIMEOUT_TEST
 
     if (errors)
         fprintf(stderr, "aclk timeout unittest: %d ERROR(S)\n", errors);

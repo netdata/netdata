@@ -815,8 +815,16 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         // specific cause; without this the status kept whatever the previous disconnect set.
         // Only that class is covered: the earlier setup failures (TCP connect, proxy, SSL setup,
         // SNI, mqtt_ng_connect) return via mqtt_rc and still leave a stale status.
-        if (mqtt_service_rc)
+        //
+        // Note the ACLK_STATUS_OFFLINE_* strings all read "disconnected, ..." even though we never
+        // reached a connection here. Log the phase explicitly so diagnosis is not misled; the
+        // status strings themselves are left alone because Netdata Cloud may match on them.
+        if (mqtt_service_rc) {
             aclk_status_set(aclk_status_from_mqtt_wss_rc(mqtt_service_rc));
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "ACLK: connection attempt failed before the link was established: %s",
+                   aclk_status_to_string());
+        }
 
         error_report("ACLK: connection failed");
     }
