@@ -386,24 +386,17 @@ Network interfaces inside containers are discovered and monitored by the cgroups
 
 ## Troubleshooting cgroup directory access errors
 
-When cgroups.plugin cannot read the cgroup filesystem, Netdata logs an error of
-the form:
+When cgroups.plugin cannot read the cgroup filesystem, Netdata logs an error of the form:
 
 ```text
 CGROUP: cannot open directory '/sys/fs/cgroup': <reason>
 ```
 
-The `<reason>` is the system error reported by `opendir()` — most commonly
-`No such file or directory` (the path does not exist or is not mounted) or
-`Permission denied` (the `netdata` user cannot read or traverse it).
+The `<reason>` is the system error reported by `opendir()` — most commonly `No such file or directory` (the path does not exist or is not mounted) or `Permission denied` (the `netdata` user cannot read or traverse it).
 
 ### What the error disables
 
-Netdata opens the cgroup base mount once per discovery cycle: for cgroup v2 this
-is `/sys/fs/cgroup`, and for v1 each subsystem (`cpuacct`, `blkio`, `memory`)
-has its own base mount under `/sys/fs/cgroup`. When the base directory cannot be
-opened, Netdata disables statistics for that subsystem and logs a follow-up
-line, for example:
+Netdata opens the cgroup base mount once per discovery cycle: for cgroup v2 this is `/sys/fs/cgroup`, and for v1 each subsystem (`cpuacct`, `blkio`, `memory`) has its own base mount under `/sys/fs/cgroup`. When the base directory cannot be opened, Netdata disables statistics for that subsystem and logs a follow-up line, for example:
 
 ```text
 CGROUP: disabled unified cgroups statistics.
@@ -417,59 +410,23 @@ CGROUP: disabled blkio statistics.
 CGROUP: disabled memory statistics.
 ```
 
-While a subsystem is disabled, the corresponding container, virtual machine, and
-systemd-service cgroup charts stop appearing. Once a subsystem is disabled this
-way it is **not retried on later discovery cycles** — you must fix the access
-problem and restart Netdata for the subsystem to be re-enabled.
+While a subsystem is disabled, the corresponding container, virtual machine, and systemd-service cgroup charts stop appearing. Once a subsystem is disabled this way it is **not retried on later discovery cycles** — you must fix the access problem and restart Netdata for the subsystem to be re-enabled.
 
 :::note
-Permission errors on individual cgroup **subdirectories** (not the base mount)
-are logged at `DEBUG` level only and are harmless — Netdata skips that subtree
-and keeps collecting the rest. Only a failure on the **base mount** disables
-metrics.
+Permission errors on individual cgroup **subdirectories** (not the base mount) are logged at `DEBUG` level only and are harmless — Netdata skips that subtree and keeps collecting the rest. Only a failure on the **base mount** disables metrics.
 :::
 
 ### Resolving the error
 
 The `<reason>` tells you which of the two cases below applies.
 
-**`No such file or directory` — the cgroup filesystem isn't mounted or visible to Netdata.**
+**`No such file or directory`** — the cgroup filesystem isn't mounted or visible to Netdata. Confirm with `stat -fc %T /sys/fs/cgroup` (the same check documented under [Monitoring systemd services](#monitoring-systemd-services)), which prints `cgroup2fs` for cgroup v2 or `tmpfs` for cgroup v1. If it fails or reports the path is missing:
 
-Confirm with:
+- On a host install, the cgroup filesystem itself isn't mounted.
+- In a container, as noted in [Monitoring ephemeral containers](#monitoring-ephemeral-containers), Netdata must see the host's `/proc` and `/sys` filesystems, which include `/sys/fs/cgroup`. The official Netdata Docker image already binds these under `/host` (for example `-v /sys:/host/sys:ro`) and sets the host prefix. If you use a custom or reduced image, mount the host's `/sys` (matching the official image), or `/sys/fs/cgroup` directly, into the container.
 
-```sh
-stat -fc %T /sys/fs/cgroup
-```
+**`Permission denied`** — usually not a plain Unix permissions problem. On most systems `/sys/fs/cgroup` is `0555 root:root` (world-readable and traversable), so a bare file-mode issue is uncommon in practice. Before assuming a permissions change will help, check for a Mandatory Access Control (MAC) denial:
 
-This prints `cgroup2fs` for cgroup v2 or `tmpfs` for cgroup v1 (the same check
-documented under [Monitoring systemd services](#monitoring-systemd-services)). If
-the command fails or reports the path is missing:
-
-- **On a host install**, the cgroup filesystem itself isn't mounted.
-- **In a container**, as noted in [Monitoring ephemeral containers](#monitoring-ephemeral-containers),
-  Netdata must see the host's `/proc` and `/sys` filesystems, which include
-  `/sys/fs/cgroup`. The official Netdata Docker image already binds these under
-  `/host` (for example `-v /sys:/host/sys:ro`) and sets the host prefix. If you
-  use a custom or reduced image, mount the host's `/sys` (matching the official
-  image) or `/sys/fs/cgroup` directly into the container.
-
-**`Permission denied` — usually not a plain Unix permissions problem.**
-
-On most systems `/sys/fs/cgroup` is `0555 root:root` — world-readable and
-traversable — so a bare file-mode issue is uncommon in practice. Before
-assuming a permissions change will help, check for a Mandatory Access Control
-(MAC) denial:
-
-- Check whether SELinux or AppArmor is active (`getenforce`, or test for
-  `/sys/kernel/security/apparmor`) — the same check the
-  [Netdata support bundle](/packaging/installer/SUPPORT-BUNDLE.md) collects,
-  because MAC denials are a documented cause of silent collector failures.
-- If either is active, look for a denial referencing `/sys/fs/cgroup` in
-  `journalctl -k` (SELinux `avc:  denied` / AppArmor `apparmor="DENIED"`
-  entries) or `/var/log/audit/audit.log`. The
-  [`ebpf.plugin` SELinux section](/src/collectors/ebpf.plugin/README.md#selinux)
-  documents the same diagnose-then-`audit2allow` pattern for a denial on a
-  different resource class — apply the same approach here, adjusted to the
-  `dir`/`file` object classes involved in cgroup access.
-- Running `./netdata-support-bundle` from an install captures the MAC state
-  automatically.
+- Check whether SELinux or AppArmor is active (`getenforce`, or test for `/sys/kernel/security/apparmor`) — the same check the [Netdata support bundle](/packaging/installer/SUPPORT-BUNDLE.md) collects, because MAC denials are a documented cause of silent collector failures.
+- If either is active, look for a denial referencing `/sys/fs/cgroup` in `journalctl -k` (SELinux `avc:  denied` / AppArmor `apparmor="DENIED"` entries) or `/var/log/audit/audit.log`. The [`ebpf.plugin` SELinux section](/src/collectors/ebpf.plugin/README.md#selinux) documents the same diagnose-then-`audit2allow` pattern for a denial on a different resource class — apply the same approach here, adjusted to the `dir`/`file` object classes involved in cgroup access.
+- Running `./netdata-support-bundle` from an install captures the MAC state automatically.
