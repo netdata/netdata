@@ -236,6 +236,12 @@ var manifest = map[string]ManifestCase{
 	"CASE-027/incremental-sum-conserves-across-zoom": {
 		Proves: "time_group=incremental-sum answers how much a value changed in a bucket, so the buckets of a window telescope: each measures from where the one before it ended, and they add up to the change between the first reading and the last, at every resolution. The mechanism is one line - a bucket hands its last sample forward as the next bucket's baseline - and a bucket holding a SINGLE sample has no 'last' distinct from the baseline it just captured, so a carry that copies the missing one over the real one destroys it. Every bucket then holds a baseline with nothing to measure against it and answers EMPTY, which is what a chart drawn at one bucket per collection interval used to do for its whole length. Asserted at ten buckets per stored record, one per record, and five and ten records per bucket",
 	},
+	"CASE-028/rate-with-gaps-is-tier-independent": {
+		Proves: "a rate metric with holes in it totals the same whichever tier answers. Above tier 0 a stored record carries a sum, a count and a wall-clock width, and where seconds under it were never collected the width and the measured time are different numbers - whichever the arithmetic uses, the result must not become a property of retention",
+	},
+	"CASE-029/tier0-slow-metric-totals-at-every-zoom": {
+		Proves: "sum's zoom inflation was never a property of tiers - it was a property of a stored record being WIDER than the row asking about it, which is equally true at tier 0 for anything collected less often than once a second. A metric collected every ten seconds answers ten one-second rows from one stored record, and used to report ten times what it stored. Pins the deliberate change to what tier 0 answers for slow metrics",
+	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves:  "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
 		FixedBy: "#23216",
