@@ -335,6 +335,9 @@ func (pso *PreparedStoreOperation) runAttempt(
 			config,
 			pso.spec.expected,
 		)
+		if errors.Is(result.err, secretstore.ErrMutationBusy) {
+			result.release = pso.operations.store.MutationReady(config.ExposedKey())
+		}
 	}
 	result.retryable = containmentRetryable(result.err)
 	if err := admission.Admit(); err != nil {

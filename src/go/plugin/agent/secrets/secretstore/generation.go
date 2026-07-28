@@ -45,11 +45,12 @@ const (
 )
 
 type generationRecord struct {
-	key          string
-	stateVersion uint64
-	preparations int
-	current      *StoreGeneration
-	retiring     [2]*StoreGeneration
+	key           string
+	stateVersion  uint64
+	preparations  int
+	current       *StoreGeneration
+	retiring      [2]*StoreGeneration
+	mutationReady chan struct{}
 }
 
 func (record *generationRecord) retirementCount() int {
@@ -86,6 +87,9 @@ func (record *generationRecord) addRetiring(generation *StoreGeneration) bool {
 	for index := range record.retiring {
 		if record.retiring[index] == nil {
 			record.retiring[index] = generation
+			if record.mutationReady == nil {
+				record.mutationReady = make(chan struct{})
+			}
 			return true
 		}
 	}
@@ -114,10 +118,20 @@ func (record *generationRecord) removeRetiring(generation *StoreGeneration) bool
 		}
 		copy(record.retiring[index:], record.retiring[index+1:])
 		record.retiring[len(record.retiring)-1] = nil
+		if !record.hasRetiring() && record.mutationReady != nil {
+			close(record.mutationReady)
+			record.mutationReady = nil
+		}
 		return true
 	}
 	return false
 }
+
+var immediateMutationReady = func() <-chan struct{} {
+	ready := make(chan struct{})
+	close(ready)
+	return ready
+}()
 
 // StoreGeneration is one immutable published provider generation.
 type StoreGeneration struct {
@@ -194,6 +208,24 @@ func (store *SecretStore) Generation(key string) uint64 {
 		return 0
 	}
 	return record.current.generation
+}
+
+// MutationReady closes when every generation whose retirement currently blocks
+// a same-key mutation has physically released.
+func (store *SecretStore) MutationReady(key string) <-chan struct{} {
+	if store == nil || key == "" {
+		return immediateMutationReady
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	record := store.records[key]
+	if record == nil || !record.hasRetiring() {
+		return immediateMutationReady
+	}
+	if record.mutationReady == nil {
+		record.mutationReady = make(chan struct{})
+	}
+	return record.mutationReady
 }
 
 func (store *SecretStore) Config(key string) (Config, bool) {

@@ -401,6 +401,79 @@ func TestStoreUpdateWhilePriorGenerationRetiresIsRetryable(t *testing.T) {
 	require.True(t, controller.pendingVersion(initial.ExposedKey(), 2))
 }
 
+func TestStoreBusyOperationWaitsForRetiringGeneration(t *testing.T) {
+	controller, store := newSecretControllerTestHarness(t, nil)
+	initial := secretTestConfig(confgroup.TypeUser, "initial")
+	key := initial.ExposedKey()
+
+	mutation, err := store.PrepareMutation(t.Context(), controller.creators, initial, 0)
+	require.NoError(t, err)
+	initialResult, err := mutation.Commit(t.Context())
+	require.NoError(t, err)
+	scope, err := store.AcquireScope([]string{key})
+	require.NoError(t, err)
+
+	replacement := secretTestConfig(confgroup.TypeUser, "replacement")
+	mutation, err = store.PrepareMutation(
+		t.Context(),
+		controller.creators,
+		replacement,
+		initialResult.Generation,
+	)
+	require.NoError(t, err)
+	replacementResult, err := mutation.Commit(t.Context())
+	require.NoError(t, err)
+	require.EqualValues(t, 1, store.Census().Retiring)
+
+	kind, name, err := secretstore.ParseStoreKey(key)
+	require.NoError(t, err)
+	stage, err := controller.operations.prepare(storeOperationSpec{
+		target: secretTarget{
+			command: dyncfg.CommandUpdate,
+			key:     key,
+			kind:    kind,
+			name:    name,
+		},
+		config:   secretTestConfig(confgroup.TypeUser, "latest"),
+		expected: replacementResult.Generation,
+		mode:     storeOperationMutation,
+	})
+	require.NoError(t, err)
+	stage.Start()
+	defer stage.Release()
+	select {
+	case <-stage.Ready():
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "busy Store operation did not settle")
+	}
+	result, err := takeStoreOperation(stage)
+	require.NoError(t, err)
+	require.ErrorIs(t, result.err, secretstore.ErrMutationBusy)
+	require.True(t, result.retryable)
+	require.NotNil(t, result.release)
+	select {
+	case <-result.release:
+		require.FailNow(t, "test failed", "Store retry released before the retiring generation")
+	default:
+	}
+
+	stage.Release()
+	select {
+	case <-result.release:
+		require.FailNow(t, "test failed", "Store attempt release was mistaken for generation readiness")
+	default:
+	}
+	require.NoError(t, scope.Release(t.Context()))
+	select {
+	case <-result.release:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "Store retry did not observe generation readiness")
+	}
+
+	require.NoError(t, store.Retire(t.Context(), key, replacementResult.Generation))
+	require.NoError(t, store.Close(t.Context()))
+}
+
 func TestRemoveFailedAbsentDynCfgStoreWithdrawsPendingDesiredState(t *testing.T) {
 	controller, store := newSecretControllerTestHarness(t, nil)
 	require.NoError(t, controller.Bind(restartTestJobs{}))

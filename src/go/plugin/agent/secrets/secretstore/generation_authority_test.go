@@ -647,12 +647,28 @@ func TestSecretStoreRemovalTombstonesTwoReaderPinnedGenerations(t *testing.T) {
 		census.Readers != 2 {
 		t.Fatalf("removed Store retained unexpected ownership: %+v", census)
 	}
+	ready := store.MutationReady(key)
+	select {
+	case <-ready:
+		t.Fatal("mutation became ready while two generations were retiring")
+	default:
+	}
 
 	if err := initialScope.Release(t.Context()); err != nil {
 		t.Fatal(err)
 	}
+	select {
+	case <-ready:
+		t.Fatal("mutation became ready while one generation was still retiring")
+	default:
+	}
 	if err := replacementScope.Release(t.Context()); err != nil {
 		t.Fatal(err)
+	}
+	select {
+	case <-ready:
+	case <-time.After(time.Second):
+		t.Fatal("mutation readiness did not follow final retirement")
 	}
 	if err := store.Close(t.Context()); err != nil {
 		t.Fatal(err)

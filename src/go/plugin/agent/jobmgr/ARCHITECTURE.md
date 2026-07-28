@@ -638,7 +638,8 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    job-graph work may proceed while dependency mutations remain fenced. `secrets/restart.go`,
    `secrets/transaction.go`.
 3. **Retire the old generation last.** The superseded generation is retired only after its last reader scope drains,
-   so an in-flight resolution never sees credentials vanish mid-read.
+   so an in-flight resolution never sees credentials vanish mid-read. A same-key mutation that encounters retirement
+   waits on that key's mutation-readiness signal before retrying; it does not poll or use a timer.
 4. **Seal on reload.** Reload seals the old epoch before retiring its run. Sealing rejects new scopes and late
    mutation commits, while already-pinned immutable generations remain readable. The old epoch closes after its exact
    retained-state census drains; it does not enter or dirty the retired run's census.
