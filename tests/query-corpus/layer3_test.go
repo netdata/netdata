@@ -12,9 +12,10 @@
 // Notable pinned semantics:
 //   - ses/des state RUNS ACROSS buckets: an all-gap bucket after data
 //     returns the running level, not null;
-//   - incremental-sum carries the previous bucket's last value, and an
-//     empty bucket resets the carry; single-value buckets without a carry
-//     are null — so an identity (group=1) incremental-sum query is ALL
+//   - incremental-sum carries the previous bucket's last value forward as
+//     the next bucket's baseline, including from a bucket that held only
+//     one sample; an empty bucket keeps the baseline it was given — so an
+//     identity (group=1) incremental-sum query answers every bucket but
 //     null (pinned as current contract);
 //   - percentile/trimmed-mean are slot-window MEANS (not quantiles) and
 //     walk from the top when any bucket value is negative;
@@ -251,7 +252,8 @@ func TestLayer3SignSemantics(t *testing.T) {
 
 // TestLayer3SparseBuckets pins single-numeric-value buckets: one value
 // per decade, the rest gaps. stddev yields 0.0 (not null); average/min/
-// max/median pass the value through; incremental-sum is ALL null — the
+// max/median pass the value through; incremental-sum answers from its
+// second value onward, measuring each against the one before it — the
 // leading single-value bucket loses its seed and every empty… non-carried
 // bucket resets (pinned as current contract).
 func TestLayer3SparseBuckets(t *testing.T) {
@@ -275,7 +277,7 @@ func TestLayer3SparseBuckets(t *testing.T) {
 
 // TestLayer3IdentitySmoothing pins ses/des at group=1 (identity view):
 // the smoothing window comes from the requested points (capped 15), and
-// incremental-sum at identity is all null.
+// incremental-sum at identity answers every bucket but the first.
 func TestLayer3IdentitySmoothing(t *testing.T) {
 	ch := fixture.Series("fixture.l3ident", "fixture.l3ident", fixture.T0, 60, 1, func(i int) string {
 		return strconv.Itoa((i*7)%23 - 5)
