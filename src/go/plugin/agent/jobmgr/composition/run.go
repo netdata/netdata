@@ -40,17 +40,18 @@ type runSecretServices struct {
 }
 
 type runGenerationConfig struct {
-	Generation      uint64                    // this run's generation number
-	ShutdownTimeout time.Duration             // per-run shutdown budget
-	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
-	UIDs            *lifecycle.UIDLedger      // process-lifetime UID ledger
-	Frames          *lifecycle.FrameOwner     // the one frame writer
-	Modules         collectorapi.Registry     // collector module registry
-	Jobs            runJobServices            // job services
-	Secrets         runSecretServices         // secret services
-	Discovery       runDiscoveryServices      // discovery services
-	SecretEpoch     *processSecretEpoch       // process-owned Store epoch for this run
-	Attempts        *containment.Authority    // process-owned opaque-work authority
+	Generation      uint64                       // this run's generation number
+	ShutdownTimeout time.Duration                // per-run shutdown budget
+	Diagnostics     jobmgr.DiagnosticObserver    // process-wide operational log sink
+	UIDs            *lifecycle.UIDLedger         // process-lifetime UID ledger
+	Frames          *lifecycle.FrameOwner        // the one frame writer
+	CleanupOutput   *joboutput.CleanupOutputGate // process-lifetime accepted-cleanup output
+	Modules         collectorapi.Registry        // collector module registry
+	Jobs            runJobServices               // job services
+	Secrets         runSecretServices            // secret services
+	Discovery       runDiscoveryServices         // discovery services
+	SecretEpoch     *processSecretEpoch          // process-owned Store epoch for this run
+	Attempts        *containment.Authority       // process-owned opaque-work authority
 }
 
 type runGeneration struct {
@@ -89,6 +90,7 @@ func newRunGeneration(
 		config.ShutdownTimeout <= 0 ||
 		config.UIDs == nil ||
 		config.Frames == nil ||
+		config.CleanupOutput == nil ||
 		config.Modules == nil ||
 		config.Jobs.PluginName == "" ||
 		config.Jobs.Defaults == nil ||
@@ -239,6 +241,7 @@ func newRunGeneration(
 		Attempts:        config.Attempts,
 		Modules:         config.Modules,
 		Frames:          config.Frames,
+		CleanupOutput:   config.CleanupOutput,
 		ConfigModules:   configModules,
 		Runtime:         config.Jobs.Runtime,
 		Vnodes:          config.Jobs.Vnodes,

@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -60,6 +61,7 @@ type processCore struct {
 
 	uids        *lifecycle.UIDLedger            // process-lifetime UID ledger
 	frames      *lifecycle.FrameOwner           // the one process-lifetime frame writer
+	cleanupOut  *joboutput.CleanupOutputGate    // accepted-cleanup output until process finalization
 	ingress     *functionadapter.ProcessIngress // the one process-lifetime stdin reader
 	attempts    *containment.Authority          // process-lifetime opaque-work authority
 	storeEpochs *processSecretEpochs            // process-owned per-run secret Store epochs
@@ -83,6 +85,10 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if err != nil {
 		return nil, err
 	}
+	cleanupOut, err := joboutput.NewCleanupOutputGate(frames)
+	if err != nil {
+		return nil, err
+	}
 	ingress, err := functionadapter.NewProcessIngress(config.Input)
 	if err != nil {
 		return nil, err
@@ -100,6 +106,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		diagnostics: config.Diagnostics,
 		uids:        lifecycle.NewUIDLedger(),
 		frames:      frames,
+		cleanupOut:  cleanupOut,
 		ingress:     ingress,
 		attempts:    attempts,
 		storeEpochs: storeEpochs,
@@ -450,6 +457,7 @@ func (pc *processCore) newRun(
 		Diagnostics:     pc.diagnostics,
 		UIDs:            pc.uids,
 		Frames:          pc.frames,
+		CleanupOutput:   pc.cleanupOut,
 		Modules:         pc.config.Modules,
 		Jobs:            pc.config.Jobs,
 		Secrets:         pc.config.Secrets,
@@ -603,6 +611,7 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 			finalErr = errors.Join(finalErr, err)
 		}
 	}
+	pc.cleanupOut.Fence()
 	if pc.storeEpochs != nil {
 		if err := pc.storeEpochs.shutdown(shutdownCtx); err != nil {
 			finalErr = errors.Join(finalErr, err)

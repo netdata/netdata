@@ -5,6 +5,7 @@ package sd
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
@@ -100,9 +101,11 @@ func classifyMaterializationError(
 
 func materializationIdentity(prefix string, values ...[]byte) string {
 	hash := sha256.New()
+	var length [8]byte
 	for _, value := range values {
+		binary.BigEndian.PutUint64(length[:], uint64(len(value)))
+		_, _ = hash.Write(length[:])
 		_, _ = hash.Write(value)
-		_, _ = hash.Write([]byte{0})
 	}
 	return prefix + "\x00" + string(hash.Sum(nil))
 }

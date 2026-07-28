@@ -219,6 +219,9 @@ func (operation *PreparedStoreOperation) start() {
 		operation.mu.Lock()
 		operation.identity = identity
 		operation.mu.Unlock()
+		// This logically contains and cancels physical preparation, which may
+		// continue until Released. prepareRemove commits the desired-version
+		// fence that invalidates older retained ADDs.
 		operation.operations.attempts.CutProcessAttempt(identity, jobmgr.ErrProcessAttemptSuperseded)
 		operation.publish(storeOperationResult{
 			desiredVersion: operation.spec.desiredVersion,

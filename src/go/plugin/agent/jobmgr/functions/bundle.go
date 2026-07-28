@@ -237,6 +237,8 @@ func (callback *functionCallback) quarantineIfActive() {
 	if callback == nil || callback.bundle == nil {
 		return
 	}
+	// Containment invokes this fence under the attempt-authority lock.
+	// Bundle admissions must therefore release bundle.mu before entering it.
 	bundle := callback.bundle
 	bundle.mu.Lock()
 	if !callback.completed {

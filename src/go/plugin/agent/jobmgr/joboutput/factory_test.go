@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -985,36 +986,83 @@ func testRunWithoutClaims(
 }
 
 func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
-	state := &factoryTestState{}
-	creator := collectorapi.Creator{
-		Create: func() collectorapi.CollectorV1 {
-			module := state.module(nil, false)
-			charts := collectorapi.Charts{}
-			module.ChartsFunc = func() *collectorapi.Charts { return &charts }
-			return module
+	tests := map[string]func(*factoryTestState) collectorapi.Creator{
+		"V1": func(state *factoryTestState) collectorapi.Creator {
+			return collectorapi.Creator{
+				Create: func() collectorapi.CollectorV1 {
+					module := state.module(nil, false)
+					charts := collectorapi.Charts{
+						&collectorapi.Chart{
+							ID:    "work",
+							Title: "Work",
+							Units: "units",
+							Dims:  collectorapi.Dims{{ID: "value"}},
+						},
+					}
+					module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+					module.CollectFunc = func(context.Context) map[string]int64 {
+						return map[string]int64{"value": 1}
+					}
+					return module
+				},
+			}
+		},
+		"V2": func(state *factoryTestState) collectorapi.Creator {
+			store := metrix.NewCollectorStore()
+			return collectorapi.Creator{
+				CreateV2: func() collectorapi.CollectorV2 {
+					return &factoryTestV2{
+						state:    state,
+						store:    store,
+						template: factoryTestChartTemplate,
+						collect: func(context.Context) error {
+							store.Write().SnapshotMeter("factory").Gauge("value").Observe(1)
+							return nil
+						},
+					}
+				},
+			}
 		},
 	}
-	factory, _ := newFactoryTestHarness(t, creator, nil)
-	permit, tasks := issueTestJobPermit(t, "module_job", 1)
-	prepared, failure, err := prepareFactoryTestCandidate(
-		context.Background(),
-		factory,
-		factoryTestConfig(false),
-		lifecycle.ResourceIdentity{
-			ID:         "module_job",
-			Generation: 1,
-		},
-		permit,
-	)
-	require.NoError(t, err)
-	require.Nil(t, failure)
-	for range 2 {
-		err = prepared.Dispose(context.Background())
+	for name, newCreator := range tests {
+		t.Run(name, func(t *testing.T) {
+			state := &factoryTestState{}
+			factory, output := newFactoryTestHarness(t, newCreator(state), nil)
+			permit, tasks := issueTestJobPermit(t, "module_job", 1)
+			prepared, failure, err := prepareFactoryTestCandidate(
+				context.Background(),
+				factory,
+				factoryTestConfig(false),
+				lifecycle.ResourceIdentity{
+					ID:         "module_job",
+					Generation: 1,
+				},
+				permit,
+			)
+			require.NoError(t, err)
+			require.Nil(t, failure)
+			resource, err := prepared.AcceptStart(context.Background(), 1)
+			require.NoError(t, err)
+			generation := resource.(*JobGeneration)
+			require.NoError(t, generation.Publish())
+			require.NoError(t, generation.reserveInstallation())
+			require.NoError(t, generation.acknowledgeInstallation())
+
+			clock := 0
+			require.Eventually(t, func() bool {
+				clock++
+				generation.resources.candidateJob.Tick(clock)
+				return bytes.Contains(output.Bytes(), []byte("CHART"))
+			}, 2*time.Second, 10*time.Millisecond)
+
+			require.NoError(t, generation.Stop(context.Background()))
+			require.NoError(t, generation.Finalize())
+			requireFactoryAttemptsIdle(t, factory)
+			require.EqualValues(t, 1, state.collectorCleanup)
+			require.Contains(t, output.String(), "obsolete")
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+		})
 	}
-	require.Error(t, err)
-	requireFactoryAttemptsIdle(t, factory)
-	require.EqualValues(t, 1, state.collectorCleanup)
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 type factoryTestState struct {
@@ -1028,6 +1076,7 @@ type factoryTestV2 struct {
 	OptionStr      string `yaml:"option_str"`
 	state          *factoryTestState
 	checkErr       error
+	collect        func(context.Context) error
 	exposeResolved bool
 	panicCheck     bool
 	store          metrix.CollectorStore
@@ -1047,7 +1096,12 @@ func (ft2 *factoryTestV2) Check(context.Context) error {
 	return ft2.checkErr
 }
 
-func (*factoryTestV2) Collect(context.Context) error { return nil }
+func (ft2 *factoryTestV2) Collect(ctx context.Context) error {
+	if ft2.collect != nil {
+		return ft2.collect(ctx)
+	}
+	return nil
+}
 
 func (ft2 *factoryTestV2) Cleanup(context.Context) {
 	ft2.state.collectorCleanup++
@@ -1149,10 +1203,12 @@ func newFactoryTestHarness(
 	t *testing.T,
 	creator collectorapi.Creator,
 	hooks factoryTestJobHooks,
-) (*Factory, *bytes.Buffer) {
+) (*Factory, *factoryTestOutput) {
 	t.Helper()
-	output := &bytes.Buffer{}
+	output := &factoryTestOutput{}
 	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	cleanupOutput, err := NewCleanupOutputGate(frames)
 	require.NoError(t, err)
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
@@ -1179,6 +1235,7 @@ func newFactoryTestHarness(
 			"module": creator,
 		},
 		Frames:           frames,
+		CleanupOutput:    cleanupOutput,
 		ConfigModules:    configModules,
 		Vnodes:           vnoderegistry.New(),
 		HandlerStager:    hooks,
@@ -1188,6 +1245,35 @@ func newFactoryTestHarness(
 	})
 	require.NoError(t, err)
 	return factory, output
+}
+
+type factoryTestOutput struct {
+	mu sync.Mutex
+	bytes.Buffer
+}
+
+func (output *factoryTestOutput) Write(payload []byte) (int, error) {
+	output.mu.Lock()
+	defer output.mu.Unlock()
+	return output.Buffer.Write(payload)
+}
+
+func (output *factoryTestOutput) Len() int {
+	output.mu.Lock()
+	defer output.mu.Unlock()
+	return output.Buffer.Len()
+}
+
+func (output *factoryTestOutput) String() string {
+	output.mu.Lock()
+	defer output.mu.Unlock()
+	return output.Buffer.String()
+}
+
+func (output *factoryTestOutput) Bytes() []byte {
+	output.mu.Lock()
+	defer output.mu.Unlock()
+	return append([]byte(nil), output.Buffer.Bytes()...)
 }
 
 func prepareFactoryTestCandidate(

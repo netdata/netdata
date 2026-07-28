@@ -357,6 +357,8 @@ func TestRemoveFailedAbsentDynCfgStoreWithdrawsPendingDesiredState(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, 200, applied.ResultStatus())
 	_, disposition, owned := applied.Ownership()
+	// The failed entry never installed a resource, so removing its desired
+	// state leaves resource ownership unchanged.
 	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
 	require.Nil(t, owned)
 	_, exists := controller.entry(key)

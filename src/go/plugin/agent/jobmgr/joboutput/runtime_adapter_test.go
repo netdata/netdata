@@ -289,6 +289,27 @@ func TestGenerationOutputGateAbortsLateTransactionWithoutPoisoningFrameOwner(t *
 	require.Empty(t, output.Bytes())
 }
 
+func TestCleanupOutputGateTerminalFenceRejectsLateOutputWithoutPoisoningFrameOwner(t *testing.T) {
+	var output bytes.Buffer
+	owner, err := lifecycle.NewFrameOwner(&output)
+	require.NoError(t, err)
+	gate, err := NewCleanupOutputGate(owner)
+	require.NoError(t, err)
+	payload := []byte("cleanup\n")
+
+	n, err := gate.Write(payload)
+	require.NoError(t, err)
+	require.Equal(t, len(payload), n)
+	require.Equal(t, payload, output.Bytes())
+
+	gate.Fence()
+	_, err = gate.Write([]byte("late cleanup\n"))
+	require.ErrorIs(t, err, errCleanupOutputFenced)
+	gate.PoisonOutput(err)
+	require.False(t, owner.Census().Poisoned)
+	require.Equal(t, payload, output.Bytes())
+}
+
 type recordingFrameState struct {
 	events    *[]string
 	commitErr error

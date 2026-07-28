@@ -476,7 +476,7 @@ flowchart TD
     AutoD{"Check + post-check<br/>yield global jobs claim"}
     Keep("Reject / supersede / busy<br/>incumbent unchanged")
     Reserve("Reserve inactive<br/>run permit")
-    Retire("Fence + detach<br/>prior generation")
+    Retire("Fence ordinary output + detach<br/>prior generation")
     Promote{"Acquire installed-runtime<br/>identity"}
     Attach("Attach live projections<br/>activate permit + output")
     Live("Start + publish Running")
@@ -514,8 +514,8 @@ flowchart TD
    success cannot be admitted after a cut. A normal detection failure commits `StatusFailed`; a busy/contained
    persistent source retains only its latest desired retry, while synchronous DynCfg returns a retryable error.
 4. **Reserve and retire** — only a timely successful candidate is wrapped in an inactive run permit. Replacement then
-   fences the incumbent's output and detaches its run projections immediately; its physical managed loop, `Stop`,
-   Function drain, and collector cleanup remain process-owned until they return.
+   fences the incumbent's ordinary output and detaches its run projections immediately; its physical managed loop,
+   `Stop`, Function drain, and collector cleanup remain process-owned until they return.
 5. **Promote, attach, and start** — the candidate acquires the separate `job-runtime` identity only after logical
    retirement. Candidate `Init`/`Check` may overlap the incumbent, but two installed runtimes for one job cannot.
    After promotion the staged runtime/vnode/Function projections attach, the permit and output gate activate, and the
@@ -523,15 +523,21 @@ flowchart TD
    apply failure aborts it when possible, or returns the still-live retained generation to the kernel for fail-closed
    ownership. If the old runtime does not release within the supersession grace, the candidate is rejected and the
    source-specific busy/pending policy applies.
-6. **Emit** — installation activates the generation output gate. Retirement fences it before detaching projections, so
-   a retained old runtime cannot interleave late frames with its successor. Whole active frames still commit through
-   the process's one `FrameOwner`. `joboutput/output_gate.go`.
+6. **Emit** — installation activates the generation output gate. Retirement permanently fences ordinary output before
+   detaching projections, so a retained old runtime cannot interleave late collection frames with its successor.
+   Accepted V1/V2 cleanup uses a separate process-lifetime capability to emit terminal chart-obsoletion frames only
+   after the managed loop and Function handlers physically quiesce. The same `job-runtime` identity remains occupied
+   through cleanup, so a same-job successor cannot start before those terminal frames complete. Both capabilities
+   serialize whole frames through the process's one `FrameOwner`. `joboutput/output_gate.go`.
 
 ### Job generations and fencing
 
 Every job carries a monotonic **generation** number. A staged result is consumed only by the matching transaction and
 run epoch. The process-owned attempt target rejects late work from a retired run, while the per-generation output gate
-allows frames only after installation and fences them at logical retirement.
+allows ordinary frames only after installation and fences them at logical retirement. The separate accepted-cleanup
+capability is process-owned rather than run-owned because physical cleanup may outlive a run rotation. Process
+termination terminally fences that capability before finalizing the output service, suppressing cleanup reached after
+the bounded shutdown budget.
 
 ### V1 vs V2
 
@@ -835,8 +841,8 @@ agent-level module) stages one stable process-owned handler bundle outside contr
 Job Manager separates two lifetimes:
 
 - **The process is the building.** Built once by `composition.NewProcess`, it survives every reload: the stdin reader,
-  the one `FrameOwner`, the UID ledger, the frozen module registry, the secret resolver, the process-attempt and Store
-  epoch authorities, the vnode registry, and the runtime metrics service.
+  the one `FrameOwner`, the accepted-cleanup output capability, the UID ledger, the frozen module registry, the secret
+  resolver, the process-attempt and Store epoch authorities, the vnode registry, and the runtime metrics service.
 - **The run generation is the current tenant.** A complete, self-contained occupant built by `composition/run.go`: the
   kernel and its loop, the task supervisor, the run supervisor, the DynCfg graph, the run-owned SecretStore
   controller/dependency projections, Function catalog projections and publications, the job factory, the autodetection
@@ -884,7 +890,9 @@ instead of waiting behind its startup barrier.
 
 **Termination** (SIGINT/SIGTERM) follows the same retirement path with no successor, then begins process-authority
 shutdown. It reports retained physical work after the bounded shutdown budget rather than waiting forever; only actual
-process exit can reclaim a permanently blocked goroutine.
+process exit can reclaim a permanently blocked goroutine. After the authority drains or the budget expires, the
+process terminally fences accepted-cleanup output before finalizing the output service. A contained collector that
+returns later still releases its resources, but cannot emit a late terminal frame.
 
 ## Runtime Metrics
 

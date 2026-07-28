@@ -54,6 +54,29 @@ func TestProcessCoreRestartSupersedesInitialStartup(t *testing.T) {
 	close(release)
 }
 
+func TestProcessCoreFencesCleanupOutputBeforeFinalizingOutput(t *testing.T) {
+	var output bytes.Buffer
+	process, err := newProcessCore(processCoreConfig{
+		Input:           strings.NewReader(""),
+		Output:          &output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            testRunJobServices(t),
+		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+
+	var lateWriteErr error
+	process.config.FinalizeOutput = func() {
+		_, lateWriteErr = process.cleanupOut.Write([]byte("late cleanup\n"))
+	}
+
+	require.NoError(t, process.finalize(nil, nil))
+	require.ErrorContains(t, lateWriteErr, "cleanup output is fenced")
+	require.Empty(t, output.Bytes())
+}
+
 func TestProcessCoreRestartFencesInitialTargetAfterCanceledConstruction(t *testing.T) {
 	reader, writer := io.Pipe()
 	entered := make(chan struct{})

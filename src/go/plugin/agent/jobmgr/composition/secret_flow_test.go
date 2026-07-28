@@ -772,6 +772,15 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 }
 
 func TestProcessCoreStoreRemovalCancelsPendingMaterializationAuthoritatively(t *testing.T) {
+	t.Run("running update", func(t *testing.T) {
+		testProcessCoreStoreRemovalCancelsPendingMaterialization(t, true)
+	})
+	t.Run("previously absent add", func(t *testing.T) {
+		testProcessCoreStoreRemovalCancelsPendingMaterialization(t, false)
+	})
+}
+
+func testProcessCoreStoreRemovalCancelsPendingMaterialization(t *testing.T, installInitial bool) {
 	gate := newProcessBlockingStoreGate()
 	t.Cleanup(gate.release)
 	jobs := testRunJobServices(t)
@@ -805,21 +814,27 @@ func TestProcessCoreStoreRemovalCancelsPendingMaterializationAuthoritatively(t *
 	}()
 	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
 
-	_, err = io.WriteString(
-		writer,
-		"FUNCTION_PAYLOAD secret-remove-add 30 "+
-			"\"config go.d:secretstore:vault add main\" "+
-			"0xFFFF \"user=test\" application/json\n"+
-			"{\"value\":\"initial\"}\n"+
-			"FUNCTION_PAYLOAD_END\n",
-	)
-	require.NoError(t, err)
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-add 200 application/json")
+	if installInitial {
+		_, err = io.WriteString(
+			writer,
+			"FUNCTION_PAYLOAD secret-remove-initial 30 "+
+				"\"config go.d:secretstore:vault add main\" "+
+				"0xFFFF \"user=test\" application/json\n"+
+				"{\"value\":\"initial\"}\n"+
+				"FUNCTION_PAYLOAD_END\n",
+		)
+		require.NoError(t, err)
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-initial 200 application/json")
+	}
 
+	command := "\"config go.d:secretstore:vault add main\" "
+	if installInitial {
+		command = "\"config go.d:secretstore:vault:main update\" "
+	}
 	_, err = io.WriteString(
 		writer,
-		"FUNCTION_PAYLOAD secret-remove-update 30 "+
-			"\"config go.d:secretstore:vault:main update\" "+
+		"FUNCTION_PAYLOAD secret-remove-blocked 30 "+
+			command+
 			"0xFFFF \"user=test\" application/json\n"+
 			"{\"value\":\"blocked\"}\n"+
 			"FUNCTION_PAYLOAD_END\n",
@@ -838,7 +853,7 @@ func TestProcessCoreStoreRemovalCancelsPendingMaterializationAuthoritatively(t *
 			"0xFFFF \"user=test\"\n",
 	)
 	require.NoError(t, err)
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-update 503 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-blocked 503 application/json")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove 200 application/json")
 
 	gate.release()

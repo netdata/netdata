@@ -1683,6 +1683,8 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 	output := &bytes.Buffer{}
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
+	cleanupOutput, err := NewCleanupOutputGate(frames)
+	require.NoError(t, err)
 	supervisor, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	state := &factoryTestState{}
@@ -1721,6 +1723,7 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 			Attempts:         attempts,
 			Modules:          modules,
 			Frames:           frames,
+			CleanupOutput:    cleanupOutput,
 			ConfigModules:    configModules,
 			Vnodes:           vnoderegistry.New(),
 			Scheduler:        newTestScheduler(t),

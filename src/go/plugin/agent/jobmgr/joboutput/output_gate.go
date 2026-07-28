@@ -13,6 +13,7 @@ import (
 var (
 	errGenerationOutputInactive = errors.New("job output: generation output is inactive")
 	errGenerationOutputFenced   = errors.New("job output: generation output is fenced")
+	errCleanupOutputFenced      = errors.New("job output: cleanup output is fenced")
 )
 
 type generationOutputState uint8
@@ -25,6 +26,9 @@ const (
 
 // generationOutputGate linearizes a collector generation's output with its
 // installation and retirement without changing the process-global writer.
+// Its read lease deliberately spans frame I/O so Fence waits for every
+// admitted write. A permanently blocked process stdout is not recoverable
+// inside Job Manager.
 type generationOutputGate struct {
 	mu     sync.RWMutex
 	writer FrameWriter
@@ -105,6 +109,53 @@ func (gate *generationOutputGate) PoisonOutput(err error) {
 	if gate == nil ||
 		errors.Is(err, errGenerationOutputInactive) ||
 		errors.Is(err, errGenerationOutputFenced) {
+		return
+	}
+	gate.writer.PoisonOutput(err)
+}
+
+// CleanupOutputGate is the process-lifetime output capability used only by
+// accepted collector cleanup. Fence terminally rejects cleanup reached after
+// bounded process shutdown.
+type CleanupOutputGate struct {
+	mu     sync.RWMutex
+	writer FrameWriter
+	fenced bool
+}
+
+// NewCleanupOutputGate binds accepted cleanup to the process frame owner.
+func NewCleanupOutputGate(owner *lifecycle.FrameOwner) (*CleanupOutputGate, error) {
+	if owner == nil {
+		return nil, errors.New("job output: nil cleanup output owner")
+	}
+	return &CleanupOutputGate{
+		writer: FrameWriter{Owner: owner},
+	}, nil
+}
+
+func (gate *CleanupOutputGate) Fence() {
+	if gate == nil {
+		return
+	}
+	gate.mu.Lock()
+	gate.fenced = true
+	gate.mu.Unlock()
+}
+
+func (gate *CleanupOutputGate) Write(payload []byte) (int, error) {
+	if gate == nil {
+		return 0, errCleanupOutputFenced
+	}
+	gate.mu.RLock()
+	defer gate.mu.RUnlock()
+	if gate.fenced {
+		return 0, errCleanupOutputFenced
+	}
+	return gate.writer.Write(payload)
+}
+
+func (gate *CleanupOutputGate) PoisonOutput(err error) {
+	if gate == nil || errors.Is(err, errCleanupOutputFenced) {
 		return
 	}
 	gate.writer.PoisonOutput(err)

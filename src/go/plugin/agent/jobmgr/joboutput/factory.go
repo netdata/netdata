@@ -61,6 +61,7 @@ type FactoryConfig struct {
 	Attempts         jobmgr.ProcessAttemptAuthority                                    // process-owned candidate authority
 	Modules          ModuleCatalog                                                     // collector creator registry
 	Frames           *lifecycle.FrameOwner                                             // frame owner used as the collector output sink
+	CleanupOutput    *CleanupOutputGate                                                // process-lifetime accepted-cleanup output
 	ConfigModules    *ConfigModuleFactory                                              // resolved config application and short-lived probes
 	Runtime          runtimecomp.Service                                               // V2 runtime service dependency
 	Vnodes           *vnoderegistry.Registry                                           // vnode registry for V2 jobs
@@ -69,7 +70,7 @@ type FactoryConfig struct {
 	HandlerAttacher  JobHandlerAttacher                                                // run-owned Function publication attachment
 	Scheduler        *Scheduler                                                        // tick/registration scheduler
 	Observer         lifecycle.RuntimeObserver                                         // runtime gauge sink
-	RunWithoutClaims func(context.Context, func(context.Context) error) (error, error) // claim-yield adapter for probes
+	RunWithoutClaims func(context.Context, func(context.Context) error) (error, error) // claim-yield adapter; NewFactory installs the default
 }
 
 // Factory owns collector construction, validation, and transfer. It does not
@@ -177,6 +178,7 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 		config.Attempts == nil ||
 		config.Modules == nil ||
 		config.Frames == nil ||
+		config.CleanupOutput == nil ||
 		config.ConfigModules == nil ||
 		config.Vnodes == nil ||
 		config.Scheduler == nil ||
@@ -447,6 +449,7 @@ func (f *Factory) buildV1(
 		Module:          module,
 		Labels:          factoryLabels(config),
 		Out:             outputGate,
+		CleanupOut:      f.config.CleanupOutput,
 		UpdateEvery:     config.UpdateEvery(),
 		AutoDetectEvery: config.AutoDetectionRetry(),
 		Priority:        config.Priority(),
@@ -524,6 +527,7 @@ func (f *Factory) buildV2(
 		Module:          module,
 		Labels:          factoryLabels(config),
 		Out:             outputGate,
+		CleanupOut:      f.config.CleanupOutput,
 		UpdateEvery:     config.UpdateEvery(),
 		AutoDetectEvery: config.AutoDetectionRetry(),
 		IsStock:         config.SourceType() == confgroup.TypeStock,
