@@ -437,8 +437,8 @@ process-owned handler bundle outside controller locks:
 - availability polling and handler invocation run as contained attempts outside
   the controller and process-control loops;
 - a call that crosses its caller deadline has late output fenced and quarantines
-  only its bundle until all retained calls return; unrelated bundles remain
-  available.
+  only its bundle until every call already active when quarantine was established
+  physically returns; unrelated bundles remain available.
 
 `functions/bundle.go`, `functions/module_stage.go`,
 `functions/controller.go`.

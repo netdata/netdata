@@ -331,6 +331,43 @@ staleRetries:
 	discovery.mgr.StopAll()
 }
 
+func TestReleasedPipelineMaterializationRetainsImmediateRetry(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	discovery := &ServiceDiscovery{
+		attempts: &releasedMaterializationAuthority{},
+		pending:  newPendingPipelineIndex(ctx),
+	}
+	defer discovery.pending.wait()
+	config, err := newSDConfigFromJSON(
+		[]byte(`{
+			"discoverer":{"fixture":{}},
+			"services":[{"id":"service","match":"true"}]
+		}`),
+		"job",
+		"/etc/netdata/sd/job.conf",
+		confgroup.TypeUser,
+		"fixture",
+		"/etc/netdata/sd/job.conf",
+	)
+	require.NoError(t, err)
+	identity := pipelineMaterializationIdentity(config)
+
+	discovery.retainPendingPipeline(config, &materializationError{
+		cause:    jobmgr.ErrProcessAttemptBusy,
+		identity: identity,
+	})
+
+	select {
+	case token := <-discovery.pending.retry:
+		retained, ok := discovery.pending.take(token)
+		require.True(t, ok)
+		require.Equal(t, config.Hash(), retained.Hash())
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "released materialization did not schedule an immediate retry")
+	}
+}
+
 type containedTestDiscoverer struct{}
 
 func (containedTestDiscoverer) Discover(context.Context, chan<- []model.TargetGroup) {}
@@ -364,4 +401,32 @@ func (authority *busyMaterializationAuthority) ProcessAttemptReleased(
 ) (<-chan struct{}, bool) {
 	release, ok := authority.release.Load().(chan struct{})
 	return release, ok
+}
+
+type releasedMaterializationAuthority struct{}
+
+func (*releasedMaterializationAuthority) StartProcessAttempt(
+	jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	return nil, errors.New("test: unexpected materialization start")
+}
+
+func (*releasedMaterializationAuthority) SupersedeProcessAttempt(
+	context.Context,
+	jobmgr.ProcessAttemptIdentity,
+) error {
+	return jobmgr.ErrProcessAttemptBusy
+}
+
+func (*releasedMaterializationAuthority) CutProcessAttempt(
+	jobmgr.ProcessAttemptIdentity,
+	error,
+) bool {
+	return false
+}
+
+func (*releasedMaterializationAuthority) ProcessAttemptReleased(
+	jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return nil, false
 }

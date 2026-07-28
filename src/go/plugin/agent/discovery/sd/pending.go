@@ -189,7 +189,9 @@ func (d *ServiceDiscovery) retainPendingPipeline(config sdConfig, err error) {
 	}
 	release, ok := d.attempts.ProcessAttemptReleased(contained.identity)
 	if !ok {
-		return
+		immediate := make(chan struct{})
+		close(immediate)
+		release = immediate
 	}
 	d.pending.retain(config, release)
 }

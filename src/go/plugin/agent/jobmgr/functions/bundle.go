@@ -43,8 +43,10 @@ type functionBundle struct {
 	resource     string
 	target       uint64
 	invocationID uint64
+	activeCalls  int
 	retained     int
 	quarantined  bool
+	idExhausted  bool
 }
 
 type functionAvailabilityPoll struct {
@@ -169,10 +171,12 @@ func (bundle *functionBundle) invoke(
 	bundle.invocationID++
 	if bundle.invocationID == 0 {
 		bundle.quarantined = true
+		bundle.idExhausted = true
 		bundle.mu.Unlock()
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
 	invocationID := bundle.invocationID
+	bundle.activeCalls++
 	bundle.references++
 	attempts := bundle.attempts
 	key := bundle.identityKey
@@ -252,11 +256,26 @@ func (invocation *functionInvocation) complete() {
 		return
 	}
 	invocation.completed = true
+	if bundle.activeCalls <= 0 {
+		bundle.mu.Unlock()
+		panic("jobmgr Function bundle: active invocation underflow")
+	}
+	bundle.activeCalls--
 	if invocation.retained {
-		bundle.retained--
-		if bundle.retained == 0 && !bundle.retired {
-			bundle.quarantined = false
+		if bundle.retained <= 0 {
+			bundle.mu.Unlock()
+			panic("jobmgr Function bundle: retained invocation underflow")
 		}
+		bundle.retained--
+	}
+	// A sibling can cross its logical deadline before its caller records
+	// retained ownership. Once established, quarantine therefore stays closed
+	// until every callback admitted before it has physically returned.
+	if bundle.quarantined &&
+		bundle.activeCalls == 0 &&
+		!bundle.retired &&
+		!bundle.idExhausted {
+		bundle.quarantined = false
 	}
 	if bundle.references <= 0 {
 		bundle.mu.Unlock()

@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -50,6 +52,77 @@ func TestProcessCoreRestartSupersedesInitialStartup(t *testing.T) {
 	require.NoError(t, <-terminate.result)
 	require.NoError(t, <-done)
 	close(release)
+}
+
+func TestProcessCoreRestartFencesInitialTargetAfterCanceledConstruction(t *testing.T) {
+	reader, writer := io.Pipe()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var handlerCalls atomic.Int32
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          newProcessSynchronizedBuffer(),
+		ShutdownTimeout: time.Second,
+		Modules: collectorapi.Registry{
+			"module": {
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "method"}}
+				},
+				MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+					if handlerCalls.Add(1) == 1 {
+						close(entered)
+						<-release
+					}
+					return &runTestHandler{cleanup: func() {}}
+				},
+			},
+		},
+		Jobs:        testRunJobServices(t),
+		Discovery:   testRunDiscoveryServices(t),
+		Diagnostics: testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = writer.Close()
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	controls := newTestProcessControls(2)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "initial Function construction did not start")
+	}
+
+	restart := testProcessControl()
+	controls.sendRestart(restart)
+	close(release)
+	require.NoError(t, <-restart.result)
+
+	_, err = process.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		Identity: jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJob,
+			Key:       "late-generation-one-work",
+			Resource:  "late generation one work",
+		},
+		Target: 1,
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
+			return nil
+		},
+	})
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptRetired)
+
+	terminate := testProcessControl()
+	controls.sendTerminate(terminate)
+	require.NoError(t, <-terminate.result)
+	require.NoError(t, <-done)
 }
 
 func TestProcessCoreTerminateInterruptsInitialStartup(t *testing.T) {

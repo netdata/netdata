@@ -216,7 +216,7 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 					control.result <- finalErr
 					return finalErr
 				}
-				retireErr := pc.retireForSuccessor(result.generation, nextID)
+				retireErr := pc.retireForSuccessor(result.generation, active.target, nextID)
 				transitionErr := errors.Join(result.err, retireErr)
 				if transitionErr != nil && !processTransitionCancellationOnly(transitionErr) {
 					finalErr := pc.finalize(result.generation, transitionErr)
@@ -487,7 +487,7 @@ func (pc *processCore) rotate(
 		Generation: current.run.Generation(),
 		State:      "rotating",
 	})
-	if err := pc.retireForSuccessor(current, nextID); err != nil {
+	if err := pc.retireForSuccessor(current, current.run.Generation(), nextID); err != nil {
 		return current, err
 	}
 	next, err := pc.startGeneration(ctx, nextID, quit)
@@ -503,22 +503,28 @@ func (pc *processCore) rotate(
 	return next, nil
 }
 
-func (pc *processCore) retireForSuccessor(current *runGeneration, nextID uint64) error {
+func (pc *processCore) retireForSuccessor(
+	current *runGeneration,
+	retiringTarget uint64,
+	nextID uint64,
+) error {
+	if current != nil {
+		if err := pc.storeEpochs.seal(current.secretEpoch); err != nil {
+			pc.storeEpochs.observeFailure(
+				current.run.Generation(),
+				"secret Store epoch seal failed",
+				err,
+			)
+		}
+	}
+	if pc.attempts != nil {
+		pc.attempts.CutTarget(retiringTarget)
+	}
 	if current == nil {
 		return nil
 	}
-	if err := pc.storeEpochs.seal(current.secretEpoch); err != nil {
-		pc.storeEpochs.observeFailure(
-			current.run.Generation(),
-			"secret Store epoch seal failed",
-			err,
-		)
-	}
 	if !current.isStarted() {
 		return current.abortConstruction()
-	}
-	if pc.attempts != nil {
-		pc.attempts.CutTarget(current.run.Generation())
 	}
 	ingressLive := pc.ingress.State() == functionadapter.ProcessIngressLive
 	if ingressLive {

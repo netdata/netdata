@@ -4,6 +4,7 @@ package functions
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -78,6 +79,118 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 
 	bundle.retire()
 	require.NoError(t, bundle.wait(context.Background()))
+}
+
+func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attempts := &gatedSecondAwaitAuthority{
+		delegate:          delegate,
+		secondSettled:     make(chan struct{}),
+		allowSecondReturn: make(chan struct{}),
+	}
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &controllerTestHandler{}
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	require.NoError(t, bundle.bindContainment(attempts, 1, "1/module/agent", "module"))
+
+	firstEntered := make(chan struct{})
+	firstRelease := make(chan struct{})
+	secondEntered := make(chan struct{})
+	secondRelease := make(chan struct{})
+	t.Cleanup(func() {
+		for _, signal := range []chan struct{}{
+			firstRelease,
+			secondRelease,
+			attempts.allowSecondReturn,
+		} {
+			select {
+			case <-signal:
+			default:
+				close(signal)
+			}
+		}
+		bundle.retire()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = bundle.wait(ctx)
+		_ = delegate.Shutdown(ctx)
+	})
+
+	firstCtx, cancelFirst := context.WithCancel(context.Background())
+	firstDone := make(chan error, 1)
+	go func() {
+		_, invokeErr := bundle.invoke(firstCtx, func(context.Context) (lifecycle.SealedResult, error) {
+			close(firstEntered)
+			<-firstRelease
+			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+		})
+		firstDone <- invokeErr
+	}()
+	<-firstEntered
+
+	secondCtx, cancelSecond := context.WithCancel(context.Background())
+	secondDone := make(chan error, 1)
+	go func() {
+		_, invokeErr := bundle.invoke(secondCtx, func(context.Context) (lifecycle.SealedResult, error) {
+			close(secondEntered)
+			<-secondRelease
+			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+		})
+		secondDone <- invokeErr
+	}()
+	<-secondEntered
+
+	cancelSecond()
+	<-attempts.secondSettled
+	cancelFirst()
+	require.NoError(t, <-firstDone)
+	require.True(t, bundle.quarantined)
+
+	firstIdentity := jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
+		Key:       "1/module/agent/invocation/1",
+		Resource:  "module",
+	}
+	firstReleased, ok := attempts.ProcessAttemptReleased(firstIdentity)
+	require.True(t, ok)
+	close(firstRelease)
+	<-firstReleased
+
+	calls := 0
+	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
+		calls++
+		return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+	})
+	require.NoError(t, err)
+	require.Zero(t, calls)
+
+	close(attempts.allowSecondReturn)
+	require.NoError(t, <-secondDone)
+	secondIdentity := jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
+		Key:       "1/module/agent/invocation/2",
+		Resource:  "module",
+	}
+	secondReleased, ok := attempts.ProcessAttemptReleased(secondIdentity)
+	require.True(t, ok)
+	close(secondRelease)
+	<-secondReleased
+	require.False(t, bundle.quarantined)
+
+	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
+		calls++
+		return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, calls)
 }
 
 func TestFunctionBundleAvailabilityPollIsPerBundleBusy(t *testing.T) {
@@ -282,6 +395,61 @@ func TestContainedFunctionControllerPublishesSuccessfulAvailabilityTransition(t 
 
 type availabilityPublicationPort struct {
 	published chan PublicationRecord
+}
+
+type gatedSecondAwaitAuthority struct {
+	delegate          jobmgr.ProcessAttemptAuthority
+	started           atomic.Int32
+	secondSettled     chan struct{}
+	allowSecondReturn chan struct{}
+}
+
+func (authority *gatedSecondAwaitAuthority) StartProcessAttempt(
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	attempt, err := authority.delegate.StartProcessAttempt(plan)
+	if err != nil || authority.started.Add(1) != 2 {
+		return attempt, err
+	}
+	return &gatedAwaitAttempt{
+		ProcessAttempt: attempt,
+		settled:        authority.secondSettled,
+		allowReturn:    authority.allowSecondReturn,
+	}, nil
+}
+
+func (authority *gatedSecondAwaitAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	return authority.delegate.SupersedeProcessAttempt(ctx, identity)
+}
+
+func (authority *gatedSecondAwaitAuthority) CutProcessAttempt(
+	identity jobmgr.ProcessAttemptIdentity,
+	cause error,
+) bool {
+	return authority.delegate.CutProcessAttempt(identity, cause)
+}
+
+func (authority *gatedSecondAwaitAuthority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return authority.delegate.ProcessAttemptReleased(identity)
+}
+
+type gatedAwaitAttempt struct {
+	jobmgr.ProcessAttempt
+	settled     chan struct{}
+	allowReturn chan struct{}
+	once        sync.Once
+}
+
+func (attempt *gatedAwaitAttempt) Await(ctx context.Context) error {
+	err := attempt.ProcessAttempt.Await(ctx)
+	attempt.once.Do(func() { close(attempt.settled) })
+	<-attempt.allowReturn
+	return err
 }
 
 func (port *availabilityPublicationPort) Publish(record PublicationRecord) error {
