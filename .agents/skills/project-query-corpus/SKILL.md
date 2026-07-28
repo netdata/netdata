@@ -57,6 +57,24 @@ corpus belongs to one of three classes, with different rules:
     while both broke the L10/L11 totals. `fixture.ViewSumVolume` replaces it
     for `sum`. Ask of every Class B use: is there a law here the port could
     contradict? If yes, assert the law instead.
+- **Fixtures MUST make the answer exact where the contract is exact.** A
+  conservation check reads a difference, so anything else that moves the total
+  is noise the check will report as a defect. Above tier 0 the loudest such
+  source is resolution: when a window edge or a plan seam cuts a stored
+  record, the part inside can only be estimated from the record's width, and
+  with varying data that estimate is wrong by a share of the record — which
+  is what tiers cost, not a defect (see "Tiered rollups are not bugs").
+  - Grid-align the window so no edge falls inside a record, and where a
+    boundary is discovered rather than chosen (a rotated tier head), carry a
+    **flat dimension** alongside the varying ones: a constant survives rollup
+    exactly, so its share of a cut record is its exact truth and any
+    difference left is arithmetic.
+  - Worked example: CASE-026's seam contract first read 0.49s of data
+    "missing" across a plan switch, entirely from the seam cutting one
+    random-valued tier1 record. On the flat dimension the same three windows
+    answer 7,200,000 to the digit at every zoom. Had the noisy version been
+    committed, the corpus would have reported accepted rollup as an engine
+    bug — the mirror image of fit-to-engine, and just as damaging.
 - **Class C — byte-pins and parity checks.** Formatter byte-pins (L7/L8,
   options) capture engine output once and pin **stability** — they detect
   contract regressions, not first-principles correctness. Parity checks
