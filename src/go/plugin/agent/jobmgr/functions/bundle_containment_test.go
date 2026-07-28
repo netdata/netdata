@@ -47,7 +47,6 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 	<-entered
 	cancel()
 	require.NoError(t, <-first)
-	require.EqualValues(t, 1, bundle.retained)
 	require.True(t, bundle.quarantined)
 
 	calls := 0
@@ -67,7 +66,6 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 	require.True(t, ok)
 	close(release)
 	<-released
-	require.Zero(t, bundle.retained)
 	require.False(t, bundle.quarantined)
 
 	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {

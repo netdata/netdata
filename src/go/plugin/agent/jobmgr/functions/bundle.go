@@ -44,7 +44,6 @@ type functionBundle struct {
 	target       uint64
 	invocationID uint64
 	activeCalls  int
-	retained     int
 	quarantined  bool
 	idExhausted  bool
 }
@@ -62,7 +61,6 @@ type functionAvailabilityResult struct {
 
 type functionInvocation struct {
 	bundle    *functionBundle
-	retained  bool
 	completed bool
 }
 
@@ -220,7 +218,7 @@ func (bundle *functionBundle) invoke(
 		select {
 		case <-attempt.Released():
 		default:
-			invocation.markRetained()
+			invocation.quarantineIfActive()
 		}
 		if ctx.Err() != nil || errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
 			return functionErrorResult(503, "Function handler did not complete before its deadline")
@@ -231,15 +229,13 @@ func (bundle *functionBundle) invoke(
 	return response.result, response.err
 }
 
-func (invocation *functionInvocation) markRetained() {
+func (invocation *functionInvocation) quarantineIfActive() {
 	if invocation == nil || invocation.bundle == nil {
 		return
 	}
 	bundle := invocation.bundle
 	bundle.mu.Lock()
-	if !invocation.completed && !invocation.retained {
-		invocation.retained = true
-		bundle.retained++
+	if !invocation.completed {
 		bundle.quarantined = true
 	}
 	bundle.mu.Unlock()
@@ -261,13 +257,6 @@ func (invocation *functionInvocation) complete() {
 		panic("jobmgr Function bundle: active invocation underflow")
 	}
 	bundle.activeCalls--
-	if invocation.retained {
-		if bundle.retained <= 0 {
-			bundle.mu.Unlock()
-			panic("jobmgr Function bundle: retained invocation underflow")
-		}
-		bundle.retained--
-	}
 	// A sibling can cross its logical deadline before its caller records
 	// retained ownership. Once established, quarantine therefore stays closed
 	// until every callback admitted before it has physically returned.
