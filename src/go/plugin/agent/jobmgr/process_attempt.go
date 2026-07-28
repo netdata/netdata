@@ -66,6 +66,10 @@ type ProcessAttemptPlan struct {
 	Identity ProcessAttemptIdentity
 	Target   uint64
 	Work     func(context.Context, ProcessAttemptAdmission) error
+
+	// OnContainment is a synchronous pre-settlement fence. It MUST be
+	// non-blocking and MUST NOT re-enter the attempt authority.
+	OnContainment func()
 }
 
 // ProcessAttemptAdmission is the only attempt control available to its worker.

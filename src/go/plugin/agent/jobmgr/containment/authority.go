@@ -109,6 +109,7 @@ type attempt struct {
 	timer    *time.Timer
 	state    attemptState
 	result   error
+	fence    func()
 	settled  chan struct{}
 	released chan struct{}
 }
@@ -160,6 +161,7 @@ func (authority *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, err
 		ctx:       ctx,
 		cancel:    cancel,
 		state:     attemptStateProbing,
+		fence:     plan.OnContainment,
 		settled:   make(chan struct{}),
 		released:  make(chan struct{}),
 	}
@@ -254,6 +256,9 @@ func (authority *Authority) cut(attempt *attempt, cause error, probingOnly bool)
 	authority.census.Contained++
 	attempt.timer.Stop()
 	attempt.cancel(cause)
+	if attempt.fence != nil {
+		attempt.fence()
+	}
 	close(attempt.settled)
 	census := authority.census
 	age := time.Since(attempt.started)

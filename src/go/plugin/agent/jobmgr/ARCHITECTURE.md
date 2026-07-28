@@ -815,8 +815,11 @@ agent-level module) stages one stable process-owned handler bundle outside contr
 - a handler invocation or availability poll that settles while its callback remains physically live quarantines only
   its bundle; new callbacks for that bundle are rejected until every callback covered by quarantine physically
   returns, while unrelated bundles remain available.
+- containment runs the bundle fence before logical settlement becomes observable, so admission cannot race ahead of
+  quarantine while an `Await` caller is waiting to be scheduled.
 
-`functions/bundle.go`, `functions/module_stage.go`, `functions/controller.go`.
+`functions/bundle.go`, `functions/module_stage.go`, `functions/controller.go`, `containment/authority.go`,
+`process_attempt.go`.
 
 ### DynCfg is not a published Function
 

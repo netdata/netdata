@@ -79,9 +79,13 @@ func TestAuthorityFuseWinsLateCompletionAndRedactsDiagnostics(t *testing.T) {
 		"vault/main",
 	)
 	release := make(chan struct{})
+	fenced := false
 	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Target:   11,
+		OnContainment: func() {
+			fenced = true
+		},
 		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
 			<-release
 			return errors.New("provider-sensitive-detail")
@@ -90,6 +94,7 @@ func TestAuthorityFuseWinsLateCompletionAndRedactsDiagnostics(t *testing.T) {
 	require.NoError(t, err)
 
 	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptDeadline)
+	require.True(t, fenced)
 	require.Equal(t, Census{Active: 1, Contained: 1}, authority.Census())
 	require.Equal(t, attemptStateContained, attempt.stateSnapshot())
 

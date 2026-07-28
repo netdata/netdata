@@ -82,10 +82,12 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 	delegate, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
-	attempts := &gatedSecondAwaitAuthority{
-		delegate:          delegate,
-		secondSettled:     make(chan struct{}),
-		allowSecondReturn: make(chan struct{}),
+	attempts := &gatedAwaitAuthority{
+		delegate:    delegate,
+		namespace:   jobmgr.ProcessAttemptFunctionInvocation,
+		ordinal:     2,
+		settled:     make(chan struct{}),
+		allowReturn: make(chan struct{}),
 	}
 	bundle, err := newAgentFunctionBundle(
 		"module",
@@ -107,7 +109,7 @@ func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 		for _, signal := range []chan struct{}{
 			firstRelease,
 			secondRelease,
-			attempts.allowSecondReturn,
+			attempts.allowReturn,
 		} {
 			select {
 			case <-signal:
@@ -147,7 +149,7 @@ func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 	<-secondEntered
 
 	cancelSecond()
-	<-attempts.secondSettled
+	<-attempts.settled
 	cancelFirst()
 	require.NoError(t, <-firstDone)
 	require.True(t, bundle.quarantined)
@@ -170,7 +172,7 @@ func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, calls)
 
-	close(attempts.allowSecondReturn)
+	close(attempts.allowReturn)
 	require.NoError(t, <-secondDone)
 	secondIdentity := jobmgr.ProcessAttemptIdentity{
 		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
@@ -298,10 +300,167 @@ func TestRetainedAvailabilityPollQuarantinesInvocations(t *testing.T) {
 	require.NoError(t, bundle.wait(context.Background()))
 }
 
+func TestContainedAvailabilityPollFencesInvocationBeforeAwaitReturns(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attempts := &gatedAwaitAuthority{
+		delegate:    delegate,
+		namespace:   jobmgr.ProcessAttemptFunctionPoll,
+		ordinal:     1,
+		settled:     make(chan struct{}),
+		allowReturn: make(chan struct{}),
+	}
+	var blocking atomic.Bool
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &controllerTestHandler{}
+			},
+		},
+		[]funcapi.FunctionConfig{{
+			ID: "method",
+			Available: func() bool {
+				if blocking.Load() {
+					close(entered)
+					<-release
+				}
+				return true
+			},
+		}},
+	)
+	require.NoError(t, err)
+	require.NoError(t, bundle.bindContainment(attempts, 1, "1/module/agent", "module"))
+	blocking.Store(true)
+	t.Cleanup(func() {
+		for _, signal := range []chan struct{}{release, attempts.allowReturn} {
+			select {
+			case <-signal:
+			default:
+				close(signal)
+			}
+		}
+		bundle.retire()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = bundle.wait(ctx)
+		_ = delegate.Shutdown(ctx)
+	})
+
+	poll, err := bundle.startAvailabilityPoll()
+	require.NoError(t, err)
+	waitBundleContainmentTestValue(t, entered, "availability callback entry")
+	require.True(t, poll.attempt.Cut(jobmgr.ErrProcessAttemptSuperseded))
+	waitBundleContainmentTestValue(t, attempts.settled, "availability poll settlement")
+
+	calls := 0
+	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
+		calls++
+		return lifecycle.NewSealedResult(200, "application/json", nil)
+	})
+	require.NoError(t, err)
+	require.Zero(t, calls)
+
+	close(attempts.allowReturn)
+	close(release)
+	result := waitBundleContainmentTestValue(t, poll.result, "availability poll result")
+	require.ErrorIs(t, result.err, jobmgr.ErrProcessAttemptSuperseded)
+	require.Eventually(t, func() bool {
+		return !functionBundleQuarantined(bundle)
+	}, time.Second, time.Millisecond)
+}
+
+func TestContainedInvocationFencesSiblingBeforeAwaitReturns(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attempts := &gatedAwaitAuthority{
+		delegate:    delegate,
+		namespace:   jobmgr.ProcessAttemptFunctionInvocation,
+		ordinal:     1,
+		settled:     make(chan struct{}),
+		allowReturn: make(chan struct{}),
+	}
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &controllerTestHandler{}
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	require.NoError(t, bundle.bindContainment(attempts, 1, "1/module/agent", "module"))
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	firstDone := make(chan error, 1)
+	t.Cleanup(func() {
+		cancel()
+		for _, signal := range []chan struct{}{release, attempts.allowReturn} {
+			select {
+			case <-signal:
+			default:
+				close(signal)
+			}
+		}
+		bundle.retire()
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+		defer waitCancel()
+		_ = bundle.wait(waitCtx)
+		_ = delegate.Shutdown(waitCtx)
+	})
+
+	go func() {
+		_, invokeErr := bundle.invoke(ctx, func(context.Context) (lifecycle.SealedResult, error) {
+			close(entered)
+			<-release
+			return lifecycle.NewSealedResult(200, "application/json", nil)
+		})
+		firstDone <- invokeErr
+	}()
+	waitBundleContainmentTestValue(t, entered, "invocation callback entry")
+	cancel()
+	waitBundleContainmentTestValue(t, attempts.settled, "invocation settlement")
+
+	calls := 0
+	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
+		calls++
+		return lifecycle.NewSealedResult(200, "application/json", nil)
+	})
+	require.NoError(t, err)
+	require.Zero(t, calls)
+
+	close(attempts.allowReturn)
+	require.NoError(t, waitBundleContainmentTestValue(t, firstDone, "contained invocation result"))
+	close(release)
+	require.Eventually(t, func() bool {
+		return !functionBundleQuarantined(bundle)
+	}, time.Second, time.Millisecond)
+}
+
 func functionBundleQuarantined(bundle *functionBundle) bool {
 	bundle.mu.Lock()
 	defer bundle.mu.Unlock()
 	return bundle.quarantined
+}
+
+func waitBundleContainmentTestValue[T any](
+	t *testing.T,
+	result <-chan T,
+	name string,
+) T {
+	t.Helper()
+	select {
+	case value := <-result:
+		return value
+	case <-time.After(time.Second):
+		require.FailNowf(t, "test failed", "%s did not settle", name)
+		var zero T
+		return zero
+	}
 }
 
 func TestFunctionBundleAvailabilityPollIsPerBundleBusy(t *testing.T) {
@@ -504,42 +663,46 @@ type availabilityPublicationPort struct {
 	published chan PublicationRecord
 }
 
-type gatedSecondAwaitAuthority struct {
-	delegate          jobmgr.ProcessAttemptAuthority
-	started           atomic.Int32
-	secondSettled     chan struct{}
-	allowSecondReturn chan struct{}
+type gatedAwaitAuthority struct {
+	delegate    jobmgr.ProcessAttemptAuthority
+	namespace   jobmgr.ProcessAttemptNamespace
+	ordinal     int32
+	started     atomic.Int32
+	settled     chan struct{}
+	allowReturn chan struct{}
 }
 
-func (authority *gatedSecondAwaitAuthority) StartProcessAttempt(
+func (authority *gatedAwaitAuthority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	attempt, err := authority.delegate.StartProcessAttempt(plan)
-	if err != nil || authority.started.Add(1) != 2 {
+	if err != nil ||
+		plan.Identity.Namespace != authority.namespace ||
+		authority.started.Add(1) != authority.ordinal {
 		return attempt, err
 	}
 	return &gatedAwaitAttempt{
 		ProcessAttempt: attempt,
-		settled:        authority.secondSettled,
-		allowReturn:    authority.allowSecondReturn,
+		settled:        authority.settled,
+		allowReturn:    authority.allowReturn,
 	}, nil
 }
 
-func (authority *gatedSecondAwaitAuthority) SupersedeProcessAttempt(
+func (authority *gatedAwaitAuthority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,
 ) error {
 	return authority.delegate.SupersedeProcessAttempt(ctx, identity)
 }
 
-func (authority *gatedSecondAwaitAuthority) CutProcessAttempt(
+func (authority *gatedAwaitAuthority) CutProcessAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	cause error,
 ) bool {
 	return authority.delegate.CutProcessAttempt(identity, cause)
 }
 
-func (authority *gatedSecondAwaitAuthority) ProcessAttemptReleased(
+func (authority *gatedAwaitAuthority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
 	return authority.delegate.ProcessAttemptReleased(identity)

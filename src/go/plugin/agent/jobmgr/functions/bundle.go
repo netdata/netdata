@@ -126,7 +126,8 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 			Key:       key,
 			Resource:  resource,
 		},
-		Target: target,
+		Target:        target,
+		OnContainment: callback.quarantineIfActive,
 		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
 			defer callback.complete()
 			availability, pollErr := bundle.evaluateAvailability()
@@ -147,13 +148,6 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 	result := make(chan functionAvailabilityResult, 1)
 	go func() {
 		settledErr := attempt.Await(context.Background())
-		if settledErr != nil {
-			select {
-			case <-attempt.Released():
-			default:
-				callback.quarantineIfActive()
-			}
-		}
 		<-attempt.Released()
 		if settledErr != nil {
 			result <- functionAvailabilityResult{err: settledErr}
@@ -204,7 +198,8 @@ func (bundle *functionBundle) invoke(
 			Key:       fmt.Sprintf("%s/invocation/%d", key, invocationID),
 			Resource:  resource,
 		},
-		Target: target,
+		Target:        target,
+		OnContainment: callback.quarantineIfActive,
 		Work: func(
 			attemptCtx context.Context,
 			_ jobmgr.ProcessAttemptAdmission,
@@ -229,11 +224,6 @@ func (bundle *functionBundle) invoke(
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
 	if err := attempt.Await(ctx); err != nil {
-		select {
-		case <-attempt.Released():
-		default:
-			callback.quarantineIfActive()
-		}
 		if ctx.Err() != nil || errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
 			return functionErrorResult(503, "Function handler did not complete before its deadline")
 		}

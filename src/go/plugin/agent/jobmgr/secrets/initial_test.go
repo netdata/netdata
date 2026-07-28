@@ -336,7 +336,11 @@ func TestRemoveFailedAbsentDynCfgStoreWithdrawsPendingDesiredState(t *testing.T)
 	stage, err := controller.Stage(input)
 	require.NoError(t, err)
 	stage.Start()
-	<-stage.Ready()
+	select {
+	case <-stage.Ready():
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "Store removal did not settle")
+	}
 	defer stage.Release()
 	prepared, err := controller.PrepareStaged(
 		t.Context(),
@@ -352,6 +356,9 @@ func TestRemoveFailedAbsentDynCfgStoreWithdrawsPendingDesiredState(t *testing.T)
 
 	require.NoError(t, err)
 	require.Equal(t, 200, applied.ResultStatus())
+	_, disposition, owned := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, owned)
 	_, exists := controller.entry(key)
 	require.False(t, exists)
 	require.False(t, controller.pendingVersion(key, version))
