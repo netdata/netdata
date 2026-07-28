@@ -306,6 +306,21 @@ static void puback_callback(uint16_t packet_id)
 
 void aclk_graceful_disconnect(mqtt_wss_client client);
 
+// Single source for MQTT_WSS_ERR_* -> status, so a drop reports the same cause whether it happens
+// while waiting for CONNACK or on an established connection.
+static ACLK_STATUS aclk_status_from_mqtt_wss_rc(int rc)
+{
+    switch (rc) {
+        case MQTT_WSS_ERR_REMOTE_CLOSED:   return ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE;
+        case MQTT_WSS_ERR_PROTO_MQTT:      return ACLK_STATUS_OFFLINE_MQTT_PROTOCOL_ERROR;
+        case MQTT_WSS_ERR_PROTO_WS:        return ACLK_STATUS_OFFLINE_WS_PROTOCOL_ERROR;
+        case MQTT_WSS_ERR_MSG_TOO_BIG:     return ACLK_STATUS_OFFLINE_MESSAGE_TOO_BIG;
+        case MQTT_WSS_ERR_POLL_FAILED:     return ACLK_STATUS_OFFLINE_POLL_ERROR;
+        case MQTT_WSS_ERR_NO_IO_PROGRESS:  return ACLK_STATUS_OFFLINE_NO_IO_PROGRESS;
+        default:                           return ACLK_STATUS_OFFLINE_SOCKET_ERROR;
+    }
+}
+
 bool schedule_node_update = false;
 /* Keeps connection alive and handles all network communications.
  * Returns on error or when netdata is shutting down.
@@ -323,18 +338,7 @@ static int handle_connection(mqtt_wss_client client)
             worker_is_busy(WORKER_ACLK_DISCONNECTED);
             error_report("Connection Error or Dropped");
 
-            if(rc == MQTT_WSS_ERR_REMOTE_CLOSED)
-                aclk_status_set(ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE);
-            else if(rc == MQTT_WSS_ERR_PROTO_MQTT)
-                aclk_status_set(ACLK_STATUS_OFFLINE_MQTT_PROTOCOL_ERROR);
-            else if(rc == MQTT_WSS_ERR_PROTO_WS)
-                aclk_status_set(ACLK_STATUS_OFFLINE_WS_PROTOCOL_ERROR);
-            else if(rc == MQTT_WSS_ERR_MSG_TOO_BIG)
-                aclk_status_set(ACLK_STATUS_OFFLINE_MESSAGE_TOO_BIG);
-            else if(rc == MQTT_WSS_ERR_POLL_FAILED)
-                aclk_status_set(ACLK_STATUS_OFFLINE_POLL_ERROR);
-            else /* if(rc == MQTT_WSS_ERR_CONN_DROP) */
-                aclk_status_set(ACLK_STATUS_OFFLINE_SOCKET_ERROR);
+            aclk_status_set(aclk_status_from_mqtt_wss_rc(rc));
 
             return 1;
         }
@@ -434,7 +438,12 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Attempting to gracefully shutdown the MQTT/WSS connection");
 
-    mqtt_wss_disconnect(client, 1000);
+    // Split four ways inside mqtt_wss_disconnect(), so 1s per phase. Each phase bounds how long
+    // we keep flushing whatever is still queued in the WebSocket write buffer; it does not wait
+    // for the peer, and it returns immediately when the buffer is already empty (the normal
+    // case). Nothing forcibly kills this thread, so an oversized budget delays shutdown rather
+    // than being truncated - keep it small enough that a stalled link cannot hold up exit.
+    mqtt_wss_disconnect(client, 4000);
 }
 
 static unsigned long aclk_reconnect_delay() {
@@ -579,6 +588,9 @@ const char *aclk_status_to_string(void) {
 
         case ACLK_STATUS_OFFLINE_POLL_ERROR:
             return "disconnected, poll() failed";
+
+        case ACLK_STATUS_OFFLINE_NO_IO_PROGRESS:
+            return "disconnected, no I/O progress on a ready socket";
 
         case ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE:
             return "disconnected, closed by remote end";
@@ -764,11 +776,12 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             (char **)&proxy_conf.proxy_destination,
             &proxy_conf.type);
 
+        int mqtt_service_rc = 0;
 #ifdef ACLK_DISABLE_CHALLENGE
-        int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf);
+        int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf, &fallback_ipv4, &mqtt_service_rc);
         url_t_destroy(&base_url);
 #else
-        int mqtt_rc = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf, &fallback_ipv4);
+        int mqtt_rc = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf, &fallback_ipv4, &mqtt_service_rc);
         url_t_destroy(&mqtt_url);
 
         freez((char*)mqtt_conn_params.clientid);
@@ -791,6 +804,14 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             fallback_ipv4 = false;
             return 0;
         }
+
+        // A failure inside the service loop (watchdog drop, poll error, protocol error) carries a
+        // specific cause; without this the status kept whatever the previous disconnect set.
+        // Only that class is covered: the earlier setup failures (TCP connect, proxy, SSL setup,
+        // SNI, mqtt_ng_connect) return via mqtt_rc and still leave a stale status - see the
+        // follow-up issue for mapping those.
+        if (mqtt_service_rc)
+            aclk_status_set(aclk_status_from_mqtt_wss_rc(mqtt_service_rc));
 
         error_report("ACLK: connection failed");
     }

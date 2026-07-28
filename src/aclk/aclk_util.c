@@ -557,16 +557,90 @@ static int aclk_poll_for_io(int fd, short events, int timeout_ms)
     return 1;
 }
 
-static int aclk_timeout_remaining_ms(usec_t start, int timeout_ms)
+// Clock-free so it can be unit tested; the guard against a negative timeout_ms must precede the
+// unsigned cast, or a negative budget would become a ~584 million year one (the comparison is in
+// milliseconds).
+static int aclk_timeout_remaining_ms_at(usec_t start_ut, int timeout_ms, usec_t now_ut)
 {
     if (timeout_ms <= 0)
         return 0;
 
-    usec_t elapsed_ms = clocks_usec_delta_or_zero(now_monotonic_usec(), start) / USEC_PER_MS;
-    if (elapsed_ms >= (usec_t)timeout_ms)
+    // Also keeps the subtraction below in range: it only runs when elapsed_ms < timeout_ms, so
+    // the result is positive and (int) cannot overflow.
+    msec_t elapsed_ms = clocks_usec_delta_or_zero(now_ut, start_ut) / USEC_PER_MS;
+    if (elapsed_ms >= (msec_t)timeout_ms)
         return 0;
 
     return timeout_ms - (int)elapsed_ms;
+}
+
+int aclk_timeout_remaining_ms(usec_t start_ut, int timeout_ms)
+{
+    return aclk_timeout_remaining_ms_at(start_ut, timeout_ms, now_monotonic_usec());
+}
+
+int aclk_timeout_unittest(void)
+{
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning aclk timeout unittest\n");
+
+#define ACLK_TIMEOUT_TEST(condition, msg) do {                                   \
+        if(!(condition)) {                                                       \
+            fprintf(stderr, "aclk timeout unittest FAILED: %s (%s:%d)\n",        \
+                    (msg), __FUNCTION__, __LINE__);                              \
+            errors++;                                                            \
+        }                                                                        \
+    } while(0)
+
+    const usec_t start_ut = 100 * USEC_PER_SEC;
+
+    // a fresh deadline hands back the whole budget
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut) == 1000,
+                      "full budget was not returned intact");
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 400 * USEC_PER_MS) == 600,
+                      "partially elapsed budget did not return the remainder");
+
+    // exactly-elapsed reports 0, i.e. spent, which is what the callers' "remaining <= 0" checks
+    // rely on. Note this does not pin the >= in the guard: at exact equality the fall-through
+    // would compute the same 0, so >= and > are indistinguishable here for every input.
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 1000 * USEC_PER_MS) == 0,
+                      "exactly elapsed budget was not reported as expired");
+
+    // over-elapsed must clamp to 0, never a negative remainder: this is what the guard actually
+    // buys, and without it the subtraction would return -4000 here
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 5000 * USEC_PER_MS) == 0,
+                      "over-elapsed budget returned a negative remainder instead of 0");
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 999 * USEC_PER_MS) == 1,
+                      "1ms short of the deadline was not still live");
+
+    // never hand back 0 while time is left, or callers would poll() non-blocking and spin
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 999999) == 1,
+                      "sub-millisecond remainder collapsed to a spinning zero timeout");
+
+    // a non-positive budget must expire immediately rather than wrap to ~584 million years
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 0, start_ut) == 0,
+                      "zero timeout was not treated as expired");
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, -1, start_ut) == 0,
+                      "negative timeout was not treated as expired");
+
+    // a backward monotonic reading must not be mistaken for elapsed time
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut - USEC_PER_SEC) == 1000,
+                      "backward clock reading consumed the budget");
+
+    // the widest budget must survive the subtraction without overflowing int
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, INT_MAX, start_ut + 5 * USEC_PER_MS) ==
+                          INT_MAX - 5,
+                      "maximum budget did not round-trip through int");
+
+#undef ACLK_TIMEOUT_TEST
+
+    if (errors)
+        fprintf(stderr, "aclk timeout unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "aclk timeout unittest: OK\n");
+
+    return errors;
 }
 
 static int aclk_write_all_timeout(int fd, const void *buf, size_t len, int timeout_ms)

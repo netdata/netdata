@@ -124,4 +124,8 @@ int aclk_proxy_negotiation_connect(int sockfd, enum mqtt_wss_proxy_type proxy_ty
 void aclk_sensitive_memzero(void *ptr, size_t len);
 void aclk_sensitive_free(char **ptr);
 
+// Monotonic budget left out of timeout_ms, or 0 once spent. Expiry is inclusive, and the result
+// is >= 1 while time remains so callers never poll() with a 0 timeout.
+int aclk_timeout_remaining_ms(usec_t start_ut, int timeout_ms);
+
 #endif /* ACLK_UTIL_H */
