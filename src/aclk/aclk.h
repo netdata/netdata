@@ -23,6 +23,14 @@ typedef enum {
     ACLK_PING_TIMEOUT = 3
 } ACLK_DISCONNECT_ACTION;
 
+// True for requests that belong to one MQTT connection and are meaningless once it is gone.
+// ACLK_RELOAD_CONF is deliberately NOT one of them: it is set from the claim path
+// (src/claim/claim.c) on another thread and must survive a reconnect, or a reclaim is silently
+// dropped and the Netdata Agent keeps running under the stale identity.
+static inline bool aclk_disconnect_action_is_connection_scoped(ACLK_DISCONNECT_ACTION action) {
+    return action == ACLK_PING_TIMEOUT || action == ACLK_CLOUD_DISCONNECT;
+}
+
 typedef enum {
     ACLK_STATUS_CONNECTED = 0,
 
@@ -46,6 +54,7 @@ typedef enum {
     ACLK_STATUS_OFFLINE_PING_TIMEOUT,
     ACLK_STATUS_OFFLINE_RELOADING_CONFIG,
     ACLK_STATUS_OFFLINE_POLL_ERROR,
+    ACLK_STATUS_OFFLINE_NO_IO_PROGRESS,
     ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE,
     ACLK_STATUS_OFFLINE_SOCKET_ERROR,
     ACLK_STATUS_OFFLINE_MQTT_PROTOCOL_ERROR,

@@ -17,6 +17,11 @@
                                             // was requested by user of library
 #define MQTT_WSS_ERR_POLL_FAILED    -9
 #define MQTT_WSS_ERR_REMOTE_CLOSED  -10
+#define MQTT_WSS_ERR_NO_IO_PROGRESS -11     // poll() kept reporting readiness but nothing moved
+                                            // for the client's I/O watchdog window - a CPU spin.
+                                            // Dropped so the caller reconnects; distinct from
+                                            // MQTT_WSS_ERR_CONN_DROP so the cause is visible in
+                                            // status and logs.
 
 typedef struct mqtt_wss_client_struct *mqtt_wss_client;
 
@@ -50,6 +55,12 @@ struct mqtt_wss_proxy;
  * @param port to connect to (where MQTT over WSS server is listening)
  * @param mqtt_params pointer to mqtt_connect_params structure which contains MQTT credentials and settings
  * @param ssl_flags parameters for OpenSSL, 0=MQTT_WSS_SSL_CERT_CHECK_FULL
+ * @param service_rc optional out-parameter, zeroed on entry. Set to the MQTT_WSS_ERR_* code when
+ *        the attempt failed inside the service loop that drives the TLS handshake, the WebSocket
+ *        upgrade and the wait for CONNACK. This function's own return codes overlap that space,
+ *        so the two cannot be merged; pass NULL if the distinction is not needed.
+ *        Note the setup failures that happen before that loop (TCP connect, proxy, SSL object
+ *        setup, SNI) return via the function result and leave this 0.
  */
 int mqtt_wss_connect(
     mqtt_wss_client client,
@@ -58,8 +69,16 @@ int mqtt_wss_connect(
     struct mqtt_connect_params *mqtt_params,
     int ssl_flags,
     const struct mqtt_wss_proxy *proxy,
-    bool *fallback_ipv4);
+    bool *fallback_ipv4,
+    int *service_rc);
 int mqtt_wss_service(mqtt_wss_client client, int t_ms);
+
+/* Flush what is queued, then send MQTT DISCONNECT and a WebSocket close, and close the socket.
+ * @param timeout_ms total budget, split four ways by integer division. Below 4ms each phase gets
+ *        a zero budget, and any value that is not a multiple of 4 loses up to 3ms. A phase whose
+ *        write buffer is already empty returns immediately rather than consuming its budget, so
+ *        this bounds flushing; it never waits for the peer.
+ */
 void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);
 
 // we redefine this instead of using MQTT-C flags as in future
