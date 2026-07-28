@@ -46,7 +46,7 @@ rollup.
 
 For the cross-cutting Enrichment concept (provider chains, shared trie with
 BioRIS, withdrawal handling, restart convergence), see
-[Enrichment](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[Enrichment](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 The plugin runs a TCP listener on `0.0.0.0:10179`. This port is the Akvorado

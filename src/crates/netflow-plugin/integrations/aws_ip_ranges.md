@@ -50,7 +50,7 @@ Schema of `ip-ranges.json`:
 For the cross-cutting concepts (how multiple network sources merge, the lookup
 priority vs static `networks` config, TLS verification rules, the jq engine and
 its expected output schema, fetch loop and retry/backoff), see
-[Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[Network Identity](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 The plugin issues a periodic GET to `https://ip-ranges.amazonaws.com/ip-ranges.json`,
@@ -109,7 +109,7 @@ output (`tenant`, `region`, `role`, `name`, `site`, `city`, `country`, `state`,
 
 The expected `transform` output is a stream of objects, each carrying a `prefix`
 (CIDR string) plus any subset of the optional attribute fields. See the
-cross-cutting [Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
+cross-cutting [Network Identity](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md)
 page for the full output schema.
 
 

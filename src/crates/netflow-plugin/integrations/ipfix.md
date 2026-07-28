@@ -30,7 +30,7 @@ any additional IEs the exporter provides.
 
 For full documentation including vendor configuration examples (Cisco, Juniper, Arista),
 biflow handling, sampling caveats, and verification steps, see the
-[Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
+[Network Flows Overview](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/README.md).
 
 
 The plugin uses the same configurable UDP listener set as NetFlow. IPFIX messages are identified by
@@ -131,10 +131,10 @@ protocols:
 
 ### Verifying flow data is arriving and diagnosing failures
 
-See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
+See [Troubleshooting](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/troubleshooting.md) for
 the full diagnostic recipe. Use `netflow.input_packets` for UDP arrival,
 `netflow.protocol_packets` for v5/v7/v9/IPFIX/sFlow identification, and
 `netflow.decoder_exceptions` for parse failures. For v9/IPFIX, watch the
 missing-template dimensions on `netflow.flow_sets`; Data Sets arriving before
 their templates cannot be decoded. See also
-[Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality).
+[Validation and Data Quality](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/validation.md).

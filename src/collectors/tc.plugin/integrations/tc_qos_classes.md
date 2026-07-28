@@ -174,3 +174,24 @@ Metrics:
 | tc.qos_dropped | Class Dropped Packets | a dimension per class | packets/s |
 | tc.qos_tokens | Class Tokens | a dimension per class | tokens |
 | tc.qos_ctokens | Class cTokens | a dimension per class | ctokens |
+
+
+
+## Troubleshooting
+
+### Recurring Cannot find file warnings for tc-qos-helper.conf
+
+When `tc-qos-helper.sh` starts, it looks for its configuration in two places, in this order: the stock configuration directory (typically at `/usr/lib/netdata/conf.d`) and the user [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) (typically at `/etc/netdata`). Netdata does not ship a stock `tc-qos-helper.conf`, so on a default installation neither file exists and the script emits a `Cannot find file` warning for each missing path.
+
+These warnings are harmless. When no configuration file is found the script keeps its built-in defaults (for example `tc_show="qdisc"`). They reappear every hour because the script exits and is restarted by Netdata every 3600 seconds (`qos_exit_every=3600`), which re-runs the same checks on each start.
+
+Creating `tc-qos-helper.conf` in your user config directory with the desired setting silences the warning for the user configuration path. The warning for the stock path is expected to remain, because no stock `tc-qos-helper.conf` ships with Netdata, and it is benign.
+
+
+### FireQOS is not installed warning
+
+When `tc-qos-helper.sh` starts and cannot find FireQOS (neither the `/var/run/fireqos` directory nor the `fireqos` executable), it logs that FireQOS is not installed on this system. This is normal on systems that do not perform QoS traffic shaping with FireQOS.
+
+Like the configuration warnings, this message repeats every hour because the script exits and is restarted by Netdata every 3600 seconds (`qos_exit_every=3600`), re-running the FireQOS presence check on each start.
+
+FireQOS is only required to apply QoS and expose human-readable class names to Netdata. Without it the plugin still collects `tc` qdisc/class metrics directly from the `tc` command. To expose FireQOS class names, [install FireQOS](https://firehol.org/tutorial/fireqos-new-user/). To map numeric class IDs to readable names without FireQOS, list them in `/etc/iproute2/tc_cls` and set `tc_show="class"` in `tc-qos-helper.conf` in your user config directory.

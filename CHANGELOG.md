@@ -820,6 +820,19 @@
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.34.1 to 1.35.0 in /src/go ([#23267](https://github.com/netdata/netdata/issues/23267))
 - Fix(go.d/jobmgr): harden lifecycle and configuration reconciliation ([#23279](https://github.com/netdata/netdata/issues/23279))
 - Perf(go.d/metrix): reduce structured flatten allocations ([#23278](https://github.com/netdata/netdata/issues/23278))
+- Fix(go.d/cato): support Cato SDK v0.3.2 snapshots ([#23280](https://github.com/netdata/netdata/issues/23280))
+- Build(deps): bump actions/labeler from 6 to 7 ([#23284](https://github.com/netdata/netdata/issues/23284))
+- Docs: Add apply-changes step to configuration README ([#23199](https://github.com/netdata/netdata/issues/23199))
+- Docs: publish extreme cardinality protection guide ([#23196](https://github.com/netdata/netdata/issues/23196))
+- Perf(go.d/chartengine): skip disabled lifecycle cap work ([#23282](https://github.com/netdata/netdata/issues/23282))
+- Docs: Document Network Flows Cloud-auth gating for standalone agents ([#23208](https://github.com/netdata/netdata/issues/23208))
+- Docs: Explain UI claim verification step and session ID file ([#23214](https://github.com/netdata/netdata/issues/23214))
+- Feat: add monitoring of system calls on FreeBSD ([#23082](https://github.com/netdata/netdata/issues/23082))
+- Docs: Add netdata_driver.sys prerequisite to Windows CPU temp docs ([#23200](https://github.com/netdata/netdata/issues/23200))
+- Make warnings and fatal errors more obnoxiously visible. ([#23252](https://github.com/netdata/netdata/issues/23252))
+- Build RPM packages through CPack in CI ([#23290](https://github.com/netdata/netdata/issues/23290))
+- Fix macOS disk.util percent scaling ([#23292](https://github.com/netdata/netdata/issues/23292))
+- Fix pythond DEB depends typo and duplicate ndsudo entry ([#23289](https://github.com/netdata/netdata/issues/23289))
 
 ## [2.10.0] - 2026-04-09
 

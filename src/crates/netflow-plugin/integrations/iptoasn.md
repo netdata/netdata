@@ -42,7 +42,7 @@ or coordinates.
 
 For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
 provider chains), see
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 The Netdata plugin reads MMDB only. IPtoASN ships gzipped TSV
@@ -72,7 +72,7 @@ This integration runs as a single instance per Netdata Agent.
 
 Not auto-detected as the default ASN source -- the plugin auto-detects
 DB-IP MMDBs in the cache directory at startup
-(see [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)).
+(see [IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md)).
 To use IPtoASN, run `topology-ip-intel-downloader` when available to produce IPtoASN-derived
 MMDBs (the downloader writes to the same cache paths the plugin scans,
 so once present they are picked up automatically on the 30-second
@@ -225,7 +225,7 @@ no organisation. This is data-source-level, not a plugin issue. If richer AS-nam
 coverage matters, layer a MaxMind GeoLite2-ASN MMDB after IPtoASN in
 `asn_database` -- per-field "last database with a non-empty value
 wins" composition (see
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment))
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md))
 means MaxMind names override IPtoASN's empty entries.
 
 
