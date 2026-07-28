@@ -206,24 +206,18 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
             return false;
     }
 
-    bool locked = false;
-    if (ctx->sem != SEM_FAILED) {
-        if (!ebpfgo_shm_sem_wait(ctx->sem)) {
-            if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec(), ctx->update_every_s)) {
-                netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
-                return false;
-            }
-            /* Return true if we have a prior snapshot, even with zero live entries:
-             * snapshot_total may be 0 when the publisher is alive but tracks no PIDs. */
-            return ctx->snapshot != NULL;
+    if (!ebpfgo_shm_sem_wait(ctx->sem)) {
+        if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec(), ctx->update_every_s)) {
+            netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
+            return false;
         }
-        locked = true;
+        /* Return true if we have a prior snapshot, even with zero live entries:
+         * snapshot_total may be 0 when the publisher is alive but tracks no PIDs. */
+        return ctx->snapshot != NULL;
     }
 
     bool ok = netdata_ebpfgo_shared_pid_memory_copy_snapshot(ctx);
-
-    if (locked)
-        sem_post(ctx->sem);
+    sem_post(ctx->sem);
 
     if (!ok)
         return false;
