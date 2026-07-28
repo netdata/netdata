@@ -32,18 +32,32 @@ type RuntimeJob interface {
 	Tick(int)
 }
 
-type PublishedJob struct {
-	Identity lifecycle.ResourceIdentity
-	Job      RuntimeJob
-}
-
 type HandlerLifecycle interface {
 	Publish() error
 	CloseAndDrain(context.Context) error
 }
 
+type ProcessHandlerLifecycle interface {
+	HandlerLifecycle
+	Detach(context.Context) error
+	Finalize(context.Context) error
+}
+
+type StagedHandlerLifecycle interface {
+	CloseAndDrain(context.Context) error
+}
+
+type JobHandlerStager interface {
+	Stage(RuntimeJob) (StagedHandlerLifecycle, error)
+}
+
+type JobHandlerAttacher interface {
+	Attach(lifecycle.ResourceIdentity, StagedHandlerLifecycle) (HandlerLifecycle, error)
+}
+
 type JobHooks interface {
-	Prepare(PublishedJob) (HandlerLifecycle, error)
+	JobHandlerStager
+	JobHandlerAttacher
 }
 
 type jobNamedModule interface {
@@ -51,15 +65,19 @@ type jobNamedModule interface {
 }
 
 type FactoryConfig struct {
+	Epoch            uint64                                                            // target run generation
 	PluginName       string                                                            // owning plugin name stamped into job config
+	Attempts         jobmgr.ProcessAttemptAuthority                                    // process-owned candidate authority
 	Modules          ModuleCatalog                                                     // collector creator registry
 	Tasks            *lifecycle.TaskSupervisor                                         // supervisor owning inherited run-loop goroutines
 	Frames           *lifecycle.FrameOwner                                             // frame owner used as the collector output sink
 	ConfigModules    *ConfigModuleFactory                                              // resolved config application and short-lived probes
 	Runtime          runtimecomp.Service                                               // V2 runtime service dependency
+	RuntimeStaging   bool                                                              // construct a private V2 staging capability
 	Vnodes           *vnoderegistry.Registry                                           // vnode registry for V2 jobs
 	Vnode            func(string) (jobruntime.VnodeSnapshot, bool)                     // vnode snapshot lookup by name
-	Hooks            JobHooks                                                          // handler-lifecycle preparation for Function-bearing jobs
+	HandlerStager    JobHandlerStager                                                  // run-detached Function-handler staging
+	HandlerAttacher  JobHandlerAttacher                                                // run-owned Function publication attachment
 	Scheduler        *Scheduler                                                        // tick/registration scheduler
 	Observer         lifecycle.RuntimeObserver                                         // runtime gauge sink
 	RunWithoutClaims func(context.Context, func(context.Context) error) (error, error) // claim-yield adapter for probes
@@ -69,6 +87,118 @@ type FactoryConfig struct {
 // own current-job indexing or lifecycle state.
 type Factory struct {
 	config FactoryConfig
+}
+
+type factoryAttachment struct {
+	tasks           *lifecycle.TaskSupervisor
+	runtime         runtimecomp.Service
+	vnode           func(string) (jobruntime.VnodeSnapshot, bool)
+	handlerAttacher JobHandlerAttacher
+	scheduler       *Scheduler
+	observer        lifecycle.RuntimeObserver
+}
+
+func (f *Factory) attachment() factoryAttachment {
+	if f == nil {
+		return factoryAttachment{}
+	}
+	return factoryAttachment{
+		tasks:           f.config.Tasks,
+		runtime:         f.config.Runtime,
+		vnode:           f.config.Vnode,
+		handlerAttacher: f.config.HandlerAttacher,
+		scheduler:       f.config.Scheduler,
+		observer:        f.config.Observer,
+	}
+}
+
+func (attachment factoryAttachment) attach(
+	candidate ConstructedJob,
+	identity lifecycle.ResourceIdentity,
+	owner *stagedJobOwner,
+) (ConstructedJob, error) {
+	if !identity.Valid() ||
+		candidate.candidateJob == nil ||
+		(owner == nil && attachment.tasks == nil) ||
+		attachment.scheduler == nil {
+		return candidate, errors.New("job output: invalid candidate attachment")
+	}
+	var attached ConstructedJob
+	var err error
+	if owner == nil {
+		attached, err = newManagedJob(
+			candidate.Variant,
+			candidate.candidateJob,
+			attachment.tasks,
+			identity,
+			attachment.scheduler,
+			candidate.CollectorCleanup,
+		)
+	} else {
+		attached, err = newProcessManagedJob(
+			candidate.Variant,
+			candidate.candidateJob,
+			identity,
+			attachment.scheduler,
+			candidate.CollectorCleanup,
+			owner,
+		)
+	}
+	if err != nil {
+		return candidate, err
+	}
+	attached.Observer = attachment.observer
+	attached.resolvedReferences = candidate.resolvedReferences
+	attached.finalCleanup = candidate.finalCleanup
+	attached.runtimeStage = candidate.runtimeStage
+	attached.vnodeStage = candidate.vnodeStage
+	attached.outputGate = candidate.outputGate
+	attached.StagedHandlers = candidate.StagedHandlers
+	if candidate.runtimeStage != nil ||
+		candidate.vnodeStage != nil ||
+		candidate.outputGate != nil {
+		attached.activateAttachment = func() error {
+			var runtimeErr error
+			if candidate.runtimeStage != nil {
+				runtimeErr = candidate.runtimeStage.attach(attachment.runtime)
+			}
+			if runtimeErr != nil {
+				return runtimeErr
+			}
+			if candidate.vnodeStage != nil {
+				if err := candidate.vnodeStage.attach(attachment.vnode); err != nil {
+					return err
+				}
+			}
+			if candidate.outputGate != nil {
+				return candidate.outputGate.Activate()
+			}
+			return nil
+		}
+	}
+	if candidate.StagedHandlers != nil {
+		handlers, attachErr := callAttachHandlers(
+			attachment.handlerAttacher,
+			identity,
+			candidate.StagedHandlers,
+		)
+		if handlers != nil {
+			attached.Handlers = handlers
+			attached.StagedHandlers = nil
+		}
+		if attachErr != nil {
+			return attached, attachErr
+		}
+		if handlers == nil {
+			return attached, errors.New("job output: nil attached handler lifecycle")
+		}
+		if owner != nil {
+			if _, ok := handlers.(ProcessHandlerLifecycle); !ok {
+				return attached, errors.New("job output: attached handler lifecycle cannot detach")
+			}
+		}
+	}
+	return attached, nil
 }
 
 func NewFactory(config FactoryConfig) (*Factory, error) {
@@ -114,9 +244,8 @@ func (f *Factory) ValidateConfig(ctx context.Context, config confgroup.Config) e
 func (f *Factory) build(
 	ctx context.Context,
 	config confgroup.Config,
-	generation uint64,
 ) (constructed ConstructedJob, resultErr error) {
-	if f == nil || ctx == nil || config == nil || generation == 0 {
+	if f == nil || ctx == nil || config == nil {
 		return ConstructedJob{}, errors.New("job output: invalid factory build")
 	}
 	creator, ok := f.config.Modules.Lookup(config.Module())
@@ -140,51 +269,74 @@ func (f *Factory) build(
 	if err != nil {
 		return ConstructedJob{}, err
 	}
-	identity := lifecycle.ResourceIdentity{
-		ID:         config.FullName(),
-		Generation: generation,
-	}
 	var job RuntimeJob
 	var variant JobVariant
 	var redactLifecycle bool
+	var runtimeStage *stagedRuntimeService
+	var vnodeStage *stagedVNodeLookup
+	outputGate, err := newGenerationOutputGate(f.config.Frames)
+	if err != nil {
+		return ConstructedJob{}, err
+	}
+	if vnode.Vnode != nil {
+		vnodeStage = newStagedVNodeLookup(config.Vnode(), vnode)
+	}
 	defer func() {
 		if redactLifecycle && resultErr != nil {
 			resultErr = redactResolvedLifecycleError(resultErr)
 		}
 	}()
 	if creator.CreateV2 != nil {
-		job, redactLifecycle, err = f.buildV2(ctx, config, creator, functionOnly, vnode)
+		job, runtimeStage, redactLifecycle, err = f.buildV2(
+			ctx,
+			config,
+			creator,
+			functionOnly,
+			vnode,
+			vnodeStage,
+			outputGate,
+		)
 		variant = JobVariantV2
 	} else {
-		job, redactLifecycle, err = f.buildV1(ctx, config, creator, functionOnly, vnode)
+		job, redactLifecycle, err = f.buildV1(
+			ctx,
+			config,
+			creator,
+			functionOnly,
+			vnode,
+			vnodeStage,
+			outputGate,
+		)
 		variant = JobVariantV1
 	}
 	if err != nil {
 		return ConstructedJob{}, err
 	}
 	cleanup := &factoryJobCleanup{
-		job:    job,
-		redact: redactLifecycle,
+		job:          job,
+		runtimeStage: runtimeStage,
+		vnodeStage:   vnodeStage,
+		redact:       redactLifecycle,
 	}
-	constructed, err = newManagedJob(variant, job, f.config.Tasks, identity, f.config.Scheduler, cleanup.reject)
-	if err != nil {
-		return ConstructedJob{
-			Variant:            variant,
-			CollectorCleanup:   cleanup.reject,
-			resolvedReferences: redactLifecycle,
-		}, err
+	constructed = ConstructedJob{
+		Variant:            variant,
+		CollectorCleanup:   cleanup.reject,
+		autoDetection:      job.AutoDetectionManaged,
+		autoDetectionEvery: job.AutoDetectionEvery,
+		retryAutoDetection: job.RetryAutoDetection,
+		finalCleanup:       cleanup.final,
+		resolvedReferences: redactLifecycle,
+		candidateJob:       job,
+		runtimeStage:       runtimeStage,
+		vnodeStage:         vnodeStage,
+		outputGate:         outputGate,
 	}
-	constructed.resolvedReferences = redactLifecycle
-	if hasFunctions && f.config.Hooks == nil {
+	if hasFunctions && f.config.HandlerStager == nil {
 		return constructed, errors.New("job output: function-bearing job has no handler lifecycle")
 	}
-	if hooks := f.config.Hooks; hasFunctions {
-		published := PublishedJob{
-			Identity: identity,
-			Job:      job,
-		}
-		handlers, prepareErr := callPrepareHandlers(hooks, published)
-		constructed.Handlers = handlers
+	if hasFunctions {
+		handlers, prepareErr := callStageHandlers(f.config.HandlerStager, job)
+		constructed.StagedHandlers = handlers
 		if prepareErr != nil {
 			return constructed, prepareErr
 		}
@@ -192,11 +344,6 @@ func (f *Factory) build(
 			return constructed, errors.New("job output: nil prepared handler lifecycle")
 		}
 	}
-	constructed.Observer = f.config.Observer
-	constructed.autoDetection = job.AutoDetectionManaged
-	constructed.autoDetectionEvery = job.AutoDetectionEvery
-	constructed.retryAutoDetection = job.RetryAutoDetection
-	constructed.finalCleanup = cleanup.final
 	return constructed, nil
 }
 
@@ -209,14 +356,22 @@ func (f *Factory) Prepare(
 	if f == nil || ctx == nil || config == nil || !identity.Valid() || identity.ID != config.FullName() {
 		return PreparedJob{}, errors.New("job output: invalid factory preparation")
 	}
-	return prepareJob(
-		ctx,
-		identity.ID,
-		identity.Generation,
+	candidate, err := f.build(ctx, config)
+	if err != nil {
+		cleanupErr := cleanupConstructed(context.WithoutCancel(ctx), candidate)
+		err = errors.Join(err, cleanupErr)
+		if lifecycle.OwnershipRetained(err) || cleanupErr != nil {
+			err = lifecycle.RetainOwnership(err)
+		}
+		return PreparedJob{}, err
+	}
+	return prepareCandidateJob(
+		identity,
 		permit,
-		func(buildCtx context.Context) (ConstructedJob, error) {
-			return f.build(buildCtx, config, identity.Generation)
-		},
+		candidate,
+		f.attachment(),
+		nil,
+		false,
 	)
 }
 
@@ -264,16 +419,20 @@ func (f *Factory) Probe(ctx context.Context, prepared PreparedJob) (*autoDetecti
 }
 
 type factoryJobCleanup struct {
-	once   sync.Once
-	job    RuntimeJob
-	redact bool
-	err    error
+	once         sync.Once
+	job          RuntimeJob
+	runtimeStage *stagedRuntimeService
+	vnodeStage   *stagedVNodeLookup
+	redact       bool
+	err          error
 }
 
 func (fjc *factoryJobCleanup) reject(context.Context) error {
 	fjc.once.Do(func() {
 		fjc.err = callJobLifecycle("rejected collector Cleanup", func() error {
 			fjc.job.CleanupRejected()
+			fjc.runtimeStage.close()
+			fjc.vnodeStage.close()
 			return nil
 		})
 		if fjc.redact {
@@ -287,6 +446,8 @@ func (fjc *factoryJobCleanup) final(context.Context) error {
 	fjc.once.Do(func() {
 		fjc.err = callJobLifecycle("collector Cleanup", func() error {
 			fjc.job.Cleanup()
+			fjc.runtimeStage.close()
+			fjc.vnodeStage.close()
 			return nil
 		})
 		if fjc.redact {
@@ -296,7 +457,10 @@ func (fjc *factoryJobCleanup) final(context.Context) error {
 	return fjc.err
 }
 
-func callPrepareHandlers(hooks JobHooks, published PublishedJob) (handlers HandlerLifecycle, err error) {
+func callStageHandlers(
+	stager JobHandlerStager,
+	job RuntimeJob,
+) (handlers StagedHandlerLifecycle, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			handlers = nil
@@ -307,7 +471,25 @@ func callPrepareHandlers(hooks JobHooks, published PublishedJob) (handlers Handl
 			))
 		}
 	}()
-	return hooks.Prepare(published)
+	return stager.Stage(job)
+}
+
+func callAttachHandlers(
+	attacher JobHandlerAttacher,
+	identity lifecycle.ResourceIdentity,
+	staged StagedHandlerLifecycle,
+) (handlers HandlerLifecycle, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			handlers = nil
+			err = fmt.Errorf(
+				"%w in handler attachment: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			)
+		}
+	}()
+	return attacher.Attach(identity, staged)
 }
 
 func (f *Factory) buildV1(
@@ -316,6 +498,8 @@ func (f *Factory) buildV1(
 	creator collectorapi.Creator,
 	functionOnly bool,
 	vnode jobruntime.VnodeSnapshot,
+	vnodeStage *stagedVNodeLookup,
+	outputGate *generationOutputGate,
 ) (job RuntimeJob, redactLifecycle bool, err error) {
 	if creator.Create == nil {
 		return nil, false, fmt.Errorf("job output: module %q has no V1 creator", config.Module())
@@ -354,16 +538,14 @@ func (f *Factory) buildV1(
 		return nil, redactLifecycle, err
 	}
 	jobConfig := jobruntime.JobConfig{
-		PluginName: f.config.PluginName,
-		Name:       config.Name(),
-		ModuleName: config.Module(),
-		FullName:   config.FullName(),
-		Source:     factoryLogSource(config),
-		Module:     module,
-		Labels:     factoryLabels(config),
-		Out: FrameWriter{
-			Owner: f.config.Frames,
-		},
+		PluginName:      f.config.PluginName,
+		Name:            config.Name(),
+		ModuleName:      config.Module(),
+		FullName:        config.FullName(),
+		Source:          factoryLogSource(config),
+		Module:          module,
+		Labels:          factoryLabels(config),
+		Out:             outputGate,
 		UpdateEvery:     config.UpdateEvery(),
 		AutoDetectEvery: config.AutoDetectionRetry(),
 		Priority:        config.Priority(),
@@ -378,7 +560,7 @@ func (f *Factory) buildV1(
 		jobConfig.VnodeName = config.Vnode()
 		jobConfig.VnodeRevision = vnode.Revision
 		jobConfig.VnodeMetadataRevision = vnode.MetadataRevision
-		jobConfig.VnodeLookup = f.config.Vnode
+		jobConfig.VnodeLookup = vnodeStage.Lookup
 	}
 	return jobruntime.NewJob(jobConfig), redactLifecycle, nil
 }
@@ -389,7 +571,9 @@ func (f *Factory) buildV2(
 	creator collectorapi.Creator,
 	functionOnly bool,
 	vnode jobruntime.VnodeSnapshot,
-) (job RuntimeJob, redactLifecycle bool, err error) {
+	vnodeStage *stagedVNodeLookup,
+	outputGate *generationOutputGate,
+) (job RuntimeJob, runtimeStage *stagedRuntimeService, redactLifecycle bool, err error) {
 	var module collectorapi.CollectorV2
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -410,35 +594,40 @@ func (f *Factory) buildV2(
 				err = lifecycle.RetainOwnership(err)
 			}
 		}
+		if err != nil && runtimeStage != nil {
+			runtimeStage.close()
+			runtimeStage = nil
+		}
 		if redactLifecycle && err != nil {
 			err = redactResolvedLifecycleError(err)
 		}
 	}()
 	module = creator.CreateV2()
 	if module == nil {
-		return nil, false, fmt.Errorf("job output: module %q returned a nil V2 collector", config.Module())
+		return nil, nil, false, fmt.Errorf("job output: module %q returned a nil V2 collector", config.Module())
 	}
 	setModuleJobName(module, config.Name())
 	redactLifecycle, err = f.config.ConfigModules.applyResolved(ctx, config, module)
 	if err != nil {
-		return nil, redactLifecycle, err
+		return nil, nil, redactLifecycle, err
+	}
+	if f.config.Runtime != nil || f.config.RuntimeStaging {
+		runtimeStage = newStagedRuntimeService()
 	}
 	jobConfig := jobruntime.JobV2Config{
-		PluginName: f.config.PluginName,
-		Name:       config.Name(),
-		ModuleName: config.Module(),
-		FullName:   config.FullName(),
-		Source:     factoryLogSource(config),
-		Module:     module,
-		Labels:     factoryLabels(config),
-		Out: FrameWriter{
-			Owner: f.config.Frames,
-		},
+		PluginName:      f.config.PluginName,
+		Name:            config.Name(),
+		ModuleName:      config.Module(),
+		FullName:        config.FullName(),
+		Source:          factoryLogSource(config),
+		Module:          module,
+		Labels:          factoryLabels(config),
+		Out:             outputGate,
 		UpdateEvery:     config.UpdateEvery(),
 		AutoDetectEvery: config.AutoDetectionRetry(),
 		IsStock:         config.SourceType() == confgroup.TypeStock,
 		FunctionOnly:    functionOnly,
-		RuntimeService:  f.config.Runtime,
+		RuntimeService:  runtimeStage,
 		VnodeRegistry:   f.config.Vnodes,
 	}
 	if redactLifecycle {
@@ -449,9 +638,9 @@ func (f *Factory) buildV2(
 		jobConfig.VnodeName = config.Vnode()
 		jobConfig.VnodeRevision = vnode.Revision
 		jobConfig.VnodeMetadataRevision = vnode.MetadataRevision
-		jobConfig.VnodeLookup = f.config.Vnode
+		jobConfig.VnodeLookup = vnodeStage.Lookup
 	}
-	return jobruntime.NewJobV2(jobConfig), redactLifecycle, nil
+	return jobruntime.NewJobV2(jobConfig), runtimeStage, redactLifecycle, nil
 }
 
 func callFactoryModuleCleanup(ctx context.Context, cleanup func(context.Context)) error {

@@ -530,7 +530,7 @@ func newTestRunGeneration(
 			require.FailNow(t, "test failed", "test Store epoch retained ownership")
 		}
 	})
-	return newRunGeneration(config)
+	return newRunGeneration(context.Background(), config)
 }
 
 func testRunJobServices(t testing.TB) runJobServices {

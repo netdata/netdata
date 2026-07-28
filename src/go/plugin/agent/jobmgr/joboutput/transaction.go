@@ -212,12 +212,19 @@ func (prt *PreparedResourceTransaction) Apply(
 	mutationOwned := spec.Graph != nil && spec.MutationPrepared
 	ownershipDisposition := lifecycle.ResourceTransactionUnchanged
 	ownershipCurrent := spec.Current
+	var pendingInstallation *JobGeneration
 	appliedSealed := false
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			resultErr = errors.Join(
 				resultErr,
 				fmt.Errorf("%w in prepared resource transaction apply: %v", lifecycle.ErrTaskPanic, recovered),
+			)
+		}
+		if resultErr != nil && pendingInstallation != nil {
+			resultErr = errors.Join(
+				resultErr,
+				pendingInstallation.abortPendingInstallation(context.WithoutCancel(ctx)),
 			)
 		}
 		if mutationOwned {
@@ -285,8 +292,13 @@ func (prt *PreparedResourceTransaction) Apply(
 		lifecycle.ResourceTransactionReplaced:
 		current, err = spec.Successor.AcceptStart(ctx, spec.Scope.Successor.Generation)
 		if current != nil {
-			ownershipCurrent = current
-			ownershipDisposition = spec.Disposition
+			pending, _ := current.(interface{ installationPending() bool })
+			if pending == nil || !pending.installationPending() {
+				ownershipCurrent = current
+				ownershipDisposition = spec.Disposition
+			} else {
+				pendingInstallation, _ = current.(*JobGeneration)
+			}
 		}
 		if err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
@@ -297,6 +309,11 @@ func (prt *PreparedResourceTransaction) Apply(
 		}
 		if err := current.Publish(); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
+		}
+		if pendingInstallation != nil {
+			if err := pendingInstallation.reserveInstallation(); err != nil {
+				return lifecycle.AppliedResourceTransaction{}, err
+			}
 		}
 	case lifecycle.ResourceTransactionRemoved:
 	default:
@@ -321,6 +338,12 @@ func (prt *PreparedResourceTransaction) Apply(
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
+	if installed, ok := current.(interface{ acknowledgeInstallation() error }); ok {
+		if err := installed.acknowledgeInstallation(); err != nil {
+			return lifecycle.AppliedResourceTransaction{}, err
+		}
+	}
+	pendingInstallation = nil
 	appliedSealed = true
 	if spec.AfterApply != nil {
 		spec.AfterApply()

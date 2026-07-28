@@ -46,6 +46,20 @@ type ResourceTransactionHandler func(
 	lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error)
 
+type ResourceTransactionStage interface {
+	jobmgr.PreClaimStage
+	Prepare(
+		context.Context,
+		lifecycle.ReadyResource,
+		lifecycle.ResourceTransactionScope,
+		lifecycle.LongLivedPermit,
+	) (lifecycle.PreparedResourceTransaction, error)
+}
+
+type ResourceTransactionStageHandler func(
+	HandlerInput,
+) (ResourceTransactionStage, error)
+
 type CompositeResourceTransactionHandler func(
 	context.Context,
 	HandlerInput,
@@ -84,6 +98,7 @@ type ResourceTransactionCommand struct {
 type ResourceTransactionDeclaration struct {
 	Prepare                    ResourceTransactionHandler          // prepares a plain resource transaction
 	PrepareComposite           CompositeResourceTransactionHandler // prepares a composite resource transaction (child commands)
+	StageResource              ResourceTransactionStageHandler
 	StageComposite             CompositeResourceTransactionStageHandler
 	CompositeChildLaneConflict CompositeChildLaneConflictHandler // identifies resource lanes a composite may submit to
 	Permit                     lifecycle.LongLivedPlan           // optional run-owned lifetime behind the successor
@@ -274,7 +289,9 @@ type invocationSlot struct {
 	input           HandlerInput                   // materialized handler input for the call
 	claims          []string                       // global claim followed by command claims
 	transactionPlan jobmgr.ResourceTransactionPlan // resource-transaction plan when the route is transactional
-	stage           CompositeResourceTransactionStage
+	stage           jobmgr.PreClaimStage
+	resourceStage   ResourceTransactionStage
+	compositeStage  CompositeResourceTransactionStage
 }
 
 func (is *invocationSlot) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
@@ -304,6 +321,9 @@ func (is *invocationSlot) prepareResourceTransaction(
 	if is == nil || is.resolved == nil || is.resolved.transaction == nil || is.resolved.transaction.Prepare == nil {
 		return nil, errors.New("jobmgr Function catalog: invalid resource transaction invocation")
 	}
+	if is.resourceStage != nil {
+		return is.resourceStage.Prepare(ctx, current, scope, permit)
+	}
 	return is.resolved.transaction.Prepare(ctx, is.input, current, scope, permit)
 }
 
@@ -319,8 +339,8 @@ func (is *invocationSlot) prepareCompositeResourceTransaction(
 		is.resolved.transaction.PrepareComposite == nil {
 		return nil, errors.New("jobmgr Function catalog: invalid composite transaction invocation")
 	}
-	if is.stage != nil {
-		return is.stage.PrepareComposite(ctx, current, scope, permit)
+	if is.compositeStage != nil {
+		return is.compositeStage.PrepareComposite(ctx, current, scope, permit)
 	}
 	return is.resolved.transaction.PrepareComposite(ctx, is.input, current, scope, permit)
 }
@@ -522,6 +542,8 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 		(declaration.PrepareComposite == nil) ||
 		(declaration.PrepareComposite != nil &&
 			declaration.CompositeChildLaneConflict == nil) ||
+		(declaration.StageResource != nil &&
+			declaration.Prepare == nil) ||
 		(declaration.StageComposite != nil &&
 			declaration.PrepareComposite == nil) ||
 		declaration.GlobalClaim == "" ||
@@ -561,7 +583,7 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 			}
 		}
 	}
-	if hasStage != (declaration.StageComposite != nil) {
+	if hasStage != (declaration.StageResource != nil || declaration.StageComposite != nil) {
 		return errors.New("jobmgr Function catalog: staged transaction command differs from declaration")
 	}
 	if hasSuccessor {
@@ -653,10 +675,18 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 		transactionPermit = resolved.transaction.Permit
 	}
 	input := handlerInput(lookup, resolved.method)
-	var stage CompositeResourceTransactionStage
+	var stage jobmgr.PreClaimStage
+	var resourceStage ResourceTransactionStage
+	var compositeStage CompositeResourceTransactionStage
 	if transactionCommand && command.Stage {
 		var err error
-		stage, err = resolved.transaction.StageComposite(input)
+		if resolved.transaction.StageResource != nil {
+			resourceStage, err = resolved.transaction.StageResource(input)
+			stage = resourceStage
+		} else {
+			compositeStage, err = resolved.transaction.StageComposite(input)
+			stage = compositeStage
+		}
 		if err != nil {
 			return jobmgr.FunctionCatalogDecision{}, err
 		}
@@ -699,10 +729,12 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 		return jobmgr.FunctionCatalogDecision{}, errors.New("jobmgr Function catalog: invocation generation wrapped")
 	}
 	*slot = invocationSlot{
-		generation: nextGeneration,
-		resolved:   resolved,
-		input:      input,
-		stage:      stage,
+		generation:     nextGeneration,
+		resolved:       resolved,
+		input:          input,
+		stage:          stage,
+		resourceStage:  resourceStage,
+		compositeStage: compositeStage,
 	}
 	resolved.invocationLeases++
 	generation.invocationLeases++

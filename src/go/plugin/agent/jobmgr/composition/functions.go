@@ -20,6 +20,7 @@ type FunctionAssembly struct {
 	controller  *functionadapter.Controller  // Function controller (route planning + publication)
 	catalog     *functionadapter.Catalog     // the route catalog
 	publication *functionadapter.Publication // external FUNCTION/FUNCTION_DEL registration set
+	jobStager   *functionadapter.JobStager   // run-detached job Function staging
 }
 
 func NewFunctionAssembly(
@@ -35,6 +36,46 @@ func NewFunctionAssembly(
 	if err != nil {
 		return nil, err
 	}
+	return newFunctionAssembly(epoch, controller, catalog, frames)
+}
+
+func NewContainedFunctionAssembly(
+	ctx context.Context,
+	epoch uint64,
+	attempts jobmgr.ProcessAttemptAuthority,
+	modules collectorapi.Registry,
+	frames *lifecycle.FrameOwner,
+	initial ...functionadapter.InitialRoute,
+) (*FunctionAssembly, error) {
+	if ctx == nil || epoch == 0 || attempts == nil || modules == nil || frames == nil {
+		return nil, errors.New("jobmgr composition: invalid contained Function assembly")
+	}
+	controller, catalog, err := functionadapter.NewContainedController(
+		ctx,
+		epoch,
+		attempts,
+		modules,
+		initial...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return newFunctionAssembly(epoch, controller, catalog, frames)
+}
+
+func newFunctionAssembly(
+	epoch uint64,
+	controller *functionadapter.Controller,
+	catalog *functionadapter.Catalog,
+	frames *lifecycle.FrameOwner,
+) (*FunctionAssembly, error) {
+	if epoch == 0 || controller == nil || catalog == nil || frames == nil {
+		return nil, errors.New("jobmgr composition: invalid staged Function assembly")
+	}
+	jobStager, err := controller.JobStager()
+	if err != nil {
+		return nil, errors.Join(err, controller.AbortConstruction(context.Background()))
+	}
 	port, err := functionadapter.NewFramePublicationPort(frames)
 	if err != nil {
 		return nil, errors.Join(err, controller.AbortConstruction(context.Background()))
@@ -47,6 +88,7 @@ func NewFunctionAssembly(
 		controller:  controller,
 		catalog:     catalog,
 		publication: publication,
+		jobStager:   jobStager,
 	}
 	return assembly, nil
 }
@@ -60,12 +102,20 @@ func (fa *FunctionAssembly) Catalog() jobmgr.FunctionCatalogPort {
 	return fa.catalog
 }
 
-// JobHooks returns the exact-handle bridge consumed by the job factory.
-func (fa *FunctionAssembly) JobHooks() joboutput.JobHooks {
+func (fa *FunctionAssembly) JobHandlerStager() joboutput.JobHandlerStager {
 	if fa == nil {
 		return nil
 	}
-	return functionJobHooks{
+	return functionJobStager{
+		stager: fa.jobStager,
+	}
+}
+
+func (fa *FunctionAssembly) JobHandlerAttacher() joboutput.JobHandlerAttacher {
+	if fa == nil {
+		return nil
+	}
+	return functionJobAttacher{
 		controller: fa.controller,
 	}
 }
@@ -120,16 +170,33 @@ func (fa *FunctionAssembly) FinalizeRun(_ context.Context, generation uint64) er
 	return fa.controller.Stop(generation)
 }
 
-type functionJobHooks struct {
+type functionJobStager struct {
+	stager *functionadapter.JobStager
+}
+
+func (fjs functionJobStager) Stage(
+	job joboutput.RuntimeJob,
+) (joboutput.StagedHandlerLifecycle, error) {
+	if fjs.stager == nil || job == nil {
+		return nil, errors.New("jobmgr composition: invalid Function job staging")
+	}
+	return fjs.stager.StageJob(job)
+}
+
+type functionJobAttacher struct {
 	controller *functionadapter.Controller
 }
 
-func (fjh functionJobHooks) Prepare(published joboutput.PublishedJob) (joboutput.HandlerLifecycle, error) {
-	if fjh.controller == nil ||
-		published.Identity.ID == "" ||
-		published.Identity.Generation == 0 ||
-		published.Job == nil {
-		return nil, errors.New("jobmgr composition: invalid Function job preparation")
+func (fja functionJobAttacher) Attach(
+	identity lifecycle.ResourceIdentity,
+	staged joboutput.StagedHandlerLifecycle,
+) (joboutput.HandlerLifecycle, error) {
+	if fja.controller == nil || !identity.Valid() || staged == nil {
+		return nil, errors.New("jobmgr composition: invalid Function job attachment")
 	}
-	return fjh.controller.PrepareJob(published.Identity, published.Job)
+	handle, ok := staged.(*functionadapter.StagedJobHandle)
+	if !ok {
+		return nil, errors.New("jobmgr composition: foreign staged Function job")
+	}
+	return fja.controller.AttachJob(identity, handle)
 }

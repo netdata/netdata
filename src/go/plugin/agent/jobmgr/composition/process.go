@@ -451,7 +451,7 @@ func (pc *processCore) startGeneration(
 	generationID uint64,
 	quit func(),
 ) (*runGeneration, error) {
-	generation, err := pc.newRun(generationID)
+	generation, err := pc.newRun(ctx, generationID)
 	if err != nil {
 		return nil, err
 	}
@@ -473,12 +473,15 @@ func (pc *processCore) startGeneration(
 	return generation, nil
 }
 
-func (pc *processCore) newRun(generation uint64) (*runGeneration, error) {
+func (pc *processCore) newRun(
+	ctx context.Context,
+	generation uint64,
+) (*runGeneration, error) {
 	epoch, err := pc.storeEpochs.create(generation)
 	if err != nil {
 		return nil, err
 	}
-	run, err := newRunGeneration(runGenerationConfig{
+	run, err := newRunGeneration(ctx, runGenerationConfig{
 		Generation:      generation,
 		ShutdownTimeout: pc.config.ShutdownTimeout,
 		Diagnostics:     pc.diagnostics,

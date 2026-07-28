@@ -153,13 +153,12 @@ func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	}, frames)
 	require.NoError(t, err)
 	job := &assemblyTestJob{}
-	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
-		Identity: lifecycle.ResourceIdentity{
-			ID:         job.FullName(),
-			Generation: 3,
-		},
-		Job: job,
-	})
+	staged, err := assembly.JobHandlerStager().Stage(job)
+	require.NoError(t, err)
+	handle, err := assembly.JobHandlerAttacher().Attach(lifecycle.ResourceIdentity{
+		ID:         job.FullName(),
+		Generation: 3,
+	}, staged)
 	require.NoError(t, err)
 	require.NotNil(t, handle)
 
@@ -269,13 +268,12 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 	require.NoError(t, err)
 
 	job := &assemblyTestJob{}
-	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
-		Identity: lifecycle.ResourceIdentity{
-			ID:         job.FullName(),
-			Generation: 1,
-		},
-		Job: job,
-	})
+	staged, err := assembly.JobHandlerStager().Stage(job)
+	require.NoError(t, err)
+	handle, err := assembly.JobHandlerAttacher().Attach(lifecycle.ResourceIdentity{
+		ID:         job.FullName(),
+		Generation: 1,
+	}, staged)
 	require.NoError(t, err)
 	permit := lifecycle.NewJobLongLivedPlan()
 	return shutdownFunctionHarness{

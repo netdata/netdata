@@ -61,6 +61,112 @@ func newManagedJob(
 	}, nil
 }
 
+func newProcessManagedJob(
+	variant JobVariant,
+	job RuntimeJob,
+	identity lifecycle.ResourceIdentity,
+	scheduler *Scheduler,
+	collectorCleanup func(context.Context) error,
+	owner *stagedJobOwner,
+) (ConstructedJob, error) {
+	if !variant.Valid() ||
+		job == nil ||
+		!identity.Valid() ||
+		scheduler == nil ||
+		collectorCleanup == nil ||
+		owner == nil {
+		return ConstructedJob{}, errors.New("job output: invalid process-managed job")
+	}
+	if err := owner.BindAttachment(); err != nil {
+		return ConstructedJob{}, err
+	}
+	physical := &processManagedLoopSupport{
+		owner: owner,
+	}
+	scheduled := &scheduledJobSupport{
+		scheduler: scheduler,
+		identity:  identity,
+		job:       job,
+	}
+	var runtime jobruntime.Runtime
+	switch variant {
+	case JobVariantV1:
+		runtime = jobruntime.NewV1Runtime([]jobruntime.Support{physical, scheduled})
+	case JobVariantV2:
+		runtime = jobruntime.NewV2Runtime([]jobruntime.Support{physical, scheduled})
+	}
+	return ConstructedJob{
+		Variant:          variant,
+		Runtime:          runtime,
+		CollectorCleanup: collectorCleanup,
+		candidateJob:     job,
+		processOwner:     owner,
+	}, nil
+}
+
+type processManagedLoopSupport struct {
+	mu sync.Mutex
+
+	owner    *stagedJobOwner
+	started  bool
+	stopped  bool
+	released bool
+}
+
+func (support *processManagedLoopSupport) Start(ctx context.Context) error {
+	if support == nil || ctx == nil {
+		return errors.New("job output: invalid process-managed loop start")
+	}
+	support.mu.Lock()
+	if support.owner == nil || support.started || support.stopped || support.released {
+		support.mu.Unlock()
+		return errors.New("job output: invalid process-managed loop state")
+	}
+	owner := support.owner
+	support.mu.Unlock()
+	if err := owner.Start(ctx); err != nil {
+		owner.Retire()
+		return err
+	}
+	support.mu.Lock()
+	support.started = true
+	support.mu.Unlock()
+	return nil
+}
+
+func (support *processManagedLoopSupport) Stop(context.Context) error {
+	if support == nil {
+		return errors.New("job output: nil process-managed loop stop")
+	}
+	support.mu.Lock()
+	if !support.started || support.released {
+		support.mu.Unlock()
+		return errors.New("job output: invalid process-managed loop stop")
+	}
+	if support.stopped {
+		support.mu.Unlock()
+		return nil
+	}
+	support.stopped = true
+	owner := support.owner
+	support.mu.Unlock()
+	owner.Retire()
+	return nil
+}
+
+func (support *processManagedLoopSupport) Release(context.Context) error {
+	if support == nil {
+		return errors.New("job output: nil process-managed loop release")
+	}
+	support.mu.Lock()
+	defer support.mu.Unlock()
+	if !support.started || !support.stopped || support.released {
+		return errors.New("job output: invalid process-managed loop release")
+	}
+	support.released = true
+	return nil
+}
+
 type scheduledJobSupport struct {
 	mu sync.Mutex // guards the flags below
 
@@ -266,4 +372,46 @@ func (fw FrameWriter) PoisonOutput(err error) {
 	if fw.Owner != nil {
 		fw.Owner.Poison(err)
 	}
+}
+
+func finalizeProcessOwnedConstructed(constructed ConstructedJob) (resultErr error) {
+	defer func() {
+		if constructed.resolvedReferences {
+			resultErr = redactResolvedLifecycleError(resultErr)
+		}
+	}()
+	if handlers := constructed.Handlers; handlers != nil {
+		if split, ok := handlers.(ProcessHandlerLifecycle); ok {
+			resultErr = errors.Join(
+				resultErr,
+				callJobLifecycle("process-owned handler finalization", func() error {
+					return split.Finalize(context.Background())
+				}),
+			)
+		} else {
+			resultErr = errors.Join(
+				resultErr,
+				callJobLifecycle("process-owned handler close/drain", func() error {
+					return handlers.CloseAndDrain(context.Background())
+				}),
+			)
+		}
+	}
+	if staged := constructed.StagedHandlers; staged != nil {
+		resultErr = errors.Join(
+			resultErr,
+			callJobLifecycle("process-owned staged handler close/drain", func() error {
+				return staged.CloseAndDrain(context.Background())
+			}),
+		)
+	}
+	if cleanup := constructed.CollectorCleanup; cleanup != nil {
+		resultErr = errors.Join(
+			resultErr,
+			callJobLifecycle("process-owned collector Cleanup", func() error {
+				return cleanup(context.Background())
+			}),
+		)
+	}
+	return resultErr
 }

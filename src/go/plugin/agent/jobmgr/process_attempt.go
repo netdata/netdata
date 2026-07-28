@@ -24,6 +24,7 @@ const (
 	ProcessAttemptJobTest
 	ProcessAttemptStore
 	ProcessAttemptStoreTest
+	ProcessAttemptFunctionBundle
 	ProcessAttemptFunctionPoll
 	ProcessAttemptFunctionInvocation
 	ProcessAttemptServiceDiscovery

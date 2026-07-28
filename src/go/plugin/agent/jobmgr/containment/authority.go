@@ -43,6 +43,7 @@ const (
 	NamespaceJobTest
 	NamespaceStore
 	NamespaceStoreTest
+	NamespaceFunctionBundle
 	NamespaceFunctionPoll
 	NamespaceFunctionInvocation
 	NamespaceServiceDiscovery
@@ -62,6 +63,8 @@ func (namespace Namespace) String() string {
 		return "store"
 	case NamespaceStoreTest:
 		return "store-test"
+	case NamespaceFunctionBundle:
+		return "function-bundle"
 	case NamespaceFunctionPoll:
 		return "function-poll"
 	case NamespaceFunctionInvocation:

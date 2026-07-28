@@ -73,7 +73,10 @@ type runGeneration struct {
 	startedAttempted bool       // start was attempted (guards re-entry)
 }
 
-func newRunGeneration(config runGenerationConfig) (generation *runGeneration, resultErr error) {
+func newRunGeneration(
+	ctx context.Context,
+	config runGenerationConfig,
+) (generation *runGeneration, resultErr error) {
 	var secretController *secretadapter.Controller
 	var functions *FunctionAssembly
 	defer func() {
@@ -81,7 +84,8 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 			resultErr = errors.Join(resultErr, abortRunConstruction(functions, secretController))
 		}
 	}()
-	if config.Generation == 0 ||
+	if ctx == nil ||
+		config.Generation == 0 ||
 		config.ShutdownTimeout <= 0 ||
 		config.UIDs == nil ||
 		config.Frames == nil ||
@@ -195,7 +199,14 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		config.Discovery.BuildContext.DyncfgOutput = serviceDiscovery
 		config.Discovery.BuildContext.FnReg = serviceDiscovery
 	}
-	functions, err = NewFunctionAssembly(config.Generation, config.Modules, config.Frames, initialRoutes...)
+	functions, err = NewContainedFunctionAssembly(
+		ctx,
+		config.Generation,
+		config.Attempts,
+		config.Modules,
+		config.Frames,
+		initialRoutes...,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -217,17 +228,20 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		return nil, err
 	}
 	jobs, err := joboutput.NewFactory(joboutput.FactoryConfig{
-		PluginName:    config.Jobs.PluginName,
-		Modules:       config.Modules,
-		Tasks:         tasks,
-		Frames:        config.Frames,
-		ConfigModules: configModules,
-		Runtime:       config.Jobs.Runtime,
-		Vnodes:        config.Jobs.Vnodes,
-		Vnode:         vnodeConfig.Lookup,
-		Hooks:         functions.JobHooks(),
-		Scheduler:     scheduler,
-		Observer:      metrics,
+		Epoch:           config.Generation,
+		PluginName:      config.Jobs.PluginName,
+		Attempts:        config.Attempts,
+		Modules:         config.Modules,
+		Tasks:           tasks,
+		Frames:          config.Frames,
+		ConfigModules:   configModules,
+		Runtime:         config.Jobs.Runtime,
+		Vnodes:          config.Jobs.Vnodes,
+		Vnode:           vnodeConfig.Lookup,
+		HandlerStager:   functions.JobHandlerStager(),
+		HandlerAttacher: functions.JobHandlerAttacher(),
+		Scheduler:       scheduler,
+		Observer:        metrics,
 	})
 	if err != nil {
 		return nil, err
