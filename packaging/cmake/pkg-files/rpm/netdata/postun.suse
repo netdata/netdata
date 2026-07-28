@@ -1,2 +1,17 @@
+if [ $1 -ge 1 ]; then
+  need_reload=0
+
+  for unit in netdata.service netdata-updater.service netdata-updater.timer; do
+    if systemctl --system show --property=NeedDaemonReload --value "${unit}" 2>/dev/null | grep -q 'yes' ; then
+      need_reload=1
+      break
+    fi
+  done
+
+  if [ "${need_reload}" -eq 1 ]; then
+    systemctl --system daemon-reload || :
+  fi
+fi
+
 %service_del_postun netdata.service
 %service_del_postun netdata-updater.timer
