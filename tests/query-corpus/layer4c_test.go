@@ -14,6 +14,7 @@ package corpus
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"testing"
 	"time"
@@ -28,6 +29,15 @@ const (
 	c4cDims    = 50
 	c4cRows    = 200_000 // ~10M samples ≈ 40MB of tier0 pages > the 25MB quota
 	c4cContext = "fixture.l4c"
+
+	// A constant dimension alongside the random ones. Rollup keeps a
+	// constant EXACTLY: every stored window holds 60 x c4cConstValue, and
+	// the part of a window cut by a boundary is worth exactly its share of
+	// it. There is nothing a coarser tier can lose about a flat line, so on
+	// this dimension any difference between two answers over the same
+	// seconds is arithmetic, never resolution.
+	c4cConstDim   = "flat"
+	c4cConstValue = 1000
 )
 
 // c4cValue is the deterministic sample generator: a 24-bit full-mantissa
@@ -86,6 +96,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	for d := 0; d < c4cDims; d++ {
 		conn.Dimension(c4cDimID(d), "", 1, 1)
 	}
+	conn.Dimension(c4cConstDim, "", 1, 1)
 	firstT := int64(fixture.T0)
 	lastT := int64(fixture.T0 + c4cRows)
 	conn.ChartDefinitionEnd(firstT, lastT, lastT)
@@ -96,13 +107,18 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		func(_ string, after, before int64) []stream.ReplayRow {
 			rows := make([]stream.ReplayRow, 0, before-after)
 			for ts := after + 1; ts <= before; ts++ {
-				row := stream.ReplayRow{T: ts, Dims: make([]stream.ReplayValue, c4cDims)}
-				for d := range row.Dims {
+				row := stream.ReplayRow{T: ts, Dims: make([]stream.ReplayValue, c4cDims+1)}
+				for d := 0; d < c4cDims; d++ {
 					row.Dims[d] = stream.ReplayValue{
 						ID:        c4cDimID(d),
 						Collected: strconv.FormatInt(c4cValue(int64(d), ts-fixture.T0), 10),
 						Flags:     stream.FlagNotAnomalous,
 					}
+				}
+				row.Dims[c4cDims] = stream.ReplayValue{
+					ID:        c4cConstDim,
+					Collected: strconv.Itoa(c4cConstValue),
+					Flags:     stream.FlagNotAnomalous,
 				}
 				rows = append(rows, row)
 			}
@@ -220,6 +236,105 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	if len(ptp) < 2 || ptp[0] != 0 || ptp[1] == 0 {
 		t.Fatalf("head-only query: expected tier1 alone, per_tier points %v", ptp)
 	}
+
+	// (3) CASE-026: a total does not change because the answer had to be
+	// assembled from two tiers.
+	//
+	// sum pays each row the seconds it owns, at the rate of the record that
+	// owns them, and carries across rows the seconds a record still owes.
+	// The carry is state that survives between rows - and a plan switch is
+	// the one moment where the record stream itself jumps: the engine reads
+	// ahead into the next tier and may keep or discard either side. A carry
+	// dropped or double-paid there changes the total by up to one stored
+	// record, which above tier 0 is a whole minute of data.
+	//
+	// The window straddles the rotated tier0 head, so it can only be answered
+	// by two plans. Its total is a property of the window, not of how finely
+	// it is cut, so every zoom must agree - the same conservation law L10
+	// asserts inside one tier, asked where the tiers meet.
+	// Every window starts on a tier1 record boundary and is a whole number
+	// of them wide. An edge falling INSIDE a stored record is a different
+	// question - the record's own distribution is gone, so the part of it
+	// inside the window can only be estimated from its width, and the answer
+	// legitimately depends on which tier served it. That is what tiers cost,
+	// not a defect, and it would drown out the seconds a seam can lose.
+	//
+	// The two single-plan windows are the controls: the same zooms, the same
+	// tier CHOICE changing under the query as the buckets widen, no seam
+	// inside them. If they conserve and the straddling window does not, the
+	// seam is the whole difference.
+	ok := c4cSumConserves(t, dd, "head-only", c4cAlignTier1(boundary-10800))
+	ok = c4cSumConserves(t, dd, "tail-only", c4cAlignTier1(boundary+3600)) && ok
+	ok = c4cSumConserves(t, dd, "straddling", c4cAlignTier1(boundary-3600)) && ok
+
+	assertContract(t, "CASE-026/totals-survive-a-plan-switch", ok)
+}
+
+// c4cAlignTier1 rounds a timestamp down onto the tier1 record grid, whose
+// windows end at T0+40 (mod 60) — see tier1WindowsFor.
+func c4cAlignTier1(ts int64) int64 {
+	return ts - (ts-(fixture.T0+40))%tier1Gran
+}
+
+// c4cSumConserves totals a sum query over one grid-aligned window at several
+// zooms and compares each against what the fixture actually pushed.
+//
+// The dimension is flat, so the answer is arithmetic: the window holds
+// c4cConstValue for every one of its seconds, whichever tier serves them and
+// however finely they are cut. Nothing here is read back from the engine to
+// decide what is right - the fixture already decided.
+func c4cSumConserves(t *testing.T, dd *daemon.Daemon, label string, after int64) bool {
+	t.Helper()
+
+	const span = 7200 // whole tier1 records, and divisible by every zoom below
+	before := after + span
+	want := float64(c4cConstValue) * float64(span)
+	ok := true
+
+	for _, points := range []int64{span, span / 10, span / 60, span / 300} {
+		// no tier pin: the planner must be free to cross the boundary
+		params := daemon.DataParams(c4cContext, after, before, points)
+		params.Set("time_group", "sum")
+		params.Set("scope_dimensions", c4cConstDim)
+		params.Set("options", "jsonwrap|unaligned")
+		doc, err := dd.DataV3("l4c-child", params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		col, has := cols[c4cConstDim]
+		if !has {
+			t.Logf("plan-switch conservation not met: %s at %d buckets returned no column", label, points)
+			ok = false
+			continue
+		}
+
+		total := 0.0
+		for _, pt := range col {
+			if pt.Value != nil {
+				total += *pt.Value
+			}
+		}
+
+		bucket := span / points
+		t.Logf("plan-switch conservation [%s]: %ds buckets (%d points, per_tier %v) total %.10g, want %.10g",
+			label, bucket, points, perTierPoints(doc), total, want)
+
+		if math.Abs(total-want) > want*1e-6 {
+			t.Logf("plan-switch conservation not met: [%s] %ds buckets total %.10g over a window "+
+				"holding a flat %d for %ds, which is %.10g (off by %.4g seconds of data) - a flat "+
+				"line has nothing a coarser tier can lose",
+				label, bucket, total, c4cConstValue, span, want,
+				(total-want)/float64(c4cConstValue))
+			ok = false
+		}
+	}
+
+	return ok
 }
 
 // tier1WindowsFor computes the tier1 fetched averages (sum/count of the
