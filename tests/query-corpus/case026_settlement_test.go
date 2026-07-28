@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// CASE-026 a row's anomaly rate describes the seconds the row was paid.
+// CASE-026 a row that reports a value reports an anomaly rate with it.
 //
-// Every row of a query answers two things about the same seconds: how much
-// happened in them (the value) and how much of that was anomalous (the
-// anomaly rate). They are two readings of ONE span, so they must describe
-// the same span - a row cannot report seconds in its value that its anomaly
-// rate does not know about.
+// Every row of a query answers two things: how much happened (the value)
+// and how much of it was anomalous (the anomaly rate). Exactly which
+// samples the rate is averaged over is an OPEN CONTRACT - the shipped
+// documentation says the raw samples inside the row, the engine merges
+// every record its read loop touched for that row, and the two disagree
+// whenever records do not line up with rows. This case deliberately does
+// not decide that. It asserts the one thing true under every candidate: a
+// row whose value came from anomalous seconds cannot report zero.
 //
 // `sum` is the grouping that can break the pair, because it is the only one
 // that pays a row seconds belonging to a record the row was never handed:
@@ -17,7 +20,7 @@
 // a value out of nowhere and calls it perfectly healthy.
 //
 // The fixture makes every stored second anomalous, so there is nothing to
-// weigh: any row with a value must read 100. A row reading 0 is a row whose
+// weigh and every candidate answers 100. A row reading 0 is a row whose
 // value came from seconds its anomaly rate never looked at.
 package corpus
 
