@@ -29,6 +29,8 @@ struct shared_pid_memory {
     int shm_fd;
     sem_t *sem;
     bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
+    char *shm_name;        /* owned copy of the POSIX SHM object name */
+    char *sem_name;        /* owned copy of the POSIX semaphore name */
 };
 
 static inline size_t shared_pid_memory_nbytes(const struct shared_pid_memory *ctx)
@@ -90,10 +92,10 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
     }
-    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
-    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
+    (void)sem_unlink(ctx->sem_name);
+    (void)shm_unlink(ctx->shm_name);
 
-    ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
+    ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
         return false;
     /* Mark created before any further steps; close() unlinks on any failure path. */
@@ -111,7 +113,7 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
     /* New SHM is kernel-zero-filled; no explicit memset needed. */
-    ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
+    ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED) {
         /* mapping is set but sem is not — next publish would write without a
          * lock.  Null out mapping so the publish guard catches it. */
@@ -127,14 +129,24 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     return true;
 }
 
-struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_every_s)
+struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const char *sem_name,
+                                                  size_t total, uint32_t update_every_s)
 {
-    if (!total)
+    if (!total || !shm_name || !sem_name)
         return NULL;
 
     struct shared_pid_memory *ctx = callocz(1, sizeof(*ctx));
     if (!ctx)
         return NULL;
+
+    ctx->shm_name = strdup(shm_name);
+    ctx->sem_name = strdup(sem_name);
+    if (!ctx->shm_name || !ctx->sem_name) {
+        freez(ctx->shm_name);
+        freez(ctx->sem_name);
+        freez(ctx);
+        return NULL;
+    }
 
     ctx->shm_fd = -1;
     ctx->sem = SEM_FAILED;
@@ -156,12 +168,12 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
      * 17.5 MB page-fault storm on the first publish after creation. */
     struct stat pre_stat = {0};
     bool reused;
-    ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_EXCL | O_RDWR, 0660);
+    ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_EXCL | O_RDWR, 0660);
     if (ctx->shm_fd >= 0) {
         reused = false;
         ctx->shm_name_created = true;
     } else if (errno == EEXIST) {
-        ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_RDWR, 0);
+        ctx->shm_fd = shm_open(ctx->shm_name, O_RDWR, 0);
         if (ctx->shm_fd < 0)
             goto fail;
         if (fstat(ctx->shm_fd, &pre_stat) != 0)
@@ -181,8 +193,8 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
     if (reused && pre_stat.st_size != (off_t)length) {
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
-        (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
-        ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
+        (void)shm_unlink(ctx->shm_name);
+        ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_RDWR, 0660);
         if (ctx->shm_fd < 0)
             goto fail;
         reused = false;
@@ -208,7 +220,7 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
      * Opening the existing semaphore (O_CREAT opens it if it already exists,
      * ignoring the initial value) keeps writer and all consumers on the same
      * underlying object. */
-    ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
+    ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;
 
@@ -338,7 +350,9 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
      * is still live.  The sem name is intentionally NOT unlinked: consumers and
      * the next writer must share the same underlying kernel object. */
     if (ctx->shm_name_created)
-        (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
+        (void)shm_unlink(ctx->shm_name);
 
+    freez(ctx->shm_name);
+    freez(ctx->sem_name);
     freez(ctx);
 }

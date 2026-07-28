@@ -68,6 +68,14 @@ const (
 	ebpfgoSHMFlagSocket    uint32 = 0x02
 )
 
+// Production POSIX names for the shared-memory segment and its semaphore.
+// Must match NETDATA_EBPFGO_INTEGRATION_NAME / NETDATA_EBPFGO_SHM_INTEGRATION_NAME
+// in apps_ebpf_shared_pid_row.h, which is what all consumer plugins open.
+const (
+	productionSHMName = "/netdata_shm_integration_ebpfgo_v3"
+	productionSEMName = "/netdata_sem_integration_ebpfgo_v3"
+)
+
 // Publish writes the current entries to the shared-memory segment and stamps
 // the per-module validity flags.  Only the CACHESTAT bit is cleared after
 // each publish; the SOCKET bit persists across cachestat cycles so the C

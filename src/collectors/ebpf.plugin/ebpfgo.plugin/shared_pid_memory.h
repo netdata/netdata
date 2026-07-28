@@ -9,10 +9,15 @@
 
 struct shared_pid_memory;
 
-/* update_every_s: the publisher's collection interval in seconds.  Written into
+/* shm_name / sem_name: POSIX names for the shared-memory object and its
+ * semaphore (must start with '/').  Callers supply these so tests can use
+ * unique non-production names and avoid touching a live agent's segment.
+ *
+ * update_every_s: the publisher's collection interval in seconds.  Written into
  * the SHM header so the reader can scale its stale-timeout window instead of
  * using a hardcoded constant that breaks when update_every > 10. */
-struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_every_s);
+struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const char *sem_name,
+                                                  size_t total, uint32_t update_every_s);
 /* flags: OR of EBPFGO_SHM_FLAG_* bits; written into the SHM header under the
  * semaphore along with last_publish_ut so consumers can tell which modules
  * produced valid data and whether the payload is still live. */

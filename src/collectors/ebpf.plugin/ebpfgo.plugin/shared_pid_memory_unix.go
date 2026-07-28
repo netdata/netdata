@@ -46,10 +46,15 @@ type SharedPidMemoryPublisher struct {
 	ptr *C.struct_shared_pid_memory
 }
 
-func NewSharedPidMemoryPublisher(total uint32, updateEverySec uint32) (*SharedPidMemoryPublisher, error) {
+func NewSharedPidMemoryPublisher(shmName, semName string, total uint32, updateEverySec uint32) (*SharedPidMemoryPublisher, error) {
 	assertSharedPidMemoryLayout()
 
-	ctx := C.shared_pid_memory_open(C.size_t(total), C.uint32_t(updateEverySec))
+	cShm := C.CString(shmName)
+	defer C.free(unsafe.Pointer(cShm))
+	cSem := C.CString(semName)
+	defer C.free(unsafe.Pointer(cSem))
+
+	ctx := C.shared_pid_memory_open(cShm, cSem, C.size_t(total), C.uint32_t(updateEverySec))
 	if ctx == nil {
 		return nil, fmt.Errorf("open shared pid memory failed")
 	}

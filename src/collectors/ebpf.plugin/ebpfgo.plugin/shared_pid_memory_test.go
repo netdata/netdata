@@ -3,6 +3,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"testing"
 	"unsafe"
 )
@@ -25,8 +27,14 @@ func TestSharedPidMemoryLayoutMatchesGo(t *testing.T) {
 //	0 → N  (no memset; only memcpy of new entries)
 //	N → M  (conditional memset zeros vacated slots [M, N))
 func TestSharedPidMemoryPublisher_PrevCountInvariant(t *testing.T) {
+	// Use unique per-process names so this test never touches the production
+	// SHM segment even when the Netdata Agent is running on the same host.
+	pid := os.Getpid()
+	shmName := fmt.Sprintf("/netdata_test_shm_%d", pid)
+	semName := fmt.Sprintf("/netdata_test_sem_%d", pid)
+
 	const total = 8
-	pub, err := NewSharedPidMemoryPublisher(total, 1)
+	pub, err := NewSharedPidMemoryPublisher(shmName, semName, total, 1)
 	if err != nil {
 		t.Skipf("SHM unavailable (not Linux or /dev/shm missing): %v", err)
 	}

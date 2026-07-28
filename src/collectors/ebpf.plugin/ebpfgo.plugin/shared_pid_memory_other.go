@@ -6,7 +6,7 @@ import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libb
 
 type SharedPidMemoryPublisher struct{}
 
-func NewSharedPidMemoryPublisher(total uint32, _ uint32) (*SharedPidMemoryPublisher, error) {
+func NewSharedPidMemoryPublisher(_, _ string, total uint32, _ uint32) (*SharedPidMemoryPublisher, error) {
 	_ = total
 	return nil, libbpfloader.ErrDisabled
 }
