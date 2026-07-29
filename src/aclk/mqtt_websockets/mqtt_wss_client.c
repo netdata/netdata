@@ -128,8 +128,11 @@ struct mqtt_wss_client_struct {
     unsigned int mqtt_connected:1;
     unsigned int mqtt_disconnecting:1;
 
-// SSL_write() returned WANT_READ (TLS renegotiation or a post-handshake message): the write can
-// only proceed once the socket is readable, so queued output must NOT arm POLLOUT until then.
+// SSL_write() returned WANT_READ (TLS renegotiation or a post-handshake message): the write cannot
+// proceed until the socket is readable, so queued output must NOT arm POLLOUT while this is set.
+// Cleared when a write actually makes progress, or on the next connect attempt.
+// Invariant: set implies buf_write is non-empty - it is only assigned inside the write block, and
+// the only paths that empty buf_write also clear it.
     unsigned int write_wants_read:1;
 
 // Application layer callback pointers
@@ -556,9 +559,10 @@ int mqtt_wss_connect(
         return -5;
     }
 
+    int ssl_connect_ec = SSL_ERROR_NONE;
     if (result == -1) {
-        int ec = SSL_get_error(client->ssl, result);
-        if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
+        ssl_connect_ec = SSL_get_error(client->ssl, result);
+        if (ssl_connect_ec != SSL_ERROR_WANT_READ && ssl_connect_ec != SSL_ERROR_WANT_WRITE) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to start SSL connection");
             mqtt_wss_close_sockfd(client);
             return -6;
@@ -593,6 +597,13 @@ int mqtt_wss_connect(
 
     client->poll_fds[POLLFD_PIPE].events = POLLIN;
     client->poll_fds[POLLFD_SOCKET].events = POLLIN;
+
+    // Honour the direction SSL_connect() asked for. A handshake blocked on WANT_WRITE needs
+    // POLLOUT, and nothing else arms it before CONNACK: buf_write is still empty (the WebSocket
+    // upgrade request is only generated later, inside ws_client_process()).
+    if (ssl_connect_ec == SSL_ERROR_WANT_WRITE)
+        client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
+
     client->last_io_progress_ut = now_monotonic_usec();
     // wait till MQTT connection is established
     while (!client->mqtt_connected) {
@@ -612,7 +623,7 @@ int mqtt_wss_connect(
     return 0;
 }
 
-#define MWS_TIMED_OUT 1
+#define MWS_TIMED_OUT 2
 #define MWS_OK 0
 static const char *mqtt_wss_error_tos(int ec)
 {
@@ -685,6 +696,12 @@ static int mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_REASON reason) {
     return MQTT_WSS_OK;
 }
 
+// Queued output wants writability, unless OpenSSL is waiting on readability to let the write
+// proceed - arming POLLOUT then would make poll() return instantly on every retry.
+static bool mqtt_wss_should_arm_pollout(bool bytes_queued, bool write_wants_read) {
+    return bytes_queued && !write_wants_read;
+}
+
 static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
     const usec_t start_ut = now_monotonic_usec();
@@ -698,9 +715,11 @@ static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
         // Cap each attempt so a congested socket gets many tries within the phase instead of
         // spending the whole budget inside one poll(). mqtt_wss_service() arms POLLOUT itself
         // from the write buffer, so nothing needs re-arming here.
-        // Return the underlying cause rather than a generic error: every teardown failure used
-        // to log as "Unspecified Error". The two code spaces do not overlap - MQTT_WSS_ERR_* are
-        // negative, MWS_* are 0/1 - so the caller can stringify either.
+        // Return the underlying cause rather than a generic error: every teardown failure used to
+        // log as "Unspecified Error". MQTT_WSS_ERR_* are negative and MWS_* are 0/2, so the caller
+        // can stringify either. MWS_TIMED_OUT deliberately avoids 1, which mqtt_wss_client.h
+        // assigns to MQTT_WSS_OK_TO - a documented (currently unused) success return of
+        // mqtt_wss_service() that would otherwise be misread here as a failure.
         const int rc = mqtt_wss_service(client, MIN(remaining_ms, 100));
         if (rc)
             return rc;
@@ -860,6 +879,25 @@ int mqtt_wss_client_timeout_unittest(void) {
     MQTT_WSS_TEST(!aclk_usec_budget_spent(progress_ut, watchdog_ut, progress_ut - 1),
                   "backward clock reading expired the watchdog");
 
+    // The drop decision must use the watchdog window itself, not just any budget: these two pin
+    // MQTT_WSS_IO_WATCHDOG_UT, which the generic aclk_usec_budget_spent() assertions above cannot.
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLIN, progress_ut, progress_ut + watchdog_ut - 1) ==
+                      MQTT_WSS_DROP_NONE,
+                  "dropped 1us short of the watchdog window");
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLIN, progress_ut, progress_ut + watchdog_ut) ==
+                      MQTT_WSS_DROP_NO_IO_PROGRESS,
+                  "did not drop exactly at the watchdog window boundary");
+
+    // POLLOUT arming rule, all four combinations.
+    MQTT_WSS_TEST(mqtt_wss_should_arm_pollout(true, false),
+                  "queued output did not arm POLLOUT");
+    MQTT_WSS_TEST(!mqtt_wss_should_arm_pollout(true, true),
+                  "queued output armed POLLOUT while the write was blocked on readability");
+    MQTT_WSS_TEST(!mqtt_wss_should_arm_pollout(false, false),
+                  "an empty write buffer armed POLLOUT");
+    MQTT_WSS_TEST(!mqtt_wss_should_arm_pollout(false, true),
+                  "an empty write buffer armed POLLOUT while blocked on readability");
+
     // Drop decision: dispatch and precedence.
     MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLIN, progress_ut, progress_ut) == MQTT_WSS_DROP_NONE,
                   "healthy readable socket was dropped");
@@ -951,6 +989,8 @@ int mqtt_wss_client_timeout_unittest(void) {
     return errors;
 }
 
+#undef MQTT_WSS_TEST
+
 static int handle_mqtt_internal(mqtt_wss_client client)
 {
     int rc = mqtt_ng_sync(client->mqtt);
@@ -1004,14 +1044,17 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         }
     }
 
-    // Arm POLLOUT from the write buffer, not from the last SSL error: a *successful partial*
-    // SSL_write() leaves no WANT_WRITE for set_socket_pollfds() to re-arm from, so keying off the
-    // error would leave queued bytes waiting for the poll timeout instead of writability.
+    // Arm POLLOUT from the write buffer, not from the last SSL error. SSL_write() can report a
+    // short count while still returning success - it completes a previously pending fragment, and
+    // buf_write (128KiB) is larger than OpenSSL's 16KiB max_send_fragment - and that leaves no
+    // WANT_WRITE for set_socket_pollfds() to re-arm from. Keying off the error would strand those
+    // bytes until the poll timeout. (This is not SSL_MODE_ENABLE_PARTIAL_WRITE, which is not set.)
     //
     // Except while the write is blocked on readability: OpenSSL requires the retry to wait for
     // POLLIN there, and arming POLLOUT on an already-writable socket would make poll() return
     // instantly on every retry - a busy loop that credits no progress and ends in a watchdog drop.
-    if (rbuf_bytes_available(client->ws_client->buf_write) && !client->write_wants_read)
+    if (mqtt_wss_should_arm_pollout(rbuf_bytes_available(client->ws_client->buf_write) > 0,
+                                    client->write_wants_read))
         client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
 
 #ifdef MQTT_WSS_CPUSTATS
@@ -1037,9 +1080,15 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     if (ret == 0) {
-        // a clean poll() timeout means the loop blocked rather than spun: that is forward
-        // progress for the watchdog (a healthy idle link reaches here at the caller cadence)
-        client->last_io_progress_ut = now_monotonic_usec();
+        // A clean poll() timeout means the loop blocked rather than spun: that is forward progress
+        // for the watchdog (a healthy idle link reaches here at the caller cadence).
+        //
+        // Except while a write is blocked on readability with bytes still queued. That is a
+        // stalled write, not an idle link: crediting it would hide the stall from the watchdog and
+        // leave recovery to the much slower keepalive path, reported as a ping timeout rather than
+        // as the lack of I/O progress it actually is.
+        if (!(client->write_wants_read && rbuf_bytes_available(client->ws_client->buf_write)))
+            client->last_io_progress_ut = now_monotonic_usec();
         time_t now = now_realtime_sec();
         if (send_keepalive) {
             // otherwise we shortened the timeout ourselves to take care of
@@ -1196,7 +1245,17 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             int errnobkp = errno;
             ret = SSL_get_error(client->ssl, ret);
             set_socket_pollfds(client, ret);
+
             client->write_wants_read = (ret == SSL_ERROR_WANT_READ);
+            if (client->write_wants_read) {
+                // Drop any POLLOUT armed earlier in this same iteration - by
+                // mqtt_didnt_finish_write above, or by a WANT_WRITE from SSL_read(). events is not
+                // cleared again until after the next poll(), so a stale POLLOUT would make it
+                // return instantly on writability and spin. Such a POLLOUT is provably stale:
+                // SSL_write() retries any pending flush first, so it cannot report WANT_READ
+                // until writability is no longer what OpenSSL is waiting for.
+                client->poll_fds[POLLFD_SOCKET].events &= ~POLLOUT;
+            }
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
                 worker_is_busy(WORKER_ACLK_TX_ERROR);

@@ -642,6 +642,8 @@ int aclk_timeout_unittest(void)
     return errors;
 }
 
+#undef ACLK_TIMEOUT_TEST
+
 static int aclk_write_all_timeout(int fd, const void *buf, size_t len, int timeout_ms)
 {
     size_t written = 0;
