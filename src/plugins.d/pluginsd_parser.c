@@ -1480,13 +1480,21 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     // once rrd_collector_finished() runs below. The manifest refresh therefore has to happen
     // after that, so snapshot the hosts here - the JudyL lives in the parser, which is
     // destroyed first.
+    //
+    // Snapshot machine guids rather than RRDHOST pointers: the loop below clears
+    // RRDHOST_FLAG_COLLECTOR_ONLINE, which is exactly what makes rrdhost_is_online() false and so
+    // lets `netdatacli remove-stale-node --unregister` free a vnode (see remove_ephemeral_host()).
+    // A borrowed pointer would have to survive the chart sweep, the parser destroy and the
+    // collector wait below. Re-resolving the guid afterwards is what service.c does for the same
+    // hazard, and aclk_arm_node_manifest() ignores a NULL host, so a vnode that did go away is
+    // simply skipped.
     size_t vnodes_used = 0;
-    RRDHOST **vnodes = NULL;
+    char (*vnode_guids)[GUID_LEN + 1] = NULL;
 
     {
         Word_t vnodes_count = JudyLCount(parser->user.vnodes.JudyL, 0, -1, PJE0);
         if (vnodes_count)
-            vnodes = mallocz(vnodes_count * sizeof(*vnodes));
+            vnode_guids = mallocz(vnodes_count * sizeof(*vnode_guids));
 
         Word_t Index = 0;
         bool first_then_next = true;
@@ -1502,7 +1510,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
             }
 
             if (vnodes_used < (size_t)vnodes_count)
-                vnodes[vnodes_used++] = virtual_host;
+                strncpyz(vnode_guids[vnodes_used++], virtual_host->machine_guid, GUID_LEN);
         }
         (void) JudyLFreeArray(&parser->user.vnodes.JudyL, PJE0);
     }
@@ -1522,8 +1530,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     // is no longer running, so they must drop out of the cloud manifest
     aclk_arm_node_manifest(host);
     for (size_t i = 0; i < vnodes_used; i++)
-        aclk_arm_node_manifest(vnodes[i]);
-    freez(vnodes);
+        aclk_arm_node_manifest(rrdhost_find_by_guid(vnode_guids[i]));
+    freez(vnode_guids);
 
     return count;
 }

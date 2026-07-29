@@ -49,6 +49,17 @@ static void build_node_manifest(RRDHOST *host)
 {
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
+    // Validate what is actually about to be transmitted. The caller only checked that node_id is
+    // non-empty, and set_host_node_id() fills it with a plain 37-byte uuid_unparse_lower() with no
+    // release fence, so a reader that saw a non-empty first byte can still observe a partial string.
+    // The manifest carries no machine_guid for the cloud to fall back on, and the send request has
+    // already been claimed, so re-arm rather than transmitting an unusable node_id.
+    nd_uuid_t node_uuid;
+    if (unlikely(uuid_parse(aclk_host_config->node_id, node_uuid) != 0)) {
+        aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+        return;
+    }
+
     struct update_node_instance_manifest manifest;
 
     CLAIM_ID claim_id = claim_id_get();
