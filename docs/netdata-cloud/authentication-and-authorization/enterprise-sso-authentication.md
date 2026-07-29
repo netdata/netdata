@@ -56,7 +56,7 @@ Click on the link `Sign-in with an Enterprise Single Sign-On (SSO)` and follow t
 
 ## Multi-Factor Authentication (MFA)
 
-With Enterprise SSO, multi-factor authentication is handled entirely by your identity provider. Netdata Cloud does not store MFA credentials or run its own MFA challenge — it inherits the authentication policy enforced by your identity provider (for example, Okta, Azure AD, or Google Workspace).
+With Enterprise SSO, multi-factor authentication is handled entirely by your identity provider. Netdata Cloud does not store MFA credentials or run its own MFA challenge — it inherits the authentication policy enforced by your identity provider (for example, Okta, Microsoft Entra ID, or Google Workspace).
 
 Because the SSO flow redirects users to the identity provider for authentication, any MFA challenge, conditional access rule, or sign-on policy configured at the identity provider is applied before access to Netdata Cloud is granted. Netdata Cloud cannot bypass it.
 
