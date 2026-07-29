@@ -1752,10 +1752,6 @@ func (ck *CommandKernel) runFinalizerFailedTerminal() bool {
 	return ck.finalizerFailed && !ck.finalizerRequest.Valid() && !ck.finalizerTask.Valid() && ck.finalizerAction == 0
 }
 
-func (ck *CommandKernel) shutdownQuiescent() bool {
-	return ck.runCensus().Drained()
-}
-
 func (ck *CommandKernel) kernelOwnershipDrained() bool {
 	return ck.shutdownBarrierSettled() && ck.kernelStateDrained() &&
 		ck.runtimeHead == nil && ck.runtimeTail == nil &&
@@ -1815,4 +1811,15 @@ func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
 		Abandoned:              ck.abandoned,
 		RunFinalizerComplete:   ck.finalizerDone && !ck.finalizerFailed,
 	}
+}
+
+func runCensusBlockedOnlyByFrame(census lifecycle.RunCensus) bool {
+	if !census.Frame.Busy ||
+		census.Frame.Poisoned ||
+		census.Frame.PendingControl ||
+		census.Frame.RetainedBytes != 0 {
+		return false
+	}
+	census.Frame.Busy = false
+	return census.Drained()
 }

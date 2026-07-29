@@ -2951,6 +2951,53 @@ func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
 
 }
 
+func TestRunCensusBlockedOnlyByFrame(t *testing.T) {
+	base := lifecycle.RunCensus{
+		KernelDrained:          true,
+		FunctionCatalogDrained: true,
+		RunFinalizerComplete:   true,
+	}
+	tests := map[string]struct {
+		mutate func(*lifecycle.RunCensus)
+		want   bool
+	}{
+		"idle": {
+			mutate: func(*lifecycle.RunCensus) {},
+		},
+		"ordinary frame busy": {
+			mutate: func(census *lifecycle.RunCensus) {
+				census.Frame.Busy = true
+			},
+			want: true,
+		},
+		"frame and task busy": {
+			mutate: func(census *lifecycle.RunCensus) {
+				census.Frame.Busy = true
+				census.TransientActive = 1
+			},
+		},
+		"control reservation supplies its own wake": {
+			mutate: func(census *lifecycle.RunCensus) {
+				census.Frame.Busy = true
+				census.Frame.PendingControl = true
+			},
+		},
+		"poisoned frame is terminal failure": {
+			mutate: func(census *lifecycle.RunCensus) {
+				census.Frame.Busy = true
+				census.Frame.Poisoned = true
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			census := base
+			test.mutate(&census)
+			require.Equal(t, test.want, runCensusBlockedOnlyByFrame(census))
+		})
+	}
+}
+
 func TestKernelStopDrainsCooperativeTask(t *testing.T) {
 	started := make(chan struct{})
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {

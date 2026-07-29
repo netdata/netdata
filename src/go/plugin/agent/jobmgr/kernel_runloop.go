@@ -192,9 +192,21 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				terminal = ck.shutdownDeadlineExceededTerminal(terminal)
 				return
 			}
-			if ck.shutdownQuiescent() || ck.runShutdownBarrierFailedTerminal() || ck.runFinalizerFailedTerminal() {
-				terminal = errors.Join(terminal, ck.run.Terminal(ck.runCensus()))
+			census := ck.runCensus()
+			if census.Drained() || ck.runShutdownBarrierFailedTerminal() || ck.runFinalizerFailedTerminal() {
+				terminal = errors.Join(terminal, ck.run.Terminal(census))
 				return
+			}
+			if runCensusBlockedOnlyByFrame(census) {
+				idle, err := ck.frames.ArmRunIdleNotification(ck.run.Generation())
+				if err != nil {
+					ck.run.Dirty(err)
+					terminal = errors.Join(terminal, ck.run.Terminal(census))
+					return
+				}
+				if idle {
+					continue
+				}
 			}
 		}
 		if moreDeadlines || moreControls || moreSubmissions || moreFunctionCleanups ||
