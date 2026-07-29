@@ -107,15 +107,6 @@ set at the end.
 | W/volume | volume = (hl-bl)/bl x fraction-of-time above/below baseline; equal-averages metrics skipped | n/a | |
 | W/ks2 | ks2 exact endpoints (identical diffs → 0, one-sided diffs → 1); spread_results_evenly rank normalization pinned via Go port; intermediate KS values deferred (KSfbar port) | n/a | |
 | L8/post-processing | percentage (implies absolute on v2/v3 — as does any non-dimension group-by), absolute, nonzero (+ self-neutralizing all-zero), null2zero, cardinality_limit fold | n/a | |
-
-## Corpus-wide pusher discipline
-
-- CASE-015 established the harness rule: pusher connections close only AFTER
-  the settle barrier confirms retention. Deliberate immediate closes exist
-  only inside the CASE-015 cases — green since #23118, where they prove the
-  drain guarantee (an immediate close loses nothing).
-- The historical spike-3 discipline (first point alone, wait, then burst)
-  is NOT needed since #23096 — pinned by L0/live-burst.
 | CASE-025/carry-survives-gaps | a stored record wider than a bucket owes its remainder to the NEXT bucket, and that debt is paid even when the next bucket collects nothing of its own. The engine settles a carry only while handing a numeric record to a bucket, so a bucket that is a gap - or the synthetic point at the end of the data - never asks, and the seconds owed to it are paid nowhere at all. A window total then drops by up to one stored record at every gap edge and at the end of retention. Invisible to L10 and L11, whose conservation checks allow one record of slack at each edge, which is precisely where this lives | n/a |  |
 | CASE-025/anomaly-bit-not-blended | a bucket lying entirely inside one stored window reports THAT window's anomaly rate, un-blended. options=anomaly-bit answers about the anomaly RATE, so sum's seconds-owed arithmetic is skipped for it - and the other half of the boundary machinery must not reach it either. A bucket carved inside a fully-anomalous window contains no sample from the window before it, so blending would report the metric as less anomalous than every sample under the bucket actually was. Asserted under average, min, max and sum over a hard 0 -> 100 step on a stored window boundary: all three buckets read 100, and a blended 33/67/100 would be the step smeared backwards into seconds it never touched. Records the ruling that refuted a review finding which had assumed the blended answer was the correct one | n/a |  |
 | CASE-026/anomaly-rate-covers-the-paid-seconds | a row that reports a value reports an anomaly rate with it. sum is the one grouping that pays a row from a record delivered to a DIFFERENT row - a record wider than the row owes its opening seconds backwards - so a row can hold a value from a record it never received. Taking the anomaly rate from the received records alone makes such a row report a value out of nowhere and call it perfectly healthy. Which samples the rate is averaged over is an OPEN contract - the shipped docs say the raw samples inside the row, the engine merges every record its read loop touched - and this case deliberately does not decide it: the fixture makes every stored second anomalous, so every candidate answers 100 and only a row that looked at nothing answers 0 | n/a |  |
@@ -125,3 +116,12 @@ set at the end.
 | CASE-029/tier0-slow-metric-totals-at-every-zoom | sum's zoom inflation was never a property of tiers - it was a property of a stored record being WIDER than the row asking about it, which is equally true at tier 0 for anything collected less often than once a second. A metric collected every ten seconds answers ten one-second rows from one stored record, and used to report ten times what it stored. Pins the deliberate change to what tier 0 answers for slow metrics | n/a |  |
 | CASE-030/interval-change-slowing-down | a metric that changes how often it is collected does not change what its history held. Netdata supports update_every changing while a metric runs and the database keeps every historical record at the interval it was collected at, so a volume over an OLD window is a property of that window's own records. This is the case that separates the interval a record's samples were collected at from the interval the metric uses now - identical numbers until the interval changes, which is why a fixture with one uniform interval cannot tell a correct implementation from one reading current metadata. Asserted on a window of whole tier1 records in the middle of the history, at forced tier 0 and tier 1 | n/a |  |
 | CASE-030/interval-change-speeding-up | the mirror of CASE-030/interval-change-slowing-down: history collected every ten seconds keeps its volume after the metric moves to once a second. Asserted separately so a run names which direction broke, and so one failure cannot be counted twice | n/a |  |
+
+## Corpus-wide pusher discipline
+
+- CASE-015 established the harness rule: pusher connections close only AFTER
+  the settle barrier confirms retention. Deliberate immediate closes exist
+  only inside the CASE-015 cases — green since #23118, where they prove the
+  drain guarantee (an immediate close loses nothing).
+- The historical spike-3 discipline (first point alone, wait, then burst)
+  is NOT needed since #23096 — pinned by L0/live-burst.
