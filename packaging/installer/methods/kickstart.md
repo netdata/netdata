@@ -132,26 +132,9 @@ If `curl` fails to download the install script with `curl: (60) SSL certificate 
 
 If you see a message like `File not found when checking for remote file at https://repository.netdata.cloud/repos/repoconfig` while running `kickstart.sh`, it is an informational notice. It means a remote file check during installation did not succeed, but this does not stop or break the installation — the installer continues automatically to the next step. The message is not specific to any particular Linux distribution and can appear on any supported system.
 
-### Switching from a distribution-managed package to a static build
+### Switching from a vendor-packaged native install
 
-Systems such as XCP-ng and XOA ship Netdata through their own package repositories, and these bundled packages are often older than the latest release. `kickstart.sh` is not designed to safely update, reinstall, or uninstall these distribution-managed installs, and attempting to do so may fail or leave the system in a broken state. To replace a bundled package with the latest static build:
-
-1. Stop the Agent: `sudo systemctl stop netdata`
-2. Remove the distribution package with your system package manager:
-   - **XCP-ng** (RPM-based): `sudo yum remove netdata` or `sudo dnf remove netdata`
-   - **XOA** (Debian-based): `sudo apt remove netdata`
-3. Back up your configuration and data. See [Data Backups When Switching Install Types](/docs/learn/switching-install-types.md#data-backups-when-switching-install-types) for the exact paths and files to exclude.
-4. Install the static build:
-
-   ```bash
-   sh /tmp/netdata-kickstart.sh --static-only
-   ```
-
-   If you have not downloaded the script yet, use the command from the [One-Line Install](#run-the-one-line-install-command) section and add `--static-only`.
-
-5. Restore your backup to the matching paths under the static build's `/opt/netdata/` prefix, as described in the linked guide.
-
-For general guidance on removing native packages, see the [Uninstall Guide](/packaging/installer/UNINSTALL.md).
+Systems such as XCP-ng and XOA ship Netdata through their own package repositories, and these bundled packages are often older than the latest release. `kickstart.sh` does not recognize these installs and is not designed to safely update, reinstall, or uninstall them. See the "Switching From a Vendor-Packaged Native Install" section under [Switching Install Types](/docs/learn/switching-install-types.md#switching-install-types) for the full procedure to remove the existing package and switch to a static build or another install type.
 
 ## Related Docs
 
