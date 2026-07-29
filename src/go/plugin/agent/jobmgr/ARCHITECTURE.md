@@ -42,8 +42,9 @@ Three things can drive it:
 Everything a plugin writes back — metrics, charts, Function registrations, config state, keepalives — leaves through
 **one serialized stdout writer**.
 
-The whole process runs **one active "run generation"** at a time. A reload (SIGHUP) rotates that generation cleanly
-without rebuilding the process itself.
+The whole process runs **one active "run generation"** at a time. A reload (SIGHUP) rotates that generation without
+rebuilding the process when the rotation completes cleanly. If rotation cannot complete safely within its deadline,
+the plugin exits successfully so the daemon starts a fresh process.
 
 ## Where Job Manager Sits
 
@@ -70,7 +71,7 @@ flowchart TD
 
 - `cmd/*plugin/main.go` builds a `RunModePolicy`, registers discovery providers, and calls `agent.New`.
 - `cmd/internal/agenthost/host.go` hosts one process-lifetime Agent and maps OS signals to acknowledged controls:
-  **SIGHUP → `Restart`**, **SIGINT/SIGTERM → `Terminate`** (each bounded to 10s).
+  **SIGHUP → `Restart`** (30s), **SIGINT/SIGTERM → `Terminate`** (10s).
 - `plugin/agent/agent.go` loads config and modules, then calls `composition.NewProcess` and `process.Run(ctx)`.
 
 **Run modes** (`plugin/agent/policy/runmode.go`) flip a few gates:
@@ -291,7 +292,9 @@ stateDiagram-v2
     Probing --> Contained: fuse expires · caller cancels · superseded · run retired
     Admitted --> Contained: cut on retire, supersede, or shutdown
     Contained --> Released: worker finally returns — possibly never
-    Released --> [*]: identity is free again
+    Released --> [*]: safe terminal result — identity is free again
+    Released --> Quarantined: unsafe terminal result
+    Quarantined --> [*]: process exit only
 ```
 
 - **Probing** — the attempt is producing a result and is bounded by the fuse.
@@ -299,15 +302,20 @@ stateDiagram-v2
   a prepared Store mutation, a built Function bundle) until the caller decides.
 - **Contained** — logically settled and cancelled; late output and mutation are fenced. Still physically running.
 - **Released** — `Work` and its cleanup returned. Only now is the identity admissible again.
+- **Quarantined** — the physical work returned, but its terminal outcome made the identity unsafe to reuse. The
+  quarantine is process-lifetime state, not an active attempt, and only process exit clears it.
 
-`Census` reports these counts exactly (`Active`, `Probing`, `Admitted`, `Contained`). Containment is loud and success is
-quiet: entering `Contained`, releasing a contained worker, and a worker panic each emit a diagnostic event, while an
-attempt that admits or returns in time emits none. In long-lived mode, `jobmgr.runtime` also projects the current census
-as aggregate process-attempt gauges.
+`Census` reports these counts exactly (`Active`, `Probing`, `Admitted`, `Contained`, `Quarantined`). Containment is
+loud and success is quiet: entering `Contained`, releasing a contained worker, quarantining an identity, and a worker
+panic each emit a diagnostic event, while an attempt that admits or returns in time emits none. In long-lived mode,
+`jobmgr.runtime` also projects the current census as aggregate process-attempt gauges.
 
 Containment fences execute synchronously before settlement becomes visible. They stay under the authority lock to
 preserve that ordering, but cross a panic boundary: a panic is redacted as `ErrProcessAttemptFencePanic`, joined with
 the original cut cause, and cannot strand the authority mutex.
+
+Terminal outcomes quarantine an identity when an admitted worker fails, ownership remains retained, the worker
+panics, or the containment fence panics. Ordinary pre-admission validation failures release the identity normally.
 
 ### What the fuse actually bounds
 
@@ -363,7 +371,7 @@ remain independently admissible.
 | `job-test` | One DynCfg `test` of a raw job config | name + config hash |
 | `store` | SecretStore validation and generation preparation | epoch + `kind:name` |
 | `store-test` | One DynCfg `test` of a SecretStore config | epoch + `kind:name` + config hash |
-| `function-bundle` | An agent-level module's Function handler bundle plan | epoch + module |
+| `function-bundle` | An agent-level module's Function handler bundle plan | canonical agent-module key |
 | `function-poll` | One Function availability poll | bundle key |
 | `function-invocation` | One Function invocation | bundle key + invocation id |
 | `service-discovery` | Materializing one SD configuration into a pipeline | SD config key |
@@ -864,26 +872,37 @@ Job Manager separates two lifetimes:
   controller/dependency projections, Function catalog projections and publications, the job factory, the autodetection
   scheduler, and the `jobmgr.runtime` metrics.
 
-A **SIGHUP reload evicts the whole tenant and moves a fresh one in without touching the building.**
+A **SIGHUP reload tries to evict the whole tenant and move a fresh one in without touching the building.** The host
+gives the complete rotation one 30-second budget. If it expires, or a quarantined agent-module identity makes an
+in-process successor unsafe, the plugin exits with status 0 and the daemon rebuilds the process. Unexpected
+construction, cleanup, validation, and invariant failures remain failures and exit nonzero.
 
 ```mermaid
 flowchart TD
     HUP("SIGHUP → Restart")
+    Budget("Start one 30s<br/>rotation budget")
     Seal("Seal Store epoch")
     Cut("Cut run-target attempts")
-    Ingress("Seal stdin ingress<br/>publish stopping cut · start budget")
+    Ingress("Seal stdin ingress<br/>publish stopping cut")
     Drain("Drain run-owned work<br/>within shutdown budget")
     Census("Require exact-zero run census<br/>detach projections")
     Next("Construct + adopt<br/>next generation")
     Retained("Process authority retains<br/>non-cooperative physical work")
+    Recover{"Rotation disposition"}
+    Fresh("Exit 0<br/>daemon starts fresh process")
+    Fail("Exit nonzero")
 
-    HUP --> Seal --> Cut --> Ingress --> Drain --> Census --> Next
+    HUP --> Budget --> Seal --> Cut --> Ingress --> Drain --> Census --> Next --> Recover
+    Drain -->|"30s expires"| Recover
+    Recover -->|"success"| NextRun("Successor running")
+    Recover -->|"deadline or explicit<br/>restart-required quarantine"| Fresh
+    Recover -->|"unexpected failure"| Fail
     Cut -. "physical release later" .-> Retained
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
-    class HUP ext;
-    class Seal,Cut,Ingress,Drain,Census,Next,Retained core;
+    class HUP,Fresh,Fail ext;
+    class Budget,Seal,Cut,Ingress,Drain,Census,Next,Retained,Recover,NextRun core;
 ```
 
 The rotation is an acknowledged sequence (`composition/process.go`, `retireForSuccessor`):
@@ -891,24 +910,37 @@ The rotation is an acknowledged sequence (`composition/process.go`, `retireForSu
 1. **Seal the old Store epoch**, so no new old-run mutation can commit.
 2. **Cut every process attempt targeting the retiring run.** Their callers settle immediately; their physical workers
    stay process-owned.
-3. **Seal stdin ingress**, stop the run, and start the single shutdown budget.
+3. **Seal stdin ingress** and arm the run shutdown budget from the remaining caller-owned rotation deadline before
+   stopping the run.
 4. **Drain run-owned work** — tasks, claims, permits, retries, Function publications, and projections — then drain
    paused ingress. A process-owned worker that ignores cancellation remains in the process census, not the retired run
    census.
 5. **Require a fully drained run authority census** and finish the run finalizer. Live run-owned leftovers still make
-   the terminal state dirty; process-owned retained work does not fabricate run ownership.
+   the terminal state dirty; process-owned retained work does not fabricate run ownership. If an ordinary frame write
+   is the only remaining owner, the kernel arms one shutdown-only idle notification before sleeping. Frame completion
+   wakes the kernel to recensus; the terminal decision validates that same snapshot rather than taking a racy second
+   census.
 6. **Construct, start, and adopt the next generation.** Restart acknowledges only after the successor run is running.
-   If an old installed collector runtime is still retained, its job remains unavailable/pending in the new run until
-   the physical identity releases.
+   Startup uses the rotation context, but the accepted kernel uses the process context; cancelling an acknowledged
+   restart therefore cannot stop the new run.
+7. **Classify an incomplete rotation at the host boundary.** Deadline expiry and an explicit process-restart-required
+   identity quarantine return status 0 so the daemon restarts the plugin. Mixed or unexpected failures remain visible
+   as status 1. There is no degraded generation and no second shutdown phase after the rotation deadline.
+
+An old installed collector runtime that is still retained leaves its job unavailable/pending in the new run until the
+physical identity releases. Agent-level module Function bundles are different: their identity is canonical across
+generations. A released-but-quarantined module bundle cannot be reconstructed safely in the same process, so rotation
+requests a fresh process instead of bypassing the quarantine with an epoch-specific key.
 
 The process command receiver exists during initial startup and rotation. `Terminate` can cancel an active transition
 instead of waiting behind its startup barrier.
 
 **Termination** (SIGINT/SIGTERM) follows the same retirement path with no successor, then begins process-authority
-shutdown. It reports retained physical work after the bounded shutdown budget rather than waiting forever; only actual
-process exit can reclaim a permanently blocked goroutine. After the authority drains or the budget expires, the
-process terminally fences accepted-cleanup output before finalizing the output service. A contained collector that
-returns later still releases its resources, but cannot emit a late terminal frame.
+shutdown. The host uses one total 10-second budget for both the `Terminate` acknowledgement and waiting for the run
+loop; it does not start a second 10-second wait. It reports retained physical work after the budget rather than waiting
+forever; only actual process exit can reclaim a permanently blocked goroutine. After the authority drains or the
+budget expires, the process terminally fences accepted-cleanup output before finalizing the output service. A
+contained collector that returns later still releases its resources, but cannot emit a late terminal frame.
 
 ## Runtime Metrics
 

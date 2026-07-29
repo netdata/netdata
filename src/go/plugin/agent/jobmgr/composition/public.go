@@ -26,7 +26,49 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var ErrProcessStopped = errors.New("jobmgr composition: process stopped")
+var (
+	ErrProcessStopped         = errors.New("jobmgr composition: process stopped")
+	ErrProcessRestartRequired = errors.New("jobmgr composition: process restart required")
+)
+
+// ContainsOnlyProcessControlErrors reports whether every leaf in err matches
+// one of the allowed control dispositions. Mixed and malformed trees fail
+// closed.
+func ContainsOnlyProcessControlErrors(err error, allowed ...error) bool {
+	if err == nil || len(allowed) == 0 {
+		return false
+	}
+	leaves := 0
+	var visit func(error, int) bool
+	visit = func(current error, depth int) bool {
+		if current == nil || depth > 32 {
+			return false
+		}
+		if joined, ok := current.(interface{ Unwrap() []error }); ok {
+			children := joined.Unwrap()
+			if len(children) == 0 {
+				return false
+			}
+			for _, child := range children {
+				if !visit(child, depth+1) {
+					return false
+				}
+			}
+			return true
+		}
+		if wrapped, ok := current.(interface{ Unwrap() error }); ok {
+			return visit(wrapped.Unwrap(), depth+1)
+		}
+		leaves++
+		for _, candidate := range allowed {
+			if candidate != nil && errors.Is(current, candidate) {
+				return true
+			}
+		}
+		return false
+	}
+	return visit(err, 0) && leaves > 0
+}
 
 type RuntimeService interface {
 	runtimecomp.Service
@@ -230,6 +272,7 @@ func (p *Process) send(ctx context.Context, controls chan<- processControl) erro
 	result := make(chan error, 1)
 	select {
 	case controls <- processControl{
+		ctx:    ctx,
 		result: result,
 	}:
 	case <-p.done:

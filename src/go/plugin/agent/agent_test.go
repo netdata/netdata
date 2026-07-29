@@ -5,6 +5,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
@@ -31,6 +33,13 @@ func TestNew(t *testing.T) {
 		a := New(Config{Name: "test"})
 		assert.Nil(t, a.ModuleRegistry)
 	})
+}
+
+func TestNormalizeProcessControlErrorChecksEveryLeaf(t *testing.T) {
+	unexpected := errors.New("unexpected")
+	mixed := errors.Join(composition.ErrProcessStopped, unexpected)
+	require.ErrorIs(t, normalizeProcessControlError(composition.ErrProcessStopped), ErrNotRunning)
+	require.Equal(t, mixed, normalizeProcessControlError(mixed))
 }
 
 func TestAgent_serviceDiscoveryEnabled(t *testing.T) {

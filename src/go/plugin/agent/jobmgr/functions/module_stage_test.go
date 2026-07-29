@@ -98,7 +98,7 @@ func TestContainedControllerConstructionSettlesWhileModuleCallbackRemainsOwned(t
 
 	identity := jobmgr.ProcessAttemptIdentity{
 		Namespace: jobmgr.ProcessAttemptFunctionBundle,
-		Key:       "1/module/agent",
+		Key:       modulePlanAttemptIdentity("module").Key,
 		Resource:  "module",
 	}
 	released, ok := attempts.ProcessAttemptReleased(identity)
@@ -141,7 +141,7 @@ func TestContainedControllerAbortDoesNotWaitForHandlerCleanup(t *testing.T) {
 
 	identity := jobmgr.ProcessAttemptIdentity{
 		Namespace: jobmgr.ProcessAttemptFunctionBundle,
-		Key:       "1/module/agent",
+		Key:       modulePlanAttemptIdentity("module").Key,
 		Resource:  "module",
 	}
 	released, ok := attempts.ProcessAttemptReleased(identity)
@@ -149,6 +149,87 @@ func TestContainedControllerAbortDoesNotWaitForHandlerCleanup(t *testing.T) {
 	close(handler.cleanupRelease)
 	<-released
 	require.EqualValues(t, containment.Census{}, attempts.Census())
+}
+
+func TestContainedControllerWaitsForPriorEpochModuleRelease(t *testing.T) {
+	handler := &moduleStageBlockingHandler{
+		cleanupEntered: make(chan struct{}),
+		cleanupRelease: make(chan struct{}),
+	}
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	modules := collectorapi.Registry{
+		"module": {
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return handler
+			},
+		},
+	}
+	first, _, err := NewContainedController(context.Background(), 1, attempts, modules)
+	require.NoError(t, err)
+	require.NoError(t, first.AbortConstruction(context.Background()))
+	<-handler.cleanupEntered
+
+	type controllerResult struct {
+		controller *Controller
+		err        error
+	}
+	secondResult := make(chan controllerResult, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go func() {
+		controller, _, buildErr := NewContainedController(ctx, 2, attempts, modules)
+		secondResult <- controllerResult{controller: controller, err: buildErr}
+	}()
+	select {
+	case result := <-secondResult:
+		if result.controller != nil {
+			_ = result.controller.AbortConstruction(context.Background())
+		}
+		require.FailNow(t, "test failed", "successor module overlapped prior cleanup")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	close(handler.cleanupRelease)
+	result := <-secondResult
+	require.NoError(t, result.err)
+	require.NotNil(t, result.controller)
+	require.NoError(t, result.controller.AbortConstruction(context.Background()))
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
+	require.NoError(t, attempts.Shutdown(context.Background()))
+}
+
+func TestContainedControllerRejectsPriorEpochModuleQuarantine(t *testing.T) {
+	handler := &moduleStagePanicCleanupHandler{}
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	modules := collectorapi.Registry{
+		"module": {
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return handler
+			},
+		},
+	}
+	first, _, err := NewContainedController(context.Background(), 1, attempts, modules)
+	require.NoError(t, err)
+	require.NoError(t, first.AbortConstruction(context.Background()))
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{Quarantined: 1})
+	}, time.Second, time.Millisecond)
+
+	second, _, err := NewContainedController(context.Background(), 2, attempts, modules)
+	require.Nil(t, second)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
+	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+	require.NoError(t, attempts.Shutdown(context.Background()))
 }
 
 func TestContainedControllerCanceledAfterModuleAdmissionCleansAbandonedPlan(t *testing.T) {
@@ -197,6 +278,27 @@ type moduleStageBlockingHandler struct {
 	cleanupEntered chan struct{}
 	cleanupRelease chan struct{}
 	cleanupOnce    sync.Once
+}
+
+type moduleStagePanicCleanupHandler struct{}
+
+func (*moduleStagePanicCleanupHandler) MethodParams(
+	context.Context,
+	string,
+) ([]funcapi.ParamConfig, error) {
+	return nil, nil
+}
+
+func (*moduleStagePanicCleanupHandler) Handle(
+	context.Context,
+	string,
+	funcapi.ResolvedParams,
+) *funcapi.FunctionResponse {
+	return &funcapi.FunctionResponse{Status: 200}
+}
+
+func (*moduleStagePanicCleanupHandler) Cleanup(context.Context) {
+	panic("cleanup failed")
 }
 
 func (*moduleStageBlockingHandler) MethodParams(

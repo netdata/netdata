@@ -22,7 +22,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-var ErrNotRunning = errors.New("agent: process is not running")
+var (
+	ErrNotRunning             = errors.New("agent: process is not running")
+	ErrProcessRestartRequired = composition.ErrProcessRestartRequired
+)
 
 // Config is an Agent configuration.
 type Config struct {
@@ -136,10 +139,14 @@ func (a *Agent) Terminate(ctx context.Context) error {
 }
 
 func normalizeProcessControlError(err error) error {
-	if errors.Is(err, composition.ErrProcessStopped) {
+	if composition.ContainsOnlyProcessControlErrors(err, composition.ErrProcessStopped) {
 		return ErrNotRunning
 	}
 	return err
+}
+
+func ContainsOnlyProcessControlErrors(err error, allowed ...error) bool {
+	return composition.ContainsOnlyProcessControlErrors(err, allowed...)
 }
 
 func (a *Agent) run(ctx context.Context) error {

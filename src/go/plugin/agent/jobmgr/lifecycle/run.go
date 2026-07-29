@@ -118,6 +118,18 @@ func (rs *RunSupervisor) OpenAdmission() error {
 }
 
 func (rs *RunSupervisor) BeginShutdown() (*ShutdownBudget, error) {
+	return rs.beginShutdown(rs.timeout)
+}
+
+// BeginShutdownWithTimeout starts the one run shutdown budget with a
+// caller-owned remaining duration. Repeated calls preserve the first budget.
+func (rs *RunSupervisor) BeginShutdownWithTimeout(
+	timeout time.Duration,
+) (*ShutdownBudget, error) {
+	return rs.beginShutdown(timeout)
+}
+
+func (rs *RunSupervisor) beginShutdown(timeout time.Duration) (*ShutdownBudget, error) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	if rs.shutdown != nil {
@@ -126,8 +138,11 @@ func (rs *RunSupervisor) BeginShutdown() (*ShutdownBudget, error) {
 	if rs.terminal {
 		return nil, errors.New("jobmgr run supervisor: shutdown after terminal")
 	}
+	if timeout <= 0 {
+		return nil, errors.New("jobmgr run supervisor: invalid shutdown budget")
+	}
 	rs.publishStoppingLocked()
-	budget, err := newShutdownBudget(rs.clock, rs.timeout)
+	budget, err := newShutdownBudget(rs.clock, timeout)
 	if err != nil {
 		return nil, err
 	}

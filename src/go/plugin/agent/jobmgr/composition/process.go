@@ -18,6 +18,7 @@ import (
 )
 
 type processControl struct {
+	ctx    context.Context
 	result chan error
 }
 
@@ -135,7 +136,7 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 	var generation *runGeneration
 	quit := false
 	markQuit := func() { quit = true }
-	transition := pc.beginStartTransition(ctx, generationID, markQuit, nil)
+	transition := pc.beginStartTransition(ctx, ctx, generationID, markQuit, nil)
 	var supersedingInitial *processControl
 	var terminatingControl *processControl
 	var terminalCause error
@@ -223,20 +224,31 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 					control.result <- finalErr
 					return finalErr
 				}
-				retireErr := pc.retireForSuccessor(result.generation, active.target, nextID)
+				retireErr := pc.retireForSuccessor(control.ctx, result.generation, active.target, nextID)
 				transitionErr := errors.Join(result.err, retireErr)
 				if transitionErr != nil && !processTransitionCancellationOnly(transitionErr) {
+					disposition := processRestartRecoveryDisposition(transitionErr)
+					if disposition != nil {
+						control.result <- disposition
+					}
 					finalErr := pc.finalize(result.generation, transitionErr)
-					control.result <- finalErr
+					if disposition == nil {
+						control.result <- finalErr
+					}
 					return finalErr
 				}
 				generationID = nextID
-				transition = pc.beginStartTransition(ctx, nextID, markQuit, control)
+				transition = pc.beginStartTransition(control.ctx, ctx, nextID, markQuit, control)
 				continue
 			}
 
 			if result.err != nil {
 				active.cancel(errProcessTransitionInterrupted)
+				if disposition := processRestartRecoveryDisposition(result.err); disposition != nil &&
+					active.control != nil {
+					active.control.result <- disposition
+					active.control = nil
+				}
 				finalErr := pc.finalize(result.generation, result.err)
 				if active.control != nil {
 					active.control.result <- finalErr
@@ -250,7 +262,7 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 				active.control.result <- nil
 			}
 		case control := <-restartControls:
-			if control.result == nil {
+			if control.ctx == nil || control.result == nil {
 				finalErr := pc.finalize(generation, errors.New("jobmgr composition: invalid restart control"))
 				return finalErr
 			}
@@ -265,10 +277,10 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 				control.result <- finalErr
 				return finalErr
 			}
-			transition = pc.beginRotateTransition(ctx, generation, nextID, markQuit, control)
+			transition = pc.beginRotateTransition(control.ctx, ctx, generation, nextID, markQuit, control)
 			generation = nil
 		case control := <-terminateControls:
-			if control.result == nil {
+			if control.ctx == nil || control.result == nil {
 				cause := errors.New("jobmgr composition: invalid terminate control")
 				if transition == nil {
 					return pc.finalize(generation, cause)
@@ -339,46 +351,44 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 }
 
 func processTransitionCancellationOnly(err error) bool {
-	if err == nil {
-		return false
+	return ContainsOnlyProcessControlErrors(
+		err,
+		errProcessTransitionInterrupted,
+		context.Canceled,
+	)
+}
+
+func processRestartRecoveryDisposition(err error) error {
+	if !ContainsOnlyProcessControlErrors(
+		err,
+		errProcessTransitionInterrupted,
+		context.Canceled,
+		context.DeadlineExceeded,
+		ErrProcessRestartRequired,
+	) {
+		return nil
 	}
-	leaves := 0
-	var visit func(error, int) bool
-	visit = func(current error, depth int) bool {
-		if current == nil || depth > 32 {
-			return false
-		}
-		if joined, ok := current.(interface{ Unwrap() []error }); ok {
-			children := joined.Unwrap()
-			if len(children) == 0 {
-				return false
-			}
-			for _, child := range children {
-				if !visit(child, depth+1) {
-					return false
-				}
-			}
-			return true
-		}
-		if wrapped, ok := current.(interface{ Unwrap() error }); ok {
-			return visit(wrapped.Unwrap(), depth+1)
-		}
-		leaves++
-		return current == errProcessTransitionInterrupted || current == context.Canceled
+	var disposition error
+	if errors.Is(err, context.DeadlineExceeded) {
+		disposition = context.DeadlineExceeded
 	}
-	return visit(err, 0) && leaves > 0
+	if errors.Is(err, ErrProcessRestartRequired) {
+		disposition = errors.Join(disposition, ErrProcessRestartRequired)
+	}
+	return disposition
 }
 
 func (pc *processCore) beginStartTransition(
-	parent context.Context,
+	startupParent context.Context,
+	runParent context.Context,
 	target uint64,
 	quit func(),
 	control *processControl,
 ) *processTransition {
-	ctx, cancel := context.WithCancelCause(parent)
+	ctx, cancel := context.WithCancelCause(startupParent)
 	done := make(chan processTransitionResult, 1)
 	go func() {
-		generation, err := pc.startGeneration(ctx, target, quit)
+		generation, err := pc.startGeneration(ctx, runParent, target, quit)
 		done <- processTransitionResult{
 			generation: generation,
 			err:        err,
@@ -393,16 +403,17 @@ func (pc *processCore) beginStartTransition(
 }
 
 func (pc *processCore) beginRotateTransition(
-	parent context.Context,
+	startupParent context.Context,
+	runParent context.Context,
 	current *runGeneration,
 	target uint64,
 	quit func(),
 	control processControl,
 ) *processTransition {
-	ctx, cancel := context.WithCancelCause(parent)
+	ctx, cancel := context.WithCancelCause(startupParent)
 	done := make(chan processTransitionResult, 1)
 	go func() {
-		generation, err := pc.rotate(ctx, current, target, quit)
+		generation, err := pc.rotate(ctx, runParent, current, target, quit)
 		done <- processTransitionResult{
 			generation: generation,
 			err:        err,
@@ -417,22 +428,23 @@ func (pc *processCore) beginRotateTransition(
 }
 
 func (pc *processCore) startGeneration(
-	ctx context.Context,
+	startupCtx context.Context,
+	runCtx context.Context,
 	generationID uint64,
 	quit func(),
 ) (*runGeneration, error) {
-	generation, err := pc.newRun(ctx, generationID)
+	generation, err := pc.newRun(startupCtx, generationID)
 	if err != nil {
 		return nil, err
 	}
-	if err := generation.start(ctx); err != nil {
+	if err := generation.startWithRunContext(startupCtx, runCtx); err != nil {
 		return generation, err
 	}
 	binding, err := pc.binding(generation, quit)
 	if err != nil {
 		return generation, err
 	}
-	if err := pc.ingress.Adopt(ctx, binding); err != nil {
+	if err := pc.ingress.Adopt(startupCtx, binding); err != nil {
 		return generation, err
 	}
 	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
@@ -484,7 +496,8 @@ func (pc *processCore) binding(generation *runGeneration, quit func()) (function
 }
 
 func (pc *processCore) rotate(
-	ctx context.Context,
+	startupCtx context.Context,
+	runCtx context.Context,
 	current *runGeneration,
 	nextID uint64,
 	quit func(),
@@ -495,11 +508,14 @@ func (pc *processCore) rotate(
 		Generation: current.run.Generation(),
 		State:      "rotating",
 	})
-	if err := pc.retireForSuccessor(current, current.run.Generation(), nextID); err != nil {
+	if err := pc.retireForSuccessor(startupCtx, current, current.run.Generation(), nextID); err != nil {
 		return current, err
 	}
-	next, err := pc.startGeneration(ctx, nextID, quit)
+	next, err := pc.startGeneration(startupCtx, runCtx, nextID, quit)
 	if err != nil {
+		if processRestartRequiresProcessExit(err) {
+			return next, ErrProcessRestartRequired
+		}
 		return next, err
 	}
 	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
@@ -512,10 +528,14 @@ func (pc *processCore) rotate(
 }
 
 func (pc *processCore) retireForSuccessor(
+	ctx context.Context,
 	current *runGeneration,
 	retiringTarget uint64,
 	nextID uint64,
 ) error {
+	if ctx == nil {
+		return errors.New("jobmgr composition: invalid successor retirement context")
+	}
 	if current != nil {
 		if err := pc.storeEpochs.seal(current.secretEpoch); err != nil {
 			pc.storeEpochs.observeFailure(
@@ -540,11 +560,21 @@ func (pc *processCore) retireForSuccessor(
 			return err
 		}
 	}
-	current.Stop()
-	budget, err := current.run.BeginShutdown()
+	var budget *lifecycle.ShutdownBudget
+	var err error
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return context.Cause(ctx)
+		}
+		budget, err = current.run.BeginShutdownWithTimeout(remaining)
+	} else {
+		budget, err = current.run.BeginShutdown()
+	}
 	if err != nil {
 		return err
 	}
+	current.Stop()
 	shutdownCtx := budget.Context()
 	if ingressLive {
 		if err := pc.ingress.DrainPause(shutdownCtx, nextID); err != nil {
@@ -555,6 +585,16 @@ func (pc *processCore) retireForSuccessor(
 		return err
 	}
 	return current.run.FinishShutdown()
+}
+
+func processRestartRequiresProcessExit(err error) bool {
+	// A mixed tree is unexpected and must not be hidden behind a clean restart.
+	return ContainsOnlyProcessControlErrors(
+		err,
+		jobmgr.ErrProcessAttemptQuarantined,
+		jobmgr.ErrProcessAttemptWorkerPanic,
+		jobmgr.ErrProcessAttemptFencePanic,
+	)
 }
 
 func (pc *processCore) finalize(current *runGeneration, cause error) error {

@@ -341,7 +341,16 @@ func abortRunConstruction(
 }
 
 func (rg *runGeneration) start(ctx context.Context) error {
-	if rg == nil || ctx == nil {
+	return rg.startWithRunContext(ctx, ctx)
+}
+
+// Startup may be deadline-bounded by a restart without making that control
+// context the lifetime of the accepted kernel.
+func (rg *runGeneration) startWithRunContext(
+	startupCtx context.Context,
+	runCtx context.Context,
+) error {
+	if rg == nil || startupCtx == nil || runCtx == nil {
 		return errors.New("jobmgr composition: invalid run start")
 	}
 	rg.mu.Lock()
@@ -351,7 +360,7 @@ func (rg *runGeneration) start(ctx context.Context) error {
 	}
 	rg.startedAttempted = true
 	rg.mu.Unlock()
-	if err := rg.kernel.Start(ctx); err != nil {
+	if err := rg.kernel.Start(runCtx); err != nil {
 		return errors.Join(err, rg.abortConstruction())
 	}
 	rg.mu.Lock()
@@ -379,17 +388,17 @@ func (rg *runGeneration) start(ctx context.Context) error {
 		rg.Stop()
 		return err
 	}
-	if err := rg.vnodes.publishInitial(ctx, rg.kernel); err != nil {
-		return rg.stopAfterStartFailure(ctx, err)
+	if err := rg.vnodes.publishInitial(startupCtx, rg.kernel); err != nil {
+		return rg.stopAfterStartFailure(startupCtx, err)
 	}
-	if err := rg.secrets.PublishInitial(ctx, rg.kernel); err != nil {
-		return rg.stopAfterStartFailure(ctx, err)
+	if err := rg.secrets.PublishInitial(startupCtx, rg.kernel); err != nil {
+		return rg.stopAfterStartFailure(startupCtx, err)
 	}
-	if err := rg.dyncfg.PublishInitial(ctx, rg.kernel, rg.run.Generation()); err != nil {
-		return rg.stopAfterStartFailure(ctx, err)
+	if err := rg.dyncfg.PublishInitial(startupCtx, rg.kernel, rg.run.Generation()); err != nil {
+		return rg.stopAfterStartFailure(startupCtx, err)
 	}
-	if err := rg.startDiscovery(ctx); err != nil {
-		return rg.stopAfterStartFailure(ctx, err)
+	if err := rg.startDiscovery(startupCtx); err != nil {
+		return rg.stopAfterStartFailure(startupCtx, err)
 	}
 	return nil
 }

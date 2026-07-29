@@ -105,6 +105,25 @@ func TestRunSupervisorOwnsOneBroadcastShutdownBudget(t *testing.T) {
 	require.EqualValues(t, 1, cancels)
 }
 
+func TestRunSupervisorUsesCallerSuppliedShutdownTimeout(t *testing.T) {
+	clock := newShutdownTestClock()
+	run, err := NewRunSupervisor(7, clock, 10*time.Second)
+	require.NoError(t, err)
+
+	budget, err := run.BeginShutdownWithTimeout(30 * time.Second)
+	require.NoError(t, err)
+	deadline, ok := budget.Context().Deadline()
+	require.True(t, ok)
+	require.Equal(t, time.Unix(130, 0), deadline)
+
+	clock.mu.Lock()
+	arms, delay := clock.arms, clock.delay
+	clock.mu.Unlock()
+	require.EqualValues(t, 1, arms)
+	require.Equal(t, 30*time.Second, delay)
+	require.NoError(t, run.FinishShutdown())
+}
+
 func TestRunSupervisorPublishesOneGenerationStoppingCut(t *testing.T) {
 	tests := map[string]struct {
 		stop func(*testing.T, *RunSupervisor)

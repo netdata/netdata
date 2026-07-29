@@ -5,7 +5,6 @@ package functions
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"sync"
 	"unicode/utf8"
@@ -108,7 +107,7 @@ func prepareContainedModulePlans(
 	slices.Sort(names)
 	stages := make([]modulePlanStage, 0, len(names))
 	for _, module := range names {
-		stage, err := startModulePlanStage(epoch, attempts, module, modules[module])
+		stage, err := startModulePlanStage(ctx, epoch, attempts, module, modules[module])
 		if err != nil {
 			releaseModulePlanStages(stages)
 			return nil, err
@@ -163,84 +162,115 @@ func acceptModulePlanResult(ctx context.Context, result *modulePlanResult) error
 }
 
 func startModulePlanStage(
+	ctx context.Context,
 	epoch uint64,
 	attempts jobmgr.ProcessAttemptAuthority,
 	module string,
 	creator collectorapi.Creator,
 ) (modulePlanStage, error) {
-	result := make(chan modulePlanResult, 1)
-	settled := make(chan error, 1)
-	attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
-		Identity: jobmgr.ProcessAttemptIdentity{
-			Namespace: jobmgr.ProcessAttemptFunctionBundle,
-			Key:       fmt.Sprintf("%d/%s/agent", epoch, module),
-			Resource:  candidateFunctionResource(module),
-		},
-		Target: epoch,
-		Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
-			plan, buildErr := buildControllerModulePlan(module, creator)
-			if buildErr != nil {
-				result <- modulePlanResult{err: buildErr}
-				return buildErr
-			}
-			if bindErr := plan.agentBundle.bindContainment(
-				attempts,
-				epoch,
-				fmt.Sprintf("%d/%s/agent", epoch, module),
-				candidateFunctionResource(module),
-			); bindErr != nil {
-				plan.agentBundle.retire()
-				cleanupErr := plan.agentBundle.wait(context.Background())
-				bindErr = joinRetainedBundleCleanup(bindErr, cleanupErr)
-				result <- modulePlanResult{err: bindErr}
-				return bindErr
-			}
-			if admitErr := admission.Admit(); admitErr != nil {
-				plan.agentBundle.retire()
-				cleanupErr := plan.agentBundle.wait(context.Background())
-				return joinRetainedBundleCleanup(admitErr, cleanupErr)
-			}
-			if plan.agentBundle.handler != nil {
-				plan.owner = newModulePlanOwner()
-			}
-			transfer := newModulePlanTransfer()
-			result <- modulePlanResult{
-				plan:     plan,
-				transfer: transfer,
-			}
-			select {
-			case <-transfer.decided:
-			case <-ctx.Done():
-				transfer.Abandon()
-				<-transfer.decided
-			}
-			if !transfer.wasAccepted() {
-				plan.agentBundle.retire()
-				return joinRetainedBundleCleanup(
-					nil,
-					plan.agentBundle.wait(context.Background()),
-				)
-			}
-			if plan.owner == nil {
-				return nil
-			}
-			<-plan.owner.done
-			plan.agentBundle.retire()
-			return plan.agentBundle.wait(context.Background())
-		},
-	})
-	if err != nil {
-		return modulePlanStage{}, err
+	if ctx == nil {
+		return modulePlanStage{}, errors.New("jobmgr Function controller: invalid module-plan context")
 	}
-	go func() {
-		settled <- attempt.Await(context.Background())
-	}()
-	return modulePlanStage{
-		module:  module,
-		attempt: attempt,
-		result:  result,
-		settled: settled,
-	}, nil
+	if cause := context.Cause(ctx); cause != nil {
+		return modulePlanStage{}, cause
+	}
+	identity := modulePlanAttemptIdentity(module)
+	start := func() (modulePlanStage, error) {
+		result := make(chan modulePlanResult, 1)
+		settled := make(chan error, 1)
+		attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+			Identity: identity,
+			Target:   epoch,
+			Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+				plan, buildErr := buildControllerModulePlan(module, creator)
+				if buildErr != nil {
+					result <- modulePlanResult{err: buildErr}
+					return buildErr
+				}
+				if bindErr := plan.agentBundle.bindContainment(
+					attempts,
+					epoch,
+					identity.Key,
+					identity.Resource,
+				); bindErr != nil {
+					plan.agentBundle.retire()
+					cleanupErr := plan.agentBundle.wait(context.Background())
+					bindErr = joinRetainedBundleCleanup(bindErr, cleanupErr)
+					result <- modulePlanResult{err: bindErr}
+					return bindErr
+				}
+				if admitErr := admission.Admit(); admitErr != nil {
+					plan.agentBundle.retire()
+					cleanupErr := plan.agentBundle.wait(context.Background())
+					return joinRetainedBundleCleanup(admitErr, cleanupErr)
+				}
+				if plan.agentBundle.handler != nil {
+					plan.owner = newModulePlanOwner()
+				}
+				transfer := newModulePlanTransfer()
+				result <- modulePlanResult{
+					plan:     plan,
+					transfer: transfer,
+				}
+				select {
+				case <-transfer.decided:
+				case <-ctx.Done():
+					transfer.Abandon()
+					<-transfer.decided
+				}
+				if !transfer.wasAccepted() {
+					plan.agentBundle.retire()
+					return joinRetainedBundleCleanup(
+						nil,
+						plan.agentBundle.wait(context.Background()),
+					)
+				}
+				if plan.owner == nil {
+					return nil
+				}
+				<-plan.owner.done
+				plan.agentBundle.retire()
+				return plan.agentBundle.wait(context.Background())
+			},
+		})
+		if err != nil {
+			return modulePlanStage{}, err
+		}
+		go func() {
+			settled <- attempt.Await(context.Background())
+		}()
+		return modulePlanStage{
+			module:  module,
+			attempt: attempt,
+			result:  result,
+			settled: settled,
+		}, nil
+	}
+
+	stage, err := start()
+	if !errors.Is(err, jobmgr.ErrProcessAttemptBusy) {
+		return stage, err
+	}
+	released, occupied := attempts.ProcessAttemptReleased(identity)
+	if occupied {
+		select {
+		case <-released:
+		case <-ctx.Done():
+			return modulePlanStage{}, context.Cause(ctx)
+		}
+	}
+	if cause := context.Cause(ctx); cause != nil {
+		return modulePlanStage{}, cause
+	}
+	return start()
+}
+
+func modulePlanAttemptIdentity(module string) jobmgr.ProcessAttemptIdentity {
+	return jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptFunctionBundle,
+		Key:       "agent\x00" + module,
+		Resource:  candidateFunctionResource(module),
+	}
 }
 
 func buildControllerModulePlan(

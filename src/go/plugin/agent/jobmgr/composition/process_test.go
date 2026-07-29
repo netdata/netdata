@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -316,6 +317,128 @@ func TestProcessTransitionCancellationClassificationRejectsMixedFailures(t *test
 	}
 }
 
+func TestProcessControlErrorClassificationChecksEveryLeaf(t *testing.T) {
+	unexpected := errors.New("unexpected")
+	tests := map[string]struct {
+		err     error
+		allowed []error
+		want    bool
+	}{
+		"nil": {
+			allowed: []error{context.Canceled},
+		},
+		"single": {
+			err:     context.Canceled,
+			allowed: []error{context.Canceled},
+			want:    true,
+		},
+		"wrapped": {
+			err:     fmt.Errorf("wrapped: %w", context.Canceled),
+			allowed: []error{context.Canceled},
+			want:    true,
+		},
+		"joined allowed": {
+			err:     errors.Join(context.Canceled, context.DeadlineExceeded),
+			allowed: []error{context.Canceled, context.DeadlineExceeded},
+			want:    true,
+		},
+		"mixed": {
+			err:     errors.Join(context.Canceled, unexpected),
+			allowed: []error{context.Canceled},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, test.want, ContainsOnlyProcessControlErrors(test.err, test.allowed...))
+		})
+	}
+}
+
+func TestProcessRestartRecoveryDispositionRejectsMixedFailures(t *testing.T) {
+	unexpected := errors.New("unexpected")
+	tests := map[string]struct {
+		err  error
+		want error
+	}{
+		"deadline": {
+			err:  context.DeadlineExceeded,
+			want: context.DeadlineExceeded,
+		},
+		"restart required": {
+			err:  ErrProcessRestartRequired,
+			want: ErrProcessRestartRequired,
+		},
+		"initial cancellation then deadline": {
+			err: errors.Join(
+				errProcessTransitionInterrupted,
+				context.Canceled,
+				context.DeadlineExceeded,
+			),
+			want: context.DeadlineExceeded,
+		},
+		"cancellation only": {
+			err: errors.Join(errProcessTransitionInterrupted, context.Canceled),
+		},
+		"deadline plus unexpected": {
+			err: errors.Join(context.DeadlineExceeded, unexpected),
+		},
+		"restart required plus unexpected": {
+			err: errors.Join(ErrProcessRestartRequired, unexpected),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			disposition := processRestartRecoveryDisposition(test.err)
+			if test.want == nil {
+				require.NoError(t, disposition)
+				return
+			}
+			require.ErrorIs(t, disposition, test.want)
+		})
+	}
+}
+
+func TestProcessRestartRequiresProcessExitOnlyForContainmentFailures(t *testing.T) {
+	unexpected := errors.New("unexpected")
+	tests := map[string]struct {
+		err  error
+		want bool
+	}{
+		"quarantined identity": {
+			err:  jobmgr.ErrProcessAttemptQuarantined,
+			want: true,
+		},
+		"quarantined worker panic": {
+			err: errors.Join(
+				jobmgr.ErrProcessAttemptQuarantined,
+				jobmgr.ErrProcessAttemptWorkerPanic,
+			),
+			want: true,
+		},
+		"quarantined fence panic": {
+			err: errors.Join(
+				jobmgr.ErrProcessAttemptQuarantined,
+				jobmgr.ErrProcessAttemptFencePanic,
+			),
+			want: true,
+		},
+		"unexpected failure": {
+			err: unexpected,
+		},
+		"quarantine plus unexpected failure": {
+			err: errors.Join(
+				jobmgr.ErrProcessAttemptQuarantined,
+				unexpected,
+			),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, test.want, processRestartRequiresProcessExit(test.err))
+		})
+	}
+}
+
 func TestProcessCoreServiceDiscoveryMutationSendsFunctionResultBeforeStatus(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
@@ -568,6 +691,54 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "process did not exit after retained discovery provider")
 	}
+}
+
+func TestProcessCoreRequestsFreshProcessForQuarantinedModule(t *testing.T) {
+	reader, writer := io.Pipe()
+	defer func() { require.NoError(t, writer.Close()) }()
+	diagnostics := &recordingCompositionDiagnosticObserver{}
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          newProcessSynchronizedBuffer(),
+		ShutdownTimeout: time.Second,
+		Modules: collectorapi.Registry{
+			"module": {
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "method"}}
+				},
+				MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+					return &runTestHandler{
+						cleanup: func() { panic("cleanup failed") },
+					}
+				},
+			},
+		},
+		Jobs:        testRunJobServices(t),
+		Discovery:   testRunDiscoveryServices(t),
+		Diagnostics: diagnostics,
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	require.Eventually(t, func() bool {
+		for _, event := range diagnostics.snapshot() {
+			if event.Name == "job manager generation started" && event.Generation == 1 {
+				return true
+			}
+		}
+		return false
+	}, time.Second, time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	control := testProcessControl()
+	control.ctx = ctx
+	controls.sendRestart(control)
+	require.ErrorIs(t, <-control.result, ErrProcessRestartRequired)
+	require.Error(t, <-done)
 }
 
 func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
@@ -892,6 +1063,7 @@ func waitProcessEvent(t *testing.T, events <-chan string, want string) {
 
 func testProcessControl() processControl {
 	return processControl{
+		ctx:    context.Background(),
 		result: make(chan error, 1),
 	}
 }
