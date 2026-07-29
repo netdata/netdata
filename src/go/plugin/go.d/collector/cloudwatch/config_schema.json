@@ -860,12 +860,11 @@
     "ui:options": {
       "tabs": [
         {
-          "title": "Base",
+          "title": "Collection",
           "fields": [
             "update_every",
             "autodetection_retry",
-            "timeout",
-            "limits"
+            "timeout"
           ]
         },
         {
@@ -881,16 +880,22 @@
           ]
         },
         {
-          "title": "Collection Rules",
+          "title": "Rules",
           "fields": [
             "rule_defaults",
             "rules"
           ]
         },
         {
-          "title": "Resource Tags",
+          "title": "Resource Labels",
           "fields": [
             "labels"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "limits"
           ]
         },
         {
