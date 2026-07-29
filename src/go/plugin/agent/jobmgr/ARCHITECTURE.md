@@ -271,7 +271,9 @@ Which mechanism each command surface uses:
 - **An ordinary timed-out run task keeps run ownership.** The kernel only cooperatively cancels it; its claims, lane,
   and resource authority stay held until it returns, and repeated overruns can escalate to fail-stop.
 - **A contained attempt keeps process ownership instead.** Its caller, claims, and run may settle after the
-  containment cut, because late output and mutation are fenced by the process-owned attempt boundary.
+  containment cut because late output and mutation cannot escape the process-owned attempt boundary. The physical
+  worker may still finish state private to that attempt; the boundary prevents publication, re-entry, or reuse until
+  physical release.
 
 ## Process Containment
 
@@ -307,7 +309,8 @@ stateDiagram-v2
 - **Probing** — the attempt is producing a result and is bounded by the fuse.
 - **Admitted** — the attempt has handed its result to the caller and now *holds* something (a running collector loop,
   a prepared Store mutation, a built Function bundle) until the caller decides.
-- **Contained** — logically settled and cancelled; late output and mutation are fenced. Still physically running.
+- **Contained** — logically settled and cancelled; late effects cannot escape the attempt boundary. The worker may
+  still finish private state and remains physically running.
 - **Released** — `Work` and its cleanup returned. Only now is the identity admissible again.
 - **Quarantined** — the physical work returned, but its terminal outcome made the identity unsafe to reuse. The
   quarantine is process-lifetime state, not an active attempt, and only process exit clears it.

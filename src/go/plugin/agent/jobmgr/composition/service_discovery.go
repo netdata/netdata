@@ -298,6 +298,8 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 			// The opaque handler stays fuse-bounded. Its terminal result is
 			// admitted only after the callback returns, so handler or
 			// protocol failures quarantine the identity.
+			// A started command may finish state private to its generation.
+			// The identity prevents re-entry and admission gates publication.
 			if admitErr := admission.Admit(); admitErr != nil {
 				return admitErr
 			}
