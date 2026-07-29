@@ -307,7 +307,7 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 		}
 	}
 	if err != nil {
-		err, resources, ownership, rejected := sjo.failPromotionLocked(err)
+		resources, ownership, rejected, err := sjo.failPromotionLocked(err)
 		sjo.mu.Unlock()
 		if rejected {
 			sjo.finishRejection(resources, ownership)
@@ -315,7 +315,7 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 		return err
 	}
 	if err := <-admitted; err != nil {
-		err, resources, ownership, rejected := sjo.failPromotionLocked(err)
+		resources, ownership, rejected, err := sjo.failPromotionLocked(err)
 		sjo.mu.Unlock()
 		if rejected {
 			sjo.finishRejection(resources, ownership)
@@ -333,15 +333,15 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 
 func (sjo *stagedJobOwner) failPromotionLocked(
 	promotionErr error,
-) (error, ConstructedJob, stagedJobOwnership, bool) {
+) (ConstructedJob, stagedJobOwnership, bool, error) {
 	sjo.ownership = stagedJobOwnedByCandidate
 	// The candidate cut may have waited behind the promotion lock. Its context
 	// records the winning cause independently of that lock.
 	if cause := context.Cause(sjo.candidateCtx); cause != nil {
 		resources, ownership, rejected := sjo.rejectLocked(cause, true)
-		return cause, resources, ownership, rejected
+		return resources, ownership, rejected, cause
 	}
-	return promotionErr, ConstructedJob{}, 0, false
+	return ConstructedJob{}, 0, false, promotionErr
 }
 
 func (sjo *stagedJobOwner) ReserveInstallation() error {
@@ -614,7 +614,6 @@ func (f *Factory) newCandidate(
 	detached.Scheduler = nil
 	detached.Observer = nil
 	detached.Attempts = nil
-	detached.RunWithoutClaims = nil
 	if vnode.Vnode != nil {
 		name := config.Vnode()
 		detached.Vnode = func(candidate string) (jobruntime.VnodeSnapshot, bool) {
@@ -645,10 +644,10 @@ func (f *Factory) newCandidate(
 // graph claim is yielded, then returns only after the stage is logically
 // settled and the claim has been reacquired.
 func (f *Factory) awaitCandidate(ctx context.Context, stage *preparedJobCandidate) error {
-	if f == nil || ctx == nil || stage == nil || f.config.RunWithoutClaims == nil {
+	if f == nil || ctx == nil || stage == nil || f.runWithoutClaims == nil {
 		return errors.New("job output: invalid candidate wait")
 	}
-	waitErr, claimErr := f.config.RunWithoutClaims(ctx, func(yielded context.Context) error {
+	waitErr, claimErr := f.runWithoutClaims(ctx, func(yielded context.Context) error {
 		if cause := context.Cause(yielded); cause != nil {
 			stage.Cancel(cause)
 			return cause

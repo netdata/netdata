@@ -86,20 +86,12 @@ func (fa *FunctionAssembly) Catalog() jobmgr.FunctionCatalogPort {
 	return fa.catalog
 }
 
-func (fa *FunctionAssembly) JobHandlerStager() joboutput.JobHandlerStager {
+func (fa *FunctionAssembly) jobLifecycle() *functionJobLifecycle {
 	if fa == nil {
 		return nil
 	}
-	return functionJobStager{
-		stager: fa.jobStager,
-	}
-}
-
-func (fa *FunctionAssembly) JobHandlerAttacher() joboutput.JobHandlerAttacher {
-	if fa == nil {
-		return nil
-	}
-	return functionJobAttacher{
+	return &functionJobLifecycle{
+		stager:     fa.jobStager,
 		controller: fa.controller,
 	}
 }
@@ -154,39 +146,36 @@ func (fa *FunctionAssembly) FinalizeRun(_ context.Context, generation uint64) er
 	return fa.controller.Stop(generation)
 }
 
-type functionJobStager struct {
-	stager *functionadapter.JobStager
+type functionJobLifecycle struct {
+	stager     *functionadapter.JobStager
+	controller *functionadapter.Controller
 }
 
-func (fjs functionJobStager) Stage(
+func (fjl *functionJobLifecycle) Stage(
 	job joboutput.RuntimeJob,
 ) (joboutput.StagedHandlerLifecycle, error) {
-	if fjs.stager == nil || job == nil {
+	if fjl == nil || fjl.stager == nil || job == nil {
 		return nil, errors.New("jobmgr composition: invalid Function job staging")
 	}
-	handle, err := fjs.stager.StageJob(job)
+	handle, err := fjl.stager.StageJob(job)
 	if handle == nil {
 		return nil, err
 	}
 	return handle, err
 }
 
-type functionJobAttacher struct {
-	controller *functionadapter.Controller
-}
-
-func (fja functionJobAttacher) Attach(
+func (fjl *functionJobLifecycle) Attach(
 	identity lifecycle.ResourceIdentity,
 	staged joboutput.StagedHandlerLifecycle,
 ) (joboutput.ProcessHandlerLifecycle, error) {
-	if fja.controller == nil || !identity.Valid() || staged == nil {
+	if fjl == nil || fjl.controller == nil || !identity.Valid() || staged == nil {
 		return nil, errors.New("jobmgr composition: invalid Function job attachment")
 	}
 	handle, ok := staged.(*functionadapter.StagedJobHandle)
 	if !ok {
 		return nil, errors.New("jobmgr composition: foreign staged Function job")
 	}
-	attached, err := fja.controller.AttachJob(identity, handle)
+	attached, err := fjl.controller.AttachJob(identity, handle)
 	if attached == nil {
 		return nil, err
 	}

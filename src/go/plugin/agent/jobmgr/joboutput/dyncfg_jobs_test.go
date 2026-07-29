@@ -1806,19 +1806,19 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 	})
 	factory, err := NewFactory(
 		FactoryConfig{
-			PluginName:       "go.d",
-			Epoch:            9,
-			Attempts:         attempts,
-			Modules:          modules,
-			Frames:           frames,
-			CleanupOutput:    cleanupOutput,
-			ConfigModules:    configModules,
-			Vnodes:           vnoderegistry.New(),
-			Scheduler:        newTestScheduler(t),
-			RunWithoutClaims: testRunWithoutClaims,
+			PluginName:    "go.d",
+			Epoch:         9,
+			Attempts:      attempts,
+			Modules:       modules,
+			Frames:        frames,
+			CleanupOutput: cleanupOutput,
+			ConfigModules: configModules,
+			Vnodes:        vnoderegistry.New(),
+			Scheduler:     newTestScheduler(t),
 		},
 	)
 	require.NoError(t, err)
+	factory.runWithoutClaims = testRunWithoutClaims
 	graph, err := dyncfg.NewGraph(nil)
 	require.NoError(t, err)
 	controller, err := NewDynCfgJobController(

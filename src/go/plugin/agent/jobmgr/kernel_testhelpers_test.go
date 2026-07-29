@@ -81,21 +81,6 @@ func (sp shutdownProbe) waitSettlement(ctx context.Context) error {
 	}
 }
 
-func (ck *CommandKernel) submitAndWait(ctx context.Context, request Request) error {
-	terminal := make(chan error, 1)
-	if err := ck.submit(ctx, request, terminal); err != nil {
-		return err
-	}
-	select {
-	case err := <-terminal:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-ck.done:
-		return ck.Wait(context.Background())
-	}
-}
-
 type runShutdownBarrierFunc func(context.Context, uint64) error
 
 func (fn runShutdownBarrierFunc) BeforeFunctionCatalogClose(ctx context.Context, generation uint64) error {

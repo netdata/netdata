@@ -818,7 +818,6 @@ func (ts *TaskSupervisor) runChild(
 	} else if !outcome.empty() {
 		slot.outcome = outcome
 	}
-	outcome = TaskOutcome{}
 	slot.sequence = 1
 	ts.completions <- TaskCompletion{
 		Ref:      ref,

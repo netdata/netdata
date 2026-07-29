@@ -275,7 +275,7 @@ func (dcjc *DynCfgJobController) runConfigOperation(
 	}
 	defer stage.Release()
 	if yieldClaims {
-		waitErr, claimErr := dcjc.factory.config.RunWithoutClaims(
+		waitErr, claimErr := dcjc.factory.runWithoutClaims(
 			ctx,
 			func(yielded context.Context) error {
 				return stage.Await(yielded)

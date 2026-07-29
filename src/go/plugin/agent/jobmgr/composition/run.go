@@ -235,6 +235,7 @@ func newRunGeneration(
 	if err != nil {
 		return nil, err
 	}
+	functionJobs := functions.jobLifecycle()
 	jobs, err := joboutput.NewFactory(joboutput.FactoryConfig{
 		Epoch:           config.Generation,
 		PluginName:      config.Jobs.PluginName,
@@ -246,8 +247,8 @@ func newRunGeneration(
 		Runtime:         config.Jobs.Runtime,
 		Vnodes:          config.Jobs.Vnodes,
 		Vnode:           vnodeConfig.Lookup,
-		HandlerStager:   functions.JobHandlerStager(),
-		HandlerAttacher: functions.JobHandlerAttacher(),
+		HandlerStager:   functionJobs,
+		HandlerAttacher: functionJobs,
 		Scheduler:       scheduler,
 		Observer:        metrics,
 	})
@@ -338,10 +339,6 @@ func abortRunConstruction(
 		return errors.Join(functionErr, controller.CloseProjection())
 	}
 	return functionErr
-}
-
-func (rg *runGeneration) start(ctx context.Context) error {
-	return rg.startWithRunContext(ctx, ctx)
 }
 
 // Startup may be deadline-bounded by a restart without making that control
@@ -450,17 +447,7 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 		rg.scheduler.StopAutoDetectionRetries()
 	default:
 	}
-	retryErr := rg.scheduler.WaitAutoDetectionRetries(ctx)
-	retryJoined := rg.scheduler.AutoDetectionRetriesJoined()
-	select {
-	case <-rg.kernel.Done():
-		if !retryJoined {
-			return errors.Join(waitErr, retryErr)
-		}
-		return errors.Join(waitErr, retryErr)
-	default:
-		return errors.Join(waitErr, retryErr)
-	}
+	return errors.Join(waitErr, rg.scheduler.WaitAutoDetectionRetries(ctx))
 }
 
 type runMetricsRegistration struct {

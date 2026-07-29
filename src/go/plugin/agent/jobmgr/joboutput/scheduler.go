@@ -76,10 +76,6 @@ func (s *Scheduler) WaitAutoDetectionRetries(ctx context.Context) error {
 	)
 }
 
-func (s *Scheduler) AutoDetectionRetriesJoined() bool {
-	return s == nil || s.retries.joined() && s.pending.joined()
-}
-
 func (s *Scheduler) Register(identity lifecycle.ResourceIdentity, job RuntimeJob) error {
 	if s == nil || !identity.Valid() || job == nil || identity.ID != job.FullName() || job.ModuleName() == "" {
 		return errors.New("job output: invalid scheduler registration")

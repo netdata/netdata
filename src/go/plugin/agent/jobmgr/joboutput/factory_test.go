@@ -710,7 +710,7 @@ func TestFactoryProbeDoesNotActivateRunPermitOrLiveV2Runtime(t *testing.T) {
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
 	factory.config.Runtime = runtime
-	permit, tasks := issueTestJobPermit(t, "module_job", 1)
+	permit, _ := issueTestJobPermit(t, "module_job", 1)
 
 	prepared, failure, err := prepareFactoryTestCandidate(
 		context.Background(),
@@ -731,7 +731,7 @@ func TestFactoryProbeDoesNotActivateRunPermitOrLiveV2Runtime(t *testing.T) {
 	require.NoError(t, prepared.reject(context.Background()))
 	requireFactoryAttemptsIdle(t, factory)
 
-	permit, tasks = issueTestJobPermit(t, "module_job", 2)
+	permit, tasks := issueTestJobPermit(t, "module_job", 2)
 	prepared, failure, err = prepareFactoryTestCandidate(
 		context.Background(),
 		factory,
@@ -858,7 +858,7 @@ func TestFactoryCandidateWaitYieldsGraphClaimForWholeMaterialization(t *testing.
 	require.NoError(t, err)
 	factory.config.Epoch = 1
 	factory.config.Attempts = attempts
-	factory.config.RunWithoutClaims = func(
+	factory.runWithoutClaims = func(
 		ctx context.Context,
 		work func(context.Context) error,
 	) (error, error) {
@@ -902,7 +902,7 @@ func TestCandidateWaitDoesNotStartAfterYieldedContextCancellation(t *testing.T) 
 	attempts := &unexpectedPendingJobAuthority{}
 	factory.config.Epoch = 1
 	factory.config.Attempts = attempts
-	factory.config.RunWithoutClaims = func(
+	factory.runWithoutClaims = func(
 		ctx context.Context,
 		work func(context.Context) error,
 	) (error, error) {
@@ -1199,7 +1199,7 @@ func TestFactoryCandidateUsesAuthorityContextWithoutInventingDeadline(t *testing
 	type contextKey struct{}
 	parent := context.Background()
 	yielded := context.WithValue(parent, contextKey{}, "yielded")
-	factory.config.RunWithoutClaims = func(
+	factory.runWithoutClaims = func(
 		ctx context.Context,
 		work func(context.Context) error,
 	) (error, error) {
@@ -1294,7 +1294,7 @@ func TestFactoryCandidateRejectsFailureBeforeClaimReacquisition(t *testing.T) {
 		},
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
-	factory.config.RunWithoutClaims = func(
+	factory.runWithoutClaims = func(
 		ctx context.Context,
 		work func(context.Context) error,
 	) (error, error) {
@@ -1671,16 +1671,16 @@ func newFactoryTestHarness(
 		Modules: collectorapi.Registry{
 			"module": creator,
 		},
-		Frames:           frames,
-		CleanupOutput:    cleanupOutput,
-		ConfigModules:    configModules,
-		Vnodes:           vnoderegistry.New(),
-		HandlerStager:    hooks,
-		HandlerAttacher:  hooks,
-		Scheduler:        newTestScheduler(t),
-		RunWithoutClaims: testRunWithoutClaims,
+		Frames:          frames,
+		CleanupOutput:   cleanupOutput,
+		ConfigModules:   configModules,
+		Vnodes:          vnoderegistry.New(),
+		HandlerStager:   hooks,
+		HandlerAttacher: hooks,
+		Scheduler:       newTestScheduler(t),
 	})
 	require.NoError(t, err)
+	factory.runWithoutClaims = testRunWithoutClaims
 	return factory, output
 }
 

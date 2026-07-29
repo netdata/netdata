@@ -16,6 +16,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func (adri *autoDetectionRetryIndex) joined() bool {
+	if adri == nil {
+		return true
+	}
+	adri.mu.Lock()
+	bound := adri.bound
+	done := adri.done
+	adri.mu.Unlock()
+	if !bound {
+		return true
+	}
+	select {
+	case <-done:
+		return true
+	default:
+		return false
+	}
+}
+
 func TestAutoDetectionRetryIndexDispatchesOnlyCurrentDueEntries(t *testing.T) {
 	tests := map[string]struct {
 		arrange      func(*autoDetectionRetryIndex, confgroup.Config) confgroup.Config
@@ -204,7 +223,7 @@ func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
 		1,
 		func(error) {},
 	))
-	require.False(t, scheduler.AutoDetectionRetriesJoined())
+	require.False(t, scheduler.retries.joined() && scheduler.pending.joined())
 	scheduler.retries.schedule(autoDetectionRetryTestConfig("job"), 1)
 	require.NoError(t, scheduler.Tick(context.Background(), 0))
 
@@ -223,7 +242,7 @@ func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
 	close(release)
 	scheduler.StopAutoDetectionRetries()
 	require.NoError(t, scheduler.WaitAutoDetectionRetries(context.Background()))
-	require.True(t, scheduler.AutoDetectionRetriesJoined())
+	require.True(t, scheduler.retries.joined() && scheduler.pending.joined())
 }
 
 func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {

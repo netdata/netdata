@@ -129,13 +129,13 @@ func TestFunctionAssemblyLifecycle(t *testing.T) {
 }
 
 func TestFunctionLifecycleAdaptersCanonicalizeConcreteNil(t *testing.T) {
-	staged, err := (functionJobStager{
+	staged, err := (&functionJobLifecycle{
 		stager: &functionadapter.JobStager{},
 	}).Stage(&assemblyTestJob{})
 	require.Error(t, err)
 	require.True(t, staged == nil)
 
-	attached, err := (functionJobAttacher{
+	attached, err := (&functionJobLifecycle{
 		controller: &functionadapter.Controller{},
 	}).Attach(
 		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
@@ -233,9 +233,10 @@ func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	}, frames)
 	require.NoError(t, err)
 	job := &assemblyTestJob{}
-	staged, err := assembly.JobHandlerStager().Stage(job)
+	jobFunctions := assembly.jobLifecycle()
+	staged, err := jobFunctions.Stage(job)
 	require.NoError(t, err)
-	handle, err := assembly.JobHandlerAttacher().Attach(lifecycle.ResourceIdentity{
+	handle, err := jobFunctions.Attach(lifecycle.ResourceIdentity{
 		ID:         job.FullName(),
 		Generation: 3,
 	}, staged)
@@ -348,9 +349,10 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 	require.NoError(t, err)
 
 	job := &assemblyTestJob{}
-	staged, err := assembly.JobHandlerStager().Stage(job)
+	jobFunctions := assembly.jobLifecycle()
+	staged, err := jobFunctions.Stage(job)
 	require.NoError(t, err)
-	handle, err := assembly.JobHandlerAttacher().Attach(lifecycle.ResourceIdentity{
+	handle, err := jobFunctions.Attach(lifecycle.ResourceIdentity{
 		ID:         job.FullName(),
 		Generation: 1,
 	}, staged)

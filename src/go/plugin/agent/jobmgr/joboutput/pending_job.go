@@ -277,25 +277,6 @@ func (pji *pendingJobIndex) wait(ctx context.Context) error {
 	}
 }
 
-func (pji *pendingJobIndex) joined() bool {
-	if pji == nil {
-		return true
-	}
-	pji.mu.Lock()
-	bound := pji.bound
-	done := pji.done
-	pji.mu.Unlock()
-	if !bound {
-		return true
-	}
-	select {
-	case <-done:
-		return true
-	default:
-		return false
-	}
-}
-
 func (pji *pendingJobIndex) join() {
 	<-pji.stop
 	pji.wg.Wait()

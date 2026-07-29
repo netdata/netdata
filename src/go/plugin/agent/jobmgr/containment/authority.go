@@ -455,15 +455,6 @@ func (at *attempt) Released() <-chan struct{} {
 	return at.released
 }
 
-func (at *attempt) stateSnapshot() attemptState {
-	if at == nil || at.authority == nil {
-		return 0
-	}
-	at.authority.mu.Lock()
-	defer at.authority.mu.Unlock()
-	return at.state
-}
-
 func (a *Authority) Census() Census {
 	if a == nil {
 		return Census{}

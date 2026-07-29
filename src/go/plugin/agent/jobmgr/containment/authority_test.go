@@ -16,6 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func (at *attempt) stateSnapshot() attemptState {
+	if at == nil || at.authority == nil {
+		return 0
+	}
+	at.authority.mu.Lock()
+	defer at.authority.mu.Unlock()
+	return at.state
+}
+
 func TestAuthorityRejectsCanceledClaimBeforeReservingIdentity(t *testing.T) {
 	authority := newTestAuthority(t, time.Second, 20*time.Millisecond, nil)
 	ctx, cancel := context.WithCancelCause(context.Background())

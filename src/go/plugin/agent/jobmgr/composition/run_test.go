@@ -28,6 +28,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func (rg *runGeneration) start(ctx context.Context) error {
+	return rg.startWithRunContext(ctx, ctx)
+}
+
 func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	modules := collectorapi.Registry{
 		"z-module":      {},

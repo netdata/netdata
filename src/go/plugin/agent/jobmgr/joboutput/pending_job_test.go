@@ -18,6 +18,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func (pji *pendingJobIndex) joined() bool {
+	if pji == nil {
+		return true
+	}
+	pji.mu.Lock()
+	bound := pji.bound
+	done := pji.done
+	pji.mu.Unlock()
+	if !bound {
+		return true
+	}
+	select {
+	case <-done:
+		return true
+	default:
+		return false
+	}
+}
+
 func TestPendingJobRetainsOnlyLatestDesiredUntilItsIdentityReleases(t *testing.T) {
 	commands := &autoDetectionRetryTestCommands{}
 	index := newPendingJobIndex()

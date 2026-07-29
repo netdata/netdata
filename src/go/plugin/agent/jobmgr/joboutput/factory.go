@@ -64,28 +64,28 @@ type jobNamedModule interface {
 }
 
 type FactoryConfig struct {
-	Epoch            uint64                                                            // target run generation
-	PluginName       string                                                            // owning plugin name stamped into job config
-	Attempts         jobmgr.ProcessAttemptAuthority                                    // process-owned candidate authority
-	Modules          ModuleCatalog                                                     // collector creator registry
-	Frames           *lifecycle.FrameOwner                                             // frame owner used as the collector output sink
-	CleanupOutput    *CleanupOutputGate                                                // process-lifetime accepted-cleanup output
-	ConfigModules    *ConfigModuleFactory                                              // resolved config application and short-lived probes
-	Runtime          runtimecomp.Service                                               // V2 runtime service dependency
-	Vnodes           *vnoderegistry.Registry                                           // vnode registry for V2 jobs
-	Vnode            func(string) (jobruntime.VnodeSnapshot, bool)                     // vnode snapshot lookup by name
-	HandlerStager    JobHandlerStager                                                  // run-detached Function-handler staging
-	HandlerAttacher  JobHandlerAttacher                                                // run-owned Function publication attachment
-	Scheduler        *Scheduler                                                        // tick/registration scheduler
-	Observer         lifecycle.RuntimeObserver                                         // runtime gauge sink
-	RunWithoutClaims func(context.Context, func(context.Context) error) (error, error) // claim-yield adapter; NewFactory installs the default
+	Epoch           uint64                                        // target run generation
+	PluginName      string                                        // owning plugin name stamped into job config
+	Attempts        jobmgr.ProcessAttemptAuthority                // process-owned candidate authority
+	Modules         ModuleCatalog                                 // collector creator registry
+	Frames          *lifecycle.FrameOwner                         // frame owner used as the collector output sink
+	CleanupOutput   *CleanupOutputGate                            // process-lifetime accepted-cleanup output
+	ConfigModules   *ConfigModuleFactory                          // resolved config application and short-lived probes
+	Runtime         runtimecomp.Service                           // V2 runtime service dependency
+	Vnodes          *vnoderegistry.Registry                       // vnode registry for V2 jobs
+	Vnode           func(string) (jobruntime.VnodeSnapshot, bool) // vnode snapshot lookup by name
+	HandlerStager   JobHandlerStager                              // run-detached Function-handler staging
+	HandlerAttacher JobHandlerAttacher                            // run-owned Function publication attachment
+	Scheduler       *Scheduler                                    // tick/registration scheduler
+	Observer        lifecycle.RuntimeObserver                     // runtime gauge sink
 }
 
 // Factory owns collector construction, validation, and transfer. It does not
 // own current-job indexing or lifecycle state.
 type Factory struct {
-	config         FactoryConfig
-	runtimeStaging bool
+	config           FactoryConfig
+	runtimeStaging   bool
+	runWithoutClaims func(context.Context, func(context.Context) error) (error, error)
 }
 
 type factoryAttachment struct {
@@ -193,11 +193,9 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 		(config.HandlerStager == nil) != (config.HandlerAttacher == nil) {
 		return nil, errors.New("job output: incomplete factory configuration")
 	}
-	if config.RunWithoutClaims == nil {
-		config.RunWithoutClaims = jobmgr.RunWithoutClaims
-	}
 	return &Factory{
-		config: config,
+		config:           config,
+		runWithoutClaims: jobmgr.RunWithoutClaims,
 	}, nil
 }
 

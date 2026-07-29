@@ -118,7 +118,7 @@ func TestContainedConfigValidationYieldsGraphClaimForAllCallbacks(t *testing.T) 
 	controller.modules["module"] = creator
 	controller.factory.config.Modules = controller.modules
 	controller.configModules.config.Modules = controller.modules
-	controller.factory.config.RunWithoutClaims = func(
+	controller.factory.runWithoutClaims = func(
 		ctx context.Context,
 		work func(context.Context) error,
 	) (error, error) {
