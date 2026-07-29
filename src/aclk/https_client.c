@@ -559,6 +559,8 @@ int https_client_timeout_unittest(void) {
     return errors;
 }
 
+#undef HTTPS_TIMEOUT_TEST
+
 static char *_ssl_err_tos(int err)
 {
     switch(err){
