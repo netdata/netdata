@@ -470,7 +470,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 				{"tail-identity", tailAfter, 60, [3]bool{false, true, false}},
 				{"tail-upsample", tailAfter, 1, [3]bool{true, false, false}},
 			} {
-				if !c4ConditionExact(t, dd, c4ConditionSpec{
+				if !c4ConditionContract(t, dd, c4ConditionSpec{
 					label:              "layer4c-" + dimension.label + "-" + tc.label,
 					context:            c4cContext,
 					host:               "l4c-child",
@@ -493,8 +493,14 @@ func TestLayer4PlanSwitching(t *testing.T) {
 				}
 			}
 		}
+		if !c4cFineEventsAuthoritative(t, dd, lastT) {
+			ok = false
+		}
+		if !c4cFineFlapsAuthoritative(t, dd, lastT) {
+			ok = false
+		}
 		if !ok {
-			t.Errorf("condition groupings did not conserve exact fixture answers across the tier0/tier1 plan boundary")
+			t.Errorf("condition groupings violated exact fine-tier or bounded coarse-tier seam semantics")
 		}
 	})
 
@@ -606,6 +612,205 @@ func c4DimensionRetention(
 	return tiers
 }
 
+// c4cFineEventsAuthoritative proves the automatic seam never hides exact
+// events available from the finer tier. The crossing coarse record remains the
+// approximation for its unavailable prefix, but it cannot consume any event
+// observed in the fine suffix.
+func c4cFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
+	t.Helper()
+
+	var dimension string
+	var boundary, coarseEnd int64
+	for d := 0; d < c4cDims; d++ {
+		candidate := c4cDimID(d)
+		retention := c4DimensionRetention(
+			t, dd, c4cContext, "l4c-child", candidate, lastT, 2)
+		candidateBoundary := retention[0].FirstEntry
+		candidateCoarseEnd := c4AlignUp(
+			candidateBoundary, c4cConditionEpoch, c4cCounterPeriod)
+		if candidateCoarseEnd-candidateBoundary >= 2 {
+			dimension = candidate
+			boundary = candidateBoundary
+			coarseEnd = candidateCoarseEnd
+			break
+		}
+	}
+	if dimension == "" {
+		t.Log("no dimension has multiple exact fine points under its crossing tier1 record")
+		return false
+	}
+
+	after, before := coarseEnd-120, coarseEnd+60
+	params := daemon.DataParams(c4cContext, after, before, before-after)
+	params.Set("time_group", "number-of-times")
+	params.Set("time_group_options", ">=-1")
+	params.Set("scope_dimensions", dimension)
+	params.Set("options", "jsonwrap|unaligned")
+	doc, err := dd.DataV3("l4c-child", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok := true
+	if !assertTierPresence(t, doc, []bool{true, true, false}) {
+		t.Log("fine-event authority query did not cross the tier1-to-tier0 seam")
+		ok = false
+	}
+	if !assertExactView(t, doc, after, before, 1) {
+		t.Log("fine-event authority query returned the wrong view grid")
+		ok = false
+	}
+	if !assertOnlyColumn(t, cols, dimension) {
+		t.Log("fine-event authority query returned the wrong columns")
+		return false
+	}
+
+	fineRows, retainedEvents := 0, 0
+	for _, point := range cols[dimension] {
+		if point.T < boundary || point.T > coarseEnd {
+			continue
+		}
+		fineRows++
+		if point.Value == nil {
+			t.Logf("fine overlap row %d is null, want exactly one retained event", point.T)
+			ok = false
+		} else if *point.Value != 1 {
+			t.Logf("fine overlap row %d is %.12g, want exactly one retained event",
+				point.T, *point.Value)
+			ok = false
+		} else {
+			retainedEvents++
+		}
+	}
+	wantFineRows := int(coarseEnd - boundary + 1)
+	if fineRows != wantFineRows {
+		t.Logf("fine overlap has %d rows, want %d", fineRows, wantFineRows)
+		ok = false
+	}
+
+	t.Logf("%s crossing tier1 record ends at %d; tier0 starts at %d; retained %d of %d exact fine events",
+		dimension, coarseEnd, boundary, retainedEvents, fineRows)
+	return ok
+}
+
+// c4cFineFlapsAuthoritative is the stateful counterpart of
+// c4cFineEventsAuthoritative. It finds a deterministic threshold with multiple
+// false-to-true transitions under one crossing coarse record and requires every
+// transition visible in the fine tier to survive.
+func c4cFineFlapsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
+	t.Helper()
+
+	var dimension string
+	var boundary, coarseEnd, threshold int64
+	var expected map[int64]float64
+	wantFlaps := 0
+	for d := 0; d < c4cDims && dimension == ""; d++ {
+		candidate := c4cDimID(d)
+		retention := c4DimensionRetention(
+			t, dd, c4cContext, "l4c-child", candidate, lastT, 2)
+		candidateBoundary := retention[0].FirstEntry
+		candidateCoarseEnd := c4AlignUp(
+			candidateBoundary, c4cConditionEpoch, c4cCounterPeriod)
+		if candidateCoarseEnd-candidateBoundary < 4 {
+			continue
+		}
+
+		values := make([]int64, 0, candidateCoarseEnd-candidateBoundary+1)
+		for ts := candidateBoundary; ts <= candidateCoarseEnd; ts++ {
+			values = append(values, c4cValue(int64(d), ts-fixture.T0))
+		}
+		for _, candidateThreshold := range values {
+			state := true // a mixed crossing record leaves flap state true
+			candidateExpected := make(map[int64]float64, len(values))
+			candidateFlaps := 0
+			for i, value := range values {
+				now := value >= candidateThreshold
+				event := !state && now
+				state = now
+				if event {
+					candidateFlaps++
+					candidateExpected[candidateBoundary+int64(i)] = 1
+				} else {
+					candidateExpected[candidateBoundary+int64(i)] = 0
+				}
+			}
+			if candidateFlaps >= 2 {
+				dimension = candidate
+				boundary = candidateBoundary
+				coarseEnd = candidateCoarseEnd
+				threshold = candidateThreshold
+				expected = candidateExpected
+				wantFlaps = candidateFlaps
+				break
+			}
+		}
+	}
+	if dimension == "" {
+		t.Log("no crossing tier1 record has multiple deterministic fine-tier flaps")
+		return false
+	}
+
+	after, before := coarseEnd-120, coarseEnd+60
+	params := daemon.DataParams(c4cContext, after, before, before-after)
+	params.Set("time_group", "number-of-flaps")
+	params.Set("time_group_options", ">="+strconv.FormatInt(threshold, 10))
+	params.Set("scope_dimensions", dimension)
+	params.Set("options", "jsonwrap|unaligned")
+	doc, err := dd.DataV3("l4c-child", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok := true
+	if !assertTierPresence(t, doc, []bool{true, true, false}) {
+		t.Log("fine-flap authority query did not cross the tier1-to-tier0 seam")
+		ok = false
+	}
+	if !assertExactView(t, doc, after, before, 1) {
+		t.Log("fine-flap authority query returned the wrong view grid")
+		ok = false
+	}
+	if !assertOnlyColumn(t, cols, dimension) {
+		t.Log("fine-flap authority query returned the wrong columns")
+		return false
+	}
+
+	fineRows, retainedFlaps := 0, 0
+	for _, point := range cols[dimension] {
+		want, fine := expected[point.T]
+		if !fine {
+			continue
+		}
+		fineRows++
+		if point.Value == nil {
+			t.Logf("fine flap row %d is null, want %.0f", point.T, want)
+			ok = false
+		} else if *point.Value != want {
+			t.Logf("fine flap row %d is %.12g, want %.0f", point.T, *point.Value, want)
+			ok = false
+		}
+		if point.Value != nil && !math.IsNaN(*point.Value) && !math.IsInf(*point.Value, 0) {
+			retainedFlaps += int(*point.Value)
+		}
+	}
+	if fineRows != len(expected) {
+		t.Logf("fine flap overlap has %d rows, want %d", fineRows, len(expected))
+		ok = false
+	}
+
+	t.Logf("%s crossing tier1 record ends at %d; tier0 starts at %d; retained %d of %d exact fine flaps",
+		dimension, coarseEnd, boundary, retainedFlaps, wantFlaps)
+	return ok
+}
+
 // c4cRequireTwoTierWindow proves that a planned control or seam window has the
 // claimed physical relation to this dimension's own retention.
 func c4cRequireTwoTierWindow(
@@ -696,7 +901,7 @@ func c4ExpectedAvailability(spec c4ConditionSpec) []expectedColumnPoint {
 	return out
 }
 
-func c4ConditionExact(t *testing.T, dd *daemon.Daemon, spec c4ConditionSpec) bool {
+func c4ConditionContract(t *testing.T, dd *daemon.Daemon, spec c4ConditionSpec) bool {
 	t.Helper()
 	if spec.availabilityOnly && spec.counterOnly {
 		t.Fatalf("condition query cannot be both availability-only and counter-only: %+v", spec)
@@ -780,17 +985,37 @@ func c4ConditionExact(t *testing.T, dd *daemon.Daemon, spec c4ConditionSpec) boo
 					spec.label, query.group, query.expression)
 				ok = false
 			}
-		} else if !assertEventColumnShapeAndTotal(
-			t, cols, query.dimension, spec.after, spec.before, spec.rowSpan,
-			(spec.rowSpan+spec.counterPeriod-1)/spec.counterPeriod,
-			float64((spec.before-spec.after)/spec.counterPeriod)) {
-			// A higher-tier record proves that a reset happened but cannot
-			// retain its exact sample timestamp. Pin conservation and reject
-			// duplicated rows without making its within-record placement a
-			// public contract.
-			t.Logf("%s %s(%s): reset conservation oracle failed",
-				spec.label, query.group, query.expression)
-			ok = false
+		} else {
+			seams := int64(0)
+			if spec.selectedTier < 0 {
+				tiers := int64(0)
+				for _, present := range spec.expectedTiers {
+					if present {
+						tiers++
+					}
+				}
+				if tiers > 1 {
+					seams = tiers - 1
+				}
+			}
+
+			exactTotal := float64((spec.before - spec.after) / spec.counterPeriod)
+			maxEventsPerRow := (spec.rowSpan + spec.counterPeriod - 1) / spec.counterPeriod
+			if spec.rowSpan > 1 {
+				maxEventsPerRow += seams
+			}
+			if !assertEventColumnShapeAndTotalRange(
+				t, cols, query.dimension, spec.after, spec.before, spec.rowSpan,
+				maxEventsPerRow,
+				exactTotal, exactTotal+float64(seams)) {
+				// Fine-tier events are authoritative. A crossing coarse
+				// record is the estimate for its unavailable prefix, but its
+				// aggregate still includes the fine suffix and may therefore
+				// add at most one event per automatic-tier seam.
+				t.Logf("%s %s(%s): reset bound oracle failed",
+					spec.label, query.group, query.expression)
+				ok = false
+			}
 		}
 	}
 	return ok
