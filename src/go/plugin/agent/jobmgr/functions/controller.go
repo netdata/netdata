@@ -159,7 +159,7 @@ func (js *JobStager) StageJob(
 	if err := bundle.bindContainment(
 		js.attempts,
 		js.epoch,
-		fmt.Sprintf("%d/%s/job", js.epoch, job.FullName()),
+		jobFunctionAttemptKey(js.epoch, job.FullName()),
 		candidateFunctionResource(job.FullName()),
 	); err != nil {
 		bundle.retire()

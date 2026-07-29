@@ -523,16 +523,12 @@ func (f *Factory) newCandidate(
 			runtimeStaging: f.config.Runtime != nil,
 		},
 		attempts: f.config.Attempts,
-		identity: jobmgr.ProcessAttemptIdentity{
-			Namespace: jobmgr.ProcessAttemptJob,
-			Key:       config.FullName(),
-			Resource:  candidateDiagnosticResource(config.FullName()),
-		},
-		target: f.config.Epoch,
-		config: config,
-		ctx:    ctx,
-		cancel: cancel,
-		ready:  make(chan struct{}),
+		identity: jobAttemptIdentity(jobmgr.ProcessAttemptJob, config.FullName()),
+		target:   f.config.Epoch,
+		config:   config,
+		ctx:      ctx,
+		cancel:   cancel,
+		ready:    make(chan struct{}),
 	}, nil
 }
 
@@ -555,18 +551,6 @@ func (f *Factory) awaitCandidate(ctx context.Context, stage *preparedJobCandidat
 		}
 	})
 	return errors.Join(waitErr, claimErr)
-}
-
-func candidateDiagnosticResource(name string) string {
-	if name == "" || len(name) > 256 {
-		return "collector job"
-	}
-	for _, char := range name {
-		if char < ' ' || char == 0x7f {
-			return "collector job"
-		}
-	}
-	return name
 }
 
 func (pjc *preparedJobCandidate) Start() {
@@ -749,11 +733,10 @@ func (pjc *preparedJobCandidate) run(
 		candidate,
 		pjc.attempts,
 		pjc.target,
-		jobmgr.ProcessAttemptIdentity{
-			Namespace: jobmgr.ProcessAttemptJobRuntime,
-			Key:       candidate.candidateJob.FullName(),
-			Resource:  candidateDiagnosticResource(candidate.candidateJob.FullName()),
-		},
+		jobAttemptIdentity(
+			jobmgr.ProcessAttemptJobRuntime,
+			candidate.candidateJob.FullName(),
+		),
 	)
 	pjc.publish(stagedJobResult{
 		candidate: candidate,

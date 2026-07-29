@@ -38,12 +38,6 @@ func TestStoreAttemptIdentityIsBoundedAndStructurallyDistinct(t *testing.T) {
 	long := operations.identity(longKey, false, nil)
 	require.Len(t, long.Key, sha256.Size)
 	require.Equal(t, "secret Store", long.Resource)
-
-	require.NotEqual(
-		t,
-		storeAttemptIdentityKey([]byte("ab"), []byte("c")),
-		storeAttemptIdentityKey([]byte("a"), []byte("bc")),
-	)
 }
 
 func TestInitialStoreAttemptAcceptsLongValidName(t *testing.T) {

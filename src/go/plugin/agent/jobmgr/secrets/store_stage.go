@@ -4,12 +4,10 @@ package secrets
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -460,39 +458,16 @@ func (so *StoreOperations) identity(
 	payload []byte,
 ) jobmgr.ProcessAttemptIdentity {
 	namespace := jobmgr.ProcessAttemptStore
-	var epoch [8]byte
-	binary.BigEndian.PutUint64(epoch[:], so.epoch)
-	fields := [][]byte{epoch[:], []byte(key)}
+	domain := "secret-store"
+	fields := []string{strconv.FormatUint(so.epoch, 10), key}
 	if test {
 		namespace = jobmgr.ProcessAttemptStoreTest
-		fields = append(fields, payload)
+		domain = "secret-store-test"
+		fields = append(fields, string(payload))
 	}
 	return jobmgr.ProcessAttemptIdentity{
 		Namespace: namespace,
-		Key:       storeAttemptIdentityKey(fields...),
-		Resource:  storeAttemptDiagnosticResource(key),
+		Key:       jobmgr.ProcessAttemptIdentityKey(domain, fields...),
+		Resource:  jobmgr.ProcessAttemptDiagnosticResource(key, "secret Store"),
 	}
-}
-
-func storeAttemptIdentityKey(fields ...[]byte) string {
-	hash := sha256.New()
-	var length [8]byte
-	for _, field := range fields {
-		binary.BigEndian.PutUint64(length[:], uint64(len(field)))
-		_, _ = hash.Write(length[:])
-		_, _ = hash.Write(field)
-	}
-	return string(hash.Sum(nil))
-}
-
-func storeAttemptDiagnosticResource(key string) string {
-	if key == "" || len(key) > 256 || !utf8.ValidString(key) {
-		return "secret Store"
-	}
-	for _, char := range key {
-		if char < ' ' || char == 0x7f {
-			return "secret Store"
-		}
-	}
-	return key
 }

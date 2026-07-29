@@ -66,9 +66,13 @@ func newServiceDiscoveryBinding(
 		return nil, errors.New("jobmgr composition: invalid service discovery binding")
 	}
 	return &serviceDiscoveryBinding{
-		pluginName:  pluginName,
-		epoch:       epoch,
-		attemptKey:  fmt.Sprintf("%d/%s", epoch, pluginName),
+		pluginName: pluginName,
+		epoch:      epoch,
+		attemptKey: jobmgr.ProcessAttemptIdentityKey(
+			"service-discovery-binding",
+			fmt.Sprintf("%d", epoch),
+			pluginName,
+		),
 		attempts:    attempts,
 		frames:      frames,
 		diagnostics: diagnostics,
@@ -332,10 +336,10 @@ func (sdb *serviceDiscoveryBinding) serviceDiscoveryContainmentResult(
 }
 
 func serviceDiscoveryDiagnosticResource(resource string) string {
-	if resource == "" || len(resource) > 256 {
-		return "service discovery configuration"
-	}
-	return resource
+	return jobmgr.ProcessAttemptDiagnosticResource(
+		resource,
+		"service discovery configuration",
+	)
 }
 
 func (sdb *serviceDiscoveryBinding) invoke(

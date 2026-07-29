@@ -371,11 +371,7 @@ func (dcjc *DynCfgJobController) retainPendingAfterApplyWithRequirement(
 			config == nil || config.FullName() == "" {
 			return
 		}
-		identity := jobmgr.ProcessAttemptIdentity{
-			Namespace: namespace,
-			Key:       config.FullName(),
-			Resource:  candidateDiagnosticResource(config.FullName()),
-		}
+		identity := jobAttemptIdentity(namespace, config.FullName())
 		release, ok := dcjc.factory.config.Attempts.ProcessAttemptReleased(identity)
 		if !ok {
 			immediate := make(chan struct{})

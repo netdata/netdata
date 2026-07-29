@@ -5,6 +5,7 @@ package functions
 import (
 	"context"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -32,6 +33,25 @@ func TestContainedControllerAcceptsInvalidUTF8ModuleIdentity(t *testing.T) {
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
 	module := string([]byte{0xff})
+
+	controller, catalog, err := NewContainedController(
+		context.Background(),
+		1,
+		attempts,
+		collectorapi.Registry{module: {}},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, controller)
+	require.NotNil(t, catalog)
+	require.NoError(t, controller.AbortConstruction(context.Background()))
+	attempts.BeginShutdown()
+	require.NoError(t, attempts.Shutdown(context.Background()))
+}
+
+func TestContainedControllerAcceptsLongModuleIdentity(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	module := strings.Repeat("m", 4097)
 
 	controller, catalog, err := NewContainedController(
 		context.Background(),

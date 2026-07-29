@@ -7,7 +7,6 @@ import (
 	"errors"
 	"slices"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -265,14 +264,6 @@ func startModulePlanStage(
 	return start()
 }
 
-func modulePlanAttemptIdentity(module string) jobmgr.ProcessAttemptIdentity {
-	return jobmgr.ProcessAttemptIdentity{
-		Namespace: jobmgr.ProcessAttemptFunctionBundle,
-		Key:       "agent\x00" + module,
-		Resource:  candidateFunctionResource(module),
-	}
-}
-
 func buildControllerModulePlan(
 	module string,
 	creator collectorapi.Creator,
@@ -318,16 +309,4 @@ func releaseModulePlanStages(stages []modulePlanStage) {
 		default:
 		}
 	}
-}
-
-func candidateFunctionResource(module string) string {
-	if module == "" || len(module) > 256 || !utf8.ValidString(module) {
-		return "collector module"
-	}
-	for _, char := range module {
-		if char < ' ' || char == 0x7f {
-			return "collector module"
-		}
-	}
-	return module
 }

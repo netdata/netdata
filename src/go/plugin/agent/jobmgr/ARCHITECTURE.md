@@ -366,22 +366,24 @@ remain independently admissible.
 
 | Namespace | Owns | Key shape |
 | --- | --- | --- |
-| `job` | Candidate preparation: clone, secret resolution, construction, `Init`, `Check` | canonical job `FullName` |
-| `job-runtime` | The installed collector's managed loop, `Stop`, and cleanup | canonical job `FullName` |
-| `job-test` | One DynCfg `test` of a raw job config | name + config hash |
+| `job` | Candidate preparation: clone, secret resolution, construction, `Init`, `Check` | digest of canonical job `FullName` |
+| `job-runtime` | The installed collector's managed loop, `Stop`, and cleanup | same job-name digest in its own namespace |
+| `job-test` | One DynCfg `test` of a raw job config | digest of operation + name + config hash |
 | `store` | SecretStore validation and generation preparation | digest of epoch + `kind:name` |
 | `store-test` | One DynCfg `test` of a SecretStore config | digest of epoch + `kind:name` + config hash |
-| `function-bundle` | An agent-level module's Function handler bundle plan | canonical agent-module key |
+| `function-bundle` | An agent-level module's Function handler bundle plan | digest of agent scope + module |
 | `function-poll` | One Function availability poll | bundle key |
 | `function-invocation` | One Function invocation | bundle key + invocation id |
-| `service-discovery` | Materializing one SD configuration into a pipeline | SD config key |
+| `service-discovery` | One service-discovery Function binding invocation | digest of epoch + plugin |
 
 Test identities are derived from the raw config and exist only in memory, so an identical repeated `test` returns busy
 instead of multiplying workers.
 
-SecretStore attempt keys use length-framed fields and a fixed-size digest. This preserves the public Store-name
-contract without allowing a long name to exceed containment's internal identity bounds; diagnostics retain a safe
-short `kind:name` and use a generic label for oversized names.
+All variable name components in attempt keys first pass through domain-separated, length-framed fields and a
+fixed-size digest; Function invocations append only a bounded counter to that digest. This preserves public job,
+Store, module, and service-discovery names without allowing a long value to exceed containment's internal identity
+bounds. Diagnostics retain safe short names and use bounded generic labels for oversized, invalid-UTF-8, or
+control-bearing values. Graph IDs, lane keys, config IDs, and wire-visible names remain unchanged.
 
 ## Jobs
 

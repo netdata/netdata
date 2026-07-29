@@ -4,7 +4,11 @@ package jobmgr
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
+	"io"
+	"unicode/utf8"
 )
 
 var (
@@ -17,6 +21,13 @@ var (
 	ErrProcessAttemptQuarantined = errors.New("jobmgr containment: identity quarantined until process restart")
 	ErrProcessAttemptWorkerPanic = errors.New("jobmgr containment: worker panic")
 	ErrProcessAttemptFencePanic  = errors.New("jobmgr containment: containment fence panic")
+)
+
+const (
+	// MaximumProcessAttemptKeyBytes bounds process-lifetime map keys.
+	MaximumProcessAttemptKeyBytes = 4 * 1024
+	// MaximumProcessAttemptDiagnosticResourceBytes bounds retained log labels.
+	MaximumProcessAttemptDiagnosticResourceBytes = 256
 )
 
 type ProcessAttemptNamespace uint8
@@ -62,6 +73,63 @@ type ProcessAttemptIdentity struct {
 	Namespace ProcessAttemptNamespace
 	Key       string
 	Resource  string
+}
+
+// Valid reports whether the identity satisfies the process-containment bounds.
+func (identity ProcessAttemptIdentity) Valid() bool {
+	return identity.Namespace >= ProcessAttemptJob &&
+		identity.Namespace <= ProcessAttemptServiceDiscovery &&
+		identity.Key != "" &&
+		len(identity.Key) <= MaximumProcessAttemptKeyBytes &&
+		validProcessAttemptDiagnosticResource(identity.Resource)
+}
+
+// ProcessAttemptIdentityKey derives one fixed-size key from structurally
+// framed semantic fields. Domain separates unrelated identity contracts that
+// share a containment namespace.
+func ProcessAttemptIdentityKey(domain string, fields ...string) string {
+	if domain == "" {
+		return ""
+	}
+	hash := sha256.New()
+	writeProcessAttemptIdentityField(hash, domain)
+	for _, field := range fields {
+		writeProcessAttemptIdentityField(hash, field)
+	}
+	return string(hash.Sum(nil))
+}
+
+func writeProcessAttemptIdentityField(hash io.Writer, field string) {
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(field)))
+	_, _ = hash.Write(length[:])
+	_, _ = io.WriteString(hash, field)
+}
+
+// ProcessAttemptDiagnosticResource retains a safe specific resource when
+// possible and otherwise returns a bounded fallback suitable for diagnostics.
+func ProcessAttemptDiagnosticResource(resource, fallback string) string {
+	if validProcessAttemptDiagnosticResource(resource) {
+		return resource
+	}
+	if validProcessAttemptDiagnosticResource(fallback) {
+		return fallback
+	}
+	return "job manager resource"
+}
+
+func validProcessAttemptDiagnosticResource(resource string) bool {
+	if resource == "" ||
+		len(resource) > MaximumProcessAttemptDiagnosticResourceBytes ||
+		!utf8.ValidString(resource) {
+		return false
+	}
+	for _, char := range resource {
+		if char < ' ' || char == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 type ProcessAttemptPlan struct {

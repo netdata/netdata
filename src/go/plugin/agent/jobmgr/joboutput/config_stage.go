@@ -5,7 +5,6 @@ package joboutput
 import (
 	"context"
 	"errors"
-	"strconv"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -63,21 +62,14 @@ func newPreparedConfigOperation(
 	if err != nil {
 		return nil, err
 	}
-	namespace := jobmgr.ProcessAttemptJobTest
-	key := strconv.Itoa(int(kind)) + "\x00" + cloned.FullName() + "\x00" +
-		strconv.FormatUint(cloned.Hash(), 10)
+	identity := jobTestAttemptIdentity(kind, cloned)
 	if kind == configOperationValidate {
-		namespace = jobmgr.ProcessAttemptJob
-		key = cloned.FullName()
+		identity = jobAttemptIdentity(jobmgr.ProcessAttemptJob, cloned.FullName())
 	}
 	ctx, cancel := context.WithCancelCause(context.Background())
 	return &preparedConfigOperation{
-		attempts: factory.config.Attempts,
-		identity: jobmgr.ProcessAttemptIdentity{
-			Namespace: namespace,
-			Key:       key,
-			Resource:  candidateDiagnosticResource(cloned.FullName()),
-		},
+		attempts:  factory.config.Attempts,
+		identity:  identity,
 		target:    factory.config.Epoch,
 		config:    cloned,
 		operation: operation,

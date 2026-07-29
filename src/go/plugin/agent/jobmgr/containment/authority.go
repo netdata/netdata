@@ -11,41 +11,16 @@ import (
 	"sort"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
 const (
-	DefaultFuse                        = 2 * time.Minute
-	DefaultSupersessionGrace           = 2 * time.Second
-	MaximumDiagnosticIdentitySample    = 8
-	maximumIdentityKeyBytes            = 4 * 1024
-	maximumDiagnosticResourceNameBytes = 256
+	DefaultFuse                     = 2 * time.Minute
+	DefaultSupersessionGrace        = 2 * time.Second
+	MaximumDiagnosticIdentitySample = 8
 )
-
-func validIdentity(identity jobmgr.ProcessAttemptIdentity) bool {
-	return identity.Namespace >= jobmgr.ProcessAttemptJob &&
-		identity.Namespace <= jobmgr.ProcessAttemptServiceDiscovery &&
-		identity.Key != "" &&
-		len(identity.Key) <= maximumIdentityKeyBytes &&
-		validDiagnosticResource(identity.Resource)
-}
-
-func validDiagnosticResource(resource string) bool {
-	if resource == "" ||
-		len(resource) > maximumDiagnosticResourceNameBytes ||
-		!utf8.ValidString(resource) {
-		return false
-	}
-	for _, char := range resource {
-		if char < ' ' || char == 0x7f {
-			return false
-		}
-	}
-	return true
-}
 
 type identityKey struct {
 	namespace jobmgr.ProcessAttemptNamespace
@@ -141,7 +116,7 @@ func newAuthority(diagnostics jobmgr.DiagnosticObserver, policy policy) (*Author
 
 // Start reserves identity before starting exactly one worker.
 func (a *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
-	if a == nil || !validIdentity(plan.Identity) || plan.Work == nil {
+	if a == nil || !plan.Identity.Valid() || plan.Work == nil {
 		return nil, errors.New("jobmgr containment: invalid attempt plan")
 	}
 	a.mu.Lock()
@@ -489,7 +464,7 @@ func (a *Authority) CutProcessAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	cause error,
 ) bool {
-	if a == nil || !validIdentity(identity) {
+	if a == nil || !identity.Valid() {
 		return false
 	}
 	a.mu.Lock()
@@ -502,7 +477,7 @@ func (a *Authority) CutProcessAttempt(
 func (a *Authority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
-	if a == nil || !validIdentity(identity) {
+	if a == nil || !identity.Valid() {
 		return nil, false
 	}
 	a.mu.Lock()
@@ -520,7 +495,7 @@ func (a *Authority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,
 ) error {
-	if a == nil || ctx == nil || !validIdentity(identity) {
+	if a == nil || ctx == nil || !identity.Valid() {
 		return errors.New("jobmgr containment: invalid supersession")
 	}
 	a.mu.Lock()
