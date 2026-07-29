@@ -196,6 +196,91 @@ func TestProcessCoreTerminateInterruptsSuccessorStartup(t *testing.T) {
 	close(release)
 }
 
+func TestProcessCorePublishesKnownRestartFailureBeforeFinalization(t *testing.T) {
+	reader, writer := io.Pipe()
+	started := make(chan struct{})
+	failureKnown := make(chan struct{})
+	var builds atomic.Int32
+	factory := agentdiscovery.NewProviderFactory(
+		"failing-successor",
+		func(build agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
+			if builds.Add(1) == 2 {
+				close(failureKnown)
+				panic("successor construction failed")
+			}
+			return processSignalingDiscovery{started: started}, true, nil
+		},
+	)
+	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
+	require.NoError(t, err)
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          newProcessSynchronizedBuffer(),
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            testRunJobServices(t),
+		Discovery: runDiscoveryServices{
+			BuildContext: agentdiscovery.BuildContext{
+				Registry: confgroup.Registry{"test": {}},
+			},
+			Providers: catalog,
+		},
+		Diagnostics: testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	finalizeEntered := make(chan struct{})
+	releaseFinalize := make(chan struct{})
+	process.config.FinalizeOutput = func() {
+		close(finalizeEntered)
+		<-releaseFinalize
+	}
+	t.Cleanup(func() {
+		_ = writer.Close()
+		select {
+		case <-releaseFinalize:
+		default:
+			close(releaseFinalize)
+		}
+	})
+
+	controls := newTestProcessControls(1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "initial discovery provider did not start")
+	}
+
+	restart := testProcessControl()
+	controls.sendRestart(restart)
+	select {
+	case <-failureKnown:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "successor failure was not reached")
+	}
+	select {
+	case err := <-restart.result:
+		require.ErrorContains(t, err, "provider factory panic")
+	case <-time.After(100 * time.Millisecond):
+		require.FailNow(t, "test failed", "known restart failure was withheld behind finalization")
+	}
+	select {
+	case <-finalizeEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "process finalization did not start")
+	}
+	select {
+	case err := <-done:
+		require.FailNowf(t, "test failed", "process stopped before finalization was released: %v", err)
+	default:
+	}
+	close(releaseFinalize)
+	require.ErrorContains(t, <-done, "provider factory panic")
+}
+
 func TestProcessCoreRotationRetainsOldStoreScopeOutsideRun(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
@@ -376,11 +461,40 @@ func TestProcessRestartRecoveryDispositionRejectsMixedFailures(t *testing.T) {
 			),
 			want: context.DeadlineExceeded,
 		},
+		"deadline-generated nonquiescence": {
+			err: errors.Join(
+				context.DeadlineExceeded,
+				jobmgr.ErrShutdownDeadlineExceeded,
+				lifecycle.ErrRunTerminalNonQuiescent,
+				errRunDidNotQuiesce,
+			),
+			want: context.DeadlineExceeded,
+		},
+		"deadline plus restart required": {
+			err:  errors.Join(context.DeadlineExceeded, ErrProcessRestartRequired),
+			want: context.DeadlineExceeded,
+		},
 		"cancellation only": {
 			err: errors.Join(errProcessTransitionInterrupted, context.Canceled),
 		},
+		"nonquiescence without deadline": {
+			err: errors.Join(
+				jobmgr.ErrShutdownDeadlineExceeded,
+				lifecycle.ErrRunTerminalNonQuiescent,
+				errRunDidNotQuiesce,
+			),
+		},
 		"deadline plus unexpected": {
 			err: errors.Join(context.DeadlineExceeded, unexpected),
+		},
+		"deadline-generated nonquiescence plus unexpected": {
+			err: errors.Join(
+				context.DeadlineExceeded,
+				jobmgr.ErrShutdownDeadlineExceeded,
+				lifecycle.ErrRunTerminalNonQuiescent,
+				errRunDidNotQuiesce,
+				unexpected,
+			),
 		},
 		"restart required plus unexpected": {
 			err: errors.Join(ErrProcessRestartRequired, unexpected),
@@ -679,9 +793,8 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.
 	controls.sendRestart(control)
 	select {
 	case err := <-control.result:
-		require.False(t, err == nil ||
-			!strings.Contains(err.Error(), "jobmgr composition: run did not quiesce") ||
-			!errors.Is(err, context.DeadlineExceeded))
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.ErrorIs(t, processRestartRecoveryDisposition(err), context.DeadlineExceeded)
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "restart did not reject retained discovery provider")
 	}
@@ -1017,6 +1130,15 @@ type processServiceDiscovery struct {
 type processNoncooperativeDiscovery struct {
 	started chan<- struct{}
 	release <-chan struct{}
+}
+
+type processSignalingDiscovery struct {
+	started chan<- struct{}
+}
+
+func (psd processSignalingDiscovery) Run(ctx context.Context, _ chan<- []*confgroup.Group) {
+	close(psd.started)
+	<-ctx.Done()
 }
 
 func (pnd processNoncooperativeDiscovery) Run(context.Context, chan<- []*confgroup.Group) {

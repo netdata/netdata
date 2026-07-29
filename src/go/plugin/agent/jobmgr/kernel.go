@@ -21,7 +21,10 @@ const (
 	asyncEventServiceQuantum = lifecycle.TaskStartServiceQuantum * lifecycle.TransactionTaskPhases
 )
 
-var ErrStopped = errors.New("jobmgr kernel: stopped")
+var (
+	ErrStopped                  = errors.New("jobmgr kernel: stopped")
+	ErrShutdownDeadlineExceeded = errors.New("jobmgr kernel: shutdown deadline exceeded")
+)
 
 type submission struct {
 	request       Request                 // the command being submitted

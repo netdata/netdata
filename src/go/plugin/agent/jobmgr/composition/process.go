@@ -43,6 +43,8 @@ type processInputCompletion struct {
 	quit bool
 }
 
+var errRunDidNotQuiesce = errors.New("jobmgr composition: run did not quiesce")
+
 type processCoreConfig struct {
 	Input           io.Reader                 // plugin stdin
 	Output          io.Writer                 // plugin stdout
@@ -227,14 +229,8 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 				retireErr := pc.retireForSuccessor(control.ctx, result.generation, active.target, nextID)
 				transitionErr := errors.Join(result.err, retireErr)
 				if transitionErr != nil && !processTransitionCancellationOnly(transitionErr) {
-					disposition := processRestartRecoveryDisposition(transitionErr)
-					if disposition != nil {
-						control.result <- disposition
-					}
+					control.result <- processRestartResult(transitionErr)
 					finalErr := pc.finalize(result.generation, transitionErr)
-					if disposition == nil {
-						control.result <- finalErr
-					}
 					return finalErr
 				}
 				generationID = nextID
@@ -244,9 +240,8 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 
 			if result.err != nil {
 				active.cancel(errProcessTransitionInterrupted)
-				if disposition := processRestartRecoveryDisposition(result.err); disposition != nil &&
-					active.control != nil {
-					active.control.result <- disposition
+				if active.control != nil && !processTransitionCancellationOnly(result.err) {
+					active.control.result <- processRestartResult(result.err)
 					active.control = nil
 				}
 				finalErr := pc.finalize(result.generation, result.err)
@@ -359,23 +354,44 @@ func processTransitionCancellationOnly(err error) bool {
 }
 
 func processRestartRecoveryDisposition(err error) error {
-	if !ContainsOnlyProcessControlErrors(
+	var disposition error
+	if processRotationTimeoutOnly(err) {
+		disposition = context.DeadlineExceeded
+	}
+	if ContainsOnlyProcessControlErrors(
 		err,
 		errProcessTransitionInterrupted,
 		context.Canceled,
-		context.DeadlineExceeded,
 		ErrProcessRestartRequired,
-	) {
-		return nil
-	}
-	var disposition error
-	if errors.Is(err, context.DeadlineExceeded) {
-		disposition = context.DeadlineExceeded
-	}
-	if errors.Is(err, ErrProcessRestartRequired) {
+	) && errors.Is(err, ErrProcessRestartRequired) {
 		disposition = errors.Join(disposition, ErrProcessRestartRequired)
 	}
 	return disposition
+}
+
+func processRestartResult(err error) error {
+	// Restart owns only the transition result. Process-finalization failures
+	// remain observable through Run after this known result is acknowledged.
+	if disposition := processRestartRecoveryDisposition(err); disposition != nil {
+		return disposition
+	}
+	return err
+}
+
+func processRotationTimeoutOnly(err error) bool {
+	// The extra sentinels are consequences produced while enforcing the same
+	// expired rotation budget. Any independent leaf still fails closed.
+	return errors.Is(err, context.DeadlineExceeded) &&
+		ContainsOnlyProcessControlErrors(
+			err,
+			errProcessTransitionInterrupted,
+			context.Canceled,
+			context.DeadlineExceeded,
+			ErrProcessRestartRequired,
+			jobmgr.ErrShutdownDeadlineExceeded,
+			lifecycle.ErrRunTerminalNonQuiescent,
+			errRunDidNotQuiesce,
+		)
 }
 
 func (pc *processCore) beginStartTransition(
@@ -696,7 +712,7 @@ func (pc *processCore) retireRun(ctx context.Context, generation *runGeneration)
 		err := errors.Join(
 			waitErr,
 			generation.run.DirtyCause(),
-			errors.New("jobmgr composition: run did not quiesce"),
+			errRunDidNotQuiesce,
 		)
 		jobmgr.ObserveDiagnostic(generation.diagnostics, jobmgr.DiagnosticEvent{
 			Level:      jobmgr.DiagnosticError,

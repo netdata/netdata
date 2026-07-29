@@ -236,6 +236,7 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 				nonzero.TransientActive = 1
 				err := run.Terminal(nonzero)
 				require.ErrorIs(t, err, cause)
+				require.ErrorIs(t, err, ErrRunTerminalNonQuiescent)
 				require.Contains(t, err.Error(), "TransientActive:1")
 				state := run.TerminalState()
 				require.False(t, !state.Reached || state.Quiescent ||

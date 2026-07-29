@@ -847,6 +847,9 @@ agent-level module) stages one stable process-owned handler bundle outside contr
   returns, while unrelated bundles remain available.
 - containment runs the bundle fence before logical settlement becomes observable, so admission cannot race ahead of
   quarantine while an `Await` caller is waiting to be scheduled.
+- a panic from a handler invocation is recovered at the bundle boundary and permanently closes that bundle. Later
+  requests receive an unavailable response without re-entering the handler or accumulating one process-lifetime
+  quarantine tombstone per request.
 
 `functions/bundle.go`, `functions/module_stage.go`, `functions/controller.go`, `containment/authority.go`,
 `process_attempt.go`.
@@ -925,7 +928,11 @@ The rotation is an acknowledged sequence (`composition/process.go`, `retireForSu
    restart therefore cannot stop the new run.
 7. **Classify an incomplete rotation at the host boundary.** Deadline expiry and an explicit process-restart-required
    identity quarantine return status 0 so the daemon restarts the plugin. Mixed or unexpected failures remain visible
-   as status 1. There is no degraded generation and no second shutdown phase after the rotation deadline.
+   as status 1. Deadline-generated kernel, terminal-census, and run-non-quiescence errors carry typed causal
+   provenance; they are recoverable only when the same complete error tree contains the rotation deadline. A known
+   unexpected transition failure is acknowledged before process finalization, so a slow finalizer cannot let the
+   deadline relabel it as recovery. There is no degraded generation and no second shutdown phase after the rotation
+   deadline.
 
 An old installed collector runtime that is still retained leaves its job unavailable/pending in the new run until the
 physical identity releases. Agent-level module Function bundles are different: their identity is canonical across

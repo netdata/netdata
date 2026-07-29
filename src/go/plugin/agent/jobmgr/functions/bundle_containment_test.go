@@ -120,6 +120,38 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 	require.NoError(t, bundle.wait(context.Background()))
 }
 
+func TestFunctionBundlePanicPermanentlyClosesBundleWithoutInvocationTombstones(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &controllerTestHandler{}
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	require.NoError(t, bundle.bindContainment(attempts, 1, "1/module/agent", "module"))
+
+	calls := 0
+	for range 3 {
+		_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
+			calls++
+			panic("handler failed")
+		})
+		require.NoError(t, err)
+	}
+	require.EqualValues(t, 1, calls)
+	require.True(t, functionBundleQuarantined(bundle))
+	require.Zero(t, attempts.Census().Quarantined)
+
+	bundle.retire()
+	require.NoError(t, bundle.wait(context.Background()))
+	require.NoError(t, attempts.Shutdown(context.Background()))
+}
+
 type typedNilBundleTestHandler struct{}
 
 func (*typedNilBundleTestHandler) MethodParams(

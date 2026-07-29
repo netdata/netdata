@@ -46,7 +46,7 @@ type functionBundle struct {
 	invocationID    uint64
 	activeCallbacks int
 	quarantined     bool
-	idExhausted     bool
+	quarantineFixed bool
 }
 
 type functionAvailabilityPoll struct {
@@ -178,7 +178,7 @@ func (fb *functionBundle) invoke(
 	fb.invocationID++
 	if fb.invocationID == 0 {
 		fb.quarantined = true
-		fb.idExhausted = true
+		fb.quarantineFixed = true
 		fb.mu.Unlock()
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
@@ -210,7 +210,11 @@ func (fb *functionBundle) invoke(
 			stop := context.AfterFunc(ctx, func() {
 				cancel(context.Cause(ctx))
 			})
-			sealed, callErr := call(callCtx)
+			sealed, callErr, panicked := callFunctionInvocation(callCtx, call)
+			if panicked {
+				callback.quarantinePermanently()
+				sealed, callErr = functionErrorResult(503, "Function handler is unavailable")
+			}
 			stop()
 			cancel(nil)
 			result <- functionInvocationResult{
@@ -248,6 +252,21 @@ func (fc *functionCallback) quarantineIfActive() {
 	bundle.mu.Unlock()
 }
 
+func (fc *functionCallback) quarantinePermanently() {
+	if fc == nil || fc.bundle == nil {
+		return
+	}
+	bundle := fc.bundle
+	bundle.mu.Lock()
+	if !fc.completed {
+		bundle.quarantined = true
+		// A panicked handler may have corrupted its own state. Do not re-enter
+		// it merely because the callback unwound and released physical ownership.
+		bundle.quarantineFixed = true
+	}
+	bundle.mu.Unlock()
+}
+
 func (fc *functionCallback) complete() {
 	if fc == nil || fc.bundle == nil {
 		return
@@ -270,7 +289,7 @@ func (fc *functionCallback) complete() {
 	if bundle.quarantined &&
 		bundle.activeCallbacks == 0 &&
 		!bundle.retired &&
-		!bundle.idExhausted {
+		!bundle.quarantineFixed {
 		bundle.quarantined = false
 	}
 	if bundle.references <= 0 {
@@ -283,6 +302,21 @@ func (fc *functionCallback) complete() {
 	if start {
 		go bundle.cleanup()
 	}
+}
+
+func callFunctionInvocation(
+	ctx context.Context,
+	call func(context.Context) (lifecycle.SealedResult, error),
+) (result lifecycle.SealedResult, err error, panicked bool) {
+	defer func() {
+		if recover() != nil {
+			result = lifecycle.SealedResult{}
+			err = nil
+			panicked = true
+		}
+	}()
+	result, err = call(ctx)
+	return result, err, false
 }
 
 func newAgentFunctionBundle(

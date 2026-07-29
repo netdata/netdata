@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-var ErrRunTerminalReached = errors.New("jobmgr run supervisor: terminal already reached")
+var (
+	ErrRunTerminalReached      = errors.New("jobmgr run supervisor: terminal already reached")
+	ErrRunTerminalNonQuiescent = errors.New("jobmgr run supervisor: terminal with nonzero process census")
+)
 
 type StoppingRejection struct {
 	Generation uint64
@@ -237,7 +240,7 @@ func (rs *RunSupervisor) Terminal(census RunCensus) error {
 		first := rs.dirty == nil
 		rs.dirty = errors.Join(
 			rs.dirty,
-			fmt.Errorf("jobmgr run supervisor: terminal with nonzero process census: %+v", census),
+			fmt.Errorf("%w: %+v", ErrRunTerminalNonQuiescent, census),
 		)
 		if first && rs.observer != nil {
 			rs.observer.AddRuntimeCounter(RuntimeCounterDirtyRuns, 1)

@@ -474,7 +474,7 @@ func (ck *CommandKernel) hasRunnableSubmissions() bool {
 func (ck *CommandKernel) shutdownDeadlineExceededTerminal(prev error) error {
 	return errors.Join(
 		prev,
-		errors.New("jobmgr kernel: shutdown deadline exceeded"),
+		ErrShutdownDeadlineExceeded,
 		ck.run.Terminal(ck.runCensus()),
 	)
 }

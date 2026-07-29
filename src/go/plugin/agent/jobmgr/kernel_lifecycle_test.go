@@ -1907,7 +1907,7 @@ func TestKernelShutdownDeadlineWinsFinalizerCompletion(t *testing.T) {
 	clock.expireShutdown(t)
 
 	err := kernel.Wait(context.Background())
-	require.False(t, err == nil || !strings.Contains(err.Error(), "shutdown deadline exceeded"))
+	require.ErrorIs(t, err, ErrShutdownDeadlineExceeded)
 
 	terminal := run.TerminalState()
 	require.False(t, !terminal.Reached || terminal.Quiescent || terminal.Dirty == nil)
