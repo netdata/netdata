@@ -135,8 +135,8 @@ jobs:
 
 	require.Len(t, initial, 1)
 	require.Len(t, loadErrs, 2)
-	require.Contains(t, output.String(), "CONFIG go.d:secretstore:vault:valid create running job")
-	require.Contains(t, output.String(), "CONFIG go.d:collector:module:unrelated create running job")
+	output.waitContains(t, "CONFIG go.d:secretstore:vault:valid create running job")
+	output.waitContains(t, "CONFIG go.d:collector:module:unrelated create running job")
 	require.NotContains(t, output.String(), "inferred_unknown")
 	require.NotContains(t, output.String(), "non_string_kind")
 	require.NoError(t, generation.run.DirtyCause())
