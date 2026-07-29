@@ -37,7 +37,7 @@ type DecisionIndex struct {
 
 	sources             map[string]map[uint64]confgroup.Config               // per-source config sets (authoritative full set per source)
 	candidates          map[string]map[decisionCandidateKey]confgroup.Config // per-job candidate configs by key
-	acknowledged        map[string]confgroup.Config                          // last acknowledged config per job full name
+	acknowledged        map[string]decisionSelection                         // last acknowledged config and authoritative source slot
 	candidateRejections map[string]map[decisionCandidateRevision]struct{}    // exact rejected candidate revisions
 	pendingRemovals     map[string]struct{}                                  // rejected removals to retry on a later batch
 	revision            uint64                                               // monotonic decision revision
@@ -51,6 +51,11 @@ type decisionCandidateKey struct {
 type decisionCandidateRevision struct {
 	key decisionCandidateKey
 	uid string
+}
+
+type decisionSelection struct {
+	confgroup.Config
+	key decisionCandidateKey
 }
 
 func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
@@ -73,7 +78,7 @@ func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
 		diagnostics:         config.Diagnostics,
 		sources:             make(map[string]map[uint64]confgroup.Config),
 		candidates:          make(map[string]map[decisionCandidateKey]confgroup.Config),
-		acknowledged:        make(map[string]confgroup.Config),
+		acknowledged:        make(map[string]decisionSelection),
 		candidateRejections: make(map[string]map[decisionCandidateRevision]struct{}),
 		pendingRemovals:     make(map[string]struct{}),
 	}, nil
@@ -187,9 +192,7 @@ func (di *DecisionIndex) observeRejection(name string, err error) {
 	})
 }
 
-func (di *DecisionIndex) applyGroup(
-	group *confgroup.Group,
-) (map[string]struct{}, error) {
+func (di *DecisionIndex) applyGroup(group *confgroup.Group) (map[string]struct{}, error) {
 	if di == nil || group == nil || group.Source == "" {
 		return nil, errors.New("jobmgr discovery: invalid group")
 	}
@@ -311,11 +314,18 @@ type decisionReconciliation struct {
 func (di *DecisionIndex) prepareReconciliation(fullName string) decisionReconciliation {
 	reconciliation := decisionReconciliation{fullName: fullName}
 	current, hasCurrent := di.acknowledged[fullName]
-	next, candidateKey, hasNext := di.selectConfig(fullName, current, hasCurrent)
+	next, candidateKey, hasNext := di.selectConfig(fullName, current.Config, hasCurrent)
+	// A rejected replacement never changed graph ownership. Keep that incumbent
+	// against same/lower sources until its authoritative source is removed.
+	if hasCurrent &&
+		di.incumbentSourceBlocked(fullName, current.key.source) &&
+		(!hasNext || next.SourceTypePriority() <= current.Config.SourceTypePriority()) {
+		return reconciliation
+	}
 	if !hasCurrent && !hasNext {
 		return reconciliation
 	}
-	if hasCurrent && hasNext && current.UID() == next.UID() {
+	if hasCurrent && hasNext && current.Config.UID() == next.UID() {
 		return reconciliation
 	}
 	reconciliation.next = next
@@ -329,7 +339,7 @@ func (di *DecisionIndex) prepareReconciliation(fullName string) decisionReconcil
 			change.Status = dyncfg.StatusRunning
 		}
 	} else {
-		change.Config = current
+		change.Config = current.Config
 		change.Remove = true
 	}
 	plan, err := di.plan(change)
@@ -356,10 +366,27 @@ func (di *DecisionIndex) prepareReconciliation(fullName string) decisionReconcil
 
 func (di *DecisionIndex) acknowledge(reconciliation decisionReconciliation) {
 	if reconciliation.hasNext {
-		di.acknowledged[reconciliation.fullName] = reconciliation.next
+		di.acknowledged[reconciliation.fullName] = decisionSelection{
+			Config: reconciliation.next,
+			key:    reconciliation.candidateKey,
+		}
 	} else {
 		delete(di.acknowledged, reconciliation.fullName)
 	}
+}
+
+func (di *DecisionIndex) incumbentSourceBlocked(fullName string, source string) bool {
+	found := false
+	for key, candidate := range di.candidates[fullName] {
+		if key.source != source {
+			continue
+		}
+		found = true
+		if !di.candidateRejected(fullName, key, candidate) {
+			return false
+		}
+	}
+	return found
 }
 
 func (di *DecisionIndex) selectConfig(

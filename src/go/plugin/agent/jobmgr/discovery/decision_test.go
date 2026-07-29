@@ -268,6 +268,151 @@ func TestDecisionIndexRejectedHigherPrioritySelectionKeepsIncumbent(t *testing.T
 	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
 }
 
+func TestDecisionIndexRejectedSameSourceReplacementKeepsIncumbent(t *testing.T) {
+	var changes []DiscoveredChange
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			changes = append(changes, change)
+			if !change.Remove && change.Config.Get("revision") == "rejected" {
+				return jobmgr.WorkPlan{}, jobmgr.RejectProposal(errors.New("invalid replacement"))
+			}
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	lower := decisionTestConfig("job", confgroup.TypeStock, "lower")
+	original := decisionTestConfig("job", confgroup.TypeUser, "source").Set("revision", "original")
+	replacement := decisionTestConfig("job", confgroup.TypeUser, "source").Set("revision", "rejected")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{
+		{Source: "lower", Configs: []confgroup.Config{lower}},
+		{Source: "source", Configs: []confgroup.Config{original}},
+	}))
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{replacement},
+	}}))
+
+	require.Len(t, changes, 2)
+	require.False(t, changes[0].Remove)
+	require.False(t, changes[1].Remove)
+	require.Len(t, commands.requests, 1)
+	require.Equal(t, original.UID(), index.acknowledged[original.FullName()].UID())
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "source"}}))
+	require.Len(t, changes, 3)
+	require.False(t, changes[2].Remove)
+	require.Equal(t, lower.UID(), changes[2].Config.UID())
+	require.Len(t, commands.requests, 2)
+	require.Equal(t, lower.UID(), index.acknowledged[lower.FullName()].UID())
+}
+
+func TestDecisionIndexSubmittedSameSourceReplacementRejectionKeepsIncumbent(t *testing.T) {
+	var changes []DiscoveredChange
+	commands := &sequenceDecisionTestCommands{
+		results: []error{
+			nil,
+			jobmgr.RejectProposal(errors.New("rejected during command preparation")),
+		},
+	}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			changes = append(changes, change)
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	original := decisionTestConfig("job", confgroup.TypeUser, "source").Set("revision", "original")
+	replacement := decisionTestConfig("job", confgroup.TypeUser, "source").Set("revision", "rejected")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{original},
+	}}))
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{replacement},
+	}}))
+
+	require.Len(t, changes, 2)
+	require.False(t, changes[0].Remove)
+	require.False(t, changes[1].Remove)
+	require.Len(t, commands.requests, 2)
+	require.Equal(t, original.UID(), index.acknowledged[original.FullName()].UID())
+}
+
+func TestDecisionIndexRejectedOtherSourceDoesNotMaskIncumbentSourceRemoval(t *testing.T) {
+	var changes []DiscoveredChange
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			changes = append(changes, change)
+			if !change.Remove && change.Config.SourceType() == confgroup.TypeUser {
+				return jobmgr.WorkPlan{}, jobmgr.RejectProposal(errors.New("invalid user config"))
+			}
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	stock := decisionTestConfig("job", confgroup.TypeStock, "stock")
+	user := decisionTestConfig("job", confgroup.TypeUser, "user")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "stock",
+		Configs: []confgroup.Config{stock},
+	}}))
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "user",
+		Configs: []confgroup.Config{user},
+	}}))
+	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
+	require.Len(t, commands.requests, 1)
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "stock"}}))
+	require.Len(t, changes, 3)
+	require.True(t, changes[2].Remove)
+	require.Len(t, commands.requests, 2)
+	require.NotContains(t, index.acknowledged, stock.FullName())
+}
+
+func TestDecisionIndexRejectedReplacementDoesNotMaskHigherPrioritySource(t *testing.T) {
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			if change.Config.Get("revision") == "rejected" {
+				return jobmgr.WorkPlan{}, jobmgr.RejectProposal(errors.New("invalid replacement"))
+			}
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	stock := decisionTestConfig("job", confgroup.TypeStock, "stock").Set("revision", "original")
+	replacement := decisionTestConfig("job", confgroup.TypeStock, "stock").Set("revision", "rejected")
+	user := decisionTestConfig("job", confgroup.TypeUser, "user")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "stock",
+		Configs: []confgroup.Config{stock},
+	}}))
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "stock",
+		Configs: []confgroup.Config{replacement},
+	}}))
+	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "user",
+		Configs: []confgroup.Config{user},
+	}}))
+	require.Len(t, commands.requests, 2)
+	require.Equal(t, user.UID(), index.acknowledged[user.FullName()].UID())
+}
+
 func TestDecisionIndexRejectedHigherPriorityFallsBackInSameBatch(t *testing.T) {
 	var planned []string
 	commands := &decisionTestCommands{}

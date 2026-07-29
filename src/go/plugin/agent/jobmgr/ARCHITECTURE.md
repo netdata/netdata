@@ -463,6 +463,7 @@ Common event sequences:
 | DynCfg config is checking; a lower source arrives | Work for that job identity is serialized. If DynCfg establishes graph ownership, the lower reconciliation becomes a no-op before `Check`. |
 | Higher source is `Accepted`, `Running`, `Failed`, or `Disabled` | Its graph record still owns the identity. A lower source cannot replace it merely because it is not running. |
 | Higher proposal is invalid or rejected before graph mutation | It never becomes the owner. That exact source revision is skipped until its record changes, and the selected valid lower source may proceed in the same reconciliation. |
+| An acknowledged source publishes a rejected replacement | The incumbent remains the graph owner against same/lower sources while that authoritative source still has a record. A strictly higher valid source may replace it; a real removal of the incumbent source may remove it. |
 | A stale pending attempt or retry becomes runnable | It revalidates the source winner, desired config, token, and graph state. If any changed, it becomes a no-op. |
 | DynCfg `test` runs | It uses a separate, memory-only attempt identity. It never owns the graph and never masks another source. |
 | DynCfg override is removed | The override and its runtime, if running, are removed. A masked lower source is **not** activated automatically; it needs a later source-state transition that produces a new reconciliation. An unchanged masked candidate is not installed merely because DynCfg disappeared. |
