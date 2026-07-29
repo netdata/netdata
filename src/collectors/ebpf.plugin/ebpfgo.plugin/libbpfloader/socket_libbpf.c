@@ -2,11 +2,13 @@
 // +build netdata_ebpf_libbpf
 
 #include <errno.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <time.h>
 
 /* Minimum gap between repeated pid-hash-table-full log lines (microseconds).
@@ -688,30 +690,55 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
 
     while (bpf_map_get_next_key(ndfd, first_nditer ? NULL : &key, &next) == 0) {
         first_nditer = false;
-        if (next.pid != 0 && bpf_map_lookup_elem(ndfd, &next, vbuf) == 0) {
-            if (ndcount == 1) {
-                if (!pid_ht_accumulate(rt->pid_ht, next.pid, vbuf, rt->pid_ht_size, rt->pid_ht_mask))
-                    rt->pid_ht_drops++;
-            } else {
-                /* PERCPU_HASH: sum per-CPU values into a temporary entry. */
-                netdata_socket_bpf_value_t agg = {0};
-                for (int c = 0; c < ndcount; c++) {
-                    agg.tcp.tcp_bytes_sent      += vbuf[c].tcp.tcp_bytes_sent;
-                    agg.tcp.tcp_bytes_received  += vbuf[c].tcp.tcp_bytes_received;
-                    agg.tcp.call_tcp_sent       += vbuf[c].tcp.call_tcp_sent;
-                    agg.tcp.call_tcp_received   += vbuf[c].tcp.call_tcp_received;
-                    agg.tcp.retransmit          += vbuf[c].tcp.retransmit;
-                    agg.udp.call_udp_sent       += vbuf[c].udp.call_udp_sent;
-                    agg.udp.call_udp_received   += vbuf[c].udp.call_udp_received;
-                    agg.tcp.close               += vbuf[c].tcp.close;
-                    agg.tcp.ipv4_connect        += vbuf[c].tcp.ipv4_connect;
-                    agg.tcp.ipv6_connect        += vbuf[c].tcp.ipv6_connect;
-                }
-                if (!pid_ht_accumulate(rt->pid_ht, next.pid, &agg, rt->pid_ht_size, rt->pid_ht_mask))
-                    rt->pid_ht_drops++;
-            }
-        }
+        /* Advance the predecessor before any 'continue' so get_next_key always
+         * receives a valid (or recently-deleted) predecessor.  The kernel handles
+         * a deleted predecessor by returning the next hash-table slot after it. */
         key = next;
+
+        if (next.pid == 0 || bpf_map_lookup_elem(ndfd, &next, vbuf) != 0)
+            continue;
+
+        /* Delete unbound entries (both addresses are all-zero).  These are
+         * never routable, accumulate indefinitely in a plain hash map, and
+         * consume capacity.  Mirrors ebpf_socket.c:1860-1862. */
+        static const uint8_t zero16[16] = {0};
+        if (memcmp(next.saddr, zero16, 16) == 0 && memcmp(next.daddr, zero16, 16) == 0) {
+            bpf_map_delete_elem(ndfd, &next);
+            continue;
+        }
+
+        /* Delete entries for dead PIDs.  tbl_nd_socket is a plain percpu
+         * hash — neither the BPF program nor userspace deletes entries, so
+         * closed connections accumulate until the map hits its capacity limit
+         * and bpf_map_update_elem starts returning E2BIG for all new flows.
+         * kill(pid, 0) == -1/ESRCH confirms the process is gone; EPERM means
+         * alive but not ours, so we keep those.  Mirrors ebpf_socket.c:1930. */
+        if (kill((pid_t)next.pid, 0) != 0 && errno == ESRCH) {
+            bpf_map_delete_elem(ndfd, &next);
+            continue;
+        }
+
+        if (ndcount == 1) {
+            if (!pid_ht_accumulate(rt->pid_ht, next.pid, vbuf, rt->pid_ht_size, rt->pid_ht_mask))
+                rt->pid_ht_drops++;
+        } else {
+            /* PERCPU_HASH: sum per-CPU values into a temporary entry. */
+            netdata_socket_bpf_value_t agg = {0};
+            for (int c = 0; c < ndcount; c++) {
+                agg.tcp.tcp_bytes_sent      += vbuf[c].tcp.tcp_bytes_sent;
+                agg.tcp.tcp_bytes_received  += vbuf[c].tcp.tcp_bytes_received;
+                agg.tcp.call_tcp_sent       += vbuf[c].tcp.call_tcp_sent;
+                agg.tcp.call_tcp_received   += vbuf[c].tcp.call_tcp_received;
+                agg.tcp.retransmit          += vbuf[c].tcp.retransmit;
+                agg.udp.call_udp_sent       += vbuf[c].udp.call_udp_sent;
+                agg.udp.call_udp_received   += vbuf[c].udp.call_udp_received;
+                agg.tcp.close               += vbuf[c].tcp.close;
+                agg.tcp.ipv4_connect        += vbuf[c].tcp.ipv4_connect;
+                agg.tcp.ipv6_connect        += vbuf[c].tcp.ipv6_connect;
+            }
+            if (!pid_ht_accumulate(rt->pid_ht, next.pid, &agg, rt->pid_ht_size, rt->pid_ht_mask))
+                rt->pid_ht_drops++;
+        }
     }
 
     if (rt->pid_ht_drops > 0) {
