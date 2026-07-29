@@ -404,6 +404,7 @@ func newRetainedTransactionSuccessor(
 		finalCleanup:     func(context.Context) error { return nil },
 	}
 	owner := newStagedJobOwner(
+		context.Background(),
 		candidate,
 		attempts,
 		1,
@@ -574,6 +575,7 @@ func applyTargetRetirementTransaction(
 	}
 	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
 	owner = newStagedJobOwner(
+		context.Background(),
 		candidate,
 		attempts,
 		1,

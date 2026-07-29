@@ -62,6 +62,7 @@ func TestPreparedJobAcceptanceTransfersFinalCleanupToProcessOwner(t *testing.T) 
 		finalCleanup:     func(context.Context) error { final++; return nil },
 	}
 	owner := newStagedJobOwner(
+		context.Background(),
 		candidate,
 		attempts,
 		1,
@@ -118,6 +119,7 @@ func TestPreparedJobRetirementBeforeResourceAcceptanceLeavesPermitUnused(t *test
 		finalCleanup:     func(context.Context) error { return nil },
 	}
 	owner := newStagedJobOwner(
+		context.Background(),
 		candidate,
 		attempts,
 		1,
@@ -161,7 +163,9 @@ func TestCandidateCancellationBeforePromotionPreservesRetirementCause(t *testing
 	outputGate, err := newGenerationOutputGate(frames)
 	require.NoError(t, err)
 	var cleanups int
+	ctx, cancel := context.WithCancelCause(context.Background())
 	owner := newStagedJobOwner(
+		ctx,
 		ConstructedJob{
 			Variant:          JobVariantV1,
 			CollectorCleanup: func(context.Context) error { cleanups++; return nil },
@@ -175,7 +179,6 @@ func TestCandidateCancellationBeforePromotionPreservesRetirementCause(t *testing
 			Resource:  "module_job",
 		},
 	)
-	ctx, cancel := context.WithCancelCause(context.Background())
 	finished := make(chan error, 1)
 	go func() {
 		finished <- owner.finishCandidate(ctx)
@@ -208,7 +211,9 @@ func TestCandidateCancellationDoesNotRejectPromotionInProgress(t *testing.T) {
 	outputGate, err := newGenerationOutputGate(frames)
 	require.NoError(t, err)
 	var cleanups int
+	candidateCtx, cancelCandidate := context.WithCancelCause(context.Background())
 	owner := newStagedJobOwner(
+		candidateCtx,
 		ConstructedJob{
 			Variant:          JobVariantV1,
 			CollectorCleanup: func(context.Context) error { cleanups++; return nil },
@@ -222,7 +227,6 @@ func TestCandidateCancellationDoesNotRejectPromotionInProgress(t *testing.T) {
 			Resource:  "module_job",
 		},
 	)
-	candidateCtx, cancelCandidate := context.WithCancelCause(context.Background())
 	finished := make(chan error, 1)
 	go func() {
 		finished <- owner.finishCandidate(candidateCtx)
@@ -259,6 +263,67 @@ func TestCandidateCancellationDoesNotRejectPromotionInProgress(t *testing.T) {
 	require.NoError(t, delegate.Shutdown(context.Background()))
 }
 
+func TestCandidateCancellationControlsFailedPromotion(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attempts := &busyPromotionGateAuthority{
+		ProcessAttemptAuthority: delegate,
+		entered:                 make(chan struct{}),
+		release:                 make(chan struct{}),
+	}
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	outputGate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	var cleanups int
+	candidateCtx, cancelCandidate := context.WithCancelCause(context.Background())
+	owner := newStagedJobOwner(
+		candidateCtx,
+		ConstructedJob{
+			Variant:          JobVariantV1,
+			CollectorCleanup: func(context.Context) error { cleanups++; return nil },
+			outputGate:       outputGate,
+		},
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module_job",
+			Resource:  "module_job",
+		},
+	)
+	finished := make(chan error, 1)
+	go func() {
+		finished <- owner.finishCandidate(candidateCtx)
+	}()
+	promoted := make(chan error, 1)
+	go func() {
+		promoted <- owner.Promote(context.Background())
+	}()
+	select {
+	case <-attempts.entered:
+	case <-time.After(time.Second):
+		t.Fatal("promotion did not reach busy runtime supersession")
+	}
+
+	cancelCandidate(jobmgr.ErrProcessAttemptStopped)
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case err := <-promoted:
+		require.ErrorIs(t, err, jobmgr.ErrProcessAttemptStopped)
+	case <-timer.C:
+		close(attempts.release)
+		<-promoted
+		t.Fatal("candidate cancellation did not interrupt busy runtime supersession")
+	}
+	require.NoError(t, <-finished)
+	require.EqualValues(t, 1, cleanups)
+
+	delegate.BeginShutdown()
+	require.NoError(t, delegate.Shutdown(context.Background()))
+}
+
 type promotionGateAuthority struct {
 	jobmgr.ProcessAttemptAuthority
 	entered chan struct{}
@@ -272,6 +337,32 @@ func (a *promotionGateAuthority) StartProcessAttempt(
 	close(a.entered)
 	<-a.release
 	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+}
+
+type busyPromotionGateAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (*busyPromotionGateAuthority) StartProcessAttempt(
+	context.Context,
+	jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	return nil, jobmgr.ErrProcessAttemptBusy
+}
+
+func (a *busyPromotionGateAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	_ jobmgr.ProcessAttemptIdentity,
+) error {
+	close(a.entered)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-a.release:
+		return jobmgr.ErrProcessAttemptBusy
+	}
 }
 
 type testingHelper interface {

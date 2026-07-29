@@ -53,6 +53,7 @@ type stagedJobOwner struct {
 
 	resources       ConstructedJob
 	attempts        jobmgr.ProcessAttemptAuthority
+	candidateCtx    context.Context
 	runtimeIdentity jobmgr.ProcessAttemptIdentity
 	target          uint64
 	ownership       stagedJobOwnership
@@ -92,14 +93,19 @@ type stagedJobStartRequest struct {
 }
 
 func newStagedJobOwner(
+	candidateCtx context.Context,
 	candidate ConstructedJob,
 	attempts jobmgr.ProcessAttemptAuthority,
 	target uint64,
 	runtimeIdentity jobmgr.ProcessAttemptIdentity,
 ) *stagedJobOwner {
+	if candidateCtx == nil {
+		candidateCtx = context.Background()
+	}
 	return &stagedJobOwner{
 		resources:       candidate,
 		attempts:        attempts,
+		candidateCtx:    candidateCtx,
 		runtimeIdentity: runtimeIdentity,
 		target:          target,
 		ownership:       stagedJobOwnedByCandidate,
@@ -192,11 +198,22 @@ func (sjo *stagedJobOwner) reject(cause error, candidateOnly bool) bool {
 		return false
 	}
 	sjo.mu.Lock()
+	resources, ownership, rejected := sjo.rejectLocked(cause, candidateOnly)
+	sjo.mu.Unlock()
+	if rejected {
+		sjo.finishRejection(resources, ownership)
+	}
+	return rejected
+}
+
+func (sjo *stagedJobOwner) rejectLocked(
+	cause error,
+	candidateOnly bool,
+) (ConstructedJob, stagedJobOwnership, bool) {
 	ownership := sjo.ownership
 	if sjo.decided ||
 		candidateOnly && ownership != stagedJobOwnedByCandidate {
-		sjo.mu.Unlock()
-		return false
+		return ConstructedJob{}, 0, false
 	}
 	sjo.decided = true
 	sjo.installing = false
@@ -207,8 +224,15 @@ func (sjo *stagedJobOwner) reject(cause error, candidateOnly bool) bool {
 		sjo.retirementCause = cause
 	}
 	sjo.retiring = true
+	sjo.candidateCtx = nil
 	resources := sjo.resources
-	sjo.mu.Unlock()
+	return resources, ownership, true
+}
+
+func (sjo *stagedJobOwner) finishRejection(
+	resources ConstructedJob,
+	ownership stagedJobOwnership,
+) {
 	resources.outputGate.Fence()
 	sjo.retireOnce.Do(func() {
 		close(sjo.retire)
@@ -219,7 +243,6 @@ func (sjo *stagedJobOwner) reject(cause error, candidateOnly bool) bool {
 			close(sjo.rejectCandidate)
 		})
 	}
-	return true
 }
 
 func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
@@ -247,6 +270,12 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 		sjo.mu.Unlock()
 		return errors.New("job output: invalid staged job promotion")
 	}
+	if cause := context.Cause(sjo.candidateCtx); cause != nil {
+		resources, ownership, _ := sjo.rejectLocked(cause, true)
+		sjo.mu.Unlock()
+		sjo.finishRejection(resources, ownership)
+		return cause
+	}
 	sjo.ownership = stagedJobPromotionActive
 	start := func() (jobmgr.ProcessAttempt, <-chan error, error) {
 		admitted := make(chan error, 1)
@@ -269,27 +298,49 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 	}
 	_, admitted, err := start()
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) {
-		err = sjo.attempts.SupersedeProcessAttempt(ctx, sjo.runtimeIdentity)
+		// No successor owns the handoff yet, so candidate containment may still
+		// interrupt the bounded supersession wait.
+		err = sjo.attempts.SupersedeProcessAttempt(sjo.candidateCtx, sjo.runtimeIdentity)
 		if err == nil {
 			_, admitted, err = start()
 		}
 	}
 	if err != nil {
-		sjo.ownership = stagedJobOwnedByCandidate
+		err, resources, ownership, rejected := sjo.failPromotionLocked(err)
 		sjo.mu.Unlock()
+		if rejected {
+			sjo.finishRejection(resources, ownership)
+		}
 		return err
 	}
 	if err := <-admitted; err != nil {
-		sjo.ownership = stagedJobOwnedByCandidate
+		err, resources, ownership, rejected := sjo.failPromotionLocked(err)
 		sjo.mu.Unlock()
+		if rejected {
+			sjo.finishRejection(resources, ownership)
+		}
 		return err
 	}
 	sjo.ownership = stagedJobOwnedByRuntime
+	sjo.candidateCtx = nil
 	sjo.transferOnce.Do(func() {
 		close(sjo.transferred)
 	})
 	sjo.mu.Unlock()
 	return nil
+}
+
+func (sjo *stagedJobOwner) failPromotionLocked(
+	promotionErr error,
+) (error, ConstructedJob, stagedJobOwnership, bool) {
+	sjo.ownership = stagedJobOwnedByCandidate
+	// The candidate cut may have waited behind the promotion lock. Its context
+	// records the winning cause independently of that lock.
+	if cause := context.Cause(sjo.candidateCtx); cause != nil {
+		resources, ownership, rejected := sjo.rejectLocked(cause, true)
+		return cause, resources, ownership, rejected
+	}
+	return promotionErr, ConstructedJob{}, 0, false
 }
 
 func (sjo *stagedJobOwner) ReserveInstallation() error {
@@ -793,6 +844,7 @@ func (pjc *preparedJobCandidate) run(
 	storeSnapshot := candidate.storeSnapshot
 	candidate.storeSnapshot = nil
 	owner := newStagedJobOwner(
+		ctx,
 		candidate,
 		pjc.attempts,
 		pjc.target,

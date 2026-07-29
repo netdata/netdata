@@ -39,6 +39,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 		outputGate:       gate,
 	}
 	owner := newStagedJobOwner(
+		context.Background(),
 		candidate,
 		attempts,
 		1,
@@ -130,6 +131,7 @@ func TestProcessOwnedJobCannotAttachAfterTargetRetirementFinalizesCandidate(t *t
 		outputGate:       gate,
 	}
 	owner := newStagedJobOwner(
+		context.Background(),
 		candidate,
 		attempts,
 		1,
@@ -163,6 +165,7 @@ func TestProcessOwnedJobCannotAttachAfterTargetRetirementFinalizesCandidate(t *t
 func TestStagedJobPromotionDoesNotStartAfterCallerCancellation(t *testing.T) {
 	attempts := &unexpectedPendingJobAuthority{}
 	owner := newStagedJobOwner(
+		context.Background(),
 		ConstructedJob{},
 		attempts,
 		1,
