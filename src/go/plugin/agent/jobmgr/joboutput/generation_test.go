@@ -153,6 +153,127 @@ func TestPreparedJobRetirementBeforeResourceAcceptanceLeavesPermitUnused(t *test
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
+func TestCandidateCancellationBeforePromotionPreservesRetirementCause(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	outputGate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	var cleanups int
+	owner := newStagedJobOwner(
+		ConstructedJob{
+			Variant:          JobVariantV1,
+			CollectorCleanup: func(context.Context) error { cleanups++; return nil },
+			outputGate:       outputGate,
+		},
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module_job",
+			Resource:  "module_job",
+		},
+	)
+	ctx, cancel := context.WithCancelCause(context.Background())
+	finished := make(chan error, 1)
+	go func() {
+		finished <- owner.finishCandidate(ctx)
+	}()
+
+	cancel(jobmgr.ErrProcessAttemptStopped)
+	select {
+	case <-owner.rejectCandidate:
+	case <-time.After(time.Second):
+		t.Fatal("candidate cancellation did not reject its ownership")
+	}
+	require.ErrorIs(t, owner.Promote(context.Background()), jobmgr.ErrProcessAttemptStopped)
+	require.NoError(t, <-finished)
+	require.EqualValues(t, 1, cleanups)
+
+	attempts.BeginShutdown()
+	require.NoError(t, attempts.Shutdown(context.Background()))
+}
+
+func TestCandidateCancellationDoesNotRejectPromotionInProgress(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attempts := &promotionGateAuthority{
+		ProcessAttemptAuthority: delegate,
+		entered:                 make(chan struct{}),
+		release:                 make(chan struct{}),
+	}
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	outputGate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	var cleanups int
+	owner := newStagedJobOwner(
+		ConstructedJob{
+			Variant:          JobVariantV1,
+			CollectorCleanup: func(context.Context) error { cleanups++; return nil },
+			outputGate:       outputGate,
+		},
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module_job",
+			Resource:  "module_job",
+		},
+	)
+	candidateCtx, cancelCandidate := context.WithCancelCause(context.Background())
+	finished := make(chan error, 1)
+	go func() {
+		finished <- owner.finishCandidate(candidateCtx)
+	}()
+	promoted := make(chan error, 1)
+	go func() {
+		promoted <- owner.Promote(context.Background())
+	}()
+	select {
+	case <-attempts.entered:
+	case <-time.After(time.Second):
+		t.Fatal("promotion did not reach runtime-attempt admission")
+	}
+
+	cancelCandidate(jobmgr.ErrProcessAttemptStopped)
+	close(attempts.release)
+	require.NoError(t, <-promoted)
+	require.NoError(t, <-finished)
+	owner.mu.Lock()
+	ownership, retiring, decided := owner.ownership, owner.retiring, owner.decided
+	owner.mu.Unlock()
+	require.Equal(t, stagedJobOwnedByRuntime, ownership)
+	require.False(t, retiring)
+	require.False(t, decided)
+
+	owner.Reject()
+	select {
+	case <-owner.done:
+	case <-time.After(time.Second):
+		t.Fatal("promoted runtime did not retire")
+	}
+	require.EqualValues(t, 1, cleanups)
+	delegate.BeginShutdown()
+	require.NoError(t, delegate.Shutdown(context.Background()))
+}
+
+type promotionGateAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (a *promotionGateAuthority) StartProcessAttempt(
+	ctx context.Context,
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	close(a.entered)
+	<-a.release
+	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+}
+
 type testingHelper interface {
 	require.TestingT
 	Helper()

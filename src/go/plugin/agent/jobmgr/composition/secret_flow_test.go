@@ -154,17 +154,21 @@ func TestProcessCoreSecretUpdateDependentRestart(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			testProcessCoreSecretMutationDependentRestart(t, "update", test.restartErr, false)
+			testProcessCoreSecretMutationDependentRestart(t, "update", test.restartErr, false, false)
 		})
 	}
 }
 
 func TestProcessCoreSecretAddReplayDependentRestart(t *testing.T) {
-	testProcessCoreSecretMutationDependentRestart(t, "add", nil, false)
+	testProcessCoreSecretMutationDependentRestart(t, "add", nil, false, false)
 }
 
 func TestProcessCoreSecretUpdateDuringInitialCandidateRetriesLatestStoreGeneration(t *testing.T) {
-	testProcessCoreSecretMutationDependentRestart(t, "update", nil, true)
+	testProcessCoreSecretMutationDependentRestart(t, "update", nil, true, false)
+}
+
+func TestProcessCoreShutdownDuringPendingSecretCandidatePromotionQuiesces(t *testing.T) {
+	testProcessCoreSecretMutationDependentRestart(t, "update", nil, true, true)
 }
 
 func testProcessCoreSecretMutationDependentRestart(
@@ -172,6 +176,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	command string,
 	restartErr error,
 	gateInitial bool,
+	terminateAfterReplacementInit bool,
 ) {
 	t.Helper()
 	starts := make(chan string, 4)
@@ -326,6 +331,9 @@ func testProcessCoreSecretMutationDependentRestart(
 		releaseInitialOnce.Do(func() { close(releaseInitial) })
 	}
 	waitSecretStart(t, starts, "replacement")
+	if gateInitial && !terminateAfterReplacementInit {
+		output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+	}
 	if !gateInitial {
 		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+" 200 application/json")
 	}

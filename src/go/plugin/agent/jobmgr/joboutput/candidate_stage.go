@@ -177,28 +177,49 @@ func (sjo *stagedJobOwner) BindAttachment() error {
 }
 
 func (sjo *stagedJobOwner) Reject() {
+	sjo.reject(nil, false)
+}
+
+// rejectCandidateOnCut lets candidate-attempt cancellation win only before
+// promotion owns the handoff. Once promotion starts, its runtime attempt owns
+// retirement and the candidate cut must not invalidate that successor.
+func (sjo *stagedJobOwner) rejectCandidateOnCut(cause error) bool {
+	return sjo.reject(cause, true)
+}
+
+func (sjo *stagedJobOwner) reject(cause error, candidateOnly bool) bool {
 	if sjo == nil {
-		return
+		return false
 	}
 	sjo.mu.Lock()
-	if sjo.decided {
+	ownership := sjo.ownership
+	if sjo.decided ||
+		candidateOnly && ownership != stagedJobOwnedByCandidate {
 		sjo.mu.Unlock()
-		return
+		return false
 	}
 	sjo.decided = true
 	sjo.installing = false
-	ownership := sjo.ownership
 	if ownership == stagedJobOwnedByCandidate {
 		sjo.ownership = stagedJobOwnershipRejected
 	}
+	if !sjo.retiring {
+		sjo.retirementCause = cause
+	}
+	sjo.retiring = true
+	resources := sjo.resources
 	sjo.mu.Unlock()
-	sjo.requestRetirement(nil)
+	resources.outputGate.Fence()
+	sjo.retireOnce.Do(func() {
+		close(sjo.retire)
+	})
 	sjo.Detached()
 	if ownership == stagedJobOwnedByCandidate {
 		sjo.candidateRejectOnce.Do(func() {
 			close(sjo.rejectCandidate)
 		})
 	}
+	return true
 }
 
 func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
@@ -213,9 +234,7 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 		sjo.target == 0 ||
 		sjo.runtimeIdentity.Namespace != jobmgr.ProcessAttemptJobRuntime ||
 		sjo.runtimeIdentity.Key == "" ||
-		sjo.runtimeIdentity.Resource == "" ||
-		sjo.ownership != stagedJobOwnedByCandidate ||
-		sjo.decided {
+		sjo.runtimeIdentity.Resource == "" {
 		sjo.mu.Unlock()
 		return errors.New("job output: invalid staged job promotion")
 	}
@@ -223,6 +242,10 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 		err := sjo.retirementErrorLocked("job output: invalid staged job promotion")
 		sjo.mu.Unlock()
 		return err
+	}
+	if sjo.ownership != stagedJobOwnedByCandidate || sjo.decided {
+		sjo.mu.Unlock()
+		return errors.New("job output: invalid staged job promotion")
 	}
 	sjo.ownership = stagedJobPromotionActive
 	start := func() (jobmgr.ProcessAttempt, <-chan error, error) {
@@ -484,7 +507,7 @@ func (sjo *stagedJobOwner) finishCandidate(ctx context.Context) error {
 	case <-sjo.rejectCandidate:
 		return sjo.finalize()
 	case <-ctx.Done():
-		sjo.Reject()
+		sjo.rejectCandidateOnCut(context.Cause(ctx))
 		select {
 		case <-sjo.transferred:
 			return nil
