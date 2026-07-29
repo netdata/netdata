@@ -45,25 +45,31 @@ static void build_node_collectors(RRDHOST *host)
         aclk_host_config->node_id, rrdhost_hostname(host));
 }
 
-static void build_node_manifest(RRDHOST *host)
+// Copies aclk_host_config->node_id into dst and reports whether it is usable.
+//
+// The copy is not optional. set_host_node_id() fills that buffer with a plain 37-byte
+// uuid_unparse_lower() and no release fence, so validating the shared buffer and then transmitting
+// it would validate different bytes than it sends. Callers validate once and send the snapshot.
+//
+// Usable means it parses AND is not the all-zero UUID: zero means the cloud has not registered this
+// node, and UpdateNodeInstanceManifest carries no machine_guid to fall back on, so such a message is
+// unattributable. Note node_id[0] alone is not evidence of a usable id - for the zero UUID it is '0'.
+static bool aclk_node_id_snapshot(const struct aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])
 {
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    memcpy(dst, aclk_host_config->node_id, UUID_STR_LEN);
+    dst[UUID_STR_LEN - 1] = '\0';
 
-    // Validate what is actually about to be transmitted. The caller only checked that node_id is
-    // non-empty, and set_host_node_id() fills it with a plain 37-byte uuid_unparse_lower() with no
-    // release fence, so a reader that saw a non-empty first byte can still observe a partial string.
-    // The manifest carries no machine_guid for the cloud to fall back on, and the send request has
-    // already been claimed, so re-arm rather than transmitting an unusable node_id.
-    nd_uuid_t node_uuid;
-    if (unlikely(uuid_parse(aclk_host_config->node_id, node_uuid) != 0)) {
-        aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
-        return;
-    }
+    nd_uuid_t parsed;
+    return uuid_parse(dst, parsed) == 0 && !uuid_is_null(parsed);
+}
 
+// node_id is the caller's validated snapshot, not the shared buffer - see aclk_node_id_snapshot().
+static void build_node_manifest(RRDHOST *host, char *node_id)
+{
     struct update_node_instance_manifest manifest;
 
     CLAIM_ID claim_id = claim_id_get();
-    manifest.node_id = aclk_host_config->node_id;
+    manifest.node_id = node_id;
     manifest.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
     now_realtime_timeval(&manifest.updated_at);
 
@@ -84,7 +90,7 @@ static void build_node_manifest(RRDHOST *host)
 
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
            "ACLK RES [%s (%s)]: NODE MANIFEST SENT",
-        aclk_host_config->node_id, rrdhost_hostname(host));
+        node_id, rrdhost_hostname(host));
 }
 
 static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_completion)
@@ -266,13 +272,18 @@ void aclk_check_node_info_collectors_and_manifest(void)
         // replication and context checks and re-emitting the NODES INFO line. The request itself is
         // deliberately left armed, so it goes out as soon as the condition clears.
         //
-        // node_id here is the string that build_node_manifest() actually sends. Do NOT test
-        // host->node_id.uuid instead: a child can inherit its node_id from its parent
-        // (stream_sender_get_node_and_claim_id_from_parent() assigns host->node_id directly)
-        // without it ever reaching the aclk config, and the manifest carries no machine_guid the
-        // cloud could fall back on.
-        bool manifest_pending =
-            node_manifest_send_time && manifest_topic_available && aclk_host_config->node_id[0];
+        // The node_id checked is the one build_node_manifest() will send, snapshotted here so the
+        // validated bytes are the transmitted bytes. Do NOT test host->node_id.uuid instead: a child
+        // can inherit its node_id from its parent (stream_sender_get_node_and_claim_id_from_parent()
+        // assigns host->node_id directly) without it ever reaching the aclk config.
+        //
+        // An unusable node_id must leave manifest_pending false rather than being rejected later in
+        // build_node_manifest(): the request stays armed either way, but reporting it as pending here
+        // would keep this host on the per-second path indefinitely, which is exactly what the
+        // early exit below exists to avoid.
+        char manifest_node_id[UUID_STR_LEN];
+        bool manifest_pending = node_manifest_send_time && manifest_topic_available &&
+                                aclk_node_id_snapshot(aclk_host_config, manifest_node_id);
 
         if (!node_info_send_time && !node_collectors_send && !manifest_pending)
             continue;
@@ -330,7 +341,7 @@ void aclk_check_node_info_collectors_and_manifest(void)
         if (manifest_pending && pp_queue_empty && node_manifest_send_time &&
             nd_time_t_add_compare(node_manifest_send_time, 30, now) < 0 &&
             aclk_send_timestamp_claim(&aclk_host_config->node_manifest_send_time, node_manifest_send_time)) {
-            build_node_manifest(host);
+            build_node_manifest(host, manifest_node_id);
             internal_error(true, "ACLK SYNC: Sending node manifest for %s", rrdhost_hostname(host));
         }
     }

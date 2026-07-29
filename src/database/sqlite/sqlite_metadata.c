@@ -288,6 +288,11 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
     else
         uuid_unparse_lower(*node_id, aclk_host_config->node_id);
 
+    // The manifest is keyed by node_id at the cloud, and no function-registry event fires when the
+    // node_id itself changes - so without this a host that gets (or changes) its node_id keeps a
+    // manifest filed under the previous id until some unrelated function is registered.
+    aclk_arm_node_manifest(host);
+
     stream_receiver_send_node_and_claim_id_to_child(host);
     stream_path_node_id_updated(host);
 }
