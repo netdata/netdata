@@ -288,13 +288,19 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 		Target: sdb.epoch,
 		Work: func(
 			attemptCtx context.Context,
-			_ jobmgr.ProcessAttemptAdmission,
+			admission jobmgr.ProcessAttemptAdmission,
 		) error {
 			result, cleanup, invokeErr := sdb.invoke(
 				function.UID,
 				captureNotifications,
 				func() { call(attemptCtx) },
 			)
+			// The opaque handler stays fuse-bounded. Its terminal result is
+			// admitted only after the callback returns, so handler or
+			// protocol failures quarantine the identity.
+			if admitErr := admission.Admit(); admitErr != nil {
+				return admitErr
+			}
 			resultCh <- serviceDiscoveryInvocationResult{
 				result:  result,
 				cleanup: cleanup,

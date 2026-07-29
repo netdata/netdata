@@ -91,6 +91,46 @@ func TestConfigPublicationPreservesWindowsSourcePath(t *testing.T) {
 	require.NoError(t, store.Close(t.Context()))
 }
 
+func TestTakenStoreMutationIsAbortedWhenCommandResourceDiffers(t *testing.T) {
+	controller, store := newSecretControllerTestHarness(t, nil)
+	require.NoError(t, controller.Bind(restartTestJobs{}))
+	controller.setCommandsReady(true)
+	t.Cleanup(func() {
+		_ = store.Close(context.Background())
+	})
+	input := CommandInput{
+		Args:        []string{"go.d:secretstore:vault", string(dyncfg.CommandAdd), "main"},
+		Payload:     []byte(`{"value":"replacement"}`),
+		ContentType: "application/json",
+		HasPayload:  true,
+	}
+	stage, err := controller.Stage(input)
+	require.NoError(t, err)
+	defer stage.Release()
+	stage.Start()
+	requireStoreOperationReady(t, stage)
+	resourceID := secretResourceID("vault:main")
+
+	_, err = controller.PrepareStaged(
+		t.Context(),
+		input,
+		nil,
+		lifecycle.ResourceTransactionScope{
+			ID:      resourceID,
+			Current: lifecycle.ResourceIdentity{ID: resourceID, Generation: 1},
+			Successor: lifecycle.ResourceIdentity{
+				ID:         resourceID,
+				Generation: 2,
+			},
+		},
+		lifecycle.LongLivedPermit{},
+		stage,
+	)
+
+	require.ErrorContains(t, err, "command resource has no active Store")
+	require.Zero(t, store.Census().Preparations)
+}
+
 func TestInitialStoreMaterializationStartsDifferentIdentitiesConcurrently(t *testing.T) {
 	gate := newInitialStoreMaterializationGate()
 	t.Cleanup(gate.release)
@@ -496,8 +536,9 @@ func TestStoreBusyOperationWaitsForRetiringGeneration(t *testing.T) {
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "busy Store operation did not settle")
 	}
-	result, err := takeStoreOperation(stage)
+	operation, err := takeStoreOperation(stage)
 	require.NoError(t, err)
+	result := operation.result
 	require.ErrorIs(t, result.err, secretstore.ErrMutationBusy)
 	require.True(t, result.retryable)
 	require.NotNil(t, result.release)

@@ -668,7 +668,10 @@ func (c *Controller) finishAvailabilityPoll(
 	creator collectorapi.Creator,
 	poll functionAvailabilityPoll,
 ) {
-	result := <-poll.result
+	if err := poll.attempt.Await(context.Background()); err != nil {
+		return
+	}
+	result := <-poll.workerResult
 	if result.err != nil {
 		return
 	}

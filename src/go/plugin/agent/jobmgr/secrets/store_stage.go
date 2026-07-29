@@ -80,6 +80,62 @@ type storeOperationResult struct {
 	removal        bool
 }
 
+// preparedMutationOwner keeps a prepared mutation abortable until a prepared
+// transaction has accepted it.
+type preparedMutationOwner struct {
+	mutation *secretstore.PreparedSecretMutation
+}
+
+func (o *preparedMutationOwner) prepareTransaction(
+	spec preparedSecretSpec,
+) (lifecycle.PreparedResourceTransaction, error) {
+	if o != nil {
+		spec.mutation = o.mutation
+	}
+	transaction, err := newPreparedSecretTransaction(spec)
+	if err != nil {
+		return nil, err
+	}
+	if o != nil {
+		o.mutation = nil
+	}
+	return transaction, nil
+}
+
+func (o *preparedMutationOwner) releaseUntransferred(
+	transaction *lifecycle.PreparedResourceTransaction,
+	resultErr *error,
+) {
+	if o == nil || o.mutation == nil {
+		return
+	}
+	abortErr := o.mutation.Abort()
+	o.mutation = nil
+	if abortErr == nil {
+		return
+	}
+	if transaction != nil {
+		*transaction = nil
+	}
+	if resultErr != nil {
+		*resultErr = lifecycle.RetainOwnership(errors.Join(*resultErr, abortErr))
+	}
+}
+
+type takenStoreOperation struct {
+	result   storeOperationResult
+	mutation preparedMutationOwner
+}
+
+func (o *takenStoreOperation) releaseUntransferred(
+	transaction *lifecycle.PreparedResourceTransaction,
+	resultErr *error,
+) {
+	if o != nil {
+		o.mutation.releaseUntransferred(transaction, resultErr)
+	}
+}
+
 // PreparedStoreOperation is a process-owned pre-claim materialization.
 type PreparedStoreOperation struct {
 	mu sync.Mutex

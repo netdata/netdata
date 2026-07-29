@@ -559,6 +559,7 @@ func (pc *processCore) retireForSuccessor(
 				"secret Store epoch seal failed",
 				err,
 			)
+			return err
 		}
 	}
 	if pc.attempts != nil {

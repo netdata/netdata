@@ -151,6 +151,58 @@ func TestServiceDiscoveryQuarantineReturnsConfigLocalUnavailableResult(t *testin
 	require.NoError(t, cleanup())
 }
 
+func TestServiceDiscoveryHandlerPanicQuarantinesProductionInvocation(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
+	attempts := binding.attempts.(*containment.Authority)
+
+	first, firstCleanup, err := binding.invokeContained(
+		t.Context(),
+		"go.d:sd:type:job",
+		frameworkfunctions.Function{UID: "panicked"},
+		false,
+		func(context.Context) {
+			panic("handler failed")
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, firstCleanup)
+	firstApplied, err := lifecycle.NewAppliedResourceTransaction(
+		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
+		lifecycle.ResourceTransactionUnchanged,
+		nil,
+		first,
+		firstCleanup,
+	)
+	require.NoError(t, err)
+	require.Equal(t, 503, firstApplied.ResultStatus())
+
+	var retryCalls int
+	retry, retryCleanup, err := binding.invokeContained(
+		t.Context(),
+		"go.d:sd:type:job",
+		frameworkfunctions.Function{UID: "retry"},
+		false,
+		func(context.Context) {
+			retryCalls++
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, retryCleanup)
+	retryApplied, err := lifecycle.NewAppliedResourceTransaction(
+		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
+		lifecycle.ResourceTransactionUnchanged,
+		nil,
+		retry,
+		retryCleanup,
+	)
+	require.NoError(t, err)
+	require.Equal(t, 503, retryApplied.ResultStatus())
+	require.Zero(t, retryCalls)
+	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+}
+
 func TestServiceDiscoveryRetirementReturnsConfigLocalUnavailableResult(t *testing.T) {
 	binding := &serviceDiscoveryBinding{}
 

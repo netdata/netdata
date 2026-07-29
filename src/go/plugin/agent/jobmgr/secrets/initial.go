@@ -160,7 +160,10 @@ func (c *Controller) planInitial(
 				current lifecycle.ReadyResource,
 				scope lifecycle.ResourceTransactionScope,
 				permit lifecycle.LongLivedPermit,
-			) (lifecycle.PreparedResourceTransaction, error) {
+			) (
+				transaction lifecycle.PreparedResourceTransaction,
+				resultErr error,
+			) {
 				if scope.ID != resourceID {
 					return nil, errors.New("jobmgr secrets: initial Store scope differs")
 				}
@@ -180,16 +183,14 @@ func (c *Controller) planInitial(
 						)
 					}
 				}
-				materialized, err := takeStoreOperation(stage)
+				operation, err := takeStoreOperation(stage)
 				if err != nil {
 					return nil, err
 				}
+				defer operation.releaseUntransferred(&transaction, &resultErr)
+				materialized := operation.result
 				expected := c.store.Generation(key)
 				if materialized.expected != expected {
-					if materialized.mutation != nil {
-						_ = materialized.mutation.Abort()
-						materialized.mutation = nil
-					}
 					materialized.retryable = true
 					materialized.err = errors.New(
 						"jobmgr secrets: initial Store changed while preparation was staged",
@@ -199,7 +200,7 @@ func (c *Controller) planInitial(
 				if materialized.retryable {
 					return c.prepareRetryableResult(scope, current, materialized, expected == 0)
 				}
-				return c.prepareStoreMutation(scope, current, materialized, true)
+				return c.prepareStoreMutation(scope, current, operation, true)
 			},
 		},
 		CooperativeCancel:   true,

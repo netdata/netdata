@@ -50,9 +50,9 @@ type functionBundle struct {
 }
 
 type functionAvailabilityPoll struct {
-	attempt jobmgr.ProcessAttempt
-	result  <-chan functionAvailabilityResult
-	bundle  *functionBundle
+	attempt      jobmgr.ProcessAttempt
+	workerResult <-chan functionAvailabilityResult
+	bundle       *functionBundle
 }
 
 type functionAvailabilityResult struct {
@@ -146,20 +146,10 @@ func (fb *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, err
 		callback.complete()
 		return functionAvailabilityPoll{}, err
 	}
-	result := make(chan functionAvailabilityResult, 1)
-	go func() {
-		settledErr := attempt.Await(context.Background())
-		<-attempt.Released()
-		if settledErr != nil {
-			result <- functionAvailabilityResult{err: settledErr}
-			return
-		}
-		result <- <-workerResult
-	}()
 	return functionAvailabilityPoll{
-		attempt: attempt,
-		result:  result,
-		bundle:  fb,
+		attempt:      attempt,
+		workerResult: workerResult,
+		bundle:       fb,
 	}, nil
 }
 

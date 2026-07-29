@@ -369,6 +369,25 @@ func TestProcessCoreRotationRetainsOldStoreScopeOutsideRun(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
+func TestProcessCoreRotationRejectsUnownedStoreEpoch(t *testing.T) {
+	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, time.Second)
+	require.NoError(t, err)
+	process := &processCore{
+		storeEpochs: &processSecretEpochs{
+			diagnostics: testProcessDiagnostics(),
+			epochs:      make(map[uint64]*processSecretEpoch),
+		},
+	}
+	current := &runGeneration{
+		run:         run,
+		secretEpoch: &processSecretEpoch{generation: 1},
+	}
+
+	err = process.retireForSuccessor(t.Context(), current, 1, 2)
+
+	require.ErrorContains(t, err, "secret Store epoch is not process-owned")
+}
+
 func TestProcessTransitionCancellationClassificationRejectsMixedFailures(t *testing.T) {
 	cleanupErr := errors.New("cleanup failed")
 	tests := map[string]struct {

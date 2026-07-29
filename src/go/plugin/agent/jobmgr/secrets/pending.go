@@ -263,7 +263,10 @@ func (c *Controller) preparePendingAttempt(
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 	stage *PreparedStoreOperation,
-) (lifecycle.PreparedResourceTransaction, error) {
+) (
+	transaction lifecycle.PreparedResourceTransaction,
+	resultErr error,
+) {
 	if permit.Valid() || !c.pendingVersion(config.ExposedKey(), version) {
 		return c.noop(scope, current, mustSecretMessage(204, ""), nil, nil)
 	}
@@ -283,30 +286,25 @@ func (c *Controller) preparePendingAttempt(
 			)
 		}
 	}
-	result, err := takeStoreOperation(stage)
+	operation, err := takeStoreOperation(stage)
 	if err != nil {
 		return nil, err
 	}
+	defer operation.releaseUntransferred(&transaction, &resultErr)
+	result := operation.result
 	expected := c.store.Generation(config.ExposedKey())
 	if (expected == 0) != (current == nil) ||
 		(expected != 0) != scope.Current.Valid() {
-		if result.mutation != nil {
-			_ = result.mutation.Abort()
-		}
 		return nil, errors.New("jobmgr secrets: pending Store resource differs from active generation")
 	}
 	if result.expected != expected {
-		if result.mutation != nil {
-			_ = result.mutation.Abort()
-			result.mutation = nil
-		}
 		result.retryable = true
 		result.err = errors.New("jobmgr secrets: pending Store changed while preparation was staged")
 	}
 	if result.retryable {
 		return c.prepareRetryableResult(scope, current, result, expected == 0)
 	}
-	return c.prepareStoreMutation(scope, current, result, expected == 0)
+	return c.prepareStoreMutation(scope, current, operation, expected == 0)
 }
 
 func (c *Controller) prepareRetryableResult(

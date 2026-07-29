@@ -176,15 +176,20 @@ func (c *Controller) prepareTest(
 	current lifecycle.ReadyResource,
 	target secretTarget,
 	stage *PreparedStoreOperation,
-) (lifecycle.PreparedResourceTransaction, error) {
+) (
+	transaction lifecycle.PreparedResourceTransaction,
+	resultErr error,
+) {
 	entry, ok := c.entry(target.key)
 	if !ok {
 		return c.noopMessage(scope, current, 404, fmt.Sprintf(msgSecretStoreNotConfigured, target.key))
 	}
-	result, err := takeStoreOperation(stage)
+	operation, err := takeStoreOperation(stage)
 	if err != nil {
 		return nil, err
 	}
+	defer operation.releaseUntransferred(&transaction, &resultErr)
+	result := operation.result
 	if result.retryable {
 		return c.noopMessage(scope, current, 503, "Secretstore test is still busy.")
 	}
@@ -212,11 +217,16 @@ func (c *Controller) prepareAdd(
 	current lifecycle.ReadyResource,
 	target secretTarget,
 	stage *PreparedStoreOperation,
-) (lifecycle.PreparedResourceTransaction, error) {
-	result, err := takeStoreOperation(stage)
+) (
+	transaction lifecycle.PreparedResourceTransaction,
+	resultErr error,
+) {
+	operation, err := takeStoreOperation(stage)
 	if err != nil {
 		return nil, err
 	}
+	defer operation.releaseUntransferred(&transaction, &resultErr)
+	result := operation.result
 	if result.config == nil {
 		return c.noopMessageWithCommit(
 			scope,
@@ -242,11 +252,6 @@ func (c *Controller) prepareAdd(
 		entry.status == dyncfg.StatusRunning &&
 		entry.config.SourceType() == confgroup.TypeDyncfg &&
 		entry.config.Hash() == config.Hash() {
-		if result.mutation != nil {
-			if err := result.mutation.Abort(); err != nil {
-				return nil, err
-			}
-		}
 		return c.noopWithCommit(
 			scope,
 			current,
@@ -259,10 +264,6 @@ func (c *Controller) prepareAdd(
 		)
 	}
 	if result.expected != expected {
-		if result.mutation != nil {
-			_ = result.mutation.Abort()
-			result.mutation = nil
-		}
 		result.retryable = true
 		result.err = errors.New("jobmgr secrets: Store changed while preparation was staged")
 		return c.prepareRetryableResult(scope, current, result, expected == 0)
@@ -270,7 +271,7 @@ func (c *Controller) prepareAdd(
 	if result.retryable {
 		return c.prepareRetryableResult(scope, current, result, expected == 0)
 	}
-	return c.prepareStoreMutation(scope, current, result, expected == 0)
+	return c.prepareStoreMutation(scope, current, operation, expected == 0)
 }
 
 func (c *Controller) prepareUpdate(
@@ -278,7 +279,10 @@ func (c *Controller) prepareUpdate(
 	current lifecycle.ReadyResource,
 	target secretTarget,
 	stage *PreparedStoreOperation,
-) (lifecycle.PreparedResourceTransaction, error) {
+) (
+	transaction lifecycle.PreparedResourceTransaction,
+	resultErr error,
+) {
 	entry, exists := c.entry(target.key)
 	if !exists {
 		return c.noopMessage(
@@ -288,10 +292,12 @@ func (c *Controller) prepareUpdate(
 			fmt.Sprintf(msgSecretStoreNotConfigured, target.key),
 		)
 	}
-	result, err := takeStoreOperation(stage)
+	operation, err := takeStoreOperation(stage)
 	if err != nil {
 		return nil, err
 	}
+	defer operation.releaseUntransferred(&transaction, &resultErr)
+	result := operation.result
 	if result.config == nil {
 		return c.noopMessageWithCommit(
 			scope,
@@ -314,11 +320,6 @@ func (c *Controller) prepareUpdate(
 	}
 	installFailure := expected == 0
 	if expected != 0 && entry.config.Hash() == config.Hash() {
-		if result.mutation != nil {
-			if err := result.mutation.Abort(); err != nil {
-				return nil, err
-			}
-		}
 		return c.noopWithCommit(
 			scope,
 			current,
@@ -331,10 +332,6 @@ func (c *Controller) prepareUpdate(
 		)
 	}
 	if result.expected != expected {
-		if result.mutation != nil {
-			_ = result.mutation.Abort()
-			result.mutation = nil
-		}
 		result.retryable = true
 		result.err = errors.New("jobmgr secrets: Store changed while preparation was staged")
 		return c.prepareRetryableResult(scope, current, result, installFailure)
@@ -342,7 +339,7 @@ func (c *Controller) prepareUpdate(
 	if result.retryable {
 		return c.prepareRetryableResult(scope, current, result, installFailure)
 	}
-	return c.prepareStoreMutation(scope, current, result, installFailure)
+	return c.prepareStoreMutation(scope, current, operation, installFailure)
 }
 
 func (c *Controller) prepareRemove(
@@ -350,11 +347,16 @@ func (c *Controller) prepareRemove(
 	current lifecycle.ReadyResource,
 	target secretTarget,
 	stage *PreparedStoreOperation,
-) (lifecycle.PreparedResourceTransaction, error) {
-	result, err := takeStoreOperation(stage)
+) (
+	transaction lifecycle.PreparedResourceTransaction,
+	resultErr error,
+) {
+	operation, err := takeStoreOperation(stage)
 	if err != nil {
 		return nil, err
 	}
+	defer operation.releaseUntransferred(&transaction, &resultErr)
+	result := operation.result
 	if !result.removal {
 		return nil, errors.New("jobmgr secrets: removal did not pass its pre-claim stage")
 	}
@@ -408,22 +410,21 @@ func (c *Controller) prepareRemove(
 	if err != nil {
 		return nil, err
 	}
-	return newPreparedSecretTransaction(
-		preparedSecretSpec{
-			scope:      scope,
-			current:    current,
-			store:      c.store,
-			storeKey:   target.key,
-			mutation:   mutation,
-			remove:     true,
-			result:     mustSecretMessage(200, ""),
-			cleanup:    c.configDeleteCleanup(target.key),
-			controller: c,
-			commit: func() {
-				c.clearPendingThrough(target.key, result.desiredVersion)
-			},
+	mutationOwner := preparedMutationOwner{mutation: mutation}
+	defer mutationOwner.releaseUntransferred(&transaction, &resultErr)
+	return mutationOwner.prepareTransaction(preparedSecretSpec{
+		scope:      scope,
+		current:    current,
+		store:      c.store,
+		storeKey:   target.key,
+		remove:     true,
+		result:     mustSecretMessage(200, ""),
+		cleanup:    c.configDeleteCleanup(target.key),
+		controller: c,
+		commit: func() {
+			c.clearPendingThrough(target.key, result.desiredVersion)
 		},
-	)
+	})
 }
 
 func materializeSecretConfig(input CommandInput, target secretTarget) (secretstore.Config, error) {
@@ -447,14 +448,14 @@ func materializeSecretConfig(input CommandInput, target secretTarget) (secretsto
 func (c *Controller) prepareStoreMutation(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
-	materialized storeOperationResult,
+	operation *takenStoreOperation,
 	installFailure bool,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if !scope.Successor.Valid() {
+	if operation == nil || !scope.Successor.Valid() {
 		return nil, errors.New("jobmgr secrets: invalid Store mutation successor")
 	}
+	materialized := operation.result
 	config := materialized.config
-	mutation := materialized.mutation
 	prepareErr := materialized.err
 	entry := secretEntry{
 		config: config,
@@ -478,36 +479,42 @@ func (c *Controller) prepareStoreMutation(
 			spec.cleanup = c.configCreateCleanup(entry)
 			spec.entry = &entry
 		}
-		if mutation.Valid() {
-			spec.mutation = mutation
+		if operation.mutation.mutation.Valid() {
 			spec.abort = true
+			return operation.mutation.prepareTransaction(spec)
 		}
 		return newPreparedSecretTransaction(spec)
 	}
-	return newPreparedSecretTransaction(
-		preparedSecretSpec{
-			scope:      scope,
-			current:    current,
-			store:      c.store,
-			storeKey:   config.ExposedKey(),
-			mutation:   mutation,
-			result:     mustSecretMessage(200, ""),
-			cleanup:    c.configCreateCleanup(entry),
-			controller: c,
-			entry:      &entry,
-			restarts:   c.restartCommand(),
-			commit: func() {
-				c.clearPendingThrough(config.ExposedKey(), materialized.desiredVersion)
-			},
+	return operation.mutation.prepareTransaction(preparedSecretSpec{
+		scope:      scope,
+		current:    current,
+		store:      c.store,
+		storeKey:   config.ExposedKey(),
+		result:     mustSecretMessage(200, ""),
+		cleanup:    c.configCreateCleanup(entry),
+		controller: c,
+		entry:      &entry,
+		restarts:   c.restartCommand(),
+		commit: func() {
+			c.clearPendingThrough(config.ExposedKey(), materialized.desiredVersion)
 		},
-	)
+	})
 }
 
-func takeStoreOperation(stage *PreparedStoreOperation) (storeOperationResult, error) {
+func takeStoreOperation(stage *PreparedStoreOperation) (*takenStoreOperation, error) {
 	if stage == nil {
-		return storeOperationResult{}, errors.New("jobmgr secrets: Store command has no pre-claim stage")
+		return nil, errors.New("jobmgr secrets: Store command has no pre-claim stage")
 	}
-	return stage.take()
+	result, err := stage.take()
+	if err != nil {
+		return nil, err
+	}
+	mutation := result.mutation
+	result.mutation = nil
+	return &takenStoreOperation{
+		result:   result,
+		mutation: preparedMutationOwner{mutation: mutation},
+	}, nil
 }
 
 func (c *Controller) restartCommand() *SecretRestartCommand {
