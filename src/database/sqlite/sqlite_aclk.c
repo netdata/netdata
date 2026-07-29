@@ -1370,6 +1370,22 @@ void aclk_arm_node_manifest(RRDHOST *host)
 
     // No config: nothing to arm. build_node_info() arms the first manifest for every host that
     // gets one, which covers every function registered until then.
+    //
+    // The load below is lock-free and destroy_aclk_config() frees what it returns, so what keeps
+    // this safe is teardown ordering, not the NULL check. destroy_aclk_config() has exactly one
+    // caller - rrdhost_free_unlinked() - and everything this function's callers depend on is torn
+    // down earlier in it:
+    //   1. rrdhost_index_del_by_guid()          - the host stops being findable
+    //   2. stream_receiver_signal_to_stop_and_wait() - blocks until host->receiver is NULL
+    //   3. rrd_functions_host_destroy()         - host->functions becomes NULL
+    //   4. destroy_aclk_config()                - only now is the config freed
+    // So the function-registry callers (which must first mutate host->functions) and
+    // rrdhost_clear_receiver() (which runs before host->receiver is cleared) cannot still be
+    // running here, and a caller that reached this host through rrdhost_find_by_guid() did so
+    // before step 1. Do NOT "fix" this by routing the arm back through the ACLK event loop: that
+    // publishes a borrowed RRDHOST pointer to another thread (a wider window on a longer-lived
+    // object) and blocks the caller in push_cmd() when the command pool is full, sometimes while
+    // holding the host functions lock.
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (!aclk_host_config)
         return;
