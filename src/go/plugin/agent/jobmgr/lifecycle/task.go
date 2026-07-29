@@ -987,7 +987,7 @@ func normalizeStoppingCancellation(err error, cause error) error {
 	if !ok {
 		return err
 	}
-	if !allErrorLeavesMatch(err, func(leaf error) bool {
+	if !AllErrorLeavesMatch(err, func(leaf error) bool {
 		return leaf == context.Canceled
 	}) {
 		return err

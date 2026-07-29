@@ -50,3 +50,31 @@ func TestContainsOnlyErrorLeavesFailsClosed(t *testing.T) {
 		})
 	}
 }
+
+func TestContainsOnlyErrorLeavesBoundsTotalTraversal(t *testing.T) {
+	unwraps := 0
+	var tree error = ErrProcessAttemptRetired
+	for range 6 {
+		tree = sharedProcessAttemptErrorTree{
+			child:   tree,
+			unwraps: &unwraps,
+		}
+	}
+
+	require.False(t, ContainsOnlyErrorLeaves(tree, ErrProcessAttemptRetired))
+	require.LessOrEqual(t, unwraps, 32)
+}
+
+type sharedProcessAttemptErrorTree struct {
+	child   error
+	unwraps *int
+}
+
+func (sharedProcessAttemptErrorTree) Error() string {
+	return "shared process attempt error tree"
+}
+
+func (tree sharedProcessAttemptErrorTree) Unwrap() []error {
+	(*tree.unwraps)++
+	return []error{tree.child, tree.child}
+}

@@ -28,7 +28,7 @@ func ContainsOnlyCurrentStoppingRejections(err error, generation uint64) bool {
 	if generation == 0 {
 		return false
 	}
-	return allErrorLeavesMatch(err, func(leaf error) bool {
+	return AllErrorLeavesMatch(err, func(leaf error) bool {
 		stopping, ok := leaf.(*StoppingRejection)
 		return ok && stopping.Generation == generation
 	})

@@ -222,6 +222,7 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
 	mutationOwned := spec.Graph != nil && spec.MutationPrepared
+	graphCommitted := false
 	ownershipDisposition := lifecycle.ResourceTransactionUnchanged
 	ownershipCurrent := spec.Current
 	var pendingInstallation *JobGeneration
@@ -280,9 +281,9 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 				applied = failed
 			}
 		}
-		if expectedRetirement && settlementProven && !appliedSealed {
-			// The run is already stopping, so normal retry/pending AfterApply
-			// callbacks must not create new work after this proved rollback.
+		if expectedRetirement && settlementProven && !appliedSealed && !graphCommitted {
+			// Only pre-commit retirement proves a complete rollback. Once the
+			// graph commits, acknowledgement failure must remain fail-closed.
 			resultErr = nil
 		}
 	}()
@@ -407,6 +408,7 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 		if err := commitGraphMutation(spec.Graph, spec.Mutation); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
+		graphCommitted = true
 		if spec.AfterGraphCommit != nil {
 			spec.AfterGraphCommit()
 		}

@@ -266,6 +266,61 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 	}
 }
 
+func TestPreparedResourceTransactionDoesNotSuppressRetirementAfterGraphCommit(t *testing.T) {
+	var events []string
+	identity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+	successorReady := &transactionTestAcknowledgedResource{
+		transactionTestReadyResource: &transactionTestReadyResource{
+			identity: identity,
+			prefix:   "successor",
+			events:   &events,
+		},
+		acknowledgeErr: jobmgr.ErrProcessAttemptRetired,
+	}
+	successor := &transactionTestPreparedResource{
+		identity: identity,
+		ready:    successorReady,
+		events:   &events,
+	}
+	graph, err := dyncfg.NewGraph(nil)
+	require.NoError(t, err)
+	postimage := dyncfg.GraphConfig{ID: identity.ID, Module: "module", Name: "job"}
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
+		ID:     identity.ID,
+		Config: &postimage,
+	}})
+	require.NoError(t, err)
+	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
+	require.NoError(t, err)
+	afterApply := false
+	transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+		Scope: lifecycle.ResourceTransactionScope{
+			ID:        identity.ID,
+			Successor: identity,
+		},
+		Disposition:      lifecycle.ResourceTransactionInstalled,
+		Successor:        successor,
+		Graph:            graph,
+		Mutation:         mutation,
+		MutationPrepared: true,
+		AfterApply:       func() { afterApply = true },
+		Result:           result,
+		Cleanup:          func() error { return nil },
+	})
+	require.NoError(t, err)
+
+	applied, err := transaction.Apply(context.Background())
+
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptRetired)
+	require.False(t, afterApply)
+	record, ok := graph.Lookup(identity.ID)
+	require.True(t, ok)
+	require.Equal(t, postimage.Module, record.Module)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.Same(t, successorReady, current)
+}
+
 func TestPreparedResourceTransactionReturnsRetainedPendingSuccessorOnFailure(t *testing.T) {
 	startFailure := errors.New("successor start failed")
 	abortFailure := errors.New("successor abort failed")
@@ -925,4 +980,13 @@ func (ttrr *transactionTestReadyResource) Stop(context.Context) error {
 func (ttrr *transactionTestReadyResource) Finalize() error {
 	*ttrr.events = append(*ttrr.events, ttrr.prefix+"-finalize")
 	return ttrr.finalizeErr
+}
+
+type transactionTestAcknowledgedResource struct {
+	*transactionTestReadyResource
+	acknowledgeErr error
+}
+
+func (resource *transactionTestAcknowledgedResource) acknowledgeInstallation() error {
+	return resource.acknowledgeErr
 }

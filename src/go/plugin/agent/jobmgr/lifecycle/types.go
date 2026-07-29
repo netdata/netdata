@@ -132,17 +132,9 @@ func canonicalCancellationCause(cause error) (canonical error, deadline, ok bool
 
 const strictErrorTreeLimit = 32
 
-func isNilErrorValue(err error) bool {
-	value := reflect.ValueOf(err)
-	switch value.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice:
-		return value.IsNil()
-	default:
-		return false
-	}
-}
-
-func allErrorLeavesMatch(err error, match func(error) bool) bool {
+// AllErrorLeavesMatch reports whether every leaf matches while rejecting
+// malformed trees and traversals that exceed the fixed total-node budget.
+func AllErrorLeavesMatch(err error, match func(error) bool) bool {
 	if err == nil || match == nil {
 		return false
 	}
@@ -157,7 +149,7 @@ func allErrorLeavesMatch(err error, match func(error) bool) bool {
 		}
 		count--
 		current := pending[count]
-		if current == nil || isNilErrorValue(current) {
+		if current == nil || nilErrorValue(current) {
 			return false
 		}
 		if joined, ok := current.(interface{ Unwrap() []error }); ok {
@@ -189,6 +181,16 @@ func allErrorLeavesMatch(err error, match func(error) bool) bool {
 		leaves++
 	}
 	return leaves > 0
+}
+
+func nilErrorValue(err error) bool {
+	value := reflect.ValueOf(err)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
 
 type TaskPlan struct {
