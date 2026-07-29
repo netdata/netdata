@@ -152,10 +152,10 @@ func TestAgent_Run(t *testing.T) {
 				assert.Equalf(t, generations, stats[module+"_init"], "%s init", module)
 				assert.Equalf(t, generations, stats[module+"_check"], "%s check", module)
 				assert.Equalf(t, generations, stats[module+"_charts"], "%s charts", module)
-				assert.GreaterOrEqualf(
+				assert.Equalf(
 					t,
-					stats[module+"_collect"],
 					generations,
+					stats[module+"_collect"],
 					"%s collect",
 					module,
 				)
@@ -223,6 +223,7 @@ func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) col
 }
 
 func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) collectorapi.CollectorV1 {
+	var firstCollection sync.Once
 	return &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			mux.Lock()
@@ -245,9 +246,11 @@ func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) colle
 			}
 		},
 		CollectFunc: func(context.Context) map[string]int64 {
-			mux.Lock()
-			defer mux.Unlock()
-			stats[name+"_collect"]++
+			firstCollection.Do(func() {
+				mux.Lock()
+				defer mux.Unlock()
+				stats[name+"_collect"]++
+			})
 			return map[string]int64{"id1": 1}
 		},
 		CleanupFunc: func(context.Context) {
