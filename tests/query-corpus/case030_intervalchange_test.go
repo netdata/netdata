@@ -89,7 +89,6 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 
 			// a window of whole tier1 records, entirely inside the HISTORY -
 			// every second of it was measured at the first interval
-			gran1 := int64(tc.first) * 60
 			gran2 := int64(tc.first) * 3600
 			// four whole tier2 records in the MIDDLE of the history - which
 			// is also a whole number of tier1 records and of samples, so one
@@ -99,7 +98,6 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 			// first interval.
 			after := base + 2*gran2
 			before := after + 4*gran2
-			_ = gran1
 			want := float64(before-after) * float64(rate)
 
 			ok := true
