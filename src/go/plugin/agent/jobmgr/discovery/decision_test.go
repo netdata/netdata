@@ -20,6 +20,7 @@ type decisionTestCensus struct {
 	sources      int
 	candidates   int
 	acknowledged int
+	rejected     int
 	pending      int
 	revision     uint64
 }
@@ -28,11 +29,14 @@ func decisionIndexCensus(index *DecisionIndex) decisionTestCensus {
 	census := decisionTestCensus{
 		sources:      len(index.sources),
 		acknowledged: len(index.acknowledged),
-		pending:      len(index.pending),
+		pending:      len(index.pendingRemovals),
 		revision:     index.revision,
 	}
 	for _, candidates := range index.candidates {
 		census.candidates += len(candidates)
+	}
+	for _, rejected := range index.candidateRejections {
+		census.rejected += len(rejected)
 	}
 	return census
 }
@@ -63,7 +67,7 @@ func TestDecisionIndexQuarantinesTypedProposalAndContinuesBatch(t *testing.T) {
 		sources:      1,
 		candidates:   2,
 		acknowledged: 1,
-		pending:      1,
+		rejected:     1,
 		revision:     1,
 	}, decisionIndexCensus(index))
 }
@@ -87,7 +91,7 @@ func TestDecisionIndexQuarantinesCloneFailureAndContinuesBatch(t *testing.T) {
 	}}))
 	require.Len(t, commands.requests, 1)
 	require.Equal(t, good.FullName(), commands.requests[0].LaneKey)
-	require.NotContains(t, index.pending, bad.FullName())
+	require.NotContains(t, index.pendingRemovals, bad.FullName())
 
 	fixed := decisionTestConfig("bad", confgroup.TypeStock, "source")
 	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
@@ -96,7 +100,7 @@ func TestDecisionIndexQuarantinesCloneFailureAndContinuesBatch(t *testing.T) {
 	}}))
 	require.Len(t, commands.requests, 2)
 	require.Equal(t, fixed.FullName(), commands.requests[1].LaneKey)
-	require.NotContains(t, index.pending, bad.FullName())
+	require.NotContains(t, index.pendingRemovals, bad.FullName())
 }
 
 func TestDecisionIndexCloneFailureDoesNotSuppressValidSameNameCandidate(t *testing.T) {
@@ -245,15 +249,159 @@ func TestDecisionIndexRejectedHigherPrioritySelectionKeepsIncumbent(t *testing.T
 		Configs: []confgroup.Config{user},
 	}}))
 	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
-	require.Contains(t, index.pending, stock.FullName())
+	require.EqualValues(t, 1, decisionIndexCensus(index).rejected)
 
 	rejectUser = false
 	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "tick"}}))
+	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
+	require.EqualValues(t, 1, decisionIndexCensus(index).rejected)
+
+	user = decisionTestConfig("job", confgroup.TypeUser, "user").Set("changed", true)
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "user",
+		Configs: []confgroup.Config{user},
+	}}))
 	require.Equal(t, user.UID(), index.acknowledged[user.FullName()].UID())
-	require.NotContains(t, index.pending, user.FullName())
+	require.Zero(t, decisionIndexCensus(index).rejected)
 
 	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "user"}}))
 	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
+}
+
+func TestDecisionIndexRejectedHigherPriorityFallsBackInSameBatch(t *testing.T) {
+	var planned []string
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			planned = append(planned, change.Config.UID())
+			if change.Config.SourceType() == confgroup.TypeUser && change.Config.Get("fixed") != true {
+				return jobmgr.WorkPlan{}, jobmgr.RejectProposal(errors.New("invalid user config"))
+			}
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	stock := decisionTestConfig("job", confgroup.TypeStock, "stock")
+	user := decisionTestConfig("job", confgroup.TypeUser, "user")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{
+		{Source: "stock", Configs: []confgroup.Config{stock}},
+		{Source: "user", Configs: []confgroup.Config{user}},
+	}))
+	require.Equal(t, []string{user.UID(), stock.UID()}, planned)
+	require.Len(t, commands.requests, 1)
+	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "user",
+		Configs: []confgroup.Config{user},
+	}}))
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "tick"}}))
+	require.Equal(t, []string{user.UID(), stock.UID()}, planned)
+	require.Len(t, commands.requests, 1)
+
+	fixed := decisionTestConfig("job", confgroup.TypeUser, "user").Set("fixed", true)
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "user",
+		Configs: []confgroup.Config{fixed},
+	}}))
+	require.Equal(t, []string{user.UID(), stock.UID(), fixed.UID()}, planned)
+	require.Len(t, commands.requests, 2)
+	require.Equal(t, fixed.UID(), index.acknowledged[fixed.FullName()].UID())
+}
+
+func TestDecisionIndexSubmittedRejectionFallsBackInSameBatch(t *testing.T) {
+	var planned []string
+	commands := &sequenceDecisionTestCommands{
+		results: []error{
+			jobmgr.RejectProposal(errors.New("rejected during command preparation")),
+			nil,
+		},
+	}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			planned = append(planned, change.Config.UID())
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	stock := decisionTestConfig("job", confgroup.TypeStock, "stock")
+	user := decisionTestConfig("job", confgroup.TypeUser, "user")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{
+		{Source: "stock", Configs: []confgroup.Config{stock}},
+		{Source: "user", Configs: []confgroup.Config{user}},
+	}))
+	require.Equal(t, []string{user.UID(), stock.UID()}, planned)
+	require.Len(t, commands.requests, 2)
+	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
+}
+
+func TestDecisionIndexSourceMetadataChangeClearsCandidateRejection(t *testing.T) {
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			if change.Config.Provider() == "test" {
+				return jobmgr.WorkPlan{}, jobmgr.RejectProposal(errors.New("rejected provider metadata"))
+			}
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	original := decisionTestConfig("job", confgroup.TypeUser, "source")
+	changed := decisionTestConfig("job", confgroup.TypeUser, "source").SetProvider("updated")
+	require.Equal(t, original.Hash(), changed.Hash())
+	require.NotEqual(t, original.UID(), changed.UID())
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{original},
+	}}))
+	require.Empty(t, commands.requests)
+	require.Empty(t, index.acknowledged)
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{changed},
+	}}))
+	require.Len(t, commands.requests, 1)
+	require.Equal(t, changed.UID(), index.acknowledged[changed.FullName()].UID())
+}
+
+func TestDecisionIndexRemovedCandidateClearsRejection(t *testing.T) {
+	reject := true
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+			if reject {
+				return jobmgr.WorkPlan{}, jobmgr.RejectProposal(errors.New("rejected candidate"))
+			}
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	config := decisionTestConfig("job", confgroup.TypeUser, "source")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{config},
+	}}))
+	require.EqualValues(t, 1, decisionIndexCensus(index).rejected)
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "source"}}))
+	require.Zero(t, decisionIndexCensus(index).rejected)
+
+	reject = false
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{config},
+	}}))
+	require.Len(t, commands.requests, 1)
+	require.Equal(t, config.UID(), index.acknowledged[config.FullName()].UID())
 }
 
 func TestDecisionIndexConfigurationPolicy(t *testing.T) {
@@ -522,6 +670,28 @@ func (dtc *decisionTestCommands) SubmitPreparedAndWait(
 	defer dtc.mu.Unlock()
 	dtc.requests = append(dtc.requests, request)
 	return dtc.err
+}
+
+type sequenceDecisionTestCommands struct {
+	mu       sync.Mutex
+	results  []error
+	requests []jobmgr.Request
+}
+
+func (sdtc *sequenceDecisionTestCommands) SubmitPreparedAndWait(
+	_ context.Context,
+	request jobmgr.Request,
+	_ jobmgr.WorkPlan,
+) error {
+	sdtc.mu.Lock()
+	defer sdtc.mu.Unlock()
+	sdtc.requests = append(sdtc.requests, request)
+	if len(sdtc.results) == 0 {
+		return nil
+	}
+	result := sdtc.results[0]
+	sdtc.results = sdtc.results[1:]
+	return result
 }
 
 type decisionBenchmarkCommands struct{}

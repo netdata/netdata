@@ -35,16 +35,22 @@ type DecisionIndex struct {
 	commands    PreparedCommandPort       // prepared-command port for submitting decisions
 	diagnostics jobmgr.DiagnosticObserver // operational rejection observer
 
-	sources      map[string]map[uint64]confgroup.Config               // per-source config sets (authoritative full set per source)
-	candidates   map[string]map[decisionCandidateKey]confgroup.Config // per-job candidate configs by key
-	acknowledged map[string]confgroup.Config                          // last acknowledged config per job full name
-	pending      map[string]struct{}                                  // rejected selections/removals to retry on a later batch
-	revision     uint64                                               // monotonic decision revision
+	sources             map[string]map[uint64]confgroup.Config               // per-source config sets (authoritative full set per source)
+	candidates          map[string]map[decisionCandidateKey]confgroup.Config // per-job candidate configs by key
+	acknowledged        map[string]confgroup.Config                          // last acknowledged config per job full name
+	candidateRejections map[string]map[decisionCandidateRevision]struct{}    // exact rejected candidate revisions
+	pendingRemovals     map[string]struct{}                                  // rejected removals to retry on a later batch
+	revision            uint64                                               // monotonic decision revision
 }
 
 type decisionCandidateKey struct {
 	source string
 	hash   uint64
+}
+
+type decisionCandidateRevision struct {
+	key decisionCandidateKey
+	uid string
 }
 
 func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
@@ -59,16 +65,17 @@ func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
 		runJob[name] = struct{}{}
 	}
 	return &DecisionIndex{
-		generation:   config.Generation,
-		runJob:       runJob,
-		autoEnable:   config.AutoEnable,
-		plan:         config.Plan,
-		commands:     config.Commands,
-		diagnostics:  config.Diagnostics,
-		sources:      make(map[string]map[uint64]confgroup.Config),
-		candidates:   make(map[string]map[decisionCandidateKey]confgroup.Config),
-		acknowledged: make(map[string]confgroup.Config),
-		pending:      make(map[string]struct{}),
+		generation:          config.Generation,
+		runJob:              runJob,
+		autoEnable:          config.AutoEnable,
+		plan:                config.Plan,
+		commands:            config.Commands,
+		diagnostics:         config.Diagnostics,
+		sources:             make(map[string]map[uint64]confgroup.Config),
+		candidates:          make(map[string]map[decisionCandidateKey]confgroup.Config),
+		acknowledged:        make(map[string]confgroup.Config),
+		candidateRejections: make(map[string]map[decisionCandidateRevision]struct{}),
+		pendingRemovals:     make(map[string]struct{}),
 	}, nil
 }
 
@@ -76,8 +83,8 @@ func (di *DecisionIndex) Apply(ctx context.Context, batch []*confgroup.Group) er
 	if di == nil || ctx == nil || batch == nil {
 		return errors.New("jobmgr discovery: invalid decision batch")
 	}
-	affected := make(map[string]struct{}, len(di.pending))
-	maps.Copy(affected, di.pending)
+	affected := make(map[string]struct{}, len(di.pendingRemovals))
+	maps.Copy(affected, di.pendingRemovals)
 	for _, group := range batch {
 		changed, err := di.applyGroup(group)
 		if err != nil {
@@ -85,7 +92,23 @@ func (di *DecisionIndex) Apply(ctx context.Context, batch []*confgroup.Group) er
 		}
 		maps.Copy(affected, changed)
 	}
-	names := slices.Sorted(maps.Keys(affected))
+	di.pruneCandidateRejections(affected)
+
+	var resultErr error
+	for len(affected) > 0 {
+		retry, err := di.reconcileRound(ctx, slices.Sorted(maps.Keys(affected)))
+		if resultErr == nil {
+			resultErr = err
+		}
+		affected = retry
+	}
+	return resultErr
+}
+
+func (di *DecisionIndex) reconcileRound(
+	ctx context.Context,
+	names []string,
+) (map[string]struct{}, error) {
 	reconciliations := make([]decisionReconciliation, len(names))
 	for i, name := range names {
 		reconciliations[i] = di.prepareReconciliation(name)
@@ -106,10 +129,11 @@ func (di *DecisionIndex) Apply(ctx context.Context, batch []*confgroup.Group) er
 	}
 	wg.Wait()
 
+	retry := make(map[string]struct{})
 	var resultErr error
 	for _, reconciliation := range reconciliations {
 		if reconciliation.err == nil {
-			delete(di.pending, reconciliation.fullName)
+			delete(di.pendingRemovals, reconciliation.fullName)
 			if reconciliation.submit {
 				di.acknowledge(reconciliation)
 			}
@@ -122,18 +146,33 @@ func (di *DecisionIndex) Apply(ctx context.Context, batch []*confgroup.Group) er
 			continue
 		}
 		if jobmgr.IsProposalRejection(reconciliation.err) {
-			di.quarantine(reconciliation.fullName, reconciliation.err)
+			if reconciliation.hasNext {
+				di.rejectCandidate(reconciliation, reconciliation.err)
+				retry[reconciliation.fullName] = struct{}{}
+			} else {
+				di.deferRemoval(reconciliation.fullName, reconciliation.err)
+			}
 			continue
 		}
 		if resultErr == nil {
 			resultErr = reconciliation.err
 		}
 	}
-	return resultErr
+	return retry, resultErr
 }
 
-func (di *DecisionIndex) quarantine(name string, err error) {
-	di.pending[name] = struct{}{}
+func (di *DecisionIndex) rejectCandidate(reconciliation decisionReconciliation, err error) {
+	rejected := di.candidateRejections[reconciliation.fullName]
+	if rejected == nil {
+		rejected = make(map[decisionCandidateRevision]struct{})
+		di.candidateRejections[reconciliation.fullName] = rejected
+	}
+	rejected[candidateRevision(reconciliation.candidateKey, reconciliation.next)] = struct{}{}
+	di.observeRejection(reconciliation.fullName, err)
+}
+
+func (di *DecisionIndex) deferRemoval(name string, err error) {
+	di.pendingRemovals[name] = struct{}{}
 	di.observeRejection(name, err)
 }
 
@@ -234,6 +273,22 @@ func (di *DecisionIndex) applyGroup(
 	return affected, nil
 }
 
+func (di *DecisionIndex) pruneCandidateRejections(affected map[string]struct{}) {
+	for fullName := range affected {
+		rejected := di.candidateRejections[fullName]
+		candidates := di.candidates[fullName]
+		for revision := range rejected {
+			candidate, ok := candidates[revision.key]
+			if !ok || candidateRevision(revision.key, candidate) != revision {
+				delete(rejected, revision)
+			}
+		}
+		if len(rejected) == 0 {
+			delete(di.candidateRejections, fullName)
+		}
+	}
+}
+
 func (di *DecisionIndex) allowed(config confgroup.Config) bool {
 	if len(di.runJob) == 0 {
 		return true
@@ -243,25 +298,29 @@ func (di *DecisionIndex) allowed(config confgroup.Config) bool {
 }
 
 type decisionReconciliation struct {
-	fullName string
-	next     confgroup.Config
-	hasNext  bool
-	submit   bool
-	request  jobmgr.Request
-	plan     jobmgr.WorkPlan
-	err      error
+	fullName     string
+	next         confgroup.Config
+	candidateKey decisionCandidateKey
+	hasNext      bool
+	submit       bool
+	request      jobmgr.Request
+	plan         jobmgr.WorkPlan
+	err          error
 }
 
 func (di *DecisionIndex) prepareReconciliation(fullName string) decisionReconciliation {
 	reconciliation := decisionReconciliation{fullName: fullName}
 	current, hasCurrent := di.acknowledged[fullName]
-	next, hasNext := di.selectConfig(fullName, current, hasCurrent)
+	next, candidateKey, hasNext := di.selectConfig(fullName, current, hasCurrent)
 	if !hasCurrent && !hasNext {
 		return reconciliation
 	}
 	if hasCurrent && hasNext && current.UID() == next.UID() {
 		return reconciliation
 	}
+	reconciliation.next = next
+	reconciliation.candidateKey = candidateKey
+	reconciliation.hasNext = hasNext
 	var change DiscoveredChange
 	if hasNext {
 		change.Config = next
@@ -284,8 +343,6 @@ func (di *DecisionIndex) prepareReconciliation(fullName string) decisionReconcil
 	}
 	revision := di.revision + 1
 	di.revision = revision
-	reconciliation.next = next
-	reconciliation.hasNext = hasNext
 	reconciliation.submit = true
 	reconciliation.request = jobmgr.Request{
 		UID:     fmt.Sprintf("jobmgr-discovery-%d-%d", di.generation, revision),
@@ -309,26 +366,50 @@ func (di *DecisionIndex) selectConfig(
 	fullName string,
 	current confgroup.Config,
 	hasCurrent bool,
-) (confgroup.Config, bool) {
+) (confgroup.Config, decisionCandidateKey, bool) {
 	candidates := di.candidates[fullName]
 	if len(candidates) == 0 {
-		return nil, false
+		return nil, decisionCandidateKey{}, false
 	}
 	var selected confgroup.Config
+	var selectedKey decisionCandidateKey
 	maxPriority := -1
-	for _, candidate := range candidates {
+	for key, candidate := range candidates {
+		if di.candidateRejected(fullName, key, candidate) {
+			continue
+		}
 		priority := candidate.SourceTypePriority()
 		if priority > maxPriority || priority == maxPriority && (selected == nil || candidate.UID() < selected.UID()) {
 			selected = candidate
+			selectedKey = key
 			maxPriority = priority
 		}
 	}
+	if selected == nil {
+		return nil, decisionCandidateKey{}, false
+	}
 	if hasCurrent && current.SourceTypePriority() == maxPriority {
-		for _, candidate := range candidates {
-			if candidate.UID() == current.UID() {
-				return candidate, true
+		for key, candidate := range candidates {
+			if candidate.UID() == current.UID() && !di.candidateRejected(fullName, key, candidate) {
+				return candidate, key, true
 			}
 		}
 	}
-	return selected, true
+	return selected, selectedKey, true
+}
+
+func (di *DecisionIndex) candidateRejected(
+	fullName string,
+	key decisionCandidateKey,
+	candidate confgroup.Config,
+) bool {
+	_, ok := di.candidateRejections[fullName][candidateRevision(key, candidate)]
+	return ok
+}
+
+func candidateRevision(key decisionCandidateKey, candidate confgroup.Config) decisionCandidateRevision {
+	return decisionCandidateRevision{
+		key: key,
+		uid: candidate.UID(),
+	}
 }
