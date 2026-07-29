@@ -91,9 +91,36 @@ func c028Measured(ue int, gapped bool, after, before int64) float64 {
 	return float64(seconds * c028Rate)
 }
 
+// c028Fixtures pushes the four shapes once, whichever case asks first.
+var c028Ready = map[string]bool{}
+
+func c028Fixture(t *testing.T, ue int, gapped bool) (ctx, host string) {
+	t.Helper()
+	shape := "nogaps"
+	if gapped {
+		shape = "gapped"
+	}
+	name := fmt.Sprintf("ue%d-%s", ue, shape)
+	ctx, host = "fixture.c028_"+name, "c028-"+name
+	if c028Ready[name] {
+		return ctx, host
+	}
+
+	g := 260 + ue*2
+	if gapped {
+		g++
+	}
+	ch := c028Chart(ctx, ue, gapped)
+	pushLiveBurst(t, host, guid(g), ch)
+	if _, err := td.WaitRetention(host, ctx, ch.FirstT(), ch.LastT(), 60*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	c028Ready[name] = true
+	return ctx, host
+}
+
 func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 	ok := true
-	g := 260
 
 	for _, ue := range []int{1, 10} {
 		for _, gapped := range []bool{false, true} {
@@ -102,21 +129,7 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 				shape = "gapped"
 			}
 			name := fmt.Sprintf("ue%d-%s", ue, shape)
-			ctx := "fixture.c028_" + name
-			host := "c028-" + name
-
-			g++
-			ch := c028Chart(ctx, ue, gapped)
-			pushLiveBurst(t, host, guid(g), ch)
-
-			// the series opens and closes on a collected sample, so the
-			// retention barrier is the whole span either way
-			ret, err := td.WaitRetention(host, ctx, ch.FirstT(), ch.LastT(), 60*time.Second)
-			if err != nil {
-				t.Fatalf("%s: %v (retention %+v)", name, err, ret)
-			}
-			t.Logf("%s: retention [%d,%d] = t0%+d..t0%+d", name, ret.FirstEntry, ret.LastEntry,
-				ret.FirstEntry-int64(fixture.T0), ret.LastEntry-int64(fixture.T0))
+			ctx, host := c028Fixture(t, ue, gapped)
 
 			gran1 := int64(ue) * 60
 			gran2 := int64(ue) * 3600
@@ -178,4 +191,75 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 	}
 
 	assertContract(t, "CASE-028/rate-with-gaps-totals-what-was-measured", ok)
+}
+
+// CASE-028b: a window that cuts stored records still totals what those
+// seconds hold.
+//
+// The matrix above aligns every window to a record boundary, which is what
+// makes its oracle exact - and it means a partial record is never asked for.
+// A window that starts and ends INSIDE records is the ordinary case for a
+// dashboard, and the seconds it covers are still countable from the fixture:
+// a rate that never changes holds the same amount per second whichever part
+// of a record the window takes.
+//
+// No gaps here: with holes in the record, the part of it inside the window
+// can only be estimated from its width, and that estimate is the open
+// implementation question CASE-028 already asserts. This is about the
+// boundary arithmetic alone.
+func TestCase028PartialAndOffGridWindows(t *testing.T) {
+	ok := true
+
+	for _, ue := range []int{1, 10} {
+		name := fmt.Sprintf("ue%d-nogaps", ue)
+		ctx, host := c028Fixture(t, ue, false)
+
+		gran1 := int64(ue) * 60
+		base := c028Base(ue)
+
+		// windows that begin and end inside a stored record, off the tier1
+		// grid, and not a whole number of records wide
+		for _, w := range []struct{ from, span int64 }{
+			{gran1 + gran1/2, 4 * gran1},         // starts mid-record, whole records wide
+			{gran1 + gran1/3, 4*gran1 + gran1/2}, // both edges inside records
+			{2*gran1 + 7*int64(ue), 3 * gran1},   // an odd number of samples in
+		} {
+			after := base + w.from
+			before := after + w.span
+			want := c028Measured(ue, false, after, before)
+
+			for _, tier := range []int{0, 1} {
+				params := daemon.DataParamsTier(ctx, tier, after, before, w.span/gran1, "sum")
+				params.Set("options", "jsonwrap|unaligned")
+				doc, err := td.DataV3(host, params)
+				if err != nil {
+					t.Fatal(err)
+				}
+				cols, err := canon.Columns(doc)
+				if err != nil {
+					t.Fatal(err)
+				}
+				total := 0.0
+				for _, pt := range cols["rate"] {
+					if pt.Value != nil {
+						total += *pt.Value
+					}
+				}
+				// one stored sample of slack at each edge: which side of a
+				// boundary a sample falls on is a separate contract (L1),
+				// and a whole record is 60 samples
+				if math.Abs(total-want) > float64(2*ue*c028Rate) {
+					t.Logf("partial-window contract not met: %s tier %d over (t0%+d,t0%+d] "+
+						"totals %.4f, but the fixture measured %.0f seconds of %d/s in it, "+
+						"which is %.4f - a window that cuts a record still holds the seconds "+
+						"it covers",
+						name, tier, after-base, before-base, total,
+						want/float64(c028Rate), c028Rate, want)
+					ok = false
+				}
+			}
+		}
+	}
+
+	assertContract(t, "CASE-028/partial-and-off-grid-rate-windows", ok)
 }

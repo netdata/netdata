@@ -85,7 +85,38 @@ func TestCase026SettlementCarriesAnomaly(t *testing.T) {
 			continue
 		}
 
+		// The settlement-only row: it starts inside the LAST stored record
+		// (so it is owed that record's closing seconds) and no record ends
+		// within it (so nothing is delivered to it). Identify it from the
+		// fixture, and require it to be there - a run where it does not
+		// exist is not evidence that the settlement works.
+		settleOnly := int64(-1)
 		for _, pt := range col {
+			rowStart := pt.T - 35
+			if rowStart > last-int64(ue) && rowStart < last {
+				settleOnly = pt.T
+			}
+		}
+		// only sum carries seconds into a row that received nothing; under
+		// every other grouping such a row is legitimately empty
+		if group != "sum" {
+			settleOnly = -1
+		} else if settleOnly < 0 {
+			t.Logf("anomaly-pairing contract not met: %s produced no row that opens inside "+
+				"the last stored record - the shape this case is about is absent", group)
+			ok = false
+		}
+
+		for _, pt := range col {
+			if pt.T == settleOnly {
+				if pt.Value == nil {
+					t.Logf("anomaly-pairing contract not met: %s row t0%+d is the row owed the "+
+						"last record's closing seconds and it answered nothing - those seconds "+
+						"were paid nowhere", group, pt.T-fixture.T0)
+					ok = false
+					continue
+				}
+			}
 			if pt.Value == nil {
 				continue
 			}

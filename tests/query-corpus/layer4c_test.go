@@ -38,6 +38,15 @@ const (
 	// seconds is arithmetic, never resolution.
 	c4cConstDim   = "flat"
 	c4cConstValue = 1000
+
+	// A RATE dimension alongside them. Its volume is the only quantity whose
+	// arithmetic depends on which tier answered - a rate's sum has to be
+	// multiplied by the interval its samples were collected at, and above
+	// tier 0 that interval is not in the record's value. A constant rate
+	// makes the answer exact, so a seam that mislabels which tier a record
+	// came from cannot hide behind rollup noise.
+	c4cRateDim   = "rate"
+	c4cRateValue = 20
 )
 
 // c4cValue is the deterministic sample generator: a 24-bit full-mantissa
@@ -97,6 +106,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		conn.Dimension(c4cDimID(d), "", 1, 1)
 	}
 	conn.Dimension(c4cConstDim, "", 1, 1)
+	conn.Dimension(c4cRateDim, "incremental", 1, 1)
 	firstT := int64(fixture.T0)
 	lastT := int64(fixture.T0 + c4cRows)
 	conn.ChartDefinitionEnd(firstT, lastT, lastT)
@@ -107,7 +117,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		func(_ string, after, before int64) []stream.ReplayRow {
 			rows := make([]stream.ReplayRow, 0, before-after)
 			for ts := after + 1; ts <= before; ts++ {
-				row := stream.ReplayRow{T: ts, Dims: make([]stream.ReplayValue, c4cDims+1)}
+				row := stream.ReplayRow{T: ts, Dims: make([]stream.ReplayValue, c4cDims+2)}
 				for d := 0; d < c4cDims; d++ {
 					row.Dims[d] = stream.ReplayValue{
 						ID:        c4cDimID(d),
@@ -118,6 +128,11 @@ func TestLayer4PlanSwitching(t *testing.T) {
 				row.Dims[c4cDims] = stream.ReplayValue{
 					ID:        c4cConstDim,
 					Collected: strconv.Itoa(c4cConstValue),
+					Flags:     stream.FlagNotAnomalous,
+				}
+				row.Dims[c4cDims+1] = stream.ReplayValue{
+					ID:        c4cRateDim,
+					Collected: strconv.Itoa(c4cRateValue),
 					Flags:     stream.FlagNotAnomalous,
 				}
 				rows = append(rows, row)
@@ -268,6 +283,72 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	ok = c4cSumConserves(t, dd, "straddling", c4cAlignTier1(boundary-3600)) && ok
 
 	assertContract(t, "CASE-026/totals-survive-a-plan-switch", ok)
+
+	// CASE-031: the same question asked of a RATE, whose volume depends on
+	// the interval its samples were collected at. Above tier 0 that interval
+	// is not in the record - it has to come from the record's own coverage -
+	// so a seam is where an implementation that mislabels a record's source
+	// tier gives itself away, and the rotated head is where a query is
+	// served from a higher tier alone.
+	rok := c4cRateVolume(t, dd, "across-the-seam", boundary-3600, boundary+3600)
+	rok = c4cRateVolume(t, dd, "rotated-head-only", c4cAlignTier1(boundary-10800), c4cAlignTier1(boundary-3600)) && rok
+	rok = c4cRateVolume(t, dd, "tier0-only", c4cAlignTier1(boundary+3600), c4cAlignTier1(boundary+10800)) && rok
+	assertContract(t, "CASE-031/rate-volume-across-an-automatic-seam", rok)
+}
+
+// c4cRateVolume totals the rate dimension over one window, with no tier pin,
+// and compares it against what the fixture pushed: a constant rate collected
+// once a second holds rate x seconds, whichever tier answers.
+func c4cRateVolume(t *testing.T, dd *daemon.Daemon, label string, after, before int64) bool {
+	t.Helper()
+
+	want := float64(before-after) * float64(c4cRateValue)
+	ok := true
+
+	// 1s buckets are what forces the split: only tier 0 satisfies that
+	// density, so the rotated head must come from a second tier1 plan and
+	// the answer is assembled from both
+	for _, points := range []int64{1, (before - after) / 60, before - after} {
+		params := daemon.DataParams(c4cContext, after, before, points)
+		params.Set("time_group", "sum")
+		params.Set("scope_dimensions", c4cRateDim)
+		params.Set("options", "jsonwrap|unaligned")
+		doc, err := dd.DataV3("l4c-child", params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		col, has := cols[c4cRateDim]
+		if !has || len(col) == 0 {
+			t.Logf("rate volume not met: [%s] at %d buckets returned no data", label, points)
+			ok = false
+			continue
+		}
+
+		total := 0.0
+		for _, pt := range col {
+			if pt.Value != nil {
+				total += *pt.Value
+			}
+		}
+		t.Logf("rate volume [%s]: %d buckets (per_tier %v) total %.6g, want %.6g",
+			label, points, perTierPoints(doc), total, want)
+
+		// one stored record of slack at each edge, which cannot hide an
+		// interval read from the wrong tier - that is wrong by 60x or 3600x
+		if math.Abs(total-want) > float64(c4cRateValue)*120 {
+			t.Logf("rate volume not met: [%s] at %d buckets totals %.6g over %ds of a "+
+				"constant %d/s, which is %.6g - a rate's volume is the interval its samples "+
+				"were collected at, and that is a property of the record, not of the tier "+
+				"serving the query",
+				label, points, total, before-after, c4cRateValue, want)
+			ok = false
+		}
+	}
+	return ok
 }
 
 // c4cAlignTier1 rounds a timestamp down onto the tier1 record grid, whose

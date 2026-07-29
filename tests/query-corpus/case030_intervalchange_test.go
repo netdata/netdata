@@ -35,15 +35,18 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 		slow = 10 // and the one the metric moves to
 	)
 
-	base := int64(fixture.T0) - int64(fixture.T0)%3600
+	// aligned to the COARSEST tier2 grid in play (the ten-second metric's
+	// tier2 records are 36000s wide and land on multiples of that), so a
+	// window of whole tier2 records cuts no record at any tier
+	base := int64(fixture.T0) - int64(fixture.T0)%36000
 
 	for _, tc := range []struct {
 		name, contract     string
 		first, then        int
 		samples1, samples2 int
 	}{
-		{"speeds-up", "CASE-030/interval-change-speeding-up", slow, fast, 720, 3600},
-		{"slows-down", "CASE-030/interval-change-slowing-down", fast, slow, 3600, 360},
+		{"speeds-up", "CASE-030/interval-change-speeding-up", slow, fast, 28800, 600},
+		{"slows-down", "CASE-030/interval-change-slowing-down", fast, slow, 28800, 600},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := "fixture.c030_" + tc.name
@@ -87,17 +90,21 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 			// a window of whole tier1 records, entirely inside the HISTORY -
 			// every second of it was measured at the first interval
 			gran1 := int64(tc.first) * 60
-			// four whole tier1 records in the MIDDLE of the history: far
-			// enough from its head and its tail that every record the query
-			// reads is complete and rolled up, whatever else the daemon is
-			// doing. Every second of it was measured at the first interval.
-			after := base + 4*gran1
-			before := after + 4*gran1
+			gran2 := int64(tc.first) * 3600
+			// four whole tier2 records in the MIDDLE of the history - which
+			// is also a whole number of tier1 records and of samples, so one
+			// window serves every tier. Far enough from either end that each
+			// record the query reads is complete and rolled up whatever else
+			// the daemon is doing, and every second of it was measured at the
+			// first interval.
+			after := base + 2*gran2
+			before := after + 4*gran2
+			_ = gran1
 			want := float64(before-after) * float64(rate)
 
 			ok := true
-			for _, tier := range []int{0, 1} {
-				params := daemon.DataParamsTier(ctx, tier, after, before, 10, "sum")
+			for _, tier := range []int{0, 1, 2} {
+				params := daemon.DataParamsTier(ctx, tier, after, before, 4, "sum")
 				params.Set("options", "jsonwrap|unaligned")
 				doc, err := td.DataV3(host, params)
 				if err != nil {
