@@ -159,7 +159,7 @@ func TestInitialStoreMaterializationStartsDifferentIdentitiesConcurrently(t *tes
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "initial Store publication did not complete")
 	}
-	require.True(t, fastBeforeRelease, "initial Store identities were materialized serially")
+	require.True(t, fastBeforeRelease, "initial Store identities did not materialize concurrently")
 	require.NoError(t, controller.CloseProjection())
 	attempts.BeginShutdown()
 	require.NoError(t, attempts.Shutdown(t.Context()))
@@ -266,6 +266,8 @@ func TestPreparedStoreOperationQuarantinesFailedUntakenMutationRelease(t *testin
 		supersede: true,
 	})
 	require.NoError(t, err)
+	// This idempotent fallback covers failures before the explicit release
+	// that triggers the quarantine behavior asserted below.
 	t.Cleanup(stage.Release)
 
 	stage.Start()

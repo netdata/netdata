@@ -203,6 +203,9 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 	if sjo == nil || ctx == nil {
 		return errors.New("job output: invalid staged job promotion")
 	}
+	if cause := context.Cause(ctx); cause != nil {
+		return cause
+	}
 	sjo.mu.Lock()
 	if sjo.attempts == nil ||
 		sjo.target == 0 ||
@@ -569,6 +572,10 @@ func (f *Factory) awaitCandidate(ctx context.Context, stage *preparedJobCandidat
 		return errors.New("job output: invalid candidate wait")
 	}
 	waitErr, claimErr := f.config.RunWithoutClaims(ctx, func(yielded context.Context) error {
+		if cause := context.Cause(yielded); cause != nil {
+			stage.Cancel(cause)
+			return cause
+		}
 		stage.Start()
 		select {
 		case <-stage.Ready():

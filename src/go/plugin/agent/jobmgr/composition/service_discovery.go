@@ -275,6 +275,9 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 		return lifecycle.SealedResult{}, nil,
 			errors.New("jobmgr composition: invalid contained service discovery invocation")
 	}
+	if cause := context.Cause(ctx); cause != nil {
+		return lifecycle.SealedResult{}, nil, cause
+	}
 	resultCh := make(chan serviceDiscoveryInvocationResult, 1)
 	attempt, err := sdb.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{

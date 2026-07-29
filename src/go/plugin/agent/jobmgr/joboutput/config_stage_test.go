@@ -142,6 +142,45 @@ func TestContainedConfigValidationYieldsGraphClaimForAllCallbacks(t *testing.T) 
 	require.Zero(t, violations.Load())
 }
 
+func TestConfigOperationAwaitDoesNotStartAfterCallerCancellation(t *testing.T) {
+	attempts := &validationSupersedeAuthority{}
+	factory := &Factory{
+		config: FactoryConfig{
+			Epoch:    1,
+			Attempts: attempts,
+		},
+	}
+	var calls atomic.Int32
+	stage, err := newPreparedConfigOperation(
+		factory,
+		factoryTestConfig(false),
+		configOperationTest,
+		func(context.Context, confgroup.Config) ([]byte, error) {
+			calls.Add(1)
+			return nil, nil
+		},
+	)
+	require.NoError(t, err)
+	t.Cleanup(stage.Release)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = stage.Await(ctx)
+
+	require.ErrorIs(t, err, context.Canceled)
+	select {
+	case <-stage.Ready():
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "canceled config operation did not settle")
+	}
+	stage.mu.Lock()
+	started := stage.started
+	stage.mu.Unlock()
+	require.False(t, started)
+	require.Zero(t, attempts.started.Load())
+	require.Zero(t, calls.Load())
+}
+
 func TestConfigValidationSupersedesEarlierSameJobOperation(t *testing.T) {
 	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
 	attempts := &validationSupersedeAuthority{}

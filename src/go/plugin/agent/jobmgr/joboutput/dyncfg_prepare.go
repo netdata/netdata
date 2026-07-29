@@ -35,6 +35,8 @@ func (dcjc *DynCfgJobController) prepareAdd(
 		return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, failure.result)
 	}
 	if _, err := dcjc.runConfigOperation(ctx, config, configOperationValidate, true); err != nil {
+		// The resource lane stays active while validation yields the graph
+		// claim, so same-resource DynCfg work cannot supersede this attempt.
 		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
 			errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
 			errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
@@ -148,6 +150,8 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 				return nil, err
 			}
+			// The resource lane stays active while validation yields the graph
+			// claim, so same-resource DynCfg work cannot supersede this attempt.
 			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
 				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
 				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {

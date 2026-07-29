@@ -5,12 +5,15 @@ package composition
 import (
 	"context"
 	"errors"
+	"sort"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 )
+
+const maximumRetainedSecretEpochSamples = 8
 
 type processSecretEpoch struct {
 	generation  uint64
@@ -146,8 +149,11 @@ func (es *processSecretEpochs) shutdown(ctx context.Context) error {
 		snapshot = append(snapshot, epoch)
 	}
 	es.mu.Unlock()
+	sort.Slice(snapshot, func(left, right int) bool {
+		return snapshot[left].generation < snapshot[right].generation
+	})
 	var result error
-	for _, epoch := range snapshot {
+	for index, epoch := range snapshot {
 		select {
 		case <-epoch.done():
 			result = errors.Join(result, epoch.store.Close(context.Background()))
@@ -164,20 +170,51 @@ func (es *processSecretEpochs) shutdown(ctx context.Context) error {
 				continue
 			default:
 			}
+			retained := make([]*processSecretEpoch, 0, len(snapshot)-index)
+			for _, candidate := range snapshot[index:] {
+				select {
+				case <-candidate.done():
+					result = errors.Join(result, candidate.store.Close(context.Background()))
+				default:
+					retained = append(retained, candidate)
+				}
+			}
+			if len(retained) == 0 {
+				return result
+			}
 			result = errors.Join(
 				result,
 				errors.New("jobmgr composition: retained secret Store epoch"),
 				ctx.Err(),
 			)
-			es.observeFailure(
-				epoch.generation,
-				"secret Store epoch retained at process shutdown",
-				ctx.Err(),
-			)
+			es.observeRetained(retained, ctx.Err())
 			return result
 		}
 	}
 	return result
+}
+
+func (es *processSecretEpochs) observeRetained(
+	epochs []*processSecretEpoch,
+	err error,
+) {
+	if len(epochs) == 0 {
+		return
+	}
+	jobmgr.ObserveDiagnostic(es.diagnostics, jobmgr.DiagnosticEvent{
+		Level: jobmgr.DiagnosticError,
+		Name:  "secret Store epochs retained at process shutdown",
+		Count: len(epochs),
+		Err:   err,
+	})
+	for _, epoch := range epochs[:min(len(epochs), maximumRetainedSecretEpochSamples)] {
+		jobmgr.ObserveDiagnostic(es.diagnostics, jobmgr.DiagnosticEvent{
+			Level:      jobmgr.DiagnosticWarning,
+			Name:       "secret Store epoch retained at process shutdown",
+			Generation: epoch.generation,
+			Err:        err,
+		})
+	}
 }
 
 func (es *processSecretEpochs) observeClose(epoch *processSecretEpoch) {

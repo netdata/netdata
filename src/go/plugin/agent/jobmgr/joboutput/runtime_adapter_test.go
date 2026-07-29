@@ -160,6 +160,27 @@ func TestProcessOwnedJobCannotAttachAfterTargetRetirementFinalizesCandidate(t *t
 	require.Error(t, err)
 }
 
+func TestStagedJobPromotionDoesNotStartAfterCallerCancellation(t *testing.T) {
+	attempts := &unexpectedPendingJobAuthority{}
+	owner := newStagedJobOwner(
+		ConstructedJob{},
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module_job",
+			Resource:  "module_job",
+		},
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := owner.Promote(ctx)
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.Zero(t, attempts.calls.Load())
+}
+
 func TestFrameWriterWholeCommit(t *testing.T) {
 	var output bytes.Buffer
 	owner, err := lifecycle.NewFrameOwner(&output)

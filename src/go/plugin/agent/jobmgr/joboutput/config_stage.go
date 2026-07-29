@@ -146,6 +146,11 @@ func (pco *preparedConfigOperation) Await(ctx context.Context) error {
 	if pco == nil || ctx == nil {
 		return errors.New("job output: invalid config operation wait")
 	}
+	if cause := context.Cause(ctx); cause != nil {
+		pco.Cancel(cause)
+		pco.publish(configOperationResult{err: cause})
+		return cause
+	}
 	pco.Start()
 	select {
 	case <-pco.Ready():

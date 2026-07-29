@@ -88,7 +88,7 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 	<-entered
 	cancel()
 	require.NoError(t, <-first)
-	require.True(t, bundle.quarantined)
+	require.True(t, functionBundleQuarantined(bundle))
 
 	calls := 0
 	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
@@ -107,7 +107,7 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 	require.True(t, ok)
 	close(release)
 	<-released
-	require.False(t, bundle.quarantined)
+	require.False(t, functionBundleQuarantined(bundle))
 
 	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
 		calls++
@@ -118,6 +118,46 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 
 	bundle.retire()
 	require.NoError(t, bundle.wait(context.Background()))
+}
+
+func TestFunctionBundleDoesNotStartInvocationAfterCallerCancellation(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		attempts.BeginShutdown()
+		require.NoError(t, attempts.Shutdown(context.Background()))
+	})
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &controllerTestHandler{}
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	require.NoError(t, bundle.bindContainment(attempts, 1, "bundle", "module"))
+	t.Cleanup(func() {
+		bundle.retire()
+		require.NoError(t, bundle.wait(context.Background()))
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var calls atomic.Int32
+
+	_, err = bundle.invoke(ctx, func(context.Context) (lifecycle.SealedResult, error) {
+		calls.Add(1)
+		return lifecycle.NewSealedResult(200, "application/json", nil)
+	})
+
+	require.NoError(t, err)
+	bundle.mu.Lock()
+	invocationID := bundle.invocationID
+	bundle.mu.Unlock()
+	require.Zero(t, invocationID)
+	require.Zero(t, calls.Load())
+	require.Equal(t, containment.Census{}, attempts.Census())
 }
 
 func TestFunctionBundlePanicPermanentlyClosesBundleWithoutInvocationTombstones(t *testing.T) {
@@ -252,7 +292,7 @@ func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 	<-attempts.settled
 	cancelFirst()
 	require.NoError(t, <-firstDone)
-	require.True(t, bundle.quarantined)
+	require.True(t, functionBundleQuarantined(bundle))
 
 	firstIdentity := jobmgr.ProcessAttemptIdentity{
 		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
@@ -283,7 +323,7 @@ func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 	require.True(t, ok)
 	close(secondRelease)
 	<-secondReleased
-	require.False(t, bundle.quarantined)
+	require.False(t, functionBundleQuarantined(bundle))
 
 	_, err = bundle.invoke(context.Background(), func(context.Context) (lifecycle.SealedResult, error) {
 		calls++
@@ -331,7 +371,7 @@ func TestFunctionBundleQuarantineRejectsAvailabilityPoll(t *testing.T) {
 	<-entered
 	cancel()
 	require.NoError(t, <-done)
-	require.True(t, bundle.quarantined)
+	require.True(t, functionBundleQuarantined(bundle))
 
 	poll, err := bundle.startAvailabilityPoll()
 	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptBusy)
@@ -688,7 +728,12 @@ func TestFunctionBundleAvailabilityPollPreventsConcurrentCleanup(t *testing.T) {
 	require.NoError(t, err)
 	<-entered
 	bundle.retire()
-	time.Sleep(20 * time.Millisecond)
+	bundle.mu.Lock()
+	cleanupStarted := bundle.cleanupStart
+	references := bundle.references
+	bundle.mu.Unlock()
+	require.False(t, cleanupStarted)
+	require.Positive(t, references)
 	require.Zero(t, handler.cleanupCount())
 
 	close(release)

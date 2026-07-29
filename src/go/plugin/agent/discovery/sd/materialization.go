@@ -53,6 +53,9 @@ func runMaterialization[T any](
 		discovery.attempts == nil || key == "" || work == nil {
 		return zero, errors.New("service discovery: invalid materialization")
 	}
+	if cause := context.Cause(ctx); cause != nil {
+		return zero, cause
+	}
 	identity := jobmgr.ProcessAttemptIdentity{
 		Namespace: jobmgr.ProcessAttemptServiceDiscovery,
 		Key:       key,

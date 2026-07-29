@@ -841,6 +841,33 @@ func TestFactoryCandidateWaitYieldsGraphClaimForWholeMaterialization(t *testing.
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
+func TestCandidateWaitDoesNotStartAfterYieldedContextCancellation(t *testing.T) {
+	factory, _ := newFactoryTestHarness(t, collectorapi.Creator{}, nil)
+	attempts := &unexpectedPendingJobAuthority{}
+	factory.config.Epoch = 1
+	factory.config.Attempts = attempts
+	factory.config.RunWithoutClaims = func(
+		ctx context.Context,
+		work func(context.Context) error,
+	) (error, error) {
+		return work(ctx), nil
+	}
+	stage, err := factory.newCandidate(factoryTestConfig(false))
+	require.NoError(t, err)
+	t.Cleanup(stage.Release)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = factory.awaitCandidate(ctx, stage)
+
+	require.ErrorIs(t, err, context.Canceled)
+	stage.mu.Lock()
+	started := stage.started
+	stage.mu.Unlock()
+	require.False(t, started)
+	require.Zero(t, attempts.calls.Load())
+}
+
 func TestFactoryCandidateStageSettlesWhileNonCooperativeProbeRemainsOwned(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})

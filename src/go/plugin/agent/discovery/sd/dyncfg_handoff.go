@@ -35,6 +35,8 @@ func (d *ServiceDiscovery) enqueueDyncfgFunction(fn dyncfg.Function) {
 		ctx = context.Background()
 	}
 	fnCtx := dyncfgFunctionContext(fn)
+	// Production captures these results inside the outer contained invocation.
+	// Once fnCtx is canceled, that owner discards any racing shutdown result.
 	pending, admission := d.beginDyncfg(fn)
 	switch admission {
 	case dyncfgAdmissionDuplicate:

@@ -78,9 +78,12 @@ func newTestFunctionAssembly(
 		initial...,
 	)
 	t.Cleanup(func() {
-		_ = stopFunctionAssembly(assembly, epoch)
 		if assembly != nil {
-			_ = assembly.abortConstruction()
+			// Abort first because a failed shutdown attempt still enters the
+			// draining state and can no longer roll construction back.
+			if abortErr := assembly.abortConstruction(); abortErr != nil {
+				_ = stopFunctionAssembly(assembly, epoch)
+			}
 		}
 		attempts.BeginShutdown()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)

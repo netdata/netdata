@@ -343,6 +343,35 @@ func TestServiceDiscoveryTransactionDisposeDoesNotInvokeHandler(t *testing.T) {
 	require.Empty(t, output.String())
 }
 
+func TestServiceDiscoveryInvocationDoesNotStartAfterCallerCancellation(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		delegate.BeginShutdown()
+		require.NoError(t, delegate.Shutdown(context.Background()))
+	})
+	attempts := &countingProcessAttemptAuthority{delegate: delegate}
+	binding, err := newServiceDiscoveryBinding(1, "go.d", attempts, frames, nil)
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var calls int
+
+	_, _, err = binding.invokeContained(
+		ctx,
+		"go.d:sd:type:job",
+		frameworkfunctions.Function{UID: "canceled"},
+		false,
+		func(context.Context) { calls++ },
+	)
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.Zero(t, attempts.started)
+	require.Zero(t, calls)
+}
+
 func TestServiceDiscoveryTransactionContainsNonCooperativeHandler(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
@@ -483,4 +512,36 @@ func newServiceDiscoveryTestBinding(
 	binding, err := newServiceDiscoveryBinding(epoch, "go.d", attempts, frames, diagnostics)
 	require.NoError(t, err)
 	return binding
+}
+
+type countingProcessAttemptAuthority struct {
+	delegate jobmgr.ProcessAttemptAuthority
+	started  int
+}
+
+func (a *countingProcessAttemptAuthority) StartProcessAttempt(
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	a.started++
+	return a.delegate.StartProcessAttempt(plan)
+}
+
+func (a *countingProcessAttemptAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	return a.delegate.SupersedeProcessAttempt(ctx, identity)
+}
+
+func (a *countingProcessAttemptAuthority) CutProcessAttempt(
+	identity jobmgr.ProcessAttemptIdentity,
+	cause error,
+) bool {
+	return a.delegate.CutProcessAttempt(identity, cause)
+}
+
+func (a *countingProcessAttemptAuthority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return a.delegate.ProcessAttemptReleased(identity)
 }

@@ -170,6 +170,9 @@ func (fb *functionBundle) invoke(
 	if fb == nil || ctx == nil || call == nil {
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
+	if context.Cause(ctx) != nil {
+		return functionErrorResult(503, "Function handler did not complete before its deadline")
+	}
 	fb.mu.Lock()
 	if fb.retired || fb.quarantined {
 		fb.mu.Unlock()
@@ -536,6 +539,8 @@ func (fb *functionBundle) startCleanupLocked() bool {
 
 func (fb *functionBundle) cleanup() {
 	if fb.handler != nil {
+		// Caller waits stay cancelable; the enclosing module/job attempt owns
+		// physical cleanup until this callback returns or the process exits.
 		fb.cleanupErr = callMethodCleanup(context.Background(), fb.handler)
 	}
 	close(fb.cleanupDone)
