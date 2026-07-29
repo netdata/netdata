@@ -183,6 +183,8 @@ func assertSameResponse(t *testing.T, a, b url.Values) {
 }
 
 func TestLayer5MultiKeyGroupBy(t *testing.T) {
+	trackContract(t, "L5/multi-key-group-by")
+
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")

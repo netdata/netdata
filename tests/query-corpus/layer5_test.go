@@ -230,6 +230,8 @@ func l5Expected(agg string, group []l5Member, i int, raw bool) (val, arp float64
 // aggregatable mode — sums stay undivided, anomaly rates accumulated,
 // per-point contribution counts on the wire).
 func TestLayer5GroupByMatrix(t *testing.T) {
+	trackContract(t, "L5/group-by-matrix")
+
 	pushLayer5(t)
 	members := l5Members()
 
@@ -329,6 +331,8 @@ func TestLayer5GroupByMatrix(t *testing.T) {
 //   - group_by=dimension is DEGENERATE by construction: hidden dims group
 //     separately and are filtered, so the selected column reads flat 100%.
 func TestLayer5Percentage(t *testing.T) {
+	trackContract(t, "L5/percentage")
+
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
@@ -489,6 +493,8 @@ func viewSts(doc map[string]any) map[string]map[string]float64 {
 // correct weighted mean. In raw mode the (sum, count) pair rides the wire
 // untouched for the cloud.
 func TestLayer5Statistics(t *testing.T) {
+	trackContract(t, "L5/statistics")
+
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")

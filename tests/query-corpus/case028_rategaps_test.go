@@ -121,6 +121,8 @@ func c028Fixture(t *testing.T, ue int, gapped bool) (ctx, host string) {
 }
 
 func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
+	trackContract(t, "CASE-028/rate-with-gaps-totals-what-was-measured")
+
 	ok := true
 
 	for _, ue := range []int{1, 10} {
@@ -144,51 +146,20 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 				// Zooms that divide the span exactly, so the engine covers
 				// the window that was asked for rather than a rounded one.
 				//
-				// A SINGLE bucket is deliberately absent: measured against
-				// this same fixture it covers one second more than the
-				// window asked for, at every update_every and on every tier
-				// (exactly `rate` units too much). That is a question about
-				// what one bucket spans, it applies to every grouping, and
-				// it would show up here as a volume error that this case did
-				// not put there.
+				// A single bucket is covered separately by CASE-034. Keeping
+				// that known window-normalization defect out of this matrix
+				// lets this contract isolate rate arithmetic over gaps.
 				for _, points := range []int64{(before - after) / gran1, (before - after) / (gran1 * 2)} {
-					params := daemon.DataParamsTier(ctx, tier, after, before, points, "sum")
-					params.Set("options", "jsonwrap|unaligned")
-					doc, err := td.DataV3(host, params)
-					if err != nil {
-						t.Fatal(err)
-					}
-					cols, err := canon.Columns(doc)
-					if err != nil {
-						t.Logf("volume contract not met: %s tier %d at %d buckets: %v",
-							name, tier, points, err)
-						ok = false
-						continue
-					}
-
-					col, has := cols["rate"]
-					if !has || len(col) == 0 {
-						t.Logf("volume contract not met: %s tier %d at %d buckets returned no "+
-							"data - the tier does not hold this window", name, tier, points)
-						ok = false
-						continue
-					}
-
-					total := 0.0
-					for _, pt := range col {
-						if pt.Value != nil {
-							total += *pt.Value
-						}
-					}
-
-					// exact: the window is a whole number of stored records
-					// at every tier, so nothing is split and there is no
-					// rounding for a tolerance to absorb
-					if math.Abs(total-want) > 1e-6 {
-						t.Logf("volume contract not met: %s tier %d at %d buckets totals %.4f, "+
-							"but the fixture measured %.0f seconds of %d/s in this window, "+
-							"which is %.4f - seconds nobody measured cannot be added to a volume",
-							name, tier, points, total, want/float64(c028Rate), c028Rate, want)
+					if !c028VolumeMatches(t, c028Query{
+						context: ctx,
+						host:    host,
+						label:   name,
+						tier:    tier,
+						after:   after,
+						before:  before,
+						points:  points,
+						want:    want,
+					}) {
 						ok = false
 					}
 				}
@@ -214,6 +185,8 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 // already asserts, and it would drown this one out. This is about the
 // boundary arithmetic alone.
 func TestCase028PartialAndOffGridWindows(t *testing.T) {
+	trackContract(t, "CASE-028/partial-and-off-grid-rate-windows")
+
 	ok := true
 
 	for _, ue := range []int{1, 10} {
@@ -226,9 +199,9 @@ func TestCase028PartialAndOffGridWindows(t *testing.T) {
 		// windows that begin and end inside a stored record, off the tier1
 		// grid, and not a whole number of records wide
 		for _, w := range []struct{ from, span int64 }{
-			{gran1 + gran1/2, 4 * gran1},         // starts mid-record, whole records wide
-			{gran1 + gran1/3, 4*gran1 + gran1/2}, // both edges inside records
-			{2*gran1 + 7*int64(ue), 3 * gran1},   // an odd number of samples in
+			{gran1 + gran1/2, 4 * gran1},                 // starts mid-record, whole records wide
+			{gran1 + gran1/3, 4*gran1 + gran1/2},         // both edges inside records
+			{2*gran1 + 7*int64(ue), 3*gran1 + int64(ue)}, // exactly 181 samples
 		} {
 			after := base + w.from
 			before := after + w.span
@@ -244,7 +217,18 @@ func TestCase028PartialAndOffGridWindows(t *testing.T) {
 
 			for _, tier := range []int{0, 1} {
 				for _, points := range zooms {
-					runPartial(t, ctx, host, name, tier, after, before, points, want, &ok)
+					if !c028VolumeMatches(t, c028Query{
+						context: ctx,
+						host:    host,
+						label:   name,
+						tier:    tier,
+						after:   after,
+						before:  before,
+						points:  points,
+						want:    want,
+					}) {
+						ok = false
+					}
 				}
 			}
 		}
@@ -253,33 +237,49 @@ func TestCase028PartialAndOffGridWindows(t *testing.T) {
 	assertContract(t, "CASE-028/partial-and-off-grid-rate-windows", ok)
 }
 
-func runPartial(t *testing.T, ctx, host, name string, tier int, after, before, points int64, want float64, ok *bool) {
+type c028Query struct {
+	context, host, label  string
+	tier                  int
+	after, before, points int64
+	want                  float64
+}
+
+func c028VolumeMatches(t *testing.T, q c028Query) bool {
 	t.Helper()
 
-	params := daemon.DataParamsTier(ctx, tier, after, before, points, "sum")
+	params := daemon.DataParamsTier(q.context, q.tier, q.after, q.before, q.points, "sum")
 	params.Set("options", "jsonwrap|unaligned")
-	doc, err := td.DataV3(host, params)
+	doc, err := td.DataV3(q.host, params)
 	if err != nil {
 		t.Fatal(err)
 	}
 	cols, err := canon.Columns(doc)
 	if err != nil {
-		t.Fatal(err)
+		t.Logf("volume contract not met: %s tier %d at %d buckets: %v",
+			q.label, q.tier, q.points, err)
+		return false
+	}
+	col, has := cols["rate"]
+	if !has || len(col) == 0 {
+		t.Logf("volume contract not met: %s tier %d at %d buckets returned no data",
+			q.label, q.tier, q.points)
+		return false
 	}
 
 	total := 0.0
-	for _, pt := range cols["rate"] {
+	for _, pt := range col {
 		if pt.Value != nil {
 			total += *pt.Value
 		}
 	}
 
-	if math.Abs(total-want) > 1e-6 {
-		t.Logf("partial-window contract not met: %s tier %d over (t0%+d,t0%+d] at %d buckets "+
+	if math.IsNaN(total) || math.IsInf(total, 0) || math.Abs(total-q.want) > 1e-6 {
+		t.Logf("volume contract not met: %s tier %d over (t0%+d,t0%+d] at %d buckets "+
 			"totals %.4f, but the fixture measured %.0f seconds of %d/s in it, which is %.4f - "+
-			"a window that cuts a record still holds the seconds it covers",
-			name, tier, after-int64(fixture.T0), before-int64(fixture.T0), points,
-			total, want/float64(c028Rate), c028Rate, want)
-		*ok = false
+			"unmeasured seconds contribute nothing",
+			q.label, q.tier, q.after-int64(fixture.T0), q.before-int64(fixture.T0), q.points,
+			total, q.want/float64(c028Rate), c028Rate, q.want)
+		return false
 	}
+	return true
 }

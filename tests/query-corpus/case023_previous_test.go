@@ -34,6 +34,8 @@ import (
 )
 
 func TestCase023PreviousSurvivesRedelivery(t *testing.T) {
+	trackContract(t, "CASE-023/previous-survives-redelivery")
+
 	const samples = 1800 // 30 tier-1 windows
 
 	// a counter that only ever climbs - one step per second, no restart
@@ -118,6 +120,8 @@ func TestCase023PreviousSurvivesRedelivery(t *testing.T) {
 // the buckets that follow it (where nothing happened) and, once the floor
 // has been carried forward, stops reporting it in its own.
 func TestCase023PreviousFindsARealDropAtEveryZoom(t *testing.T) {
+	trackContract(t, "CASE-023/previous-drop-at-every-zoom")
+
 	const (
 		samples = 1800
 		resetAt = 900 // one restart, in the middle

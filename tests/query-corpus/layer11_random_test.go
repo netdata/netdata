@@ -123,7 +123,7 @@ func shrinkCase(t *testing.T, c sliceCase) sliceCase {
 	for progress := true; progress; {
 		progress = false
 		for _, simpler := range shrinkCandidates(c) {
-			if bad, _ := checkCase(t, simpler); !bad {
+			if holds, _ := checkCase(t, simpler); !holds {
 				c = simpler
 				progress = true
 				break
@@ -159,6 +159,8 @@ func shrinkCandidates(c sliceCase) []sliceCase {
 }
 
 func TestLayer11RandomisedSlicing(t *testing.T) {
+	trackContract(t, "L11/randomised-slicing")
+
 	seed := int64(20231114)
 	if s := os.Getenv("QUERY_CORPUS_SEED"); s != "" {
 		if v, err := strconv.ParseInt(s, 10, 64); err == nil {

@@ -68,9 +68,10 @@ layers; each layer declares which entries it consumes:
 - **A broken contract fails. Always.** On master, on a feature branch, whether
   or not the break is already known. There is no recorded "expected failure"
   anywhere in this suite: a corpus that reports success on a broken engine is
-  worse than no corpus, because it is the thing you would trust. The run ends
-  with the full list of contracts the engine does not hold, so the suite's
-  output IS the open-defect list.
+  worse than no corpus, because it is the thing you would trust. An unfiltered
+  run ends with the complete, deduplicated list of broken contracts and fails
+  if any manifest contract or required test component did not run. A filtered
+  run reports its partial coverage and never claims the complete corpus holds.
 - The manifest tracks case -> proves-what -> cloud status -> fixed-by. It
   records no expected outcome; only running a case can say whether it holds.
 

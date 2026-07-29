@@ -73,6 +73,8 @@ func bbAnom(i int) bool { return i >= 21 && i <= 40 }
 func aaGap(i int) bool  { return i >= 51 && i <= 55 }
 
 func TestAnomalyBitOption(t *testing.T) {
+	trackContractComponent(t, "L3/anomaly-bit-option", "option")
+
 	ch := abFixture()
 	pushLiveBurst(t, "anom-bit", guid(69), ch)
 	if _, err := td.WaitRetention("anom-bit", abContext, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
@@ -202,6 +204,8 @@ func TestAnomalyBitOption(t *testing.T) {
 // the per-dimension mean of the plotted rows' anomaly rates;
 // db.dimensions.sts.arp is the anomaly rate of the FETCHED db points.
 func TestAnomalyStsArrays(t *testing.T) {
+	trackContract(t, "L5/anomaly-statistics")
+
 	if _, err := td.WaitRetention("anom-bit", abContext, fixture.T0+1, fixture.T0+60, 15*time.Second); err != nil {
 		t.Skip("anomaly fixture not available (TestAnomalyBitOption failed?)")
 	}
@@ -246,6 +250,8 @@ func TestAnomalyStsArrays(t *testing.T) {
 // options=anomaly-bit over a forced tier1 query, every view point is
 // the tier window's 100*anomaly_count/count.
 func TestAnomalyBitTierRates(t *testing.T) {
+	trackContractComponent(t, "L3/anomaly-bit-option", "tier-rates")
+
 	ch := fixture.Series("fixture.anomtier", "fixture.anomtier", fixture.T0, 600, 1, strconv.Itoa, func(i int) string {
 		if i >= 100 && i <= 159 {
 			return stream.FlagAnomalous

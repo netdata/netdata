@@ -183,119 +183,98 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	t.Logf("tier0 head rotated to t0%+d; tier1 keeps t0%+d — plan-switch boundary discovered",
 		boundary-fixture.T0, tiers[1].FirstEntry-fixture.T0)
 
-	// (1) SWITCHING query: 1s buckets straddling the boundary force tier0
-	// as the selected tier (only it satisfies the density), and the head
-	// must come from a second tier1 plan
-	after, before := boundary-3600, boundary+3600
-	params := daemon.DataParams(c4cContext, after, before, before-after)
-	params.Set("scope_dimensions", c4cDimID(0))
-	doc, err := dd.DataV3("l4c-child", params)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ptp := perTierPoints(doc)
-	if len(ptp) < 2 || ptp[0] == 0 || ptp[1] == 0 {
-		t.Fatalf("expected a tier1+tier0 plan switch, per_tier points %v", ptp)
-	}
-	t.Logf("plan switch proven: per_tier points %v", ptp)
+	t.Run("plan-switching-seam", func(t *testing.T) {
+		trackContractComponent(t, "L4/plan-switching", "seam")
 
-	cols, err := canon.Columns(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	col := cols[c4cDimID(0)]
-	windows := map[int64]float64{} // tier1 window end → fetched average
-	for _, pt := range col {
-		off := pt.T - fixture.T0
-		switch {
-		case pt.T > boundary+60:
-			// tail: tier0 identity — exact sample values
-			want := fixture.SNRoundTrip(float64(c4cValue(0, off)))
-			if pt.Value == nil || !tierValueMatch(*pt.Value, want, 0) {
-				t.Errorf("tail bucket t0%+d: got %v, want %v", off, pt.Value, want)
-			}
-		case pt.T < boundary-60 && (pt.T-(fixture.T0+40))%tier1Gran == 0:
-			// head, on the tier1 grid: the bucket lands exactly on a tier1
-			// point end, where interpolation is exact — value equals that
-			// window's fetched average
-			if len(windows) == 0 {
-				for end, tp := range tier1WindowsFor(0, after-tier1Gran, boundary) {
-					windows[end] = tp
+		// 1s buckets straddling the boundary force tier0 as the selected
+		// tier; the rotated head must come from a second tier1 plan.
+		after, before := boundary-3600, boundary+3600
+		params := daemon.DataParams(c4cContext, after, before, before-after)
+		params.Set("scope_dimensions", c4cDimID(0))
+		doc, err := dd.DataV3("l4c-child", params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ptp := perTierPoints(doc)
+		if len(ptp) < 2 || ptp[0] == 0 || ptp[1] == 0 {
+			t.Fatalf("expected a tier1+tier0 plan switch, per_tier points %v", ptp)
+		}
+		t.Logf("plan switch proven: per_tier points %v", ptp)
+
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		col := cols[c4cDimID(0)]
+		windows := map[int64]float64{} // tier1 window end → fetched average
+		for _, pt := range col {
+			off := pt.T - fixture.T0
+			switch {
+			case pt.T > boundary+60:
+				want := fixture.SNRoundTrip(float64(c4cValue(0, off)))
+				if pt.Value == nil || !tierValueMatch(*pt.Value, want, 0) {
+					t.Errorf("tail bucket t0%+d: got %v, want %v", off, pt.Value, want)
+				}
+			case pt.T < boundary-60 && (pt.T-(fixture.T0+40))%tier1Gran == 0:
+				if len(windows) == 0 {
+					for end, tp := range tier1WindowsFor(0, after-tier1Gran, boundary) {
+						windows[end] = tp
+					}
+				}
+				want, ok := windows[pt.T]
+				if !ok {
+					continue
+				}
+				if pt.Value == nil || !tierValueMatch(*pt.Value, want, 1e-9) {
+					t.Errorf("head bucket t0%+d (tier1 grid): got %v, want %v", off, pt.Value, want)
+				}
+			case pt.T < boundary-60:
+				if pt.Value == nil {
+					t.Errorf("head bucket t0%+d: null — tier1 did not serve the rotated range", off)
 				}
 			}
-			want, ok := windows[pt.T]
-			if !ok {
-				continue
-			}
-			if pt.Value == nil || !tierValueMatch(*pt.Value, want, 1e-9) {
-				t.Errorf("head bucket t0%+d (tier1 grid): got %v, want %v", off, pt.Value, want)
-			}
-		case pt.T < boundary-60:
-			// head, off-grid: coarse points interpolate linearly — pin
-			// only that data exists (tier1 serves the rotated range)
-			if pt.Value == nil {
-				t.Errorf("head bucket t0%+d: null — tier1 did not serve the rotated range", off)
-			}
 		}
-	}
+	})
 
-	// (2) HEAD-ONLY query: entirely inside the rotated range — tier1 must
-	// serve alone, tier0 contributes nothing
-	params = daemon.DataParams(c4cContext, boundary-7200, boundary-3600, 60)
-	params.Set("scope_dimensions", c4cDimID(0))
-	doc, err = dd.DataV3("l4c-child", params)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ptp = perTierPoints(doc)
-	if len(ptp) < 2 || ptp[0] != 0 || ptp[1] == 0 {
-		t.Fatalf("head-only query: expected tier1 alone, per_tier points %v", ptp)
-	}
+	t.Run("plan-switching-head-only", func(t *testing.T) {
+		trackContractComponent(t, "L4/plan-switching", "head-only")
 
-	// (3) CASE-026: a total does not change because the answer had to be
-	// assembled from two tiers.
-	//
-	// sum pays each row the seconds it owns, at the rate of the record that
-	// owns them, and carries across rows the seconds a record still owes.
-	// The carry is state that survives between rows - and a plan switch is
-	// the one moment where the record stream itself jumps: the engine reads
-	// ahead into the next tier and may keep or discard either side. A carry
-	// dropped or double-paid there changes the total by up to one stored
-	// record, which above tier 0 is a whole minute of data.
-	//
-	// The window straddles the rotated tier0 head, so it can only be answered
-	// by two plans. Its total is a property of the window, not of how finely
-	// it is cut, so every zoom must agree - the same conservation law L10
-	// asserts inside one tier, asked where the tiers meet.
-	// Every window starts on a tier1 record boundary and is a whole number
-	// of them wide. An edge falling INSIDE a stored record is a different
-	// question - the record's own distribution is gone, so the part of it
-	// inside the window can only be estimated from its width, and the answer
-	// legitimately depends on which tier served it. That is what tiers cost,
-	// not a defect, and it would drown out the seconds a seam can lose.
-	//
-	// The two single-plan windows are the controls: the same zooms, the same
-	// tier CHOICE changing under the query as the buckets widen, no seam
-	// inside them. If they conserve and the straddling window does not, the
-	// seam is the whole difference.
-	ok := c4cSumConserves(t, dd, "head-only", c4cAlignTier1(boundary-10800))
-	ok = c4cSumConserves(t, dd, "tail-only", c4cAlignTier1(boundary+3600)) && ok
-	ok = c4cSumConserves(t, dd, "straddling", c4cAlignTier1(boundary-3600)) && ok
+		params := daemon.DataParams(c4cContext, boundary-7200, boundary-3600, 60)
+		params.Set("scope_dimensions", c4cDimID(0))
+		doc, err := dd.DataV3("l4c-child", params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ptp := perTierPoints(doc)
+		if len(ptp) < 2 || ptp[0] != 0 || ptp[1] == 0 {
+			t.Fatalf("head-only query: expected tier1 alone, per_tier points %v", ptp)
+		}
+	})
 
-	assertContract(t, "CASE-026/totals-survive-a-plan-switch", ok)
+	t.Run("sum-conservation", func(t *testing.T) {
+		trackContract(t, "CASE-026/totals-survive-a-plan-switch")
 
-	// CASE-031: the same question asked of a RATE, whose volume depends on
-	// the interval its samples were collected at. Above tier 0 that interval
-	// is not in the record - it has to come from the record's own coverage -
-	// so a seam is where an implementation that mislabels a record's source
-	// tier gives itself away, and the rotated head is where a query is
-	// served from a higher tier alone.
-	rok := c4cRateVolume(t, dd, "across-the-seam", boundary-3600, boundary+3600, true, true)
-	rok = c4cRateVolume(t, dd, "rotated-head-only",
-		c4cAlignTier1(boundary-10800), c4cAlignTier1(boundary-3600), false, true) && rok
-	rok = c4cRateVolume(t, dd, "tier0-only",
-		c4cAlignTier1(boundary+3600), c4cAlignTier1(boundary+10800), true, false) && rok
-	assertContract(t, "CASE-031/rate-volume-across-an-automatic-seam", rok)
+		// The two single-plan windows are controls. If they conserve and
+		// the straddling window does not, the seam is the difference.
+		ok := c4cSumConserves(t, dd, "head-only", c4cAlignTier1(boundary-10800))
+		ok = c4cSumConserves(t, dd, "tail-only", c4cAlignTier1(boundary+3600)) && ok
+		ok = c4cSumConserves(t, dd, "straddling", c4cAlignTier1(boundary-3600)) && ok
+		assertContract(t, "CASE-026/totals-survive-a-plan-switch", ok)
+	})
+
+	t.Run("rate-volume", func(t *testing.T) {
+		trackContract(t, "CASE-031/rate-volume-across-an-automatic-seam")
+
+		rok := c4cRateVolume(t, dd, "across-the-seam", boundary-3600, boundary+3600,
+			[3]bool{false, true, false}, [3]bool{true, true, false})
+		rok = c4cRateVolume(t, dd, "rotated-head-only",
+			c4cAlignTier1(boundary-10800), c4cAlignTier1(boundary-3600),
+			[3]bool{false, true, false}, [3]bool{false, true, false}) && rok
+		rok = c4cRateVolume(t, dd, "tier0-only",
+			c4cAlignTier1(boundary+3600), c4cAlignTier1(boundary+10800),
+			[3]bool{false, true, false}, [3]bool{true, false, false}) && rok
+		assertContract(t, "CASE-031/rate-volume-across-an-automatic-seam", rok)
+	})
 }
 
 // c4cRateVolume totals the rate dimension over one window, with no tier pin,
@@ -306,21 +285,16 @@ func TestLayer4PlanSwitching(t *testing.T) {
 // planner quietly served everything from one tier would report the same
 // number and prove nothing about seams at all.
 //
-// wantTier0/wantTier1 say whether each tier must have contributed points at
-// the one-second zoom - the only zoom where tier 0's density is required, so
-// the only one where the planner has to split a window that straddles the
-// rotated head.
+// The expected presence vectors cover all configured tiers at both zooms.
 func c4cRateVolume(t *testing.T, dd *daemon.Daemon, label string, after, before int64,
-	wantTier0, wantTier1 bool) bool {
+	wantAt60s, wantAt1s [3]bool) bool {
 	t.Helper()
 
 	want := float64(before-after) * float64(c4cRateValue)
 	ok := true
 
-	// A single bucket is deliberately absent: measured against this fixture
-	// it covers one second more than the window asked for (exactly one
-	// `rate` too much), which is a question about what one bucket spans
-	// rather than about rate volume.
+	// CASE-034 covers the known single-bucket window-normalization defect.
+	// These two zooms isolate rate conservation and tier selection.
 	for _, points := range []int64{(before - after) / 60, before - after} {
 		params := daemon.DataParams(c4cContext, after, before, points)
 		params.Set("time_group", "sum")
@@ -351,18 +325,22 @@ func c4cRateVolume(t *testing.T, dd *daemon.Daemon, label string, after, before 
 		t.Logf("rate volume [%s]: %d buckets (per_tier %v) total %.10g, want %.10g",
 			label, points, ptp, total, want)
 
+		wantTiers := wantAt60s
 		if points == before-after {
-			if got := len(ptp) > 0 && ptp[0] > 0; got != wantTier0 {
-				t.Logf("rate volume not met: [%s] tier 0 contributed=%v, want %v (per_tier %v) "+
-					"- the window did not exercise the tier path this case is about",
-					label, got, wantTier0, ptp)
-				ok = false
-			}
-			if got := len(ptp) > 1 && ptp[1] > 0; got != wantTier1 {
-				t.Logf("rate volume not met: [%s] tier 1 contributed=%v, want %v (per_tier %v) "+
-					"- the window did not exercise the tier path this case is about",
-					label, got, wantTier1, ptp)
-				ok = false
+			wantTiers = wantAt1s
+		}
+		if len(ptp) != len(wantTiers) {
+			t.Logf("rate volume not met: [%s] per_tier has %d tiers, want %d: %v",
+				label, len(ptp), len(wantTiers), ptp)
+			ok = false
+		} else {
+			for tier, wantTier := range wantTiers {
+				if got := ptp[tier] > 0; got != wantTier {
+					t.Logf("rate volume not met: [%s] tier %d contributed=%v, want %v "+
+						"at %d buckets (per_tier %v)",
+						label, tier, got, wantTier, points, ptp)
+					ok = false
+				}
 			}
 		}
 

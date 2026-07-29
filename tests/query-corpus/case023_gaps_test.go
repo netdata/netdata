@@ -37,6 +37,8 @@ import (
 // buckets. Every bucket past the last sample is uncollected time and has to
 // be counted as such, all the way to the end of the requested window.
 func TestCase023TrailingGapsRunToTheEnd(t *testing.T) {
+	trackContract(t, "CASE-023/trailing-gaps")
+
 	const (
 		samples = 600 // the chart keeps collecting for the whole window
 		stops   = 120 // ...but this dimension stops here
@@ -131,6 +133,8 @@ func TestCase023TrailingGapsRunToTheEnd(t *testing.T) {
 // a 100s hole is ten missing samples - not a hundred - so it cannot
 // outweigh the collected samples around it by the collection interval.
 func TestCase023GapWeightFollowsCollectionInterval(t *testing.T) {
+	trackContract(t, "CASE-023/gap-weight")
+
 	const (
 		ue      = 10
 		samples = 40 // 20 collected, 20 uncollected, in equal halves
@@ -215,6 +219,8 @@ func TestCase023GapWeightFollowsCollectionInterval(t *testing.T) {
 // the latter answers about the samples it was given and stays blind to
 // gaps unless the condition names one.
 func TestCase023PercentageOfTimeCountsTheWholeWindow(t *testing.T) {
+	trackContract(t, "CASE-023/percentage-of-time-denominator")
+
 	// one collected second, then ninety-nine with nothing pushed at all
 	const (
 		collected = 1
@@ -310,6 +316,8 @@ func TestCase023PercentageOfTimeCountsTheWholeWindow(t *testing.T) {
 // it IS the answer, and dropping the metric turns a total outage into an
 // empty chart, which reads like a healthy node nobody asked about.
 func TestCase023WindowOutsideRetention(t *testing.T) {
+	trackContract(t, "CASE-023/window-outside-retention")
+
 	const samples = 300
 
 	ch := fixture.Chart{
@@ -322,7 +330,7 @@ func TestCase023WindowOutsideRetention(t *testing.T) {
 			fixture.Point{T: fixture.T0 + int64(i), Collected: "1", Flags: stream.FlagNotAnomalous})
 	}
 
-	pushLiveBurst(t, "c023gone", guid(215), ch)
+	pushLiveBurst(t, "c023gone", guid(291), ch)
 	if _, err := td.WaitRetention("c023gone", ch.Context, ch.FirstT(), ch.LastT(), 20*time.Second); err != nil {
 		t.Fatal(err)
 	}

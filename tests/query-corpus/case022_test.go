@@ -26,6 +26,8 @@ import (
 )
 
 func TestCase022TimeGroupLatest(t *testing.T) {
+	trackContract(t, "CASE-022/time-group-latest")
+
 	const chart = "fixture.c022"
 	const big = 16777217 // 2^24+1: NOT representable in storage_number
 

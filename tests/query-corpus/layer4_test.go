@@ -65,6 +65,8 @@ func tierFetchBuckets(d fixture.Dimension, name string, granularity, after, buck
 // unaligned head, a gap run) and anomaly runs included, so families see
 // unequal per-window counts.
 func TestLayer4FamilyTierMatrix(t *testing.T) {
+	trackContract(t, "L4/family-tier-matrix")
+
 	ch := fixture.Series("fixture.l4matrix", "fixture.l4matrix", fixture.T0, 2400, 1, func(i int) string {
 		return strconv.FormatFloat(float64(i%13-6)+float64(i%7)/10, 'f', 1, 64)
 	}, func(i int) string {
@@ -109,6 +111,9 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 	d := ch.Dimensions[0]
 	for _, tg := range groups {
 		t.Run(tg.name+optSuffix(tg.options), func(t *testing.T) {
+			if tg.name == "min" || tg.name == "max" {
+				trackContractComponent(t, "L4/minmax-absolute-semantics", "tier1-"+tg.name)
+			}
 			params := daemon.DataParamsTier(ch.Context, 1, after, after+buckets*bucketSpan, buckets, tg.name)
 			if tg.options != "" {
 				params.Set("time_group_options", tg.options)
@@ -162,6 +167,8 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 // fitting tier — and the values equal that tier's oracle. Reuses the
 // layer-2 tier2 fixture (17200 replicated samples on host l2-tier2).
 func TestLayer4AutoTierSelection(t *testing.T) {
+	trackContract(t, "L4/auto-tier-selection")
+
 	const host, context = "l2-tier2", "fixture.l2tier2"
 	value := func(i int) string { return strconv.Itoa(i % 1000) }
 	flags := func(i int) string {

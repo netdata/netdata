@@ -267,6 +267,8 @@ func sliceMatrix() []sliceAxes {
 
 // The halves of a window total the whole of it, across the matrix.
 func TestLayer11SlicingIsAdditive(t *testing.T) {
+	trackContract(t, "L11/slicing-is-additive")
+
 	configs := sliceMatrix()
 
 	// push every fixture the matrix needs, once
@@ -307,6 +309,8 @@ func TestLayer11SlicingIsAdditive(t *testing.T) {
 // and that regime is precisely where sum-over-time multiplies a total by the
 // zoom - so excluding it would throw away the check that matters most.
 func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
+	trackContract(t, "L11/totals-match-what-was-pushed")
+
 	ok := true
 	checked := 0
 	for _, shape := range sliceShapes {

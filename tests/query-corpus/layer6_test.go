@@ -150,6 +150,8 @@ func l6Groups(key1, key2 string, members []l5Member) map[string][][]l5Member {
 // green: chains whose pass-1 accumulator IS the group's final value (sum
 // and the champions), so pass 2 consumes exactly what the semantics mean.
 func TestLayer6TwoPassMatrix(t *testing.T) {
+	trackContract(t, "L6/two-pass-matrix")
+
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
@@ -255,6 +257,8 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 // sum-of-all divided by the GROUP count — inflated by roughly the members
 // per group versus the mean of the group averages.
 func TestCase018MultipassAverage(t *testing.T) {
+	trackContract(t, "CASE-018/multipass-average")
+
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
@@ -331,6 +335,8 @@ func TestCase018MultipassAverage(t *testing.T) {
 // stays the visible accumulator, the hidden accumulator rides the wire,
 // and the point count is the number of visible pass-1 groups.
 func TestLayer6TwoPassPercentage(t *testing.T) {
+	trackContract(t, "L6/two-pass-percentage")
+
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")

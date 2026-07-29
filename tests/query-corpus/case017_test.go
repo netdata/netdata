@@ -29,6 +29,8 @@ import (
 )
 
 func TestCase017TierBoundaryAbsorption(t *testing.T) {
+	trackContract(t, "CASE-017/tier-boundary-absorption")
+
 	// 400 per-second samples of value i%10 from T0+1: tier1 windows end at
 	// T0+40 (partial) then every 60s; data extends two full windows past the
 	// last queried end (tier write-delay settle rule)

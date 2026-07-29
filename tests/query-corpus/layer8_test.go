@@ -92,6 +92,8 @@ func l8Query(t *testing.T, host, context, options string, extra map[string]strin
 }
 
 func TestLayer8PostProcessing(t *testing.T) {
+	trackContractComponent(t, "L8/post-processing", "post-processing")
+
 	ch := l8Fixture()
 	pushLiveBurst(t, "l8-post", guid(92), ch)
 	if _, err := td.WaitRetention("l8-post", ch.Context, fixture.T0+1, fixture.T0+l8Rows, 15*time.Second); err != nil {
@@ -186,6 +188,8 @@ func TestLayer8PostProcessing(t *testing.T) {
 // TestLayer8NonzeroAllZero pins the self-neutralizing branch: when every
 // dimension is zero, options=nonzero is dropped and all dimensions return.
 func TestLayer8NonzeroAllZero(t *testing.T) {
+	trackContractComponent(t, "L8/post-processing", "nonzero-all-zero")
+
 	const context = "fixture.l8zero"
 	ch := fixture.Chart{
 		ID: context, Title: "all zero", Units: "units", Family: "fixture",
@@ -222,6 +226,8 @@ func TestLayer8NonzeroAllZero(t *testing.T) {
 // |view sum| survive, the rest fold into "remaining X dimensions" whose
 // per-row value is the SUM of the folded values.
 func TestLayer8CardinalityLimit(t *testing.T) {
+	trackContractComponent(t, "L8/post-processing", "cardinality-limit")
+
 	const context = "fixture.l8card"
 	const dims = 6
 	ch := fixture.Chart{

@@ -44,6 +44,8 @@ import (
 // the silence is guaranteed to straddle a bucket boundary and to have a
 // remainder owed to a bucket that will see no data.
 func TestCase025CarrySurvivesGaps(t *testing.T) {
+	trackContract(t, "CASE-025/carry-survives-gaps")
+
 	const (
 		ctx     = "fixture.c025gap"
 		host    = "c025gap"
@@ -135,6 +137,8 @@ func TestCase025CarrySurvivesGaps(t *testing.T) {
 // 100, under every grouping - a blended 33/67/100 would be the step smeared
 // backwards into seconds it never touched.
 func TestCase025AnomalyBitNotBlended(t *testing.T) {
+	trackContract(t, "CASE-025/anomaly-bit-not-blended")
+
 	const (
 		ctx     = "fixture.c025anom"
 		host    = "c025anom"

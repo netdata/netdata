@@ -35,6 +35,8 @@ import (
 )
 
 func TestCase023FleetTimeGroupings(t *testing.T) {
+	trackContract(t, "CASE-023/fleet-time-groupings")
+
 	const chart = "fixture.c023"
 
 	// the three fixture series, 12 samples at T0+1 .. T0+12
@@ -389,6 +391,8 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 // six zeros and six ones, so the two readings are 50 (target 0, buggy)
 // and 0 (target 5, correct).
 func TestCase023CountifBareNumber(t *testing.T) {
+	trackContract(t, "CASE-023/countif-bare-number")
+
 	const chart = "fixture.c023"
 
 	resp, err := td.HostJSON("c023", "api/v3/data", map[string][]string{

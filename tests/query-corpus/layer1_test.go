@@ -22,6 +22,8 @@ func modVal(i int) string  { return strconv.Itoa(i % 10) }
 func notAnom(_ int) string { return stream.FlagNotAnomalous }
 
 func TestLayer1Palette(t *testing.T) {
+	trackContract(t, "L1/palette")
+
 	cases := map[string]struct {
 		hostname string
 		guid     string
@@ -108,11 +110,11 @@ func TestLayer1Palette(t *testing.T) {
 
 // TestLayer1SinglePoint verifies single-point ingestion through a window
 // wider than the retention: the value sits at exactly its timestamp with
-// nulls around it. It also PINS the current 1-point-window behavior — the
-// engine expands a (t0, t0+1] points=1 query to view [t0+1, t0+2] with
-// update_every 2 and stamps the bucket at t0+2 — as a layer-9 seed
-// (window/alignment semantics review pending).
+// nulls around it. CASE-034 separately asserts the window semantics of a
+// query asking for one result bucket.
 func TestLayer1SinglePoint(t *testing.T) {
+	trackContract(t, "L1/single-point")
+
 	ch := fixture.Series("fixture.l1single", "fixture.l1single", fixture.T0, 1, 1, func(_ int) string {
 		return "7"
 	}, notAnom)
@@ -139,25 +141,14 @@ func TestLayer1SinglePoint(t *testing.T) {
 		}
 	}
 
-	// pin the current 1-point-window expansion (layer-9 seed)
-	doc, err = td.DataV3("l1-single", daemon.DataParams(ch.Context, fixture.T0, fixture.T0+1, 1))
-	if err != nil {
-		t.Fatal(err)
-	}
-	cols, err = canon.Columns(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	col := cols["load"]
-	if len(col) != 1 || col[0].T != fixture.T0+2 || col[0].Value == nil || *col[0].Value != 7 {
-		t.Errorf("1-point window behavior changed: got %+v, want single bucket stamped t0+2 value 7 (if this fails after an engine change, re-pin deliberately)", col)
-	}
 }
 
 // TestLayer1TrailingWindow pins the beyond-retention read: querying past
 // the last stored point returns null points (annotated EMPTY) — at the
 // fixed 2023 epoch no now-trimming applies.
 func TestLayer1TrailingWindow(t *testing.T) {
+	trackContract(t, "L1/trailing-window")
+
 	// reuses the trailing-gap chart pushed by TestLayer1Palette
 	host, context := "l1-trailgap", "fixture.l1trailgap"
 	if _, err := td.WaitRetention(host, context, fixture.T0+1, fixture.T0+45, 15*time.Second); err != nil {
@@ -192,6 +183,8 @@ func TestLayer1TrailingWindow(t *testing.T) {
 // engine's stored values equal the Go port of pack/unpack
 // (fixture.SNRoundTrip) within JSON print/parse tolerance.
 func TestLayer1Precision(t *testing.T) {
+	trackContract(t, "L1/precision")
+
 	values := []string{
 		"16777215",      // max 24-bit mantissa, exact
 		"16777217",      // just above: quantized by the divide-by-10 step
@@ -226,6 +219,8 @@ func TestLayer1Precision(t *testing.T) {
 // (c) on the NEXT live iteration: the ghost reappears.
 // MUST stay last in this file: it restarts the shared daemon.
 func TestLayer1ZGapStates(t *testing.T) {
+	trackContract(t, "L1/gap-states")
+
 	const host = "l1-ghost"
 	const context = "fixture.l1ghost"
 	t0 := int64(fixture.T0)

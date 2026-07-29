@@ -73,6 +73,8 @@ func l7Params(extraOptions string) map[string][]string {
 }
 
 func TestLayer7Formatters(t *testing.T) {
+	trackContract(t, "L7/formatters")
+
 	ch := l7Fixture()
 	pushLiveBurst(t, "l7-fmt", guid(90), ch)
 	if _, err := td.WaitRetention("l7-fmt", ch.Context, fixture.T0+1, fixture.T0+l7Rows, 15*time.Second); err != nil {

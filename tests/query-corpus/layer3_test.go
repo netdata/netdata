@@ -144,6 +144,8 @@ func layer3Canonical(chartID string) fixture.Chart {
 // TestLayer3Families drives every time-grouping family (and the alias/
 // variant spread) over the canonical fixture at group 10.
 func TestLayer3Families(t *testing.T) {
+	trackContract(t, "L3/families")
+
 	ch := layer3Canonical("fixture.l3canon")
 	pushLiveBurst(t, "l3-canon", guid(60), ch)
 	if _, err := td.WaitRetention("l3-canon", ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
@@ -205,6 +207,8 @@ func TestLayer3Families(t *testing.T) {
 // percentile/trimmed-mean and the extremes champion across all-negative
 // and mixed-sign data (per-bucket sign decides the direction).
 func TestLayer3SignSemantics(t *testing.T) {
+	trackContract(t, "L3/sign-semantics")
+
 	cases := map[string]struct {
 		hostname string
 		guid     string
@@ -243,6 +247,9 @@ func TestLayer3SignSemantics(t *testing.T) {
 			}
 			for _, tg := range groups {
 				t.Run(tg.name, func(t *testing.T) {
+					if tg.name == "min" || tg.name == "max" {
+						trackContractComponent(t, "L4/minmax-absolute-semantics", "tier0-"+tg.name)
+					}
 					verifyTimeGroup(t, tc.hostname, ch, tg.name, tg.options, 10)
 				})
 			}
@@ -257,6 +264,8 @@ func TestLayer3SignSemantics(t *testing.T) {
 // leading single-value bucket loses its seed and every empty… non-carried
 // bucket resets (pinned as current contract).
 func TestLayer3SparseBuckets(t *testing.T) {
+	trackContract(t, "L3/sparse-buckets")
+
 	ch := fixture.Series("fixture.l3sparse", "fixture.l3sparse", fixture.T0, 60, 1, strconv.Itoa, func(i int) string {
 		if i%10 == 5 {
 			return stream.FlagNotAnomalous
@@ -279,6 +288,8 @@ func TestLayer3SparseBuckets(t *testing.T) {
 // the smoothing window comes from the requested points (capped 15), and
 // incremental-sum at identity answers every bucket but the first.
 func TestLayer3IdentitySmoothing(t *testing.T) {
+	trackContract(t, "L3/identity-smoothing")
+
 	ch := fixture.Series("fixture.l3ident", "fixture.l3ident", fixture.T0, 60, 1, func(i int) string {
 		return strconv.Itoa((i*7)%23 - 5)
 	}, notAnom)

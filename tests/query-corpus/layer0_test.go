@@ -14,6 +14,7 @@
 package corpus
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -67,9 +68,19 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	_ = td.Stop()
 
-	// the run's actual answer: which contracts the query engine does not
-	// hold. Printed last so it is the thing left on screen.
-	fmt.Fprint(os.Stderr, brokenSummary())
+	// The run's actual answer: which contracts the query engine does not
+	// hold, and whether the requested run exercised the complete ledger.
+	// Printed last so it is the thing left on screen.
+	fullRun := completeContractRunRequested()
+	if testFlagSet("test.list") {
+		fmt.Fprintln(os.Stderr, "query contract corpus: listing tests only; no contract verdict")
+	} else {
+		report, complete := contractSummary(fullRun)
+		fmt.Fprint(os.Stderr, report)
+		if fullRun && !complete {
+			code = 1
+		}
+	}
 
 	if code == 0 && os.Getenv("QUERY_CORPUS_KEEP") == "" {
 		_ = os.RemoveAll(runDir)
@@ -77,6 +88,20 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "daemon run dir kept: %s\n", runDir)
 	}
 	os.Exit(code)
+}
+
+func completeContractRunRequested() bool {
+	for _, name := range []string{"test.run", "test.skip", "test.list"} {
+		if testFlagSet(name) {
+			return false
+		}
+	}
+	return true
+}
+
+func testFlagSet(name string) bool {
+	f := flag.Lookup(name)
+	return f != nil && f.Value.String() != ""
 }
 
 // guid returns a deterministic fixture machine GUID.
@@ -260,24 +285,28 @@ func pushReplication(t *testing.T, hostname, machineGUID string, ch fixture.Char
 
 func TestLayer0RoundTrip(t *testing.T) {
 	cases := map[string]struct {
+		contract string
 		hostname string
 		guid     string
 		chart    fixture.Chart
 		push     func(t *testing.T, hostname, machineGUID string, ch fixture.Chart)
 	}{
 		"live-burst-no-settle-discipline": {
+			contract: "L0/live-burst",
 			hostname: "l0-live",
 			guid:     guid(1),
 			chart:    fixture.FullPalette("fixture.l0live", "fixture.l0live", fixture.T0, 60),
 			push:     pushLiveBurst,
 		},
 		"live-paced-legacy-discipline": {
+			contract: "L0/live-paced",
 			hostname: "l0-paced",
 			guid:     guid(2),
 			chart:    fixture.FullPalette("fixture.l0paced", "fixture.l0paced", fixture.T0, 60),
 			push:     pushLivePaced,
 		},
 		"replication": {
+			contract: "L0/replication",
 			hostname: "l0-repl",
 			guid:     guid(3),
 			chart:    fixture.FullPalette("fixture.l0repl", "fixture.l0repl", fixture.T0, 60),
@@ -287,6 +316,7 @@ func TestLayer0RoundTrip(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			trackContract(t, tc.contract)
 			tc.push(t, tc.hostname, tc.guid, tc.chart)
 			settleAndVerify(t, tc.hostname, tc.chart)
 		})
@@ -297,6 +327,8 @@ func TestLayer0RoundTrip(t *testing.T) {
 // TestLayer0TwoChildren pushes the same context from two children and
 // verifies each host answers independently — the two-children palette seed.
 func TestLayer0TwoChildren(t *testing.T) {
+	trackContract(t, "L0/two-children")
+
 	hosts := []struct {
 		hostname string
 		guid     string
@@ -316,6 +348,8 @@ func TestLayer0TwoChildren(t *testing.T) {
 // TestLayer0Labels verifies chart labels pushed via CLABEL are visible on
 // the query path.
 func TestLayer0Labels(t *testing.T) {
+	trackContract(t, "L0/labels")
+
 	ch := fixture.FullPalette("fixture.l0label", "fixture.l0label", fixture.T0, 60)
 	ch.Labels = [][2]string{{"corpus_case", "layer0"}, {"corpus_kind", "labels"}}
 	pushLiveBurst(t, "l0-label", guid(6), ch)
@@ -342,6 +376,8 @@ func TestLayer0Labels(t *testing.T) {
 // test in this file: it restarts the shared daemon and depends on the
 // round-trip tests having pushed their data.
 func TestLayer0ZRestart(t *testing.T) {
+	trackContract(t, "L0/restart")
+
 	if !roundTripOK {
 		t.Skip("round-trip failures; skipping restart verification")
 	}

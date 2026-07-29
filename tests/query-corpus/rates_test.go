@@ -25,6 +25,8 @@ import (
 )
 
 func TestIncrementalRates(t *testing.T) {
+	trackContractComponent(t, "L1/incremental-rates", "rates-ue1-2-5")
+
 	cases := map[string]struct {
 		ue       int
 		algo     string
@@ -189,6 +191,8 @@ func TestSumOverTimeVolume(t *testing.T) {
 	}
 
 	t.Run("rate-volume", func(t *testing.T) {
+		trackContractComponent(t, "L3/sum-over-time-volume", "rate-volume")
+
 		// 20 units/s stored per 5s point → 100 units of volume per point;
 		// a 2-point bucket accumulates 200
 		for _, bucketPoints := range []int64{1, 2} {
@@ -216,6 +220,8 @@ func TestSumOverTimeVolume(t *testing.T) {
 	})
 
 	t.Run("gauge-plain-sum", func(t *testing.T) {
+		trackContractComponent(t, "L3/sum-over-time-volume", "gauge-plain-sum")
+
 		// absolute (non-rate) metrics sum plainly: 100 per point, 200 for
 		// a 2-point bucket — no duration multiplication
 		cols, _ := sumQuery(t, "rates-absolute-ue2", "fixture.rates_absolute-ue2", 2, 2*2)
@@ -237,6 +243,8 @@ func TestSumOverTimeVolume(t *testing.T) {
 	})
 
 	t.Run("units", func(t *testing.T) {
+		trackContract(t, "CASE-020/sum-over-time-units")
+
 		_, doc := sumQuery(t, "rates-incremental-ue5", "fixture.rates_incremental-ue5", 5, 5)
 		units := viewUnits(doc)
 		t.Logf("sum-over-time of a units/s rate reports units %q", units)
