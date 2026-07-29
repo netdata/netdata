@@ -152,10 +152,12 @@ Applying tax to the final amount, if positive. Negative results adjust your cust
 </details>
 
 <details>
-<summary>How Does Node Counting Work for VMware/vSphere Environments?</summary>
+<summary>How Does Node Counting Work When a Collector Monitors Multiple Devices or Resources?</summary>
 
-Billing for a VMware/vSphere deployment follows the same active node model as every other integration: each running Netdata Agent connected to Netdata Cloud counts as one billable node. ESXi hosts and VMs monitored via the vSphere collector — including powered-off VMs — do not add billable nodes on their own; the collector reports their metrics as labeled charts under the monitoring Agent's own node identity.
+Billing follows the same active node model for every integration: each running Netdata Agent connected to Netdata Cloud counts as one billable node, no matter how many devices, hosts, or resources a single collector job discovers or monitors.
 
-If you explicitly attach a [Virtual Node](/docs/learn/node-identities.md#virtual-nodes-vnodes) to a vSphere collector job via its `vnode` option, that job's metrics are attributed to the virtual node instead, and Cloud counts it as one additional node — a single node for the whole job, not one per monitored VM or host.
+Most collectors that discover many sub-entities — for example hosts and VMs behind a hypervisor, or devices reachable over a network — report them as labeled chart dimensions under the collecting Agent's own node identity. The number of sub-entities discovered or monitored, including ones that are offline or powered down, does not by itself add billable nodes. Only an explicit [Virtual Node](/docs/learn/node-identities.md#virtual-nodes-vnodes) attached to the job adds one additional node for that job.
+
+Some collectors instead automatically create a separate virtual node for each discovered or monitored resource, with no explicit vnode configuration required. For those, each such resource does count as a billable node. Check the specific collector's own configuration reference to see whether it uses per-resource virtual nodes.
 
 </details>
