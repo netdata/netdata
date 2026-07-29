@@ -134,13 +134,13 @@ If you see a message like `File not found when checking for remote file at https
 
 ### Switching from a distribution-managed package to a static build
 
-Systems such as XCP-ng and XOA ship Netdata through their own package repositories, and these bundled packages are often older than the latest release. `kickstart.sh` cannot update, reinstall, or uninstall these distribution-managed installs. To replace a bundled package with the latest static build:
+Systems such as XCP-ng and XOA ship Netdata through their own package repositories, and these bundled packages are often older than the latest release. `kickstart.sh` is not designed to safely update, reinstall, or uninstall these distribution-managed installs, and attempting to do so may fail or leave the system in a broken state. To replace a bundled package with the latest static build:
 
 1. Stop the Agent: `sudo systemctl stop netdata`
 2. Remove the distribution package with your system package manager:
    - **XCP-ng** (RPM-based): `sudo yum remove netdata` or `sudo dnf remove netdata`
    - **XOA** (Debian-based): `sudo apt remove netdata`
-3. To preserve your configuration and metric history, back up `/etc/netdata`, `/var/cache/netdata`, and `/var/lib/netdata`. Exclude the `.environment` and `.install-type` files — carrying them into a different install type breaks updates. After installing the static build, restore the contents to the matching paths under `/opt/netdata/`.
+3. Back up your configuration and data. See [Data Backups When Switching Install Types](/docs/learn/switching-install-types.md#data-backups-when-switching-install-types) for the exact paths and files to exclude.
 4. Install the static build:
 
    ```bash
@@ -148,6 +148,8 @@ Systems such as XCP-ng and XOA ship Netdata through their own package repositori
    ```
 
    If you have not downloaded the script yet, use the command from the [One-Line Install](#run-the-one-line-install-command) section and add `--static-only`.
+
+5. Restore your backup to the matching paths under the static build's `/opt/netdata/` prefix, as described in the linked guide.
 
 For general guidance on removing native packages, see the [Uninstall Guide](/packaging/installer/UNINSTALL.md).
 
