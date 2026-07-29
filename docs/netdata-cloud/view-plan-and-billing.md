@@ -154,10 +154,8 @@ Applying tax to the final amount, if positive. Negative results adjust your cust
 <details>
 <summary>How Does Node Counting Work for VMware/vSphere Environments?</summary>
 
-Billing for a VMware/vSphere deployment follows the same **active node** model as every other integration: each running Netdata Agent connected to Netdata Cloud counts as one billable node. The number of ESXi hosts or VMs that an Agent monitors using the vSphere collector does **not** translate into billable nodes.
+Billing for a VMware/vSphere deployment follows the same active node model as every other integration: each running Netdata Agent connected to Netdata Cloud counts as one billable node. ESXi hosts and VMs monitored via the vSphere collector — including powered-off VMs — do not add billable nodes on their own; the collector reports their metrics as labeled charts under the monitoring Agent's own node identity.
 
-The vSphere collector discovers hosts and VMs from vCenter and reports their metrics as labeled charts under that Agent's own node identity. It does not create a separate billable node per monitored host or VM, and it does not auto-create virtual nodes. Only Agents that are online and connected to Cloud count toward your node total; VMs that are merely discovered by the collector — including powered-off VMs — do not add billable nodes.
-
-If you explicitly attach a [Virtual Node](/docs/learn/node-identities.md#virtual-nodes-vnodes) to a vSphere collector job by setting its `vnode` option, that job's metrics are attributed to the virtual node instead, and Cloud sees the virtual node as one additional node. This is a single virtual node for the whole job — not one per monitored VM or host.
+If you explicitly attach a [Virtual Node](/docs/learn/node-identities.md#virtual-nodes-vnodes) to a vSphere collector job via its `vnode` option, that job's metrics are attributed to the virtual node instead, and Cloud counts it as one additional node — a single node for the whole job, not one per monitored VM or host.
 
 </details>
