@@ -291,7 +291,7 @@ func TestPreparedStoreOperationQuarantinesFailedUntakenMutationRelease(t *testin
 	<-attempt.Released()
 
 	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
-	_, err = attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	_, err = attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
 	})

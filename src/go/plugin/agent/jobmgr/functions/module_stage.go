@@ -177,7 +177,7 @@ func startModulePlanStage(
 	start := func() (modulePlanStage, error) {
 		result := make(chan modulePlanResult, 1)
 		settled := make(chan error, 1)
-		attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		attempt, err := attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
 			Identity: identity,
 			Target:   epoch,
 			Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {

@@ -130,7 +130,7 @@ func TestProcessCoreRestartFencesInitialTargetAfterCanceledConstruction(t *testi
 	close(release)
 	require.NoError(t, <-restart.result)
 
-	_, err = process.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	_, err = process.attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptJob,
 			Key:       "late-generation-one-work",

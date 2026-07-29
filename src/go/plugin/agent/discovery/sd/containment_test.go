@@ -376,6 +376,7 @@ type busyMaterializationAuthority struct {
 }
 
 func (*busyMaterializationAuthority) StartProcessAttempt(
+	context.Context,
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	return nil, errors.New("test: unexpected materialization start")
@@ -405,6 +406,7 @@ func (authority *busyMaterializationAuthority) ProcessAttemptReleased(
 type releasedMaterializationAuthority struct{}
 
 func (*releasedMaterializationAuthority) StartProcessAttempt(
+	context.Context,
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	return nil, errors.New("test: unexpected materialization start")

@@ -818,9 +818,10 @@ type gatedAwaitAuthority struct {
 }
 
 func (gaa *gatedAwaitAuthority) StartProcessAttempt(
+	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
-	attempt, err := gaa.delegate.StartProcessAttempt(plan)
+	attempt, err := gaa.delegate.StartProcessAttempt(ctx, plan)
 	if err != nil ||
 		plan.Identity.Namespace != gaa.namespace ||
 		gaa.started.Add(1) != gaa.ordinal {

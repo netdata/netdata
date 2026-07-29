@@ -253,6 +253,7 @@ type delayedDispositionAttempt struct {
 }
 
 func (*delayedDispositionAuthority) StartProcessAttempt(
+	_ context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
@@ -331,6 +332,7 @@ func (dda *delayedDispositionAttempt) Released() <-chan struct{} {
 }
 
 func (vsa *validationSupersedeAuthority) StartProcessAttempt(
+	context.Context,
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	vsa.started.Add(1)

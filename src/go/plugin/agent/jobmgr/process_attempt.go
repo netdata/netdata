@@ -176,7 +176,7 @@ type ProcessAttempt interface {
 // ProcessAttemptAuthority is the process-lifetime capability supplied to
 // source-specific staging adapters.
 type ProcessAttemptAuthority interface {
-	StartProcessAttempt(ProcessAttemptPlan) (ProcessAttempt, error)
+	StartProcessAttempt(context.Context, ProcessAttemptPlan) (ProcessAttempt, error)
 	SupersedeProcessAttempt(context.Context, ProcessAttemptIdentity) error
 	CutProcessAttempt(ProcessAttemptIdentity, error) bool
 	ProcessAttemptReleased(ProcessAttemptIdentity) (<-chan struct{}, bool)

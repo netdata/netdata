@@ -225,7 +225,7 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 	sjo.ownership = stagedJobPromotionActive
 	start := func() (jobmgr.ProcessAttempt, <-chan error, error) {
 		admitted := make(chan error, 1)
-		attempt, err := sjo.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		attempt, err := sjo.attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
 			Identity: sjo.runtimeIdentity,
 			Target:   sjo.target,
 			Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
@@ -665,7 +665,7 @@ func (pjc *preparedJobCandidate) start() {
 		return
 	}
 	workerResult := make(chan stagedJobResult, 1)
-	attempt, err := pjc.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	attempt, err := pjc.attempts.StartProcessAttempt(pjc.ctx, jobmgr.ProcessAttemptPlan{
 		Identity: pjc.identity,
 		Target:   pjc.target,
 		Work: func(

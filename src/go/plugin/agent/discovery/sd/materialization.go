@@ -67,7 +67,7 @@ func runMaterialization[T any](
 		}
 	}
 	resultCh := make(chan materializationResult[T], 1)
-	attempt, err := discovery.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	attempt, err := discovery.attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Target:   discovery.epoch,
 		Work: func(

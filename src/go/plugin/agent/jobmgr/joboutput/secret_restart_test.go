@@ -233,12 +233,13 @@ type runtimeQuarantinedTestAuthority struct {
 }
 
 func (rqta runtimeQuarantinedTestAuthority) StartProcessAttempt(
+	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		return nil, jobmgr.ErrProcessAttemptQuarantined
 	}
-	return rqta.delegate.StartProcessAttempt(plan)
+	return rqta.delegate.StartProcessAttempt(ctx, plan)
 }
 
 func (rqta runtimeQuarantinedTestAuthority) SupersedeProcessAttempt(
@@ -262,12 +263,13 @@ func (rqta runtimeQuarantinedTestAuthority) ProcessAttemptReleased(
 }
 
 func (rbpa runtimeBusyPendingAuthority) StartProcessAttempt(
+	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		return nil, jobmgr.ErrProcessAttemptBusy
 	}
-	return rbpa.delegate.StartProcessAttempt(plan)
+	return rbpa.delegate.StartProcessAttempt(ctx, plan)
 }
 
 func (rbpa runtimeBusyPendingAuthority) SupersedeProcessAttempt(

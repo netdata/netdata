@@ -114,12 +114,16 @@ func newAuthority(diagnostics jobmgr.DiagnosticObserver, policy policy) (*Author
 	}, nil
 }
 
-// Start reserves identity before starting exactly one worker.
-func (a *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
-	if a == nil || !plan.Identity.Valid() || plan.Work == nil {
+// start reserves identity before starting exactly one worker.
+func (a *Authority) start(ctx context.Context, plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
+	if a == nil || ctx == nil || !plan.Identity.Valid() || plan.Work == nil {
 		return nil, errors.New("jobmgr containment: invalid attempt plan")
 	}
 	a.mu.Lock()
+	if cause := context.Cause(ctx); cause != nil {
+		a.mu.Unlock()
+		return nil, cause
+	}
 	if a.stopping {
 		a.mu.Unlock()
 		return nil, jobmgr.ErrProcessAttemptStopped
@@ -137,13 +141,13 @@ func (a *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
 		a.mu.Unlock()
 		return nil, jobmgr.ErrProcessAttemptBusy
 	}
-	ctx, cancel := context.WithCancelCause(context.Background())
+	workerCtx, cancel := context.WithCancelCause(context.Background())
 	attempt := &attempt{
 		authority: a,
 		identity:  plan.Identity,
 		target:    plan.Target,
 		started:   time.Now(),
-		ctx:       ctx,
+		ctx:       workerCtx,
 		cancel:    cancel,
 		state:     attemptStateProbing,
 		fence:     plan.OnContainment,
@@ -160,10 +164,13 @@ func (a *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
 	return attempt, nil
 }
 
+// StartProcessAttempt snapshots caller cancellation before reserving identity.
+// The caller context gates admission only; the worker remains process-owned.
 func (a *Authority) StartProcessAttempt(
+	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
-	return a.start(plan)
+	return a.start(ctx, plan)
 }
 
 func (at *attempt) run(work func(context.Context, jobmgr.ProcessAttemptAdmission) error) {
@@ -412,8 +419,9 @@ func quarantineAttemptResult(result, fenceErr error) error {
 	return err
 }
 
-// Await returns the first logical disposition. Caller cancellation cuts the
-// attempt but never waits for physical worker return.
+// Await returns the first logical disposition handed to the caller. Cancellation
+// observed before that handoff wins even when settlement is already selectable;
+// it cuts the attempt but never waits for physical worker return.
 func (at *attempt) Await(ctx context.Context) error {
 	if at == nil || at.authority == nil || ctx == nil {
 		return errors.New("jobmgr containment: invalid attempt wait")
@@ -495,8 +503,9 @@ func (a *Authority) ProcessAttemptReleased(
 	return attempt.Released(), true
 }
 
-// SupersedeProcessAttempt cancels one identity and waits only the fixed grace for physical
-// release. A still-live worker remains the exclusive owner.
+// SupersedeProcessAttempt cancels the owner snapshotted at entry and waits only
+// the fixed grace for its physical release. Success is not an identity
+// reservation; callers must perform an authoritative StartProcessAttempt.
 func (a *Authority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,

@@ -121,7 +121,7 @@ func (fb *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, err
 		return functionAvailabilityPoll{}, errors.New("jobmgr Function bundle: availability containment is not bound")
 	}
 	workerResult := make(chan functionAvailabilityResult, 1)
-	attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	attempt, err := attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptFunctionPoll,
 			Key:       key,
@@ -196,7 +196,7 @@ func (fb *functionBundle) invoke(
 	fb.mu.Unlock()
 
 	result := make(chan functionInvocationResult, 1)
-	attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	attempt, err := attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptFunctionInvocation,
 			Key:       fmt.Sprintf("%s/invocation/%d", key, invocationID),

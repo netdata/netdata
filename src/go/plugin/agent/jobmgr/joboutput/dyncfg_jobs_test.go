@@ -1341,12 +1341,13 @@ type runtimeBusyTestAuthority struct {
 }
 
 func (rbta runtimeBusyTestAuthority) StartProcessAttempt(
+	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		return nil, jobmgr.ErrProcessAttemptBusy
 	}
-	return rbta.delegate.StartProcessAttempt(plan)
+	return rbta.delegate.StartProcessAttempt(ctx, plan)
 }
 
 func (rbta runtimeBusyTestAuthority) SupersedeProcessAttempt(

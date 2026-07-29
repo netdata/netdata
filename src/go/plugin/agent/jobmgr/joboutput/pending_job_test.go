@@ -409,6 +409,7 @@ type busyPendingJobAuthority struct {
 type quarantinedPendingJobAuthority struct{}
 
 func (quarantinedPendingJobAuthority) StartProcessAttempt(
+	context.Context,
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	return nil, errors.New("test: quarantined pending job attempt started")
@@ -435,6 +436,7 @@ func (quarantinedPendingJobAuthority) ProcessAttemptReleased(
 }
 
 func (bpja busyPendingJobAuthority) StartProcessAttempt(
+	context.Context,
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	return nil, errors.New("test: unexpected pending job attempt start")
@@ -465,6 +467,7 @@ type unexpectedPendingJobAuthority struct {
 }
 
 func (upja *unexpectedPendingJobAuthority) StartProcessAttempt(
+	context.Context,
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	upja.calls.Add(1)

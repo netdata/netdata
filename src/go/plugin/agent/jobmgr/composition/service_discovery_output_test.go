@@ -520,10 +520,11 @@ type countingProcessAttemptAuthority struct {
 }
 
 func (a *countingProcessAttemptAuthority) StartProcessAttempt(
+	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	a.started++
-	return a.delegate.StartProcessAttempt(plan)
+	return a.delegate.StartProcessAttempt(ctx, plan)
 }
 
 func (a *countingProcessAttemptAuthority) SupersedeProcessAttempt(

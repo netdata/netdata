@@ -173,7 +173,7 @@ func (pco *preparedConfigOperation) start() {
 		}
 	}
 	workerResult := make(chan configOperationResult, 1)
-	attempt, err := pco.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	attempt, err := pco.attempts.StartProcessAttempt(pco.ctx, jobmgr.ProcessAttemptPlan{
 		Identity: pco.identity,
 		Target:   pco.target,
 		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {

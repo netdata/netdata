@@ -279,7 +279,7 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 		return lifecycle.SealedResult{}, nil, cause
 	}
 	resultCh := make(chan serviceDiscoveryInvocationResult, 1)
-	attempt, err := sdb.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	attempt, err := sdb.attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptServiceDiscovery,
 			Key:       sdb.attemptKey,

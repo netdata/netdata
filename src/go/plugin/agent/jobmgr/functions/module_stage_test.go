@@ -367,6 +367,7 @@ func newControlledModuleAdmissionAuthority(
 }
 
 func (cmaa *controlledModuleAdmissionAuthority) StartProcessAttempt(
+	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	work := plan.Work
@@ -379,7 +380,7 @@ func (cmaa *controlledModuleAdmissionAuthority) StartProcessAttempt(
 			authority:               cmaa,
 		})
 	}
-	delegate, err := cmaa.delegate.StartProcessAttempt(plan)
+	delegate, err := cmaa.delegate.StartProcessAttempt(ctx, plan)
 	if err != nil {
 		return nil, err
 	}

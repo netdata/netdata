@@ -203,7 +203,7 @@ func TestRunMetricsProjectsProcessAttemptCensus(t *testing.T) {
 	release := make(chan struct{})
 	var admitOnce sync.Once
 	var releaseOnce sync.Once
-	attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	attempt, err := attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptJobRuntime,
 			Key:       "module/job",
@@ -244,7 +244,7 @@ func TestRunMetricsProjectsProcessAttemptCensus(t *testing.T) {
 	<-attempt.Released()
 	assertCensus(containment.Census{})
 
-	quarantined, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+	quarantined, err := attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptJobRuntime,
 			Key:       "module/quarantined",

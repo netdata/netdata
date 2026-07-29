@@ -285,7 +285,7 @@ func (pso *PreparedStoreOperation) startAttempt(
 	config secretstore.Config,
 ) (jobmgr.ProcessAttempt, error) {
 	start := func() (jobmgr.ProcessAttempt, error) {
-		attempt, err := pso.operations.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		attempt, err := pso.operations.attempts.StartProcessAttempt(pso.ctx, jobmgr.ProcessAttemptPlan{
 			Identity: identity,
 			Target:   pso.operations.epoch,
 			Work: func(
