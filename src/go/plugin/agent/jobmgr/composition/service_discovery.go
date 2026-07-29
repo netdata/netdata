@@ -21,6 +21,10 @@ import (
 
 const dynCfgServiceDiscoveryClaim = "dyncfg:service-discovery"
 
+var errServiceDiscoveryNoTerminalResult = errors.New(
+	"jobmgr composition: service discovery handler produced no terminal result",
+)
+
 type serviceDiscoveryBinding struct {
 	mu sync.Mutex // guards handler/registered/active/dirty
 
@@ -301,6 +305,12 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 			// A started command may finish state private to its generation.
 			// The identity prevents re-entry and admission gates publication.
 			if admitErr := admission.Admit(); admitErr != nil {
+				if invokeErr != nil &&
+					!errors.Is(invokeErr, errServiceDiscoveryNoTerminalResult) {
+					// Containment already settled the caller, so preserve the
+					// obscured terminal failure for physical-release quarantine.
+					return lifecycle.RetainOwnership(errors.Join(admitErr, invokeErr))
+				}
 				return admitErr
 			}
 			resultCh <- serviceDiscoveryInvocationResult{
@@ -411,8 +421,7 @@ func (sdb *serviceDiscoveryBinding) invoke(
 		return lifecycle.SealedResult{}, nil, err
 	}
 	if result == nil {
-		return lifecycle.SealedResult{}, nil,
-			errors.New("jobmgr composition: service discovery handler produced no terminal result")
+		return lifecycle.SealedResult{}, nil, errServiceDiscoveryNoTerminalResult
 	}
 	sealed, err := lifecycle.NewSealedResult(result.Code, result.ContentType, []byte(result.Payload))
 	if err != nil {

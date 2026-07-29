@@ -157,50 +157,128 @@ func TestServiceDiscoveryHandlerPanicQuarantinesProductionInvocation(t *testing.
 	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
 	attempts := binding.attempts.(*containment.Authority)
 
-	first, firstCleanup, err := binding.invokeContained(
-		t.Context(),
-		"go.d:sd:type:job",
-		frameworkfunctions.Function{UID: "panicked"},
-		false,
+	requireServiceDiscoveryInvocationStatus(t, binding, "panicked", 503,
 		func(context.Context) {
 			panic("handler failed")
 		},
 	)
-	require.NoError(t, err)
-	require.NotNil(t, firstCleanup)
-	firstApplied, err := lifecycle.NewAppliedResourceTransaction(
-		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
-		lifecycle.ResourceTransactionUnchanged,
-		nil,
-		first,
-		firstCleanup,
-	)
-	require.NoError(t, err)
-	require.Equal(t, 503, firstApplied.ResultStatus())
 
 	var retryCalls int
-	retry, retryCleanup, err := binding.invokeContained(
-		t.Context(),
-		"go.d:sd:type:job",
-		frameworkfunctions.Function{UID: "retry"},
-		false,
+	requireServiceDiscoveryInvocationStatus(t, binding, "retry", 503,
 		func(context.Context) {
 			retryCalls++
 		},
 	)
-	require.NoError(t, err)
-	require.NotNil(t, retryCleanup)
-	retryApplied, err := lifecycle.NewAppliedResourceTransaction(
-		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
-		lifecycle.ResourceTransactionUnchanged,
-		nil,
-		retry,
-		retryCleanup,
-	)
-	require.NoError(t, err)
-	require.Equal(t, 503, retryApplied.ResultStatus())
 	require.Zero(t, retryCalls)
 	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+}
+
+func TestServiceDiscoveryHandlerPanicAfterContainmentQuarantinesProductionInvocation(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
+	attempts := binding.attempts.(*containment.Authority)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	released := false
+	t.Cleanup(func() {
+		if !released {
+			close(release)
+		}
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	firstDone := make(chan error, 1)
+	go func() {
+		_, _, err := binding.invokeContained(
+			ctx,
+			"go.d:sd:type:job",
+			frameworkfunctions.Function{UID: "late-panic"},
+			false,
+			func(context.Context) {
+				close(entered)
+				<-release
+				panic("handler failed after containment")
+			},
+		)
+		firstDone <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "service discovery handler was not entered")
+	}
+	cancel()
+	select {
+	case err := <-firstDone:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "contained service discovery invocation did not settle")
+	}
+
+	close(release)
+	released = true
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{Quarantined: 1})
+	}, time.Second, time.Millisecond)
+
+	var retryCalls int
+	requireServiceDiscoveryInvocationStatus(t, binding, "retry-after-late-panic", 503,
+		func(context.Context) {
+			retryCalls++
+		},
+	)
+	require.Zero(t, retryCalls)
+}
+
+func TestServiceDiscoveryCooperativeCancellationDoesNotQuarantineProductionInvocation(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
+	attempts := binding.attempts.(*containment.Authority)
+	entered := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	firstDone := make(chan error, 1)
+	go func() {
+		_, _, err := binding.invokeContained(
+			ctx,
+			"go.d:sd:type:job",
+			frameworkfunctions.Function{UID: "cooperative-cancel"},
+			false,
+			func(attemptCtx context.Context) {
+				close(entered)
+				<-attemptCtx.Done()
+			},
+		)
+		firstDone <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "service discovery handler was not entered")
+	}
+	cancel()
+	select {
+	case err := <-firstDone:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "contained service discovery invocation did not settle")
+	}
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
+
+	var retryCalls int
+	requireServiceDiscoveryInvocationStatus(t, binding, "retry-after-cooperative-cancel", 200,
+		func(context.Context) {
+			retryCalls++
+			binding.FunctionResult(dyncfg.Result{
+				UID:         "retry-after-cooperative-cancel",
+				Code:        200,
+				ContentType: "application/json",
+			})
+		},
+	)
+	require.EqualValues(t, 1, retryCalls)
 }
 
 func TestServiceDiscoveryRetirementReturnsConfigLocalUnavailableResult(t *testing.T) {
@@ -564,6 +642,34 @@ func newServiceDiscoveryTestBinding(
 	binding, err := newServiceDiscoveryBinding(epoch, "go.d", attempts, frames, diagnostics)
 	require.NoError(t, err)
 	return binding
+}
+
+func requireServiceDiscoveryInvocationStatus(
+	t *testing.T,
+	binding *serviceDiscoveryBinding,
+	uid string,
+	want int,
+	call func(context.Context),
+) {
+	t.Helper()
+	result, cleanup, err := binding.invokeContained(
+		t.Context(),
+		"go.d:sd:type:job",
+		frameworkfunctions.Function{UID: uid},
+		false,
+		call,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, cleanup)
+	applied, err := lifecycle.NewAppliedResourceTransaction(
+		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
+		lifecycle.ResourceTransactionUnchanged,
+		nil,
+		result,
+		cleanup,
+	)
+	require.NoError(t, err)
+	require.Equal(t, want, applied.ResultStatus())
 }
 
 type countingProcessAttemptAuthority struct {
