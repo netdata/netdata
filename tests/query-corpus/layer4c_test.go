@@ -290,25 +290,38 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	// so a seam is where an implementation that mislabels a record's source
 	// tier gives itself away, and the rotated head is where a query is
 	// served from a higher tier alone.
-	rok := c4cRateVolume(t, dd, "across-the-seam", boundary-3600, boundary+3600)
-	rok = c4cRateVolume(t, dd, "rotated-head-only", c4cAlignTier1(boundary-10800), c4cAlignTier1(boundary-3600)) && rok
-	rok = c4cRateVolume(t, dd, "tier0-only", c4cAlignTier1(boundary+3600), c4cAlignTier1(boundary+10800)) && rok
+	rok := c4cRateVolume(t, dd, "across-the-seam", boundary-3600, boundary+3600, true, true)
+	rok = c4cRateVolume(t, dd, "rotated-head-only",
+		c4cAlignTier1(boundary-10800), c4cAlignTier1(boundary-3600), false, true) && rok
+	rok = c4cRateVolume(t, dd, "tier0-only",
+		c4cAlignTier1(boundary+3600), c4cAlignTier1(boundary+10800), true, false) && rok
 	assertContract(t, "CASE-031/rate-volume-across-an-automatic-seam", rok)
 }
 
 // c4cRateVolume totals the rate dimension over one window, with no tier pin,
 // and compares it against what the fixture pushed: a constant rate collected
 // once a second holds rate x seconds, whichever tier answers.
-func c4cRateVolume(t *testing.T, dd *daemon.Daemon, label string, after, before int64) bool {
+//
+// It also asserts WHICH tiers answered. Without that, a run where the
+// planner quietly served everything from one tier would report the same
+// number and prove nothing about seams at all.
+//
+// wantTier0/wantTier1 say whether each tier must have contributed points at
+// the one-second zoom - the only zoom where tier 0's density is required, so
+// the only one where the planner has to split a window that straddles the
+// rotated head.
+func c4cRateVolume(t *testing.T, dd *daemon.Daemon, label string, after, before int64,
+	wantTier0, wantTier1 bool) bool {
 	t.Helper()
 
 	want := float64(before-after) * float64(c4cRateValue)
 	ok := true
 
-	// 1s buckets are what forces the split: only tier 0 satisfies that
-	// density, so the rotated head must come from a second tier1 plan and
-	// the answer is assembled from both
-	for _, points := range []int64{1, (before - after) / 60, before - after} {
+	// A single bucket is deliberately absent: measured against this fixture
+	// it covers one second more than the window asked for (exactly one
+	// `rate` too much), which is a question about what one bucket spans
+	// rather than about rate volume.
+	for _, points := range []int64{(before - after) / 60, before - after} {
 		params := daemon.DataParams(c4cContext, after, before, points)
 		params.Set("time_group", "sum")
 		params.Set("scope_dimensions", c4cRateDim)
@@ -334,14 +347,28 @@ func c4cRateVolume(t *testing.T, dd *daemon.Daemon, label string, after, before 
 				total += *pt.Value
 			}
 		}
-		t.Logf("rate volume [%s]: %d buckets (per_tier %v) total %.6g, want %.6g",
-			label, points, perTierPoints(doc), total, want)
+		ptp := perTierPoints(doc)
+		t.Logf("rate volume [%s]: %d buckets (per_tier %v) total %.10g, want %.10g",
+			label, points, ptp, total, want)
 
-		// one stored record of slack at each edge, which cannot hide an
-		// interval read from the wrong tier - that is wrong by 60x or 3600x
-		if math.Abs(total-want) > float64(c4cRateValue)*120 {
-			t.Logf("rate volume not met: [%s] at %d buckets totals %.6g over %ds of a "+
-				"constant %d/s, which is %.6g - a rate's volume is the interval its samples "+
+		if points == before-after {
+			if got := len(ptp) > 0 && ptp[0] > 0; got != wantTier0 {
+				t.Logf("rate volume not met: [%s] tier 0 contributed=%v, want %v (per_tier %v) "+
+					"- the window did not exercise the tier path this case is about",
+					label, got, wantTier0, ptp)
+				ok = false
+			}
+			if got := len(ptp) > 1 && ptp[1] > 0; got != wantTier1 {
+				t.Logf("rate volume not met: [%s] tier 1 contributed=%v, want %v (per_tier %v) "+
+					"- the window did not exercise the tier path this case is about",
+					label, got, wantTier1, ptp)
+				ok = false
+			}
+		}
+
+		if math.Abs(total-want) > 1e-6 {
+			t.Logf("rate volume not met: [%s] at %d buckets totals %.10g over %ds of a "+
+				"constant %d/s, which is %.10g - a rate's volume is the interval its samples "+
 				"were collected at, and that is a property of the record, not of the tier "+
 				"serving the query",
 				label, points, total, before-after, c4cRateValue, want)

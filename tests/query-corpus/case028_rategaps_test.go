@@ -20,8 +20,9 @@
 // update_every 1 AND 10. A single higher tier cannot tell `sum x collection
 // interval` from `sum x this tier's own stride` - so every case runs at tier
 // 1 AND tier 2, whose strides differ by sixty. The no-gap rows are the
-// control: with nothing missing every candidate agrees, so a failure there is
-// measuring something else.
+// control: with nothing missing, the measured time and the record's width
+// are the same number, so an implementation that confuses them still answers
+// correctly there - a failure in those rows is measuring something else.
 package corpus
 
 import (
@@ -140,10 +141,17 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 			want := c028Measured(ue, gapped, after, before)
 
 			for _, tier := range []int{0, 1, 2} {
-				// one bucket for the whole window, and one per tier1 window:
-				// both divide the span exactly, so the engine covers the
-				// window asked for rather than a rounded one
-				for _, points := range []int64{1, (before - after) / gran1} {
+				// Zooms that divide the span exactly, so the engine covers
+				// the window that was asked for rather than a rounded one.
+				//
+				// A SINGLE bucket is deliberately absent: measured against
+				// this same fixture it covers one second more than the
+				// window asked for, at every update_every and on every tier
+				// (exactly `rate` units too much). That is a question about
+				// what one bucket spans, it applies to every grouping, and
+				// it would show up here as a volume error that this case did
+				// not put there.
+				for _, points := range []int64{(before - after) / gran1, (before - after) / (gran1 * 2)} {
 					params := daemon.DataParamsTier(ctx, tier, after, before, points, "sum")
 					params.Set("options", "jsonwrap|unaligned")
 					doc, err := td.DataV3(host, params)
@@ -173,12 +181,10 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 						}
 					}
 
-					// a stored record straddling either edge is legitimately
-					// split, so allow one of them at each end rather than
-					// demanding the exact integer. The defect this case is
-					// built for doubles the answer; edge slack cannot hide it.
-					slack := float64(int64(c028Rate) * gran1 * 2)
-					if math.Abs(total-want) > slack {
+					// exact: the window is a whole number of stored records
+					// at every tier, so nothing is split and there is no
+					// rounding for a tolerance to absorb
+					if math.Abs(total-want) > 1e-6 {
 						t.Logf("volume contract not met: %s tier %d at %d buckets totals %.4f, "+
 							"but the fixture measured %.0f seconds of %d/s in this window, "+
 							"which is %.4f - seconds nobody measured cannot be added to a volume",
@@ -203,9 +209,9 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 // a rate that never changes holds the same amount per second whichever part
 // of a record the window takes.
 //
-// No gaps here: with holes in the record, the part of it inside the window
-// can only be estimated from its width, and that estimate is the open
-// implementation question CASE-028 already asserts. This is about the
+// No gaps here. With holes in the record, the part of it inside the window
+// cannot be counted from what is stored - that is the defect CASE-028
+// already asserts, and it would drown this one out. This is about the
 // boundary arithmetic alone.
 func TestCase028PartialAndOffGridWindows(t *testing.T) {
 	ok := true
@@ -228,38 +234,52 @@ func TestCase028PartialAndOffGridWindows(t *testing.T) {
 			before := after + w.span
 			want := c028Measured(ue, false, after, before)
 
+			// bucket counts that divide the span exactly: a count that does
+			// not makes the engine cover a rounded window, and the total then
+			// differs for a reason this case did not put there
+			zooms := []int64{w.span / int64(ue)}
+			if w.span%(int64(ue)*2) == 0 {
+				zooms = append(zooms, w.span/(int64(ue)*2))
+			}
+
 			for _, tier := range []int{0, 1} {
-				params := daemon.DataParamsTier(ctx, tier, after, before, w.span/gran1, "sum")
-				params.Set("options", "jsonwrap|unaligned")
-				doc, err := td.DataV3(host, params)
-				if err != nil {
-					t.Fatal(err)
-				}
-				cols, err := canon.Columns(doc)
-				if err != nil {
-					t.Fatal(err)
-				}
-				total := 0.0
-				for _, pt := range cols["rate"] {
-					if pt.Value != nil {
-						total += *pt.Value
-					}
-				}
-				// one stored sample of slack at each edge: which side of a
-				// boundary a sample falls on is a separate contract (L1),
-				// and a whole record is 60 samples
-				if math.Abs(total-want) > float64(2*ue*c028Rate) {
-					t.Logf("partial-window contract not met: %s tier %d over (t0%+d,t0%+d] "+
-						"totals %.4f, but the fixture measured %.0f seconds of %d/s in it, "+
-						"which is %.4f - a window that cuts a record still holds the seconds "+
-						"it covers",
-						name, tier, after-base, before-base, total,
-						want/float64(c028Rate), c028Rate, want)
-					ok = false
+				for _, points := range zooms {
+					runPartial(t, ctx, host, name, tier, after, before, points, want, &ok)
 				}
 			}
 		}
 	}
 
 	assertContract(t, "CASE-028/partial-and-off-grid-rate-windows", ok)
+}
+
+func runPartial(t *testing.T, ctx, host, name string, tier int, after, before, points int64, want float64, ok *bool) {
+	t.Helper()
+
+	params := daemon.DataParamsTier(ctx, tier, after, before, points, "sum")
+	params.Set("options", "jsonwrap|unaligned")
+	doc, err := td.DataV3(host, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	total := 0.0
+	for _, pt := range cols["rate"] {
+		if pt.Value != nil {
+			total += *pt.Value
+		}
+	}
+
+	if math.Abs(total-want) > 1e-6 {
+		t.Logf("partial-window contract not met: %s tier %d over (t0%+d,t0%+d] at %d buckets "+
+			"totals %.4f, but the fixture measured %.0f seconds of %d/s in it, which is %.4f - "+
+			"a window that cuts a record still holds the seconds it covers",
+			name, tier, after-int64(fixture.T0), before-int64(fixture.T0), points,
+			total, want/float64(c028Rate), c028Rate, want)
+		*ok = false
+	}
 }
