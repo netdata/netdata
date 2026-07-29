@@ -157,11 +157,11 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"tier0-min", "tier0-max", "tier1-min", "tier1-max"},
 	},
 	"L4/plan-switching": {
-		Proves:     "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated 11M-sample fixture rotates tier0 at the 25MB quota floor while tier1 keeps the head; the discovered boundary is checked with per-side values, tier1-only controls, and exact availability plus conserved reset counts across downsampling, identity and upsampling",
+		Proves:     "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated 11M-sample fixture rotates tier0 at the 25MB quota floor while tier1 keeps the head; the discovered boundary is checked with per-side values, tier1-only controls, exact availability, authoritative fine-tier event/flap rows, and event totals bounded to raw truth plus one crossing coarse representative per seam",
 		Components: []string{"seam", "head-only", "condition-groupings"},
 	},
 	"L4/three-tier-join": {
-		Proves: "three tiers with different retention depths join inside one query: tier0 keeps the newest slice, tier1 outlives it and tier2 outlives both. Five zoom levels pin coverage, ordering, range and outward alignment across both seams; forced tiers and automatic seams additionally pin exact availability plus conserved reset counts while downsampling, reading at storage resolution and upsampling",
+		Proves: "three tiers with different retention depths join inside one query: tier0 keeps the newest slice, tier1 outlives it and tier2 outlives both. Five zoom levels pin coverage, ordering, range and outward alignment across both seams; forced tiers pin exact controls, while automatic seams pin exact availability, authoritative finer-tier event rows, and event totals bounded to raw truth plus one crossing coarse representative per seam",
 	},
 	"L5/group-by-matrix": {
 		Proves: "level-1 group-by, BOTH contracts: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette equals the member-enumeration oracle — non-raw converts (average divides, ar/gbc), raw defers (sums undivided, ar accumulated, per-point counts on the wire); PARTIAL stamping and group naming pinned (instance = id@guid, node = machine guid, label = value)",

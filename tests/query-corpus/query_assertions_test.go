@@ -203,6 +203,25 @@ func assertColumnShapeAndTotal(
 	wantTotal float64,
 ) bool {
 	t.Helper()
+	return assertColumnShapeAndTotalRange(
+		t, cols, dimension, after, before, rowSpan, wantTotal, wantTotal)
+}
+
+// assertColumnShapeAndTotalRange is the bounded-approximation counterpart of
+// assertColumnShapeAndTotal. Row shape remains exact; only the total may vary
+// within the explicitly documented inclusive range.
+func assertColumnShapeAndTotalRange(
+	t *testing.T,
+	cols map[string][]canon.Pt,
+	dimension string,
+	after, before, rowSpan int64,
+	minTotal, maxTotal float64,
+) bool {
+	t.Helper()
+
+	if minTotal > maxTotal {
+		t.Fatalf("invalid total range %.12g through %.12g", minTotal, maxTotal)
+	}
 
 	col, has := cols[dimension]
 	if !has {
@@ -260,8 +279,13 @@ func assertColumnShapeAndTotal(
 		total += *point.Value
 	}
 
-	if total != wantTotal {
-		t.Logf("dimension %q totals %.12g, want exactly %.12g", dimension, total, wantTotal)
+	if total < minTotal || total > maxTotal {
+		if minTotal == maxTotal {
+			t.Logf("dimension %q totals %.12g, want exactly %.12g", dimension, total, minTotal)
+		} else {
+			t.Logf("dimension %q totals %.12g, want %.12g through %.12g",
+				dimension, total, minTotal, maxTotal)
+		}
 		ok = false
 	}
 	if suppressed > 0 {
@@ -283,11 +307,28 @@ func assertEventColumnShapeAndTotal(
 	wantTotal float64,
 ) bool {
 	t.Helper()
+	return assertEventColumnShapeAndTotalRange(
+		t, cols, dimension, after, before, rowSpan,
+		maxEventsPerRow, wantTotal, wantTotal)
+}
+
+// assertEventColumnShapeAndTotalRange keeps the row-level event contract
+// strict while allowing only the documented aggregate uncertainty.
+func assertEventColumnShapeAndTotalRange(
+	t *testing.T,
+	cols map[string][]canon.Pt,
+	dimension string,
+	after, before, rowSpan int64,
+	maxEventsPerRow int64,
+	minTotal, maxTotal float64,
+) bool {
+	t.Helper()
 
 	if maxEventsPerRow < 0 {
 		t.Fatalf("event-count maximum cannot be negative: %d", maxEventsPerRow)
 	}
-	if !assertColumnShapeAndTotal(t, cols, dimension, after, before, rowSpan, wantTotal) {
+	if !assertColumnShapeAndTotalRange(
+		t, cols, dimension, after, before, rowSpan, minTotal, maxTotal) {
 		return false
 	}
 
@@ -432,6 +473,16 @@ func TestQueryAssertionGuardsDetectMutations(t *testing.T) {
 	if !assertEventColumnShapeAndTotal(t, validEvents, "events", 0, 600, 300, 5, 10) {
 		t.Fatal("event-count guard rejected its valid control")
 	}
+	if !assertEventColumnShapeAndTotalRange(t, validEvents, "events", 0, 600, 300, 5, 10, 11) {
+		t.Fatal("bounded event-count guard rejected its lower-bound control")
+	}
+	six := 6.0
+	boundedUpper := map[string][]canon.Pt{
+		"events": {{T: 300, Value: &six}, {T: 600, Value: &five}},
+	}
+	if !assertEventColumnShapeAndTotalRange(t, boundedUpper, "events", 0, 600, 300, 6, 10, 11) {
+		t.Fatal("bounded event-count guard rejected its upper-bound control")
+	}
 	validView := map[string]any{"view": map[string]any{
 		"after":        float64(1),
 		"before":       float64(20),
@@ -482,11 +533,27 @@ func TestQueryAssertionGuardsDetectMutations(t *testing.T) {
 		}
 	})
 	t.Run("column/balanced-event-duplication", func(t *testing.T) {
-		six, four := 6.0, 4.0
+		four := 4.0
 		if assertEventColumnShapeAndTotal(t, map[string][]canon.Pt{
 			"events": {{T: 300, Value: &six}, {T: 600, Value: &four}},
 		}, "events", 0, 600, 300, 5, 10) {
 			t.Error("event-count guard accepted balanced duplication and loss")
+		}
+	})
+	t.Run("column/event-total-below-bound", func(t *testing.T) {
+		four := 4.0
+		if assertEventColumnShapeAndTotalRange(t, map[string][]canon.Pt{
+			"events": {{T: 300, Value: &five}, {T: 600, Value: &four}},
+		}, "events", 0, 600, 300, 5, 10, 11) {
+			t.Error("bounded event-count guard accepted a total below its lower bound")
+		}
+	})
+	t.Run("column/event-total-above-bound", func(t *testing.T) {
+		seven := 7.0
+		if assertEventColumnShapeAndTotalRange(t, map[string][]canon.Pt{
+			"events": {{T: 300, Value: &seven}, {T: 600, Value: &five}},
+		}, "events", 0, 600, 300, 7, 10, 11) {
+			t.Error("bounded event-count guard accepted a total above its upper bound")
 		}
 	})
 	for name, view := range map[string]map[string]any{
