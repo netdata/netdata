@@ -439,6 +439,10 @@ func TestCompileConfig_RejectsInvalidRuleReferences(t *testing.T) {
 			mutate:  func(cfg *Config) { cfg.Rules[0].Profiles = &ProfileSelectorConfig{Include: []string{"missing"}} },
 			message: "unknown profile",
 		},
+		"noncanonical profile reference": {
+			mutate:  func(cfg *Config) { cfg.Rules[0].Profiles = &ProfileSelectorConfig{Include: []string{" ec2 "}} },
+			message: "surrounding whitespace",
+		},
 		"duplicate target reference": {
 			mutate:  func(cfg *Config) { cfg.Rules[0].Targets = []string{"base", "base"} },
 			message: "duplicate target",

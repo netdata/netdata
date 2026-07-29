@@ -304,37 +304,37 @@ modules:
               description: Up to 64 named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials in `type_static`). Multiple targets can share one credential source.
               default_value: ""
               required: true
-              group: Authentication
+              group: Credentials
             - name: credentials[].name
               description: Credential source name referenced by targets. Names are lowercase, start with a letter, use only letters, digits, `_`, and `-`, and are at most 64 characters; the same format applies to target and rule names.
               default_value: ""
               required: true
-              group: Authentication
+              group: Credentials
             - name: credentials[].type
               description: "Credential source type: `default` uses the AWS SDK chain; `static` requires `type_static`."
               default_value: ""
               required: true
-              group: Authentication
+              group: Credentials
             - name: credentials[].type_static
               description: Configuration used only when the credential source `type` is `static`.
               default_value: ""
               required: false
-              group: Authentication
+              group: Credentials
             - name: credentials[].type_static.access_key_id
               description: AWS access key ID. Required in `type_static`. Use a go.d secret reference such as `${env:AWS_ACCESS_KEY_ID}`.
               default_value: ""
               required: false
-              group: Authentication
+              group: Credentials
             - name: credentials[].type_static.secret_access_key
               description: AWS secret access key. Required in `type_static`. Use a go.d secret reference; do not store plaintext credentials in the file.
               default_value: ""
               required: false
-              group: Authentication
+              group: Credentials
             - name: credentials[].type_static.session_token
               description: Optional AWS session token in `type_static` for temporary credentials. Use a go.d secret reference.
               default_value: ""
               required: false
-              group: Authentication
+              group: Credentials
             - name: targets
               description: Up to 64 named monitored AWS identities. A target uses one credential source directly or uses that source to assume one role. Targets remain distinct even when they resolve to the same AWS account.
               default_value: ""
@@ -434,72 +434,72 @@ modules:
               description: Shared query timing inherited field-by-field by collection rules. Omitted fields fall through to profile or built-in fallbacks. The resolved `publication_delay + lookback + period` horizon cannot exceed 14 days.
               default_value: ""
               required: false
-              group: Query Policy
+              group: Rules / Query Policy
             - name: rule_defaults.query.period
               description: Default CloudWatch aggregation period from `1m` through `24h`, as an exact multiple of `1m`. An omitted rule period inherits this value before nested metric and profile query defaults.
               default_value: ""
               required: false
-              group: Query Policy
+              group: Rules / Query Policy
             - name: rule_defaults.query.lookback
               description: Default rolling window searched for the newest eligible datapoint. It must be at least the effective period, an exact period multiple, and no more than 1,440 buckets (a bucket is one period).
               default_value: ""
               required: false
-              group: Query Policy
+              group: Rules / Query Policy
             - name: rule_defaults.query.publication_delay
               description: Default collector wait after a bucket closes before it becomes eligible. This is a scheduling policy, not an AWS publication guarantee. Omission falls through to the profile value and then the built-in `10m` fallback. Setting this option overrides profile-specific delays for every inheriting rule, including the stock S3 storage profile's conservative `1d`; AWS documents only that S3 storage metrics are reported once per day, so use a shorter default only after verifying each workload's publication timing.
               default_value: ""
               required: false
-              group: Query Policy
+              group: Rules / Query Policy
             - name: rules[].query
               description: Optional query timing overrides for this rule. Each omitted field independently inherits `rule_defaults.query`, then the relevant profile or built-in fallback.
               default_value: ""
               required: false
-              group: Query Policy
+              group: Rules / Query Policy
             - name: rules[].query.period
               description: CloudWatch aggregation period for every series selected by this rule, from `1m` through `24h` as an exact multiple of `1m`. Rate metrics are normalized using this effective period.
               default_value: ""
               required: false
-              group: Query Policy
+              group: Rules / Query Policy
             - name: rules[].query.lookback
               description: Rolling window searched for the newest complete finite datapoint. It must be at least the effective period, an exact period multiple, and no more than 1,440 buckets (a bucket is one period). Successful queries may present the retained datapoint as current for up to this duration; longer lookbacks increase response work.
               default_value: ""
               required: false
-              group: Query Policy
+              group: Rules / Query Policy
             - name: rules[].query.publication_delay
               description: Collector wait after a bucket closes before querying it. This is a scheduling policy, not an AWS publication guarantee. Explicit `0s` is allowed for metrics known to publish immediately.
               default_value: ""
               required: false
-              group: Query Policy
+              group: Rules / Query Policy
             - name: rule_defaults.filters.resource_tags
               description: Job-wide list of exact, case-sensitive AWS resource tag predicates inherited by rules that omit `rules[].filters.resource_tags`. All keys must match; any listed value for one key may match. The Resource Groups Tagging API performs the focused lookup and requires `tag:GetResources`.
               default_value: ""
               required: false
-              group: Resource Filters
+              group: Rules / Resource Filters
             - name: rule_defaults.filters.resource_tags[].key
               description: Exact AWS resource tag key. A filter list supports at most 50 distinct keys.
               default_value: ""
               required: true
-              group: Resource Filters
+              group: Rules / Resource Filters
             - name: rule_defaults.filters.resource_tags[].values
               description: One to 20 exact, case-sensitive accepted values for this key. Values for one key are ORed.
               default_value: ""
               required: true
-              group: Resource Filters
+              group: Rules / Resource Filters
             - name: rules[].filters.resource_tags
               description: Per-rule replacement for `rule_defaults.filters.resource_tags`. Omit it to inherit the default, provide a non-empty list to replace the default, or set `[]` to disable tag filtering for this rule.
               default_value: ""
               required: false
-              group: Resource Filters
+              group: Rules / Resource Filters
             - name: rules[].filters.resource_tags[].key
               description: Exact AWS resource tag key. A filter list supports at most 50 distinct keys.
               default_value: ""
               required: true
-              group: Resource Filters
+              group: Rules / Resource Filters
             - name: rules[].filters.resource_tags[].values
               description: One to 20 exact, case-sensitive accepted values for this key. Values for one key are ORed.
               default_value: ""
               required: true
-              group: Resource Filters
+              group: Rules / Resource Filters
             - name: labels.resource_tags
               description: Optional AWS resource tags copied to charts as non-identity labels. This is presentation only and does not select resources. Tag values may contain personal data, so expose only keys intended for Netdata. Requires `tag:GetResources`.
               default_value: ""

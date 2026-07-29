@@ -239,7 +239,7 @@ func (pc *planCompiler) addScope(path, ruleName string, target *collectionTarget
 	if !static {
 		discoveryKey := discoveryGroupKey{target: target.Name, region: region, namespace: profile.Config.Namespace}
 		if _, ok := pc.discoveryGroups[discoveryKey]; !ok {
-			if limit := pc.cfg.Limits.maxDiscoveryGroups(); len(pc.discoveryGroups) == limit {
+			if limit := pc.cfg.Limits.MaxDiscoveryGroups; len(pc.discoveryGroups) == limit {
 				guidance := "split the collection across multiple jobs"
 				if limit < maxDiscoveryGroupsPerJob {
 					guidance = fmt.Sprintf("raise the safeguard up to %d for intentional scale or %s", maxDiscoveryGroupsPerJob, guidance)

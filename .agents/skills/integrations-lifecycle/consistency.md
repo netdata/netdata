@@ -106,6 +106,30 @@ When reviewing a PR that touches a collector, verify:
    - `metadata.yaml` -- the option appears under
      `setup.configuration.options.list`.
 
+   The option's `group` and the DynCfg tab that shows it MUST
+   name the same thing. `metadata.yaml` `group` becomes the
+   doc's Group column; `config_schema.json`
+   `uiSchema.ui:options.tabs[].title` becomes the UI tab. When
+   the two vocabularies differ, an operator reading the doc
+   cannot find the option in the UI. Rules:
+   - Every `group` MUST equal a tab title, or take the
+     `Tab / Subgroup` form whose first segment is a tab title.
+     `Tab / Subgroup` exists because tabs can only group whole
+     top-level schema properties, so a doc group refining a
+     nested concern (query timing, tag filters) cannot be its
+     own tab.
+   - Every tab title MUST be named by at least one `group`, or
+     the doc can never point at that tab.
+   - Name the section after the config key the operator types,
+     so the doc column, the UI tab, and the YAML key read alike.
+   - List tabs in the order the doc lists the groups.
+   - Most collectors predate this rule and still disagree, so do
+     NOT copy grouping from a neighbouring collector; derive it
+     from that collector's own keys. `cloudwatch` is the worked
+     example, guarded by
+     `cloudwatch/config_test.go`
+     `TestConfigSchema_TabsMatchMetadataGroups`.
+
 4. **Alert changes have matching `metadata.yaml.alerts`
    entries.** If `health.d/<plugin>.conf` adds, removes, or
    renames an alert, `metadata.yaml.modules.<m>.alerts[]` must

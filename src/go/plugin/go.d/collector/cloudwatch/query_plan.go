@@ -114,9 +114,6 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	shadowed := 0
 	reserved := 0
 	maxInstances := c.Limits.MaxInstances
-	if maxInstances <= 0 {
-		maxInstances = defaultMaxInstances
-	}
 	for _, scope := range c.plan.Scopes {
 		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
 		if !ok {

@@ -51,7 +51,10 @@ func New() *Collector {
 		Config: Config{
 			UpdateEvery:        defaultUpdateEvery,
 			AutoDetectionRetry: defaultAutoDetectRetry,
-			Discovery:          DiscoveryConfig{RefreshEvery: defaultDiscoveryRefresh},
+			Discovery: DiscoveryConfig{
+				RefreshEvery:       defaultDiscoveryRefresh,
+				RecentlyActiveOnly: new(true),
+			},
 			Limits: LimitsConfig{
 				MaxInstances:       defaultMaxInstances,
 				MaxDiscoveryGroups: defaultMaxDiscoveryGroups,
