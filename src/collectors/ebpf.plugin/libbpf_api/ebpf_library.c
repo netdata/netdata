@@ -1339,3 +1339,250 @@ void ebpf_read_local_addresses_unsafe()
 
     freeifaddrs(ifaddr);
 }
+
+/*****************************************************************
+ *
+ *  IP LIST MANIPULATION FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * Check if the ip is inside a IP range
+ */
+static int ebpf_is_ip_inside_range(
+    union netdata_ip_t *rfirst,
+    union netdata_ip_t *rlast,
+    union netdata_ip_t *cmpfirst,
+    union netdata_ip_t *cmplast,
+    int family)
+{
+    if (family == AF_INET) {
+        if ((rfirst->addr32[0] <= cmpfirst->addr32[0]) && (rlast->addr32[0] >= cmplast->addr32[0]))
+            return 1;
+    } else {
+        if (memcmp(rfirst->addr8, cmpfirst->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+            memcmp(rlast->addr8, cmplast->addr8, sizeof(union netdata_ip_t)) >= 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/**
+ * Fill IP list
+ *
+ * @param out a pointer to link list.
+ * @param in the structure that will be linked.
+ * @param table the modified table.
+ */
+void ebpf_fill_ip_list_unsafe(
+    ebpf_network_viewer_ip_list_t **out,
+    ebpf_network_viewer_ip_list_t *in,
+    char *table __maybe_unused)
+{
+    if (in->ver == AF_INET) {
+        in->first.addr32[0] = ntohl(in->first.addr32[0]);
+        in->last.addr32[0] = ntohl(in->last.addr32[0]);
+    }
+    if (likely(*out)) {
+        ebpf_network_viewer_ip_list_t *move = *out;
+        while (move) {
+            if (in->ver == move->ver &&
+                ebpf_is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
+#ifdef NETDATA_DEV_MODE
+                netdata_log_info(
+                    "The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
+                    in->value,
+                    move->value);
+#endif
+                freez(in->value);
+                freez(in);
+                return;
+            }
+            move = move->next;
+        }
+        move = *out;
+        while (move->next)
+            move = move->next;
+        move->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_DEV_MODE
+    char first[256], last[512];
+    if (in->ver == AF_INET) {
+        netdata_log_info(
+            "Adding values %s: (%u - %u) to %s IP list \"%s\" used on network viewer",
+            in->value,
+            in->first.addr32[0],
+            in->last.addr32[0],
+            (*out == network_viewer_opt.included_ips) ? "included" : "excluded",
+            table);
+    } else {
+        if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
+            inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
+            netdata_log_info(
+                "Adding values %s - %s to %s IP list \"%s\" used on network viewer",
+                first,
+                last,
+                (*out == network_viewer_opt.included_ips) ? "included" : "excluded",
+                table);
+    }
+#endif
+}
+
+/**
+ * Parse IP Range
+ *
+ * Parse the IP ranges given and create Network Viewer IP Structure
+ *
+ * @param source  is a pointer with the text to parse.
+ */
+void ebpf_parse_ips_unsafe(const char *source)
+{
+    if (unlikely(!source))
+        return;
+
+    CLEAN_CHAR_P *input = strdupz(source);
+    char *ptr = input;
+
+    while (likely(ptr)) {
+        while (isspace((uint8_t)*ptr))
+            ptr++;
+
+        if (unlikely(!*ptr))
+            return;
+
+        char *end = strchr(ptr, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        bool neg = false;
+        if (*ptr == '!') {
+            neg = true;
+            ptr++;
+        }
+
+        if (isascii(*ptr)) {
+            ebpf_parse_ip_list_unsafe(
+                neg ? (void **)&network_viewer_opt.excluded_ips : (void **)&network_viewer_opt.included_ips, ptr);
+        }
+
+        ptr = end;
+    }
+}
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO CREATE CHARTS
+ *
+ *****************************************************************/
+
+/**
+ * Create apps for module
+ *
+ * @param em     the module main structure.
+ * @param root   a pointer for the targets.
+ */
+void ebpf_create_apps_for_module(ebpf_module_t *em, ebpf_target_t *root)
+{
+    if (ebpf_module_enabled_get(em) < NETDATA_THREAD_EBPF_STOPPING && em->apps_charts && em->functions.apps_routine)
+        em->functions.apps_routine(em, root);
+}
+
+/**
+ * Create apps charts
+ *
+ * Call ebpf_create_chart to create the charts on apps submenu.
+ *
+ * @param root a pointer for the targets.
+ */
+void ebpf_create_apps_charts(ebpf_target_t *root)
+{
+    struct ebpf_target *w;
+    int newly_added = 0;
+
+    for (w = root; w; w = w->next) {
+        if (w->target)
+            continue;
+
+        if (unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
+            struct ebpf_pid_on_target *pid_on_target;
+
+            fprintf(
+                stderr,
+                "ebpf.plugin: target '%s' has aggregated %u process%s:",
+                w->name,
+                w->processes,
+                (w->processes == 1) ? "" : "es");
+
+            for (pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
+                fprintf(stderr, " %d", pid_on_target->pid);
+            }
+
+            fputc('\n', stderr);
+        }
+
+        if (!w->exposed && w->processes) {
+            newly_added++;
+            w->exposed = 1;
+            if (debug_enabled || w->debug_enabled)
+                debug_log_int("%s just added - regenerating charts.", w->name);
+        }
+    }
+
+    if (newly_added) {
+        int i;
+        for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+            if (!(collect_pids & (1 << i)))
+                continue;
+
+            ebpf_module_t *current = &ebpf_modules[i];
+            ebpf_create_apps_for_module(current, root);
+        }
+    }
+}
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO READ GLOBAL HASH TABLES
+ *
+ *****************************************************************/
+
+/**
+ * Read Global Table Stats
+ *
+ * Read data from a BPF map (map_fd) into stats[], accumulating per-core
+ * values when maps_per_core is set.
+ *
+ * @param stats         output vector
+ * @param values        per-core read buffer
+ * @param map_fd        BPF map file descriptor
+ * @param maps_per_core non-zero when per-CPU map must be aggregated
+ * @param begin         first key to read
+ * @param end           one-past-last key (exclusive)
+ */
+void ebpf_read_global_table_stats(
+    netdata_idx_t *stats,
+    netdata_idx_t *values,
+    int map_fd,
+    int maps_per_core,
+    uint32_t begin,
+    uint32_t end)
+{
+    uint32_t idx;
+    int before = (maps_per_core) ? ebpf_nprocs : 1;
+
+    for (idx = begin; idx < end; idx++) {
+        if (!bpf_map_lookup_elem(map_fd, &idx, values)) {
+            netdata_idx_t total = 0;
+            int i;
+            for (i = 0; i < before; i++)
+                total += values[i];
+
+            stats[idx - begin] = total;
+        }
+    }
+}
