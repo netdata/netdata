@@ -121,7 +121,7 @@ var manifest = map[string]ManifestCase{
 		Proves: "ses/des at group=1 use the requested points (capped 15) as the smoothing window; incremental-sum at identity answers every bucket but the first: one sample per bucket is the shape the carry exists for",
 	},
 	"L3/registry-completeness": {
-		Proves: "the FULL time-grouping registry: all 47 accepted name strings (latest included since #23257) answer (20 variants/aliases beyond L3/families, alias==canonical), the complete countif grammar (! !: >: <: <> : == spaces empty), numeric option overrides with clamps (percentile [0,100], trimmed-mean/median [0,50]), unknown names silently parse to average; PINNED QUIRK (rulings batch): bare-number countif options lose their first digit",
+		Proves: "the complete pre-fleet time-grouping registry: all 48 accepted name strings (latest included since #23257) answer (21 variants/aliases beyond L3/families, alias==canonical), the countif operator spellings (! !: >: <: <> : ==), spaces and empty default, numeric option overrides with clamps (percentile [0,100], trimmed-mean/median [0,50]), and unknown names silently parse to average; CASE-023 independently proves the four fleet groupings, bare operands and invalid-expression handling",
 	},
 	"L3/anomaly-bit-option": {
 		Proves:     "options=anomaly-bit replaces fetched values with per-point anomaly rates BEFORE time-grouping: 0/100 at tier0 identity, buckets aggregate the rates (average = bucket anomaly %, max = any-anomaly), group-by consumes them as values (sum adds across members, gaps stamp PARTIAL), and tier>0 feeds FRACTIONAL window rates (100*anomaly_count/count)",
@@ -132,7 +132,19 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"rate-volume", "gauge-plain-sum"},
 	},
 	"CASE-020/sum-over-time-units": {
-		Proves: "summing a rate over time produces a volume, but the response units keep the rate form — 'units/s' should become 'units' when time_group=sum integrates a rate",
+		Proves: "time_group=sum integrates a stored rate into volume and reports the corresponding volume units: 'units/s' becomes 'units'",
+	},
+	"CASE-020/units-across-query-surfaces": {
+		Proves: "db metadata keeps each metric's stored units, while sum transforms a rate's result units from rate to volume consistently in view metadata, per-dimension result metadata and labels for group_by=dimension, units and dimension,units; gauges and non-sum groupings keep their source units",
+	},
+	"CASE-020/mixed-rate-gauge-units": {
+		Proves: "grouping a rate and gauge with the same resulting volume units is independent of metric encounter order: both orders produce exact volume units and labels, never the first contributor's source units",
+	},
+	"CASE-020/badge-sum-units": {
+		Proves: "the badge endpoint renders both the exact sum value and its transformed volume units for rates, while average and gauge results keep their correct units",
+	},
+	"CASE-020/badge-filtered-metric-units": {
+		Proves: "badge unit detection uses the same archived and dimension-filtered metric set as the query: selecting an archived rate while a live gauge shares the chart reports the rate's integrated volume and units",
 	},
 	"L4/family-tier-matrix": {
 		Proves: "every grouping family over FORCED tier1 with 6 windows per bucket equals the fetch-aware oracle (min/max/sum fetch their tier fields, all else the per-window average — avg-of-averages pinned quantitatively with unequal counts); bucket anomaly rates from tier counts; window alignment rounds `before` UP to group multiples",
@@ -145,11 +157,11 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"tier0-min", "tier0-max", "tier1-min", "tier1-max"},
 	},
 	"L4/plan-switching": {
-		Proves:     "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated daemon with tier0 at the 25MB quota floor rotates its head out (boundary DISCOVERED from db.per_tier, ~19h evicted at 10M samples), a straddling query reads tier1 (head) + tier0 (tail) with per-side oracle values, and a head-only query is served by tier1 alone",
-		Components: []string{"seam", "head-only"},
+		Proves:     "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated 11M-sample fixture rotates tier0 at the 25MB quota floor while tier1 keeps the head; the discovered boundary is checked with per-side values, tier1-only controls, and exact availability plus conserved reset counts across downsampling, identity and upsampling",
+		Components: []string{"seam", "head-only", "condition-groupings"},
 	},
 	"L4/three-tier-join": {
-		Proves: "three tiers with DIFFERENT retention depths, joined inside one query: every tier at the engine's 25MiB floor and the tiers brought close together (1s/5s/10s) so each fills its own quota from one fixture — tier0 keeps the newest slice, tier1 outlives it, tier2 outlives them both. The whole retained duration is then read at five resolutions from 845s buckets down to 2.9s: no bucket inside the span is ever empty, time never runs backwards, every value stays inside the generator range, and across the resolutions all three tiers contribute (the planner picks the coarsest tier that can supply the requested density, so WHICH tier answers changes with the zoom). Pins that alignment rounds the grid OUTWARD, so the leading buckets can precede retention and are legitimately empty; and that asking for buckets finer than the serving tier is upsampling, not a seam defect",
+		Proves: "three tiers with different retention depths join inside one query: tier0 keeps the newest slice, tier1 outlives it and tier2 outlives both. Five zoom levels pin coverage, ordering, range and outward alignment across both seams; forced tiers and automatic seams additionally pin exact availability plus conserved reset counts while downsampling, reading at storage resolution and upsampling",
 	},
 	"L5/group-by-matrix": {
 		Proves: "level-1 group-by, BOTH contracts: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette equals the member-enumeration oracle — non-raw converts (average divides, ar/gbc), raw defers (sums undivided, ar accumulated, per-point counts on the wire); PARTIAL stamping and group naming pinned (instance = id@guid, node = machine guid, label = value)",
@@ -186,8 +198,24 @@ var manifest = map[string]ManifestCase{
 	"CASE-023/fleet-time-groupings": {
 		Proves: "the four fleet time-aggregations and their shared expression grammar: percentage-of-samples (canonical, countif alias) / percentage-of-time / number-of-flaps / number-of-times, each echoing its canonical name and transforming the response units (%/%/flaps/events); gap tokens (nan|null|gap|empty) pull gap slots in for percentage-of-samples, number-of-flaps and number-of-times while an expression without one keeps them invisible there (percentage-of-time always counts uncollected time - CASE-023/percentage-of-time-denominator); previous|last compare against the previous COLLECTED sample so a counter reset is a reboot and the first sample never matches; flaps count observed false->true transitions only, carried across buckets; a gap contributes its SLOT width, not the zero span of QUERY_POINT_EMPTY",
 	},
+	"CASE-023/expression-grammar-and-state": {
+		Proves: "the shared expression parser accepts every documented operator spelling, bare operands, gap aliases and previous|last; missing, empty and whitespace-only whole expressions default to ==0 at all four entry points, while incomplete or malformed expressions are rejected; predecessor and flap state survive gaps and bucket flushes",
+	},
+	"CASE-023/mcp-surface": {
+		Proves: "a protocol-valid MCP lifecycle advertises all four condition groupings, the countif alias and string time_group_options; exact nonzero numeric and gap-operand calls prove option forwarding, canonical echo, percentage-of-samples versus percentage-of-time behavior across a cadence change, units, JSON2 schema, timestamps, anomaly rates and annotations, while missing, blank, non-string, incomplete and malformed required expressions return -32602 Invalid Params with structured INVALID_PARAMS details",
+	},
 	"CASE-023/tier-estimation": {
-		Proves: "ABOVE tier 0 a stored point is min/max/avg over many samples, not a sample: percentage-of-time estimates the share of each stored window that satisfied the condition with the two-point mass model (weight(max) = (avg-min)/(max-min)), which is EXACT for a 0/1 availability signal because there the average IS the fraction of time at 1 — so up% and down% of a mixed window sum to 100 instead of both answering 'never', which is what evaluating the condition on the stored average does; a mixed window counts one flap and at most one occurrence (no ordering survives the rollup); percentage-of-samples keeps its historical tier behaviour",
+		Proves: "ABOVE tier 0 a stored point is min/max/avg over many samples, not a sample: percentage-of-time estimates the share of each stored window that satisfied the condition with the two-point mass model (weight(max) = (avg-min)/(max-min)). For a 0/1 availability signal at a steady collection cadence, the average is exactly the fraction of elapsed time at 1, so up% and down% of a mixed window sum to 100 instead of both answering 'never'. If cadence changes inside one stored interval, the average is sample-weighted instead; that separate contract is pinned by CASE-023/cadence-change-availability. A mixed window counts one flap and at most one occurrence because ordering does not survive the rollup; percentage-of-samples keeps its historical tier behaviour",
+	},
+	"CASE-023/cadence-change-availability": {
+		Proves:     "when collection cadence changes, percentage-of-time keeps exact wall-time availability at tier 0. At tiers 1 and 2, a stored interval containing both cadences exposes only min/max/avg/count, so the approved two-point estimator is necessarily sample-weighted: the test derives that estimate from the fixture ledger and pins it separately from the exact steady-cadence contract",
+		Components: []string{"slows-down", "speeds-up"},
+	},
+	"CASE-023/historical-gap-slots-after-cadence-change": {
+		Proves: "after a metric speeds up from every 10 seconds to every second, gaps in its old history retain their historical slot weight. One missing old slot counts once, not ten times because the chart's latest cadence is one second. Asserted exactly at forced tiers 0, 1 and 2",
+	},
+	"CASE-023/tier-resolution-matrix": {
+		Proves: "all four condition groupings keep fixture-derived answers across forced tiers 0, 1 and 2 while downsampling, reading at storage resolution and upsampling, including a 10-second metric upsampled from tier0; exact rows cover gaps, changing neighboring rollup averages and interpolation, non-binary estimates, event de-duplication and counter predecessor state, with strict db.per_tier source proof",
 	},
 	"CASE-023/redelivery": {
 		Proves: "the same stored point handed to several result buckets means different things to different groupings: percentage-of-samples treats a delivery AS a sample and must answer in EVERY bucket (skipping repeats leaves EMPTY holes where a value used to be), while number-of-times and number-of-flaps must count a stored window at most once however many buckets it was delivered into. Counted-once and answered-everywhere are separate contracts and both hold: a bucket a wide point covers on its own carries no occurrence but is still a zero, not EMPTY - skipping the repeat entirely punches holes into a chart wherever the user zooms past the stored resolution",
@@ -221,9 +249,6 @@ var manifest = map[string]ManifestCase{
 	},
 	"CASE-023/tier-anomaly-bit": {
 		Proves: "with options=anomaly-bit above tier 0 the value is the stored window's anomaly RATE while min/max still describe the metric, so the condition is answered on the rate itself — a window either satisfied it or it did not (100/0), never a fraction estimated across two unrelated domains; >=N and <N partition every window",
-	},
-	"CASE-023/countif-bare-number": {
-		Proves: "the shared expression parser fixes the bare-number digit swallow (countif.h:78 advances past the operator switch even when no operator matched, so options '5' targets 0) — the API is aligned to health, which has always parsed countif(5) as '=5' (health-config-unittest.c:96)",
 	},
 	"CASE-024/zoom-into-slow-metrics": {
 		Proves: "a metric collected once a minute, once per ten minutes or once an hour still answers when the dashboard zooms BELOW its collection interval: a 60-point request over a window shorter than one sample interval, fully inside the collected span, returns rows that carry the value - a chart that empties out when the user zooms in is indistinguishable from an outage",
@@ -271,11 +296,17 @@ var manifest = map[string]ManifestCase{
 		Proves:     "points=1 covers exactly the requested `(after,before]` interval. The fixture makes the complete record ending at `after` 1000/s and every sample inside the requested window 10/s, so including the outside record is visible under both average and sum. Asserted at update_every 1 and 10 and forced tiers 0, 1 and 2; the row timestamp, view bounds and view update_every must also describe exactly the requested window",
 		Components: []string{"ue1", "ue10"},
 	},
-	"CASE-035/straddling-record-slowing-down": {
-		Proves: "a complete higher-tier record that straddles a metric changing from update_every 1 to 10 preserves the exact rate volume measured on both sides. The rate also changes at the transition, so multiplying an unweighted mean rate by the record span cannot pass. The oracle sums each fixture sample's rate x its own collection interval; asserted on whole tier1 and tier2 records with tier0 controls and exact selected-tier evidence",
+	"CASE-035/transition-volume-slowing-down": {
+		Proves: "a metric slowing from update_every 1 to 10 preserves exact fixture-measured rate volume in the complete historical control row and the next row containing both cadences. Asserted at forced tiers 1 and 2 against a raw tier0 control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
 	},
-	"CASE-035/straddling-record-speeding-up": {
-		Proves: "the mirror of CASE-035/straddling-record-slowing-down: a complete higher-tier record spanning a change from update_every 10 to 1 preserves the exact measured rate volume. Asserted separately in both directions because the old cadence determines the in-progress higher-tier record boundaries",
+	"CASE-035/transition-volume-speeding-up": {
+		Proves: "the update_every 10 to 1 mirror preserves exact fixture-measured rate volume in the complete historical control row and the next row containing both cadences, at forced tiers 1 and 2 against a raw tier0 control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
+	},
+	"CASE-036/absolute-across-plan-seam": {
+		Proves: "options=absolute applies to the point read from the incoming tier plan: a negative flat line stays exactly positive in every 1-second row across an automatic tier1-to-tier0 seam, with tier1-only and tier0-only controls and strict source-tier evidence",
+	},
+	"CASE-037/rate-volume-across-three-tier-cadence-query": {
+		Proves: "one exact one-second sum query crosses automatic tier2-to-tier1 and tier1-to-tier0 plan seams, then crosses an update_every 1-to-10 transition where the rate also changes. Every returned row and the complete total come from the fixture ledger, and db.per_tier must prove all three tiers contributed. Forced-tier mixed-cadence records remain covered separately by CASE-035",
 	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves:  "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",

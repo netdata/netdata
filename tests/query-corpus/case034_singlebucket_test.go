@@ -7,7 +7,6 @@ package corpus
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"testing"
 	"time"
@@ -83,9 +82,13 @@ func TestCase034SingleBucketRespectsRequestedWindow(t *testing.T) {
 				for group := range map[string]struct{}{"average": {}, "sum": {}} {
 					params := daemon.DataParamsTier(context, tier, after, before, 1, group)
 					params.Set("options", "jsonwrap|unaligned")
+					params.Set("scope_dimensions", "rate")
 					doc, err := td.DataV3(host, params)
 					if err != nil {
 						t.Fatal(err)
+					}
+					if !assertSelectedTier(t, doc, tier) {
+						ok = false
 					}
 
 					view, hasView := doc["view"].(map[string]any)
@@ -104,23 +107,19 @@ func TestCase034SingleBucketRespectsRequestedWindow(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					col := cols["rate"]
-					if len(col) != 1 || col[0].T != before || col[0].Value == nil {
-						t.Logf("ue%d tier%d %s returned %v, want one non-null row ending at %d",
-							ue, tier, group, col, before)
+					if !assertOnlyColumn(t, cols, "rate") {
 						ok = false
-						continue
 					}
 
-					want := float64(c034InsideRate)
+					wantValue := float64(c034InsideRate)
 					if group == "sum" {
-						want *= float64(duration)
+						wantValue *= float64(duration)
 					}
-					if math.IsNaN(*col[0].Value) || math.IsInf(*col[0].Value, 0) ||
-						math.Abs(*col[0].Value-want) > 1e-6 {
-						t.Logf("ue%d tier%d %s over (%d,%d] returned %.10g, want %.10g; "+
+					want := []expectedColumnPoint{wantNumberAt(before, wantValue)}
+					if !assertExactColumn(t, cols, "rate", want, 0) {
+						t.Logf("ue%d tier%d %s over (%d,%d] did not return exact value %.10g; "+
 							"the %d/s record ending at after is outside the requested window",
-							ue, tier, group, after, before, *col[0].Value, want, c034OutsideRate)
+							ue, tier, group, after, before, wantValue, c034OutsideRate)
 						ok = false
 					}
 				}

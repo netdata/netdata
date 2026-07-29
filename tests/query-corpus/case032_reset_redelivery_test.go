@@ -7,6 +7,7 @@
 package corpus
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -43,23 +44,43 @@ func TestCase032ResetAnnotationIsNotRedelivered(t *testing.T) {
 	for group := range map[string]struct{}{"average": {}, "sum": {}} {
 		params := daemon.DataParamsTier(context, 0, base, base+samples*ue, samples*2, group)
 		params.Set("options", "jsonwrap|unaligned")
+		params.Set("scope_dimensions", ch.Dimensions[0].ID)
 		doc, err := td.DataV3(host, params)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertSelectedTier(t, doc, 0) {
+			ok = false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
+			ok = false
+		}
 		col, has := cols[ch.Dimensions[0].ID]
-		if !has || len(col) == 0 {
-			t.Logf("%s returned no rows for the reset dimension", group)
+		if !has || len(col) != samples*2 {
+			t.Logf("%s returned %d rows for the reset dimension, want exactly %d",
+				group, len(col), samples*2)
 			ok = false
 			continue
 		}
 
 		var resetRows []int64
-		for _, pt := range col {
+		for i, pt := range col {
+			wantT := base + int64(i+1)*(ue/2)
+			if pt.T != wantT {
+				t.Logf("%s row %d ends at %d, want %d", group, i, pt.T, wantT)
+				ok = false
+			}
+			if pt.Value == nil || pt.PA&canon.AnnotationEmpty != 0 {
+				t.Logf("%s row %d at %d is empty, want a numeric row", group, i, pt.T)
+				ok = false
+			} else if math.IsNaN(*pt.Value) || math.IsInf(*pt.Value, 0) {
+				t.Logf("%s row %d at %d is non-finite: %v", group, i, pt.T, *pt.Value)
+				ok = false
+			}
 			if pt.PA&canon.AnnotationReset != 0 {
 				resetRows = append(resetRows, pt.T)
 			}

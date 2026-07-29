@@ -7,6 +7,7 @@
 package corpus
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -42,30 +43,47 @@ func TestCase033AnomalyRateCountsSamplesInTheRow(t *testing.T) {
 	for group := range map[string]struct{}{"average": {}, "max": {}, "sum": {}} {
 		params := daemon.DataParamsTier(context, 0, base, base+100, 4, group)
 		params.Set("options", "jsonwrap|unaligned")
+		params.Set("scope_dimensions", ch.Dimensions[0].ID)
 		doc, err := td.DataV3(host, params)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertSelectedTier(t, doc, 0) {
+			ok = false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
+			ok = false
+		}
 
-		found := false
-		for _, pt := range cols[ch.Dimensions[0].ID] {
-			if pt.T != base+75 {
-				continue
-			}
-			found = true
-			if pt.ARP != 50 {
-				t.Logf("%s row (t0+50,t0+75] reports anomaly rate %.10g, want 50: "+
-					"one of its two raw samples is anomalous", group, pt.ARP)
+		col := cols[ch.Dimensions[0].ID]
+		if len(col) != 4 {
+			t.Logf("%s returned %d rows, want exactly 4", group, len(col))
+			ok = false
+			continue
+		}
+		wantARP := []float64{0, 0, 50, 0}
+		for i, pt := range col {
+			wantT := base + int64(i+1)*25
+			if pt.T != wantT {
+				t.Logf("%s row %d ends at %d, want %d", group, i, pt.T, wantT)
 				ok = false
 			}
-		}
-		if !found {
-			t.Logf("%s did not return the row ending at t0+75", group)
-			ok = false
+			if pt.Value == nil || pt.PA&canon.AnnotationEmpty != 0 {
+				t.Logf("%s row %d at %d is empty, want a numeric row", group, i, pt.T)
+				ok = false
+			} else if math.IsNaN(*pt.Value) || math.IsInf(*pt.Value, 0) {
+				t.Logf("%s row %d at %d is non-finite: %v", group, i, pt.T, *pt.Value)
+				ok = false
+			}
+			if pt.ARP != wantARP[i] {
+				t.Logf("%s row %d at %d reports anomaly rate %.10g, want %.10g",
+					group, i, pt.T, pt.ARP, wantARP[i])
+				ok = false
+			}
 		}
 	}
 

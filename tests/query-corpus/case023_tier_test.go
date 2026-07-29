@@ -16,8 +16,10 @@
 //
 //	weight(max) = (avg - min) / (max - min)
 //
-// which is EXACT for a 0/1 dimension — the shape of every availability
-// signal — because there the average IS the fraction of time at 1.
+// which is EXACT for a 0/1 dimension at a steady collection cadence —
+// the shape of the fixture below — because there the sample-weighted
+// average is also the fraction of elapsed time at 1. A cadence change
+// inside a rollup is pinned separately by CASE-023/cadence-change-availability.
 //
 // Expectations below are derived from that definition and from the
 // fixture, never from the engine.
@@ -38,14 +40,11 @@ import (
 func TestCase023TierEstimation(t *testing.T) {
 	trackContract(t, "CASE-023/tier-estimation")
 
-	// a 0/1 availability signal: `up` is 1 except for a run of zeros
-	// inside each tier-1 window, so every window has min=0, max=1 and an
-	// average that IS the fraction of time up.
-	//
-	// window k (k = 0..) covers samples [60k, 60k+59]. We make the first
-	// `down(k)` samples of each window 0 and the rest 1, so
-	//   avg(k)  = (60 - down(k)) / 60
-	//   time at 0 = down(k)/60, time at 1 = 1 - down(k)/60
+	// A 0/1 availability signal changes its down-time pattern every 60
+	// fixture samples. Storage windows sit on the absolute 60-second tier
+	// grid, so the first window is partial and later windows can cross two
+	// generator phases. The oracle below reads fixture.TierWindows() rather
+	// than assuming fixture indices and tier windows are aligned.
 	down := func(k int) int {
 		switch k % 4 {
 		case 0:
@@ -86,7 +85,7 @@ func TestCase023TierEstimation(t *testing.T) {
 	// one view bucket per tier-1 window, so each answer is one window's
 	// estimate and nothing is mixed
 	const (
-		after      = fixture.T0 - 80
+		after      = fixture.T0 - 20
 		bucketSpan = tier1Gran
 		buckets    = 12
 	)
@@ -140,14 +139,33 @@ func TestCase023TierEstimation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertSelectedTier(t, doc, 1) {
+			ok = false
+		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertOnlyColumn(t, cols, d.ID) {
+			ok = false
 		}
 		return cols
 	}
 
 	near := func(got, want float64) bool { return math.Abs(got-want) < 1e-6 }
+	expected := func(value func(fixture.TierPoint) float64) []expectedColumnPoint {
+		t.Helper()
+		out := make([]expectedColumnPoint, buckets)
+		for i := range out {
+			end := int64(after + int64(i+1)*bucketSpan)
+			w, has := windows[end]
+			if !has || w.Count == 0 {
+				t.Fatalf("fixture has no populated tier-1 window ending at %d", end)
+			}
+			out[i] = wantNumberAt(end, value(w))
+		}
+		return out
+	}
 
 	// percentage-of-time: the share of each window that satisfied the
 	// condition, weighted by the model above
@@ -160,38 +178,10 @@ func TestCase023TierEstimation(t *testing.T) {
 		{"==1", func(w fixture.TierPoint) float64 { return fractionEqual(w, 1) * 100 }},
 	} {
 		cols := query("percentage-of-time", tc.options)
-		col := cols[d.ID]
-		for _, pt := range col {
-			w, has := windows[pt.T]
-			if !has || w.Count == 0 || pt.Value == nil {
-				continue
-			}
-			want := tc.want(w)
-			check(near(*pt.Value, want),
-				"percentage-of-time %s at window t=%d (min=%v max=%v avg=%.4f): %v, want %.4f",
-				tc.options, pt.T, w.Min, w.Max, w.Sum/float64(w.Count), *pt.Value, want)
-		}
-	}
-
-	// the failure this layer exists to prevent: evaluating the condition on
-	// the stored average makes a half-and-half window answer "never" in
-	// BOTH directions
-	{
-		up := query("percentage-of-time", ">=1")[d.ID]
-		dn := query("percentage-of-time", "==0")[d.ID]
-		for i := range up {
-			if i >= len(dn) || up[i].Value == nil || dn[i].Value == nil {
-				continue
-			}
-			w, has := windows[up[i].T]
-			if !has || w.Count == 0 || w.Max <= w.Min {
-				continue
-			}
-			check(*up[i].Value > 0 || *dn[i].Value > 0,
-				"window t=%d was neither up nor down (%v / %v) — the condition was evaluated on the average",
-				up[i].T, *up[i].Value, *dn[i].Value)
-			check(near(*up[i].Value+*dn[i].Value, 100),
-				"window t=%d: up%%+down%% = %v, want 100", up[i].T, *up[i].Value+*dn[i].Value)
+		// The oracle is exact; printTol only accounts for json2's seven
+		// fractional digits.
+		if !assertExactColumn(t, cols, d.ID, expected(tc.want), printTol) {
+			check(false, "percentage-of-time %s did not return the exact fixture-derived tier windows", tc.options)
 		}
 	}
 
@@ -200,15 +190,25 @@ func TestCase023TierEstimation(t *testing.T) {
 	// only counts when it turns the state on
 	{
 		cols := query("number-of-flaps", "==0")
-		for _, pt := range cols[d.ID] {
-			w, has := windows[pt.T]
-			if !has || w.Count == 0 || pt.Value == nil {
-				continue
+		state, hasState := false, false
+		want := expected(func(w fixture.TierPoint) float64 {
+			share := fractionEqual(w, 0)
+			flaps := 0.0
+			if share > 0 && share < 1 {
+				flaps = 1
+				state = true
+			} else {
+				now := share > 0
+				if hasState && !state && now {
+					flaps = 1
+				}
+				state = now
 			}
-			if w.Max > w.Min {
-				check(*pt.Value >= 1,
-					"number-of-flaps at mixed window t=%d = %v, want at least 1", pt.T, *pt.Value)
-			}
+			hasState = true
+			return flaps
+		})
+		if !assertExactColumn(t, cols, d.ID, want, 0) {
+			check(false, "number-of-flaps ==0 did not return one exact verdict per tier window")
 		}
 	}
 
@@ -216,16 +216,14 @@ func TestCase023TierEstimation(t *testing.T) {
 	// one, because the window keeps no ordering
 	{
 		cols := query("number-of-times", "==0")
-		for _, pt := range cols[d.ID] {
-			w, has := windows[pt.T]
-			if !has || w.Count == 0 || pt.Value == nil {
-				continue
+		want := expected(func(w fixture.TierPoint) float64 {
+			if fractionEqual(w, 0) > 0 {
+				return 1
 			}
-			check(*pt.Value <= 1,
-				"number-of-times at window t=%d = %v, want at most 1 (count-as-1)", pt.T, *pt.Value)
-			if w.Min == 0 && w.Max == 0 {
-				check(*pt.Value == 1, "number-of-times at all-zero window t=%d = %v, want 1", pt.T, *pt.Value)
-			}
+			return 0
+		})
+		if !assertExactColumn(t, cols, d.ID, want, 0) {
+			check(false, "number-of-times ==0 did not apply count-as-one exactly once per tier window")
 		}
 	}
 
@@ -233,19 +231,15 @@ func TestCase023TierEstimation(t *testing.T) {
 	// stored point IS the sample, so the condition is evaluated on it
 	{
 		cols := query("percentage-of-samples", "==0")
-		for _, pt := range cols[d.ID] {
-			w, has := windows[pt.T]
-			if !has || w.Count == 0 || pt.Value == nil {
-				continue
-			}
+		want := expected(func(w fixture.TierPoint) float64 {
 			avg := w.Sum / float64(w.Count)
-			want := 0.0
-			if avg == 0 {
-				want = 100
+			if near(avg, 0) {
+				return 100
 			}
-			check(near(*pt.Value, want),
-				"percentage-of-samples ==0 at window t=%d (avg=%.4f) = %v, want %v (unchanged at tiers)",
-				pt.T, avg, *pt.Value, want)
+			return 0
+		})
+		if !assertExactColumn(t, cols, d.ID, want, 0) {
+			check(false, "percentage-of-samples ==0 did not evaluate every delivered tier average")
 		}
 	}
 
@@ -342,49 +336,41 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertSelectedTier(t, doc, 1) {
+			ok = false
+		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertOnlyColumn(t, cols, d.ID) {
+			ok = false
+		}
 		return cols[d.ID]
 	}
 
-	// group the answers by the stored window each bucket falls in
-	byWindow := func(col []canon.Pt) map[int64][]float64 {
-		out := make(map[int64][]float64)
-		for _, pt := range col {
-			if pt.Value == nil {
-				continue
-			}
-			out[tierWindowEnd(pt.T, tier1Gran)] = append(out[tierWindowEnd(pt.T, tier1Gran)], *pt.Value)
+	wantTime := make([]expectedColumnPoint, windows*perWindow)
+	for i := range wantTime {
+		end := after + int64(i+1)*bucketSpan
+		storedEnd := tierWindowEnd(end, tier1Gran)
+		w, has := stored[storedEnd]
+		if !has || w.Count == 0 {
+			t.Fatalf("fixture window ending %d is not populated: %+v", storedEnd, w)
 		}
-		return out
+		shareAtOne := 0.0
+		avg := w.Sum / float64(w.Count)
+		switch {
+		case w.Max <= w.Min && avg >= 1:
+			shareAtOne = 1
+		case w.Max > w.Min && 1 <= w.Min:
+			shareAtOne = 1
+		case w.Max > w.Min && 1 <= w.Max:
+			shareAtOne = (avg - w.Min) / (w.Max - w.Min)
+		}
+		wantTime[i] = wantNumberAt(end, shareAtOne*100)
 	}
-
-	// the view grid has to actually be finer than the stored data, or this
-	// case proves nothing
-	checked := 0
-	{
-		col := query("percentage-of-time", ">=1")
-		if len(col) < windows*perWindow {
-			t.Fatalf("view grid is not finer than the stored data: %d buckets for %d stored windows",
-				len(col), windows)
-		}
-		groups := byWindow(col)
-		for end, vals := range groups {
-			w, has := stored[end]
-			if !has || w.Count == 0 {
-				continue
-			}
-			checked++
-			check(len(vals) == perWindow,
-				"stored window t=%d was delivered to %d buckets, want %d", end, len(vals), perWindow)
-			for i := 1; i < len(vals); i++ {
-				check(math.Abs(vals[i]-vals[0]) < 1e-6,
-					"stored window t=%d: bucket %d answered %v, bucket 0 answered %v — a re-delivery changed the estimate",
-					end, i, vals[i], vals[0])
-			}
-		}
+	if cols := map[string][]canon.Pt{d.ID: query("percentage-of-time", ">=1")}; !assertExactColumn(t, cols, d.ID, wantTime, printTol) {
+		check(false, "percentage-of-time changed or dropped a tier-window estimate during re-delivery")
 	}
 
 	// an occurrence belongs to the window, not to the buckets it was
@@ -396,26 +382,39 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 		{"number-of-times", "==0"},
 		{"number-of-flaps", "==0"},
 	} {
-		groups := byWindow(query(tc.group, tc.options))
-		for end, vals := range groups {
-			w, has := stored[end]
-			if !has || w.Count == 0 {
-				continue
+		want := make([]expectedColumnPoint, windows*perWindow)
+		state, hasState := false, false
+		for i := range want {
+			end := after + int64(i+1)*bucketSpan
+			value := 0.0
+			if i%perWindow == 0 {
+				w := stored[tierWindowEnd(end, tier1Gran)]
+				share := c023WindowFractionEqual(w, 0)
+				switch tc.group {
+				case "number-of-times":
+					if share > 0 {
+						value = 1
+					}
+				case "number-of-flaps":
+					if share > 0 && share < 1 {
+						value = 1
+						state = true
+					} else {
+						now := share > 0
+						if hasState && !state && now {
+							value = 1
+						}
+						state = now
+					}
+					hasState = true
+				}
 			}
-			total := 0.0
-			for _, v := range vals {
-				total += v
-			}
-			check(total <= 1,
-				"%s %s: stored window t=%d totalled %v across %d buckets, want at most 1 — the repeats were counted",
-				tc.group, tc.options, end, total, len(vals))
+			want[i] = wantNumberAt(end, value)
 		}
-	}
-
-	// a case that silently checks nothing is worse than no case
-	if checked < windows-1 {
-		t.Fatalf("only %d of %d stored windows were reachable — the fixture and the query window disagree",
-			checked, windows)
+		if cols := map[string][]canon.Pt{d.ID: query(tc.group, tc.options)}; !assertExactColumn(t, cols, d.ID, want, 0) {
+			check(false, "%s %s did not count each stored window exactly once across its three deliveries",
+				tc.group, tc.options)
+		}
 	}
 
 	assertContract(t, "CASE-023/tier-wide-point", ok)

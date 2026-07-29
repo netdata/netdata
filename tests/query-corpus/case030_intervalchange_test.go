@@ -16,7 +16,6 @@
 package corpus
 
 import (
-	"math"
 	"strconv"
 	"testing"
 	"time"
@@ -98,12 +97,18 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 			// first interval.
 			after := base + 2*gran2
 			before := after + 4*gran2
-			want := float64(before-after) * float64(rate)
+			rowVolume := float64(gran2 * rate)
+			want := make([]expectedColumnPoint, 4)
+			for i := range want {
+				want[i] = wantNumberAt(after+int64(i+1)*gran2, rowVolume)
+			}
+			dimension := ch1.Dimensions[0].ID
 
 			ok := true
 			for _, tier := range []int{0, 1, 2} {
 				params := daemon.DataParamsTier(ctx, tier, after, before, 4, "sum")
 				params.Set("options", "jsonwrap|unaligned")
+				params.Set("scope_dimensions", dimension)
 				doc, err := td.DataV3(host, params)
 				if err != nil {
 					t.Fatal(err)
@@ -114,18 +119,17 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 					ok = false
 					continue
 				}
-				total := 0.0
-				for _, pt := range cols[ch1.Dimensions[0].ID] {
-					if pt.Value != nil {
-						total += *pt.Value
-					}
+				if !assertSelectedTier(t, doc, tier) {
+					ok = false
 				}
-				t.Logf("%s tier %d: %.4f (want %.4f)", name, tier, total, want)
-				if math.Abs(total-want) > 1e-6 {
-					t.Logf("history contract not met: %s tier %d totals %.4f over %ds of a "+
-						"%d/s rate collected every %ds, which is %.4f - how often the metric "+
-						"is sampled TODAY cannot change what its history held",
-						name, tier, total, before-after, rate, tc.first, want)
+				if !assertOnlyColumn(t, cols, dimension) {
+					ok = false
+				}
+				if !assertExactColumn(t, cols, dimension, want, 0) {
+					t.Logf("history contract not met: %s tier %d must return four exact "+
+						"%ds rows of %.0f units; how often the metric is sampled today "+
+						"cannot change what its history held",
+						name, tier, gran2, rowVolume)
 					ok = false
 				}
 			}

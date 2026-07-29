@@ -184,7 +184,7 @@ func sliceTierCovers(t *testing.T, a sliceAxes, after, before int64) bool {
 	if err != nil {
 		return false
 	}
-	tiers := perTierRetention(doc)
+	tiers := perTierRetention(t, doc)
 	if a.Tier >= len(tiers) {
 		return false
 	}
