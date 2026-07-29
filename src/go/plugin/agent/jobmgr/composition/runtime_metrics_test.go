@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
@@ -104,6 +106,21 @@ func (rms *runMetricsService) finalized() []string {
 	return append([]string(nil), rms.componentFinalized...)
 }
 
+func newTestRunMetrics(t *testing.T) *runMetrics {
+	t.Helper()
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	metrics, err := newRunMetrics(attempts)
+	require.NoError(t, err)
+	return metrics
+}
+
+func TestNewRunMetricsRejectsNilProcessAttemptAuthority(t *testing.T) {
+	metrics, err := newRunMetrics(nil)
+	require.Nil(t, metrics)
+	require.Error(t, err)
+}
+
 func TestRunMetricsProjection(t *testing.T) {
 	tests := map[string]struct {
 		apply func(*runMetrics)
@@ -143,7 +160,7 @@ func TestRunMetricsProjection(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			metrics := newRunMetrics()
+			metrics := newTestRunMetrics(t)
 			test.apply(metrics)
 
 			require.NoError(t, metrics.refreshProjection())
@@ -156,8 +173,97 @@ func TestRunMetricsProjection(t *testing.T) {
 	}
 }
 
+func TestRunMetricsProjectsProcessAttemptCensus(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+
+	metrics, err := newRunMetrics(attempts)
+	require.NoError(t, err)
+	assertCensus := func(want containment.Census) {
+		t.Helper()
+		require.Equal(t, want, attempts.Census())
+		require.NoError(t, metrics.refreshProjection())
+		reader := metrics.store.Read(metrix.ReadRaw())
+		for name, value := range map[string]int{
+			"process_attempts_active":      want.Active,
+			"process_attempts_probing":     want.Probing,
+			"process_attempts_admitted":    want.Admitted,
+			"process_attempts_contained":   want.Contained,
+			"process_attempts_quarantined": want.Quarantined,
+		} {
+			got, ok := reader.Value(runtimeMetricPrefix+"."+name, nil)
+			require.True(t, ok, name)
+			require.EqualValues(t, value, got, name)
+		}
+	}
+
+	started := make(chan struct{})
+	admit := make(chan struct{})
+	admitted := make(chan error, 1)
+	release := make(chan struct{})
+	var admitOnce sync.Once
+	var releaseOnce sync.Once
+	attempt, err := attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
+		Identity: jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module/job",
+			Resource:  "module/job",
+		},
+		Target: 1,
+		Work: func(_ context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+			close(started)
+			<-admit
+			err := admission.Admit()
+			admitted <- err
+			if err != nil {
+				return err
+			}
+			<-release
+			return nil
+		},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		admitOnce.Do(func() { close(admit) })
+		releaseOnce.Do(func() { close(release) })
+		<-attempt.Released()
+	})
+
+	<-started
+	assertCensus(containment.Census{Active: 1, Probing: 1})
+
+	admitOnce.Do(func() { close(admit) })
+	require.NoError(t, <-admitted)
+	assertCensus(containment.Census{Active: 1, Admitted: 1})
+
+	require.True(t, attempt.Cut(jobmgr.ErrProcessAttemptDeadline))
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptDeadline)
+	assertCensus(containment.Census{Active: 1, Contained: 1})
+
+	releaseOnce.Do(func() { close(release) })
+	<-attempt.Released()
+	assertCensus(containment.Census{})
+
+	quarantined, err := attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
+		Identity: jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module/quarantined",
+			Resource:  "module/quarantined",
+		},
+		Target: 1,
+		Work: func(_ context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+			require.NoError(t, admission.Admit())
+			return errors.New("cleanup failed")
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorIs(t, quarantined.Await(context.Background()), jobmgr.ErrProcessAttemptQuarantined)
+	<-quarantined.Released()
+	assertCensus(containment.Census{Quarantined: 1})
+}
+
 func TestRunMetricsOwnerUpdatesDoNotAllocate(t *testing.T) {
-	metrics := newRunMetrics()
+	metrics := newTestRunMetrics(t)
 	now := time.Now()
 	allocations := testing.AllocsPerRun(100, func() {
 		metrics.SetRuntimeGauge(lifecycle.RuntimeGaugeOperationsActive, 1)
@@ -189,7 +295,7 @@ func TestRunMetricsRegistration(t *testing.T) {
 			service := &runMetricsService{
 				producerErr: test.producerErr,
 			}
-			metrics := newRunMetrics()
+			metrics := newTestRunMetrics(t)
 			err := metrics.register(service)
 			require.EqualValues(t, test.wantErr, err != nil)
 			components, removals, producers, _ := service.snapshot()
@@ -214,7 +320,7 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -261,7 +367,7 @@ func TestRunGenerationFinalizerStopsRuntimeWriterBeforeTerminalCensus(t *testing
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,

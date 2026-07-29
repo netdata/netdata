@@ -101,7 +101,13 @@ func (dcjc *DynCfgJobController) BindAutoDetectionRetries(
 	if dcjc == nil || dcjc.scheduler == nil {
 		return errors.New("job output: invalid autodetection retry controller")
 	}
-	return dcjc.scheduler.bindAutoDetectionRetries(commands, dcjc.planAutoDetectionRetry, run, failure)
+	return dcjc.scheduler.bindAutoDetectionRetries(
+		commands,
+		dcjc.planAutoDetectionRetry,
+		dcjc.planPendingJob,
+		run,
+		failure,
+	)
 }
 
 func DynCfgJobPrefix(pluginName string) string {
@@ -142,8 +148,17 @@ func (dcjc *DynCfgJobController) Handle(
 		if failure.valid {
 			return failure.result, nil
 		}
-		if err := dcjc.configModules.Test(ctx, config); err != nil {
-			return dynCfgMessage(422, err.Error())
+		if _, err := dcjc.runConfigOperation(ctx, config, configOperationTest, false); err != nil {
+			if ctx.Err() != nil {
+				return lifecycle.SealedResult{}, err
+			}
+			code := 422
+			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
+				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+				code = 503
+			}
+			return dynCfgMessage(code, err.Error())
 		}
 		return dynCfgMessage(200, "")
 	case dyncfg.CommandGet:
@@ -158,9 +173,18 @@ func (dcjc *DynCfgJobController) Handle(
 		if err != nil {
 			return lifecycle.SealedResult{}, err
 		}
-		payload, err := dcjc.configModules.Configuration(ctx, config)
+		payload, err := dcjc.runConfigOperation(ctx, config, configOperationGet, false)
 		if err != nil {
-			return dynCfgMessage(500, err.Error())
+			if ctx.Err() != nil {
+				return lifecycle.SealedResult{}, err
+			}
+			code := 500
+			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
+				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+				code = 503
+			}
+			return dynCfgMessage(code, err.Error())
 		}
 		return lifecycle.NewSealedResult(200, "application/json", payload)
 	default:

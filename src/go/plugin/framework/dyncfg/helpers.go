@@ -3,6 +3,7 @@
 package dyncfg
 
 import (
+	"context"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -26,8 +27,8 @@ func NormalizeJobName(name string) string {
 }
 
 // WrapHandler adapts a dyncfg function handler to functions.Registry handler type.
-func WrapHandler(handler func(Function)) func(functions.Function) {
-	return func(fn functions.Function) {
-		handler(NewFunction(fn))
+func WrapHandler(handler func(Function)) functions.Handler {
+	return func(ctx context.Context, fn functions.Function) {
+		handler(NewFunction(ctx, fn))
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -19,7 +20,7 @@ import (
 )
 
 // stopFunctionAssembly runs the same shutdown sequence the kernel drives in
-// production: BeforeFunctionCatalogClose then FinalizeRun.
+// production: shutdown barrier, catalog drain, then run finalization.
 func stopFunctionAssembly(fa *FunctionAssembly, epoch uint64) error {
 	if fa == nil {
 		return nil
@@ -27,7 +28,69 @@ func stopFunctionAssembly(fa *FunctionAssembly, epoch uint64) error {
 	if err := fa.BeforeFunctionCatalogClose(context.Background(), epoch); err != nil {
 		return err
 	}
+	catalog, ok := fa.Catalog().(*functionadapter.Catalog)
+	if !ok {
+		return errors.New("unexpected Function catalog type")
+	}
+	if err := catalog.BeginClose(); err != nil {
+		return err
+	}
+	for {
+		cleanups, more, err := catalog.CloseStep(jobmgr.MaximumFunctionCloseQuantum)
+		if err != nil {
+			return err
+		}
+		for _, cleanup := range cleanups {
+			_, cleanupErr := cleanup.Work()(context.Background())
+			if err := catalog.CompleteCleanup(cleanup.Ref()); err != nil {
+				return errors.Join(cleanupErr, err)
+			}
+			if cleanupErr != nil {
+				return cleanupErr
+			}
+		}
+		if !more {
+			break
+		}
+	}
+	if !catalog.LifecycleDrained() {
+		return errors.New("Function catalog did not drain")
+	}
 	return fa.FinalizeRun(context.Background(), epoch)
+}
+
+func newTestFunctionAssembly(
+	t *testing.T,
+	epoch uint64,
+	modules collectorapi.Registry,
+	frames *lifecycle.FrameOwner,
+	initial ...functionadapter.InitialRoute,
+) (*FunctionAssembly, error) {
+	t.Helper()
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	assembly, buildErr := NewContainedFunctionAssembly(
+		t.Context(),
+		epoch,
+		attempts,
+		modules,
+		frames,
+		initial...,
+	)
+	t.Cleanup(func() {
+		if assembly != nil {
+			// Abort first because a failed shutdown attempt still enters the
+			// draining state and can no longer roll construction back.
+			if abortErr := assembly.abortConstruction(); abortErr != nil {
+				_ = stopFunctionAssembly(assembly, epoch)
+			}
+		}
+		attempts.BeginShutdown()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(ctx))
+	})
+	return assembly, buildErr
 }
 
 func TestFunctionAssemblyLifecycle(t *testing.T) {
@@ -44,7 +107,7 @@ func TestFunctionAssemblyLifecycle(t *testing.T) {
 			},
 		},
 	}
-	assembly, err := NewFunctionAssembly(7, modules, frames)
+	assembly, err := newTestFunctionAssembly(t, 7, modules, frames)
 	require.NoError(t, err)
 	catalog, ok := assembly.Catalog().(*functionadapter.Catalog)
 	require.True(t, ok)
@@ -63,6 +126,23 @@ func TestFunctionAssemblyLifecycle(t *testing.T) {
 	require.NoError(t, stopFunctionAssembly(assembly, 7))
 
 	require.EqualValues(t, registration+"FUNCTION_DEL GLOBAL \"module:method\"\n\n", output.String())
+}
+
+func TestFunctionLifecycleAdaptersCanonicalizeConcreteNil(t *testing.T) {
+	staged, err := (&functionJobLifecycle{
+		stager: &functionadapter.JobStager{},
+	}).Stage(&assemblyTestJob{})
+	require.Error(t, err)
+	require.True(t, staged == nil)
+
+	attached, err := (&functionJobLifecycle{
+		controller: &functionadapter.Controller{},
+	}).Attach(
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		&functionadapter.StagedJobHandle{},
+	)
+	require.Error(t, err)
+	require.True(t, attached == nil)
 }
 
 func TestFunctionAssemblyStateGuards(t *testing.T) {
@@ -134,7 +214,7 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 			require.NoError(t, err)
-			assembly, err := NewFunctionAssembly(1, collectorapi.Registry{}, frames)
+			assembly, err := newTestFunctionAssembly(t, 1, collectorapi.Registry{}, frames)
 			require.NoError(t, err)
 			catalog := assembly.Catalog().(*functionadapter.Catalog)
 
@@ -148,18 +228,18 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	assembly, err := NewFunctionAssembly(1, collectorapi.Registry{
+	assembly, err := newTestFunctionAssembly(t, 1, collectorapi.Registry{
 		"module": {},
 	}, frames)
 	require.NoError(t, err)
 	job := &assemblyTestJob{}
-	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
-		Identity: lifecycle.ResourceIdentity{
-			ID:         job.FullName(),
-			Generation: 3,
-		},
-		Job: job,
-	})
+	jobFunctions := assembly.jobLifecycle()
+	staged, err := jobFunctions.Stage(job)
+	require.NoError(t, err)
+	handle, err := jobFunctions.Attach(lifecycle.ResourceIdentity{
+		ID:         job.FullName(),
+		Generation: 3,
+	}, staged)
 	require.NoError(t, err)
 	require.NotNil(t, handle)
 
@@ -228,7 +308,7 @@ type shutdownFunctionHarness struct {
 	tasks  *lifecycle.TaskSupervisor
 	output *bytes.Buffer
 	job    *assemblyTestJob
-	handle joboutput.HandlerLifecycle
+	handle joboutput.ProcessHandlerLifecycle
 	permit lifecycle.LongLivedPlan
 	probe  compositionShutdownProbe
 }
@@ -248,7 +328,7 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 			},
 		},
 	}
-	assembly, err := NewFunctionAssembly(1, modules, frames)
+	assembly, err := newTestFunctionAssembly(t, 1, modules, frames)
 	require.NoError(t, err)
 	clock := lifecycle.RealClock{}
 	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
@@ -269,13 +349,13 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 	require.NoError(t, err)
 
 	job := &assemblyTestJob{}
-	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
-		Identity: lifecycle.ResourceIdentity{
-			ID:         job.FullName(),
-			Generation: 1,
-		},
-		Job: job,
-	})
+	jobFunctions := assembly.jobLifecycle()
+	staged, err := jobFunctions.Stage(job)
+	require.NoError(t, err)
+	handle, err := jobFunctions.Attach(lifecycle.ResourceIdentity{
+		ID:         job.FullName(),
+		Generation: 1,
+	}, staged)
 	require.NoError(t, err)
 	permit := lifecycle.NewJobLongLivedPlan()
 	return shutdownFunctionHarness{
@@ -413,7 +493,7 @@ func (*assemblyTestJob) StartManaged(ready chan<- struct{}) {
 type shutdownFunctionReadyResource struct {
 	identity    lifecycle.ResourceIdentity
 	permit      lifecycle.LongLivedPermit
-	handle      joboutput.HandlerLifecycle
+	handle      joboutput.ProcessHandlerLifecycle
 	stopEntered chan<- struct{}
 	stopRelease <-chan struct{}
 }
@@ -445,7 +525,7 @@ func (sfrr *shutdownFunctionReadyResource) Finalize() error {
 type shutdownFunctionPreparedTransaction struct {
 	scope   lifecycle.ResourceTransactionScope
 	permit  lifecycle.LongLivedPermit
-	handle  joboutput.HandlerLifecycle
+	handle  joboutput.ProcessHandlerLifecycle
 	entered chan<- struct{}
 	release <-chan struct{}
 }

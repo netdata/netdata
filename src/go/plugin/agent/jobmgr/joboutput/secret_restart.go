@@ -39,8 +39,12 @@ func (sds *SecretDependentStop) markStopped() {
 // SecretDependentStart records a collector-construction failure that was
 // truthfully committed as a failed DynCfg graph status.
 type SecretDependentStart struct {
-	mu  sync.Mutex
-	err error
+	mu sync.Mutex
+
+	err              error
+	candidatePending func()
+	runtimePending   func()
+	pendingOnce      sync.Once
 }
 
 func (sds *SecretDependentStart) Err() error {
@@ -56,6 +60,44 @@ func (sds *SecretDependentStart) setError(err error) {
 	sds.mu.Lock()
 	sds.err = err
 	sds.mu.Unlock()
+}
+
+func (sds *SecretDependentStart) setPending(
+	candidate func(),
+	runtime func(),
+) {
+	sds.mu.Lock()
+	sds.candidatePending = candidate
+	sds.runtimePending = runtime
+	sds.mu.Unlock()
+}
+
+// RetainPending preserves the desired restart when the child deadline expires
+// before its transaction reaches AfterApply.
+func (sds *SecretDependentStart) RetainPending() {
+	if sds == nil {
+		return
+	}
+	sds.mu.Lock()
+	pending := sds.candidatePending
+	sds.mu.Unlock()
+	sds.retainPending(pending)
+}
+
+func (sds *SecretDependentStart) retainRuntimePending() {
+	if sds == nil {
+		return
+	}
+	sds.mu.Lock()
+	pending := sds.runtimePending
+	sds.mu.Unlock()
+	sds.retainPending(pending)
+}
+
+func (sds *SecretDependentStart) retainPending(pending func()) {
+	if pending != nil {
+		sds.pendingOnce.Do(pending)
+	}
 }
 
 func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.WorkPlan, *SecretDependentStop, error) {
@@ -86,15 +128,18 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				if current == nil || !scope.Current.Valid() {
 					return nil, errors.New("job output: running dependent has no current resource")
 				}
-				return PrepareResourceTransaction(
-					ResourceTransactionSpec{
-						Scope:       scope,
-						Disposition: lifecycle.ResourceTransactionRemoved,
-						Current:     current,
-						AfterApply:  state.markStopped,
-						Result:      mustDynCfgMessage(204, ""),
-						Cleanup:     func() error { return nil },
-					},
+				postimage := graphConfig(record, dyncfg.StatusFailed)
+				return dcjc.prepareMutationWithRetryAfterApply(
+					scope,
+					current,
+					nil,
+					lifecycle.LongLivedPermit{},
+					lifecycle.ResourceTransactionRemoved,
+					&postimage,
+					mustDynCfgMessage(204, ""),
+					dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+					autoDetectionRetryToken{},
+					state.markStopped,
 				)
 			},
 		},
@@ -109,6 +154,27 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 	}
 	permit := lifecycle.NewJobLongLivedPlan()
 	state := &SecretDependentStart{}
+	if record, exists := dcjc.graph.Lookup(id); exists {
+		cloned, err := graphRecordConfig(record)
+		if err != nil {
+			return jobmgr.WorkPlan{}, nil, err
+		}
+		if cloned.FullName() != id {
+			return jobmgr.WorkPlan{}, nil, errors.New("job output: dependent start identity differs")
+		}
+		state.setPending(
+			dcjc.retainAbsentPendingAfterApply(
+				cloned,
+				jobmgr.ProcessAttemptJob,
+				cloned.UID(),
+			),
+			dcjc.retainAbsentPendingAfterApply(
+				cloned,
+				jobmgr.ProcessAttemptJobRuntime,
+				cloned.UID(),
+			),
+		)
+	}
 	// The enclosing secret mutation keeps the dependency graph stable through
 	// this acknowledged restart.
 	return jobmgr.WorkPlan{
@@ -139,14 +205,23 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 				if cloned.FullName() != id {
 					return nil, errors.New("job output: dependent start identity differs")
 				}
-				successor, prepareErr := dcjc.factory.Prepare(ctx, cloned, scope.Successor, permit)
+				successor, probeFailure, prepareErr := dcjc.prepareContainedJob(
+					ctx,
+					cloned,
+					scope.Successor,
+					permit,
+				)
 				if prepareErr != nil {
 					if ctx.Err() != nil || lifecycle.OwnershipRetained(prepareErr) {
 						return nil, prepareErr
 					}
-					state.setError(prepareErr)
 					postimage := graphConfig(record, dyncfg.StatusFailed)
-					return dcjc.prepareMutation(
+					var pending func()
+					if candidatePreparationBusy(prepareErr) ||
+						errors.Is(prepareErr, jobmgr.ErrProcessAttemptDeadline) {
+						pending = state.RetainPending
+					}
+					return dcjc.prepareMutationWithRetryAfterApply(
 						scope,
 						nil,
 						nil,
@@ -155,14 +230,17 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						&postimage,
 						mustDynCfgMessage(204, ""),
 						dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+						autoDetectionRetryToken{},
+						composeAfterApply(
+							func() {
+								state.setError(prepareErr)
+							},
+							pending,
+						),
 					)
 				}
 				postimage := graphConfig(record, dyncfg.StatusRunning)
 				failedPostimage := graphConfig(record, dyncfg.StatusFailed)
-				probeFailure, probeErr := dcjc.factory.Probe(ctx, successor)
-				if probeErr != nil {
-					return nil, probeErr
-				}
 				if probeFailure != nil {
 					return dcjc.prepareProbeFailure(
 						scope,
@@ -185,15 +263,35 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						},
 					)
 				}
-				return dcjc.prepareMutation(
+				return dcjc.prepareMutationWithActivationFallbacks(
 					scope,
 					nil,
 					successor,
-					lifecycle.LongLivedPermit{},
 					lifecycle.ResourceTransactionInstalled,
 					&postimage,
 					mustDynCfgMessage(204, ""),
 					dcjc.configStatusCleanup(id, dyncfg.StatusRunning),
+					autoDetectionRetryToken{},
+					nil,
+					activationFallbackPlan{
+						postimage: &failedPostimage,
+						result:    mustDynCfgMessage(204, ""),
+						cleanup:   dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+						afterApply: composeAfterApply(
+							func() {
+								state.setError(jobmgr.ErrProcessAttemptBusy)
+							},
+							state.retainRuntimePending,
+						),
+					},
+					activationFallbackPlan{
+						postimage: &failedPostimage,
+						result:    mustDynCfgMessage(204, ""),
+						cleanup:   dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+						afterApply: func() {
+							state.setError(jobmgr.ErrProcessAttemptQuarantined)
+						},
+					},
 				)
 			},
 		},

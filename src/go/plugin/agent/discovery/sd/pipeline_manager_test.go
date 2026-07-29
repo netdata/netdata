@@ -4,7 +4,6 @@ package sd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 	"github.com/stretchr/testify/assert"
@@ -23,26 +21,25 @@ func TestPipelineManager_Start(t *testing.T) {
 	tests := map[string]struct {
 		setup       func(m *PipelineManager, ctx context.Context)
 		key         string
-		cfg         pipeline.Config
+		prepared    sdPipeline
 		wantErr     bool
 		wantRunning bool
 	}{
 		"start new pipeline": {
 			key:         "test-pipeline",
-			cfg:         pipeline.Config{Name: "test"},
+			prepared:    newMockPipeline("test"),
 			wantRunning: true,
 		},
 		"start replaces existing pipeline": {
 			setup: func(m *PipelineManager, ctx context.Context) {
-				_ = m.Start(ctx, "test-pipeline", pipeline.Config{Name: "old"})
+				_ = m.StartPrepared(ctx, "test-pipeline", newMockPipeline("old"))
 			},
 			key:         "test-pipeline",
-			cfg:         pipeline.Config{Name: "new"},
+			prepared:    newMockPipeline("new"),
 			wantRunning: true,
 		},
-		"start with invalid config fails": {
+		"start with nil pipeline fails": {
 			key:     "test-pipeline",
-			cfg:     pipeline.Config{Name: "invalid"},
 			wantErr: true,
 		},
 	}
@@ -56,7 +53,6 @@ func TestPipelineManager_Start(t *testing.T) {
 
 			m := NewPipelineManager(
 				logger.New(),
-				mockNewPipeline,
 				func(_ context.Context, groups []*confgroup.Group) {
 					mu.Lock()
 					sentGroups = append(sentGroups, groups...)
@@ -68,7 +64,7 @@ func TestPipelineManager_Start(t *testing.T) {
 				tc.setup(m, ctx)
 			}
 
-			err := m.Start(ctx, tc.key, tc.cfg)
+			err := m.StartPrepared(ctx, tc.key, tc.prepared)
 
 			if tc.wantErr {
 				assert.Error(t, err)
@@ -89,12 +85,6 @@ func TestPipelineManager_Stop(t *testing.T) {
 
 		m := NewPipelineManager(
 			logger.New(),
-			mockNewPipelineWithGroups(
-				[]*confgroup.Group{
-					{Source: "source1", Configs: []confgroup.Config{}},
-					{Source: "source2", Configs: []confgroup.Config{}},
-				},
-			),
 			func(_ context.Context, groups []*confgroup.Group) {
 				mu.Lock()
 				sentGroups = append(sentGroups, groups...)
@@ -102,7 +92,14 @@ func TestPipelineManager_Stop(t *testing.T) {
 			},
 		)
 
-		err := m.Start(ctx, "test-pipeline", pipeline.Config{Name: "test"})
+		err := m.StartPrepared(
+			ctx,
+			"test-pipeline",
+			newMockPipelineWithGroups("test", []*confgroup.Group{
+				{Source: "source1", Configs: []confgroup.Config{}},
+				{Source: "source2", Configs: []confgroup.Config{}},
+			}),
+		)
 		require.NoError(t, err)
 
 		// Wait for groups to be received
@@ -132,7 +129,6 @@ func TestPipelineManager_Stop(t *testing.T) {
 	t.Run("stop non-existent pipeline is no-op", func(t *testing.T) {
 		m := NewPipelineManager(
 			logger.New(),
-			mockNewPipeline,
 			func(_ context.Context, _ []*confgroup.Group) {},
 		)
 
@@ -160,16 +156,8 @@ func TestPipelineManager_Restart(t *testing.T) {
 			{Source: "source1", Configs: []confgroup.Config{}},
 		}
 
-		callCount := 0
 		m := NewPipelineManager(
 			logger.New(),
-			func(cfg pipeline.Config) (sdPipeline, error) {
-				callCount++
-				if callCount == 1 {
-					return newMockPipelineWithGroups(cfg.Name, firstPipelineGroups), nil
-				}
-				return newMockPipelineWithGroups(cfg.Name, secondPipelineGroups), nil
-			},
 			func(_ context.Context, groups []*confgroup.Group) {
 				mu.Lock()
 				sentGroups = append(sentGroups, groups...)
@@ -178,14 +166,22 @@ func TestPipelineManager_Restart(t *testing.T) {
 		)
 
 		// Start first pipeline
-		err := m.Start(ctx, "test-pipeline", pipeline.Config{Name: "v1"})
+		err := m.StartPrepared(
+			ctx,
+			"test-pipeline",
+			newMockPipelineWithGroups("v1", firstPipelineGroups),
+		)
 		require.NoError(t, err)
 
 		// Wait for first pipeline to send groups
 		time.Sleep(100 * time.Millisecond)
 
 		// Restart with new config
-		err = m.Restart(ctx, "test-pipeline", pipeline.Config{Name: "v2"})
+		err = m.RestartPrepared(
+			ctx,
+			"test-pipeline",
+			newMockPipelineWithGroups("v2", secondPipelineGroups),
+		)
 		require.NoError(t, err)
 
 		// Wait for second pipeline to send groups
@@ -225,26 +221,18 @@ func TestPipelineManager_Restart(t *testing.T) {
 	t.Run("restart with invalid config keeps old pipeline", func(t *testing.T) {
 		ctx := t.Context()
 
-		callCount := 0
 		m := NewPipelineManager(
 			logger.New(),
-			func(cfg pipeline.Config) (sdPipeline, error) {
-				callCount++
-				if cfg.Name == "invalid" {
-					return nil, errors.New("invalid config")
-				}
-				return newMockPipeline(cfg.Name), nil
-			},
 			func(_ context.Context, _ []*confgroup.Group) {},
 		)
 
 		// Start first pipeline
-		err := m.Start(ctx, "test-pipeline", pipeline.Config{Name: "v1"})
+		err := m.StartPrepared(ctx, "test-pipeline", newMockPipeline("v1"))
 		require.NoError(t, err)
 		assert.True(t, m.IsRunning("test-pipeline"))
 
-		// Try to restart with invalid config
-		err = m.Restart(ctx, "test-pipeline", pipeline.Config{Name: "invalid"})
+		// Invalid prepared state is rejected before disrupting the old pipeline.
+		err = m.RestartPrepared(ctx, "test-pipeline", nil)
 		assert.Error(t, err)
 
 		// Old pipeline should still be running
@@ -261,9 +249,6 @@ func TestPipelineManager_StopAll(t *testing.T) {
 
 		m := NewPipelineManager(
 			logger.New(),
-			mockNewPipelineWithGroups(
-				[]*confgroup.Group{{Source: "source1", Configs: []confgroup.Config{}}},
-			),
 			func(_ context.Context, groups []*confgroup.Group) {
 				mu.Lock()
 				sentGroups = append(sentGroups, groups...)
@@ -272,9 +257,10 @@ func TestPipelineManager_StopAll(t *testing.T) {
 		)
 
 		// Start multiple pipelines
-		_ = m.Start(ctx, "pipeline1", pipeline.Config{Name: "p1"})
-		_ = m.Start(ctx, "pipeline2", pipeline.Config{Name: "p2"})
-		_ = m.Start(ctx, "pipeline3", pipeline.Config{Name: "p3"})
+		groups := []*confgroup.Group{{Source: "source1", Configs: []confgroup.Config{}}}
+		_ = m.StartPrepared(ctx, "pipeline1", newMockPipelineWithGroups("p1", groups))
+		_ = m.StartPrepared(ctx, "pipeline2", newMockPipelineWithGroups("p2", groups))
+		_ = m.StartPrepared(ctx, "pipeline3", newMockPipelineWithGroups("p3", groups))
 
 		// Wait for pipelines to send groups
 		time.Sleep(100 * time.Millisecond)
@@ -303,7 +289,6 @@ func TestPipelineManager_RunGracePeriodCleanup(t *testing.T) {
 
 		m := NewPipelineManager(
 			logger.New(),
-			mockNewPipeline,
 			func(_ context.Context, groups []*confgroup.Group) {
 				mu.Lock()
 				sentGroups = append(sentGroups, groups...)
@@ -351,7 +336,6 @@ func TestPipelineManager_RunGracePeriodCleanup(t *testing.T) {
 
 		m := NewPipelineManager(
 			logger.New(),
-			mockNewPipeline,
 			func(_ context.Context, groups []*confgroup.Group) {
 				mu.Lock()
 				sentGroups = append(sentGroups, groups...)
@@ -396,13 +380,12 @@ func TestPipelineManager_IsRunning(t *testing.T) {
 
 	m := NewPipelineManager(
 		logger.New(),
-		mockNewPipeline,
 		func(_ context.Context, _ []*confgroup.Group) {},
 	)
 
 	assert.False(t, m.IsRunning("test"))
 
-	_ = m.Start(ctx, "test", pipeline.Config{Name: "test"})
+	_ = m.StartPrepared(ctx, "test", newMockPipeline("test"))
 	assert.True(t, m.IsRunning("test"))
 
 	m.Stop("test")
@@ -420,14 +403,8 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 	// Track created and stopped pipelines to detect leaks
 	var created, stopped atomic.Int64
 
-	mockFactory := func(cfg pipeline.Config) (sdPipeline, error) {
-		created.Add(1)
-		return &trackingMockPipeline{stopped: &stopped}, nil
-	}
-
 	m := NewPipelineManager(
 		logger.New(),
-		mockFactory,
 		func(_ context.Context, _ []*confgroup.Group) {},
 	)
 
@@ -439,7 +416,8 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			key := fmt.Sprintf("pipeline-%d", i)
-			_ = m.Start(ctx, key, pipeline.Config{Name: key})
+			created.Add(1)
+			_ = m.StartPrepared(ctx, key, &trackingMockPipeline{stopped: &stopped})
 		}(i)
 	}
 
@@ -467,24 +445,6 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 		return created.Load() == stopped.Load()
 	}, time.Second*5, time.Millisecond*100,
 		"leaked pipelines: created=%d, stopped=%d", created.Load(), stopped.Load())
-}
-
-// mockNewPipeline creates a mock pipeline that does nothing.
-func mockNewPipeline(cfg pipeline.Config) (sdPipeline, error) {
-	if cfg.Name == "invalid" {
-		return nil, errors.New("invalid config")
-	}
-	return newMockPipeline(cfg.Name), nil
-}
-
-// mockNewPipelineWithGroups creates a factory that produces pipelines that send specific groups.
-func mockNewPipelineWithGroups(groups []*confgroup.Group) func(cfg pipeline.Config) (sdPipeline, error) {
-	return func(cfg pipeline.Config) (sdPipeline, error) {
-		if cfg.Name == "invalid" {
-			return nil, errors.New("invalid config")
-		}
-		return newMockPipelineWithGroups(cfg.Name, groups), nil
-	}
 }
 
 type testMockPipeline struct {

@@ -2,7 +2,11 @@
 
 package jobmgr
 
-import "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+import (
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+)
 
 // DiagnosticLevel classifies actionable Job Manager observations.
 type DiagnosticLevel uint8
@@ -26,6 +30,7 @@ type DiagnosticEvent struct {
 	Sequence     uint8
 	Count        int
 	ResultStatus int
+	Age          time.Duration
 	Level        DiagnosticLevel
 }
 

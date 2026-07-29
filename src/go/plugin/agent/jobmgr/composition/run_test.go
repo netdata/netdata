@@ -16,6 +16,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -25,6 +27,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/stretchr/testify/require"
 )
+
+func (rg *runGeneration) start(ctx context.Context) error {
+	return rg.startWithRunContext(ctx, ctx)
+}
 
 func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	modules := collectorapi.Registry{
@@ -36,7 +42,7 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      7,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -80,7 +86,7 @@ func TestRunGenerationQuarantinesUnpublishableDiscoveredConfigAndContinues(t *te
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -161,7 +167,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 			require.NoError(t, err)
 			uids := lifecycle.NewUIDLedger()
-			generation, err := newRunGeneration(runGenerationConfig{
+			generation, err := newTestRunGeneration(t, runGenerationConfig{
 				Generation:      1,
 				ShutdownTimeout: 10 * time.Second,
 				UIDs:            uids,
@@ -185,7 +191,9 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 
 			require.NoError(t, generation.Wait(context.Background()))
 
-			require.EqualValues(t, int32(test.jobs), cleanupCalls.Load())
+			require.Eventually(t, func() bool {
+				return cleanupCalls.Load() == int32(test.jobs)
+			}, time.Second, time.Millisecond)
 
 			closeRunTestUIDs(t, uids)
 		})
@@ -230,7 +238,7 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 		},
 	}
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -259,10 +267,15 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 
 	require.NoError(t, generation.Wait(context.Background()))
 
+	want := []string{"publish", "result", "withdraw", "cleanup"}
+	require.Eventually(t, func() bool {
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		return len(events) == len(want)
+	}, time.Second, time.Millisecond)
 	eventsMu.Lock()
 	got := append([]string(nil), events...)
 	eventsMu.Unlock()
-	want := []string{"publish", "result", "withdraw", "cleanup"}
 	require.EqualValues(t, len(want), len(got))
 	for index := range want {
 		require.EqualValues(t, want[index], got[index])
@@ -314,7 +327,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -365,7 +378,9 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 		wire,
 	)
 
-	require.EqualValues(t, 1, cleanupCalls.Load())
+	require.Eventually(t, func() bool {
+		return cleanupCalls.Load() == 1
+	}, time.Second, time.Millisecond)
 
 	closeRunTestUIDs(t, uids)
 }
@@ -422,7 +437,7 @@ func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testin
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -468,7 +483,9 @@ func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testin
 
 	require.NotContains(t, output.String(), `FUNCTION GLOBAL "module:method"`)
 	require.NotContains(t, output.String(), `FUNCTION_DEL GLOBAL "module:method"`)
-	require.EqualValues(t, 1, cleanupCalls.Load())
+	require.Eventually(t, func() bool {
+		return cleanupCalls.Load() == 1
+	}, time.Second, time.Millisecond)
 	require.Zero(t, generation.tasks.InheritedActive())
 	require.Equal(t, lifecycle.LongLivedCensus{}, generation.tasks.LongLivedCensus())
 	closeRunTestUIDs(t, uids)
@@ -491,6 +508,51 @@ func fullCapacityDiscoveredJobs(count int) []confgroup.Config {
 		configs[ordinal] = config
 	}
 	return configs
+}
+
+func newTestRunGeneration(
+	t testing.TB,
+	config runGenerationConfig,
+) (*runGeneration, error) {
+	t.Helper()
+	store, err := secretstore.NewSecretStore(config.Jobs.Resolver)
+	if err != nil {
+		return nil, err
+	}
+	epoch := &processSecretEpoch{
+		generation:  config.Generation,
+		store:       store,
+		diagnostics: config.Diagnostics,
+	}
+	config.SecretEpoch = epoch
+	ownsAttempts := config.Attempts == nil
+	if ownsAttempts {
+		config.Attempts, err = containment.NewAuthority(config.Diagnostics)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if config.CleanupOutput == nil {
+		config.CleanupOutput, err = joboutput.NewCleanupOutputGate(config.Frames)
+		if err != nil {
+			return nil, err
+		}
+	}
+	t.Cleanup(func() {
+		if ownsAttempts {
+			config.Attempts.BeginShutdown()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			require.NoError(t, config.Attempts.Shutdown(shutdownCtx))
+		}
+		require.NoError(t, epoch.seal())
+		select {
+		case <-epoch.done():
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "test Store epoch retained ownership")
+		}
+	})
+	return newRunGeneration(context.Background(), config)
 }
 
 func testRunJobServices(t testing.TB) runJobServices {

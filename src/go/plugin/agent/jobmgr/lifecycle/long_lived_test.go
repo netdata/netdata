@@ -111,8 +111,7 @@ func TestLongLivedPlansDescribeResourceOwnership(t *testing.T) {
 		plan  LongLivedPlan
 		class LongLivedClass
 	}{
-		"job":          {plan: NewJobLongLivedPlan(), class: LongLivedJob},
-		"secret store": {plan: NewSecretStoreLongLivedPlan(), class: LongLivedSecretStore},
+		"job": {plan: NewJobLongLivedPlan(), class: LongLivedJob},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -198,38 +197,14 @@ func TestLongLivedPermitRemainsLiveAfterIssuanceIsSealed(t *testing.T) {
 	require.Equal(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
-func TestSecretStorePermitsHaveNoConfiguredCountLimit(t *testing.T) {
-	const stores = 9
-	supervisor := newLongLivedTestSupervisor(t)
-	permits := make([]LongLivedPermit, 0, stores)
-	for index := range stores {
-		permit, err := supervisor.IssueLongLivedPermit(
-			ResourceIdentity{
-				ID:         fmt.Sprintf("secret-store-%02d", index),
-				Generation: 1,
-			},
-			NewSecretStoreLongLivedPlan(),
-		)
-		require.NoError(t, err)
-		permits = append(permits, permit)
-	}
-	census := supervisor.LongLivedCensus()
-	require.Equal(t, stores, census.Active)
-	require.Equal(t, stores, census.SecretStores)
-	for _, permit := range permits {
-		require.NoError(t, permit.AbortUnused())
-	}
-	require.Equal(t, LongLivedCensus{}, supervisor.LongLivedCensus())
-}
-
 func TestLongLivedPermitReturnWaitsForExternalRelease(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
 	permit, err := supervisor.IssueLongLivedPermit(
 		ResourceIdentity{
-			ID:         "secret-store",
+			ID:         "job",
 			Generation: 1,
 		},
-		NewSecretStoreLongLivedPlan(),
+		NewJobLongLivedPlan(),
 	)
 	require.NoError(t, err)
 	require.Error(t, permit.Return())

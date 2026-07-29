@@ -102,6 +102,8 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	var buf bytes.Buffer
 	sd := &ServiceDiscovery{
+		epoch:       1,
+		attempts:    newTestAttemptAuthority(t),
 		Logger:      logger.New(),
 		pluginName:  testPluginName,
 		dyncfgApi:   dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&buf))),
@@ -147,7 +149,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 	}
 
 	sd.ctx = ctx
-	sd.mgr = NewPipelineManager(sd.Logger, sd.newPipeline, send)
+	sd.mgr = NewPipelineManager(sd.Logger, send)
 
 	// Register dyncfg templates (creates CONFIG entries for templates)
 	sd.registerDyncfgTemplates(ctx)
@@ -223,7 +225,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 // sendDyncfgCmd sends a dyncfg command and waits for processing
 func sendDyncfgCmd(sd *ServiceDiscovery, uid string, args []string, payload []byte, source string) {
-	fn := dyncfg.NewFunction(functions.Function{
+	fn := dyncfg.NewFunction(context.Background(), functions.Function{
 		UID:         uid,
 		Args:        args,
 		Payload:     payload,
@@ -1792,8 +1794,11 @@ func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
 						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusRunning})
 
 						// Start the pipeline to simulate running state
-						pipelineCfg := pipeline.Config{Name: "test-job"}
-						_ = sd.mgr.Start(sd.ctx, fileCfg.PipelineKey(), pipelineCfg)
+						_ = sd.mgr.StartPrepared(
+							sd.ctx,
+							fileCfg.PipelineKey(),
+							newTestPipeline("test-job"),
+						)
 
 						// Dyncfg add with same name - should replace file config
 						sendDyncfgCmd(sd, "1-add",
@@ -1878,8 +1883,11 @@ func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
 						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: dyncfgCfg, Status: dyncfg.StatusRunning})
 
 						// Start the pipeline to simulate running state
-						pipelineCfg := pipeline.Config{Name: "test-job"}
-						_ = sd.mgr.Start(sd.ctx, dyncfgCfg.PipelineKey(), pipelineCfg)
+						_ = sd.mgr.StartPrepared(
+							sd.ctx,
+							dyncfgCfg.PipelineKey(),
+							newTestPipeline("test-job"),
+						)
 
 						// Another dyncfg add with same name - should replace (matching jobmgr pattern)
 						sendDyncfgCmd(sd, "1-add",
@@ -2117,8 +2125,11 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusRunning})
 
 						// Start the file pipeline
-						pipelineCfg := pipeline.Config{Name: "test-job"}
-						_ = sd.mgr.Start(sd.ctx, fileCfg.PipelineKey(), pipelineCfg)
+						_ = sd.mgr.StartPrepared(
+							sd.ctx,
+							fileCfg.PipelineKey(),
+							newTestPipeline("test-job"),
+						)
 
 						// Update via dyncfg - should convert to dyncfg source
 						sendDyncfgCmd(sd, "1-update",
@@ -2219,9 +2230,6 @@ func TestServiceDiscovery_DyncfgRestartErrorHandling(t *testing.T) {
 							}
 							return newTestPipeline(cfg.Name), nil
 						}
-						// Also update mgr's newPipeline
-						sd.mgr.newPipeline = sd.newPipeline
-
 						// Add and enable
 						sendDyncfgCmd(sd, "1-add",
 							[]string{sd.dyncfgTemplateID(testDiscovererTypeNetListeners), "add", "test-job"},
@@ -2299,8 +2307,11 @@ func TestServiceDiscovery_DyncfgFileRemovalWithDyncfgOverride(t *testing.T) {
 						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: dyncfgCfg, Status: dyncfg.StatusRunning})
 
 						// Start the dyncfg pipeline
-						pipelineCfg := pipeline.Config{Name: "test-job"}
-						_ = sd.mgr.Start(sd.ctx, dyncfgCfg.PipelineKey(), pipelineCfg)
+						_ = sd.mgr.StartPrepared(
+							sd.ctx,
+							dyncfgCfg.PipelineKey(),
+							newTestPipeline("test-job"),
+						)
 
 						// Simulate file removal by calling removePipeline
 						sd.removePipeline(confFile{source: "/etc/netdata/sd.d/test.conf"})

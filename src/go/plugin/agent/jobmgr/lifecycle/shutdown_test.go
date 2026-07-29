@@ -105,6 +105,25 @@ func TestRunSupervisorOwnsOneBroadcastShutdownBudget(t *testing.T) {
 	require.EqualValues(t, 1, cancels)
 }
 
+func TestRunSupervisorUsesCallerSuppliedShutdownTimeout(t *testing.T) {
+	clock := newShutdownTestClock()
+	run, err := NewRunSupervisor(7, clock, 10*time.Second)
+	require.NoError(t, err)
+
+	budget, err := run.BeginShutdownWithTimeout(30 * time.Second)
+	require.NoError(t, err)
+	deadline, ok := budget.Context().Deadline()
+	require.True(t, ok)
+	require.Equal(t, time.Unix(130, 0), deadline)
+
+	clock.mu.Lock()
+	arms, delay := clock.arms, clock.delay
+	clock.mu.Unlock()
+	require.EqualValues(t, 1, arms)
+	require.Equal(t, 30*time.Second, delay)
+	require.NoError(t, run.FinishShutdown())
+}
+
 func TestRunSupervisorPublishesOneGenerationStoppingCut(t *testing.T) {
 	tests := map[string]struct {
 		stop func(*testing.T, *RunSupervisor)
@@ -217,6 +236,7 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 				nonzero.TransientActive = 1
 				err := run.Terminal(nonzero)
 				require.ErrorIs(t, err, cause)
+				require.ErrorIs(t, err, ErrRunTerminalNonQuiescent)
 				require.Contains(t, err.Error(), "TransientActive:1")
 				state := run.TerminalState()
 				require.False(t, !state.Reached || state.Quiescent ||
@@ -337,15 +357,16 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 			release := make(chan struct{})
 			refs := make([]InheritedTaskRef, population)
 			owners := make([]ResourceIdentity, population)
+			permits := make([]LongLivedPermit, population)
 			for index := range population {
 				owners[index] = ResourceIdentity{
 					ID:         "owner-" + strconv.Itoa(index+1),
 					Generation: 1,
 				}
-				refs[index], err = supervisor.StartInherited(
-					context.Background(),
+				refs[index], permits[index] = startInheritedTestTask(
+					t,
+					supervisor,
 					owners[index],
-					InheritedV1Runtime,
 					func(ctx context.Context) error {
 						<-ctx.Done()
 						observed <- struct{}{}
@@ -353,8 +374,9 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 						return nil
 					},
 				)
-				require.NoError(t, err)
 			}
+			lateOwner := ResourceIdentity{ID: "late", Generation: 1}
+			latePermit := issueInheritedTestPermit(t, supervisor, lateOwner)
 
 			require.NoError(t, supervisor.SealInherited())
 
@@ -374,16 +396,15 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 				}
 			}
 
-			_, startInheritedErr := supervisor.StartInherited(
+			_, startInheritedErr := supervisor.StartInheritedWithPermit(
 				context.Background(),
-				ResourceIdentity{
-					ID:         "late",
-					Generation: 1,
-				},
-				InheritedV1Runtime,
+				lateOwner,
+				InheritedPipelineSupervisor,
+				latePermit,
 				func(context.Context) error { return nil },
 			)
 			require.Error(t, startInheritedErr)
+			require.NoError(t, latePermit.AbortUnused())
 
 			for index := range refs {
 				require.NoError(t, supervisor.CancelInherited(refs[index], owners[index]))
@@ -398,7 +419,7 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 				)
 				require.False(t, joinInheritedErr != nil || !joinInheritedJoined)
 
-				require.NoError(t, supervisor.ReleaseInherited(refs[index], owners[index]))
+				releaseInheritedTestTask(t, supervisor, refs[index], owners[index], permits[index])
 			}
 
 			require.Zero(t, supervisor.InheritedActive())

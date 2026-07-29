@@ -118,6 +118,7 @@ func (fcd FunctionCatalogDecision) validate() error {
 			fcd.ResourceID != "" ||
 			fcd.Plan.Work != nil ||
 			fcd.Plan.Transaction != nil ||
+			fcd.Plan.Stage != nil ||
 			len(fcd.Plan.Claims) != 0 ||
 			fcd.Plan.NoResponse ||
 			fcd.Plan.CooperativeCancel || fcd.Plan.CooperativeDeadline {

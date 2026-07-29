@@ -51,6 +51,8 @@ func SD(registry sd.Registry) discovery.ProviderFactory {
 		}
 
 		d, err := sd.NewServiceDiscovery(sd.Config{
+			Epoch:          ctx.Epoch,
+			Attempts:       ctx.Attempts,
 			ConfigDefaults: ctx.Registry,
 			PluginName:     ctx.Identity.Name,
 			RunModePolicy:  ctx.RunMode,

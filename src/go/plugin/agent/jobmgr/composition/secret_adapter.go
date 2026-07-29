@@ -52,6 +52,7 @@ func newSecretInitialRoute(
 		{
 			Name:              string(dyncfg.CommandAdd),
 			AllocateSuccessor: true,
+			Stage:             true,
 			Claims:            []string{joboutput.DynCfgJobGraphClaim},
 		},
 		{Name: string(dyncfg.CommandSchema)},
@@ -59,11 +60,16 @@ func newSecretInitialRoute(
 		{
 			Name:              string(dyncfg.CommandUpdate),
 			AllocateSuccessor: true,
+			Stage:             true,
 			Claims:            []string{joboutput.DynCfgJobGraphClaim},
 		},
-		{Name: string(dyncfg.CommandTest)},
+		{Name: string(dyncfg.CommandTest), Stage: true},
 		{Name: string(dyncfg.CommandUserconfig)},
-		{Name: string(dyncfg.CommandRemove), Claims: []string{joboutput.DynCfgJobGraphClaim}},
+		{
+			Name:   string(dyncfg.CommandRemove),
+			Stage:  true,
+			Claims: []string{joboutput.DynCfgJobGraphClaim},
+		},
 	}
 	prefix := controller.Prefix()
 	return functionadapter.InitialRoute{
@@ -106,7 +112,20 @@ func newSecretInitialRoute(
 					}
 					return composite, err
 				},
-				Permit:          lifecycle.NewSecretStoreLongLivedPlan(),
+				StageComposite: func(
+					input functionadapter.HandlerInput,
+				) (functionadapter.CompositeResourceTransactionStage, error) {
+					command := secretCommandInput(input)
+					stage, err := controller.Stage(command)
+					if err != nil {
+						return nil, err
+					}
+					return &stagedSecretTransaction{
+						controller: controller,
+						input:      command,
+						stage:      stage,
+					}, nil
+				},
 				CommandArgument: 1,
 				GlobalClaim:     secretadapter.SecretGraphClaim,
 				Commands:        commands,
@@ -119,6 +138,63 @@ func newSecretInitialRoute(
 			RawPayload:          true,
 		},
 	}, nil
+}
+
+type stagedSecretTransaction struct {
+	controller *secretadapter.Controller
+	input      secretadapter.CommandInput
+	stage      *secretadapter.PreparedStoreOperation
+}
+
+func (sst *stagedSecretTransaction) Start() {
+	sst.stage.Start()
+}
+
+func (sst *stagedSecretTransaction) Ready() <-chan struct{} {
+	return sst.stage.Ready()
+}
+
+func (sst *stagedSecretTransaction) Cancel(cause error) {
+	sst.stage.Cancel(cause)
+}
+
+func (sst *stagedSecretTransaction) Release() {
+	sst.stage.Release()
+	sst.controller = nil
+	sst.input = secretadapter.CommandInput{}
+	sst.stage = nil
+}
+
+func (sst *stagedSecretTransaction) PrepareComposite(
+	ctx context.Context,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+) (jobmgr.PreparedCompositeResourceTransaction, error) {
+	if sst == nil ||
+		sst.controller == nil ||
+		sst.stage == nil {
+		return nil, errors.New("jobmgr composition: invalid staged secret transaction")
+	}
+	prepared, err := sst.controller.PrepareStaged(
+		ctx,
+		sst.input,
+		current,
+		scope,
+		permit,
+		sst.stage,
+	)
+	if prepared == nil {
+		return nil, err
+	}
+	composite, ok := prepared.(jobmgr.PreparedCompositeResourceTransaction)
+	if !ok {
+		return nil, errors.Join(
+			err,
+			errors.New("jobmgr composition: staged secret transaction is not composite"),
+		)
+	}
+	return composite, err
 }
 
 func secretCommandInput(input functionadapter.HandlerInput) secretadapter.CommandInput {

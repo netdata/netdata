@@ -25,35 +25,35 @@ type kernelClaimYieldLease struct {
 	operation *commandOperation
 }
 
-func (lease kernelClaimYieldLease) release(ctx context.Context) error {
-	return lease.request(ctx, claimYieldRelease)
+func (kcyl kernelClaimYieldLease) release(ctx context.Context) error {
+	return kcyl.request(ctx, claimYieldRelease)
 }
 
-func (lease kernelClaimYieldLease) reacquire(ctx context.Context) error {
-	return lease.request(ctx, claimYieldReacquire)
+func (kcyl kernelClaimYieldLease) reacquire(ctx context.Context) error {
+	return kcyl.request(ctx, claimYieldReacquire)
 }
 
-func (lease kernelClaimYieldLease) request(ctx context.Context, action claimYieldAction) error {
-	if lease.kernel == nil || lease.operation == nil || ctx == nil {
+func (kcyl kernelClaimYieldLease) request(ctx context.Context, action claimYieldAction) error {
+	if kcyl.kernel == nil || kcyl.operation == nil || ctx == nil {
 		return errors.New("jobmgr claims: invalid yield lease")
 	}
 	result := make(chan error, 1)
 	request := claimYieldRequest{
-		operation: lease.operation,
+		operation: kcyl.operation,
 		action:    action,
 		result:    result,
 	}
 	select {
-	case lease.kernel.claimYields <- request:
+	case kcyl.kernel.claimYields <- request:
 	case <-ctx.Done():
 		return context.Cause(ctx)
-	case <-lease.kernel.done:
+	case <-kcyl.kernel.done:
 		return ErrStopped
 	}
 	select {
 	case err := <-result:
 		return err
-	case <-lease.kernel.done:
+	case <-kcyl.kernel.done:
 		return ErrStopped
 	}
 }

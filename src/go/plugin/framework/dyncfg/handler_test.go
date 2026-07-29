@@ -75,7 +75,7 @@ func (m *mockCallbacks) ValidateConfigName(name string) error {
 	return JobNameRuleStrict(name)
 }
 
-func (m *mockCallbacks) Start(cfg testConfig) error {
+func (m *mockCallbacks) Start(_ Function, cfg testConfig) error {
 	m.startCalls = append(m.startCalls, cfg)
 	if m.startFn != nil {
 		return m.startFn(cfg)
@@ -83,7 +83,7 @@ func (m *mockCallbacks) Start(cfg testConfig) error {
 	return nil
 }
 
-func (m *mockCallbacks) Update(oldCfg, newCfg testConfig) error {
+func (m *mockCallbacks) Update(_ Function, oldCfg, newCfg testConfig) error {
 	m.updateCalls = append(m.updateCalls, updateCall{oldCfg, newCfg})
 	if m.updateFn != nil {
 		return m.updateFn(oldCfg, newCfg)
@@ -155,7 +155,7 @@ func newTestFn(id, cmd, name string, payload []byte) Function {
 	if name != "" {
 		args = append(args, name)
 	}
-	return NewFunction(functions.Function{
+	return NewFunction(context.Background(), functions.Function{
 		UID:     "test-uid",
 		Args:    args,
 		Payload: payload,
@@ -450,6 +450,21 @@ func TestCmdAdd_ParseError(t *testing.T) {
 	h.CmdAdd(fn)
 
 	assert.Equal(t, 0, exposedCacheCount(h.exposed))
+}
+
+func TestCmdAdd_ParseErrorUsesCallbackCode(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+		return testConfig{}, &codedErr{err: errors.New("materialization busy"), code: 503}
+	}
+	h, out := newTestHandlerWithOutput(cb)
+
+	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
+	h.CmdAdd(fn)
+
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
+	assert.Contains(t, out.String(), " 503 ")
+	assert.Contains(t, out.String(), "materialization busy")
 }
 
 func TestCmdAdd_ReplacesExisting(t *testing.T) {
@@ -948,6 +963,32 @@ func TestCmdUpdate_NonConversion_StartFails_NonDisruptiveRollback(t *testing.T) 
 
 	_, ok = lookupSeenByUID(h.seen, newCfg.UID())
 	assert.False(t, ok, "new config should be removed from seen cache on rollback")
+}
+
+func TestCmdUpdate_NonConversion_StartFails_NonDisruptiveRollbackUsesCallbackCode(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.updateFn = func(_, _ testConfig) error {
+		return MarkNonDisruptiveUpdate(
+			&codedErr{err: errors.New("materialization busy"), code: 503},
+		)
+	}
+	h, out := newTestHandlerWithOutput(cb)
+
+	oldCfg := testConfig{uid: "dyncfg:job1:v1", key: "job1", sourceType: "dyncfg", hash: 100}
+	newCfg := testConfig{uid: "dyncfg:job1:v2", key: "job1", sourceType: "dyncfg", hash: 200}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+		return newCfg, nil
+	}
+
+	h.CmdUpdate(newTestFn("test:job1", "update", "job1", []byte(`{}`)))
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, oldCfg.UID(), entry.Cfg.UID())
+	assert.Contains(t, out.String(), `"status":503`)
+	assert.Contains(t, out.String(), "materialization busy")
 }
 
 func TestCmdUpdate_Conversion_StartFails(t *testing.T) {

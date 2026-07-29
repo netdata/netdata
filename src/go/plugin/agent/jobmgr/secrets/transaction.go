@@ -15,7 +15,6 @@ import (
 type preparedSecretSpec struct {
 	scope   lifecycle.ResourceTransactionScope // transaction identity triple (current/successor) being applied
 	current lifecycle.ReadyResource            // existing ready store resource; nil on install
-	permit  lifecycle.LongLivedPermit          // long-lived resource/external ownership for the successor generation
 
 	store    *secretstore.SecretStore            // target secret store
 	storeKey string                              // the store's kind_name key
@@ -26,6 +25,7 @@ type preparedSecretSpec struct {
 
 	result  lifecycle.SealedResult // sealed dyncfg response
 	cleanup lifecycle.TaskCleanup  // post-commit protocol emit
+	commit  func()                 // process desired-state update committed with this transaction
 
 	controller *Controller  // controller to publish the entry into
 	entry      *secretEntry // the entry to commit
@@ -33,11 +33,14 @@ type preparedSecretSpec struct {
 
 // commitEntryDisposition applies the entry side of a committed transaction:
 // delete the entry on removal, publish the committed entry, or do nothing.
-func (spec preparedSecretSpec) commitEntryDisposition() {
-	if spec.remove {
-		spec.controller.commitEntry(spec.storeKey, nil)
-	} else if spec.entry != nil {
-		spec.controller.commitEntry(spec.entry.config.ExposedKey(), spec.entry)
+func (pss preparedSecretSpec) commitEntryDisposition() {
+	if pss.remove {
+		pss.controller.commitEntry(pss.storeKey, nil)
+	} else if pss.entry != nil {
+		pss.controller.commitEntry(pss.entry.config.ExposedKey(), pss.entry)
+	}
+	if pss.commit != nil {
+		pss.commit()
 	}
 }
 
@@ -56,11 +59,6 @@ func newPreparedSecretTransaction(spec preparedSecretSpec) (*preparedSecretTrans
 		spec.cleanup == nil ||
 		spec.controller == nil {
 		return nil, errors.New("jobmgr secrets: invalid prepared transaction")
-	}
-	if spec.mutation == nil && spec.permit.Valid() &&
-		(!spec.scope.Successor.Valid() ||
-			spec.permit.Owner() != spec.scope.Successor) {
-		return nil, errors.New("jobmgr secrets: no-op permit differs from scope")
 	}
 	return &preparedSecretTransaction{
 		spec: spec,
@@ -115,11 +113,6 @@ func (pst *preparedSecretTransaction) apply(
 		spec.mutation = nil
 	}
 	if spec.mutation == nil {
-		if spec.permit.Valid() && !spec.abort {
-			if err := spec.permit.AbortUnused(); err != nil {
-				return lifecycle.AppliedResourceTransaction{}, err
-			}
-		}
 		spec.commitEntryDisposition()
 		return lifecycle.NewAppliedResourceTransaction(
 			spec.scope,
@@ -151,6 +144,9 @@ func (pst *preparedSecretTransaction) apply(
 			abortErr = spec.mutation.Abort()
 		}
 		if predecessorRestored && abortErr == nil {
+			if spec.commit != nil {
+				spec.commit()
+			}
 			return lifecycle.NewAppliedResourceTransaction(
 				spec.scope,
 				lifecycle.ResourceTransactionUnchanged,
@@ -212,8 +208,6 @@ func (pst *preparedSecretTransaction) Dispose(ctx context.Context) (lifecycle.Re
 	}
 	if spec.mutation != nil {
 		err = spec.mutation.Abort()
-	} else if spec.permit.Valid() {
-		err = spec.permit.AbortUnused()
 	}
 	return spec.current, err
 }

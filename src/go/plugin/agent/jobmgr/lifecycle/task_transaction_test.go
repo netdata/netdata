@@ -41,6 +41,23 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			},
 			disposition: ResourceTransactionRemoved,
 		},
+		"install projection without run permit": {
+			scope: ResourceTransactionScope{
+				ID: "projection",
+				Successor: ResourceIdentity{
+					ID:         "projection",
+					Generation: 1,
+				},
+			},
+			disposition: ResourceTransactionInstalled,
+			resulting: &recordingReadyResource{
+				identity: ResourceIdentity{
+					ID:         "projection",
+					Generation: 1,
+				},
+				events: new([]string),
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -74,11 +91,12 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 				test.current,
 				test.scope,
 				func(
-					context.Context,
-					ReadyResource,
-					ResourceTransactionScope,
-					LongLivedPermit,
+					_ context.Context,
+					_ ReadyResource,
+					_ ResourceTransactionScope,
+					permit LongLivedPermit,
 				) (PreparedResourceTransaction, error) {
+					require.False(t, permit.Valid())
 					events = append(events, "prepare")
 					return prepared, nil
 				},

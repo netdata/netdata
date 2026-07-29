@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -28,13 +27,12 @@ const (
 )
 
 type methodGeneration struct {
-	id       string                             // generation identity
-	module   string                             // owning collector module
-	kind     methodGenerationKind               // method kind (agent / shared / instance)
-	creator  collectorapi.Creator               // collector creator supplying the method set
-	methods  map[string]funcapi.FunctionConfig  // method configs by method ID
-	jobs     map[string]collectorapi.RuntimeJob // runtime jobs by job name (instance methods)
-	handlers map[string]funcapi.MethodHandler   // resolved method handlers by key
+	id      string                            // generation identity
+	module  string                            // owning collector module
+	kind    methodGenerationKind              // method kind (agent / shared / instance)
+	creator collectorapi.Creator              // immutable routing policy
+	methods map[string]funcapi.FunctionConfig // method configs by method ID
+	bundles map[string]*functionBundle        // stable handler bundles by job name; agent uses ""
 
 	cleanupOnce sync.Once     // guards cleanup (once)
 	cleanupErr  error         // captured cleanup error
@@ -47,20 +45,19 @@ func newMethodGeneration(
 	kind methodGenerationKind,
 	creator collectorapi.Creator,
 	methods []funcapi.FunctionConfig,
-	jobs map[string]collectorapi.RuntimeJob,
+	bundles map[string]*functionBundle,
 ) (result *methodGeneration, err error) {
-	if id == "" || module == "" || creator.MethodHandler == nil || len(methods) == 0 {
+	if id == "" || module == "" || len(methods) == 0 {
 		return nil, errors.New("jobmgr Function method generation: invalid construction")
 	}
 	generation := &methodGeneration{
-		id:       id,
-		module:   module,
-		kind:     kind,
-		creator:  creator,
-		methods:  make(map[string]funcapi.FunctionConfig, len(methods)),
-		jobs:     make(map[string]collectorapi.RuntimeJob, len(jobs)),
-		handlers: make(map[string]funcapi.MethodHandler, max(1, len(jobs))),
-		done:     make(chan struct{}),
+		id:      id,
+		module:  module,
+		kind:    kind,
+		creator: creator,
+		methods: make(map[string]funcapi.FunctionConfig, len(methods)),
+		bundles: make(map[string]*functionBundle, max(1, len(bundles))),
+		done:    make(chan struct{}),
 	}
 	transferred := false
 	defer func() {
@@ -80,27 +77,33 @@ func newMethodGeneration(
 		generation.methods[method.ID] = method
 	}
 	if kind == methodGenerationAgent {
-		handler := creator.MethodHandler(nil)
-		if handler == nil {
-			return nil, errors.New("jobmgr Function method generation: nil agent handler")
+		bundle := bundles[""]
+		if len(bundles) != 1 || bundle == nil || bundle.kind != functionBundleAgent || bundle.module != module {
+			return nil, errors.New("jobmgr Function method generation: invalid agent bundle")
 		}
-		generation.handlers[""] = handler
+		if err := bundle.acquire(); err != nil {
+			return nil, err
+		}
+		generation.bundles[""] = bundle
 		transferred = true
 		return generation, nil
 	}
-	if len(jobs) == 0 {
-		return nil, errors.New("jobmgr Function method generation: no runtime jobs")
+	if len(bundles) == 0 {
+		return nil, errors.New("jobmgr Function method generation: no job bundles")
 	}
-	for name, job := range jobs {
-		if name == "" || job == nil || job.Name() != name || job.ModuleName() != module {
-			return nil, errors.New("jobmgr Function method generation: invalid runtime job")
+	for name, bundle := range bundles {
+		if name == "" ||
+			bundle == nil ||
+			bundle.kind != functionBundleJob ||
+			bundle.job == nil ||
+			bundle.job.Name() != name ||
+			bundle.module != module {
+			return nil, errors.New("jobmgr Function method generation: invalid job bundle")
 		}
-		handler := creator.MethodHandler(job)
-		if handler == nil {
-			return nil, fmt.Errorf("jobmgr Function method generation: nil handler for job %q", name)
+		if err := bundle.acquire(); err != nil {
+			return nil, err
 		}
-		generation.jobs[name] = job
-		generation.handlers[name] = handler
+		generation.bundles[name] = bundle
 	}
 	transferred = true
 	return generation, nil
@@ -128,9 +131,8 @@ func (mg *methodGeneration) wait(ctx context.Context) error {
 
 func (mg *methodGeneration) cleanup(ctx context.Context) error {
 	mg.cleanupOnce.Do(func() {
-		names := slices.Sorted(maps.Keys(mg.handlers))
-		for _, name := range names {
-			mg.cleanupErr = errors.Join(mg.cleanupErr, callMethodCleanup(ctx, mg.handlers[name]))
+		for _, bundle := range mg.bundles {
+			bundle.release()
 		}
 		close(mg.done)
 	})
@@ -155,10 +157,23 @@ func (mg *methodGeneration) handle(ctx context.Context, input HandlerInput) (lif
 	if slices.Contains(input.Args, "info") && !method.RawRequest {
 		return mg.infoResult(method)
 	}
-	jobName, job, handler, err := mg.resolveTarget(method, input)
+	jobName, job, bundle, err := mg.resolveTarget(method, input)
 	if err != nil {
 		return functionResponseError(err)
 	}
+	return bundle.invoke(ctx, func(callCtx context.Context) (lifecycle.SealedResult, error) {
+		return mg.invokeResolved(callCtx, input, method, jobName, job, bundle.handler)
+	})
+}
+
+func (mg *methodGeneration) invokeResolved(
+	ctx context.Context,
+	input HandlerInput,
+	method funcapi.FunctionConfig,
+	jobName string,
+	job collectorapi.RuntimeJob,
+	handler funcapi.MethodHandler,
+) (lifecycle.SealedResult, error) {
 	if job != nil && !job.IsRunning() {
 		return functionErrorResult(503, "job %q is not running", jobName)
 	}
@@ -215,10 +230,11 @@ func (mg *methodGeneration) handle(ctx context.Context, input HandlerInput) (lif
 func (mg *methodGeneration) resolveTarget(
 	method funcapi.FunctionConfig,
 	input HandlerInput,
-) (string, collectorapi.RuntimeJob, funcapi.MethodHandler, error) {
+) (string, collectorapi.RuntimeJob, *functionBundle, error) {
 	switch mg.kind {
 	case methodGenerationAgent:
-		return "", nil, mg.handlers[""], nil
+		bundle := mg.bundles[""]
+		return "", nil, bundle, nil
 	case methodGenerationInstance:
 		names := mg.availableJobNames(method.ID)
 		if len(names) != 1 {
@@ -228,7 +244,8 @@ func (mg *methodGeneration) resolveTarget(
 			}
 		}
 		name := names[0]
-		return name, mg.jobs[name], mg.handlers[name], nil
+		bundle := mg.bundles[name]
+		return name, bundle.job, bundle, nil
 	case methodGenerationShared:
 		names := mg.availableJobNames(method.ID)
 		if len(names) == 0 {
@@ -254,22 +271,22 @@ func (mg *methodGeneration) resolveTarget(
 				name = values[0]
 			}
 		}
-		job := mg.jobs[name]
-		if job == nil || !slices.Contains(names, name) {
+		bundle := mg.bundles[name]
+		if bundle == nil || !slices.Contains(names, name) {
 			return "", nil, nil, functionStatusError{
 				status:  404,
 				message: fmt.Sprintf("unknown job %q, available: %v", name, names),
 			}
 		}
-		return name, job, mg.handlers[name], nil
+		return name, bundle.job, bundle, nil
 	}
 	return "", nil, nil, errors.New("jobmgr Function method generation: invalid target")
 }
 
 func (mg *methodGeneration) availableJobNames(methodID string) []string {
-	names := make([]string, 0, len(mg.jobs))
-	for name, job := range mg.jobs {
-		if jobBackedFunctionAvailable(job, methodID) {
+	names := make([]string, 0, len(mg.bundles))
+	for name, bundle := range mg.bundles {
+		if bundle.job != nil && bundle.job.IsRunning() && bundle.available(methodID) {
 			names = append(names, name)
 		}
 	}
@@ -290,14 +307,6 @@ func (mg *methodGeneration) withJobParam(methodID string, params []funcapi.Param
 		return params
 	}
 	return append([]funcapi.ParamConfig{buildFunctionJobParam(mg.availableJobNames(methodID))}, params...)
-}
-
-func jobBackedFunctionAvailable(job collectorapi.RuntimeJob, methodID string) bool {
-	if job == nil || !job.IsRunning() {
-		return false
-	}
-	availability, ok := job.Collector().(collectorapi.FunctionAvailability)
-	return !ok || availability == nil || availability.FunctionAvailable(methodID)
 }
 
 type functionStatusError struct {

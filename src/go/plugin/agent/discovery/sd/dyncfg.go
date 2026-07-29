@@ -4,13 +4,15 @@ package sd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -93,38 +95,39 @@ func (cb *sdCallbacks) ValidateConfigName(name string) error {
 }
 
 func (cb *sdCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (sdConfig, error) {
-	dt, _, _ := cb.sd.extractDiscovererAndName(fn.ID())
-	if _, err := parseDyncfgPayload(fn.Payload(), dt, name, cb.sd.configDefaults, cb.sd.discovererRegistry(), true); err != nil {
-		return nil, err
-	}
 	if !netdataapi.ValidSingleQuotedProtocolField(fn.Source()) {
 		return nil, fmt.Errorf("invalid Function source")
 	}
-	pkey := pipelineKey(dt, name)
-	cfg, err := newSDConfigFromJSON(fn.Payload(), name, fn.Source(), confgroup.TypeDyncfg, dt, pkey)
-	if err != nil {
-		return nil, err
-	}
-	return cfg, nil
+	return cb.sd.prepareDyncfgConfig(fn, name, false)
 }
 
-func (cb *sdCallbacks) Start(cfg sdConfig) error {
-	pipelineCfg, err := cfg.ToPipelineConfig(cb.sd.configDefaults)
+func (cb *sdCallbacks) Start(fn dyncfg.Function, cfg sdConfig) error {
+	prepared, err := cb.sd.preparePipeline(fn.Context(), cfg)
 	if err != nil {
+		cb.sd.retainPendingPipeline(cfg, err)
 		return err
 	}
-	return cb.sd.mgr.Start(cb.sd.ctx, cfg.PipelineKey(), pipelineCfg)
+	if err := cb.sd.mgr.StartPrepared(cb.sd.ctx, cfg.PipelineKey(), prepared); err != nil {
+		return err
+	}
+	cb.sd.cancelPendingPipeline(cfg)
+	return nil
 }
 
-func (cb *sdCallbacks) Update(oldCfg, newCfg sdConfig) error {
-	pipelineCfg, err := newCfg.ToPipelineConfig(cb.sd.configDefaults)
+func (cb *sdCallbacks) Update(fn dyncfg.Function, oldCfg, newCfg sdConfig) error {
+	prepared, err := cb.sd.preparePipeline(fn.Context(), newCfg)
 	if err != nil {
 		return dyncfg.MarkNonDisruptiveUpdate(err)
 	}
-	return cb.sd.mgr.Restart(cb.sd.ctx, newCfg.PipelineKey(), pipelineCfg)
+	if err := cb.sd.mgr.RestartPrepared(cb.sd.ctx, newCfg.PipelineKey(), prepared); err != nil {
+		return err
+	}
+	cb.sd.cancelPendingPipeline(newCfg)
+	return nil
 }
 
 func (cb *sdCallbacks) Stop(cfg sdConfig) {
+	cb.sd.cancelPendingPipeline(cfg)
 	cb.sd.mgr.Stop(cfg.PipelineKey())
 }
 
@@ -172,6 +175,12 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 
 // dyncfgSeqExec executes state-changing dyncfg commands serially.
 func (d *ServiceDiscovery) dyncfgSeqExec(fn dyncfg.Function) {
+	// Linearize physical start before checking cancellation: cancellation
+	// either wins first, or its response owner must wait for completion.
+	d.startDyncfg(fn)
+	if dyncfgFunctionContext(fn).Err() != nil {
+		return
+	}
 	d.handler.SyncDecision(fn)
 
 	switch fn.Command() {
@@ -274,10 +283,14 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 	}
 
 	// Parse and validate the config without storing it
-	_, err := parseDyncfgPayload(fn.Payload(), dt, name, d.configDefaults, d.discovererRegistry(), true)
+	_, err := d.prepareDyncfgConfig(fn, name, true)
 	if err != nil {
 		d.Warningf("dyncfg: test: failed to parse config for '%s': %v", dt, err)
-		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
+		code := 400
+		if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
+			code = coded.DyncfgCode()
+		}
+		d.dyncfgApi.SendCodef(fn, code, "Failed to parse config: %v", err)
 		return
 	}
 
@@ -312,13 +325,18 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 		jobName = dyncfgTemplateJobName(fn)
 	}
 
-	if _, err := parseDyncfgPayload(fn.Payload(), dt, jobName, d.configDefaults, d.discovererRegistry(), false); err != nil {
+	config, err := d.prepareUserConfig(fn, dt, jobName)
+	if err != nil {
 		d.Warningf("dyncfg: userconfig: failed to parse config for '%s': %v", id, err)
-		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
+		code := 400
+		if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
+			code = coded.DyncfgCode()
+		}
+		d.dyncfgApi.SendCodef(fn, code, "Failed to parse config: %v", err)
 		return
 	}
 
-	bs, err := userConfigFromPayload(fn.Payload(), dt, jobName)
+	bs, err := yaml.Marshal(config)
 	if err != nil {
 		d.Warningf("dyncfg: userconfig: failed to create config for '%s': %v", id, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to create config: %v", err)
@@ -384,7 +402,7 @@ func (d *ServiceDiscovery) unregisterDyncfgTemplates() {
 
 // autoEnableConfig enables a config without waiting for netdata's enable command.
 func (d *ServiceDiscovery) autoEnableConfig(cfg sdConfig) {
-	fn := dyncfg.NewFunction(functions.Function{
+	fn := dyncfg.NewFunction(d.ctx, functions.Function{
 		Args: []string{d.dyncfgJobID(cfg.DiscovererType(), cfg.Name()), "enable"},
 	})
 	d.handler.CmdEnable(fn)

@@ -72,6 +72,9 @@ func (ck *CommandKernel) admitSubmission(
 			return errors.Join(err, ck.uids.Complete(request.UID, false, now))
 		}
 		if err := decision.validate(); err != nil {
+			if decision.Plan.Stage != nil {
+				decision.Plan.Stage.Release()
+			}
 			if decision.Lease.Valid() {
 				err = errors.Join(err, ck.releaseFunctionInvocation(decision.Lease))
 			}
@@ -95,6 +98,12 @@ func (ck *CommandKernel) admitSubmission(
 			request.LaneKey = functionResourceID
 		}
 	}
+	releaseStage := plan.Stage != nil
+	defer func() {
+		if releaseStage {
+			plan.Stage.Release()
+		}
+	}()
 	releaseFunctionInvocation := functionInvocation.Valid()
 	defer func() {
 		if releaseFunctionInvocation {
@@ -220,6 +229,10 @@ func (ck *CommandKernel) admitSubmission(
 		}
 		heap.Push(&ck.deadlines, &operation.deadline)
 	}
+	if plan.Stage != nil {
+		ck.startPreClaimStage(operation)
+	}
+	releaseStage = false
 	if parent == nil && ck.compositeFenceConflicts(operation.claims) {
 		if err := ck.blockOnCompositeFence(operation); err != nil {
 			ck.run.Dirty(err)
@@ -233,7 +246,7 @@ func (ck *CommandKernel) admitSubmission(
 	if submissionResult != nil {
 		submissionResult <- nil
 	}
-	if !operation.fenceBlocked && lane.active == nil && lane.head == operation {
+	if !operation.fenceBlocked && !operation.stagePending && lane.active == nil && lane.head == operation {
 		ck.markReady(lane)
 	}
 	return nil

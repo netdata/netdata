@@ -17,8 +17,8 @@ const (
 	TaskOutcomeAppliedResourceTransaction
 )
 
-func (kind TaskOutcomeKind) String() string {
-	switch kind {
+func (tok TaskOutcomeKind) String() string {
+	switch tok {
 	case TaskOutcomeNone:
 		return "none"
 	case TaskOutcomeFrame:

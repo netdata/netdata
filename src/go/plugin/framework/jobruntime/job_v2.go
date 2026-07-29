@@ -36,6 +36,7 @@ type JobV2Config struct {
 	Module                  collectorapi.CollectorV2
 	Labels                  map[string]string
 	Out                     io.Writer
+	CleanupOut              io.Writer // terminal cleanup sink; defaults to Out
 	UpdateEvery             int
 	AutoDetectEvery         int
 	IsStock                 bool
@@ -88,6 +89,10 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	}
 	if j.out == nil {
 		j.out = io.Discard
+	}
+	j.cleanupOut = cfg.CleanupOut
+	if j.cleanupOut == nil {
+		j.cleanupOut = j.out
 	}
 
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
@@ -153,10 +158,11 @@ type JobV2 struct {
 	runCtx    context.Context
 	cancelRun context.CancelFunc
 
-	tick chan int
-	out  io.Writer
-	buf  *bytes.Buffer
-	api  *netdataapi.API
+	tick       chan int
+	out        io.Writer
+	cleanupOut io.Writer
+	buf        *bytes.Buffer
+	api        *netdataapi.API
 
 	stopCtrl stopController
 
@@ -318,7 +324,7 @@ func (j *JobV2) cleanup(emit bool) {
 			j.buf.Reset()
 			continue
 		}
-		if err := commitJobOutput(j.out, j.buf.Bytes()); err != nil {
+		if err := commitJobOutput(j.cleanupOut, j.buf.Bytes()); err != nil {
 			j.Warningf("cleanup output failed for host scope %q: %v", snapshot.scopeKey, err)
 		}
 		j.buf.Reset()
