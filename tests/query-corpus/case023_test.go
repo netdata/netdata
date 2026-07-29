@@ -30,23 +30,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/tests/query-corpus/canon"
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
 	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
 
-func TestCase023FleetTimeGroupings(t *testing.T) {
-	trackContract(t, "CASE-023/fleet-time-groupings")
-
-	const chart = "fixture.c023"
-
-	// the three fixture series, 12 samples at T0+1 .. T0+12
-	//
-	// bool     a 0/1 availability signal
-	// counter  a monotone counter that RESETS twice (t4, t9) — reboots
-	// sparse   collected only outside t5..t8, which are gaps
+func c023FleetFixture(chart string) fixture.Chart {
+	// bool is a 0/1 availability signal; counter resets at t4 and t9;
+	// sparse has explicit gaps at t5..t8.
 	boolV := []int{1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0}
 	counterV := []int{10, 20, 30, 5, 15, 25, 35, 45, 5, 15, 25, 35}
-	sparseV := []int{1, 2, 3, 4, -1, -1, -1, -1, 9, 10, 11, 12} // -1 marks a gap
+	sparseV := []int{1, 2, 3, 4, -1, -1, -1, -1, 9, 10, 11, 12}
 
 	ch := fixture.Chart{
 		ID: chart, Title: "fleet groupings", Units: "units", Family: "fixture",
@@ -71,6 +65,20 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 			})
 		}
 	}
+	return ch
+}
+
+func TestCase023FleetTimeGroupings(t *testing.T) {
+	trackContract(t, "CASE-023/fleet-time-groupings")
+
+	const chart = "fixture.c023"
+
+	// the three fixture series, 12 samples at T0+1 .. T0+12
+	//
+	// bool     a 0/1 availability signal
+	// counter  a monotone counter that RESETS twice (t4, t9) — reboots
+	// sparse   collected only outside t5..t8, which are gaps
+	ch := c023FleetFixture(chart)
 	pushLiveBurst(t, "c023", guid(210), ch)
 	if _, err := td.WaitRetention("c023", ch.Context, fixture.T0+1, fixture.T0+12, 15*time.Second); err != nil {
 		t.Fatal(err)
@@ -331,29 +339,40 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 	// be counted as a missing sample.
 	{
 		for _, points := range []string{"1", "2", "3", "6", "12"} {
-			r := whole("percentage-of-samples", "==gap", map[string]string{"points": points, "options": "flip"})
-			bi := dimIndex(r, "bool")
-			check(bi >= 0, "bool dimension missing from the %s-bucket gap sweep", points)
-			if bi < 0 {
-				continue
+			n, err := strconv.Atoi(points)
+			if err != nil {
+				t.Fatal(err)
 			}
-			data, _ := dig(r, "result", "data").([]any)
-			for row := range data {
-				v, is := rowVal(r, row, bi)
-				check(!is || near(v, 0),
-					"points=%s row %d: percentage-of-samples ==gap on the fully collected bool = %v, want 0",
-					points, row, v)
+			want := make([]expectedColumnPoint, n)
+			step := int64(12 / n)
+			for i := range want {
+				want[i] = wantNumberAt(fixture.T0+int64(i+1)*step, 0)
 			}
 
-			rt := whole("number-of-times", "==gap", map[string]string{"points": points, "options": "flip"})
-			if ti := dimIndex(rt, "bool"); ti >= 0 {
-				dt, _ := dig(rt, "result", "data").([]any)
-				for row := range dt {
-					v, is := rowVal(rt, row, ti)
-					check(!is || near(v, 0),
-						"points=%s row %d: number-of-times ==gap on the fully collected bool = %v, want 0",
-						points, row, v)
-				}
+			r := whole("percentage-of-samples", "==gap", map[string]string{
+				"points": points, "options": "flip", "scope_dimensions": "bool",
+			})
+			cols, err := canon.Columns(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !assertOnlyColumn(t, cols, "bool") ||
+				!assertExactColumn(t, cols, "bool", want, 0) {
+				check(false, "points=%s: percentage-of-samples ==gap did not return exactly %d numeric zero rows",
+					points, n)
+			}
+
+			rt := whole("number-of-times", "==gap", map[string]string{
+				"points": points, "options": "flip", "scope_dimensions": "bool",
+			})
+			cols, err = canon.Columns(rt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !assertOnlyColumn(t, cols, "bool") ||
+				!assertExactColumn(t, cols, "bool", want, 0) {
+				check(false, "points=%s: number-of-times ==gap did not return exactly %d numeric zero rows",
+					points, n)
 			}
 		}
 	}
@@ -375,63 +394,4 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 	}
 
 	assertContract(t, "CASE-023/fleet-time-groupings", ok)
-}
-
-// TestCase023CountifBareNumber pins the shared parser's bare-number fix
-// (bug-list ruling (d), resolved 2026-07-25 — "fix it for all of them").
-//
-// tg_countif_create advances one character past the operator switch even
-// when NO operator matched (countif.h:78), so a bare number loses its
-// first digit: options "5" targets 0, not 5. Health has never had this
-// bug — health_config.c only advances on a matched operator, and
-// health-config-unittest.c:96 asserts countif(0.5) parses as "=0.5".
-// The shared parser aligns the API to health.
-//
-// Fixture reuse: the `bool` series of TestCase023FleetTimeGroupings has
-// six zeros and six ones, so the two readings are 50 (target 0, buggy)
-// and 0 (target 5, correct).
-func TestCase023CountifBareNumber(t *testing.T) {
-	trackContract(t, "CASE-023/countif-bare-number")
-
-	const chart = "fixture.c023"
-
-	resp, err := td.HostJSON("c023", "api/v3/data", map[string][]string{
-		"scope_contexts":     {chart},
-		"time_group":         {"countif"},
-		"time_group_options": {"5"},
-		"format":             {"json2"},
-		"group_by":           {"dimension"},
-		"after":              {strconv.FormatInt(fixture.T0, 10)},
-		"before":             {strconv.FormatInt(fixture.T0+12, 10)},
-		"points":             {"1"},
-		"options":            {"unaligned"}, // see the note in whole()
-	})
-	if err != nil {
-		t.Skip("c023 fixture not available (TestCase023FleetTimeGroupings failed?)")
-	}
-
-	labels, _ := resp["result"].(map[string]any)
-	if labels == nil {
-		t.Skip("c023 fixture not available (TestCase023FleetTimeGroupings failed?)")
-	}
-	lab, _ := labels["labels"].([]any)
-	di := -1
-	for i, l := range lab {
-		if l == "bool" {
-			di = i - 1
-		}
-	}
-	if di < 0 {
-		t.Skip("c023 fixture not available (TestCase023FleetTimeGroupings failed?)")
-	}
-	data, _ := labels["data"].([]any)
-	if len(data) == 0 {
-		t.Skip("c023 fixture not available (TestCase023FleetTimeGroupings failed?)")
-	}
-	row, _ := data[0].([]any)
-	point, _ := row[di+1].([]any)
-	v, _ := point[0].(float64)
-
-	t.Logf("countif with a bare '5' on a 0/1 series reads %v (50 = the swallowed digit, 0 = parsed as =5)", v)
-	assertContract(t, "CASE-023/countif-bare-number", math.Abs(v-0) < 1e-9)
 }

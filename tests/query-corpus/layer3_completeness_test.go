@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Layer 3 completeness — the FULL time-grouping registry
+// Layer 3 completeness — the pre-fleet time-grouping registry
 // (src/web/api/queries/query-group-over-time.c): TestLayer3Families
-// covers 27 of the 47 accepted name strings; this file covers the
-// remaining 20, the complete countif options grammar (countif.h), the
+// covers 27 of the 48 pre-fleet accepted name strings; this file covers
+// the remaining 21, the complete countif options grammar (countif.h), the
 // numeric group-options overrides with their clamps (percentile
 // [0,100]; trimmed-mean/median [0,50]), and the silent-fallback
 // contract (an unknown time_group name parses to average, never an
 // error — time_grouping_parse).
 //
-// Pinned quirk (rulings batch): a BARE-NUMBER countif expression loses
-// its first digit — tg_countif_create's post-switch pointer advance
-// runs even when no operator matched, so "40" compares EQUAL against 0
-// and "440" against 40. Operator spellings are unaffected.
+// Bare-number and invalid-expression behavior is covered independently by
+// CASE-023, so this registry test cannot pass merely because a parser bug
+// happens to produce the same value as one of its operator probes.
 package corpus
 
 import (
@@ -66,14 +65,9 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 	// options compare EQUAL against 0.0, and a bare number compares EQUAL
 	// against itself (it used to lose its first digit)
 	t.Run("countif-grammar", func(t *testing.T) {
-		// a BARE number ("40") is deliberately absent: the old parser lost
-		// its first digit, that was ruled a bug, and the shared expression
-		// grammar fixes it — so the spelling is contested behaviour and
-		// belongs to the manifest case that self-detects the flip
-		// (CASE-023/countif-bare-number), not to a hard assertion here.
 		for _, opts := range []string{
 			"!5", "!:5", ">:30", "<:20", "<>1", ":40", "==40",
-			"", "  <>  1",
+			"40", "", "  <>  1",
 		} {
 			t.Run("countif("+opts+")", func(t *testing.T) {
 				verifyTimeGroup(t, "l3-reg", ch, "countif", opts, 10)

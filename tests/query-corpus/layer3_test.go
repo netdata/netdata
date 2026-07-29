@@ -15,8 +15,8 @@
 //   - incremental-sum carries the previous bucket's last value forward as
 //     the next bucket's baseline, including from a bucket that held only
 //     one sample; an empty bucket keeps the baseline it was given — so an
-//     identity (group=1) incremental-sum query answers every bucket but
-//     null (pinned as current contract);
+//     identity (group=1) incremental-sum query answers every bucket but the
+//     first (pinned as current contract);
 //   - percentile/trimmed-mean are slot-window MEANS (not quantiles) and
 //     walk from the top when any bucket value is negative;
 //   - median trims by value range, then takes the R-7 quantile.

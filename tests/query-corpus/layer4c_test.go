@@ -27,7 +27,7 @@ import (
 
 const (
 	c4cDims    = 50
-	c4cRows    = 200_000 // ~10M samples ≈ 40MB of tier0 pages > the 25MB quota
+	c4cRows    = 200_000 // 55 dimensions x 200k rows = 11M samples, enough to rotate tier0
 	c4cContext = "fixture.l4c"
 
 	// A constant dimension alongside the random ones. Rollup keeps a
@@ -47,6 +47,25 @@ const (
 	// came from cannot hide behind rollup noise.
 	c4cRateDim   = "rate"
 	c4cRateValue = 20
+
+	// Exact condition fixtures. Availability is up for seven of every ten
+	// seconds. The counter resets inside every tier1 record, with each new
+	// floor one lower than the last. The raw drop and the rollup's new minimum
+	// therefore prove the same one event per minute at every tier, including
+	// the record crossing any possible plan seam.
+	c4cAvailabilityDim = "availability"
+	c4cCounterDim      = "counter"
+	c4cConditionEpoch  = int64(fixture.T0 + 40)
+	c4cCounterEpoch    = int64(fixture.T0 - 50)
+	c4cCounterBase     = int64(1_000_000)
+	c4cAvailabilityUp  = int64(7)
+	c4cAvailabilityN   = int64(10)
+	c4cCounterPeriod   = int64(60)
+
+	// A negative flat line exposes whether options=absolute was applied to
+	// the point read from the incoming plan at a tier seam.
+	c4cNegativeDim   = "negative"
+	c4cNegativeValue = -37
 )
 
 // c4cValue is the deterministic sample generator: a 24-bit full-mantissa
@@ -62,16 +81,53 @@ func c4cValue(dim, off int64) int64 {
 
 func c4cDimID(d int) string { return fmt.Sprintf("d%02d", d) }
 
-// perTierRetention extracts db.per_tier[].{first,last}_entry.
-func perTierRetention(doc map[string]any) []daemon.Retention {
-	db, _ := doc["db"].(map[string]any)
-	tiersAny, _ := db["per_tier"].([]any)
-	out := make([]daemon.Retention, 0, len(tiersAny))
-	for _, ta := range tiersAny {
-		tier, _ := ta.(map[string]any)
-		first, _ := tier["first_entry"].(float64)
-		last, _ := tier["last_entry"].(float64)
-		out = append(out, daemon.Retention{FirstEntry: int64(first), LastEntry: int64(last)})
+func c4cCounterValueAt(ts int64) int64 {
+	elapsed := ts - c4cCounterEpoch
+	cycle := elapsed / c4cCounterPeriod
+	return c4cCounterBase - cycle + elapsed%c4cCounterPeriod
+}
+
+// perTierRetention extracts db.per_tier by its explicit tier ID. Missing,
+// duplicate, fractional or malformed entries cannot silently become epoch zero.
+func perTierRetention(t *testing.T, doc map[string]any) []daemon.Retention {
+	t.Helper()
+
+	db, ok := doc["db"].(map[string]any)
+	if !ok {
+		t.Fatal("response has no db object")
+	}
+	tiersAny, ok := db["per_tier"].([]any)
+	if !ok || len(tiersAny) == 0 {
+		t.Fatalf("db.per_tier is missing or empty: %v", db["per_tier"])
+	}
+
+	out := make([]daemon.Retention, len(tiersAny))
+	seen := make([]bool, len(tiersAny))
+	for i, raw := range tiersAny {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("db.per_tier[%d] is malformed: %v", i, raw)
+		}
+		tierRaw, tierOK := entry["tier"].(float64)
+		firstRaw, firstOK := entry["first_entry"].(float64)
+		lastRaw, lastOK := entry["last_entry"].(float64)
+		tier := int(tierRaw)
+		first, last := int64(firstRaw), int64(lastRaw)
+		if !tierOK || tier < 0 || tier >= len(out) || tierRaw != float64(tier) ||
+			!firstOK || firstRaw != float64(first) ||
+			!lastOK || lastRaw != float64(last) {
+			t.Fatalf("db.per_tier[%d] has invalid tier/retention fields: %v", i, entry)
+		}
+		if seen[tier] {
+			t.Fatalf("db.per_tier repeats tier %d", tier)
+		}
+		seen[tier] = true
+		out[tier] = daemon.Retention{FirstEntry: first, LastEntry: last}
+	}
+	for tier, found := range seen {
+		if !found {
+			t.Fatalf("db.per_tier is missing tier %d", tier)
+		}
 	}
 	return out
 }
@@ -89,7 +145,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	t.Cleanup(func() { _ = dd.Stop() })
 
 	// stream the fixture: rows are generated per replication request —
-	// materializing 10M points would cost hundreds of MB
+	// materializing 11M points would cost hundreds of MB
 	conn, err := stream.Connect(dd.Addr, daemon.StreamKey, stream.HostInfo{
 		Hostname: "l4c-child", MachineGUID: guid(80),
 	}, stream.CapsReplication)
@@ -107,6 +163,9 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	}
 	conn.Dimension(c4cConstDim, "", 1, 1)
 	conn.Dimension(c4cRateDim, "incremental", 1, 1)
+	conn.Dimension(c4cAvailabilityDim, "", 1, 1)
+	conn.Dimension(c4cCounterDim, "", 1, 1)
+	conn.Dimension(c4cNegativeDim, "", 1, 1)
 	firstT := int64(fixture.T0)
 	lastT := int64(fixture.T0 + c4cRows)
 	conn.ChartDefinitionEnd(firstT, lastT, lastT)
@@ -117,7 +176,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		func(_ string, after, before int64) []stream.ReplayRow {
 			rows := make([]stream.ReplayRow, 0, before-after)
 			for ts := after + 1; ts <= before; ts++ {
-				row := stream.ReplayRow{T: ts, Dims: make([]stream.ReplayValue, c4cDims+2)}
+				row := stream.ReplayRow{T: ts, Dims: make([]stream.ReplayValue, c4cDims+5)}
 				for d := 0; d < c4cDims; d++ {
 					row.Dims[d] = stream.ReplayValue{
 						ID:        c4cDimID(d),
@@ -133,6 +192,22 @@ func TestLayer4PlanSwitching(t *testing.T) {
 				row.Dims[c4cDims+1] = stream.ReplayValue{
 					ID:        c4cRateDim,
 					Collected: strconv.Itoa(c4cRateValue),
+					Flags:     stream.FlagNotAnomalous,
+				}
+				row.Dims[c4cDims+2] = stream.ReplayValue{
+					ID: c4cAvailabilityDim,
+					Collected: strconv.FormatInt(
+						c4AvailabilityValue(ts, c4cConditionEpoch, c4cAvailabilityN, c4cAvailabilityUp), 10),
+					Flags: stream.FlagNotAnomalous,
+				}
+				row.Dims[c4cDims+3] = stream.ReplayValue{
+					ID:        c4cCounterDim,
+					Collected: strconv.FormatInt(c4cCounterValueAt(ts), 10),
+					Flags:     stream.FlagNotAnomalous,
+				}
+				row.Dims[c4cDims+4] = stream.ReplayValue{
+					ID:        c4cNegativeDim,
+					Collected: strconv.Itoa(c4cNegativeValue),
 					Flags:     stream.FlagNotAnomalous,
 				}
 				rows = append(rows, row)
@@ -156,7 +231,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		if err != nil {
 			return nil
 		}
-		return perTierRetention(doc)
+		return perTierRetention(t, doc)
 	}
 	deadline := time.Now().Add(5 * time.Minute)
 	var tiers []daemon.Retention
@@ -191,28 +266,49 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		after, before := boundary-3600, boundary+3600
 		params := daemon.DataParams(c4cContext, after, before, before-after)
 		params.Set("scope_dimensions", c4cDimID(0))
+		params.Set("options", "jsonwrap|unaligned")
 		doc, err := dd.DataV3("l4c-child", params)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ptp := perTierPoints(doc)
-		if len(ptp) < 2 || ptp[0] == 0 || ptp[1] == 0 {
-			t.Fatalf("expected a tier1+tier0 plan switch, per_tier points %v", ptp)
+		if !assertTierPresence(t, doc, []bool{true, true, false}) {
+			t.Fatal("expected exactly a tier1+tier0 plan switch")
 		}
-		t.Logf("plan switch proven: per_tier points %v", ptp)
+		if !assertExactView(t, doc, after, before, 1) {
+			t.Error("plan-switching seam returned the wrong view grid")
+		}
 
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		col := cols[c4cDimID(0)]
+		dimension := c4cDimID(0)
+		if !assertOnlyColumn(t, cols, dimension) {
+			t.Error("plan-switching seam returned the wrong columns")
+		}
+		col := cols[dimension]
+		if len(col) != int(before-after) {
+			t.Fatalf("plan-switching seam returned %d rows, want exactly %d", len(col), before-after)
+		}
 		windows := map[int64]float64{} // tier1 window end → fetched average
-		for _, pt := range col {
+		for i, pt := range col {
+			wantT := after + int64(i+1)
+			if pt.T != wantT {
+				t.Errorf("plan-switching seam row %d ends at %d, want %d", i, pt.T, wantT)
+			}
+			if pt.Value == nil {
+				t.Errorf("plan-switching seam row %d at %d is null inside retained history", i, pt.T)
+				continue
+			}
+			if math.IsNaN(*pt.Value) || math.IsInf(*pt.Value, 0) {
+				t.Errorf("plan-switching seam row %d at %d is non-finite: %v", i, pt.T, *pt.Value)
+				continue
+			}
 			off := pt.T - fixture.T0
 			switch {
 			case pt.T > boundary+60:
 				want := fixture.SNRoundTrip(float64(c4cValue(0, off)))
-				if pt.Value == nil || !tierValueMatch(*pt.Value, want, 0) {
+				if !tierValueMatch(*pt.Value, want, 0) {
 					t.Errorf("tail bucket t0%+d: got %v, want %v", off, pt.Value, want)
 				}
 			case pt.T < boundary-60 && (pt.T-(fixture.T0+40))%tier1Gran == 0:
@@ -225,12 +321,8 @@ func TestLayer4PlanSwitching(t *testing.T) {
 				if !ok {
 					continue
 				}
-				if pt.Value == nil || !tierValueMatch(*pt.Value, want, 1e-9) {
+				if !tierValueMatch(*pt.Value, want, 1e-9) {
 					t.Errorf("head bucket t0%+d (tier1 grid): got %v, want %v", off, pt.Value, want)
-				}
-			case pt.T < boundary-60:
-				if pt.Value == nil {
-					t.Errorf("head bucket t0%+d: null — tier1 did not serve the rotated range", off)
 				}
 			}
 		}
@@ -239,42 +331,509 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	t.Run("plan-switching-head-only", func(t *testing.T) {
 		trackContractComponent(t, "L4/plan-switching", "head-only")
 
-		params := daemon.DataParams(c4cContext, boundary-7200, boundary-3600, 60)
-		params.Set("scope_dimensions", c4cDimID(0))
+		after, before := boundary-7200, boundary-3600
+		params := daemon.DataParams(c4cContext, after, before, 60)
+		dimension := c4cDimID(0)
+		params.Set("scope_dimensions", dimension)
+		params.Set("options", "jsonwrap|unaligned")
 		doc, err := dd.DataV3("l4c-child", params)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ptp := perTierPoints(doc)
-		if len(ptp) < 2 || ptp[0] != 0 || ptp[1] == 0 {
-			t.Fatalf("head-only query: expected tier1 alone, per_tier points %v", ptp)
+		if !assertTierPresence(t, doc, []bool{false, true, false}) {
+			t.Fatal("head-only query did not use tier1 alone")
+		}
+		if !assertExactView(t, doc, after, before, 60) {
+			t.Error("head-only query returned the wrong view grid")
+		}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !assertOnlyColumn(t, cols, dimension) {
+			t.Error("head-only query returned the wrong columns")
+		}
+		col := cols[dimension]
+		if len(col) != 60 {
+			t.Fatalf("head-only query returned %d rows, want exactly 60", len(col))
+		}
+		for i, point := range col {
+			wantT := after + int64(i+1)*60
+			if point.T != wantT {
+				t.Errorf("head-only row %d ends at %d, want %d", i, point.T, wantT)
+			}
+			if point.Value == nil || math.IsNaN(*point.Value) || math.IsInf(*point.Value, 0) {
+				t.Errorf("head-only row %d at %d is missing or non-finite: %v", i, point.T, point.Value)
+			}
 		}
 	})
 
 	t.Run("sum-conservation", func(t *testing.T) {
 		trackContract(t, "CASE-026/totals-survive-a-plan-switch")
 
+		flatTiers := c4DimensionRetention(
+			t, dd, c4cContext, "l4c-child", c4cConstDim, lastT, 2)
+		flatBoundary := flatTiers[0].FirstEntry
+		headAfter := c4cAlignTier1(flatBoundary - 10800)
+		tailAfter := c4cAlignTier1(flatBoundary + 3600)
+		seamAfter := c4cAlignTier1(flatBoundary - 3600)
+		c4cRequireTwoTierWindow(t, "flat head-only", headAfter, headAfter+7200,
+			flatTiers, [2]bool{false, true})
+		c4cRequireTwoTierWindow(t, "flat tail-only", tailAfter, tailAfter+7200,
+			flatTiers, [2]bool{true, false})
+		c4cRequireTwoTierWindow(t, "flat straddling", seamAfter, seamAfter+7200,
+			flatTiers, [2]bool{true, true})
+
 		// The two single-plan windows are controls. If they conserve and
 		// the straddling window does not, the seam is the difference.
-		ok := c4cSumConserves(t, dd, "head-only", c4cAlignTier1(boundary-10800))
-		ok = c4cSumConserves(t, dd, "tail-only", c4cAlignTier1(boundary+3600)) && ok
-		ok = c4cSumConserves(t, dd, "straddling", c4cAlignTier1(boundary-3600)) && ok
+		ok := c4cSumConserves(t, dd, "head-only", headAfter,
+			[3]bool{false, true, false})
+		ok = c4cSumConserves(t, dd, "tail-only", tailAfter,
+			[3]bool{true, false, false}) && ok
+		ok = c4cSumConserves(t, dd, "straddling", seamAfter,
+			[3]bool{true, true, false}) && ok
 		assertContract(t, "CASE-026/totals-survive-a-plan-switch", ok)
 	})
 
 	t.Run("rate-volume", func(t *testing.T) {
 		trackContract(t, "CASE-031/rate-volume-across-an-automatic-seam")
 
-		rok := c4cRateVolume(t, dd, "across-the-seam", boundary-3600, boundary+3600,
+		rateTiers := c4DimensionRetention(
+			t, dd, c4cContext, "l4c-child", c4cRateDim, lastT, 2)
+		rateBoundary := rateTiers[0].FirstEntry
+		seamAfter, seamBefore := rateBoundary-3600, rateBoundary+3600
+		headAfter, headBefore := c4cAlignTier1(rateBoundary-10800), c4cAlignTier1(rateBoundary-3600)
+		tailAfter, tailBefore := c4cAlignTier1(rateBoundary+3600), c4cAlignTier1(rateBoundary+10800)
+		c4cRequireTwoTierWindow(t, "rate seam", seamAfter, seamBefore,
+			rateTiers, [2]bool{true, true})
+		c4cRequireTwoTierWindow(t, "rate rotated head", headAfter, headBefore,
+			rateTiers, [2]bool{false, true})
+		c4cRequireTwoTierWindow(t, "rate tier0 tail", tailAfter, tailBefore,
+			rateTiers, [2]bool{true, false})
+
+		rok := c4cRateVolume(t, dd, "across-the-seam", seamAfter, seamBefore,
 			[3]bool{false, true, false}, [3]bool{true, true, false})
-		rok = c4cRateVolume(t, dd, "rotated-head-only",
-			c4cAlignTier1(boundary-10800), c4cAlignTier1(boundary-3600),
+		rok = c4cRateVolume(t, dd, "rotated-head-only", headAfter, headBefore,
 			[3]bool{false, true, false}, [3]bool{false, true, false}) && rok
-		rok = c4cRateVolume(t, dd, "tier0-only",
-			c4cAlignTier1(boundary+3600), c4cAlignTier1(boundary+10800),
+		rok = c4cRateVolume(t, dd, "tier0-only", tailAfter, tailBefore,
 			[3]bool{false, true, false}, [3]bool{true, false, false}) && rok
 		assertContract(t, "CASE-031/rate-volume-across-an-automatic-seam", rok)
 	})
+
+	t.Run("condition-groupings", func(t *testing.T) {
+		trackContractComponent(t, "L4/plan-switching", "condition-groupings")
+
+		const span = int64(7200)
+		ok := true
+		for _, dimension := range []struct {
+			label            string
+			id               string
+			availabilityOnly bool
+			counterOnly      bool
+		}{
+			{label: "availability", id: c4cAvailabilityDim, availabilityOnly: true},
+			{label: "counter", id: c4cCounterDim, counterOnly: true},
+		} {
+			dimensionTiers := c4DimensionRetention(
+				t, dd, c4cContext, "l4c-child", dimension.id, lastT, 2)
+			dimensionBoundary := dimensionTiers[0].FirstEntry
+			windowEpoch := c4cConditionEpoch
+			if dimension.counterOnly {
+				windowEpoch = c4cCounterEpoch
+			}
+			seamAfter := c4AlignDown(
+				dimensionBoundary-3600, windowEpoch, c4cCounterPeriod)
+			headAfter := c4AlignDown(
+				dimensionBoundary-10800, windowEpoch, c4cCounterPeriod)
+			tailAfter := c4AlignDown(
+				dimensionBoundary+3600, windowEpoch, c4cCounterPeriod)
+			c4cRequireTwoTierWindow(t, dimension.label+" seam", seamAfter, seamAfter+span,
+				dimensionTiers, [2]bool{true, true})
+			c4cRequireTwoTierWindow(t, dimension.label+" head", headAfter, headAfter+span,
+				dimensionTiers, [2]bool{false, true})
+			c4cRequireTwoTierWindow(t, dimension.label+" tail", tailAfter, tailAfter+span,
+				dimensionTiers, [2]bool{true, false})
+
+			for _, tc := range []struct {
+				label        string
+				after        int64
+				rowSpan      int64
+				expectedTier [3]bool
+			}{
+				{"seam-downsample", seamAfter, 300, [3]bool{false, true, false}},
+				{"seam-identity", seamAfter, 60, [3]bool{false, true, false}},
+				{"seam-upsample", seamAfter, 1, [3]bool{true, true, false}},
+				{"head-downsample", headAfter, 300, [3]bool{false, true, false}},
+				{"head-identity", headAfter, 60, [3]bool{false, true, false}},
+				{"head-upsample", headAfter, 1, [3]bool{false, true, false}},
+				{"tail-downsample", tailAfter, 300, [3]bool{false, true, false}},
+				{"tail-identity", tailAfter, 60, [3]bool{false, true, false}},
+				{"tail-upsample", tailAfter, 1, [3]bool{true, false, false}},
+			} {
+				if !c4ConditionExact(t, dd, c4ConditionSpec{
+					label:              "layer4c-" + dimension.label + "-" + tc.label,
+					context:            c4cContext,
+					host:               "l4c-child",
+					availabilityDim:    c4cAvailabilityDim,
+					counterDim:         c4cCounterDim,
+					after:              tc.after,
+					before:             tc.after + span,
+					rowSpan:            tc.rowSpan,
+					selectedTier:       -1,
+					expectedTiers:      tc.expectedTier,
+					availabilityEpoch:  c4cConditionEpoch,
+					availabilityPeriod: c4cAvailabilityN,
+					availabilityUp:     c4cAvailabilityUp,
+					counterPeriod:      c4cCounterPeriod,
+					tier0First:         dimensionBoundary,
+					availabilityOnly:   dimension.availabilityOnly,
+					counterOnly:        dimension.counterOnly,
+				}) {
+					ok = false
+				}
+			}
+		}
+		if !ok {
+			t.Errorf("condition groupings did not conserve exact fixture answers across the tier0/tier1 plan boundary")
+		}
+	})
+
+	t.Run("absolute-across-plan-seam", func(t *testing.T) {
+		trackContract(t, "CASE-036/absolute-across-plan-seam")
+
+		const span = int64(7200)
+		negativeTiers := c4DimensionRetention(
+			t, dd, c4cContext, "l4c-child", c4cNegativeDim, lastT, 2)
+		negativeBoundary := negativeTiers[0].FirstEntry
+		if negativeBoundary <= negativeTiers[1].FirstEntry {
+			t.Fatalf("negative dimension has no tier1-only history: %+v", negativeTiers)
+		}
+		seamAfter := c4AlignDown(negativeBoundary-3600, c4cConditionEpoch, c4cCounterPeriod)
+		headAfter := c4AlignDown(negativeBoundary-10800, c4cConditionEpoch, c4cCounterPeriod)
+		tailAfter := c4AlignDown(negativeBoundary+3600, c4cConditionEpoch, c4cCounterPeriod)
+		c4cRequireTwoTierWindow(t, "absolute seam", seamAfter, seamAfter+span,
+			negativeTiers, [2]bool{true, true})
+		c4cRequireTwoTierWindow(t, "absolute rotated head", headAfter, headAfter+span,
+			negativeTiers, [2]bool{false, true})
+		c4cRequireTwoTierWindow(t, "absolute tier0 tail", tailAfter, tailAfter+span,
+			negativeTiers, [2]bool{true, false})
+
+		ok := c4cAbsoluteExact(t, dd, "seam", seamAfter, seamAfter+span,
+			[3]bool{true, true, false})
+		ok = c4cAbsoluteExact(t, dd, "rotated-head", headAfter, headAfter+span,
+			[3]bool{false, true, false}) && ok
+		ok = c4cAbsoluteExact(t, dd, "tier0-tail", tailAfter, tailAfter+span,
+			[3]bool{true, false, false}) && ok
+		assertContract(t, "CASE-036/absolute-across-plan-seam", ok)
+	})
+}
+
+func c4PositiveMod(value, modulus int64) int64 {
+	remainder := value % modulus
+	if remainder < 0 {
+		remainder += modulus
+	}
+	return remainder
+}
+
+func c4AlignDown(ts, epoch, granularity int64) int64 {
+	return ts - c4PositiveMod(ts-epoch, granularity)
+}
+
+func c4AlignUp(ts, epoch, granularity int64) int64 {
+	down := c4AlignDown(ts, epoch, granularity)
+	if down < ts {
+		return down + granularity
+	}
+	return down
+}
+
+func c4AvailabilityValue(ts, epoch, period, up int64) int64 {
+	if c4PositiveMod(ts-epoch-1, period) < up {
+		return 1
+	}
+	return 0
+}
+
+// The value reaches period-1 and drops to zero exactly at each period end.
+// A window (epoch+k*period, epoch+(k+n)*period] therefore contains n resets.
+func c4CounterValue(ts, epoch, period int64) int64 {
+	return c4PositiveMod(ts-epoch, period)
+}
+
+type c4ConditionSpec struct {
+	label                  string
+	context, host          string
+	availabilityDim        string
+	counterDim             string
+	after, before, rowSpan int64
+	selectedTier           int // -1 lets the planner switch tiers
+	expectedTiers          [3]bool
+	availabilityEpoch      int64
+	availabilityPeriod     int64
+	availabilityUp         int64
+	counterPeriod          int64
+	tier0First             int64
+	availabilityOnly       bool
+	counterOnly            bool
+}
+
+func c4DimensionRetention(
+	t *testing.T,
+	dd *daemon.Daemon,
+	context, host, dimension string,
+	last int64,
+	wantTiers int,
+) []daemon.Retention {
+	t.Helper()
+
+	params := daemon.DataParams(context, last-60, last, 60)
+	params.Set("scope_dimensions", dimension)
+	doc, err := dd.DataV3(host, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tiers := perTierRetention(t, doc)
+	if len(tiers) < wantTiers {
+		t.Fatalf("%s retention has %d tiers, want at least %d: %+v",
+			dimension, len(tiers), wantTiers, tiers)
+	}
+	for tier := 0; tier < wantTiers; tier++ {
+		if tiers[tier].FirstEntry <= 0 || tiers[tier].LastEntry < tiers[tier].FirstEntry {
+			t.Fatalf("%s tier%d retention is invalid: %+v", dimension, tier, tiers[tier])
+		}
+	}
+	return tiers
+}
+
+// c4cRequireTwoTierWindow proves that a planned control or seam window has the
+// claimed physical relation to this dimension's own retention.
+func c4cRequireTwoTierWindow(
+	t *testing.T,
+	label string,
+	after, before int64,
+	tiers []daemon.Retention,
+	want [2]bool,
+) {
+	t.Helper()
+
+	if len(tiers) < 2 {
+		t.Fatalf("%s has fewer than two retention tiers: %+v", label, tiers)
+	}
+	wantTier0, wantTier1 := want[0], want[1]
+	switch {
+	case wantTier0 && wantTier1:
+		if !(after < tiers[0].FirstEntry && before > tiers[0].FirstEntry) {
+			t.Fatalf("%s (%d,%d] does not cross tier0 first entry %d",
+				label, after, before, tiers[0].FirstEntry)
+		}
+	case wantTier1:
+		if before >= tiers[0].FirstEntry {
+			t.Fatalf("%s (%d,%d] reaches tier0 first entry %d",
+				label, after, before, tiers[0].FirstEntry)
+		}
+	case wantTier0:
+		if after < tiers[0].FirstEntry {
+			t.Fatalf("%s (%d,%d] starts before tier0 first entry %d",
+				label, after, before, tiers[0].FirstEntry)
+		}
+	default:
+		t.Fatalf("%s requests neither tier0 nor tier1", label)
+	}
+	if wantTier1 && (after < tiers[1].FirstEntry || before > tiers[1].LastEntry) {
+		t.Fatalf("%s (%d,%d] exceeds tier1 retention [%d,%d]",
+			label, after, before, tiers[1].FirstEntry, tiers[1].LastEntry)
+	}
+	if wantTier0 && before > tiers[0].LastEntry {
+		t.Fatalf("%s (%d,%d] exceeds tier0 last entry %d",
+			label, after, before, tiers[0].LastEntry)
+	}
+}
+
+func c4TierVectorExact(t *testing.T, doc map[string]any, want [3]bool) bool {
+	t.Helper()
+	return assertTierPresence(t, doc, want[:])
+}
+
+func c4ExpectedAvailability(spec c4ConditionSpec) []expectedColumnPoint {
+	points := int((spec.before - spec.after) / spec.rowSpan)
+	out := make([]expectedColumnPoint, points)
+	higherShare := float64(spec.availabilityUp) / float64(spec.availabilityPeriod)
+	hasTier0 := spec.expectedTiers[0]
+	hasHigherTier := spec.expectedTiers[1] || spec.expectedTiers[2]
+
+	rawAt := func(ts int64) bool {
+		if spec.selectedTier == 0 {
+			return true
+		}
+		if spec.selectedTier > 0 || !hasTier0 {
+			return false
+		}
+		if !hasHigherTier {
+			return true
+		}
+		return ts >= spec.tier0First
+	}
+
+	for i := range out {
+		rowStart := spec.after + int64(i)*spec.rowSpan
+		rowEnd := rowStart + spec.rowSpan
+		matched := 0.0
+		for ts := rowStart + 1; ts <= rowEnd; ts++ {
+			if rawAt(ts) {
+				matched += float64(c4AvailabilityValue(
+					ts, spec.availabilityEpoch, spec.availabilityPeriod, spec.availabilityUp))
+			} else {
+				// Higher tiers retain min/max/sum/count, so the window
+				// estimator is sample-weighted. These fixtures have a
+				// constant sample cadence and aligned periods, making the
+				// estimate exact.
+				matched += higherShare
+			}
+		}
+		out[i] = wantNumberAt(rowEnd, 100*matched/float64(spec.rowSpan))
+	}
+	return out
+}
+
+func c4ConditionExact(t *testing.T, dd *daemon.Daemon, spec c4ConditionSpec) bool {
+	t.Helper()
+	if spec.availabilityOnly && spec.counterOnly {
+		t.Fatalf("condition query cannot be both availability-only and counter-only: %+v", spec)
+	}
+	runAvailability := !spec.counterOnly
+	runCounter := !spec.availabilityOnly
+	if spec.rowSpan <= 0 || spec.before <= spec.after ||
+		(spec.before-spec.after)%spec.rowSpan != 0 {
+		t.Fatalf("invalid exact condition window %+v", spec)
+	}
+	if runCounter && (spec.counterPeriod <= 0 ||
+		(spec.before-spec.after)%spec.counterPeriod != 0) {
+		t.Fatalf("invalid exact counter window %+v", spec)
+	}
+	if runAvailability && (spec.availabilityPeriod <= 0 ||
+		spec.availabilityUp < 0 || spec.availabilityUp > spec.availabilityPeriod) {
+		t.Fatalf("invalid exact availability window %+v", spec)
+	}
+	if runAvailability && spec.selectedTier < 0 && spec.expectedTiers[0] &&
+		(spec.expectedTiers[1] || spec.expectedTiers[2]) && spec.tier0First <= 0 {
+		t.Fatalf("mixed tier0/higher-tier condition query has no discovered tier0 boundary: %+v", spec)
+	}
+	points := (spec.before - spec.after) / spec.rowSpan
+	ok := true
+	for _, query := range []struct {
+		group, expression, dimension string
+		availability                 bool
+	}{
+		{
+			group: "percentage-of-time", expression: "==1", dimension: spec.availabilityDim,
+			availability: true,
+		},
+		{
+			group: "number-of-times", expression: "<previous", dimension: spec.counterDim,
+		},
+	} {
+		if query.availability && !runAvailability {
+			continue
+		}
+		if !query.availability && !runCounter {
+			continue
+		}
+		var params = daemon.DataParams(spec.context, spec.after, spec.before, points)
+		if spec.selectedTier >= 0 {
+			params = daemon.DataParamsTier(spec.context, spec.selectedTier,
+				spec.after, spec.before, points, query.group)
+		} else {
+			params.Set("time_group", query.group)
+		}
+		params.Set("options", "jsonwrap|unaligned")
+		params.Set("time_group_options", query.expression)
+		params.Set("scope_dimensions", query.dimension)
+		doc, err := dd.DataV3(spec.host, params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !assertExactView(t, doc, spec.after, spec.before, spec.rowSpan) {
+			t.Logf("%s %s(%s): view mismatch", spec.label, query.group, query.expression)
+			ok = false
+		}
+		if !c4TierVectorExact(t, doc, spec.expectedTiers) {
+			t.Logf("%s %s(%s): tier vector mismatch", spec.label, query.group, query.expression)
+			ok = false
+		}
+		if spec.selectedTier >= 0 && !assertSelectedTier(t, doc, spec.selectedTier) {
+			t.Logf("%s %s(%s): forced-tier proof failed", spec.label, query.group, query.expression)
+			ok = false
+		}
+		if !assertOnlyColumn(t, cols, query.dimension) {
+			t.Logf("%s %s(%s): result contains the wrong columns", spec.label, query.group, query.expression)
+			ok = false
+		}
+		if query.availability {
+			if !assertExactColumn(t, cols, query.dimension, c4ExpectedAvailability(spec), printTol) {
+				t.Logf("%s %s(%s): exact availability oracle failed",
+					spec.label, query.group, query.expression)
+				ok = false
+			}
+		} else if !assertEventColumnShapeAndTotal(
+			t, cols, query.dimension, spec.after, spec.before, spec.rowSpan,
+			(spec.rowSpan+spec.counterPeriod-1)/spec.counterPeriod,
+			float64((spec.before-spec.after)/spec.counterPeriod)) {
+			// A higher-tier record proves that a reset happened but cannot
+			// retain its exact sample timestamp. Pin conservation and reject
+			// duplicated rows without making its within-record placement a
+			// public contract.
+			t.Logf("%s %s(%s): reset conservation oracle failed",
+				spec.label, query.group, query.expression)
+			ok = false
+		}
+	}
+	return ok
+}
+
+func c4cAbsoluteExact(
+	t *testing.T,
+	dd *daemon.Daemon,
+	label string,
+	after, before int64,
+	expectedTiers [3]bool,
+) bool {
+	t.Helper()
+	params := daemon.DataParams(c4cContext, after, before, before-after)
+	params.Set("time_group", "average")
+	params.Set("scope_dimensions", c4cNegativeDim)
+	params.Set("options", "jsonwrap|unaligned|absolute")
+	doc, err := dd.DataV3("l4c-child", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := make([]expectedColumnPoint, before-after)
+	for i := range want {
+		want[i] = wantNumberAt(after+int64(i+1), -float64(c4cNegativeValue))
+	}
+	ok := assertExactView(t, doc, after, before, 1)
+	if !c4TierVectorExact(t, doc, expectedTiers) {
+		t.Logf("absolute %s: tier vector mismatch", label)
+		ok = false
+	}
+	if !assertOnlyColumn(t, cols, c4cNegativeDim) {
+		t.Logf("absolute %s: result contains the wrong columns", label)
+		ok = false
+	}
+	if !assertExactColumn(t, cols, c4cNegativeDim, want, 0) {
+		t.Logf("absolute %s: negative flat line did not remain positive in every row", label)
+		ok = false
+	}
+	return ok
 }
 
 // c4cRateVolume totals the rate dimension over one window, with no tier pin,
@@ -308,48 +867,26 @@ func c4cRateVolume(t *testing.T, dd *daemon.Daemon, label string, after, before 
 		if err != nil {
 			t.Fatal(err)
 		}
-		col, has := cols[c4cRateDim]
-		if !has || len(col) == 0 {
-			t.Logf("rate volume not met: [%s] at %d buckets returned no data", label, points)
-			ok = false
-			continue
-		}
-
-		total := 0.0
-		for _, pt := range col {
-			if pt.Value != nil {
-				total += *pt.Value
-			}
-		}
-		ptp := perTierPoints(doc)
-		t.Logf("rate volume [%s]: %d buckets (per_tier %v) total %.10g, want %.10g",
-			label, points, ptp, total, want)
-
 		wantTiers := wantAt60s
 		if points == before-after {
 			wantTiers = wantAt1s
 		}
-		if len(ptp) != len(wantTiers) {
-			t.Logf("rate volume not met: [%s] per_tier has %d tiers, want %d: %v",
-				label, len(ptp), len(wantTiers), ptp)
+		rowSpan := (before - after) / points
+		if !assertExactView(t, doc, after, before, rowSpan) {
+			t.Logf("rate volume not met: [%s] at %d buckets has the wrong view", label, points)
 			ok = false
-		} else {
-			for tier, wantTier := range wantTiers {
-				if got := ptp[tier] > 0; got != wantTier {
-					t.Logf("rate volume not met: [%s] tier %d contributed=%v, want %v "+
-						"at %d buckets (per_tier %v)",
-						label, tier, got, wantTier, points, ptp)
-					ok = false
-				}
-			}
 		}
-
-		if math.Abs(total-want) > 1e-6 {
-			t.Logf("rate volume not met: [%s] at %d buckets totals %.10g over %ds of a "+
-				"constant %d/s, which is %.10g - a rate's volume is the interval its samples "+
-				"were collected at, and that is a property of the record, not of the tier "+
-				"serving the query",
-				label, points, total, before-after, c4cRateValue, want)
+		if !assertTierPresence(t, doc, wantTiers[:]) {
+			t.Logf("rate volume not met: [%s] at %d buckets has the wrong tier vector", label, points)
+			ok = false
+		}
+		if !assertOnlyColumn(t, cols, c4cRateDim) {
+			t.Logf("rate volume not met: [%s] at %d buckets returned the wrong columns", label, points)
+			ok = false
+		}
+		if !assertColumnShapeAndTotal(t, cols, c4cRateDim, after, before, rowSpan, want) {
+			t.Logf("rate volume not met: [%s] at %d buckets did not preserve %.10g",
+				label, points, want)
 			ok = false
 		}
 	}
@@ -369,7 +906,13 @@ func c4cAlignTier1(ts int64) int64 {
 // c4cConstValue for every one of its seconds, whichever tier serves them and
 // however finely they are cut. Nothing here is read back from the engine to
 // decide what is right - the fixture already decided.
-func c4cSumConserves(t *testing.T, dd *daemon.Daemon, label string, after int64) bool {
+func c4cSumConserves(
+	t *testing.T,
+	dd *daemon.Daemon,
+	label string,
+	after int64,
+	wantAt1s [3]bool,
+) bool {
 	t.Helper()
 
 	const span = 7200 // whole tier1 records, and divisible by every zoom below
@@ -392,13 +935,32 @@ func c4cSumConserves(t *testing.T, dd *daemon.Daemon, label string, after int64)
 			t.Fatal(err)
 		}
 
-		col, has := cols[c4cConstDim]
-		if !has {
-			t.Logf("plan-switch conservation not met: %s at %d buckets returned no column", label, points)
+		if !assertOnlyColumn(t, cols, c4cConstDim) {
+			t.Logf("plan-switch conservation not met: %s at %d buckets returned the wrong columns",
+				label, points)
 			ok = false
 			continue
 		}
 
+		rowSpan := span / points
+		if !assertExactView(t, doc, after, before, rowSpan) {
+			t.Logf("plan-switch conservation not met: %s at %d buckets returned the wrong view",
+				label, points)
+			ok = false
+		}
+		if !assertColumnShapeAndTotal(
+			t, cols, c4cConstDim, after, before, rowSpan, want) {
+			t.Logf("plan-switch conservation not met: [%s] %ds buckets did not preserve exact shape and total",
+				label, rowSpan)
+			ok = false
+		}
+		if points == span && !assertTierPresence(t, doc, wantAt1s[:]) {
+			t.Logf("plan-switch conservation not met: %s did not use the expected one-second tier plans",
+				label)
+			ok = false
+		}
+
+		col := cols[c4cConstDim]
 		total := 0.0
 		for _, pt := range col {
 			if pt.Value != nil {
@@ -406,18 +968,8 @@ func c4cSumConserves(t *testing.T, dd *daemon.Daemon, label string, after int64)
 			}
 		}
 
-		bucket := span / points
 		t.Logf("plan-switch conservation [%s]: %ds buckets (%d points, per_tier %v) total %.10g, want %.10g",
-			label, bucket, points, perTierPoints(doc), total, want)
-
-		if math.Abs(total-want) > want*1e-6 {
-			t.Logf("plan-switch conservation not met: [%s] %ds buckets total %.10g over a window "+
-				"holding a flat %d for %ds, which is %.10g (off by %.4g seconds of data) - a flat "+
-				"line has nothing a coarser tier can lose",
-				label, bucket, total, c4cConstValue, span, want,
-				(total-want)/float64(c4cConstValue))
-			ok = false
-		}
+			label, rowSpan, points, perTierPoints(doc), total, want)
 	}
 
 	return ok

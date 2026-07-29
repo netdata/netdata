@@ -19,7 +19,6 @@
 package corpus
 
 import (
-	"math"
 	"strconv"
 	"testing"
 	"time"
@@ -64,8 +63,9 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	}
 
 	const (
-		perWindow = 3
-		windows   = 8
+		perWindow  = 3
+		windows    = 8
+		bucketSpan = tier1Gran / perWindow
 	)
 	after := int64(fixture.T0 + 40) // the first absolute multiple of tier1Gran
 	before := after + windows*tier1Gran
@@ -78,9 +78,15 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertSelectedTier(t, doc, 1) {
+			ok = false
+		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
+			ok = false
 		}
 		return cols[ch.Dimensions[0].ID]
 	}
@@ -90,18 +96,14 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	// used to carry a value must not become EMPTY
 	{
 		col := query("percentage-of-samples", ">=1")
-		if len(col) < windows*perWindow {
-			t.Fatalf("view grid is not finer than the stored data: %d buckets", len(col))
+		want := make([]expectedColumnPoint, windows*perWindow)
+		for i := range want {
+			want[i] = wantNumberAt(after+int64(i+1)*bucketSpan, 0)
 		}
-		empty := 0
-		for _, pt := range col {
-			if pt.Value == nil {
-				empty++
-			}
+		if !assertExactColumn(t, map[string][]canon.Pt{ch.Dimensions[0].ID: col},
+			ch.Dimensions[0].ID, want, 0) {
+			check(false, "percentage-of-samples did not return an exact numeric verdict in every re-delivery bucket")
 		}
-		check(empty == 0,
-			"percentage-of-samples left %d of %d buckets EMPTY — repeats were skipped",
-			empty, len(col))
 	}
 
 	// the counting groupings answer at most once per stored window, however
@@ -115,24 +117,21 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	// the user zooms past the stored resolution.
 	for _, group := range []string{"number-of-times", "number-of-flaps"} {
 		col := query(group, "==0")
-		perStored := map[int64]float64{}
-		empty := 0
-		for _, pt := range col {
-			if pt.Value == nil {
-				empty++
-				continue
+		want := make([]expectedColumnPoint, windows*perWindow)
+		for i := range want {
+			value := 0.0
+			if i%perWindow == 0 {
+				// Every stored window contains both zero and one. The first
+				// delivery contributes its one inferred event; repeats are
+				// numeric zero, never another event and never null.
+				value = 1
 			}
-			perStored[tierWindowEnd(pt.T, tier1Gran)] += *pt.Value
+			want[i] = wantNumberAt(after+int64(i+1)*bucketSpan, value)
 		}
-		for end, total := range perStored {
-			check(total <= 1,
-				"%s totalled %v across the buckets of the stored window ending %d, want at most 1",
-				group, total, end)
+		if !assertExactColumn(t, map[string][]canon.Pt{ch.Dimensions[0].ID: col},
+			ch.Dimensions[0].ID, want, 0) {
+			check(false, "%s did not return exactly one event and two numeric zeros per stored window", group)
 		}
-		check(empty == 0,
-			"%s left %d of %d buckets EMPTY — the buckets a wide stored point covers on its own "+
-				"report 'nothing here' instead of 'nothing happened'",
-			group, empty, len(col))
 	}
 
 	assertContract(t, "CASE-023/redelivery", ok)
@@ -172,9 +171,10 @@ func TestCase023ResetCountedOnceAcrossWindows(t *testing.T) {
 
 	after := int64(fixture.T0 + 40)
 	before := after + 20*tier1Gran
+	resetWindowEnd := tierWindowEnd(fixture.T0+resetAt, tier1Gran)
 
 	// the fixture resets once inside this window
-	total := func(buckets int64) float64 {
+	exact := func(buckets int64) bool {
 		t.Helper()
 		params := daemon.DataParamsTier(ch.Context, 1, after, before, buckets, "number-of-times")
 		params.Set("time_group_options", "<previous")
@@ -183,32 +183,42 @@ func TestCase023ResetCountedOnceAcrossWindows(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		ok := assertSelectedTier(t, doc, 1)
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		sum := 0.0
-		for _, pt := range cols[ch.Dimensions[0].ID] {
-			if pt.Value != nil {
-				sum += *pt.Value
-			}
+		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
+			ok = false
 		}
-		return sum
+
+		step := (before - after) / buckets
+		firstDeliveryEnd := after + ((resetWindowEnd-tier1Gran-after)/step+1)*step
+		want := make([]expectedColumnPoint, buckets)
+		for i := range want {
+			end := after + int64(i+1)*step
+			value := 0.0
+			if end == firstDeliveryEnd {
+				value = 1
+			}
+			want[i] = wantNumberAt(end, value)
+		}
+		return assertExactColumn(t, cols, ch.Dimensions[0].ID, want, 0) && ok
 	}
 
 	ok := true
 
 	// one bucket per stored window: the reset must be counted once, and the
 	// window AFTER it must not be counted as a second one
-	if got := total(20); math.Abs(got-1) >= 1e-6 {
-		t.Logf("reset contract not met: one bucket per stored window counted %v reboots, want 1", got)
+	if !exact(20) {
+		t.Logf("reset contract not met: one bucket per stored window did not return exactly one reboot")
 		ok = false
 	}
 
 	// three buckets per stored window: the same reset, re-delivered, still
 	// counts once
-	if got := total(60); math.Abs(got-1) >= 1e-6 {
-		t.Logf("reset contract not met: a finer grid counted %v reboots, want 1", got)
+	if !exact(60) {
+		t.Logf("reset contract not met: the reset window did not return one reboot followed by numeric zeros")
 		ok = false
 	}
 
