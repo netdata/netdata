@@ -938,6 +938,9 @@ void netdata_dns_runtime_set_flow_ttl(struct netdata_dns_runtime *rt, uint64_t t
 {
     if (!rt || ttl_seconds == 0)
         return;
+    /* Clamp before multiply to avoid uint64 overflow. */
+    if (ttl_seconds > UINT64_MAX / 1000000ULL)
+        ttl_seconds = UINT64_MAX / 1000000ULL;
     rt->flow_ttl_us = ttl_seconds * 1000000ULL;
 }
 

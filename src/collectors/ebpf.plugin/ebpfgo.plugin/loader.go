@@ -147,12 +147,18 @@ func RedHatRelease() (int, error) {
 	return RedHatReleaseFromFile(string(contents))
 }
 
-// KernelVersionString returns the bare kernel release string from
-// /proc/sys/kernel/osrelease (e.g. "5.15.0-91-generic").  This matches the
-// format that reject-list entries use, so HasPrefix comparisons work correctly.
-// It is intentionally consistent with KernelVersion(), which reads the same file.
+// KernelVersionString returns a version string suitable for reject-list prefix
+// matching.  It tries /proc/version_signature first (Ubuntu-only; returns
+// "Ubuntu 4.18.0-xx.xx-generic 4.18.20"), then falls back to
+// /proc/sys/kernel/osrelease (returns "4.18.0-xxx-generic" on other distros).
+// Using version_signature as the primary source preserves Ubuntu-specific
+// reject-list entries (e.g. "Ubuntu 4.18.0") without matching the same kernel
+// version on non-Ubuntu distributions like RHEL 8 ("4.18.0-305.el8.x86_64").
 func KernelVersionString() (string, error) {
-	if release, err := readFirstExistingFile("/proc/sys/kernel/osrelease"); err == nil {
+	if release, err := readFirstExistingFile(
+		"/proc/version_signature",
+		"/proc/sys/kernel/osrelease",
+	); err == nil {
 		return release, nil
 	}
 
