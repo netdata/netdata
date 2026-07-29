@@ -51,6 +51,19 @@ static void build_node_collectors(RRDHOST *host)
 // uuid_unparse_lower() and no release fence, so validating the shared buffer and then transmitting
 // it would validate different bytes than it sends. Callers validate once and send the snapshot.
 //
+// What this does NOT do is make the copy atomic, and it cannot: the buffer is published without
+// synchronization and is read the same way by every other sender (build_node_info(),
+// build_node_collectors(), and the alert paths in sqlite_aclk_alert.c). Validation cannot detect a
+// torn copy either, because old and new node ids are both well-formed UUID strings of identical
+// shape, so any mixture of them still parses. What bounds the exposure is that the only transition
+// the agent initiates is empty -> value: the buffer starts zeroed, every byte of the 36-character
+// body is non-NUL (the 37th byte written is the terminator, already NUL in the zeroed buffer), and
+// 32 hex digits can only be reached once the full body is in place, so a torn copy of that
+// transition always fails to parse and is simply retried. A value -> different value change is
+// cloud-driven only (aclk.c requests a node id only when the host has none), and set_host_node_id()
+// re-arms the manifest, so a stale id is corrected within one window. Publishing this field
+// coherently for all senders is tracked separately.
+//
 // Usable means it parses AND is not the all-zero UUID: zero means the cloud has not registered this
 // node, and UpdateNodeInstanceManifest carries no machine_guid to fall back on, so such a message is
 // unattributable. Note node_id[0] alone is not evidence of a usable id - for the zero UUID it is '0'.
@@ -281,7 +294,7 @@ void aclk_check_node_info_collectors_and_manifest(void)
         // build_node_manifest(): the request stays armed either way, but reporting it as pending here
         // would keep this host on the per-second path indefinitely, which is exactly what the
         // early exit below exists to avoid.
-        char manifest_node_id[UUID_STR_LEN];
+        char manifest_node_id[UUID_STR_LEN] = "";
         bool manifest_pending = node_manifest_send_time && manifest_topic_available &&
                                 aclk_node_id_snapshot(aclk_host_config, manifest_node_id);
 

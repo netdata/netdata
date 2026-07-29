@@ -283,9 +283,15 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
 
     uuid_copy(host->node_id.uuid, *node_id);
 
-    if (unlikely(!aclk_host_config))
+    if (unlikely(!aclk_host_config)) {
         create_aclk_config(host, &host->host_id.uuid, node_id);
-    else
+        // re-load: create_aclk_config() returns without writing node_id when it loses the publish
+        // CAS to a concurrent creator, and that creator may have built the config while
+        // host->node_id was still null - leaving the string empty for good
+        aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    }
+
+    if (likely(aclk_host_config))
         uuid_unparse_lower(*node_id, aclk_host_config->node_id);
 
     // The manifest is keyed by node_id at the cloud, and no function-registry event fires when the

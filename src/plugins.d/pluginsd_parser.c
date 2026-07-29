@@ -1485,9 +1485,12 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     // RRDHOST_FLAG_COLLECTOR_ONLINE, which is exactly what makes rrdhost_is_online() false and so
     // lets `netdatacli remove-stale-node --unregister` free a vnode (see remove_ephemeral_host()).
     // A borrowed pointer would have to survive the chart sweep, the parser destroy and the
-    // collector wait below. Re-resolving the guid afterwards is what service.c does for the same
-    // hazard, and aclk_arm_node_manifest() ignores a NULL host, so a vnode that did go away is
-    // simply skipped.
+    // collector wait below; re-resolving narrows that to the resolve-then-arm pair, and
+    // aclk_arm_node_manifest() ignores a NULL host, so a vnode that did go away is simply skipped.
+    // This does not make the pointer refcounted - holding an RRDHOST across the free paths needs
+    // more than a lock, since rrdhost_free___consume_metadata_lifetime_writelock() releases both
+    // rrd_wrlock and metadata_lifetime_lock before rrdhost_free_unlinked(). It is the same bare
+    // lookup every other caller of rrdhost_find_by_guid() does.
     size_t vnodes_used = 0;
     char (*vnode_guids)[GUID_LEN + 1] = NULL;
 

@@ -1037,12 +1037,12 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     aclk_send_timestamp_set(
         &aclk_host_config->node_info_send_time,
         (host == localhost || NULL == localhost) ? nd_time_t_add_saturating(now, -25) : now);
-    // node_manifest_send_time is deliberately NOT armed here: build_node_info() arms it, so a
-    // host's first manifest is always armed after its node info was built, and there is a single
-    // arming point to reason about. This orders the ARMING only - both messages are dispatched to
-    // parallel query workers, so it is no guarantee of publish order at the cloud. What keeps the
-    // manifest from describing a node the cloud does not know is the node_id check in
-    // aclk_check_node_info_collectors_and_manifest().
+    // node_manifest_send_time is deliberately NOT armed here: build_node_info() arms it, so it is
+    // armed after that host's node info was built rather than alongside it. That orders the ARMING
+    // only - both messages are dispatched to parallel query workers, so it is no guarantee of
+    // publish order at the cloud. What keeps the manifest from describing a node the cloud does not
+    // know is the node_id check in aclk_check_node_info_collectors_and_manifest().
+    // (set_host_node_id() also arms right after creating a config, so this is not the only path.)
 
     struct aclk_sync_cfg_t *expected = NULL;
     if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {

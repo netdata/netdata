@@ -16,12 +16,13 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
                             HTTP_ACCESS *access, int *priority, uint32_t *version);
 void host_functions2json(RRDHOST *host, BUFFER *wb);
 
-// Snapshot of a single user-visible host function. The strings are duplicated
-// references (string_dup()) so the entry stays valid after the host functions
-// read lock is released; the entry is keyed by the function name.
+// Snapshot of a single user-visible host function. The strings are byte copies, not STRING
+// references, so the entry stays valid after the host functions read lock is released without
+// touching a refcount that a concurrent re-registration may already have dropped.
+// The entry is keyed by the function name.
 struct rrd_function_manifest_entry {
-    STRING *help;           // owned reference
-    STRING *tags;           // owned reference
+    char *help;             // owned copy
+    char *tags;             // owned copy
     HTTP_ACCESS access;
     int priority;
     uint32_t version;

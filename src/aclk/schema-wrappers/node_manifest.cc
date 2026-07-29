@@ -45,7 +45,7 @@ static_assert(
 // Requiring the bits to be contiguous from bit 0 pins the shape of HTTP_ACCESS_ALL, so a bit
 // cannot be dropped from it without also tripping the count above.
 static_assert(
-    (unsigned)HTTP_ACCESS_ALL == (1ull << HTTP_ACCESS_MAP_ENTRIES) - 1ull,
+    (unsigned)HTTP_ACCESS_ALL == (1ULL << HTTP_ACCESS_MAP_ENTRIES) - 1ULL,
     "HTTP_ACCESS bits are no longer contiguous from bit 0 - update http_access_map");
 
 // Both assertions above are functions of HTTP_ACCESS_ALL alone, which is itself hand-maintained:
@@ -119,11 +119,12 @@ char *generate_update_node_instance_manifest_message(size_t *len, struct update_
 
             manifestpb::Function *f = functions->add_items();
             f->set_name(fn_value_dfe.name);
-            const char *help = string2str(fn->help);
-            if (*help)
-                f->set_help(help);
-            set_function_tags(f, string2str(fn->tags));
-            f->set_priority((uint32_t)fn->priority);
+            if (fn->help && *fn->help)
+                f->set_help(fn->help);
+            set_function_tags(f, fn->tags);
+            // the proto field is unsigned; a negative priority would wrap, so fall back to the
+            // default the way pluginsd already does for its own input
+            f->set_priority(fn->priority > 0 ? (uint32_t)fn->priority : RRDFUNCTIONS_PRIORITY_DEFAULT);
             f->set_version(fn->version);
             set_function_access(f, fn->access);
         }

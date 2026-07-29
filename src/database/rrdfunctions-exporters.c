@@ -182,8 +182,8 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
 static void manifest_entry_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
                                      void *data __maybe_unused) {
     struct rrd_function_manifest_entry *e = value;
-    string_freez(e->help);
-    string_freez(e->tags);
+    freez((void *)e->help);
+    freez((void *)e->tags);
 }
 
 DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
@@ -197,11 +197,14 @@ DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
         if(!rrd_function_is_available(t, host)) continue;
         if(t->options & (RRD_FUNCTION_DYNCFG | RRD_FUNCTION_RESTRICTED)) continue;
 
-        // duplicate the string references, so the entry stays valid after this
-        // read lock is released
+        // Copy the bytes rather than taking a STRING reference. The conflict callback swaps
+        // help/tags and frees the displaced STRING under the dictionary INDEX lock, while this
+        // traversal only holds the ITEMS lock - so string_dup() here would be a refcount
+        // read-modify-write on a STRING that can already be freed, which also fatal()s on a
+        // deleted string. Every sibling exporter reads these the same way.
         struct rrd_function_manifest_entry e = {
-            .help = string_dup(t->help),
-            .tags = string_dup(t->tags),
+            .help = strdupz(string2str(t->help)),
+            .tags = strdupz(string2str(t->tags)),
             .access = t->access,
             .priority = t->priority,
             .version = t->version,

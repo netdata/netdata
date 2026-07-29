@@ -94,8 +94,11 @@ static inline void aclk_send_timestamp_arm(aclk_send_timestamp_t *send_time, tim
     time_t expected = __atomic_load_n(send_time, __ATOMIC_ACQUIRE);
 
     while (expected == 0 || expected > value) {
+        // failure order must not be stronger than success order, and the CAS writes the observed
+        // value back into `expected` regardless of it, so RELAXED is sufficient on failure -
+        // matching aclk_send_timestamp_claim() below
         if (__atomic_compare_exchange_n(
-                send_time, &expected, value, false, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE))
+                send_time, &expected, value, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED))
             return;
         // expected now holds the current value; re-test and retry
     }
