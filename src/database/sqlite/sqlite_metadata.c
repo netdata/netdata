@@ -291,13 +291,20 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     }
 
-    if (likely(aclk_host_config))
+    if (likely(aclk_host_config)) {
         uuid_unparse_lower(*node_id, aclk_host_config->node_id);
 
-    // The manifest is keyed by node_id at the cloud, and no function-registry event fires when the
-    // node_id itself changes - so without this a host that gets (or changes) its node_id keeps a
-    // manifest filed under the previous id until some unrelated function is registered.
-    aclk_arm_node_manifest(host);
+        // The manifest is keyed by node_id at the cloud, and no function-registry event fires when
+        // the node_id itself changes - so without this a host that gets (or changes) its node_id
+        // keeps a manifest filed under the previous id until some unrelated function is registered.
+        //
+        // This SETS the deadline rather than arming it, because a request armed before this change
+        // does not satisfy one made after it: aclk_arm_node_manifest() keeps the earlier deadline,
+        // which a worker that already snapshotted the OLD node_id would then claim - publishing the
+        // stale id and consuming the only pending request. Replacing the deadline instead makes that
+        // worker's claim CAS fail, so it re-snapshots and sends the new id on a later pass.
+        aclk_send_timestamp_set(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+    }
 
     stream_receiver_send_node_and_claim_id_to_child(host);
     stream_path_node_id_updated(host);
