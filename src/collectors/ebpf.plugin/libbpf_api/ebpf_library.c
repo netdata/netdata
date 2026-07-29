@@ -1576,6 +1576,9 @@ void ebpf_read_global_table_stats(
     int before = (maps_per_core) ? ebpf_nprocs : 1;
 
     for (idx = begin; idx < end; idx++) {
+        /* Zero the slot first: a failed lookup must publish 0, not stale or
+         * uninitialized data (callers may pass stack-allocated arrays). */
+        stats[idx - begin] = 0;
         if (!bpf_map_lookup_elem(map_fd, &idx, values)) {
             netdata_idx_t total = 0;
             int i;
