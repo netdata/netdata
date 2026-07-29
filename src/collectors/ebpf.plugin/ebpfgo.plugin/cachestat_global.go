@@ -122,7 +122,9 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 	if total > 0 {
 		publish.Ratio = int64((float64(hits) / float64(total)) * 100)
 	} else {
-		publish.Ratio = 100
+		// No page accesses this cycle: ratio is undefined, not 100 %.
+		// Emit 0 so idle periods don't fabricate a perfect hit rate.
+		publish.Ratio = 0
 	}
 
 	s.cumDirty += mbd

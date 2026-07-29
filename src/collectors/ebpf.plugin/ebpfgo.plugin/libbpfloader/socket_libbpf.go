@@ -175,7 +175,9 @@ func (r *SocketRuntime) SnapshotPerPID() ([]SocketPIDEntry, error) {
 	var cCount C.int
 	cEntries := C.netdata_socket_per_pid_snapshot(r.ptr, &cCount)
 	if cEntries == nil || cCount <= 0 {
-		return nil, nil
+		// Empty BPF map: no network-active PIDs this cycle.  Return an empty
+		// slice (not nil) so callers can distinguish "no data" from "failure".
+		return []SocketPIDEntry{}, nil
 	}
 
 	n := int(cCount)

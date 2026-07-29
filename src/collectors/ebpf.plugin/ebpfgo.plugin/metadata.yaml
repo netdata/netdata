@@ -370,18 +370,12 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        This module does not publish standalone Netdata charts. It attaches to kernel TCP/UDP functions
-        and exposes the collected data through the on-demand `network-protocols` function
-        (FUNCTIONGLOBAL) consumed by the network-viewer.
+        This module attaches to kernel TCP/UDP functions and publishes nine host-level `ip.*` charts
+        plus the on-demand `network-protocols` function (FUNCTIONGLOBAL) consumed by the network-viewer.
 
-        > **Migration note** — Prior versions of `ebpf.plugin` published the following standalone charts
-        > that supported alerting and metric retention. These charts are **permanently removed**; the
-        > data is now available through the `network-protocols` on-demand function in network-viewer.
-        > On-demand function output does not support alerting or metric retention.
-        >
-        > Removed host-level charts: `ip.inbound_conn`, `ip.tcp_outbound_conn`, `ip.tcp_functions`,
-        > `ip.total_tcp_bandwidth`, `ip.tcp_error`, `ip.tcp_retransmit`, `ip.udp_functions`,
-        > `ip.total_udp_bandwidth`, `ip.udp_error`.
+        > **Migration note** — Per-app charts published by prior versions of `ebpf.plugin` are not
+        > republished. The following are permanently removed; use the `network-protocols` function in
+        > network-viewer as a replacement.
         >
         > Removed per-app charts: `app.ebpf_call_tcp_v4_connection`, `app.ebpf_call_tcp_v6_connection`,
         > `app.ebpf_sock_total_bandwidth`, `app.ebpf_call_tcp_sendmsg`, `app.ebpf_call_tcp_cleanup_rbuf`,
@@ -418,4 +412,70 @@ modules:
         | SegsRetransmitted | Retransmitted segments per second |
         | DatagramsNoPort | Datagrams with no destination port per second |
       availability: []
-      scopes: []
+      scopes:
+        - name: global
+          description: "These metrics show total number of calls to functions inside kernel."
+          labels: []
+          metrics:
+            - name: ip.inbound_conn
+              description: Inbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connected_tcp
+                - name: connected_udp
+            - name: ip.tcp_outbound_conn
+              description: TCP outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: ip.tcp_functions
+              description: Calls to internal functions
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: received
+                - name: send
+                - name: closed
+            - name: ip.total_tcp_bandwidth
+              description: TCP bandwidth
+              unit: "kilobits/s"
+              chart_type: stacked
+              dimensions:
+                - name: received
+                - name: send
+            - name: ip.tcp_error
+              description: TCP errors
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: received
+                - name: send
+            - name: ip.tcp_retransmit
+              description: Packages retransmitted
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: retransmitted
+            - name: ip.udp_functions
+              description: UDP calls
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: received
+                - name: send
+            - name: ip.total_udp_bandwidth
+              description: UDP bandwidth
+              unit: "kilobits/s"
+              chart_type: stacked
+              dimensions:
+                - name: received
+                - name: send
+            - name: ip.udp_error
+              description: UDP errors
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: received
+                - name: send

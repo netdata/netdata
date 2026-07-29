@@ -149,6 +149,49 @@ jobs:
             | gotestfmt -hide all
         working-directory: ${{ matrix.module }}
 
+  ebpf-libbpf-tests:
+    name: Go ebpf libbpf-tagged tests
+    runs-on: ubuntu-latest
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod
+      - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Install libbpf headers
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libbpf-dev linux-headers-generic
+      - name: Go mod download
+        if: needs.file-check.outputs.run == 'true'
+        run: go mod download
+        working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
+      - name: Set up gotestfmt
+        if: needs.file-check.outputs.run == 'true'
+        uses: GoTestTools/gotestfmt-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: v2.2.0
+      - name: Go test (libbpf tag)
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          CGO_ENABLED=1 go test -tags netdata_ebpf_libbpf -json ./... -race -count=1 2>&1 \
+            | "$GITHUB_WORKSPACE/.github/scripts/normalize-go-test-json.py" \
+            | gotestfmt -hide all
+        working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
+
   build-tests:
     name: Go build tests
     runs-on: ubuntu-latest

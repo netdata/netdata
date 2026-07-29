@@ -97,6 +97,16 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 		cfg.FlowTTL = *fileCfg.FlowTTL
 	}
 
+	// NV_DNS_UPDATE_EVERY is hardcoded to 20 in network-viewer.c.  If FlowTTL
+	// differs, dns-queries results will be double-counted (TTL > 20) or silently
+	// dropped (TTL < 20).  Warn early so operators catch the misconfiguration.
+	if cfg.FlowTTL != dnsDefaultFlowTTL {
+		fmt.Fprintf(os.Stderr,
+			"ebpf-go.plugin: dns: flow ttl %d != NV_DNS_UPDATE_EVERY (%d); "+
+				"dns-queries results may be double-counted or missing\n",
+			cfg.FlowTTL, dnsDefaultFlowTTL)
+	}
+
 	// Clamp update_every to the flow TTL: records older than FlowTTL seconds are
 	// dropped by FlowSnapshot.  The TTL is propagated to the C runtime via
 	// SetFlowTTL after loading so both layers enforce the same live window.
