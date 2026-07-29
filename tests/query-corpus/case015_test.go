@@ -42,6 +42,8 @@ func case015Settled(t *testing.T, hostname string, ch fixture.Chart) bool {
 }
 
 func TestCase015LiveDisconnectDiscard(t *testing.T) {
+	trackContract(t, "CASE-015/live-disconnect-discard")
+
 	ch := fixture.FullPalette("fixture.c015live", "fixture.c015live", fixture.T0, case015Points)
 
 	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
@@ -67,6 +69,8 @@ func TestCase015LiveDisconnectDiscard(t *testing.T) {
 // daemon must survive and keep serving. Green on fixed and unfixed builds;
 // it guards crash-safety, not data completeness.
 func TestCase015MidDialogueDisconnect(t *testing.T) {
+	trackContractComponent(t, "CASE-015/robustness", "mid-dialogue")
+
 	ch := fixture.FullPalette("fixture.c015mid", "fixture.c015mid", fixture.T0, 60)
 
 	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
@@ -93,6 +97,8 @@ func TestCase015MidDialogueDisconnect(t *testing.T) {
 // to shake races out of the teardown path. Liveness guard only — data
 // completeness is asserted by the discard cases above.
 func TestCase015DisconnectSoak(t *testing.T) {
+	trackContractComponent(t, "CASE-015/robustness", "disconnect-soak")
+
 	const cycles = 30
 	for i := 0; i < cycles; i++ {
 		host := fmt.Sprintf("c015-soak-%02d", i)
@@ -117,6 +123,8 @@ func TestCase015DisconnectSoak(t *testing.T) {
 }
 
 func TestCase015ReplicationDisconnectDiscard(t *testing.T) {
+	trackContract(t, "CASE-015/replication-disconnect-discard")
+
 	ch := fixture.FullPalette("fixture.c015repl", "fixture.c015repl", fixture.T0, case015Points)
 
 	conn, err := stream.Connect(td.Addr, daemon.StreamKey,

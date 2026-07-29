@@ -31,6 +31,8 @@ import (
 )
 
 func TestCase019JsonNameEscaping(t *testing.T) {
+	trackContract(t, "CASE-019/v1-json-name-escaping")
+
 	const chart = "fixture.c019"
 	ch := fixture.Chart{
 		ID: chart, Title: "escaping", Units: "units", Family: "fixture",

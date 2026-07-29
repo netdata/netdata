@@ -170,6 +170,8 @@ func emptyKind(stored bool) string {
 // T0+1..T0+40; full windows follow every 60s. Every fixture pushes two full
 // windows beyond the last asserted end (the tier write-delay settle rule).
 func TestLayer2Tier1Palette(t *testing.T) {
+	trackContract(t, "L2/tier1-palette")
+
 	const b1 = fixture.T0 + 40 // first aligned tier1 window end after T0
 
 	cases := map[string]struct {
@@ -255,6 +257,8 @@ func TestLayer2Tier1Palette(t *testing.T) {
 // all-gap window). Both must read back as null + EMPTY; the flanking partial
 // windows carry the reduced counts.
 func TestLayer2WholeChartAbsence(t *testing.T) {
+	trackContract(t, "L2/whole-chart-absence")
+
 	const b1 = fixture.T0 + 40
 	points := make([]fixture.Point, 0, 240)
 	for i := 1; i <= 400; i++ {
@@ -287,6 +291,8 @@ func TestLayer2WholeChartAbsence(t *testing.T) {
 // read 16777220. The same fixture cross-checks the tier0 identity
 // (SNRoundTrip oracle) so both contracts are asserted on the same data.
 func TestLayer2SNvsOriginal(t *testing.T) {
+	trackContract(t, "L2/sn-vs-original")
+
 	const v = "16777217"
 	ch := fixture.Series("fixture.l2snorig", "fixture.l2snorig", fixture.T0, 280, 1, func(_ int) string {
 		return v
@@ -306,6 +312,8 @@ func TestLayer2SNvsOriginal(t *testing.T) {
 // TestLayer2UpdateEvery5 exercises the tier grid arithmetic with a
 // non-default update_every: granularity 5×60=300, first aligned end T0+100.
 func TestLayer2UpdateEvery5(t *testing.T) {
+	trackContract(t, "L2/update-every-5")
+
 	ch := fixture.Series("fixture.l2ue5", "fixture.l2ue5", fixture.T0, 260, 5, modVal, notAnom)
 
 	pushLiveBurst(t, "l2-ue5", guid(48), ch)
@@ -323,6 +331,8 @@ func TestLayer2UpdateEvery5(t *testing.T) {
 // asserts a stretch of tier1 windows around the gap boundary, so both rollup
 // levels are pinned on identical data.
 func TestLayer2Tier2(t *testing.T) {
+	trackContract(t, "L2/tier2")
+
 	ch := fixture.Series("fixture.l2tier2", "fixture.l2tier2", fixture.T0, 17200, 1, func(i int) string {
 		return strconv.Itoa(i % 1000)
 	}, func(i int) string {

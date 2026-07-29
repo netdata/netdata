@@ -35,6 +35,8 @@ import (
 )
 
 func TestCase027IncrementalSumConservesAcrossZoom(t *testing.T) {
+	trackContract(t, "CASE-027/incremental-sum-conserves-across-zoom")
+
 	const (
 		ctx     = "fixture.c027inc"
 		host    = "c027inc"

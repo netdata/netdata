@@ -18,9 +18,10 @@ import (
 // hardcoded "we know this one is broken" would make a broken engine report
 // success, and the whole point of this corpus is to name what is broken.
 type ManifestCase struct {
-	Name    string
-	Proves  string
-	FixedBy string // PR or commit that fixed it
+	Proves     string
+	Cloud      string   // defaults to n/a
+	FixedBy    string   // PR or commit that fixed it
+	Components []string // required independent test scopes; empty means one scope
 }
 
 var manifest = map[string]ManifestCase{
@@ -52,13 +53,14 @@ var manifest = map[string]ManifestCase{
 		FixedBy: "#23118",
 	},
 	"CASE-015/robustness": {
-		Proves: "receiver teardown with queued replies to a dead child stays crash-free: mid-dialogue disconnect and a 30-cycle disconnect soak",
+		Proves:     "receiver teardown with queued replies to a dead child stays crash-free: mid-dialogue disconnect and a 30-cycle disconnect soak",
+		Components: []string{"mid-dialogue", "disconnect-soak"},
 	},
 	"L1/palette": {
 		Proves: "tier0 ingestion identity for the edge-data palette: complete, leading/interior-run gaps, trailing short retention, reset (AR and lone-R), anomaly runs, negatives, all-zero, update_every=5",
 	},
 	"L1/single-point": {
-		Proves: "single-point ingestion exact through a wide window; PINS the 1-point-window view expansion (ue 1→2, bucket at t0+2) as a layer-9 seed",
+		Proves: "single-point ingestion is exact through a window wider than retention: the value stays at its stored timestamp and surrounding rows stay empty. CASE-034 separately covers the semantics of asking for one result bucket",
 	},
 	"L1/trailing-window": {
 		Proves: "beyond-retention reads return null points at the fixed epoch (no now-trimming)",
@@ -71,7 +73,8 @@ var manifest = map[string]ManifestCase{
 		FixedBy: "ruling #23095",
 	},
 	"L1/incremental-rates": {
-		Proves: "the db stores PER-SECOND rates regardless of update_every: a v1 child's raw counters through the parent's rrdset_done yield K*(mul/div)/UE per second (incremental at ue 1/2/5 incl. mul/div scaling; absolute control unscaled)",
+		Proves:     "the db stores PER-SECOND rates regardless of update_every: a v1 child's raw counters through the parent's rrdset_done yield K*(mul/div)/UE per second (incremental at ue 1/2/5 incl. mul/div scaling; absolute control unscaled)",
+		Components: []string{"rates-ue1-2-5", "rate-ue10"},
 	},
 	"L1/resets-overflows": {
 		Proves: "parent rrdset_done reset/overflow arithmetic over the v1 wire: implausible backward step → zero increment + SN_FLAG_RESET; plausible 32-bit wrap reconstructs cap-relative delta — ONE LESS than the true modulo delta (cap 0xFFFFFFFF, pinned quirk, rulings batch); percentage-of-incremental-row pre-pass absorbs the reset (0% + RESET, survivors split 100%); a silence beyond the gap threshold resets the collection (no spike from the across-gap delta, no RESET, null gap rows); sub-second sample offsets BLEND adjacent sample rates across stored rows with exact mass conservation",
@@ -121,10 +124,12 @@ var manifest = map[string]ManifestCase{
 		Proves: "the FULL time-grouping registry: all 47 accepted name strings (latest included since #23257) answer (20 variants/aliases beyond L3/families, alias==canonical), the complete countif grammar (! !: >: <: <> : == spaces empty), numeric option overrides with clamps (percentile [0,100], trimmed-mean/median [0,50]), unknown names silently parse to average; PINNED QUIRK (rulings batch): bare-number countif options lose their first digit",
 	},
 	"L3/anomaly-bit-option": {
-		Proves: "options=anomaly-bit replaces fetched values with per-point anomaly rates BEFORE time-grouping: 0/100 at tier0 identity, buckets aggregate the rates (average = bucket anomaly %, max = any-anomaly), group-by consumes them as values (sum adds across members, gaps stamp PARTIAL), and tier>0 feeds FRACTIONAL window rates (100*anomaly_count/count)",
+		Proves:     "options=anomaly-bit replaces fetched values with per-point anomaly rates BEFORE time-grouping: 0/100 at tier0 identity, buckets aggregate the rates (average = bucket anomaly %, max = any-anomaly), group-by consumes them as values (sum adds across members, gaps stamp PARTIAL), and tier>0 feeds FRACTIONAL window rates (100*anomaly_count/count)",
+		Components: []string{"option", "tier-rates"},
 	},
 	"L3/sum-over-time-volume": {
-		Proves: "time_group=sum has two modes: RATE-stored metrics (incremental) multiply each point by its duration — the sum is the VOLUME at any update_every; non-rate metrics sum plainly",
+		Proves:     "time_group=sum has two modes: RATE-stored metrics (incremental) multiply each point by its duration — the sum is the VOLUME at any update_every; non-rate metrics sum plainly",
+		Components: []string{"rate-volume", "gauge-plain-sum"},
 	},
 	"CASE-020/sum-over-time-units": {
 		Proves: "summing a rate over time produces a volume, but the response units keep the rate form — 'units/s' should become 'units' when time_group=sum integrates a rate",
@@ -136,10 +141,12 @@ var manifest = map[string]ManifestCase{
 		Proves: "with no tier param the planner picks the COARSEST tier whose density is acceptable (>= HALF the wanted points, wanted floored at QUERY_PLAN_MIN_POINTS=10): 1s buckets from tier0, 60s from tier1, and even 3600s buckets from tier1 while it covers (tier2 needs >= 5h windows — 5 x 3600s — or coverage gaps); db.per_tier points-read pinned exclusive; values equal the serving tier's oracle",
 	},
 	"L4/minmax-absolute-semantics": {
-		Proves: "time_group=min returns the value CLOSEST to zero and max the value FURTHEST from zero (min.h/max.h fabs comparisons) — visible only on negative/mixed data; pinned green in L3 sign-semantics + L4 matrix; RULING PENDING (arithmetic min/max would be a behavior change; extremes already provides champion-by-abs)",
+		Proves:     "time_group=min returns the value CLOSEST to zero and max the value FURTHEST from zero (min.h/max.h fabs comparisons) — visible only on negative/mixed data; pinned green in L3 sign-semantics + L4 matrix; RULING PENDING (arithmetic min/max would be a behavior change; extremes already provides champion-by-abs)",
+		Components: []string{"tier0-min", "tier0-max", "tier1-min", "tier1-max"},
 	},
 	"L4/plan-switching": {
-		Proves: "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated daemon with tier0 at the 25MB quota floor rotates its head out (boundary DISCOVERED from db.per_tier, ~19h evicted at 10M samples), a straddling query reads tier1 (head) + tier0 (tail) with per-side oracle values, and a head-only query is served by tier1 alone",
+		Proves:     "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated daemon with tier0 at the 25MB quota floor rotates its head out (boundary DISCOVERED from db.per_tier, ~19h evicted at 10M samples), a straddling query reads tier1 (head) + tier0 (tail) with per-side oracle values, and a head-only query is served by tier1 alone",
+		Components: []string{"seam", "head-only"},
 	},
 	"L4/three-tier-join": {
 		Proves: "three tiers with DIFFERENT retention depths, joined inside one query: every tier at the engine's 25MiB floor and the tiers brought close together (1s/5s/10s) so each fills its own quota from one fixture — tier0 keeps the newest slice, tier1 outlives it, tier2 outlives them both. The whole retained duration is then read at five resolutions from 845s buckets down to 2.9s: no bucket inside the span is ever empty, time never runs backwards, every value stays inside the generator range, and across the resolutions all three tiers contribute (the planner picks the coarsest tier that can supply the requested density, so WHICH tier answers changes with the zoom). Pins that alignment rounds the grid OUTWARD, so the leading buckets can precede retention and are legitimately empty; and that asking for buckets finer than the serving tier is upsampling, not a seam defect",
@@ -237,22 +244,38 @@ var manifest = map[string]ManifestCase{
 		Proves: "time_group=incremental-sum answers how much a value changed in a bucket, so the buckets of a window telescope: each measures from where the one before it ended, and they add up to the change between the first reading and the last, at every resolution. The mechanism is one line - a bucket hands its last sample forward as the next bucket's baseline - and a bucket holding a SINGLE sample has no 'last' distinct from the baseline it just captured, so a carry that copies the missing one over the real one destroys it. Every bucket then holds a baseline with nothing to measure against it and answers EMPTY, which is what a chart drawn at one bucket per collection interval used to do for its whole length. Asserted at ten buckets per stored record, one per record, and five and ten records per bucket",
 	},
 	"CASE-028/rate-with-gaps-totals-what-was-measured": {
-		Proves: "a rate metric with holes in it totals the seconds that were MEASURED, on every tier. Above tier 0 a stored record carries a sum, a count and a wall-clock width, and where seconds under it were never collected the width and the measured time differ - using the width invents volume for time nobody watched and makes the answer a property of retention. The matrix separates the candidate arithmetics: update_every 1 AND 10 (at 1 second, sum x interval is indistinguishable from sum alone), tier 1 AND tier 2 (whose own strides differ by sixty), gapped and no-gap controls, and bucket counts that divide no stored record evenly",
+		Proves: "a rate metric with holes in it totals the seconds that were MEASURED, on every tier. Above tier 0 a stored record carries a sum, a count and a wall-clock width, and where seconds under it were never collected the width and the measured time differ - using the width invents volume for time nobody watched and makes the answer a property of retention. The matrix separates the candidate arithmetics: update_every 1 AND 10 (at 1 second, sum x interval is indistinguishable from sum alone), tier 1 AND tier 2 (whose own strides differ by sixty), and gapped plus no-gap controls. Every query spans whole stored records and uses bucket counts that divide the window exactly, so the oracle has no edge estimate or rounded query span",
+	},
+	"CASE-028/partial-and-off-grid-rate-windows": {
+		Proves: "a window that CUTS stored records still totals what those seconds hold. The aligned matrix is what makes CASE-028's oracle exact, and it means a partial record is never asked for - but a window starting and ending inside records is the ordinary case for a dashboard. Asserted on a rate with no holes, where the part of a record inside the window is countable from the fixture rather than estimated, at update_every 1 and 10, on tier 0 and tier 1, over windows that start mid-record, end mid-record, and cover exactly 181 samples",
 	},
 	"CASE-029/tier0-slow-metric-totals-at-every-zoom": {
 		Proves: "sum's zoom inflation was never a property of tiers - it was a property of a stored record being WIDER than the row asking about it, which is equally true at tier 0 for anything collected less often than once a second. A metric collected every ten seconds answers ten one-second rows from one stored record, and used to report ten times what it stored. Pins the deliberate change to what tier 0 answers for slow metrics",
 	},
 	"CASE-030/interval-change-slowing-down": {
-		Proves: "a metric that changes how often it is collected does not change what its history held. Netdata supports update_every changing while a metric runs and the database keeps every historical record at the interval it was collected at, so a volume over an OLD window is a property of that window's own records. This is the case that separates the interval a record's samples were collected at from the interval the metric uses now - identical numbers until the interval changes, which is why a fixture with one uniform interval cannot tell a correct implementation from one reading current metadata. Asserted on a window of whole tier2 records in the middle of the history - which is also a whole number of tier1 records and of samples, so one window serves every tier - at forced tier 0, tier 1 AND tier 2, whose strides differ by sixty and by 3600. Mutation-proved: an implementation reading the metric's CURRENT tier-0 interval fails both directions at all three tiers, by 10x in each",
+		Proves: "a metric changing how often it is collected does not rewrite the volume of complete, no-gap historical records. This separates the interval represented by the queried records from the metric's current interval - identical numbers until the interval changes, which is why a uniform fixture cannot detect current-metadata arithmetic. Asserted on four whole tier2 records in the middle of the first collection phase, also a whole number of tier1 records and samples, at forced tiers 0, 1 and 2. This does not claim that a gapped higher-tier record preserves its historical interval: CASE-028 proves sum/count/span cannot expose that. Mutation-proved: reading the metric's CURRENT tier-0 interval fails both directions at all three tiers by 10x",
 	},
 	"CASE-030/interval-change-speeding-up": {
 		Proves: "the mirror of CASE-030/interval-change-slowing-down: history collected every ten seconds keeps its volume after the metric moves to once a second. Asserted separately so a run names which direction broke, and so one failure cannot be counted twice. Same three tiers and the same mutation proof as its mirror",
 	},
 	"CASE-031/rate-volume-across-an-automatic-seam": {
-		Proves: "a rate's volume over a window is the same whether the query is served by one tier, by another, or by both at once. A rate's sum has to be multiplied by the interval its samples were collected at, and above tier 0 that interval is not in the record's value - it has to come from the record's own coverage. An automatic tier seam is therefore where an implementation that mislabels which tier a record came from gives itself away (wrong by the tier grouping, 60x or 3600x), and the rotated tier0 head is where a rate is served from a higher tier alone. Asserted on the layer-4c daemon, where the seam is discovered rather than predicted, across the seam and on each side of it",
+		Proves: "a rate's volume over a window is the same whether the query is served by tier 0, tier 1, or both at once. An automatic tier0-tier1 seam is where labelling a record with the planner's next tier instead of its source tier gives itself away by the 60x grouping difference; the rotated tier0 head proves tier1-only history. Asserted on the layer-4c daemon at both 60-second and 1-second zooms, with the exact presence or absence of all three configured tiers across the seam and on each side. A tier1-tier2 rate seam is not covered here",
 	},
-	"CASE-028/partial-and-off-grid-rate-windows": {
-		Proves: "a window that CUTS stored records still totals what those seconds hold. The aligned matrix is what makes CASE-028's oracle exact, and it means a partial record is never asked for - but a window starting and ending inside records is the ordinary case for a dashboard. Asserted on a rate with no holes, where the part of a record inside the window is countable from the fixture rather than estimated, at update_every 1 and 10, on tier 0 and tier 1, over windows that start mid-record, end mid-record, and cover an odd number of samples",
+	"CASE-032/reset-annotation-is-not-redelivered": {
+		Proves: "a RESET is annotated exactly once, on the result row containing the reset sample's timestamp. At tier 0 a metric collected every 10 seconds and viewed in 5-second rows re-delivers each stored point to two rows; average and sum must not turn one RESET into two or annotate the earlier row before the event occurred",
+	},
+	"CASE-033/anomaly-rate-counts-samples-in-the-row": {
+		Proves: "a result row's anomaly rate is the percentage of raw samples whose timestamps are inside that row, matching the shipped API contract. At tier 0, row (t0+50,t0+75] contains exactly the samples at +60 and +70; with only +60 anomalous, average, max and sum must report 50%, independent of records fetched outside the row",
+	},
+	"CASE-034/single-bucket-respects-requested-window": {
+		Proves:     "points=1 covers exactly the requested `(after,before]` interval. The fixture makes the complete record ending at `after` 1000/s and every sample inside the requested window 10/s, so including the outside record is visible under both average and sum. Asserted at update_every 1 and 10 and forced tiers 0, 1 and 2; the row timestamp, view bounds and view update_every must also describe exactly the requested window",
+		Components: []string{"ue1", "ue10"},
+	},
+	"CASE-035/straddling-record-slowing-down": {
+		Proves: "a complete higher-tier record that straddles a metric changing from update_every 1 to 10 preserves the exact rate volume measured on both sides. The rate also changes at the transition, so multiplying an unweighted mean rate by the record span cannot pass. The oracle sums each fixture sample's rate x its own collection interval; asserted on whole tier1 and tier2 records with tier0 controls and exact selected-tier evidence",
+	},
+	"CASE-035/straddling-record-speeding-up": {
+		Proves: "the mirror of CASE-035/straddling-record-slowing-down: a complete higher-tier record spanning a change from update_every 10 to 1 preserves the exact measured rate volume. Asserted separately in both directions because the old cadence determines the in-progress higher-tier record boundaries",
 	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves:  "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
@@ -314,10 +337,12 @@ var manifest = map[string]ManifestCase{
 		Proves: "a total equals what the fixture actually pushed into the window - conservation against arithmetic rather than against another query. Two preconditions, both principled and both enforced: the chart points must be at least as wide as the COLLECTION INTERVAL (below that the engine is no longer dividing stored records but manufacturing values between them, which layer 9 owns), and the tier being asked must actually cover the window (a rollup still catching up answers with less than was pushed, which looks like a defect and is not). The precondition is on the collection interval and NOT on the stored record, because at tier 1 a 1-second chart point is still one point per collected sample - and that regime is exactly where sum-over-time multiplies a total by the zoom",
 	},
 	"L9/virtual-points": {
-		Proves: "the virtual-points view oracle is engine-EXACT (fixture/viewpoints.go, the rrd2rrdr_query_execute port): grid boundaries cutting sample intervals serve a linearly interpolated boundary point per line; only freshly fetched points ending inside the line are added whole (a pending straddler shifts to the interpolation anchor WITHOUT re-adding, keeping its original bounds); off-grid charts re-time onto the absolute grid with exact interpolated slots; upsampling serves interpolated sub-ue slots, with the query's FIRST straddler raw — tier0 has no backward plan expansion, so it has no anchor (the CASE-017 asymmetry)",
+		Proves:     "the virtual-points view oracle is engine-EXACT (fixture/viewpoints.go, the rrd2rrdr_query_execute port): grid boundaries cutting sample intervals serve a linearly interpolated boundary point per line; only freshly fetched points ending inside the line are added whole (a pending straddler shifts to the interpolation anchor WITHOUT re-adding, keeping its original bounds); off-grid charts re-time onto the absolute grid with exact interpolated slots; upsampling serves interpolated sub-ue slots, with the query's FIRST straddler raw — tier0 has no backward plan expansion, so it has no anchor (the CASE-017 asymmetry)",
+		Components: []string{"interpolated-buckets", "off-grid-identity", "upsampling"},
 	},
 	"L9/window-normalization": {
-		Proves: "a negative `after` is relative to `before` (identical to the absolute equivalent); (0,0) resolves to the ~600s grid-aligned default window ending NOW — NOT the full retention (the reason backdated fixtures settle via explicit windows); time_resampling (v1 gtime) forces the bucket size up",
+		Proves:     "a negative `after` is relative to `before` (identical to the absolute equivalent); (0,0) resolves to the ~600s grid-aligned default window ending NOW — NOT the full retention (the reason backdated fixtures settle via explicit windows); time_resampling (v1 gtime) forces the bucket size up",
+		Components: []string{"relative-window", "default-relative-window", "time-resampling"},
 	},
 	"L9/natural-points": {
 		Proves: "options=natural-points keeps the db COUNT and spacing with raw sample values, but timestamps still snap onto the absolute ue grid; slot values around region boundaries are the raw sample OR its phase-interpolation toward the next (two-candidate pin; the full natural-mode slot selection is a recorded deferral — the DEFAULT virtual-points mode is oracle-exact)",
@@ -329,19 +354,23 @@ var manifest = map[string]ManifestCase{
 		Proves: "/api/v2/data and /api/v3/data answer identically for identical params (shared api_v23_data_internal) — only the api version field differs",
 	},
 	"API/selectors": {
-		Proves: "the selector surface with VALUE-exact oracles: nodes/instances/dimensions filters and their scope_ counterparts, '!' negation patterns, label key:value patterns (labels + scope_labels); match-ids/match-names dimension modes with id!=name dims (default matches BOTH; each mode excludes the other's namespace; a no-match response is the bare [time] labels row)",
+		Proves:     "the selector surface with VALUE-exact oracles: nodes/instances/dimensions filters and their scope_ counterparts, '!' negation patterns, label key:value patterns (labels + scope_labels); match-ids/match-names dimension modes with id!=name dims (default matches BOTH; each mode excludes the other's namespace; a no-match response is the bare [time] labels row)",
+		Components: []string{"selectors", "match-modes"},
 	},
 	"API/options-long-tail": {
-		Proves: "ms renders epoch-milliseconds; rfc3339 loses to seconds on the v1 formatters (pinned no-op); objectrows emits named row objects; jsonwrap all-dimensions ADDS full_dimension_list/full_chart_list/full_chart_labels while the queried selection stays; tqx wraps datatable in the gviz envelope echoing reqId; tsv-excel == tsv; csv label-quotes quotes the header; v2 minimal-stats drops totals, long-json-keys switches to descriptive keys, group-by-labels flattens the label values into the view",
+		Proves:     "ms renders epoch-milliseconds; rfc3339 loses to seconds on the v1 formatters (pinned no-op); objectrows emits named row objects; jsonwrap all-dimensions ADDS full_dimension_list/full_chart_list/full_chart_labels while the queried selection stays; tqx wraps datatable in the gviz envelope echoing reqId; tsv-excel == tsv; csv label-quotes quotes the header; v2 minimal-stats drops totals, long-json-keys switches to descriptive keys, group-by-labels flattens the label values into the view",
+		Components: []string{"timestamps", "v1-json-shapes", "google-viz", "format-aliases", "label-quotes", "v2-shapes"},
 	},
 	"API/row-reductions": {
 		Proves: "the single-series formats reduce each row by the requested option: min2max = max-min (0 on single-value rows), min, max, average — exact cells over the formatter fixture (default sum pinned by L7/formatters)",
 	},
 	"API/fallbacks-and-limits": {
-		Proves: "unknown v1 format silently serves json; unknown weights method silently runs ks2; cardinality_limit at 2 folds five dimensions into the remaining bucket and at >= the dimension count folds nothing",
+		Proves:     "unknown v1 format silently serves json; unknown weights method silently runs ks2; cardinality_limit at 2 folds five dimensions into the remaining bucket and at >= the dimension count folds nothing",
+		Components: []string{"fallback-pins", "cardinality-limit-sweep"},
 	},
 	"W/value": {
-		Proves: "weights method=value: per-metric weight = the window average over NATURAL points with the after-INCLUSIVE window (121 points for a 120s span — rulings batch); MULTINODE rollup rows carry the mean of their dimensions; the per-dimension timeframe stats (min/avg/max/sum/count/anomaly_count) are exact; method=value NEVER rank-normalizes",
+		Proves:     "weights method=value: per-metric weight = the window average over NATURAL points with the after-INCLUSIVE window (121 points for a 120s span — rulings batch); MULTINODE rollup rows carry the mean of their dimensions; the per-dimension timeframe stats (min/avg/max/sum/count/anomaly_count) are exact; method=value NEVER rank-normalizes",
+		Components: []string{"multi-node", "never-spreads"},
 	},
 	"W/anomaly-rate-per-metric": {
 		Proves: "weights method=anomaly-rate on the PER-METRIC path (no context selector) applies the anomaly bit: raw weights are the true window anomaly rates; the NONZERO default (no options= given) drops zero-weight results, any explicit options= keeps them",
@@ -357,8 +386,92 @@ var manifest = map[string]ManifestCase{
 		Proves: "weights method=ks2 exact endpoints: identical consecutive-diff distributions weigh exactly 0, fully one-sided diff distributions with n*d^2>=18 weigh exactly 1 (KSfbar special cases); spread_results_evenly rank normalization pinned via the Go port (unique-value slots, ties share a slot); intermediate KS probabilities are a recorded deferral (KSfbar port)",
 	},
 	"L8/post-processing": {
-		Proves: "options=percentage (v2/v3 FORCE absolute with it — and with any non-dimension group-by: shares computed over |values|), options=absolute (|v| at fetch), nonzero (drops all-zero dims; self-neutralizes when everything is zero), null2zero (gap cells become 0), cardinality_limit (top N-1 by |view sum| + 'remaining X dimensions' fold of per-row sums)",
+		Proves:     "options=percentage (v2/v3 FORCE absolute with it — and with any non-dimension group-by: shares computed over |values|), options=absolute (|v| at fetch), nonzero (drops all-zero dims; self-neutralizes when everything is zero), null2zero (gap cells become 0), cardinality_limit (top N-1 by |view sum| + 'remaining X dimensions' fold of per-row sums)",
+		Components: []string{"post-processing", "nonzero-all-zero", "cardinality-limit"},
 	},
+}
+
+const defaultContractComponent = "contract"
+
+type contractObservation struct {
+	evaluated bool
+	broken    bool
+}
+
+type contractLedger struct {
+	mu      sync.Mutex
+	results map[string]map[string]contractObservation
+}
+
+func newContractLedger() *contractLedger {
+	return &contractLedger{results: make(map[string]map[string]contractObservation)}
+}
+
+func requiredContractComponents(mc ManifestCase) []string {
+	if len(mc.Components) == 0 {
+		return []string{defaultContractComponent}
+	}
+	return mc.Components
+}
+
+func validateContractComponent(name, component string) error {
+	mc, ok := manifest[name]
+	if !ok {
+		return fmt.Errorf("case %q missing from manifest", name)
+	}
+
+	for _, required := range requiredContractComponents(mc) {
+		if component == required {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("case %q has no component %q", name, component)
+}
+
+func (l *contractLedger) record(name, component string, held, skipped bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// A clean skip did not evaluate the contract. A test that failed before
+	// it skipped still produced a real broken observation and must not vanish.
+	if skipped && held {
+		return
+	}
+
+	components := l.results[name]
+	if components == nil {
+		components = make(map[string]contractObservation)
+		l.results[name] = components
+	}
+
+	observation := components[component]
+	observation.evaluated = true
+	if !held {
+		observation.broken = true
+	}
+	components[component] = observation
+}
+
+// trackContract records the result of an ordinary Go test as one corpus
+// contract. Register it before any assertion so Fatal and Skip are visible.
+func trackContract(t *testing.T, name string) {
+	t.Helper()
+	trackContractComponent(t, name, defaultContractComponent)
+}
+
+// trackContractComponent records one required scope of a contract that is
+// proven by more than one independent test.
+func trackContractComponent(t *testing.T, name, component string) {
+	t.Helper()
+
+	if err := validateContractComponent(name, component); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		contractResults.record(name, component, !t.Failed(), t.Skipped())
+	})
 }
 
 // assertContract records the verdict for one corpus case.
@@ -374,46 +487,104 @@ var manifest = map[string]ManifestCase{
 func assertContract(t *testing.T, name string, held bool) {
 	t.Helper()
 
-	mc, ok := manifest[name]
-	if !ok {
-		t.Fatalf("case %q missing from manifest", name)
+	if err := validateContractComponent(name, defaultContractComponent); err != nil {
+		t.Fatal(err)
 	}
 
+	contractResults.record(name, defaultContractComponent, held, false)
 	if held {
 		return
 	}
 
-	brokenMu.Lock()
-	broken = append(broken, name)
-	brokenMu.Unlock()
-
-	t.Errorf("BROKEN %s: %s", name, mc.Proves)
+	t.Errorf("BROKEN %s: %s", name, manifest[name].Proves)
 }
 
-var (
-	brokenMu sync.Mutex
-	broken   []string
-)
+var contractResults = newContractLedger()
 
-// brokenSummary is printed once, after every test has run: the corpus
-// answers "what does the query engine get wrong today" and this is that
-// answer, in one place.
-func brokenSummary() string {
-	brokenMu.Lock()
-	defer brokenMu.Unlock()
+type contractRunSummary struct {
+	evaluated  int
+	broken     []string
+	incomplete []string
+}
 
-	if len(broken) == 0 {
-		return fmt.Sprintf("query contract corpus: all %d contracts hold\n", len(manifest))
+func (l *contractLedger) summarize(cases map[string]ManifestCase) contractRunSummary {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	var summary contractRunSummary
+	for name, mc := range cases {
+		complete := true
+		broken := false
+		for _, component := range requiredContractComponents(mc) {
+			observation, ok := l.results[name][component]
+			if !ok || !observation.evaluated {
+				complete = false
+				if len(mc.Components) == 0 {
+					summary.incomplete = append(summary.incomplete, name)
+				} else {
+					summary.incomplete = append(summary.incomplete, name+"/"+component)
+				}
+			}
+			if observation.broken {
+				broken = true
+			}
+		}
+		if complete {
+			summary.evaluated++
+		}
+		if broken {
+			summary.broken = append(summary.broken, name)
+		}
 	}
 
-	sort.Strings(broken)
+	sort.Strings(summary.broken)
+	sort.Strings(summary.incomplete)
+	return summary
+}
+
+// contractSummary is printed once, after every test has run. complete is true
+// only when every manifest contract and each of its required scopes ran.
+func contractSummary(includeIncompleteDetails bool) (report string, complete bool) {
+	summary := contractResults.summarize(manifest)
+	return formatContractSummary(summary, len(manifest), includeIncompleteDetails)
+}
+
+func formatContractSummary(summary contractRunSummary, total int, includeIncompleteDetails bool) (report string, complete bool) {
+	complete = len(summary.incomplete) == 0
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "\nquery contract corpus: %d of %d contracts BROKEN\n",
-		len(broken), len(manifest))
-	for _, name := range broken {
-		fmt.Fprintf(&b, "  BROKEN  %s\n", name)
+	if complete && len(summary.broken) == 0 {
+		fmt.Fprintf(&b, "query contract corpus: all %d contracts hold\n", total)
+		return b.String(), true
 	}
-	fmt.Fprintf(&b, "\nEach one is a defect in the query engine, not a test to adjust.\n")
-	return b.String()
+
+	if !complete {
+		fmt.Fprintf(&b, "\nquery contract corpus: %d of %d contracts fully evaluated; %d required scope(s) did not run\n",
+			summary.evaluated, total, len(summary.incomplete))
+	}
+
+	if len(summary.broken) > 0 {
+		if complete {
+			fmt.Fprintf(&b, "\nquery contract corpus: %d of %d contracts BROKEN\n",
+				len(summary.broken), total)
+		} else {
+			fmt.Fprintf(&b, "query contract corpus: %d contract(s) reported BROKEN\n",
+				len(summary.broken))
+		}
+		for _, name := range summary.broken {
+			fmt.Fprintf(&b, "  BROKEN  %s\n", name)
+		}
+		fmt.Fprintln(&b, "\nEach one is a defect in the query engine, not a test to adjust.")
+	} else {
+		fmt.Fprintln(&b, "query contract corpus: no evaluated contract reported broken")
+	}
+
+	if !complete && includeIncompleteDetails {
+		fmt.Fprintln(&b, "\nRequired contract scopes not run:")
+		for _, name := range summary.incomplete {
+			fmt.Fprintf(&b, "  NOT RUN  %s\n", name)
+		}
+	}
+
+	return b.String(), complete
 }

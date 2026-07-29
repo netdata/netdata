@@ -29,6 +29,8 @@ import (
 )
 
 func TestCase029SlowMetricTotalsAtEveryZoom(t *testing.T) {
+	trackContract(t, "CASE-029/tier0-slow-metric-totals-at-every-zoom")
+
 	const (
 		ctx     = "fixture.c029slow"
 		host    = "c029slow"

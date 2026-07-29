@@ -40,6 +40,8 @@ func selGroups(keep func(l5Member) bool, key string) map[string][]l5Member {
 }
 
 func TestSelectors(t *testing.T) {
+	trackContractComponent(t, "API/selectors", "selectors")
+
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
 	}
@@ -80,6 +82,8 @@ func TestSelectors(t *testing.T) {
 // default matches BOTH; match-ids restricts to ids, match-names to
 // names (query_target.c:1287 — both default true when neither given).
 func TestSelectorsMatchModes(t *testing.T) {
+	trackContractComponent(t, "API/selectors", "match-modes")
+
 	const ctx = "fixture.selnamed"
 	conn := connect(t, "sel-named", guid(166), stream.CapsLive)
 	conn.DefineChart(stream.Chart{
@@ -159,6 +163,8 @@ func TestSelectorsMatchModes(t *testing.T) {
 // TestFallbackPins: unknown names never error — the v1 format falls
 // back to json, the weights method to ks2.
 func TestFallbackPins(t *testing.T) {
+	trackContractComponent(t, "API/fallbacks-and-limits", "fallback-pins")
+
 	if _, err := td.WaitRetention("l7-fmt", l7Chart, fixture.T0+1, fixture.T0+6, 15*time.Second); err != nil {
 		t.Skip("layer-7 fixture not available")
 	}
@@ -198,6 +204,8 @@ func TestFallbackPins(t *testing.T) {
 // limit 2 keeps the top dimension and folds five; limits at or above
 // the dimension count fold nothing.
 func TestCardinalityLimitSweep(t *testing.T) {
+	trackContractComponent(t, "API/fallbacks-and-limits", "cardinality-limit-sweep")
+
 	const context = "fixture.l8card"
 	if _, err := td.WaitRetention("l8-card", context, fixture.T0+1, fixture.T0+20, 15*time.Second); err != nil {
 		t.Skip("cardinality fixture not available (TestLayer8CardinalityLimit failed?)")

@@ -40,6 +40,8 @@ const (
 )
 
 func TestLayer4ThreeTierJoin(t *testing.T) {
+	trackContract(t, "L4/three-tier-join")
+
 	dd, err := daemon.Start(daemon.Options{
 		Binary: netdataBinary,
 		RunDir: t.TempDir(),

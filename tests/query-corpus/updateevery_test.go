@@ -29,6 +29,8 @@ import (
 )
 
 func TestUpdateEverySweep(t *testing.T) {
+	trackContract(t, "L2/update-every-sweep")
+
 	const n = 400
 	for idx, ue := range []int{10, 30, 60, 600, 3600} {
 		host := fmt.Sprintf("ue-%d", ue)
@@ -139,6 +141,8 @@ func TestUpdateEverySweep(t *testing.T) {
 // TestIncrementalRateUE10 extends the paced v1 rate contract to ue=10:
 // a counter advancing +50 per 10s interval stores 5/s.
 func TestIncrementalRateUE10(t *testing.T) {
+	trackContractComponent(t, "L1/incremental-rates", "rate-ue10")
+
 	t.Parallel() // paced in real time — overlap the other paced cases
 
 	const (
@@ -212,6 +216,8 @@ func TestIncrementalRateUE10(t *testing.T) {
 // Invisible whenever the epoch is ue-aligned — the authority for why
 // sweep fixtures pre-align their timestamps so oracles map 1:1.
 func TestOffGridTimestamps(t *testing.T) {
+	trackContract(t, "L1/off-grid-timestamps")
+
 	const ue = 30
 	const n = 10
 	ctx := "fixture.uesnap"

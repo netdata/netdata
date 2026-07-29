@@ -47,6 +47,8 @@ func optsGet(t *testing.T, format, options string, extra map[string]string) stri
 }
 
 func TestOptionsTimestamps(t *testing.T) {
+	trackContractComponent(t, "API/options-long-tail", "timestamps")
+
 	optsL7(t)
 
 	t.Run("ms", func(t *testing.T) {
@@ -79,6 +81,8 @@ func TestOptionsTimestamps(t *testing.T) {
 }
 
 func TestOptionsV1JSONShapes(t *testing.T) {
+	trackContractComponent(t, "API/options-long-tail", "v1-json-shapes")
+
 	optsL7(t)
 
 	t.Run("objectrows", func(t *testing.T) {
@@ -126,6 +130,8 @@ func TestOptionsV1JSONShapes(t *testing.T) {
 }
 
 func TestOptionsGoogleViz(t *testing.T) {
+	trackContractComponent(t, "API/options-long-tail", "google-viz")
+
 	optsL7(t)
 
 	got := optsGet(t, "datatable", "", map[string]string{"tqx": "version:0.6;reqId:7;out:json"})
@@ -138,6 +144,8 @@ func TestOptionsGoogleViz(t *testing.T) {
 }
 
 func TestOptionsFormatAliases(t *testing.T) {
+	trackContractComponent(t, "API/options-long-tail", "format-aliases")
+
 	optsL7(t)
 
 	if a, b := optsGet(t, "tsv-excel", "", nil), optsGet(t, "tsv", "", nil); a != b {
@@ -146,6 +154,8 @@ func TestOptionsFormatAliases(t *testing.T) {
 }
 
 func TestOptionsLabelQuotes(t *testing.T) {
+	trackContractComponent(t, "API/options-long-tail", "label-quotes")
+
 	optsL7(t)
 
 	got := optsGet(t, "csv", "label-quotes", nil)
@@ -155,6 +165,8 @@ func TestOptionsLabelQuotes(t *testing.T) {
 }
 
 func TestOptionsReductions(t *testing.T) {
+	trackContract(t, "API/row-reductions")
+
 	optsL7(t)
 
 	// per-row reductions on the single-series ssv format; rows newest
@@ -186,6 +198,8 @@ func TestOptionsReductions(t *testing.T) {
 }
 
 func TestOptionsV2Shapes(t *testing.T) {
+	trackContractComponent(t, "API/options-long-tail", "v2-shapes")
+
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
 		t.Skip("layer-5 palette not available")
 	}

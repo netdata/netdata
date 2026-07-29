@@ -30,6 +30,8 @@ import (
 )
 
 func TestCase024ZoomIntoSlowMetrics(t *testing.T) {
+	trackContract(t, "CASE-024/zoom-into-slow-metrics")
+
 	// one chart per collection interval, each constant
 	cases := map[string]struct {
 		ue      int

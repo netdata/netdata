@@ -36,6 +36,8 @@ import (
 )
 
 func TestCase026SettlementCarriesAnomaly(t *testing.T) {
+	trackContract(t, "CASE-026/anomaly-rate-covers-the-paid-seconds")
+
 	const (
 		ctx     = "fixture.c026anom"
 		host    = "c026anom"

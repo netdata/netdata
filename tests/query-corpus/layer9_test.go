@@ -67,6 +67,8 @@ func l9Settle(t *testing.T) fixture.Chart {
 // off-phase fixture, EXACT values via the view oracle — the S5 sweep
 // pinned only the envelope; this is the full contract.
 func TestLayer9InterpolatedBuckets(t *testing.T) {
+	trackContractComponent(t, "L9/virtual-points", "interpolated-buckets")
+
 	ch := l9Settle(t)
 
 	const group = 10
@@ -78,7 +80,8 @@ func TestLayer9InterpolatedBuckets(t *testing.T) {
 	end := last + (span-last%span)%span
 	lines := int((end - anchor) / span)
 
-	buckets := fixture.ViewBuckets(ch.Dimensions[0].DBPoints(l9UE), anchor, span, lines)
+	dbPoints := ch.Dimensions[0].DBPoints(l9UE)
+	buckets := fixture.ViewBuckets(dbPoints, anchor, span, lines)
 
 	for _, tg := range []string{"average", "sum", "min", "max", "stddev"} {
 		t.Run(tg, func(t *testing.T) {
@@ -100,7 +103,7 @@ func TestLayer9InterpolatedBuckets(t *testing.T) {
 			// bucket's end - see fixture.ViewSumVolume
 			exp := fixture.TGOracle(tg, "", buckets, group, lines)
 			if tg == "sum" {
-				exp = fixture.ViewSumVolume(ch.Dimensions[0].DBPoints(l9UE), anchor, span, lines)
+				exp = fixture.ViewSumVolume(dbPoints, anchor, span, lines)
 			}
 			for i, pt := range col {
 				want := exp[i]
@@ -126,6 +129,8 @@ func TestLayer9InterpolatedBuckets(t *testing.T) {
 // fixture — every slot value interpolates between the two samples the
 // slot cuts; exact via the view oracle (upgrades the S5 envelope pin).
 func TestLayer9OffGridIdentity(t *testing.T) {
+	trackContractComponent(t, "L9/virtual-points", "off-grid-identity")
+
 	ch := l9Settle(t)
 
 	anchor := fixture.T0 + (int64(l9UE)-fixture.T0%int64(l9UE))%int64(l9UE)
@@ -172,6 +177,8 @@ func TestLayer9OffGridIdentity(t *testing.T) {
 // TestLayer9RelativeWindow: a negative `after` is relative to `before`
 // — the response must be identical to the absolute equivalent.
 func TestLayer9RelativeWindow(t *testing.T) {
+	trackContractComponent(t, "L9/window-normalization", "relative-window")
+
 	ch := l9Settle(t)
 	_ = ch
 
@@ -205,6 +212,8 @@ func TestLayer9RelativeWindow(t *testing.T) {
 // 2023 epoch fixture that window holds no data — the reason the
 // harness settles via explicit windows.
 func TestLayer9DefaultRelativeWindow(t *testing.T) {
+	trackContractComponent(t, "L9/window-normalization", "default-relative-window")
+
 	l9Settle(t)
 
 	doc, err := td.DataV3("l9-interp", daemon.DataParams(l9Context, 0, 0, 10))
@@ -233,6 +242,8 @@ func TestLayer9DefaultRelativeWindow(t *testing.T) {
 // serves INTERPOLATED sub-ue virtual slots (200 x 3s lines from 30s
 // data) — exact via the view oracle's last-point reuse branch.
 func TestLayer9Upsampling(t *testing.T) {
+	trackContractComponent(t, "L9/virtual-points", "upsampling")
+
 	ch := l9Settle(t)
 
 	span := int64(600)
@@ -290,6 +301,8 @@ func TestLayer9Upsampling(t *testing.T) {
 // the bucket size to at least the requested seconds — with resampling
 // 300 over a 3000s span and 100 requested points, buckets are 300s.
 func TestLayer9TimeResampling(t *testing.T) {
+	trackContractComponent(t, "L9/window-normalization", "time-resampling")
+
 	ch := l9Settle(t)
 
 	span := int64(3000)
@@ -317,6 +330,8 @@ func TestLayer9TimeResampling(t *testing.T) {
 // TestLayer9V2V3Parity: /api/v2/data and /api/v3/data share one
 // implementation — identical params must produce identical results.
 func TestLayer9V2V3Parity(t *testing.T) {
+	trackContract(t, "L9/v2-v3-parity")
+
 	l9Settle(t)
 
 	params := daemon.DataParams(l9Context, fixture.T0, fixture.T0+int64(l9N*l9UE), 40)
@@ -350,6 +365,8 @@ func TestLayer9V2V3Parity(t *testing.T) {
 // onto the absolute ue grid (the same phase shift as every other
 // view): "natural" means the count and the values, not the times.
 func TestLayer9NaturalPoints(t *testing.T) {
+	trackContract(t, "L9/natural-points")
+
 	ch := l9Settle(t)
 
 	after := fixture.T0 + int64(3000)
@@ -432,6 +449,8 @@ func TestLayer9NaturalPoints(t *testing.T) {
 // incomplete tail bucket at its grid position, holding the collected
 // tail — and nothing further into the future.
 func TestLayer9LiveEdgeTrimming(t *testing.T) {
+	trackContract(t, "L9/live-edge")
+
 	const ue = 1
 	const n = 65
 	ctx := "fixture.l9edge"

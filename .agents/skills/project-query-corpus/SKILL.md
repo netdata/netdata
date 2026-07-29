@@ -120,9 +120,19 @@ acceptable.
 
 ## The manifest
 
-Every contract case has an entry in `manifest.go` (`Proves`, optional
-`FixedBy`) mirrored as a row in `MANIFEST.md`. Tests report through
-`assertContract(t, name, held)`.
+Every contract case has an entry in `manifest.go`; its `Proves`, `Cloud`, and
+optional `FixedBy` fields are mirrored as a row in `MANIFEST.md`.
+
+- Register ordinary Go assertions with `trackContract(t, name)` before any
+  operation that may fail or skip. Its cleanup records `Error`, `Fatal`, and
+  `Skip`.
+- Use `assertContract(t, name, held)` when the test computes an explicit
+  contract verdict. Register the test up front as well, so an earlier
+  `Fatal` cannot make the contract disappear from the summary.
+- When independent test scopes jointly prove one contract, declare their
+  names in `ManifestCase.Components` and register each with
+  `trackContractComponent`. One component passing never substitutes for
+  another component that did not run.
 
 **A broken contract fails. Always.** On master, on a feature branch,
 whether or not the break is already known.
@@ -131,13 +141,15 @@ whether or not the break is already known.
   therefore fine" state, and adding one is prohibited: it makes a broken
   query engine report success, and this suite exists to name what is
   broken, not to keep a list of exceptions.
-- A run ends with the full list of contracts the engine does not hold
-  (`brokenSummary()`, printed from `TestMain`). **That list is the corpus's
-  answer** — the open-defect list for the query engine, produced by
-  measurement rather than by hand.
-- `go test ./...` therefore exits non-zero while any contract is broken.
-  That is the intended signal, not a problem to suppress. The corpus is not
-  wired into CI.
+- An unfiltered root-package run ends with the deduplicated list of broken
+  contracts and fails if any manifest contract or required component did
+  not run. **That complete list is the corpus's answer** — the open-defect
+  list produced by measurement rather than by hand.
+- A filtered run reports how many contracts were fully evaluated and never
+  claims the complete corpus holds. `-list` prints no contract verdict.
+- `go test ./...` therefore exits non-zero while any contract is broken or
+  the ledger is incomplete. That is the intended signal, not a problem to
+  suppress. The corpus is not wired into CI.
 
 A case name is `<layer-or-CASE-id>/<slug>`; `Proves` is one sentence a
 maintainer can read as the contract claim. A case whose bug is fixed keeps
@@ -208,7 +220,8 @@ its test as the regression guard and records `FixedBy: "#PR"`.
    the ingestion path is the thing under test), settle, query.
 3. Compute expectations in Go from the fixture definition. Never paste a
    number you got from the engine.
-4. Add the manifest entry and the `MANIFEST.md` row.
+4. Add the manifest entry and the `MANIFEST.md` row, then register the
+   contract at the narrowest test/subtest scope that proves it.
 5. Run the full suite; a new case MUST NOT destabilize existing cases
    (watch for GUID collisions and shared-host mutations).
 

@@ -246,6 +246,8 @@ func weightsHighlightAverages() map[string]float64 {
 }
 
 func TestWeightsValueMultiNode(t *testing.T) {
+	trackContractComponent(t, "W/value", "multi-node")
+
 	weightsSettle(t, "weights-h", guid(160), weightsFixture())
 
 	p := url.Values{}
@@ -323,6 +325,8 @@ func TestWeightsValueMultiNode(t *testing.T) {
 }
 
 func TestWeightsPerMetricAnomalyRate(t *testing.T) {
+	trackContract(t, "W/anomaly-rate-per-metric")
+
 	weightsSettle(t, "weights-h", guid(160), weightsFixture())
 
 	// the per-metric path (v1 host route, NO context selector) applies
@@ -364,6 +368,8 @@ func TestWeightsPerMetricAnomalyRate(t *testing.T) {
 // multi-dimensional path (was: the bare method ranked by plain value
 // averages there, while the per-metric and MCP paths forced the bit).
 func TestWeightsMultiDimAnomalyRate(t *testing.T) {
+	trackContract(t, "W/anomaly-rate-multidim")
+
 	weightsSettle(t, "weights-h", guid(160), weightsFixture())
 
 	rates := map[string]float64{"flat": 0, "level": 0, "split": 0, "anom": 12000.0 / 121}
@@ -389,6 +395,8 @@ func TestWeightsMultiDimAnomalyRate(t *testing.T) {
 }
 
 func TestWeightsVolume(t *testing.T) {
+	trackContract(t, "W/volume")
+
 	weightsSettle(t, "weights-h", guid(160), weightsFixture())
 
 	doc, err := td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("volume", wContext, "raw", true))
@@ -417,6 +425,8 @@ func TestWeightsVolume(t *testing.T) {
 }
 
 func TestWeightsKS2(t *testing.T) {
+	trackContract(t, "W/ks2")
+
 	weightsSettle(t, "weights-ks2", guid(163), weightsKS2Fixture())
 
 	// raw: the exact endpoints without normalization
@@ -449,6 +459,8 @@ func TestWeightsKS2(t *testing.T) {
 }
 
 func TestWeightsValueNeverSpreads(t *testing.T) {
+	trackContractComponent(t, "W/value", "never-spreads")
+
 	weightsSettle(t, "weights-h", guid(160), weightsFixture())
 
 	// method=value skips spreading even on v1 — raw averages come back

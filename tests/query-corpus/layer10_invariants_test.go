@@ -290,6 +290,8 @@ func l10Query(t *testing.T, group string, tier int, after, before, points int64,
 // is: a grouping the engine offers and this file does not classify is a
 // grouping no invariant is checked against.
 func TestLayer10RosterIsComplete(t *testing.T) {
+	trackContract(t, "L10/roster-is-complete")
+
 	r, err := readGroupingRoster()
 	if err != nil {
 		t.Fatal(err)
@@ -350,6 +352,8 @@ func TestLayer10RosterIsComplete(t *testing.T) {
 // that genuinely needs two of them (an increment, a dispersion) is not being
 // asked for the impossible.
 func TestLayer10NoHolesInsideData(t *testing.T) {
+	trackContract(t, "L10/no-holes-inside-data")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -423,6 +427,8 @@ func TestLayer10NoHolesInsideData(t *testing.T) {
 // genuinely needs two of them is not asked for the impossible. That fairness
 // is exactly what hides this case, so it gets its own sweep.
 func TestLayer10BucketsFinerThanStoredDataAnswer(t *testing.T) {
+	trackContract(t, "L10/buckets-finer-than-stored-data-answer")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -477,6 +483,8 @@ func TestLayer10BucketsFinerThanStoredDataAnswer(t *testing.T) {
 // invented a number - from an interpolation it should not have used, or from
 // state left behind by another point.
 func TestLayer10OrderStatisticsStayInRange(t *testing.T) {
+	trackContract(t, "L10/order-statistics-stay-in-range")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -534,6 +542,8 @@ func TestLayer10OrderStatisticsStayInRange(t *testing.T) {
 // alongside it, and on the order they happened to be walked in. Nothing else
 // in the corpus would notice.
 func TestLayer10DimensionsAreIndependent(t *testing.T) {
+	trackContract(t, "L10/dimensions-are-independent")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -586,6 +596,8 @@ func TestLayer10DimensionsAreIndependent(t *testing.T) {
 // again - the total over a fixed span may collapse as a rollup loses ordering,
 // but it may never grow.
 func TestLayer10CountsDoNotInflateWithZoom(t *testing.T) {
+	trackContract(t, "L10/counts-do-not-inflate-with-zoom")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -644,6 +656,8 @@ func TestLayer10CountsDoNotInflateWithZoom(t *testing.T) {
 // (TIER_QUERY_FETCH_SUM), so each of those buckets is handed the total of the
 // whole window and adds it again.
 func TestLayer10TotalsAreExactAcrossZoom(t *testing.T) {
+	trackContract(t, "L10/totals-are-exact-across-zoom")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -699,6 +713,8 @@ func TestLayer10TotalsAreExactAcrossZoom(t *testing.T) {
 // flush. Needing two samples is a reason to look backwards, not a reason to
 // answer nothing.
 func TestLayer10SinglePointBucketsAnswer(t *testing.T) {
+	trackContract(t, "L10/single-point-buckets-answer")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -754,6 +770,8 @@ func TestLayer10SinglePointBucketsAnswer(t *testing.T) {
 // `percentage-of-samples` is deliberately NOT here: it answers about the
 // samples it was handed and a re-delivery is another sample to it.
 func TestLayer10TimeSharesAreStableAcrossZoom(t *testing.T) {
+	trackContract(t, "L10/time-shares-stable-across-zoom")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -818,6 +836,8 @@ func TestLayer10TimeSharesAreStableAcrossZoom(t *testing.T) {
 // what it claims - a copy-paste in the table would silently route `ewma` to
 // the wrong aggregation.
 func TestLayer10AliasesResolveToTheSameGrouping(t *testing.T) {
+	trackContract(t, "L10/aliases-resolve-to-the-same-grouping")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -874,6 +894,8 @@ func TestLayer10AliasesResolveToTheSameGrouping(t *testing.T) {
 // first and every answer after that is a function of what was asked before
 // it.
 func TestLayer10QueriesAreDeterministic(t *testing.T) {
+	trackContract(t, "L10/queries-are-deterministic")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -916,6 +938,8 @@ func TestLayer10QueriesAreDeterministic(t *testing.T) {
 // Every grouping. A repeated or out-of-order timestamp means the grid walk
 // lost its place, and every value after it is attributed to the wrong moment.
 func TestLayer10BucketsAreOrderedAndUnique(t *testing.T) {
+	trackContract(t, "L10/buckets-are-ordered-and-unique")
+
 	l10Fixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -1074,6 +1098,8 @@ func l10GapCollectedIn(after, before int64) int {
 // never sees. A sum is the sum of the samples that were collected: gaps add
 // nothing, and where the span begins cannot change what is inside it.
 func TestLayer10TotalsAreExactOverGapsAndOffGrid(t *testing.T) {
+	trackContract(t, "L10/totals-exact-over-gaps-and-off-grid")
+
 	l10GapFixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {
@@ -1148,6 +1174,8 @@ func TestLayer10TotalsAreExactOverGapsAndOffGrid(t *testing.T) {
 // never anomalous. Every answer about it under anomaly-bit is an answer about
 // zero.
 func TestLayer10AnomalyBitAnswersAboutRates(t *testing.T) {
+	trackContract(t, "L10/anomaly-bit-answers-about-rates")
+
 	l10GapFixture(t)
 	r, err := readGroupingRoster()
 	if err != nil {

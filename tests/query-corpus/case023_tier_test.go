@@ -36,6 +36,8 @@ import (
 )
 
 func TestCase023TierEstimation(t *testing.T) {
+	trackContract(t, "CASE-023/tier-estimation")
+
 	// a 0/1 availability signal: `up` is 1 except for a run of zeros
 	// inside each tier-1 window, so every window has min=0, max=1 and an
 	// average that IS the fraction of time up.
@@ -278,6 +280,8 @@ func tierWindowEnd(t, granularity int64) int64 {
 // Counting the repeats would inflate an SLO by exactly the zoom factor,
 // which is the failure this pins.
 func TestCase023TierWidePointRedelivery(t *testing.T) {
+	trackContract(t, "CASE-023/tier-wide-point")
+
 	// the same 0/1 availability shape as the estimation case: every stored
 	// window has min=0, max=1, and an average that IS the fraction of time up
 	down := func(k int) int {
@@ -423,6 +427,8 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 // unrelated domains, so the condition is answered on the rate itself: a
 // window either satisfied it or it did not.
 func TestCase023TierAnomalyBit(t *testing.T) {
+	trackContract(t, "CASE-023/tier-anomaly-bit")
+
 	// values sweep a wide metric range, so a leak of the metric extrema
 	// into the estimate shows up as a fractional answer
 	const samples = 600

@@ -34,6 +34,8 @@ import (
 // delivered to three buckets, so the two groupings that disagree about a
 // repeat are both exercised on the same data.
 func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
+	trackContract(t, "CASE-023/redelivery")
+
 	const samples = 2400 // 40 tier-1 windows
 
 	// a 0/1 signal that varies inside every window, so no window is
@@ -145,6 +147,8 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 // itself, so it is compared against the maximum its own first delivery
 // stored.
 func TestCase023ResetCountedOnceAcrossWindows(t *testing.T) {
+	trackContract(t, "CASE-023/reset-counted-once")
+
 	const (
 		samples = 1800 // 30 tier-1 windows
 		resetAt = 900  // one reset, in the middle
@@ -217,6 +221,8 @@ func TestCase023ResetCountedOnceAcrossWindows(t *testing.T) {
 // dropped by options=nonzero, even though every sample behind it is
 // non-zero.
 func TestCase023NonzeroFollowsTheAnswer(t *testing.T) {
+	trackContract(t, "CASE-023/nonzero-follows-answer")
+
 	// TWO dimensions, both collecting non-zero samples throughout. One
 	// satisfies the condition below and one never does.
 	//

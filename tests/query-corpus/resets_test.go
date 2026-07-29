@@ -124,6 +124,8 @@ func assertSteadyWithBlend(t *testing.T, col []canon.Pt, steady, special float64
 }
 
 func TestCounterResets(t *testing.T) {
+	trackContract(t, "L1/resets-overflows")
+
 	type sample struct {
 		values map[string]string
 		pause  int // seconds to sleep before this sample (0 = ue)

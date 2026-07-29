@@ -21,6 +21,8 @@ import (
 )
 
 func TestLayer3RegistryCompleteness(t *testing.T) {
+	trackContract(t, "L3/registry-completeness")
+
 	ch := layer3Canonical("fixture.l3reg")
 	pushLiveBurst(t, "l3-reg", guid(68), ch)
 	if _, err := td.WaitRetention("l3-reg", ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
