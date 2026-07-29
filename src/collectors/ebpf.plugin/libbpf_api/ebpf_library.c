@@ -1047,8 +1047,6 @@ cleanipdup:
     freez(clean_end);
 }
 
-}
-
 /*****************************************************************
  *
  *  FUNCTIONS TO DEFINE OPTIONS

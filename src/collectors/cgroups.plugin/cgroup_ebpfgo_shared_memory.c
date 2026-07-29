@@ -27,11 +27,6 @@ uint32_t cgroup_ebpfgo_shared_memory_flags(void)
     return netdata_ebpfgo_shared_pid_memory_flags(&cgroup_ebpfgo_shared_memory_ctx);
 }
 
-uint32_t cgroup_ebpfgo_shared_memory_update_every_s(void)
-{
-    return cgroup_ebpfgo_shared_memory_ctx.update_every_s;
-}
-
 void cgroup_ebpfgo_shared_memory_close(void)
 {
     netdata_ebpfgo_shared_pid_memory_close(&cgroup_ebpfgo_shared_memory_ctx);

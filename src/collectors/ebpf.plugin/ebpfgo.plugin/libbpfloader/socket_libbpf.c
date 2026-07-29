@@ -683,38 +683,53 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     memset(rt->pid_ht, 0, rt->pid_ht_size * sizeof(*rt->pid_ht));
     rt->pid_ht_drops = 0;
 
-    /* Iterate all connection entries and accumulate per PID. */
+    /* Iterate all connection entries and accumulate per PID.
+     *
+     * Deletions are deferred to after the loop.  BPF_MAP_TYPE_HASH requires
+     * the predecessor key passed to bpf_map_get_next_key to still exist in
+     * the map: htab_get_next_key falls back to find_first_elem when the
+     * predecessor is missing, restarting iteration from the first bucket and
+     * causing already-visited entries to be visited again — double-counting
+     * their values into the per-PID accumulator. */
     netdata_socket_bpf_key_t key = {}, next = {};
     netdata_socket_bpf_value_t *vbuf = rt->percpu_nd_socket;
     bool first_nditer = true;
 
+    /* Deferred-delete buffer.  1024 slots cover realistic per-cycle churn;
+     * any overflow is silently skipped and cleaned up in the next cycle. */
+#define NDEL_CAP 1024
+    netdata_socket_bpf_key_t del_keys[NDEL_CAP];
+    int ndel = 0;
+
     while (bpf_map_get_next_key(ndfd, first_nditer ? NULL : &key, &next) == 0) {
         first_nditer = false;
-        /* Advance the predecessor before any 'continue' so get_next_key always
-         * receives a valid (or recently-deleted) predecessor.  The kernel handles
-         * a deleted predecessor by returning the next hash-table slot after it. */
+        /* Advance the predecessor before any 'continue' so get_next_key
+         * always receives a key that exists in the map. */
         key = next;
 
         if (next.pid == 0 || bpf_map_lookup_elem(ndfd, &next, vbuf) != 0)
             continue;
 
-        /* Delete unbound entries (both addresses are all-zero).  These are
-         * never routable, accumulate indefinitely in a plain hash map, and
-         * consume capacity.  Mirrors ebpf_socket.c:1860-1862. */
+        /* Defer deletion of unbound entries (both addresses are all-zero).
+         * These are never routable, accumulate indefinitely in a plain hash
+         * map, and consume capacity.  Mirrors ebpf_socket.c:1860-1862. */
         static const uint8_t zero16[16] = {0};
         if (memcmp(next.saddr, zero16, 16) == 0 && memcmp(next.daddr, zero16, 16) == 0) {
-            bpf_map_delete_elem(ndfd, &next);
+            if (ndel < NDEL_CAP)
+                del_keys[ndel++] = next;
             continue;
         }
 
-        /* Delete entries for dead PIDs.  tbl_nd_socket is a plain percpu
-         * hash — neither the BPF program nor userspace deletes entries, so
-         * closed connections accumulate until the map hits its capacity limit
-         * and bpf_map_update_elem starts returning E2BIG for all new flows.
-         * kill(pid, 0) == -1/ESRCH confirms the process is gone; EPERM means
-         * alive but not ours, so we keep those.  Mirrors ebpf_socket.c:1930. */
+        /* Defer deletion of entries for dead PIDs.  tbl_nd_socket is a plain
+         * percpu hash — neither the BPF program nor userspace deletes entries,
+         * so closed connections accumulate until the map hits its capacity
+         * limit and bpf_map_update_elem starts returning E2BIG for all new
+         * flows.  kill(pid, 0) == -1/ESRCH confirms the process is gone;
+         * EPERM means alive but not ours, so we keep those.
+         * Mirrors ebpf_socket.c:1930. */
         if (kill((pid_t)next.pid, 0) != 0 && errno == ESRCH) {
-            bpf_map_delete_elem(ndfd, &next);
+            if (ndel < NDEL_CAP)
+                del_keys[ndel++] = next;
             continue;
         }
 
@@ -740,6 +755,11 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
                 rt->pid_ht_drops++;
         }
     }
+
+    /* Apply deferred deletions now that traversal is complete. */
+    for (int i = 0; i < ndel; i++)
+        bpf_map_delete_elem(ndfd, &del_keys[i]);
+#undef NDEL_CAP
 
     if (rt->pid_ht_drops > 0) {
         uint64_t now = socket_now_usec();

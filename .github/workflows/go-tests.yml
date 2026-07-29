@@ -132,7 +132,7 @@ jobs:
         working-directory: ${{ matrix.module }}
       - name: Set up gotestfmt
         if: needs.file-check.outputs.run == 'true'
-        uses: GoTestTools/gotestfmt-action@v2
+        uses: GoTestTools/gotestfmt-action@8b4478c7019be847373babde9300210e7de34bfb # v2.2.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0
@@ -159,15 +159,16 @@ jobs:
         id: skip
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version-file: src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
+      - name: Install Go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod
       - name: Install libbpf headers
         if: needs.file-check.outputs.run == 'true'
         run: |

@@ -13,12 +13,13 @@
 #define TASK_COMM_LEN 16
 #endif
 
-/* v3: live_count added at offset 16; header is now 24 bytes; entries start
+/* v4: socket_update_every_s added to ebpf_socket_publish_apps.
+ * v3: live_count added at offset 16; header is now 24 bytes; entries start
  *     at offset 24 (still 8-byte aligned for the uint64_t fields in ebpf_pid_stat).
  * v2: update_every_s replaced _pad; header grew from 8 to 16 bytes.
  * Version suffix ensures old consumers never map the new layout at the wrong offset. */
-#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v3"
-#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v3"
+#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v4"
+#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v4"
 
 /* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
  * immediately.  sizeof == 24 so entries start on an 8-byte boundary, which
@@ -119,6 +120,7 @@ struct ebpf_socket_publish_apps {
     uint64_t call_close;
     uint64_t call_tcp_v4_connection;
     uint64_t call_tcp_v6_connection;
+    uint32_t socket_update_every_s; /* socket collection interval for these deltas */
 };
 
 struct ebpf_publish_vfs {

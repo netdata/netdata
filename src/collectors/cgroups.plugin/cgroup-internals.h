@@ -61,6 +61,7 @@ typedef struct cgroup_ebpfgo_socket {
     uint64_t call_close;
     uint64_t call_tcp_v4_connection;
     uint64_t call_tcp_v6_connection;
+    uint32_t socket_update_every_s;
 } cgroup_ebpfgo_socket_t;
 
 #endif

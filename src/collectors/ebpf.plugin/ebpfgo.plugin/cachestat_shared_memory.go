@@ -14,20 +14,20 @@ import (
 const cachestatStaleCycles = 3
 
 type cachestatSharedMemoryStore struct {
-	mu            sync.RWMutex
-	entries       []ebpfPidStat
-	nextEntries   []ebpfPidStat
-	prev          map[uint32]netdataCachestat
-	prevCt        map[uint32]uint64 // last observed BPF timestamp per PID
-	missCount     map[uint32]int    // consecutive cycles where ct did not advance
-	nextPrev      map[uint32]netdataCachestat
-	nextPrevCt    map[uint32]uint64
-	nextMiss      map[uint32]int
-	stalePIDs     []uint32
-	socketData        map[uint32]ebpfSocketPublishApps // per-interval deltas written to SHM this cycle
-	prevSocketData    map[uint32]ebpfSocketPublishApps // raw cumulative counters from the previous cycle
+	mu                 sync.RWMutex
+	entries            []ebpfPidStat
+	nextEntries        []ebpfPidStat
+	prev               map[uint32]netdataCachestat
+	prevCt             map[uint32]uint64 // last observed BPF timestamp per PID
+	missCount          map[uint32]int    // consecutive cycles where ct did not advance
+	nextPrev           map[uint32]netdataCachestat
+	nextPrevCt         map[uint32]uint64
+	nextMiss           map[uint32]int
+	stalePIDs          []uint32
+	socketData         map[uint32]ebpfSocketPublishApps // per-interval deltas written to SHM this cycle
+	prevSocketData     map[uint32]ebpfSocketPublishApps // raw cumulative counters from the previous cycle
 	nextPrevSocketData map[uint32]ebpfSocketPublishApps // scratch buffer for the next prevSocketData
-	activeModules uint32                               // EBPFGO_SHM_FLAG_* bits set when a module writes data
+	activeModules      uint32                           // EBPFGO_SHM_FLAG_* bits set when a module writes data
 	// cachestatOwnsEntries is true when UpdateApps last populated s.entries.
 	// When false (socket is the sole publisher), UpdateSocketApps must rebuild
 	// s.entries from scratch each cycle rather than merging in-place, so
@@ -72,8 +72,8 @@ const (
 // Must match NETDATA_EBPFGO_INTEGRATION_NAME / NETDATA_EBPFGO_SHM_INTEGRATION_NAME
 // in apps_ebpf_shared_pid_row.h, which is what all consumer plugins open.
 const (
-	productionSHMName = "/netdata_shm_integration_ebpfgo_v3"
-	productionSEMName = "/netdata_sem_integration_ebpfgo_v3"
+	productionSHMName = "/netdata_shm_integration_ebpfgo_v4"
+	productionSEMName = "/netdata_sem_integration_ebpfgo_v4"
 )
 
 // Publish writes the current entries to the shared-memory segment and stamps
@@ -326,6 +326,7 @@ func socketIntervalDelta(curr, prev ebpfSocketPublishApps) ebpfSocketPublishApps
 		CallClose:           clamp(curr.CallClose, prev.CallClose),
 		CallTCPV4Connection: clamp(curr.CallTCPV4Connection, prev.CallTCPV4Connection),
 		CallTCPV6Connection: clamp(curr.CallTCPV6Connection, prev.CallTCPV6Connection),
+		UpdateEverySec:      curr.UpdateEverySec,
 	}
 }
 
@@ -350,7 +351,7 @@ func socketIntervalDelta(curr, prev ebpfSocketPublishApps) ebpfSocketPublishApps
 // merged in-place the way the co-publisher path does, entries would accumulate
 // every PID that ever had socket activity and never shrink, eventually exceeding
 // the 32768-row SHM capacity and silently dropping high-PID processes.
-func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.SocketPIDEntry) {
+func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.SocketPIDEntry, updateEverySec uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -375,6 +376,7 @@ func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.Soc
 				CallClose:           e.CallClose,
 				CallTCPV4Connection: e.CallTCPV4Connection,
 				CallTCPV6Connection: e.CallTCPV6Connection,
+				UpdateEverySec:      updateEverySec,
 			}
 			s.nextPrevSocketData[e.PID] = raw
 			if prev, ok := s.prevSocketData[e.PID]; ok {

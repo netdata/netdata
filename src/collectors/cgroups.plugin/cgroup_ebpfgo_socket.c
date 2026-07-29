@@ -45,6 +45,8 @@ static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
         cg->net.call_close             += s->call_close;
         cg->net.call_tcp_v4_connection += s->call_tcp_v4_connection;
         cg->net.call_tcp_v6_connection += s->call_tcp_v6_connection;
+        if (s->socket_update_every_s)
+            cg->net.socket_update_every_s = s->socket_update_every_s;
     }
 }
 
@@ -119,10 +121,10 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
     const bool is_service = is_cgroup_systemd_service(cg);
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5300;
 
-    /* Use the ebpfgo publish interval as divisor so per-interval deltas
-     * become per-second rates matching the declared chart units. */
-    uint32_t update_every_s = cgroup_ebpfgo_shared_memory_update_every_s();
-    long ebpf_divisor = (update_every_s > 0) ? (long)update_every_s : (long)cgroup_update_every;
+    /* Socket deltas are collected on socket.conf's cadence, which may differ
+     * from the SHM publisher cadence when cachestat owns publishing. */
+    long ebpf_divisor = (cg->net.socket_update_every_s > 0) ?
+        (long)cg->net.socket_update_every_s : (long)cgroup_update_every;
 
     uint64_t call_v4  = cg->net.call_tcp_v4_connection;
     uint64_t call_v6  = cg->net.call_tcp_v6_connection;

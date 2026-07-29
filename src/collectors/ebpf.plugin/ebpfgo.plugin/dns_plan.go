@@ -13,6 +13,7 @@ const (
 	// stays fresh mid-window; NV_DNS_UPDATE_EVERY must equal the TTL to keep
 	// consecutive NV snapshots non-overlapping (each query counted once).
 	dnsDefaultUpdateEvery = 10
+	dnsNVUpdateEvery      = 20
 	// dnsDefaultFlowTTL is the default DNS flow record lifetime in seconds.
 	// Must match DNS_FLOW_TTL_US in dns_libbpf.c.  update every must not exceed
 	// this value or records expire in the kernel ring before Go collects them.
@@ -100,11 +101,11 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 	// NV_DNS_UPDATE_EVERY is hardcoded to 20 in network-viewer.c.  If FlowTTL
 	// differs, dns-queries results will be double-counted (TTL > 20) or silently
 	// dropped (TTL < 20).  Warn early so operators catch the misconfiguration.
-	if cfg.FlowTTL != dnsDefaultFlowTTL {
+	if cfg.FlowTTL != dnsNVUpdateEvery {
 		fmt.Fprintf(os.Stderr,
 			"ebpf-go.plugin: dns: flow ttl %d != NV_DNS_UPDATE_EVERY (%d); "+
 				"dns-queries results may be double-counted or missing\n",
-			cfg.FlowTTL, dnsDefaultFlowTTL)
+			cfg.FlowTTL, dnsNVUpdateEvery)
 	}
 
 	// Clamp update_every to the flow TTL: records older than FlowTTL seconds are

@@ -188,7 +188,7 @@ func mustIndexString(v interface{}) string {
 // flag when called with a non-nil, non-empty slice.
 func TestUpdateSocketApps_SetsFlag(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
-	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 1}})
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 1}}, 10)
 	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
 		t.Fatal("UpdateSocketApps did not set the SOCKET flag")
 	}
@@ -199,7 +199,7 @@ func TestUpdateSocketApps_SetsFlag(t *testing.T) {
 // responsible for clearing it via MarkSocketInactive before calling here.
 func TestUpdateSocketApps_NilDoesNotSetFlag(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
-	store.UpdateSocketApps(nil)
+	store.UpdateSocketApps(nil, 0)
 	if store.activeModules&ebpfgoSHMFlagSocket != 0 {
 		t.Fatal("UpdateSocketApps(nil) set the SOCKET flag; it must not")
 	}
@@ -210,8 +210,8 @@ func TestUpdateSocketApps_NilDoesNotSetFlag(t *testing.T) {
 // The flag persists until MarkSocketInactive() clears it.
 func TestUpdateSocketApps_NilDoesNotClearExistingFlag(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
-	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 1}})
-	store.UpdateSocketApps(nil) // simulate a failed cycle without prior MarkSocketInactive
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 1}}, 10)
+	store.UpdateSocketApps(nil, 0) // simulate a failed cycle without prior MarkSocketInactive
 	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
 		t.Fatal("UpdateSocketApps(nil) cleared the SOCKET flag; it must not")
 	}
@@ -220,7 +220,7 @@ func TestUpdateSocketApps_NilDoesNotClearExistingFlag(t *testing.T) {
 func TestSHMFlagRoundTrip_ResetsAfterPublish(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
 	// The SOCKET flag is set by UpdateSocketApps when called with real data.
-	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 100}})
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 100}}, 10)
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
 		{Pid: 1, Ppid: 1, Ct: 100},
 	})
@@ -260,10 +260,10 @@ func TestApplySocketDataLocked_ZeroesSocketForPIDsGone(t *testing.T) {
 	})
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
 		{PID: 10, BytesSent: 1000},
-	})
+	}, 10)
 
 	// Now UpdateApps with no socket entry for PID 10 (simulating PID exit).
-	store.UpdateSocketApps(nil)
+	store.UpdateSocketApps(nil, 0)
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
 		{Pid: 10, Ppid: 1, Ct: 101, MarkPageAccessed: 55},
 	})
@@ -285,12 +285,12 @@ func TestApplySocketDataLocked_AppendsSocketOnlyPIDs(t *testing.T) {
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
 		{PID: 30, BytesSent: 0, CallUDPSent: 0},
 		{PID: 10, BytesReceived: 0, CallTCPReceived: 0},
-	})
+	}, 10)
 	// Cycle 2: delta = cycle2 - cycle1 = the values below.
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
 		{PID: 30, BytesSent: 3000, CallUDPSent: 4},
 		{PID: 10, BytesReceived: 1000, CallTCPReceived: 2},
-	})
+	}, 10)
 
 	// No cachestat data; socket data must build entries directly.
 	snap := store.Snapshot()

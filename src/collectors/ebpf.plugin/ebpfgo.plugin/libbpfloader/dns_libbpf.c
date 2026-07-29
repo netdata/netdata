@@ -910,20 +910,18 @@ int netdata_dns_runtime_flow_snapshot(
          * sock_fd's recv buffer is never filled by normal operation.
          * tp_drops > 0 means the filter is not executing (detached, JIT
          * failure, etc.) and DNS queries are being silently discarded. */
-        if (rt->sock_fd >= 0) {
-            struct netdata_tpacket_stats stats;
-            socklen_t stats_len = sizeof(stats);
-            if (getsockopt(rt->sock_fd, SOL_PACKET, PACKET_STATISTICS, &stats, &stats_len) == 0 &&
-                stats.tp_drops > 0) {
-                uint64_t now = dns_now_us();
-                if (rt->sock_drop_last_log_usec == 0 ||
-                    now - rt->sock_drop_last_log_usec >= DNS_FLOW_DROP_LOG_INTERVAL_USEC) {
-                    fprintf(stderr,
-                            "ebpf-go: dns: sock_fd (buffer mode) dropped %u frame(s);"
-                            " eBPF filter may not be executing\n",
-                            (unsigned)stats.tp_drops);
-                    rt->sock_drop_last_log_usec = now;
-                }
+        struct netdata_tpacket_stats stats;
+        socklen_t stats_len = sizeof(stats);
+        if (getsockopt(rt->sock_fd, SOL_PACKET, PACKET_STATISTICS, &stats, &stats_len) == 0 &&
+            stats.tp_drops > 0) {
+            uint64_t now = dns_now_us();
+            if (rt->sock_drop_last_log_usec == 0 ||
+                now - rt->sock_drop_last_log_usec >= DNS_FLOW_DROP_LOG_INTERVAL_USEC) {
+                fprintf(stderr,
+                        "ebpf-go: dns: sock_fd (buffer mode) dropped %u frame(s);"
+                        " eBPF filter may not be executing\n",
+                        (unsigned)stats.tp_drops);
+                rt->sock_drop_last_log_usec = now;
             }
         }
     } else if (rt->sock_fd >= 0)

@@ -140,6 +140,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 				{name: "CallClose", kind: reflect.Uint64, typ: "uint64"},
 				{name: "CallTCPV4Connection", kind: reflect.Uint64, typ: "uint64"},
 				{name: "CallTCPV6Connection", kind: reflect.Uint64, typ: "uint64"},
+				{name: "UpdateEverySec", kind: reflect.Uint32, typ: "uint32"},
 			},
 		},
 		"vfs": {

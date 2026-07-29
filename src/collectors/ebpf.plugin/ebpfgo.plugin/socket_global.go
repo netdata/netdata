@@ -110,8 +110,6 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		updateEvery = socketDefaultUpdateEvery
 	}
 
-	createSocketGlobalCharts(api, updateEvery)
-
 	if store != nil {
 		// Clear the SOCKET SHM flag when this goroutine exits so the C consumer
 		// stops gating on socket_ok after the module shuts down.
@@ -144,7 +142,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		// before Publish runs, or the consumer will see socket_ok = true
 		// alongside zero data arrays.  UpdateSocketApps(nil) does not set the
 		// SOCKET bit (nil signals a failed cycle), so the bit stays cleared.
-		store.UpdateSocketApps(nil)
+		store.UpdateSocketApps(nil, 0)
 		if shmPublisher != nil {
 			if err := store.Publish(shmPublisher); err != nil {
 				logPluginErr("socket.publish", "socket", "shared memory publish", err)
@@ -166,7 +164,6 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 		if publish, ok := state.Update(snap); ok {
 			fnStore.update(publish)
-			publish.writeCharts(api, usecSince)
 		}
 
 		if store != nil {
@@ -178,7 +175,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 				store.MarkSocketInactive()
 				clearSocketApps()
 			} else {
-				store.UpdateSocketApps(pidEntries)
+				store.UpdateSocketApps(pidEntries, uint32(updateEvery))
 				if shmPublisher != nil {
 					if err := store.Publish(shmPublisher); err != nil {
 						logPluginErr("socket.publish", "socket", "shared memory publish", err)
