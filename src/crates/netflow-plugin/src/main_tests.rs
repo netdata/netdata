@@ -1,20 +1,20 @@
 use super::{
     FLOWS_FUNCTION_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowsFunctionResponse, NetflowFlowsHandler,
-    flows_required_params, ingest, plugin_config, query, tiering,
+    flows_required_params, ingest, plugin_config, query, tiering, wait_for_listener_ready,
 };
 use chrono::Utc;
 use etherparse::{SlicedPacket, TransportSlice};
-use journal_sdk_core::file::Mmap;
+use journal_sdk_core::file::{JournalState, Mmap, MmapMut};
 use journal_sdk_core::repository::File as RepoFile;
 use journal_sdk_core::{Direction, JournalFile, JournalReader, Location};
 use pcap_file::pcap::PcapReader;
 use rt::ProgressState;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::net::UdpSocket as StdUdpSocket;
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
@@ -22,6 +22,160 @@ use tokio::net::UdpSocket;
 use tokio_util::sync::CancellationToken;
 
 const E2E_INGEST_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[tokio::test]
+async fn background_facet_work_waits_for_udp_listener_readiness() {
+    let listener_ready = CancellationToken::new();
+    let shutdown = CancellationToken::new();
+    let started = Arc::new(AtomicBool::new(false));
+    let task_listener_ready = listener_ready.clone();
+    let task_shutdown = shutdown.clone();
+    let task_started = Arc::clone(&started);
+    let task = tokio::spawn(async move {
+        if wait_for_listener_ready(&task_listener_ready, &task_shutdown).await {
+            task_started.store(true, Ordering::Release);
+        }
+    });
+
+    tokio::task::yield_now().await;
+    assert!(
+        !started.load(Ordering::Acquire),
+        "background facet work must not begin before the UDP listener is ready"
+    );
+    listener_ready.cancel();
+    tokio::time::timeout(Duration::from_secs(1), task)
+        .await
+        .expect("listener gate should open promptly")
+        .expect("listener gate task should finish");
+    assert!(started.load(Ordering::Acquire));
+
+    let listener_ready = CancellationToken::new();
+    let shutdown = CancellationToken::new();
+    shutdown.cancel();
+    assert!(
+        !wait_for_listener_ready(&listener_ready, &shutdown).await,
+        "shutdown must not be mistaken for listener readiness"
+    );
+}
+
+#[tokio::test]
+async fn startup_reconciles_reopened_online_journal_as_active_across_restarts() {
+    let (mut cfg, _tmp) = offline_journal_cfg();
+    cfg.listener.sync_every_entries = 1;
+    let raw_dir = cfg.journal.raw_tier_dir();
+    let first_record = crate::flow::FlowRecord {
+        flow_version: "ipfix",
+        protocol: 6,
+        bytes: 100,
+        packets: 1,
+        flows: 1,
+        ..Default::default()
+    };
+
+    let first_runtime = Arc::new(crate::facet_runtime::FacetRuntime::new(
+        &cfg.journal.base_dir(),
+    ));
+    let mut first_ingest = offline_ingest_with_facet_runtime(&cfg, Arc::clone(&first_runtime));
+    assert_eq!(
+        first_ingest.handle_decoded_batch_raw_only_for_test(
+            1_000_000,
+            std::slice::from_ref(&first_record),
+            0,
+        ),
+        0,
+        "the first record should be synced"
+    );
+    drop(first_ingest);
+    drop(first_runtime);
+
+    let journal_paths = journal_files(&raw_dir);
+    assert_eq!(journal_paths.len(), 1, "expected one raw journal");
+    let active_path = journal_paths[0].clone();
+    set_journal_state(&active_path, JournalState::Online);
+
+    // Production startup order: start watching, construct writers so they
+    // register reopened files, then reconcile from a fresh disk inventory.
+    let second_runtime = Arc::new(crate::facet_runtime::FacetRuntime::new(
+        &cfg.journal.base_dir(),
+    ));
+    let (second_query, _notify_rx) =
+        query::FlowQueryService::new_with_facet_runtime(&cfg, Arc::clone(&second_runtime))
+            .await
+            .expect("create second query service");
+    let mut second_ingest = offline_ingest_with_facet_runtime(&cfg, Arc::clone(&second_runtime));
+    second_query
+        .initialize_facets_before_ingest()
+        .await
+        .expect("reconcile reopened journal");
+    assert_eq!(
+        second_runtime
+            .snapshot()
+            .fields
+            .get("PROTOCOL")
+            .expect("protocol facet after first restart")
+            .values
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["6".to_string()])
+    );
+
+    let second_record = crate::flow::FlowRecord {
+        protocol: 17,
+        ..first_record
+    };
+    assert_eq!(
+        second_ingest.handle_decoded_batch_raw_only_for_test(
+            2_000_000,
+            std::slice::from_ref(&second_record),
+            0,
+        ),
+        0,
+        "the post-restart record should be synced"
+    );
+    assert_eq!(
+        second_runtime
+            .snapshot()
+            .fields
+            .get("PROTOCOL")
+            .expect("protocol facet after append")
+            .values
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["6".to_string(), "17".to_string()])
+    );
+    drop(second_ingest);
+    drop(second_query);
+    drop(second_runtime);
+    set_journal_state(&active_path, JournalState::Online);
+
+    let third_runtime = Arc::new(crate::facet_runtime::FacetRuntime::new(
+        &cfg.journal.base_dir(),
+    ));
+    let (third_query, _notify_rx) =
+        query::FlowQueryService::new_with_facet_runtime(&cfg, Arc::clone(&third_runtime))
+            .await
+            .expect("create third query service");
+    let third_ingest = offline_ingest_with_facet_runtime(&cfg, Arc::clone(&third_runtime));
+    third_query
+        .initialize_facets_before_ingest()
+        .await
+        .expect("reconcile journal after second restart");
+    assert_eq!(
+        third_runtime
+            .snapshot()
+            .fields
+            .get("PROTOCOL")
+            .expect("protocol facet after second restart")
+            .values
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["6".to_string(), "17".to_string()])
+    );
+    drop(third_ingest);
+}
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_ingest_writes_journals_and_query_reads_flows() {
@@ -843,6 +997,29 @@ fn offline_journal_cfg() -> (plugin_config::PluginConfig, TempDir) {
     let mut cfg = plugin_config::PluginConfig::default();
     cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
     (cfg, tmp)
+}
+
+fn offline_ingest_with_facet_runtime(
+    cfg: &plugin_config::PluginConfig,
+    facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
+) -> ingest::IngestService {
+    ingest::IngestService::new_with_facet_runtime(
+        cfg.clone(),
+        Arc::new(ingest::IngestMetrics::default()),
+        Arc::new(RwLock::new(tiering::OpenTierState::default())),
+        Arc::new(RwLock::new(tiering::TierFlowIndexStore::default())),
+        facet_runtime,
+    )
+    .expect("create offline ingest service")
+}
+
+fn set_journal_state(path: &Path, state: JournalState) {
+    let repository_file = RepoFile::from_path(path).expect("parse journal path");
+    let mut journal_file =
+        JournalFile::<MmapMut>::open_for_append(&repository_file, 8 * 1024 * 1024)
+            .expect("open journal for state update");
+    journal_file.journal_header_mut().state = state as u8;
+    journal_file.sync().expect("persist journal state");
 }
 
 /// Start of a fully closed 5m bucket ~20-25 minutes in the past: 1m and 5m
@@ -1671,6 +1848,61 @@ async fn e2e_aggregated_safe_group_by_falls_back_to_on_disk_lower_tiers() {
         materialized_tier_files > 0,
         "expected function response query tier to reflect on-disk materialized-tier availability"
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_fields_absent_from_rollups_force_raw_tier() {
+    let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+        ingest_fixture_with_timestamp_source("nfv5.pcap", plugin_config::TimestampSource::Input)
+            .await;
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
+
+    let requests = [
+        (
+            "group-by",
+            query::FlowsRequest {
+                view: query::ViewMode::TableSankey,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec!["DST_AS_PATH".to_string()],
+                ..Default::default()
+            },
+        ),
+        (
+            "selection",
+            query::FlowsRequest {
+                view: query::ViewMode::TableSankey,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec!["PROTOCOL".to_string()],
+                selections: HashMap::from([(
+                    "MPLS_LABELS".to_string(),
+                    vec!["synthetic-no-match".to_string()],
+                )]),
+                ..Default::default()
+            },
+        ),
+    ];
+
+    for (case, request) in requests {
+        let output = query_service
+            .query_flows(&request)
+            .await
+            .unwrap_or_else(|error| panic!("{case} raw-tier query failed: {error}"));
+        assert_eq!(
+            output.stats.get("query_forced_raw_tier").copied(),
+            Some(1),
+            "{case} on a field absent from rollups must force the raw tier"
+        );
+        assert_eq!(
+            output.stats.get("query_tier").copied(),
+            Some(0),
+            "{case} on a field absent from rollups must execute on raw data"
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

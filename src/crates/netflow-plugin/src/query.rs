@@ -16,7 +16,9 @@ use journal_sdk_core::file::{JournalFileMap, Mmap};
 use journal_sdk_core::{
     Direction as JournalDirection, JournalCursor, JournalFile, JournalReader, Location,
 };
-use journal_sdk_registry::{FileInfo, Monitor, Registry, repository::File as RegistryFile};
+use journal_sdk_registry::{
+    FileInfo, Monitor, Registry, TimeRange, repository::File as RegistryFile,
+};
 use notify::Event;
 use regex::Regex;
 use serde::de::Error as _;

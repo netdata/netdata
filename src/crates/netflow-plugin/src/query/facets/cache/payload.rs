@@ -1,4 +1,5 @@
 use super::*;
+use crate::facet_catalog::{FacetPresentation, facet_field_spec};
 use std::borrow::Cow;
 use std::collections::{BinaryHeap, HashSet};
 
@@ -22,10 +23,13 @@ pub(crate) fn build_facet_vocabulary_payload(
             .map(|field| field.total_values)
             .unwrap_or_default()
             .max(row_count);
-        let autocomplete = published
+        let promoted_to_autocomplete = published
             .map(|field| field.autocomplete)
             .unwrap_or_default();
-        let truncated = autocomplete || total_values > FACET_VALUE_LIMIT;
+        let autocomplete = facet_field_spec(field)
+            .is_some_and(|spec| spec.presentation == FacetPresentation::Autocomplete)
+            || promoted_to_autocomplete;
+        let truncated = promoted_to_autocomplete || total_values > FACET_VALUE_LIMIT;
 
         let values = rows
             .into_iter()

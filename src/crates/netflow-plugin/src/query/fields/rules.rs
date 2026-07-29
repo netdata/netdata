@@ -1,13 +1,16 @@
 use crate::facet_catalog::facet_field_enabled;
-use crate::query::RAW_ONLY_FIELDS;
+use crate::query::virtual_flow_field_dependencies;
+use crate::tiering::rollup_field_available;
 use std::collections::HashMap;
 
 pub(crate) fn field_is_raw_only(field: &str) -> bool {
-    RAW_ONLY_FIELDS
-        .iter()
-        .any(|raw_only| field.eq_ignore_ascii_case(raw_only))
-        || field.to_ascii_uppercase().starts_with("V9_")
-        || field.to_ascii_uppercase().starts_with("IPFIX_")
+    if is_virtual_flow_field(field) {
+        return !virtual_flow_field_dependencies(field)
+            .iter()
+            .all(|dependency| rollup_field_available(dependency));
+    }
+
+    !rollup_field_available(field)
 }
 
 pub(crate) fn is_virtual_flow_field(field: &str) -> bool {

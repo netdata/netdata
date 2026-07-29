@@ -6,6 +6,7 @@ pub(crate) use index::*;
 pub(crate) use model::*;
 #[cfg(test)]
 pub(crate) use rollup::dimensions_for_rollup;
+pub(crate) use rollup::rollup_field_available;
 
 #[cfg(test)]
 #[path = "tiering/tests.rs"]

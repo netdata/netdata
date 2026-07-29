@@ -4,7 +4,7 @@ mod store;
 
 use crate::facet_catalog::{
     AutocompleteMatchKind, FACET_ALLOWED_OPTIONS, FACET_FIELD_SPECS, FacetFieldSpec,
-    facet_field_spec, facet_field_spec_static,
+    FacetValueKind, facet_field_spec, facet_field_spec_static,
 };
 use crate::flow::FlowRecord;
 use crate::memory_estimation::btree_container_overhead_bytes;
@@ -31,20 +31,22 @@ pub(crate) use contribution::{
     FacetFileContribution, FacetValueSink, append_record_facet_values,
     facet_contribution_from_flow_fields,
 };
-use sidecar::{delete_sidecar_files, search_sidecar, sidecar_path, write_sidecar_files};
+pub(crate) use sidecar::sidecar_path;
+use sidecar::{delete_sidecar_files, search_sidecar, write_sidecar_files};
 use store::{FacetStore, FacetStoreValueRef, PersistedFacetStore};
 
-// Version 6 invalidates state built with the old 16-bit IP_FRAGMENT_ID catalog.
-// Archived per-file contributions are not persisted, so retained journals must
-// be rescanned to reconstruct the global value set and its sidecars correctly.
-const FACET_STATE_VERSION: u32 = 6;
+// Version 7 changes DIRECTION from its unusable numeric store to text. Version
+// 6 remains a valid migration source: all compatible fields are retained while
+// archived DIRECTION values are rebuilt after listener startup.
+const FACET_STATE_VERSION: u32 = 7;
+const DIRECTION_MIGRATION_SOURCE_VERSION: u32 = 6;
 const FACET_STATE_FILE_NAME: &str = "facet-state.bin";
 const FACET_STATE_MAGIC: &[u8; 4] = b"NFFS";
 const FACET_STATE_SCHEMA_VERSION: u32 = 1;
 const FACET_STATE_HEADER_LEN: usize = 4 + 4 + 8 + 8;
 const MAX_FACET_STATE_PAYLOAD_LEN: usize = 128 * 1024 * 1024;
 const MAX_FACET_STATE_FILE_LEN: usize = FACET_STATE_HEADER_LEN + MAX_FACET_STATE_PAYLOAD_LEN;
-const FACET_AUTOCOMPLETE_LIMIT: usize = 100;
+const FACET_AUTOCOMPLETE_LIMIT: usize = 256;
 #[cfg(test)]
 static FACET_BEFORE_DISK_WRITE_HOOK: Mutex<Option<Arc<dyn Fn(&Path) + Send + Sync>>> =
     Mutex::new(None);
@@ -94,12 +96,16 @@ struct FacetState {
     published: FacetPublishedSnapshot,
     dirty: bool,
     dirty_generation: u64,
+    topology_generation: u64,
     rebuild_archived: bool,
+    direction_migration_pending: bool,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct FacetReconcilePlan {
+    pub(crate) topology_generation: u64,
     pub(crate) current_archived_paths: BTreeSet<String>,
+    pub(crate) current_active_paths: BTreeSet<String>,
     pub(crate) archived_files_to_scan: Vec<FileInfo>,
     pub(crate) active_files_to_scan: Vec<FileInfo>,
     pub(crate) rebuild_archived: bool,
@@ -112,6 +118,12 @@ pub(crate) struct FacetRuntime {
     ready: AtomicBool,
     state_path: PathBuf,
     persistence: FacetPersistence,
+}
+
+impl journal_sdk_log_writer::LogArtifactSizer for FacetRuntime {
+    fn journal_artifact_size(&self, journal_path: &Path) -> journal_sdk_log_writer::Result<u64> {
+        sidecar::journal_sidecar_bytes(journal_path)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,8 +166,16 @@ impl FacetRuntime {
         }
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn is_ready(&self) -> bool {
         self.ready.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn direction_migration_pending(&self) -> bool {
+        self.state
+            .lock()
+            .map(|state| state.direction_migration_pending)
+            .unwrap_or(false)
     }
 
     pub(crate) fn snapshot(&self) -> Arc<FacetPublishedSnapshot> {
@@ -187,14 +207,21 @@ impl FacetRuntime {
     }
 
     pub(crate) fn build_reconcile_plan(&self, registry_files: &[FileInfo]) -> FacetReconcilePlan {
-        let current_archived_paths = registry_files
+        let registry_active_paths = registry_files
             .iter()
-            .filter(|file_info| file_info.file.is_archived())
+            .filter(|file_info| file_info.file.is_active())
             .map(|file_info| file_info.file.path().to_string())
             .collect::<BTreeSet<_>>();
         let Some(state) = self.state.lock().ok() else {
+            let current_archived_paths = registry_files
+                .iter()
+                .filter(|file_info| file_info.file.is_archived())
+                .map(|file_info| file_info.file.path().to_string())
+                .collect::<BTreeSet<_>>();
             return FacetReconcilePlan {
+                topology_generation: 0,
                 current_archived_paths,
+                current_active_paths: registry_active_paths,
                 archived_files_to_scan: registry_files
                     .iter()
                     .filter(|file_info| file_info.file.is_archived())
@@ -209,6 +236,20 @@ impl FacetRuntime {
             };
         };
 
+        // The writer's non-strict filenames look archived to the registry even
+        // while they are active. Lifecycle state is authoritative for those paths.
+        let current_active_paths = registry_active_paths
+            .into_iter()
+            .chain(state.active_contributions.keys().cloned())
+            .collect::<BTreeSet<_>>();
+        let current_archived_paths = registry_files
+            .iter()
+            .filter(|file_info| {
+                file_info.file.is_archived()
+                    && !current_active_paths.contains(file_info.file.path())
+            })
+            .map(|file_info| file_info.file.path().to_string())
+            .collect::<BTreeSet<_>>();
         let rebuild_archived = state.rebuild_archived
             || !state
                 .indexed_archived_paths
@@ -217,6 +258,7 @@ impl FacetRuntime {
             .iter()
             .filter(|file_info| {
                 file_info.file.is_archived()
+                    && !current_active_paths.contains(file_info.file.path())
                     && (rebuild_archived
                         || !state.indexed_archived_paths.contains(file_info.file.path()))
             })
@@ -224,12 +266,14 @@ impl FacetRuntime {
             .collect::<Vec<_>>();
         let active_files_to_scan = registry_files
             .iter()
-            .filter(|file_info| file_info.file.is_active())
+            .filter(|file_info| current_active_paths.contains(file_info.file.path()))
             .cloned()
             .collect::<Vec<_>>();
 
         FacetReconcilePlan {
+            topology_generation: state.topology_generation,
             current_archived_paths,
+            current_active_paths,
             archived_files_to_scan,
             active_files_to_scan,
             rebuild_archived,
@@ -241,14 +285,29 @@ impl FacetRuntime {
         plan: FacetReconcilePlan,
         archived_scans: BTreeMap<String, FacetFileContribution>,
         active_scans: BTreeMap<String, FacetFileContribution>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let (sidecar_deletes, sidecar_writes, persist_snapshot) = {
             let mut state = self
                 .state
                 .lock()
                 .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
+            if state.topology_generation != plan.topology_generation
+                || (state.rebuild_archived && !plan.rebuild_archived)
+            {
+                return Ok(false);
+            }
+            if plan_omits_existing_runtime_path(&state, &plan)? {
+                return Ok(false);
+            }
+
             let mut sidecar_deletes = Vec::new();
             let mut sidecar_writes = Vec::new();
+            let previous_archived_paths = state.indexed_archived_paths.clone();
+            let previous_active_paths = state
+                .active_contributions
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>();
 
             let removed_archived = state
                 .indexed_archived_paths
@@ -280,13 +339,38 @@ impl FacetRuntime {
                 }
             }
 
-            if !state.active_contributions.is_empty() {
+            state
+                .active_contributions
+                .retain(|path, _| plan.current_active_paths.contains(path));
+            for (path, contribution) in active_scans {
+                if !plan.current_active_paths.contains(&path) {
+                    continue;
+                }
+                match state.active_contributions.entry(path) {
+                    std::collections::btree_map::Entry::Occupied(mut entry) => {
+                        if entry.get_mut().merge_from(&contribution) {
+                            mark_dirty(&mut state);
+                        }
+                    }
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(contribution);
+                        mark_dirty(&mut state);
+                    }
+                }
+            }
+            let current_active_paths = state
+                .active_contributions
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            if previous_active_paths != current_active_paths {
                 mark_dirty(&mut state);
             }
-            state.active_contributions.clear();
-            for (path, contribution) in active_scans {
-                state.active_contributions.insert(path, contribution);
-                mark_dirty(&mut state);
+
+            if previous_archived_paths != state.indexed_archived_paths
+                || previous_active_paths != current_active_paths
+            {
+                mark_topology_changed(&mut state);
             }
             rebuild_published_fields(&mut state);
             state.rebuild_archived = false;
@@ -306,7 +390,7 @@ impl FacetRuntime {
         }
         self.persist_snapshot(persist_snapshot)?;
         self.mark_ready();
-        Ok(())
+        Ok(true)
     }
 
     pub(crate) fn observe_active_contribution(
@@ -331,6 +415,21 @@ impl FacetRuntime {
         Ok(())
     }
 
+    pub(crate) fn observe_active_path_created(&self, path: &Path) -> Result<()> {
+        let Some(path_str) = path.to_str() else {
+            return Ok(());
+        };
+
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
+        if ensure_active_contribution_entry(&mut state, path_str) {
+            mark_topology_changed(&mut state);
+        }
+        Ok(())
+    }
+
     pub(crate) fn observe_active_record(&self, path: &Path, record: &FlowRecord) -> Result<()> {
         let Some(path_str) = path.to_str() else {
             return Ok(());
@@ -340,7 +439,9 @@ impl FacetRuntime {
             .state
             .lock()
             .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
-        ensure_active_contribution_entry(&mut state, path_str);
+        if ensure_active_contribution_entry(&mut state, path_str) {
+            mark_topology_changed(&mut state);
+        }
         let changed = {
             let mut sink = ActiveContributionSink::new(&mut state, path_str);
             append_record_facet_values(&mut sink, record);
@@ -362,11 +463,13 @@ impl FacetRuntime {
                 .state
                 .lock()
                 .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
+            mark_topology_changed(&mut state);
 
             let contribution = state
                 .active_contributions
                 .remove(&archived_path_str)
                 .or_else(|| state.active_contributions.remove(&active_path_str));
+            ensure_active_contribution_entry(&mut state, &active_path_str);
             if let Some(contribution) = contribution {
                 merge_global_contribution(&mut state.archived_fields, &contribution);
                 rebuild_published_fields(&mut state);
@@ -400,6 +503,9 @@ impl FacetRuntime {
                 .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
             let mut changed = false;
             let mut sidecar_deletes = Vec::new();
+            if !deleted_paths.is_empty() {
+                mark_topology_changed(&mut state);
+            }
 
             for path in deleted_paths {
                 let Some(path_str) = path.to_str() else {
@@ -447,6 +553,79 @@ impl FacetRuntime {
             self.prepare_persist_snapshot_locked(&mut state)?
         };
         self.persist_snapshot(persist_snapshot)
+    }
+
+    /// Refresh only active journals while a compatible v6 archived state waits
+    /// for its post-listener DIRECTION migration.
+    pub(crate) fn apply_active_scan_before_direction_migration(
+        &self,
+        active_scans: BTreeMap<String, FacetFileContribution>,
+    ) -> Result<()> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
+        if !state.direction_migration_pending {
+            return Ok(());
+        }
+
+        state.active_contributions = active_scans;
+        rebuild_published_fields(&mut state);
+        mark_dirty(&mut state);
+        publish_locked(&self.snapshot, &state);
+        Ok(())
+    }
+
+    /// Replace only the archived DIRECTION store after proving that the
+    /// retained journal set did not change while it was scanned.
+    ///
+    /// Returns `false` when a concurrent rotation or deletion requires a retry.
+    /// Active contributions and every compatible archived field remain intact.
+    pub(crate) fn complete_direction_migration(
+        &self,
+        expected_archived_paths: &BTreeSet<String>,
+        archived_scans: BTreeMap<String, FacetFileContribution>,
+    ) -> Result<bool> {
+        let persist_snapshot = {
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
+            if !state.direction_migration_pending {
+                return Ok(true);
+            }
+            if state.rebuild_archived {
+                return Ok(false);
+            }
+            if state.indexed_archived_paths != *expected_archived_paths
+                || archived_scans.len() != expected_archived_paths.len()
+                || archived_scans
+                    .keys()
+                    .any(|path| !expected_archived_paths.contains(path))
+            {
+                return Ok(false);
+            }
+
+            let mut archived_direction = FacetStore::new(FacetValueKind::Text);
+            for contribution in archived_scans.into_values() {
+                let Some(direction) = contribution.field("DIRECTION") else {
+                    continue;
+                };
+                let _ = archived_direction.merge_from(direction);
+            }
+            state
+                .archived_fields
+                .insert("DIRECTION".to_string(), archived_direction);
+
+            state.direction_migration_pending = false;
+            rebuild_published_fields(&mut state);
+            mark_dirty(&mut state);
+            publish_locked(&self.snapshot, &state);
+            self.prepare_persist_snapshot_locked(&mut state)?
+        };
+
+        self.persist_snapshot(persist_snapshot)?;
+        Ok(true)
     }
 
     pub(crate) fn autocomplete(&self, field: &str, term: &str) -> Result<Vec<String>> {
@@ -543,7 +722,7 @@ impl FacetRuntime {
         &self,
         state: &mut FacetState,
     ) -> Result<Option<FacetPersistSnapshot>> {
-        if !state.dirty {
+        if !state.dirty || state.rebuild_archived || state.direction_migration_pending {
             return Ok(None);
         }
         if !self.persistence.writes_enabled() {
@@ -602,17 +781,24 @@ impl FacetState {
             active_contributions: BTreeMap::new(),
             dirty: false,
             dirty_generation: 0,
+            topology_generation: 0,
             rebuild_archived: false,
+            direction_migration_pending: false,
         }
     }
 
     fn from_persisted(persisted: PersistedFacetState) -> Self {
         let PersistedFacetState {
+            version,
             indexed_archived_paths,
-            archived_fields: persisted_archived_fields,
-            published,
-            ..
+            archived_fields: mut persisted_archived_fields,
+            mut published,
         } = persisted;
+        let direction_migration_pending = version == DIRECTION_MIGRATION_SOURCE_VERSION;
+        if direction_migration_pending {
+            persisted_archived_fields.remove("DIRECTION");
+            published.remove("DIRECTION");
+        }
         let mut archived_fields = empty_field_stores();
         for (field, saved) in persisted_archived_fields {
             let Some(spec) = facet_field_spec(field.as_str()) else {
@@ -624,21 +810,31 @@ impl FacetState {
             );
         }
 
+        let mut published = if published.is_empty() {
+            published_snapshot_from_archived_and_active_contributions(
+                &archived_fields,
+                &BTreeMap::new(),
+            )
+        } else {
+            FacetPublishedSnapshot { fields: published }
+        };
+        if direction_migration_pending {
+            published.fields.insert(
+                "DIRECTION".to_string(),
+                published_field_from_store(archived_fields.get("DIRECTION")),
+            );
+        }
+
         Self {
             indexed_archived_paths,
-            published: if published.is_empty() {
-                published_snapshot_from_archived_and_active_contributions(
-                    &archived_fields,
-                    &BTreeMap::new(),
-                )
-            } else {
-                FacetPublishedSnapshot { fields: published }
-            },
+            published,
             archived_fields,
             active_contributions: BTreeMap::new(),
             dirty: false,
             dirty_generation: 0,
+            topology_generation: 0,
             rebuild_archived: false,
+            direction_migration_pending,
         }
     }
 }
@@ -651,7 +847,13 @@ struct FacetPersistSnapshot {
 pub(crate) fn scan_registry_file_contribution(
     file_info: &FileInfo,
 ) -> Result<FacetFileContribution> {
-    let requested_fields = FACET_ALLOWED_OPTIONS.clone();
+    scan_registry_file_contribution_for_fields(file_info, FACET_ALLOWED_OPTIONS.as_slice())
+}
+
+pub(crate) fn scan_registry_file_contribution_for_fields(
+    file_info: &FileInfo,
+    requested_fields: &[String],
+) -> Result<FacetFileContribution> {
     let simple_fields = requested_fields
         .iter()
         .filter(|field| !facet_field_requires_protocol_scan(field))
@@ -742,7 +944,7 @@ fn published_snapshot_from_archived_and_active_contributions(
         for spec in FACET_FIELD_SPECS.iter() {
             fields.insert(
                 spec.name.to_string(),
-                published_field_from_store(*spec, archived_fields.get(spec.name)),
+                published_field_from_store(archived_fields.get(spec.name)),
             );
         }
         return FacetPublishedSnapshot { fields };
@@ -759,7 +961,7 @@ fn published_snapshot_from_archived_and_active_contributions(
             }
         }
         let total_values = combined.len();
-        let autocomplete = spec.supports_autocomplete && total_values > FACET_VALUE_LIMIT;
+        let autocomplete = total_values > FACET_VALUE_LIMIT;
         let values = if autocomplete {
             Vec::new()
         } else {
@@ -778,12 +980,9 @@ fn published_snapshot_from_archived_and_active_contributions(
     FacetPublishedSnapshot { fields }
 }
 
-fn published_field_from_store(
-    spec: FacetFieldSpec,
-    store: Option<&FacetStore>,
-) -> FacetPublishedField {
+fn published_field_from_store(store: Option<&FacetStore>) -> FacetPublishedField {
     let total_values = store.map(FacetStore::len).unwrap_or_default();
-    let autocomplete = spec.supports_autocomplete && total_values > FACET_VALUE_LIMIT;
+    let autocomplete = total_values > FACET_VALUE_LIMIT;
     let values = if autocomplete {
         Vec::new()
     } else {
@@ -817,7 +1016,7 @@ fn apply_new_active_value_to_published(
         .or_insert_with(FacetPublishedField::default);
 
     entry.total_values = entry.total_values.saturating_add(1);
-    if spec.supports_autocomplete && entry.total_values > FACET_VALUE_LIMIT {
+    if entry.total_values > FACET_VALUE_LIMIT {
         entry.autocomplete = true;
         entry.values.clear();
         return;
@@ -835,7 +1034,9 @@ fn apply_active_contribution(
     contribution: &FacetFileContribution,
 ) -> bool {
     let mut changed = false;
-    ensure_active_contribution_entry(state, path_str);
+    if ensure_active_contribution_entry(state, path_str) {
+        mark_topology_changed(state);
+    }
 
     for (field, store) in contribution.iter() {
         store.visit_values(|value| {
@@ -846,12 +1047,14 @@ fn apply_active_contribution(
     changed
 }
 
-fn ensure_active_contribution_entry(state: &mut FacetState, path_str: &str) {
+fn ensure_active_contribution_entry(state: &mut FacetState, path_str: &str) -> bool {
     if !state.active_contributions.contains_key(path_str) {
         state
             .active_contributions
             .insert(path_str.to_string(), FacetFileContribution::default());
+        return true;
     }
+    false
 }
 
 fn apply_active_value(
@@ -947,6 +1150,10 @@ impl FacetValueSink for ActiveContributionSink<'_> {
         if value == 0 {
             return;
         }
+        self.insert_u16_present_static(field, value);
+    }
+
+    fn insert_u16_present_static(&mut self, field: &'static str, value: u16) {
         self.changed |= apply_active_value(
             self.state,
             self.path_str,
@@ -959,6 +1166,10 @@ impl FacetValueSink for ActiveContributionSink<'_> {
         if value == 0 {
             return;
         }
+        self.insert_u32_present_static(field, value);
+    }
+
+    fn insert_u32_present_static(&mut self, field: &'static str, value: u32) {
         self.changed |= apply_active_value(
             self.state,
             self.path_str,
@@ -967,10 +1178,7 @@ impl FacetValueSink for ActiveContributionSink<'_> {
         );
     }
 
-    fn insert_u64_static(&mut self, field: &'static str, value: u64) {
-        if value == 0 {
-            return;
-        }
+    fn insert_u64_present_static(&mut self, field: &'static str, value: u64) {
         self.changed |= apply_active_value(
             self.state,
             self.path_str,
@@ -1038,6 +1246,33 @@ fn before_facet_disk_write_for_test(_path: &Path) {}
 fn mark_dirty(state: &mut FacetState) {
     state.dirty = true;
     state.dirty_generation = state.dirty_generation.wrapping_add(1);
+}
+
+fn mark_topology_changed(state: &mut FacetState) {
+    state.topology_generation = state.topology_generation.wrapping_add(1);
+}
+
+fn plan_omits_existing_runtime_path(state: &FacetState, plan: &FacetReconcilePlan) -> Result<bool> {
+    let omitted_paths = state
+        .indexed_archived_paths
+        .iter()
+        .filter(|path| !plan.current_archived_paths.contains(*path))
+        .chain(
+            state
+                .active_contributions
+                .keys()
+                .filter(|path| !plan.current_active_paths.contains(*path)),
+        );
+
+    for path in omitted_paths {
+        if Path::new(path)
+            .try_exists()
+            .with_context(|| format!("failed to verify retained netflow journal path {path}"))?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn persisted_state_from_runtime_state(state: &FacetState) -> PersistedFacetState {
@@ -1244,7 +1479,10 @@ fn load_persisted_state(state_path: &Path) -> Option<PersistedFacetState> {
             return None;
         }
     };
-    if persisted.version != FACET_STATE_VERSION {
+    if !matches!(
+        persisted.version,
+        FACET_STATE_VERSION | DIRECTION_MIGRATION_SOURCE_VERSION
+    ) {
         tracing::warn!(
             "ignoring persisted netflow facet state {} due to version mismatch {} != {}",
             state_path.display(),
@@ -1252,6 +1490,13 @@ fn load_persisted_state(state_path: &Path) -> Option<PersistedFacetState> {
             FACET_STATE_VERSION
         );
         return None;
+    }
+    if persisted.version == DIRECTION_MIGRATION_SOURCE_VERSION {
+        tracing::info!(
+            "loaded netflow facet state version {} for background DIRECTION migration to version {}",
+            persisted.version,
+            FACET_STATE_VERSION
+        );
     }
     Some(persisted)
 }
@@ -1317,7 +1562,7 @@ fn merge_autocomplete_values(left: Vec<String>, right: Vec<String>) -> Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::flow::FlowFields;
+    use crate::flow::{FlowDirection, FlowFields};
     use allocative::size_of_unique_allocated_data;
     use journal_sdk_core::file::{JournalState, Mmap};
     use journal_sdk_core::repository::File as JournalRepositoryFile;
@@ -1417,6 +1662,64 @@ mod tests {
         }
     }
 
+    fn write_archived_direction_journal(base_dir: &Path, directions: &[FlowDirection]) -> FileInfo {
+        let machine_dir = base_dir.join("11111111-1111-1111-1111-111111111111");
+        fs::create_dir_all(&machine_dir).expect("create journal machine directory");
+        let path = machine_dir.join(
+            "system@33333333333333333333333333333333-0000000000000001-00000000000f4240.journal",
+        );
+        let repository_file =
+            JournalRepositoryFile::from_path(&path).expect("parse archived journal path");
+        let test_uuid = |seed: u8| uuid::Uuid::from_bytes([seed; 16]);
+        let mut journal_file = JournalFile::create(
+            &repository_file,
+            JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3)),
+        )
+        .expect("create archived direction journal");
+        let mut writer = JournalWriter::new(&mut journal_file, 1, test_uuid(4))
+            .expect("create archived direction journal writer");
+        let mut encoded = Vec::new();
+        let mut fields = Vec::new();
+        let mut value_starts = Vec::new();
+
+        for (index, direction) in directions.iter().copied().enumerate() {
+            let mut record = FlowRecord {
+                flow_version: "netflow9",
+                protocol: 17,
+                ..FlowRecord::default()
+            };
+            record.set_direction(direction);
+            record.encode_to_journal_buf(&mut encoded, &mut fields, &mut value_starts);
+            let realtime_usec = 1_000_000 + index as u64;
+            let source_realtime = format!("_SOURCE_REALTIME_TIMESTAMP={realtime_usec}");
+            let mut payloads = fields
+                .iter()
+                .map(|field| &encoded[field.clone()])
+                .collect::<Vec<_>>();
+            payloads.push(source_realtime.as_bytes());
+            writer
+                .add_entry(
+                    &mut journal_file,
+                    &payloads,
+                    realtime_usec,
+                    1 + index as u64,
+                )
+                .expect("write archived direction journal entry");
+        }
+        drop(writer);
+        journal_file.journal_header_mut().state = JournalState::Archived as u8;
+        journal_file
+            .sync()
+            .expect("sync archived direction journal state");
+        drop(journal_file);
+
+        FileInfo {
+            file: journal_sdk_registry::repository::File::from_path(&path)
+                .expect("parse archived registry path"),
+            time_range: TimeRange::Unknown,
+        }
+    }
+
     #[test]
     fn runtime_rebuilds_global_values_after_archived_deletion() {
         let tmp = tempfile::tempdir().expect("create temp dir");
@@ -1439,10 +1742,17 @@ mod tests {
         runtime
             .observe_deleted_paths(&[PathBuf::from("/tmp/flows-a.journal")])
             .expect("delete first file");
+        let topology_generation = runtime
+            .state
+            .lock()
+            .expect("lock facet state")
+            .topology_generation;
         runtime
             .apply_reconcile_plan(
                 FacetReconcilePlan {
+                    topology_generation,
                     current_archived_paths: BTreeSet::new(),
+                    current_active_paths: BTreeSet::from([String::from("/tmp/flows-b.journal")]),
                     archived_files_to_scan: Vec::new(),
                     active_files_to_scan: Vec::new(),
                     rebuild_archived: true,
@@ -1458,6 +1768,187 @@ mod tests {
         assert!(
             !protocol.autocomplete,
             "small protocol domains should stay inline"
+        );
+    }
+
+    #[test]
+    fn reconcile_merges_scanned_active_values_with_live_updates() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_path = tmp.path().join("flows-active.journal");
+        let active_path_str = active_path.to_string_lossy().to_string();
+        let scanned = facet_contribution_from_flow_fields(&fields_with_protocol("6"));
+        let live = facet_contribution_from_flow_fields(&fields_with_protocol("17"));
+        runtime
+            .observe_active_path_created(&active_path)
+            .expect("observe active path before reconcile scan");
+        let topology_generation = runtime
+            .state
+            .lock()
+            .expect("lock facet state")
+            .topology_generation;
+        let plan = FacetReconcilePlan {
+            topology_generation,
+            current_archived_paths: BTreeSet::new(),
+            current_active_paths: BTreeSet::from([active_path_str.clone()]),
+            archived_files_to_scan: Vec::new(),
+            active_files_to_scan: Vec::new(),
+            rebuild_archived: false,
+        };
+
+        runtime
+            .observe_active_contribution(&active_path, &live)
+            .expect("observe live update during reconcile scan");
+        assert!(
+            runtime
+                .apply_reconcile_plan(
+                    plan,
+                    BTreeMap::new(),
+                    BTreeMap::from([(active_path_str, scanned)]),
+                )
+                .expect("apply current reconcile plan")
+        );
+
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("protocol field")
+                .values,
+            vec!["6".to_string(), "17".to_string()],
+            "a scan result must merge with values received while the scan was running"
+        );
+    }
+
+    #[test]
+    fn reconcile_rejects_a_plan_that_predates_a_new_active_path() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let stale_plan = runtime.build_reconcile_plan(&[]);
+        let active_path = tmp.path().join("flows-created-during-scan.journal");
+        let live = facet_contribution_from_flow_fields(&fields_with_protocol("17"));
+
+        runtime
+            .observe_active_path_created(&active_path)
+            .expect("observe active path created during reconcile scan");
+        runtime
+            .observe_active_contribution(&active_path, &live)
+            .expect("observe first live contribution");
+        assert!(
+            !runtime
+                .apply_reconcile_plan(stale_plan, BTreeMap::new(), BTreeMap::new())
+                .expect("reject stale reconcile plan")
+        );
+
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("protocol field")
+                .values,
+            vec!["17".to_string()],
+            "a stale scan must not remove a newly created active path"
+        );
+    }
+
+    #[test]
+    fn reconcile_preserves_lifecycle_active_path_during_registry_skew() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_path = tmp.path().join("flows-created-before-plan.journal");
+        fs::File::create(&active_path).expect("create active journal placeholder");
+        runtime
+            .observe_active_path_created(&active_path)
+            .expect("observe active path before stale registry plan");
+        let stale_plan = runtime.build_reconcile_plan(&[]);
+        let live = facet_contribution_from_flow_fields(&fields_with_protocol("17"));
+
+        runtime
+            .observe_active_contribution(&active_path, &live)
+            .expect("observe first live contribution during scan");
+        assert!(
+            runtime
+                .apply_reconcile_plan(stale_plan, BTreeMap::new(), BTreeMap::new())
+                .expect("apply registry-skewed reconcile plan")
+        );
+
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("protocol field")
+                .values,
+            vec!["17".to_string()],
+            "a registry snapshot older than lifecycle state must not remove the active path"
+        );
+    }
+
+    #[test]
+    fn reconcile_plan_uses_lifecycle_state_for_non_strict_active_filename() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_path = tmp.path().join(
+            "system@22222222222222222222222222222222-\
+             0000000000000001-00000000000f4240.journal",
+        );
+        runtime
+            .observe_active_path_created(&active_path)
+            .expect("observe writer active path");
+        let file_info = FileInfo {
+            file: journal_sdk_registry::repository::File::from_path(&active_path)
+                .expect("parse non-strict writer path"),
+            time_range: TimeRange::Unknown,
+        };
+        assert!(file_info.file.is_archived(), "filename parser control");
+
+        let plan = runtime.build_reconcile_plan(&[file_info]);
+        let active_path = active_path.to_string_lossy().to_string();
+        assert!(plan.current_active_paths.contains(&active_path));
+        assert!(!plan.current_archived_paths.contains(&active_path));
+        assert_eq!(plan.active_files_to_scan.len(), 1);
+        assert!(plan.archived_files_to_scan.is_empty());
+    }
+
+    #[test]
+    fn stale_reconcile_does_not_clear_a_newer_archived_rebuild() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let archived_path = tmp.path().join("flows-archived.journal");
+        let active_path = tmp.path().join("flows-active.journal");
+        let contribution = facet_contribution_from_flow_fields(&fields_with_protocol("17"));
+
+        runtime
+            .observe_active_contribution(&archived_path, &contribution)
+            .expect("observe active contribution");
+        runtime
+            .observe_rotation(&archived_path, &active_path)
+            .expect("promote archived contribution");
+        let stale_plan = runtime.build_reconcile_plan(&[]);
+
+        runtime
+            .observe_deleted_paths(std::slice::from_ref(&archived_path))
+            .expect("delete archived path during reconcile scan");
+        assert!(
+            !runtime
+                .apply_reconcile_plan(stale_plan, BTreeMap::new(), BTreeMap::new())
+                .expect("reject stale reconcile plan")
+        );
+
+        let state = runtime.state.lock().expect("lock facet state");
+        assert!(
+            state.rebuild_archived,
+            "a stale scan must not clear a newer rebuild request"
+        );
+        drop(state);
+        assert!(
+            load_persisted_state(&runtime.state_path)
+                .expect("load last clean state")
+                .indexed_archived_paths
+                .contains(archived_path.to_str().expect("UTF-8 test path")),
+            "a stale scan must not replace the last clean state on disk"
         );
     }
 
@@ -1846,6 +2337,46 @@ mod tests {
     }
 
     #[test]
+    fn pending_archived_rebuild_is_not_persisted_as_clean_state() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let archived_path = tmp.path().join("deleted-before-rebuild.journal");
+        let active_path = tmp.path().join("next-active.journal");
+        let contribution = facet_contribution_from_flow_fields(&fields_with_protocol("17"));
+
+        runtime
+            .observe_active_contribution(&archived_path, &contribution)
+            .expect("observe active contribution");
+        runtime
+            .observe_rotation(&archived_path, &active_path)
+            .expect("persist archived contribution");
+        assert!(
+            load_persisted_state(&runtime.state_path)
+                .expect("load pre-deletion state")
+                .indexed_archived_paths
+                .contains(archived_path.to_str().expect("UTF-8 test path"))
+        );
+
+        runtime
+            .observe_deleted_paths(std::slice::from_ref(&archived_path))
+            .expect("mark archived path deleted");
+        let disk_state = load_persisted_state(&runtime.state_path)
+            .expect("previous clean state must remain on disk");
+        assert!(
+            disk_state
+                .indexed_archived_paths
+                .contains(archived_path.to_str().expect("UTF-8 test path")),
+            "an intermediate store containing deleted values must not replace the last clean state"
+        );
+
+        let restarted = FacetRuntime::new(tmp.path());
+        assert!(
+            restarted.build_reconcile_plan(&[]).rebuild_archived,
+            "the previous state must force a rebuild after restart"
+        );
+    }
+
+    #[test]
     fn runtime_reconcile_persists_cleared_active_contributions() {
         let tmp = tempfile::tempdir().expect("create temp dir");
         let runtime = FacetRuntime::new(tmp.path());
@@ -1864,10 +2395,17 @@ mod tests {
             "setup should persist the active published facet"
         );
 
+        let topology_generation = runtime
+            .state
+            .lock()
+            .expect("lock facet state")
+            .topology_generation;
         runtime
             .apply_reconcile_plan(
                 FacetReconcilePlan {
+                    topology_generation,
                     current_archived_paths: BTreeSet::new(),
+                    current_active_paths: BTreeSet::new(),
                     archived_files_to_scan: Vec::new(),
                     active_files_to_scan: Vec::new(),
                     rebuild_archived: false,
@@ -2005,11 +2543,8 @@ mod tests {
     fn runtime_rebuilds_legacy_fragment_facets_once() {
         const LEGACY_FACET_STATE_VERSION: u32 = 5;
 
-        assert_eq!(
-            FACET_STATE_VERSION,
-            LEGACY_FACET_STATE_VERSION + 1,
-            "the fixture must represent the immediately preceding facet-state format"
-        );
+        assert_eq!(LEGACY_FACET_STATE_VERSION, 5);
+        assert!(LEGACY_FACET_STATE_VERSION < FACET_STATE_VERSION);
 
         let tmp = tempfile::tempdir().expect("create temp dir");
         let file_info = write_archived_fragment_journal(tmp.path(), &[42, 70_000]);
@@ -2136,6 +2671,256 @@ mod tests {
                 .expect("reloaded fragment ID field")
                 .values,
             vec!["42".to_string(), "70000".to_string()]
+        );
+    }
+
+    #[test]
+    fn runtime_migrates_only_v6_direction_from_a_real_archived_journal() {
+        const NUMERIC_DIRECTION_STATE_VERSION: u32 = 6;
+
+        assert_eq!(
+            FACET_STATE_VERSION,
+            NUMERIC_DIRECTION_STATE_VERSION + 1,
+            "direction's facet-kind change requires one state-version bump"
+        );
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let file_info = write_archived_direction_journal(
+            tmp.path(),
+            &[FlowDirection::Ingress, FlowDirection::Egress],
+        );
+        let archived_path = file_info.file.path().to_string();
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let old_state = PersistedFacetState {
+            version: NUMERIC_DIRECTION_STATE_VERSION,
+            indexed_archived_paths: BTreeSet::from([archived_path.clone()]),
+            archived_fields: BTreeMap::from([
+                (
+                    "DIRECTION".to_string(),
+                    PersistedFacetStore::DenseU8(vec![0]),
+                ),
+                (
+                    "PROTOCOL".to_string(),
+                    PersistedFacetStore::DenseU8(vec![17]),
+                ),
+            ]),
+            published: BTreeMap::from([
+                (
+                    "DIRECTION".to_string(),
+                    FacetPublishedField {
+                        total_values: 1,
+                        autocomplete: false,
+                        values: vec!["0".to_string()],
+                    },
+                ),
+                (
+                    "PROTOCOL".to_string(),
+                    FacetPublishedField {
+                        total_values: 1,
+                        autocomplete: false,
+                        values: vec!["17".to_string()],
+                    },
+                ),
+            ]),
+        };
+        persist_state_snapshot(
+            &state_path,
+            &encode_persisted_facet_state(&old_state).expect("encode v6 facet state"),
+        )
+        .expect("persist v6 facet state");
+
+        let runtime = FacetRuntime::new(tmp.path());
+        assert!(
+            runtime.is_ready(),
+            "compatible v6 state must remain queryable during migration"
+        );
+        assert!(runtime.direction_migration_pending());
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("DIRECTION")
+                .expect("direction field")
+                .total_values,
+            0
+        );
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("preserved protocol field")
+                .values,
+            vec!["17".to_string()]
+        );
+        let plan = runtime.build_reconcile_plan(std::slice::from_ref(&file_info));
+        assert!(
+            plan.archived_files_to_scan.is_empty(),
+            "the compatible archived fields must not be rebuilt at startup"
+        );
+
+        let mut active_fields = FlowFields::new();
+        active_fields.insert("DIRECTION", "egress".to_string());
+        active_fields.insert("PROTOCOL", "6".to_string());
+        active_fields.insert("SRC_AS_NAME", "AS64512 EXAMPLE".to_string());
+        runtime
+            .observe_active_contribution(
+                Path::new("/tmp/active-during-direction-migration.journal"),
+                &facet_contribution_from_flow_fields(&active_fields),
+            )
+            .expect("observe live contribution during migration");
+        runtime
+            .persist_if_dirty()
+            .expect("skip persistence while migration is pending");
+        assert_eq!(
+            load_persisted_state(&state_path)
+                .expect("reload original v6 state")
+                .version,
+            NUMERIC_DIRECTION_STATE_VERSION,
+            "v7 must not be persisted before the archived scan succeeds"
+        );
+
+        let direction_scan =
+            scan_registry_file_contribution_for_fields(&file_info, &["DIRECTION".to_string()])
+                .expect("scan archived DIRECTION through the production reader");
+        assert!(
+            runtime
+                .complete_direction_migration(
+                    &BTreeSet::from([archived_path.clone()]),
+                    BTreeMap::from([(archived_path.clone(), direction_scan)]),
+                )
+                .expect("apply DIRECTION migration")
+        );
+
+        let migrated = runtime.snapshot();
+        assert_eq!(
+            migrated
+                .fields
+                .get("DIRECTION")
+                .expect("migrated direction")
+                .values,
+            vec!["egress".to_string(), "ingress".to_string()]
+        );
+        assert_eq!(
+            migrated
+                .fields
+                .get("PROTOCOL")
+                .expect("compatible and live protocols")
+                .values,
+            vec!["6".to_string(), "17".to_string()]
+        );
+        assert_eq!(
+            migrated
+                .fields
+                .get("SRC_AS_NAME")
+                .expect("live field")
+                .values,
+            vec!["AS64512 EXAMPLE".to_string()],
+            "targeted migration must preserve live contributions"
+        );
+        let persisted = load_persisted_state(&state_path).expect("load migrated v7 state");
+        assert_eq!(persisted.version, FACET_STATE_VERSION);
+        assert!(matches!(
+            persisted.archived_fields.get("PROTOCOL"),
+            Some(PersistedFacetStore::DenseU8(values)) if values == &[17]
+        ));
+
+        let restarted = FacetRuntime::new(tmp.path());
+        assert!(restarted.is_ready());
+        assert!(!restarted.direction_migration_pending());
+        assert!(
+            restarted
+                .build_reconcile_plan(&[file_info])
+                .archived_files_to_scan
+                .is_empty(),
+            "v7 restart must not scan the retained journal again"
+        );
+    }
+
+    #[test]
+    fn direction_migration_retries_when_archived_paths_change() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let original_path = "/tmp/original-direction.journal".to_string();
+        let old_state = PersistedFacetState {
+            version: DIRECTION_MIGRATION_SOURCE_VERSION,
+            indexed_archived_paths: BTreeSet::from([original_path.clone()]),
+            archived_fields: BTreeMap::from([(
+                "PROTOCOL".to_string(),
+                PersistedFacetStore::DenseU8(vec![17]),
+            )]),
+            published: BTreeMap::new(),
+        };
+        persist_state_snapshot(
+            &state_path,
+            &encode_persisted_facet_state(&old_state).expect("encode v6 facet state"),
+        )
+        .expect("persist v6 facet state");
+        let runtime = FacetRuntime::new(tmp.path());
+        let original_scan = facet_contribution_from_flow_fields(&FlowFields::from([(
+            "DIRECTION",
+            "ingress".to_string(),
+        )]));
+
+        let rotated_path = Path::new("/tmp/rotated-direction.journal");
+        runtime
+            .observe_active_contribution(
+                rotated_path,
+                &facet_contribution_from_flow_fields(&FlowFields::from([(
+                    "DIRECTION",
+                    "egress".to_string(),
+                )])),
+            )
+            .expect("observe concurrent active journal");
+        runtime
+            .observe_rotation(rotated_path, Path::new("/tmp/next-direction.journal"))
+            .expect("rotate journal during migration");
+
+        assert!(
+            !runtime
+                .complete_direction_migration(
+                    &BTreeSet::from([original_path.clone()]),
+                    BTreeMap::from([(original_path, original_scan)]),
+                )
+                .expect("reject stale migration scan")
+        );
+        assert!(runtime.direction_migration_pending());
+        assert_eq!(
+            load_persisted_state(&state_path)
+                .expect("reload original state after retry")
+                .version,
+            DIRECTION_MIGRATION_SOURCE_VERSION
+        );
+    }
+
+    #[test]
+    fn empty_v6_direction_migration_persists_v7_without_a_journal_scan() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let old_state = PersistedFacetState {
+            version: DIRECTION_MIGRATION_SOURCE_VERSION,
+            indexed_archived_paths: BTreeSet::new(),
+            archived_fields: BTreeMap::new(),
+            published: BTreeMap::new(),
+        };
+        persist_state_snapshot(
+            &state_path,
+            &encode_persisted_facet_state(&old_state).expect("encode empty v6 facet state"),
+        )
+        .expect("persist empty v6 facet state");
+        let runtime = FacetRuntime::new(tmp.path());
+
+        assert!(
+            runtime
+                .complete_direction_migration(&BTreeSet::new(), BTreeMap::new())
+                .expect("complete empty DIRECTION migration")
+        );
+        assert!(!runtime.direction_migration_pending());
+        assert_eq!(
+            load_persisted_state(&state_path)
+                .expect("load empty migrated state")
+                .version,
+            FACET_STATE_VERSION
         );
     }
 
@@ -2348,7 +3133,7 @@ mod tests {
 
         // Two journals, each promoted to sidecar by inserting >FACET_VALUE_LIMIT
         // distinct values. Each sidecar has only 30 entries that match the
-        // search term, so neither alone can fill FACET_AUTOCOMPLETE_LIMIT (100)
+        // search term, so neither alone can fill FACET_AUTOCOMPLETE_LIMIT (256)
         // and the loop must reach both sidecars.
         let paths = [
             Path::new("/tmp/flows-multi-a.journal"),
@@ -2419,6 +3204,33 @@ mod tests {
             5,
             "empty term must surface every value (limited by FACET_AUTOCOMPLETE_LIMIT); got {results:?}"
         );
+    }
+
+    #[test]
+    fn runtime_autocomplete_returns_up_to_256_unique_values() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let active_path = Path::new("/tmp/flows-autocomplete-limit.journal");
+
+        for asn in 0..300u32 {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_AS_NAME", format!("AS{asn:05} Provider-{asn:03}"));
+            runtime
+                .observe_active_contribution(
+                    active_path,
+                    &facet_contribution_from_flow_fields(&fields),
+                )
+                .expect("observe contribution");
+        }
+
+        let results = runtime
+            .autocomplete("SRC_AS_NAME", "")
+            .expect("autocomplete values");
+        let unique = results.iter().collect::<BTreeSet<_>>();
+
+        assert_eq!(FACET_AUTOCOMPLETE_LIMIT, 256);
+        assert_eq!(results.len(), FACET_AUTOCOMPLETE_LIMIT);
+        assert_eq!(unique.len(), FACET_AUTOCOMPLETE_LIMIT);
     }
 
     #[test]
@@ -2630,5 +3442,82 @@ mod tests {
                 field, kind, len, estimated, allocative_bytes
             );
         }
+    }
+
+    #[test]
+    #[ignore = "manual production-data sidecar retention metadata benchmark"]
+    fn stress_profile_live_sidecar_retention_metadata() {
+        let base_dir = std::env::var_os("NETFLOW_PROFILE_BASE_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("/var/cache/netdata/flows"));
+        let rounds = std::env::var("NETFLOW_SIDECAR_BENCH_ROUNDS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|rounds| *rounds > 0)
+            .unwrap_or(10);
+        let mut pending = vec![base_dir];
+        let mut journal_paths = Vec::new();
+        while let Some(directory) = pending.pop() {
+            for entry in fs::read_dir(&directory)
+                .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
+            {
+                let entry = entry.expect("read directory entry");
+                let file_type = entry.file_type().expect("read directory entry type");
+                let path = entry.path();
+                if file_type.is_dir() {
+                    pending.push(path);
+                } else if path
+                    .extension()
+                    .is_some_and(|extension| extension == "journal")
+                {
+                    journal_paths.push(path);
+                }
+            }
+        }
+        assert!(!journal_paths.is_empty(), "no journal files to benchmark");
+
+        let sidecar_fields = FACET_FIELD_SPECS
+            .iter()
+            .filter(|spec| spec.uses_sidecar)
+            .count();
+        let metadata_calls = journal_paths.len().saturating_mul(sidecar_fields);
+        let mut elapsed = Vec::with_capacity(rounds);
+        let mut measured_bytes = None;
+        for _ in 0..rounds {
+            let started = std::time::Instant::now();
+            let bytes = journal_paths.iter().fold(0_u64, |total, path| {
+                total.saturating_add(
+                    sidecar::journal_sidecar_bytes(path).expect("measure journal sidecars"),
+                )
+            });
+            elapsed.push(started.elapsed());
+            match measured_bytes {
+                Some(previous) => assert_eq!(bytes, previous, "sidecar bytes changed during run"),
+                None => measured_bytes = Some(bytes),
+            }
+        }
+        elapsed.sort_unstable();
+        let min = elapsed[0];
+        let median = elapsed[elapsed.len() / 2];
+        let max = elapsed[elapsed.len() - 1];
+        let median_ns_per_call = if metadata_calls == 0 {
+            0
+        } else {
+            median.as_nanos() / metadata_calls as u128
+        };
+
+        eprintln!(
+            "sidecar retention metadata: journals={} fields={} calls_per_round={} \
+             artifact_bytes={} rounds={} min_us={} median_us={} max_us={} median_ns_per_call={}",
+            journal_paths.len(),
+            sidecar_fields,
+            metadata_calls,
+            measured_bytes.unwrap_or(0),
+            rounds,
+            min.as_micros(),
+            median.as_micros(),
+            max.as_micros(),
+            median_ns_per_call,
+        );
     }
 }

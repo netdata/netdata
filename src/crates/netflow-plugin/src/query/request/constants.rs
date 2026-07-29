@@ -43,19 +43,6 @@ pub(crate) const CITY_MAP_GROUP_BY_FIELDS: &[&str] = &[
     "DST_GEO_LONGITUDE",
 ];
 
-pub(crate) const RAW_ONLY_FIELDS: &[&str] = &[
-    "SRC_ADDR",
-    "DST_ADDR",
-    "SRC_PORT",
-    "DST_PORT",
-    "SRC_GEO_CITY",
-    "DST_GEO_CITY",
-    "SRC_GEO_LATITUDE",
-    "DST_GEO_LATITUDE",
-    "SRC_GEO_LONGITUDE",
-    "DST_GEO_LONGITUDE",
-];
-
 pub(crate) fn default_group_by() -> Vec<String> {
     DEFAULT_GROUP_BY_FIELDS
         .iter()

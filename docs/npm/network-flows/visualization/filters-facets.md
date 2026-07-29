@@ -29,7 +29,7 @@ Across different fields: **AND**. Adding `SRC_COUNTRY = US` to the above shows T
 
 ## No negative match
 
-You cannot directly say "everything except X". The workaround is to select all values and remove the unwanted one — works for low-cardinality fields like `PROTOCOL` (a handful of values). For high-cardinality fields like `SRC_AS_NAME`, the autocomplete only surfaces the top 100 values, so there's no practical way to "select all and remove".
+You cannot directly say "everything except X". The workaround is to select all values and remove the unwanted one — works for low-cardinality fields like `PROTOCOL` (a handful of values). For high-cardinality fields like `SRC_AS_NAME`, the autocomplete only surfaces the top 256 values, so there's no practical way to "select all and remove".
 
 Negative matching is not supported.
 
@@ -37,7 +37,8 @@ Negative matching is not supported.
 
 Type into a facet field and the dashboard suggests existing values from your live data. The list:
 
-- Shows up to **100 matching values**, sorted alphabetically.
+- Shows up to **256 matching values**, sorted alphabetically.
+- High-cardinality fields always use autocomplete, even while the collector has observed only a few values. Fixed categorical fields stay inline while they fit within the separate 100-value inline limit.
 - Matching policy is per-field. Free-form text fields (`SRC_AS_NAME`, `EXPORTER_NAME`, `IN_IF_DESCRIPTION`, MAC addresses, AS paths, BGP communities, country/city/state names) match by **substring**, so typing `Akamai` finds `AS20940 Akamai International`. IPs and short numeric fields (ports, protocols, ASN numbers, interface speeds) match by **prefix**, so typing `10.0.` narrows to that range.
 - Runs against an **in-memory snapshot of the live journal** plus on-disk FST sidecars for promoted high-cardinality fields. Autocomplete never reads the raw flow tiers, and is fast even on busy collectors.
 - The autocomplete `term` is hard-capped at 256 bytes; longer requests are rejected.

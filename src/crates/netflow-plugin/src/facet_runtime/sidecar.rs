@@ -26,16 +26,38 @@ pub(crate) fn write_sidecar_files(
 pub(crate) fn delete_sidecar_files(journal_path: &Path) {
     for spec in FACET_FIELD_SPECS.iter().filter(|spec| spec.uses_sidecar) {
         let path = sidecar_path(journal_path, spec.name);
-        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(path.with_extension("fst.tmp"));
     }
 }
 
 pub(crate) fn sidecar_path(journal_path: &Path, field: &str) -> PathBuf {
-    PathBuf::from(format!(
-        "{}.facet.{}.fst",
-        journal_path.display(),
-        field.to_ascii_uppercase()
-    ))
+    let mut path = journal_path.as_os_str().to_os_string();
+    path.push(format!(".facet.{}.fst", field.to_ascii_uppercase()));
+    PathBuf::from(path)
+}
+
+pub(super) fn journal_sidecar_bytes(journal_path: &Path) -> journal_sdk_log_writer::Result<u64> {
+    let mut total = 0_u64;
+
+    for spec in FACET_FIELD_SPECS.iter().filter(|spec| spec.uses_sidecar) {
+        let path = sidecar_path(journal_path, spec.name);
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.file_type().is_file() => {
+                total = total.saturating_add(metadata.len());
+            }
+            Ok(_) => {
+                return Err(journal_sdk_log_writer::WriterError::InvalidPath(format!(
+                    "facet sidecar is not a regular file: {}",
+                    path.display()
+                )));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+
+    Ok(total)
 }
 
 pub(crate) fn search_sidecar(
@@ -133,4 +155,130 @@ fn write_field_sidecar(journal_path: &Path, field: &str, values: &[String]) -> R
     })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sidecar_fields() -> Vec<&'static str> {
+        FACET_FIELD_SPECS
+            .iter()
+            .filter(|spec| spec.uses_sidecar)
+            .map(|spec| spec.name)
+            .collect()
+    }
+
+    #[test]
+    fn journal_sidecar_bytes_counts_only_catalog_owned_final_files() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let journal_path = tmp.path().join("flow.journal");
+        let fields = sidecar_fields();
+        assert!(
+            fields.len() >= 2,
+            "test requires at least two sidecar fields"
+        );
+
+        fs::write(sidecar_path(&journal_path, fields[0]), vec![0_u8; 13])
+            .expect("write first owned sidecar");
+        fs::write(sidecar_path(&journal_path, fields[1]), vec![0_u8; 29])
+            .expect("write second owned sidecar");
+        fs::write(
+            sidecar_path(&journal_path, fields[0]).with_extension("fst.tmp"),
+            vec![0_u8; 101],
+        )
+        .expect("write temporary sidecar");
+        fs::write(
+            sidecar_path(&journal_path, "UNKNOWN_FIELD"),
+            vec![0_u8; 103],
+        )
+        .expect("write unknown sidecar");
+        fs::write(tmp.path().join("facet-state.bin"), vec![0_u8; 107])
+            .expect("write shared facet state");
+        fs::write(
+            sidecar_path(&tmp.path().join("flow.journal.backup"), fields[0]),
+            vec![0_u8; 109],
+        )
+        .expect("write prefix-collision sidecar");
+
+        assert_eq!(
+            journal_sidecar_bytes(&journal_path).expect("measure owned sidecars"),
+            42
+        );
+    }
+
+    #[test]
+    fn journal_sidecar_bytes_handles_missing_and_rejects_non_regular_paths() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let journal_path = tmp.path().join("flow.journal");
+        let field = sidecar_fields().into_iter().next().expect("sidecar field");
+        let path = sidecar_path(&journal_path, field);
+
+        assert_eq!(
+            journal_sidecar_bytes(&journal_path).expect("measure missing sidecars"),
+            0
+        );
+
+        fs::create_dir(&path).expect("create directory at exact sidecar path");
+        let error = journal_sidecar_bytes(&journal_path)
+            .expect_err("directory at exact sidecar path must fail");
+        assert!(matches!(
+            error,
+            journal_sdk_log_writer::WriterError::InvalidPath(_)
+        ));
+        fs::remove_dir(&path).expect("remove exact sidecar directory");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+
+            let target = tmp.path().join("target");
+            fs::write(&target, b"target").expect("write symlink target");
+            symlink(&target, &path).expect("create sidecar symlink");
+            let error = journal_sidecar_bytes(&journal_path)
+                .expect_err("symlink at exact sidecar path must fail");
+            assert!(matches!(
+                error,
+                journal_sdk_log_writer::WriterError::InvalidPath(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn delete_sidecar_files_removes_owned_final_and_temporary_files() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let journal_path = tmp.path().join("flow.journal");
+        let field = sidecar_fields().into_iter().next().expect("sidecar field");
+        let final_path = sidecar_path(&journal_path, field);
+        let temporary_path = final_path.with_extension("fst.tmp");
+        let unknown_path = sidecar_path(&journal_path, "UNKNOWN_FIELD");
+
+        fs::write(&final_path, b"final").expect("write final sidecar");
+        fs::write(&temporary_path, b"temporary").expect("write temporary sidecar");
+        fs::write(&unknown_path, b"unknown").expect("write unknown sidecar");
+
+        delete_sidecar_files(&journal_path);
+
+        assert!(!final_path.exists());
+        assert!(!temporary_path.exists());
+        assert!(unknown_path.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sidecar_path_preserves_non_utf8_journal_paths() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+
+        let mut expected = b"flow-\xff.journal".to_vec();
+        let journal_path = PathBuf::from(OsString::from_vec(expected.clone()));
+        expected.extend_from_slice(b".facet.SRC_ADDR.fst");
+
+        assert_eq!(
+            sidecar_path(&journal_path, "src_addr")
+                .as_os_str()
+                .as_bytes(),
+            expected
+        );
+    }
 }

@@ -2,10 +2,10 @@ use super::planner::{grouped_query_can_use_projected_scan, resolve_effective_gro
 use super::scan::cursor_prefilter_pairs;
 use super::{
     FlowsRequest, SortBy, build_aggregated_flows, build_facets, build_grouped_flows,
-    dimensions_from_fields, metrics_from_fields, requires_raw_tier_for_fields,
+    dimensions_from_fields, field_is_raw_only, metrics_from_fields, requires_raw_tier_for_fields,
 };
 use crate::rollup::build_rollup_key;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::time::Instant;
 
 #[test]
@@ -90,6 +90,103 @@ fn raw_tier_is_required_for_city_fields() {
     let group_by = vec!["SRC_GEO_CITY".to_string(), "DST_GEO_STATE".to_string()];
     let selections = HashMap::new();
     assert!(requires_raw_tier_for_fields(&group_by, &selections, ""));
+}
+
+#[test]
+fn raw_tier_capabilities_cover_every_supported_grouping_field() {
+    const EXPECTED_RAW_ONLY_FIELDS: &[&str] = &[
+        "DST_ADDR",
+        "DST_ADDR_NAT",
+        "DST_AS_PATH",
+        "DST_COMMUNITIES",
+        "DST_GEO_CITY",
+        "DST_LARGE_COMMUNITIES",
+        "DST_MAC",
+        "DST_MASK",
+        "DST_PORT",
+        "DST_PORT_NAT",
+        "DST_PREFIX",
+        "IPTTL",
+        "IPV6_FLOW_LABEL",
+        "IP_FRAGMENT_ID",
+        "IP_FRAGMENT_OFFSET",
+        "MPLS_LABELS",
+        "SRC_ADDR",
+        "SRC_ADDR_NAT",
+        "SRC_GEO_CITY",
+        "SRC_MAC",
+        "SRC_MASK",
+        "SRC_PORT",
+        "SRC_PORT_NAT",
+        "SRC_PREFIX",
+    ];
+
+    let actual = super::supported_group_by_fields()
+        .iter()
+        .filter(|field| field_is_raw_only(field))
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let expected = EXPECTED_RAW_ONLY_FIELDS
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(actual, expected);
+    assert_eq!(
+        super::supported_group_by_fields().len(),
+        80,
+        "public grouping field count changed"
+    );
+    assert_eq!(
+        super::supported_group_by_fields()
+            .iter()
+            .filter(|field| !field_is_raw_only(field))
+            .count(),
+        56,
+        "54 physical rollup fields plus two virtual fields should remain rollup-safe"
+    );
+
+    for field in super::supported_group_by_fields() {
+        let group_by = vec![field.clone()];
+        let selections = HashMap::from([(field.clone(), vec!["value".to_string()])]);
+        assert_eq!(
+            requires_raw_tier_for_fields(&group_by, &HashMap::new(), ""),
+            field_is_raw_only(field),
+            "grouping capability drifted for {field}"
+        );
+        assert_eq!(
+            requires_raw_tier_for_fields(&[], &selections, ""),
+            field_is_raw_only(field),
+            "selection capability drifted for {field}"
+        );
+    }
+}
+
+#[test]
+fn hidden_city_coordinates_and_metric_selections_force_raw() {
+    for field in [
+        "SRC_GEO_LATITUDE",
+        "SRC_GEO_LONGITUDE",
+        "DST_GEO_LATITUDE",
+        "DST_GEO_LONGITUDE",
+        "BYTES",
+        "PACKETS",
+        "FLOWS",
+        "V9_VENDOR_FIELD",
+        "IPFIX_VENDOR_FIELD",
+    ] {
+        assert!(field_is_raw_only(field), "{field} must force raw");
+        assert!(requires_raw_tier_for_fields(
+            &[field.to_string()],
+            &HashMap::new(),
+            ""
+        ));
+        assert!(requires_raw_tier_for_fields(
+            &[],
+            &HashMap::from([(field.to_string(), vec!["value".to_string()])]),
+            ""
+        ));
+    }
 }
 
 #[test]
@@ -885,6 +982,9 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
         .find(|entry| entry["field"] == "SRC_AS_NAME")
         .expect("src facet");
 
+    assert_eq!(protocol["autocomplete"], false);
+    assert_eq!(src_as["autocomplete"], true);
+    assert_eq!(src_as["truncated"], false);
     assert_eq!(
         protocol["values"]
             .as_array()
@@ -914,6 +1014,39 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
         facets.get("excluded_fields").is_none(),
         "facet payload should not advertise exposed raw-only fields as excluded"
     );
+}
+
+#[test]
+fn high_cardinality_facets_prefer_autocomplete_without_observed_values() {
+    let requested_fields = vec![
+        "SRC_ADDR".to_string(),
+        "SRC_AS_NAME".to_string(),
+        "PROTOCOL".to_string(),
+        "DIRECTION".to_string(),
+    ];
+    let facets =
+        super::build_facet_vocabulary_payload(&requested_fields, &HashMap::new(), &BTreeMap::new());
+    let fields = facets["fields"].as_array().expect("fields array");
+
+    for (field, expected) in [
+        ("SRC_ADDR", true),
+        ("SRC_AS_NAME", true),
+        ("PROTOCOL", false),
+        ("DIRECTION", false),
+    ] {
+        let facet = fields
+            .iter()
+            .find(|entry| entry["field"] == field)
+            .unwrap_or_else(|| panic!("missing {field} facet"));
+        assert_eq!(
+            facet["autocomplete"], expected,
+            "semantic autocomplete policy drifted for {field}"
+        );
+        assert_eq!(
+            facet["truncated"], false,
+            "an empty semantic autocomplete facet is not truncated"
+        );
+    }
 }
 
 #[test]
