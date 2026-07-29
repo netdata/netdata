@@ -174,6 +174,8 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         }
     }
 
+    ctx->data->hdr.publisher_pid = (uint32_t)getpid();
+
     return ctx;
 
 fail:

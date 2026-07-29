@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
@@ -392,25 +393,25 @@ func TestDNSLegacyConfig_DefaultEnablesPerQuery(t *testing.T) {
 
 // ---- M10: Per-PID socket aggregation API shape ----------------------------
 
-// TestSocketPIDEntryLayout pins the Go-side per-PID socket entry struct size
-// so any field rename in libbpfloader.SocketPIDEntry fails this test. The
-// C-side aggregator in socket_libbpf.c must mirror the same field order so
-// netdata_socket_per_pid_snapshot produces values that decode correctly.
+// TestSocketPIDEntryLayout pins the Go-side per-PID socket entry struct layout
+// against struct netdata_socket_per_pid_entry in socket_libbpf.c.  Any field
+// addition, removal, or type change in SocketPIDEntry must be mirrored in the
+// C aggregator or the decode will produce garbage values at runtime.
 func TestSocketPIDEntryLayout(t *testing.T) {
-	// 11 fields, each uint64: PID (uint32 padded to uint64 on most ABIs), then
-	// 10 uint64 counters. Go's struct layout does not necessarily pack uint32
-	// at offset 0 with no padding; assert the natural alignment size.
-	entry := libbpfloader.SocketPIDEntry{}
-	if entry.PID != 0 {
-		t.Fatalf("zero-value SocketPIDEntry.PID = %d, want 0", entry.PID)
+	// PID uint32 (4) + 4 bytes alignment padding + 10 × uint64 (80) = 88 bytes.
+	const wantSize = uintptr(4 + 4 + 10*8)
+	if got := unsafe.Sizeof(libbpfloader.SocketPIDEntry{}); got != wantSize {
+		t.Fatalf("unsafe.Sizeof(SocketPIDEntry{}) = %d, want %d; "+
+			"socket_libbpf.c and socket_types.go are out of sync",
+			got, wantSize)
 	}
-	if entry.BytesSent != 0 || entry.CallTCPV6Connection != 0 {
-		t.Fatalf("zero-value SocketPIDEntry has non-zero counters: %+v", entry)
+	// PID must be first so the C-produced entry decodes at the expected offset.
+	if got := unsafe.Offsetof(libbpfloader.SocketPIDEntry{}.PID); got != 0 {
+		t.Fatalf("unsafe.Offsetof(SocketPIDEntry.PID) = %d, want 0", got)
 	}
-	// All aggregate and per-call counters must remain uint64 so long-running
-	// systems do not overflow at 2^32 events.
-	if got := entry.BytesSent + 1; got != 1 {
-		t.Fatalf("BytesSent arithmetic failed: got %d", got)
+	// BytesSent is the second field; the 4-byte pad after PID must be present.
+	if got, want := unsafe.Offsetof(libbpfloader.SocketPIDEntry{}.BytesSent), uintptr(8); got != want {
+		t.Fatalf("unsafe.Offsetof(SocketPIDEntry.BytesSent) = %d, want %d", got, want)
 	}
 }
 

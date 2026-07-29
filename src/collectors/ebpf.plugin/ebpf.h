@@ -130,23 +130,6 @@ typedef struct ebpf_network_viewer_dimension_names {
     struct ebpf_network_viewer_dimension_names *next;
 } ebpf_network_viewer_dim_name_t;
 
-typedef struct ebpf_network_viewer_port_list {
-    char *value;
-    uint32_t hash;
-
-    uint16_t first;
-    uint16_t last;
-
-    uint16_t cmp_first;
-    uint16_t cmp_last;
-
-    uint16_t protocol;
-    uint32_t pid;
-    uint32_t tgid;
-    uint64_t connections;
-    struct ebpf_network_viewer_port_list *next;
-} ebpf_network_viewer_port_list_t;
-
 union netdata_ip_t {
     uint8_t addr8[16];
     uint16_t addr16[8];
@@ -183,9 +166,6 @@ typedef struct ebpf_network_viewer_options {
 
     uint32_t hostname_resolution_enabled;
     uint32_t service_resolution_enabled;
-
-    ebpf_network_viewer_port_list_t *excluded_port;
-    ebpf_network_viewer_port_list_t *included_port;
 
     ebpf_network_viewer_dim_name_t *names;
 
@@ -399,7 +379,6 @@ void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
 netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
 
 void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
-void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 void ebpf_read_local_addresses_unsafe();
 

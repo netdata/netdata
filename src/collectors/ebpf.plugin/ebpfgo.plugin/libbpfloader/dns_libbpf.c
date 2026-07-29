@@ -149,6 +149,7 @@ struct netdata_dns_runtime {
     int flow_fd;   /* AF_PACKET + classic cBPF socket; opened when the eBPF program drops packets */
     int per_query; /* when false, skip the flow socket and per-query tracking */
     uint64_t flow_drop_last_log_usec; /* last time flow socket drops were logged */
+    uint64_t sock_drop_last_log_usec; /* last time sock_fd drop warning was emitted */
     uint64_t flow_ttl_us; /* live window for FlowSnapshot; settable via netdata_dns_runtime_set_flow_ttl */
     struct netdata_dns_pending    pending[DNS_PENDING_CAP];
     struct netdata_dns_flow_ring  flows;
@@ -903,9 +904,29 @@ int netdata_dns_runtime_flow_snapshot(
     if (!rt || !out || max_records <= 0)
         return -1;
 
-    if (rt->flow_fd >= 0)
+    if (rt->flow_fd >= 0) {
         dns_drain_flow_socket(rt);
-    else if (rt->sock_fd >= 0)
+        /* In buffer mode the eBPF program returns 0 on every frame so
+         * sock_fd's recv buffer is never filled by normal operation.
+         * tp_drops > 0 means the filter is not executing (detached, JIT
+         * failure, etc.) and DNS queries are being silently discarded. */
+        if (rt->sock_fd >= 0) {
+            struct netdata_tpacket_stats stats;
+            socklen_t stats_len = sizeof(stats);
+            if (getsockopt(rt->sock_fd, SOL_PACKET, PACKET_STATISTICS, &stats, &stats_len) == 0 &&
+                stats.tp_drops > 0) {
+                uint64_t now = dns_now_us();
+                if (rt->sock_drop_last_log_usec == 0 ||
+                    now - rt->sock_drop_last_log_usec >= DNS_FLOW_DROP_LOG_INTERVAL_USEC) {
+                    fprintf(stderr,
+                            "ebpf-go: dns: sock_fd (buffer mode) dropped %u frame(s);"
+                            " eBPF filter may not be executing\n",
+                            (unsigned)stats.tp_drops);
+                    rt->sock_drop_last_log_usec = now;
+                }
+            }
+        }
+    } else if (rt->sock_fd >= 0)
         dns_drain_socket(rt);
 
     if (!rt->per_query)

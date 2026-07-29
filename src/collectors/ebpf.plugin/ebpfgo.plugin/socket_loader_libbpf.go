@@ -34,11 +34,12 @@ func tryLoadSocketPlan(cfg SocketLegacyConfig, plan LoadPlan) (*SocketLegacyHand
 	}
 
 	return &SocketLegacyHandle{
-		Plan:        plan,
-		Runtime:     rt,
-		UpdateEvery: cfg.UpdateEvery,
-		ConfigFound: cfg.ConfigFound,
-		MapsPerCore: cfg.MapsPerCore,
+		Plan:         plan,
+		Runtime:      rt,
+		UpdateEvery:  cfg.UpdateEvery,
+		ConfigFound:  cfg.ConfigFound,
+		MapsPerCore:  cfg.MapsPerCore,
+		PidTableSize: cfg.PidTableSize,
 	}, nil
 }
 

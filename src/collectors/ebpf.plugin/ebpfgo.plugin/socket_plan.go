@@ -39,14 +39,16 @@ type SocketLegacyConfig struct {
 	BTFPath                   string
 	SocketMonitoringTableSize uint32 // max_entries for tbl_nd_socket
 	UDPConnectionTableSize    uint32 // max_entries for tbl_nv_udp
+	PidTableSize              uint32 // max rows in the per-PID SHM segment
 }
 
 type SocketLegacyHandle struct {
-	Plan        LoadPlan
-	Runtime     *libbpfloader.SocketRuntime
-	UpdateEvery int
-	ConfigFound bool
-	MapsPerCore bool
+	Plan         LoadPlan
+	Runtime      *libbpfloader.SocketRuntime
+	UpdateEvery  int
+	ConfigFound  bool
+	MapsPerCore  bool
+	PidTableSize uint32
 }
 
 func (h *SocketLegacyHandle) Close() {
@@ -71,6 +73,7 @@ func defaultSocketLegacyConfig() SocketLegacyConfig {
 		Enabled:                   false, // stock ebpf.d.conf: socket = no
 		SocketMonitoringTableSize: socketDefaultMonitoringTableSize,
 		UDPConnectionTableSize:    socketDefaultUDPConnectionTableSize,
+		PidTableSize:              socketDefaultPIDTableSize,
 	}
 }
 
@@ -103,6 +106,9 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 	}
 	if fileCfg.UDPConnectionTableSize != nil && *fileCfg.UDPConnectionTableSize > 0 {
 		cfg.UDPConnectionTableSize = *fileCfg.UDPConnectionTableSize
+	}
+	if fileCfg.PidTable != nil && *fileCfg.PidTable > 0 {
+		cfg.PidTableSize = applyPidTableSizeClamp(*fileCfg.PidTable)
 	}
 
 	kver, isRHF, err := resolveKernelAndRH()
