@@ -57,6 +57,7 @@ static void cgroup_ebpfgo_socket_update_single_chart(
     const char *dimension,
     const char *units,
     int priority,
+    long divisor,
     collected_number value)
 {
     RRDSET *chart = *chart_ptr;
@@ -78,7 +79,7 @@ static void cgroup_ebpfgo_socket_update_single_chart(
             RRDSET_TYPE_LINE);
 
         rrdset_update_rrdlabels(chart, cg->chart_labels);
-        rrddim_add(chart, dimension, NULL, 1, cgroup_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(chart, dimension, NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set(chart, dimension, value);
@@ -118,6 +119,11 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
     const bool is_service = is_cgroup_systemd_service(cg);
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5300;
 
+    /* Use the ebpfgo publish interval as divisor so per-interval deltas
+     * become per-second rates matching the declared chart units. */
+    uint32_t update_every_s = cgroup_ebpfgo_shared_memory_update_every_s();
+    long ebpf_divisor = (update_every_s > 0) ? (long)update_every_s : (long)cgroup_update_every;
+
     uint64_t call_v4  = cg->net.call_tcp_v4_connection;
     uint64_t call_v6  = cg->net.call_tcp_v6_connection;
     uint64_t bytes_rx = cg->net.bytes_received;
@@ -132,13 +138,13 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
         cg, &cg->st_net_conn_ipv4, "outbound_conn_v4",
         "TCP v4 outbound connections",
         is_service ? "systemd.service.net_conn_ipv4" : "cgroup.net_conn_ipv4",
-        "connections", "connections/s", prio, (collected_number)call_v4);
+        "connections", "connections/s", prio, ebpf_divisor, (collected_number)call_v4);
 
     cgroup_ebpfgo_socket_update_single_chart(
         cg, &cg->st_net_conn_ipv6, "outbound_conn_v6",
         "TCP v6 outbound connections",
         is_service ? "systemd.service.net_conn_ipv6" : "cgroup.net_conn_ipv6",
-        "connections", "connections/s", prio + 1, (collected_number)call_v6);
+        "connections", "connections/s", prio + 1, ebpf_divisor, (collected_number)call_v6);
 
     // Bandwidth chart: two dimensions (received + sent), kilobits/s from bytes/interval
     {
@@ -159,9 +165,9 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
                 cgroup_update_every,
                 RRDSET_TYPE_LINE);
             rrdset_update_rrdlabels(chart, cg->chart_labels);
-            // bytes/interval * 8 / 1000 / cgroup_update_every = kilobits/s
-            cg->st_net_bw_rd_received = rrddim_add(chart, "received", NULL, 8, (long)(cgroup_update_every) * 1000, RRD_ALGORITHM_ABSOLUTE);
-            cg->st_net_bw_rd_sent     = rrddim_add(chart, "sent",     NULL, 8, (long)(cgroup_update_every) * 1000, RRD_ALGORITHM_ABSOLUTE);
+            // bytes/interval * 8 / (ebpf_divisor * 1000) = kilobits/s
+            cg->st_net_bw_rd_received = rrddim_add(chart, "received", NULL, 8, ebpf_divisor * 1000, RRD_ALGORITHM_ABSOLUTE);
+            cg->st_net_bw_rd_sent     = rrddim_add(chart, "sent",     NULL, 8, ebpf_divisor * 1000, RRD_ALGORITHM_ABSOLUTE);
         }
         rrddim_set_by_pointer(chart, cg->st_net_bw_rd_received, (collected_number)bytes_rx);
         rrddim_set_by_pointer(chart, cg->st_net_bw_rd_sent,     (collected_number)bytes_tx);
@@ -172,31 +178,31 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
         cg, &cg->st_net_tcp_recv, "bandwidth_tcp_recv",
         "TCP calls to cleanup buffer",
         is_service ? "systemd.service.net_tcp_recv" : "cgroup.net_tcp_recv",
-        "calls", "calls/s", prio + 3, (collected_number)tcp_rx);
+        "calls", "calls/s", prio + 3, ebpf_divisor, (collected_number)tcp_rx);
 
     cgroup_ebpfgo_socket_update_single_chart(
         cg, &cg->st_net_tcp_send, "bandwidth_tcp_send",
         "TCP calls to send",
         is_service ? "systemd.service.net_tcp_send" : "cgroup.net_tcp_send",
-        "calls", "calls/s", prio + 4, (collected_number)tcp_tx);
+        "calls", "calls/s", prio + 4, ebpf_divisor, (collected_number)tcp_tx);
 
     cgroup_ebpfgo_socket_update_single_chart(
         cg, &cg->st_net_retransmit, "bandwidth_tcp_retransmit",
         "TCP retransmits",
         is_service ? "systemd.service.net_retransmit" : "cgroup.net_retransmit",
-        "calls", "calls/s", prio + 5, (collected_number)retrans);
+        "calls", "calls/s", prio + 5, ebpf_divisor, (collected_number)retrans);
 
     cgroup_ebpfgo_socket_update_single_chart(
         cg, &cg->st_net_udp_send, "bandwidth_udp_send",
         "UDP calls to send",
         is_service ? "systemd.service.net_udp_send" : "cgroup.net_udp_send",
-        "calls", "calls/s", prio + 6, (collected_number)udp_tx);
+        "calls", "calls/s", prio + 6, ebpf_divisor, (collected_number)udp_tx);
 
     cgroup_ebpfgo_socket_update_single_chart(
         cg, &cg->st_net_udp_recv, "bandwidth_udp_recv",
         "UDP calls to receive",
         is_service ? "systemd.service.net_udp_recv" : "cgroup.net_udp_recv",
-        "calls", "calls/s", prio + 7, (collected_number)udp_rx);
+        "calls", "calls/s", prio + 7, ebpf_divisor, (collected_number)udp_rx);
 }
 
 #endif

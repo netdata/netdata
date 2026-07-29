@@ -153,18 +153,24 @@ func sendFunctionError(api *netdataapi.API, uid string, code int, msg string) {
 // TestBuildNetworkProtocolsJSON_BPFMapping so a kernel ABI rename silently
 // breaks the test instead of silently flipping Sent/Received.
 func buildNetworkProtocolsJSON(p socketGlobalPublish, updateEvery int, expires int64) (string, error) {
-	tcpReceived := p.tcpDimReceivedCalls
-	tcpSent := p.tcpDimSentCalls
-	tcpErrors := p.tcpDimReceivedErr + p.tcpDimSentErr
-	tcpConnActive := p.tcpV4Conn + p.tcpV6Conn
-	tcpConnPassive := p.inboundTCP
-	tcpSegsTotal := p.tcpDimReceivedCalls + p.tcpDimSentCalls + p.tcpCloseCalls
-	tcpSegsRetrans := p.tcpRetransmit
+	// Convert per-interval deltas to per-second rates to match the declared column units.
+	inv := uint64(updateEvery)
+	if inv == 0 {
+		inv = 1
+	}
 
-	udpReceived := p.udpRecvCalls
-	udpSent := p.udpSendCalls
-	udpErrors := p.udpRecvErr + p.udpSendErr
-	udpConnPassive := p.inboundUDP
+	tcpReceived := p.tcpDimReceivedCalls / inv
+	tcpSent := p.tcpDimSentCalls / inv
+	tcpErrors := (p.tcpDimReceivedErr + p.tcpDimSentErr) / inv
+	tcpConnActive := (p.tcpV4Conn + p.tcpV6Conn) / inv
+	tcpConnPassive := p.inboundTCP / inv
+	tcpSegsTotal := (p.tcpDimReceivedCalls + p.tcpDimSentCalls + p.tcpCloseCalls) / inv
+	tcpSegsRetrans := p.tcpRetransmit / inv
+
+	udpReceived := p.udpRecvCalls / inv
+	udpSent := p.udpSendCalls / inv
+	udpErrors := (p.udpRecvErr + p.udpSendErr) / inv
+	udpConnPassive := p.inboundUDP / inv
 
 	resp := fnTableResponse{
 		Status:      200,
