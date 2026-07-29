@@ -298,8 +298,9 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 	}
 	_, admitted, err := start()
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) {
-		// No successor owns the handoff yet, so candidate containment may still
-		// interrupt the bounded supersession wait.
+		// Resource apply deliberately excludes task cancellation so it cannot
+		// abandon an atomic graph transition. Until a successor exists, the
+		// candidate attempt is the process-owned stop signal for supersession.
 		err = sjo.attempts.SupersedeProcessAttempt(sjo.candidateCtx, sjo.runtimeIdentity)
 		if err == nil {
 			_, admitted, err = start()
