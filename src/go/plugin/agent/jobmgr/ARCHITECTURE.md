@@ -553,6 +553,12 @@ flowchart TD
    apply failure aborts it when possible, or returns the still-live retained generation to the kernel for fail-closed
    ownership. If the old runtime does not release within the supersession grace, the candidate is rejected and the
    source-specific busy/pending policy applies.
+   Process rotation cuts run-target attempts before draining the run so non-cooperative startup cannot consume the HUP
+   budget. If that cut reaches a job before installation reservation, the transaction aborts the pending generation
+   and graph mutation, then returns the exact unchanged/removed ownership disposition. Once reservation begins,
+   retirement cannot invalidate the short internal commit; run shutdown retires the installed generation afterward.
+   Only a pure target-retired/process-stopped error tree is normal cancellation; any mixed, cleanup, graph, panic, or
+   ownership error remains fail-closed.
 6. **Emit** — installation activates the generation output gate. Retirement permanently fences ordinary output before
    detaching projections, so a retained old runtime cannot interleave late collection frames with its successor.
    Accepted V1/V2 cleanup uses a separate process-lifetime capability to emit terminal chart-obsoletion frames only

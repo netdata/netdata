@@ -213,9 +213,7 @@ func (prt *PreparedResourceTransaction) Scope() lifecycle.ResourceTransactionSco
 	return prt.spec.Scope
 }
 
-func (prt *PreparedResourceTransaction) Apply(
-	ctx context.Context,
-) (
+func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 	applied lifecycle.AppliedResourceTransaction,
 	resultErr error,
 ) {
@@ -229,7 +227,14 @@ func (prt *PreparedResourceTransaction) Apply(
 	var pendingInstallation *JobGeneration
 	appliedSealed := false
 	defer func() {
+		expectedRetirement := jobmgr.ContainsOnlyErrorLeaves(
+			resultErr,
+			jobmgr.ErrProcessAttemptRetired,
+			jobmgr.ErrProcessAttemptStopped,
+		)
+		settlementProven := true
 		if recovered := recover(); recovered != nil {
+			settlementProven = false
 			resultErr = errors.Join(
 				resultErr,
 				fmt.Errorf("%w in prepared resource transaction apply: %v", lifecycle.ErrTaskPanic, recovered),
@@ -244,13 +249,20 @@ func (prt *PreparedResourceTransaction) Apply(
 				ownershipCurrent = remaining
 				ownershipDisposition = spec.Disposition
 			}
+			if settleErr != nil {
+				settlementProven = false
+			}
 			resultErr = errors.Join(
 				resultErr,
 				settleErr,
 			)
 		}
 		if mutationOwned {
-			resultErr = errors.Join(resultErr, spec.Graph.Abort(spec.Mutation))
+			abortErr := spec.Graph.Abort(spec.Mutation)
+			if abortErr != nil {
+				settlementProven = false
+			}
+			resultErr = errors.Join(resultErr, abortErr)
 		}
 		if resultErr != nil && !appliedSealed {
 			failed, ownershipErr := lifecycle.NewAppliedResourceTransaction(
@@ -260,10 +272,18 @@ func (prt *PreparedResourceTransaction) Apply(
 				spec.Result,
 				spec.Cleanup,
 			)
+			if ownershipErr != nil {
+				settlementProven = false
+			}
 			resultErr = errors.Join(resultErr, ownershipErr)
 			if ownershipErr == nil {
 				applied = failed
 			}
+		}
+		if expectedRetirement && settlementProven && !appliedSealed {
+			// The run is already stopping, so normal retry/pending AfterApply
+			// callbacks must not create new work after this proved rollback.
+			resultErr = nil
 		}
 	}()
 	if ctx == nil {
@@ -414,10 +434,7 @@ func (prt *PreparedResourceTransaction) Apply(
 	return applied, nil
 }
 
-func activationFallback(
-	spec ResourceTransactionSpec,
-	err error,
-) *ResourceActivationFallback {
+func activationFallback(spec ResourceTransactionSpec, err error) *ResourceActivationFallback {
 	switch {
 	case errors.Is(err, jobmgr.ErrProcessAttemptQuarantined):
 		return spec.ActivationQuarantinedFallback

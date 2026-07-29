@@ -5,6 +5,7 @@ package composition
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -148,6 +149,37 @@ func TestServiceDiscoveryQuarantineReturnsConfigLocalUnavailableResult(t *testin
 	require.NoError(t, err)
 	require.Equal(t, 503, applied.ResultStatus())
 	require.NoError(t, cleanup())
+}
+
+func TestServiceDiscoveryRetirementReturnsConfigLocalUnavailableResult(t *testing.T) {
+	binding := &serviceDiscoveryBinding{}
+
+	result, cleanup, err := binding.serviceDiscoveryContainmentResult(
+		jobmgr.ErrProcessAttemptRetired,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, cleanup)
+	applied, err := lifecycle.NewAppliedResourceTransaction(
+		lifecycle.ResourceTransactionScope{ID: "config"},
+		lifecycle.ResourceTransactionUnchanged,
+		nil,
+		result,
+		cleanup,
+	)
+	require.NoError(t, err)
+	require.Equal(t, 503, applied.ResultStatus())
+	require.NoError(t, cleanup())
+}
+
+func TestServiceDiscoveryRetirementDoesNotHideMixedFailure(t *testing.T) {
+	binding := &serviceDiscoveryBinding{}
+	unexpected := errors.New("unexpected")
+
+	_, cleanup, err := binding.serviceDiscoveryContainmentResult(
+		errors.Join(jobmgr.ErrProcessAttemptRetired, unexpected),
+	)
+	require.ErrorIs(t, err, unexpected)
+	require.Nil(t, cleanup)
 }
 
 func TestServiceDiscoveryReadOnlyInvocationDoesNotCaptureConfigNotifications(t *testing.T) {

@@ -391,6 +391,32 @@ func TestAuthorityAdmittedTerminalErrorQuarantinesBeforeRelease(t *testing.T) {
 	require.NotContains(t, diagnostics.String(), "provider-sensitive-cleanup")
 }
 
+func TestAuthorityAdmissionAfterCutReturnsTerminalDisposition(t *testing.T) {
+	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
+	entered := make(chan struct{})
+	proceed := make(chan struct{})
+	admitted := make(chan error, 1)
+
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: testIdentity(jobmgr.ProcessAttemptJobRuntime, "module/job", "module/job"),
+		Work: func(_ context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+			close(entered)
+			<-proceed
+			err := admission.Admit()
+			admitted <- err
+			return err
+		},
+	})
+	require.NoError(t, err)
+	<-entered
+	require.True(t, attempt.Cut(jobmgr.ErrProcessAttemptRetired))
+	close(proceed)
+
+	require.ErrorIs(t, <-admitted, jobmgr.ErrProcessAttemptRetired)
+	<-attempt.Released()
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptRetired)
+}
+
 func TestAuthorityContainedAdmittedTerminalErrorQuarantinesOnRelease(t *testing.T) {
 	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
 	identity := testIdentity(jobmgr.ProcessAttemptFunctionBundle, "module/agent", "module")

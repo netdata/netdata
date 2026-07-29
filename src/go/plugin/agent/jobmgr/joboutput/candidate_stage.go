@@ -59,6 +59,7 @@ type stagedJobOwner struct {
 	attached        bool
 	started         bool
 	retiring        bool
+	retirementCause error
 	finalized       bool
 
 	startRequests       chan stagedJobStartRequest
@@ -127,9 +128,7 @@ func (sjo *stagedJobOwner) Replace(resources ConstructedJob) error {
 
 // AcceptResources linearizes permit activation with freezing the accepted
 // cleanup contract, then returns the same resource value to the generation.
-func (sjo *stagedJobOwner) AcceptResources(
-	permit lifecycle.LongLivedPermit,
-) (ConstructedJob, error) {
+func (sjo *stagedJobOwner) AcceptResources(permit lifecycle.LongLivedPermit) (ConstructedJob, error) {
 	if sjo == nil {
 		return ConstructedJob{}, errors.New("job output: nil staged job acceptance")
 	}
@@ -138,9 +137,11 @@ func (sjo *stagedJobOwner) AcceptResources(
 	if sjo.ownership != stagedJobOwnedByRuntime ||
 		!sjo.attached ||
 		sjo.decided ||
-		sjo.retiring ||
 		sjo.finalized {
 		return ConstructedJob{}, errors.New("job output: invalid staged job acceptance")
+	}
+	if sjo.retiring {
+		return ConstructedJob{}, sjo.retirementErrorLocked("job output: invalid staged job acceptance")
 	}
 	if err := permit.ActivateExternal(); err != nil {
 		return ConstructedJob{}, err
@@ -163,9 +164,11 @@ func (sjo *stagedJobOwner) BindAttachment() error {
 	if sjo.ownership != stagedJobOwnedByRuntime ||
 		sjo.attached ||
 		sjo.decided ||
-		sjo.retiring ||
 		sjo.finalized {
 		return errors.New("job output: invalid staged job attachment binding")
+	}
+	if sjo.retiring {
+		return sjo.retirementErrorLocked("job output: invalid staged job attachment binding")
 	}
 	sjo.attached = true
 	return nil
@@ -187,7 +190,7 @@ func (sjo *stagedJobOwner) Reject() {
 		sjo.ownership = stagedJobOwnershipRejected
 	}
 	sjo.mu.Unlock()
-	sjo.requestRetirement()
+	sjo.requestRetirement(nil)
 	sjo.Detached()
 	if ownership == stagedJobOwnedByCandidate {
 		sjo.candidateRejectOnce.Do(func() {
@@ -207,10 +210,14 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 		sjo.runtimeIdentity.Key == "" ||
 		sjo.runtimeIdentity.Resource == "" ||
 		sjo.ownership != stagedJobOwnedByCandidate ||
-		sjo.decided ||
-		sjo.retiring {
+		sjo.decided {
 		sjo.mu.Unlock()
 		return errors.New("job output: invalid staged job promotion")
+	}
+	if sjo.retiring {
+		err := sjo.retirementErrorLocked("job output: invalid staged job promotion")
+		sjo.mu.Unlock()
+		return err
 	}
 	sjo.ownership = stagedJobPromotionActive
 	start := func() (jobmgr.ProcessAttempt, <-chan error, error) {
@@ -263,8 +270,11 @@ func (sjo *stagedJobOwner) ReserveInstallation() error {
 	}
 	sjo.mu.Lock()
 	defer sjo.mu.Unlock()
-	if sjo.decided || sjo.installing || sjo.retiring {
+	if sjo.decided || sjo.installing {
 		return errors.New("job output: staged job cannot begin installation")
+	}
+	if sjo.retiring {
+		return sjo.retirementErrorLocked("job output: staged job cannot begin installation")
 	}
 	sjo.installing = true
 	return nil
@@ -296,22 +306,23 @@ func (sjo *stagedJobOwner) Start(ctx context.Context) error {
 	select {
 	case sjo.startRequests <- request:
 	case <-sjo.retire:
-		return errors.New("job output: process-owned job is retiring")
+		return sjo.retirementError("job output: process-owned job is retiring")
 	case <-sjo.done:
 		return errors.New("job output: process-owned job is released")
 	case <-ctx.Done():
-		return ctx.Err()
+		return context.Cause(ctx)
 	}
 	select {
 	case err := <-result:
 		return err
 	case <-sjo.retire:
-		return errors.New("job output: process-owned job retired during start")
+		return sjo.retirementError("job output: process-owned job retired during start")
 	case <-sjo.done:
 		return errors.New("job output: process-owned job released during start")
 	case <-ctx.Done():
-		sjo.requestRetirement()
-		return ctx.Err()
+		cause := context.Cause(ctx)
+		sjo.requestRetirement(cause)
+		return cause
 	}
 }
 
@@ -319,7 +330,7 @@ func (sjo *stagedJobOwner) Retire() {
 	if sjo == nil {
 		return
 	}
-	sjo.requestRetirement()
+	sjo.requestRetirement(nil)
 }
 
 func (sjo *stagedJobOwner) Detached() {
@@ -337,8 +348,11 @@ func (sjo *stagedJobOwner) Detached() {
 	})
 }
 
-func (sjo *stagedJobOwner) requestRetirement() {
+func (sjo *stagedJobOwner) requestRetirement(cause error) {
 	sjo.mu.Lock()
+	if !sjo.retiring {
+		sjo.retirementCause = cause
+	}
 	sjo.retiring = true
 	resources := sjo.resources
 	sjo.mu.Unlock()
@@ -346,6 +360,19 @@ func (sjo *stagedJobOwner) requestRetirement() {
 	sjo.retireOnce.Do(func() {
 		close(sjo.retire)
 	})
+}
+
+func (sjo *stagedJobOwner) retirementError(fallback string) error {
+	sjo.mu.Lock()
+	defer sjo.mu.Unlock()
+	return sjo.retirementErrorLocked(fallback)
+}
+
+func (sjo *stagedJobOwner) retirementErrorLocked(fallback string) error {
+	if sjo.retiring && sjo.retirementCause != nil {
+		return sjo.retirementCause
+	}
+	return errors.New(fallback)
 }
 
 func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
@@ -365,7 +392,7 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 	case <-sjo.retire:
 		return sjo.finalize()
 	case <-ctx.Done():
-		sjo.cutBeforeStart()
+		sjo.cutBeforeStart(context.Cause(ctx))
 		return sjo.finalize()
 	}
 
@@ -381,7 +408,7 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 	sjo.mu.Unlock()
 	if job == nil {
 		request.result <- errors.New("job output: missing process-owned runtime job")
-		sjo.requestRetirement()
+		sjo.requestRetirement(nil)
 		return sjo.finalize()
 	}
 
@@ -404,15 +431,17 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 			errors.New("job output: process-owned managed loop exited before readiness"),
 			resultErr,
 		)
-		sjo.requestRetirement()
+		sjo.requestRetirement(nil)
 	case <-sjo.retire:
-		request.result <- errors.New("job output: process-owned job retired before readiness")
+		request.result <- sjo.retirementError("job output: process-owned job retired before readiness")
 	case <-ctx.Done():
-		sjo.Retire()
-		request.result <- context.Cause(ctx)
+		cause := context.Cause(ctx)
+		sjo.requestRetirement(cause)
+		request.result <- cause
 	case <-request.ctx.Done():
-		sjo.Retire()
-		request.result <- request.ctx.Err()
+		cause := context.Cause(request.ctx)
+		sjo.requestRetirement(cause)
+		request.result <- cause
 	}
 
 	if !physicalExited {
@@ -423,7 +452,7 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 			sjo.Retire()
 		case <-sjo.retire:
 		case <-ctx.Done():
-			sjo.Retire()
+			sjo.requestRetirement(context.Cause(ctx))
 		}
 	}
 	if !physicalExited {
@@ -460,8 +489,8 @@ func (sjo *stagedJobOwner) finishCandidate(ctx context.Context) error {
 	}
 }
 
-func (sjo *stagedJobOwner) cutBeforeStart() {
-	sjo.Retire()
+func (sjo *stagedJobOwner) cutBeforeStart(cause error) {
+	sjo.requestRetirement(cause)
 	sjo.mu.Lock()
 	attached := sjo.attached
 	sjo.mu.Unlock()

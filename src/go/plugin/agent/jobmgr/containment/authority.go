@@ -206,8 +206,14 @@ func (at *attempt) Admit() error {
 	authority := at.authority
 	authority.mu.Lock()
 	if at.state != attemptStateProbing {
+		result := error(jobmgr.ErrProcessAttemptSettled)
+		if at.state == attemptStateContained && at.result != nil {
+			// Containment owns the terminal disposition; do not erase it when
+			// the cut wins the registration-to-admission race.
+			result = at.result
+		}
 		authority.mu.Unlock()
-		return jobmgr.ErrProcessAttemptSettled
+		return result
 	}
 	at.state = attemptStateAdmitted
 	at.admitted = true

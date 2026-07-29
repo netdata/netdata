@@ -132,6 +132,44 @@ func validProcessAttemptDiagnosticResource(resource string) bool {
 	return true
 }
 
+// ContainsOnlyErrorLeaves reports whether every leaf in err matches one of
+// the allowed errors. Mixed and malformed trees fail closed.
+func ContainsOnlyErrorLeaves(err error, allowed ...error) bool {
+	if err == nil || len(allowed) == 0 {
+		return false
+	}
+	leaves := 0
+	var visit func(error, int) bool
+	visit = func(current error, depth int) bool {
+		if current == nil || depth > 32 {
+			return false
+		}
+		if joined, ok := current.(interface{ Unwrap() []error }); ok {
+			children := joined.Unwrap()
+			if len(children) == 0 {
+				return false
+			}
+			for _, child := range children {
+				if !visit(child, depth+1) {
+					return false
+				}
+			}
+			return true
+		}
+		if wrapped, ok := current.(interface{ Unwrap() error }); ok {
+			return visit(wrapped.Unwrap(), depth+1)
+		}
+		leaves++
+		for _, candidate := range allowed {
+			if candidate != nil && errors.Is(current, candidate) {
+				return true
+			}
+		}
+		return false
+	}
+	return visit(err, 0) && leaves > 0
+}
+
 type ProcessAttemptPlan struct {
 	Identity ProcessAttemptIdentity
 	Target   uint64

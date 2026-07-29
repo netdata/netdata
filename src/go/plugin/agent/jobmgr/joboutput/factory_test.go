@@ -770,7 +770,7 @@ func TestFactoryCandidateStageOwnsProbeUntilInstallationAcknowledgement(t *testi
 	require.NoError(t, generation.Finalize())
 	<-released
 	require.EqualValues(t, 1, state.collectorCleanup)
-	require.EqualValues(t, containment.Census{}, attempts.Census())
+	requireFactoryAttemptsIdle(t, factory)
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 

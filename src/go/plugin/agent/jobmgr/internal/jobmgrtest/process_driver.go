@@ -313,8 +313,9 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 		releaseCleanup()
 		_ = fixture.input.Close()
 	}()
+	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest create running single "
 	if err := waitUntil(ctx, func() bool {
-		return state.count("check") == 1
+		return state.count("check") == 1 && fixture.output.contains(runningPublication)
 	}); err != nil {
 		return err
 	}

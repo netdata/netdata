@@ -5,6 +5,7 @@ package joboutput
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -413,6 +414,220 @@ func (transactionTestRuntime) Stop(context.Context) error {
 func (transactionTestRuntime) ReleaseAfterCleanup(context.Context) error {
 	return nil
 }
+
+func TestPreparedResourceTransactionSettlesTargetRetirementBeforeAcceptance(t *testing.T) {
+	identity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+	graph, err := dyncfg.NewGraph(nil)
+	require.NoError(t, err)
+	postimage := dyncfg.GraphConfig{ID: identity.ID, Module: "module", Name: "job"}
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
+		ID:     identity.ID,
+		Config: &postimage,
+	}})
+	require.NoError(t, err)
+	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
+	require.NoError(t, err)
+	events := []string{}
+	transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+		Scope: lifecycle.ResourceTransactionScope{
+			ID:        identity.ID,
+			Successor: identity,
+		},
+		Disposition: lifecycle.ResourceTransactionInstalled,
+		Successor: &transactionTestPreparedResource{
+			identity:  identity,
+			events:    &events,
+			acceptErr: jobmgr.ErrProcessAttemptRetired,
+		},
+		Graph:            graph,
+		Mutation:         mutation,
+		MutationPrepared: true,
+		Result:           result,
+		Cleanup:          func() error { return nil },
+	})
+	require.NoError(t, err)
+
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, current)
+	_, exists := graph.Lookup(identity.ID)
+	require.False(t, exists)
+}
+
+func TestPreparedResourceTransactionSettlesTargetRetirementAfterPublication(t *testing.T) {
+	applied, applyErr, graphConfigExists := applyTargetRetirementTransaction(t, nil)
+	require.NoError(t, applyErr)
+	scope, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionScope{
+		ID:        "job",
+		Successor: lifecycle.ResourceIdentity{ID: "job", Generation: 1},
+	}, scope)
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, current)
+	require.False(t, graphConfigExists)
+}
+
+func TestPreparedResourceTransactionDoesNotHideTargetRetirementSettlementFailure(t *testing.T) {
+	settlementErr := errors.New("detach failed")
+	applied, applyErr, graphConfigExists := applyTargetRetirementTransaction(t, settlementErr)
+	require.ErrorIs(t, applyErr, settlementErr)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.NotNil(t, current)
+	require.False(t, graphConfigExists)
+}
+
+func applyTargetRetirementTransaction(
+	t *testing.T,
+	detachErr error,
+) (lifecycle.AppliedResourceTransaction, error, bool) {
+	t.Helper()
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	job := newBlockingStopManagedJob()
+	stopReleased := false
+	var owner *stagedJobOwner
+	releaseStop := func() {
+		if !stopReleased {
+			close(job.stopRelease)
+			stopReleased = true
+		}
+	}
+	defer func() {
+		if owner != nil {
+			owner.Detached()
+			owner.Reject()
+		}
+		releaseStop()
+		attempts.BeginShutdown()
+		require.NoError(t, attempts.Shutdown(context.Background()))
+	}()
+	frames, err := lifecycle.NewFrameOwner(io.Discard)
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	require.NoError(t, gate.Activate())
+
+	var cleanups int
+	candidate := ConstructedJob{
+		Variant:          JobVariantV1,
+		CollectorCleanup: func(context.Context) error { cleanups++; return nil },
+		candidateJob:     job,
+		outputGate:       gate,
+	}
+	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
+	owner = newStagedJobOwner(
+		candidate,
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       identity.ID,
+			Resource:  identity.ID,
+		},
+	)
+	require.NoError(t, owner.Promote(t.Context()))
+	attached, err := newProcessManagedJob(
+		JobVariantV1,
+		job,
+		identity,
+		newTestScheduler(t),
+		candidate.CollectorCleanup,
+		owner,
+	)
+	require.NoError(t, err)
+	attached.outputGate = gate
+	attached.Handlers = &retireTargetOnPublishHandler{
+		attempts:  attempts,
+		target:    1,
+		retired:   owner.retire,
+		detachErr: detachErr,
+	}
+	require.NoError(t, owner.Replace(attached))
+
+	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
+	accepted, err := owner.AcceptResources(permit)
+	require.NoError(t, err)
+	generation := &JobGeneration{
+		resources:    accepted,
+		permit:       permit,
+		stopDone:     make(chan struct{}),
+		ID:           identity.ID,
+		Generation:   identity.Generation,
+		state:        JobAllocated,
+		owner:        owner,
+		processOwner: owner,
+	}
+	require.NoError(t, generation.Start(context.Background()))
+
+	graph, err := dyncfg.NewGraph(nil)
+	require.NoError(t, err)
+	postimage := dyncfg.GraphConfig{
+		ID: identity.ID, Module: job.ModuleName(), Name: job.Name(),
+	}
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
+		ID:     identity.ID,
+		Config: &postimage,
+	}})
+	require.NoError(t, err)
+	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
+	require.NoError(t, err)
+	events := []string{}
+	transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+		Scope: lifecycle.ResourceTransactionScope{
+			ID:        identity.ID,
+			Successor: identity,
+		},
+		Disposition: lifecycle.ResourceTransactionInstalled,
+		Successor: &transactionTestPreparedResource{
+			identity: identity,
+			ready:    generation,
+			events:   &events,
+		},
+		Graph:            graph,
+		Mutation:         mutation,
+		MutationPrepared: true,
+		Result:           result,
+		Cleanup:          func() error { return nil },
+	})
+	require.NoError(t, err)
+
+	applied, err := transaction.Apply(context.Background())
+	_, exists := graph.Lookup(identity.ID)
+	if generation.State() == JobRetained {
+		owner.Detached()
+		owner.Reject()
+		require.NoError(t, permit.ReleaseExternal())
+		require.NoError(t, permit.Return())
+	}
+
+	releaseStop()
+	<-owner.done
+	require.Equal(t, 1, cleanups)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	return applied, err, exists
+}
+
+type retireTargetOnPublishHandler struct {
+	attempts  interface{ CutTarget(uint64) int }
+	target    uint64
+	retired   <-chan struct{}
+	detachErr error
+}
+
+func (handler *retireTargetOnPublishHandler) Publish() error {
+	_ = handler.attempts.CutTarget(handler.target)
+	<-handler.retired
+	return nil
+}
+
+func (*retireTargetOnPublishHandler) CloseAndDrain(context.Context) error { return nil }
+func (handler *retireTargetOnPublishHandler) Detach(context.Context) error {
+	return handler.detachErr
+}
+func (*retireTargetOnPublishHandler) Finalize(context.Context) error { return nil }
 
 func TestPreparedResourceTransactionCommitsBusyFallbackAfterIncumbentRemoval(t *testing.T) {
 	var events []string

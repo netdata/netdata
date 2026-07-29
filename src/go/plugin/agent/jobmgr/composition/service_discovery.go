@@ -318,6 +318,18 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 func (sdb *serviceDiscoveryBinding) serviceDiscoveryContainmentResult(
 	err error,
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
+	if jobmgr.ContainsOnlyErrorLeaves(
+		err,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	) {
+		return mustDynCfgMessage(
+				503,
+				"Service discovery configuration is unavailable while the plugin is stopping.",
+			),
+			func() error { return nil },
+			nil
+	}
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
