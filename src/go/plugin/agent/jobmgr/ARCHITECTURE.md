@@ -369,8 +369,8 @@ remain independently admissible.
 | `job` | Candidate preparation: clone, secret resolution, construction, `Init`, `Check` | canonical job `FullName` |
 | `job-runtime` | The installed collector's managed loop, `Stop`, and cleanup | canonical job `FullName` |
 | `job-test` | One DynCfg `test` of a raw job config | name + config hash |
-| `store` | SecretStore validation and generation preparation | epoch + `kind:name` |
-| `store-test` | One DynCfg `test` of a SecretStore config | epoch + `kind:name` + config hash |
+| `store` | SecretStore validation and generation preparation | digest of epoch + `kind:name` |
+| `store-test` | One DynCfg `test` of a SecretStore config | digest of epoch + `kind:name` + config hash |
 | `function-bundle` | An agent-level module's Function handler bundle plan | canonical agent-module key |
 | `function-poll` | One Function availability poll | bundle key |
 | `function-invocation` | One Function invocation | bundle key + invocation id |
@@ -378,6 +378,10 @@ remain independently admissible.
 
 Test identities are derived from the raw config and exist only in memory, so an identical repeated `test` returns busy
 instead of multiplying workers.
+
+SecretStore attempt keys use length-framed fields and a fixed-size digest. This preserves the public Store-name
+contract without allowing a long name to exceed containment's internal identity bounds; diagnostics retain a safe
+short `kind:name` and use a generic label for oversized names.
 
 ## Jobs
 
