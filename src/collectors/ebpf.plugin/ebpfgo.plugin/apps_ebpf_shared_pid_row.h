@@ -32,7 +32,7 @@ struct ebpfgo_shm_header {
     uint32_t update_every_s;  /* publish interval in seconds; 0 = unknown (old writer) */
     uint64_t last_publish_ut; /* CLOCK_MONOTONIC, usec; 0 means no live producer */
     uint32_t live_count;      /* entries written this cycle; reader copies only this many */
-    uint32_t _reserved;       /* reserved for future use */
+    uint32_t publisher_pid;   /* PID of the current segment owner; 0 = no live producer */
 };
 
 #define EBPFGO_SHM_FLAG_CACHESTAT 0x01u /* cachestat per-PID fields are valid */

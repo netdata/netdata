@@ -5,6 +5,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,6 +66,7 @@ static void shared_pid_memory_invalidate(struct shared_pid_memory *ctx)
      * again on this context. */
     __atomic_store_n(&ctx->header->flags, 0, __ATOMIC_RELEASE);
     __atomic_store_n(&ctx->header->last_publish_ut, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&ctx->header->publisher_pid, 0, __ATOMIC_RELEASE);
 
     if (locked)
         sem_post(ctx->sem);
@@ -126,6 +128,7 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     /* Restore the prev_count==0 invariant so the first publish after replace
      * skips the conditional memset (new segment is already kernel-zero-filled). */
     ctx->prev_count = 0;
+    ctx->header->publisher_pid = (uint32_t)getpid();
     return true;
 }
 
@@ -226,19 +229,21 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
 
     if (reused) {
         if (ebpfgo_shm_sem_wait(ctx->sem)) {
-            /* Acquired: zero the segment so surviving consumers see a clean
-             * slate, then release.  Zeroing last_publish_ut makes any
-             * in-flight reader reject the data via is_live.
-             *
-             * A successful sem_wait proves the prior producer is dead: a live
-             * publisher holds the semaphore only during a brief memcpy window
-             * and releases it immediately after.  Having acquired exclusive
-             * access we are now the lifecycle owner and must unlink on close —
-             * without this the segment leaks permanently after every crash
-             * whose recovery happens to match the prior segment size. */
-            memset(ctx->mapping, 0, length);
+            /* Read the prior publisher's PID under the semaphore.
+             * kill(pid, 0) probes liveness: 0 → alive, EPERM → alive but no
+             * permission, ESRCH → dead.  Take over only when the prior
+             * publisher is confirmed dead: zero the segment, write our PID,
+             * and claim ownership.  If still alive, release without
+             * modification — the segment belongs to that publisher. */
+            pid_t prev_pid   = (pid_t)__atomic_load_n(&ctx->header->publisher_pid, __ATOMIC_ACQUIRE);
+            bool  prev_alive = (prev_pid > 0) &&
+                               (kill(prev_pid, 0) == 0 || errno == EPERM);
+            if (!prev_alive) {
+                memset(ctx->mapping, 0, length);
+                ctx->header->publisher_pid = (uint32_t)getpid();
+                ctx->shm_name_created = true;
+            }
             sem_post(ctx->sem);
-            ctx->shm_name_created = true;
         } else {
             /* Timed out: a slow live holder and a crashed owner both produce
              * the same timeout; posting without ownership is unsafe.  Replace
@@ -247,6 +252,11 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
             if (!pid_shm_replace_generation(ctx, length))
                 goto fail;
         }
+    } else {
+        /* Fresh segment: kernel zero-filled; no prior publisher exists.
+         * Write our PID so consumers and a racing second opener can identify
+         * the owner without acquiring the semaphore. */
+        ctx->header->publisher_pid = (uint32_t)getpid();
     }
     return ctx;
 

@@ -97,8 +97,9 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 		cfg.FlowTTL = *fileCfg.FlowTTL
 	}
 
-	// Clamp update_every to the flow TTL: records expire in the kernel ring after
-	// FlowTTL seconds, so a longer collection interval causes silent data loss.
+	// Clamp update_every to the flow TTL: records older than FlowTTL seconds are
+	// dropped by FlowSnapshot.  The TTL is propagated to the C runtime via
+	// SetFlowTTL after loading so both layers enforce the same live window.
 	if cfg.UpdateEvery > cfg.FlowTTL {
 		fmt.Fprintf(os.Stderr,
 			"ebpf-go.plugin: dns: update every %d exceeds flow ttl %d; clamping to %d\n",

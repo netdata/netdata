@@ -96,10 +96,7 @@ struct netdata_sock_fprog {
 #define DNS_PENDING_CAP         512         /* max concurrent in-flight queries  */
 #define DNS_PENDING_TIMEOUT_US  5000000ULL  /* 5 s: unmatched query → timeout    */
 #define DNS_FLOW_RING_CAP       1000        /* ring capacity — matches SHM       */
-#define DNS_FLOW_TTL_US         (20ULL * 1000000ULL) /* 20 s live window; MUST equal
-                                                       * NV_DNS_UPDATE_EVERY so consecutive
-                                                       * NV snapshots cover non-overlapping
-                                                       * windows (each query counted once). */
+#define DNS_FLOW_TTL_US_DEFAULT (20ULL * 1000000ULL) /* 20 s default live window */
 #define DNS_DOMAIN_MAX          256
 #define DNS_PACKET_BUF          65536
 
@@ -152,6 +149,7 @@ struct netdata_dns_runtime {
     int flow_fd;   /* AF_PACKET + classic cBPF socket; opened when the eBPF program drops packets */
     int per_query; /* when false, skip the flow socket and per-query tracking */
     uint64_t flow_drop_last_log_usec; /* last time flow socket drops were logged */
+    uint64_t flow_ttl_us; /* live window for FlowSnapshot; settable via netdata_dns_runtime_set_flow_ttl */
     struct netdata_dns_pending    pending[DNS_PENDING_CAP];
     struct netdata_dns_flow_ring  flows;
 };
@@ -821,6 +819,8 @@ struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int 
     rt->flow_fd = -1;
     rt->per_query = per_query ? 1 : 0;
 
+    rt->flow_ttl_us = DNS_FLOW_TTL_US_DEFAULT;
+
     struct bpf_object *obj = bpf_object__open_file(path, NULL);
     if (!obj || libbpf_get_error(obj)) {
         if (obj && libbpf_get_error(obj))
@@ -926,12 +926,19 @@ int netdata_dns_runtime_flow_snapshot(
             &rt->flows.records[i % DNS_FLOW_RING_CAP];
         if (r->timestamp_us == 0)
             continue;
-        if (now_us - r->timestamp_us > DNS_FLOW_TTL_US)
+        if (now_us - r->timestamp_us > rt->flow_ttl_us)
             continue;
         out[count++] = *r;
     }
 
     return count;
+}
+
+void netdata_dns_runtime_set_flow_ttl(struct netdata_dns_runtime *rt, uint64_t ttl_seconds)
+{
+    if (!rt || ttl_seconds == 0)
+        return;
+    rt->flow_ttl_us = ttl_seconds * 1000000ULL;
 }
 
 void netdata_dns_runtime_close(struct netdata_dns_runtime *rt)

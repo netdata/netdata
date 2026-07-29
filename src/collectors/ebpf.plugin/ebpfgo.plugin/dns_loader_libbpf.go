@@ -61,6 +61,7 @@ func LoadDNSLegacy(cfg DNSLegacyConfig) (*DNSLegacyHandle, error) {
 		if err == nil {
 			handle.UpdateEvery = cfg.UpdateEvery
 			handle.ConfigFound = cfg.ConfigFound
+			handle.Runtime.SetFlowTTL(cfg.FlowTTL)
 			return handle, nil
 		}
 		lastErr = err

@@ -33,6 +33,7 @@ int netdata_dns_runtime_load(struct netdata_dns_runtime *rt);
 int netdata_dns_runtime_attach(struct netdata_dns_runtime *rt);
 int netdata_dns_runtime_flow_snapshot(struct netdata_dns_runtime *rt,
                                       struct netdata_dns_flow_record *out, int max_records);
+void netdata_dns_runtime_set_flow_ttl(struct netdata_dns_runtime *rt, uint64_t ttl_seconds);
 void netdata_dns_runtime_close(struct netdata_dns_runtime *rt);
 */
 import "C"
@@ -148,6 +149,16 @@ func (r *DNSRuntime) FlowSnapshot() ([]DNSFlowRecord, error) {
 	}
 
 	return out, nil
+}
+
+// SetFlowTTL propagates the configured flow TTL to the C runtime so
+// FlowSnapshot applies the same live-window filter as the Go-side clamp.
+// Must be called after Load() and before the first FlowSnapshot().
+func (r *DNSRuntime) SetFlowTTL(seconds int) {
+	if r == nil || r.ptr == nil || seconds <= 0 {
+		return
+	}
+	C.netdata_dns_runtime_set_flow_ttl(r.ptr, C.uint64_t(seconds))
 }
 
 func (r *DNSRuntime) Close() {

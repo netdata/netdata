@@ -147,13 +147,13 @@ func RedHatRelease() (int, error) {
 	return RedHatReleaseFromFile(string(contents))
 }
 
+// KernelVersionString returns the bare kernel release string from
+// /proc/sys/kernel/osrelease (e.g. "5.15.0-91-generic").  This matches the
+// format that reject-list entries use, so HasPrefix comparisons work correctly.
+// It is intentionally consistent with KernelVersion(), which reads the same file.
 func KernelVersionString() (string, error) {
-	if content, err := readFirstExistingFile("/proc/version_signature"); err == nil {
-		return content, nil
-	}
-
-	if content, err := readFirstExistingFile("/proc/version"); err == nil {
-		return content, nil
+	if release, err := readFirstExistingFile("/proc/sys/kernel/osrelease"); err == nil {
+		return release, nil
 	}
 
 	return "", fmt.Errorf("unable to determine kernel version string")
