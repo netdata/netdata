@@ -3,6 +3,7 @@
 package sd
 
 import (
+	"context"
 	"encoding/json"
 	"slices"
 
@@ -13,6 +14,7 @@ type Descriptor struct {
 	Type            string
 	Schema          string
 	ParseJSONConfig func(raw json.RawMessage) (any, error)
+	TestConfig      func(ctx context.Context, cfg any) error
 	NewDiscoverers  func(cfg any, source string) ([]model.Discoverer, error)
 }
 
@@ -71,6 +73,23 @@ func NewDescriptor[T any](
 			return newDiscs(v, source)
 		},
 	}
+}
+
+func NewDescriptorWithTest[T any](
+	typ, schema string,
+	parseJSON func(raw json.RawMessage) (T, error),
+	testConfig func(ctx context.Context, cfg T) error,
+	newDiscs func(cfg T, source string) ([]model.Discoverer, error),
+) Descriptor {
+	desc := NewDescriptor(typ, schema, parseJSON, newDiscs)
+	desc.TestConfig = func(ctx context.Context, cfg any) error {
+		v, ok := cfg.(T)
+		if !ok {
+			return &typedConfigError{typ: typ}
+		}
+		return testConfig(ctx, v)
+	}
+	return desc
 }
 
 type typedConfigError struct {

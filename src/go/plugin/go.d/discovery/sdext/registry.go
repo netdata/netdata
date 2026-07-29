@@ -51,10 +51,11 @@ func Registry(includeDocker bool) sd.Registry {
 		),
 	}
 	if includeDocker {
-		descs = append(descs, sd.NewDescriptor(
+		descs = append(descs, sd.NewDescriptorWithTest(
 			discovererDocker,
 			schemaDocker,
 			parseJSONConfig[dockersd.Config],
+			dockersd.TestConfig,
 			newDockerDiscoverers,
 		))
 	}

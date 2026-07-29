@@ -82,6 +82,7 @@ func newTestSNMPConfig(name string, cfg testSNMPConfig, services []pipeline.Serv
 type dyncfgSim struct {
 	do func(sd *ServiceDiscovery)
 
+	discoverers    Registry
 	wantExposed    []wantExposedConfig
 	wantRunning    []string
 	wantDyncfg     string
@@ -101,6 +102,11 @@ func (s *dyncfgSim) run(t *testing.T) {
 	require.NotNil(t, s.do, "s.do is nil")
 
 	var buf bytes.Buffer
+	discoverers := s.discoverers
+	if discoverers == nil {
+		discoverers = testDiscovererRegistry()
+	}
+
 	sd := &ServiceDiscovery{
 		Logger:      logger.New(),
 		pluginName:  testPluginName,
@@ -108,7 +114,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 		seen:        dyncfg.NewSeenCache[sdConfig](),
 		exposed:     dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:    make(chan dyncfg.Function, 1),
-		discoverers: testDiscovererRegistry(),
+		discoverers: discoverers,
 		newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
 			return newTestPipeline(cfg.Name), nil
 		},
@@ -1540,6 +1546,38 @@ FUNCTION_RESULT_END
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-test 200 application/json
 {"status":200,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"test docker connectivity failure": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestDockerConfig("docker-test", "unix:///missing/docker.sock", 0, defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				reg := NewRegistry(NewDescriptorWithTest(
+					testDiscovererTypeDocker,
+					testDiscovererSchema,
+					parseJSONTestConfig[testDockerConfig],
+					func(context.Context, testDockerConfig) error {
+						return errors.New("docker endpoint is unreachable")
+					},
+					newTestDiscoverers[testDockerConfig],
+				))
+
+				return &dyncfgSim{
+					discoverers: reg,
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-test",
+							[]string{sd.dyncfgTemplateID(testDiscovererTypeDocker), "test"},
+							payload, "")
+					},
+					wantExposed: []wantExposedConfig{},
+					wantRunning: []string{},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-test 400 application/json
+{"status":400,"errorMessage":"Failed to test config: docker endpoint is unreachable"}
 FUNCTION_RESULT_END
 `,
 				}

@@ -273,12 +273,28 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 		return
 	}
 
-	// Parse and validate the config without storing it
-	_, err := parseDyncfgPayload(fn.Payload(), dt, name, d.configDefaults, d.discovererRegistry(), true)
+	// Parse and validate the config without storing it.
+	reg := d.discovererRegistry()
+	cfg, err := parseDyncfgPayload(fn.Payload(), dt, name, d.configDefaults, reg, true)
 	if err != nil {
 		d.Warningf("dyncfg: test: failed to parse config for '%s': %v", dt, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
 		return
+	}
+
+	desc, _ := reg.Get(dt)
+	if desc.TestConfig != nil {
+		discovererCfg, err := desc.ParseJSONConfig(cfg.Discoverer.Config)
+		if err != nil {
+			d.Warningf("dyncfg: test: failed to parse config for '%s': %v", dt, err)
+			d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
+			return
+		}
+		if err := desc.TestConfig(d.ctx, discovererCfg); err != nil {
+			d.Warningf("dyncfg: test: config test failed for '%s': %v", dt, err)
+			d.dyncfgApi.SendCodef(fn, 400, "Failed to test config: %v", err)
+			return
+		}
 	}
 
 	if isJob {
