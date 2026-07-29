@@ -345,10 +345,12 @@ Who admits, and who does not:
 | Installed job runtime | Immediately | The managed collector loop is the held resource |
 | Module Function bundle | Bundle built and containment-bound | Holds the plan until the transfer decision |
 | SecretStore operation | Validation or mutation prepared | Holds the mutation until commit or abort |
+| Service-discovery Function | Opaque callback returned, before result publication | Keeps the callback fuse-bounded; terminal failures quarantine the binding |
 | Function availability poll | Never | Stays fuse-bounded |
 | Function invocation | Never | Stays fuse-bounded |
 
-`joboutput/candidate_stage.go`, `functions/module_stage.go`, `secrets/store_stage.go`, `functions/bundle.go`.
+`joboutput/candidate_stage.go`, `functions/module_stage.go`, `secrets/store_stage.go`, `functions/bundle.go`,
+`composition/service_discovery.go`.
 
 ### What the caller sees
 
