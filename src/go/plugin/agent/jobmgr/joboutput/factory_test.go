@@ -278,6 +278,62 @@ func TestFactoryDoesNotStageFunctionsAfterFailedManagedProbe(t *testing.T) {
 	}
 }
 
+func TestFactoryRejectsCandidateWhenResolvedStoreGenerationChangesDuringProbe(t *testing.T) {
+	scope := &factoryTestAtomicScope{
+		value: "initial",
+	}
+	state := &factoryTestState{}
+	creator := collectorapi.Creator{
+		CreateV2: func() collectorapi.CollectorV2 {
+			return &factoryTestV2{
+				state: state,
+				check: func(context.Context) error {
+					scope.current.Store(false)
+					return nil
+				},
+				store:    metrix.NewCollectorStore(),
+				template: factoryTestChartTemplate,
+			}
+		},
+	}
+	factory, _ := newFactoryTestHarness(t, creator, nil)
+	resolver, err := secretresolver.NewAtomicResolver(nil)
+	require.NoError(t, err)
+	configModules, err := NewConfigModuleFactory(ConfigModuleFactoryConfig{
+		Modules: collectorapi.Registry{
+			"module": creator,
+		},
+		Resolver: resolver,
+		StoreScope: func([]string) (secretresolver.AtomicScope, error) {
+			scope.current.Store(true)
+			return scope, nil
+		},
+	})
+	require.NoError(t, err)
+	factory.config.ConfigModules = configModules
+	config := factoryTestConfig(false)
+	config["option_str"] = "${store:vault:test:key}"
+	permit, tasks := issueTestJobPermit(t, "module_job", 1)
+
+	prepared, failure, err := prepareFactoryTestCandidate(
+		context.Background(),
+		factory,
+		config,
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
+		permit,
+	)
+	require.Error(t, err)
+	require.False(t, prepared.Valid())
+	require.Nil(t, failure)
+	require.NoError(t, permit.AbortUnused())
+	requireFactoryAttemptsIdle(t, factory)
+	require.EqualValues(t, 1, state.collectorCleanup)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
 func TestFactoryCleanHandlerStagingFailureRejectsOnlyCandidate(t *testing.T) {
 	state := &factoryTestState{}
 	stageErr := errors.New("handler staging failed")
@@ -1631,6 +1687,31 @@ func newFactoryTestHarness(
 type factoryTestOutput struct {
 	mu sync.Mutex
 	bytes.Buffer
+}
+
+type factoryTestAtomicScope struct {
+	current atomic.Bool
+	value   string
+}
+
+func (scope *factoryTestAtomicScope) Resolve(
+	context.Context,
+	string,
+	string,
+) ([]byte, error) {
+	return []byte(scope.value), nil
+}
+
+func (*factoryTestAtomicScope) Release(context.Context) error {
+	return nil
+}
+
+func (scope *factoryTestAtomicScope) Snapshot() secretresolver.AtomicScopeSnapshot {
+	return scope
+}
+
+func (scope *factoryTestAtomicScope) Current() bool {
+	return scope.current.Load()
 }
 
 func (fto *factoryTestOutput) Write(payload []byte) (int, error) {

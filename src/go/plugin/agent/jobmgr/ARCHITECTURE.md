@@ -624,14 +624,15 @@ flowchart TD
     Compile("Compile references → distinct store keys")
     Scope("Acquire ONE reader scope<br/>pin current store generations")
     Resolve("Resolve the clone")
+    Proof("Capture immutable<br/>generation proof")
     Release("Release scope · drain readers")
     Post("Complete in-memory clone → build job")
 
-    Ref --> Clone --> Compile --> Scope --> Resolve --> Release --> Post
+    Ref --> Clone --> Compile --> Scope --> Resolve --> Proof --> Release --> Post
 
     classDef sec fill:#fee2e2,stroke:#dc2626,color:#0b1021;
     classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
-    class Ref,Clone,Compile,Scope,Resolve,Release sec;
+    class Ref,Clone,Compile,Scope,Resolve,Proof,Release sec;
     class Post job;
 ```
 
@@ -742,9 +743,11 @@ flowchart TD
     Secrets{"Secret refs<br/>present?"}
     Resolve("Pin Store generations<br/>resolve cloned config")
     Check("Collector Init + Check<br/>private candidate state")
+    Fresh{"No Store refs, or pinned<br/>generations still current?"}
     Settle("Commit graph + dependency index<br/>then attach live vnode lookup")
     Run("Running job")
     Transient("Selected job Failed / removed<br/>normal retry policy")
+    Retry("Reject stale candidate<br/>DynCfg 503 / discovery latest retry")
     Reject("Invalid proposal rejected<br/>incumbent unchanged")
 
     Raw --> Vnode
@@ -752,21 +755,22 @@ flowchart TD
     Vnode -->|"yes but missing"| Transient
     Vnode -->|"no"| Secrets
     Secrets -->|"yes"| Resolve
-    Resolve -->|"all resolve"| Check
+    Resolve -->|"all resolve"| Check -->|"ready"| Fresh
     Resolve -->|"provider / scope unavailable"| Transient
     Resolve -->|"invalid reference / config"| Reject
     Secrets -->|"no"| Check
-    Check -->|"ready"| Settle --> Run
     Check -->|"fails / contained"| Transient
+    Fresh -->|"yes"| Settle --> Run
+    Fresh -->|"no"| Retry
 
     classDef cfg fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef dep fill:#fee2e2,stroke:#dc2626,color:#0b1021;
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
     classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
     class Raw cfg;
-    class Vnode,Snapshot,Secrets,Resolve dep;
+    class Vnode,Snapshot,Secrets,Resolve,Fresh dep;
     class Check,Settle core;
-    class Run,Transient,Reject job;
+    class Run,Transient,Retry,Reject job;
 ```
 
 ### Secret-dependent job
@@ -774,10 +778,19 @@ flowchart TD
 - The collector graph stores the **raw config with references**, never resolved credential values.
 - Candidate preparation resolves a clone atomically: either every reference is resolved under one pinned Store scope,
   or no resolved config reaches the collector.
+- Before releasing that scope, resolution captures the exact numbered Store generations used by the clone. After
+  `Init` and `Check` finish and the job-graph claim is reacquired, installation validates all captured generations
+  under one Store lock.
+- A generation changed or removed during construction makes the candidate stale. It is cleaned without installation;
+  synchronous DynCfg returns retryable `503` and preserves the incumbent, while persistent discovery retains only its
+  latest desired config for retry.
 - An unavailable provider or reader scope is a **transient** activation failure. An invalid reference or invalid
   resolved config is a **proposal rejection** and leaves the incumbent unchanged.
 - The raw dependency set and the graph mutation commit together. This prevents a running job from becoming invisible
   to a later Store update.
+- The generation check also covers a brand-new job and a replacement that introduces a new Store reference before
+  either dependency postimage exists. Store mutation never waits for a non-cooperative candidate `Check`; the stale
+  candidate may finish physically later, but it cannot install.
 - `${store:...}` dependencies participate in live Store restart orchestration. `${env:...}`, `${file:...}`, and
   `${cmd:...}` are resolved at build time but have no live Store generation to watch.
 
@@ -811,10 +824,12 @@ sequenceDiagram
     S->>J: Start selected job attempt
     J->>V: Capture current vnode revision
     J->>K: Pin generations and resolve a clone
-    K-->>J: Complete resolved config
+    K-->>J: Complete resolved config + generation proof
     J->>C: Init and Check with private staging
     V-->>V: A newer vnode revision may commit
     C-->>J: Ready
+    J->>K: Validate generation proof
+    K-->>J: Current
     J->>R: Install and attach live vnode lookup
     R->>V: Refresh after attachment
     V-->>R: Return newest committed revision
@@ -824,6 +839,8 @@ Consequences:
 
 - A Store update restarts the job from its raw graph config. The replacement resolves the new Store generation and
   captures the current vnode snapshot.
+- A Store update or removal that overlaps candidate `Init` / `Check` invalidates the generation proof, so the
+  candidate is rejected before installation and follows its source-specific retry contract.
 - A vnode update alone does not restart the job or re-resolve secrets.
 - A vnode update during `Check` is not lost: the candidate sees its staged snapshot while detached, then the installed
   runtime catches up through the live revisioned lookup.

@@ -35,6 +35,22 @@ func (poas *processOwnedAtomicScope) Resolve(
 	return poas.scope.Resolve(ctx, reference, original)
 }
 
+func (poas *processOwnedAtomicScope) Snapshot() secretresolver.AtomicScopeSnapshot {
+	if poas == nil {
+		return nil
+	}
+	poas.mu.Lock()
+	defer poas.mu.Unlock()
+	if poas.scope == nil {
+		return nil
+	}
+	snapshotter, ok := poas.scope.(secretresolver.AtomicScopeSnapshotter)
+	if !ok {
+		return nil
+	}
+	return snapshotter.Snapshot()
+}
+
 func (poas *processOwnedAtomicScope) Release(ctx context.Context) error {
 	if poas == nil {
 		return errors.New("jobmgr composition: invalid process-owned Store scope")

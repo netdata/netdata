@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
@@ -16,6 +17,7 @@ import (
 var (
 	ErrPreparedJobConsumed   = errors.New("job output: prepared job consumed")
 	ErrJobGenerationMismatch = errors.New("job output: job generation mismatch")
+	ErrStaleStoreGeneration  = errors.New("job output: Store changed during candidate preparation")
 )
 
 type autoDetectionFailure struct {
@@ -109,6 +111,7 @@ type ConstructedJob struct {
 	runtimeStage       *stagedRuntimeService
 	vnodeStage         *stagedVNodeLookup
 	outputGate         *generationOutputGate
+	storeSnapshot      secretresolver.AtomicScopeSnapshot
 	processOwner       *stagedJobOwner
 }
 

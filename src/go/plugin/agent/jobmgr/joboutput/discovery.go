@@ -323,7 +323,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				pendingSettlement,
 			)
 		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) {
+		if candidatePreparationBusy(err) {
 			baselineUID := ""
 			if exists {
 				baselineUID = incumbent.UID()

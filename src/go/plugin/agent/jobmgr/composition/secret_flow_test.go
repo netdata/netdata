@@ -154,22 +154,34 @@ func TestProcessCoreSecretUpdateDependentRestart(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			testProcessCoreSecretMutationDependentRestart(t, "update", test.restartErr)
+			testProcessCoreSecretMutationDependentRestart(t, "update", test.restartErr, false)
 		})
 	}
 }
 
 func TestProcessCoreSecretAddReplayDependentRestart(t *testing.T) {
-	testProcessCoreSecretMutationDependentRestart(t, "add", nil)
+	testProcessCoreSecretMutationDependentRestart(t, "add", nil, false)
+}
+
+func TestProcessCoreSecretUpdateDuringInitialCandidateRetriesLatestStoreGeneration(t *testing.T) {
+	testProcessCoreSecretMutationDependentRestart(t, "update", nil, true)
 }
 
 func testProcessCoreSecretMutationDependentRestart(
 	t *testing.T,
 	command string,
 	restartErr error,
+	gateInitial bool,
 ) {
 	t.Helper()
 	starts := make(chan string, 4)
+	initialEntered := make(chan struct{})
+	releaseInitial := make(chan struct{})
+	var enterInitialOnce sync.Once
+	var releaseInitialOnce sync.Once
+	t.Cleanup(func() {
+		releaseInitialOnce.Do(func() { close(releaseInitial) })
+	})
 	var cleanups atomic.Int32
 	modules := collectorapi.Registry{
 		"module": {
@@ -181,6 +193,14 @@ func testProcessCoreSecretMutationDependentRestart(
 				}
 				collector.InitFunc = func(ctx context.Context) error {
 					starts <- collector.Config.OptionStr
+					if gateInitial && collector.Config.OptionStr == "initial" {
+						enterInitialOnce.Do(func() { close(initialEntered) })
+						select {
+						case <-releaseInitial:
+						case <-ctx.Done():
+							return context.Cause(ctx)
+						}
+					}
 					if collector.Config.OptionStr == "replacement" {
 						if restartErr != nil {
 							return restartErr
@@ -273,6 +293,15 @@ func testProcessCoreSecretMutationDependentRestart(
 	case <-time.After(3 * time.Second):
 		require.FailNowf(t, "test failed", "collector did not start with initial secret; output=%q", output.String())
 	}
+	if gateInitial {
+		select {
+		case <-initialEntered:
+		case <-time.After(3 * time.Second):
+			require.FailNow(t, "test failed", "initial collector did not enter its gated initialization")
+		}
+	} else {
+		output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+	}
 
 	uid := "secret-" + command
 	target := "go.d:secretstore:vault:main update"
@@ -289,8 +318,17 @@ func testProcessCoreSecretMutationDependentRestart(
 	)
 	require.NoError(t, writeStringErr)
 
+	if gateInitial {
+		// The Store mutation commits while the brand-new job is still outside
+		// the acknowledged graph. Releasing Init then exercises the generation
+		// fence: the stale candidate is rejected and discovery retries it.
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+" 200 application/json")
+		releaseInitialOnce.Do(func() { close(releaseInitial) })
+	}
 	waitSecretStart(t, starts, "replacement")
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+" 200 application/json")
+	if !gateInitial {
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+" 200 application/json")
+	}
 	if restartErr == nil {
 		require.EqualValues(t, 1, cleanups.Load())
 	} else {

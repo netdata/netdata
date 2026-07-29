@@ -225,7 +225,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 				nil,
 			)
 		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+		if candidatePreparationBusy(err) ||
 			errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
 			return dcjc.noop(
 				scope,
@@ -461,7 +461,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 				nil,
 			)
 		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+		if candidatePreparationBusy(err) ||
 			errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
 			return dcjc.noop(
 				scope,

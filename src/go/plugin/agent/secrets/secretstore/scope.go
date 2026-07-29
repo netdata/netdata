@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"sync"
+
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 )
 
 type scopeRef struct {
@@ -28,6 +30,16 @@ type ResolutionScope struct {
 	owner    *SecretStore
 	ref      scopeRef
 	pins     map[string]*StoreGeneration
+}
+
+type generationSnapshotPin struct {
+	key        string
+	generation uint64
+}
+
+type generationSnapshot struct {
+	owner *SecretStore
+	pins  []generationSnapshotPin
 }
 
 func (store *SecretStore) AcquireScope(keys []string) (*ResolutionScope, error) {
@@ -152,6 +164,52 @@ func (scope *ResolutionScope) Resolve(
 		Original:  "${store:" + storeKey + ":" + secretKey + "}",
 	})
 	return []byte(value), err
+}
+
+func (scope *ResolutionScope) Snapshot() secretresolver.AtomicScopeSnapshot {
+	if scope == nil {
+		return nil
+	}
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+	if scope.released || scope.owner == nil || len(scope.pins) == 0 {
+		return nil
+	}
+	pins := make([]generationSnapshotPin, 0, len(scope.pins))
+	for key, generation := range scope.pins {
+		if generation == nil || generation.generation == 0 {
+			return nil
+		}
+		pins = append(pins, generationSnapshotPin{
+			key:        key,
+			generation: generation.generation,
+		})
+	}
+	return &generationSnapshot{
+		owner: scope.owner,
+		pins:  pins,
+	}
+}
+
+func (snapshot *generationSnapshot) Current() bool {
+	if snapshot == nil || snapshot.owner == nil || len(snapshot.pins) == 0 {
+		return false
+	}
+	store := snapshot.owner
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if store.state != storeAuthorityOpen || store.dirty != nil {
+		return false
+	}
+	for _, pin := range snapshot.pins {
+		record := store.records[pin.key]
+		if record == nil ||
+			record.current == nil ||
+			record.current.generation != pin.generation {
+			return false
+		}
+	}
+	return true
 }
 
 func (scope *ResolutionScope) Release(context.Context) error {

@@ -1249,6 +1249,82 @@ func TestRunningUpdateTransientConstructionFailureCommitsFailedAndSchedulesRetry
 	commands.waitForSubmissions(t, 1)
 }
 
+func TestRunningUpdateRejectsStaleStoreCandidateAndPreservesIncumbent(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	scopeState := &factoryTestAtomicScope{value: "initial"}
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(func(context.Context) error {
+			scopeState.current.Store(false)
+			return nil
+		}, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+	controller.factory.config.ConfigModules.config.StoreScope =
+		func([]string) (secretresolver.AtomicScope, error) {
+			scopeState.current.Store(true)
+			return scopeState, nil
+		}
+
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider(confgroup.TypeDyncfg)
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+	incumbentPayload := record.Payload()
+
+	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
+	current := &transactionTestReadyResource{identity: currentIdentity}
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 2)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:        config.FullName(),
+		Current:   currentIdentity,
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+	}
+	target := dynCfgTarget{
+		module:     config.Module(),
+		name:       config.Name(),
+		resourceID: config.FullName(),
+		creator:    creator,
+	}
+	transaction, err := controller.prepareUpdate(
+		context.Background(),
+		DynCfgJobRequest{
+			Payload:      []byte(`{"option_str":"${store:vault:test:key}"}`),
+			ContentType:  "application/json",
+			CallerSource: "user=test",
+			HasPayload:   true,
+		},
+		target,
+		record,
+		true,
+		current,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, active := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Same(t, current, active)
+	require.Equal(t, 503, applied.ResultStatus())
+	record, exists = graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+	require.Equal(t, incumbentPayload, record.Payload())
+	require.Eventually(t, func() bool {
+		return tasks.LongLivedCensus() == (lifecycle.LongLivedCensus{})
+	}, time.Second, time.Millisecond)
+	requireFactoryAttemptsIdle(t, controller.factory)
+	require.EqualValues(t, 1, state.collectorCleanup)
+}
+
 func TestRunningUpdateCommitsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	delegate := controller.factory.config.Attempts.(*containment.Authority)

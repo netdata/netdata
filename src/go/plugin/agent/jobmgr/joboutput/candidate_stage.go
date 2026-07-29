@@ -9,15 +9,17 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
 
 type stagedJobResult struct {
-	candidate ConstructedJob
-	owner     *stagedJobOwner
-	failure   *autoDetectionFailure
-	err       error
+	candidate     ConstructedJob
+	owner         *stagedJobOwner
+	storeSnapshot secretresolver.AtomicScopeSnapshot
+	failure       *autoDetectionFailure
+	err           error
 }
 
 // preparedJobCandidate contains no run-owned attachment capability. The
@@ -765,6 +767,8 @@ func (pjc *preparedJobCandidate) run(
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		return joinRetainedCleanup(err, cleanupErr)
 	}
+	storeSnapshot := candidate.storeSnapshot
+	candidate.storeSnapshot = nil
 	owner := newStagedJobOwner(
 		candidate,
 		pjc.attempts,
@@ -775,8 +779,9 @@ func (pjc *preparedJobCandidate) run(
 		),
 	)
 	pjc.publish(stagedJobResult{
-		candidate: candidate,
-		owner:     owner,
+		candidate:     candidate,
+		owner:         owner,
+		storeSnapshot: storeSnapshot,
 	})
 	return owner.finishCandidate(ctx)
 }
@@ -833,6 +838,10 @@ func (f *Factory) prepareCandidate(
 	if result.err != nil || result.failure != nil {
 		return PreparedJob{}, result.failure, result.err
 	}
+	if err := validateStoreSnapshot(result.storeSnapshot); err != nil {
+		result.owner.Reject()
+		return PreparedJob{}, nil, err
+	}
 	prepared, err := prepareCandidateJob(
 		identity,
 		permit,
@@ -844,6 +853,26 @@ func (f *Factory) prepareCandidate(
 		result.owner.Reject()
 	}
 	return prepared, nil, err
+}
+
+func validateStoreSnapshot(snapshot secretresolver.AtomicScopeSnapshot) (err error) {
+	if snapshot == nil {
+		return nil
+	}
+	defer func() {
+		if recover() != nil {
+			err = ErrStaleStoreGeneration
+		}
+	}()
+	if !snapshot.Current() {
+		return ErrStaleStoreGeneration
+	}
+	return nil
+}
+
+func candidatePreparationBusy(err error) bool {
+	return errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+		errors.Is(err, ErrStaleStoreGeneration)
 }
 
 func (dcjc *DynCfgJobController) prepareContainedJob(

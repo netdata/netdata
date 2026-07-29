@@ -11,6 +11,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
@@ -117,6 +119,72 @@ func TestDiscoveredBusyRetainsPendingDesiredAndRetriesOnRelease(t *testing.T) {
 	require.False(t, waited)
 	require.Equal(t, config.FullName(), submitted[0].LaneKey)
 	require.NotNil(t, plans[0].Transaction)
+	require.Equal(t, config.FullName(), plans[0].Transaction.ID)
+}
+
+func TestDiscoveredStaleStoreCandidateRetainsPendingDesired(t *testing.T) {
+	controller, _, _, _, state := newDynCfgJobTestHarness(t)
+	scopeState := &factoryTestAtomicScope{value: "initial"}
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(func(context.Context) error {
+			scopeState.current.Store(false)
+			return nil
+		}, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+	controller.factory.config.ConfigModules.config.StoreScope =
+		func([]string) (secretresolver.AtomicScope, error) {
+			scopeState.current.Store(true)
+			return scopeState, nil
+		}
+	commands := &autoDetectionRetryTestCommands{}
+	require.NoError(t, controller.BindAutoDetectionRetries(commands, 9, func(error) {}))
+	t.Cleanup(func() {
+		controller.scheduler.StopAutoDetectionRetries()
+		require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(context.Background()))
+	})
+
+	config := autoDetectionRetryTestConfig("job")
+	config["option_str"] = "${store:vault:test:key}"
+	config.SetSourceType(confgroup.TypeUser)
+	config.SetSource("user")
+	config.SetProvider("user")
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+	}
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{
+			Config: config,
+			Status: dyncfg.StatusRunning,
+		},
+		nil,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, current)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+
+	commands.waitForSubmissions(t, 1)
+	submitted, plans, waited := commands.snapshot()
+	require.Len(t, submitted, 1)
+	require.Len(t, plans, 1)
+	require.False(t, waited)
+	require.Equal(t, config.FullName(), submitted[0].LaneKey)
 	require.Equal(t, config.FullName(), plans[0].Transaction.ID)
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -253,6 +254,7 @@ func (f *Factory) build(
 	var job RuntimeJob
 	var variant JobVariant
 	var redactLifecycle bool
+	var storeSnapshot secretresolver.AtomicScopeSnapshot
 	var runtimeStage *stagedRuntimeService
 	var vnodeStage *stagedVNodeLookup
 	outputGate, err := newGenerationOutputGate(f.config.Frames)
@@ -268,7 +270,7 @@ func (f *Factory) build(
 		}
 	}()
 	if creator.CreateV2 != nil {
-		job, runtimeStage, redactLifecycle, err = f.buildV2(
+		job, runtimeStage, storeSnapshot, redactLifecycle, err = f.buildV2(
 			ctx,
 			config,
 			creator,
@@ -279,7 +281,7 @@ func (f *Factory) build(
 		)
 		variant = JobVariantV2
 	} else {
-		job, redactLifecycle, err = f.buildV1(
+		job, storeSnapshot, redactLifecycle, err = f.buildV1(
 			ctx,
 			config,
 			creator,
@@ -312,6 +314,7 @@ func (f *Factory) build(
 		runtimeStage:       runtimeStage,
 		vnodeStage:         vnodeStage,
 		outputGate:         outputGate,
+		storeSnapshot:      storeSnapshot,
 	}
 	if hasFunctions && f.config.HandlerStager == nil {
 		return constructed, errors.New("job output: function-bearing job has no handler lifecycle")
@@ -446,9 +449,14 @@ func (f *Factory) buildV1(
 	vnode jobruntime.VnodeSnapshot,
 	vnodeStage *stagedVNodeLookup,
 	outputGate *generationOutputGate,
-) (job RuntimeJob, redactLifecycle bool, err error) {
+) (
+	job RuntimeJob,
+	storeSnapshot secretresolver.AtomicScopeSnapshot,
+	redactLifecycle bool,
+	err error,
+) {
 	if creator.Create == nil {
-		return nil, false, fmt.Errorf("job output: module %q has no V1 creator", config.Module())
+		return nil, nil, false, fmt.Errorf("job output: module %q has no V1 creator", config.Module())
 	}
 	var module collectorapi.CollectorV1
 	defer func() {
@@ -473,12 +481,13 @@ func (f *Factory) buildV1(
 	}()
 	module = creator.Create()
 	if module == nil {
-		return nil, false, fmt.Errorf("job output: module %q returned a nil V1 collector", config.Module())
+		return nil, nil, false, fmt.Errorf("job output: module %q returned a nil V1 collector", config.Module())
 	}
 	setModuleJobName(module, config.Name())
-	redactLifecycle, err = f.config.ConfigModules.applyResolved(ctx, config, module)
+	redactLifecycle, storeSnapshot, err =
+		f.config.ConfigModules.applyResolvedWithSnapshot(ctx, config, module)
 	if err != nil {
-		return nil, redactLifecycle, err
+		return nil, nil, redactLifecycle, err
 	}
 	jobConfig := jobruntime.JobConfig{
 		PluginName:      f.config.PluginName,
@@ -506,7 +515,7 @@ func (f *Factory) buildV1(
 		jobConfig.VnodeMetadataRevision = vnode.MetadataRevision
 		jobConfig.VnodeLookup = vnodeStage.Lookup
 	}
-	return jobruntime.NewJob(jobConfig), redactLifecycle, nil
+	return jobruntime.NewJob(jobConfig), storeSnapshot, redactLifecycle, nil
 }
 
 func (f *Factory) buildV2(
@@ -517,7 +526,13 @@ func (f *Factory) buildV2(
 	vnode jobruntime.VnodeSnapshot,
 	vnodeStage *stagedVNodeLookup,
 	outputGate *generationOutputGate,
-) (job RuntimeJob, runtimeStage *stagedRuntimeService, redactLifecycle bool, err error) {
+) (
+	job RuntimeJob,
+	runtimeStage *stagedRuntimeService,
+	storeSnapshot secretresolver.AtomicScopeSnapshot,
+	redactLifecycle bool,
+	err error,
+) {
 	var module collectorapi.CollectorV2
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -545,12 +560,13 @@ func (f *Factory) buildV2(
 	}()
 	module = creator.CreateV2()
 	if module == nil {
-		return nil, nil, false, fmt.Errorf("job output: module %q returned a nil V2 collector", config.Module())
+		return nil, nil, nil, false, fmt.Errorf("job output: module %q returned a nil V2 collector", config.Module())
 	}
 	setModuleJobName(module, config.Name())
-	redactLifecycle, err = f.config.ConfigModules.applyResolved(ctx, config, module)
+	redactLifecycle, storeSnapshot, err =
+		f.config.ConfigModules.applyResolvedWithSnapshot(ctx, config, module)
 	if err != nil {
-		return nil, nil, redactLifecycle, err
+		return nil, nil, nil, redactLifecycle, err
 	}
 	if f.config.Runtime != nil || f.runtimeStaging {
 		runtimeStage = newStagedRuntimeService()
@@ -582,7 +598,7 @@ func (f *Factory) buildV2(
 		jobConfig.VnodeMetadataRevision = vnode.MetadataRevision
 		jobConfig.VnodeLookup = vnodeStage.Lookup
 	}
-	return jobruntime.NewJobV2(jobConfig), runtimeStage, redactLifecycle, nil
+	return jobruntime.NewJobV2(jobConfig), runtimeStage, storeSnapshot, redactLifecycle, nil
 }
 
 func callFactoryModuleCleanup(ctx context.Context, cleanup func(context.Context)) error {

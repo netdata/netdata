@@ -126,6 +126,80 @@ func TestSecretStoreLeaseRetirementAndDynamicPopulation(t *testing.T) {
 	}
 }
 
+func TestResolutionScopeSnapshotTracksUpdateAndRemoval(t *testing.T) {
+	store := newGenerationTestSecretStore(t)
+	catalog := newGenerationTestCatalog(t)
+	key := StoreKey(KindVault, "main")
+
+	initial, err := store.PrepareMutation(
+		t.Context(),
+		catalog,
+		generationTestConfig("main", "initial"),
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialResult, err := initial.Commit(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialScope, err := store.AcquireScope([]string{key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialSnapshot := initialScope.Snapshot()
+	if initialSnapshot == nil || !initialSnapshot.Current() {
+		t.Fatal("current Store generation produced a stale snapshot")
+	}
+
+	replacement, err := store.PrepareMutation(
+		t.Context(),
+		catalog,
+		generationTestConfig("main", "replacement"),
+		initialResult.Generation,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementResult, err := replacement.Commit(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initialSnapshot.Current() {
+		t.Fatal("superseded Store generation remained current")
+	}
+	replacementScope, err := store.AcquireScope([]string{key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementSnapshot := replacementScope.Snapshot()
+	if replacementSnapshot == nil || !replacementSnapshot.Current() {
+		t.Fatal("replacement Store generation produced a stale snapshot")
+	}
+
+	removal, err := store.PrepareRemoval(key, replacementResult.Generation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result, err := removal.Commit(t.Context()); err != nil || !result.Applied {
+		t.Fatalf("removal result=%+v err=%v", result, err)
+	}
+	if replacementSnapshot.Current() {
+		t.Fatal("removed Store generation remained current")
+	}
+
+	if err := initialScope.Release(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := replacementScope.Release(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPreparedSecretMutationMatrix(t *testing.T) {
 	tests := map[string]struct {
 		action       string

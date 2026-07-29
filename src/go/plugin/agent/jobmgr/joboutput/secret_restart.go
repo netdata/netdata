@@ -217,7 +217,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 					}
 					postimage := graphConfig(record, dyncfg.StatusFailed)
 					var pending func()
-					if errors.Is(prepareErr, jobmgr.ErrProcessAttemptBusy) ||
+					if candidatePreparationBusy(prepareErr) ||
 						errors.Is(prepareErr, jobmgr.ErrProcessAttemptDeadline) {
 						pending = state.RetainPending
 					}
