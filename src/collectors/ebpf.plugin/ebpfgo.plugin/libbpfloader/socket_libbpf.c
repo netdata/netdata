@@ -184,6 +184,12 @@ struct netdata_ebpf_socket_runtime {
     struct netdata_socket_per_pid_entry *per_pid_entries;
     int                                  per_pid_count;
     int                                  per_pid_cap;
+
+    /* Deferred-delete buffer for tbl_nd_socket stale entries (reused every cycle).
+     * Sized at pid_ht_size/2 = max(nd_socket_size, SOCKET_PID_HT_MIN), which
+     * matches the BPF map capacity and guarantees no entry is silently skipped. */
+    netdata_socket_bpf_key_t *nd_del_keys;
+    uint32_t                   nd_del_cap;
 };
 
 /* Snapshot output: raw counters from tbl_global_sock and tbl_lports. */
@@ -464,6 +470,13 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     if (!rt->pid_ht)
         return -1;
 
+    /* Deferred-delete buffer: sized to the BPF map capacity so every stale
+     * entry can be collected in a single pass with no silent overflow. */
+    rt->nd_del_cap  = ht_size / 2u;  /* = ht_base >= nd_socket_size */
+    rt->nd_del_keys = callocz(rt->nd_del_cap, sizeof(*rt->nd_del_keys));
+    if (!rt->nd_del_keys)
+        return -1;
+
     /* Initial output array capacity = 256 unique PIDs (grows on demand). */
     rt->per_pid_cap = 256;
     rt->per_pid_entries = callocz((size_t)rt->per_pid_cap, sizeof(*rt->per_pid_entries));
@@ -603,6 +616,10 @@ void netdata_socket_runtime_close(struct netdata_ebpf_socket_runtime *rt)
     freez(rt->pid_ht);
     rt->pid_ht = NULL;
 
+    freez(rt->nd_del_keys);
+    rt->nd_del_keys = NULL;
+    rt->nd_del_cap  = 0;
+
     freez(rt->per_pid_entries);
     rt->per_pid_entries = NULL;
     rt->per_pid_count = 0;
@@ -695,11 +712,11 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     netdata_socket_bpf_value_t *vbuf = rt->percpu_nd_socket;
     bool first_nditer = true;
 
-    /* Deferred-delete buffer.  1024 slots cover realistic per-cycle churn;
-     * any overflow is silently skipped and cleaned up in the next cycle. */
-#define NDEL_CAP 1024
-    netdata_socket_bpf_key_t del_keys[NDEL_CAP];
-    int ndel = 0;
+    /* Deferred-delete buffer: pre-allocated at prepare() time to the BPF map
+     * capacity, so all stale entries are captured without a fixed-cap silent
+     * drop that could leave the map full and reject new flows. */
+    netdata_socket_bpf_key_t *del_keys = rt->nd_del_keys;
+    uint32_t ndel = 0;
 
     while (bpf_map_get_next_key(ndfd, first_nditer ? NULL : &key, &next) == 0) {
         first_nditer = false;
@@ -715,7 +732,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
          * map, and consume capacity.  Mirrors ebpf_socket.c:1860-1862. */
         static const uint8_t zero16[16] = {0};
         if (memcmp(next.saddr, zero16, 16) == 0 && memcmp(next.daddr, zero16, 16) == 0) {
-            if (ndel < NDEL_CAP)
+            if (ndel < rt->nd_del_cap)
                 del_keys[ndel++] = next;
             continue;
         }
@@ -728,7 +745,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
          * EPERM means alive but not ours, so we keep those.
          * Mirrors ebpf_socket.c:1930. */
         if (kill((pid_t)next.pid, 0) != 0 && errno == ESRCH) {
-            if (ndel < NDEL_CAP)
+            if (ndel < rt->nd_del_cap)
                 del_keys[ndel++] = next;
             continue;
         }
@@ -757,9 +774,8 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     }
 
     /* Apply deferred deletions now that traversal is complete. */
-    for (int i = 0; i < ndel; i++)
+    for (uint32_t i = 0; i < ndel; i++)
         bpf_map_delete_elem(ndfd, &del_keys[i]);
-#undef NDEL_CAP
 
     if (rt->pid_ht_drops > 0) {
         uint64_t now = socket_now_usec();
