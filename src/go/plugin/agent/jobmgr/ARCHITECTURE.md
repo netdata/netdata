@@ -386,11 +386,14 @@ remain independently admissible.
 Test identities are derived from the raw config and exist only in memory, so an identical repeated `test` returns busy
 instead of multiplying workers.
 
-All variable name components in attempt keys first pass through domain-separated, length-framed fields and a
-fixed-size digest; Function invocations append only a bounded counter to that digest. This preserves public job,
-Store, module, and service-discovery names without allowing a long value to exceed containment's internal identity
-bounds. Diagnostics retain safe short names and use bounded generic labels for oversized, invalid-UTF-8, or
-control-bearing values. Graph IDs, lane keys, config IDs, and wire-visible names remain unchanged.
+Attempt keys are built so a long or hostile name cannot exceed containment's internal identity bounds:
+
+- Every variable component passes through domain-separated, length-framed fields and a fixed-size digest. Function
+  invocations append only a bounded counter to that digest.
+- Public job, Store, module, and service-discovery names are therefore preserved without bound risk.
+- Diagnostics keep safe short names, and fall back to bounded generic labels for oversized, invalid-UTF-8, or
+  control-bearing values.
+- Graph IDs, lane keys, config IDs, and wire-visible names are **unchanged** by this hashing.
 
 ## Jobs
 
@@ -544,43 +547,56 @@ flowchart TD
    runtime/vnode staging, but no run permit and no live run service. **The incumbent keeps running.**
    `joboutput/candidate_stage.go`, `joboutput/runtime_staging.go`.
 3. **Settle autodetection** — caller cancellation is propagated and the transaction temporarily yields the global
-   `dyncfg:jobs` claim. The process-owned fuse bounds logical waiting even if the collector never returns, and late
-   success cannot be admitted after a cut. A normal detection failure commits `StatusFailed`; a busy/contained
-   persistent source retains only its latest desired retry, while synchronous DynCfg returns a retryable error.
-   A normal `Init`, `Check`, validation, or Function-staging failure is isolated to that candidate after complete
-   rejection cleanup. Only a failed or unprovable cleanup retains process ownership and fails the run closed; one
-   collector's ordinary configuration or connectivity failure cannot dirty the Job Manager.
+   `dyncfg:jobs` claim.
+   - The process-owned fuse bounds logical waiting even if the collector never returns, and late success cannot be
+     admitted after a cut.
+   - A normal detection failure commits `StatusFailed`. A busy/contained persistent source retains only its latest
+     desired retry; synchronous DynCfg returns a retryable error instead.
+   - **One bad collector cannot dirty Job Manager.** A normal `Init`, `Check`, validation, or Function-staging failure
+     is isolated to that candidate once rejection cleanup completes. Only a *failed or unprovable* cleanup retains
+     process ownership and fails the run closed.
 4. **Reserve and retire** — only a timely successful candidate is wrapped in an inactive run permit. Replacement then
    fences the incumbent's ordinary output and detaches its run projections immediately; its physical managed loop,
    `Stop`, Function drain, and collector cleanup remain process-owned until they return.
 5. **Promote, attach, and start** — the candidate acquires the separate `job-runtime` identity only after logical
    retirement. Candidate `Init`/`Check` may overlap the incumbent, but two installed runtimes for one job cannot.
-   After promotion the staged runtime/vnode/Function projections attach, the permit and output gate activate, and the
-   managed loop starts. The resource transaction owns this successor until installation acknowledgement: an
-   apply failure aborts it when possible, or returns the still-live retained generation to the kernel for fail-closed
-   ownership. If the old runtime does not release within the supersession grace, the candidate is rejected and the
-   source-specific busy/pending policy applies.
-   Process rotation cuts run-target attempts before draining the run so non-cooperative startup cannot consume the HUP
-   budget. If that cut reaches a job before installation reservation, the transaction aborts the pending generation
-   and graph mutation, then returns the exact unchanged/removed ownership disposition. Once reservation begins,
-   retirement cannot invalidate the short internal commit; run shutdown retires the installed generation afterward.
-   Only a pure target-retired/process-stopped error tree is normal cancellation; any mixed, cleanup, graph, panic, or
-   ownership error remains fail-closed.
-6. **Emit** — installation activates the generation output gate. Retirement permanently fences ordinary output before
-   detaching projections, so a retained old runtime cannot interleave late collection frames with its successor.
-   Accepted V1/V2 cleanup uses a separate process-lifetime capability to emit terminal chart-obsoletion frames only
-   after the managed loop and Function handlers physically quiesce. The same `job-runtime` identity remains occupied
-   through cleanup, so a same-job successor cannot start before those terminal frames complete. Both capabilities
-   serialize whole frames through the process's one `FrameOwner`. `joboutput/output_gate.go`.
+   - After promotion the staged runtime/vnode/Function projections attach, the permit and output gate activate, and
+     the managed loop starts.
+   - The resource transaction owns this successor until installation acknowledgement. An apply failure aborts it when
+     possible, or returns the still-live retained generation to the kernel for fail-closed ownership.
+   - If the old runtime does not release within the supersession grace, the candidate is rejected and the
+     source-specific busy/pending policy applies.
+
+   Rotation interacts with this step deliberately. Rotation cuts run-target attempts *before* draining the run, so a
+   non-cooperative startup cannot consume the reload budget:
+
+   | When the cut arrives | Result |
+   | --- | --- |
+   | Before installation reservation | The transaction aborts the pending generation and graph mutation, then returns the exact unchanged/removed disposition |
+   | After reservation begins | Retirement cannot invalidate the short internal commit; run shutdown retires the installed generation afterward |
+
+   Only a pure target-retired/process-stopped error tree counts as normal cancellation. Any mixed, cleanup, graph,
+   panic, or ownership error stays fail-closed.
+6. **Emit** — installation activates the generation output gate. Two capabilities exist, and both serialize whole
+   frames through the process's one `FrameOwner` (`joboutput/output_gate.go`):
+   - **Ordinary collection output** is run-owned. Retirement permanently fences it before detaching projections, so a
+     retained old runtime cannot interleave late collection frames with its successor.
+   - **Accepted V1/V2 cleanup output** is process-owned, because physical cleanup may outlive a rotation. It emits
+     terminal chart-obsoletion frames only after the managed loop and Function handlers physically quiesce.
+   - The `job-runtime` identity stays occupied through cleanup, so a same-job successor cannot start before those
+     terminal frames complete.
 
 ### Job generations and fencing
 
-Every job carries a monotonic **generation** number. A staged result is consumed only by the matching transaction and
-run epoch. The process-owned attempt target rejects late work from a retired run, while the per-generation output gate
-allows ordinary frames only after installation and fences them at logical retirement. The separate accepted-cleanup
-capability is process-owned rather than run-owned because physical cleanup may outlive a run rotation. Process
-termination terminally fences that capability before finalizing the output service, suppressing cleanup reached after
-the bounded shutdown budget.
+Every job carries a monotonic **generation** number, and a staged result is consumed only by the matching transaction
+and run epoch. Three fences enforce that:
+
+- **The process-owned attempt target** rejects late work from a retired run.
+- **The per-generation output gate** allows ordinary frames only after installation, and fences them at logical
+  retirement.
+- **The accepted-cleanup capability** is process-owned rather than run-owned, because physical cleanup may outlive a
+  rotation. Process termination fences it terminally before finalizing the output service, suppressing cleanup that
+  arrives after the bounded shutdown budget.
 
 ### V1 vs V2
 
@@ -641,11 +657,15 @@ error, so a half-resolved config can never reach a collector.
 
 ### Redaction after a secret is applied
 
-Once a configuration containing secret references has been applied to a collector, Job Manager replaces lifecycle
-failures with a generic redacted error before logging or publishing them. The collector's own logger also sanitizes
-messages and newly attached attributes, so an internally logged request error cannot bypass the runtime boundary.
-Cancellation, DynCfg code/retryability, panic classification, and retained-ownership state survive; the raw collector
-cause does not.
+Once a configuration containing secret references has been applied to a collector, two layers scrub its errors:
+
+- **At the Job Manager boundary** — lifecycle failures are replaced with a generic redacted error before they are
+  logged or published.
+- **Inside the collector's own logger** — messages and newly attached attributes are sanitized, so an internally
+  logged request error cannot bypass the runtime boundary.
+
+What survives redaction: cancellation, DynCfg code/retryability, panic classification, and retained-ownership state.
+What does not: the raw collector cause.
 
 ### Changing a store restarts its jobs
 
@@ -955,21 +975,34 @@ The rotation is an acknowledged sequence (`composition/process.go`, `retireForSu
 4. **Drain run-owned work** — tasks, claims, permits, retries, Function publications, and projections — then drain
    paused ingress. A process-owned worker that ignores cancellation remains in the process census, not the retired run
    census.
-5. **Require a fully drained run authority census** and finish the run finalizer. Live run-owned leftovers still make
-   the terminal state dirty; process-owned retained work does not fabricate run ownership. If an ordinary frame write
-   is the only remaining owner, the kernel arms one shutdown-only idle notification before sleeping. Frame completion
-   wakes the kernel to recensus; the terminal decision validates that same snapshot rather than taking a racy second
-   census.
+5. **Require a fully drained run authority census** and finish the run finalizer.
+   - Live run-owned leftovers still make the terminal state dirty.
+   - Process-owned retained work does not fabricate run ownership.
+   - If an ordinary frame write is the only remaining owner, the kernel arms one shutdown-only idle notification
+     before sleeping. Frame completion wakes it to recensus, and the terminal decision validates *that same snapshot*
+     rather than taking a racy second census.
 6. **Construct, start, and adopt the next generation.** Restart acknowledges only after the successor run is running.
-   Startup uses the rotation context, but the accepted kernel uses the process context; cancelling an acknowledged
-   restart therefore cannot stop the new run.
-7. **Classify an incomplete rotation at the host boundary.** Deadline expiry and an explicit process-restart-required
-   identity quarantine return status 0 so the daemon restarts the plugin. Mixed or unexpected failures remain visible
-   as status 1. Deadline-generated kernel, terminal-census, and run-non-quiescence errors carry typed causal
-   provenance; they are recoverable only when the same complete error tree contains the rotation deadline. A known
-   unexpected transition failure is acknowledged before process finalization, so a slow finalizer cannot let the
-   deadline relabel it as recovery. There is no degraded generation and no second shutdown phase after the rotation
-   deadline.
+   Startup uses the rotation context, but the accepted kernel uses the process context — so cancelling an acknowledged
+   restart cannot stop the new run.
+7. **Classify an incomplete rotation at the host boundary.** See the table below.
+
+An incomplete rotation is never left half-applied: there is no degraded generation and no second shutdown phase after
+the rotation deadline. The host maps the outcome to an exit status:
+
+| Rotation outcome | Exit status | Why |
+| --- | --- | --- |
+| Successor running | — | Normal reload; the process keeps running |
+| Rotation deadline expired | 0 | Recoverable: the daemon starts a fresh process |
+| Explicit process-restart-required identity quarantine | 0 | Recoverable the same way; see the note below |
+| Mixed or unexpected failure | 1 | Construction, cleanup, validation, or invariant failure stays visible |
+
+Two rules keep that classification honest:
+
+- **Typed causal provenance.** Deadline-generated kernel, terminal-census, and run-non-quiescence errors are
+  recoverable *only* when the same complete error tree also contains the rotation deadline. Any independent error leaf
+  fails closed.
+- **Acknowledge before finalizing.** A known unexpected transition failure is acknowledged before process
+  finalization, so a slow finalizer cannot let the deadline relabel a real failure as recovery.
 
 An old installed collector runtime that is still retained leaves its job unavailable/pending in the new run until the
 physical identity releases. Agent-level module Function bundles are different: their identity is canonical across
@@ -980,18 +1013,22 @@ The process command receiver exists during initial startup and rotation. `Termin
 instead of waiting behind its startup barrier.
 
 **Termination** (SIGINT/SIGTERM) follows the same retirement path with no successor, then begins process-authority
-shutdown. The host uses one total 10-second budget for both the `Terminate` acknowledgement and waiting for the run
-loop; it does not start a second 10-second wait. It reports retained physical work after the budget rather than waiting
-forever; only actual process exit can reclaim a permanently blocked goroutine. After the authority drains or the
-budget expires, the process terminally fences accepted-cleanup output before finalizing the output service. A
-contained collector that returns later still releases its resources, but cannot emit a late terminal frame.
+shutdown:
+
+- **One budget, not two.** The host spends a single 10-second budget on both the `Terminate` acknowledgement and the
+  wait for the run loop; it never starts a second 10-second wait.
+- **Report, don't block.** Retained physical work is reported once the budget expires rather than waited on forever.
+  Only actual process exit can reclaim a permanently blocked goroutine.
+- **Fence cleanup output last.** After the authority drains or the budget expires, the process terminally fences
+  accepted-cleanup output before finalizing the output service. A contained collector that returns later still
+  releases its resources, but cannot emit a late terminal frame.
 
 ## Runtime Metrics
 
 In long-lived agent mode, one component — `jobmgr.runtime` — projects live orchestration counts
 (`composition/runtime_metrics.go`):
 
-- process attempts: active, probing, admitted, and contained;
+- process attempts: active, probing, admitted, contained, and quarantined identities;
 - operations: admitted, active, rejected, timed out, duplicate-UID rejected, shutdown-rejected, results disposed;
 - claims: keys tracked, waiters, oldest wait age;
 - tasks: active, queued, oldest wait age, panics;
