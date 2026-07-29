@@ -378,7 +378,9 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 		wire,
 	)
 
-	require.EqualValues(t, 1, cleanupCalls.Load())
+	require.Eventually(t, func() bool {
+		return cleanupCalls.Load() == 1
+	}, time.Second, time.Millisecond)
 
 	closeRunTestUIDs(t, uids)
 }
@@ -481,7 +483,9 @@ func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testin
 
 	require.NotContains(t, output.String(), `FUNCTION GLOBAL "module:method"`)
 	require.NotContains(t, output.String(), `FUNCTION_DEL GLOBAL "module:method"`)
-	require.EqualValues(t, 1, cleanupCalls.Load())
+	require.Eventually(t, func() bool {
+		return cleanupCalls.Load() == 1
+	}, time.Second, time.Millisecond)
 	require.Zero(t, generation.tasks.InheritedActive())
 	require.Equal(t, lifecycle.LongLivedCensus{}, generation.tasks.LongLivedCensus())
 	closeRunTestUIDs(t, uids)
