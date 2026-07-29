@@ -38,12 +38,12 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 	base := int64(fixture.T0) - int64(fixture.T0)%3600
 
 	for _, tc := range []struct {
-		name               string
+		name, contract     string
 		first, then        int
 		samples1, samples2 int
 	}{
-		{"speeds-up", slow, fast, 720, 3600},
-		{"slows-down", fast, slow, 3600, 360},
+		{"speeds-up", "CASE-030/interval-change-speeding-up", slow, fast, 720, 3600},
+		{"slows-down", "CASE-030/interval-change-slowing-down", fast, slow, 3600, 360},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := "fixture.c030_" + tc.name
@@ -116,7 +116,7 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 					}
 				}
 				t.Logf("%s tier %d: %.4f (want %.4f)", tc.name, tier, total, want)
-				if math.Abs(total-want) > want*1e-3 {
+				if math.Abs(total-want) > 1e-6 {
 					t.Logf("history contract not met: %s tier %d totals %.4f over %ds of a "+
 						"%d/s rate collected every %ds, which is %.4f - how often the metric "+
 						"is sampled TODAY cannot change what its history held",
@@ -124,7 +124,7 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 					ok = false
 				}
 			}
-			assertContract(t, "CASE-030/interval-change-keeps-history", ok)
+			assertContract(t, tc.contract, ok)
 		})
 	}
 }

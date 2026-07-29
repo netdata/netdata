@@ -242,8 +242,11 @@ var manifest = map[string]ManifestCase{
 	"CASE-029/tier0-slow-metric-totals-at-every-zoom": {
 		Proves: "sum's zoom inflation was never a property of tiers - it was a property of a stored record being WIDER than the row asking about it, which is equally true at tier 0 for anything collected less often than once a second. A metric collected every ten seconds answers ten one-second rows from one stored record, and used to report ten times what it stored. Pins the deliberate change to what tier 0 answers for slow metrics",
 	},
-	"CASE-030/interval-change-keeps-history": {
-		Proves: "a metric that changes how often it is collected does not change what its history held. Netdata supports update_every changing while a metric runs and the database keeps every historical record at the interval it was collected at, so a volume over an OLD window is a property of that window's own records. This is the case that separates the interval a record's samples were collected at from the interval the metric uses now - identical numbers until the interval changes, which is why a fixture with one uniform interval cannot tell a correct implementation from one reading current metadata. Asserted in both directions, speeding up and slowing down",
+	"CASE-030/interval-change-slowing-down": {
+		Proves: "a metric that changes how often it is collected does not change what its history held. Netdata supports update_every changing while a metric runs and the database keeps every historical record at the interval it was collected at, so a volume over an OLD window is a property of that window's own records. This is the case that separates the interval a record's samples were collected at from the interval the metric uses now - identical numbers until the interval changes, which is why a fixture with one uniform interval cannot tell a correct implementation from one reading current metadata. Asserted on a window of whole tier1 records in the middle of the history, at forced tier 0 and tier 1",
+	},
+	"CASE-030/interval-change-speeding-up": {
+		Proves: "the mirror of CASE-030/interval-change-slowing-down: history collected every ten seconds keeps its volume after the metric moves to once a second. Asserted separately so a run names which direction broke, and so one failure cannot be counted twice",
 	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves:  "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
