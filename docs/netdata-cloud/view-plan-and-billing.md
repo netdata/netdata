@@ -150,3 +150,14 @@ Subtracting credit from your balance, if necessary.
 Applying tax to the final amount, if positive. Negative results adjust your customer credit balance.
 
 </details>
+
+<details>
+<summary>How Does Node Counting Work When a Collector Monitors Multiple Devices or Resources?</summary>
+
+Billing follows the same active node model for every integration: each running Netdata Agent connected to Netdata Cloud counts as one billable node, no matter how many devices, hosts, or resources a single collector job discovers or monitors.
+
+Most collectors that discover many sub-entities — for example hosts and VMs behind a hypervisor, or devices reachable over a network — report them as labeled chart dimensions under the collecting Agent's own node identity. The number of sub-entities discovered or monitored, including ones that are offline or powered down, does not by itself add billable nodes. Only an explicit [Virtual Node](/docs/learn/node-identities.md#virtual-nodes-vnodes) attached to the job adds one additional node for that job.
+
+Some collectors instead automatically create a separate virtual node for each discovered or monitored resource, with no explicit vnode configuration required. For those, each such resource does count as a billable node. Check the specific collector's own configuration reference to see whether it uses per-resource virtual nodes.
+
+</details>

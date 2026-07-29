@@ -833,6 +833,18 @@
 - Build RPM packages through CPack in CI ([#23290](https://github.com/netdata/netdata/issues/23290))
 - Fix macOS disk.util percent scaling ([#23292](https://github.com/netdata/netdata/issues/23292))
 - Fix pythond DEB depends typo and duplicate ndsudo entry ([#23289](https://github.com/netdata/netdata/issues/23289))
+- Docs: Explain verification-key rejection when connecting existing agent ([#23217](https://github.com/netdata/netdata/issues/23217))
+- Docs: Add tc.plugin QoS log message troubleshooting to metadata ([#23231](https://github.com/netdata/netdata/issues/23231))
+- Docs: Fix fabricated MSI property names in Windows SCCM fleet docs ([#23230](https://github.com/netdata/netdata/issues/23230))
+- Docs: Fix Events tab role access table for Auditing events ([#23229](https://github.com/netdata/netdata/issues/23229))
+- Docs: Fix per-core CPU label example in proc.plugin metadata ([#23233](https://github.com/netdata/netdata/issues/23233))
+- Docs: Add HA Netdata Parent to metrics centralization diagram ([#23236](https://github.com/netdata/netdata/issues/23236))
+- Apps.plugin: skip macOS zombies instead of logging an error every cycle ([#23297](https://github.com/netdata/netdata/issues/23297))
+- Regenerate integrations docs ([#23287](https://github.com/netdata/netdata/issues/23287))
+- Docs: Add private IP enrichment guidance to enrichment page ([#23239](https://github.com/netdata/netdata/issues/23239))
+- Regenerate integrations docs ([#23298](https://github.com/netdata/netdata/issues/23298))
+- Add NetFlow capacity benchmarks and optimize shared ingestion paths ([#23246](https://github.com/netdata/netdata/issues/23246))
+- Avoid out-of-bounds read in url_percent_escape_decode ([#22965](https://github.com/netdata/netdata/issues/22965))
 
 ## [2.10.0] - 2026-04-09
 

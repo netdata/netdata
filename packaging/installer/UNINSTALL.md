@@ -27,7 +27,7 @@ Similarly, with our documentation on updating Netdata, you need to [determine yo
 
 **Native Package Users**
 
-If your installation type indicates a [native package](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/native-linux-distribution-packages), then proceed to uninstall Netdata using your package manager.
+If your installation type indicates a [native package](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/native-linux-distribution-packages), then proceed to uninstall Netdata using your package manager. If you want to switch to a different install type afterward, see the "Switching From a Vendor-Packaged Native Install" section under [Switching Install Types](/docs/learn/switching-install-types.md#switching-install-types).
 
 :::
 
