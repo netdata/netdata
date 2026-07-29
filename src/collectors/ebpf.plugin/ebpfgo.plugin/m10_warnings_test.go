@@ -317,7 +317,7 @@ func TestRunSocketGlobalCollector_NilHandleIsNoOp(t *testing.T) {
 			t.Fatalf("nil handle panicked: %v", r)
 		}
 	}()
-	runSocketGlobalCollector(nil, make(chan struct{}), 5, nil, nil, false)
+	runSocketGlobalCollector(nil, nil, make(chan struct{}), 5, nil, nil, false)
 }
 
 func TestRunSocketGlobalCollector_NilRuntimeIsNoOp(t *testing.T) {
@@ -326,7 +326,7 @@ func TestRunSocketGlobalCollector_NilRuntimeIsNoOp(t *testing.T) {
 			t.Fatalf("nil runtime panicked: %v", r)
 		}
 	}()
-	runSocketGlobalCollector(&SocketLegacyHandle{}, make(chan struct{}), 5, nil, nil, false)
+	runSocketGlobalCollector(nil, &SocketLegacyHandle{}, make(chan struct{}), 5, nil, nil, false)
 }
 
 // runDNSGlobalCollector is harder to exercise without a real DNS runtime;

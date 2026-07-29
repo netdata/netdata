@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
@@ -32,6 +33,11 @@ type socketGlobalPublish struct {
 	udpSendErr    uint64 // delta of ErrorUDPSendmsg
 	inboundTCP    uint64 // delta of InboundConnTCP
 	inboundUDP    uint64 // delta of InboundConnUDP
+
+	tcpBytesSent     uint64 // delta of BytesTCPSendmsg
+	tcpBytesReceived uint64 // delta of BytesTCPCleanupRbuf
+	udpBytesSent     uint64 // delta of BytesUDPSendmsg
+	udpBytesReceived uint64 // delta of BytesUDPRecvmsg
 }
 
 type socketGlobalState struct {
@@ -76,6 +82,10 @@ func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlob
 		udpSendErr:          socketDelta(snap.ErrorUDPSendmsg, prev.ErrorUDPSendmsg),
 		inboundTCP:          socketDelta(snap.InboundConnTCP, prev.InboundConnTCP),
 		inboundUDP:          socketDelta(snap.InboundConnUDP, prev.InboundConnUDP),
+		tcpBytesSent:        socketDelta(snap.BytesTCPSendmsg, prev.BytesTCPSendmsg),
+		tcpBytesReceived:    socketDelta(snap.BytesTCPCleanupRbuf, prev.BytesTCPCleanupRbuf),
+		udpBytesSent:        socketDelta(snap.BytesUDPSendmsg, prev.BytesUDPSendmsg),
+		udpBytesReceived:    socketDelta(snap.BytesUDPRecvmsg, prev.BytesUDPRecvmsg),
 	}, true
 }
 
@@ -91,7 +101,7 @@ func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlob
 // shouldPublish must be true when cachestat is not publishing to SHM; in that
 // case the socket collector opens the shared segment and publishes each cycle
 // so that cgroup.plugin can read socket data independently of cachestat.
-func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *cachestatSharedMemoryStore, fnStore *socketFunctionStore, shouldPublish bool) {
+func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *cachestatSharedMemoryStore, fnStore *socketFunctionStore, shouldPublish bool) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -99,6 +109,8 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 	if updateEvery <= 0 {
 		updateEvery = socketDefaultUpdateEvery
 	}
+
+	createSocketGlobalCharts(api, updateEvery)
 
 	if store != nil {
 		// Clear the SOCKET SHM flag when this goroutine exits so the C consumer
@@ -140,7 +152,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		}
 	}
 
-	collectAndPublish := func() {
+	collectAndPublish := func(usecSince int) {
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("socket.snapshot", "socket", "snapshot", err)
@@ -154,6 +166,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		}
 		if publish, ok := state.Update(snap); ok {
 			fnStore.update(publish)
+			publish.writeCharts(api, usecSince)
 		}
 
 		if store != nil {
@@ -175,7 +188,8 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		}
 	}
 
-	collectAndPublish()
+	collectAndPublish(0)
+	lastCollection := time.Now()
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -187,6 +201,12 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		case <-ticker.C:
 		}
 
-		collectAndPublish()
+		now := time.Now()
+		usecSince := int(now.Sub(lastCollection).Microseconds())
+		if usecSince < 0 {
+			usecSince = 0
+		}
+		lastCollection = now
+		collectAndPublish(usecSince)
 	}
 }
