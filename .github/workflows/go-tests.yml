@@ -160,12 +160,12 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
       - name: Install Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
       - name: Install libbpf headers
@@ -179,7 +179,7 @@ jobs:
         working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
       - name: Set up gotestfmt
         if: needs.file-check.outputs.run == 'true'
-        uses: GoTestTools/gotestfmt-action@v2
+        uses: GoTestTools/gotestfmt-action@8b4478c7019be847373babde9300210e7de34bfb # v2.2.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0
