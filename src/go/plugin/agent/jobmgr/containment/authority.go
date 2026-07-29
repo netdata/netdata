@@ -164,8 +164,9 @@ func (a *Authority) start(ctx context.Context, plan jobmgr.ProcessAttemptPlan) (
 	return attempt, nil
 }
 
-// StartProcessAttempt snapshots caller cancellation before reserving identity.
-// The caller context gates admission only; the worker remains process-owned.
+// StartProcessAttempt checks caller cancellation while holding the identity
+// registry lock. A successful reservation linearizes at that snapshot; the
+// caller context gates admission only and the worker remains process-owned.
 func (a *Authority) StartProcessAttempt(
 	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
@@ -503,9 +504,9 @@ func (a *Authority) ProcessAttemptReleased(
 	return attempt.Released(), true
 }
 
-// SupersedeProcessAttempt cancels the owner snapshotted at entry and waits only
-// the fixed grace for its physical release. Success is not an identity
-// reservation; callers must perform an authoritative StartProcessAttempt.
+// SupersedeProcessAttempt cancels the owner observed during its locked registry
+// snapshot and waits only the fixed grace for physical release. Success is not
+// an identity reservation; callers must perform an authoritative start.
 func (a *Authority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,

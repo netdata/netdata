@@ -281,10 +281,12 @@ release** (the goroutine actually returns).
 
 `process_attempt.go` declares the contract; `containment/authority.go` implements it.
 
-- `StartProcessAttempt` snapshots caller cancellation under the authority mutex immediately before it reserves the
-  identity. The caller context gates admission only; the worker receives an independent process-owned context.
-- `SupersedeProcessAttempt` targets the owner snapshotted when the call begins. Its success confirms that owner
-  released; it does not reserve the identity against a later successor, so the subsequent start remains authoritative.
+- `StartProcessAttempt` checks caller cancellation while holding the identity-registry mutex. A successful claim
+  linearizes at that snapshot: later cancellation follows the caller's normal post-start lifecycle. The caller context
+  gates admission only; the worker receives an independent process-owned context.
+- `SupersedeProcessAttempt` targets the owner observed during its locked registry snapshot. Its success confirms that
+  owner released; it does not reserve the identity against a later successor, so the subsequent start remains
+  authoritative.
 
 ### The attempt state machine
 
