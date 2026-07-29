@@ -84,6 +84,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 		retry,
 		afterApply,
 		nil,
+		nil,
 	)
 }
 
@@ -98,7 +99,8 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	cleanup lifecycle.TaskCleanup,
 	retry autoDetectionRetryToken,
 	afterApply func(),
-	busyFallback *ResourceActivationBusyFallback,
+	busyFallback *ResourceActivationFallback,
+	quarantinedFallback *ResourceActivationFallback,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	afterApply = composeAfterApply(dcjc.retrySettlement(scope.ID, retry), afterApply)
 	var dependencyCommit func()
@@ -117,16 +119,17 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 		if successor != nil {
 			return dcjc.prepareResourceTransaction(
 				ResourceTransactionSpec{
-					Scope:                  scope,
-					Disposition:            disposition,
-					Current:                current,
-					Successor:              successor,
-					Graph:                  dcjc.graph,
-					AfterGraphCommit:       dependencyCommit,
-					AfterApply:             afterApply,
-					ActivationBusyFallback: busyFallback,
-					Result:                 result,
-					Cleanup:                cleanup,
+					Scope:                         scope,
+					Disposition:                   disposition,
+					Current:                       current,
+					Successor:                     successor,
+					Graph:                         dcjc.graph,
+					AfterGraphCommit:              dependencyCommit,
+					AfterApply:                    afterApply,
+					ActivationBusyFallback:        busyFallback,
+					ActivationQuarantinedFallback: quarantinedFallback,
+					Result:                        result,
+					Cleanup:                       cleanup,
 				},
 			)
 		}
@@ -147,32 +150,33 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	}
 	return dcjc.prepareResourceTransaction(
 		ResourceTransactionSpec{
-			Scope:                  scope,
-			Disposition:            disposition,
-			Current:                current,
-			Successor:              successor,
-			UnusedPermit:           unusedPermit,
-			Graph:                  dcjc.graph,
-			Mutation:               mutation,
-			MutationPrepared:       true,
-			AfterGraphCommit:       dependencyCommit,
-			AfterApply:             afterApply,
-			ActivationBusyFallback: busyFallback,
-			Result:                 result,
-			Cleanup:                cleanup,
+			Scope:                         scope,
+			Disposition:                   disposition,
+			Current:                       current,
+			Successor:                     successor,
+			UnusedPermit:                  unusedPermit,
+			Graph:                         dcjc.graph,
+			Mutation:                      mutation,
+			MutationPrepared:              true,
+			AfterGraphCommit:              dependencyCommit,
+			AfterApply:                    afterApply,
+			ActivationBusyFallback:        busyFallback,
+			ActivationQuarantinedFallback: quarantinedFallback,
+			Result:                        result,
+			Cleanup:                       cleanup,
 		},
 	)
 }
 
-func (dcjc *DynCfgJobController) newActivationBusyFallback(
+func (dcjc *DynCfgJobController) newActivationFallback(
 	id string,
 	postimage *dyncfg.GraphConfig,
 	result lifecycle.SealedResult,
 	cleanup lifecycle.TaskCleanup,
 	afterApply func(),
-) (*ResourceActivationBusyFallback, error) {
+) (*ResourceActivationFallback, error) {
 	if dcjc == nil || id == "" || cleanup == nil {
-		return nil, errors.New("job output: invalid activation-busy fallback")
+		return nil, errors.New("job output: invalid activation fallback")
 	}
 	var dependencyCommit func()
 	if dcjc.dependencies != nil {
@@ -182,7 +186,7 @@ func (dcjc *DynCfgJobController) newActivationBusyFallback(
 			return nil, err
 		}
 	}
-	return &ResourceActivationBusyFallback{
+	return &ResourceActivationFallback{
 		Change: dyncfg.GraphChange{
 			ID:     id,
 			Config: postimage,
@@ -194,14 +198,14 @@ func (dcjc *DynCfgJobController) newActivationBusyFallback(
 	}, nil
 }
 
-type activationBusyPlan struct {
+type activationFallbackPlan struct {
 	postimage  *dyncfg.GraphConfig
 	result     lifecycle.SealedResult
 	cleanup    lifecycle.TaskCleanup
 	afterApply func()
 }
 
-func (dcjc *DynCfgJobController) prepareMutationWithActivationBusy(
+func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -211,14 +215,25 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationBusy(
 	cleanup lifecycle.TaskCleanup,
 	retry autoDetectionRetryToken,
 	afterApply func(),
-	busy activationBusyPlan,
+	busy activationFallbackPlan,
+	quarantined activationFallbackPlan,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	fallback, err := dcjc.newActivationBusyFallback(
+	busyFallback, err := dcjc.newActivationFallback(
 		scope.ID,
 		busy.postimage,
 		busy.result,
 		busy.cleanup,
 		busy.afterApply,
+	)
+	if err != nil {
+		return nil, rollbackSuccessorMutation(successor, err)
+	}
+	quarantinedFallback, err := dcjc.newActivationFallback(
+		scope.ID,
+		quarantined.postimage,
+		quarantined.result,
+		quarantined.cleanup,
+		quarantined.afterApply,
 	)
 	if err != nil {
 		return nil, rollbackSuccessorMutation(successor, err)
@@ -234,7 +249,8 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationBusy(
 		cleanup,
 		retry,
 		afterApply,
-		fallback,
+		busyFallback,
+		quarantinedFallback,
 	)
 }
 

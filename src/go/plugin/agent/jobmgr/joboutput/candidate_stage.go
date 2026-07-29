@@ -708,6 +708,9 @@ func (pjc *preparedJobCandidate) run(
 		factory = nil
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		err = joinRetainedCleanup(err, cleanupErr)
+		if lifecycle.OwnershipRetained(err) {
+			return err
+		}
 		workerResult <- stagedJobResult{err: err}
 		return nil
 	}
@@ -717,8 +720,7 @@ func (pjc *preparedJobCandidate) run(
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		if cleanupErr != nil {
 			err = joinRetainedCleanup(probeErr, cleanupErr)
-			workerResult <- stagedJobResult{err: err}
-			return nil
+			return err
 		}
 		var failure *autoDetectionFailure
 		if errors.As(probeErr, &failure) {
@@ -734,10 +736,7 @@ func (pjc *preparedJobCandidate) run(
 		failure := autoDetectionFailureFor(candidate, stageErr)
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		if lifecycle.OwnershipRetained(stageErr) || cleanupErr != nil {
-			workerResult <- stagedJobResult{
-				err: joinRetainedCleanup(stageErr, cleanupErr),
-			}
-			return nil
+			return joinRetainedCleanup(stageErr, cleanupErr)
 		}
 		workerResult <- stagedJobResult{failure: failure}
 		return nil

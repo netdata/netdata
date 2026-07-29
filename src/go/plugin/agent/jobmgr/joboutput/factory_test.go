@@ -320,6 +320,52 @@ func TestFactoryCleanHandlerStagingFailureRejectsOnlyCandidate(t *testing.T) {
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
+func TestFactoryCandidateCleanupPanicQuarantinesIdentity(t *testing.T) {
+	state := &factoryTestState{}
+	creator := collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return state.module(func(context.Context) error {
+				return errors.New("check failed")
+			}, true)
+		},
+	}
+	factory, _ := newFactoryTestHarness(t, creator, nil)
+	permit, tasks := issueTestJobPermit(t, "module_job", 1)
+
+	prepared, failure, err := prepareFactoryTestCandidate(
+		context.Background(),
+		factory,
+		factoryTestConfig(false),
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
+		permit,
+	)
+	require.False(t, prepared.Valid())
+	require.Nil(t, failure)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
+	require.False(t, lifecycle.OwnershipRetained(err))
+	require.NoError(t, permit.AbortUnused())
+
+	attempts, ok := factory.config.Attempts.(*containment.Authority)
+	require.True(t, ok)
+	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+	stage, err := factory.newCandidate(factoryTestConfig(false))
+	require.NoError(t, err)
+	defer stage.Release()
+	stage.Start()
+	<-stage.Ready()
+	_, _, err = factory.prepareCandidate(
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 2},
+		lifecycle.LongLivedPermit{},
+		stage,
+	)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
+	require.EqualValues(t, 1, state.collectorCleanup)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
 func TestFactoryCanonicalizesTypedNilLifecycleResults(t *testing.T) {
 	stageErr := errors.New("stage failed")
 	attachErr := errors.New("attach failed")
@@ -365,17 +411,17 @@ func TestNewFactoryRejectsMismatchedHandlerLifecycleDependencies(t *testing.T) {
 
 func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 	tests := map[string]struct {
-		configure     func(*factoryTestState, *collectorapi.Creator) factoryTestJobHooks
-		wantClose     int
-		wantRetained  bool
-		wantNoCleanup bool
+		configure       func(*factoryTestState, *collectorapi.Creator) factoryTestJobHooks
+		wantClose       int
+		wantQuarantined bool
+		wantNoCleanup   bool
 	}{
 		"creator panic": {
 			configure: func(*factoryTestState, *collectorapi.Creator) factoryTestJobHooks {
 				return nil
 			},
-			wantRetained:  true,
-			wantNoCleanup: true,
+			wantQuarantined: true,
+			wantNoCleanup:   true,
 		},
 		"autodetection failure": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {
@@ -406,7 +452,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				}
 				return nil
 			},
-			wantRetained: true,
+			wantQuarantined: true,
 		},
 		"function-bearing job without hooks": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {
@@ -448,7 +494,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 					},
 				}
 			},
-			wantRetained: true,
+			wantQuarantined: true,
 		},
 	}
 	for name, test := range tests {
@@ -491,7 +537,15 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			require.EqualValues(t, wantCollectorCleanup, state.collectorCleanup)
 			require.EqualValues(t, test.wantClose, state.handlerClose)
 			require.EqualValues(t, 0, output.Len())
-			require.Equal(t, test.wantRetained, lifecycle.OwnershipRetained(err))
+			require.False(t, lifecycle.OwnershipRetained(err))
+			require.Equal(t, test.wantQuarantined, errors.Is(err, jobmgr.ErrProcessAttemptQuarantined))
+			attempts, ok := factory.config.Attempts.(*containment.Authority)
+			require.True(t, ok)
+			wantCensus := containment.Census{}
+			if test.wantQuarantined {
+				wantCensus.Quarantined = 1
+			}
+			require.Equal(t, wantCensus, attempts.Census())
 			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 		})
 	}

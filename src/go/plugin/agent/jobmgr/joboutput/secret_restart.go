@@ -263,7 +263,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						},
 					)
 				}
-				return dcjc.prepareMutationWithActivationBusy(
+				return dcjc.prepareMutationWithActivationFallbacks(
 					scope,
 					nil,
 					successor,
@@ -273,7 +273,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 					dcjc.configStatusCleanup(id, dyncfg.StatusRunning),
 					autoDetectionRetryToken{},
 					nil,
-					activationBusyPlan{
+					activationFallbackPlan{
 						postimage: &failedPostimage,
 						result:    mustDynCfgMessage(204, ""),
 						cleanup:   dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
@@ -283,6 +283,14 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 							},
 							state.retainRuntimePending,
 						),
+					},
+					activationFallbackPlan{
+						postimage: &failedPostimage,
+						result:    mustDynCfgMessage(204, ""),
+						cleanup:   dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+						afterApply: func() {
+							state.setError(jobmgr.ErrProcessAttemptQuarantined)
+						},
 					},
 				)
 			},

@@ -249,6 +249,54 @@ func TestPreparedStoreOperationRetainsIdentityUntilStageRelease(t *testing.T) {
 	require.EqualValues(t, 1, initializations.Load())
 }
 
+func TestPreparedStoreOperationQuarantinesFailedUntakenMutationRelease(t *testing.T) {
+	controller, store := newSecretControllerTestHarness(t, nil)
+	attempts, ok := controller.operations.attempts.(*containment.Authority)
+	require.True(t, ok)
+	target := secretTarget{
+		command: dyncfg.CommandAdd,
+		key:     secretstore.StoreKey(secretstore.KindVault, "main"),
+		kind:    secretstore.KindVault,
+		name:    "main",
+	}
+	stage, err := controller.operations.prepare(storeOperationSpec{
+		target:    target,
+		config:    secretTestConfig(confgroup.TypeUser, "value"),
+		mode:      storeOperationMutation,
+		supersede: true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(stage.Release)
+
+	stage.Start()
+	select {
+	case <-stage.Ready():
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "Store operation did not become ready")
+	}
+	stage.mu.Lock()
+	mutation := stage.result.mutation
+	attempt := stage.attempt
+	identity := stage.identity
+	stage.mu.Unlock()
+	require.NotNil(t, mutation)
+	require.NotNil(t, attempt)
+
+	// Simulate the Store rejecting final mutation release after ownership was
+	// handed to the stage.
+	require.NoError(t, mutation.Abort())
+	stage.Release()
+	<-attempt.Released()
+
+	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+	_, err = attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+	})
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
+	require.NoError(t, store.Close(t.Context()))
+}
+
 func TestInvalidStoreCommandClearsOlderPendingDesiredConfig(t *testing.T) {
 	controller, store := newSecretControllerTestHarness(t, nil)
 	require.NoError(t, controller.Bind(restartTestJobs{}))

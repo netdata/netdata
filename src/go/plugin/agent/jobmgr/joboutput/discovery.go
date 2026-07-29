@@ -302,6 +302,27 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
+		if errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+			failedPostimage := postimage
+			failedPostimage.Status = dyncfg.StatusFailed.String()
+			return dcjc.prepareMutationWithRetryAfterApply(
+				scope,
+				current,
+				nil,
+				permit,
+				resourceRemovalDisposition(current),
+				&failedPostimage,
+				result,
+				dcjc.configCreateCleanup(
+					failedPostimage,
+					change.Config.SourceType(),
+					change.Config.Source(),
+					dcjc.configType(dcjc.modules[change.Config.Module()]),
+				),
+				change.retry,
+				pendingSettlement,
+			)
+		}
 		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) {
 			baselineUID := ""
 			if exists {
@@ -425,7 +446,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		change.Config.Source(),
 		dcjc.configType(dcjc.modules[change.Config.Module()]),
 	)
-	return dcjc.prepareMutationWithActivationBusy(
+	return dcjc.prepareMutationWithActivationFallbacks(
 		scope,
 		current,
 		successor,
@@ -435,7 +456,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		cleanup,
 		change.retry,
 		dcjc.pendingDesiredSettlement(change.Config, change.pending),
-		activationBusyPlan{
+		activationFallbackPlan{
 			postimage: &failedPostimage,
 			result:    result,
 			cleanup:   failedCleanup,
@@ -447,6 +468,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 					change.Config.UID(),
 				),
 			),
+		},
+		activationFallbackPlan{
+			postimage:  &failedPostimage,
+			result:     result,
+			cleanup:    failedCleanup,
+			afterApply: settlement,
 		},
 	)
 }

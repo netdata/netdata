@@ -21,10 +21,11 @@ const (
 )
 
 type processAttemptGauges struct {
-	active    metrix.StatefulGauge
-	probing   metrix.StatefulGauge
-	admitted  metrix.StatefulGauge
-	contained metrix.StatefulGauge
+	active      metrix.StatefulGauge
+	probing     metrix.StatefulGauge
+	admitted    metrix.StatefulGauge
+	contained   metrix.StatefulGauge
+	quarantined metrix.StatefulGauge
 }
 
 type runMetrics struct {
@@ -55,6 +56,7 @@ func newRunMetrics(attempts *containment.Authority) (*runMetrics, error) {
 	metrics.attemptGauges.probing = runtimeGauge(meter, "process_attempts_probing", "attempts")
 	metrics.attemptGauges.admitted = runtimeGauge(meter, "process_attempts_admitted", "attempts")
 	metrics.attemptGauges.contained = runtimeGauge(meter, "process_attempts_contained", "attempts")
+	metrics.attemptGauges.quarantined = runtimeGauge(meter, "process_attempts_quarantined", "identities")
 	metrics.gauges[lifecycle.RuntimeGaugeOperationsActive] = runtimeGauge(meter, "operations_active", "operations")
 	metrics.gauges[lifecycle.RuntimeGaugeFunctionInvocationsActive] =
 		runtimeGauge(meter, "function_invocations_active", "invocations")
@@ -162,6 +164,7 @@ func (rm *runMetrics) refreshProjection() error {
 	rm.attemptGauges.probing.Set(float64(attempts.Probing))
 	rm.attemptGauges.admitted.Set(float64(attempts.Admitted))
 	rm.attemptGauges.contained.Set(float64(attempts.Contained))
+	rm.attemptGauges.quarantined.Set(float64(attempts.Quarantined))
 	for kind := lifecycle.RuntimeGaugeOperationsActive; kind <= lifecycle.RuntimeGaugeJobsActive; kind++ {
 		rm.gauges[kind].Set(float64(rm.gaugeValues[kind].Load()))
 	}

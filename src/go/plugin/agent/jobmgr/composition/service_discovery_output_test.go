@@ -127,6 +127,29 @@ func TestServiceDiscoveryBindingRoutesNotificationsOutsideInvocations(t *testing
 	assert.Equal(t, "CONFIG go.d:sd:type:gone delete\n\n", output.String())
 }
 
+func TestServiceDiscoveryQuarantineReturnsConfigLocalUnavailableResult(t *testing.T) {
+	binding := &serviceDiscoveryBinding{}
+
+	result, cleanup, err := binding.serviceDiscoveryContainmentResult(
+		jobmgr.ErrProcessAttemptQuarantined,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, cleanup)
+	applied, err := lifecycle.NewAppliedResourceTransaction(
+		lifecycle.ResourceTransactionScope{
+			ID:      "config",
+			Current: lifecycle.ResourceIdentity{ID: "config", Generation: 1},
+		},
+		lifecycle.ResourceTransactionRemoved,
+		nil,
+		result,
+		cleanup,
+	)
+	require.NoError(t, err)
+	require.Equal(t, 503, applied.ResultStatus())
+	require.NoError(t, cleanup())
+}
+
 func TestServiceDiscoveryReadOnlyInvocationDoesNotCaptureConfigNotifications(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)

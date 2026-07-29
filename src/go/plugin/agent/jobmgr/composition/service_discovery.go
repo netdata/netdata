@@ -315,10 +315,15 @@ func (sdb *serviceDiscoveryBinding) serviceDiscoveryContainmentResult(
 	err error,
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
+		errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+		message := "Service discovery configuration is busy; retry the command."
+		if errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+			message = "Service discovery configuration is unavailable until the plugin restarts."
+		}
 		return mustDynCfgMessage(
 				503,
-				"Service discovery configuration is busy; retry the command.",
+				message,
 			),
 			func() error { return nil },
 			nil

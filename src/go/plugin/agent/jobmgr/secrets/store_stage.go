@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 )
 
@@ -195,9 +196,8 @@ func (pso *PreparedStoreOperation) Release() {
 		close(pso.release)
 	})
 	if !started {
-		pso.publish(storeOperationResult{err: context.Canceled})
+		_ = pso.publish(storeOperationResult{err: context.Canceled})
 	}
-	pso.clearUnownedResult()
 }
 
 func (pso *PreparedStoreOperation) start() {
@@ -207,11 +207,11 @@ func (pso *PreparedStoreOperation) start() {
 	pso.mu.Unlock()
 	if immediate != nil {
 		result := *immediate
-		pso.publish(result)
+		_ = pso.publish(result)
 		return
 	}
 	if err := context.Cause(pso.ctx); err != nil {
-		pso.publish(storeOperationResult{err: err})
+		_ = pso.publish(storeOperationResult{err: err})
 		return
 	}
 	if pso.spec.mode == storeOperationRemoval {
@@ -223,7 +223,7 @@ func (pso *PreparedStoreOperation) start() {
 		// continue until Released. prepareRemove commits the desired-version
 		// fence that invalidates older retained ADDs.
 		pso.operations.attempts.CutProcessAttempt(identity, jobmgr.ErrProcessAttemptSuperseded)
-		pso.publish(storeOperationResult{
+		_ = pso.publish(storeOperationResult{
 			desiredVersion: pso.spec.desiredVersion,
 			removal:        true,
 		})
@@ -235,7 +235,7 @@ func (pso *PreparedStoreOperation) start() {
 		var err error
 		config, err = materializeSecretConfig(pso.spec.input, pso.spec.target)
 		if err != nil {
-			pso.publish(storeOperationResult{
+			_ = pso.publish(storeOperationResult{
 				err:            err,
 				desiredVersion: pso.spec.desiredVersion,
 				validationOnly: pso.spec.validationOnly,
@@ -260,7 +260,7 @@ func (pso *PreparedStoreOperation) start() {
 	attempt, err := pso.startAttempt(identity, config)
 	if err != nil {
 		released, _ := pso.operations.attempts.ProcessAttemptReleased(identity)
-		pso.publish(storeOperationResult{
+		_ = pso.publish(storeOperationResult{
 			config:         config,
 			release:        released,
 			err:            err,
@@ -341,14 +341,18 @@ func (pso *PreparedStoreOperation) runAttempt(
 	}
 	result.retryable = containmentRetryable(result.err)
 	if err := admission.Admit(); err != nil {
-		if result.mutation != nil {
-			_ = result.mutation.Abort()
+		cleanupErr := pso.releaseResult(result)
+		if cleanupErr != nil {
+			return lifecycle.RetainOwnership(errors.Join(err, cleanupErr))
 		}
 		return err
 	}
-	pso.publish(result)
+	releaseErr := pso.publish(result)
 	<-pso.release
-	pso.clearUnownedResult()
+	releaseErr = errors.Join(releaseErr, pso.clearUnownedResult())
+	if releaseErr != nil {
+		return lifecycle.RetainOwnership(releaseErr)
+	}
 	return nil
 }
 
@@ -357,7 +361,7 @@ func (pso *PreparedStoreOperation) observeAttempt(
 	config secretstore.Config,
 ) {
 	err := attempt.Await(context.Background())
-	pso.publish(storeOperationResult{
+	_ = pso.publish(storeOperationResult{
 		config:         config,
 		release:        attempt.Released(),
 		err:            err,
@@ -375,7 +379,7 @@ func containmentRetryable(err error) bool {
 		errors.Is(err, secretstore.ErrMutationBusy)
 }
 
-func (pso *PreparedStoreOperation) publish(result storeOperationResult) {
+func (pso *PreparedStoreOperation) publish(result storeOperationResult) error {
 	discard := false
 	published := false
 	pso.readyOnce.Do(func() {
@@ -393,8 +397,9 @@ func (pso *PreparedStoreOperation) publish(result storeOperationResult) {
 		close(pso.ready)
 	})
 	if !published || discard {
-		pso.releaseResult(result)
+		return pso.releaseResult(result)
 	}
+	return nil
 }
 
 func (pso *PreparedStoreOperation) take() (storeOperationResult, error) {
@@ -417,22 +422,22 @@ func (pso *PreparedStoreOperation) take() (storeOperationResult, error) {
 	return result, nil
 }
 
-func (pso *PreparedStoreOperation) clearUnownedResult() {
+func (pso *PreparedStoreOperation) clearUnownedResult() error {
 	pso.mu.Lock()
 	if pso.taken {
 		pso.mu.Unlock()
-		return
+		return nil
 	}
 	result := pso.result
 	pso.result = storeOperationResult{}
 	pso.taken = true
 	pso.mu.Unlock()
-	pso.releaseResult(result)
+	return pso.releaseResult(result)
 }
 
-func (pso *PreparedStoreOperation) releaseResult(result storeOperationResult) {
+func (pso *PreparedStoreOperation) releaseResult(result storeOperationResult) error {
 	if result.mutation == nil {
-		return
+		return nil
 	}
 	if err := result.mutation.Abort(); err != nil {
 		pso.mu.Lock()
@@ -445,7 +450,9 @@ func (pso *PreparedStoreOperation) releaseResult(result storeOperationResult) {
 			Generation: pso.operations.epoch,
 			Err:        err,
 		})
+		return err
 	}
+	return nil
 }
 
 func (so *StoreOperations) identity(

@@ -14,6 +14,7 @@ var (
 	ErrProcessAttemptRetired     = errors.New("jobmgr containment: target generation retired")
 	ErrProcessAttemptStopped     = errors.New("jobmgr containment: process authority stopped")
 	ErrProcessAttemptSettled     = errors.New("jobmgr containment: attempt already settled")
+	ErrProcessAttemptQuarantined = errors.New("jobmgr containment: identity quarantined until process restart")
 	ErrProcessAttemptWorkerPanic = errors.New("jobmgr containment: worker panic")
 	ErrProcessAttemptFencePanic  = errors.New("jobmgr containment: containment fence panic")
 )

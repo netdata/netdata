@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/stretchr/testify/require"
 )
 
@@ -231,15 +232,23 @@ func TestAuthorityCompletionAndCutHaveOneTerminalOwner(t *testing.T) {
 func TestAuthorityContainsPanicsWithoutPublishingPanicValues(t *testing.T) {
 	diagnostics := &recordingAttemptDiagnostics{}
 	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, diagnostics)
+	identity := testIdentity(jobmgr.ProcessAttemptFunctionPoll, "module/job", "module/job")
 	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
-		Identity: testIdentity(jobmgr.ProcessAttemptFunctionPoll, "module/job", "module/job"),
+		Identity: identity,
 		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
 			panic("provider-sensitive-panic")
 		},
 	})
 	require.NoError(t, err)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptQuarantined)
 	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptWorkerPanic)
 	<-attempt.Released()
+	require.Equal(t, Census{Quarantined: 1}, authority.Census())
+	_, err = authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+	})
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
 	require.NotContains(t, diagnostics.String(), "provider-sensitive-panic")
 }
 
@@ -283,9 +292,132 @@ func TestAuthorityContainsContainmentFencePanics(t *testing.T) {
 
 	releaseWork()
 	<-attempt.Released()
-	require.Equal(t, Census{}, authority.Census())
+	require.Equal(t, Census{Quarantined: 1}, authority.Census())
 	require.Contains(t, diagnostics.String(), jobmgr.ErrProcessAttemptFencePanic.Error())
 	require.NotContains(t, diagnostics.String(), "provider-sensitive-fence-panic")
+}
+
+func TestAuthorityOrdinaryPreAdmissionErrorDoesNotQuarantine(t *testing.T) {
+	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
+	identity := testIdentity(jobmgr.ProcessAttemptJob, "module/job", "module/job")
+	rejected := errors.New("candidate rejected")
+
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
+			return rejected
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorIs(t, attempt.Await(context.Background()), rejected)
+	<-attempt.Released()
+	require.Equal(t, Census{}, authority.Census())
+
+	successor, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+	})
+	require.NoError(t, err)
+	require.NoError(t, successor.Await(context.Background()))
+	<-successor.Released()
+}
+
+func TestAuthorityRetainedPreAdmissionErrorQuarantinesOnlyIdentity(t *testing.T) {
+	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
+	identity := testIdentity(jobmgr.ProcessAttemptJob, "module/job", "module/job")
+	retained := lifecycle.RetainOwnership(errors.New("candidate cleanup failed"))
+
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
+			return retained
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptQuarantined)
+	require.False(t, lifecycle.OwnershipRetained(attempt.Await(context.Background())))
+	<-attempt.Released()
+	require.Equal(t, Census{Quarantined: 1}, authority.Census())
+
+	_, err = authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+	})
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
+
+	other, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: testIdentity(jobmgr.ProcessAttemptJob, "module/other", "module/other"),
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+	})
+	require.NoError(t, err)
+	require.NoError(t, other.Await(context.Background()))
+	<-other.Released()
+	require.Equal(t, Census{Quarantined: 1}, authority.Census())
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, authority.Shutdown(ctx))
+}
+
+func TestAuthorityAdmittedTerminalErrorQuarantinesBeforeRelease(t *testing.T) {
+	diagnostics := &recordingAttemptDiagnostics{}
+	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, diagnostics)
+	identity := testIdentity(jobmgr.ProcessAttemptJobRuntime, "module/job", "module/job")
+	admitted := make(chan error, 1)
+	release := make(chan struct{})
+
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work: func(_ context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+			admitted <- admission.Admit()
+			<-release
+			return errors.New("provider-sensitive-cleanup")
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, <-admitted)
+	require.Equal(t, Census{Active: 1, Admitted: 1}, authority.Census())
+
+	close(release)
+	<-attempt.Released()
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptQuarantined)
+	require.Equal(t, Census{Quarantined: 1}, authority.Census())
+
+	_, err = authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+	})
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
+	require.NotContains(t, diagnostics.String(), "provider-sensitive-cleanup")
+}
+
+func TestAuthorityContainedAdmittedTerminalErrorQuarantinesOnRelease(t *testing.T) {
+	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
+	identity := testIdentity(jobmgr.ProcessAttemptFunctionBundle, "module/agent", "module")
+	admitted := make(chan error, 1)
+	release := make(chan struct{})
+
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work: func(_ context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+			admitted <- admission.Admit()
+			<-release
+			return errors.New("cleanup failed")
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, <-admitted)
+	require.True(t, attempt.Cut(jobmgr.ErrProcessAttemptRetired))
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptRetired)
+	close(release)
+	<-attempt.Released()
+	require.Equal(t, Census{Quarantined: 1}, authority.Census())
+
+	_, err = authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+	})
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
 }
 
 func TestAuthorityShutdownReportsBoundedRetainedSample(t *testing.T) {

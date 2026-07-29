@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
 const (
@@ -69,10 +70,11 @@ func (p policy) valid() bool {
 
 // Census is the exact process-owned attempt accounting.
 type Census struct {
-	Active    int
-	Probing   int
-	Admitted  int
-	Contained int
+	Active      int
+	Probing     int
+	Admitted    int
+	Contained   int
+	Quarantined int
 }
 
 type attemptState uint8
@@ -91,6 +93,7 @@ type Authority struct {
 	diagnostics    jobmgr.DiagnosticObserver
 	policy         policy
 	attempts       map[identityKey]*attempt
+	quarantines    map[identityKey]struct{} // non-active identities unsafe to reuse before process exit
 	census         Census
 	retiredThrough uint64
 	stopping       bool
@@ -108,8 +111,10 @@ type attempt struct {
 	cancel   context.CancelCauseFunc
 	timer    *time.Timer
 	state    attemptState
+	admitted bool
 	result   error
 	fence    func()
+	fenceErr error
 	settled  chan struct{}
 	released chan struct{}
 }
@@ -129,6 +134,7 @@ func newAuthority(diagnostics jobmgr.DiagnosticObserver, policy policy) (*Author
 		diagnostics: diagnostics,
 		policy:      policy,
 		attempts:    make(map[identityKey]*attempt),
+		quarantines: make(map[identityKey]struct{}),
 		drained:     make(chan struct{}),
 	}, nil
 }
@@ -148,6 +154,10 @@ func (a *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
 		return nil, jobmgr.ErrProcessAttemptRetired
 	}
 	key := mapKey(plan.Identity)
+	if _, quarantined := a.quarantines[key]; quarantined {
+		a.mu.Unlock()
+		return nil, jobmgr.ErrProcessAttemptQuarantined
+	}
 	if a.attempts[key] != nil {
 		a.mu.Unlock()
 		return nil, jobmgr.ErrProcessAttemptBusy
@@ -225,6 +235,7 @@ func (at *attempt) Admit() error {
 		return jobmgr.ErrProcessAttemptSettled
 	}
 	at.state = attemptStateAdmitted
+	at.admitted = true
 	authority.census.Probing--
 	authority.census.Admitted++
 	at.timer.Stop()
@@ -271,6 +282,7 @@ func (a *Authority) cut(attempt *attempt, cause error, probingOnly bool) bool {
 	attempt.cancel(cause)
 	fenceErr := callContainmentFence(attempt.fence)
 	if fenceErr != nil {
+		attempt.fenceErr = fenceErr
 		attempt.result = errors.Join(cause, fenceErr)
 	}
 	close(attempt.settled)
@@ -328,14 +340,22 @@ func (a *Authority) finish(attempt *attempt, result error) {
 	}
 	attempt.cancel(nil)
 	previous := attempt.state
+	quarantine := (attempt.admitted && result != nil) ||
+		lifecycle.OwnershipRetained(result) ||
+		errors.Is(result, jobmgr.ErrProcessAttemptWorkerPanic) ||
+		attempt.fenceErr != nil
+	settledResult := result
+	if quarantine {
+		settledResult = quarantineAttemptResult(result, attempt.fenceErr)
+	}
 	switch previous {
 	case attemptStateProbing:
 		a.census.Probing--
-		attempt.result = result
+		attempt.result = settledResult
 		close(attempt.settled)
 	case attemptStateAdmitted:
 		a.census.Admitted--
-		attempt.result = result
+		attempt.result = settledResult
 		close(attempt.settled)
 	case attemptStateContained:
 		a.census.Contained--
@@ -345,6 +365,12 @@ func (a *Authority) finish(attempt *attempt, result error) {
 	}
 	attempt.state = attemptStateReleased
 	key := mapKey(attempt.identity)
+	if quarantine {
+		if _, exists := a.quarantines[key]; !exists {
+			a.quarantines[key] = struct{}{}
+			a.census.Quarantined++
+		}
+	}
 	if a.attempts[key] == attempt {
 		delete(a.attempts, key)
 	}
@@ -356,6 +382,7 @@ func (a *Authority) finish(attempt *attempt, result error) {
 	identity := attempt.identity
 	target := attempt.target
 	age := time.Since(attempt.started)
+	census := a.census
 	a.mu.Unlock()
 
 	if errors.Is(result, jobmgr.ErrProcessAttemptWorkerPanic) {
@@ -379,6 +406,29 @@ func (a *Authority) finish(attempt *attempt, result error) {
 			Age:        age,
 		})
 	}
+	if quarantine {
+		jobmgr.ObserveDiagnostic(a.diagnostics, jobmgr.DiagnosticEvent{
+			Level:      jobmgr.DiagnosticError,
+			Name:       "job manager attempt identity quarantined",
+			Resource:   identity.Resource,
+			State:      identity.Namespace.String(),
+			Generation: target,
+			Count:      census.Quarantined,
+			Age:        age,
+			Err:        jobmgr.ErrProcessAttemptQuarantined,
+		})
+	}
+}
+
+func quarantineAttemptResult(result, fenceErr error) error {
+	err := jobmgr.ErrProcessAttemptQuarantined
+	if errors.Is(result, jobmgr.ErrProcessAttemptWorkerPanic) {
+		err = errors.Join(err, jobmgr.ErrProcessAttemptWorkerPanic)
+	}
+	if fenceErr != nil {
+		err = errors.Join(err, jobmgr.ErrProcessAttemptFencePanic)
+	}
+	return err
 }
 
 // Await returns the first logical disposition. Caller cancellation cuts the
@@ -474,8 +524,13 @@ func (a *Authority) SupersedeProcessAttempt(
 		return errors.New("jobmgr containment: invalid supersession")
 	}
 	a.mu.Lock()
-	attempt := a.attempts[mapKey(identity)]
+	key := mapKey(identity)
+	attempt := a.attempts[key]
+	_, quarantined := a.quarantines[key]
 	a.mu.Unlock()
+	if quarantined {
+		return jobmgr.ErrProcessAttemptQuarantined
+	}
 	if attempt == nil {
 		return nil
 	}

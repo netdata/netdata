@@ -650,7 +650,7 @@ func (err dynCfgCodedAutoDetectionError) DyncfgCode() int {
 	return err.code
 }
 
-func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
+func TestDynCfgCommandsCommitFailedForQuarantinedCandidateIdentity(t *testing.T) {
 	type prepareCommand func(
 		context.Context,
 		*DynCfgJobController,
@@ -760,10 +760,21 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 			}
 
 			transaction, err := test.prepare(context.Background(), controller, target, record, scope, permit)
-			require.Nil(t, transaction)
-			require.True(t, lifecycle.OwnershipRetained(err))
-			census := permitTasks.LongLivedCensus()
-			require.EqualValues(t, 1, census.Active)
+			require.NoError(t, err)
+			applied, err := transaction.Apply(context.Background())
+			require.NoError(t, err)
+			_, disposition, current := applied.Ownership()
+			require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+			require.Nil(t, current)
+			require.Equal(t, 503, applied.ResultStatus())
+
+			record, exists = graph.Lookup(config.FullName())
+			require.True(t, exists)
+			require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, permitTasks.LongLivedCensus())
+			attempts, ok := controller.factory.config.Attempts.(*containment.Authority)
+			require.True(t, ok)
+			require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
 		})
 	}
 }

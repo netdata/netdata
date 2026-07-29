@@ -36,7 +36,8 @@ func (dcjc *DynCfgJobController) prepareAdd(
 	}
 	if _, err := dcjc.runConfigOperation(ctx, config, configOperationValidate, true); err != nil {
 		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-			errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+			errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
+			errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
 			return dcjc.noop(
 				scope,
 				current,
@@ -148,7 +149,8 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 				return nil, err
 			}
 			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
+				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
 				return dcjc.noop(
 					scope,
 					current,
@@ -193,6 +195,31 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 	if err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
+		}
+		if errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+			failedPostimage := postimage
+			failedPostimage.Status = dyncfg.StatusFailed.String()
+			return dcjc.prepareMutationWithRetryAfterApply(
+				scope,
+				current,
+				nil,
+				permit,
+				resourceRemovalDisposition(current),
+				&failedPostimage,
+				mustDynCfgMessage(
+					503,
+					"config update is unavailable until the plugin restarts.",
+				),
+				dcjc.updateCleanup(
+					target,
+					request,
+					oldConfig,
+					failedPostimage,
+					dyncfg.StatusFailed,
+				),
+				autoDetectionRetryToken{},
+				nil,
+			)
 		}
 		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
 			errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
@@ -268,7 +295,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			},
 		)
 	}
-	return dcjc.prepareMutationWithActivationBusy(
+	return dcjc.prepareMutationWithActivationFallbacks(
 		scope,
 		current,
 		successor,
@@ -278,11 +305,20 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		cleanup,
 		autoDetectionRetryToken{},
 		nil,
-		activationBusyPlan{
+		activationFallbackPlan{
 			postimage: &failedPostimage,
 			result: mustDynCfgMessage(
 				503,
 				"config update is busy; retry the command.",
+			),
+			cleanup:    failedCleanup,
+			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
+		},
+		activationFallbackPlan{
+			postimage: &failedPostimage,
+			result: mustDynCfgMessage(
+				503,
+				"config update is unavailable until the plugin restarts.",
 			),
 			cleanup:    failedCleanup,
 			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
@@ -403,6 +439,24 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
+		if errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+			failedPostimage := graphConfig(record, dyncfg.StatusFailed)
+			return dcjc.prepareMutationWithRetryAfterApply(
+				scope,
+				current,
+				nil,
+				permit,
+				resourceRemovalDisposition(current),
+				&failedPostimage,
+				mustDynCfgMessage(
+					503,
+					"job activation is unavailable until the plugin restarts.",
+				),
+				dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
+				autoDetectionRetryToken{},
+				nil,
+			)
+		}
 		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
 			errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
 			return dcjc.noop(
@@ -467,7 +521,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 			},
 		)
 	}
-	return dcjc.prepareMutationWithActivationBusy(
+	return dcjc.prepareMutationWithActivationFallbacks(
 		scope,
 		current,
 		successor,
@@ -477,11 +531,20 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 		dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusRunning),
 		autoDetectionRetryToken{},
 		nil,
-		activationBusyPlan{
+		activationFallbackPlan{
 			postimage: &failedPostimage,
 			result: mustDynCfgMessage(
 				503,
 				"job activation is busy; retry the command.",
+			),
+			cleanup:    dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
+			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
+		},
+		activationFallbackPlan{
+			postimage: &failedPostimage,
+			result: mustDynCfgMessage(
+				503,
+				"job activation is unavailable until the plugin restarts.",
 			),
 			cleanup:    dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
 			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),

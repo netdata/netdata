@@ -120,6 +120,49 @@ func TestDiscoveredBusyRetainsPendingDesiredAndRetriesOnRelease(t *testing.T) {
 	require.Equal(t, config.FullName(), plans[0].Transaction.ID)
 }
 
+func TestDiscoveredQuarantinedCandidateCommitsFailedWithoutPendingRetry(t *testing.T) {
+	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+	controller.factory.config.Attempts = quarantinedPendingJobAuthority{}
+
+	config := autoDetectionRetryTestConfig("job")
+	config.SetSourceType(confgroup.TypeUser)
+	config.SetSource("user")
+	config.SetProvider("user")
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+	}
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{
+			Config: config,
+			Status: dyncfg.StatusRunning,
+		},
+		nil,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, current)
+
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	controller.scheduler.pending.mu.Lock()
+	pending := controller.scheduler.pending.entries[config.FullName()]
+	controller.scheduler.pending.mu.Unlock()
+	require.Nil(t, pending)
+}
+
 func TestFreshDesiredConfigCancelsDifferentPendingReplacement(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	incumbent := autoDetectionRetryTestConfig("job")
@@ -361,6 +404,34 @@ func TestAbsentPendingDoesNotRestartRunningJob(t *testing.T) {
 
 type busyPendingJobAuthority struct {
 	release <-chan struct{}
+}
+
+type quarantinedPendingJobAuthority struct{}
+
+func (quarantinedPendingJobAuthority) StartProcessAttempt(
+	jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	return nil, errors.New("test: quarantined pending job attempt started")
+}
+
+func (quarantinedPendingJobAuthority) SupersedeProcessAttempt(
+	context.Context,
+	jobmgr.ProcessAttemptIdentity,
+) error {
+	return jobmgr.ErrProcessAttemptQuarantined
+}
+
+func (quarantinedPendingJobAuthority) CutProcessAttempt(
+	jobmgr.ProcessAttemptIdentity,
+	error,
+) bool {
+	return false
+}
+
+func (quarantinedPendingJobAuthority) ProcessAttemptReleased(
+	jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return nil, false
 }
 
 func (bpja busyPendingJobAuthority) StartProcessAttempt(

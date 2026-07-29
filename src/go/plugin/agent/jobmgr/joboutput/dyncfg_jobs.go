@@ -154,7 +154,8 @@ func (dcjc *DynCfgJobController) Handle(
 			}
 			code := 422
 			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
+				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
 				code = 503
 			}
 			return dynCfgMessage(code, err.Error())
@@ -179,7 +180,8 @@ func (dcjc *DynCfgJobController) Handle(
 			}
 			code := 500
 			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
+				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
 				code = 503
 			}
 			return dynCfgMessage(code, err.Error())

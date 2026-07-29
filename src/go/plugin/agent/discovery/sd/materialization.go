@@ -24,6 +24,9 @@ type materializationError struct {
 }
 
 func (err *materializationError) Error() string {
+	if err != nil && errors.Is(err.cause, jobmgr.ErrProcessAttemptQuarantined) {
+		return "service discovery configuration is unavailable until the plugin restarts"
+	}
 	return "service discovery configuration is busy; retry the command"
 }
 
@@ -93,7 +96,8 @@ func classifyMaterializationError(
 ) error {
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
-		errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
+		errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) ||
+		errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
 		return &materializationError{cause: err, identity: identity}
 	}
 	return err

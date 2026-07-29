@@ -89,6 +89,65 @@ func TestSecretDependentStartCommitsFailedAndWaitsForBusyRuntimeRelease(t *testi
 	commands.waitForSubmissions(t, 1)
 }
 
+func TestSecretDependentStartCommitsFailedWithoutRetryForQuarantinedRuntime(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	delegate := controller.factory.config.Attempts.(*containment.Authority)
+	controller.factory.config.Attempts = runtimeQuarantinedTestAuthority{delegate: delegate}
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(nil, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+	controller.factory.config.Modules = controller.modules
+	controller.configModules.config.Modules = controller.modules
+
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider(confgroup.TypeDyncfg)
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+
+	work, startState, err := controller.PlanSecretDependentStart(config.FullName())
+	require.NoError(t, err)
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+	}
+	transaction, err := work.Transaction.Prepare(
+		context.Background(),
+		nil,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, current)
+	require.ErrorIs(t, startState.Err(), jobmgr.ErrProcessAttemptQuarantined)
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	require.Eventually(t, func() bool {
+		return delegate.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
+	require.EqualValues(t, 1, state.collectorCleanup)
+
+	controller.scheduler.pending.mu.Lock()
+	pending := controller.scheduler.pending.entries[config.FullName()]
+	controller.scheduler.pending.mu.Unlock()
+	require.Nil(t, pending)
+}
+
 func TestSecretDependentStopCommitsFailedBeforeRestart(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	config := factoryTestConfig(false)
@@ -167,6 +226,39 @@ func TestSecretDependentStartRetainsAbsentPendingAfterExternalDeadline(t *testin
 type runtimeBusyPendingAuthority struct {
 	delegate jobmgr.ProcessAttemptAuthority
 	release  <-chan struct{}
+}
+
+type runtimeQuarantinedTestAuthority struct {
+	delegate jobmgr.ProcessAttemptAuthority
+}
+
+func (rqta runtimeQuarantinedTestAuthority) StartProcessAttempt(
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		return nil, jobmgr.ErrProcessAttemptQuarantined
+	}
+	return rqta.delegate.StartProcessAttempt(plan)
+}
+
+func (rqta runtimeQuarantinedTestAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	return rqta.delegate.SupersedeProcessAttempt(ctx, identity)
+}
+
+func (rqta runtimeQuarantinedTestAuthority) CutProcessAttempt(
+	identity jobmgr.ProcessAttemptIdentity,
+	cause error,
+) bool {
+	return rqta.delegate.CutProcessAttempt(identity, cause)
+}
+
+func (rqta runtimeQuarantinedTestAuthority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return rqta.delegate.ProcessAttemptReleased(identity)
 }
 
 func (rbpa runtimeBusyPendingAuthority) StartProcessAttempt(

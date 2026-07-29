@@ -185,10 +185,11 @@ func TestRunMetricsProjectsProcessAttemptCensus(t *testing.T) {
 		require.NoError(t, metrics.refreshProjection())
 		reader := metrics.store.Read(metrix.ReadRaw())
 		for name, value := range map[string]int{
-			"process_attempts_active":    want.Active,
-			"process_attempts_probing":   want.Probing,
-			"process_attempts_admitted":  want.Admitted,
-			"process_attempts_contained": want.Contained,
+			"process_attempts_active":      want.Active,
+			"process_attempts_probing":     want.Probing,
+			"process_attempts_admitted":    want.Admitted,
+			"process_attempts_contained":   want.Contained,
+			"process_attempts_quarantined": want.Quarantined,
 		} {
 			got, ok := reader.Value(runtimeMetricPrefix+"."+name, nil)
 			require.True(t, ok, name)
@@ -242,6 +243,23 @@ func TestRunMetricsProjectsProcessAttemptCensus(t *testing.T) {
 	releaseOnce.Do(func() { close(release) })
 	<-attempt.Released()
 	assertCensus(containment.Census{})
+
+	quarantined, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		Identity: jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module/quarantined",
+			Resource:  "module/quarantined",
+		},
+		Target: 1,
+		Work: func(_ context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+			require.NoError(t, admission.Admit())
+			return errors.New("cleanup failed")
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorIs(t, quarantined.Await(context.Background()), jobmgr.ErrProcessAttemptQuarantined)
+	<-quarantined.Released()
+	assertCensus(containment.Census{Quarantined: 1})
 }
 
 func TestRunMetricsOwnerUpdatesDoNotAllocate(t *testing.T) {

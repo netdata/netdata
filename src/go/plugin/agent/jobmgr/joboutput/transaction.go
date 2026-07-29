@@ -14,25 +14,26 @@ import (
 )
 
 type ResourceTransactionSpec struct {
-	Scope                  lifecycle.ResourceTransactionScope       // identity of current + successor slots this txn spans
-	Disposition            lifecycle.ResourceTransactionDisposition // Unchanged / Installed / Removed / Replaced
-	Current                lifecycle.ReadyResource                  // running resource to stop/finalize (Removed/Replaced)
-	Successor              lifecycle.PreparedResource               // prepared job to start/publish (Installed/Replaced)
-	UnusedPermit           lifecycle.LongLivedPermit                // permit to abort when a successor slot goes unused
-	Graph                  *dyncfg.Graph                            // dyncfg graph whose postimage is committed on apply
-	Mutation               dyncfg.GraphMutation                     // prepared graph mutation (valid when MutationPrepared)
-	MutationPrepared       bool                                     // Mutation is owned and must be committed or aborted
-	AfterGraphCommit       func()                                   // fires after the primary graph commit
-	AfterApply             func()                                   // fires after the whole transaction applies
-	ActivationBusyFallback *ResourceActivationBusyFallback          // postimage after incumbent removal + busy promotion
-	Result                 lifecycle.SealedResult                   // sealed dyncfg response for the caller
-	Cleanup                lifecycle.TaskCleanup                    // protocol-frame cleanup emitted on success
+	Scope                         lifecycle.ResourceTransactionScope       // identity of current + successor slots this txn spans
+	Disposition                   lifecycle.ResourceTransactionDisposition // Unchanged / Installed / Removed / Replaced
+	Current                       lifecycle.ReadyResource                  // running resource to stop/finalize (Removed/Replaced)
+	Successor                     lifecycle.PreparedResource               // prepared job to start/publish (Installed/Replaced)
+	UnusedPermit                  lifecycle.LongLivedPermit                // permit to abort when a successor slot goes unused
+	Graph                         *dyncfg.Graph                            // dyncfg graph whose postimage is committed on apply
+	Mutation                      dyncfg.GraphMutation                     // prepared graph mutation (valid when MutationPrepared)
+	MutationPrepared              bool                                     // Mutation is owned and must be committed or aborted
+	AfterGraphCommit              func()                                   // fires after the primary graph commit
+	AfterApply                    func()                                   // fires after the whole transaction applies
+	ActivationBusyFallback        *ResourceActivationFallback              // postimage after incumbent removal + busy promotion
+	ActivationQuarantinedFallback *ResourceActivationFallback              // postimage after incumbent removal + quarantine
+	Result                        lifecycle.SealedResult                   // sealed dyncfg response for the caller
+	Cleanup                       lifecycle.TaskCleanup                    // protocol-frame cleanup emitted on success
 }
 
-// ResourceActivationBusyFallback is the graph/resource outcome used when a
-// successor cannot acquire a still-live installed-runtime identity after the
-// incumbent has been logically removed.
-type ResourceActivationBusyFallback struct {
+// ResourceActivationFallback is the graph/resource outcome used when a
+// successor cannot acquire its installed-runtime identity after the incumbent
+// has been logically removed.
+type ResourceActivationFallback struct {
 	Change           dyncfg.GraphChange // failed or removed graph postimage
 	AfterGraphCommit func()             // commits source/dependency projections
 	AfterApply       func()             // records pending/retry state
@@ -322,10 +323,7 @@ func (prt *PreparedResourceTransaction) Apply(
 			}
 		}
 		if err != nil {
-			if spec.ActivationBusyFallback != nil &&
-				errors.Is(err, jobmgr.ErrProcessAttemptBusy) &&
-				current == nil {
-				fallback := spec.ActivationBusyFallback
+			if fallback := activationFallback(spec, err); fallback != nil && current == nil {
 				spec.Result = fallback.Result
 				spec.Cleanup = fallback.Cleanup
 				if mutationOwned {
@@ -414,6 +412,20 @@ func (prt *PreparedResourceTransaction) Apply(
 		spec.AfterApply()
 	}
 	return applied, nil
+}
+
+func activationFallback(
+	spec ResourceTransactionSpec,
+	err error,
+) *ResourceActivationFallback {
+	switch {
+	case errors.Is(err, jobmgr.ErrProcessAttemptQuarantined):
+		return spec.ActivationQuarantinedFallback
+	case errors.Is(err, jobmgr.ErrProcessAttemptBusy):
+		return spec.ActivationBusyFallback
+	default:
+		return nil
+	}
 }
 
 func commitGraphMutation(graph *dyncfg.Graph, mutation dyncfg.GraphMutation) (resultErr error) {
@@ -509,15 +521,21 @@ func validateResourceTransactionSpec(spec ResourceTransactionSpec) error {
 	if spec.Successor != nil && spec.UnusedPermit.Valid() {
 		return errors.New("job output: transaction owns both successor and unused permit")
 	}
-	if fallback := spec.ActivationBusyFallback; fallback != nil {
+	for _, fallback := range []*ResourceActivationFallback{
+		spec.ActivationBusyFallback,
+		spec.ActivationQuarantinedFallback,
+	} {
+		if fallback == nil {
+			continue
+		}
 		if spec.Successor == nil ||
 			spec.Graph == nil ||
 			fallback.Change.ID != spec.Scope.ID ||
 			fallback.Cleanup == nil {
-			return errors.New("job output: invalid activation-busy fallback")
+			return errors.New("job output: invalid activation fallback")
 		}
 		if fallback.Change.Config != nil && fallback.Change.Config.ID != spec.Scope.ID {
-			return errors.New("job output: activation-busy fallback config differs from scope")
+			return errors.New("job output: activation fallback config differs from scope")
 		}
 	}
 	switch spec.Disposition {
