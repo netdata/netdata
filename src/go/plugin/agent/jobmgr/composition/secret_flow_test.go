@@ -488,12 +488,20 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 		require.FailNow(t, "test failed", "dependent stop did not reach collector cleanup")
 	}
 
-	_, writeStringErr2 := io.WriteString(writer, "FUNCTION_CANCEL secret-cancel\n")
+	_, writeStringErr2 := io.WriteString(
+		writer,
+		"FUNCTION_CANCEL secret-cancel\n"+
+			"FUNCTION secret-cancel-barrier invalid \"missing:route\" 0xFFFF \"user=test\"\n",
+	)
 	require.NoError(t, writeStringErr2)
+	// Pipe writes acknowledge byte consumption, so a following processed
+	// command is the barrier that makes the preceding cancellation authoritative.
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel-barrier 400 application/json")
 
 	releaseOnce.Do(func() { close(releaseStop) })
 	waitSecretStart(t, starts, "replacement")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
+	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-cancel 200 application/json")
 
 	require.EqualValues(t, 1, cleanups.Load())
 
