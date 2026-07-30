@@ -336,6 +336,47 @@ func TestBearerTokenFileOutsideK8sSuppression(t *testing.T) {
 	require.Empty(t, req.Header.Get("Authorization"))
 }
 
+func TestOptionalK8sTokenFileError(t *testing.T) {
+	tests := map[string]struct {
+		path      string
+		insideK8s bool
+		err       error
+		want      bool
+	}{
+		"missing secret outside Kubernetes": {
+			path: "/var/run/secrets/netdata-test-missing-token",
+			err:  os.ErrNotExist,
+			want: true,
+		},
+		"missing secret inside Kubernetes": {
+			path:      "/var/run/secrets/netdata-test-missing-token",
+			insideK8s: true,
+			err:       os.ErrNotExist,
+		},
+		"missing file outside the secrets directory": {
+			path: "/tmp/netdata-test-missing-token",
+			err:  os.ErrNotExist,
+		},
+		"permission failure": {
+			path: "/var/run/secrets/netdata-test-token",
+			err:  os.ErrPermission,
+		},
+		"oversized file": {
+			path: "/var/run/secrets/netdata-test-token",
+			err:  safefile.ErrTooLarge,
+		},
+		"non-regular file": {
+			path: "/var/run/secrets/netdata-test-token",
+			err:  safefile.ErrNotRegular,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, isOptionalK8sTokenFileError(tc.path, tc.insideK8s, tc.err))
+		})
+	}
+}
+
 func TestNewHTTPRequestWithPath(t *testing.T) {
 	tests := map[string]struct {
 		config  RequestConfig

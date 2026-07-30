@@ -5,6 +5,7 @@
 package safefile
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -66,14 +67,30 @@ func Read(path string) (data []byte, err error) {
 		return nil, newFileError("read", path, ErrTooLarge)
 	}
 
-	data, err = io.ReadAll(io.LimitReader(file, MaxSize+1))
+	data, err = readBounded(file, info.Size())
 	if err != nil {
 		return nil, newFileError("read", path, err)
 	}
-	if int64(len(data)) > MaxSize {
-		return nil, newFileError("read", path, ErrTooLarge)
-	}
 	return data, nil
+}
+
+func readBounded(r io.Reader, size int64) ([]byte, error) {
+	if size < 0 {
+		size = 0
+	}
+	if size > MaxSize {
+		size = MaxSize
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, int(size)+bytes.MinRead))
+	n, err := buf.ReadFrom(io.LimitReader(r, MaxSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if n > MaxSize {
+		return nil, ErrTooLarge
+	}
+	return buf.Bytes(), nil
 }
 
 func newFileError(op, path string, err error) error {

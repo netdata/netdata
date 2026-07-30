@@ -89,9 +89,9 @@ x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConf
 
 ### Configured credential and TLS files
 
-`web` bearer-token files and `tlscfg` CA, certificate, and key files use `src/go/pkg/safefile`. The helper opens the path
-once, verifies the opened object is a regular file, reads at most 1 MiB, and closes it. Symlinks to regular files are
-supported; non-regular objects and larger files are rejected.
+`web` bearer-token files and `tlscfg` CA files use `src/go/pkg/safefile`; certificate and key files use it when both are
+configured. The helper opens the path once, verifies the opened object is a regular file, reads at most 1 MiB, and closes
+it. Symlinks to regular files are supported; non-regular objects and larger files are rejected.
 
 Use `safefile.Read` for new bounded credential or key-material paths that share this contract. Do not add a separate
 preflight followed by `os.ReadFile`: that checks a different filesystem object and leaves the production read unbounded.

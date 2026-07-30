@@ -43,8 +43,8 @@ Each discovery cycle, the discoverer:
 - **Response size** is capped at 10 MiB.
 - A DynCfg **test** performs one complete fetch only when `method` is empty/default or exactly `GET`. It uses the configured authentication, headers, TLS, proxy, redirects, and timeout; requires HTTP 200; and parses every returned item. Redirects can make up to 10 HTTP requests. The test discards the targets without evaluating `services:` rules or creating jobs. Other configured methods are intentionally validation-only.
 - **One-shot mode** (`interval: 0`) fetches a single time when the pipeline starts. It does **not** refetch on SD reload — recreate the pipeline to refresh.
-- **`bearer_token_file`** under `/var/run/secrets/` is treated as optional when Netdata is **not** running in Kubernetes (so the same config can be used in a Helm deployment without erroring out on dev hosts).
-- Bearer-token, TLS CA, TLS certificate, and TLS key files must resolve to regular files no larger than 1 MiB. Symlinks to regular files are supported.
+- A missing **`bearer_token_file`** under `/var/run/secrets/` is treated as optional when Netdata is **not** running in Kubernetes (so the same config can be used in a Helm deployment without erroring out on dev hosts).
+- Bearer-token and TLS CA files must resolve to regular files no larger than 1 MiB. When both `tls_cert` and `tls_key` are configured, each file has the same requirement. Symlinks to regular files are supported.
 - The discoverer does not introspect the items it received — anything beyond what the upstream endpoint provides must be inferred via service rules.
 
 
@@ -109,7 +109,7 @@ With `auto`, the decoder uses `Content-Type` when it is unambiguous (`applicatio
 <a id="option-headers-username-password-bearer-token-file-proxy-url-tls-skip-verify-etc"></a>
 ##### headers / username / password / bearer_token_file / proxy_url / tls_skip_verify / etc.
 
-See any go.d HTTP-based collector (`httpcheck`, `prometheus`, `nginx`, …) for the full set. Bearer-token, TLS CA, TLS certificate, and TLS key paths must resolve to regular files no larger than 1 MiB; symlinks to regular files are supported. When `bearer_token_file` points under `/var/run/secrets/` and Netdata is **not** running inside Kubernetes, missing token files are silently ignored.
+See any go.d HTTP-based collector (`httpcheck`, `prometheus`, `nginx`, …) for the full set. Bearer-token and TLS CA paths must resolve to regular files no larger than 1 MiB. When both `tls_cert` and `tls_key` are configured, each path has the same requirement. Symlinks to regular files are supported. When `bearer_token_file` points under `/var/run/secrets/` and Netdata is **not** running inside Kubernetes, a missing token file is silently ignored.
 
 
 

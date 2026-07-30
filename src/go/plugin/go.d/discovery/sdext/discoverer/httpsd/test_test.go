@@ -311,6 +311,40 @@ func TestDiscovererTestClosesResponseAndIdleConnections(t *testing.T) {
 	assert.True(t, transport.idleClosed.Load())
 }
 
+func TestDiscovererTestHonorsCallerCancellation(t *testing.T) {
+	started := make(chan struct{}, 1)
+	transport := &testTransport{
+		waitForContext: true,
+		started:        started,
+	}
+	d := newTestDiscoverer(t, web.HTTPConfig{
+		RequestConfig: web.RequestConfig{URL: "http://127.0.0.1/discovery"},
+		ClientConfig:  web.ClientConfig{Timeout: confopt.Duration(200 * time.Millisecond)},
+	})
+	d.client.Transport = transport
+
+	ctx, cancel := context.WithCancel(t.Context())
+	result := make(chan error, 1)
+	go func() {
+		result <- d.Test(ctx)
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("HTTP discovery test did not start its request")
+	}
+	cancel()
+
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, context.Canceled)
+		assert.True(t, transport.idleClosed.Load())
+	case <-time.After(time.Second):
+		t.Fatal("HTTP discovery test did not honor caller cancellation")
+	}
+}
+
 func newTestDiscoverer(t *testing.T, cfg web.HTTPConfig) *Discoverer {
 	t.Helper()
 	d, err := NewDiscoverer(Config{HTTPConfig: cfg})
@@ -336,10 +370,17 @@ type testTransport struct {
 	responseBody   io.ReadCloser
 	err            error
 	waitForContext bool
+	started        chan struct{}
 }
 
 func (t *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	t.roundTrips.Add(1)
+	if t.started != nil {
+		select {
+		case t.started <- struct{}{}:
+		default:
+		}
+	}
 	if t.waitForContext {
 		<-req.Context().Done()
 		return nil, req.Context().Err()
