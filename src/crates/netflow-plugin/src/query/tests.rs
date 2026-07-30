@@ -5,6 +5,7 @@ use super::{
     dimensions_from_fields, field_is_raw_only, metrics_from_fields, requires_raw_tier_for_fields,
 };
 use crate::rollup::build_rollup_key;
+use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::time::Instant;
 
@@ -163,15 +164,12 @@ fn raw_tier_capabilities_cover_every_supported_grouping_field() {
 }
 
 #[test]
-fn hidden_city_coordinates_and_metric_selections_force_raw() {
+fn hidden_city_coordinates_and_vendor_fields_force_raw() {
     for field in [
         "SRC_GEO_LATITUDE",
         "SRC_GEO_LONGITUDE",
         "DST_GEO_LATITUDE",
         "DST_GEO_LONGITUDE",
-        "BYTES",
-        "PACKETS",
-        "FLOWS",
         "V9_VENDOR_FIELD",
         "IPFIX_VENDOR_FIELD",
     ] {
@@ -574,6 +572,32 @@ fn request_deserialization_rejects_removed_internal_timestamp_selection_field() 
             .contains("unsupported selection field `FLOW_END_USEC`"),
         "unexpected error: {error}"
     );
+}
+
+#[test]
+fn request_deserialization_rejects_metric_selection_fields() {
+    for (input, expected) in [
+        ("bytes", "BYTES"),
+        ("PACKETS", "PACKETS"),
+        ("Flows", "FLOWS"),
+    ] {
+        let payload = format!(
+            r#"{{
+                "view":"table-sankey",
+                "group_by":["PROTOCOL"],
+                "selections":{{"{input}":["1"]}}
+            }}"#
+        );
+        let error = serde_json::from_str::<FlowsRequest>(&payload)
+            .expect_err("metric selections must be rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("unsupported selection field `{expected}`")),
+            "unexpected error for {input}: {error}"
+        );
+    }
 }
 
 #[test]
@@ -983,7 +1007,7 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
         .expect("src facet");
 
     assert_eq!(protocol["autocomplete"], false);
-    assert_eq!(src_as["autocomplete"], true);
+    assert_eq!(src_as["autocomplete"], false);
     assert_eq!(src_as["truncated"], false);
     assert_eq!(
         protocol["values"]
@@ -1017,56 +1041,55 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
 }
 
 #[test]
-fn high_cardinality_facets_prefer_autocomplete_without_observed_values() {
+fn facet_vocabularies_omit_unselected_fields_without_retained_values() {
     let requested_fields = vec![
         "SRC_ADDR".to_string(),
         "SRC_AS_NAME".to_string(),
         "PROTOCOL".to_string(),
         "DIRECTION".to_string(),
     ];
-    let facets =
-        super::build_facet_vocabulary_payload(&requested_fields, &HashMap::new(), &BTreeMap::new());
-    let fields = facets["fields"].as_array().expect("fields array");
+    let selections = HashMap::from([("SRC_ADDR".to_string(), Vec::new())]);
+    let snapshot = BTreeMap::from([
+        (
+            "SRC_ADDR".to_string(),
+            crate::facet_runtime::FacetPublishedField::default(),
+        ),
+        (
+            "PROTOCOL".to_string(),
+            crate::facet_runtime::FacetPublishedField::default(),
+        ),
+    ]);
 
-    for (field, expected) in [
-        ("SRC_ADDR", true),
-        ("SRC_AS_NAME", true),
-        ("PROTOCOL", false),
-        ("DIRECTION", false),
-    ] {
-        let facet = fields
-            .iter()
-            .find(|entry| entry["field"] == field)
-            .unwrap_or_else(|| panic!("missing {field} facet"));
-        assert_eq!(
-            facet["autocomplete"], expected,
-            "semantic autocomplete policy drifted for {field}"
-        );
-        assert_eq!(
-            facet["truncated"], false,
-            "an empty semantic autocomplete facet is not truncated"
-        );
-    }
+    let facets = super::build_facet_vocabulary_payload(&requested_fields, &selections, &snapshot);
+
+    assert_eq!(facets["fields"], json!([]));
+    assert_eq!(facets["auto"]["facets"], json!(requested_fields));
+    assert_eq!(facets["auto"]["selections"], json!(selections));
 }
 
 #[test]
-fn facet_vocabularies_keep_selected_values_for_missing_published_field() {
-    let requested_fields = vec!["PROTOCOL".to_string()];
-    let selections = HashMap::from([(
-        "PROTOCOL".to_string(),
-        vec!["6".to_string(), "17".to_string()],
+fn facet_vocabularies_keep_selected_values_without_retained_vocabulary() {
+    let requested_fields = vec!["PROTOCOL".to_string(), "SRC_ADDR".to_string()];
+    let selections = HashMap::from([
+        (
+            "PROTOCOL".to_string(),
+            vec!["6".to_string(), "17".to_string()],
+        ),
+        ("SRC_ADDR".to_string(), vec!["192.0.2.1".to_string()]),
+    ]);
+    let snapshot = BTreeMap::from([(
+        "SRC_ADDR".to_string(),
+        crate::facet_runtime::FacetPublishedField::default(),
     )]);
 
-    let facets =
-        super::build_facet_vocabulary_payload(&requested_fields, &selections, &BTreeMap::new());
+    let facets = super::build_facet_vocabulary_payload(&requested_fields, &selections, &snapshot);
 
-    let protocol = facets["fields"]
-        .as_array()
-        .expect("fields array")
+    let fields = facets["fields"].as_array().expect("fields array");
+    let protocol = fields
         .iter()
         .find(|entry| entry["field"] == "PROTOCOL")
         .expect("protocol facet");
-    assert_eq!(protocol["total_values"], 2);
+    assert_eq!(protocol["total_values"], 0);
     assert_eq!(protocol["truncated"], false);
     assert_eq!(protocol["autocomplete"], false);
     assert_eq!(
@@ -1083,48 +1106,90 @@ fn facet_vocabularies_keep_selected_values_for_missing_published_field() {
             .collect::<Vec<_>>(),
         vec![("6", "TCP"), ("17", "UDP")]
     );
+
+    let src_addr = fields
+        .iter()
+        .find(|entry| entry["field"] == "SRC_ADDR")
+        .expect("source address facet");
+    assert_eq!(src_addr["total_values"], 0);
+    assert_eq!(src_addr["autocomplete"], false);
+    assert_eq!(
+        src_addr["values"][0],
+        json!({
+            "value": "192.0.2.1",
+            "name": "192.0.2.1",
+        })
+    );
 }
 
 #[test]
-fn facet_vocabularies_mark_autocomplete_payloads_truncated_without_extra_values() {
-    let requested_fields = vec!["PROTOCOL".to_string()];
+fn facet_vocabularies_follow_retained_vocabulary_transitions() {
+    let requested_fields = vec!["SRC_AS_NAME".to_string()];
+    let empty_snapshot = BTreeMap::from([(
+        "SRC_AS_NAME".to_string(),
+        crate::facet_runtime::FacetPublishedField::default(),
+    )]);
+    let populated_snapshot = BTreeMap::from([(
+        "SRC_AS_NAME".to_string(),
+        crate::facet_runtime::FacetPublishedField {
+            total_values: 1,
+            autocomplete: false,
+            values: vec!["AS15169 GOOGLE".to_string()],
+        },
+    )]);
+
+    let before =
+        super::build_facet_vocabulary_payload(&requested_fields, &HashMap::new(), &empty_snapshot);
+    let after_first_value = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &HashMap::new(),
+        &populated_snapshot,
+    );
+    let after_last_value =
+        super::build_facet_vocabulary_payload(&requested_fields, &HashMap::new(), &empty_snapshot);
+
+    assert_eq!(before["fields"], json!([]));
+    assert_eq!(after_first_value["fields"][0]["field"], "SRC_AS_NAME");
+    assert_eq!(after_first_value["fields"][0]["total_values"], 1);
+    assert_eq!(after_first_value["fields"][0]["autocomplete"], false);
+    assert_eq!(
+        after_first_value["fields"][0]["values"][0]["value"],
+        "AS15169 GOOGLE"
+    );
+    assert_eq!(after_last_value["fields"], json!([]));
+}
+
+#[test]
+fn facet_vocabularies_keep_published_autocomplete_fields_without_inline_values() {
+    let requested_fields = vec!["SRC_ADDR".to_string()];
     let facets = super::build_facet_vocabulary_payload(
         &requested_fields,
         &HashMap::new(),
         &BTreeMap::from([(
-            "PROTOCOL".to_string(),
+            "SRC_ADDR".to_string(),
             crate::facet_runtime::FacetPublishedField {
-                total_values: 2,
+                total_values: super::FACET_STATIC_VALUE_LIMIT + 1,
                 autocomplete: true,
-                values: vec!["17".to_string(), "6".to_string()],
+                values: Vec::new(),
             },
         )]),
     );
 
-    let protocol = facets["fields"]
-        .as_array()
-        .expect("fields array")
-        .iter()
-        .find(|entry| entry["field"] == "PROTOCOL")
-        .expect("protocol facet");
-    assert_eq!(protocol["total_values"], 2);
-    assert_eq!(protocol["truncated"], true);
-    assert_eq!(protocol["autocomplete"], true);
+    let src_addr = &facets["fields"][0];
+    assert_eq!(src_addr["field"], "SRC_ADDR");
     assert_eq!(
-        protocol["values"]
-            .as_array()
-            .expect("protocol values")
-            .iter()
-            .map(|entry| entry["value"].as_str().unwrap_or_default())
-            .collect::<Vec<_>>(),
-        vec!["6", "17"]
+        src_addr["total_values"],
+        super::FACET_STATIC_VALUE_LIMIT + 1
     );
+    assert_eq!(src_addr["autocomplete"], true);
+    assert_eq!(src_addr["truncated"], true);
+    assert_eq!(src_addr["values"], json!([]));
 }
 
 #[test]
 fn facet_vocabularies_keep_exact_value_limit_untruncated() {
     let requested_fields = vec!["SRC_AS_NAME".to_string()];
-    let published_values = (0..super::FACET_VALUE_LIMIT)
+    let published_values = (0..super::FACET_STATIC_VALUE_LIMIT)
         .rev()
         .map(|index| format!("AS{index:05} PROVIDER"))
         .collect::<Vec<_>>();
@@ -1148,8 +1213,9 @@ fn facet_vocabularies_keep_exact_value_limit_untruncated() {
         .iter()
         .find(|entry| entry["field"] == "SRC_AS_NAME")
         .expect("src_as facet");
-    assert_eq!(src_as["total_values"], super::FACET_VALUE_LIMIT);
+    assert_eq!(src_as["total_values"], super::FACET_STATIC_VALUE_LIMIT);
     assert_eq!(src_as["truncated"], false);
+    assert_eq!(src_as["autocomplete"], false);
 
     let values = src_as["values"]
         .as_array()
@@ -1157,14 +1223,14 @@ fn facet_vocabularies_keep_exact_value_limit_untruncated() {
         .iter()
         .map(|entry| entry["value"].as_str().unwrap_or_default())
         .collect::<Vec<_>>();
-    let expected_last = format!("AS{:05} PROVIDER", super::FACET_VALUE_LIMIT - 1);
-    assert_eq!(values.len(), super::FACET_VALUE_LIMIT);
+    let expected_last = format!("AS{:05} PROVIDER", super::FACET_STATIC_VALUE_LIMIT - 1);
+    assert_eq!(values.len(), super::FACET_STATIC_VALUE_LIMIT);
     assert_eq!(values.first().copied(), Some("AS00000 PROVIDER"));
     assert_eq!(values.last().copied(), Some(expected_last.as_str()));
 }
 
 #[test]
-fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_cardinality() {
+fn facet_vocabularies_keep_stale_selection_separate_from_static_vocabulary() {
     let requested_fields = vec!["SRC_AS_NAME".to_string()];
     let selections = HashMap::from([(
         "SRC_AS_NAME".to_string(),
@@ -1175,7 +1241,7 @@ fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_ca
             "AS00103 PROVIDER".to_string(),
         ],
     )]);
-    let published_values = (0..(super::FACET_VALUE_LIMIT + 5))
+    let published_values = (0..super::FACET_STATIC_VALUE_LIMIT)
         .rev()
         .map(|index| format!("AS{index:05} PROVIDER"))
         .collect::<Vec<_>>();
@@ -1198,8 +1264,9 @@ fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_ca
         .iter()
         .find(|entry| entry["field"] == "SRC_AS_NAME")
         .expect("src_as facet");
-    assert_eq!(src_as["total_values"], super::FACET_VALUE_LIMIT + 6);
-    assert_eq!(src_as["truncated"], true);
+    assert_eq!(src_as["total_values"], super::FACET_STATIC_VALUE_LIMIT);
+    assert_eq!(src_as["truncated"], false);
+    assert_eq!(src_as["autocomplete"], false);
 
     let values = src_as["values"]
         .as_array()
@@ -1207,24 +1274,12 @@ fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_ca
         .iter()
         .map(|entry| entry["value"].as_str().unwrap_or_default())
         .collect::<Vec<_>>();
-    assert_eq!(values.len(), super::FACET_VALUE_LIMIT);
-    assert_eq!(
-        &values[..4],
-        &[
-            "AS99999 SELECTED",
-            "AS00103 PROVIDER",
-            "AS00000 PROVIDER",
-            "AS00001 PROVIDER",
-        ]
-    );
-    assert!(
-        values.contains(&"AS00097 PROVIDER"),
-        "expected the sorted prefix to fill the remaining response slots"
-    );
-    assert!(
-        !values.contains(&"AS00098 PROVIDER"),
-        "expected values after the response limit to be omitted"
-    );
+    assert_eq!(values.len(), super::FACET_STATIC_VALUE_LIMIT + 1);
+    assert_eq!(&values[..2], &["AS99999 SELECTED", "AS00103 PROVIDER"]);
+    assert!((0..super::FACET_STATIC_VALUE_LIMIT).all(|index| {
+        let value = format!("AS{index:05} PROVIDER");
+        values.contains(&value.as_str())
+    }));
     assert_eq!(
         values
             .iter()
@@ -1240,6 +1295,47 @@ fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_ca
             .count(),
         1,
         "selected missing values must not be duplicated"
+    );
+}
+
+#[test]
+fn facet_vocabularies_keep_only_selections_inline_after_autocomplete_promotion() {
+    let requested_fields = vec!["SRC_AS_NAME".to_string()];
+    let selections = HashMap::from([(
+        "SRC_AS_NAME".to_string(),
+        vec![
+            "AS99999 SELECTED".to_string(),
+            "AS00103 PROVIDER".to_string(),
+            "AS99999 SELECTED".to_string(),
+            "AS00103 PROVIDER".to_string(),
+        ],
+    )]);
+
+    let facets = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &selections,
+        &BTreeMap::from([(
+            "SRC_AS_NAME".to_string(),
+            crate::facet_runtime::FacetPublishedField {
+                total_values: super::FACET_STATIC_VALUE_LIMIT + 5,
+                autocomplete: true,
+                values: Vec::new(),
+            },
+        )]),
+    );
+
+    let src_as = &facets["fields"][0];
+    assert_eq!(src_as["total_values"], super::FACET_STATIC_VALUE_LIMIT + 5);
+    assert_eq!(src_as["truncated"], true);
+    assert_eq!(src_as["autocomplete"], true);
+    assert_eq!(
+        src_as["values"]
+            .as_array()
+            .expect("src_as values")
+            .iter()
+            .map(|entry| entry["value"].as_str().unwrap_or_default())
+            .collect::<Vec<_>>(),
+        vec!["AS99999 SELECTED", "AS00103 PROVIDER"]
     );
 }
 

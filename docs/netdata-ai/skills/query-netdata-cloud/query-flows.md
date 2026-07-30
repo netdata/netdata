@@ -78,7 +78,7 @@ Verified against `src/crates/netflow-plugin/src/api/flows/handler.rs`:
 | `before` | flows | Unix seconds, upper bound. `0` = now |
 | `query` | flows | Free-text filter |
 | `selections` | flows | Pre-applied facet filters as `{ "FIELD_NAME": ["val", "val2"] }`. Common fields: `SRC_ADDR`, `DST_ADDR`, `SRC_PORT`, `DST_PORT`, `PROTOCOL`, `SRC_AS_NAME`, `DST_AS_NAME`, `SRC_COUNTRY`, `DST_COUNTRY`, `INTERFACE`, ... |
-| `facets` | flows | Array of facet field names whose value-distributions should appear in the response |
+| `facets` | flows | Array of requested facet fields. Fields with no retained values are omitted unless they have an active selection. |
 | `group_by` | flows | Up to 10 tuple-key field names (e.g. `["SRC_ADDR","DST_ADDR","PROTOCOL"]`) -- order defines the aggregation tuple |
 | `sort_by` | flows | `bytes` or `packets` |
 | `top_n` | flows | One of `25`, `50`, `100`, `200`, `500` |
@@ -116,7 +116,7 @@ envelope (same shape as topology and logs):
 | `stats` | Counters: `flows_total`, `packets_total`, `bytes_total`, etc. |
 | `metrics` | Optional metric block |
 | `warnings[]` | Optional non-fatal diagnostics |
-| `facets` | When `facets` was requested in body, per-field value-counts plus `selections` echo |
+| `facets` | Retention-wide vocabularies for requested fields. Empty unselected fields are omitted; selected fields remain. Fields with up to 256 retained values return the complete static list; larger fields set `autocomplete: true`. The mode can change as retained values enter or leave retention. `auto.facets` echoes the requested field list and `auto.selections` echoes selections. |
 
 ### `data` object -- mode `flows`, view `timeseries`
 

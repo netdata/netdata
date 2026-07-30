@@ -29,12 +29,17 @@ pub(crate) fn facet_field_requested(field: &str) -> bool {
     facet_field_enabled(field)
 }
 
+pub(crate) fn field_is_metric(field: &str) -> bool {
+    matches!(
+        field.to_ascii_uppercase().as_str(),
+        "BYTES" | "PACKETS" | "RAW_BYTES" | "RAW_PACKETS" | "FLOWS" | "SAMPLING_RATE"
+    )
+}
+
 pub(crate) fn field_is_groupable(field: &str) -> bool {
     let normalized = field.to_ascii_uppercase();
-    !matches!(
-        normalized.as_str(),
-        "BYTES" | "PACKETS" | "RAW_BYTES" | "RAW_PACKETS" | "FLOWS" | "SAMPLING_RATE"
-    ) && !normalized.starts_with('_')
+    !field_is_metric(&normalized)
+        && !normalized.starts_with('_')
         && !normalized.starts_with("V9_")
         && !normalized.starts_with("IPFIX_")
 }

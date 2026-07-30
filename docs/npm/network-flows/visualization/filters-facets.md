@@ -21,6 +21,8 @@ Around 80 fields are available as facets. They're a subset of the full 91-field 
 
 Everything else — IPs, ports, protocol, AS numbers and names, country, state, city, exporter labels, interfaces, MACs, VLANs, NAT addresses, TCP flags, ToS, etc. — is filterable.
 
+The filter ribbon shows only fields that have at least one value in the collector's retained facet vocabulary. A field appears after its first value is retained and disappears after its last value ages out. An actively selected field remains visible even when its retained vocabulary is empty, so you can clear the filter. This availability is collector-retention-wide, not limited to the time window currently shown.
+
 ## Filter logic
 
 Within a single field: **OR**. Selecting `PROTOCOL = TCP` and `PROTOCOL = UDP` shows TCP-or-UDP.
@@ -38,7 +40,7 @@ Negative matching is not supported.
 Type into a facet field and the dashboard suggests existing values from your live data. The list:
 
 - Shows up to **256 matching values**, sorted alphabetically.
-- High-cardinality fields always use autocomplete, even while the collector has observed only a few values. Fixed categorical fields stay inline while they fit within the separate 100-value inline limit.
+- Every facet uses the same retention-wide vocabulary. Facets with up to **256 retained values** return the complete static list; facets with 257 or more values switch to autocomplete. A facet can switch back to a static list when older values leave retention.
 - Matching policy is per-field. Free-form text fields (`SRC_AS_NAME`, `EXPORTER_NAME`, `IN_IF_DESCRIPTION`, MAC addresses, AS paths, BGP communities, country/city/state names) match by **substring**, so typing `Akamai` finds `AS20940 Akamai International`. IPs and short numeric fields (ports, protocols, ASN numbers, interface speeds) match by **prefix**, so typing `10.0.` narrows to that range.
 - Runs against an **in-memory snapshot of the live journal** plus on-disk FST sidecars for promoted high-cardinality fields. Autocomplete never reads the raw flow tiers, and is fast even on busy collectors.
 - The autocomplete `term` is hard-capped at 256 bytes; longer requests are rejected.

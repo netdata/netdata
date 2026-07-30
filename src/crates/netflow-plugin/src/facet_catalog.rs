@@ -12,12 +12,6 @@ pub(crate) enum FacetValueKind {
     IpAddr,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FacetPresentation {
-    Inline,
-    Autocomplete,
-}
-
 /// How the autocomplete dropdown matches user input against stored values.
 ///
 /// This is exclusively about the autocomplete/dropdown UX. Regular facet
@@ -37,7 +31,6 @@ pub(crate) enum AutocompleteMatchKind {
 pub(crate) struct FacetFieldSpec {
     pub(crate) name: &'static str,
     pub(crate) kind: FacetValueKind,
-    pub(crate) presentation: FacetPresentation,
     pub(crate) uses_sidecar: bool,
     pub(crate) autocomplete_match: AutocompleteMatchKind,
 }
@@ -46,14 +39,12 @@ const VIRTUAL_FACET_FIELDS: &[FacetFieldSpec] = &[
     FacetFieldSpec {
         name: "ICMPV4",
         kind: FacetValueKind::Text,
-        presentation: FacetPresentation::Inline,
         uses_sidecar: false,
         autocomplete_match: AutocompleteMatchKind::Substring,
     },
     FacetFieldSpec {
         name: "ICMPV6",
         kind: FacetValueKind::Text,
-        presentation: FacetPresentation::Inline,
         uses_sidecar: false,
         autocomplete_match: AutocompleteMatchKind::Substring,
     },
@@ -150,12 +141,6 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
         _ => FacetValueKind::Text,
     };
 
-    let presentation = match field {
-        "FLOW_VERSION" | "ETYPE" | "PROTOCOL" | "FORWARDING_STATUS" | "DIRECTION"
-        | "IN_IF_BOUNDARY" | "OUT_IF_BOUNDARY" | "IPTOS" | "TCP_FLAGS" | "ICMPV4_TYPE"
-        | "ICMPV4_CODE" | "ICMPV6_TYPE" | "ICMPV6_CODE" => FacetPresentation::Inline,
-        _ => FacetPresentation::Autocomplete,
-    };
     let autocomplete_match = match field {
         "SRC_PREFIX" | "DST_PREFIX" => AutocompleteMatchKind::Prefix,
         _ if matches!(kind, FacetValueKind::Text) => AutocompleteMatchKind::Substring,
@@ -165,7 +150,6 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
     Some(FacetFieldSpec {
         name: field,
         kind,
-        presentation,
         uses_sidecar: field != "DIRECTION"
             && matches!(
                 kind,
@@ -181,7 +165,7 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FACET_FIELD_SPECS, FacetPresentation, FacetValueKind, facet_field_spec};
+    use super::{FACET_FIELD_SPECS, FacetValueKind, facet_field_spec};
     use std::collections::BTreeSet;
 
     #[test]
@@ -231,40 +215,13 @@ mod tests {
     }
 
     #[test]
-    fn only_fixed_categorical_fields_prefer_inline_values() {
-        let actual = FACET_FIELD_SPECS
+    fn facet_catalog_has_expected_unique_fields() {
+        let names = FACET_FIELD_SPECS
             .iter()
-            .filter(|spec| spec.presentation == FacetPresentation::Inline)
             .map(|spec| spec.name)
             .collect::<BTreeSet<_>>();
-        let expected = [
-            "DIRECTION",
-            "ETYPE",
-            "FLOW_VERSION",
-            "FORWARDING_STATUS",
-            "ICMPV4",
-            "ICMPV4_CODE",
-            "ICMPV4_TYPE",
-            "ICMPV6",
-            "ICMPV6_CODE",
-            "ICMPV6_TYPE",
-            "IN_IF_BOUNDARY",
-            "IPTOS",
-            "OUT_IF_BOUNDARY",
-            "PROTOCOL",
-            "TCP_FLAGS",
-        ]
-        .into_iter()
-        .collect::<BTreeSet<_>>();
 
-        assert_eq!(actual, expected);
         assert_eq!(FACET_FIELD_SPECS.len(), 80);
-        assert_eq!(
-            FACET_FIELD_SPECS
-                .iter()
-                .filter(|spec| spec.presentation == FacetPresentation::Autocomplete)
-                .count(),
-            65
-        );
+        assert_eq!(names.len(), FACET_FIELD_SPECS.len());
     }
 }

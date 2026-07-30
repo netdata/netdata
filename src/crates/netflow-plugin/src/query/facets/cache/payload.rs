@@ -1,7 +1,6 @@
 use super::*;
-use crate::facet_catalog::{FacetPresentation, facet_field_spec};
 use std::borrow::Cow;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::HashSet;
 
 pub(crate) fn build_facet_vocabulary_payload(
     requested_fields: &[String],
@@ -13,23 +12,28 @@ pub(crate) fn build_facet_vocabulary_payload(
     for field in requested_fields {
         let selected_values = selections.get(field).map(Vec::as_slice).unwrap_or_default();
         let published = snapshot_fields.get(field);
-        let published_values = published
-            .map(|field| field.values.as_slice())
-            .unwrap_or_default();
-        let (rows, row_count) =
-            limited_facet_payload_rows(field, published_values, selected_values);
-
         let total_values = published
             .map(|field| field.total_values)
-            .unwrap_or_default()
-            .max(row_count);
-        let promoted_to_autocomplete = published
-            .map(|field| field.autocomplete)
             .unwrap_or_default();
-        let autocomplete = facet_field_spec(field)
-            .is_some_and(|spec| spec.presentation == FacetPresentation::Autocomplete)
-            || promoted_to_autocomplete;
-        let truncated = promoted_to_autocomplete || total_values > FACET_VALUE_LIMIT;
+        if selected_values.is_empty() && total_values == 0 {
+            continue;
+        }
+
+        let autocomplete = total_values > FACET_STATIC_VALUE_LIMIT;
+        debug_assert_eq!(
+            published
+                .map(|field| field.autocomplete)
+                .unwrap_or_default(),
+            autocomplete
+        );
+        let published_values = if autocomplete {
+            &[]
+        } else {
+            published
+                .map(|field| field.values.as_slice())
+                .unwrap_or_default()
+        };
+        let rows = facet_payload_rows(field, published_values, selected_values);
 
         let values = rows
             .into_iter()
@@ -45,7 +49,7 @@ pub(crate) fn build_facet_vocabulary_payload(
             "field": field,
             "name": presentation::field_display_name(field),
             "total_values": total_values,
-            "truncated": truncated,
+            "truncated": autocomplete,
             "autocomplete": autocomplete,
             "overflowed": false,
             "overflow_records": 0,
@@ -54,7 +58,7 @@ pub(crate) fn build_facet_vocabulary_payload(
     }
 
     json!({
-        "value_limit": FACET_VALUE_LIMIT,
+        "value_limit": FACET_STATIC_VALUE_LIMIT,
         "overflowed_fields": 0,
         "overflowed_records": 0,
         "fields": fields,
@@ -84,11 +88,11 @@ impl PartialOrd for FacetPayloadRow<'_> {
     }
 }
 
-fn limited_facet_payload_rows<'a>(
+fn facet_payload_rows<'a>(
     field: &str,
     published_values: &'a [String],
     selected_values: &'a [String],
-) -> (Vec<FacetPayloadRow<'a>>, usize) {
+) -> Vec<FacetPayloadRow<'a>> {
     let mut selected_ranks = HashMap::with_capacity(selected_values.len());
     for (rank, value) in selected_values.iter().enumerate() {
         selected_ranks.entry(value.as_str()).or_insert(rank);
@@ -110,34 +114,20 @@ fn limited_facet_payload_rows<'a>(
         }
     }
 
-    let row_count = published_values.len() + missing_selected.len();
-
-    if row_count <= FACET_VALUE_LIMIT {
-        let mut rows = Vec::with_capacity(row_count);
-        rows.extend(
-            published_values
-                .iter()
-                .map(|value| facet_payload_row(field, value, &selected_ranks)),
-        );
-        rows.extend(
-            missing_selected
-                .iter()
-                .copied()
-                .map(|value| facet_payload_row(field, value, &selected_ranks)),
-        );
-        rows.sort();
-        return (rows, row_count);
-    }
-
-    let mut rows = BinaryHeap::with_capacity(FACET_VALUE_LIMIT);
-    for value in published_values {
-        push_limited_facet_payload_row(&mut rows, facet_payload_row(field, value, &selected_ranks));
-    }
-    for value in missing_selected {
-        push_limited_facet_payload_row(&mut rows, facet_payload_row(field, value, &selected_ranks));
-    }
-
-    (rows.into_sorted_vec(), row_count)
+    let mut rows = Vec::with_capacity(published_values.len() + missing_selected.len());
+    rows.extend(
+        published_values
+            .iter()
+            .map(|value| facet_payload_row(field, value, &selected_ranks)),
+    );
+    rows.extend(
+        missing_selected
+            .iter()
+            .copied()
+            .map(|value| facet_payload_row(field, value, &selected_ranks)),
+    );
+    rows.sort();
+    rows
 }
 
 fn facet_payload_row<'a>(
@@ -151,25 +141,6 @@ fn facet_payload_row<'a>(
             .map(Cow::Owned)
             .unwrap_or(Cow::Borrowed(value)),
         selected_rank: selected_ranks.get(value).copied(),
-    }
-}
-
-fn push_limited_facet_payload_row<'a>(
-    rows: &mut BinaryHeap<FacetPayloadRow<'a>>,
-    row: FacetPayloadRow<'a>,
-) {
-    if rows.len() < FACET_VALUE_LIMIT {
-        rows.push(row);
-        return;
-    }
-
-    let replaces_worst = rows
-        .peek()
-        .map(|worst| compare_facet_payload_rows(&row, worst) == Ordering::Less)
-        .unwrap_or(false);
-    if replaces_worst {
-        let _ = rows.pop();
-        rows.push(row);
     }
 }
 

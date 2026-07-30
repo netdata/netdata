@@ -9,9 +9,9 @@ use crate::facet_catalog::{
 use crate::flow::FlowRecord;
 use crate::memory_estimation::btree_container_overhead_bytes;
 use crate::query::{
-    FACET_CACHE_JOURNAL_WINDOW_SIZE, FACET_VALUE_LIMIT, accumulate_simple_closed_file_facet_values,
-    accumulate_targeted_facet_values, facet_field_requires_protocol_scan,
-    virtual_flow_field_dependencies,
+    FACET_CACHE_JOURNAL_WINDOW_SIZE, FACET_STATIC_VALUE_LIMIT,
+    accumulate_simple_closed_file_facet_values, accumulate_targeted_facet_values,
+    facet_field_requires_protocol_scan, virtual_flow_field_dependencies,
 };
 use anyhow::{Context, Result, bail};
 use journal_sdk_core::file::JournalFileMap;
@@ -792,12 +792,12 @@ impl FacetState {
             version,
             indexed_archived_paths,
             archived_fields: mut persisted_archived_fields,
-            mut published,
+            published: mut persisted_published,
         } = persisted;
         let direction_migration_pending = version == DIRECTION_MIGRATION_SOURCE_VERSION;
         if direction_migration_pending {
             persisted_archived_fields.remove("DIRECTION");
-            published.remove("DIRECTION");
+            persisted_published.remove("DIRECTION");
         }
         let mut archived_fields = empty_field_stores();
         for (field, saved) in persisted_archived_fields {
@@ -810,19 +810,55 @@ impl FacetState {
             );
         }
 
-        let mut published = if published.is_empty() {
-            published_snapshot_from_archived_and_active_contributions(
-                &archived_fields,
-                &BTreeMap::new(),
-            )
-        } else {
-            FacetPublishedSnapshot { fields: published }
-        };
-        if direction_migration_pending {
-            published.fields.insert(
-                "DIRECTION".to_string(),
-                published_field_from_store(archived_fields.get("DIRECTION")),
-            );
+        // Published values include active journals, whose contributions are
+        // rebuilt immediately after startup. Reuse only internally complete
+        // persisted fields, and derive everything else from archived stores so
+        // presentation-threshold changes take effect safely after an upgrade.
+        let mut published = published_snapshot_from_archived_and_active_contributions(
+            &archived_fields,
+            &BTreeMap::new(),
+        );
+        for (field, saved) in persisted_published {
+            if facet_field_spec(field.as_str()).is_none() {
+                continue;
+            }
+            let Some(archived) = published.fields.get(field.as_str()) else {
+                continue;
+            };
+            if saved.total_values < archived.total_values {
+                continue;
+            }
+
+            if saved.total_values > FACET_STATIC_VALUE_LIMIT {
+                published.fields.insert(
+                    field,
+                    FacetPublishedField {
+                        total_values: saved.total_values,
+                        autocomplete: true,
+                        values: Vec::new(),
+                    },
+                );
+                continue;
+            }
+
+            let mut values = saved.values;
+            values.sort_unstable();
+            values.dedup();
+            let complete = values.len() == saved.total_values
+                && archived
+                    .values
+                    .iter()
+                    .all(|value| values.binary_search(value).is_ok());
+            if complete {
+                published.fields.insert(
+                    field,
+                    FacetPublishedField {
+                        total_values: saved.total_values,
+                        autocomplete: false,
+                        values,
+                    },
+                );
+            }
         }
 
         Self {
@@ -961,7 +997,7 @@ fn published_snapshot_from_archived_and_active_contributions(
             }
         }
         let total_values = combined.len();
-        let autocomplete = total_values > FACET_VALUE_LIMIT;
+        let autocomplete = total_values > FACET_STATIC_VALUE_LIMIT;
         let values = if autocomplete {
             Vec::new()
         } else {
@@ -982,7 +1018,7 @@ fn published_snapshot_from_archived_and_active_contributions(
 
 fn published_field_from_store(store: Option<&FacetStore>) -> FacetPublishedField {
     let total_values = store.map(FacetStore::len).unwrap_or_default();
-    let autocomplete = total_values > FACET_VALUE_LIMIT;
+    let autocomplete = total_values > FACET_STATIC_VALUE_LIMIT;
     let values = if autocomplete {
         Vec::new()
     } else {
@@ -1016,7 +1052,7 @@ fn apply_new_active_value_to_published(
         .or_insert_with(FacetPublishedField::default);
 
     entry.total_values = entry.total_values.saturating_add(1);
-    if entry.total_values > FACET_VALUE_LIMIT {
+    if entry.total_values > FACET_STATIC_VALUE_LIMIT {
         entry.autocomplete = true;
         entry.values.clear();
         return;
@@ -2008,7 +2044,7 @@ mod tests {
             )
             .expect("observe protocol contribution");
 
-        for asn in 0..=FACET_VALUE_LIMIT {
+        for asn in 0..=FACET_STATIC_VALUE_LIMIT {
             let mut fields = FlowFields::new();
             fields.insert("SRC_AS_NAME", format!("AS{asn:05} Provider-{asn:03}"));
             runtime
@@ -2023,7 +2059,7 @@ mod tests {
             runtime.cardinality_snapshot(),
             FacetCardinalitySnapshot {
                 populated_fields: 2,
-                total_values: (FACET_VALUE_LIMIT as u64) + 2,
+                total_values: (FACET_STATIC_VALUE_LIMIT as u64) + 2,
                 exposed_values: 1,
                 autocomplete_fields: 1,
             }
@@ -2034,7 +2070,7 @@ mod tests {
     fn archive_only_published_rebuild_uses_archived_values_and_autocomplete_threshold() {
         let mut archived_fields = empty_field_stores();
 
-        for asn in 0..=FACET_VALUE_LIMIT {
+        for asn in 0..=FACET_STATIC_VALUE_LIMIT {
             let mut fields = FlowFields::new();
             fields.insert("SRC_AS_NAME", format!("AS{asn:05} Provider-{asn:03}"));
             merge_global_contribution(
@@ -2052,7 +2088,7 @@ mod tests {
             .get("SRC_AS_NAME")
             .expect("src as name field");
 
-        assert_eq!(src_as_name.total_values, FACET_VALUE_LIMIT + 1);
+        assert_eq!(src_as_name.total_values, FACET_STATIC_VALUE_LIMIT + 1);
         assert!(
             src_as_name.autocomplete,
             "archive-only rebuild must preserve autocomplete promotion"
@@ -2061,6 +2097,106 @@ mod tests {
             src_as_name.values.is_empty(),
             "autocomplete-promoted archive-only fields must not publish inline values"
         );
+    }
+
+    #[test]
+    fn persisted_state_rebuilds_derived_presentation_metadata() {
+        const ARCHIVED_VALUES: usize = 100;
+        let retained_values = (0..ARCHIVED_VALUES)
+            .map(|asn| format!("AS{asn:05} Provider-{asn:03}"))
+            .collect::<Vec<_>>();
+        let mut state = FacetState::from_persisted(PersistedFacetState {
+            version: FACET_STATE_VERSION,
+            indexed_archived_paths: BTreeSet::new(),
+            archived_fields: BTreeMap::from([(
+                "SRC_AS_NAME".to_string(),
+                PersistedFacetStore::Text(retained_values),
+            )]),
+            published: BTreeMap::from([(
+                "SRC_AS_NAME".to_string(),
+                FacetPublishedField {
+                    total_values: FACET_STATIC_VALUE_LIMIT,
+                    autocomplete: true,
+                    values: Vec::new(),
+                },
+            )]),
+        });
+
+        let src_as_name = state
+            .published
+            .fields
+            .get("SRC_AS_NAME")
+            .expect("src as name field");
+        assert_eq!(src_as_name.total_values, ARCHIVED_VALUES);
+        assert!(!src_as_name.autocomplete);
+        assert_eq!(src_as_name.values.len(), ARCHIVED_VALUES);
+
+        let mut active_contribution = FacetFileContribution::default();
+        for asn in ARCHIVED_VALUES..FACET_STATIC_VALUE_LIMIT {
+            active_contribution
+                .insert_text_static("SRC_AS_NAME", &format!("AS{asn:05} Provider-{asn:03}"));
+        }
+        state.active_contributions.insert(
+            "/tmp/flows-threshold-active.journal".to_string(),
+            active_contribution,
+        );
+        rebuild_published_fields(&mut state);
+
+        let rebuilt = state
+            .published
+            .fields
+            .get("SRC_AS_NAME")
+            .expect("rebuilt src as name field");
+        assert_eq!(rebuilt.total_values, FACET_STATIC_VALUE_LIMIT);
+        assert!(!rebuilt.autocomplete);
+        assert_eq!(rebuilt.values.len(), FACET_STATIC_VALUE_LIMIT);
+    }
+
+    #[test]
+    fn published_snapshot_promotes_and_demotes_with_retained_cardinality() {
+        let mut promoted_contribution = FacetFileContribution::default();
+        for asn in 0..=FACET_STATIC_VALUE_LIMIT {
+            promoted_contribution
+                .insert_text_static("SRC_AS_NAME", &format!("AS{asn:05} Provider-{asn:03}"));
+        }
+        let mut active_contributions = BTreeMap::from([(
+            "/tmp/flows-threshold.journal".to_string(),
+            promoted_contribution,
+        )]);
+
+        let promoted = published_snapshot_from_archived_and_active_contributions(
+            &empty_field_stores(),
+            &active_contributions,
+        );
+        let promoted_field = promoted
+            .fields
+            .get("SRC_AS_NAME")
+            .expect("promoted src as name");
+        assert_eq!(promoted_field.total_values, FACET_STATIC_VALUE_LIMIT + 1);
+        assert!(promoted_field.autocomplete);
+        assert!(promoted_field.values.is_empty());
+
+        let mut demoted_contribution = FacetFileContribution::default();
+        for asn in 0..FACET_STATIC_VALUE_LIMIT {
+            demoted_contribution
+                .insert_text_static("SRC_AS_NAME", &format!("AS{asn:05} Provider-{asn:03}"));
+        }
+        active_contributions.insert(
+            "/tmp/flows-threshold.journal".to_string(),
+            demoted_contribution,
+        );
+
+        let demoted = published_snapshot_from_archived_and_active_contributions(
+            &empty_field_stores(),
+            &active_contributions,
+        );
+        let demoted_field = demoted
+            .fields
+            .get("SRC_AS_NAME")
+            .expect("demoted src as name");
+        assert_eq!(demoted_field.total_values, FACET_STATIC_VALUE_LIMIT);
+        assert!(!demoted_field.autocomplete);
+        assert_eq!(demoted_field.values.len(), FACET_STATIC_VALUE_LIMIT);
     }
 
     #[test]
@@ -2431,19 +2567,20 @@ mod tests {
     fn runtime_autocomplete_reads_promoted_archived_sidecar_values() {
         let tmp = tempfile::tempdir().expect("create temp dir");
         let runtime = FacetRuntime::new(tmp.path());
-        let archived_path = Path::new("/tmp/flows-promoted.journal");
+        let archived_path = tmp.path().join("flows-promoted.journal");
+        let active_path = tmp.path().join("flows-promoted-next.journal");
 
-        for value in 0..120 {
+        for value in 0..=FACET_STATIC_VALUE_LIMIT {
             let mut fields = FlowFields::new();
             fields.insert("SRC_AS_NAME", format!("AS{value:03} EXAMPLE"));
             let contribution = facet_contribution_from_flow_fields(&fields);
             runtime
-                .observe_active_contribution(archived_path, &contribution)
+                .observe_active_contribution(&archived_path, &contribution)
                 .expect("observe contribution");
         }
 
         runtime
-            .observe_rotation(archived_path, Path::new("/tmp/flows-promoted-next.journal"))
+            .observe_rotation(&archived_path, &active_path)
             .expect("rotate file");
 
         let results = runtime
@@ -2970,7 +3107,7 @@ mod tests {
         let runtime = FacetRuntime::new_read_only(tmp.path());
         let archived_path = tmp.path().join("flows-promoted.journal");
 
-        for value in 0..120 {
+        for value in 0..=FACET_STATIC_VALUE_LIMIT {
             let mut fields = FlowFields::new();
             fields.insert("SRC_AS_NAME", format!("AS{value:03} EXAMPLE"));
             let contribution = facet_contribution_from_flow_fields(&fields);
@@ -3011,7 +3148,7 @@ mod tests {
         let archived_path = tmp.path().join("flows-promoted.journal");
         let runtime = FacetRuntime::new(tmp.path());
 
-        for value in 0..120 {
+        for value in 0..=FACET_STATIC_VALUE_LIMIT {
             let mut fields = FlowFields::new();
             fields.insert("SRC_AS_NAME", format!("AS{value:03} EXAMPLE"));
             let contribution = facet_contribution_from_flow_fields(&fields);
@@ -3092,24 +3229,22 @@ mod tests {
     fn runtime_autocomplete_text_substring_survives_archive_promotion() {
         let tmp = tempfile::tempdir().expect("create temp dir");
         let runtime = FacetRuntime::new(tmp.path());
-        let archived_path = Path::new("/tmp/flows-substring-archived.journal");
+        let archived_path = tmp.path().join("flows-substring-archived.journal");
+        let active_path = tmp.path().join("flows-substring-archived-next.journal");
 
-        for asn in 0..120u32 {
+        for asn in 0..=FACET_STATIC_VALUE_LIMIT as u32 {
             let mut fields = FlowFields::new();
             fields.insert("SRC_AS_NAME", format!("AS{asn:05} Akamai-{asn:03}"));
             runtime
                 .observe_active_contribution(
-                    archived_path,
+                    &archived_path,
                     &facet_contribution_from_flow_fields(&fields),
                 )
                 .expect("observe contribution");
         }
 
         runtime
-            .observe_rotation(
-                archived_path,
-                Path::new("/tmp/flows-substring-archived-next.journal"),
-            )
+            .observe_rotation(&archived_path, &active_path)
             .expect("rotate file");
 
         let results = runtime
@@ -3131,16 +3266,16 @@ mod tests {
         let tmp = tempfile::tempdir().expect("create temp dir");
         let runtime = FacetRuntime::new(tmp.path());
 
-        // Two journals, each promoted to sidecar by inserting >FACET_VALUE_LIMIT
+        // Two journals, each promoted to sidecar by exceeding the static-value limit.
         // distinct values. Each sidecar has only 30 entries that match the
         // search term, so neither alone can fill FACET_AUTOCOMPLETE_LIMIT (256)
         // and the loop must reach both sidecars.
         let paths = [
-            Path::new("/tmp/flows-multi-a.journal"),
-            Path::new("/tmp/flows-multi-b.journal"),
+            tmp.path().join("flows-multi-a.journal"),
+            tmp.path().join("flows-multi-b.journal"),
         ];
         for (idx, journal_path) in paths.iter().enumerate() {
-            for asn in 0..120u32 {
+            for asn in 0..=FACET_STATIC_VALUE_LIMIT as u32 {
                 let mut fields = FlowFields::new();
                 let unique_asn = asn + (idx as u32) * 1000;
                 let label = if asn < 30 {
@@ -3156,11 +3291,9 @@ mod tests {
                     )
                     .expect("observe contribution");
             }
+            let active_path = tmp.path().join(format!("flows-multi-{idx}-rot.journal"));
             runtime
-                .observe_rotation(
-                    journal_path,
-                    Path::new(&format!("/tmp/flows-multi-{idx}-rot.journal")),
-                )
+                .observe_rotation(journal_path, &active_path)
                 .expect("rotate file");
         }
 
@@ -3260,9 +3393,8 @@ mod tests {
         let runtime = FacetRuntime::new(tmp.path());
         let archived_path = Path::new("/tmp/flows-threshold.journal");
 
-        // FACET_VALUE_LIMIT == 100; promotion fires only when total_values > 100.
-        // Insert exactly 100 values: should NOT promote, archived in-memory store wins.
-        for asn in 0..100u32 {
+        // Promotion fires only after the complete static vocabulary no longer fits.
+        for asn in 0..FACET_STATIC_VALUE_LIMIT as u32 {
             let mut fields = FlowFields::new();
             fields.insert("SRC_AS_NAME", format!("AS{asn:05} Provider-{asn:03}"));
             runtime
