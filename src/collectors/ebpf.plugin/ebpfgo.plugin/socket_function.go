@@ -62,11 +62,15 @@ func (s *socketFunctionStore) snapshot() (socketGlobalPublish, bool) {
 // fnStore may be nil when the socket module is disabled.
 func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, closeStop func()) {
 	defer closeStop()
-	sc := bufio.NewScanner(os.Stdin)
-	// Default 64 KB limit would kill the plugin on an oversized FUNCTION line.
-	sc.Buffer(make([]byte, 4096), 1<<20)
-	for sc.Scan() {
-		line := sc.Text()
+	rd := bufio.NewReaderSize(os.Stdin, 1<<20)
+	for {
+		line, err := readBoundedLine(rd)
+		if err != nil {
+			return
+		}
+		if line == "" {
+			continue // empty or oversized line — skip
+		}
 		switch {
 		case line == "QUIT":
 			return
@@ -85,6 +89,36 @@ func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, close
 			default:
 				sendFunctionError(api, uid, 404, "unknown function: "+name)
 			}
+		}
+	}
+}
+
+// readBoundedLine reads one complete line from rd. Lines exceeding 1 MiB are
+// discarded — all chunks are consumed but ("", nil) is returned — so the
+// dispatcher continues with the next request instead of shutting down.
+// ("", err) signals EOF or a real I/O error and the caller should exit.
+func readBoundedLine(rd *bufio.Reader) (string, error) {
+	const limit = 1 << 20
+	var sb strings.Builder
+	accumulated := 0
+	oversized := false
+	for {
+		part, isPrefix, err := rd.ReadLine()
+		if err != nil {
+			return "", err
+		}
+		accumulated += len(part)
+		if accumulated > limit {
+			oversized = true
+		}
+		if !oversized {
+			sb.Write(part)
+		}
+		if !isPrefix {
+			if oversized {
+				return "", nil
+			}
+			return sb.String(), nil
 		}
 	}
 }

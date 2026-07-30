@@ -112,11 +112,11 @@ static bool netdata_ebpfgo_shared_pid_memory_open(
     if (fstat(ctx->shm_fd, &st) != 0)
         goto fail;
 
-    /* Reject segments not owned by our own UID.  The producer (ebpfgo.plugin)
-     * runs as the same user as the consumers (apps.plugin, cgroups.plugin,
-     * network-viewer.plugin).  Any other owner means an unauthorized local
-     * process created the segment to inject arbitrary data or trigger an OOM
-     * allocation in all consumers. */
+    /* Reject segments not owned by our real UID.  The producer (ebpfgo.plugin)
+     * runs setuid-root but transfers SHM ownership to its real UID via fchown,
+     * so st_uid matches the real UID of every consumer.  Any other owner means
+     * an unauthorized local process created the segment to inject arbitrary
+     * data or trigger an OOM allocation in all consumers. */
     if (st.st_uid != getuid())
         goto fail;
 

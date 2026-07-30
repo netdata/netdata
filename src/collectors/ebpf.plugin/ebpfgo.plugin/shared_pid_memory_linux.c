@@ -102,6 +102,9 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
         return false;
     /* Mark created before any further steps; close() unlinks on any failure path. */
     ctx->shm_name_created = true;
+    /* Transfer ownership to real UID so consumers can verify the producer. */
+    if (fchown(ctx->shm_fd, getuid(), getgid()) != 0)
+        return false;
 
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         return false;
@@ -175,6 +178,9 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
     if (ctx->shm_fd >= 0) {
         reused = false;
         ctx->shm_name_created = true;
+        /* Transfer ownership to real UID so consumers can verify the producer. */
+        if (fchown(ctx->shm_fd, getuid(), getgid()) != 0)
+            goto fail;
     } else if (errno == EEXIST) {
         ctx->shm_fd = shm_open(ctx->shm_name, O_RDWR, 0);
         if (ctx->shm_fd < 0)
@@ -202,6 +208,9 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
             goto fail;
         reused = false;
         ctx->shm_name_created = true;
+        /* Transfer ownership to real UID so consumers can verify the producer. */
+        if (fchown(ctx->shm_fd, getuid(), getgid()) != 0)
+            goto fail;
     }
 
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
