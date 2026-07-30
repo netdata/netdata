@@ -185,6 +185,9 @@ func (store *SecretStore) Test(
 	if cause := context.Cause(ctx); cause != nil {
 		return true, cause
 	}
+	if errors.Is(err, dyncfg.ErrTestUnsupported) {
+		return false, nil
+	}
 	if err != nil {
 		return true, err
 	}

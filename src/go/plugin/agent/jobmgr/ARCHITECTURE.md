@@ -896,6 +896,9 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
   capability. After each callback returns, the shared Pipeline Test boundary makes the caller's cancellation cause take
   precedence over the discoverer result. Discoverers classify their configured timeouts but need not repeat caller
   cancellation checks.
+- A Testable discoverer can return `dyncfg.ErrTestUnsupported` when the resource type has an operational test but the
+  configured instance cannot run it safely. The pipeline continues testing later discoverers and reports the aggregate
+  as validation-only; the sentinel does not turn real failures into success.
 - Resource-authored parsing, construction, and operational failures retain their causes internally but cross one
   sanitized response/diagnostic boundary. Unmarked failures render only their generic phase. A `dyncfg.PublicError`
   may add static, code-authored detail; its public message must never derive from submitted/resolved values, endpoints,
@@ -904,10 +907,12 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
 - A discoverer without the capability produces an explicit validation-only success. Configuration/construction
   failures return 400, operational failures return 422, and busy/contained attempts return 503.
 - Operational guarantees are discoverer-specific. Docker performs a one-item container-list query. `net_listeners`
-  executes and parses one production helper snapshot, then discards the targets without rule rendering, cache
-  reconciliation, publication, or installation. Its process count and elapsed time are bounded to one invocation and the
-  caller/configured timeout; work and buffered output still scale with the host socket/process inventory. Other shipped
-  discoverers currently remain validation-only.
+  executes and parses one production helper snapshot. HTTP performs one production fetch only for empty/default or exact
+  `GET`: it uses the configured request/client path, requires HTTP 200, enforces the 10 MiB response limit, and parses all
+  targets. Redirect handling permits at most ten actual requests. These tests discard targets without rule rendering,
+  cache reconciliation, publication, or installation. A non-empty HTTP method other than exact `GET`, plus Kubernetes
+  and SNMP, remains validation-only. Local-listener process count and elapsed time are bounded to one invocation and the
+  caller/configured timeout; its work and buffered output still scale with the host socket/process inventory.
 - File-backed stock/user state keeps one latest pending retry after a busy/contained result; synchronous DynCfg
   commands do not.
 - The complete service-discovery DynCfg Function is also contained, so a non-cooperative command cannot pin the

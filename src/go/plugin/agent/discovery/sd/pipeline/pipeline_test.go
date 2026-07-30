@@ -111,6 +111,36 @@ func TestPipeline_Test(t *testing.T) {
 		require.Equal(t, []string{"capable"}, calls)
 	})
 
+	t.Run("continues after a configured discoverer does not support a test", func(t *testing.T) {
+		var calls []string
+		p := &Pipeline{discoverers: []model.Discoverer{
+			&pipelineTestDiscoverer{name: "unsupported", calls: &calls, err: dyncfg.ErrTestUnsupported},
+			&pipelineTestDiscoverer{name: "capable", calls: &calls},
+		}}
+
+		fullyTested, err := p.Test(t.Context())
+
+		require.NoError(t, err)
+		require.False(t, fullyTested)
+		require.Equal(t, []string{"unsupported", "capable"}, calls)
+	})
+
+	t.Run("does not hide a later operational failure after an unsupported test", func(t *testing.T) {
+		testErr := errors.New("unavailable")
+		var calls []string
+		p := &Pipeline{discoverers: []model.Discoverer{
+			&pipelineTestDiscoverer{name: "unsupported", calls: &calls, err: dyncfg.ErrTestUnsupported},
+			&pipelineTestDiscoverer{name: "failure", calls: &calls, err: testErr},
+		}}
+
+		fullyTested, err := p.Test(t.Context())
+
+		require.False(t, fullyTested)
+		require.ErrorIs(t, err, testErr)
+		require.NotErrorIs(t, err, dyncfg.ErrTestUnsupported)
+		require.Equal(t, []string{"unsupported", "failure"}, calls)
+	})
+
 	t.Run("stops at the first operational failure", func(t *testing.T) {
 		testErr := errors.New("unavailable")
 		var calls []string
@@ -169,6 +199,29 @@ func TestPipeline_Test(t *testing.T) {
 		require.NotErrorIs(t, err, resourceErr)
 		_, hasPublicMessage := dyncfg.PublicMessage(err)
 		require.False(t, hasPublicMessage)
+		require.Equal(t, []string{"first"}, calls)
+	})
+
+	t.Run("caller cancellation wins an unsupported result", func(t *testing.T) {
+		cancelCause := errors.New("test request superseded")
+		ctx, cancel := context.WithCancelCause(t.Context())
+		var calls []string
+		p := &Pipeline{discoverers: []model.Discoverer{
+			&pipelineTestDiscoverer{
+				name:  "first",
+				calls: &calls,
+				test: func(context.Context) error {
+					cancel(cancelCause)
+					return dyncfg.ErrTestUnsupported
+				},
+			},
+		}}
+
+		fullyTested, err := p.Test(ctx)
+
+		require.False(t, fullyTested)
+		require.ErrorIs(t, err, cancelCause)
+		require.NotErrorIs(t, err, dyncfg.ErrTestUnsupported)
 		require.Equal(t, []string{"first"}, calls)
 	})
 }

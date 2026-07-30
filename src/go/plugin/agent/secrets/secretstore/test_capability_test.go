@@ -44,6 +44,21 @@ func TestSecretStoreTestCapability(t *testing.T) {
 		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
 	})
 
+	t.Run("reports validation only when the configured Store does not support a test", func(t *testing.T) {
+		state := &testCapabilityState{err: dyncfg.ErrTestUnsupported}
+		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
+			return &testCapableStore{state: state}
+		})
+
+		tested, err := store.Test(t.Context(), catalog, testCapabilityConfig())
+
+		require.NoError(t, err)
+		require.False(t, tested)
+		require.Equal(t, 1, state.calls)
+		require.Equal(t, "configured", state.value)
+		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
+	})
+
 	t.Run("returns an operational failure as a tested result", func(t *testing.T) {
 		testErr := errors.New("provider unavailable")
 		state := &testCapabilityState{err: testErr}
@@ -125,6 +140,28 @@ func TestSecretStoreTestCapability(t *testing.T) {
 		require.NotErrorIs(t, err, providerErr)
 		_, hasPublicMessage := dyncfg.PublicMessage(err)
 		require.False(t, hasPublicMessage)
+		require.Equal(t, 1, state.calls)
+		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
+	})
+
+	t.Run("caller cancellation wins an unsupported result", func(t *testing.T) {
+		cancelCause := errors.New("test request superseded")
+		ctx, cancel := context.WithCancelCause(t.Context())
+		state := &testCapabilityState{
+			test: func(context.Context) error {
+				cancel(cancelCause)
+				return dyncfg.ErrTestUnsupported
+			},
+		}
+		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
+			return &testCapableStore{state: state}
+		})
+
+		tested, err := store.Test(ctx, catalog, testCapabilityConfig())
+
+		require.True(t, tested)
+		require.ErrorIs(t, err, cancelCause)
+		require.NotErrorIs(t, err, dyncfg.ErrTestUnsupported)
 		require.Equal(t, 1, state.calls)
 		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
 	})

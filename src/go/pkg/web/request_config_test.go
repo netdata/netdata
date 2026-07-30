@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +31,7 @@ func TestRequest_Copy(t *testing.T) {
 					"X-Api-Key": "secret",
 				},
 				Username:      "username",
-				Password:      "password",
+				Password:      "test-password",
 				ProxyUsername: "proxy_username",
 				ProxyPassword: "proxy_password",
 			},
@@ -92,7 +94,7 @@ func TestNewHTTPRequest(t *testing.T) {
 	// Create a temporary file for bearer token test
 	tmpDir := t.TempDir()
 	bearerTokenFile := filepath.Join(tmpDir, "token")
-	err := os.WriteFile(bearerTokenFile, []byte("test-bearer-token"), 0644)
+	err := os.WriteFile(bearerTokenFile, []byte("test-token"), 0o644)
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -159,7 +161,7 @@ func TestNewHTTPRequest(t *testing.T) {
 			},
 			validate: func(t *testing.T, req *http.Request, cfg RequestConfig) {
 				auth := req.Header.Get("Authorization")
-				assert.Equal(t, "Bearer test-bearer-token", auth)
+				assert.Equal(t, "Bearer test-token", auth)
 			},
 		},
 		"bearer token file not found": {
@@ -180,7 +182,7 @@ func TestNewHTTPRequest(t *testing.T) {
 			validate: func(t *testing.T, req *http.Request, cfg RequestConfig) {
 				// Should have bearer token, not basic auth
 				auth := req.Header.Get("Authorization")
-				assert.Equal(t, "Bearer test-bearer-token", auth)
+				assert.Equal(t, "Bearer test-token", auth)
 
 				// Basic auth should not be set
 				_, _, ok := req.BasicAuth()
@@ -277,6 +279,61 @@ func TestNewHTTPRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBearerTokenFileBounds(t *testing.T) {
+	t.Run("accepts a regular file at the limit", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "token")
+		token := strings.Repeat("t", int(safefile.MaxSize))
+		require.NoError(t, os.WriteFile(path, []byte(token), 0o600))
+
+		req, err := NewHTTPRequest(RequestConfig{
+			URL:             "http://example.com",
+			BearerTokenFile: path,
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, "Bearer "+token, req.Header.Get("Authorization"))
+	})
+
+	t.Run("rejects a regular file over the limit", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "token")
+		require.NoError(t, os.WriteFile(path, make([]byte, safefile.MaxSize+1), 0o600))
+
+		_, err := NewHTTPRequest(RequestConfig{
+			URL:             "http://example.com",
+			BearerTokenFile: path,
+		})
+
+		require.ErrorIs(t, err, safefile.ErrFile)
+		require.ErrorIs(t, err, safefile.ErrTooLarge)
+	})
+
+	t.Run("rejects a non-regular opened object", func(t *testing.T) {
+		path := t.TempDir()
+
+		_, err := NewHTTPRequest(RequestConfig{
+			URL:             "http://example.com",
+			BearerTokenFile: path,
+		})
+
+		require.ErrorIs(t, err, safefile.ErrFile)
+		require.ErrorIs(t, err, safefile.ErrNotRegular)
+	})
+}
+
+func TestBearerTokenFileOutsideK8sSuppression(t *testing.T) {
+	if hostinfo.IsInsideK8sCluster() {
+		t.Skip("suppression applies only outside Kubernetes")
+	}
+
+	req, err := NewHTTPRequest(RequestConfig{
+		URL:             "http://example.com",
+		BearerTokenFile: "/var/run/secrets/netdata-test-missing-token",
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, req.Header.Get("Authorization"))
 }
 
 func TestNewHTTPRequestWithPath(t *testing.T) {

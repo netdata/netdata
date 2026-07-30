@@ -27,6 +27,7 @@ SD_PAGE = {
     "jump_to": [
         {"label": "How it works", "anchor": "how-it-works"},
         {"label": "Configuration file structure", "anchor": "configuration-file-structure"},
+        {"label": "Testing configurations", "anchor": "testing-configurations"},
         {"label": "Rule evaluation semantics", "anchor": "rule-evaluation-semantics"},
         {"label": "Template helper reference", "anchor": "template-helper-reference"},
         {"label": "config_template rendering", "anchor": "config_template-rendering"},
@@ -85,6 +86,14 @@ services:
             "`disabled: yes` keeps the file on disk but turns the pipeline off.",
             "Editing a stock file requires restarting the agent. UI-managed pipelines apply live.",
             "Where each discoverer's stock conf ships (with the Netdata package, with the Helm chart, or not at all) is documented on its per-discoverer page.",
+        ],
+    },
+    "testing": {
+        "heading": "## Testing configurations",
+        "body": [
+            "Testing a UI-managed pipeline builds a complete temporary pipeline but does not publish targets, install jobs, or make the configuration persistent. The response says explicitly when only configuration validation was possible.",
+            "Operational guarantees depend on the discoverer. Docker runs one bounded container-list query. Local-listener discovery runs and parses one helper snapshot. HTTP discovery runs one complete production fetch only when `method` is empty/default or exactly `GET`; it uses the configured authentication, headers, TLS, proxy, redirects, and timeout, requires HTTP 200, enforces the 10 MiB response limit, and parses every returned item. Redirect handling can issue at most 10 requests.",
+            "The HTTP test discards the parsed targets. It does not evaluate `services:` rules, render or validate collector jobs, publish targets, or install jobs. A non-empty HTTP method other than exact `GET`, plus Kubernetes and SNMP, is intentionally validation-only.",
         ],
     },
     "rule_eval": {
@@ -358,6 +367,7 @@ def build_page_context() -> Dict[str, Any]:
         ),
         "how_it_works": SD_PAGE["how_it_works"],
         "config_file": SD_PAGE["config_file"],
+        "testing": SD_PAGE["testing"],
         "rule_eval": SD_PAGE["rule_eval"],
         "helpers": SD_PAGE["helpers"],
         "config_template": SD_PAGE["config_template"],

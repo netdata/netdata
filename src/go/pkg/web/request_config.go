@@ -9,12 +9,12 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
 // RequestConfig is the configuration of the HTTP request.
@@ -119,7 +119,7 @@ func setAuthentication(req *http.Request, cfg RequestConfig) error {
 }
 
 func setBearerTokenAuth(req *http.Request, tokenFile string) error {
-	tokenBs, err := os.ReadFile(tokenFile)
+	tokenBs, err := safefile.Read(tokenFile)
 	if err != nil {
 		// Ignore K8s service account token errors when running outside the cluster
 		if strings.HasPrefix(tokenFile, "/var/run/secrets/") && !hostinfo.IsInsideK8sCluster() {
