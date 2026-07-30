@@ -27,6 +27,7 @@ func TestSecretStoreTestCapability(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, tested)
 		require.Equal(t, 1, state.calls)
+		require.Equal(t, "configured", state.value)
 		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
 	})
 
@@ -54,6 +55,24 @@ func TestSecretStoreTestCapability(t *testing.T) {
 		require.True(t, tested)
 		require.ErrorIs(t, err, testErr)
 		require.Equal(t, 1, state.calls)
+		require.Equal(t, "configured", state.value)
+		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
+	})
+
+	t.Run("rejects an already-canceled request before Store creation", func(t *testing.T) {
+		var creates int
+		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
+			creates++
+			return &testValidationOnlyStore{}
+		})
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		tested, err := store.Test(ctx, catalog, testCapabilityConfig())
+
+		require.False(t, tested)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Zero(t, creates)
 		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
 	})
 }
@@ -92,6 +111,7 @@ func testCapabilityConfig() secretstore.Config {
 type testCapabilityState struct {
 	calls int
 	err   error
+	value string
 }
 
 type testCapableStore struct {
@@ -115,6 +135,7 @@ func (s *testCapableStore) Publish() secretstore.PublishedStore {
 
 func (s *testCapableStore) Test(context.Context) error {
 	s.state.calls++
+	s.state.value = s.config.Value
 	return s.state.err
 }
 

@@ -159,6 +159,7 @@ func (store *SecretStore) Test(
 	if store == nil || ctx == nil || catalog == nil {
 		return false, errors.New("secretstore: invalid test")
 	}
+	// Atomic resolution rejects cancellation before Store construction or Init.
 	configured, err := configureStore(ctx, store.resolver, cfg, catalog.New)
 	if err != nil {
 		return false, err

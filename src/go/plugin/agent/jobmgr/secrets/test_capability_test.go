@@ -20,7 +20,7 @@ import (
 func TestStoreOperationRunsOptionalOperationalTest(t *testing.T) {
 	testErr := errors.New("provider unavailable")
 	state := &storeTestCapabilityState{err: testErr}
-	operations, store, attempts := newStoreTestCapabilityOperations(t, func() secretstore.Store {
+	operations, attempts := newStoreTestCapabilityOperations(t, func() secretstore.Store {
 		return &storeTestCapableProvider{state: state}
 	})
 	stage, err := operations.prepare(storeOperationSpec{
@@ -37,7 +37,7 @@ func TestStoreOperationRunsOptionalOperationalTest(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		stage.Release()
-		shutdownStoreTestCapabilityOperations(t, store, attempts)
+		shutdownStoreTestCapabilityAttempts(t, attempts)
 	})
 	stage.Start()
 	select {
@@ -119,10 +119,10 @@ func TestSecretStoreTestResponseClassification(t *testing.T) {
 
 func TestSecretStoreTestQuarantineIsUnavailable(t *testing.T) {
 	state := &storeTestCapabilityState{panicOnTest: true}
-	operations, store, attempts := newStoreTestCapabilityOperations(t, func() secretstore.Store {
+	operations, attempts := newStoreTestCapabilityOperations(t, func() secretstore.Store {
 		return &storeTestCapableProvider{state: state}
 	})
-	defer shutdownStoreTestCapabilityOperations(t, store, attempts)
+	defer shutdownStoreTestCapabilityAttempts(t, attempts)
 	controller, target := newStoreTestCapabilityController(t)
 
 	for range 2 {
@@ -160,7 +160,7 @@ func TestSecretStoreTestQuarantineIsUnavailable(t *testing.T) {
 func newStoreTestCapabilityOperations(
 	t *testing.T,
 	create func() secretstore.Store,
-) (*StoreOperations, *secretstore.SecretStore, *containment.Authority) {
+) (*StoreOperations, *containment.Authority) {
 	t.Helper()
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
@@ -184,12 +184,11 @@ func newStoreTestCapabilityOperations(
 		Creators: catalog,
 	})
 	require.NoError(t, err)
-	return operations, store, attempts
+	return operations, attempts
 }
 
-func shutdownStoreTestCapabilityOperations(
+func shutdownStoreTestCapabilityAttempts(
 	t *testing.T,
-	store *secretstore.SecretStore,
 	attempts *containment.Authority,
 ) {
 	t.Helper()
@@ -197,7 +196,6 @@ func shutdownStoreTestCapabilityOperations(
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	require.NoError(t, attempts.Shutdown(ctx))
-	require.NoError(t, store.Close(context.Background()))
 }
 
 func newStoreTestCapabilityController(

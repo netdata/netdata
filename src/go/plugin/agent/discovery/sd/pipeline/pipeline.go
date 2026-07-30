@@ -87,6 +87,7 @@ func (p *Pipeline) registerDiscoverers(conf Config, makeDiscoverers DiscovererFa
 // Test runs the optional operational test of every configured discoverer.
 // The bool reports whether every discoverer provided an operational test.
 func (p *Pipeline) Test(ctx context.Context) (bool, error) {
+	// Test is a public capability boundary and rejects invalid operands.
 	if p == nil || ctx == nil {
 		return false, errors.New("service discovery pipeline: invalid test")
 	}
