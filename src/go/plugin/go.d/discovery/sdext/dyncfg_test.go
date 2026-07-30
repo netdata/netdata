@@ -87,8 +87,7 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			require.FailNow(t, "test failed", "service discovery did not expose every DynCfg template")
 		}
 	}
-	tests := []struct {
-		name     string
+	tests := map[string]struct {
 		uid      string
 		id       string
 		payload  string
@@ -97,56 +96,49 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 		mode     string
 		requests int64
 	}{
-		{
-			name:    "resource parser",
+		"resource parser": {
 			uid:     "test-docker-parser",
 			id:      "go.d:sd:docker",
 			payload: `{"discoverer":{"docker":{"timeout":"[REDACTED_SECRET]"}},"services":[{"id":"test","match":"true"}]}`,
 			message: "service discovery resource configuration is invalid",
 			code:    400,
 		},
-		{
-			name:    "resource constructor",
+		"resource constructor": {
 			uid:     "test-http-constructor",
 			id:      "go.d:sd:http",
 			payload: `{"discoverer":{"http":{"url":"http://example.invalid","proxy_url":"http://%zz/[REDACTED_SECRET]"}},"services":[{"id":"test","match":"true"}]}`,
 			message: "service discovery resource construction failed",
 			code:    400,
 		},
-		{
-			name:    "HTTP TLS file construction",
+		"HTTP TLS file construction": {
 			uid:     "test-http-tls-file",
 			id:      "go.d:sd:http",
 			payload: fmt.Sprintf(`{"discoverer":{"http":{"url":"https://example.invalid","tls_ca":%q}},"services":[{"id":"test","match":"true"}]}`, missingCAFile),
 			message: "service discovery resource construction failed: the configured HTTP credential or TLS file could not be read safely",
 			code:    400,
 		},
-		{
-			name:    "semantic validation",
+		"semantic validation": {
 			uid:     "test-docker-semantics",
 			id:      "go.d:sd:docker",
 			payload: `{"discoverer":{"docker":{}},"services":[{"id":"[REDACTED_SECRET]","match":""}]}`,
 			message: "service discovery resource configuration is invalid: service discovery service rules are invalid",
 			code:    400,
 		},
-		{
-			name:    "operational connection",
+		"operational connection": {
 			uid:     "test-docker-operational",
 			id:      "go.d:sd:docker",
 			payload: `{"discoverer":{"docker":{"address":"unix:///tmp/netdata-[REDACTED_SECRET].sock","timeout":"50ms"}},"services":[{"id":"test","match":"true"}]}`,
 			message: "service discovery operational test failed: cannot connect to the configured Docker endpoint",
 			code:    422,
 		},
-		{
-			name:    "net listeners operational success",
+		"net listeners operational success": {
 			uid:     "test-net-listeners-operational-success",
 			id:      "go.d:sd:net_listeners",
 			payload: `{"discoverer":{"net_listeners":{}},"services":[{"id":"test","match":"true"}]}`,
 			message: `"message":""`,
 			code:    200,
 		},
-		{
-			name:    "net listeners helper failure",
+		"net listeners helper failure": {
 			uid:     "test-net-listeners-operational-failure",
 			id:      "go.d:sd:net_listeners",
 			payload: `{"discoverer":{"net_listeners":{}},"services":[{"id":"test","match":"true"}]}`,
@@ -154,8 +146,7 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			code:    422,
 			mode:    "failure",
 		},
-		{
-			name:    "net listeners invalid output",
+		"net listeners invalid output": {
 			uid:     "test-net-listeners-invalid-output",
 			id:      "go.d:sd:net_listeners",
 			payload: `{"discoverer":{"net_listeners":{}},"services":[{"id":"test","match":"true"}]}`,
@@ -163,8 +154,7 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			code:    422,
 			mode:    "invalid",
 		},
-		{
-			name:     "http operational success",
+		"http operational success": {
 			uid:      "test-http-operational-success",
 			id:       "go.d:sd:http",
 			payload:  fmt.Sprintf(`{"discoverer":{"http":{"url":%q}},"services":[{"id":"test","match":"true"}]}`, httpServer.URL+"/ok"),
@@ -172,8 +162,7 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			code:     200,
 			requests: 1,
 		},
-		{
-			name:     "http operational failure",
+		"http operational failure": {
 			uid:      "test-http-operational-failure",
 			id:       "go.d:sd:http",
 			payload:  fmt.Sprintf(`{"discoverer":{"http":{"url":%q}},"services":[{"id":"test","match":"true"}]}`, httpServer.URL+"/fail"),
@@ -181,16 +170,14 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			code:     422,
 			requests: 1,
 		},
-		{
-			name:    "http credential file failure",
+		"http credential file failure": {
 			uid:     "test-http-credential-file",
 			id:      "go.d:sd:http",
 			payload: fmt.Sprintf(`{"discoverer":{"http":{"url":%q,"bearer_token_file":%q}},"services":[{"id":"test","match":"true"}]}`, httpServer.URL+"/unexpected", missingTokenFile),
 			message: "service discovery operational test failed: the configured HTTP credential or TLS file could not be read safely",
 			code:    422,
 		},
-		{
-			name:    "http unsafe method is validation only",
+		"http unsafe method is validation only": {
 			uid:     "test-http-validation-only",
 			id:      "go.d:sd:http",
 			payload: fmt.Sprintf(`{"discoverer":{"http":{"url":%q,"method":"POST"}},"services":[{"id":"test","match":"true"}]}`, httpServer.URL+"/unexpected"),
@@ -198,8 +185,8 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			code:    200,
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
 			requestsBefore := httpRequests.Load()
 			t.Setenv("NETDATA_TEST_LOCAL_LISTENER_MODE", test.mode)
 			handler(t.Context(), functions.Function{

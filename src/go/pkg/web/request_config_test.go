@@ -282,44 +282,52 @@ func TestNewHTTPRequest(t *testing.T) {
 }
 
 func TestBearerTokenFileBounds(t *testing.T) {
-	t.Run("accepts a regular file at the limit", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "token")
-		token := strings.Repeat("t", int(safefile.MaxSize))
-		require.NoError(t, os.WriteFile(path, []byte(token), 0o600))
+	token := strings.Repeat("t", int(safefile.MaxSize))
+	tests := map[string]struct {
+		prepare  func(t *testing.T) string
+		wantAuth string
+		wantErrs []error
+	}{
+		"accepts a regular file at the limit": {
+			prepare: func(t *testing.T) string {
+				path := filepath.Join(t.TempDir(), "token")
+				require.NoError(t, os.WriteFile(path, []byte(token), 0o600))
+				return path
+			},
+			wantAuth: "Bearer " + token,
+		},
+		"rejects a regular file over the limit": {
+			prepare: func(t *testing.T) string {
+				path := filepath.Join(t.TempDir(), "token")
+				require.NoError(t, os.WriteFile(path, make([]byte, safefile.MaxSize+1), 0o600))
+				return path
+			},
+			wantErrs: []error{safefile.ErrFile, safefile.ErrTooLarge},
+		},
+		"rejects a non-regular opened object": {
+			prepare:  func(t *testing.T) string { return t.TempDir() },
+			wantErrs: []error{safefile.ErrFile, safefile.ErrNotRegular},
+		},
+	}
 
-		req, err := NewHTTPRequest(RequestConfig{
-			URL:             "http://example.com",
-			BearerTokenFile: path,
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			req, err := NewHTTPRequest(RequestConfig{
+				URL:             "http://example.com",
+				BearerTokenFile: tc.prepare(t),
+			})
+
+			if len(tc.wantErrs) > 0 {
+				require.Error(t, err)
+				for _, wantErr := range tc.wantErrs {
+					require.ErrorIs(t, err, wantErr)
+				}
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.wantAuth, req.Header.Get("Authorization"))
 		})
-
-		require.NoError(t, err)
-		require.Equal(t, "Bearer "+token, req.Header.Get("Authorization"))
-	})
-
-	t.Run("rejects a regular file over the limit", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "token")
-		require.NoError(t, os.WriteFile(path, make([]byte, safefile.MaxSize+1), 0o600))
-
-		_, err := NewHTTPRequest(RequestConfig{
-			URL:             "http://example.com",
-			BearerTokenFile: path,
-		})
-
-		require.ErrorIs(t, err, safefile.ErrFile)
-		require.ErrorIs(t, err, safefile.ErrTooLarge)
-	})
-
-	t.Run("rejects a non-regular opened object", func(t *testing.T) {
-		path := t.TempDir()
-
-		_, err := NewHTTPRequest(RequestConfig{
-			URL:             "http://example.com",
-			BearerTokenFile: path,
-		})
-
-		require.ErrorIs(t, err, safefile.ErrFile)
-		require.ErrorIs(t, err, safefile.ErrNotRegular)
-	})
+	}
 }
 
 func TestBearerTokenFileOutsideK8sSuppression(t *testing.T) {

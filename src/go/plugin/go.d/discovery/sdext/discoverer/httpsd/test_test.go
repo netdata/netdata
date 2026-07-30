@@ -28,13 +28,24 @@ import (
 var _ dyncfg.Testable = (*Discoverer)(nil)
 
 func TestDiscovererTestUnsupportedMethodsDoNoOperationalWork(t *testing.T) {
-	for _, method := range []string{"get", http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, "CUSTOM"} {
-		t.Run(method, func(t *testing.T) {
+	tests := map[string]struct {
+		method string
+	}{
+		"lowercase GET": {method: "get"},
+		"POST":          {method: http.MethodPost},
+		"PUT":           {method: http.MethodPut},
+		"PATCH":         {method: http.MethodPatch},
+		"DELETE":        {method: http.MethodDelete},
+		"custom":        {method: "CUSTOM"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			d, err := NewDiscoverer(Config{
 				HTTPConfig: web.HTTPConfig{
 					RequestConfig: web.RequestConfig{
 						URL:             "http://127.0.0.1/discovery",
-						Method:          method,
+						Method:          tc.method,
 						BearerTokenFile: t.TempDir() + "/missing-token",
 					},
 				},
@@ -53,11 +64,14 @@ func TestDiscovererTestUnsupportedMethodsDoNoOperationalWork(t *testing.T) {
 }
 
 func TestDiscovererTestUsesConfiguredGETRequest(t *testing.T) {
-	for _, method := range []string{"", http.MethodGet} {
-		name := method
-		if name == "" {
-			name = "default"
-		}
+	tests := map[string]struct {
+		method string
+	}{
+		"default": {},
+		"GET":     {method: http.MethodGet},
+	}
+
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			tokenFile := t.TempDir() + "/token"
 			require.NoError(t, os.WriteFile(tokenFile, []byte("test-token"), 0o600))
@@ -77,7 +91,7 @@ func TestDiscovererTestUsesConfiguredGETRequest(t *testing.T) {
 				HTTPConfig: web.HTTPConfig{
 					RequestConfig: web.RequestConfig{
 						URL:             srv.URL,
-						Method:          method,
+						Method:          tc.method,
 						BearerTokenFile: tokenFile,
 						Headers:         map[string]string{"X-Test": "test-value"},
 					},
@@ -92,206 +106,229 @@ func TestDiscovererTestUsesConfiguredGETRequest(t *testing.T) {
 }
 
 func TestDiscovererTestPublicErrors(t *testing.T) {
-	t.Run("request creation", func(t *testing.T) {
-		tokenFile := t.TempDir() + "/empty-token"
-		require.NoError(t, os.WriteFile(tokenFile, nil, 0o600))
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{
-				URL:             "http://127.0.0.1/discovery",
-				BearerTokenFile: tokenFile,
+	tests := map[string]struct {
+		run         func(t *testing.T) (error, []string)
+		wantMessage string
+		wantErrs    []error
+	}{
+		"request creation": {
+			run: func(t *testing.T) (error, []string) {
+				tokenFile := t.TempDir() + "/empty-token"
+				require.NoError(t, os.WriteFile(tokenFile, nil, 0o600))
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{
+						URL:             "http://127.0.0.1/discovery",
+						BearerTokenFile: tokenFile,
+					},
+				})
+				return d.Test(t.Context()), nil
 			},
-		})
-
-		err := d.Test(t.Context())
-
-		requirePublicError(t, err, "the configured HTTP discovery request could not be created")
-	})
-
-	t.Run("credential file", func(t *testing.T) {
-		path := t.TempDir() + "/missing-token"
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{
-				URL:             "http://127.0.0.1/discovery",
-				BearerTokenFile: path,
+			wantMessage: "the configured HTTP discovery request could not be created",
+		},
+		"credential file": {
+			run: func(t *testing.T) (error, []string) {
+				path := t.TempDir() + "/missing-token"
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{
+						URL:             "http://127.0.0.1/discovery",
+						BearerTokenFile: path,
+					},
+				})
+				return d.Test(t.Context()), []string{path}
 			},
-		})
-
-		err := d.Test(t.Context())
-
-		requirePublicError(t, err, "the configured HTTP credential or TLS file could not be read safely")
-		require.ErrorIs(t, err, safefile.ErrFile)
-		assert.NotContains(t, err.Error(), path)
-	})
-
-	t.Run("TLS file", func(t *testing.T) {
-		path := t.TempDir() + "/missing-ca"
-		_, err := NewDiscoverer(Config{
-			HTTPConfig: web.HTTPConfig{
-				RequestConfig: web.RequestConfig{URL: "https://127.0.0.1/discovery"},
-				ClientConfig: web.ClientConfig{
-					TLSConfig: tlscfg.TLSConfig{TLSCA: path},
-				},
+			wantMessage: "the configured HTTP credential or TLS file could not be read safely",
+			wantErrs:    []error{safefile.ErrFile},
+		},
+		"TLS file": {
+			run: func(t *testing.T) (error, []string) {
+				path := t.TempDir() + "/missing-ca"
+				_, err := NewDiscoverer(Config{
+					HTTPConfig: web.HTTPConfig{
+						RequestConfig: web.RequestConfig{URL: "https://127.0.0.1/discovery"},
+						ClientConfig: web.ClientConfig{
+							TLSConfig: tlscfg.TLSConfig{TLSCA: path},
+						},
+					},
+				})
+				return err, []string{path}
 			},
+			wantMessage: "the configured HTTP credential or TLS file could not be read safely",
+			wantErrs:    []error{tlscfg.ErrTLSFile, safefile.ErrFile},
+		},
+		"query": {
+			run: func(t *testing.T) (error, []string) {
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://private.example.invalid/discovery"},
+				})
+				d.client.Transport = &testTransport{err: errors.New("private transport response")}
+				return d.Test(t.Context()), []string{"private"}
+			},
+			wantMessage: "cannot query the configured HTTP endpoint",
+		},
+		"status": {
+			run: func(t *testing.T) (error, []string) {
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://private.example.invalid/discovery"},
+				})
+				d.client.Transport = &testTransport{
+					statusCode: http.StatusUnauthorized,
+					body:       "private response body",
+				}
+				return d.Test(t.Context()), []string{"private"}
+			},
+			wantMessage: "cannot query the configured HTTP endpoint",
+		},
+		"invalid response": {
+			run: func(t *testing.T) (error, []string) {
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://private.example.invalid/discovery"},
+				})
+				d.client.Transport = &testTransport{
+					statusCode:  http.StatusOK,
+					contentType: "application/json",
+					body:        "[private invalid response",
+				}
+				return d.Test(t.Context()), []string{"private"}
+			},
+			wantMessage: "the configured HTTP endpoint did not return usable discovery data",
+		},
+		"oversized response": {
+			run: func(t *testing.T) (error, []string) {
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1/discovery"},
+				})
+				d.client.Transport = &testTransport{
+					statusCode: http.StatusOK,
+					body:       strings.Repeat("x", responseBodyLimit+1),
+				}
+				return d.Test(t.Context()), nil
+			},
+			wantMessage: "the configured HTTP endpoint did not return usable discovery data",
+		},
+		"configured timeout": {
+			run: func(t *testing.T) (error, []string) {
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1/discovery"},
+					ClientConfig:  web.ClientConfig{Timeout: confopt.Duration(20 * time.Millisecond)},
+				})
+				d.client.Transport = &testTransport{waitForContext: true}
+				return d.Test(t.Context()), nil
+			},
+			wantMessage: "the configured HTTP endpoint did not respond before the timeout",
+			wantErrs:    []error{context.DeadlineExceeded},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err, privateValues := tc.run(t)
+
+			requirePublicError(t, err, tc.wantMessage)
+			for _, wantErr := range tc.wantErrs {
+				require.ErrorIs(t, err, wantErr)
+			}
+			for _, privateValue := range privateValues {
+				assert.NotContains(t, err.Error(), privateValue)
+			}
 		})
-
-		requirePublicError(t, err, "the configured HTTP credential or TLS file could not be read safely")
-		require.ErrorIs(t, err, tlscfg.ErrTLSFile)
-		require.ErrorIs(t, err, safefile.ErrFile)
-		assert.NotContains(t, err.Error(), path)
-	})
-
-	t.Run("query", func(t *testing.T) {
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: "http://private.example.invalid/discovery"},
-		})
-		d.client.Transport = &testTransport{err: errors.New("private transport response")}
-
-		err := d.Test(t.Context())
-
-		requirePublicError(t, err, "cannot query the configured HTTP endpoint")
-		assert.NotContains(t, err.Error(), "private")
-	})
-
-	t.Run("status", func(t *testing.T) {
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: "http://private.example.invalid/discovery"},
-		})
-		d.client.Transport = &testTransport{
-			statusCode: http.StatusUnauthorized,
-			body:       "private response body",
-		}
-
-		err := d.Test(t.Context())
-
-		requirePublicError(t, err, "cannot query the configured HTTP endpoint")
-		assert.NotContains(t, err.Error(), "private")
-	})
-
-	t.Run("invalid response", func(t *testing.T) {
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: "http://private.example.invalid/discovery"},
-		})
-		d.client.Transport = &testTransport{
-			statusCode:  http.StatusOK,
-			contentType: "application/json",
-			body:        "[private invalid response",
-		}
-
-		err := d.Test(t.Context())
-
-		requirePublicError(t, err, "the configured HTTP endpoint did not return usable discovery data")
-		assert.NotContains(t, err.Error(), "private")
-	})
-
-	t.Run("oversized response", func(t *testing.T) {
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: "http://127.0.0.1/discovery"},
-		})
-		d.client.Transport = &testTransport{
-			statusCode: http.StatusOK,
-			body:       strings.Repeat("x", responseBodyLimit+1),
-		}
-
-		err := d.Test(t.Context())
-
-		requirePublicError(t, err, "the configured HTTP endpoint did not return usable discovery data")
-	})
-
-	t.Run("configured timeout", func(t *testing.T) {
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: "http://127.0.0.1/discovery"},
-			ClientConfig:  web.ClientConfig{Timeout: confopt.Duration(20 * time.Millisecond)},
-		})
-		d.client.Transport = &testTransport{waitForContext: true}
-
-		err := d.Test(t.Context())
-
-		requirePublicError(t, err, "the configured HTTP endpoint did not respond before the timeout")
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-	})
+	}
 }
 
 func TestDiscovererTestUsesConfiguredTLSAndProxyPaths(t *testing.T) {
-	t.Run("TLS CA", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = fmt.Fprint(w, `[]`)
-		}))
-		defer srv.Close()
+	tests := map[string]struct {
+		run func(t *testing.T) error
+	}{
+		"TLS CA": {
+			run: func(t *testing.T) error {
+				srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = fmt.Fprint(w, `[]`)
+				}))
+				defer srv.Close()
 
-		caFile := t.TempDir() + "/ca.pem"
-		caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
-		require.NoError(t, os.WriteFile(caFile, caPEM, 0o600))
+				caFile := t.TempDir() + "/ca.pem"
+				caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
+				require.NoError(t, os.WriteFile(caFile, caPEM, 0o600))
 
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: srv.URL},
-			ClientConfig: web.ClientConfig{
-				TLSConfig: tlscfg.TLSConfig{TLSCA: caFile},
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: srv.URL},
+					ClientConfig: web.ClientConfig{
+						TLSConfig: tlscfg.TLSConfig{TLSCA: caFile},
+					},
+				})
+				return d.Test(t.Context())
 			},
+		},
+		"proxy": {
+			run: func(t *testing.T) error {
+				var requests atomic.Int64
+				proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					requests.Add(1)
+					assert.Equal(t, "origin.example.invalid", r.URL.Host)
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = fmt.Fprint(w, `[]`)
+				}))
+				defer proxy.Close()
+
+				d := newTestDiscoverer(t, web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://origin.example.invalid/discovery"},
+					ClientConfig:  web.ClientConfig{ProxyURL: proxy.URL},
+				})
+				err := d.Test(t.Context())
+				assert.EqualValues(t, 1, requests.Load())
+				return err
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NoError(t, tc.run(t))
 		})
-
-		require.NoError(t, d.Test(t.Context()))
-	})
-
-	t.Run("proxy", func(t *testing.T) {
-		var requests atomic.Int64
-		proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requests.Add(1)
-			assert.Equal(t, "origin.example.invalid", r.URL.Host)
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = fmt.Fprint(w, `[]`)
-		}))
-		defer proxy.Close()
-
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: "http://origin.example.invalid/discovery"},
-			ClientConfig:  web.ClientConfig{ProxyURL: proxy.URL},
-		})
-
-		require.NoError(t, d.Test(t.Context()))
-		assert.EqualValues(t, 1, requests.Load())
-	})
+	}
 }
 
 func TestDiscovererTestRedirectRequestBound(t *testing.T) {
-	t.Run("ten requests can succeed", func(t *testing.T) {
-		var requests atomic.Int64
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			n := requests.Add(1)
-			if n < 10 {
+	tests := map[string]struct {
+		successAt   int64
+		wantMessage string
+	}{
+		"ten requests can succeed": {
+			successAt: 10,
+		},
+		"eleventh request is not made": {
+			wantMessage: "cannot query the configured HTTP endpoint",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var requests atomic.Int64
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				n := requests.Add(1)
+				if tc.successAt > 0 && n >= tc.successAt {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = fmt.Fprint(w, `[]`)
+					return
+				}
 				http.Redirect(w, r, fmt.Sprintf("/%d", n), http.StatusFound)
-				return
+			}))
+			defer srv.Close()
+
+			d := newTestDiscoverer(t, web.HTTPConfig{
+				RequestConfig: web.RequestConfig{URL: srv.URL},
+			})
+
+			err := d.Test(t.Context())
+
+			if tc.wantMessage == "" {
+				require.NoError(t, err)
+			} else {
+				requirePublicError(t, err, tc.wantMessage)
 			}
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = fmt.Fprint(w, `[]`)
-		}))
-		defer srv.Close()
-
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: srv.URL},
+			assert.EqualValues(t, 10, requests.Load())
 		})
-
-		require.NoError(t, d.Test(t.Context()))
-		assert.EqualValues(t, 10, requests.Load())
-	})
-
-	t.Run("eleventh request is not made", func(t *testing.T) {
-		var requests atomic.Int64
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			n := requests.Add(1)
-			http.Redirect(w, r, fmt.Sprintf("/%d", n), http.StatusFound)
-		}))
-		defer srv.Close()
-
-		d := newTestDiscoverer(t, web.HTTPConfig{
-			RequestConfig: web.RequestConfig{URL: srv.URL},
-		})
-
-		err := d.Test(t.Context())
-
-		requirePublicError(t, err, "cannot query the configured HTTP endpoint")
-		assert.EqualValues(t, 10, requests.Load())
-	})
+	}
 }
 
 func TestDiscovererTestClosesResponseAndIdleConnections(t *testing.T) {
