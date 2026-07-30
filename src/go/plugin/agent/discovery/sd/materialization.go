@@ -23,6 +23,28 @@ type materializationError struct {
 	identity jobmgr.ProcessAttemptIdentity
 }
 
+type operationalTestError struct {
+	cause error
+}
+
+func (err *operationalTestError) Error() string {
+	if err == nil || err.cause == nil {
+		return "service discovery operational test failed"
+	}
+	return err.cause.Error()
+}
+
+func (err *operationalTestError) Unwrap() error {
+	if err == nil {
+		return nil
+	}
+	return err.cause
+}
+
+func (*operationalTestError) DyncfgCode() int {
+	return 422
+}
+
 func (err *materializationError) Error() string {
 	if err != nil && errors.Is(err.cause, jobmgr.ErrProcessAttemptQuarantined) {
 		return "service discovery configuration is unavailable until the plugin restarts"
@@ -120,25 +142,15 @@ func materializationIdentity(prefix string, values ...[]byte) string {
 func (d *ServiceDiscovery) prepareDyncfgConfig(
 	fn dyncfg.Function,
 	name string,
-	test bool,
 ) (sdConfig, error) {
 	discovererType, _, _ := d.extractDiscovererAndName(fn.ID())
 	pipelineID := pipelineKey(discovererType, name)
 	key := materializationIdentity("config", []byte(discovererType+":"+name))
-	supersede := true
-	if test {
-		key = materializationIdentity(
-			"test",
-			[]byte(pipelineID),
-			fn.Payload(),
-		)
-		supersede = false
-	}
 	return runMaterialization(
 		fn.Context(),
 		d,
 		key,
-		supersede,
+		true,
 		func(context.Context) (sdConfig, error) {
 			if _, err := parseDyncfgPayload(
 				fn.Payload(),
@@ -158,6 +170,61 @@ func (d *ServiceDiscovery) prepareDyncfgConfig(
 				discovererType,
 				pipelineID,
 			)
+		},
+	)
+}
+
+func (d *ServiceDiscovery) testDyncfgConfig(
+	fn dyncfg.Function,
+	name string,
+) (bool, error) {
+	discovererType, _, _ := d.extractDiscovererAndName(fn.ID())
+	pipelineID := pipelineKey(discovererType, name)
+	key := materializationIdentity(
+		"test",
+		[]byte(pipelineID),
+		fn.Payload(),
+	)
+	return runMaterialization(
+		fn.Context(),
+		d,
+		key,
+		false,
+		func(ctx context.Context) (bool, error) {
+			if _, err := parseDyncfgPayload(
+				fn.Payload(),
+				discovererType,
+				name,
+				d.configDefaults,
+				d.discovererRegistry(),
+				true,
+			); err != nil {
+				return false, err
+			}
+			config, err := newSDConfigFromJSON(
+				fn.Payload(),
+				name,
+				fn.Source(),
+				"dyncfg",
+				discovererType,
+				pipelineID,
+			)
+			if err != nil {
+				return false, err
+			}
+			pipelineConfig, err := config.ToPipelineConfig(d.configDefaults)
+			if err != nil {
+				return false, err
+			}
+			prepared, err := d.newPipeline(pipelineConfig)
+			if err != nil {
+				return false, err
+			}
+			fullyTested, err := prepared.Test(ctx)
+			if err != nil {
+				return false, &operationalTestError{cause: err}
+			}
+			return fullyTested, nil
 		},
 	)
 }

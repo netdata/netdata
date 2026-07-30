@@ -122,6 +122,7 @@ type (
 		mgr *PipelineManager
 	}
 	sdPipeline interface {
+		Test(ctx context.Context) (fullyTested bool, err error)
 		Run(ctx context.Context, in chan<- []*confgroup.Group)
 	}
 	confFileProvider interface {

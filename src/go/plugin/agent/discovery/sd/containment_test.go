@@ -78,7 +78,7 @@ func TestDescriptorParsingIsContainedPerConfigurationIdentity(t *testing.T) {
 	})
 	done := make(chan error, 1)
 	go func() {
-		_, err := discovery.prepareDyncfgConfig(blockedFn, "job", true)
+		_, err := discovery.testDyncfgConfig(blockedFn, "job")
 		done <- err
 	}()
 	select {
@@ -94,7 +94,7 @@ func TestDescriptorParsingIsContainedPerConfigurationIdentity(t *testing.T) {
 		require.FailNow(t, "test failed", "canceled descriptor parser did not settle")
 	}
 
-	_, err = discovery.prepareDyncfgConfig(
+	_, err = discovery.testDyncfgConfig(
 		dyncfg.NewFunction(t.Context(), functions.Function{
 			UID:     "duplicate",
 			Args:    []string{"test:sd:fixture", "test", "job"},
@@ -102,7 +102,6 @@ func TestDescriptorParsingIsContainedPerConfigurationIdentity(t *testing.T) {
 			Source:  "user=test",
 		}),
 		"job",
-		true,
 	)
 	var busy *materializationError
 	require.ErrorAs(t, err, &busy)
@@ -112,7 +111,7 @@ func TestDescriptorParsingIsContainedPerConfigurationIdentity(t *testing.T) {
 		"discoverer":{"fixture":{"block":false}},
 		"services":[{"id":"service","match":"true"}]
 	}`)
-	config, err := discovery.prepareDyncfgConfig(
+	fullyTested, err := discovery.testDyncfgConfig(
 		dyncfg.NewFunction(t.Context(), functions.Function{
 			UID:     "healthy",
 			Args:    []string{"test:sd:fixture", "test", "job"},
@@ -120,10 +119,9 @@ func TestDescriptorParsingIsContainedPerConfigurationIdentity(t *testing.T) {
 			Source:  "user=test",
 		}),
 		"job",
-		true,
 	)
 	require.NoError(t, err)
-	require.Equal(t, "job", config.Name())
+	require.False(t, fullyTested)
 
 	close(release)
 	require.Eventually(t, func() bool {

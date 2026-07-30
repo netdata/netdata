@@ -3,6 +3,7 @@
 package dyncfg
 
 import (
+	"context"
 	"errors"
 	"strings"
 )
@@ -48,6 +49,12 @@ const (
 	CommandSchema     Command = "schema"
 	CommandUserconfig Command = "userconfig"
 )
+
+// Testable is an optional operational-test capability for configured resources.
+// Implementations must honor ctx and release resources acquired by the test.
+type Testable interface {
+	Test(ctx context.Context) error
+}
 
 func JoinCommands(commands ...Command) string {
 	strs := make([]string, len(commands))

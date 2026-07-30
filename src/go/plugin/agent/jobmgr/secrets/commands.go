@@ -32,6 +32,8 @@ const (
 	msgSecretStoreNotConfigured    = "The specified secretstore '%s' is not configured."
 	msgInvalidSecretStoreConfig    = "Invalid secretstore configuration."
 	msgSecretStoreValidationFailed = "Secretstore configuration validation failed."
+	msgSecretStoreTestFailed       = "Secretstore operational test failed."
+	msgSecretStoreTestUnsupported  = "Configuration is valid; this secretstore does not provide an operational test."
 )
 
 func (c *Controller) Stage(input CommandInput) (*PreparedStoreOperation, error) {
@@ -197,7 +199,21 @@ func (c *Controller) prepareTest(
 		return c.noopMessage(scope, current, 400, msgInvalidSecretStoreConfig)
 	}
 	if result.err != nil {
+		if result.operational {
+			return c.noopMessage(scope, current, 422, msgSecretStoreTestFailed)
+		}
 		return c.noopMessage(scope, current, 400, msgSecretStoreValidationFailed)
+	}
+	if !result.operational {
+		message := msgSecretStoreTestUnsupported
+		if !result.validationOnly && result.config.Hash() == entry.config.Hash() {
+			message += " Submitted configuration does not change the active secretstore."
+		} else {
+			affected := formatSecretJobs(c.dependencies.Affected(target.key, false))
+			restartable := formatSecretJobs(c.dependencies.Affected(target.key, true))
+			message += " " + secretImpactMessage(affected, restartable, result.validationOnly)
+		}
+		return c.noopMessage(scope, current, 200, boundSecretMessage(message))
 	}
 	if !result.validationOnly && result.config.Hash() == entry.config.Hash() {
 		return c.noopMessage(scope, current, 202, "Submitted configuration does not change the active secretstore.")

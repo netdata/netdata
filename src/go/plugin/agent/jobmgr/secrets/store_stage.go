@@ -76,6 +76,7 @@ type storeOperationResult struct {
 	expected       uint64
 	desiredVersion uint64
 	validationOnly bool
+	operational    bool
 	retryable      bool
 	removal        bool
 }
@@ -379,7 +380,7 @@ func (pso *PreparedStoreOperation) runAttempt(
 		validationOnly: pso.spec.validationOnly,
 	}
 	if pso.spec.mode == storeOperationValidation {
-		result.err = pso.operations.store.Validate(
+		result.operational, result.err = pso.operations.store.Test(
 			ctx,
 			pso.operations.creators,
 			config,

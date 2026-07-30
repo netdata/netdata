@@ -86,6 +86,24 @@ func (d *Discoverer) String() string {
 	return "sd:docker"
 }
 
+func (d *Discoverer) Test(ctx context.Context) error {
+	if d == nil || ctx == nil {
+		return fmt.Errorf("invalid docker discovery test")
+	}
+	client, err := d.newDockerClient(d.addr)
+	if err != nil {
+		return fmt.Errorf("create docker client: %w", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	testCtx, cancel := context.WithTimeout(ctx, d.timeout)
+	defer cancel()
+	if _, err := client.ContainerList(testCtx, docker.ContainerListOptions{Limit: 1}); err != nil {
+		return fmt.Errorf("list docker containers: %w", err)
+	}
+	return nil
+}
+
 func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup) {
 	d.Info("instance is started")
 	defer func() { d.cleanup(); d.Info("instance is stopped") }()
