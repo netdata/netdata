@@ -323,8 +323,8 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 		"module": {UpdateEvery: 1},
 	}
 
-	var output bytes.Buffer
-	frames, err := lifecycle.NewFrameOwner(&output)
+	output := newProcessSynchronizedBuffer()
+	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
@@ -364,10 +364,10 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 
 	require.NoError(t, generation.Wait(context.Background()))
 	wire := output.String()
-	templateAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module create accepted template"))
-	createAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:module create accepted job"))
-	resultAt := bytes.Index(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN enable 200 application/json"))
-	statusAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:module status running"))
+	templateAt := strings.Index(wire, "CONFIG go.d:collector:module create accepted template")
+	createAt := strings.Index(wire, "CONFIG go.d:collector:module:module create accepted job")
+	resultAt := strings.Index(wire, "FUNCTION_RESULT_BEGIN enable 200 application/json")
+	statusAt := strings.Index(wire, "CONFIG go.d:collector:module:module status running")
 	require.NotContains(t, wire, `FUNCTION GLOBAL "config"`)
 	require.NotContains(t, wire, `FUNCTION_DEL GLOBAL "config"`)
 	require.False(
