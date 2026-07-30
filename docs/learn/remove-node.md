@@ -167,6 +167,8 @@ To remove Netdata from the node entirely instead, see [Uninstall Netdata](/packa
 
 ## Troubleshooting
 
+**"Remove option is disabled" (or "node removal is not allowed in this room")**: The Remove option only works from **Space Settings > Nodes** (the ⚙️ cog icon below the spaces list), not from the _All Nodes_ room or any other room view. This is a UI location issue, not the Stale-node case below — if the node shows Offline, remove it from Space Settings rather than using the CLI. Requires **Admin** role in the Space.
+
 **"Delete is disabled"**: The node is Stale, not Offline. Use the CLI approach for child nodes.
 
 **"Command not found"**: Ensure you're running `netdatacli` on a system with Netdata Agent installed.
