@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
@@ -205,14 +206,19 @@ func (d *ServiceDiscovery) testDyncfgConfig(
 		key,
 		false,
 		func(ctx context.Context) (bool, error) {
-			config, err := d.materializeDyncfgConfig(fn, discovererType, name, pipelineID)
+			pipelineConfig, err := parseDyncfgPayload(
+				fn.Payload(),
+				discovererType,
+				name,
+				d.configDefaults,
+				d.discovererRegistry(),
+				true,
+			)
 			if err != nil {
 				return false, err
 			}
-			pipelineConfig, err := config.ToPipelineConfig(d.configDefaults)
-			if err != nil {
-				return false, err
-			}
+			pipelineConfig.Name = naming.Sanitize(name)
+			pipelineConfig.Source = "dyncfg=" + fn.Source()
 			prepared, err := d.constructPipeline(pipelineConfig)
 			if err != nil {
 				return false, err

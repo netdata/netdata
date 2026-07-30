@@ -1523,9 +1523,12 @@ FUNCTION_RESULT_END
 					do: func(sd *ServiceDiscovery) {
 						sendDyncfgCmd(sd, "1-test",
 							[]string{sd.dyncfgTemplateID(testDiscovererTypeNetListeners), "test"},
-							payload, "")
+							payload, "user=test")
 					},
 					newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
+						if cfg.Source != "dyncfg=user=test" {
+							return nil, fmt.Errorf("unexpected pipeline source %q", cfg.Source)
+						}
 						return &testPipeline{name: cfg.Name, test: func(context.Context) error {
 							return nil
 						}}, nil
