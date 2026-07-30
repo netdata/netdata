@@ -55,8 +55,8 @@ const (
 // They must return failures for caller-side sanitization instead of logging raw
 // user configuration, credentials, or endpoint material. NewPublicError may
 // attach a static, code-authored explanation that is safe to render publicly.
-// ErrTestUnsupported reports that a valid configured instance cannot safely
-// perform an operational test.
+// Test may return ErrTestUnsupported when a valid configured instance cannot
+// safely perform an operational test.
 type Testable interface {
 	Test(ctx context.Context) error
 }

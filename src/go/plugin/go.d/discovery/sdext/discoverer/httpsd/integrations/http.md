@@ -44,7 +44,7 @@ Each discovery cycle, the discoverer:
 - A DynCfg **test** performs one complete fetch only when `method` is empty/default or exactly `GET`. It uses the configured authentication, headers, TLS, proxy, redirects, and timeout; requires HTTP 200; and parses every returned item. Redirects can make up to 10 HTTP requests. The test discards the targets without evaluating `services:` rules or creating jobs. Other configured methods are intentionally validation-only.
 - **One-shot mode** (`interval: 0`) fetches a single time when the pipeline starts. It does **not** refetch on SD reload — recreate the pipeline to refresh.
 - A missing **`bearer_token_file`** under `/var/run/secrets/` is treated as optional when Netdata is **not** running in Kubernetes (so the same config can be used in a Helm deployment without erroring out on dev hosts).
-- Bearer-token and TLS CA files must resolve to regular files no larger than 1 MiB. When both `tls_cert` and `tls_key` are configured, each file has the same requirement. Symlinks to regular files are supported.
+- Configured bearer-token and TLS files have [file-safety requirements](#option-headers-username-password-bearer-token-file-proxy-url-tls-skip-verify-etc).
 - The discoverer does not introspect the items it received — anything beyond what the upstream endpoint provides must be inferred via service rules.
 
 
