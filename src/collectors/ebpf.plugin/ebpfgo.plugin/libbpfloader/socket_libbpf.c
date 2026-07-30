@@ -682,6 +682,15 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
 
     struct bpf_map *ndmap = bpf_object__find_map_by_name(rt->obj, "tbl_nd_socket");
     if (!ndmap) {
+        /* tbl_nd_socket is only present in the base object flavor; the
+         * default "buffer" flavor uses a ring buffer and does not provide it.
+         * Log once so operators know per-PID socket data is unavailable. */
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            fprintf(stderr, "ebpf-go.plugin: socket: tbl_nd_socket not found; "
+                    "per-PID socket metrics are unavailable with this object flavor\n");
+        }
         *out_count = 0;
         return rt->per_pid_entries;
     }

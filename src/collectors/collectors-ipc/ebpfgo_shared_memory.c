@@ -9,6 +9,12 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+/* Maximum PID rows the producer will ever write.  Must stay in sync with
+ * cachestatMaxPIDTableSize / socketDefaultPIDTableSize in the Go producer.
+ * Segments larger than this were not created by ebpfgo.plugin and are either
+ * corrupt or crafted by an unauthorized local user to trigger an OOM alloc. */
+#define EBPFGO_SHM_PID_MAX 32768u
+
 /* Bytes occupied by entries[] only (no header). */
 static inline size_t ebpfgo_shm_entries_nbytes(size_t total)
 {
@@ -16,13 +22,18 @@ static inline size_t ebpfgo_shm_entries_nbytes(size_t total)
 }
 
 /* Returns the number of entries the SHM segment can hold, or 0 if the size is
- * invalid (too small to hold the header and at least one entry). */
+ * invalid (too small to hold the header and at least one entry, or larger than
+ * the maximum the producer can ever write). */
 static inline size_t ebpfgo_shm_stat_entry_count(const struct stat *st)
 {
     size_t hdr = sizeof(struct ebpfgo_shm_header);
     if (st->st_size <= 0 || (size_t)st->st_size <= hdr + sizeof(struct ebpf_pid_stat) - 1)
         return 0;
-    return ((size_t)st->st_size - hdr) / sizeof(struct ebpf_pid_stat);
+    size_t count = ((size_t)st->st_size - hdr) / sizeof(struct ebpf_pid_stat);
+    /* Reject oversized segments: the producer caps at EBPFGO_SHM_PID_MAX.
+     * An attacker who creates a sparse multi-GiB segment before ebpfgo.plugin
+     * starts could otherwise trigger an OOM allocation in every consumer. */
+    return (count > EBPFGO_SHM_PID_MAX) ? 0 : count;
 }
 
 static bool netdata_ebpfgo_shared_pid_memory_open_sem(
@@ -99,6 +110,14 @@ static bool netdata_ebpfgo_shared_pid_memory_open(
 
     struct stat st;
     if (fstat(ctx->shm_fd, &st) != 0)
+        goto fail;
+
+    /* Reject segments not owned by our own UID.  The producer (ebpfgo.plugin)
+     * runs as the same user as the consumers (apps.plugin, cgroups.plugin,
+     * network-viewer.plugin).  Any other owner means an unauthorized local
+     * process created the segment to inject arbitrary data or trigger an OOM
+     * allocation in all consumers. */
+    if (st.st_uid != getuid())
         goto fail;
 
     ctx->shm_total = ebpfgo_shm_stat_entry_count(&st);

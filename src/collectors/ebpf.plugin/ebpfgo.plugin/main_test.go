@@ -17,8 +17,8 @@ func TestResolveUpdateEvery(t *testing.T) {
 		"config beats argv":       {cliArg: 1, cfgVal: 10, fallback: 10, want: 10},
 		"config beats large argv": {cliArg: 30, cfgVal: 10, fallback: 10, want: 10},
 		// When config is absent, argv is used as a fallback.
-		"argv used when no config":      {cliArg: 5, cfgVal: 0, fallback: 10, want: 5},
-		"argv beats fallback":           {cliArg: 3, cfgVal: 0, fallback: 10, want: 3},
+		"argv used when no config": {cliArg: 5, cfgVal: 0, fallback: 10, want: 5},
+		"argv beats fallback":      {cliArg: 3, cfgVal: 0, fallback: 10, want: 3},
 		// Both absent — hardcoded default wins.
 		"fallback when both absent": {cliArg: 0, cfgVal: 0, fallback: 10, want: 10},
 	}
