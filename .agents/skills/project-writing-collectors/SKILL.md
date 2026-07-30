@@ -219,6 +219,13 @@ collector's own `validate()`. Write it for the operator filling the form:
   `src/go/plugin/go.d/collector/config_schema_test.go`
   (`TestConfigSchemasDoNotMaterializeOptionalArrays`). Express "non-empty when
   present" in `validate()` instead.
+- A key revealed by a `dependencies` branch MUST NOT also be declared as a
+  plain sibling property. The branch exists so the form shows that key only for
+  the selected discriminator value; declaring it twice makes the form show it
+  for every value, and leaves the runtime deciding what a field from an
+  unselected branch means. Enforced for every collector by
+  `src/go/plugin/go.d/collector/config_schema_test.go`
+  (`TestConfigSchemasDoNotDeclareBranchKeysAsProperties`).
 - Type an optional array or object to match the Go field, which is nil-able:
   `["array", "null"]` / `["object", "null"]`. A YAML key written with no value
   decodes to nil, which the runtime reads as "absent" and accepts, so a bare

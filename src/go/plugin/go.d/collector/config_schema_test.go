@@ -84,6 +84,83 @@ func TestConfigSchemasDoNotMaterializeOptionalArrays(t *testing.T) {
 	}
 }
 
+// TestConfigSchemasDoNotDeclareBranchKeysAsProperties forbids the second way a schema can make the
+// DynCfg form show something the operator did not ask for.
+//
+// A `dependencies` entry reveals extra fields only for the selected value of its discriminator --
+// `discovery.mode: filters` reveals `mode_filters`, and so on. Declaring one of those revealed keys
+// as a plain sibling property as well makes the form render it unconditionally, for every mode, and
+// the runtime then has to decide what a field belonging to an unselected branch means.
+func TestConfigSchemasDoNotDeclareBranchKeysAsProperties(t *testing.T) {
+	files, err := filepath.Glob("*/config_schema.json")
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		require.NoError(t, err, file)
+		var doc struct {
+			JSONSchema map[string]any `json:"jsonSchema"`
+		}
+		require.NoError(t, json.Unmarshal(data, &doc), file)
+
+		var walk func(node any, path string)
+		walk = func(node any, path string) {
+			obj, ok := node.(map[string]any)
+			if !ok {
+				return
+			}
+			properties, _ := obj["properties"].(map[string]any)
+			for discriminator, raw := range mapField(obj["dependencies"]) {
+				for _, branch := range schemaBranches(raw) {
+					for key := range mapField(branch["properties"]) {
+						if key == discriminator {
+							continue // the discriminator itself is a real property
+						}
+						assert.NotContainsf(t, properties, key,
+							"%s: %s declares %q both as a %q-dependent branch field and as a plain property; the form would always show it",
+							file, path, key, discriminator)
+					}
+				}
+			}
+			for key, child := range properties {
+				walk(child, path+"."+key)
+			}
+			walk(obj["items"], path+"[]")
+		}
+		walk(doc.JSONSchema, "")
+	}
+}
+
+// mapField returns node as an object, or nil when it is absent or another type.
+func mapField(node any) map[string]any {
+	obj, _ := node.(map[string]any)
+	return obj
+}
+
+// schemaBranches returns a dependency's oneOf/anyOf alternatives, or the dependency itself when it
+// applies unconditionally.
+func schemaBranches(node any) []map[string]any {
+	obj := mapField(node)
+	if obj == nil {
+		return nil
+	}
+	for _, keyword := range []string{"oneOf", "anyOf"} {
+		raw, ok := obj[keyword].([]any)
+		if !ok {
+			continue
+		}
+		branches := make([]map[string]any, 0, len(raw))
+		for _, branch := range raw {
+			if b := mapField(branch); b != nil {
+				branches = append(branches, b)
+			}
+		}
+		return branches
+	}
+	return []map[string]any{obj}
+}
+
 func schemaAllowsArray(schemaType any) bool {
 	switch value := schemaType.(type) {
 	case string:
