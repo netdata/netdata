@@ -260,6 +260,7 @@ struct cgroup {
     RRDSET *st_net_retransmit;
     RRDSET *st_net_udp_send;
     RRDSET *st_net_udp_recv;
+    long    last_socket_divisor; // tracks divisor to detect ebpfgo.plugin restarts
 
     // PIDs from cgroup.procs, extracted once per tick and shared across all
     // eBPFGo modules.  Populated by cgroup_ebpfgo_refresh_pid_lists() and

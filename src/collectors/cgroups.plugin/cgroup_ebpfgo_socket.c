@@ -81,13 +81,9 @@ static void cgroup_ebpfgo_socket_update_single_chart(
             RRDSET_TYPE_LINE);
 
         rrdset_update_rrdlabels(chart, cg->chart_labels);
+        rrddim_add(chart, dimension, NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    /* rrddim_add is idempotent: it creates the dimension on first call and
-     * calls rrddim_set_divisor on subsequent calls.  This keeps the baked
-     * divisor in sync when socket_update_every_s changes (e.g. ebpfgo
-     * restart with different update_every). */
-    rrddim_add(chart, dimension, NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
     rrddim_set(chart, dimension, value);
     rrdset_done(chart);
 }
@@ -140,6 +136,25 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
     uint64_t udp_rx   = cg->net.call_udp_received;
     uint64_t udp_tx   = cg->net.call_udp_sent;
 
+    /* Update baked divisors when socket_update_every_s changes (e.g. ebpfgo.plugin
+     * restarted with a different update_every).  Rare path: fires at most once per
+     * divisor change.  rrddim_set_divisor returns 0 if divisor is unchanged. */
+    if (unlikely(ebpf_divisor != cg->last_socket_divisor)) {
+        if (cg->st_net_conn_ipv4) {
+            RRDDIM *rd;
+            if ((rd = rrddim_find_active(cg->st_net_conn_ipv4,  "connections"))) rrddim_set_divisor(cg->st_net_conn_ipv4,  rd, (int32_t)ebpf_divisor);
+            if ((rd = rrddim_find_active(cg->st_net_conn_ipv6,  "connections"))) rrddim_set_divisor(cg->st_net_conn_ipv6,  rd, (int32_t)ebpf_divisor);
+            if (cg->st_net_bw_rd_received) rrddim_set_divisor(cg->st_net_total_bandwidth, cg->st_net_bw_rd_received, (int32_t)(ebpf_divisor * 1000));
+            if (cg->st_net_bw_rd_sent)     rrddim_set_divisor(cg->st_net_total_bandwidth, cg->st_net_bw_rd_sent,     (int32_t)(ebpf_divisor * 1000));
+            if ((rd = rrddim_find_active(cg->st_net_tcp_recv,   "calls"))) rrddim_set_divisor(cg->st_net_tcp_recv,   rd, (int32_t)ebpf_divisor);
+            if ((rd = rrddim_find_active(cg->st_net_tcp_send,   "calls"))) rrddim_set_divisor(cg->st_net_tcp_send,   rd, (int32_t)ebpf_divisor);
+            if ((rd = rrddim_find_active(cg->st_net_retransmit, "calls"))) rrddim_set_divisor(cg->st_net_retransmit, rd, (int32_t)ebpf_divisor);
+            if ((rd = rrddim_find_active(cg->st_net_udp_send,   "calls"))) rrddim_set_divisor(cg->st_net_udp_send,   rd, (int32_t)ebpf_divisor);
+            if ((rd = rrddim_find_active(cg->st_net_udp_recv,   "calls"))) rrddim_set_divisor(cg->st_net_udp_recv,   rd, (int32_t)ebpf_divisor);
+        }
+        cg->last_socket_divisor = ebpf_divisor;
+    }
+
     cgroup_ebpfgo_socket_update_single_chart(
         cg, &cg->st_net_conn_ipv4, "outbound_conn_v4",
         "TCP v4 outbound connections",
@@ -171,11 +186,9 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
                 cgroup_update_every,
                 RRDSET_TYPE_LINE);
             rrdset_update_rrdlabels(chart, cg->chart_labels);
+            cg->st_net_bw_rd_received = rrddim_add(chart, "received", NULL, 8, ebpf_divisor * 1000, RRD_ALGORITHM_ABSOLUTE);
+            cg->st_net_bw_rd_sent     = rrddim_add(chart, "sent",     NULL, 8, ebpf_divisor * 1000, RRD_ALGORITHM_ABSOLUTE);
         }
-        // bytes/interval * 8 / (ebpf_divisor * 1000) = kilobits/s
-        // rrddim_add is idempotent: updates divisor if socket_update_every_s changes.
-        cg->st_net_bw_rd_received = rrddim_add(chart, "received", NULL, 8, ebpf_divisor * 1000, RRD_ALGORITHM_ABSOLUTE);
-        cg->st_net_bw_rd_sent     = rrddim_add(chart, "sent",     NULL, 8, ebpf_divisor * 1000, RRD_ALGORITHM_ABSOLUTE);
         rrddim_set_by_pointer(chart, cg->st_net_bw_rd_received, (collected_number)bytes_rx);
         rrddim_set_by_pointer(chart, cg->st_net_bw_rd_sent,     (collected_number)bytes_tx);
         rrdset_done(chart);
