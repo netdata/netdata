@@ -2161,7 +2161,6 @@ fn consume_projected_test_record<S: super::ProjectedRowSink + ?Sized>(
     sink: &mut S,
     record: &super::QueryFlowRecord,
     group_by: &[String],
-    tier: super::TierKind,
 ) {
     sink.reset_row();
     for (field_index, field) in group_by.iter().enumerate() {
@@ -2172,7 +2171,7 @@ fn consume_projected_test_record<S: super::ProjectedRowSink + ?Sized>(
     sink.consume_row(
         record.timestamp_usec,
         super::RecordHandle::JournalRealtime {
-            tier,
+            tier: super::TierKind::Raw,
             timestamp_usec: record.timestamp_usec,
         },
         super::sampled_metrics_from_fields(&record.fields),
@@ -2182,13 +2181,11 @@ fn consume_projected_test_record<S: super::ProjectedRowSink + ?Sized>(
 
 fn materialized_test_timeseries(
     records: &[super::QueryFlowRecord],
-    tiers: &[super::TierKind],
     group_by: &[String],
     sort_by: SortBy,
     max_groups: usize,
     limit: usize,
 ) -> TestTimeseriesResult {
-    assert_eq!(records.len(), tiers.len());
     let mut aggregates: HashMap<super::GroupKey, super::AggregatedFlow> = HashMap::new();
     let mut overflow = super::GroupOverflow::default();
     for record in records {
@@ -2218,7 +2215,7 @@ fn materialized_test_timeseries(
     let layout = test_timeseries_layout();
     let mut buckets = vec![vec![0_u64; ranked.rows.len()]; layout.bucket_count];
 
-    for (record, _) in records.iter().zip(tiers) {
+    for record in records {
         let key = super::group_key_from_labels(&super::labels_for_group(record, group_by));
         let Some(dimension_index) = super::materialized_timeseries_dimension(
             &key,
@@ -2256,13 +2253,11 @@ fn materialized_test_timeseries(
 
 fn projected_test_timeseries(
     records: &[super::QueryFlowRecord],
-    tiers: &[super::TierKind],
     group_by: &[String],
     sort_by: SortBy,
     max_groups: usize,
     limit: usize,
 ) -> TestTimeseriesResult {
-    assert_eq!(records.len(), tiers.len());
     let mut aggregates = super::ProjectedGroupAccumulator::new(group_by);
     let mut row_group_field_ids = vec![None; group_by.len()];
     let mut row_missing_values = std::iter::repeat_with(|| None)
@@ -2276,8 +2271,8 @@ fn projected_test_timeseries(
             &mut row_missing_values,
             max_groups,
         );
-        for (record, tier) in records.iter().zip(tiers) {
-            consume_projected_test_record(&mut sink, record, group_by, *tier);
+        for record in records {
+            consume_projected_test_record(&mut sink, record, group_by);
         }
     }
 
@@ -2338,8 +2333,8 @@ fn projected_test_timeseries(
             &mut buckets,
             group_by.len(),
         );
-        for (record, tier) in records.iter().zip(tiers) {
-            consume_projected_test_record(&mut sink, record, group_by, *tier);
+        for record in records {
+            consume_projected_test_record(&mut sink, record, group_by);
         }
     }
 
@@ -2383,26 +2378,14 @@ fn timeseries_test_records() -> Vec<super::QueryFlowRecord> {
 }
 
 #[test]
-fn projected_timeseries_accumulation_matches_materialized_for_raw_rollup_and_mixed_handles() {
+fn projected_timeseries_accumulation_matches_materialized() {
     let records = timeseries_test_records();
     let group_by = vec!["PROTOCOL".to_string()];
-    let tier_cases = [
-        vec![super::TierKind::Raw; records.len()],
-        vec![super::TierKind::Minute5; records.len()],
-        vec![
-            super::TierKind::Raw,
-            super::TierKind::Minute1,
-            super::TierKind::Minute5,
-        ],
-    ];
 
-    for tiers in tier_cases {
-        for sort_by in [SortBy::Bytes, SortBy::Packets] {
-            let materialized =
-                materialized_test_timeseries(&records, &tiers, &group_by, sort_by, 100, 2);
-            let projected = projected_test_timeseries(&records, &tiers, &group_by, sort_by, 100, 2);
-            assert_eq!(projected, materialized);
-        }
+    for sort_by in [SortBy::Bytes, SortBy::Packets] {
+        let materialized = materialized_test_timeseries(&records, &group_by, sort_by, 100, 2);
+        let projected = projected_test_timeseries(&records, &group_by, sort_by, 100, 2);
+        assert_eq!(projected, materialized);
     }
 }
 
@@ -2434,12 +2417,11 @@ fn projected_and_materialized_timeseries_populate_ranked_overflow() {
             ]),
         },
     ];
-    let tiers = vec![super::TierKind::Raw; records.len()];
     let group_by = vec!["PROTOCOL".to_string()];
 
     for (sort_by, expected_total) in [(SortBy::Bytes, 300), (SortBy::Packets, 30)] {
-        let materialized = materialized_test_timeseries(&records, &tiers, &group_by, sort_by, 1, 1);
-        let projected = projected_test_timeseries(&records, &tiers, &group_by, sort_by, 1, 1);
+        let materialized = materialized_test_timeseries(&records, &group_by, sort_by, 1, 1);
+        let projected = projected_test_timeseries(&records, &group_by, sort_by, 1, 1);
         assert_eq!(projected, materialized);
         assert_eq!(
             projected.rows[0].0.get("_bucket").map(String::as_str),
@@ -2476,12 +2458,10 @@ fn projected_timeseries_keeps_unseen_value_distinct_from_retained_missing_group(
             ]),
         },
     ];
-    let tiers = vec![super::TierKind::Raw; records.len()];
     let group_by = vec!["PROTOCOL".to_string()];
 
-    let materialized =
-        materialized_test_timeseries(&records, &tiers, &group_by, SortBy::Bytes, 1, 1);
-    let projected = projected_test_timeseries(&records, &tiers, &group_by, SortBy::Bytes, 1, 1);
+    let materialized = materialized_test_timeseries(&records, &group_by, SortBy::Bytes, 1, 1);
+    let projected = projected_test_timeseries(&records, &group_by, SortBy::Bytes, 1, 1);
 
     assert_eq!(projected, materialized);
     assert_eq!(
