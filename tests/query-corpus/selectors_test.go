@@ -252,11 +252,11 @@ func TestCardinalityLimitSweep(t *testing.T) {
 			if !assertExactColumnSet(t, cols, dimensions) {
 				t.Fail()
 			}
-			for value, id := range dimensions {
+			for index, id := range dimensions {
 				want := make([]expectedColumnPoint, 0, 20)
 				for i := 1; i <= 20; i++ {
 					want = append(want,
-						wantNumberWithMetadataAt(fixture.T0+int64(i), float64(value+1), 0, 0))
+						wantNumberWithMetadataAt(fixture.T0+int64(i), float64(index+1), 0, 0))
 				}
 				if !assertExactColumn(t, cols, id, want, 0) {
 					t.Fail()
