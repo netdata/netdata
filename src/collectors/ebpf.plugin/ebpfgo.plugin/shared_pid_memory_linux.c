@@ -241,7 +241,9 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
             if (!prev_alive) {
                 memset(ctx->mapping, 0, length);
                 ctx->header->publisher_pid = (uint32_t)getpid();
-                ctx->shm_name_created = true;
+                /* shm_name_created stays false: this context did not create the
+                 * SHM name and must not unlink it on close — the original
+                 * creator may have restarted and be using the same name. */
             }
             sem_post(ctx->sem);
         } else {

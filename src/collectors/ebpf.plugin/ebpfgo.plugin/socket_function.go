@@ -63,6 +63,8 @@ func (s *socketFunctionStore) snapshot() (socketGlobalPublish, bool) {
 func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, closeStop func()) {
 	defer closeStop()
 	sc := bufio.NewScanner(os.Stdin)
+	// Default 64 KB limit would kill the plugin on an oversized FUNCTION line.
+	sc.Buffer(make([]byte, 4096), 1<<20)
 	for sc.Scan() {
 		line := sc.Text()
 		switch {

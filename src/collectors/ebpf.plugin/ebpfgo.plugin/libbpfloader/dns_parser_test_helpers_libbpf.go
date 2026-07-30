@@ -1,4 +1,4 @@
-//go:build netdata_ebpf_libbpf
+//go:build netdata_ebpf_libbpf && netdata_ebpf_test
 
 package libbpfloader
 
@@ -9,8 +9,14 @@ package libbpfloader
 // is a normal (non-test) source file that holds the CGo preamble and exports
 // unexported Go functions; dns_parser_libbpf_test.go calls these instead of
 // calling C directly.
+//
+// The netdata_ebpf_test build tag gates this file (and dns_libbpf.c's
+// NETDATA_EBPF_TEST block) so that test helpers are excluded from production
+// binaries.  To run these tests, use:
+//   CGO_ENABLED=1 go test -tags 'netdata_ebpf_libbpf netdata_ebpf_test' ./...
 
 /*
+#cgo CPPFLAGS: -DNETDATA_EBPF_TEST
 #include <stdlib.h>
 #include <stdint.h>
 

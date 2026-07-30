@@ -188,7 +188,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           set -euo pipefail
-          CGO_ENABLED=1 go test -tags netdata_ebpf_libbpf -json ./... -race -count=1 2>&1 \
+          CGO_ENABLED=1 go test -tags 'netdata_ebpf_libbpf netdata_ebpf_test' -json ./... -race -count=1 2>&1 \
             | "$GITHUB_WORKSPACE/.github/scripts/normalize-go-test-json.py" \
             | gotestfmt -hide all
         working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin

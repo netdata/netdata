@@ -986,11 +986,13 @@ void netdata_dns_runtime_close(struct netdata_dns_runtime *rt)
     freez(rt);
 }
 
+#ifdef NETDATA_EBPF_TEST
 /* -------------------------------------------------------------------------
- * Test helpers — thin non-static wrappers so the Go test layer can exercise
- * the packet parser without a live BPF runtime or a real BPF object file.
- * Using void * for the runtime pointer avoids pulling the full struct
- * definition (which requires libbpf headers) into the CGo test preamble.
+ * Test helpers — compiled only when NETDATA_EBPF_TEST is defined (i.e. test
+ * builds using the netdata_ebpf_test Go build tag).  Thin non-static wrappers
+ * so the Go test layer can exercise the packet parser without a live BPF
+ * runtime.  Using void * for the runtime pointer avoids pulling the full
+ * struct definition (which requires libbpf headers) into the CGo preamble.
  * ---------------------------------------------------------------------- */
 
 void *netdata_dns_alloc_test_runtime(void)
@@ -1025,3 +1027,5 @@ int netdata_dns_test_read_name(const char *msg, int msg_len, int offset,
 {
     return dns_read_name(msg, msg_len, offset, out, out_size);
 }
+
+#endif /* NETDATA_EBPF_TEST */

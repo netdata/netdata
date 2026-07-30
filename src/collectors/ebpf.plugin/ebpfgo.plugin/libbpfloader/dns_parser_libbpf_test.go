@@ -1,4 +1,4 @@
-//go:build netdata_ebpf_libbpf
+//go:build netdata_ebpf_libbpf && netdata_ebpf_test
 
 package libbpfloader
 
