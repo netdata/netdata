@@ -165,7 +165,10 @@ when any limit is exceeded):
 
 Every option can be overridden with a `NETDATA_OTEL_CFG_*` environment
 variable — the highest-priority layer. The name is the option path in
-capitals with dots replaced by underscores. An unrecognized
+capitals with dots replaced by underscores, except that the `default`
+segment of a rotation or retention path is dropped —
+`logs.rotation.default.max_file_size` becomes
+`NETDATA_OTEL_CFG_LOGS_ROTATION_MAX_FILE_SIZE`. An unrecognized
 `NETDATA_OTEL_CFG_*` name is a startup error (typos are caught, not ignored).
 
 | Variable | Overrides |
