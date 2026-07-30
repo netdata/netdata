@@ -23,23 +23,31 @@ type materializationError struct {
 	identity jobmgr.ProcessAttemptIdentity
 }
 
-type operationalTestError struct {
+type resourceTestError struct {
 	cause error
+	code  int
 }
 
-func (err *operationalTestError) Error() string {
-	return "service discovery operational test failed"
+func (err *resourceTestError) Error() string {
+	// Resource errors may contain credential-bearing configuration.
+	if err != nil && err.code == 422 {
+		return "service discovery operational test failed"
+	}
+	return "service discovery resource construction failed"
 }
 
-func (err *operationalTestError) Unwrap() error {
+func (err *resourceTestError) Unwrap() error {
 	if err == nil {
 		return nil
 	}
 	return err.cause
 }
 
-func (*operationalTestError) DyncfgCode() int {
-	return 422
+func (err *resourceTestError) DyncfgCode() int {
+	if err == nil {
+		return 400
+	}
+	return err.code
 }
 
 func (err *materializationError) Error() string {
@@ -181,11 +189,11 @@ func (d *ServiceDiscovery) testDyncfgConfig(
 			}
 			prepared, err := d.newPipeline(pipelineConfig)
 			if err != nil {
-				return false, err
+				return false, &resourceTestError{cause: err, code: 400}
 			}
 			fullyTested, err := prepared.Test(ctx)
 			if err != nil {
-				return false, &operationalTestError{cause: err}
+				return false, &resourceTestError{cause: err, code: 422}
 			}
 			return fullyTested, nil
 		},
