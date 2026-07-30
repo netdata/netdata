@@ -348,6 +348,49 @@ groups:
 	}
 }
 
+func TestBuildChartCoverage_ExcludesRetainedSeriesNotSeenInLatestSuccess(t *testing.T) {
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+
+	cc := managed.CycleController()
+	cc.BeginCycle()
+	meter := store.Write().SnapshotMeter("")
+	meter.Gauge("metric_current").Observe(1)
+	meter.Gauge("metric_stale").Observe(2)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	cc.BeginCycle()
+	meter.Gauge("metric_current").Observe(3)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	templateYAML := `
+version: v1
+context_namespace: test
+groups:
+  - family: Root
+    metrics: [metric_current, metric_stale]
+    charts:
+      - title: Current
+        context: current
+        units: "1"
+        dimensions:
+          - selector: metric_current
+            name: current
+      - title: Stale
+        context: stale
+        units: "1"
+        dimensions:
+          - selector: metric_stale
+            name: stale
+`
+
+	coverage, err := buildChartCoverage(templateYAML, 1, store.Read(metrix.ReadRaw()), nil)
+	require.NoError(t, err)
+	require.Equal(t, map[string][]string{"test.current": {"current"}}, normalizeCoverageDimsList(coverage.ExpectedByContext))
+	require.Equal(t, map[string][]string{"test.current": {"current"}}, normalizeCoverageDims(coverage.ActualByContext))
+}
+
 func TestCollectScalarSeries(t *testing.T) {
 	tests := map[string]struct {
 		collectFn func(ctx context.Context, store metrix.CollectorStore) error
