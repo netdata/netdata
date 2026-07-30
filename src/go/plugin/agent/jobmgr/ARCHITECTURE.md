@@ -899,6 +899,11 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
   configuration or endpoint material.
 - A discoverer without the capability produces an explicit validation-only success. Configuration/construction
   failures return 400, operational failures return 422, and busy/contained attempts return 503.
+- Operational guarantees are discoverer-specific. Docker performs a one-item container-list query. `net_listeners`
+  executes and parses one production helper snapshot, then discards the targets without rule rendering, cache
+  reconciliation, publication, or installation. Its process count and elapsed time are bounded to one invocation and the
+  caller/configured timeout; work and buffered output still scale with the host socket/process inventory. Other shipped
+  discoverers currently remain validation-only.
 - File-backed stock/user state keeps one latest pending retry after a busy/contained result; synchronous DynCfg
   commands do not.
 - The complete service-discovery DynCfg Function is also contained, so a non-cooperative command cannot pin the

@@ -120,13 +120,19 @@ func RunUnprivilegedWithOptionsUsageContext(
 }
 
 // SetRunnerPathsForTests overrides the nd-run and ndsudo helper paths.
-// It is intended for test environments that need to stub the helpers.
-func SetRunnerPathsForTests(ndRunPath, ndSudoPath string) {
+// It returns a function that restores the previous paths.
+func SetRunnerPathsForTests(ndRunPath, ndSudoPath string) func() {
+	previousNDRunPath := defaultRunner.ndRunPath
+	previousNDSudoPath := defaultRunner.ndSudoPath
 	if ndRunPath != "" {
 		defaultRunner.ndRunPath = ndRunPath
 	}
 	if ndSudoPath != "" {
 		defaultRunner.ndSudoPath = ndSudoPath
+	}
+	return func() {
+		defaultRunner.ndRunPath = previousNDRunPath
+		defaultRunner.ndSudoPath = previousNDSudoPath
 	}
 }
 
