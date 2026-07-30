@@ -583,11 +583,23 @@ Sampling ensures responsiveness at scale, but selecting sources and filters rema
 
 ### How to check if the plugin is running
 
+Confirm the plugin binary is present and executable (default native/package install path):
+
 ```bash
-sudo netdata -W plugins
+ls -l /usr/libexec/netdata/plugins.d/systemd-journal.plugin
 ```
 
-Check that the `systemd-journal` plugin is listed as active.
+Confirm the Agent was built with the journal plugin. A line for `systemd-journal (monitor journal logs)` showing `YES` means the plugin is compiled into this build (`NO` indicates an Alpine/static build where it is unavailable):
+
+```bash
+sudo netdata -W buildinfo
+```
+
+Confirm the plugin process is running while the Agent is active:
+
+```bash
+ps aux | grep '[s]ystemd-journal.plugin'
+```
 
 ### How to confirm journal sources are detected
 
