@@ -62,18 +62,18 @@ func startCompositionShutdownProbe(
 	}
 }
 
-func (probe compositionShutdownProbe) waitCancellation(ctx context.Context) error {
+func (csp compositionShutdownProbe) waitCancellation(ctx context.Context) error {
 	select {
-	case <-probe.cancelled:
+	case <-csp.cancelled:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (probe compositionShutdownProbe) waitSettlement(ctx context.Context) error {
+func (csp compositionShutdownProbe) waitSettlement(ctx context.Context) error {
 	select {
-	case err := <-probe.settled:
+	case err := <-csp.settled:
 		return err
 	case <-ctx.Done():
 		return ctx.Err()

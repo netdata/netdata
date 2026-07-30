@@ -32,7 +32,8 @@ type ControllerConfig struct {
 	Epoch        uint64                      // run generation this controller belongs to
 	PluginName   string                      // owning plugin name
 	Frames       *lifecycle.FrameOwner       // protocol frame sink
-	Store        *secretstore.SecretStore    // per-run secret store
+	Store        *secretstore.SecretStore    // process-owned Store epoch
+	Operations   *StoreOperations            // process-owned Store materialization
 	Creators     *secretstore.CreatorCatalog // frozen creator catalog
 	Dependencies *SecretDependencyIndex      // secret dependency index
 	Initial      []secretstore.Config        // initial (stock/user) secret store configs
@@ -40,20 +41,27 @@ type ControllerConfig struct {
 }
 
 type Controller struct {
-	mu sync.Mutex // guards entries, commandsReady, restarts, and initial
+	mu sync.Mutex // guards run projections, entries, pending state, and counters
 
 	epoch         uint64                      // run generation
 	prefix        string                      // "<plugin>:secretstore:" ID prefix
 	path          string                      // "/collectors/<plugin>/SecretStores" config path
 	frames        *lifecycle.FrameOwner       // protocol frame sink
-	store         *secretstore.SecretStore    // per-run secret store
+	store         *secretstore.SecretStore    // process-owned Store epoch
+	operations    *StoreOperations            // process-owned Store materialization
 	creators      *secretstore.CreatorCatalog // frozen creator catalog
 	dependencies  *SecretDependencyIndex      // secret dependency index
 	diagnostics   jobmgr.DiagnosticObserver   // operational log sink
 	initial       []secretstore.Config        // initial secret store configs
 	entries       map[string]secretEntry      // published store entries by key
 	restarts      *SecretRestartCommand       // dependent-job restart command (bound at Bind)
-	commandsReady bool                        // templates are visible and commands may execute
+	commands      jobmgr.PreparedCommandPort  // run-owned internal retry ingress
+	projectionCtx context.Context             // canceled when the run projection closes
+	closeContext  context.CancelFunc
+	pending       map[string]*pendingStoreState // latest persistent desired config by Store key
+	nextDesired   uint64                        // desired-config ordering
+	nextRetry     uint64                        // internal retry UID ordering
+	commandsReady bool                          // templates are visible and commands may execute
 }
 
 type secretEntry struct {
@@ -66,21 +74,27 @@ func NewController(config ControllerConfig) (*Controller, error) {
 		config.PluginName == "" ||
 		config.Frames == nil ||
 		config.Store == nil ||
+		config.Operations == nil ||
 		config.Creators == nil ||
 		config.Dependencies == nil {
 		return nil, errors.New("jobmgr secrets: incomplete controller configuration")
 	}
+	projectionCtx, closeContext := context.WithCancel(context.Background())
 	return &Controller{
-		epoch:        config.Epoch,
-		prefix:       fmt.Sprintf("%s:secretstore:", config.PluginName),
-		path:         fmt.Sprintf(dynCfgSecretPath, config.PluginName),
-		frames:       config.Frames,
-		store:        config.Store,
-		creators:     config.Creators,
-		dependencies: config.Dependencies,
-		diagnostics:  config.Diagnostics,
-		initial:      slices.Clone(config.Initial),
-		entries:      make(map[string]secretEntry),
+		epoch:         config.Epoch,
+		prefix:        fmt.Sprintf("%s:secretstore:", config.PluginName),
+		path:          fmt.Sprintf(dynCfgSecretPath, config.PluginName),
+		frames:        config.Frames,
+		store:         config.Store,
+		operations:    config.Operations,
+		creators:      config.Creators,
+		dependencies:  config.Dependencies,
+		diagnostics:   config.Diagnostics,
+		initial:       slices.Clone(config.Initial),
+		entries:       make(map[string]secretEntry),
+		projectionCtx: projectionCtx,
+		closeContext:  closeContext,
+		pending:       make(map[string]*pendingStoreState),
 	}, nil
 }
 
@@ -115,24 +129,48 @@ func (c *Controller) Prepare(
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
+	return c.prepare(ctx, input, current, scope, permit, nil)
+}
+
+func (c *Controller) PrepareStaged(
+	ctx context.Context,
+	input CommandInput,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+	stage *PreparedStoreOperation,
+) (lifecycle.PreparedResourceTransaction, error) {
+	return c.prepare(ctx, input, current, scope, permit, stage)
+}
+
+func (c *Controller) prepare(
+	ctx context.Context,
+	input CommandInput,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+	stage *PreparedStoreOperation,
+) (lifecycle.PreparedResourceTransaction, error) {
 	if c == nil || ctx == nil || !scope.Valid() {
 		return nil, errors.New("jobmgr secrets: invalid transaction preparation")
+	}
+	if permit.Valid() {
+		return nil, errors.New("jobmgr secrets: unexpected run-owned Store permit")
 	}
 	c.mu.Lock()
 	commandsReady := c.commandsReady
 	c.mu.Unlock()
 	if !commandsReady {
-		return c.noopMessageWithPermit(
+		return c.noopMessage(
 			scope,
 			current,
-			permit,
 			503,
 			"Secretstore configuration is not published yet.",
 		)
 	}
 	target, failure := c.resolveTarget(input)
 	if failure != nil {
-		transaction, err := c.noopMessageWithPermit(scope, current, permit, failure.code, failure.message)
+		transaction, err := c.noopMessage(scope, current, failure.code, failure.message)
 		return c.observeTransaction(target, transaction, err)
 	}
 	var transaction lifecycle.PreparedResourceTransaction
@@ -145,18 +183,17 @@ func (c *Controller) Prepare(
 	case dyncfg.CommandUserconfig:
 		transaction, err = c.prepareUserConfig(scope, current, input, target)
 	case dyncfg.CommandTest:
-		transaction, err = c.prepareTest(ctx, scope, current, input, target)
+		transaction, err = c.prepareTest(scope, current, target, stage)
 	case dyncfg.CommandAdd:
-		transaction, err = c.prepareAdd(ctx, scope, current, permit, input, target)
+		transaction, err = c.prepareAdd(scope, current, target, stage)
 	case dyncfg.CommandUpdate:
-		transaction, err = c.prepareUpdate(ctx, scope, current, permit, input, target)
+		transaction, err = c.prepareUpdate(scope, current, target, stage)
 	case dyncfg.CommandRemove:
-		transaction, err = c.prepareRemove(scope, current, target)
+		transaction, err = c.prepareRemove(scope, current, target, stage)
 	default:
-		transaction, err = c.noopMessageWithPermit(
+		transaction, err = c.noopMessage(
 			scope,
 			current,
-			permit,
 			501,
 			fmt.Sprintf("Function '%s' command '%s' is not implemented.", "config", target.command),
 		)
@@ -443,7 +480,7 @@ func secretResourceID(key string) string {
 	return "secretstore:" + string(kind) + "_" + name
 }
 
-func sortedInitialConfigs(configs []secretstore.Config) []secretstore.Config {
+func selectInitialConfigs(configs []secretstore.Config) []secretstore.Config {
 	cloned := slices.Clone(configs)
 	slices.SortStableFunc(cloned, func(a, b secretstore.Config) int {
 		if a.ExposedKey() != b.ExposedKey() {
@@ -451,5 +488,12 @@ func sortedInitialConfigs(configs []secretstore.Config) []secretstore.Config {
 		}
 		return cmp.Compare(b.SourceTypePriority(), a.SourceTypePriority())
 	})
-	return cloned
+	selected := cloned[:0]
+	for _, config := range cloned {
+		if len(selected) == 0 ||
+			selected[len(selected)-1].ExposedKey() != config.ExposedKey() {
+			selected = append(selected, config)
+		}
+	}
+	return selected
 }

@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -78,6 +79,67 @@ func TestNew(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPipeline_Test(t *testing.T) {
+	t.Run("tests capable discoverers sequentially", func(t *testing.T) {
+		var calls []string
+		p := &Pipeline{discoverers: []model.Discoverer{
+			&pipelineTestDiscoverer{name: "first", calls: &calls},
+			&pipelineTestDiscoverer{name: "second", calls: &calls},
+		}}
+
+		fullyTested, err := p.Test(t.Context())
+
+		require.NoError(t, err)
+		require.True(t, fullyTested)
+		require.Equal(t, []string{"first", "second"}, calls)
+	})
+
+	t.Run("reports validation only when a discoverer has no test", func(t *testing.T) {
+		var calls []string
+		p := &Pipeline{discoverers: []model.Discoverer{
+			newMockDiscoverer("", newMockTargetGroup("test")),
+			&pipelineTestDiscoverer{name: "capable", calls: &calls},
+		}}
+
+		fullyTested, err := p.Test(t.Context())
+
+		require.NoError(t, err)
+		require.False(t, fullyTested)
+		require.Equal(t, []string{"capable"}, calls)
+	})
+
+	t.Run("stops at the first operational failure", func(t *testing.T) {
+		testErr := errors.New("unavailable")
+		var calls []string
+		p := &Pipeline{discoverers: []model.Discoverer{
+			&pipelineTestDiscoverer{name: "first", calls: &calls},
+			&pipelineTestDiscoverer{name: "second", calls: &calls, err: testErr},
+			&pipelineTestDiscoverer{name: "third", calls: &calls},
+		}}
+
+		fullyTested, err := p.Test(t.Context())
+
+		require.False(t, fullyTested)
+		require.ErrorIs(t, err, testErr)
+		require.Equal(t, []string{"first", "second"}, calls)
+	})
+
+	t.Run("honors caller cancellation before testing", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		var calls []string
+		p := &Pipeline{discoverers: []model.Discoverer{
+			&pipelineTestDiscoverer{name: "first", calls: &calls},
+		}}
+
+		fullyTested, err := p.Test(ctx)
+
+		require.False(t, fullyTested)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Empty(t, calls)
+	})
 }
 
 func TestPipeline_Run(t *testing.T) {
@@ -287,6 +349,20 @@ type mockDiscoverer struct {
 	tggs  []model.TargetGroup
 	tags  model.Tags
 	delay time.Duration
+}
+
+type pipelineTestDiscoverer struct {
+	name  string
+	calls *[]string
+	err   error
+}
+
+func (d *pipelineTestDiscoverer) Discover(context.Context, chan<- []model.TargetGroup) {
+}
+
+func (d *pipelineTestDiscoverer) Test(context.Context) error {
+	*d.calls = append(*d.calls, d.name)
+	return d.err
 }
 
 func (md mockDiscoverer) String() string {

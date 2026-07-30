@@ -216,25 +216,6 @@ func (adri *autoDetectionRetryIndex) wait(ctx context.Context) error {
 	}
 }
 
-func (adri *autoDetectionRetryIndex) joined() bool {
-	if adri == nil {
-		return true
-	}
-	adri.mu.Lock()
-	bound := adri.bound
-	done := adri.done
-	adri.mu.Unlock()
-	if !bound {
-		return true
-	}
-	select {
-	case <-done:
-		return true
-	default:
-		return false
-	}
-}
-
 func (adri *autoDetectionRetryIndex) terminalError() error {
 	adri.mu.Lock()
 	defer adri.mu.Unlock()

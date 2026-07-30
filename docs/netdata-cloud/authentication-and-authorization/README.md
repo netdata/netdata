@@ -26,7 +26,7 @@ Multi-factor authentication (MFA) adds an extra layer of protection to your Netd
 | **Email**          | Netdata Cloud does not currently offer built-in MFA for email/password accounts.                                                     |
 | **Google OAuth**   | MFA is managed by Google. Enable it in your [Google Account security settings](https://myaccount.google.com/security).               |
 | **GitHub OAuth**   | MFA is managed by GitHub. Enable it in your [GitHub account settings](https://github.com/settings/security).                         |
-| **Enterprise SSO** | MFA is configured and enforced by your identity provider (e.g., Okta, Azure AD, Google Workspace) during the SSO authentication flow. |
+| **Enterprise SSO** | MFA is configured and enforced by your identity provider (e.g., Okta, Microsoft Entra ID, Google Workspace) during the SSO authentication flow. |
 
 For organizations that require MFA for all users, [Enterprise SSO](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md) delegates authentication entirely to your identity provider, which can enforce MFA policies centrally.
 

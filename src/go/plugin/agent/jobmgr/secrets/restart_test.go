@@ -52,16 +52,22 @@ func (rts restartTestStop) Stopped() (bool, error) {
 }
 
 type restartTestStart struct {
-	err error
+	err             error
+	retainedPending int
 }
 
-func (rts restartTestStart) Err() error {
+func (rts *restartTestStart) Err() error {
 	return rts.err
+}
+
+func (rts *restartTestStart) RetainPending() {
+	rts.retainedPending++
 }
 
 type restartTestJobs struct {
 	stopError    error
 	restoreError error
+	start        *restartTestStart
 }
 
 func (rtj restartTestJobs) PlanDependentStop(id string) (jobmgr.WorkPlan, DependentStopResult, error) {
@@ -74,9 +80,10 @@ func (rtj restartTestJobs) PlanDependentStop(id string) (jobmgr.WorkPlan, Depend
 }
 
 func (rtj restartTestJobs) PlanDependentStart(string) (jobmgr.WorkPlan, DependentStartResult, error) {
-	return jobmgr.WorkPlan{}, restartTestStart{
-		err: rtj.restoreError,
-	}, nil
+	if rtj.start == nil {
+		rtj.start = &restartTestStart{err: rtj.restoreError}
+	}
+	return jobmgr.WorkPlan{}, rtj.start, nil
 }
 
 func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(t *testing.T) {
@@ -218,6 +225,8 @@ func TestSecretRestartTimeoutAfterAppliedMutationIsOperational(t *testing.T) {
 	require.NoError(t, err)
 	command.childTimeout = 10 * time.Millisecond
 	command.budgetLimit = 20 * time.Millisecond
+	start := &restartTestStart{}
+	command.jobs = restartTestJobs{start: start}
 	scope := &restartTestCommandScope{
 		recovery: func(ctx context.Context) error {
 			<-ctx.Done()
@@ -242,6 +251,7 @@ func TestSecretRestartTimeoutAfterAppliedMutationIsOperational(t *testing.T) {
 	require.Contains(t, message, "module:one")
 	require.EqualValues(t, 1, scope.recoveryCalls)
 	require.ErrorIs(t, scope.recoveryCtx[0].Err(), context.DeadlineExceeded)
+	require.EqualValues(t, 1, start.retainedPending)
 }
 
 func TestSecretRestartBudgetsCapAggregateAndFairShareChildren(t *testing.T) {

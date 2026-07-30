@@ -2,10 +2,11 @@ use super::planner::{grouped_query_can_use_projected_scan, resolve_effective_gro
 use super::scan::cursor_prefilter_pairs;
 use super::{
     FlowsRequest, SortBy, build_aggregated_flows, build_facets, build_grouped_flows,
-    dimensions_from_fields, metrics_from_fields, requires_raw_tier_for_fields,
+    dimensions_from_fields, field_is_raw_only, metrics_from_fields, requires_raw_tier_for_fields,
 };
 use crate::rollup::build_rollup_key;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use serde_json::json;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::time::Instant;
 
 #[test]
@@ -93,6 +94,100 @@ fn raw_tier_is_required_for_city_fields() {
 }
 
 #[test]
+fn raw_tier_capabilities_cover_every_supported_grouping_field() {
+    const EXPECTED_RAW_ONLY_FIELDS: &[&str] = &[
+        "DST_ADDR",
+        "DST_ADDR_NAT",
+        "DST_AS_PATH",
+        "DST_COMMUNITIES",
+        "DST_GEO_CITY",
+        "DST_LARGE_COMMUNITIES",
+        "DST_MAC",
+        "DST_MASK",
+        "DST_PORT",
+        "DST_PORT_NAT",
+        "DST_PREFIX",
+        "IPTTL",
+        "IPV6_FLOW_LABEL",
+        "IP_FRAGMENT_ID",
+        "IP_FRAGMENT_OFFSET",
+        "MPLS_LABELS",
+        "SRC_ADDR",
+        "SRC_ADDR_NAT",
+        "SRC_GEO_CITY",
+        "SRC_MAC",
+        "SRC_MASK",
+        "SRC_PORT",
+        "SRC_PORT_NAT",
+        "SRC_PREFIX",
+    ];
+
+    let actual = super::supported_group_by_fields()
+        .iter()
+        .filter(|field| field_is_raw_only(field))
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let expected = EXPECTED_RAW_ONLY_FIELDS
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(actual, expected);
+    assert_eq!(
+        super::supported_group_by_fields().len(),
+        80,
+        "public grouping field count changed"
+    );
+    assert_eq!(
+        super::supported_group_by_fields()
+            .iter()
+            .filter(|field| !field_is_raw_only(field))
+            .count(),
+        56,
+        "54 physical rollup fields plus two virtual fields should remain rollup-safe"
+    );
+
+    for field in super::supported_group_by_fields() {
+        let group_by = vec![field.clone()];
+        let selections = HashMap::from([(field.clone(), vec!["value".to_string()])]);
+        assert_eq!(
+            requires_raw_tier_for_fields(&group_by, &HashMap::new(), ""),
+            field_is_raw_only(field),
+            "grouping capability drifted for {field}"
+        );
+        assert_eq!(
+            requires_raw_tier_for_fields(&[], &selections, ""),
+            field_is_raw_only(field),
+            "selection capability drifted for {field}"
+        );
+    }
+}
+
+#[test]
+fn hidden_city_coordinates_and_vendor_fields_force_raw() {
+    for field in [
+        "SRC_GEO_LATITUDE",
+        "SRC_GEO_LONGITUDE",
+        "DST_GEO_LATITUDE",
+        "DST_GEO_LONGITUDE",
+        "V9_VENDOR_FIELD",
+        "IPFIX_VENDOR_FIELD",
+    ] {
+        assert!(field_is_raw_only(field), "{field} must force raw");
+        assert!(requires_raw_tier_for_fields(
+            &[field.to_string()],
+            &HashMap::new(),
+            ""
+        ));
+        assert!(requires_raw_tier_for_fields(
+            &[],
+            &HashMap::from([(field.to_string(), vec!["value".to_string()])]),
+            ""
+        ));
+    }
+}
+
+#[test]
 fn grouped_flows_add_other_bucket_when_truncated() {
     let mut records = Vec::new();
     for idx in 0..3 {
@@ -148,7 +243,7 @@ fn grouped_other_bucket_preserves_single_group_values_and_summarizes_mixed_field
 
     let result = build_grouped_flows(
         &records,
-        &["PROTOCOL".to_string(), "SRC_AS_NAME".to_string()],
+        &["SRC_AS_NAME".to_string(), "PROTOCOL".to_string()],
         SortBy::Bytes,
         1,
     );
@@ -159,6 +254,15 @@ fn grouped_other_bucket_preserves_single_group_values_and_summarizes_mixed_field
     assert_eq!(result.flows[1]["key"]["_bucket"], "__other__");
     assert_eq!(result.flows[1]["key"]["PROTOCOL"], "6");
     assert_eq!(result.flows[1]["key"]["SRC_AS_NAME"], "Other (2)");
+    assert_eq!(
+        result.flows[1]["key"]
+            .as_object()
+            .expect("other key")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "_bucket"]
+    );
 }
 
 #[test]
@@ -302,6 +406,25 @@ fn normalized_group_by_is_capped_to_ten_fields() {
             "SRC_PORT".to_string(),
             "DST_PORT".to_string(),
             "SRC_AS_NAME".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn normalized_group_by_keeps_first_occurrence_order() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{
+            "group_by":["DST_ADDR","PROTOCOL","DST_ADDR","SRC_ADDR","PROTOCOL"]
+        }"#,
+    )
+    .expect("request should deserialize");
+
+    assert_eq!(
+        request.normalized_group_by(),
+        vec![
+            "DST_ADDR".to_string(),
+            "PROTOCOL".to_string(),
+            "SRC_ADDR".to_string(),
         ]
     );
 }
@@ -480,6 +603,32 @@ fn request_deserialization_rejects_removed_internal_timestamp_selection_field() 
 }
 
 #[test]
+fn request_deserialization_rejects_metric_selection_fields() {
+    for (input, expected) in [
+        ("bytes", "BYTES"),
+        ("PACKETS", "PACKETS"),
+        ("Flows", "FLOWS"),
+    ] {
+        let payload = format!(
+            r#"{{
+                "view":"table-sankey",
+                "group_by":["PROTOCOL"],
+                "selections":{{"{input}":["1"]}}
+            }}"#
+        );
+        let error = serde_json::from_str::<FlowsRequest>(&payload)
+            .expect_err("metric selections must be rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("unsupported selection field `{expected}`")),
+            "unexpected error for {input}: {error}"
+        );
+    }
+}
+
+#[test]
 fn request_deserialization_accepts_object_based_selections() {
     let request = serde_json::from_str::<FlowsRequest>(
         r#"{
@@ -594,6 +743,38 @@ fn request_deserialization_supports_autocomplete_mode() {
         Some("SRC_ADDR")
     );
     assert_eq!(request.normalized_autocomplete_term(), "10.0.");
+}
+
+#[test]
+fn request_deserialization_accepts_ipv4_and_ipv6_cidr_selections() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{
+            "selections": {
+                "src_addr": ["10.1.2.99/24", "2001:db8:1::abcd/48"],
+                "src_prefix": ["10.0.0.0/8"]
+            }
+        }"#,
+    )
+    .expect("CIDR selections should deserialize");
+
+    assert_eq!(
+        request.selections["SRC_ADDR"],
+        ["10.1.2.99/24", "2001:db8:1::abcd/48"]
+    );
+    assert_eq!(request.selections["SRC_PREFIX"], ["10.0.0.0/8"]);
+}
+
+#[test]
+fn request_deserialization_rejects_invalid_cidr_on_ip_address_facets_only() {
+    let error = serde_json::from_str::<FlowsRequest>(r#"{"selections":{"src_addr":["10/8"]}}"#)
+        .expect_err("loose CIDR shorthand must be autocomplete-only");
+    assert!(
+        error.to_string().contains("invalid CIDR selection `10/8`"),
+        "unexpected error: {error}"
+    );
+
+    serde_json::from_str::<FlowsRequest>(r#"{"selections":{"src_prefix":["10/8"]}}"#)
+        .expect("stored prefix facets keep exact string selection semantics");
 }
 
 #[test]
@@ -773,6 +954,87 @@ fn labels_for_group_uses_stored_as_name_values() {
 }
 
 #[test]
+fn grouped_response_objects_preserve_group_by_order() {
+    let group_by = vec![
+        "SRC_AS_NAME".to_string(),
+        "PROTOCOL".to_string(),
+        "DST_AS_NAME".to_string(),
+    ];
+    let record = super::QueryFlowRecord::new(
+        42,
+        BTreeMap::from([
+            ("SRC_AS_NAME".to_string(), "Source".to_string()),
+            ("PROTOCOL".to_string(), "6".to_string()),
+            ("DST_AS_NAME".to_string(), "Destination".to_string()),
+            ("BYTES".to_string(), "100".to_string()),
+            ("PACKETS".to_string(), "10".to_string()),
+        ]),
+    );
+
+    let result = super::build_grouped_flows(&[record], &group_by, SortBy::Bytes, 25);
+    let key = result.flows[0]["key"].as_object().expect("grouped key");
+    assert_eq!(
+        key.keys().map(String::as_str).collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]
+    );
+
+    let columns = crate::presentation::build_table_columns(&group_by);
+    assert_eq!(
+        columns
+            .as_object()
+            .expect("table columns")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME", "bytes", "packets"]
+    );
+}
+
+#[test]
+fn timeseries_dimension_ids_and_names_preserve_group_by_order() {
+    let group_by = vec![
+        "SRC_AS_NAME".to_string(),
+        "PROTOCOL".to_string(),
+        "DST_AS_NAME".to_string(),
+    ];
+    let row = super::AggregatedFlow {
+        labels: BTreeMap::from([
+            ("DST_AS_NAME".to_string(), "Destination".to_string()),
+            ("PROTOCOL".to_string(), "6".to_string()),
+            ("SRC_AS_NAME".to_string(), "Source".to_string()),
+        ]),
+        metrics: super::QueryFlowMetrics {
+            bytes: 100,
+            packets: 10,
+        },
+        ..super::AggregatedFlow::default()
+    };
+
+    let chart = super::metrics_chart_from_top_groups(
+        0,
+        60,
+        60,
+        SortBy::Bytes,
+        &group_by,
+        &[row],
+        &[vec![100]],
+    );
+
+    assert_eq!(
+        chart["view"]["dimensions"]["ids"][0],
+        r#"{"SRC_AS_NAME":"Source","PROTOCOL":"6","DST_AS_NAME":"Destination"}"#
+    );
+    assert_eq!(
+        chart["view"]["dimensions"]["names"][0],
+        "Source AS Name=Source, Protocol=TCP, Destination AS Name=Destination"
+    );
+    assert_eq!(
+        chart["result"]["labels"][1],
+        "Source AS Name=Source, Protocol=TCP, Destination AS Name=Destination"
+    );
+}
+
+#[test]
 fn captured_facet_field_value_uses_stored_as_name_values() {
     let capture_positions = super::FastHashMap::from([
         ("SRC_AS_NAME".to_string(), 0usize),
@@ -885,6 +1147,9 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
         .find(|entry| entry["field"] == "SRC_AS_NAME")
         .expect("src facet");
 
+    assert_eq!(protocol["autocomplete"], false);
+    assert_eq!(src_as["autocomplete"], false);
+    assert_eq!(src_as["truncated"], false);
     assert_eq!(
         protocol["values"]
             .as_array()
@@ -917,23 +1182,55 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
 }
 
 #[test]
-fn facet_vocabularies_keep_selected_values_for_missing_published_field() {
-    let requested_fields = vec!["PROTOCOL".to_string()];
-    let selections = HashMap::from([(
+fn facet_vocabularies_omit_unselected_fields_without_retained_values() {
+    let requested_fields = vec![
+        "SRC_ADDR".to_string(),
+        "SRC_AS_NAME".to_string(),
         "PROTOCOL".to_string(),
-        vec!["6".to_string(), "17".to_string()],
+        "DIRECTION".to_string(),
+    ];
+    let selections = HashMap::from([("SRC_ADDR".to_string(), Vec::new())]);
+    let snapshot = BTreeMap::from([
+        (
+            "SRC_ADDR".to_string(),
+            crate::facet_runtime::FacetPublishedField::default(),
+        ),
+        (
+            "PROTOCOL".to_string(),
+            crate::facet_runtime::FacetPublishedField::default(),
+        ),
+    ]);
+
+    let facets = super::build_facet_vocabulary_payload(&requested_fields, &selections, &snapshot);
+
+    assert_eq!(facets["fields"], json!([]));
+    assert_eq!(facets["auto"]["facets"], json!(requested_fields));
+    assert_eq!(facets["auto"]["selections"], json!(selections));
+}
+
+#[test]
+fn facet_vocabularies_keep_selected_values_without_retained_vocabulary() {
+    let requested_fields = vec!["PROTOCOL".to_string(), "SRC_ADDR".to_string()];
+    let selections = HashMap::from([
+        (
+            "PROTOCOL".to_string(),
+            vec!["6".to_string(), "17".to_string()],
+        ),
+        ("SRC_ADDR".to_string(), vec!["192.0.2.1".to_string()]),
+    ]);
+    let snapshot = BTreeMap::from([(
+        "SRC_ADDR".to_string(),
+        crate::facet_runtime::FacetPublishedField::default(),
     )]);
 
-    let facets =
-        super::build_facet_vocabulary_payload(&requested_fields, &selections, &BTreeMap::new());
+    let facets = super::build_facet_vocabulary_payload(&requested_fields, &selections, &snapshot);
 
-    let protocol = facets["fields"]
-        .as_array()
-        .expect("fields array")
+    let fields = facets["fields"].as_array().expect("fields array");
+    let protocol = fields
         .iter()
         .find(|entry| entry["field"] == "PROTOCOL")
         .expect("protocol facet");
-    assert_eq!(protocol["total_values"], 2);
+    assert_eq!(protocol["total_values"], 0);
     assert_eq!(protocol["truncated"], false);
     assert_eq!(protocol["autocomplete"], false);
     assert_eq!(
@@ -950,48 +1247,91 @@ fn facet_vocabularies_keep_selected_values_for_missing_published_field() {
             .collect::<Vec<_>>(),
         vec![("6", "TCP"), ("17", "UDP")]
     );
+
+    let src_addr = fields
+        .iter()
+        .find(|entry| entry["field"] == "SRC_ADDR")
+        .expect("source address facet");
+    assert_eq!(src_addr["total_values"], 0);
+    assert_eq!(src_addr["truncated"], false);
+    assert_eq!(src_addr["autocomplete"], true);
+    assert_eq!(
+        src_addr["values"][0],
+        json!({
+            "value": "192.0.2.1",
+            "name": "192.0.2.1",
+        })
+    );
 }
 
 #[test]
-fn facet_vocabularies_mark_autocomplete_payloads_truncated_without_extra_values() {
-    let requested_fields = vec!["PROTOCOL".to_string()];
+fn facet_vocabularies_follow_retained_vocabulary_transitions() {
+    let requested_fields = vec!["SRC_AS_NAME".to_string()];
+    let empty_snapshot = BTreeMap::from([(
+        "SRC_AS_NAME".to_string(),
+        crate::facet_runtime::FacetPublishedField::default(),
+    )]);
+    let populated_snapshot = BTreeMap::from([(
+        "SRC_AS_NAME".to_string(),
+        crate::facet_runtime::FacetPublishedField {
+            total_values: 1,
+            autocomplete: false,
+            values: vec!["AS15169 GOOGLE".to_string()],
+        },
+    )]);
+
+    let before =
+        super::build_facet_vocabulary_payload(&requested_fields, &HashMap::new(), &empty_snapshot);
+    let after_first_value = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &HashMap::new(),
+        &populated_snapshot,
+    );
+    let after_last_value =
+        super::build_facet_vocabulary_payload(&requested_fields, &HashMap::new(), &empty_snapshot);
+
+    assert_eq!(before["fields"], json!([]));
+    assert_eq!(after_first_value["fields"][0]["field"], "SRC_AS_NAME");
+    assert_eq!(after_first_value["fields"][0]["total_values"], 1);
+    assert_eq!(after_first_value["fields"][0]["autocomplete"], false);
+    assert_eq!(
+        after_first_value["fields"][0]["values"][0]["value"],
+        "AS15169 GOOGLE"
+    );
+    assert_eq!(after_last_value["fields"], json!([]));
+}
+
+#[test]
+fn facet_vocabularies_keep_published_autocomplete_fields_without_inline_values() {
+    let requested_fields = vec!["SRC_ADDR".to_string()];
     let facets = super::build_facet_vocabulary_payload(
         &requested_fields,
         &HashMap::new(),
         &BTreeMap::from([(
-            "PROTOCOL".to_string(),
+            "SRC_ADDR".to_string(),
             crate::facet_runtime::FacetPublishedField {
-                total_values: 2,
+                total_values: super::FACET_STATIC_VALUE_LIMIT + 1,
                 autocomplete: true,
-                values: vec!["17".to_string(), "6".to_string()],
+                values: Vec::new(),
             },
         )]),
     );
 
-    let protocol = facets["fields"]
-        .as_array()
-        .expect("fields array")
-        .iter()
-        .find(|entry| entry["field"] == "PROTOCOL")
-        .expect("protocol facet");
-    assert_eq!(protocol["total_values"], 2);
-    assert_eq!(protocol["truncated"], true);
-    assert_eq!(protocol["autocomplete"], true);
+    let src_addr = &facets["fields"][0];
+    assert_eq!(src_addr["field"], "SRC_ADDR");
     assert_eq!(
-        protocol["values"]
-            .as_array()
-            .expect("protocol values")
-            .iter()
-            .map(|entry| entry["value"].as_str().unwrap_or_default())
-            .collect::<Vec<_>>(),
-        vec!["6", "17"]
+        src_addr["total_values"],
+        super::FACET_STATIC_VALUE_LIMIT + 1
     );
+    assert_eq!(src_addr["autocomplete"], true);
+    assert_eq!(src_addr["truncated"], true);
+    assert_eq!(src_addr["values"], json!([]));
 }
 
 #[test]
 fn facet_vocabularies_keep_exact_value_limit_untruncated() {
     let requested_fields = vec!["SRC_AS_NAME".to_string()];
-    let published_values = (0..super::FACET_VALUE_LIMIT)
+    let published_values = (0..super::FACET_STATIC_VALUE_LIMIT)
         .rev()
         .map(|index| format!("AS{index:05} PROVIDER"))
         .collect::<Vec<_>>();
@@ -1015,8 +1355,9 @@ fn facet_vocabularies_keep_exact_value_limit_untruncated() {
         .iter()
         .find(|entry| entry["field"] == "SRC_AS_NAME")
         .expect("src_as facet");
-    assert_eq!(src_as["total_values"], super::FACET_VALUE_LIMIT);
+    assert_eq!(src_as["total_values"], super::FACET_STATIC_VALUE_LIMIT);
     assert_eq!(src_as["truncated"], false);
+    assert_eq!(src_as["autocomplete"], false);
 
     let values = src_as["values"]
         .as_array()
@@ -1024,14 +1365,46 @@ fn facet_vocabularies_keep_exact_value_limit_untruncated() {
         .iter()
         .map(|entry| entry["value"].as_str().unwrap_or_default())
         .collect::<Vec<_>>();
-    let expected_last = format!("AS{:05} PROVIDER", super::FACET_VALUE_LIMIT - 1);
-    assert_eq!(values.len(), super::FACET_VALUE_LIMIT);
+    let expected_last = format!("AS{:05} PROVIDER", super::FACET_STATIC_VALUE_LIMIT - 1);
+    assert_eq!(values.len(), super::FACET_STATIC_VALUE_LIMIT);
     assert_eq!(values.first().copied(), Some("AS00000 PROVIDER"));
     assert_eq!(values.last().copied(), Some(expected_last.as_str()));
 }
 
 #[test]
-fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_cardinality() {
+fn ip_facets_keep_complete_inline_values_while_advertising_autocomplete() {
+    let requested_fields = vec!["SRC_ADDR".to_string()];
+    let published_values = (0..super::FACET_STATIC_VALUE_LIMIT)
+        .map(|index| std::net::Ipv4Addr::from(0xc000_0200_u32 + index as u32).to_string())
+        .collect::<Vec<_>>();
+    let facets = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &HashMap::new(),
+        &BTreeMap::from([(
+            "SRC_ADDR".to_string(),
+            crate::facet_runtime::FacetPublishedField {
+                total_values: published_values.len(),
+                autocomplete: false,
+                values: published_values,
+            },
+        )]),
+    );
+
+    let src_addr = &facets["fields"][0];
+    assert_eq!(src_addr["total_values"], super::FACET_STATIC_VALUE_LIMIT);
+    assert_eq!(src_addr["truncated"], false);
+    assert_eq!(src_addr["autocomplete"], true);
+    assert_eq!(
+        src_addr["values"]
+            .as_array()
+            .expect("complete inline IP values")
+            .len(),
+        super::FACET_STATIC_VALUE_LIMIT
+    );
+}
+
+#[test]
+fn facet_vocabularies_keep_stale_selection_separate_from_static_vocabulary() {
     let requested_fields = vec!["SRC_AS_NAME".to_string()];
     let selections = HashMap::from([(
         "SRC_AS_NAME".to_string(),
@@ -1042,7 +1415,7 @@ fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_ca
             "AS00103 PROVIDER".to_string(),
         ],
     )]);
-    let published_values = (0..(super::FACET_VALUE_LIMIT + 5))
+    let published_values = (0..super::FACET_STATIC_VALUE_LIMIT)
         .rev()
         .map(|index| format!("AS{index:05} PROVIDER"))
         .collect::<Vec<_>>();
@@ -1065,8 +1438,9 @@ fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_ca
         .iter()
         .find(|entry| entry["field"] == "SRC_AS_NAME")
         .expect("src_as facet");
-    assert_eq!(src_as["total_values"], super::FACET_VALUE_LIMIT + 6);
-    assert_eq!(src_as["truncated"], true);
+    assert_eq!(src_as["total_values"], super::FACET_STATIC_VALUE_LIMIT);
+    assert_eq!(src_as["truncated"], false);
+    assert_eq!(src_as["autocomplete"], false);
 
     let values = src_as["values"]
         .as_array()
@@ -1074,24 +1448,12 @@ fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_ca
         .iter()
         .map(|entry| entry["value"].as_str().unwrap_or_default())
         .collect::<Vec<_>>();
-    assert_eq!(values.len(), super::FACET_VALUE_LIMIT);
-    assert_eq!(
-        &values[..4],
-        &[
-            "AS99999 SELECTED",
-            "AS00103 PROVIDER",
-            "AS00000 PROVIDER",
-            "AS00001 PROVIDER",
-        ]
-    );
-    assert!(
-        values.contains(&"AS00097 PROVIDER"),
-        "expected the sorted prefix to fill the remaining response slots"
-    );
-    assert!(
-        !values.contains(&"AS00098 PROVIDER"),
-        "expected values after the response limit to be omitted"
-    );
+    assert_eq!(values.len(), super::FACET_STATIC_VALUE_LIMIT + 1);
+    assert_eq!(&values[..2], &["AS99999 SELECTED", "AS00103 PROVIDER"]);
+    assert!((0..super::FACET_STATIC_VALUE_LIMIT).all(|index| {
+        let value = format!("AS{index:05} PROVIDER");
+        values.contains(&value.as_str())
+    }));
     assert_eq!(
         values
             .iter()
@@ -1107,6 +1469,47 @@ fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_ca
             .count(),
         1,
         "selected missing values must not be duplicated"
+    );
+}
+
+#[test]
+fn facet_vocabularies_keep_only_selections_inline_after_autocomplete_promotion() {
+    let requested_fields = vec!["SRC_AS_NAME".to_string()];
+    let selections = HashMap::from([(
+        "SRC_AS_NAME".to_string(),
+        vec![
+            "AS99999 SELECTED".to_string(),
+            "AS00103 PROVIDER".to_string(),
+            "AS99999 SELECTED".to_string(),
+            "AS00103 PROVIDER".to_string(),
+        ],
+    )]);
+
+    let facets = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &selections,
+        &BTreeMap::from([(
+            "SRC_AS_NAME".to_string(),
+            crate::facet_runtime::FacetPublishedField {
+                total_values: super::FACET_STATIC_VALUE_LIMIT + 5,
+                autocomplete: true,
+                values: Vec::new(),
+            },
+        )]),
+    );
+
+    let src_as = &facets["fields"][0];
+    assert_eq!(src_as["total_values"], super::FACET_STATIC_VALUE_LIMIT + 5);
+    assert_eq!(src_as["truncated"], true);
+    assert_eq!(src_as["autocomplete"], true);
+    assert_eq!(
+        src_as["values"]
+            .as_array()
+            .expect("src_as values")
+            .iter()
+            .map(|entry| entry["value"].as_str().unwrap_or_default())
+            .collect::<Vec<_>>(),
+        vec!["AS99999 SELECTED", "AS00103 PROVIDER"]
     );
 }
 
@@ -1136,15 +1539,21 @@ fn captured_facet_helpers_resolve_virtual_values_and_ignore_self_selection() {
             vec!["AS4333 NETDATA".to_string()],
         ),
     ]);
+    let compiled = super::CompiledSelections::compile(&selections).expect("compile selections");
     assert!(super::captured_facet_matches_selections_except(
         Some("ICMPV4"),
-        &selections,
+        &compiled,
         &capture_positions,
         &captured_values,
     ));
+    let mismatched = super::CompiledSelections::compile(&HashMap::from([(
+        "ICMPV4".to_string(),
+        vec!["Echo Request".to_string()],
+    )]))
+    .expect("compile selections");
     assert!(!super::captured_facet_matches_selections_except(
         Some("SRC_AS_NAME"),
-        &HashMap::from([("ICMPV4".to_string(), vec!["Echo Request".to_string()])]),
+        &mismatched,
         &capture_positions,
         &captured_values,
     ));
@@ -1469,7 +1878,7 @@ fn grouped_accumulator_routes_new_groups_to_overflow_after_cap() {
 
 #[test]
 fn grouped_overflow_bucket_preserves_single_group_values_and_summarizes_mixed_fields() {
-    let group_by = vec!["PROTOCOL".to_string(), "SRC_AS_NAME".to_string()];
+    let group_by = vec!["SRC_AS_NAME".to_string(), "PROTOCOL".to_string()];
     let records = vec![
         super::QueryFlowRecord {
             timestamp_usec: 1,
@@ -1513,10 +1922,20 @@ fn grouped_overflow_bucket_preserves_single_group_values_and_summarizes_mixed_fi
         );
     }
 
-    let flow = super::flow_value_from_aggregate(overflow.aggregate.expect("overflow row"));
+    let flow =
+        super::flow_value_from_aggregate(overflow.aggregate.expect("overflow row"), &group_by);
     assert_eq!(flow["key"]["_bucket"], "__overflow__");
     assert_eq!(flow["key"]["PROTOCOL"], "6");
     assert_eq!(flow["key"]["SRC_AS_NAME"], "Other (2)");
+    assert_eq!(
+        flow["key"]
+            .as_object()
+            .expect("overflow key")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "_bucket"]
+    );
 }
 
 #[test]
@@ -1583,7 +2002,7 @@ fn compact_grouped_accumulator_routes_new_groups_to_overflow_after_cap() {
 
 #[test]
 fn compact_other_bucket_preserves_single_group_values_and_summarizes_mixed_fields() {
-    let group_by = vec!["PROTOCOL".to_string(), "SRC_AS_NAME".to_string()];
+    let group_by = vec!["SRC_AS_NAME".to_string(), "PROTOCOL".to_string()];
     let mut aggregates =
         super::CompactGroupAccumulator::new(&group_by).expect("compact accumulator");
 
@@ -1633,10 +2052,20 @@ fn compact_other_bucket_preserves_single_group_values_and_summarizes_mixed_field
     let other = ranked.other.expect("other bucket");
     let flow = super::flow_value_from_aggregate(
         super::synthetic_aggregate_from_compact(other).expect("materialize compact other"),
+        &group_by,
     );
     assert_eq!(flow["key"]["_bucket"], "__other__");
     assert_eq!(flow["key"]["PROTOCOL"], "6");
     assert_eq!(flow["key"]["SRC_AS_NAME"], "Other (2)");
+    assert_eq!(
+        flow["key"]
+            .as_object()
+            .expect("compact other key")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "_bucket"]
+    );
 }
 
 #[test]
@@ -1679,6 +2108,7 @@ fn compact_overflow_bucket_preserves_single_group_values_and_summarizes_mixed_fi
         .expect("compact overflow aggregate");
     let flow = super::flow_value_from_aggregate(
         super::synthetic_aggregate_from_compact(overflow).expect("materialize compact overflow"),
+        &group_by,
     );
     assert_eq!(flow["key"]["_bucket"], "__overflow__");
     assert_eq!(flow["key"]["PROTOCOL"], "6");
@@ -1816,6 +2246,7 @@ fn metrics_chart_uses_only_discovered_top_n_groups() {
         layout.before,
         layout.bucket_seconds,
         SortBy::Bytes,
+        &group_by,
         &ranked.rows,
         &series_buckets,
     );
@@ -1836,6 +2267,397 @@ fn metrics_chart_uses_only_discovered_top_n_groups() {
         .map(|row| row[1][0].as_f64().unwrap_or(0.0))
         .sum();
     assert_eq!(total, 2.5);
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct TestTimeseriesResult {
+    rows: Vec<(BTreeMap<String, String>, u64, u64)>,
+    buckets: Vec<Vec<u64>>,
+    grouped_total: usize,
+    truncated: bool,
+    other_count: usize,
+    overflow_records: u64,
+}
+
+fn test_timeseries_layout() -> super::TimeseriesLayout {
+    super::TimeseriesLayout {
+        after: 0,
+        before: 180,
+        bucket_seconds: 60,
+        bucket_count: 3,
+    }
+}
+
+fn consume_projected_test_record<S: super::ProjectedRowSink + ?Sized>(
+    sink: &mut S,
+    record: &super::QueryFlowRecord,
+    group_by: &[String],
+) {
+    sink.reset_row();
+    for (field_index, field) in group_by.iter().enumerate() {
+        if let Some(value) = record.fields.get(field) {
+            sink.observe_group_value(field_index, value);
+        }
+    }
+    sink.consume_row(
+        record.timestamp_usec,
+        super::RecordHandle::JournalRealtime {
+            tier: super::TierKind::Raw,
+            timestamp_usec: record.timestamp_usec,
+        },
+        super::sampled_metrics_from_fields(&record.fields),
+    )
+    .expect("consume projected test record");
+}
+
+fn materialized_test_timeseries(
+    records: &[super::QueryFlowRecord],
+    group_by: &[String],
+    sort_by: SortBy,
+    max_groups: usize,
+    limit: usize,
+) -> TestTimeseriesResult {
+    let mut aggregates: HashMap<super::GroupKey, super::AggregatedFlow> = HashMap::new();
+    let mut overflow = super::GroupOverflow::default();
+    for record in records {
+        super::accumulate_grouped_record(
+            record,
+            super::sampled_metrics_from_fields(&record.fields),
+            group_by,
+            &mut aggregates,
+            &mut overflow,
+            max_groups,
+        );
+    }
+
+    let retained_group_keys = aggregates.keys().cloned().collect::<HashSet<_>>();
+    let overflow_records = overflow.dropped_records;
+    let ranked = super::rank_aggregates(aggregates, overflow.aggregate.take(), sort_by, limit);
+    let overflow_dimension = ranked.rows.iter().position(|row| {
+        row.labels.get("_bucket").map(String::as_str) == Some(super::OVERFLOW_BUCKET_LABEL)
+    });
+    let top_group_keys = ranked
+        .rows
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| !row.labels.contains_key("_bucket"))
+        .map(|(index, row)| (super::group_key_from_labels(&row.labels), index))
+        .collect::<HashMap<_, _>>();
+    let layout = test_timeseries_layout();
+    let mut buckets = vec![vec![0_u64; ranked.rows.len()]; layout.bucket_count];
+
+    for record in records {
+        let key = super::group_key_from_labels(&super::labels_for_group(record, group_by));
+        let Some(dimension_index) = super::materialized_timeseries_dimension(
+            &key,
+            &top_group_keys,
+            &retained_group_keys,
+            overflow_dimension,
+        ) else {
+            continue;
+        };
+        super::accumulate_series_bucket(
+            &mut buckets,
+            record.timestamp_usec,
+            layout.after,
+            layout.before,
+            layout.bucket_seconds,
+            dimension_index,
+            super::sampled_metric_value(sort_by, &record.fields),
+        );
+    }
+
+    let rows = ranked
+        .rows
+        .iter()
+        .map(|row| (row.labels.clone(), row.metrics.bytes, row.metrics.packets))
+        .collect();
+    TestTimeseriesResult {
+        rows,
+        buckets,
+        grouped_total: ranked.grouped_total,
+        truncated: ranked.truncated,
+        other_count: ranked.other_count,
+        overflow_records,
+    }
+}
+
+fn projected_test_timeseries(
+    records: &[super::QueryFlowRecord],
+    group_by: &[String],
+    sort_by: SortBy,
+    max_groups: usize,
+    limit: usize,
+) -> TestTimeseriesResult {
+    let mut aggregates = super::ProjectedGroupAccumulator::new(group_by);
+    let mut row_group_field_ids = vec![None; group_by.len()];
+    let mut row_missing_values = std::iter::repeat_with(|| None)
+        .take(group_by.len())
+        .collect::<Vec<Option<String>>>();
+    {
+        let mut sink = super::ProjectedGroupingSink::new(
+            &mut aggregates,
+            group_by,
+            &mut row_group_field_ids,
+            &mut row_missing_values,
+            max_groups,
+        );
+        for record in records {
+            consume_projected_test_record(&mut sink, record, group_by);
+        }
+    }
+
+    let grouped_total = aggregates.grouped_total();
+    let overflow_records = aggregates.overflow.dropped_records;
+    let super::ProjectedGroupAccumulator {
+        fields,
+        rows,
+        row_indexes: retained_group_keys,
+        overflow,
+        ..
+    } = aggregates;
+    let ranked = super::rank_compact_top_aggregates(rows, overflow.aggregate, sort_by, limit);
+    let top_group_keys = ranked
+        .rows
+        .iter()
+        .enumerate()
+        .filter_map(|(dimension_index, row)| {
+            row.group_field_ids
+                .as_ref()
+                .map(|group_key| (group_key.clone(), dimension_index))
+        })
+        .collect::<hashbrown::HashMap<_, _>>();
+    let overflow_dimension = ranked
+        .rows
+        .iter()
+        .position(|row| row.bucket_label == Some(super::OVERFLOW_BUCKET_LABEL));
+    let rows = ranked
+        .rows
+        .iter()
+        .map(|row| {
+            let labels = if let Some(bucket_label) = row.bucket_label {
+                super::synthetic_bucket_labels(bucket_label)
+            } else {
+                super::labels_for_projected_compact_flow(
+                    &fields,
+                    group_by,
+                    row.group_field_ids
+                        .as_deref()
+                        .expect("projected group field ids"),
+                )
+                .expect("materialize projected labels")
+            };
+            (labels, row.metrics.bytes, row.metrics.packets)
+        })
+        .collect();
+
+    let layout = test_timeseries_layout();
+    let mut buckets = vec![vec![0_u64; ranked.rows.len()]; layout.bucket_count];
+    {
+        let mut sink = super::ProjectedTimeseriesSink::new(
+            &fields,
+            &retained_group_keys,
+            &top_group_keys,
+            overflow_dimension,
+            sort_by,
+            layout,
+            &mut buckets,
+            group_by.len(),
+        );
+        for record in records {
+            consume_projected_test_record(&mut sink, record, group_by);
+        }
+    }
+
+    TestTimeseriesResult {
+        rows,
+        buckets,
+        grouped_total,
+        truncated: ranked.truncated,
+        other_count: ranked.other_count,
+        overflow_records,
+    }
+}
+
+fn timeseries_test_records() -> Vec<super::QueryFlowRecord> {
+    vec![
+        super::QueryFlowRecord {
+            timestamp_usec: 10_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "6".to_string()),
+                ("BYTES".to_string(), "100".to_string()),
+                ("PACKETS".to_string(), "5".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 70_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "17".to_string()),
+                ("BYTES".to_string(), "80".to_string()),
+                ("PACKETS".to_string(), "20".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 130_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "6".to_string()),
+                ("BYTES".to_string(), "50".to_string()),
+                ("PACKETS".to_string(), "10".to_string()),
+            ]),
+        },
+    ]
+}
+
+#[test]
+fn projected_timeseries_accumulation_matches_materialized() {
+    let records = timeseries_test_records();
+    let group_by = vec!["PROTOCOL".to_string()];
+
+    for sort_by in [SortBy::Bytes, SortBy::Packets] {
+        let materialized = materialized_test_timeseries(&records, &group_by, sort_by, 100, 2);
+        let projected = projected_test_timeseries(&records, &group_by, sort_by, 100, 2);
+        assert_eq!(projected, materialized);
+    }
+}
+
+#[test]
+fn projected_and_materialized_timeseries_populate_ranked_overflow() {
+    let records = vec![
+        super::QueryFlowRecord {
+            timestamp_usec: 10_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "6".to_string()),
+                ("BYTES".to_string(), "1".to_string()),
+                ("PACKETS".to_string(), "1".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 70_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "17".to_string()),
+                ("BYTES".to_string(), "100".to_string()),
+                ("PACKETS".to_string(), "10".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 130_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "1".to_string()),
+                ("BYTES".to_string(), "200".to_string()),
+                ("PACKETS".to_string(), "20".to_string()),
+            ]),
+        },
+    ];
+    let group_by = vec!["PROTOCOL".to_string()];
+
+    for (sort_by, expected_total) in [(SortBy::Bytes, 300), (SortBy::Packets, 30)] {
+        let materialized = materialized_test_timeseries(&records, &group_by, sort_by, 1, 1);
+        let projected = projected_test_timeseries(&records, &group_by, sort_by, 1, 1);
+        assert_eq!(projected, materialized);
+        assert_eq!(
+            projected.rows[0].0.get("_bucket").map(String::as_str),
+            Some(super::OVERFLOW_BUCKET_LABEL)
+        );
+        assert_eq!(
+            projected
+                .buckets
+                .iter()
+                .map(|bucket| bucket[0])
+                .sum::<u64>(),
+            expected_total
+        );
+        assert_eq!(projected.overflow_records, 2);
+    }
+}
+
+#[test]
+fn projected_timeseries_keeps_unseen_value_distinct_from_retained_missing_group() {
+    let records = vec![
+        super::QueryFlowRecord {
+            timestamp_usec: 10_000_000,
+            fields: BTreeMap::from([
+                ("BYTES".to_string(), "1".to_string()),
+                ("PACKETS".to_string(), "1".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 70_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "17".to_string()),
+                ("BYTES".to_string(), "100".to_string()),
+                ("PACKETS".to_string(), "10".to_string()),
+            ]),
+        },
+    ];
+    let group_by = vec!["PROTOCOL".to_string()];
+
+    let materialized = materialized_test_timeseries(&records, &group_by, SortBy::Bytes, 1, 1);
+    let projected = projected_test_timeseries(&records, &group_by, SortBy::Bytes, 1, 1);
+
+    assert_eq!(projected, materialized);
+    assert_eq!(
+        projected.rows[0].0.get("_bucket").map(String::as_str),
+        Some(super::OVERFLOW_BUCKET_LABEL)
+    );
+    assert_eq!(projected.rows[0].1, 100);
+    assert_eq!(
+        projected
+            .buckets
+            .iter()
+            .map(|bucket| bucket[0])
+            .sum::<u64>(),
+        100
+    );
+    assert_eq!(projected.overflow_records, 1);
+}
+
+#[test]
+fn projected_timeseries_plan_reads_only_the_selected_pass_two_metric() {
+    let request = super::FlowsRequest {
+        selections: HashMap::from([("PROTOCOL".to_string(), vec!["6".to_string()])]),
+        group_by: vec!["SRC_AS_NAME".to_string()],
+        ..super::FlowsRequest::default()
+    };
+    let selections =
+        super::CompiledSelections::compile(&request.selections).expect("compile selections");
+    let prefilter_matches = super::build_prefilter_matches(selections.prefilter_pairs());
+    let setup = super::QuerySetup {
+        sort_by: SortBy::Packets,
+        timeseries_layout: None,
+        effective_group_by: request.group_by.clone(),
+        selections,
+        prefilter_matches,
+        limit: 25,
+        spans: Vec::new(),
+        stats: HashMap::new(),
+    };
+
+    let pass1 = super::ProjectedScanPlan::for_group_totals(&setup, &request);
+    let pass2 = super::ProjectedScanPlan::for_timeseries(&setup, &request, SortBy::Packets);
+    let metric_targets = |plan: &super::ProjectedScanPlan| {
+        plan.field_specs
+            .iter()
+            .filter_map(|spec| spec.targets.metric)
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        metric_targets(&pass1),
+        vec![
+            super::ProjectedMetricField::Bytes,
+            super::ProjectedMetricField::Packets
+        ]
+    );
+    assert_eq!(
+        metric_targets(&pass2),
+        vec![super::ProjectedMetricField::Packets]
+    );
+    assert!(pass2.capture_positions.contains_key("PROTOCOL"));
+    assert!(
+        pass2.field_specs.iter().any(|spec| {
+            spec.key == b"SRC_AS_NAME" && spec.targets.action.group_slot == Some(0)
+        })
+    );
 }
 
 fn synthetic_rollup_record(group: usize, timestamp_usec: u64) -> super::QueryFlowRecord {

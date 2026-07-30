@@ -17,13 +17,13 @@ The Network Flows view exposes the same query engine through five panel types: S
 The dashboard sends one of two query modes to the plugin:
 
 - **`flows`** — the normal aggregation request. Returns top-N groups, sums of bytes and packets, optional facet counts.
-- **`autocomplete`** — for the filter ribbon. Returns up to 100 facet values matching the user's term. Matching policy is per-field: text fields use substring matching, IP and numeric fields use prefix. Term is capped at 256 bytes. Runs against in-memory facet snapshots and on-disk FST sidecars; never scans tier files. Resulting filters apply as exact equality, not substring.
+- **`autocomplete`** — for the filter ribbon. Returns up to 256 retained facet values or generated CIDR candidates. Matching policy for retained values is per-field: text fields use substring matching, IP and numeric fields use prefix. For IP address fields, `/` generates canonical IPv4/IPv6 CIDRs and returns only networks containing an address in that field's compact retention-wide vocabulary. Term is capped at 256 bytes. Retained-value lookup runs against in-memory facet snapshots and on-disk FST sidecars; CIDR validation uses only the in-memory typed IP vocabulary. Neither path scans flow tiers. Selected non-IP values use exact equality; selected IP values use exact-address or CIDR containment.
 
 A `flows` query carries:
 
 - A time range (`after` / `before`). If you omit both, the plugin uses the last 15 minutes.
 - A list of `group_by` fields (up to 10).
-- A list of `selections` — per-field IN-lists for filtering.
+- A list of `selections` — per-field IN-lists for filtering. The six IP address facets accept exact IPv4/IPv6 addresses and canonical CIDRs.
 - Optional `facets` to enrich the response with per-facet value counts.
 - A `top_n` (one of 25, 50, 100, 200, 500).
 - A `sort_by` (`bytes` or `packets`).

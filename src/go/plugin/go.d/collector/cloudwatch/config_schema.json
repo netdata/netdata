@@ -144,7 +144,10 @@
             },
             "assume_role": {
               "title": "Assume role",
-              "type": "object",
+              "type": [
+                "object",
+                "null"
+              ],
               "properties": {
                 "role_arn": {
                   "title": "Role ARN",
@@ -209,7 +212,10 @@
             "profiles": {
               "title": "Profiles",
               "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles. Higher-cardinality PrivateLink endpoint/service grains are opt-in: privatelink_endpoint_subnet, privatelink_service_az, privatelink_service_load_balancer, privatelink_service_az_load_balancer, and privatelink_service_vpc_endpoint. Billing profiles are also opt-in: billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
-              "type": "object",
+              "type": [
+                "object",
+                "null"
+              ],
               "properties": {
                 "defaults": {
                   "title": "Include defaults",
@@ -218,7 +224,10 @@
                 },
                 "include": {
                   "description": "Additional profile basenames. PrivateLink detail choices are privatelink_endpoint_subnet, privatelink_service_az, privatelink_service_load_balancer, privatelink_service_az_load_balancer, and privatelink_service_vpc_endpoint. Opt-in Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
-                  "type": "array",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
                   "maxItems": 256,
                   "uniqueItems": true,
                   "items": {
@@ -227,7 +236,10 @@
                   }
                 },
                 "exclude": {
-                  "type": "array",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
                   "maxItems": 256,
                   "uniqueItems": true,
                   "items": {
@@ -240,8 +252,10 @@
             "metrics": {
               "title": "Metrics",
               "description": "Optional per-profile metric overrides. Omit this list to collect each selected profile's default-enabled metrics. Profiles without a group keep their defaults. A group keeps its profile defaults unless defaults is false, then adds its included MetricNames.",
-              "type": "array",
-              "minItems": 1,
+              "type": [
+                "array",
+                "null"
+              ],
               "maxItems": 256,
               "uniqueItems": true,
               "items": {
@@ -262,8 +276,10 @@
                   "statistics": {
                     "title": "Default statistics",
                     "description": "Optional statistics inherited by included metrics that omit their own list. When both lists are omitted, the metric inherits every statistic declared by the profile. Named AWS statistics are case-insensitive.",
-                    "type": "array",
-                    "minItems": 1,
+                    "type": [
+                      "array",
+                      "null"
+                    ],
                     "maxItems": 256,
                     "uniqueItems": true,
                     "items": {
@@ -290,8 +306,10 @@
                         "statistics": {
                           "title": "Statistics",
                           "description": "Optional replacement for the group statistics. When both are omitted, inherit every statistic declared for this metric by the profile. Use Average, Minimum, Maximum, Sum, SampleCount, or p<N>; named statistics are case-insensitive.",
-                          "type": "array",
-                          "minItems": 1,
+                          "type": [
+                            "array",
+                            "null"
+                          ],
                           "maxItems": 256,
                           "uniqueItems": true,
                           "items": {
@@ -327,12 +345,18 @@
             "filters": {
               "title": "Resource filters",
               "description": "Selection predicates for this rule. Omit resource_tags to inherit the job default; set it to an empty list to disable the default for this rule.",
-              "type": "object",
+              "type": [
+                "object",
+                "null"
+              ],
               "properties": {
                 "resource_tags": {
                   "title": "AWS resource tag filters",
                   "description": "Replaces the job-default resource tag filters for this rule. All keys must match; any listed value may match for one key. Keys and values are exact and case-sensitive. An explicitly included profile without a safe resource-tag association is rejected.",
-                  "type": "array",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
                   "maxItems": 50,
                   "items": {
                     "type": "object",
@@ -364,7 +388,10 @@
             "query": {
               "title": "Query policy",
               "description": "Optional CloudWatch query timing overrides for this rule. Omitted fields inherit rule defaults and profile values.",
-              "type": "object",
+              "type": [
+                "object",
+                "null"
+              ],
               "properties": {
                 "period": {
                   "title": "Aggregation period",
@@ -397,16 +424,25 @@
       "rule_defaults": {
         "title": "Rule defaults",
         "description": "Job-wide defaults inherited by collection rules that do not replace them.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "filters": {
             "title": "Resource filters",
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "resource_tags": {
                 "title": "Default AWS resource tag filters",
                 "description": "Select only resources matching these exact tags unless a rule replaces or explicitly disables the list. All keys must match; any listed value may match for one key. Default-selected profiles without a safe resource-tag association are skipped with a diagnostic.",
-                "type": "array",
+                "type": [
+                  "array",
+                  "null"
+                ],
                 "maxItems": 50,
                 "items": {
                   "type": "object",
@@ -438,7 +474,10 @@
           "query": {
             "title": "Default query policy",
             "description": "Shared CloudWatch query timing inherited field-by-field by collection rules.",
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "period": {
                 "title": "Aggregation period",
@@ -464,11 +503,17 @@
       "labels": {
         "title": "Resource labels",
         "description": "Optional AWS resource tags copied to every matching Netdata chart as non-identity labels.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "resource_tags": {
             "title": "AWS resource tag labels",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "object",
               "properties": {
@@ -494,7 +539,10 @@
       "limits": {
         "title": "Collection limits",
         "description": "Operator safeguards that reject unexpectedly large compiled work without truncating collection.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "max_instances": {
             "title": "Maximum instances",
@@ -515,7 +563,10 @@
       },
       "discovery": {
         "title": "Discovery",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "refresh_every": {
             "title": "Refresh interval",
@@ -809,12 +860,11 @@
     "ui:options": {
       "tabs": [
         {
-          "title": "Base",
+          "title": "Collection",
           "fields": [
             "update_every",
             "autodetection_retry",
-            "timeout",
-            "limits"
+            "timeout"
           ]
         },
         {
@@ -830,16 +880,22 @@
           ]
         },
         {
-          "title": "Collection Rules",
+          "title": "Rules",
           "fields": [
             "rule_defaults",
             "rules"
           ]
         },
         {
-          "title": "Resource Tags",
+          "title": "Resource Labels",
           "fields": [
             "labels"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "limits"
           ]
         },
         {

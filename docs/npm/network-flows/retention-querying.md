@@ -31,15 +31,13 @@ Rollup tiers (1m, 5m, 1h) deliberately drop the high-cardinality and protocol-sp
 
 **Forced to the raw tier** (any query that filters on, groups by, or runs full-text search against these fields is rerouted to the raw tier — see [Field Reference](/docs/npm/network-flows/field-reference.md) for the per-field matrix):
 
-- `SRC_ADDR`, `DST_ADDR`, `SRC_PORT`, `DST_PORT`
+- Addresses and prefixes: `SRC_ADDR`, `DST_ADDR`, `SRC_PREFIX`, `DST_PREFIX`, `SRC_MASK`, `DST_MASK`
+- NAT: `SRC_ADDR_NAT`, `DST_ADDR_NAT`, `SRC_PORT_NAT`, `DST_PORT_NAT`
+- Transport and link details: `SRC_PORT`, `DST_PORT`, `SRC_MAC`, `DST_MAC`
 - `SRC_GEO_CITY`, `DST_GEO_CITY`, `SRC_GEO_LATITUDE`, `DST_GEO_LATITUDE`, `SRC_GEO_LONGITUDE`, `DST_GEO_LONGITUDE`
+- Routing and encapsulation: `DST_AS_PATH`, `DST_COMMUNITIES`, `DST_LARGE_COMMUNITIES`, `MPLS_LABELS`
+- IP header details: `IPTTL`, `IPV6_FLOW_LABEL`, `IP_FRAGMENT_ID`, `IP_FRAGMENT_OFFSET`
 - All `V9_*` and `IPFIX_*` raw-protocol fields.
-
-**Dropped from rollup output but do not switch tier** (the field comes back as null on rollup tiers; the planner does not reroute the query to raw):
-
-- AS path, BGP community fields (`SRC_COMMUNITIES`, `DST_COMMUNITIES`, etc.), MPLS labels, MAC addresses, NAT / post-NAT addresses, and any other field not in the preserved set below.
-
-If you need any of these fields populated in the result, force the raw tier explicitly (open a city map, add a port filter, type something into the search ribbon, or pick a window that fits inside raw-tier retention).
 
 **Preserved in rollup tiers** (these queries can use coarser tiers):
 
@@ -49,9 +47,9 @@ If you need any of these fields populated in the result, force the raw tier expl
 - Network: `SRC_NET_*` / `DST_NET_*` (name / role / site / region / tenant), `SRC_COUNTRY` / `DST_COUNTRY`, `SRC_GEO_STATE` / `DST_GEO_STATE`, `NEXT_HOP`, `SRC_VLAN` / `DST_VLAN`.
 - Aggregates: bytes / packets / flow-count sums per bucket.
 
-So rollups are fine for most country / state / ASN / interface / VLAN / protocol questions, but useless if you need to ask "which IP", "which port", "which AS path", "which MPLS label", or "where in the city".
+So rollups are fine for most country / state / ASN / interface / VLAN / protocol questions, but cannot answer "which IP", "which port", "which AS path", "which MPLS label", or "where in the city".
 
-This is why filtering or grouping by IP/port/city/lat/lon forces the query to the raw tier — there is no other tier that has those fields.
+This is why filtering or grouping by any field absent from the preserved set forces the query to the raw tier — there is no other tier that can answer it correctly.
 
 For the per-field tier-preservation matrix, see [Field Reference](/docs/npm/network-flows/field-reference.md).
 
@@ -61,7 +59,7 @@ For every query the dashboard sends to the plugin, the planner makes a single de
 
 **Rules:**
 
-1. **Any raw-only field used as a filter or group-by → raw tier.** No exception. See the "Forced to the raw tier" list above. Selecting the city map or filtering on any IP / port / city / lat / lon field (plus the `V9_*` / `IPFIX_*` raw protocol fields) falls in this category.
+1. **Any raw-only field used as a filter or group-by → raw tier.** No exception. See the complete "Forced to the raw tier" list above.
 2. **A non-empty full-text search → raw tier.** Full-text search runs as a regex against the raw journal payload, which only the raw tier carries.
 3. **Otherwise, pick the coarsest tier that satisfies the time range alignment.**
    - **Time-Series view** additionally needs at least 100 buckets in the window. The planner walks the tiers from coarsest to finest and picks the first that delivers ≥100 buckets, falling back to 1-minute when no tier qualifies:
@@ -79,7 +77,7 @@ The plugin reports the chosen tier in the response stats (`query_tier` = `0`, `1
 
 If you ask for a 30-day window with an IP filter and raw-tier retention is 24 hours, you get an empty response. No error, no banner reading "data has expired" — just an empty result set. The dashboard renders this as "No data".
 
-The planner does not fall back to a coarser tier for raw-only queries. When a span requires the raw tier (because the query filters or groups on an IP / port / city / lat / lon / V9_* / IPFIX_* field, or runs a full-text search) and that span's raw-tier files have been rotated out, the planner returns no flows for that span. Rollups never carry raw-only fields, so they cannot satisfy the query anyway. Conversely, when a span only needs preserved fields (country, ASN, exporter, interface, protocol…), the planner can fall back from a coarser tier to a finer one if the coarser files have rotated out — finer tiers are supersets of coarser tiers for the preserved fields.
+The planner does not fall back to a coarser tier for raw-only queries. When a span requires the raw tier (because the query filters or groups on any field absent from rollups, or runs a full-text search) and that span's raw-tier files have been rotated out, the planner returns no flows for that span. Rollups never carry raw-only fields, so they cannot satisfy the query anyway. Conversely, when a span only needs preserved fields (country, ASN, exporter, interface, protocol…), the planner can fall back from a coarser tier to a finer one if the coarser files have rotated out — finer tiers are supersets of coarser tiers for the preserved fields.
 
 Other spans within the same query that don't need raw data may still return flows. So it's also possible to see partial coverage — half the time range filled, half empty.
 
@@ -89,8 +87,7 @@ For Time-Series, "no data" appears as zero values in the affected buckets, not a
 
 Quick reference for "why is my query slow / showing less time?":
 
-- Adding `SRC_ADDR`, `DST_ADDR`, `SRC_PORT`, or `DST_PORT` as a filter
-- Adding any of those fields to the group-by
+- Adding any field from the raw-only list above as a filter or group-by
 - Switching to the city map (it uses `SRC_GEO_CITY`/`DST_GEO_CITY` plus latitudes/longitudes)
 - Typing anything into the global search ribbon
 
@@ -98,7 +95,7 @@ If you see the time depth in your dashboard suddenly shrink after you applied a 
 
 ## Default retention and the most common misconfiguration
 
-Each tier has its own `size_of_journal_files` and `duration_of_journal_files`. The built-in defaults are uniform: `10GB` on every tier with no time-based age limit. That is safe for first validation because disk is still capped, but production deployments should usually set tier-specific size and duration budgets; the whole point of having rollup tiers is to keep them around longer than raw.
+Each tier has its own `size_of_journal_files` and `duration_of_journal_files`. The built-in defaults are uniform: `10GB` on every tier with no time-based age limit. The size budget includes journal data and finalized per-journal facet sidecars. The protected active journal can temporarily exceed it, and shared facet state is outside the per-tier budget. Production deployments should usually set tier-specific size and duration budgets; the whole point of having rollup tiers is to keep them around longer than raw.
 
 A more useful production profile:
 

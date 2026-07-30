@@ -26,3 +26,7 @@ pub(crate) use schema::{
     HOUR_BUCKET_USEC, INTERNAL_DIRECTION_PRESENT, INTERNAL_EXPORTER_IP_PRESENT,
     INTERNAL_NEXT_HOP_PRESENT, build_rollup_flow_index, direction_from_u8,
 };
+
+pub(crate) fn rollup_field_available(field: &str) -> bool {
+    schema::rollup_field_index(field).is_some()
+}

@@ -21,7 +21,10 @@ const (
 	asyncEventServiceQuantum = lifecycle.TaskStartServiceQuantum * lifecycle.TransactionTaskPhases
 )
 
-var ErrStopped = errors.New("jobmgr kernel: stopped")
+var (
+	ErrStopped                  = errors.New("jobmgr kernel: stopped")
+	ErrShutdownDeadlineExceeded = errors.New("jobmgr kernel: shutdown deadline exceeded")
+)
 
 type submission struct {
 	request       Request                 // the command being submitted
@@ -102,12 +105,19 @@ func (pac preAdmissionControl) Unwrap() error {
 	return pac.cause
 }
 
+type preClaimStageReady struct {
+	operation *commandOperation
+}
+
 // commandOperation is one command's full lifecycle record, owned exclusively by
 // CommandKernel's run loop (the sole mutator of every field below).
 type commandOperation struct {
 	*lifecycle.OperationGeneration                                    // embedded neutral lifecycle state machine (state, response, child)
 	request                        Request                            // immutable admitted command
 	plan                           WorkPlan                           // prepared work for the command
+	stageStarted                   bool                               // pre-claim stage Start has been called
+	stagePending                   bool                               // pre-claim stage has not settled logically
+	stageReleased                  bool                               // pre-claim stage ownership has been returned
 	claims                         []string                           // normalized claim set (sorted, deduped)
 	authorityClaimEdges            []authorityClaimEdge               // per-claim edge state in the claim authority
 	claimCursor                    int                                // index of the next claim edge to acquire
@@ -230,6 +240,7 @@ type CommandKernel struct {
 	functionCleanupRequests  map[lifecycle.TaskRequestRef]FunctionCleanupRef // in-flight Function cleanup requests by request ref
 	functionCleanupBacklog   functionCleanupQueue                            // queued Function cleanup work awaiting dispatch
 	functionMutations        chan functionMutationSubmission                 // inbound Function catalog mutation submissions
+	preClaimStages           chan preClaimStageReady                         // logically settled process-owned preparation stages
 	claimYields              chan claimYieldRequest                          // task-child claim release/reacquire requests
 	functionMutationStopped  chan struct{}                                   // closed when mutation ingress is drained
 	functionMutation         functionMutationSubmission                      // the mutation currently being applied
@@ -322,6 +333,7 @@ func NewCommandKernel(
 		shutdownRequests:        make(map[lifecycle.TaskRequestRef]*commandLane),
 		shutdownTasks:           make(map[lifecycle.TaskRef]*commandLane),
 		functionMutations:       make(chan functionMutationSubmission),
+		preClaimStages:          make(chan preClaimStageReady),
 		claimYields:             make(chan claimYieldRequest, lifecycle.TaskStartServiceQuantum),
 		functionMutationStopped: make(chan struct{}),
 		lanes:                   make(map[commandLaneKey]*commandLane),
@@ -1677,7 +1689,7 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 	if !census.KernelDrained || !census.FunctionCatalogDrained ||
 		census.UIDActive != 0 || census.TransientActive != 0 ||
 		census.TransientPending != 0 || census.InheritedActive != 0 ||
-		census.LongLived.Active != census.LongLived.SecretStores {
+		census.LongLived.Active != 0 {
 		return false
 	}
 	return true
@@ -1743,10 +1755,6 @@ func (ck *CommandKernel) runFinalizerFailedTerminal() bool {
 	return ck.finalizerFailed && !ck.finalizerRequest.Valid() && !ck.finalizerTask.Valid() && ck.finalizerAction == 0
 }
 
-func (ck *CommandKernel) shutdownQuiescent() bool {
-	return ck.runCensus().Drained()
-}
-
 func (ck *CommandKernel) kernelOwnershipDrained() bool {
 	return ck.shutdownBarrierSettled() && ck.kernelStateDrained() &&
 		ck.runtimeHead == nil && ck.runtimeTail == nil &&
@@ -1806,4 +1814,15 @@ func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
 		Abandoned:              ck.abandoned,
 		RunFinalizerComplete:   ck.finalizerDone && !ck.finalizerFailed,
 	}
+}
+
+func runCensusBlockedOnlyByFrame(census lifecycle.RunCensus) bool {
+	if !census.Frame.Busy ||
+		census.Frame.Poisoned ||
+		census.Frame.PendingControl ||
+		census.Frame.RetainedBytes != 0 {
+		return false
+	}
+	census.Frame.Busy = false
+	return census.Drained()
 }

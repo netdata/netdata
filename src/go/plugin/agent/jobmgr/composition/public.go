@@ -13,6 +13,7 @@ import (
 	"time"
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
@@ -26,7 +27,17 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var ErrProcessStopped = errors.New("jobmgr composition: process stopped")
+var (
+	ErrProcessStopped         = errors.New("jobmgr composition: process stopped")
+	ErrProcessRestartRequired = errors.New("jobmgr composition: process restart required")
+)
+
+// ContainsOnlyProcessControlErrors reports whether every leaf in err matches
+// one of the allowed control dispositions. Mixed and malformed trees fail
+// closed.
+func ContainsOnlyProcessControlErrors(err error, allowed ...error) bool {
+	return jobmgr.ContainsOnlyErrorLeaves(err, allowed...)
+}
 
 type RuntimeService interface {
 	runtimecomp.Service
@@ -63,10 +74,10 @@ type Config struct {
 // generations. Restart and Terminate are acknowledged by Run returning from
 // the resulting transition or final shutdown.
 type Process struct {
-	core     *processCore        // the process core (owns ledgers, ingress, frames)
-	commands chan processControl // inbound Restart/Terminate controls
-	started  chan struct{}       // closed once Run starts
-	done     chan struct{}       // closed once Run returns
+	core     *processCore    // the process core (owns ledgers, ingress, frames)
+	controls processControls // independent Restart/Terminate delivery
+	started  chan struct{}   // closed once Run starts
+	done     chan struct{}   // closed once Run returns
 
 	mu        sync.Mutex // guards attempted/result
 	attempted bool       // Run has been attempted (once)
@@ -163,7 +174,7 @@ func NewProcess(config Config) (*Process, error) {
 	}
 	return &Process{
 		core:       core,
-		commands:   make(chan processControl),
+		controls:   newProcessControls(),
 		started:    make(chan struct{}),
 		done:       make(chan struct{}),
 		runtime:    config.Runtime,
@@ -189,7 +200,7 @@ func (p *Process) Run(ctx context.Context) error {
 			Owner: p.core.frames,
 		})
 	}
-	result := p.core.run(ctx, p.commands)
+	result := p.core.run(ctx, p.controls)
 	p.mu.Lock()
 	p.result = result
 	close(p.done)
@@ -198,15 +209,21 @@ func (p *Process) Run(ctx context.Context) error {
 }
 
 func (p *Process) Restart(ctx context.Context) error {
-	return p.send(ctx, processRestart)
+	if p == nil {
+		return errors.New("jobmgr composition: invalid process command")
+	}
+	return p.send(ctx, p.controls.restart)
 }
 
 func (p *Process) Terminate(ctx context.Context) error {
-	return p.send(ctx, processTerminate)
+	if p == nil {
+		return errors.New("jobmgr composition: invalid process command")
+	}
+	return p.send(ctx, p.controls.terminate)
 }
 
-func (p *Process) send(ctx context.Context, command processCommand) error {
-	if p == nil || ctx == nil {
+func (p *Process) send(ctx context.Context, controls chan<- processControl) error {
+	if p == nil || ctx == nil || controls == nil {
 		return errors.New("jobmgr composition: invalid process command")
 	}
 	select {
@@ -223,9 +240,9 @@ func (p *Process) send(ctx context.Context, command processCommand) error {
 	}
 	result := make(chan error, 1)
 	select {
-	case p.commands <- processControl{
-		command: command,
-		result:  result,
+	case controls <- processControl{
+		ctx:    ctx,
+		result: result,
 	}:
 	case <-p.done:
 		return ErrProcessStopped

@@ -21,6 +21,7 @@ type Scheduler struct {
 
 	reconciler ModuleReconciler                          // per-module reconciliation callback
 	retries    *autoDetectionRetryIndex                  // auto-detection retry worker
+	pending    *pendingJobIndex                          // release-triggered latest desired jobs
 	jobs       map[lifecycle.ResourceIdentity]RuntimeJob // scheduled job by identity
 	modules    map[string]int                            // scheduled job count by module
 }
@@ -32,6 +33,7 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 	return &Scheduler{
 		reconciler: reconciler,
 		retries:    newAutoDetectionRetryIndex(),
+		pending:    newPendingJobIndex(),
 		jobs:       make(map[lifecycle.ResourceIdentity]RuntimeJob),
 		modules:    make(map[string]int),
 	}, nil
@@ -40,18 +42,27 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 func (s *Scheduler) bindAutoDetectionRetries(
 	commands jobmgr.PreparedCommandPort,
 	plan autoDetectionRetryPlanner,
+	pendingPlan pendingJobPlanner,
 	run uint64,
 	failure func(error),
 ) error {
 	if s == nil {
 		return errors.New("job output: nil autodetection retry scheduler")
 	}
-	return s.retries.bind(commands, plan, run, failure)
+	if err := s.pending.bind(commands, pendingPlan, run, failure); err != nil {
+		return err
+	}
+	if err := s.retries.bind(commands, plan, run, failure); err != nil {
+		s.pending.stopWorker()
+		return err
+	}
+	return nil
 }
 
 func (s *Scheduler) StopAutoDetectionRetries() {
 	if s != nil {
 		s.retries.stopWorker()
+		s.pending.stopWorker()
 	}
 }
 
@@ -59,11 +70,10 @@ func (s *Scheduler) WaitAutoDetectionRetries(ctx context.Context) error {
 	if s == nil {
 		return errors.New("job output: nil autodetection retry scheduler")
 	}
-	return s.retries.wait(ctx)
-}
-
-func (s *Scheduler) AutoDetectionRetriesJoined() bool {
-	return s == nil || s.retries.joined()
+	return errors.Join(
+		s.retries.wait(ctx),
+		s.pending.wait(ctx),
+	)
 }
 
 func (s *Scheduler) Register(identity lifecycle.ResourceIdentity, job RuntimeJob) error {

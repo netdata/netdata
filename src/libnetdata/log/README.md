@@ -176,13 +176,14 @@ Example logrotate configuration:
 ```
 /var/log/netdata/*.log {
     daily
-    rotate 7
+    missingok
+    rotate 14
     compress
     delaycompress
-    missingok
     notifempty
+    sharedscripts
     postrotate
-        killall -USR2 netdata 2>/dev/null || true
+        /bin/kill -HUP `cat /run/netdata/netdata.pid 2>/dev/null` 2>/dev/null || true
     endscript
 }
 ```

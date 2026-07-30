@@ -366,4 +366,20 @@ mod tests {
             "expected invalid request error payload"
         );
     }
+
+    #[test]
+    fn parse_request_rejects_metric_selections_as_bad_request() {
+        for field in ["BYTES", "PACKETS", "FLOWS"] {
+            let payload = format!(r#"{{"selections":{{"{field}":["1"]}}}}"#);
+            let err = parse_flows_request(&test_call(&[], Some(&payload)))
+                .expect_err("metric selection should fail");
+            let response = String::from_utf8_lossy(&err.payload);
+
+            assert_eq!(err.status, 400);
+            assert!(
+                response.contains(&format!("unsupported selection field `{field}`")),
+                "unexpected response for {field}: {response}"
+            );
+        }
+    }
 }

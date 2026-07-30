@@ -10,21 +10,14 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 )
 
-// GenerationCarrier owns the admitted memory and external-resource facets of
-// one configured Store generation.
-type GenerationCarrier interface {
-	Valid() bool
-	Activate() error
-	Release() error
-}
-
-// SecretStore is the single per-run authority for configured Store
+// SecretStore is the single per-epoch authority for configured Store
 // generations and lexical reader scopes.
 type SecretStore struct {
 	mu sync.Mutex
 
 	state storeAuthorityState
 	dirty error
+	done  chan struct{}
 
 	records map[string]*generationRecord
 	head    *StoreGeneration
@@ -52,12 +45,93 @@ const (
 )
 
 type generationRecord struct {
-	key          string
-	stateVersion uint64
-	preparations int
-	current      *StoreGeneration
-	retiring     *StoreGeneration
+	key           string
+	stateVersion  uint64
+	preparations  int
+	current       *StoreGeneration
+	retiring      [2]*StoreGeneration
+	mutationReady chan struct{}
 }
+
+func (record *generationRecord) retirementCount() int {
+	if record == nil {
+		return 0
+	}
+	count := 0
+	for _, generation := range record.retiring {
+		if generation != nil {
+			count++
+		}
+	}
+	return count
+}
+
+func (record *generationRecord) hasRetiring() bool {
+	return record.retirementCount() != 0
+}
+
+func (record *generationRecord) retirementFull() bool {
+	if record == nil {
+		return false
+	}
+	return record.retirementCount() == len(record.retiring)
+}
+
+func (record *generationRecord) addRetiring(generation *StoreGeneration) bool {
+	if record == nil ||
+		generation == nil ||
+		generation.record != record ||
+		record.isRetiring(generation) {
+		return false
+	}
+	for index := range record.retiring {
+		if record.retiring[index] == nil {
+			record.retiring[index] = generation
+			if record.mutationReady == nil {
+				record.mutationReady = make(chan struct{})
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (record *generationRecord) isRetiring(generation *StoreGeneration) bool {
+	if record == nil || generation == nil {
+		return false
+	}
+	for _, current := range record.retiring {
+		if current == generation {
+			return true
+		}
+	}
+	return false
+}
+
+func (record *generationRecord) removeRetiring(generation *StoreGeneration) bool {
+	if record == nil || generation == nil {
+		return false
+	}
+	for index, current := range record.retiring {
+		if current != generation {
+			continue
+		}
+		copy(record.retiring[index:], record.retiring[index+1:])
+		record.retiring[len(record.retiring)-1] = nil
+		if !record.hasRetiring() && record.mutationReady != nil {
+			close(record.mutationReady)
+			record.mutationReady = nil
+		}
+		return true
+	}
+	return false
+}
+
+var immediateMutationReady = func() <-chan struct{} {
+	ready := make(chan struct{})
+	close(ready)
+	return ready
+}()
 
 // StoreGeneration is one immutable published provider generation.
 type StoreGeneration struct {
@@ -66,7 +140,6 @@ type StoreGeneration struct {
 	config     Config
 	hash       uint64
 	published  PublishedStore
-	carrier    GenerationCarrier
 	readers    int
 	previous   *StoreGeneration
 	next       *StoreGeneration
@@ -96,6 +169,7 @@ func NewSecretStore(
 		state:    storeAuthorityOpen,
 		records:  make(map[string]*generationRecord),
 		resolver: resolver,
+		done:     make(chan struct{}),
 	}, nil
 }
 
@@ -118,9 +192,7 @@ func (store *SecretStore) Census() SecretStoreCensus {
 		if record.current != nil {
 			census.Current++
 		}
-		if record.retiring != nil {
-			census.Retiring++
-		}
+		census.Retiring += record.retirementCount()
 	}
 	return census
 }
@@ -136,6 +208,24 @@ func (store *SecretStore) Generation(key string) uint64 {
 		return 0
 	}
 	return record.current.generation
+}
+
+// MutationReady closes when every generation whose retirement currently blocks
+// a same-key mutation has physically released.
+func (store *SecretStore) MutationReady(key string) <-chan struct{} {
+	if store == nil || key == "" {
+		return immediateMutationReady
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	record := store.records[key]
+	if record == nil || !record.hasRetiring() {
+		return immediateMutationReady
+	}
+	if record.mutationReady == nil {
+		record.mutationReady = make(chan struct{})
+	}
+	return record.mutationReady
 }
 
 func (store *SecretStore) Config(key string) (Config, bool) {
@@ -154,7 +244,7 @@ func (store *SecretStore) Config(key string) (Config, bool) {
 }
 
 // Retire removes the matching current generation from admission and releases
-// its carrier after all lexical readers have drained.
+// it after all lexical readers have drained.
 func (store *SecretStore) Retire(
 	ctx context.Context,
 	key string,
@@ -168,13 +258,16 @@ func (store *SecretStore) Retire(
 	if record == nil ||
 		record.current == nil ||
 		record.current.generation != generation ||
-		record.retiring != nil {
+		record.retirementFull() {
 		store.mu.Unlock()
 		return errors.New("secretstore: current generation differs")
 	}
 	retiring := record.current
+	if !record.addRetiring(retiring) {
+		store.mu.Unlock()
+		return errors.New("secretstore: current generation retirement capacity exhausted")
+	}
 	record.current = nil
-	record.retiring = retiring
 	record.stateVersion++
 	release := retiring.readers == 0
 	store.mu.Unlock()
@@ -182,6 +275,31 @@ func (store *SecretStore) Retire(
 		return store.releaseGeneration(retiring)
 	}
 	return nil
+}
+
+// Seal closes mutation and scope admission. Physical ownership may drain after
+// Seal returns; Done closes when the exact retained-state census reaches zero.
+func (store *SecretStore) Seal() error {
+	if store == nil {
+		return errors.New("secretstore: nil Store authority")
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if store.state == storeAuthorityClosed {
+		return store.dirty
+	}
+	store.state = storeAuthorityClosing
+	store.finishCloseLocked()
+	return store.dirty
+}
+
+// Done closes after a sealed Store releases every generation, reader scope,
+// and preparation.
+func (store *SecretStore) Done() <-chan struct{} {
+	if store == nil {
+		return nil
+	}
+	return store.done
 }
 
 // Close seals mutation/scope admission and acknowledges only an exact-zero
@@ -196,46 +314,50 @@ func (store *SecretStore) Close(context.Context) error {
 		return store.dirty
 	}
 	store.state = storeAuthorityClosing
-	if store.activeScopes != 0 ||
+	store.finishCloseLocked()
+	if store.state == storeAuthorityClosed {
+		return store.dirty
+	}
+	return errors.Join(
+		errors.New("secretstore: close with retained ownership"),
+		store.dirty,
+	)
+}
+
+func (store *SecretStore) finishCloseLocked() {
+	if store.state != storeAuthorityClosing ||
+		store.activeScopes != 0 ||
 		store.activePreparations != 0 ||
 		store.generations != 0 ||
 		store.readers != 0 {
-		return errors.Join(
-			errors.New("secretstore: close with retained ownership"),
-			store.dirty,
-		)
+		return
 	}
 	store.state = storeAuthorityClosed
-	return store.dirty
+	close(store.done)
 }
 
 func (store *SecretStore) releaseGeneration(
 	generation *StoreGeneration,
 ) error {
-	if generation == nil || generation.carrier == nil {
+	if generation == nil {
 		return errors.New("secretstore: invalid generation release")
 	}
-	releaseErr := callGenerationCarrierRelease(generation.carrier)
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if releaseErr != nil {
-		store.dirty = errors.Join(store.dirty, releaseErr)
-		return releaseErr
-	}
 	record := generation.record
-	if record == nil || record.retiring != generation {
+	if record == nil || !record.removeRetiring(generation) {
 		store.dirty = errors.Join(
 			store.dirty,
 			errors.New("secretstore: generation release lost ownership"),
 		)
 		return store.dirty
 	}
-	record.retiring = nil
 	record.stateVersion++
 	store.unlinkGeneration(generation)
-	if record.current == nil && record.preparations == 0 {
+	if record.current == nil && record.preparations == 0 && !record.hasRetiring() {
 		delete(store.records, record.key)
 	}
+	store.finishCloseLocked()
 	return nil
 }
 
@@ -264,28 +386,4 @@ func (store *SecretStore) unlinkGeneration(generation *StoreGeneration) {
 	generation.previous = nil
 	generation.next = nil
 	store.generations--
-}
-
-func callGenerationCarrierActivate(carrier GenerationCarrier) (err error) {
-	if carrier == nil || !carrier.Valid() {
-		return errors.New("secretstore: invalid generation carrier")
-	}
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			err = errors.New("secretstore: generation carrier activation panic")
-		}
-	}()
-	return carrier.Activate()
-}
-
-func callGenerationCarrierRelease(carrier GenerationCarrier) (err error) {
-	if carrier == nil {
-		return errors.New("secretstore: nil generation carrier")
-	}
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			err = errors.New("secretstore: generation carrier release panic")
-		}
-	}()
-	return carrier.Release()
 }

@@ -64,6 +64,7 @@ type JobConfig struct {
 	Module                  collectorapi.CollectorV1
 	Labels                  map[string]string
 	Out                     io.Writer
+	CleanupOut              io.Writer // terminal cleanup sink; defaults to Out
 	UpdateEvery             int
 	AutoDetectEvery         int
 	Priority                int
@@ -83,6 +84,9 @@ func NewJob(cfg JobConfig) *Job {
 	if cfg.UpdateEvery == 0 {
 		cfg.UpdateEvery = 1
 	}
+	if cfg.CleanupOut == nil {
+		cfg.CleanupOut = cfg.Out
+	}
 
 	j := &Job{
 		autoDetectEvery: cfg.AutoDetectEvery,
@@ -99,6 +103,7 @@ func NewJob(cfg JobConfig) *Job {
 		module:                  cfg.Module,
 		labels:                  cfg.Labels,
 		out:                     cfg.Out,
+		cleanupOut:              cfg.CleanupOut,
 		collectStatusChart:      newCollectStatusChart(cfg.PluginName),
 		collectDurationChart:    newCollectDurationChart(cfg.PluginName),
 		stopCtrl:                newStopController(),
@@ -159,6 +164,7 @@ type Job struct {
 	charts               *collectorapi.Charts
 	tick                 chan int
 	out                  io.Writer
+	cleanupOut           io.Writer
 	buf                  *bytes.Buffer
 	api                  *netdataapi.API
 
@@ -439,7 +445,7 @@ func (j *Job) Cleanup() {
 	}
 
 	if j.buf.Len() > 0 {
-		if err := commitJobOutput(j.out, j.buf.Bytes()); err != nil {
+		if err := commitJobOutput(j.cleanupOut, j.buf.Bytes()); err != nil {
 			j.Errorf("cleanup output failed: %v", err)
 		}
 	}

@@ -665,6 +665,11 @@ mod tests {
             contribution_debug_map(&actual_contribution),
             contribution_debug_map(&expected_contribution)
         );
+        assert_eq!(
+            actual_contribution.debug_string_map().get("DIRECTION"),
+            Some(&vec!["ingress".to_string()]),
+            "rollup facets must expose materialized direction text"
+        );
     }
 
     #[test]

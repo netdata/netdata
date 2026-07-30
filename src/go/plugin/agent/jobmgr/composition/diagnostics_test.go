@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/stretchr/testify/require"
@@ -48,6 +49,7 @@ func TestDiagnosticLoggerSequencesOperationalEvents(t *testing.T) {
 		Name:         "second operational event",
 		Command:      "update",
 		ResultStatus: 422,
+		Age:          1500 * time.Millisecond,
 	})
 
 	lines := strings.Split(strings.TrimSpace(output.String()), "\n")
@@ -60,4 +62,5 @@ func TestDiagnosticLoggerSequencesOperationalEvents(t *testing.T) {
 	require.Contains(t, lines[1], "event_sequence=2")
 	require.Contains(t, lines[1], "command=update")
 	require.Contains(t, lines[1], "result_status=422")
+	require.Contains(t, lines[1], "age=1.5s")
 }

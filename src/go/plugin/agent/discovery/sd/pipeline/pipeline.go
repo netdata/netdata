@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 type DiscovererFactory func(payload DiscovererPayload, source string) ([]model.Discoverer, error)
@@ -81,6 +82,33 @@ func (p *Pipeline) registerDiscoverers(conf Config, makeDiscoverers DiscovererFa
 	}
 
 	return nil
+}
+
+// Test runs the optional operational test of every configured discoverer.
+// The bool reports whether every discoverer provided an operational test.
+func (p *Pipeline) Test(ctx context.Context) (bool, error) {
+	// Test is a public capability boundary and rejects invalid operands.
+	if p == nil || ctx == nil {
+		return false, errors.New("service discovery pipeline: invalid test")
+	}
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	fullyTested := len(p.discoverers) != 0
+	for _, discoverer := range p.discoverers {
+		testable, ok := discoverer.(dyncfg.Testable)
+		if !ok {
+			fullyTested = false
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		if err := testable.Test(ctx); err != nil {
+			return false, fmt.Errorf("discoverer operational test: %w", err)
+		}
+	}
+	return fullyTested, nil
 }
 
 func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {

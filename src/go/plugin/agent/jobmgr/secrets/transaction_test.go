@@ -29,11 +29,9 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 		}},
 	)
 	require.NoError(t, err)
-	carrier := &transactionTestCarrier{}
 	mutation, err := store.PrepareMutation(
 		t.Context(),
 		catalog,
-		carrier,
 		secretstore.Config{
 			"name":            "main",
 			"kind":            string(secretstore.KindVault),
@@ -44,6 +42,7 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 		0,
 	)
 	require.NoError(t, err)
+	desiredCommitted := false
 	transaction, err := newPreparedSecretTransaction(
 		preparedSecretSpec{
 			scope: lifecycle.ResourceTransactionScope{
@@ -55,6 +54,9 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 			result:     mustSecretMessage(200, ""),
 			cleanup:    func() error { return nil },
 			controller: &Controller{},
+			commit: func() {
+				desiredCommitted = true
+			},
 		},
 	)
 	require.NoError(t, err)
@@ -64,10 +66,9 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 	_, applyErr := transaction.Apply(ctx)
 	require.NoError(t, applyErr)
 
-	require.True(t, carrier.released)
-
 	census := store.Census()
 	require.EqualValues(t, secretstore.SecretStoreCensus{}, census)
+	require.True(t, desiredCommitted)
 
 	require.NoError(t, store.Close(t.Context()))
 }
@@ -86,11 +87,9 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 		},
 	}})
 	require.NoError(t, err)
-	carrier := &transactionTestCarrier{}
 	mutation, err := store.PrepareMutation(
 		t.Context(),
 		catalog,
-		carrier,
 		secretstore.Config{
 			"name":            "main",
 			"kind":            string(secretstore.KindVault),
@@ -130,34 +129,8 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 	_, applyErr := transaction.ApplyComposite(t.Context(), commands)
 
 	require.NoError(t, applyErr)
-	require.True(t, carrier.released)
 	require.Zero(t, store.Census().Preparations)
 	require.NoError(t, store.Close(t.Context()))
-}
-
-type transactionTestCarrier struct {
-	activated bool
-	released  bool
-}
-
-func (ttc *transactionTestCarrier) Valid() bool {
-	return ttc != nil && !ttc.released
-}
-
-func (ttc *transactionTestCarrier) Activate() error {
-	if !ttc.Valid() || ttc.activated {
-		return errors.New("invalid activation")
-	}
-	ttc.activated = true
-	return nil
-}
-
-func (ttc *transactionTestCarrier) Release() error {
-	if !ttc.Valid() {
-		return errors.New("invalid release")
-	}
-	ttc.released = true
-	return nil
 }
 
 type transactionTestStore struct {
@@ -170,7 +143,11 @@ func (tts *transactionTestStore) Configuration() any {
 	return &tts.config
 }
 
-func (*transactionTestStore) Init(context.Context) error {
+func (tts *transactionTestStore) Init(context.Context) error {
+	switch tts.config.Value {
+	case "provider-failure-one", "provider-failure-two":
+		return errors.New("provider validation failed")
+	}
 	return nil
 }
 

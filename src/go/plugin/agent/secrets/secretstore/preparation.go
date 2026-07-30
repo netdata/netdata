@@ -18,17 +18,24 @@ type preparedStore struct {
 	published  PublishedStore
 }
 
-func preparePublishedConfig(
+type configuredStore struct {
+	key        string
+	rawConfig  Config
+	configHash uint64
+	store      Store
+}
+
+func configureStore(
 	ctx context.Context,
 	resolver *secretresolver.AtomicResolver,
 	cfg Config,
 	newStore func(StoreKind) (Store, bool),
-) (preparedStore, error) {
+) (configuredStore, error) {
 	if cfg == nil {
-		return preparedStore{}, fmt.Errorf("store config is nil")
+		return configuredStore{}, fmt.Errorf("store config is nil")
 	}
 	if newStore == nil {
-		return preparedStore{}, fmt.Errorf("store creator is nil")
+		return configuredStore{}, fmt.Errorf("store creator is nil")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -36,16 +43,16 @@ func preparePublishedConfig(
 
 	raw := cloneConfig(cfg)
 	if raw == nil {
-		return preparedStore{}, fmt.Errorf("store config is nil")
+		return configuredStore{}, fmt.Errorf("store config is nil")
 	}
 	if err := raw.Validate(); err != nil {
-		return preparedStore{}, err
+		return configuredStore{}, err
 	}
 	rawConfig := cloneConfig(raw)
 	rawHash := raw.Hash()
 	resolvedPayload, err := resolveProviderPayload(ctx, resolver, raw)
 	if err != nil {
-		return preparedStore{}, err
+		return configuredStore{}, err
 	}
 
 	kind := raw.Kind()
@@ -53,40 +60,61 @@ func preparePublishedConfig(
 
 	store, ok := newStore(kind)
 	if !ok {
-		return preparedStore{}, fmt.Errorf("store kind '%s' is not supported", kind)
+		return configuredStore{}, fmt.Errorf("store kind '%s' is not supported", kind)
 	}
 	if store.Configuration() == nil {
-		return preparedStore{}, fmt.Errorf("store '%s': configuration is nil", key)
+		return configuredStore{}, fmt.Errorf("store '%s': configuration is nil", key)
 	}
 
 	bs, err := yaml.Marshal(raw)
 	if err != nil {
-		return preparedStore{}, fmt.Errorf("store '%s': marshaling raw config: %w", key, err)
+		return configuredStore{}, fmt.Errorf("store '%s': marshaling raw config: %w", key, err)
 	}
 	if len(resolvedPayload) != 0 {
 		maps.Copy(raw, resolvedPayload)
 		bs, err = yaml.Marshal(raw)
 		if err != nil {
-			return preparedStore{}, fmt.Errorf("store '%s': marshaling resolved config: %w", key, err)
+			return configuredStore{}, fmt.Errorf("store '%s': marshaling resolved config: %w", key, err)
 		}
 	}
 	if err := yaml.Unmarshal(bs, store.Configuration()); err != nil {
-		return preparedStore{}, fmt.Errorf("store '%s': invalid provider payload: %w", key, err)
+		return configuredStore{}, fmt.Errorf("store '%s': invalid provider payload: %w", key, err)
 	}
 
 	if err := store.Init(ctx); err != nil {
-		return preparedStore{}, err
+		return configuredStore{}, err
 	}
 
-	published := store.Publish()
-	if published == nil {
-		return preparedStore{}, fmt.Errorf("store '%s': published resolver state is nil", key)
-	}
-
-	return preparedStore{
+	return configuredStore{
 		key:        key,
 		rawConfig:  rawConfig,
 		configHash: rawHash,
+		store:      store,
+	}, nil
+}
+
+func preparePublishedConfig(
+	ctx context.Context,
+	resolver *secretresolver.AtomicResolver,
+	cfg Config,
+	newStore func(StoreKind) (Store, bool),
+) (preparedStore, error) {
+	configured, err := configureStore(ctx, resolver, cfg, newStore)
+	if err != nil {
+		return preparedStore{}, err
+	}
+	published := configured.store.Publish()
+	if published == nil {
+		return preparedStore{}, fmt.Errorf(
+			"store '%s': published resolver state is nil",
+			configured.key,
+		)
+	}
+
+	return preparedStore{
+		key:        configured.key,
+		rawConfig:  configured.rawConfig,
+		configHash: configured.configHash,
 		published:  published,
 	}, nil
 }

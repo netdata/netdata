@@ -192,9 +192,21 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				terminal = ck.shutdownDeadlineExceededTerminal(terminal)
 				return
 			}
-			if ck.shutdownQuiescent() || ck.runShutdownBarrierFailedTerminal() || ck.runFinalizerFailedTerminal() {
-				terminal = errors.Join(terminal, ck.run.Terminal(ck.runCensus()))
+			census := ck.runCensus()
+			if census.Drained() || ck.runShutdownBarrierFailedTerminal() || ck.runFinalizerFailedTerminal() {
+				terminal = errors.Join(terminal, ck.run.Terminal(census))
 				return
+			}
+			if runCensusBlockedOnlyByFrame(census) {
+				idle, err := ck.frames.ArmRunIdleNotification(ck.run.Generation())
+				if err != nil {
+					ck.run.Dirty(err)
+					terminal = errors.Join(terminal, ck.run.Terminal(census))
+					return
+				}
+				if idle {
+					continue
+				}
 			}
 		}
 		if moreDeadlines || moreControls || moreSubmissions || moreFunctionCleanups ||
@@ -246,6 +258,8 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			ck.acknowledgeTask(acknowledgement)
 		case request := <-ck.claimYields:
 			ck.serviceClaimYield(request)
+		case stage := <-ck.preClaimStages:
+			ck.servicePreClaimStage(stage)
 		case <-deadlineC:
 			deadlineC = nil
 			cancelDeadline = nil
@@ -276,7 +290,7 @@ func (ck *CommandKernel) serviceClaimSettlements(quantum int) bool {
 }
 
 func (ck *CommandKernel) serviceOneAsyncEvent() bool {
-	const sources = 5
+	const sources = 6
 	for offset := range sources {
 		source := (int(ck.nextAsyncEvent) + offset) % sources
 		switch source {
@@ -321,6 +335,14 @@ func (ck *CommandKernel) serviceOneAsyncEvent() bool {
 			select {
 			case request := <-ck.claimYields:
 				ck.serviceClaimYield(request)
+				ck.nextAsyncEvent = 5
+				return true
+			default:
+			}
+		case 5:
+			select {
+			case stage := <-ck.preClaimStages:
+				ck.servicePreClaimStage(stage)
 				ck.nextAsyncEvent = 0
 				return true
 			default:
@@ -452,7 +474,7 @@ func (ck *CommandKernel) hasRunnableSubmissions() bool {
 func (ck *CommandKernel) shutdownDeadlineExceededTerminal(prev error) error {
 	return errors.Join(
 		prev,
-		errors.New("jobmgr kernel: shutdown deadline exceeded"),
+		ErrShutdownDeadlineExceeded,
 		ck.run.Terminal(ck.runCensus()),
 	)
 }

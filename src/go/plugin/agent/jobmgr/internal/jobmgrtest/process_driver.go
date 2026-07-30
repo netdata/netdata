@@ -22,10 +22,10 @@ type ProcessDriver struct{}
 type ProcessScenario string
 
 var processRuntimeScenarios = map[ProcessScenario]func(context.Context) error{
-	"restart waits for old Cleanup":              runProcessRestart,
-	"noncooperative Cleanup remains owned":       runProcessNoncooperativeShutdown,
-	"input fence cleans up exactly once":         runProcessInputFence,
-	"repeated stop invokes Cleanup exactly once": runCollectorRepeatedStop,
+	"restart rotates while old Cleanup is retained": runProcessRestart,
+	"noncooperative Cleanup remains owned":          runProcessNoncooperativeShutdown,
+	"input fence cleans up exactly once":            runProcessInputFence,
+	"repeated stop invokes Cleanup exactly once":    runCollectorRepeatedStop,
 }
 
 func ProcessScenarios() map[ProcessScenario]struct{} {
@@ -50,6 +50,7 @@ func (d *ProcessDriver) Run(ctx context.Context, scenario ProcessScenario) error
 type processFixture struct {
 	process *composition.Process
 	input   *io.PipeWriter
+	output  *synchronizedBuffer
 	state   *agentFixtureState
 	cancel  context.CancelFunc
 	done    chan struct{}
@@ -108,6 +109,7 @@ func startProcessFixture(
 	fixture := &processFixture{
 		process: process,
 		input:   writer,
+		output:  output,
 		state:   state,
 		cancel:  cancel,
 		done:    make(chan struct{}),
@@ -152,12 +154,14 @@ func runProcessRestart(ctx context.Context) error {
 	}
 	defer fixture.close()
 	defer releaseCleanup()
+	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest create running single "
 	if err := waitUntil(ctx, func() bool {
-		return state.count("check") == 1
+		return state.count("check") == 1 && fixture.output.contains(runningPublication)
 	}); err != nil {
 		_ = fixture.input.Close()
 		return err
 	}
+	initialRunning := fixture.output.count(runningPublication)
 	restarted := make(chan error, 1)
 	go func() {
 		restarted <- fixture.process.Restart(ctx)
@@ -170,17 +174,6 @@ func runProcessRestart(ctx context.Context) error {
 	}
 	select {
 	case err := <-restarted:
-		_ = fixture.input.Close()
-		return fmt.Errorf("restart returned before old Cleanup disposition: %v", err)
-	case <-time.After(50 * time.Millisecond):
-	}
-	if state.count("init") != 1 {
-		_ = fixture.input.Close()
-		return errors.New("replacement initialized before old Cleanup disposition")
-	}
-	releaseCleanup()
-	select {
-	case err := <-restarted:
 		if err != nil {
 			_ = fixture.input.Close()
 			return err
@@ -189,8 +182,19 @@ func runProcessRestart(ctx context.Context) error {
 		_ = fixture.input.Close()
 		return ctx.Err()
 	}
+	select {
+	case <-time.After(50 * time.Millisecond):
+	case <-ctx.Done():
+		_ = fixture.input.Close()
+		return ctx.Err()
+	}
+	if fixture.output.count(runningPublication) != initialRunning {
+		_ = fixture.input.Close()
+		return errors.New("replacement activated while old Cleanup retained physical ownership")
+	}
+	releaseCleanup()
 	if err := waitUntil(ctx, func() bool {
-		return state.count("check") == 2
+		return fixture.output.count(runningPublication) == initialRunning+1
 	}); err != nil {
 		_ = fixture.input.Close()
 		return err
@@ -205,8 +209,8 @@ func runProcessRestart(ctx context.Context) error {
 	if err := fixture.wait(ctx); err != nil {
 		return err
 	}
-	if got := state.count("cleanup"); got != 2 {
-		return fmt.Errorf("process cleanup count=%d, want 2", got)
+	if cleanups, initialized := state.count("cleanup"), state.count("init"); cleanups != initialized {
+		return fmt.Errorf("process cleanup count=%d, initialized generations=%d", cleanups, initialized)
 	}
 	return nil
 }
@@ -309,8 +313,9 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 		releaseCleanup()
 		_ = fixture.input.Close()
 	}()
+	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest create running single "
 	if err := waitUntil(ctx, func() bool {
-		return state.count("check") == 1
+		return state.count("check") == 1 && fixture.output.contains(runningPublication)
 	}); err != nil {
 		return err
 	}

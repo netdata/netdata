@@ -60,6 +60,7 @@ type FrameOwner struct {
 	writer          io.Writer
 	busy            bool
 	pendingControl  bool
+	idleWakeArmed   bool
 	poisoned        bool
 	poisonErr       error
 	retained        []byte
@@ -136,8 +137,27 @@ func (fo *FrameOwner) ReleaseRunNotifications(generation uint64) error {
 	fo.onPoisoned = nil
 	fo.runtimeObserver = nil
 	fo.pendingControl = false
+	fo.idleWakeArmed = false
 	fo.available.Broadcast()
 	return nil
+}
+
+// ArmRunIdleNotification requests one run wake when the current frame commit
+// releases the writer. An already-idle writer requires immediate recensus.
+func (fo *FrameOwner) ArmRunIdleNotification(generation uint64) (idle bool, err error) {
+	if fo == nil || generation == 0 {
+		return false, errors.New("jobmgr frame owner: invalid idle notification")
+	}
+	fo.stateMu.Lock()
+	defer fo.stateMu.Unlock()
+	if fo.runBinding != generation || fo.onControlReady == nil || fo.onPoisoned == nil {
+		return false, errors.New("jobmgr frame owner: stale idle notification")
+	}
+	if !fo.busy {
+		return true, nil
+	}
+	fo.idleWakeArmed = true
+	return false, nil
 }
 
 func PrepareFrame(uid string, result SealedResult, expiry int64) (PreparedFrame, error) {
@@ -412,6 +432,8 @@ func (fo *FrameOwner) writeAndRelease(payload []byte, borrowed bool, transaction
 	fo.stateMu.Lock()
 	fo.busy = false
 	pending := fo.pendingControl
+	idleWake := fo.idleWakeArmed
+	fo.idleWakeArmed = false
 	notify := fo.onControlReady
 	observer := fo.runtimeObserver
 	fo.available.Broadcast()
@@ -419,7 +441,7 @@ func (fo *FrameOwner) writeAndRelease(payload []byte, borrowed bool, transaction
 	if observer != nil {
 		observer.AddRuntimeCounter(RuntimeCounterFramesCommitted, 1)
 	}
-	if pending && notify != nil {
+	if (pending || idleWake) && notify != nil {
 		notify()
 	}
 	return nil
@@ -454,6 +476,7 @@ func (fo *FrameOwner) poison(payload []byte, cause error) {
 	first := !fo.poisoned
 	fo.poisoned = true
 	fo.busy = false
+	fo.idleWakeArmed = false
 	if first {
 		fo.poisonErr = errors.Join(ErrFrameOwnerPoisoned, cause)
 		fo.retained = payload

@@ -28,12 +28,12 @@ type Callbacks[C Config] interface {
 	// including pre-start cleanup and post-fail retry scheduling.
 	// Return CodedError to override the default 422 failure response.
 	// Used by CmdEnable and CmdUpdate (conversion only).
-	Start(cfg C) error
+	Start(fn Function, cfg C) error
 
 	// Update handles non-conversion config updates (dyncfg->dyncfg).
 	// Called after caches are already updated; the callback owns the runtime
 	// transition semantics.
-	Update(oldCfg, newCfg C) error
+	Update(fn Function, oldCfg, newCfg C) error
 
 	// Stop stops all work and cleans up all component state for a config.
 	// Safe to call for non-running configs (all ops are no-ops).
@@ -306,7 +306,7 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 
 	newCfg, err := h.cb.ParseAndValidate(fn, name)
 	if err != nil {
-		h.api.SendCodef(fn, 400, "%v", err)
+		h.api.SendCodef(fn, callbackErrorCode(err, 400), "%v", err)
 		return
 	}
 	if h.cb.ConfigType(newCfg) != ConfigTypeJob {
@@ -361,7 +361,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 		return
 	}
 
-	err := h.cb.Start(entry.Cfg)
+	err := h.cb.Start(fn, entry.Cfg)
 	if err != nil {
 		entry.Status = StatusFailed
 
@@ -452,7 +452,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 
 	newCfg, err := h.cb.ParseAndValidate(fn, name)
 	if err != nil {
-		h.api.SendCodef(fn, 400, "%v", err)
+		h.api.SendCodef(fn, callbackErrorCode(err, 400), "%v", err)
 		h.NotifyConfigStatus(entry.Cfg, entry.Status)
 		return
 	}
@@ -498,16 +498,16 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	}
 
 	if isConversion {
-		err = h.cb.Start(newCfg)
+		err = h.cb.Start(fn, newCfg)
 	} else {
-		err = h.cb.Update(oldCfg, newCfg)
+		err = h.cb.Update(fn, oldCfg, newCfg)
 	}
 	if err != nil {
 		if !isConversion && errors.Is(err, ErrNonDisruptiveUpdate) {
 			h.seen.Remove(newCfg)
 			h.seen.Add(oldCfg)
 			h.exposed.Add(entry)
-			h.api.SendCodef(fn, 200, "%v", err)
+			h.api.SendCodef(fn, callbackErrorCode(err, 200), "%v", err)
 			h.NotifyConfigStatus(oldCfg, oldStatus)
 			return
 		}
@@ -533,6 +533,13 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	h.api.SendCodef(fn, 200, "")
 	h.NotifyConfigStatus(newCfg, StatusRunning)
 	h.cb.OnStatusChange(newEntry, oldStatus, fn)
+}
+
+func callbackErrorCode(err error, fallback int) int {
+	if ce, ok := errors.AsType[CodedError](err); ok {
+		return ce.DyncfgCode()
+	}
+	return fallback
 }
 
 // addRejection runs CmdAdd's deterministic pre-validation gates.

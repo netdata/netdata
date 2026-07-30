@@ -14,12 +14,11 @@ type LongLivedClass uint8
 const (
 	LongLivedPipeline LongLivedClass = iota + 1
 	LongLivedJob
-	LongLivedSecretStore
 )
 
 type LongLivedPlan struct {
 	providerKeys []string       // secret-provider keys this plan pins (pipeline class)
-	class        LongLivedClass // permit class: pipeline, job, or secret store
+	class        LongLivedClass // permit class: pipeline or job
 }
 
 func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
@@ -43,12 +42,6 @@ func NewJobLongLivedPlan() LongLivedPlan {
 	}
 }
 
-func NewSecretStoreLongLivedPlan() LongLivedPlan {
-	return LongLivedPlan{
-		class: LongLivedSecretStore,
-	}
-}
-
 func (llp LongLivedPlan) Validate() error {
 	switch llp.class {
 	case LongLivedPipeline:
@@ -58,10 +51,6 @@ func (llp LongLivedPlan) Validate() error {
 	case LongLivedJob:
 		if len(llp.providerKeys) != 0 {
 			return errors.New("jobmgr long-lived permit: invalid job facets")
-		}
-	case LongLivedSecretStore:
-		if len(llp.providerKeys) != 0 {
-			return errors.New("jobmgr long-lived permit: invalid SecretStore facets")
 		}
 	default:
 		return errors.New("jobmgr long-lived permit: invalid class")
@@ -83,7 +72,7 @@ func validPipelineProviderKeys(keys []string) bool {
 
 func (llp LongLivedPlan) validateReplacementClass() error {
 	switch llp.class {
-	case LongLivedJob, LongLivedSecretStore:
+	case LongLivedJob:
 		return nil
 	default:
 		return errors.New("jobmgr long-lived permit: class cannot replace a resource")
@@ -109,7 +98,7 @@ func (llp LongLivedPermit) Valid() bool {
 	if llp.supervisor == nil || !llp.ref.valid() || !llp.owner.Valid() {
 		return false
 	}
-	return llp.class >= LongLivedPipeline && llp.class <= LongLivedSecretStore
+	return llp.class >= LongLivedPipeline && llp.class <= LongLivedJob
 }
 
 func (llp LongLivedPermit) Owner() ResourceIdentity { return llp.owner }
@@ -176,7 +165,6 @@ type longLivedRegistry struct {
 
 type longLivedSlot struct {
 	owner    ResourceIdentity                  // owning resource identity
-	class    LongLivedClass                    // permit class
 	gClaims  map[longLivedGKey]longLivedGState // per-inherited-task facet states (one 'G' facet per inherited task)
 	external longLivedExternalState            // class-derived external resource state
 }
@@ -202,8 +190,7 @@ const (
 )
 
 type LongLivedCensus struct {
-	Active       int // total active long-lived permits
-	SecretStores int // active secret-store-class permits
+	Active int // total active long-lived permits
 }
 
 func longLivedGClaims(plan LongLivedPlan) map[longLivedGKey]longLivedGState {
@@ -263,15 +250,11 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(owner ResourceIdentity, plan Long
 	}
 	*slot = longLivedSlot{
 		owner:    owner,
-		class:    plan.class,
 		gClaims:  gClaims,
 		external: longLivedExternalReserved,
 	}
 	registry.owners[owner] = ref
 	registry.census.Active++
-	if plan.class == LongLivedSecretStore {
-		registry.census.SecretStores++
-	}
 	registry.mu.Unlock()
 	return LongLivedPermit{
 		supervisor: ts,
@@ -281,15 +264,15 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(owner ResourceIdentity, plan Long
 	}, nil
 }
 
-func (registry *longLivedRegistry) allocateSlot() (LongLivedPermitRef, *longLivedSlot, error) {
-	next := registry.nextSlot + 1
+func (llr *longLivedRegistry) allocateSlot() (LongLivedPermitRef, *longLivedSlot, error) {
+	next := llr.nextSlot + 1
 	if next == 0 {
 		return 0, nil, errors.New("jobmgr long-lived permit: reference space exhausted")
 	}
-	registry.nextSlot = next
+	llr.nextSlot = next
 	ref := LongLivedPermitRef(next)
 	slot := &longLivedSlot{}
-	registry.slots[ref] = slot
+	llr.slots[ref] = slot
 	return ref, slot, nil
 }
 
@@ -347,9 +330,6 @@ func (ts *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner Re
 	delete(registry.owners, slot.owner)
 	delete(registry.slots, ref)
 	registry.census.Active--
-	if slot.class == LongLivedSecretStore {
-		registry.census.SecretStores--
-	}
 	return nil
 }
 
@@ -371,9 +351,6 @@ func (ts *TaskSupervisor) abandonLongLivedOwner(owner ResourceIdentity) int {
 	delete(registry.owners, owner)
 	delete(registry.slots, ref)
 	registry.census.Active--
-	if slot.class == LongLivedSecretStore {
-		registry.census.SecretStores--
-	}
 	return 1
 }
 

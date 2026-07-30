@@ -111,12 +111,12 @@ func (tac TaskAbandonmentCensus) Empty() bool {
 	return tac == (TaskAbandonmentCensus{})
 }
 
-func (abandonment TaskAbandonment) OwnershipCount() int {
-	count := abandonment.LongLivedPermits
-	if abandonment.Outcome != TaskOutcomeNone {
+func (ta TaskAbandonment) OwnershipCount() int {
+	count := ta.LongLivedPermits
+	if ta.Outcome != TaskOutcomeNone {
 		count++
 	}
-	if abandonment.Cleanup {
+	if ta.Cleanup {
 		count++
 	}
 	return count
@@ -419,7 +419,7 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 		}
 		initial = TaskOutcome{}
 		var permit LongLivedPermit
-		if plan.transactionScope.Successor.Valid() {
+		if plan.permitPlan.Class() != 0 {
 			permit, err = ts.IssueLongLivedPermit(plan.permitOwner, plan.permitPlan)
 			if err != nil {
 				return TaskRef{}, err
@@ -818,7 +818,6 @@ func (ts *TaskSupervisor) runChild(
 	} else if !outcome.empty() {
 		slot.outcome = outcome
 	}
-	outcome = TaskOutcome{}
 	slot.sequence = 1
 	ts.completions <- TaskCompletion{
 		Ref:      ref,
@@ -987,7 +986,7 @@ func normalizeStoppingCancellation(err error, cause error) error {
 	if !ok {
 		return err
 	}
-	if !allErrorLeavesMatch(err, func(leaf error) bool {
+	if !AllErrorLeavesMatch(err, func(leaf error) bool {
 		return leaf == context.Canceled
 	}) {
 		return err
