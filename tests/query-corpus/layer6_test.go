@@ -2,12 +2,14 @@
 
 // Layer 6 — two-pass (hierarchical) group-by: pass 2 consumes finalized
 // pass-1 groups. Pass-2 average divides by contributing pass-1 groups;
-// anomaly metadata remains weighted by the raw metric contributors beneath
-// those groups.
+// finalized anomaly metadata remains weighted by the raw metric contributors
+// beneath those groups. Raw output retains the old Agent-Cloud merge contract:
+// its single count field counts prior-pass groups because it can also be the
+// value divisor for a Cloud-rewritten average.
 //
 // Consequences, pinned here:
-//   - chains without an average boundary are the surgical contributor-weight
-//     contract;
+//   - non-raw chains without an average boundary are the surgical
+//     contributor-weight contract;
 //   - sum→average is held separately because its value and metadata need
 //     different denominators;
 //   - CASE-018 distinguishes the correct mean of finalized pass-1 averages
@@ -70,7 +72,8 @@ func l6Pass1(agg string, group []l5Member, i int) (acc, ar float64, gbc int) {
 // unconverted into the pass-2 aggregation; a final AVERAGE divides by
 // the number of contributing pass-1 groups. ARP instead divides the sum
 // of raw member anomaly rates by the number of raw metric contributors.
-// Raw mode keeps that numerator and exposes the raw contributor count.
+// Raw mode keeps that numerator but exposes the prior-pass group count required
+// by the existing Agent-Cloud merge contract.
 func l6Expected(agg1, agg2 string, pass1Groups [][]l5Member, i int, raw bool) (val, ar float64, gbc int, partial, empty bool) {
 	var acc, arTotal float64
 	groups := 0
@@ -114,7 +117,7 @@ func l6Expected(agg1, agg2 string, pass1Groups [][]l5Member, i int, raw bool) (v
 		partial = true
 	}
 	if raw {
-		return acc, arTotal, contributors, partial, false
+		return acc, arTotal, groups, partial, false
 	}
 	if agg2 == "average" {
 		acc /= float64(groups)
@@ -132,14 +135,16 @@ func TestL6ContributorWeightedMetadataOracle(t *testing.T) {
 		},
 	}
 	for _, raw := range []bool{false, true} {
-		_, arp, contributors, _, empty := l6Expected("sum", "sum", groups, 1, raw)
+		_, arp, count, _, empty := l6Expected("sum", "sum", groups, 1, raw)
 		wantARP := 25.0
+		wantCount := 4
 		if raw {
 			wantARP = 100
+			wantCount = 2
 		}
-		if empty || arp != wantARP || contributors != 4 {
-			t.Errorf("raw=%v: arp=%v contributors=%d empty=%v, want %v/4/false",
-				raw, arp, contributors, empty, wantARP)
+		if empty || arp != wantARP || count != wantCount {
+			t.Errorf("raw=%v: arp=%v count=%d empty=%v, want %v/%d/false",
+				raw, arp, count, empty, wantARP, wantCount)
 		}
 	}
 }
@@ -166,8 +171,8 @@ func l6Groups(key1, key2 string, members []l5Member) map[string][][]l5Member {
 type l6AggChain struct{ agg1, agg2 string }
 
 // TestLayer6TwoPassMatrix covers chains with no average boundary. Their
-// pass-1 accumulator is already the value consumed by pass 2, so raw
-// contributor counts can be propagated without changing a value divisor.
+// non-raw anomaly metadata can use raw-contributor weights without changing a
+// value divisor; raw output retains its prior-pass group count.
 func TestLayer6TwoPassMatrix(t *testing.T) {
 	trackContract(t, "L6/two-pass-matrix")
 
@@ -276,7 +281,8 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) {
 								if pt.Count == nil {
 									t.Errorf("%q row %d: raw point has no count", gname, i)
 								} else if *pt.Count != int64(wantGbc) {
-									t.Errorf("%q row %d: count %d, want %d raw contributors", gname, i, *pt.Count, wantGbc)
+									t.Errorf("%q row %d: count %d, want %d prior-pass groups",
+										gname, i, *pt.Count, wantGbc)
 								}
 							} else if pt.Count != nil {
 								t.Errorf("%q row %d: count %d is present, want absent", gname, i, *pt.Count)
@@ -392,7 +398,7 @@ func TestCase018MultipassAverage(t *testing.T) {
 // hidden member) taints the final point PARTIAL through the hgbc top
 // bit. Non-raw converts v*100/(v+h); raw converts NOTHING — the value
 // stays the visible accumulator, the hidden accumulator rides the wire,
-// and the point count is the number of visible raw metric contributors.
+// and the point count remains the number of visible prior-pass groups.
 func TestLayer6TwoPassPercentage(t *testing.T) {
 	trackContract(t, "L6/two-pass-percentage")
 
@@ -548,11 +554,11 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 						}
 						if raw && !empty {
 							if pt.Count == nil {
-								t.Errorf("%q row %d: count is absent, want %d visible raw contributors",
-									fk, i, visibleContributors)
-							} else if *pt.Count != int64(visibleContributors) {
-								t.Errorf("%q row %d: count %d, want %d visible raw contributors",
-									fk, i, *pt.Count, visibleContributors)
+								t.Errorf("%q row %d: count is absent, want %d visible prior-pass groups",
+									fk, i, visibleGroups)
+							} else if *pt.Count != int64(visibleGroups) {
+								t.Errorf("%q row %d: count %d, want %d visible prior-pass groups",
+									fk, i, *pt.Count, visibleGroups)
 							}
 						} else if pt.Count != nil {
 							t.Errorf("%q row %d: count %d is present, want absent", fk, i, *pt.Count)
