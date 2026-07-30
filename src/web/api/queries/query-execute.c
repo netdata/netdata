@@ -74,13 +74,18 @@ static NETDATA_DOUBLE query_point_grouping_value(
         }                                                               \
 } while(0)
 
-#define query_add_point_to_group(r, point, ops, add_flush)        do {  \
+#define query_add_point_to_group(r, point, ops, add_flush, now_end_time, source_end_time) do { \
     if(likely(netdata_double_isnumber((point).value))) {                \
         if(likely(fpclassify((point).value) != FP_ZERO))                \
             (ops)->group_points_non_zero++;                             \
                                                                         \
-        if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
-            (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
+        if(unlikely((point).sp.flags & SN_FLAG_RESET)) {                \
+            time_t _row_start =                                        \
+                (now_end_time) - (ops)->view_update_every;              \
+            if((source_end_time) > _row_start &&                        \
+               (source_end_time) <= (now_end_time))                     \
+                (ops)->group_value_flags |= RRDR_VALUE_RESET;           \
+        }                                                               \
                                                                         \
         NETDATA_DOUBLE grouping_value =                                    \
             query_point_grouping_value(point, ops, add_flush);             \
@@ -350,7 +355,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 if(likely(new_point.sp.end_time_s > now_start_time)) { // likely to favor tier0
                     // this db point ends after our now_start time
 
-                    query_add_point_to_group(r, new_point, ops, add_flush);
+                    query_add_point_to_group(
+                        r, new_point, ops, add_flush, now_end_time, new_point.sp.end_time_s);
                     new_point.added = true;
                 }
                 else {
@@ -415,10 +421,12 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             // but, we don't need it
 
             QUERY_POINT current_point;
+            time_t source_end_time;
 
             if(likely(now_end_time > new_point.sp.start_time_s)) {
                 // it is time for our NEW point to be used
                 current_point = new_point;
+                source_end_time = new_point.sp.end_time_s;
                 new_point.added = true; // first copy, then set it, so that new_point will not be added again
                 query_interpolate_point(current_point, last1_point, now_end_time);
 
@@ -438,6 +446,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             else if(likely(now_end_time <= last1_point.sp.end_time_s)) {
                 // our LAST point is still valid
                 current_point = last1_point;
+                source_end_time = last1_point.sp.end_time_s;
                 last1_point.added = true; // first copy, then set it, so that last1_point will not be added again
                 query_interpolate_point(current_point, last2_point, now_end_time);
 
@@ -456,9 +465,11 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             else {
                 // a GAP, we don't have a value this time
                 current_point = QUERY_POINT_EMPTY;
+                source_end_time = 0;
             }
 
-            query_add_point_to_group(r, current_point, ops, add_flush);
+            query_add_point_to_group(
+                r, current_point, ops, add_flush, now_end_time, source_end_time);
 
             rrdr_line = rrdr_line_init(r, now_end_time, rrdr_line);
             size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
