@@ -718,6 +718,38 @@ fn request_deserialization_supports_autocomplete_mode() {
 }
 
 #[test]
+fn request_deserialization_accepts_ipv4_and_ipv6_cidr_selections() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{
+            "selections": {
+                "src_addr": ["10.1.2.99/24", "2001:db8:1::abcd/48"],
+                "src_prefix": ["10.0.0.0/8"]
+            }
+        }"#,
+    )
+    .expect("CIDR selections should deserialize");
+
+    assert_eq!(
+        request.selections["SRC_ADDR"],
+        ["10.1.2.99/24", "2001:db8:1::abcd/48"]
+    );
+    assert_eq!(request.selections["SRC_PREFIX"], ["10.0.0.0/8"]);
+}
+
+#[test]
+fn request_deserialization_rejects_invalid_cidr_on_ip_address_facets_only() {
+    let error = serde_json::from_str::<FlowsRequest>(r#"{"selections":{"src_addr":["10/8"]}}"#)
+        .expect_err("loose CIDR shorthand must be autocomplete-only");
+    assert!(
+        error.to_string().contains("invalid CIDR selection `10/8`"),
+        "unexpected error: {error}"
+    );
+
+    serde_json::from_str::<FlowsRequest>(r#"{"selections":{"src_prefix":["10/8"]}}"#)
+        .expect("stored prefix facets keep exact string selection semantics");
+}
+
+#[test]
 fn request_deserialization_rejects_oversized_autocomplete_term() {
     let term = "x".repeat(257);
     let payload = format!(r#"{{"mode":"autocomplete","field":"src_as_name","term":"{term}"}}"#);
@@ -1112,7 +1144,8 @@ fn facet_vocabularies_keep_selected_values_without_retained_vocabulary() {
         .find(|entry| entry["field"] == "SRC_ADDR")
         .expect("source address facet");
     assert_eq!(src_addr["total_values"], 0);
-    assert_eq!(src_addr["autocomplete"], false);
+    assert_eq!(src_addr["truncated"], false);
+    assert_eq!(src_addr["autocomplete"], true);
     assert_eq!(
         src_addr["values"][0],
         json!({
@@ -1227,6 +1260,38 @@ fn facet_vocabularies_keep_exact_value_limit_untruncated() {
     assert_eq!(values.len(), super::FACET_STATIC_VALUE_LIMIT);
     assert_eq!(values.first().copied(), Some("AS00000 PROVIDER"));
     assert_eq!(values.last().copied(), Some(expected_last.as_str()));
+}
+
+#[test]
+fn ip_facets_keep_complete_inline_values_while_advertising_autocomplete() {
+    let requested_fields = vec!["SRC_ADDR".to_string()];
+    let published_values = (0..super::FACET_STATIC_VALUE_LIMIT)
+        .map(|index| std::net::Ipv4Addr::from(0xc000_0200_u32 + index as u32).to_string())
+        .collect::<Vec<_>>();
+    let facets = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &HashMap::new(),
+        &BTreeMap::from([(
+            "SRC_ADDR".to_string(),
+            crate::facet_runtime::FacetPublishedField {
+                total_values: published_values.len(),
+                autocomplete: false,
+                values: published_values,
+            },
+        )]),
+    );
+
+    let src_addr = &facets["fields"][0];
+    assert_eq!(src_addr["total_values"], super::FACET_STATIC_VALUE_LIMIT);
+    assert_eq!(src_addr["truncated"], false);
+    assert_eq!(src_addr["autocomplete"], true);
+    assert_eq!(
+        src_addr["values"]
+            .as_array()
+            .expect("complete inline IP values")
+            .len(),
+        super::FACET_STATIC_VALUE_LIMIT
+    );
 }
 
 #[test]
@@ -1365,15 +1430,21 @@ fn captured_facet_helpers_resolve_virtual_values_and_ignore_self_selection() {
             vec!["AS4333 NETDATA".to_string()],
         ),
     ]);
+    let compiled = super::CompiledSelections::compile(&selections).expect("compile selections");
     assert!(super::captured_facet_matches_selections_except(
         Some("ICMPV4"),
-        &selections,
+        &compiled,
         &capture_positions,
         &captured_values,
     ));
+    let mismatched = super::CompiledSelections::compile(&HashMap::from([(
+        "ICMPV4".to_string(),
+        vec!["Echo Request".to_string()],
+    )]))
+    .expect("compile selections");
     assert!(!super::captured_facet_matches_selections_except(
         Some("SRC_AS_NAME"),
-        &HashMap::from([("ICMPV4".to_string(), vec!["Echo Request".to_string()])]),
+        &mismatched,
         &capture_positions,
         &captured_values,
     ));
@@ -2436,10 +2507,15 @@ fn projected_timeseries_plan_reads_only_the_selected_pass_two_metric() {
         group_by: vec!["SRC_AS_NAME".to_string()],
         ..super::FlowsRequest::default()
     };
+    let selections =
+        super::CompiledSelections::compile(&request.selections).expect("compile selections");
+    let prefilter_matches = super::build_prefilter_matches(selections.prefilter_pairs());
     let setup = super::QuerySetup {
         sort_by: SortBy::Packets,
         timeseries_layout: None,
         effective_group_by: request.group_by.clone(),
+        selections,
+        prefilter_matches,
         limit: 25,
         spans: Vec::new(),
         stats: HashMap::new(),

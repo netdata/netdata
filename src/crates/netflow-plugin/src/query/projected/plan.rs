@@ -4,39 +4,33 @@ pub(crate) struct ProjectedScanPlan {
     pub(crate) capture_positions: FastHashMap<String, usize>,
     pub(crate) field_specs: Vec<ProjectedFieldSpec>,
     pub(crate) match_plan: Option<ProjectedFieldMatchPlan>,
-    pub(crate) prefilter_matches: Vec<Vec<u8>>,
 }
 
 impl ProjectedScanPlan {
-    pub(crate) fn for_group_totals(setup: &QuerySetup, request: &FlowsRequest) -> Self {
+    pub(crate) fn for_group_totals(setup: &QuerySetup, _request: &FlowsRequest) -> Self {
         Self::new(
             setup,
-            request,
             &[ProjectedMetricField::Bytes, ProjectedMetricField::Packets],
         )
     }
 
     pub(crate) fn for_timeseries(
         setup: &QuerySetup,
-        request: &FlowsRequest,
+        _request: &FlowsRequest,
         sort_by: SortBy,
     ) -> Self {
         let metric = match sort_by {
             SortBy::Bytes => ProjectedMetricField::Bytes,
             SortBy::Packets => ProjectedMetricField::Packets,
         };
-        Self::new(setup, request, &[metric])
+        Self::new(setup, &[metric])
     }
 
-    fn new(
-        setup: &QuerySetup,
-        request: &FlowsRequest,
-        metric_fields: &[ProjectedMetricField],
-    ) -> Self {
-        let mut captured_fields = request
+    fn new(setup: &QuerySetup, metric_fields: &[ProjectedMetricField]) -> Self {
+        let mut captured_fields = setup
             .selections
-            .keys()
-            .map(|field| field.to_ascii_uppercase())
+            .field_names()
+            .map(str::to_string)
             .collect::<Vec<_>>();
         captured_fields.sort_unstable();
         captured_fields.dedup();
@@ -68,14 +62,10 @@ impl ProjectedScanPlan {
         }
 
         let match_plan = ProjectedFieldMatchPlan::new(&field_specs);
-        let prefilter_matches =
-            build_prefilter_matches(&cursor_prefilter_pairs(&request.selections));
-
         Self {
             capture_positions,
             field_specs,
             match_plan,
-            prefilter_matches,
         }
     }
 }

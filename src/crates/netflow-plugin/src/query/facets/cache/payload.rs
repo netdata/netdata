@@ -1,4 +1,5 @@
 use super::*;
+use crate::facet_catalog::{FacetValueKind, facet_field_spec};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -21,14 +22,16 @@ pub(crate) fn build_facet_vocabulary_payload(
             continue;
         }
 
-        let autocomplete = total_values > FACET_STATIC_VALUE_LIMIT;
+        let truncated = total_values > FACET_STATIC_VALUE_LIMIT;
+        let autocomplete = truncated
+            || facet_field_spec(field).is_some_and(|spec| spec.kind == FacetValueKind::IpAddr);
         debug_assert_eq!(
             published
                 .map(|field| field.autocomplete)
                 .unwrap_or_default(),
-            autocomplete
+            truncated
         );
-        let published_values = if autocomplete {
+        let published_values = if truncated {
             &[]
         } else {
             published
@@ -51,7 +54,7 @@ pub(crate) fn build_facet_vocabulary_payload(
             "field": field,
             "name": presentation::field_display_name(field),
             "total_values": total_values,
-            "truncated": autocomplete,
+            "truncated": truncated,
             "autocomplete": autocomplete,
             "overflowed": false,
             "overflow_records": 0,

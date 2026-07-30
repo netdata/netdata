@@ -109,7 +109,7 @@ impl FlowQueryService {
                 execution,
                 pass_index,
                 span_index,
-                &plan.prefilter_matches,
+                &setup.prefilter_matches,
                 "projected grouped query scan",
                 |file_path, journal, timestamp_usec, data_offsets, decompress_buf| {
                     sink.reset_row();
@@ -139,10 +139,10 @@ impl FlowQueryService {
                         },
                     )?;
 
-                    if !request.selections.is_empty()
+                    if !setup.selections.is_empty()
                         && !captured_facet_matches_selections_except(
                             None,
-                            &request.selections,
+                            &setup.selections,
                             &plan.capture_positions,
                             &projected_captured_values,
                         )

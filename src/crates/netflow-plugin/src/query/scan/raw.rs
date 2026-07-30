@@ -11,7 +11,7 @@ impl FlowQueryService {
     pub(crate) fn scan_matching_records_projected_raw_direct<S: ProjectedRowSink + ?Sized>(
         &self,
         setup: &QuerySetup,
-        request: &FlowsRequest,
+        _request: &FlowsRequest,
         plan: &ProjectedScanPlan,
         sink: &mut S,
         execution: Option<&QueryExecutionPlan>,
@@ -39,7 +39,7 @@ impl FlowQueryService {
                 execution,
                 pass_index,
                 span_index,
-                &plan.prefilter_matches,
+                &setup.prefilter_matches,
                 "projected raw grouped query scan",
                 |file_path, journal, timestamp_usec, data_offsets, decompress_buf| {
                     let mut entry_state = reset_projected_raw_entry(
@@ -61,7 +61,7 @@ impl FlowQueryService {
                     )?;
 
                     if !projected_raw_entry_matches(
-                        request,
+                        &setup.selections,
                         &plan.capture_positions,
                         projected_captured_values,
                     ) {
@@ -182,14 +182,14 @@ fn projected_raw_scan_complete(
 }
 
 fn projected_raw_entry_matches(
-    request: &FlowsRequest,
+    selections: &CompiledSelections,
     projected_capture_positions: &FastHashMap<String, usize>,
     projected_captured_values: &[Option<String>],
 ) -> bool {
-    request.selections.is_empty()
+    selections.is_empty()
         || captured_facet_matches_selections_except(
             None,
-            &request.selections,
+            selections,
             projected_capture_positions,
             projected_captured_values,
         )

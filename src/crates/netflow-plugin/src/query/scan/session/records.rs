@@ -22,8 +22,6 @@ impl FlowQueryService {
         };
 
         let mut counts = ScanCounts::default();
-        let prefilter_matches =
-            build_prefilter_matches(&cursor_prefilter_pairs(&request.selections));
 
         for (span_index, span) in setup.spans.iter().enumerate() {
             if let Some(execution) = execution {
@@ -43,7 +41,7 @@ impl FlowQueryService {
                 execution,
                 pass_index,
                 span_index,
-                &prefilter_matches,
+                &setup.prefilter_matches,
                 "selected tier scan",
                 |file_path, journal, timestamp_usec, data_offsets, decompress_buf| {
                     let mut fields = BTreeMap::new();
@@ -85,7 +83,7 @@ impl FlowQueryService {
                     }
 
                     let record = QueryFlowRecord::new(timestamp_usec, fields);
-                    if !record_matches_selections(&record, &request.selections) {
+                    if !record_matches_selections(&record, &setup.selections) {
                         return Ok(false);
                     }
                     on_record(

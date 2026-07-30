@@ -414,6 +414,38 @@ async fn e2e_sflow_fixture_persists_expected_raw_journal_fields_and_query_reads_
         output.metrics.get("bytes").copied().unwrap_or(0) > 0,
         "expected selected FLOW_VERSION=sflow query to aggregate bytes"
     );
+
+    let ipv6_network = "2a0c:8880:2::/48"
+        .parse::<ipnet::IpNet>()
+        .expect("fixture IPv6 network");
+    let ipv6_output = query_service
+        .query_flows(&query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            selections: HashMap::from([("SRC_ADDR".to_string(), vec![ipv6_network.to_string()])]),
+            group_by: vec!["SRC_ADDR".to_string(), "DST_ADDR".to_string()],
+            top_n: query::TopN::N100,
+            ..Default::default()
+        })
+        .await
+        .expect("query sFlow rows with IPv6 CIDR selection");
+
+    assert!(
+        ipv6_output
+            .stats
+            .get("query_matched_entries")
+            .copied()
+            .unwrap_or_default()
+            > 0,
+        "expected IPv6 CIDR to match a persisted sFlow row"
+    );
+    assert!(ipv6_output.flows.iter().all(|row| {
+        row["key"]["SRC_ADDR"]
+            .as_str()
+            .and_then(|value| value.parse::<std::net::IpAddr>().ok())
+            .is_some_and(|address| ipv6_network.contains(&address))
+    }));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1758,6 +1790,29 @@ async fn e2e_flows_function_supports_autocomplete_mode() {
             .contains_key("query_facet_autocomplete_values"),
         "expected autocomplete response stats to include query-specific counters"
     );
+
+    let cidr_response = handler
+        .handle_request(query::FlowsRequest {
+            mode: query::RequestMode::Autocomplete,
+            field: Some("SRC_ADDR".to_string()),
+            term: "10.1/1".to_string(),
+            ..Default::default()
+        })
+        .await
+        .expect("CIDR autocomplete function call");
+    let cidr_response = match cidr_response {
+        FlowsFunctionResponse::Autocomplete(response) => response,
+        FlowsFunctionResponse::Table(_) => panic!("expected autocomplete response"),
+        FlowsFunctionResponse::Metrics(_) => panic!("expected autocomplete response"),
+    };
+    assert_eq!(cidr_response.data.values[0]["value"], "10.1.0.0/16");
+    assert_eq!(cidr_response.data.values[1]["value"], "0.0.0.0/1");
+    assert!(
+        cidr_response.data.values.iter().all(|entry| entry["value"]
+            .as_str()
+            .is_some_and(|value| value.contains('/'))),
+        "slash autocomplete must return only canonical CIDR candidates"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1917,6 +1972,39 @@ async fn e2e_aggregated_safe_group_by_falls_back_to_on_disk_lower_tiers() {
         output.stats.get("query_tier").copied().unwrap_or(0) > 0,
         materialized_tier_files > 0,
         "expected grouped query tier to reflect on-disk materialized-tier availability"
+    );
+
+    let exporter_cidr_output = query_service
+        .query_flows(&query::FlowsRequest {
+            selections: HashMap::from([(
+                "EXPORTER_IP".to_string(),
+                vec!["127.0.0.0/8".to_string()],
+            )]),
+            ..request.clone()
+        })
+        .await
+        .expect("query rollup-safe exporter CIDR");
+    assert_eq!(
+        exporter_cidr_output
+            .stats
+            .get("query_forced_raw_tier")
+            .copied(),
+        Some(0),
+        "CIDR must not add a raw-tier requirement to a rollup-safe address field"
+    );
+    assert_eq!(
+        exporter_cidr_output
+            .stats
+            .get("query_tier")
+            .copied()
+            .unwrap_or(0)
+            > 0,
+        materialized_tier_files > 0,
+        "exporter CIDR must retain the same on-disk tier availability"
+    );
+    assert_eq!(
+        exporter_cidr_output.metrics, output.metrics,
+        "the fixture's exporter CIDR must match every aggregated row"
     );
 
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
@@ -2249,7 +2337,7 @@ async fn e2e_selection_filter_uses_streaming_reader_path() {
     };
     let request_match = query::FlowsRequest {
         selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["v5".to_string()])]),
-        ..request_base
+        ..request_base.clone()
     };
     let matched = query_service
         .query_flows(&request_match)
@@ -2316,6 +2404,88 @@ async fn e2e_selection_filter_uses_streaming_reader_path() {
                 .unwrap_or(false)
         }),
         "expected every returned row to respect the multi-value protocol filter"
+    );
+
+    let selected_row = matched.flows.first().expect("matching fixture row");
+    let selected_src = selected_row["key"]["SRC_ADDR"]
+        .as_str()
+        .expect("source address in grouped key");
+    let selected_protocol = selected_row["key"]["PROTOCOL"]
+        .as_str()
+        .expect("protocol in grouped key");
+    let selected_address = selected_src
+        .parse::<std::net::IpAddr>()
+        .expect("fixture source address");
+    let broad_prefix = if selected_address.is_ipv4() { 23 } else { 119 };
+    let broad_network = ipnet::IpNet::new(selected_address, broad_prefix)
+        .expect("valid broad prefix")
+        .trunc();
+    let exact_address = if selected_address.is_ipv4() {
+        "2001:db8::dead"
+    } else {
+        "203.0.113.255"
+    };
+    let cidr_selections = HashMap::from([
+        (
+            "SRC_ADDR".to_string(),
+            vec![exact_address.to_string(), broad_network.to_string()],
+        ),
+        ("PROTOCOL".to_string(), vec![selected_protocol.to_string()]),
+    ]);
+    let request_cidr = query::FlowsRequest {
+        selections: cidr_selections,
+        ..request_base.clone()
+    };
+    let cidr_table = query_service
+        .query_flows(&request_cidr)
+        .await
+        .expect("projected table query with mixed exact and CIDR selection");
+    let cidr_matches = cidr_table
+        .stats
+        .get("query_matched_entries")
+        .copied()
+        .unwrap_or_default();
+    assert!(
+        cidr_matches > 0,
+        "broad CIDR must not be lost when its field also contains an exact address"
+    );
+    assert!(cidr_table.flows.iter().all(|row| {
+        row["key"]["SRC_ADDR"]
+            .as_str()
+            .and_then(|value| value.parse::<std::net::IpAddr>().ok())
+            .is_some_and(|address| {
+                broad_network.contains(&address) || address.to_string() == exact_address
+            })
+            && row["key"]["PROTOCOL"].as_str() == Some(selected_protocol)
+    }));
+
+    let cidr_timeseries = query_service
+        .query_flow_metrics(&query::FlowsRequest {
+            view: query::ViewMode::TimeSeries,
+            ..request_cidr.clone()
+        })
+        .await
+        .expect("projected time-series query with CIDR selection");
+    assert_eq!(
+        cidr_timeseries
+            .stats
+            .get("query_pass_1_matched_entries")
+            .copied(),
+        Some(cidr_matches),
+        "projected table and time-series pass one must apply the same CIDR matcher"
+    );
+
+    let cidr_generic = query_service
+        .query_flows(&query::FlowsRequest {
+            query: "FLOW_VERSION=v5".to_string(),
+            ..request_cidr
+        })
+        .await
+        .expect("generic table query with CIDR selection");
+    assert_eq!(
+        cidr_generic.stats.get("query_matched_entries").copied(),
+        Some(cidr_matches),
+        "generic and projected scans must apply the same CIDR matcher"
     );
 
     let request_miss = query::FlowsRequest {

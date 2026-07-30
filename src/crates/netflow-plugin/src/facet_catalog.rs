@@ -14,9 +14,9 @@ pub(crate) enum FacetValueKind {
 
 /// How the autocomplete dropdown matches user input against stored values.
 ///
-/// This is exclusively about the autocomplete/dropdown UX. Regular facet
-/// matching (selections / `key in [values]`) is always exact equality and
-/// uses indexes — never a substring scan.
+/// This is exclusively about the autocomplete/dropdown UX. Regular non-IP
+/// selections use exact equality; address facets additionally accept typed CIDR
+/// containment. Neither path uses substring matching over flow rows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AutocompleteMatchKind {
     /// `value.starts_with(term)`. Cheap on FST sidecars (automaton-driven).

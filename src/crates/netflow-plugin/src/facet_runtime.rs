@@ -47,7 +47,7 @@ const FACET_STATE_SCHEMA_VERSION: u32 = 1;
 const FACET_STATE_HEADER_LEN: usize = 4 + 4 + 8 + 8;
 const MAX_FACET_STATE_PAYLOAD_LEN: usize = 128 * 1024 * 1024;
 const MAX_FACET_STATE_FILE_LEN: usize = FACET_STATE_HEADER_LEN + MAX_FACET_STATE_PAYLOAD_LEN;
-const FACET_AUTOCOMPLETE_LIMIT: usize = 256;
+pub(crate) const FACET_AUTOCOMPLETE_LIMIT: usize = 256;
 #[cfg(test)]
 static FACET_BEFORE_DISK_WRITE_HOOK: Mutex<Option<Arc<dyn Fn(&Path) + Send + Sync>>> =
     Mutex::new(None);
