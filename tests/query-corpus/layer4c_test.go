@@ -27,7 +27,7 @@ import (
 
 const (
 	c4cDims    = 50
-	c4cRows    = 200_000 // 55 dimensions x 200k rows = 11M samples, enough to rotate tier0
+	c4cRows    = 200_000 // 55 dense dimensions x 200k rows = 11M samples, enough to rotate tier0
 	c4cContext = "fixture.l4c"
 
 	// A constant dimension alongside the random ones. Rollup keeps a
@@ -66,6 +66,17 @@ const (
 	// the point read from the incoming plan at a tier seam.
 	c4cNegativeDim   = "negative"
 	c4cNegativeValue = -37
+
+	// A sparse constant dimension creates real DBENGINE page discontinuities.
+	// Each aligned burst fits in one tier0 page; the hole before the next burst
+	// exceeds the maximum page capacity, so it flushes instead of materializing
+	// gap records. Once old tier0 files rotate, its first retained page begins
+	// at a burst while tier1 still has the preceding burst.
+	c4cDisjointDim    = "disjoint"
+	c4cDisjointValue  = 1000
+	c4cDisjointEpoch  = int64(fixture.T0 + 41)
+	c4cDisjointBurst  = int64(120)
+	c4cDisjointPeriod = int64(2040)
 )
 
 // c4cValue is the deterministic sample generator: 23 mixed low bits keep
@@ -112,6 +123,18 @@ func c4cCounterValueAt(ts int64) int64 {
 	elapsed := ts - c4cCounterEpoch
 	cycle := elapsed / c4cCounterPeriod
 	return c4cCounterBase - cycle + elapsed%c4cCounterPeriod
+}
+
+func c4cDisjointCollected(ts int64) bool {
+	offset := ts - c4cDisjointEpoch
+	return offset >= 0 && offset%c4cDisjointPeriod < c4cDisjointBurst
+}
+
+func c4cDisjointFlags(ts int64) string {
+	if (ts-c4cDisjointEpoch)%c4cDisjointPeriod < 10 {
+		return stream.FlagAnomalous
+	}
+	return stream.FlagNotAnomalous
 }
 
 // perTierRetention extracts db.per_tier by its explicit tier ID. Missing,
@@ -197,6 +220,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	conn.Dimension(c4cAvailabilityDim, "", 1, 1)
 	conn.Dimension(c4cCounterDim, "", 1, 1)
 	conn.Dimension(c4cNegativeDim, "", 1, 1)
+	conn.Dimension(c4cDisjointDim, "", 1, 1)
 	firstT := int64(fixture.T0)
 	lastT := int64(fixture.T0 + c4cRows)
 	conn.ChartDefinitionEnd(firstT, lastT, lastT)
@@ -207,7 +231,9 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		func(_ string, after, before int64) []stream.ReplayRow {
 			rows := make([]stream.ReplayRow, 0, before-after)
 			for ts := after + 1; ts <= before; ts++ {
-				row := stream.ReplayRow{T: ts, Dims: make([]stream.ReplayValue, c4cDims+5)}
+				row := stream.ReplayRow{
+					T: ts, Dims: make([]stream.ReplayValue, c4cDims+5, c4cDims+6),
+				}
 				for d := 0; d < c4cDims; d++ {
 					row.Dims[d] = stream.ReplayValue{
 						ID:        c4cDimID(d),
@@ -239,7 +265,14 @@ func TestLayer4PlanSwitching(t *testing.T) {
 				row.Dims[c4cDims+4] = stream.ReplayValue{
 					ID:        c4cNegativeDim,
 					Collected: strconv.Itoa(c4cNegativeValue),
-					Flags:     stream.FlagNotAnomalous,
+					Flags:     stream.FlagAnomalous,
+				}
+				if c4cDisjointCollected(ts) {
+					row.Dims = append(row.Dims, stream.ReplayValue{
+						ID:        c4cDisjointDim,
+						Collected: strconv.Itoa(c4cDisjointValue),
+						Flags:     c4cDisjointFlags(ts),
+					})
 				}
 				rows = append(rows, row)
 			}
@@ -266,10 +299,22 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	}
 	deadline := time.Now().Add(5 * time.Minute)
 	var tiers []daemon.Retention
+	var stableTier0First int64
+	stableProbes := 0
 	for {
 		tiers = probe()
 		if len(tiers) >= 2 && tiers[0].LastEntry >= lastT-60 {
-			break
+			if tiers[0].FirstEntry == stableTier0First {
+				stableProbes++
+			} else {
+				stableTier0First = tiers[0].FirstEntry
+				stableProbes = 1
+			}
+			if stableProbes >= 3 {
+				break
+			}
+		} else {
+			stableProbes = 0
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("ingest did not settle: per_tier %+v", tiers)
@@ -423,6 +468,8 @@ func TestLayer4PlanSwitching(t *testing.T) {
 			[3]bool{true, false, false}) && ok
 		ok = c4cSumConserves(t, dd, "straddling", seamAfter,
 			[3]bool{true, true, false}) && ok
+		ok = c4cSumFocusedSeams(t, dd, flatBoundary) && ok
+		ok = c4cSumAcrossStorageGap(t, dd, lastT) && ok
 		assertContract(t, "CASE-026/totals-survive-a-plan-switch", ok)
 	})
 
@@ -562,6 +609,23 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		ok = c4cAbsoluteExact(t, dd, "tier0-tail", tailAfter, tailAfter+span,
 			[3]bool{true, false, false}) && ok
 		assertContract(t, "CASE-036/absolute-across-plan-seam", ok)
+	})
+
+	t.Run("anomaly-source-across-plan-seam", func(t *testing.T) {
+		trackContractComponent(
+			t, "CASE-033/anomaly-rate-counts-samples-in-the-row", "plan-seam-source")
+
+		const span = int64(7200)
+		negativeTiers := c4DimensionRetention(
+			t, dd, c4cContext, "l4c-child", c4cNegativeDim, lastT, 2)
+		negativeBoundary := negativeTiers[0].FirstEntry
+		seamAfter := c4AlignDown(negativeBoundary-3600, c4cConditionEpoch, c4cCounterPeriod)
+		c4cRequireTwoTierWindow(t, "anomaly-source seam", seamAfter, seamAfter+span,
+			negativeTiers, [2]bool{true, true})
+
+		if !c4cAnomalySourceExact(t, dd, seamAfter, seamAfter+span) {
+			t.Errorf("automatic-seam rows lost the all-anomalous source record's metadata")
+		}
 	})
 }
 
@@ -1115,6 +1179,41 @@ func c4cAbsoluteExact(
 	return ok
 }
 
+func c4cAnomalySourceExact(t *testing.T, dd *daemon.Daemon, after, before int64) bool {
+	t.Helper()
+
+	params := daemon.DataParams(c4cContext, after, before, before-after)
+	params.Set("time_group", "average")
+	params.Set("scope_dimensions", c4cNegativeDim)
+	params.Set("options", "jsonwrap|unaligned")
+	doc, err := dd.DataV3("l4c-child", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := make([]expectedColumnPoint, before-after)
+	for i := range want {
+		want[i] = wantNumberWithMetadataAt(
+			after+int64(i+1), float64(c4cNegativeValue), 100, 0)
+	}
+
+	ok := assertExactView(t, doc, after, before, 1)
+	if !c4TierVectorExact(t, doc, [3]bool{true, true, false}) {
+		ok = false
+	}
+	if !assertOnlyColumn(t, cols, c4cNegativeDim) {
+		ok = false
+	}
+	if !assertExactColumn(t, cols, c4cNegativeDim, want, 0) {
+		ok = false
+	}
+	return ok
+}
+
 // c4cRateVolume totals the rate dimension over one window, with no tier pin,
 // and compares it against what the fixture pushed: a constant rate collected
 // once a second holds rate x seconds, whichever tier answers.
@@ -1250,6 +1349,208 @@ func c4cSumConserves(
 		tierPoints, _ := strictTierPoints(t, doc)
 		t.Logf("plan-switch conservation [%s]: %ds buckets (%d points, per_tier %v) total %.10g, want %.10g",
 			label, rowSpan, points, tierPoints, total, want)
+	}
+
+	return ok
+}
+
+func c4cSumFocusedSeams(t *testing.T, dd *daemon.Daemon, boundary int64) bool {
+	t.Helper()
+
+	ok := true
+	for _, seam := range []struct {
+		label string
+		after int64
+	}{
+		// The first case forces the executor to combine both plans before its
+		// first row is flushed. The second forces a crossing coarse record
+		// carried from row 1 to settle its prefix in row 2.
+		{label: "first-row", after: boundary - 5},
+		{label: "carried-row", after: boundary - 15},
+	} {
+		before := seam.after + 20
+		params := daemon.DataParams(c4cContext, seam.after, before, 2)
+		params.Set("time_group", "sum")
+		params.Set("scope_dimensions", c4cConstDim)
+		params.Set("options", "jsonwrap|unaligned")
+		doc, err := dd.DataV3("l4c-child", params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !assertExactView(t, doc, seam.after, before, 10) {
+			t.Logf("%s seam query returned the wrong view", seam.label)
+			ok = false
+		}
+		if !assertTierPresence(t, doc, []bool{true, true, false}) {
+			t.Logf("%s seam query did not use exactly tier1+tier0", seam.label)
+			ok = false
+		}
+		if !assertOnlyColumn(t, cols, c4cConstDim) {
+			t.Logf("%s seam query returned the wrong columns", seam.label)
+			ok = false
+		}
+		if !assertExactColumn(t, cols, c4cConstDim, []expectedColumnPoint{
+			wantNumberAt(seam.after+10, 10*c4cConstValue),
+			wantNumberAt(seam.after+20, 10*c4cConstValue),
+		}, 0) {
+			t.Logf("%s seam query did not combine the coarse prefix and fine suffix exactly", seam.label)
+			ok = false
+		}
+	}
+
+	return ok
+}
+
+func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
+	t.Helper()
+
+	tiers := c4DimensionRetention(
+		t, dd, c4cContext, "l4c-child", c4cDisjointDim, lastT, 2)
+	boundary := tiers[0].FirstEntry
+	offset := boundary - c4cDisjointEpoch
+	if offset < c4cDisjointPeriod || offset%c4cDisjointPeriod != 0 {
+		t.Logf("disjoint tier0 retention starts at %d, want a rotated burst boundary", boundary)
+		return false
+	}
+	t.Logf("disjoint tier0 starts at t0%+d; tier1 starts at t0%+d",
+		boundary-fixture.T0, tiers[1].FirstEntry-fixture.T0)
+
+	previousBurst := boundary - c4cDisjointPeriod
+	controlAfter, controlBefore := boundary-1, boundary+59
+	control := daemon.DataParamsTier(
+		c4cContext, 0, controlAfter, controlBefore, controlBefore-controlAfter, "sum")
+	control.Set("scope_dimensions", c4cDisjointDim)
+	control.Set("options", "jsonwrap|unaligned")
+	controlDoc, err := dd.DataV3("l4c-child", control)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controlCols, err := canon.Columns(controlDoc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controlWant := make([]expectedColumnPoint, controlBefore-controlAfter)
+	for i := range controlWant {
+		ts := controlAfter + int64(i+1)
+		arp := 0.0
+		if c4cDisjointFlags(ts) == stream.FlagAnomalous {
+			arp = 100
+		}
+		controlWant[i] = wantNumberWithARPAt(ts, float64(c4cDisjointValue), arp)
+	}
+
+	ok := true
+	if !assertSelectedTier(t, controlDoc, 0) ||
+		!assertTierPresence(t, controlDoc, []bool{true, false, false}) ||
+		!assertOnlyColumn(t, controlCols, c4cDisjointDim) ||
+		!assertExactColumn(t, controlCols, c4cDisjointDim, controlWant, 0) {
+		t.Log("disjoint seam tier0 control did not expose the exact retained burst")
+		ok = false
+	}
+
+	coarseControl := daemon.DataParamsTier(
+		c4cContext, 1, controlAfter, controlBefore, 1, "sum")
+	coarseControl.Set("scope_dimensions", c4cDisjointDim)
+	coarseControl.Set("options", "jsonwrap|unaligned|natural-points")
+	coarseDoc, err := dd.DataV3("l4c-child", coarseControl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coarseCols, err := canon.Columns(coarseDoc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !assertSelectedTier(t, coarseDoc, 1) ||
+		!assertTierPresence(t, coarseDoc, []bool{false, true, false}) ||
+		!assertOnlyColumn(t, coarseCols, c4cDisjointDim) ||
+		!assertExactColumn(t, coarseCols, c4cDisjointDim, []expectedColumnPoint{
+			wantNumberWithARPAt(controlBefore,
+				float64(60*c4cDisjointValue), 16.6666667),
+		}, printTol) {
+		t.Log("disjoint seam tier1 control did not expose the overlapping coarse record")
+		ok = false
+	}
+
+	const rowSpan = int64(10)
+	for _, seam := range []struct {
+		label         string
+		after, before int64
+	}{
+		{"fine-start-minus-one", previousBurst - 1, boundary + 59},
+		{"fine-start", previousBurst, boundary + 60},
+	} {
+		points := (seam.before - seam.after) / rowSpan
+		if points*rowSpan != seam.before-seam.after {
+			t.Fatalf("disjoint seam %s window (%d,%d] does not divide into %d-second rows",
+				seam.label, seam.after, seam.before, rowSpan)
+		}
+		c4cRequireTwoTierWindow(t, "disjoint storage-gap seam "+seam.label,
+			seam.after, seam.before, tiers, [2]bool{true, true})
+
+		params := daemon.DataParams(c4cContext, seam.after, seam.before, points)
+		params.Set("time_group", "sum")
+		params.Set("scope_dimensions", c4cDisjointDim)
+		params.Set("options", "jsonwrap|unaligned")
+		doc, err := dd.DataV3("l4c-child", params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		want := make([]expectedColumnPoint, points)
+		for i := range want {
+			rowStart := seam.after + int64(i)*rowSpan
+			rowEnd := rowStart + rowSpan
+			count := int64(0)
+			for ts := rowStart + 1; ts <= rowEnd; ts++ {
+				if c4cDisjointCollected(ts) {
+					count++
+				}
+			}
+			if count == 0 {
+				want[i] = wantEmptyWithMetadataAt(rowEnd, 0, canon.AnnotationEmpty)
+			} else if rowEnd >= boundary {
+				anomalous := int64(0)
+				for ts := rowStart + 1; ts <= rowEnd; ts++ {
+					if c4cDisjointCollected(ts) &&
+						c4cDisjointFlags(ts) == stream.FlagAnomalous {
+						anomalous++
+					}
+				}
+				want[i] = wantNumberWithARPAt(
+					rowEnd,
+					float64(count*c4cDisjointValue),
+					100*float64(anomalous)/float64(count))
+			} else {
+				want[i] = wantNumberAt(rowEnd, float64(count*c4cDisjointValue))
+			}
+		}
+
+		if !assertExactView(t, doc, seam.after, seam.before, rowSpan) {
+			t.Logf("disjoint storage-gap seam %s returned the wrong view", seam.label)
+			ok = false
+		}
+		if !assertTierPresence(t, doc, []bool{true, true, false}) {
+			t.Logf("disjoint storage-gap seam %s did not use exactly tier1+tier0", seam.label)
+			ok = false
+		}
+		if !assertOnlyColumn(t, cols, c4cDisjointDim) {
+			t.Logf("disjoint storage-gap seam %s returned the wrong columns", seam.label)
+			ok = false
+		}
+		if !assertExactColumn(t, cols, c4cDisjointDim, want, 0) {
+			t.Logf("disjoint storage-gap seam %s lost retained values or charged the true storage hole",
+				seam.label)
+			ok = false
+		}
 	}
 
 	return ok

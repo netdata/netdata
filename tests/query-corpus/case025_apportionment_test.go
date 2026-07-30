@@ -1,25 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// CASE-025 what the sum apportionment owes, and what it must not touch.
+// CASE-025 pins where a wide stored record's sum belongs, and what the
+// apportionment must not touch.
 //
-// `sum` pays each bucket the seconds it owns, at the rate of whichever
-// stored record owns them. A record wider than a bucket therefore has a
-// remainder that belongs to the NEXT bucket, and the engine carries that
-// remainder forward rather than re-reading the record.
-//
-// A carry is a debt, and these are the three ways a debt goes wrong:
-// it is never collected (the next bucket never asks), it is collected from
-// the wrong creditor (the query moved to another tier in between), or the
-// mechanism reaches a caller that never borrowed anything (an option that
-// does not go through the apportionment at all).
-//
-// All three shapes are invisible to a total taken over a whole window,
-// which is why L10 and L11 hold while these fail: they are about WHERE the
-// seconds land, and about who is left holding nothing.
+// A result row receives the share of every stored record whose time interval
+// overlaps the row. This is stricter than whole-window conservation: paying a
+// record to the wrong row can preserve the total while making both rows false.
 package corpus
 
 import (
-	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -29,20 +19,61 @@ import (
 	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
 
-// CASE-025a: a record's remainder is not lost because the next bucket
-// happens to be a gap, or because the data ran out.
-//
-// The bucket after a wide record is where that record's last seconds are
-// paid. If nothing is collected there, the bucket answers EMPTY - and the
-// seconds it owed are then paid nowhere at all. The window total silently
-// drops by up to one stored record at every gap edge and at the end of
-// retention, which is exactly where a "how much did we transfer" answer is
-// least likely to be double-checked.
-//
-// The fixture collects a run, stops dead, and the query asks for buckets
-// that do NOT divide the collection interval - so the last record before
-// the silence is guaranteed to straddle a bucket boundary and to have a
-// remainder owed to a bucket that will see no data.
+func c025ExpectedSum(
+	base, before, rowSpan int64,
+	samples, updateEvery int,
+	included func(int) bool,
+) []expectedColumnPoint {
+	points := (before - base) / rowSpan
+	want := make([]expectedColumnPoint, points)
+	for row := range want {
+		rowStart := base + int64(row)*rowSpan
+		rowEnd := rowStart + rowSpan
+		var value float64
+		for i := 1; i <= samples; i++ {
+			if !included(i) {
+				continue
+			}
+			recordStart := base + int64((i-1)*updateEvery)
+			recordEnd := recordStart + int64(updateEvery)
+			overlapStart := rowStart
+			if recordStart > overlapStart {
+				overlapStart = recordStart
+			}
+			overlapEnd := rowEnd
+			if recordEnd < overlapEnd {
+				overlapEnd = recordEnd
+			}
+			if overlapEnd > overlapStart {
+				value += float64(i) * float64(overlapEnd-overlapStart) / float64(updateEvery)
+			}
+		}
+		if value == 0 {
+			want[row] = wantEmptyWithMetadataAt(rowEnd, 0, canon.AnnotationEmpty)
+		} else {
+			want[row] = wantNumberWithMetadataAt(rowEnd, value, 0, 0)
+		}
+	}
+	return want
+}
+
+func TestCase025OverlapOracle(t *testing.T) {
+	first, second := 2.0, 1.0
+	valid := map[string][]canon.Pt{"value": {
+		{T: 15, Value: &first},
+		{T: 30, Value: &second},
+		{T: 45, PA: canon.AnnotationEmpty},
+	}}
+	want := c025ExpectedSum(0, 45, 15, 2, 10, func(int) bool { return true })
+	if !assertExactColumn(t, valid, "value", want, 0) {
+		t.Fatal("overlap oracle rejected records (0,10]=1 and (10,20]=2 over 15-second rows")
+	}
+}
+
+// CASE-025a uses 35-second rows over 10-second records. The dense dimension
+// ends mid-row, while the gapped dimension puts one settlement-only row
+// between a run and a real empty row. Both shapes require exact row ownership;
+// a whole-window total alone cannot distinguish them.
 func TestCase025CarrySurvivesGaps(t *testing.T) {
 	trackContract(t, "CASE-025/carry-survives-gaps")
 
@@ -50,67 +81,78 @@ func TestCase025CarrySurvivesGaps(t *testing.T) {
 		ctx     = "fixture.c025gap"
 		host    = "c025gap"
 		ue      = 10
-		value   = 7
 		samples = 60 // 600s of data, then nothing
+		rowSpan = 35
 	)
 
 	base := fixture.T0 - fixture.T0%int64(ue)
 	ch := fixture.Series(ctx, ctx, base, samples, ue,
-		func(int) string { return "7" },
+		func(i int) string { return strconv.Itoa(i) },
 		func(int) string { return stream.FlagNotAnomalous })
+	ch.Dimensions = append(ch.Dimensions, fixture.Dimension{ID: "interior-gap"})
+	for i := 1; i <= samples; i++ {
+		point := fixture.Point{
+			T:         base + int64(i*ue),
+			Collected: strconv.Itoa(i),
+			Flags:     stream.FlagEmpty,
+		}
+		if i <= 4 || (i >= 12 && i <= 14) {
+			point.Flags = stream.FlagNotAnomalous
+		}
+		ch.Dimensions[1].Points = append(ch.Dimensions[1].Points, point)
+	}
 
 	pushLiveBurst(t, host, guid(250), ch)
 	if _, err := td.WaitRetention(host, ch.Context, ch.FirstT(), ch.LastT(), 20*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
-	first := base
-	last := base + int64(samples*ue)
-
 	ok := true
-
-	// Buckets of 25s over 10s records: every bucket boundary cuts a record,
-	// so every bucket carries a remainder into the next one. The window
-	// runs 100s PAST the end of the data, so the final carry is owed to
-	// buckets that hold nothing.
-	for _, span := range []int64{25, 35, 55} {
-		after := first
-		before := last + 100
-		points := (before - after) / span
-
-		params := daemon.DataParamsTier(ctx, 0, after, before, points, "sum")
+	for _, tc := range []struct {
+		name, dimension string
+		before          int64
+		want            []expectedColumnPoint
+	}{
+		{
+			name:      "retention-tail",
+			dimension: ch.Dimensions[0].ID,
+			before:    base + samples*ue + 100,
+			want: c025ExpectedSum(
+				base, base+samples*ue+100, rowSpan, samples, ue, func(int) bool { return true }),
+		},
+		{
+			name:      "interior-gap",
+			dimension: ch.Dimensions[1].ID,
+			before:    base + 4*rowSpan,
+			want: c025ExpectedSum(
+				base, base+4*rowSpan, rowSpan, samples, ue,
+				func(i int) bool { return i <= 4 || (i >= 12 && i <= 14) }),
+		},
+	} {
+		after := base
+		points := (tc.before - after) / rowSpan
+		params := daemon.DataParamsTier(ctx, 0, after, tc.before, points, "sum")
 		params.Set("options", "jsonwrap|unaligned")
+		params.Set("scope_dimensions", tc.dimension)
 		doc, err := td.DataV3(host, params)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertSelectedTier(t, doc, 0) {
+			ok = false
+		}
+		if !assertExactView(t, doc, after, tc.before, rowSpan) {
+			ok = false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		col, has := cols[ch.Dimensions[0].ID]
-		if !has {
-			t.Logf("carry contract not met: bucket=%ds returned no column", span)
+		if !assertOnlyColumn(t, cols, tc.dimension) {
 			ok = false
-			continue
 		}
-
-		got := 0.0
-		for _, pt := range col {
-			if pt.Value != nil {
-				got += *pt.Value
-			}
-		}
-
-		// every collected second is worth `value` per record of `ue`
-		// seconds, so the whole run is samples*value
-		want := float64(samples * value)
-		if math.Abs(got-want) > 1e-6 {
-			t.Logf("carry contract not met: bucket=%ds over a window that ends 100s "+
-				"after the data totals %.4f, but the fixture collected %.4f - "+
-				"a remainder owed to a bucket with no data of its own is paid nowhere",
-				span, got, want)
+		if !assertExactColumn(t, cols, tc.dimension, tc.want, 1e-9) {
+			t.Logf("%s: wide-record shares did not land on their exact owning rows", tc.name)
 			ok = false
 		}
 	}
@@ -175,34 +217,32 @@ func TestCase025AnomalyBitNotBlended(t *testing.T) {
 	for _, group := range []string{"average", "min", "max", "sum"} {
 		params := daemon.DataParamsTier(ctx, 1, after, before, 3, group)
 		params.Set("options", "jsonwrap|unaligned|anomaly-bit")
+		params.Set("scope_dimensions", ch.Dimensions[0].ID)
 		doc, err := td.DataV3(host, params)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertSelectedTier(t, doc, 1) {
+			ok = false
+		}
+		if !assertExactView(t, doc, after, before, 20) {
+			ok = false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		col, has := cols[ch.Dimensions[0].ID]
-		if !has || len(col) != 3 {
-			t.Logf("anomaly-bit contract not met: %s returned %d rows, want 3", group, len(col))
+		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
 			ok = false
-			continue
 		}
-		for i, pt := range col {
-			if pt.Value == nil {
-				t.Logf("anomaly-bit contract not met: %s bucket %d is empty, want 100", group, i)
-				ok = false
-				continue
-			}
-			if math.Abs(*pt.Value-100.0) > 1e-6 {
-				t.Logf("anomaly-bit contract not met: %s bucket %d reads %.4f, want 100 - "+
-					"every sample under this bucket is anomalous, and the window before it "+
-					"is one the bucket does not overlap at all",
-					group, i, *pt.Value)
-				ok = false
-			}
+		want := []expectedColumnPoint{
+			wantNumberWithMetadataAt(after+20, 100, 100, 0),
+			wantNumberWithMetadataAt(after+40, 100, 100, 0),
+			wantNumberWithMetadataAt(after+60, 100, 100, 0),
+		}
+		if !assertExactColumn(t, cols, ch.Dimensions[0].ID, want, 1e-9) {
+			t.Logf("anomaly-bit contract not met: %s changed a pure 100%% window", group)
+			ok = false
 		}
 	}
 

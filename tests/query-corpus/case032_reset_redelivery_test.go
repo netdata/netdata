@@ -30,8 +30,8 @@ func TestCase032ResetAnnotationIsNotRedelivered(t *testing.T) {
 	ch := fixture.Series(context, context, base, samples, ue,
 		func(int) string { return "100" },
 		func(i int) string {
-			if i == 6 {
-				return stream.FlagReset
+			if i == samples {
+				return "AR"
 			}
 			return stream.FlagNotAnomalous
 		})
@@ -41,66 +41,70 @@ func TestCase032ResetAnnotationIsNotRedelivered(t *testing.T) {
 	}
 
 	ok := true
-	for group := range map[string]struct{}{"average": {}, "sum": {}} {
-		params := daemon.DataParamsTier(context, 0, base, base+samples*ue, samples*2, group)
-		params.Set("options", "jsonwrap|unaligned")
-		params.Set("scope_dimensions", ch.Dimensions[0].ID)
-		doc, err := td.DataV3(host, params)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !assertSelectedTier(t, doc, 0) {
-			ok = false
-		}
-		cols, err := canon.Columns(doc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
-			ok = false
-		}
-		col, has := cols[ch.Dimensions[0].ID]
-		if !has || len(col) != samples*2 {
-			t.Logf("%s returned %d rows for the reset dimension, want exactly %d",
-				group, len(col), samples*2)
-			ok = false
-			continue
-		}
-
-		var resetRows []int64
-		for i, pt := range col {
-			wantT := base + int64(i+1)*(ue/2)
-			if pt.T != wantT {
-				t.Logf("%s row %d ends at %d, want %d", group, i, pt.T, wantT)
+	for _, shape := range []struct {
+		name      string
+		before    int64
+		rowSpan   int64
+		resetEnds int64
+	}{
+		{name: "upsample", before: base + samples*ue, rowSpan: ue / 2, resetEnds: base + samples*ue},
+		{name: "downsample", before: base + samples*ue, rowSpan: 30, resetEnds: base + samples*ue},
+		{name: "nondividing-tail", before: base + 140, rowSpan: 35, resetEnds: base + 140},
+	} {
+		for _, group := range []string{"average", "sum"} {
+			points := (shape.before - base) / shape.rowSpan
+			params := daemon.DataParamsTier(context, 0, base, shape.before, points, group)
+			params.Set("options", "jsonwrap|unaligned")
+			params.Set("scope_dimensions", ch.Dimensions[0].ID)
+			doc, err := td.DataV3(host, params)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !assertSelectedTier(t, doc, 0) {
 				ok = false
 			}
-			if pt.Value == nil || pt.PA&canon.AnnotationEmpty != 0 {
-				t.Logf("%s row %d at %d is empty, want a numeric row", group, i, pt.T)
-				ok = false
-			} else if math.IsNaN(*pt.Value) || math.IsInf(*pt.Value, 0) {
-				t.Logf("%s row %d at %d is non-finite: %v", group, i, pt.T, *pt.Value)
+			if !assertExactView(t, doc, base, shape.before, shape.rowSpan) {
 				ok = false
 			}
-			if pt.PA&canon.AnnotationReset != 0 {
-				resetRows = append(resetRows, pt.T)
+			cols, err := canon.Columns(doc)
+			if err != nil {
+				t.Fatal(err)
 			}
-		}
-		wantT := base + 6*ue
-		if len(resetRows) != 1 || resetRows[0] != wantT {
-			t.Logf("%s annotated RESET at offsets %v, want exactly [%d]: one event belongs "+
-				"to the row containing its sample timestamp",
-				group, offsetsFrom(resetRows, base), wantT-base)
-			ok = false
+			if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
+				ok = false
+			}
+			if !assertColumnExactGrid(
+				t, cols, ch.Dimensions[0].ID, base, shape.before, shape.rowSpan) {
+				ok = false
+			}
+			col := cols[ch.Dimensions[0].ID]
+			for i, pt := range col {
+				if pt.Value == nil || pt.PA&canon.AnnotationEmpty != 0 {
+					t.Logf("%s/%s row %d at %d is empty, want a numeric row",
+						shape.name, group, i, pt.T)
+					ok = false
+				} else if math.IsNaN(*pt.Value) || math.IsInf(*pt.Value, 0) {
+					t.Logf("%s/%s row %d at %d is non-finite: %v",
+						shape.name, group, i, pt.T, *pt.Value)
+					ok = false
+				}
+				if pt.ARP != 0 {
+					t.Logf("%s/%s row %d at %d has ARP %.10g, want exactly 0",
+						shape.name, group, i, pt.T, pt.ARP)
+					ok = false
+				}
+				wantPA := int64(0)
+				if pt.T == shape.resetEnds {
+					wantPA = canon.AnnotationReset
+				}
+				if pt.PA != wantPA {
+					t.Logf("%s/%s row %d at %d has PA %d, want exactly %d",
+						shape.name, group, i, pt.T, pt.PA, wantPA)
+					ok = false
+				}
+			}
 		}
 	}
 
 	assertContract(t, "CASE-032/reset-annotation-is-not-redelivered", ok)
-}
-
-func offsetsFrom(timestamps []int64, base int64) []int64 {
-	offsets := make([]int64, len(timestamps))
-	for i, ts := range timestamps {
-		offsets[i] = ts - base
-	}
-	return offsets
 }

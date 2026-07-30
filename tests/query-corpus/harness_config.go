@@ -18,6 +18,7 @@ var daemonFreeTests = map[string]struct{}{
 	"TestC023TierNumberTimesPartialGapOverlap":              {},
 	"TestC4CFlapFixtureGuard":                               {},
 	"TestC4DAlignedGridOracleGuardsOffByOne":                {},
+	"TestCase025OverlapOracle":                              {},
 	"TestContractLedgerDeduplicatesAndKeepsFailuresSticky":  {},
 	"TestContractLedgerDoesNotCountSkippedScopeAsEvaluated": {},
 	"TestContractLedgerKeepsFailureBeforeSkip":              {},
