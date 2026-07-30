@@ -125,10 +125,15 @@ When reviewing a PR that touches a collector, verify:
    - List tabs in the order the doc lists the groups.
    - Most collectors predate this rule and still disagree, so do
      NOT copy grouping from a neighbouring collector; derive it
-     from that collector's own keys. `cloudwatch` is the worked
-     example, guarded by
-     `cloudwatch/config_test.go`
-     `TestConfigSchema_TabsMatchMetadataGroups`.
+     from that collector's own keys.
+   - Once a collector's two artifacts agree, keep them that way
+     by calling
+     `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")`
+     from its tests. It checks per option that the tab listing
+     the option's root property is the first segment of its
+     group, and that every tab is named by some group. The call
+     is opt-in because most collectors would fail it today;
+     `cloudwatch` and `azure_monitor` are the worked examples.
 
 4. **Alert changes have matching `metadata.yaml.alerts`
    entries.** If `health.d/<plugin>.conf` adds, removes, or

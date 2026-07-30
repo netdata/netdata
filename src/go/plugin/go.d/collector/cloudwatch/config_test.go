@@ -12,10 +12,10 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func validBaseConfig() Config {
@@ -101,64 +101,8 @@ func TestConfig_applyDefaults(t *testing.T) {
 	assert.Equal(t, defaultTimeout, cfg.Timeout)
 }
 
-// TestConfigSchema_TabsMatchMetadataGroups is a drift check between the two artifacts an operator
-// reads together: the DynCfg form's tab titles and the Group column of the generated integration doc
-// (metadata.yaml). A tab naming no group, or a group naming no tab, is exactly what leaves someone
-// unable to find in the UI the option they just read about. Tabs can only group whole top-level
-// properties, so a doc group that refines one uses the "Tab / Subgroup" form and matches on its first
-// segment. Neither artifact is asserted against itself — each is the other's expected value.
-func TestConfigSchema_TabsMatchMetadataGroups(t *testing.T) {
-	schemaData, err := os.ReadFile("config_schema.json")
-	require.NoError(t, err)
-	var schema struct {
-		UISchema struct {
-			Options struct {
-				Tabs []struct {
-					Title string `json:"title"`
-				} `json:"tabs"`
-			} `json:"ui:options"`
-		} `json:"uiSchema"`
-	}
-	require.NoError(t, json.Unmarshal(schemaData, &schema))
-	require.NotEmpty(t, schema.UISchema.Options.Tabs)
-
-	metaData, err := os.ReadFile("metadata.yaml")
-	require.NoError(t, err)
-	var meta struct {
-		Modules []struct {
-			Setup struct {
-				Configuration struct {
-					Options struct {
-						List []struct {
-							Name  string `yaml:"name"`
-							Group string `yaml:"group"`
-						} `yaml:"list"`
-					} `yaml:"options"`
-				} `yaml:"configuration"`
-			} `yaml:"setup"`
-		} `yaml:"modules"`
-	}
-	require.NoError(t, yaml.Unmarshal(metaData, &meta))
-	require.Len(t, meta.Modules, 1)
-	options := meta.Modules[0].Setup.Configuration.Options.List
-	require.NotEmpty(t, options)
-
-	tabs := make(map[string]bool, len(schema.UISchema.Options.Tabs))
-	for _, tab := range schema.UISchema.Options.Tabs {
-		tabs[tab.Title] = false
-	}
-
-	for _, option := range options {
-		require.NotEmptyf(t, option.Group, "metadata option %q has no group", option.Name)
-		tab, _, _ := strings.Cut(option.Group, " / ")
-		if _, ok := tabs[tab]; !assert.Truef(t, ok, "metadata option %q is in group %q, which names no schema tab", option.Name, option.Group) {
-			continue
-		}
-		tabs[tab] = true
-	}
-	for tab, used := range tabs {
-		assert.Truef(t, used, "schema tab %q names no metadata group, so the doc cannot point an operator at it", tab)
-	}
+func TestConfigSchema_MatchesMetadataGroups(t *testing.T) {
+	collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")
 }
 
 func TestConfig_validateResourceTagConfiguration(t *testing.T) {
