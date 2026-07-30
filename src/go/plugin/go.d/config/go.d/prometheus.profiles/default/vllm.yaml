@@ -1,0 +1,1621 @@
+# vLLM emits generated *_created gauges as Unix epoch timestamps. A production
+# job should exclude them, together with process_start_time_seconds, because the
+# profile schema cannot turn raw epochs into ages. Current CPU offloading also
+# emits deprecated aliases from the same observations as its canonical metrics;
+# the recommended policy excludes those aliases to prevent double counting.
+# Information families and quantile-less summaries are skipped by the writer.
+
+match: 'vllm:*'
+app: vllm
+autogen:
+  selector:
+    deny:
+      - '*_created'
+      - 'vllm:kv_offload_total_bytes_total'
+      - 'vllm:kv_offload_total_time_total'
+      - 'vllm:kv_offload_size*'
+template:
+  family: vLLM
+  context_namespace: vllm
+
+  groups:
+    - family: Request Lifecycle
+      context_namespace: request_lifecycle
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:request_success_total'
+        - 'vllm:corrupted_requests_total'
+        - 'vllm:time_to_first_token_seconds_bucket'
+        - 'vllm:time_to_first_token_seconds_count'
+        - 'vllm:time_to_first_token_seconds_sum'
+        - 'vllm:e2e_request_latency_seconds_bucket'
+        - 'vllm:e2e_request_latency_seconds_count'
+        - 'vllm:e2e_request_latency_seconds_sum'
+        - 'vllm:request_params_n_bucket'
+        - 'vllm:request_params_n_count'
+        - 'vllm:request_params_n_sum'
+        - 'vllm:request_params_max_tokens_bucket'
+        - 'vllm:request_params_max_tokens_count'
+        - 'vllm:request_params_max_tokens_sum'
+        - 'vllm:request_max_num_generation_tokens_bucket'
+        - 'vllm:request_max_num_generation_tokens_count'
+        - 'vllm:request_max_num_generation_tokens_sum'
+      charts:
+        - title: Request Outcomes
+          context: outcomes
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1000
+          dimensions:
+            - selector: 'vllm:request_success_total'
+              name_from_label: finished_reason
+
+        - title: Corrupted Requests
+          context: corrupted_requests
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1005
+          dimensions:
+            - selector: 'vllm:corrupted_requests_total'
+              name: corrupted
+
+        - title: Time to First Token
+          context: time_to_first_token
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1010
+          dimensions:
+            - selector: 'vllm:time_to_first_token_seconds_bucket'
+
+        - title: End-to-End Request Latency
+          context: end_to_end_latency
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1020
+          dimensions:
+            - selector: 'vllm:e2e_request_latency_seconds_bucket'
+
+        - title: Lifecycle Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1030
+          dimensions:
+            - selector: 'vllm:time_to_first_token_seconds_count'
+              name: first_token
+            - selector: 'vllm:e2e_request_latency_seconds_count'
+              name: completed
+
+        - title: Pre-Response Concurrency
+          context: pre_response_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1040
+          dimensions:
+            - selector: 'vllm:time_to_first_token_seconds_sum'
+              name: requests
+
+        - title: End-to-End Request Concurrency
+          context: end_to_end_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1050
+          dimensions:
+            - selector: 'vllm:e2e_request_latency_seconds_sum'
+              name: requests
+
+        - title: Requested Sequences
+          context: requested_sequences
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1060
+          dimensions:
+            - selector: 'vllm:request_params_n_bucket'
+
+        - title: Requested Sequence Volume
+          context: requested_sequence_volume
+          units: sequences/s
+          algorithm: incremental
+          type: line
+          priority: 1070
+          dimensions:
+            - selector: 'vllm:request_params_n_sum'
+              name: sequences
+
+        - title: Requested Token Limit
+          context: requested_token_limit
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1080
+          dimensions:
+            - selector: 'vllm:request_params_max_tokens_bucket'
+
+        - title: Requested Token Limits Sum
+          context: requested_token_limits_sum
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1090
+          dimensions:
+            - selector: 'vllm:request_params_max_tokens_sum'
+              name: token_limits
+
+        - title: Maximum Generated Tokens
+          context: maximum_generated_tokens
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1100
+          dimensions:
+            - selector: 'vllm:request_max_num_generation_tokens_bucket'
+
+        - title: Maximum Generated Tokens Sum
+          context: maximum_generated_tokens_sum
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1110
+          dimensions:
+            - selector: 'vllm:request_max_num_generation_tokens_sum'
+              name: maximums
+
+        - title: Parent Request Measurements
+          context: parent_request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1120
+          dimensions:
+            - selector: 'vllm:request_params_n_count'
+              name: requested_sequences
+            - selector: 'vllm:request_params_max_tokens_count'
+              name: token_limit
+            - selector: 'vllm:request_max_num_generation_tokens_count'
+              name: maximum_generated
+
+    - family: Scheduler
+      context_namespace: scheduler
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:num_requests_running'
+        - 'vllm:num_requests_waiting'
+        - 'vllm:num_requests_waiting_by_reason'
+        - 'vllm:num_preemptions_total'
+        - 'vllm:engine_sleep_state'
+        - 'vllm:request_queue_time_seconds_bucket'
+        - 'vllm:request_queue_time_seconds_count'
+        - 'vllm:request_queue_time_seconds_sum'
+      charts:
+        - title: Request State
+          context: request_state
+          units: requests
+          algorithm: absolute
+          type: line
+          priority: 1130
+          dimensions:
+            - selector: 'vllm:num_requests_running'
+              name: running
+            - selector: 'vllm:num_requests_waiting'
+              name: waiting
+
+        - title: Waiting Requests by Reason
+          context: waiting_by_reason
+          units: requests
+          algorithm: absolute
+          type: line
+          priority: 1140
+          dimensions:
+            - selector: 'vllm:num_requests_waiting_by_reason'
+              name_from_label: reason
+
+        - title: Request Preemptions
+          context: preemptions
+          units: preemptions/s
+          algorithm: incremental
+          type: line
+          priority: 1150
+          dimensions:
+            - selector: 'vllm:num_preemptions_total'
+              name: preemptions
+
+        - title: Engine Sleep State
+          context: sleep_state
+          units: state
+          algorithm: absolute
+          type: line
+          priority: 1160
+          dimensions:
+            - selector: 'vllm:engine_sleep_state'
+              name_from_label: sleep_state
+
+        - title: Request Queue Time
+          context: queue_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1170
+          dimensions:
+            - selector: 'vllm:request_queue_time_seconds_bucket'
+
+        - title: Queued Request Measurements
+          context: queued_request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1180
+          dimensions:
+            - selector: 'vllm:request_queue_time_seconds_count'
+              name: requests
+
+        - title: Queue Concurrency
+          context: queue_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1190
+          dimensions:
+            - selector: 'vllm:request_queue_time_seconds_sum'
+              name: requests
+
+    - family: Prefill
+      context_namespace: prefill
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:prompt_tokens_total'
+        - 'vllm:prompt_tokens_by_source_total'
+        - 'vllm:prompt_tokens_cached_total'
+        - 'vllm:request_prompt_tokens_bucket'
+        - 'vllm:request_prompt_tokens_count'
+        - 'vllm:request_prompt_tokens_sum'
+        - 'vllm:request_prefill_time_seconds_bucket'
+        - 'vllm:request_prefill_time_seconds_count'
+        - 'vllm:request_prefill_time_seconds_sum'
+        - 'vllm:request_prefill_kv_computed_tokens_bucket'
+        - 'vllm:request_prefill_kv_computed_tokens_count'
+        - 'vllm:request_prefill_kv_computed_tokens_sum'
+      charts:
+        - title: Processed Prompt Tokens
+          context: prompt_throughput
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1200
+          dimensions:
+            - selector: 'vllm:prompt_tokens_total'
+              name: processed
+
+        - title: Prompt Tokens by Source
+          context: prompt_tokens_by_source
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1210
+          dimensions:
+            - selector: 'vllm:prompt_tokens_by_source_total'
+              name_from_label: source
+
+        - title: Cached Prompt Tokens
+          context: cached_prompt_throughput
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1220
+          dimensions:
+            - selector: 'vllm:prompt_tokens_cached_total'
+              name: cached
+
+        - title: Prompt Size
+          context: prompt_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1230
+          dimensions:
+            - selector: 'vllm:request_prompt_tokens_bucket'
+
+        - title: Prefill Time
+          context: prefill_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1240
+          dimensions:
+            - selector: 'vllm:request_prefill_time_seconds_bucket'
+
+        - title: Computed KV Tokens
+          context: computed_kv_tokens
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1250
+          dimensions:
+            - selector: 'vllm:request_prefill_kv_computed_tokens_bucket'
+
+        - title: Prefill Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1260
+          dimensions:
+            - selector: 'vllm:request_prompt_tokens_count'
+              name: prompt_size
+            - selector: 'vllm:request_prefill_time_seconds_count'
+              name: prefill_time
+            - selector: 'vllm:request_prefill_kv_computed_tokens_count'
+              name: computed_kv
+
+        - title: Completed Request Prompt Volume
+          context: completed_request_prompt_volume
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1270
+          dimensions:
+            - selector: 'vllm:request_prompt_tokens_sum'
+              name: prompt_tokens
+
+        - title: Computed KV Token Volume
+          context: computed_kv_token_volume
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1280
+          dimensions:
+            - selector: 'vllm:request_prefill_kv_computed_tokens_sum'
+              name: computed_tokens
+
+        - title: Prefill Concurrency
+          context: concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1290
+          dimensions:
+            - selector: 'vllm:request_prefill_time_seconds_sum'
+              name: requests
+
+    - family: Decode
+      context_namespace: decode
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:generation_tokens_total'
+        - 'vllm:request_generation_tokens_bucket'
+        - 'vllm:request_generation_tokens_count'
+        - 'vllm:request_generation_tokens_sum'
+        - 'vllm:request_decode_time_seconds_bucket'
+        - 'vllm:request_decode_time_seconds_count'
+        - 'vllm:request_decode_time_seconds_sum'
+        - 'vllm:inter_token_latency_seconds_bucket'
+        - 'vllm:inter_token_latency_seconds_count'
+        - 'vllm:inter_token_latency_seconds_sum'
+        - 'vllm:request_time_per_output_token_seconds_bucket'
+        - 'vllm:request_time_per_output_token_seconds_count'
+        - 'vllm:request_time_per_output_token_seconds_sum'
+      charts:
+        - title: Generated Tokens
+          context: generation_throughput
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1300
+          dimensions:
+            - selector: 'vllm:generation_tokens_total'
+              name: generated
+
+        - title: Output Size
+          context: output_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1310
+          dimensions:
+            - selector: 'vllm:request_generation_tokens_bucket'
+
+        - title: Decode Time
+          context: decode_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1320
+          dimensions:
+            - selector: 'vllm:request_decode_time_seconds_bucket'
+
+        - title: Inter-Token Latency
+          context: inter_token_latency
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1330
+          dimensions:
+            - selector: 'vllm:inter_token_latency_seconds_bucket'
+
+        - title: Mean Output-Token Time
+          context: mean_output_token_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1340
+          dimensions:
+            - selector: 'vllm:request_time_per_output_token_seconds_bucket'
+
+        - title: Decode Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1350
+          dimensions:
+            - selector: 'vllm:request_generation_tokens_count'
+              name: output_size
+            - selector: 'vllm:request_decode_time_seconds_count'
+              name: decode_time
+            - selector: 'vllm:request_time_per_output_token_seconds_count'
+              name: mean_token_time
+
+        - title: Output Token Volume
+          context: output_token_volume
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1360
+          dimensions:
+            - selector: 'vllm:request_generation_tokens_sum'
+              name: output_tokens
+
+        - title: Decode Concurrency
+          context: concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1370
+          dimensions:
+            - selector: 'vllm:request_decode_time_seconds_sum'
+              name: requests
+
+        - title: Inter-Token Intervals
+          context: inter_token_intervals
+          units: intervals/s
+          algorithm: incremental
+          type: line
+          priority: 1380
+          dimensions:
+            - selector: 'vllm:inter_token_latency_seconds_count'
+              name: intervals
+
+        - title: Inter-Token Interval Time
+          context: inter_token_interval_time
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 1390
+          dimensions:
+            - selector: 'vllm:inter_token_latency_seconds_sum'
+              name: intervals
+
+        - title: Accumulated Mean Output-Token Time
+          context: accumulated_mean_output_token_time
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 1400
+          dimensions:
+            - selector: 'vllm:request_time_per_output_token_seconds_sum'
+              name: request_means
+
+    - family: Engine Execution
+      context_namespace: engine_execution
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:request_inference_time_seconds_bucket'
+        - 'vllm:request_inference_time_seconds_count'
+        - 'vllm:request_inference_time_seconds_sum'
+        - 'vllm:iteration_tokens_total_bucket'
+        - 'vllm:iteration_tokens_total_count'
+        - 'vllm:iteration_tokens_total_sum'
+        - 'vllm:estimated_flops_per_gpu_total'
+        - 'vllm:estimated_read_bytes_per_gpu_total'
+        - 'vllm:estimated_write_bytes_per_gpu_total'
+      charts:
+        - title: Inference Time
+          context: inference_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1410
+          dimensions:
+            - selector: 'vllm:request_inference_time_seconds_bucket'
+
+        - title: Inference Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1420
+          dimensions:
+            - selector: 'vllm:request_inference_time_seconds_count'
+              name: requests
+
+        - title: Inference Concurrency
+          context: concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1430
+          dimensions:
+            - selector: 'vllm:request_inference_time_seconds_sum'
+              name: requests
+
+        - title: Tokens per Engine Step
+          context: tokens_per_step
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1440
+          dimensions:
+            - selector: 'vllm:iteration_tokens_total_bucket'
+
+        - title: Engine Steps
+          context: engine_steps
+          units: steps/s
+          algorithm: incremental
+          type: line
+          priority: 1450
+          dimensions:
+            - selector: 'vllm:iteration_tokens_total_count'
+              name: steps
+
+        - title: Engine Step Token Volume
+          context: step_token_volume
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1460
+          dimensions:
+            - selector: 'vllm:iteration_tokens_total_sum'
+              name: tokens
+
+        - title: Estimated Compute per GPU
+          context: estimated_compute
+          units: TFLOP/s/GPU
+          algorithm: incremental
+          type: line
+          priority: 1470
+          dimensions:
+            - selector: 'vllm:estimated_flops_per_gpu_total'
+              name: compute
+              options:
+                divisor: 1000000000000
+                float: true
+
+        - title: Estimated Memory Bandwidth per GPU
+          context: estimated_memory_bandwidth
+          units: GB/s/GPU
+          algorithm: incremental
+          type: line
+          priority: 1480
+          dimensions:
+            - selector: 'vllm:estimated_read_bytes_per_gpu_total'
+              name: read
+              options:
+                divisor: 1000000000
+                float: true
+            - selector: 'vllm:estimated_write_bytes_per_gpu_total'
+              name: write
+              options:
+                divisor: 1000000000
+                float: true
+
+    - family: KV Cache
+      context_namespace: kv_cache
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:kv_cache_usage_perc'
+        - 'vllm:prefix_cache_queries_total'
+        - 'vllm:prefix_cache_hits_total'
+        - 'vllm:external_prefix_cache_queries_total'
+        - 'vllm:external_prefix_cache_hits_total'
+        - 'vllm:mm_cache_queries_total'
+        - 'vllm:mm_cache_hits_total'
+      charts:
+        - title: KV Cache Usage
+          context: usage
+          units: percentage
+          algorithm: absolute
+          type: line
+          priority: 1490
+          dimensions:
+            - selector: 'vllm:kv_cache_usage_perc'
+              name: used
+              options:
+                multiplier: 100
+                float: true
+
+        - title: Local Prefix Cache
+          context: local_prefix
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1500
+          dimensions:
+            - selector: 'vllm:prefix_cache_queries_total'
+              name: queries
+            - selector: 'vllm:prefix_cache_hits_total'
+              name: hits
+
+        - title: External Prefix Cache
+          context: external_prefix
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1510
+          dimensions:
+            - selector: 'vllm:external_prefix_cache_queries_total'
+              name: queries
+            - selector: 'vllm:external_prefix_cache_hits_total'
+              name: hits
+
+        - title: Multimodal Cache
+          context: multimodal
+          units: items/s
+          algorithm: incremental
+          type: line
+          priority: 1520
+          dimensions:
+            - selector: 'vllm:mm_cache_queries_total'
+              name: queries
+            - selector: 'vllm:mm_cache_hits_total'
+              name: hits
+
+    - family: KV Cache Residency
+      context_namespace: kv_cache_residency
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:kv_block_lifetime_seconds_bucket'
+        - 'vllm:kv_block_lifetime_seconds_count'
+        - 'vllm:kv_block_lifetime_seconds_sum'
+        - 'vllm:kv_block_idle_before_evict_seconds_bucket'
+        - 'vllm:kv_block_idle_before_evict_seconds_count'
+        - 'vllm:kv_block_idle_before_evict_seconds_sum'
+        - 'vllm:kv_block_reuse_gap_seconds_bucket'
+        - 'vllm:kv_block_reuse_gap_seconds_count'
+        - 'vllm:kv_block_reuse_gap_seconds_sum'
+      charts:
+        - title: KV Block Lifetime
+          context: block_lifetime
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1530
+          dimensions:
+            - selector: 'vllm:kv_block_lifetime_seconds_bucket'
+
+        - title: KV Block Idle Time Before Eviction
+          context: idle_before_eviction
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1540
+          dimensions:
+            - selector: 'vllm:kv_block_idle_before_evict_seconds_bucket'
+
+        - title: KV Block Reuse Gap
+          context: reuse_gap
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1550
+          dimensions:
+            - selector: 'vllm:kv_block_reuse_gap_seconds_bucket'
+
+        - title: KV Residency Measurements
+          context: measurements
+          units: observations/s
+          algorithm: incremental
+          type: line
+          priority: 1560
+          dimensions:
+            - selector: 'vllm:kv_block_lifetime_seconds_count'
+              name: lifetimes
+            - selector: 'vllm:kv_block_idle_before_evict_seconds_count'
+              name: idle_periods
+            - selector: 'vllm:kv_block_reuse_gap_seconds_count'
+              name: reuse_gaps
+
+        - title: Accumulated KV Residency Time
+          context: accumulated_time
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 1570
+          dimensions:
+            - selector: 'vllm:kv_block_lifetime_seconds_sum'
+              name: lifetime
+            - selector: 'vllm:kv_block_idle_before_evict_seconds_sum'
+              name: idle_before_eviction
+            - selector: 'vllm:kv_block_reuse_gap_seconds_sum'
+              name: reuse_gap
+
+    - family: KV Offloading
+      context_namespace: kv_offloading
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:kv_offload_load_bytes_total'
+        - 'vllm:kv_offload_load_time_total'
+        - 'vllm:kv_offload_load_size_bucket'
+        - 'vllm:kv_offload_load_size_count'
+        - 'vllm:kv_offload_load_size_sum'
+        - 'vllm:kv_offload_store_bytes_total'
+        - 'vllm:kv_offload_store_time_total'
+        - 'vllm:kv_offload_store_size_bucket'
+        - 'vllm:kv_offload_store_size_count'
+        - 'vllm:kv_offload_store_size_sum'
+        - 'vllm:kv_offload_lookup_sync_delay_seconds_bucket'
+        - 'vllm:kv_offload_lookup_sync_delay_seconds_count'
+        - 'vllm:kv_offload_lookup_sync_delay_seconds_sum'
+        - 'vllm:kv_offload_lookup_async_delay_seconds_bucket'
+        - 'vllm:kv_offload_lookup_async_delay_seconds_count'
+        - 'vllm:kv_offload_lookup_async_delay_seconds_sum'
+        - 'vllm:kv_offload_allocation_failure_total'
+        - 'vllm:kv_offload_cpu_cache_usage_perc'
+        - 'vllm:kv_offload_cpu_cache_write_usage_perc'
+        - 'vllm:kv_offload_cpu_cache_read_usage_perc'
+        - 'vllm:kv_offload_cpu_allocation_size_bucket'
+        - 'vllm:kv_offload_cpu_allocation_size_count'
+        - 'vllm:kv_offload_cpu_allocation_size_sum'
+        - 'vllm:kv_offload_stores_skipped_total'
+        - 'vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket'
+        - 'vllm:kv_offload_tiering_lookup_sync_delay_seconds_count'
+        - 'vllm:kv_offload_tiering_lookup_sync_delay_seconds_sum'
+        - 'vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket'
+        - 'vllm:kv_offload_tiering_lookup_async_delay_seconds_count'
+        - 'vllm:kv_offload_tiering_lookup_async_delay_seconds_sum'
+      charts:
+        - title: KV Offload Load Size
+          context: load_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1580
+          dimensions:
+            - selector: 'vllm:kv_offload_load_size_bucket'
+
+        - title: KV Offload Store Size
+          context: store_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1590
+          dimensions:
+            - selector: 'vllm:kv_offload_store_size_bucket'
+
+        - title: KV Offload Transfer Operations
+          context: transfer_operations
+          units: operations/s
+          algorithm: incremental
+          type: line
+          priority: 1600
+          dimensions:
+            - selector: 'vllm:kv_offload_load_size_count'
+              name: loads
+            - selector: 'vllm:kv_offload_store_size_count'
+              name: stores
+
+        - title: KV Offload Transfer Byte Accounting
+          context: transfer_bytes
+          units: bytes/s
+          algorithm: incremental
+          type: line
+          priority: 1610
+          dimensions:
+            - selector: 'vllm:kv_offload_load_bytes_total'
+              name: loaded
+            - selector: 'vllm:kv_offload_load_size_sum'
+              name: loaded_observed
+            - selector: 'vllm:kv_offload_store_bytes_total'
+              name: stored
+            - selector: 'vllm:kv_offload_store_size_sum'
+              name: stored_observed
+
+        - title: KV Offload Transfer Concurrency
+          context: transfer_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1620
+          dimensions:
+            - selector: 'vllm:kv_offload_load_time_total'
+              name: loads
+            - selector: 'vllm:kv_offload_store_time_total'
+              name: stores
+
+        - title: KV Offload Synchronous Lookup Delay
+          context: lookup_sync_delay
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1630
+          dimensions:
+            - selector: 'vllm:kv_offload_lookup_sync_delay_seconds_bucket'
+
+        - title: KV Offload Asynchronous Lookup Delay
+          context: lookup_async_delay
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1640
+          dimensions:
+            - selector: 'vllm:kv_offload_lookup_async_delay_seconds_bucket'
+
+        - title: KV Offload Lookup Measurements
+          context: lookup_measurements
+          units: lookups/s
+          algorithm: incremental
+          type: line
+          priority: 1650
+          dimensions:
+            - selector: 'vllm:kv_offload_lookup_sync_delay_seconds_count'
+              name: synchronous
+            - selector: 'vllm:kv_offload_lookup_async_delay_seconds_count'
+              name: asynchronous
+
+        - title: KV Offload Lookup Delay Accumulation
+          context: lookup_delay_accumulation
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 1660
+          dimensions:
+            - selector: 'vllm:kv_offload_lookup_sync_delay_seconds_sum'
+              name: synchronous
+            - selector: 'vllm:kv_offload_lookup_async_delay_seconds_sum'
+              name: asynchronous
+
+        - title: CPU KV Cache Usage
+          context: cpu_cache_usage
+          units: percentage
+          algorithm: absolute
+          type: line
+          priority: 1670
+          dimensions:
+            - selector: 'vllm:kv_offload_cpu_cache_usage_perc'
+              name: total
+              options:
+                multiplier: 100
+                float: true
+            - selector: 'vllm:kv_offload_cpu_cache_write_usage_perc'
+              name: writes
+              options:
+                multiplier: 100
+                float: true
+            - selector: 'vllm:kv_offload_cpu_cache_read_usage_perc'
+              name: reads
+              options:
+                multiplier: 100
+                float: true
+
+        - title: CPU KV Allocation Size
+          context: cpu_allocation_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1680
+          dimensions:
+            - selector: 'vllm:kv_offload_cpu_allocation_size_bucket'
+
+        - title: CPU KV Allocation Measurements
+          context: cpu_allocation_measurements
+          units: allocations/s
+          algorithm: incremental
+          type: line
+          priority: 1690
+          dimensions:
+            - selector: 'vllm:kv_offload_cpu_allocation_size_count'
+              name: allocations
+
+        - title: CPU KV Allocation Volume
+          context: cpu_allocation_volume
+          units: blocks/s
+          algorithm: incremental
+          type: line
+          priority: 1700
+          dimensions:
+            - selector: 'vllm:kv_offload_cpu_allocation_size_sum'
+              name: blocks
+
+        - title: KV Offload Admission Outcomes
+          context: admission_outcomes
+          units: events/s
+          algorithm: incremental
+          type: line
+          priority: 1710
+          dimensions:
+            - selector: 'vllm:kv_offload_allocation_failure_total'
+              name: allocation_failures
+            - selector: 'vllm:kv_offload_stores_skipped_total'
+              name: stores_skipped
+
+        - title: Tiered KV Offload Synchronous Lookup Delay
+          context: tiering_lookup_sync_delay
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1720
+          dimensions:
+            - selector: 'vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket'
+
+        - title: Tiered KV Offload Asynchronous Lookup Delay
+          context: tiering_lookup_async_delay
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1730
+          dimensions:
+            - selector: 'vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket'
+
+        - title: Tiered KV Offload Lookup Measurements
+          context: tiering_lookup_measurements
+          units: lookups/s
+          algorithm: incremental
+          type: line
+          priority: 1740
+          dimensions:
+            - selector: 'vllm:kv_offload_tiering_lookup_sync_delay_seconds_count'
+              name: synchronous
+            - selector: 'vllm:kv_offload_tiering_lookup_async_delay_seconds_count'
+              name: asynchronous
+
+        - title: Tiered KV Offload Lookup Delay Accumulation
+          context: tiering_lookup_delay_accumulation
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 1750
+          dimensions:
+            - selector: 'vllm:kv_offload_tiering_lookup_sync_delay_seconds_sum'
+              name: synchronous
+            - selector: 'vllm:kv_offload_tiering_lookup_async_delay_seconds_sum'
+              name: asynchronous
+
+    - family: NIXL Connector
+      context_namespace: nixl_connector
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:nixl_xfer_time_seconds_bucket'
+        - 'vllm:nixl_xfer_time_seconds_count'
+        - 'vllm:nixl_xfer_time_seconds_sum'
+        - 'vllm:nixl_post_time_seconds_bucket'
+        - 'vllm:nixl_post_time_seconds_count'
+        - 'vllm:nixl_post_time_seconds_sum'
+        - 'vllm:nixl_bytes_transferred_bucket'
+        - 'vllm:nixl_bytes_transferred_count'
+        - 'vllm:nixl_bytes_transferred_sum'
+        - 'vllm:nixl_num_descriptors_bucket'
+        - 'vllm:nixl_num_descriptors_count'
+        - 'vllm:nixl_num_descriptors_sum'
+        - 'vllm:nixl_num_failed_transfers_total'
+        - 'vllm:nixl_num_failed_notifications_total'
+        - 'vllm:nixl_num_kv_expired_reqs_total'
+      charts:
+        - title: NIXL Transfer Duration
+          context: transfer_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1760
+          dimensions:
+            - selector: 'vllm:nixl_xfer_time_seconds_bucket'
+
+        - title: NIXL Transfer Post Time
+          context: post_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1770
+          dimensions:
+            - selector: 'vllm:nixl_post_time_seconds_bucket'
+
+        - title: NIXL Transfer Size
+          context: transfer_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1780
+          dimensions:
+            - selector: 'vllm:nixl_bytes_transferred_bucket'
+
+        - title: NIXL Transfer Descriptors
+          context: transfer_descriptors
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1790
+          dimensions:
+            - selector: 'vllm:nixl_num_descriptors_bucket'
+
+        - title: NIXL Transfer Measurements
+          context: transfer_measurements
+          units: observations/s
+          algorithm: incremental
+          type: line
+          priority: 1800
+          dimensions:
+            - selector: 'vllm:nixl_xfer_time_seconds_count'
+              name: transfers
+            - selector: 'vllm:nixl_post_time_seconds_count'
+              name: posts
+            - selector: 'vllm:nixl_bytes_transferred_count'
+              name: sized_transfers
+            - selector: 'vllm:nixl_num_descriptors_count'
+              name: descriptor_sets
+
+        - title: NIXL Transfer Concurrency
+          context: transfer_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1810
+          dimensions:
+            - selector: 'vllm:nixl_xfer_time_seconds_sum'
+              name: transfer
+            - selector: 'vllm:nixl_post_time_seconds_sum'
+              name: post
+
+        - title: NIXL Transfer Throughput
+          context: transfer_throughput
+          units: bytes/s
+          algorithm: incremental
+          type: line
+          priority: 1820
+          dimensions:
+            - selector: 'vllm:nixl_bytes_transferred_sum'
+              name: transferred
+
+        - title: NIXL Descriptor Throughput
+          context: descriptor_throughput
+          units: descriptors/s
+          algorithm: incremental
+          type: line
+          priority: 1830
+          dimensions:
+            - selector: 'vllm:nixl_num_descriptors_sum'
+              name: descriptors
+
+        - title: NIXL Failures
+          context: failures
+          units: failures/s
+          algorithm: incremental
+          type: line
+          priority: 1840
+          dimensions:
+            - selector: 'vllm:nixl_num_failed_transfers_total'
+              name: transfers
+            - selector: 'vllm:nixl_num_failed_notifications_total'
+              name: notifications
+
+        - title: NIXL Requests with Expired KV
+          context: expired_requests
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 1850
+          dimensions:
+            - selector: 'vllm:nixl_num_kv_expired_reqs_total'
+              name: expired
+
+    - family: HF3FS Connector
+      context_namespace: hf3fs_connector
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:hf3fs_save_duration_seconds_bucket'
+        - 'vllm:hf3fs_save_duration_seconds_count'
+        - 'vllm:hf3fs_save_duration_seconds_sum'
+        - 'vllm:hf3fs_load_duration_seconds_bucket'
+        - 'vllm:hf3fs_load_duration_seconds_count'
+        - 'vllm:hf3fs_load_duration_seconds_sum'
+        - 'vllm:hf3fs_num_failed_save_total'
+        - 'vllm:hf3fs_num_failed_load_total'
+      charts:
+        - title: HF3FS Save Duration
+          context: save_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1860
+          dimensions:
+            - selector: 'vllm:hf3fs_save_duration_seconds_bucket'
+
+        - title: HF3FS Load Duration
+          context: load_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 1870
+          dimensions:
+            - selector: 'vllm:hf3fs_load_duration_seconds_bucket'
+
+        - title: HF3FS Transfer Measurements
+          context: transfer_measurements
+          units: operations/s
+          algorithm: incremental
+          type: line
+          priority: 1880
+          dimensions:
+            - selector: 'vllm:hf3fs_save_duration_seconds_count'
+              name: saves
+            - selector: 'vllm:hf3fs_load_duration_seconds_count'
+              name: loads
+
+        - title: HF3FS Transfer Concurrency
+          context: transfer_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 1890
+          dimensions:
+            - selector: 'vllm:hf3fs_save_duration_seconds_sum'
+              name: saves
+            - selector: 'vllm:hf3fs_load_duration_seconds_sum'
+              name: loads
+
+        - title: HF3FS Transfer Failures
+          context: failures
+          units: failures/s
+          algorithm: incremental
+          type: line
+          priority: 1900
+          dimensions:
+            - selector: 'vllm:hf3fs_num_failed_save_total'
+              name: saves
+            - selector: 'vllm:hf3fs_num_failed_load_total'
+              name: loads
+
+    - family: Mooncake Connector
+      context_namespace: mooncake_connector
+      groups:
+        - family: Operation Timing
+          context_namespace: timing
+          chart_defaults:
+            instances:
+              by_labels: [model_name, engine, operation, status]
+          metrics:
+            - 'vllm:mooncake_store_operation_time_seconds_bucket'
+            - 'vllm:mooncake_store_operation_time_seconds_count'
+            - 'vllm:mooncake_store_operation_time_seconds_sum'
+            - 'vllm:mooncake_store_operation_total'
+          charts:
+            - title: Mooncake Store Operation Time
+              context: duration
+              units: observations/s
+              algorithm: incremental
+              type: heatmap
+              priority: 1910
+              dimensions:
+                - selector: 'vllm:mooncake_store_operation_time_seconds_bucket'
+
+            - title: Mooncake Store Operation Measurements
+              context: measurements
+              units: operations/s
+              algorithm: incremental
+              type: line
+              priority: 1920
+              dimensions:
+                - selector: 'vllm:mooncake_store_operation_time_seconds_count'
+                  name: timed
+                - selector: 'vllm:mooncake_store_operation_total'
+                  name: calls
+
+            - title: Mooncake Store Operation Concurrency
+              context: concurrency
+              units: in-flight
+              algorithm: incremental
+              type: line
+              priority: 1930
+              dimensions:
+                - selector: 'vllm:mooncake_store_operation_time_seconds_sum'
+                  name: operations
+
+        - family: Operation Volume
+          context_namespace: volume
+          chart_defaults:
+            instances:
+              by_labels: [model_name, engine, operation]
+          metrics:
+            - 'vllm:mooncake_store_operation_keys_total'
+            - 'vllm:mooncake_store_operation_bytes_total'
+            - 'vllm:mooncake_store_operation_failed_keys_total'
+          charts:
+            - title: Mooncake Store Key Throughput
+              context: keys
+              units: keys/s
+              algorithm: incremental
+              type: line
+              priority: 1940
+              dimensions:
+                - selector: 'vllm:mooncake_store_operation_keys_total'
+                  name_from_label: status
+
+            - title: Mooncake Store Byte Throughput
+              context: bytes
+              units: bytes/s
+              algorithm: incremental
+              type: line
+              priority: 1950
+              dimensions:
+                - selector: 'vllm:mooncake_store_operation_bytes_total'
+                  name_from_label: status
+
+            - title: Mooncake Store Failed Keys
+              context: failed_keys
+              units: keys/s
+              algorithm: incremental
+              type: line
+              priority: 1960
+              dimensions:
+                - selector: 'vllm:mooncake_store_operation_failed_keys_total'
+                  name_from_label: status
+
+    - family: Speculative Decoding
+      context_namespace: speculative_decoding
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:spec_decode_num_drafts_total'
+        - 'vllm:spec_decode_num_draft_tokens_total'
+        - 'vllm:spec_decode_num_accepted_tokens_total'
+        - 'vllm:spec_decode_num_accepted_tokens_per_pos_total'
+      charts:
+        - title: Drafts
+          context: drafts
+          units: drafts/s
+          algorithm: incremental
+          type: line
+          priority: 1970
+          dimensions:
+            - selector: 'vllm:spec_decode_num_drafts_total'
+              name: drafts
+
+        - title: Draft Token Outcomes
+          context: token_outcomes
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1980
+          dimensions:
+            - selector: 'vllm:spec_decode_num_draft_tokens_total'
+              name: proposed
+            - selector: 'vllm:spec_decode_num_accepted_tokens_total'
+              name: accepted
+
+        - title: Accepted Tokens by Position
+          context: accepted_by_position
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 1990
+          dimensions:
+            - selector: 'vllm:spec_decode_num_accepted_tokens_per_pos_total'
+              name_from_label: position
+
+    - family: Diffusion Decoding
+      context_namespace: diffusion_decoding
+      chart_defaults:
+        instances:
+          by_labels: [model_name, engine]
+      metrics:
+        - 'vllm:diffusion_num_denoising_steps_total'
+        - 'vllm:diffusion_num_canvas_positions_total'
+        - 'vllm:diffusion_num_committed_tokens_total'
+      charts:
+        - title: Diffusion Denoising Steps
+          context: denoising_steps
+          units: steps/s
+          algorithm: incremental
+          type: line
+          priority: 2000
+          dimensions:
+            - selector: 'vllm:diffusion_num_denoising_steps_total'
+              name: steps
+
+        - title: Diffusion Canvas Positions
+          context: canvas_positions
+          units: positions/s
+          algorithm: incremental
+          type: line
+          priority: 2010
+          dimensions:
+            - selector: 'vllm:diffusion_num_canvas_positions_total'
+              name: positions
+
+        - title: Diffusion Committed Tokens
+          context: committed_tokens
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2020
+          dimensions:
+            - selector: 'vllm:diffusion_num_committed_tokens_total'
+              name: committed
+
+    - family: WebSocket Service
+      context_namespace: websocket_service
+      metrics:
+        - 'vllm:websocket_connections_active'
+        - 'vllm:websocket_connections_total'
+        - 'vllm:websocket_connection_duration_seconds_bucket'
+        - 'vllm:websocket_connection_duration_seconds_count'
+        - 'vllm:websocket_connection_duration_seconds_sum'
+      charts:
+        - title: Active WebSocket Connections
+          context: active_connections
+          units: connections
+          algorithm: absolute
+          type: line
+          priority: 2030
+          dimensions:
+            - selector: 'vllm:websocket_connections_active'
+              name: active
+
+        - title: WebSocket Connection Lifecycle
+          context: connection_lifecycle
+          units: connections/s
+          algorithm: incremental
+          type: line
+          priority: 2040
+          dimensions:
+            - selector: 'vllm:websocket_connections_total'
+              name: opened
+            - selector: 'vllm:websocket_connection_duration_seconds_count'
+              name: closed
+
+        - title: WebSocket Connection Duration
+          context: connection_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2050
+          dimensions:
+            - selector: 'vllm:websocket_connection_duration_seconds_bucket'
+
+        - title: Completed WebSocket Connection Concurrency
+          context: completed_connection_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 2060
+          dimensions:
+            - selector: 'vllm:websocket_connection_duration_seconds_sum'
+              name: connections
+
+    - family: HTTP Endpoints
+      context_namespace: http_endpoints
+      chart_defaults:
+        instances:
+          by_labels: [handler, method]
+      metrics:
+        - 'http_requests_total'
+        - 'http_request_duration_seconds_bucket'
+        - 'http_request_duration_seconds_count'
+        - 'http_request_duration_seconds_sum'
+      charts:
+        - title: HTTP Request Outcomes
+          context: request_outcomes
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2070
+          dimensions:
+            - selector: 'http_requests_total'
+              name_from_label: status
+
+        - title: HTTP Request Duration
+          context: request_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2080
+          dimensions:
+            - selector: 'http_request_duration_seconds_bucket'
+
+        - title: HTTP Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2090
+          dimensions:
+            - selector: 'http_request_duration_seconds_count'
+              name: requests
+
+        - title: HTTP Request Concurrency
+          context: request_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 2100
+          dimensions:
+            - selector: 'http_request_duration_seconds_sum'
+              name: requests
+
+    - family: HTTP Service
+      context_namespace: http_service
+      metrics:
+        - 'http_request_duration_highr_seconds_bucket'
+        - 'http_request_duration_highr_seconds_count'
+        - 'http_request_duration_highr_seconds_sum'
+      charts:
+        - title: High-Resolution HTTP Request Duration
+          context: request_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2110
+          dimensions:
+            - selector: 'http_request_duration_highr_seconds_bucket'
+
+        - title: HTTP Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2120
+          dimensions:
+            - selector: 'http_request_duration_highr_seconds_count'
+              name: requests
+
+        - title: HTTP Request Concurrency
+          context: request_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          priority: 2130
+          dimensions:
+            - selector: 'http_request_duration_highr_seconds_sum'
+              name: requests
+
+    - family: Tool Parsing
+      context_namespace: tool_parsing
+      chart_defaults:
+        instances:
+          by_labels: [model_name, request_type, mode]
+      metrics:
+        - 'vllm:tool_call_parser_invocations_total'
+      charts:
+        - title: Tool Parser Invocations
+          context: invocations
+          units: invocations/s
+          algorithm: incremental
+          type: line
+          priority: 2140
+          dimensions:
+            - selector: 'vllm:tool_call_parser_invocations_total'
+              name_from_label: outcome
+
+    - family: Runtime
+      context_namespace: runtime
+      metrics:
+        - process_virtual_memory_bytes
+        - process_resident_memory_bytes
+        - process_cpu_seconds_total
+        - process_open_fds
+        - process_max_fds
+      charts:
+        - title: Process CPU Usage
+          context: process_cpu
+          units: cores
+          algorithm: incremental
+          type: line
+          priority: 2150
+          dimensions:
+            - selector: process_cpu_seconds_total
+              name: used
+              options:
+                float: true
+
+        - title: Process Resident Memory
+          context: process_resident_memory
+          units: bytes
+          algorithm: absolute
+          type: line
+          priority: 2160
+          dimensions:
+            - selector: process_resident_memory_bytes
+              name: resident
+
+        - title: Process Virtual Memory
+          context: process_virtual_memory
+          units: bytes
+          algorithm: absolute
+          type: line
+          priority: 2170
+          dimensions:
+            - selector: process_virtual_memory_bytes
+              name: virtual
+
+        - title: Open File Descriptors
+          context: open_file_descriptors
+          units: fds
+          algorithm: absolute
+          type: line
+          priority: 2180
+          dimensions:
+            - selector: process_open_fds
+              name: open
+
+        - title: File Descriptor Limit
+          context: file_descriptor_limit
+          units: fds
+          algorithm: absolute
+          type: line
+          priority: 2190
+          dimensions:
+            - selector: process_max_fds
+              name: limit
+
+      groups:
+        - family: Python GC
+          context_namespace: python_gc
+          metrics:
+            - python_gc_objects_collected_total
+            - python_gc_objects_uncollectable_total
+            - python_gc_collections_total
+          charts:
+            - title: Collected Objects
+              context: collected_objects
+              units: objects/s
+              algorithm: incremental
+              type: line
+              priority: 2200
+              dimensions:
+                - selector: python_gc_objects_collected_total
+                  name_from_label: generation
+
+            - title: Uncollectable Objects
+              context: uncollectable_objects
+              units: objects/s
+              algorithm: incremental
+              type: line
+              priority: 2210
+              dimensions:
+                - selector: python_gc_objects_uncollectable_total
+                  name_from_label: generation
+
+            - title: Collections
+              context: collections
+              units: collections/s
+              algorithm: incremental
+              type: line
+              priority: 2220
+              dimensions:
+                - selector: python_gc_collections_total
+                  name_from_label: generation

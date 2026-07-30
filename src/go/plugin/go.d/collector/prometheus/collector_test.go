@@ -820,6 +820,357 @@ func TestCollector_HAProxyProfileAllMetrics(t *testing.T) {
 	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: curated})
 }
 
+func testCollectorStockProfileModes(
+	t *testing.T,
+	profileName string,
+	input string,
+	curated map[string][]string,
+	autogen map[string][]string,
+) {
+	t.Helper()
+
+	tests := []struct {
+		name     string
+		profiles ProfilesConfig
+		want     map[string][]string
+	}{
+		{
+			name:     "auto mode selects " + profileName,
+			profiles: ProfilesConfig{Mode: "auto"},
+			want:     curated,
+		},
+		{
+			name:     "exact mode selects " + profileName,
+			profiles: ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: profileName}}}},
+			want:     curated,
+		},
+		{
+			name:     "combined mode selects " + profileName,
+			profiles: ProfilesConfig{Mode: "combined", ModeCombined: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: profileName}}}},
+			want:     curated,
+		},
+		{
+			name:     "none mode falls back to autogen",
+			profiles: ProfilesConfig{Mode: "none"},
+			want:     autogen,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(input)) }))
+			defer srv.Close()
+
+			collr := New()
+			collr.URL = srv.URL
+			collr.Profiles = tc.profiles
+			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
+
+			cc := cycle(t, collr.MetricStore())
+			cc.BeginCycle()
+			require.NoError(t, collr.Collect(context.Background()))
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: tc.want})
+		})
+	}
+}
+
+func TestCollector_VLLMProfile(t *testing.T) {
+	const input = `
+# TYPE vllm:num_requests_running gauge
+vllm:num_requests_running{engine="0",model_name="example-model"} 1
+`
+	testCollectorStockProfileModes(
+		t,
+		"vllm",
+		input,
+		map[string][]string{"prometheus.vllm.scheduler.request_state": {"running"}},
+		map[string][]string{"prometheus.vllm:num_requests_running": {"vllm:num_requests_running"}},
+	)
+}
+
+func TestCollector_LiteLLMProfile(t *testing.T) {
+	const input = `
+# TYPE litellm_in_flight_requests gauge
+litellm_in_flight_requests 1
+`
+	testCollectorStockProfileModes(
+		t,
+		"litellm",
+		input,
+		map[string][]string{"prometheus.litellm.gateway.in_flight_requests": {"requests"}},
+		map[string][]string{"prometheus.litellm_in_flight_requests": {"litellm_in_flight_requests"}},
+	)
+}
+
+func TestCollector_CephProfile(t *testing.T) {
+	const input = `
+# TYPE ceph_health_status gauge
+ceph_health_status 0
+`
+	testCollectorStockProfileModes(
+		t,
+		"ceph",
+		input,
+		map[string][]string{"prometheus.ceph.cluster_mgr.health.cluster_status.state": {"value"}},
+		map[string][]string{"prometheus.ceph_health_status": {"ceph_health_status"}},
+	)
+}
+
+// TestCollector_VLLMProfileAllMetrics proves the stock profile against a
+// sanitized structural union, including optional and mutually exclusive
+// source-defined surfaces and each distinct entity identity.
+func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
+	input, err := os.ReadFile(filepath.Join("testdata", "vllm_all_metrics.prom"))
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(input) }))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Selector = selector.Expr{Deny: []string{
+		"*_created",
+		"process_start_time_seconds",
+		"vllm:kv_offload_total_bytes_total",
+		"vllm:kv_offload_total_time_total",
+		"vllm:kv_offload_size*",
+	}}
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	seenChartIDs := make(map[string]string)
+	identityCounts := map[string]int{
+		"prometheus.vllm.request_lifecycle.outcomes":             0,
+		"prometheus.vllm.kv_offloading.transfer_operations":      0,
+		"prometheus.vllm.mooncake_connector.volume.keys":         0,
+		"prometheus.vllm.diffusion_decoding.denoising_steps":     0,
+		"prometheus.vllm.websocket_service.connection_lifecycle": 0,
+		"prometheus.vllm.http_endpoints.request_outcomes":        0,
+		"prometheus.vllm.tool_parsing.invocations":               0,
+		"prometheus.vllm.runtime.process_cpu":                    0,
+	}
+	for _, action := range plan.Actions {
+		create, ok := action.(chartengine.CreateChartAction)
+		if !ok {
+			continue
+		}
+		if prev, dup := seenChartIDs[create.ChartID]; dup {
+			t.Fatalf("chart-ID collision %q: contexts %q and %q", create.ChartID, prev, create.Meta.Context)
+		}
+		seenChartIDs[create.ChartID] = create.Meta.Context
+		assert.Truef(t, strings.HasPrefix(create.Meta.Context, "prometheus.vllm."),
+			"context %q (chart %q) is missing the prometheus.vllm. app segment", create.Meta.Context, create.ChartID)
+
+		switch create.Meta.Context {
+		case "prometheus.vllm.request_lifecycle.outcomes":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.Equal(t, "0", create.Labels["engine"])
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.kv_offloading.transfer_operations":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.Equal(t, "0", create.Labels["engine"])
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.mooncake_connector.volume.keys":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.Equal(t, "0", create.Labels["engine"])
+			assert.NotEmpty(t, create.Labels["operation"])
+			assert.NotContains(t, create.Labels, "status")
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.diffusion_decoding.denoising_steps":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.Equal(t, "0", create.Labels["engine"])
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.websocket_service.connection_lifecycle":
+			assert.NotContains(t, create.Labels, "model_name")
+			assert.NotContains(t, create.Labels, "engine")
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.http_endpoints.request_outcomes":
+			assert.NotEmpty(t, create.Labels["handler"])
+			assert.NotEmpty(t, create.Labels["method"])
+			assert.NotContains(t, create.Labels, "model_name")
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.tool_parsing.invocations":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.NotEmpty(t, create.Labels["request_type"])
+			assert.NotEmpty(t, create.Labels["mode"])
+			assert.NotContains(t, create.Labels, "engine")
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.runtime.process_cpu":
+			assert.NotContains(t, create.Labels, "model_name")
+			assert.NotContains(t, create.Labels, "engine")
+			identityCounts[create.Meta.Context]++
+		}
+	}
+	assert.NotEmpty(t, seenChartIDs)
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.request_lifecycle.outcomes"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.kv_offloading.transfer_operations"])
+	assert.Equal(t, 2, identityCounts["prometheus.vllm.mooncake_connector.volume.keys"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.diffusion_decoding.denoising_steps"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.websocket_service.connection_lifecycle"])
+	assert.Equal(t, 2, identityCounts["prometheus.vllm.http_endpoints.request_outcomes"])
+	assert.Equal(t, 6, identityCounts["prometheus.vllm.tool_parsing.invocations"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.runtime.process_cpu"])
+
+	curated := map[string][]string{
+		"prometheus.vllm.request_lifecycle.outcomes":                  {"stop", "length", "abort", "error", "repetition"},
+		"prometheus.vllm.request_lifecycle.corrupted_requests":        {"corrupted"},
+		"prometheus.vllm.scheduler.waiting_by_reason":                 {"capacity", "deferred"},
+		"prometheus.vllm.prefill.prompt_tokens_by_source":             {"local_compute", "local_cache_hit", "external_kv_transfer"},
+		"prometheus.vllm.decode.inter_token_intervals":                {"intervals"},
+		"prometheus.vllm.engine_execution.estimated_memory_bandwidth": {"read", "write"},
+		"prometheus.vllm.kv_cache.local_prefix":                       {"queries", "hits"},
+		"prometheus.vllm.kv_cache_residency.measurements":             {"lifetimes", "idle_periods", "reuse_gaps"},
+		"prometheus.vllm.kv_offloading.cpu_cache_usage":               {"total", "writes", "reads"},
+		"prometheus.vllm.nixl_connector.failures":                     {"transfers", "notifications"},
+		"prometheus.vllm.hf3fs_connector.failures":                    {"saves", "loads"},
+		"prometheus.vllm.mooncake_connector.volume.keys":              {"ok", "error"},
+		"prometheus.vllm.speculative_decoding.accepted_by_position":   {"0", "1"},
+		"prometheus.vllm.diffusion_decoding.committed_tokens":         {"committed"},
+		"prometheus.vllm.websocket_service.connection_lifecycle":      {"opened", "closed"},
+		"prometheus.vllm.http_endpoints.request_outcomes":             {"2xx"},
+		"prometheus.vllm.http_service.request_measurements":           {"requests"},
+		"prometheus.vllm.tool_parsing.invocations":                    {"tool_call", "no_tool_call"},
+		"prometheus.vllm.runtime.process_cpu":                         {"used"},
+		"prometheus.vllm.runtime.python_gc.collections":               {"0", "1", "2"},
+	}
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: curated})
+}
+
+func testCollectorStockProfileAllMetrics(
+	t *testing.T,
+	fixture string,
+	configure func(*Collector),
+	contextPrefix string,
+	requiredContexts map[string][]string,
+) {
+	t.Helper()
+
+	input, err := os.ReadFile(filepath.Join("testdata", fixture))
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(input) }))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	if configure != nil {
+		configure(collr)
+	}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	seenChartIDs := make(map[string]string)
+	for _, action := range plan.Actions {
+		create, ok := action.(chartengine.CreateChartAction)
+		if !ok {
+			continue
+		}
+		if prev, dup := seenChartIDs[create.ChartID]; dup {
+			t.Fatalf("chart-ID collision %q: contexts %q and %q", create.ChartID, prev, create.Meta.Context)
+		}
+		seenChartIDs[create.ChartID] = create.Meta.Context
+		assert.Truef(t, strings.HasPrefix(create.Meta.Context, contextPrefix),
+			"context %q (chart %q) is missing prefix %q", create.Meta.Context, create.ChartID, contextPrefix)
+	}
+	assert.NotEmpty(t, seenChartIDs)
+
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: requiredContexts})
+}
+
+func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
+	testCollectorStockProfileAllMetrics(
+		t,
+		"litellm_all_metrics.prom",
+		func(collr *Collector) {
+			collr.Selector = selector.Expr{Deny: []string{
+				"*_created",
+				"litellm_requests_metric_total",
+				"litellm_llm_api_failed_requests_metric_total",
+				"litellm_check_batch_cost_last_run_timestamp",
+			}}
+			collr.MaxTS = 20000
+			collr.MaxTSPerMetric = 2000
+		},
+		"prometheus.litellm.",
+		map[string][]string{
+			"prometheus.litellm.gateway.in_flight_requests":                      {"requests"},
+			"prometheus.litellm.routing_and_deployments.deployment_state":        {"state"},
+			"prometheus.litellm.provider_api.accumulated_provider_latency":       {"api_latency"},
+			"prometheus.litellm.usage_and_cost.request_token_throughput":         {"total"},
+			"prometheus.litellm.caching.cache_outcomes":                          {"hits"},
+			"prometheus.litellm.governance.team_budget":                          {"team_remaining"},
+			"prometheus.litellm.guardrails.guardrail_invocations_by_status":      {"success", "failure"},
+			"prometheus.litellm.mcp_gateway.mcp_tool_calls":                      {"calls"},
+			"prometheus.litellm.managed_batch_and_files.managed_batches_created": {"created"},
+			"prometheus.litellm.callbacks_and_inventory.user_inventory":          {"total"},
+			"prometheus.litellm.internal_services.internal_service_requests":     {"redis"},
+		},
+	)
+}
+
+func TestCollector_CephProfileAllMetrics(t *testing.T) {
+	testCollectorStockProfileAllMetrics(
+		t,
+		"ceph_all_metrics.prom",
+		func(collr *Collector) {
+			collr.Selector = selector.Expr{Deny: []string{"ceph_objecter_0x*"}}
+			collr.FallbackType.Gauge = []string{"ceph_*"}
+			collr.MaxTS = 10000
+			collr.MaxTSPerMetric = 2000
+		},
+		"prometheus.ceph.",
+		map[string][]string{
+			"prometheus.ceph.cluster_mgr.health.cluster_status.state":                           {"value"},
+			"prometheus.ceph.cluster_mgr.pools.capacity_and_quotas.space":                       {"bytes_used"},
+			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.state":               {"value"},
+			"prometheus.ceph.daemon_exporters.object_gateway.operations.operations":             {"get_obj_ops"},
+			"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_19.outcomes.scrub_work":        {"dp_repl_failed_scrubs"},
+			"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_20.outcomes.scrub_work":        {"failed_scrubs_replicated"},
+			"prometheus.ceph.daemon_exporters.cephfs_mds.request_handling_and_state.operations": {"request"},
+			"prometheus.ceph.daemon_exporters.rbd_mirror.journal.byte_throughput":               {"value"},
+			"prometheus.ceph.nvme_of.block_devices.byte_throughput":                             {"read_bytes"},
+		},
+	)
+}
+
 // TestCollector_ProfileSelectionErrors covers the exact/combined contract: a named
 // profile that does not exist, or that matches no scraped metric, fails Check.
 func TestCollector_ProfileSelectionErrors(t *testing.T) {

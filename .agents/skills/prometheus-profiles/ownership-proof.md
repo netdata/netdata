@@ -29,26 +29,63 @@ Research and state the operator model independently of the metric inventory:
 Metric names can suggest research questions, but they MUST NOT define this model by themselves. A prefix, suffix, unit, or
 Prometheus type is evidence about a signal, not proof of its causal owner.
 
+Draw the capability and processing-flow map before assigning source families.
+Include optional modules and hand-offs in the declared support scope even when
+the available deployment does not enable them.
+
+For each operator owner, record whether workload, outcomes, errors, latency,
+saturation, capacity, and resource evidence is:
+
+- observed in a real exposition;
+- defined by source but available only in a synthetic fixture;
+- not exported by the application;
+- intentionally delegated to another integration;
+- unresolved after source/documentation research.
+
+This diagnostic completeness matrix does not require every role to exist. It
+prevents one quiet deployment from making an entire capability or failure mode
+disappear from the operator model without explanation.
+
 ## Account for every writer-capable family
 
-For every source family the writer could retain before the proposed job policy removes it, make these facts explicit. The
-layout may be a table, structured bullets, or another readable form; the evidence fields are mandatory, not the formatting.
+For every in-scope source family the writer could retain before the proposed job
+policy removes it, make these facts explicit. Include source-defined optional
+families absent from the observed deployment. The layout may be a table,
+structured bullets, or another readable form; the evidence fields are mandatory,
+not the formatting.
 
 - **Source family:** Exact family name and Prometheus type/shape.
 - **Owner:** Closest entity, capability/module, operation, stage, or deliberate service/runtime boundary that explains the
   signal.
-- **Entity type and identity:** What one series describes and the smallest stable identity-label set, including parent labels.
+- **Entity type and identity:** What one series describes and the smallest stable
+  identity-label set, including parent labels.
 - **Signal role:** Workload, outcome, error, latency, saturation, capacity, utilization, resource, configuration, or another
   domain role.
 - **Observation population:** What one increment, gauge value, distribution observation, or state represents and when it is
   produced.
+- **Cross-family relationship:** Whether the family is a whole, partition,
+  subset, overlap, alias/replacement, or independent population relative to
+  related families. Record source-defined sums/equalities and explicit
+  non-additivity.
 - **Unit algebra:** Raw observed unit, temporal algorithm, conversion, rendered unit, and exact counted or measured object.
 - **Label roles and cardinality:** Identity, bounded dimension, promoted metadata, routing-only, or intentional aggregation.
-- **Evidence and uncertainty:** Dump evidence, authoritative source/documentation evidence, and unresolved limits.
-- **Destination or exclusion:** Intended displayed family/chart, or one binding exclusion case plus the operator question lost.
+- **Availability gate:** Version, configuration, feature, connector, mode, or
+  lifecycle condition controlling registration or updates.
+- **Evidence and uncertainty:** Observed snapshot, authoritative
+  source/documentation, source-derived synthetic, comparative, or unresolved
+  evidence and the exact limitation of each.
+- **Destination or exclusion:** Intended displayed family/chart, or one binding
+  exclusion case plus the operator question lost.
 
-Do not collapse multiple source families into one ledger row when their owners, populations, identities, or unit algebra differ.
-Shared units do not prove shared ownership. Shared ownership does not prove that values belong on one axis.
+Do not collapse multiple source families into one ledger row when their owners,
+populations, identities, or unit algebra differ. Shared units do not prove
+shared ownership. Shared ownership does not prove that values belong on one
+axis.
+
+Use stable population identifiers when several families share the same noun.
+For example, frontend requests, internal work items, emitted choices, retries,
+and parser events can all be called “requests” while remaining non-comparable
+populations.
 
 ## Resolve ownership conflicts
 
@@ -70,8 +107,13 @@ holistic diagnosis. This is model judgment, not a reason to omit the decision.
 
 ## Reconcile the emitted profile
 
-After authoring, run the objective validator in text or JSON mode. Its `authored_mapping` is generated from the effective merged
-template, including inherited instance identity, and remains in YAML source order.
+After authoring, run the objective validator in text or JSON mode. Its
+`authored_mapping` is generated from the effective merged template, including
+inherited instance identity, and remains in YAML source order.
+
+Reconcile the source-complete synthetic `authored_mapping` first so optional
+selectors are included. Then compare observed runtime evidence separately and
+preserve which selectors, labels, and feature gates were actually seen.
 
 Compare every mapping entry with `OPERATOR-MODEL.md`:
 

@@ -1,0 +1,1309 @@
+# Synthetic vLLM Prometheus structural-union fixture; this is not a captured scrape.
+# Labels and values are non-production placeholders. Shapes cover vllm-project/vllm
+# @ adf15cadb9d0151663b001a7286674892c4daa3c and @ 837eae64580c885101ee95b073aafb27a485e7ce.
+# Mutually exclusive model modes and KV connectors coexist only to exercise profile routing.
+# Deprecated CPU-offload aliases coexist with replacements so policy can prove they are suppressed.
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 101
+python_gc_objects_collected_total{generation="1"} 102
+python_gc_objects_collected_total{generation="2"} 103
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 101
+python_gc_objects_uncollectable_total{generation="1"} 102
+python_gc_objects_uncollectable_total{generation="2"} 103
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 101
+python_gc_collections_total{generation="1"} 102
+python_gc_collections_total{generation="2"} 103
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="12",patchlevel="0",version="3.12.0"} 1
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 4194304
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 1048576
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 10
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 32
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1024
+# HELP vllm:spec_decode_num_drafts_total Number of spec decoding drafts.
+# TYPE vllm:spec_decode_num_drafts_total counter
+vllm:spec_decode_num_drafts_total{engine="0",model_name="example-model"} 101
+# HELP vllm:spec_decode_num_drafts_created Number of spec decoding drafts.
+# TYPE vllm:spec_decode_num_drafts_created gauge
+vllm:spec_decode_num_drafts_created{engine="0",model_name="example-model"} 1
+# HELP vllm:spec_decode_num_draft_tokens_total Number of draft tokens.
+# TYPE vllm:spec_decode_num_draft_tokens_total counter
+vllm:spec_decode_num_draft_tokens_total{engine="0",model_name="example-model"} 101
+# HELP vllm:spec_decode_num_draft_tokens_created Number of draft tokens.
+# TYPE vllm:spec_decode_num_draft_tokens_created gauge
+vllm:spec_decode_num_draft_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:spec_decode_num_accepted_tokens_total Number of accepted tokens.
+# TYPE vllm:spec_decode_num_accepted_tokens_total counter
+vllm:spec_decode_num_accepted_tokens_total{engine="0",model_name="example-model"} 101
+# HELP vllm:spec_decode_num_accepted_tokens_created Number of accepted tokens.
+# TYPE vllm:spec_decode_num_accepted_tokens_created gauge
+vllm:spec_decode_num_accepted_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:spec_decode_num_accepted_tokens_per_pos_total Accepted tokens per draft position.
+# TYPE vllm:spec_decode_num_accepted_tokens_per_pos_total counter
+vllm:spec_decode_num_accepted_tokens_per_pos_total{engine="0",model_name="example-model",position="0"} 101
+vllm:spec_decode_num_accepted_tokens_per_pos_total{engine="0",model_name="example-model",position="1"} 102
+# HELP vllm:spec_decode_num_accepted_tokens_per_pos_created Accepted tokens per draft position.
+# TYPE vllm:spec_decode_num_accepted_tokens_per_pos_created gauge
+vllm:spec_decode_num_accepted_tokens_per_pos_created{engine="0",model_name="example-model",position="0"} 1
+vllm:spec_decode_num_accepted_tokens_per_pos_created{engine="0",model_name="example-model",position="1"} 1
+# HELP vllm:estimated_flops_per_gpu_total Estimated number of floating point operations per GPU (for Model Flops Utilization calculations).
+# TYPE vllm:estimated_flops_per_gpu_total counter
+vllm:estimated_flops_per_gpu_total{engine="0",model_name="example-model"} 101
+# HELP vllm:estimated_flops_per_gpu_created Estimated number of floating point operations per GPU (for Model Flops Utilization calculations).
+# TYPE vllm:estimated_flops_per_gpu_created gauge
+vllm:estimated_flops_per_gpu_created{engine="0",model_name="example-model"} 1
+# HELP vllm:estimated_read_bytes_per_gpu_total Estimated number of bytes read from memory per GPU (for Model Flops Utilization calculations).
+# TYPE vllm:estimated_read_bytes_per_gpu_total counter
+vllm:estimated_read_bytes_per_gpu_total{engine="0",model_name="example-model"} 101
+# HELP vllm:estimated_read_bytes_per_gpu_created Estimated number of bytes read from memory per GPU (for Model Flops Utilization calculations).
+# TYPE vllm:estimated_read_bytes_per_gpu_created gauge
+vllm:estimated_read_bytes_per_gpu_created{engine="0",model_name="example-model"} 1
+# HELP vllm:estimated_write_bytes_per_gpu_total Estimated number of bytes written to memory per GPU (for Model Flops Utilization calculations).
+# TYPE vllm:estimated_write_bytes_per_gpu_total counter
+vllm:estimated_write_bytes_per_gpu_total{engine="0",model_name="example-model"} 101
+# HELP vllm:estimated_write_bytes_per_gpu_created Estimated number of bytes written to memory per GPU (for Model Flops Utilization calculations).
+# TYPE vllm:estimated_write_bytes_per_gpu_created gauge
+vllm:estimated_write_bytes_per_gpu_created{engine="0",model_name="example-model"} 1
+# HELP vllm:num_requests_running Number of requests in model execution batches.
+# TYPE vllm:num_requests_running gauge
+vllm:num_requests_running{engine="0",model_name="example-model"} 1
+# HELP vllm:num_requests_waiting Number of requests waiting to be processed.
+# TYPE vllm:num_requests_waiting gauge
+vllm:num_requests_waiting{engine="0",model_name="example-model"} 1
+# HELP vllm:num_requests_waiting_by_reason Number of waiting requests by reason. Reason labels: 'capacity' = waiting for scheduling capacity; 'deferred' = deferred by transient constraints (LoRA budget, KV transfer, blocked status). Sum of all reasons equals vllm:num_requests_waiting.
+# TYPE vllm:num_requests_waiting_by_reason gauge
+vllm:num_requests_waiting_by_reason{engine="0",model_name="example-model",reason="capacity"} 1
+vllm:num_requests_waiting_by_reason{engine="0",model_name="example-model",reason="deferred"} 1
+# HELP vllm:engine_sleep_state Engine sleep state; awake = 0 means engine is sleeping; awake = 1 means engine is awake; weights_offloaded = 1 means sleep level 1; discard_all = 1 means sleep level 2.
+# TYPE vllm:engine_sleep_state gauge
+vllm:engine_sleep_state{engine="0",model_name="example-model",sleep_state="awake"} 1
+vllm:engine_sleep_state{engine="0",model_name="example-model",sleep_state="weights_offloaded"} 0
+vllm:engine_sleep_state{engine="0",model_name="example-model",sleep_state="discard_all"} 0
+# HELP vllm:kv_cache_usage_perc KV-cache usage. 1 means 100 percent usage.
+# TYPE vllm:kv_cache_usage_perc gauge
+vllm:kv_cache_usage_perc{engine="0",model_name="example-model"} 0.5
+# HELP vllm:prefix_cache_queries_total Prefix cache queries, in terms of number of queried tokens.
+# TYPE vllm:prefix_cache_queries_total counter
+vllm:prefix_cache_queries_total{engine="0",model_name="example-model"} 101
+# HELP vllm:prefix_cache_queries_created Prefix cache queries, in terms of number of queried tokens.
+# TYPE vllm:prefix_cache_queries_created gauge
+vllm:prefix_cache_queries_created{engine="0",model_name="example-model"} 1
+# HELP vllm:prefix_cache_hits_total Prefix cache hits, in terms of number of cached tokens.
+# TYPE vllm:prefix_cache_hits_total counter
+vllm:prefix_cache_hits_total{engine="0",model_name="example-model"} 101
+# HELP vllm:prefix_cache_hits_created Prefix cache hits, in terms of number of cached tokens.
+# TYPE vllm:prefix_cache_hits_created gauge
+vllm:prefix_cache_hits_created{engine="0",model_name="example-model"} 1
+# HELP vllm:external_prefix_cache_queries_total External prefix cache queries from KV connector cross-instance cache sharing, in terms of number of queried tokens.
+# TYPE vllm:external_prefix_cache_queries_total counter
+vllm:external_prefix_cache_queries_total{engine="0",model_name="example-model"} 101
+# HELP vllm:external_prefix_cache_queries_created External prefix cache queries from KV connector cross-instance cache sharing, in terms of number of queried tokens.
+# TYPE vllm:external_prefix_cache_queries_created gauge
+vllm:external_prefix_cache_queries_created{engine="0",model_name="example-model"} 1
+# HELP vllm:external_prefix_cache_hits_total External prefix cache hits from KV connector cross-instance cache sharing, in terms of number of cached tokens.
+# TYPE vllm:external_prefix_cache_hits_total counter
+vllm:external_prefix_cache_hits_total{engine="0",model_name="example-model"} 101
+# HELP vllm:external_prefix_cache_hits_created External prefix cache hits from KV connector cross-instance cache sharing, in terms of number of cached tokens.
+# TYPE vllm:external_prefix_cache_hits_created gauge
+vllm:external_prefix_cache_hits_created{engine="0",model_name="example-model"} 1
+# HELP vllm:mm_cache_queries_total Multi-modal cache queries, in terms of number of queried items.
+# TYPE vllm:mm_cache_queries_total counter
+vllm:mm_cache_queries_total{engine="0",model_name="example-model"} 101
+# HELP vllm:mm_cache_queries_created Multi-modal cache queries, in terms of number of queried items.
+# TYPE vllm:mm_cache_queries_created gauge
+vllm:mm_cache_queries_created{engine="0",model_name="example-model"} 1
+# HELP vllm:mm_cache_hits_total Multi-modal cache hits, in terms of number of cached items.
+# TYPE vllm:mm_cache_hits_total counter
+vllm:mm_cache_hits_total{engine="0",model_name="example-model"} 101
+# HELP vllm:mm_cache_hits_created Multi-modal cache hits, in terms of number of cached items.
+# TYPE vllm:mm_cache_hits_created gauge
+vllm:mm_cache_hits_created{engine="0",model_name="example-model"} 1
+# HELP vllm:num_preemptions_total Cumulative number of preemption from the engine.
+# TYPE vllm:num_preemptions_total counter
+vllm:num_preemptions_total{engine="0",model_name="example-model"} 101
+# HELP vllm:num_preemptions_created Cumulative number of preemption from the engine.
+# TYPE vllm:num_preemptions_created gauge
+vllm:num_preemptions_created{engine="0",model_name="example-model"} 1
+# HELP vllm:prompt_tokens_total Number of prefill tokens processed.
+# TYPE vllm:prompt_tokens_total counter
+vllm:prompt_tokens_total{engine="0",model_name="example-model"} 101
+# HELP vllm:prompt_tokens_created Number of prefill tokens processed.
+# TYPE vllm:prompt_tokens_created gauge
+vllm:prompt_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:prompt_tokens_by_source_total Number of prompt tokens by source.
+# TYPE vllm:prompt_tokens_by_source_total counter
+vllm:prompt_tokens_by_source_total{engine="0",model_name="example-model",source="local_compute"} 101
+vllm:prompt_tokens_by_source_total{engine="0",model_name="example-model",source="local_cache_hit"} 102
+vllm:prompt_tokens_by_source_total{engine="0",model_name="example-model",source="external_kv_transfer"} 103
+# HELP vllm:prompt_tokens_by_source_created Number of prompt tokens by source.
+# TYPE vllm:prompt_tokens_by_source_created gauge
+vllm:prompt_tokens_by_source_created{engine="0",model_name="example-model",source="local_compute"} 1
+vllm:prompt_tokens_by_source_created{engine="0",model_name="example-model",source="local_cache_hit"} 1
+vllm:prompt_tokens_by_source_created{engine="0",model_name="example-model",source="external_kv_transfer"} 1
+# HELP vllm:prompt_tokens_cached_total Number of cached prompt tokens (local + external).
+# TYPE vllm:prompt_tokens_cached_total counter
+vllm:prompt_tokens_cached_total{engine="0",model_name="example-model"} 101
+# HELP vllm:prompt_tokens_cached_created Number of cached prompt tokens (local + external).
+# TYPE vllm:prompt_tokens_cached_created gauge
+vllm:prompt_tokens_cached_created{engine="0",model_name="example-model"} 1
+# HELP vllm:generation_tokens_total Number of generation tokens processed.
+# TYPE vllm:generation_tokens_total counter
+vllm:generation_tokens_total{engine="0",model_name="example-model"} 101
+# HELP vllm:generation_tokens_created Number of generation tokens processed.
+# TYPE vllm:generation_tokens_created gauge
+vllm:generation_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_success_total Count of successfully processed requests.
+# TYPE vllm:request_success_total counter
+vllm:request_success_total{engine="0",finished_reason="stop",model_name="example-model"} 101
+vllm:request_success_total{engine="0",finished_reason="length",model_name="example-model"} 102
+vllm:request_success_total{engine="0",finished_reason="abort",model_name="example-model"} 103
+vllm:request_success_total{engine="0",finished_reason="error",model_name="example-model"} 104
+vllm:request_success_total{engine="0",finished_reason="repetition",model_name="example-model"} 105
+# HELP vllm:request_success_created Count of successfully processed requests.
+# TYPE vllm:request_success_created gauge
+vllm:request_success_created{engine="0",finished_reason="stop",model_name="example-model"} 1
+vllm:request_success_created{engine="0",finished_reason="length",model_name="example-model"} 1
+vllm:request_success_created{engine="0",finished_reason="abort",model_name="example-model"} 1
+vllm:request_success_created{engine="0",finished_reason="error",model_name="example-model"} 1
+vllm:request_success_created{engine="0",finished_reason="repetition",model_name="example-model"} 1
+# HELP vllm:request_prompt_tokens Number of prefill tokens processed.
+# TYPE vllm:request_prompt_tokens histogram
+vllm:request_prompt_tokens_bucket{engine="0",le="1.0",model_name="example-model"} 1
+vllm:request_prompt_tokens_bucket{engine="0",le="2.0",model_name="example-model"} 2
+vllm:request_prompt_tokens_bucket{engine="0",le="5.0",model_name="example-model"} 3
+vllm:request_prompt_tokens_bucket{engine="0",le="10.0",model_name="example-model"} 4
+vllm:request_prompt_tokens_bucket{engine="0",le="20.0",model_name="example-model"} 5
+vllm:request_prompt_tokens_bucket{engine="0",le="50.0",model_name="example-model"} 6
+vllm:request_prompt_tokens_bucket{engine="0",le="100.0",model_name="example-model"} 7
+vllm:request_prompt_tokens_bucket{engine="0",le="200.0",model_name="example-model"} 8
+vllm:request_prompt_tokens_bucket{engine="0",le="500.0",model_name="example-model"} 9
+vllm:request_prompt_tokens_bucket{engine="0",le="1000.0",model_name="example-model"} 10
+vllm:request_prompt_tokens_bucket{engine="0",le="2000.0",model_name="example-model"} 11
+vllm:request_prompt_tokens_bucket{engine="0",le="5000.0",model_name="example-model"} 12
+vllm:request_prompt_tokens_bucket{engine="0",le="10000.0",model_name="example-model"} 13
+vllm:request_prompt_tokens_bucket{engine="0",le="20000.0",model_name="example-model"} 14
+vllm:request_prompt_tokens_bucket{engine="0",le="50000.0",model_name="example-model"} 15
+vllm:request_prompt_tokens_bucket{engine="0",le="100000.0",model_name="example-model"} 16
+vllm:request_prompt_tokens_bucket{engine="0",le="200000.0",model_name="example-model"} 17
+vllm:request_prompt_tokens_bucket{engine="0",le="500000.0",model_name="example-model"} 18
+vllm:request_prompt_tokens_bucket{engine="0",le="+Inf",model_name="example-model"} 19
+vllm:request_prompt_tokens_count{engine="0",model_name="example-model"} 19
+vllm:request_prompt_tokens_sum{engine="0",model_name="example-model"} 38
+# HELP vllm:request_prompt_tokens_created Number of prefill tokens processed.
+# TYPE vllm:request_prompt_tokens_created gauge
+vllm:request_prompt_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_generation_tokens Number of generation tokens processed.
+# TYPE vllm:request_generation_tokens histogram
+vllm:request_generation_tokens_bucket{engine="0",le="1.0",model_name="example-model"} 1
+vllm:request_generation_tokens_bucket{engine="0",le="2.0",model_name="example-model"} 2
+vllm:request_generation_tokens_bucket{engine="0",le="5.0",model_name="example-model"} 3
+vllm:request_generation_tokens_bucket{engine="0",le="10.0",model_name="example-model"} 4
+vllm:request_generation_tokens_bucket{engine="0",le="20.0",model_name="example-model"} 5
+vllm:request_generation_tokens_bucket{engine="0",le="50.0",model_name="example-model"} 6
+vllm:request_generation_tokens_bucket{engine="0",le="100.0",model_name="example-model"} 7
+vllm:request_generation_tokens_bucket{engine="0",le="200.0",model_name="example-model"} 8
+vllm:request_generation_tokens_bucket{engine="0",le="500.0",model_name="example-model"} 9
+vllm:request_generation_tokens_bucket{engine="0",le="1000.0",model_name="example-model"} 10
+vllm:request_generation_tokens_bucket{engine="0",le="2000.0",model_name="example-model"} 11
+vllm:request_generation_tokens_bucket{engine="0",le="5000.0",model_name="example-model"} 12
+vllm:request_generation_tokens_bucket{engine="0",le="10000.0",model_name="example-model"} 13
+vllm:request_generation_tokens_bucket{engine="0",le="20000.0",model_name="example-model"} 14
+vllm:request_generation_tokens_bucket{engine="0",le="50000.0",model_name="example-model"} 15
+vllm:request_generation_tokens_bucket{engine="0",le="100000.0",model_name="example-model"} 16
+vllm:request_generation_tokens_bucket{engine="0",le="200000.0",model_name="example-model"} 17
+vllm:request_generation_tokens_bucket{engine="0",le="500000.0",model_name="example-model"} 18
+vllm:request_generation_tokens_bucket{engine="0",le="+Inf",model_name="example-model"} 19
+vllm:request_generation_tokens_count{engine="0",model_name="example-model"} 19
+vllm:request_generation_tokens_sum{engine="0",model_name="example-model"} 38
+# HELP vllm:request_generation_tokens_created Number of generation tokens processed.
+# TYPE vllm:request_generation_tokens_created gauge
+vllm:request_generation_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:iteration_tokens_total Histogram of number of tokens per engine_step.
+# TYPE vllm:iteration_tokens_total histogram
+vllm:iteration_tokens_total_bucket{engine="0",le="1.0",model_name="example-model"} 1
+vllm:iteration_tokens_total_bucket{engine="0",le="8.0",model_name="example-model"} 2
+vllm:iteration_tokens_total_bucket{engine="0",le="16.0",model_name="example-model"} 3
+vllm:iteration_tokens_total_bucket{engine="0",le="32.0",model_name="example-model"} 4
+vllm:iteration_tokens_total_bucket{engine="0",le="64.0",model_name="example-model"} 5
+vllm:iteration_tokens_total_bucket{engine="0",le="128.0",model_name="example-model"} 6
+vllm:iteration_tokens_total_bucket{engine="0",le="256.0",model_name="example-model"} 7
+vllm:iteration_tokens_total_bucket{engine="0",le="512.0",model_name="example-model"} 8
+vllm:iteration_tokens_total_bucket{engine="0",le="1024.0",model_name="example-model"} 9
+vllm:iteration_tokens_total_bucket{engine="0",le="2048.0",model_name="example-model"} 10
+vllm:iteration_tokens_total_bucket{engine="0",le="4096.0",model_name="example-model"} 11
+vllm:iteration_tokens_total_bucket{engine="0",le="8192.0",model_name="example-model"} 12
+vllm:iteration_tokens_total_bucket{engine="0",le="16384.0",model_name="example-model"} 13
+vllm:iteration_tokens_total_bucket{engine="0",le="+Inf",model_name="example-model"} 14
+vllm:iteration_tokens_total_count{engine="0",model_name="example-model"} 14
+vllm:iteration_tokens_total_sum{engine="0",model_name="example-model"} 28
+# HELP vllm:iteration_tokens_total_created Histogram of number of tokens per engine_step.
+# TYPE vllm:iteration_tokens_total_created gauge
+vllm:iteration_tokens_total_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_max_num_generation_tokens Histogram of maximum number of requested generation tokens.
+# TYPE vllm:request_max_num_generation_tokens histogram
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="1.0",model_name="example-model"} 1
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="2.0",model_name="example-model"} 2
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="5.0",model_name="example-model"} 3
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="10.0",model_name="example-model"} 4
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="20.0",model_name="example-model"} 5
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="50.0",model_name="example-model"} 6
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="100.0",model_name="example-model"} 7
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="200.0",model_name="example-model"} 8
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="500.0",model_name="example-model"} 9
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="1000.0",model_name="example-model"} 10
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="2000.0",model_name="example-model"} 11
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="5000.0",model_name="example-model"} 12
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="10000.0",model_name="example-model"} 13
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="20000.0",model_name="example-model"} 14
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="50000.0",model_name="example-model"} 15
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="100000.0",model_name="example-model"} 16
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="200000.0",model_name="example-model"} 17
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="500000.0",model_name="example-model"} 18
+vllm:request_max_num_generation_tokens_bucket{engine="0",le="+Inf",model_name="example-model"} 19
+vllm:request_max_num_generation_tokens_count{engine="0",model_name="example-model"} 19
+vllm:request_max_num_generation_tokens_sum{engine="0",model_name="example-model"} 38
+# HELP vllm:request_max_num_generation_tokens_created Histogram of maximum number of requested generation tokens.
+# TYPE vllm:request_max_num_generation_tokens_created gauge
+vllm:request_max_num_generation_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_params_n Histogram of the n request parameter.
+# TYPE vllm:request_params_n histogram
+vllm:request_params_n_bucket{engine="0",le="1.0",model_name="example-model"} 1
+vllm:request_params_n_bucket{engine="0",le="2.0",model_name="example-model"} 2
+vllm:request_params_n_bucket{engine="0",le="5.0",model_name="example-model"} 3
+vllm:request_params_n_bucket{engine="0",le="10.0",model_name="example-model"} 4
+vllm:request_params_n_bucket{engine="0",le="20.0",model_name="example-model"} 5
+vllm:request_params_n_bucket{engine="0",le="+Inf",model_name="example-model"} 6
+vllm:request_params_n_count{engine="0",model_name="example-model"} 6
+vllm:request_params_n_sum{engine="0",model_name="example-model"} 12
+# HELP vllm:request_params_n_created Histogram of the n request parameter.
+# TYPE vllm:request_params_n_created gauge
+vllm:request_params_n_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_params_max_tokens Histogram of the max_tokens request parameter.
+# TYPE vllm:request_params_max_tokens histogram
+vllm:request_params_max_tokens_bucket{engine="0",le="1.0",model_name="example-model"} 1
+vllm:request_params_max_tokens_bucket{engine="0",le="2.0",model_name="example-model"} 2
+vllm:request_params_max_tokens_bucket{engine="0",le="5.0",model_name="example-model"} 3
+vllm:request_params_max_tokens_bucket{engine="0",le="10.0",model_name="example-model"} 4
+vllm:request_params_max_tokens_bucket{engine="0",le="20.0",model_name="example-model"} 5
+vllm:request_params_max_tokens_bucket{engine="0",le="50.0",model_name="example-model"} 6
+vllm:request_params_max_tokens_bucket{engine="0",le="100.0",model_name="example-model"} 7
+vllm:request_params_max_tokens_bucket{engine="0",le="200.0",model_name="example-model"} 8
+vllm:request_params_max_tokens_bucket{engine="0",le="500.0",model_name="example-model"} 9
+vllm:request_params_max_tokens_bucket{engine="0",le="1000.0",model_name="example-model"} 10
+vllm:request_params_max_tokens_bucket{engine="0",le="2000.0",model_name="example-model"} 11
+vllm:request_params_max_tokens_bucket{engine="0",le="5000.0",model_name="example-model"} 12
+vllm:request_params_max_tokens_bucket{engine="0",le="10000.0",model_name="example-model"} 13
+vllm:request_params_max_tokens_bucket{engine="0",le="20000.0",model_name="example-model"} 14
+vllm:request_params_max_tokens_bucket{engine="0",le="50000.0",model_name="example-model"} 15
+vllm:request_params_max_tokens_bucket{engine="0",le="100000.0",model_name="example-model"} 16
+vllm:request_params_max_tokens_bucket{engine="0",le="200000.0",model_name="example-model"} 17
+vllm:request_params_max_tokens_bucket{engine="0",le="500000.0",model_name="example-model"} 18
+vllm:request_params_max_tokens_bucket{engine="0",le="+Inf",model_name="example-model"} 19
+vllm:request_params_max_tokens_count{engine="0",model_name="example-model"} 19
+vllm:request_params_max_tokens_sum{engine="0",model_name="example-model"} 38
+# HELP vllm:request_params_max_tokens_created Histogram of the max_tokens request parameter.
+# TYPE vllm:request_params_max_tokens_created gauge
+vllm:request_params_max_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:time_to_first_token_seconds Histogram of time to first token in seconds.
+# TYPE vllm:time_to_first_token_seconds histogram
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 1
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 2
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 3
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.02",model_name="example-model"} 4
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.04",model_name="example-model"} 5
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.06",model_name="example-model"} 6
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.08",model_name="example-model"} 7
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 8
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.25",model_name="example-model"} 9
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 10
+vllm:time_to_first_token_seconds_bucket{engine="0",le="0.75",model_name="example-model"} 11
+vllm:time_to_first_token_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 12
+vllm:time_to_first_token_seconds_bucket{engine="0",le="2.5",model_name="example-model"} 13
+vllm:time_to_first_token_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 14
+vllm:time_to_first_token_seconds_bucket{engine="0",le="7.5",model_name="example-model"} 15
+vllm:time_to_first_token_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 16
+vllm:time_to_first_token_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 17
+vllm:time_to_first_token_seconds_bucket{engine="0",le="40.0",model_name="example-model"} 18
+vllm:time_to_first_token_seconds_bucket{engine="0",le="80.0",model_name="example-model"} 19
+vllm:time_to_first_token_seconds_bucket{engine="0",le="160.0",model_name="example-model"} 20
+vllm:time_to_first_token_seconds_bucket{engine="0",le="640.0",model_name="example-model"} 21
+vllm:time_to_first_token_seconds_bucket{engine="0",le="2560.0",model_name="example-model"} 22
+vllm:time_to_first_token_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 23
+vllm:time_to_first_token_seconds_count{engine="0",model_name="example-model"} 23
+vllm:time_to_first_token_seconds_sum{engine="0",model_name="example-model"} 46
+# HELP vllm:time_to_first_token_seconds_created Histogram of time to first token in seconds.
+# TYPE vllm:time_to_first_token_seconds_created gauge
+vllm:time_to_first_token_seconds_created{engine="0",model_name="example-model"} 1
+# HELP vllm:inter_token_latency_seconds Histogram of inter-token latency in seconds.
+# TYPE vllm:inter_token_latency_seconds histogram
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 1
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.025",model_name="example-model"} 2
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 3
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.075",model_name="example-model"} 4
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 5
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.15",model_name="example-model"} 6
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 7
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 8
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.4",model_name="example-model"} 9
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 10
+vllm:inter_token_latency_seconds_bucket{engine="0",le="0.75",model_name="example-model"} 11
+vllm:inter_token_latency_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 12
+vllm:inter_token_latency_seconds_bucket{engine="0",le="2.5",model_name="example-model"} 13
+vllm:inter_token_latency_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 14
+vllm:inter_token_latency_seconds_bucket{engine="0",le="7.5",model_name="example-model"} 15
+vllm:inter_token_latency_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 16
+vllm:inter_token_latency_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 17
+vllm:inter_token_latency_seconds_bucket{engine="0",le="40.0",model_name="example-model"} 18
+vllm:inter_token_latency_seconds_bucket{engine="0",le="80.0",model_name="example-model"} 19
+vllm:inter_token_latency_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 20
+vllm:inter_token_latency_seconds_count{engine="0",model_name="example-model"} 20
+vllm:inter_token_latency_seconds_sum{engine="0",model_name="example-model"} 40
+# HELP vllm:inter_token_latency_seconds_created Histogram of inter-token latency in seconds.
+# TYPE vllm:inter_token_latency_seconds_created gauge
+vllm:inter_token_latency_seconds_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_time_per_output_token_seconds Histogram of time_per_output_token_seconds per request.
+# TYPE vllm:request_time_per_output_token_seconds histogram
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 1
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.025",model_name="example-model"} 2
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 3
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.075",model_name="example-model"} 4
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 5
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.15",model_name="example-model"} 6
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 7
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 8
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.4",model_name="example-model"} 9
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 10
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="0.75",model_name="example-model"} 11
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 12
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="2.5",model_name="example-model"} 13
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 14
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="7.5",model_name="example-model"} 15
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 16
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 17
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="40.0",model_name="example-model"} 18
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="80.0",model_name="example-model"} 19
+vllm:request_time_per_output_token_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 20
+vllm:request_time_per_output_token_seconds_count{engine="0",model_name="example-model"} 20
+vllm:request_time_per_output_token_seconds_sum{engine="0",model_name="example-model"} 40
+# HELP vllm:request_time_per_output_token_seconds_created Histogram of time_per_output_token_seconds per request.
+# TYPE vllm:request_time_per_output_token_seconds_created gauge
+vllm:request_time_per_output_token_seconds_created{engine="0",model_name="example-model"} 1
+# HELP vllm:e2e_request_latency_seconds Histogram of e2e request latency in seconds.
+# TYPE vllm:e2e_request_latency_seconds histogram
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 1
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="0.8",model_name="example-model"} 3
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 4
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="1.5",model_name="example-model"} 5
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="2.0",model_name="example-model"} 6
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="2.5",model_name="example-model"} 7
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 8
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 9
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="15.0",model_name="example-model"} 10
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 11
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="30.0",model_name="example-model"} 12
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="40.0",model_name="example-model"} 13
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="50.0",model_name="example-model"} 14
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="60.0",model_name="example-model"} 15
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="120.0",model_name="example-model"} 16
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="240.0",model_name="example-model"} 17
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="480.0",model_name="example-model"} 18
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="960.0",model_name="example-model"} 19
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="1920.0",model_name="example-model"} 20
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="7680.0",model_name="example-model"} 21
+vllm:e2e_request_latency_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 22
+vllm:e2e_request_latency_seconds_count{engine="0",model_name="example-model"} 22
+vllm:e2e_request_latency_seconds_sum{engine="0",model_name="example-model"} 44
+# HELP vllm:e2e_request_latency_seconds_created Histogram of e2e request latency in seconds.
+# TYPE vllm:e2e_request_latency_seconds_created gauge
+vllm:e2e_request_latency_seconds_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_queue_time_seconds Histogram of time spent in WAITING phase for request.
+# TYPE vllm:request_queue_time_seconds histogram
+vllm:request_queue_time_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 1
+vllm:request_queue_time_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2
+vllm:request_queue_time_seconds_bucket{engine="0",le="0.8",model_name="example-model"} 3
+vllm:request_queue_time_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 4
+vllm:request_queue_time_seconds_bucket{engine="0",le="1.5",model_name="example-model"} 5
+vllm:request_queue_time_seconds_bucket{engine="0",le="2.0",model_name="example-model"} 6
+vllm:request_queue_time_seconds_bucket{engine="0",le="2.5",model_name="example-model"} 7
+vllm:request_queue_time_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 8
+vllm:request_queue_time_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 9
+vllm:request_queue_time_seconds_bucket{engine="0",le="15.0",model_name="example-model"} 10
+vllm:request_queue_time_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 11
+vllm:request_queue_time_seconds_bucket{engine="0",le="30.0",model_name="example-model"} 12
+vllm:request_queue_time_seconds_bucket{engine="0",le="40.0",model_name="example-model"} 13
+vllm:request_queue_time_seconds_bucket{engine="0",le="50.0",model_name="example-model"} 14
+vllm:request_queue_time_seconds_bucket{engine="0",le="60.0",model_name="example-model"} 15
+vllm:request_queue_time_seconds_bucket{engine="0",le="120.0",model_name="example-model"} 16
+vllm:request_queue_time_seconds_bucket{engine="0",le="240.0",model_name="example-model"} 17
+vllm:request_queue_time_seconds_bucket{engine="0",le="480.0",model_name="example-model"} 18
+vllm:request_queue_time_seconds_bucket{engine="0",le="960.0",model_name="example-model"} 19
+vllm:request_queue_time_seconds_bucket{engine="0",le="1920.0",model_name="example-model"} 20
+vllm:request_queue_time_seconds_bucket{engine="0",le="7680.0",model_name="example-model"} 21
+vllm:request_queue_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 22
+vllm:request_queue_time_seconds_count{engine="0",model_name="example-model"} 22
+vllm:request_queue_time_seconds_sum{engine="0",model_name="example-model"} 44
+# HELP vllm:request_queue_time_seconds_created Histogram of time spent in WAITING phase for request.
+# TYPE vllm:request_queue_time_seconds_created gauge
+vllm:request_queue_time_seconds_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_inference_time_seconds Histogram of time spent in RUNNING phase for request.
+# TYPE vllm:request_inference_time_seconds histogram
+vllm:request_inference_time_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 1
+vllm:request_inference_time_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2
+vllm:request_inference_time_seconds_bucket{engine="0",le="0.8",model_name="example-model"} 3
+vllm:request_inference_time_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 4
+vllm:request_inference_time_seconds_bucket{engine="0",le="1.5",model_name="example-model"} 5
+vllm:request_inference_time_seconds_bucket{engine="0",le="2.0",model_name="example-model"} 6
+vllm:request_inference_time_seconds_bucket{engine="0",le="2.5",model_name="example-model"} 7
+vllm:request_inference_time_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 8
+vllm:request_inference_time_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 9
+vllm:request_inference_time_seconds_bucket{engine="0",le="15.0",model_name="example-model"} 10
+vllm:request_inference_time_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 11
+vllm:request_inference_time_seconds_bucket{engine="0",le="30.0",model_name="example-model"} 12
+vllm:request_inference_time_seconds_bucket{engine="0",le="40.0",model_name="example-model"} 13
+vllm:request_inference_time_seconds_bucket{engine="0",le="50.0",model_name="example-model"} 14
+vllm:request_inference_time_seconds_bucket{engine="0",le="60.0",model_name="example-model"} 15
+vllm:request_inference_time_seconds_bucket{engine="0",le="120.0",model_name="example-model"} 16
+vllm:request_inference_time_seconds_bucket{engine="0",le="240.0",model_name="example-model"} 17
+vllm:request_inference_time_seconds_bucket{engine="0",le="480.0",model_name="example-model"} 18
+vllm:request_inference_time_seconds_bucket{engine="0",le="960.0",model_name="example-model"} 19
+vllm:request_inference_time_seconds_bucket{engine="0",le="1920.0",model_name="example-model"} 20
+vllm:request_inference_time_seconds_bucket{engine="0",le="7680.0",model_name="example-model"} 21
+vllm:request_inference_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 22
+vllm:request_inference_time_seconds_count{engine="0",model_name="example-model"} 22
+vllm:request_inference_time_seconds_sum{engine="0",model_name="example-model"} 44
+# HELP vllm:request_inference_time_seconds_created Histogram of time spent in RUNNING phase for request.
+# TYPE vllm:request_inference_time_seconds_created gauge
+vllm:request_inference_time_seconds_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_prefill_time_seconds Histogram of time spent in PREFILL phase for request.
+# TYPE vllm:request_prefill_time_seconds histogram
+vllm:request_prefill_time_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 1
+vllm:request_prefill_time_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2
+vllm:request_prefill_time_seconds_bucket{engine="0",le="0.8",model_name="example-model"} 3
+vllm:request_prefill_time_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 4
+vllm:request_prefill_time_seconds_bucket{engine="0",le="1.5",model_name="example-model"} 5
+vllm:request_prefill_time_seconds_bucket{engine="0",le="2.0",model_name="example-model"} 6
+vllm:request_prefill_time_seconds_bucket{engine="0",le="2.5",model_name="example-model"} 7
+vllm:request_prefill_time_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 8
+vllm:request_prefill_time_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 9
+vllm:request_prefill_time_seconds_bucket{engine="0",le="15.0",model_name="example-model"} 10
+vllm:request_prefill_time_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 11
+vllm:request_prefill_time_seconds_bucket{engine="0",le="30.0",model_name="example-model"} 12
+vllm:request_prefill_time_seconds_bucket{engine="0",le="40.0",model_name="example-model"} 13
+vllm:request_prefill_time_seconds_bucket{engine="0",le="50.0",model_name="example-model"} 14
+vllm:request_prefill_time_seconds_bucket{engine="0",le="60.0",model_name="example-model"} 15
+vllm:request_prefill_time_seconds_bucket{engine="0",le="120.0",model_name="example-model"} 16
+vllm:request_prefill_time_seconds_bucket{engine="0",le="240.0",model_name="example-model"} 17
+vllm:request_prefill_time_seconds_bucket{engine="0",le="480.0",model_name="example-model"} 18
+vllm:request_prefill_time_seconds_bucket{engine="0",le="960.0",model_name="example-model"} 19
+vllm:request_prefill_time_seconds_bucket{engine="0",le="1920.0",model_name="example-model"} 20
+vllm:request_prefill_time_seconds_bucket{engine="0",le="7680.0",model_name="example-model"} 21
+vllm:request_prefill_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 22
+vllm:request_prefill_time_seconds_count{engine="0",model_name="example-model"} 22
+vllm:request_prefill_time_seconds_sum{engine="0",model_name="example-model"} 44
+# HELP vllm:request_prefill_time_seconds_created Histogram of time spent in PREFILL phase for request.
+# TYPE vllm:request_prefill_time_seconds_created gauge
+vllm:request_prefill_time_seconds_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_decode_time_seconds Histogram of time spent in DECODE phase for request.
+# TYPE vllm:request_decode_time_seconds histogram
+vllm:request_decode_time_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 1
+vllm:request_decode_time_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2
+vllm:request_decode_time_seconds_bucket{engine="0",le="0.8",model_name="example-model"} 3
+vllm:request_decode_time_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 4
+vllm:request_decode_time_seconds_bucket{engine="0",le="1.5",model_name="example-model"} 5
+vllm:request_decode_time_seconds_bucket{engine="0",le="2.0",model_name="example-model"} 6
+vllm:request_decode_time_seconds_bucket{engine="0",le="2.5",model_name="example-model"} 7
+vllm:request_decode_time_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 8
+vllm:request_decode_time_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 9
+vllm:request_decode_time_seconds_bucket{engine="0",le="15.0",model_name="example-model"} 10
+vllm:request_decode_time_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 11
+vllm:request_decode_time_seconds_bucket{engine="0",le="30.0",model_name="example-model"} 12
+vllm:request_decode_time_seconds_bucket{engine="0",le="40.0",model_name="example-model"} 13
+vllm:request_decode_time_seconds_bucket{engine="0",le="50.0",model_name="example-model"} 14
+vllm:request_decode_time_seconds_bucket{engine="0",le="60.0",model_name="example-model"} 15
+vllm:request_decode_time_seconds_bucket{engine="0",le="120.0",model_name="example-model"} 16
+vllm:request_decode_time_seconds_bucket{engine="0",le="240.0",model_name="example-model"} 17
+vllm:request_decode_time_seconds_bucket{engine="0",le="480.0",model_name="example-model"} 18
+vllm:request_decode_time_seconds_bucket{engine="0",le="960.0",model_name="example-model"} 19
+vllm:request_decode_time_seconds_bucket{engine="0",le="1920.0",model_name="example-model"} 20
+vllm:request_decode_time_seconds_bucket{engine="0",le="7680.0",model_name="example-model"} 21
+vllm:request_decode_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 22
+vllm:request_decode_time_seconds_count{engine="0",model_name="example-model"} 22
+vllm:request_decode_time_seconds_sum{engine="0",model_name="example-model"} 44
+# HELP vllm:request_decode_time_seconds_created Histogram of time spent in DECODE phase for request.
+# TYPE vllm:request_decode_time_seconds_created gauge
+vllm:request_decode_time_seconds_created{engine="0",model_name="example-model"} 1
+# HELP vllm:request_prefill_kv_computed_tokens Histogram of new KV tokens computed during prefill (excluding cached tokens).
+# TYPE vllm:request_prefill_kv_computed_tokens histogram
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="1.0",model_name="example-model"} 1
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="2.0",model_name="example-model"} 2
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="5.0",model_name="example-model"} 3
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="10.0",model_name="example-model"} 4
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="20.0",model_name="example-model"} 5
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="50.0",model_name="example-model"} 6
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="100.0",model_name="example-model"} 7
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="200.0",model_name="example-model"} 8
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="500.0",model_name="example-model"} 9
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="1000.0",model_name="example-model"} 10
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="2000.0",model_name="example-model"} 11
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="5000.0",model_name="example-model"} 12
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="10000.0",model_name="example-model"} 13
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="20000.0",model_name="example-model"} 14
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="50000.0",model_name="example-model"} 15
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="100000.0",model_name="example-model"} 16
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="200000.0",model_name="example-model"} 17
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="500000.0",model_name="example-model"} 18
+vllm:request_prefill_kv_computed_tokens_bucket{engine="0",le="+Inf",model_name="example-model"} 19
+vllm:request_prefill_kv_computed_tokens_count{engine="0",model_name="example-model"} 19
+vllm:request_prefill_kv_computed_tokens_sum{engine="0",model_name="example-model"} 38
+# HELP vllm:request_prefill_kv_computed_tokens_created Histogram of new KV tokens computed during prefill (excluding cached tokens).
+# TYPE vllm:request_prefill_kv_computed_tokens_created gauge
+vllm:request_prefill_kv_computed_tokens_created{engine="0",model_name="example-model"} 1
+# HELP vllm:cache_config_info Information of the LLMEngine CacheConfig
+# TYPE vllm:cache_config_info gauge
+vllm:cache_config_info{_block_size_resolved="example-1",block_size="example-1",cache_dtype="example-1",calculate_kv_scales="example-1",enable_prefix_caching="example-1",engine="0",gpu_memory_utilization="example-1",hash_block_size="example-1",is_attention_free="example-1",kv_cache_dtype_skip_layers="example-1",kv_cache_max_concurrency="example-1",kv_cache_memory_bytes="example-1",kv_cache_size_tokens="example-1",kv_offloading_backend="example-1",kv_offloading_size="example-1",kv_sharing_fast_prefill="example-1",mamba_block_size="example-1",mamba_cache_dtype="example-1",mamba_cache_mode="example-1",mamba_page_size_padded="example-1",mamba_ssm_cache_dtype="example-1",num_cpu_blocks="example-1",num_gpu_blocks="example-1",num_gpu_blocks_override="example-1",prefix_caching_hash_algo="example-1",skip_page_size_padded="example-1",sliding_window="example-1",user_specified_block_size="example-1",user_specified_mamba_block_size="example-1"} 1
+# HELP http_requests_total Total number of requests by method, status and handler.
+# TYPE http_requests_total counter
+http_requests_total{handler="/v1/example",method="POST",status="2xx"} 101
+http_requests_total{handler="/health",method="GET",status="2xx"} 102
+# HELP http_requests_created Total number of requests by method, status and handler.
+# TYPE http_requests_created gauge
+http_requests_created{handler="/v1/example",method="POST",status="2xx"} 1
+http_requests_created{handler="/health",method="GET",status="2xx"} 1
+# HELP http_request_size_bytes Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
+# TYPE http_request_size_bytes summary
+http_request_size_bytes_count{handler="/v1/example"} 3
+http_request_size_bytes_sum{handler="/v1/example"} 6
+http_request_size_bytes_count{handler="/health"} 3
+http_request_size_bytes_sum{handler="/health"} 6
+# HELP http_request_size_bytes_created Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
+# TYPE http_request_size_bytes_created gauge
+http_request_size_bytes_created{handler="/v1/example"} 1
+http_request_size_bytes_created{handler="/health"} 1
+# HELP http_response_size_bytes Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
+# TYPE http_response_size_bytes summary
+http_response_size_bytes_count{handler="/v1/example"} 3
+http_response_size_bytes_sum{handler="/v1/example"} 6
+http_response_size_bytes_count{handler="/health"} 3
+http_response_size_bytes_sum{handler="/health"} 6
+# HELP http_response_size_bytes_created Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated.
+# TYPE http_response_size_bytes_created gauge
+http_response_size_bytes_created{handler="/v1/example"} 1
+http_response_size_bytes_created{handler="/health"} 1
+# HELP http_request_duration_highr_seconds Latency with many buckets but no API specific labels. Made for more accurate percentile calculations.
+# TYPE http_request_duration_highr_seconds histogram
+http_request_duration_highr_seconds_bucket{le="0.01"} 1
+http_request_duration_highr_seconds_bucket{le="0.025"} 2
+http_request_duration_highr_seconds_bucket{le="0.05"} 3
+http_request_duration_highr_seconds_bucket{le="0.075"} 4
+http_request_duration_highr_seconds_bucket{le="0.1"} 5
+http_request_duration_highr_seconds_bucket{le="0.25"} 6
+http_request_duration_highr_seconds_bucket{le="0.5"} 7
+http_request_duration_highr_seconds_bucket{le="0.75"} 8
+http_request_duration_highr_seconds_bucket{le="1.0"} 9
+http_request_duration_highr_seconds_bucket{le="1.5"} 10
+http_request_duration_highr_seconds_bucket{le="2.0"} 11
+http_request_duration_highr_seconds_bucket{le="2.5"} 12
+http_request_duration_highr_seconds_bucket{le="3.0"} 13
+http_request_duration_highr_seconds_bucket{le="3.5"} 14
+http_request_duration_highr_seconds_bucket{le="4.0"} 15
+http_request_duration_highr_seconds_bucket{le="4.5"} 16
+http_request_duration_highr_seconds_bucket{le="5.0"} 17
+http_request_duration_highr_seconds_bucket{le="7.5"} 18
+http_request_duration_highr_seconds_bucket{le="10.0"} 19
+http_request_duration_highr_seconds_bucket{le="30.0"} 20
+http_request_duration_highr_seconds_bucket{le="60.0"} 21
+http_request_duration_highr_seconds_bucket{le="+Inf"} 22
+http_request_duration_highr_seconds_count 22
+http_request_duration_highr_seconds_sum 44
+# HELP http_request_duration_highr_seconds_created Latency with many buckets but no API specific labels. Made for more accurate percentile calculations.
+# TYPE http_request_duration_highr_seconds_created gauge
+http_request_duration_highr_seconds_created 1
+# HELP http_request_duration_seconds Latency with only few buckets by handler. Made to be only used if aggregation by handler is important.
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{handler="/v1/example",le="0.1",method="POST"} 1
+http_request_duration_seconds_bucket{handler="/v1/example",le="0.5",method="POST"} 2
+http_request_duration_seconds_bucket{handler="/v1/example",le="1.0",method="POST"} 3
+http_request_duration_seconds_bucket{handler="/v1/example",le="+Inf",method="POST"} 4
+http_request_duration_seconds_count{handler="/v1/example",method="POST"} 4
+http_request_duration_seconds_sum{handler="/v1/example",method="POST"} 8
+http_request_duration_seconds_bucket{handler="/health",le="0.1",method="GET"} 1
+http_request_duration_seconds_bucket{handler="/health",le="0.5",method="GET"} 2
+http_request_duration_seconds_bucket{handler="/health",le="1.0",method="GET"} 3
+http_request_duration_seconds_bucket{handler="/health",le="+Inf",method="GET"} 4
+http_request_duration_seconds_count{handler="/health",method="GET"} 4
+http_request_duration_seconds_sum{handler="/health",method="GET"} 8
+# HELP http_request_duration_seconds_created Latency with only few buckets by handler. Made to be only used if aggregation by handler is important.
+# TYPE http_request_duration_seconds_created gauge
+http_request_duration_seconds_created{handler="/v1/example",method="POST"} 1
+http_request_duration_seconds_created{handler="/health",method="GET"} 1
+# HELP vllm:tool_call_parser_invocations_total Total number of ToolParser invocations. Non-streaming increments once per choice; streaming increments once per delta.
+# TYPE vllm:tool_call_parser_invocations_total counter
+vllm:tool_call_parser_invocations_total{mode="streaming",model_name="example-model",outcome="tool_call",request_type="chat_completions"} 101
+vllm:tool_call_parser_invocations_total{mode="streaming",model_name="example-model",outcome="tool_call",request_type="responses"} 102
+vllm:tool_call_parser_invocations_total{mode="streaming",model_name="example-model",outcome="tool_call",request_type="other"} 103
+vllm:tool_call_parser_invocations_total{mode="streaming",model_name="example-model",outcome="no_tool_call",request_type="chat_completions"} 104
+vllm:tool_call_parser_invocations_total{mode="streaming",model_name="example-model",outcome="no_tool_call",request_type="responses"} 105
+vllm:tool_call_parser_invocations_total{mode="streaming",model_name="example-model",outcome="no_tool_call",request_type="other"} 106
+vllm:tool_call_parser_invocations_total{mode="non_streaming",model_name="example-model",outcome="tool_call",request_type="chat_completions"} 107
+vllm:tool_call_parser_invocations_total{mode="non_streaming",model_name="example-model",outcome="tool_call",request_type="responses"} 108
+vllm:tool_call_parser_invocations_total{mode="non_streaming",model_name="example-model",outcome="tool_call",request_type="other"} 109
+vllm:tool_call_parser_invocations_total{mode="non_streaming",model_name="example-model",outcome="no_tool_call",request_type="chat_completions"} 110
+vllm:tool_call_parser_invocations_total{mode="non_streaming",model_name="example-model",outcome="no_tool_call",request_type="responses"} 111
+vllm:tool_call_parser_invocations_total{mode="non_streaming",model_name="example-model",outcome="no_tool_call",request_type="other"} 112
+# HELP vllm:tool_call_parser_invocations_created Total number of ToolParser invocations. Non-streaming increments once per choice; streaming increments once per delta.
+# TYPE vllm:tool_call_parser_invocations_created gauge
+vllm:tool_call_parser_invocations_created{mode="streaming",model_name="example-model",outcome="tool_call",request_type="chat_completions"} 1
+vllm:tool_call_parser_invocations_created{mode="streaming",model_name="example-model",outcome="tool_call",request_type="responses"} 1
+vllm:tool_call_parser_invocations_created{mode="streaming",model_name="example-model",outcome="tool_call",request_type="other"} 1
+vllm:tool_call_parser_invocations_created{mode="streaming",model_name="example-model",outcome="no_tool_call",request_type="chat_completions"} 1
+vllm:tool_call_parser_invocations_created{mode="streaming",model_name="example-model",outcome="no_tool_call",request_type="responses"} 1
+vllm:tool_call_parser_invocations_created{mode="streaming",model_name="example-model",outcome="no_tool_call",request_type="other"} 1
+vllm:tool_call_parser_invocations_created{mode="non_streaming",model_name="example-model",outcome="tool_call",request_type="chat_completions"} 1
+vllm:tool_call_parser_invocations_created{mode="non_streaming",model_name="example-model",outcome="tool_call",request_type="responses"} 1
+vllm:tool_call_parser_invocations_created{mode="non_streaming",model_name="example-model",outcome="tool_call",request_type="other"} 1
+vllm:tool_call_parser_invocations_created{mode="non_streaming",model_name="example-model",outcome="no_tool_call",request_type="chat_completions"} 1
+vllm:tool_call_parser_invocations_created{mode="non_streaming",model_name="example-model",outcome="no_tool_call",request_type="responses"} 1
+vllm:tool_call_parser_invocations_created{mode="non_streaming",model_name="example-model",outcome="no_tool_call",request_type="other"} 1
+
+# Source-derived optional and configuration-gated vLLM metric surfaces.
+# HELP vllm:corrupted_requests_total Corrupted requests, in terms of total number of requests with NaNs in logits.
+# TYPE vllm:corrupted_requests_total counter
+vllm:corrupted_requests_total{engine="0",model_name="example-model"} 1.0
+# HELP vllm:corrupted_requests_created Corrupted requests, in terms of total number of requests with NaNs in logits.
+# TYPE vllm:corrupted_requests_created gauge
+vllm:corrupted_requests_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_block_lifetime_seconds Histogram of KV cache block lifetime from allocation to eviction. Sampled metrics (controlled by --kv-cache-metrics-sample).
+# TYPE vllm:kv_block_lifetime_seconds histogram
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 0.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.002",model_name="example-model"} 0.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 0.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 0.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.02",model_name="example-model"} 0.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 0.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 0.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 1.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 1.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 1.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="2.0",model_name="example-model"} 1.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="30.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="60.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="120.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="300.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="600.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="1200.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="1800.0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_block_lifetime_seconds_sum{engine="0",model_name="example-model"} 5.2
+# HELP vllm:kv_block_lifetime_seconds_created Histogram of KV cache block lifetime from allocation to eviction. Sampled metrics (controlled by --kv-cache-metrics-sample).
+# TYPE vllm:kv_block_lifetime_seconds_created gauge
+vllm:kv_block_lifetime_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_block_idle_before_evict_seconds Histogram of idle time before KV cache block eviction. Sampled metrics (controlled by --kv-cache-metrics-sample).
+# TYPE vllm:kv_block_idle_before_evict_seconds histogram
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 0.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.002",model_name="example-model"} 0.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 0.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 0.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.02",model_name="example-model"} 0.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 0.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 1.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 1.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 1.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 1.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="2.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="30.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="60.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="120.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="300.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="600.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="1200.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="1800.0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_block_idle_before_evict_seconds_sum{engine="0",model_name="example-model"} 2.1
+# HELP vllm:kv_block_idle_before_evict_seconds_created Histogram of idle time before KV cache block eviction. Sampled metrics (controlled by --kv-cache-metrics-sample).
+# TYPE vllm:kv_block_idle_before_evict_seconds_created gauge
+vllm:kv_block_idle_before_evict_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_block_reuse_gap_seconds Histogram of time gaps between consecutive KV cache block accesses. Only the most recent accesses are recorded (ring buffer). Sampled metrics (controlled by --kv-cache-metrics-sample).
+# TYPE vllm:kv_block_reuse_gap_seconds histogram
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 0.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.002",model_name="example-model"} 0.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 0.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 0.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.02",model_name="example-model"} 0.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 1.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 1.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 1.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="2.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="20.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="30.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="60.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="120.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="300.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="600.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="1200.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="1800.0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_block_reuse_gap_seconds_sum{engine="0",model_name="example-model"} 0.55
+# HELP vllm:kv_block_reuse_gap_seconds_created Histogram of time gaps between consecutive KV cache block accesses. Only the most recent accesses are recorded (ring buffer). Sampled metrics (controlled by --kv-cache-metrics-sample).
+# TYPE vllm:kv_block_reuse_gap_seconds_created gauge
+vllm:kv_block_reuse_gap_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:lora_requests_info Running stats on lora requests.
+# TYPE vllm:lora_requests_info gauge
+vllm:lora_requests_info{max_lora="4",running_lora_adapters="adapter-running",waiting_lora_adapters="adapter-waiting"} 1.0
+# HELP vllm:diffusion_num_denoising_steps_total Number of denoising steps.
+# TYPE vllm:diffusion_num_denoising_steps_total counter
+vllm:diffusion_num_denoising_steps_total{engine="0",model_name="example-model"} 8.0
+# HELP vllm:diffusion_num_denoising_steps_created Number of denoising steps.
+# TYPE vllm:diffusion_num_denoising_steps_created gauge
+vllm:diffusion_num_denoising_steps_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:diffusion_num_canvas_positions_total Number of canvas positions evaluated.
+# TYPE vllm:diffusion_num_canvas_positions_total counter
+vllm:diffusion_num_canvas_positions_total{engine="0",model_name="example-model"} 32.0
+# HELP vllm:diffusion_num_canvas_positions_created Number of canvas positions evaluated.
+# TYPE vllm:diffusion_num_canvas_positions_created gauge
+vllm:diffusion_num_canvas_positions_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:diffusion_num_committed_tokens_total Number of committed (finalized) tokens.
+# TYPE vllm:diffusion_num_committed_tokens_total counter
+vllm:diffusion_num_committed_tokens_total{engine="0",model_name="example-model"} 16.0
+# HELP vllm:diffusion_num_committed_tokens_created Number of committed (finalized) tokens.
+# TYPE vllm:diffusion_num_committed_tokens_created gauge
+vllm:diffusion_num_committed_tokens_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:websocket_connections_active Number of currently active WebSocket connections.
+# TYPE vllm:websocket_connections_active gauge
+vllm:websocket_connections_active 2.0
+# HELP vllm:websocket_connections_total Total number of WebSocket connections.
+# TYPE vllm:websocket_connections_total counter
+vllm:websocket_connections_total 12.0
+# HELP vllm:websocket_connections_created Total number of WebSocket connections.
+# TYPE vllm:websocket_connections_created gauge
+vllm:websocket_connections_created 1.7e+09
+# HELP vllm:websocket_connection_duration_seconds Duration of WebSocket connections in seconds.
+# TYPE vllm:websocket_connection_duration_seconds histogram
+vllm:websocket_connection_duration_seconds_bucket{le="0.5"} 0.0
+vllm:websocket_connection_duration_seconds_bucket{le="1.0"} 0.0
+vllm:websocket_connection_duration_seconds_bucket{le="2.5"} 1.0
+vllm:websocket_connection_duration_seconds_bucket{le="5.0"} 1.0
+vllm:websocket_connection_duration_seconds_bucket{le="10.0"} 1.0
+vllm:websocket_connection_duration_seconds_bucket{le="30.0"} 2.0
+vllm:websocket_connection_duration_seconds_bucket{le="60.0"} 2.0
+vllm:websocket_connection_duration_seconds_bucket{le="120.0"} 2.0
+vllm:websocket_connection_duration_seconds_bucket{le="300.0"} 2.0
+vllm:websocket_connection_duration_seconds_bucket{le="600.0"} 2.0
+vllm:websocket_connection_duration_seconds_bucket{le="1800.0"} 2.0
+vllm:websocket_connection_duration_seconds_bucket{le="+Inf"} 2.0
+vllm:websocket_connection_duration_seconds_count 2.0
+vllm:websocket_connection_duration_seconds_sum 32.0
+# HELP vllm:websocket_connection_duration_seconds_created Duration of WebSocket connections in seconds.
+# TYPE vllm:websocket_connection_duration_seconds_created gauge
+vllm:websocket_connection_duration_seconds_created 1.7e+09
+# HELP vllm:nixl_xfer_time_seconds Histogram of transfer duration for NIXL KV Cache transfers.
+# TYPE vllm:nixl_xfer_time_seconds histogram
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 0.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 1.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.025",model_name="example-model"} 1.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 1.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.075",model_name="example-model"} 1.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 1.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 2.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 2.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="0.75",model_name="example-model"} 2.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:nixl_xfer_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:nixl_xfer_time_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:nixl_xfer_time_seconds_sum{engine="0",model_name="example-model"} 0.21000000000000002
+# HELP vllm:nixl_xfer_time_seconds_created Histogram of transfer duration for NIXL KV Cache transfers.
+# TYPE vllm:nixl_xfer_time_seconds_created gauge
+vllm:nixl_xfer_time_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:nixl_post_time_seconds Histogram of transfer post time for NIXL KV Cache transfers.
+# TYPE vllm:nixl_post_time_seconds histogram
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 0.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 1.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 1.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.025",model_name="example-model"} 1.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.075",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="0.75",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:nixl_post_time_seconds_sum{engine="0",model_name="example-model"} 0.055
+# HELP vllm:nixl_post_time_seconds_created Histogram of transfer post time for NIXL KV Cache transfers.
+# TYPE vllm:nixl_post_time_seconds_created gauge
+vllm:nixl_post_time_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:nixl_bytes_transferred Histogram of bytes transferred per NIXL KV Cache transfers.
+# TYPE vllm:nixl_bytes_transferred histogram
+vllm:nixl_bytes_transferred_bucket{engine="0",le="2048.0",model_name="example-model"} 0.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="8192.0",model_name="example-model"} 0.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="32768.0",model_name="example-model"} 0.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="131072.0",model_name="example-model"} 0.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="524288.0",model_name="example-model"} 0.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="2.097152e+06",model_name="example-model"} 1.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="8.388608e+06",model_name="example-model"} 1.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="3.3554432e+07",model_name="example-model"} 2.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="1.34217728e+08",model_name="example-model"} 2.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="5.36870912e+08",model_name="example-model"} 2.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="2.147483648e+09",model_name="example-model"} 2.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="8.589934592e+09",model_name="example-model"} 2.0
+vllm:nixl_bytes_transferred_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:nixl_bytes_transferred_count{engine="0",model_name="example-model"} 2.0
+vllm:nixl_bytes_transferred_sum{engine="0",model_name="example-model"} 1.7825792e+07
+# HELP vllm:nixl_bytes_transferred_created Histogram of bytes transferred per NIXL KV Cache transfers.
+# TYPE vllm:nixl_bytes_transferred_created gauge
+vllm:nixl_bytes_transferred_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:nixl_num_descriptors Histogram of number of descriptors per NIXL KV Cache transfers.
+# TYPE vllm:nixl_num_descriptors histogram
+vllm:nixl_num_descriptors_bucket{engine="0",le="10.0",model_name="example-model"} 0.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="20.0",model_name="example-model"} 1.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="30.0",model_name="example-model"} 1.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="50.0",model_name="example-model"} 1.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="75.0",model_name="example-model"} 1.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="100.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="200.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="400.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="1000.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="2000.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="4000.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="10000.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="20000.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="50000.0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_count{engine="0",model_name="example-model"} 2.0
+vllm:nixl_num_descriptors_sum{engine="0",model_name="example-model"} 120.0
+# HELP vllm:nixl_num_descriptors_created Histogram of number of descriptors per NIXL KV Cache transfers.
+# TYPE vllm:nixl_num_descriptors_created gauge
+vllm:nixl_num_descriptors_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:nixl_num_failed_transfers_total Number of failed NIXL KV Cache transfers.
+# TYPE vllm:nixl_num_failed_transfers_total counter
+vllm:nixl_num_failed_transfers_total{engine="0",model_name="example-model"} 1.0
+# HELP vllm:nixl_num_failed_transfers_created Number of failed NIXL KV Cache transfers.
+# TYPE vllm:nixl_num_failed_transfers_created gauge
+vllm:nixl_num_failed_transfers_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:nixl_num_failed_notifications_total Number of failed NIXL KV Cache notifications.
+# TYPE vllm:nixl_num_failed_notifications_total counter
+vllm:nixl_num_failed_notifications_total{engine="0",model_name="example-model"} 1.0
+# HELP vllm:nixl_num_failed_notifications_created Number of failed NIXL KV Cache notifications.
+# TYPE vllm:nixl_num_failed_notifications_created gauge
+vllm:nixl_num_failed_notifications_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:nixl_num_kv_expired_reqs_total Number of requests that had their KV expire. NOTE: This metric is tracked on the P instance.
+# TYPE vllm:nixl_num_kv_expired_reqs_total counter
+vllm:nixl_num_kv_expired_reqs_total{engine="0",model_name="example-model"} 1.0
+# HELP vllm:nixl_num_kv_expired_reqs_created Number of requests that had their KV expire. NOTE: This metric is tracked on the P instance.
+# TYPE vllm:nixl_num_kv_expired_reqs_created gauge
+vllm:nixl_num_kv_expired_reqs_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:hf3fs_save_duration_seconds Histogram of save duration for HF3FSKVConnector.
+# TYPE vllm:hf3fs_save_duration_seconds histogram
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 0.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 0.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 1.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.025",model_name="example-model"} 1.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 1.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.075",model_name="example-model"} 1.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 1.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 2.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 2.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="0.75",model_name="example-model"} 2.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:hf3fs_save_duration_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:hf3fs_save_duration_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:hf3fs_save_duration_seconds_sum{engine="0",model_name="example-model"} 0.21000000000000002
+# HELP vllm:hf3fs_save_duration_seconds_created Histogram of save duration for HF3FSKVConnector.
+# TYPE vllm:hf3fs_save_duration_seconds_created gauge
+vllm:hf3fs_save_duration_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:hf3fs_load_duration_seconds Histogram of load duration for HF3FSKVConnector.
+# TYPE vllm:hf3fs_load_duration_seconds histogram
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 0.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 1.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 1.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.025",model_name="example-model"} 1.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 1.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.075",model_name="example-model"} 1.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.2",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.3",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="0.75",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:hf3fs_load_duration_seconds_sum{engine="0",model_name="example-model"} 0.10500000000000001
+# HELP vllm:hf3fs_load_duration_seconds_created Histogram of load duration for HF3FSKVConnector.
+# TYPE vllm:hf3fs_load_duration_seconds_created gauge
+vllm:hf3fs_load_duration_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:hf3fs_num_failed_save_total Number of failed HF3FS KV save.
+# TYPE vllm:hf3fs_num_failed_save_total counter
+vllm:hf3fs_num_failed_save_total{engine="0",model_name="example-model"} 1.0
+# HELP vllm:hf3fs_num_failed_save_created Number of failed HF3FS KV save.
+# TYPE vllm:hf3fs_num_failed_save_created gauge
+vllm:hf3fs_num_failed_save_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:hf3fs_num_failed_load_total Number of failed HF3FS KV load.
+# TYPE vllm:hf3fs_num_failed_load_total counter
+vllm:hf3fs_num_failed_load_total{engine="0",model_name="example-model"} 1.0
+# HELP vllm:hf3fs_num_failed_load_created Number of failed HF3FS KV load.
+# TYPE vllm:hf3fs_num_failed_load_created gauge
+vllm:hf3fs_num_failed_load_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:mooncake_store_operation_time_seconds Histogram of Mooncake store communication time.
+# TYPE vllm:mooncake_store_operation_time_seconds histogram
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.001",model_name="example-model",operation="load_get",status="ok"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.005",model_name="example-model",operation="load_get",status="ok"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.01",model_name="example-model",operation="load_get",status="ok"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.05",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.1",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.2",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.3",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.4",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.5",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.75",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="1.0",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="1.5",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="2.0",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="3.0",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="4.0",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_count{engine="0",model_name="example-model",operation="load_get",status="ok"} 1.0
+vllm:mooncake_store_operation_time_seconds_sum{engine="0",model_name="example-model",operation="load_get",status="ok"} 0.05
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.001",model_name="example-model",operation="load_get",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.005",model_name="example-model",operation="load_get",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.01",model_name="example-model",operation="load_get",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.05",model_name="example-model",operation="load_get",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.1",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.2",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.3",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.4",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.5",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.75",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="1.0",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="1.5",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="2.0",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="3.0",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="4.0",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_count{engine="0",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_sum{engine="0",model_name="example-model",operation="load_get",status="error"} 0.1
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.001",model_name="example-model",operation="save_put",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.005",model_name="example-model",operation="save_put",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.01",model_name="example-model",operation="save_put",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.05",model_name="example-model",operation="save_put",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.1",model_name="example-model",operation="save_put",status="error"} 0.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.2",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.3",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.4",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.5",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="0.75",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="1.0",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="1.5",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="2.0",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="3.0",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="4.0",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_bucket{engine="0",le="+Inf",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_count{engine="0",model_name="example-model",operation="save_put",status="error"} 1.0
+vllm:mooncake_store_operation_time_seconds_sum{engine="0",model_name="example-model",operation="save_put",status="error"} 0.2
+# HELP vllm:mooncake_store_operation_time_seconds_created Histogram of Mooncake store communication time.
+# TYPE vllm:mooncake_store_operation_time_seconds_created gauge
+vllm:mooncake_store_operation_time_seconds_created{engine="0",model_name="example-model",operation="load_get",status="ok"} 1.7e+09
+vllm:mooncake_store_operation_time_seconds_created{engine="0",model_name="example-model",operation="load_get",status="error"} 1.7e+09
+vllm:mooncake_store_operation_time_seconds_created{engine="0",model_name="example-model",operation="save_put",status="error"} 1.7e+09
+# HELP vllm:mooncake_store_operation_total Number of Mooncake store communication operations.
+# TYPE vllm:mooncake_store_operation_total counter
+vllm:mooncake_store_operation_total{engine="0",model_name="example-model",operation="load_get",status="ok"} 5.0
+vllm:mooncake_store_operation_total{engine="0",model_name="example-model",operation="load_get",status="error"} 1.0
+vllm:mooncake_store_operation_total{engine="0",model_name="example-model",operation="save_put",status="error"} 1.0
+# HELP vllm:mooncake_store_operation_created Number of Mooncake store communication operations.
+# TYPE vllm:mooncake_store_operation_created gauge
+vllm:mooncake_store_operation_created{engine="0",model_name="example-model",operation="load_get",status="ok"} 1.7e+09
+vllm:mooncake_store_operation_created{engine="0",model_name="example-model",operation="load_get",status="error"} 1.7e+09
+vllm:mooncake_store_operation_created{engine="0",model_name="example-model",operation="save_put",status="error"} 1.7e+09
+# HELP vllm:mooncake_store_operation_keys_total Number of Mooncake store keys touched by operations.
+# TYPE vllm:mooncake_store_operation_keys_total counter
+vllm:mooncake_store_operation_keys_total{engine="0",model_name="example-model",operation="load_get",status="ok"} 20.0
+vllm:mooncake_store_operation_keys_total{engine="0",model_name="example-model",operation="load_get",status="error"} 4.0
+vllm:mooncake_store_operation_keys_total{engine="0",model_name="example-model",operation="save_put",status="error"} 4.0
+# HELP vllm:mooncake_store_operation_keys_created Number of Mooncake store keys touched by operations.
+# TYPE vllm:mooncake_store_operation_keys_created gauge
+vllm:mooncake_store_operation_keys_created{engine="0",model_name="example-model",operation="load_get",status="ok"} 1.7e+09
+vllm:mooncake_store_operation_keys_created{engine="0",model_name="example-model",operation="load_get",status="error"} 1.7e+09
+vllm:mooncake_store_operation_keys_created{engine="0",model_name="example-model",operation="save_put",status="error"} 1.7e+09
+# HELP vllm:mooncake_store_operation_bytes_total Number of bytes transferred by Mooncake store operations.
+# TYPE vllm:mooncake_store_operation_bytes_total counter
+vllm:mooncake_store_operation_bytes_total{engine="0",model_name="example-model",operation="load_get",status="ok"} 1.048576e+06
+vllm:mooncake_store_operation_bytes_total{engine="0",model_name="example-model",operation="load_get",status="error"} 262144.0
+vllm:mooncake_store_operation_bytes_total{engine="0",model_name="example-model",operation="save_put",status="error"} 262144.0
+# HELP vllm:mooncake_store_operation_bytes_created Number of bytes transferred by Mooncake store operations.
+# TYPE vllm:mooncake_store_operation_bytes_created gauge
+vllm:mooncake_store_operation_bytes_created{engine="0",model_name="example-model",operation="load_get",status="ok"} 1.7e+09
+vllm:mooncake_store_operation_bytes_created{engine="0",model_name="example-model",operation="load_get",status="error"} 1.7e+09
+vllm:mooncake_store_operation_bytes_created{engine="0",model_name="example-model",operation="save_put",status="error"} 1.7e+09
+# HELP vllm:mooncake_store_operation_failed_keys_total Number of Mooncake store keys that failed in operations.
+# TYPE vllm:mooncake_store_operation_failed_keys_total counter
+vllm:mooncake_store_operation_failed_keys_total{engine="0",model_name="example-model",operation="load_get",status="ok"} 0.0
+vllm:mooncake_store_operation_failed_keys_total{engine="0",model_name="example-model",operation="load_get",status="error"} 2.0
+vllm:mooncake_store_operation_failed_keys_total{engine="0",model_name="example-model",operation="save_put",status="error"} 2.0
+# HELP vllm:mooncake_store_operation_failed_keys_created Number of Mooncake store keys that failed in operations.
+# TYPE vllm:mooncake_store_operation_failed_keys_created gauge
+vllm:mooncake_store_operation_failed_keys_created{engine="0",model_name="example-model",operation="load_get",status="ok"} 1.7e+09
+vllm:mooncake_store_operation_failed_keys_created{engine="0",model_name="example-model",operation="load_get",status="error"} 1.7e+09
+vllm:mooncake_store_operation_failed_keys_created{engine="0",model_name="example-model",operation="save_put",status="error"} 1.7e+09
+# HELP vllm:kv_offload_load_bytes_total Total bytes loaded from offload storage to GPU.
+# TYPE vllm:kv_offload_load_bytes_total counter
+vllm:kv_offload_load_bytes_total{engine="0",model_name="example-model"} 4.194304e+06
+# HELP vllm:kv_offload_load_bytes_created Total bytes loaded from offload storage to GPU.
+# TYPE vllm:kv_offload_load_bytes_created gauge
+vllm:kv_offload_load_bytes_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_load_time_total Total load time from offload storage to GPU, in seconds.
+# TYPE vllm:kv_offload_load_time_total counter
+vllm:kv_offload_load_time_total{engine="0",model_name="example-model"} 1.5
+# HELP vllm:kv_offload_load_time_created Total load time from offload storage to GPU, in seconds.
+# TYPE vllm:kv_offload_load_time_created gauge
+vllm:kv_offload_load_time_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_load_size Histogram of KV offload load operation size, in bytes.
+# TYPE vllm:kv_offload_load_size histogram
+vllm:kv_offload_load_size_bucket{engine="0",le="1e+06",model_name="example-model"} 0.0
+vllm:kv_offload_load_size_bucket{engine="0",le="5e+06",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="1e+07",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="2e+07",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="4e+07",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="6e+07",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="8e+07",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="1e+08",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="1.5e+08",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="2e+08",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_offload_load_size_sum{engine="0",model_name="example-model"} 6.291456e+06
+# HELP vllm:kv_offload_load_size_created Histogram of KV offload load operation size, in bytes.
+# TYPE vllm:kv_offload_load_size_created gauge
+vllm:kv_offload_load_size_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_store_bytes_total Total bytes stored from GPU to offload storage.
+# TYPE vllm:kv_offload_store_bytes_total counter
+vllm:kv_offload_store_bytes_total{engine="0",model_name="example-model"} 6.291456e+06
+# HELP vllm:kv_offload_store_bytes_created Total bytes stored from GPU to offload storage.
+# TYPE vllm:kv_offload_store_bytes_created gauge
+vllm:kv_offload_store_bytes_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_store_time_total Total store time from GPU to offload storage, in seconds.
+# TYPE vllm:kv_offload_store_time_total counter
+vllm:kv_offload_store_time_total{engine="0",model_name="example-model"} 2.0
+# HELP vllm:kv_offload_store_time_created Total store time from GPU to offload storage, in seconds.
+# TYPE vllm:kv_offload_store_time_created gauge
+vllm:kv_offload_store_time_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_store_size Histogram of KV offload store operation size, in bytes.
+# TYPE vllm:kv_offload_store_size histogram
+vllm:kv_offload_store_size_bucket{engine="0",le="1e+06",model_name="example-model"} 0.0
+vllm:kv_offload_store_size_bucket{engine="0",le="5e+06",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="1e+07",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="2e+07",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="4e+07",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="6e+07",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="8e+07",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="1e+08",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="1.5e+08",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="2e+08",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_offload_store_size_sum{engine="0",model_name="example-model"} 6.291456e+06
+# HELP vllm:kv_offload_store_size_created Histogram of KV offload store operation size, in bytes.
+# TYPE vllm:kv_offload_store_size_created gauge
+vllm:kv_offload_store_size_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_lookup_sync_delay_seconds Histogram of the time spent in a single offload lookup call, in seconds.
+# TYPE vllm:kv_offload_lookup_sync_delay_seconds histogram
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="1e-05",model_name="example-model"} 0.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="5e-05",model_name="example-model"} 0.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="0.0001",model_name="example-model"} 0.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="0.0005",model_name="example-model"} 1.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 1.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 1.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_sync_delay_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_sync_delay_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_sync_delay_seconds_sum{engine="0",model_name="example-model"} 0.0105
+# HELP vllm:kv_offload_lookup_sync_delay_seconds_created Histogram of the time spent in a single offload lookup call, in seconds.
+# TYPE vllm:kv_offload_lookup_sync_delay_seconds_created gauge
+vllm:kv_offload_lookup_sync_delay_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_lookup_async_delay_seconds Histogram of time between a request's offload lookup first deferring and the following lookup resolving, or request finish, in seconds.
+# TYPE vllm:kv_offload_lookup_async_delay_seconds histogram
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="0.0001",model_name="example-model"} 0.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="0.0005",model_name="example-model"} 0.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 0.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 0.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 1.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 1.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 1.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_async_delay_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_async_delay_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_offload_lookup_async_delay_seconds_sum{engine="0",model_name="example-model"} 0.51
+# HELP vllm:kv_offload_lookup_async_delay_seconds_created Histogram of time between a request's offload lookup first deferring and the following lookup resolving, or request finish, in seconds.
+# TYPE vllm:kv_offload_lookup_async_delay_seconds_created gauge
+vllm:kv_offload_lookup_async_delay_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_allocation_failure_total Number of KV offload store allocation attempts that failed.
+# TYPE vllm:kv_offload_allocation_failure_total counter
+vllm:kv_offload_allocation_failure_total{engine="0",model_name="example-model"} 1.0
+# HELP vllm:kv_offload_allocation_failure_created Number of KV offload store allocation attempts that failed.
+# TYPE vllm:kv_offload_allocation_failure_created gauge
+vllm:kv_offload_allocation_failure_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_cpu_cache_usage_perc Fraction of CPU KV-cache space currently pinned by active transfers (0.0 = idle, 1.0 = saturated).
+# TYPE vllm:kv_offload_cpu_cache_usage_perc gauge
+vllm:kv_offload_cpu_cache_usage_perc{engine="0",model_name="example-model"} 0.5
+# HELP vllm:kv_offload_cpu_cache_write_usage_perc Fraction of CPU KV-cache space currently pinned by in-flight stores that have not yet completed (0.0 = idle, 1.0 = saturated).
+# TYPE vllm:kv_offload_cpu_cache_write_usage_perc gauge
+vllm:kv_offload_cpu_cache_write_usage_perc{engine="0",model_name="example-model"} 0.3
+# HELP vllm:kv_offload_cpu_cache_read_usage_perc Fraction of CPU KV-cache space currently pinned by in-flight loads that have not yet completed (0.0 = idle, 1.0 = saturated).
+# TYPE vllm:kv_offload_cpu_cache_read_usage_perc gauge
+vllm:kv_offload_cpu_cache_read_usage_perc{engine="0",model_name="example-model"} 0.2
+# HELP vllm:kv_offload_cpu_allocation_size Histogram of the number of CPU blocks requested by each KV offload prepare_store call.
+# TYPE vllm:kv_offload_cpu_allocation_size histogram
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="1.0",model_name="example-model"} 0.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="4.0",model_name="example-model"} 1.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="16.0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="64.0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="256.0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="1024.0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="4096.0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="16384.0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="65536.0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="262144.0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_offload_cpu_allocation_size_sum{engine="0",model_name="example-model"} 20.0
+# HELP vllm:kv_offload_cpu_allocation_size_created Histogram of the number of CPU blocks requested by each KV offload prepare_store call.
+# TYPE vllm:kv_offload_cpu_allocation_size_created gauge
+vllm:kv_offload_cpu_allocation_size_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_stores_skipped_total Number of KV offload stores skipped because the reuse threshold was not reached.
+# TYPE vllm:kv_offload_stores_skipped_total counter
+vllm:kv_offload_stores_skipped_total{engine="0",model_name="example-model"} 2.0
+# HELP vllm:kv_offload_stores_skipped_created Number of KV offload stores skipped because the reuse threshold was not reached.
+# TYPE vllm:kv_offload_stores_skipped_created gauge
+vllm:kv_offload_stores_skipped_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_tiering_lookup_sync_delay_seconds Histogram of total blocking time spent querying secondary tiers for a request, accumulated from first lookup until the request is allocated or finishes, in seconds.
+# TYPE vllm:kv_offload_tiering_lookup_sync_delay_seconds histogram
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="1e-05",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="5e-05",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="0.0001",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="0.0005",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 1.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 1.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 1.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_sum{engine="0",model_name="example-model"} 0.051000000000000004
+# HELP vllm:kv_offload_tiering_lookup_sync_delay_seconds_created Histogram of total blocking time spent querying secondary tiers for a request, accumulated from first lookup until the request is allocated or finishes, in seconds.
+# TYPE vllm:kv_offload_tiering_lookup_sync_delay_seconds_created gauge
+vllm:kv_offload_tiering_lookup_sync_delay_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_tiering_lookup_async_delay_seconds Histogram of wall-clock time from a request's first deferred secondary-tier lookup until the request is allocated or finishes, in seconds.
+# TYPE vllm:kv_offload_tiering_lookup_async_delay_seconds histogram
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="0.0001",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="0.0005",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="0.001",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="0.005",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="0.01",model_name="example-model"} 0.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="0.05",model_name="example-model"} 1.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="0.1",model_name="example-model"} 1.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="0.5",model_name="example-model"} 1.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="1.0",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="5.0",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="10.0",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket{engine="0",le="+Inf",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_count{engine="0",model_name="example-model"} 2.0
+vllm:kv_offload_tiering_lookup_async_delay_seconds_sum{engine="0",model_name="example-model"} 1.05
+# HELP vllm:kv_offload_tiering_lookup_async_delay_seconds_created Histogram of wall-clock time from a request's first deferred secondary-tier lookup until the request is allocated or finishes, in seconds.
+# TYPE vllm:kv_offload_tiering_lookup_async_delay_seconds_created gauge
+vllm:kv_offload_tiering_lookup_async_delay_seconds_created{engine="0",model_name="example-model"} 1.7e+09
+# HELP vllm:kv_offload_total_bytes_total Number of bytes offloaded by KV connector
+# TYPE vllm:kv_offload_total_bytes_total counter
+vllm:kv_offload_total_bytes_total{engine="0",model_name="example-model",transfer_type="CPU_to_GPU"} 4.194304e+06
+vllm:kv_offload_total_bytes_total{engine="0",model_name="example-model",transfer_type="GPU_to_CPU"} 6.291456e+06
+# HELP vllm:kv_offload_total_bytes_created Number of bytes offloaded by KV connector
+# TYPE vllm:kv_offload_total_bytes_created gauge
+vllm:kv_offload_total_bytes_created{engine="0",model_name="example-model",transfer_type="CPU_to_GPU"} 1.7e+09
+vllm:kv_offload_total_bytes_created{engine="0",model_name="example-model",transfer_type="GPU_to_CPU"} 1.7e+09
+# HELP vllm:kv_offload_total_time_total Total time measured by all KV offloading operations
+# TYPE vllm:kv_offload_total_time_total counter
+vllm:kv_offload_total_time_total{engine="0",model_name="example-model",transfer_type="CPU_to_GPU"} 1.5
+vllm:kv_offload_total_time_total{engine="0",model_name="example-model",transfer_type="GPU_to_CPU"} 2.0
+# HELP vllm:kv_offload_total_time_created Total time measured by all KV offloading operations
+# TYPE vllm:kv_offload_total_time_created gauge
+vllm:kv_offload_total_time_created{engine="0",model_name="example-model",transfer_type="CPU_to_GPU"} 1.7e+09
+vllm:kv_offload_total_time_created{engine="0",model_name="example-model",transfer_type="GPU_to_CPU"} 1.7e+09
+# HELP vllm:kv_offload_size Histogram of KV offload transfer size, in bytes.
+# TYPE vllm:kv_offload_size histogram
+vllm:kv_offload_size_bucket{engine="0",le="1e+06",model_name="example-model",transfer_type="CPU_to_GPU"} 0.0
+vllm:kv_offload_size_bucket{engine="0",le="5e+06",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="1e+07",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="2e+07",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="4e+07",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="6e+07",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="8e+07",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="1e+08",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="1.5e+08",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="2e+08",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="+Inf",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_count{engine="0",model_name="example-model",transfer_type="CPU_to_GPU"} 1.0
+vllm:kv_offload_size_sum{engine="0",model_name="example-model",transfer_type="CPU_to_GPU"} 4.194304e+06
+vllm:kv_offload_size_bucket{engine="0",le="1e+06",model_name="example-model",transfer_type="GPU_to_CPU"} 0.0
+vllm:kv_offload_size_bucket{engine="0",le="5e+06",model_name="example-model",transfer_type="GPU_to_CPU"} 0.0
+vllm:kv_offload_size_bucket{engine="0",le="1e+07",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="2e+07",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="4e+07",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="6e+07",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="8e+07",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="1e+08",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="1.5e+08",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="2e+08",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_bucket{engine="0",le="+Inf",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_count{engine="0",model_name="example-model",transfer_type="GPU_to_CPU"} 1.0
+vllm:kv_offload_size_sum{engine="0",model_name="example-model",transfer_type="GPU_to_CPU"} 6.291456e+06
+# HELP vllm:kv_offload_size_created Histogram of KV offload transfer size, in bytes.
+# TYPE vllm:kv_offload_size_created gauge
+vllm:kv_offload_size_created{engine="0",model_name="example-model",transfer_type="CPU_to_GPU"} 1.7e+09
+vllm:kv_offload_size_created{engine="0",model_name="example-model",transfer_type="GPU_to_CPU"} 1.7e+09

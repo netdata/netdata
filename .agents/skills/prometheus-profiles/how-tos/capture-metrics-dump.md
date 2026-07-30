@@ -1,8 +1,9 @@
 # Capture a representative Prometheus metrics dump
 
 A validator can prove only what the dump contains. Capture the exact endpoint
-and application configuration the profile is intended to support, with
-Prometheus comments intact.
+and application configuration being observed, with Prometheus comments intact.
+Do not silently treat that one configuration as the profile's complete support
+surface.
 
 ## Capture
 
@@ -30,6 +31,14 @@ wc -l metrics.txt
 Then inspect family names, types, label keys, and cardinality without copying
 sensitive label values into durable artifacts.
 
+Record provenance alongside the private dump:
+
+- application/exporter version;
+- configuration and enabled optional features, without secrets;
+- source revision when known;
+- capture time and endpoint role, using a sanitized endpoint description;
+- SHA-256 of the immutable dump.
+
 Interpret missing metadata carefully:
 
 - Missing `HELP` reduces semantic evidence but does not make the exposition
@@ -52,9 +61,15 @@ safe and authorized, capture a state that includes:
 - optional subsystems the profile claims to support.
 
 Zero is valid evidence that a family exists. Absence is not evidence that a
-feature or metric never exists. A single-dump validation cannot certify an
-optional surface absent from that dump; obtain another representative fixture
-or state the limitation.
+feature or metric never exists. A single snapshot proves exposition shape and
+current state; it does not prove update cadence, monotonicity, reset behavior,
+population relationships, or behavior under unobserved states.
+
+Capture additional real states when safe, but do not stop at the available
+deployment when the source defines other supported surfaces. Follow
+[Build a source-derived synthetic fixture](build-synthetic-fixture.md) to cover
+absent optional/configuration-gated families without misrepresenting them as
+runtime observations.
 
 ## Keep dumps private and immutable
 
@@ -65,3 +80,7 @@ temporary storage and never commit real operational dumps.
 Record a hash for a validation run and do not edit the captured file in place.
 The repository validator snapshots it again before the collector performs its
 multiple scrapes, so one run uses immutable evidence.
+
+Create committed regression fixtures only through the sanitized synthetic
+workflow. Never copy a private operational dump into `testdata/` and then edit
+individual labels until it appears safe.

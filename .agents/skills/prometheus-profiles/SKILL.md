@@ -76,6 +76,12 @@ of these proofs fails:
 - **Operator-model proof:** `OPERATOR-MODEL.md` records source-backed
   entities/containment, modules/capabilities, and operations/processing stages
   before YAML, then reconciles those decisions against the emitted profile.
+- **Holistic-surface proof:** the declared version/configuration support scope
+  accounts for every source-defined writer-capable family, including optional
+  capabilities absent from the available deployment.
+- **Fixture proof:** observed dumps and provenance-stamped source-derived
+  synthetic fixtures prove their distinct evidence classes without presenting
+  structural emulation as runtime observation.
 - **Navigation proof:** every first- and second-level family has one coherent
   operator owner. The author can state what entity/function it represents and
   what work or state it performs, receives, produces, stores, routes, or
@@ -98,17 +104,28 @@ but none of these contradictions is an acceptable exercise of judgment.
 
 ## Research the application from evidence
 
-Maintain three mental buckets:
+Maintain five explicitly labeled buckets:
 
-- **Observed:** metric names, `TYPE`, `HELP`, label keys/values, cardinality,
-  and runtime behavior present in the supplied dump.
+- **Observed snapshot fact:** metric names, `TYPE`, `HELP`, label keys/values,
+  cardinality, and state present in a captured exposition.
 - **Authoritative external fact:** exporter/application documentation or source
   that explains what a metric means or what optional surfaces exist.
+- **Source-derived synthetic evidence:** structurally faithful, sanitized
+  exposition constructed from authoritative registrations, update callsites,
+  tests, and documentation.
+- **Comparative evidence:** upstream/community fixtures, mirrored repositories,
+  and other monitoring implementations used to discover terminology, operator
+  questions, version drift, or missing cases.
 - **Design judgment:** the operator story, hierarchy, instance identity,
   dimension choice, chart composition, and ordering.
 
-The supplied dump is the observed inventory, not the complete application
-model. Research unfamiliar or ambiguous semantics before designing:
+The supplied dump is an observed inventory, not the complete application model
+or support surface. Before designing, declare the bounded application/exporter
+versions and configurations the profile will support. The default stock-profile
+scope is the observed/supplied revision plus the current upstream revision used
+at authoring time; record materially different contracts separately.
+
+Research the entire declared surface, not only unfamiliar names:
 
 1. Read the matching application/exporter documentation.
 2. Search the matching source revision for metric registration and update
@@ -121,20 +138,34 @@ model. Research unfamiliar or ambiguous semantics before designing:
    terminology, but verify their assumptions against primary evidence.
 5. Treat model memory and naming intuition as hypotheses until corroborated.
 
+If the local setup omits source-defined features or metrics in scope, fetching
+the matching source and documentation is REQUIRED. Inventory every registration,
+type/shape, label, update population, feature gate, alias, and replacement, then
+build sanitized synthetic fixtures that exercise the final profile. Use
+[the synthetic-fixture workflow](how-tos/build-synthetic-fixture.md).
+
 Use every research capability available for the task: supplied source trees,
-web browsing, repository search, and mirrored open-source repositories. Do not
-stop at `HELP` when it leaves the observation population, identity, reset
-behavior, or unit meaning ambiguous. Conversely, do not copy another
-dashboard's hierarchy merely because it already exists; it may encode a
-different deployment model or repeat an upstream mistake.
+web browsing, repository search, and mirrored open-source repositories. Search
+upstream tests/fixtures and other monitoring solutions proactively; they are
+recommended for discovering missing feature states, fixture shapes, operator
+questions, and version differences. Do not stop at `HELP` when it leaves the
+observation population, identity, reset behavior, or unit meaning ambiguous.
+Conversely, do not copy another fixture's contract or dashboard's hierarchy
+until the target application's primary source verifies it. Comparative
+integrations may be stale, collapse labels, or compute a different quantity.
 
 Do not present an inference as observed fact. One dump proves only one
 configuration and moment:
 
 - Zero values are still observed metrics and may matter under load.
-- An optional feature absent from the dump is not validated. Obtain a
-  representative dump/fixture before claiming it works.
+- An optional feature absent from the dump is not runtime-validated. If it is
+  in the declared support scope, create a provenance-stamped source-derived
+  fixture and label that proof as synthetic.
 - Do not invent metric names, label keys, or types from application concepts.
+
+If authoritative evidence cannot establish an in-scope shape, record the
+surface as unresolved and preserve generic fallback where safe. Do not fabricate
+it, silently narrow the support scope, or claim holistic completion.
 
 If `TYPE` is missing, do not guess silently. The collector can recover only
 selected untyped scalar families through `fallback_type`; it cannot reconstruct
@@ -143,7 +174,8 @@ authoritative exporter evidence or obtain a better dump.
 
 Treat dumps as potentially sensitive. Keep them in ignored `.local/` or user
 temporary storage, and never copy customer/user label values into committed
-fixtures or documentation.
+fixtures or documentation. Committed fixtures MUST be sanitized synthetic
+artifacts, not edited operational dumps.
 
 ## Model what operators expect to see
 
@@ -212,8 +244,9 @@ the role from the label name alone.
 ### Classify the evidence against that model
 
 Create `OPERATOR-MODEL.md` in the deliverable directory **before** profile YAML.
-Classify every observed writer-capable family before grouping it. The document's
-layout is up to the author, but these evidence fields are mandatory:
+Classify every in-scope writer-capable family before grouping it, whether
+observed or source-derived. The document's layout is up to the author, but these
+evidence fields are mandatory:
 
 - **Owner:** the entity, module/capability, or operation/stage this signal
   explains.
@@ -224,12 +257,18 @@ layout is up to the author, but these evidence fields are mandatory:
   utilization, resource use, configuration, or another domain role.
 - **Observation population:** what one increment, observation, or gauge value
   represents.
+- **Cross-family relationship:** whether the signal is a whole, partition,
+  subset, overlap, alias/replacement, or independent population relative to
+  similarly named families, including source-defined invariants and
+  non-additivity.
 - **Unit algebra:** raw unit, algorithm, conversion, rendered unit, and exact
   counted/measured object.
 - **Label roles/cardinality:** identity, dimension, metadata, routing, or
   intentional aggregation.
-- **Evidence/uncertainty:** the observed or authoritative support and any
-  unresolved limitation.
+- **Availability gate:** version, configuration, feature, connector, mode, or
+  lifecycle condition controlling registration/update.
+- **Evidence/uncertainty:** observed, authoritative, source-derived synthetic,
+  comparative, or unresolved support and its proof boundary.
 - **Destination:** intended family/chart or one binding exclusion case.
 
 This proof is not a fixed worksheet or dashboard generator. The model chooses
@@ -309,9 +348,10 @@ validated replacement. Writer-skipped `_info` families are pipeline
 limitations to document, not evidence that a job deny improved the profile.
 “Not interesting” and “zero in this dump” are not reasons.
 
-For every observed writer-capable family that answers a distinct operator
-question, the default is to curate it. A job exclusion is acceptable only when
-at least one of these cases is evidenced:
+For every in-scope writer-capable family that answers a distinct operator
+question, the default is to curate it. This includes source-defined optional
+families proven structurally by the synthetic fixture. A job exclusion is
+acceptable only when at least one of these cases is evidenced:
 
 1. **Unrenderable raw form:** the available value cannot answer its question
    without an unsupported transform, such as `now - epoch`.
@@ -436,8 +476,10 @@ The optional compatibility launcher
 `scripts/validate-profile.py` invokes this same Go tool; it contains no
 independent validation logic.
 
-Run the gate on the exact profile, dump, and structured job policy being
-delivered. Re-run after every edit.
+Run the gate on the exact profile, source-complete fixture, and structured job
+policy being delivered. Re-run after every edit. Keep separate observed-dump
+diagnostics or collector regressions; a partial real dump can legitimately leave
+source-defined optional charts dead under this strict authoring gate.
 
 A `PASS` proves, for that evidence:
 
@@ -485,9 +527,10 @@ explained. Do not mechanically add identity, promotion, dimensions, or unit
 suffixes merely to silence a warning; explain intentional aggregation,
 entity-level boundaries, and truthful unit algebra when they are correct.
 
-The gate cannot judge whether the dashboard is useful, and it cannot prove
-behavior for unseen metrics or label values. Exact candidate selection also
-does not prove that `match` safely auto-selects this profile against unrelated
+The gate cannot judge whether the dashboard is useful. A source-derived fixture
+can prove unseen metric structure and routing, but not live registration,
+values, update behavior, or cardinality. Exact candidate selection also does
+not prove that `match` safely auto-selects this profile against unrelated
 endpoints. Read
 `src/go/tools/prometheus-profile-validation/README.md` for the exact evidence
 boundary.
@@ -533,6 +576,35 @@ Do not weaken an objective gate to preserve an attractive but non-materializing
 design. Conversely, do not let a heuristic warning mechanically override a
 well-explained domain decision.
 
+## Complete stock-profile artifacts
+
+For a stock profile contribution, read the `integrations-lifecycle` skill and
+assess the application catalog deliberately. The profile runtime catalog and
+collector `metadata.yaml` are separate systems; one does not currently generate
+the other.
+
+Choose and record one metadata disposition:
+
+1. Add/update a Prometheus application module when no equivalent integration
+   page exists.
+2. Update or cross-link an existing first-class integration when it already
+   documents the same endpoint; do not create a duplicate catalog entry.
+3. Keep only the generic Prometheus page when there is a concrete product reason
+   that an application-specific catalog entry would be misleading.
+
+When application-specific metadata is added or updated:
+
+- keep `metadata.yaml` as the source of truth;
+- distill the operator model into a brief public description of the entities,
+  capabilities, and processing stages the profile organizes;
+- place that brief in the integration overview rather than copying the complete
+  family ledger;
+- regenerate the integration page and required catalog documentation;
+- validate the metadata/taxonomy disposition under the integrations lifecycle.
+
+This requirement does not apply to a local user profile that is not being
+contributed to the stock catalog.
+
 ## Deliver and install
 
 Deliver:
@@ -541,8 +613,14 @@ Deliver:
 - the recommended structured job policy (or exact changes to an existing job);
 - `OPERATOR-MODEL.md`, including the post-authoring selector-level
   reconciliation against `authored_mapping`;
-- validation inputs/hashes and the `PASS` summary;
-- explicit evidence limitations or optional surfaces still needing fixtures.
+- an evidence manifest identifying versions, source/documentation revisions,
+  feature gates, observed versus synthetic families, and fixture provenance;
+- sanitized source-complete fixture(s), validation inputs/hashes, and the
+  authoritative `PASS` summary;
+- separate observed-runtime and source-derived-synthetic validation claims;
+- the stock integration metadata/generated-doc disposition when applicable;
+- explicit unresolved evidence limitations; known source-defined optional
+  surfaces in scope must not be deferred merely for lack of a local feature.
 
 Do not install or reload production configuration merely because authoring
 passed. Installation is a separate operational change:
@@ -564,5 +642,7 @@ left to lifecycle/retention, and for the exceptional approval boundary.
 - `ownership-proof.md` — source-backed ownership evidence and emitted-profile
   reconciliation.
 - `how-tos/capture-metrics-dump.md` — safe evidence capture.
+- `how-tos/build-synthetic-fixture.md` — source-complete sanitized fixture
+  construction and proof boundaries.
 - `sqlite-metadata-reset.md` — destructive metadata-reset decision boundary.
 - `scripts/validate-profile.py` — thin launcher for the authoritative Go tool.
