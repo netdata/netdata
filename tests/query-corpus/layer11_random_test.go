@@ -1,129 +1,157 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Layer 11, part two — randomised slicing, with shrinking.
+// Layer 11, part two — randomized slicing with reproducible, greedy shrinking.
 //
-// The matrix in layer11_slicing_test.go covers every PAIR of axis values I
-// thought to list. That is the right coverage target for combinations, and it
-// is still a list I curated: it finds what I anticipated.
-//
-// Every slicing defect in this corpus so far escaped exactly that way. The
-// aggregation sweep held the window alignment still; the alignment tests held
-// the data shape still; the shape tests never turned an option on. Each time
-// the bug sat in the axis I had pinned, and each time a person found it
-// before the corpus did.
-//
-// So this generates configurations instead of listing them - window bounds,
-// resolution, tier, offset and shape drawn at random - and checks the same two
-// properties. When one fails it SHRINKS the case: repeatedly simplifies it and
-// keeps whatever still fails, until nothing can be simplified further. What
-// gets reported is not the random case that happened to break but the smallest
-// case that breaks, which is the difference between a lead and a bug report.
-//
-// It is seeded and therefore reproducible: the seed is printed on every run
-// and QUERY_CORPUS_SEED replays it exactly.
+// Generated cases vary window bounds, resolution, tier, offset, option and data
+// shape. A failure is repeatedly simplified while it remains a failure, yielding
+// a locally minimal case under shrinkCandidates. QUERY_CORPUS_SEED replays the
+// same generation and shrinking sequence.
 package corpus
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"strconv"
 	"testing"
 )
 
-// sliceCase is one generated question: how to slice, and what to slice.
-type sliceCase struct {
+type materializedSliceRequest struct {
 	Axes          sliceAxes
 	After, Before int64
 	Points        int64
 }
 
-func (c sliceCase) String() string {
-	return fmt.Sprintf("%s window=(t0%+d,t0%+d] points=%d",
-		c.Axes, c.After-int64(fixture_T0()), c.Before-int64(fixture_T0()), c.Points)
+// randomSliceCase stores material inputs. Every check and shrink materializes
+// the actual request again, so changing an axis cannot leave stale bounds.
+type randomSliceCase struct {
+	Shape       string
+	UE          int
+	Tier        int
+	Option      string
+	StartSample int64
+	Offset      int64
+	Records     int64
+	Buckets     int64
 }
 
-// sliceExpected is the fixture's own arithmetic: what it pushed into the
-// window, in the metric's units.
-func sliceExpected(shape string, ue int, after, before int64) float64 {
-	want := 0.0
-	base := int64(fixture_T0()) - int64(fixture_T0())%int64(ue)
-	for i := 1; i <= sliceSamples; i++ {
-		ts := base + int64(i*ue)
-		if ts > after && ts <= before && sliceCollected(shape, i) {
-			want += sliceValue
-		}
+func (c randomSliceCase) materialize() materializedSliceRequest {
+	a := sliceAxes{
+		Shape: c.Shape, UE: c.UE, Tier: c.Tier, Option: c.Option,
+		StartOffset: c.Offset,
 	}
-	return want
-}
-
-// sliceCaseTotal answers the case as asked.
-func sliceCaseTotal(t *testing.T, c sliceCase, after, before int64) float64 {
-	t.Helper()
-	a := c.Axes
-	// keep the resolution of the case when re-asking a sub-window
-	points := c.Points * (before - after) / (c.Before - c.After)
+	if c.Records > 0 {
+		a.PointsPer = int(c.Buckets / c.Records)
+	}
+	if a.PointsPer < 1 {
+		a.PointsPer = 1
+	}
+	after := sliceBase(c.UE) + int64(c.UE)*c.StartSample + c.Offset
+	before := after + c.Records*sliceRecordDuration(a)
+	points := c.Buckets
 	if points < 1 {
 		points = 1
 	}
-	return sliceTotalPoints(t, a, after, before, points)
+	return materializedSliceRequest{Axes: a, After: after, Before: before, Points: points}
 }
 
-// checkCase runs both properties against one generated case.
-func checkCase(t *testing.T, c sliceCase) (ok bool, detail string) {
+func (c randomSliceCase) String() string {
+	r := c.materialize()
+	return fmt.Sprintf("%s window=(t0%+d,t0%+d] points=%d records=%d",
+		r.Axes, r.After-fixture_T0(), r.Before-fixture_T0(), r.Points, c.Records)
+}
+
+func sliceCaseTotal(
+	t *testing.T,
+	c randomSliceCase,
+	after, before int64,
+) sliceQueryResult {
 	t.Helper()
-	a := c.Axes
-
-	recordEvery := int64(a.UE)
-	if a.Tier > 0 {
-		recordEvery = int64(a.UE) * tier1Gran
+	r := c.materialize()
+	points := r.Points * (before - after) / (r.Before - r.After)
+	if points < 1 {
+		points = 1
 	}
-	recordContent := float64(sliceValue) * float64(a.UE)
-	if a.Tier > 0 {
-		recordContent *= float64(tier1Gran)
-	}
-
-	// additivity: the halves total the whole. No oracle, no preconditions
-	// beyond having something to split.
-	if c.Before-c.After >= 2*recordEvery {
-		mid := c.After + (c.Before-c.After)/2
-		whole := sliceCaseTotal(t, c, c.After, c.Before)
-		left := sliceCaseTotal(t, c, c.After, mid)
-		right := sliceCaseTotal(t, c, mid, c.Before)
-		tol := recordContent * 1.05
-		if tol < 1e-6 {
-			tol = 1e-6
-		}
-		if math.Abs((left+right)-whole) > tol {
-			return false, fmt.Sprintf("additivity: whole=%.1f halves=%.1f (left=%.1f right=%.1f)",
-				whole, left+right, left, right)
-		}
-	}
-
-	// conservation: only where the chart points are at least as wide as the
-	// collection interval, and only against a tier that covers the window
-	bucket := (c.Before - c.After) / c.Points
-	if bucket >= int64(a.UE) && sliceTierCovers(t, a, c.After, c.Before) {
-		got := sliceTotalPoints(t, a, c.After, c.Before, c.Points)
-		want := sliceExpected(a.Shape, a.UE, c.After, c.Before)
-		if math.Abs(got-want) > recordContent*2.1 {
-			return false, fmt.Sprintf("conservation: got=%.1f want=%.1f", got, want)
-		}
-	}
-
-	return true, ""
+	return sliceQuery(t, r.Axes, after, before, points)
 }
 
-// shrinkCase reduces a failing case to the smallest one that still fails.
-// Each step is a simplification a human would try; whatever still fails is
-// kept, and the walk repeats until nothing simplifies.
-func shrinkCase(t *testing.T, c sliceCase) sliceCase {
+type sliceCaseCheck struct {
+	ok                     bool
+	detail                 string
+	additive, conservation bool
+}
+
+func checkCase(t *testing.T, c randomSliceCase) sliceCaseCheck {
+	t.Helper()
+	r := c.materialize()
+	a := r.Axes
+	check := sliceCaseCheck{ok: true}
+	requireSliceTierCovers(t, a, r.After, r.Before)
+	var whole sliceQueryResult
+	haveWhole := false
+
+	if r.Before-r.After >= 2*sliceRecordDuration(a) {
+		mid := r.After + (r.Before-r.After)/2
+		whole = sliceCaseTotal(t, c, r.After, r.Before)
+		haveWhole = true
+		left := sliceCaseTotal(t, c, r.After, mid)
+		right := sliceCaseTotal(t, c, mid, r.Before)
+		if !whole.validGrid || !left.validGrid || !right.validGrid {
+			return sliceCaseCheck{detail: "additivity: invalid response grid"}
+		}
+		if sliceExpected(a.Shape, a.UE, r.After, r.Before) > 0 {
+			if whole.numericRows == 0 || left.numericRows+right.numericRows == 0 {
+				return sliceCaseCheck{detail: fmt.Sprintf(
+					"additivity: fixture has data but numeric coverage is %d/%d+%d",
+					whole.numericRows, left.numericRows, right.numericRows)}
+			}
+			check.additive = true
+			difference := left.total + right.total - whole.total
+			edgeAllowance := sliceEdgeAllowance(a, mid)
+			numericRows := whole.numericRows + left.numericRows + right.numericRows
+			if !sliceWithinTolerance(difference, edgeAllowance, numericRows) {
+				return sliceCaseCheck{additive: true, detail: fmt.Sprintf(
+					"additivity: whole=%.1f halves=%.1f (left=%.1f right=%.1f, allowance=%.1f)",
+					whole.total, left.total+right.total, left.total, right.total, edgeAllowance)}
+			}
+		}
+	}
+
+	bucket := (r.Before - r.After) / r.Points
+	if bucket >= int64(a.UE) {
+		if !haveWhole {
+			whole = sliceCaseTotal(t, c, r.After, r.Before)
+			haveWhole = true
+		}
+		if !whole.validGrid {
+			return sliceCaseCheck{additive: check.additive, detail: "conservation: invalid response grid"}
+		}
+		want := sliceExpected(a.Shape, a.UE, r.After, r.Before)
+		if want > 0 {
+			if whole.numericRows == 0 {
+				return sliceCaseCheck{additive: check.additive,
+					detail: "conservation: positive fixture content but no numeric rows"}
+			}
+			check.conservation = true
+			edgeAllowance := sliceEdgeAllowance(a, r.After, r.Before)
+			if !sliceWithinTolerance(whole.total-want, edgeAllowance, whole.numericRows) {
+				return sliceCaseCheck{additive: check.additive, conservation: true, detail: fmt.Sprintf(
+					"conservation: got=%.1f want=%.1f allowance=%.1f",
+					whole.total, want, edgeAllowance)}
+			}
+		}
+	}
+	return check
+}
+
+// shrinkCase greedily reaches a locally minimal failing case under the
+// simplifications in shrinkCandidates.
+func shrinkCase(t *testing.T, c randomSliceCase) randomSliceCase {
 	t.Helper()
 	for progress := true; progress; {
 		progress = false
 		for _, simpler := range shrinkCandidates(c) {
-			if holds, _ := checkCase(t, simpler); !holds {
+			if !checkCase(t, simpler).ok {
 				c = simpler
 				progress = true
 				break
@@ -133,29 +161,61 @@ func shrinkCase(t *testing.T, c sliceCase) sliceCase {
 	return c
 }
 
-// shrinkCandidates lists one-step simplifications, simplest first.
-func shrinkCandidates(c sliceCase) []sliceCase {
-	var out []sliceCase
-	add := func(f func(*sliceCase)) {
-		s := c
-		f(&s)
-		if s != c && s.Before > s.After && s.Points >= 1 {
-			out = append(out, s)
+func sliceCaseSimpler(candidate, current randomSliceCase) bool {
+	rank := func(c randomSliceCase) [6]int64 {
+		var shape, option, offset, tier int64
+		if c.Shape != "dense" {
+			shape = 1
 		}
+		if c.Option != "" {
+			option = 1
+		}
+		if c.Offset != 0 {
+			offset = 1
+		}
+		if c.Tier != 0 {
+			tier = 1
+		}
+		return [6]int64{shape, option, offset, tier, c.Records, c.Buckets}
 	}
 
-	add(func(s *sliceCase) { s.Axes.Shape = "dense" })  // the plainest data
-	add(func(s *sliceCase) { s.Axes.Option = "" })      // no option flag
-	add(func(s *sliceCase) { s.Axes.StartOffset = 0 })  // on the grid
-	add(func(s *sliceCase) { s.Axes.Tier = 0 })         // the simplest tier
-	add(func(s *sliceCase) { s.Axes.PointsPer = 1 })    // one point per record
-	add(func(s *sliceCase) { s.Points = 1 })            // a single bucket
-	add(func(s *sliceCase) { s.Points = s.Points / 2 }) // fewer buckets
-	add(func(s *sliceCase) {                            // half the window
-		s.Before = s.After + (s.Before-s.After)/2
-		s.Points = s.Points / 2
+	candidateRank, currentRank := rank(candidate), rank(current)
+	for i := range candidateRank {
+		if candidateRank[i] != currentRank[i] {
+			return candidateRank[i] < currentRank[i]
+		}
+	}
+	return false
+}
+
+func shrinkCandidates(c randomSliceCase) []randomSliceCase {
+	var candidates []randomSliceCase
+	seen := map[materializedSliceRequest]bool{c.materialize(): true}
+	add := func(change func(*randomSliceCase)) {
+		candidate := c
+		change(&candidate)
+		request := candidate.materialize()
+		if candidate.Records < 1 || candidate.Buckets < 1 || request.Before <= request.After ||
+			!sliceCaseSimpler(candidate, c) || seen[request] {
+			return
+		}
+		seen[request] = true
+		candidates = append(candidates, candidate)
+	}
+
+	add(func(candidate *randomSliceCase) { candidate.Shape = "dense" })
+	add(func(candidate *randomSliceCase) { candidate.Option = "" })
+	add(func(candidate *randomSliceCase) { candidate.Offset = 0 })
+	add(func(candidate *randomSliceCase) { candidate.Tier = 0 })
+	add(func(candidate *randomSliceCase) { candidate.Buckets = candidate.Records })
+	add(func(candidate *randomSliceCase) { candidate.Buckets = 1 })
+	add(func(candidate *randomSliceCase) { candidate.Buckets = max(int64(1), candidate.Buckets/2) })
+	add(func(candidate *randomSliceCase) {
+		oldRecords := candidate.Records
+		candidate.Records = max(int64(1), candidate.Records/2)
+		candidate.Buckets = max(int64(1), candidate.Buckets*candidate.Records/oldRecords)
 	})
-	return out
+	return candidates
 }
 
 func TestLayer11RandomisedSlicing(t *testing.T) {
@@ -177,53 +237,66 @@ func TestLayer11RandomisedSlicing(t *testing.T) {
 	}
 
 	const rounds = 60
-	ok := true
-	seen := map[string]bool{}
-
-	for i := 0; i < rounds; i++ {
-		a := sliceAxes{
+	cases := make([]randomSliceCase, 0, rounds)
+	// Mandatory eligible cases guarantee coverage per shape/cadence/tier.
+	for _, shape := range sliceShapes {
+		for _, ue := range sliceUEs {
+			for _, tier := range sliceTiers {
+				cases = append(cases, randomSliceCase{
+					Shape: shape, UE: ue, Tier: tier,
+					StartSample: int64(200 + rng.Intn(200)), Offset: int64(rng.Intn(60)),
+					Records: 8, Buckets: 8,
+				})
+			}
+		}
+	}
+	for len(cases) < rounds {
+		records := int64(4 + rng.Intn(12))
+		pointsPerRecord := int64(slicePoints[rng.Intn(len(slicePoints))])
+		cases = append(cases, randomSliceCase{
 			Shape:       sliceShapes[rng.Intn(len(sliceShapes))],
 			UE:          sliceUEs[rng.Intn(len(sliceUEs))],
 			Tier:        sliceTiers[rng.Intn(len(sliceTiers))],
-			PointsPer:   slicePoints[rng.Intn(len(slicePoints))],
-			StartOffset: int64(rng.Intn(60)),
 			Option:      sliceOptions[rng.Intn(len(sliceOptions))],
-		}
-
-		recordEvery := int64(a.UE)
-		if a.Tier > 0 {
-			recordEvery = int64(a.UE) * tier1Gran
-		}
-
-		base := int64(fixture_T0()) - int64(fixture_T0())%int64(a.UE)
-		// a window well inside the fixture, of a random length in records
-		records := int64(4 + rng.Intn(12))
-		after := base + int64(a.UE)*int64(200+rng.Intn(400)) + a.StartOffset
-		before := after + records*recordEvery
-		points := records * int64(a.PointsPer)
-		if points < 1 {
-			points = 1
-		}
-
-		c := sliceCase{Axes: a, After: after, Before: before, Points: points}
-
-		good, _ := checkCase(t, c)
-		if good {
-			continue
-		}
-
-		min := shrinkCase(t, c)
-		_, detail := checkCase(t, min)
-		key := min.String()
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		ok = false
-		t.Logf("slicing property not met, shrunk to the smallest failing case:\n    %s\n    %s",
-			key, detail)
+			StartSample: int64(200 + rng.Intn(400)),
+			Offset:      int64(rng.Intn(60)), Records: records,
+			Buckets: records * pointsPerRecord,
+		})
 	}
 
-	t.Logf("%d randomised cases, %d distinct minimal failures", rounds, len(seen))
+	ok := true
+	failures := map[string]bool{}
+	additiveCoverage := map[string]bool{}
+	conservationCoverage := map[string]bool{}
+	for _, c := range cases {
+		check := checkCase(t, c)
+		key := sliceCoverageKey(sliceAxes{Shape: c.Shape, UE: c.UE, Tier: c.Tier})
+		additiveCoverage[key] = additiveCoverage[key] || check.additive
+		conservationCoverage[key] = conservationCoverage[key] || check.conservation
+		if check.ok {
+			continue
+		}
+
+		minimal := shrinkCase(t, c)
+		minimalCheck := checkCase(t, minimal)
+		failureKey := minimal.String()
+		if failures[failureKey] {
+			continue
+		}
+		failures[failureKey] = true
+		ok = false
+		t.Logf("slicing property not met, greedily reduced to a locally minimal failing case:\n    %s\n    %s",
+			failureKey, minimalCheck.detail)
+	}
+	for _, key := range missingSliceCoverage(additiveCoverage) {
+		t.Logf("random additivity coverage missing for %s", key)
+		ok = false
+	}
+	for _, key := range missingSliceCoverage(conservationCoverage) {
+		t.Logf("random conservation coverage missing for %s", key)
+		ok = false
+	}
+
+	t.Logf("%d randomized cases, %d distinct locally minimal failures", rounds, len(failures))
 	assertContract(t, "L11/randomised-slicing", ok)
 }

@@ -85,6 +85,13 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 		if err != nil {
 			t.Fatalf("tier%d %s decode: %v", tier, tg, err)
 		}
+		dimensions := make([]string, 0, len(ch.Dimensions))
+		for _, dim := range ch.Dimensions {
+			dimensions = append(dimensions, dim.ID)
+		}
+		if !assertExactColumnSet(t, cols, dimensions) {
+			t.Fatalf("tier%d %s returned the wrong dimension set", tier, tg)
+		}
 
 		for _, dim := range ch.Dimensions {
 			col, ok := cols[dim.ID]
@@ -114,6 +121,10 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 					if pt.PA&canon.AnnotationEmpty == 0 {
 						t.Errorf("tier%d %s dim %q t0%+d: EMPTY annotation missing on %s window (pa %d)",
 							tier, tg, dim.ID, pt.T-fixture.T0, emptyKind(stored), pt.PA)
+					}
+					if pt.ARP != 0 || pt.PA != canon.AnnotationEmpty {
+						t.Errorf("tier%d %s dim %q t0%+d: empty metadata ARP=%v PA=%d, want 0/%d",
+							tier, tg, dim.ID, pt.T-fixture.T0, pt.ARP, pt.PA, canon.AnnotationEmpty)
 					}
 					continue
 				}
@@ -148,9 +159,9 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 
 				// tier pages store no flags: the RESET annotation does not
 				// survive to tier1+ — pinned contract (page.c tier1 slot)
-				if pt.PA&canon.AnnotationReset != 0 {
-					t.Errorf("tier%d %s dim %q t0%+d: RESET annotation present — tier pages gained flags? re-pin deliberately",
-						tier, tg, dim.ID, pt.T-fixture.T0)
+				if pt.PA != 0 {
+					t.Errorf("tier%d %s dim %q t0%+d: annotations %d, want exactly zero — tier pages gained flags?",
+						tier, tg, dim.ID, pt.T-fixture.T0, pt.PA)
 				}
 			}
 		}

@@ -2,14 +2,18 @@
 
 package fixture
 
-import (
-	"strconv"
-	"strings"
-)
-
-// The virtual-points view oracle: a faithful port of
-// rrd2rrdr_query_execute (query-execute.c) for the DEFAULT (virtual
-// points) mode.
+// ViewBuckets is a source-derived model of the default-mode tier-0
+// point-selection/interpolation subset exercised by L9 over a preconstructed,
+// ordered DBPoint stream. It is not a complete rrd2rrdr_query_execute port:
+// planning, plan switches/read-ahead, DB setup, metadata/flags, and RRDR
+// serialization are outside this model.
+//
+// Source: netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d
+//   - interpolation and point-add paths:
+//     src/web/api/queries/query-execute.c:59-95
+//   - three-point state, fetch, and value selection: lines 177-180,201-308
+//   - outer whole-point selection: lines 346-383
+//   - inner boundary selection/interpolation: lines 397-461
 //
 // Per output line ending at now_end:
 //   - the OUTER fetch consumes db points ending STRICTLY BEFORE
@@ -107,16 +111,16 @@ func ViewBuckets(points []DBPoint, after, ueView int64, lines int) [][]float64 {
 	return out
 }
 
-// DBPoints converts a fixture dimension into its stored tier0 point
-// stream: each sample covers (T-ue, T], SNRoundTrip'd; gap samples are
-// stored NAN points on live charts.
+// DBPoints converts a fixture dimension into its stored tier-0 point stream:
+// each sample covers (T-ue, T], SNRoundTrip'd; gap samples are stored NAN
+// points on live charts. Tier-0 point construction is
+// src/database/rrddim-collection.c:149-167 at the checked revision above;
+// SNRoundTrip cites the storage-number pack/unpack source.
 func (d Dimension) DBPoints(ue int64) []DBPoint {
 	out := make([]DBPoint, 0, len(d.Points))
 	for _, p := range d.Points {
 		dp := DBPoint{Start: p.T - ue, End: p.T}
-		// gap detection matches the sibling oracles (fixture.go, tier.go):
-		// any E-carrying flags mark the slot empty
-		if v, err := strconv.ParseFloat(p.Collected, 64); err == nil && !strings.ContainsRune(p.Flags, 'E') {
+		if v, collected := p.CollectedValue(d.ID); collected {
 			dp.Value = SNRoundTrip(v)
 		} else {
 			dp.Gap = true
@@ -126,10 +130,10 @@ func (d Dimension) DBPoints(ue int64) []DBPoint {
 	return out
 }
 
-// ViewSumVolume is what a sum-over-time bucket must hold: the VOLUME the
-// fixture put inside it. Every stored record contributes its value in
-// proportion to the share of ITS OWN width that falls inside the bucket,
-// and gap records contribute nothing.
+// ViewSumVolume is a Class A first-principles conservation oracle for the
+// volume the fixture put into a sum-over-time bucket. Every stored record
+// contributes its value in proportion to the share of its own width inside
+// the bucket, and gap records contribute nothing.
 //
 // sum does NOT use the view oracle above. That oracle answers "what was
 // the LEVEL at this instant", which is the right model for average, min,

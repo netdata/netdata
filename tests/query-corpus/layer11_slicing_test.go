@@ -73,6 +73,101 @@ const (
 	sliceSamples = 1800
 )
 
+func TestL11SlicingOracleGuards(t *testing.T) {
+	for _, ue := range []int{1, 10} {
+		base := sliceBase(ue)
+		tier0 := sliceAxes{Shape: "dense", UE: ue, Tier: 0}
+		if got := sliceRecordContent(tier0, base+int64(ue)); got != 7 {
+			t.Errorf("dense tier0 ue%d record content = %v, want 7", ue, got)
+		}
+		tier1 := sliceAxes{Shape: "dense", UE: ue, Tier: 1}
+		end := (base + int64(ue)*600) / sliceRecordDuration(tier1) * sliceRecordDuration(tier1)
+		if got := sliceRecordContent(tier1, end); got != 420 {
+			t.Errorf("dense tier1 ue%d record content = %v, want 420", ue, got)
+		}
+		for shape, want := range map[string]float64{"gaps": 210, "sparse": 42} {
+			tier1.Shape = shape
+			if got := sliceRecordContent(tier1, end); got != want {
+				t.Errorf("%s tier1 ue%d record content = %v, want %v", shape, ue, got, want)
+			}
+		}
+	}
+
+	a := sliceAxes{Shape: "dense", UE: 1, Tier: 1}
+	duration := sliceRecordDuration(a)
+	aligned := (int64(fixture.T0) + 600) / duration * duration
+	if _, _, crosses := sliceCrossingRecord(a, aligned); crosses {
+		t.Fatal("aligned edge reported a crossing record")
+	}
+	end, content, crosses := sliceCrossingRecord(a, aligned+17)
+	if !crosses || end != aligned+duration || content != 420 {
+		t.Fatalf("off-grid edge crossing = end %d content %v crosses %v, want %d/420/true",
+			end, content, crosses, aligned+duration)
+	}
+	if got := sliceEdgeAllowance(a, aligned+17, aligned+30); got != 420 {
+		t.Fatalf("two cuts through the same record allow %v, want one record content 420", got)
+	}
+	if !sliceWithinTolerance(420, 420, 0) || sliceWithinTolerance(420.1, 420, 0) {
+		t.Fatal("edge tolerance does not accept its exact bound or rejects a meaningful excess")
+	}
+
+	c := randomSliceCase{
+		Shape: "gaps", UE: 10, Tier: 1, Option: "absolute",
+		StartSample: 200, Offset: 17, Records: 8, Buckets: 24,
+	}
+	baseRequest := c.materialize()
+	candidates := shrinkCandidates(c)
+	if len(candidates) == 0 {
+		t.Fatal("random slicing case produced no shrink candidates")
+	}
+	for _, candidate := range candidates {
+		if candidate.materialize() == baseRequest {
+			t.Errorf("shrink candidate did not change the materialized request: %v", candidate)
+		}
+		if !sliceCaseSimpler(candidate, c) {
+			t.Errorf("shrink candidate is not strictly simpler than its input: %v -> %v", c, candidate)
+		}
+	}
+
+	c.Buckets = 1
+	for _, candidate := range shrinkCandidates(c) {
+		if !sliceCaseSimpler(candidate, c) {
+			t.Errorf("one-bucket shrink candidate can cycle back to a more complex case: %v -> %v", c, candidate)
+		}
+	}
+
+	for option, want := range map[string]bool{
+		"": false, "absolute": false, "natural-points": true,
+	} {
+		if got := sliceResponseDeclaredGrid(option); got != want {
+			t.Errorf("option %q response-declared grid permission = %v, want %v", option, got, want)
+		}
+	}
+
+	tiers := []daemon.Retention{
+		{FirstEntry: 10, LastEntry: 100},
+		{FirstEntry: 20, LastEntry: 90},
+	}
+	if !sliceRetentionCovers(tiers, 1, 20, 90) ||
+		sliceRetentionCovers(tiers, 1, 19, 90) ||
+		sliceRetentionCovers(tiers, 1, 20, 91) ||
+		sliceRetentionCovers(tiers, 2, 20, 90) {
+		t.Fatal("tier-retention coverage guard accepted an uncovered window or rejected the exact covered window")
+	}
+
+	coverage := map[string]bool{}
+	for _, shape := range sliceShapes {
+		for _, tier := range sliceTiers {
+			coverage[sliceCoverageKey(sliceAxes{Shape: shape, UE: sliceUEs[0], Tier: tier})] = true
+		}
+	}
+	missing := missingSliceCoverage(coverage)
+	if len(missing) != len(sliceShapes)*len(sliceTiers) {
+		t.Fatalf("shape/tier-only random coverage leaves %d combinations missing, want %d: %v",
+			len(missing), len(sliceShapes)*len(sliceTiers), missing)
+	}
+}
+
 // sliceCollected says whether the fixture pushed sample i of a shape.
 func sliceCollected(shape string, i int) bool {
 	switch shape {
@@ -89,7 +184,122 @@ func sliceCollected(shape string, i int) bool {
 	}
 }
 
-var sliceReady = map[string]bool{}
+func sliceBase(ue int) int64 {
+	return int64(fixture.T0) - int64(fixture.T0)%int64(ue)
+}
+
+var slicePrefixes = map[string][]int{}
+
+func slicePrefix(shape string, ue int) []int {
+	key := fmt.Sprintf("%s/%d", shape, ue)
+	if prefix := slicePrefixes[key]; prefix != nil {
+		return prefix
+	}
+	prefix := make([]int, sliceSamples+1)
+	for i := 1; i <= sliceSamples; i++ {
+		prefix[i] = prefix[i-1]
+		if sliceCollected(shape, i) {
+			prefix[i]++
+		}
+	}
+	slicePrefixes[key] = prefix
+	return prefix
+}
+
+func sliceCollectedCount(shape string, ue int, after, before int64) int {
+	if before <= after {
+		return 0
+	}
+	base := sliceBase(ue)
+	first := (after-base)/int64(ue) + 1
+	last := (before - base) / int64(ue)
+	if first < 1 {
+		first = 1
+	}
+	if last > sliceSamples {
+		last = sliceSamples
+	}
+	if first > last || last < 1 || first > sliceSamples {
+		return 0
+	}
+	prefix := slicePrefix(shape, ue)
+	return prefix[last] - prefix[first-1]
+}
+
+func sliceExpected(shape string, ue int, after, before int64) float64 {
+	return float64(sliceValue * sliceCollectedCount(shape, ue, after, before))
+}
+
+func sliceRecordDuration(a sliceAxes) int64 {
+	duration := int64(a.UE)
+	if a.Tier > 0 {
+		duration *= tier1Gran
+	}
+	return duration
+}
+
+func sliceRecordContent(a sliceAxes, recordEnd int64) float64 {
+	duration := sliceRecordDuration(a)
+	return sliceExpected(a.Shape, a.UE, recordEnd-duration, recordEnd)
+}
+
+func sliceCrossingRecord(a sliceAxes, edge int64) (end int64, content float64, crosses bool) {
+	duration := sliceRecordDuration(a)
+	if duration <= 0 || edge%duration == 0 {
+		return 0, 0, false
+	}
+	end = (edge/duration + 1) * duration
+	return end, sliceRecordContent(a, end), true
+}
+
+func sliceEdgeAllowance(a sliceAxes, edges ...int64) float64 {
+	records := make(map[int64]float64, len(edges))
+	for _, edge := range edges {
+		if end, content, crosses := sliceCrossingRecord(a, edge); crosses {
+			records[end] = content
+		}
+	}
+	total := 0.0
+	for _, content := range records {
+		total += content
+	}
+	return total
+}
+
+func sliceWithinTolerance(difference, edgeAllowance float64, numericRows int) bool {
+	if edgeAllowance < 0 || numericRows < 0 {
+		return false
+	}
+	return math.Abs(difference) <= edgeAllowance+printTol*float64(numericRows)
+}
+
+var (
+	sliceReady     = map[string]bool{}
+	sliceRetention = map[string][]daemon.Retention{}
+)
+
+func sliceResponseDeclaredGrid(option string) bool {
+	return option == "natural-points"
+}
+
+func sliceCoverageKey(a sliceAxes) string {
+	return fmt.Sprintf("%s/%d/%d", a.Shape, a.UE, a.Tier)
+}
+
+func missingSliceCoverage(coverage map[string]bool) []string {
+	var missing []string
+	for _, shape := range sliceShapes {
+		for _, ue := range sliceUEs {
+			for _, tier := range sliceTiers {
+				key := sliceCoverageKey(sliceAxes{Shape: shape, UE: ue, Tier: tier})
+				if !coverage[key] {
+					missing = append(missing, key)
+				}
+			}
+		}
+	}
+	return missing
+}
 
 func sliceContext(shape string, ue int) string {
 	return fmt.Sprintf("fixture.l11%s%d", shape, ue)
@@ -107,7 +317,7 @@ func sliceFixture(t *testing.T, shape string, ue int) string {
 		Family: "fixture", Context: ctx, UpdateEvery: ue,
 		Dimensions: []fixture.Dimension{{ID: "v"}},
 	}
-	base := fixture.T0 - fixture.T0%int64(ue)
+	base := sliceBase(ue)
 	for i := 1; i <= sliceSamples; i++ {
 		ts := base + int64(i*ue)
 		if sliceCollected(shape, i) {
@@ -130,66 +340,102 @@ func sliceFixture(t *testing.T, shape string, ue int) string {
 
 func sliceHost(shape string, ue int) string { return "l11-" + shape + strconv.Itoa(ue) }
 
-// sliceTotal asks for a window and adds up what came back.
-func sliceTotal(t *testing.T, a sliceAxes, after, before int64) (float64, int) {
-	t.Helper()
-	ctx := sliceContext(a.Shape, a.UE)
+type sliceQueryResult struct {
+	total             float64
+	rows, numericRows int
+	doc               map[string]any
+	cols              map[string][]canon.Pt
+	validGrid         bool
+}
 
-	// one chart point per stored record, times the zoom
-	recordEvery := int64(a.UE)
-	if a.Tier > 0 {
-		recordEvery = int64(a.UE) * tier1Gran
+func sliceQuery(t *testing.T, a sliceAxes, after, before, points int64) sliceQueryResult {
+	t.Helper()
+	query := l10Query(t, l10QuerySpec{
+		host:                 sliceHost(a.Shape, a.UE),
+		context:              sliceContext(a.Shape, a.UE),
+		requestedGroup:       "sum",
+		canonicalGroup:       "sum",
+		extraOptions:         a.Option,
+		responseDeclaredGrid: sliceResponseDeclaredGrid(a.Option),
+		tier:                 a.Tier,
+		after:                after,
+		before:               before,
+		points:               points,
+		expectedDimensions:   []string{"v"},
+	})
+	result := sliceQueryResult{
+		rows:      len(query.grid),
+		doc:       query.doc,
+		cols:      query.cols,
+		validGrid: query.valid && len(query.grid) > 0,
 	}
+	for _, point := range query.cols["v"] {
+		if point.Value != nil {
+			result.total += *point.Value
+			result.numericRows++
+		}
+	}
+	return result
+}
+
+// sliceTotal asks for a window and adds up what came back.
+func sliceTotal(t *testing.T, a sliceAxes, after, before int64) sliceQueryResult {
+	t.Helper()
+	// one chart point per stored record, times the zoom
+	recordEvery := sliceRecordDuration(a)
 	points := (before - after) / recordEvery * int64(a.PointsPer)
 	if points < 1 {
 		points = 1
 	}
-
-	params := daemon.DataParamsTier(ctx, a.Tier, after, before, points, "sum")
-	opts := "jsonwrap|unaligned"
-	if a.Option != "" {
-		opts += "|" + a.Option
-	}
-	params.Set("options", opts)
-
-	doc, err := td.DataV3(sliceHost(a.Shape, a.UE), params)
-	if err != nil {
-		t.Fatalf("%s: %v", a, err)
-	}
-	cols, err := canon.Columns(doc)
-	if err != nil {
-		t.Fatalf("%s: %v", a, err)
-	}
-
-	sum, n := 0.0, 0
-	for _, pt := range cols["v"] {
-		n++
-		if pt.Value != nil {
-			sum += *pt.Value
-		}
-	}
-	return sum, n
+	return sliceQuery(t, a, after, before, points)
 }
 
-// sliceTierCovers reports whether the tier being asked actually holds the
-// whole window. A rollup is built as the data lands, so a tier that has not
-// caught up yet answers with less than was pushed - which looks exactly like
-// a conservation defect and is not one. Nothing is asserted against a tier
-// that cannot answer.
+func sliceRetentionCovers(tiers []daemon.Retention, tier int, after, before int64) bool {
+	if tier < 0 || tier >= len(tiers) {
+		return false
+	}
+	r := tiers[tier]
+	return r.FirstEntry > 0 && r.FirstEntry <= after && r.LastEntry >= before
+}
+
+// sliceTierCovers refreshes any cached snapshot that does not cover the
+// requested window. A negative rollup snapshot must not become permanent:
+// higher tiers are built asynchronously while the fixture lands.
 func sliceTierCovers(t *testing.T, a sliceAxes, after, before int64) bool {
 	t.Helper()
-	params := daemon.DataParamsTier(sliceContext(a.Shape, a.UE), a.Tier, after, before, 1, "average")
+	context := sliceContext(a.Shape, a.UE)
+	if tiers := sliceRetention[context]; sliceRetentionCovers(tiers, a.Tier, after, before) {
+		return true
+	}
+
+	params := daemon.DataParamsTier(context, 0, after, before, 1, "average")
 	params.Set("options", "jsonwrap|unaligned")
 	doc, err := td.DataV3(sliceHost(a.Shape, a.UE), params)
 	if err != nil {
 		return false
 	}
 	tiers := perTierRetention(t, doc)
-	if a.Tier >= len(tiers) {
-		return false
+	if sliceRetentionCovers(tiers, a.Tier, after, before) {
+		sliceRetention[context] = tiers
+		return true
 	}
-	r := tiers[a.Tier]
-	return r.FirstEntry > 0 && r.FirstEntry <= after && r.LastEntry >= before
+	delete(sliceRetention, context)
+	return false
+}
+
+func requireSliceTierCovers(t *testing.T, a sliceAxes, after, before int64) {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		if sliceTierCovers(t, a, after, before) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("fixture prerequisite not met: %s tier %d does not cover (%d,%d]",
+				sliceContext(a.Shape, a.UE), a.Tier, after, before)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // sliceWindow is a window well inside the fixture, offset from the grid.
@@ -205,33 +451,36 @@ func sliceWindow(a sliceAxes) (after, before int64) {
 // must total the whole of it. No oracle - the engine is compared with itself,
 // so a wrong answer has to be wrong CONSISTENTLY to escape, and a slicing
 // error at the split is by definition not.
-func checkAdditive(t *testing.T, a sliceAxes) (ok bool, detail string) {
+func checkAdditive(t *testing.T, a sliceAxes) (ok, exercised bool, detail string) {
 	t.Helper()
 	after, before := sliceWindow(a)
+	requireSliceTierCovers(t, a, after, before)
 	mid := after + (before-after)/2
 
-	whole, _ := sliceTotal(t, a, after, before)
-	left, _ := sliceTotal(t, a, after, mid)
-	right, _ := sliceTotal(t, a, mid, before)
-
-	// one stored record of slack: the split lands inside a record whose
-	// content the two halves divide, and above tier 0 that division is
-	// f32-rounded on each side
-	recordContent := float64(sliceValue) * float64(a.UE)
-	if a.Tier > 0 {
-		recordContent *= float64(tier1Gran)
+	whole := sliceTotal(t, a, after, before)
+	left := sliceTotal(t, a, after, mid)
+	right := sliceTotal(t, a, mid, before)
+	if !whole.validGrid || !left.validGrid || !right.validGrid {
+		return false, false, fmt.Sprintf("%s: one or more queries returned an invalid response grid", a)
 	}
-	tolerance := recordContent * 1.05
-	if tolerance < 1e-6 {
-		tolerance = 1e-6
+	if sliceExpected(a.Shape, a.UE, after, before) <= 0 {
+		return true, false, ""
 	}
-
-	if math.Abs((left+right)-whole) <= tolerance {
-		return true, ""
+	if whole.numericRows == 0 || left.numericRows+right.numericRows == 0 {
+		return false, false, fmt.Sprintf(
+			"%s: fixture has data but whole/halves numeric coverage is %d/%d+%d",
+			a, whole.numericRows, left.numericRows, right.numericRows)
 	}
-	return false, fmt.Sprintf("%s: whole=%.1f but halves total %.1f (left=%.1f right=%.1f, "+
-		"difference %.1f, one stored record holds %.1f)",
-		a, whole, left+right, left, right, (left+right)-whole, recordContent)
+	difference := left.total + right.total - whole.total
+	edgeAllowance := sliceEdgeAllowance(a, mid)
+	numericRows := whole.numericRows + left.numericRows + right.numericRows
+	if sliceWithinTolerance(difference, edgeAllowance, numericRows) {
+		return true, true, ""
+	}
+	return false, true, fmt.Sprintf(
+		"%s: whole=%.1f but halves total %.1f (left=%.1f right=%.1f, difference %.1f, "+
+			"split-edge allowance %.1f)",
+		a, whole.total, left.total+right.total, left.total, right.total, difference, edgeAllowance)
 }
 
 // sliceMatrix builds a set of configurations covering every PAIR of axis
@@ -280,13 +529,28 @@ func TestLayer11SlicingIsAdditive(t *testing.T) {
 
 	ok := true
 	reported := 0
+	coverage := map[string]bool{}
 	for _, a := range configs {
-		good, detail := checkAdditive(t, a)
+		good, exercised, detail := checkAdditive(t, a)
+		if exercised {
+			coverage[fmt.Sprintf("%s/%d/%d", a.Shape, a.UE, a.Tier)] = true
+		}
 		if !good {
 			ok = false
 			if reported < 12 {
 				t.Logf("additivity not met: %s", detail)
 				reported++
+			}
+		}
+	}
+	for _, shape := range sliceShapes {
+		for _, ue := range sliceUEs {
+			for _, tier := range sliceTiers {
+				key := sliceCoverageKey(sliceAxes{Shape: shape, UE: ue, Tier: tier})
+				if !coverage[key] {
+					t.Logf("additivity coverage missing for %s", key)
+					ok = false
+				}
 			}
 		}
 	}
@@ -313,6 +577,7 @@ func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
 
 	ok := true
 	checked := 0
+	coverage := map[string]bool{}
 	for _, shape := range sliceShapes {
 		for _, ue := range sliceUEs {
 			sliceFixture(t, shape, ue)
@@ -330,32 +595,30 @@ func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
 						continue // upsampling - see above
 					}
 					after, before := sliceWindow(a)
-					if !sliceTierCovers(t, a, after, before) {
-						t.Logf("skipped %s: tier %d does not cover the window yet", a, tier)
-						continue
-					}
+					requireSliceTierCovers(t, a, after, before)
 					checked++
 
-					want := 0.0
-					base := int64(fixture.T0) - int64(fixture.T0)%int64(ue)
-					for i := 1; i <= sliceSamples; i++ {
-						ts := base + int64(i*ue)
-						if ts > after && ts <= before && sliceCollected(shape, i) {
-							want += sliceValue
-						}
+					want := sliceExpected(shape, ue, after, before)
+					got := sliceTotal(t, a, after, before)
+					if !got.validGrid {
+						t.Logf("conservation not met: %s returned an invalid response grid", a)
+						ok = false
+						continue
 					}
-
-					got, _ := sliceTotal(t, a, after, before)
-
-					// a stored record straddling either end is legitimately
-					// split, so allow one record at each edge
-					recordContent := float64(sliceValue) * float64(ue)
-					if tier > 0 {
-						recordContent *= float64(tier1Gran)
+					if want <= 0 {
+						continue
 					}
-					if math.Abs(got-want) > recordContent*2.1 {
+					if got.numericRows == 0 {
+						t.Logf("conservation not met: %s has fixture content %.1f but no numeric rows", a, want)
+						ok = false
+						continue
+					}
+					coverage[sliceCoverageKey(a)] = true
+					edgeAllowance := sliceEdgeAllowance(a, after, before)
+					if !sliceWithinTolerance(got.total-want, edgeAllowance, got.numericRows) {
 						t.Logf("conservation not met: %s totals %.1f, but the fixture pushed %.1f "+
-							"into that window (one stored record holds %.1f)", a, got, want, recordContent)
+							"into that window (edge-record allowance %.1f)",
+							a, got.total, want, edgeAllowance)
 						ok = false
 					}
 				}
@@ -366,36 +629,13 @@ func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
 	if checked == 0 {
 		t.Fatalf("no configuration met the precondition - the check tested nothing")
 	}
+	for _, key := range missingSliceCoverage(coverage) {
+		t.Logf("deterministic conservation coverage missing for %s", key)
+		ok = false
+	}
 	t.Logf("%d configurations checked (the rest upsample)", checked)
 	assertContract(t, "L11/totals-match-what-was-pushed", ok)
 }
 
 // fixture_T0 is the fixed corpus epoch, as an int64.
 func fixture_T0() int64 { return int64(fixture.T0) }
-
-// sliceTotalPoints is sliceTotal with the point count given explicitly.
-func sliceTotalPoints(t *testing.T, a sliceAxes, after, before, points int64) float64 {
-	t.Helper()
-	params := daemon.DataParamsTier(sliceContext(a.Shape, a.UE), a.Tier, after, before, points, "sum")
-	opts := "jsonwrap|unaligned"
-	if a.Option != "" {
-		opts += "|" + a.Option
-	}
-	params.Set("options", opts)
-
-	doc, err := td.DataV3(sliceHost(a.Shape, a.UE), params)
-	if err != nil {
-		t.Fatalf("%s: %v", a, err)
-	}
-	cols, err := canon.Columns(doc)
-	if err != nil {
-		t.Fatalf("%s: %v", a, err)
-	}
-	sum := 0.0
-	for _, pt := range cols["v"] {
-		if pt.Value != nil {
-			sum += *pt.Value
-		}
-	}
-	return sum
-}

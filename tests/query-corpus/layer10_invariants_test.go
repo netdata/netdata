@@ -33,7 +33,6 @@ package corpus
 import (
 	"fmt"
 	"math"
-	"net/url"
 	"sort"
 	"strconv"
 	"testing"
@@ -89,14 +88,9 @@ type groupingRule struct {
 	// depend on how many columns the chart was drawn with.
 	totalExact bool
 
-	// A KNOWN defect, pinned red by L10/single-point-buckets-answer: this
-	// grouping returns EMPTY for a bucket that holds exactly one point.
-	// The general no-holes sweep steps around it so it keeps guarding the
-	// other forty groupings instead of reporting the same bug forever.
-	knownSinglePointEmpty bool
-
 	// why it is excused from a rule its kind would otherwise carry
-	why string
+	why                   string
+	firstBucketMayBeEmpty bool
 }
 
 // Every grouping the engine offers. Adding one to RRDR_TIME_GROUPING without
@@ -145,10 +139,10 @@ var groupingRules = map[string]groupingRule{
 	// ---- everything else ----
 	"RRDR_GROUPING_SUM": {kind: kindOther, totalExact: true,
 		why: "an accumulation exceeds every sample it accumulates"},
-	"RRDR_GROUPING_INCREMENTAL_SUM": {kind: kindOther, knownSinglePointEmpty: true,
+	"RRDR_GROUPING_INCREMENTAL_SUM": {kind: kindOther, firstBucketMayBeEmpty: true,
 		why: "a difference between the ends of a bucket, which is not a value in it. " +
-			"Returns EMPTY for every bucket holding a single point - a known defect, " +
-			"pinned by L10/single-point-buckets-answer"},
+			"The opening single-point bucket may be EMPTY because no preceding baseline exists, " +
+			"but its last sample must seed the carried chain for every later bucket"},
 	"RRDR_GROUPING_STDDEV": {kind: kindOther,
 		why: "a distance, not a value: zero for a constant series whose samples are 7"},
 	"RRDR_GROUPING_CV": {kind: kindOther,
@@ -212,17 +206,28 @@ func l10Value(dim string, i int) float64 {
 
 var l10Dims = []string{"ramp", "wave", "flat"}
 
-// l10Range is the closed interval every in-range grouping must stay inside.
-func l10Range(dim string) (lo, hi float64) {
-	lo, hi = math.Inf(1), math.Inf(-1)
-	for i := 1; i <= l10Samples; i++ {
-		v := l10Value(dim, i)
-		lo, hi = math.Min(lo, v), math.Max(hi, v)
-	}
-	return lo, hi
+var (
+	l10Ready        bool
+	l10FixtureChart fixture.Chart
+)
+
+type l10QuerySpec struct {
+	host, context                  string
+	requestedGroup, canonicalGroup string
+	condition, scopeDimensions     string
+	extraOptions                   string
+	responseDeclaredGrid           bool
+	tier                           int
+	after, before, points          int64
+	expectedDimensions             []string
 }
 
-var l10Ready bool
+type l10QueryResult struct {
+	doc   map[string]any
+	cols  map[string][]canon.Pt
+	grid  []int64
+	valid bool
+}
 
 // l10Fixture pushes the shared fixture once for the whole layer.
 func l10Fixture(t *testing.T) {
@@ -254,36 +259,471 @@ func l10Fixture(t *testing.T) {
 	if _, err := td.WaitRetention("l10", ch.Context, ch.FirstT(), ch.LastT(), 30*time.Second); err != nil {
 		t.Fatal(err)
 	}
+	l10FixtureChart = ch
 	l10Ready = true
 }
 
-// l10Query runs one grouping over the shared fixture.
-func l10Query(t *testing.T, group string, tier int, after, before, points int64, dims string) map[string][]canon.Pt {
+func TestL10QueryResultGuards(t *testing.T) {
+	spec := l10QuerySpec{
+		requestedGroup: "number-of-times",
+		canonicalGroup: "number-of-times",
+		condition:      ">0",
+		tier:           0,
+		after:          0,
+		before:         20,
+		points:         2,
+		expectedDimensions: []string{
+			"value",
+		},
+	}
+	build := func() map[string]any {
+		return map[string]any{
+			"request": map[string]any{"aggregations": map[string]any{"time": map[string]any{
+				"time_group":         "number-of-times",
+				"time_group_options": ">0",
+			}}},
+			"view": map[string]any{
+				"after": float64(1), "before": float64(20), "update_every": float64(10),
+			},
+			"db": map[string]any{"per_tier": []any{
+				map[string]any{"tier": float64(0), "points": float64(2)},
+				map[string]any{"tier": float64(1), "points": float64(0)},
+				map[string]any{"tier": float64(2), "points": float64(0)},
+			}},
+			"result": map[string]any{
+				"labels": []any{"time", "value"},
+				"point":  map[string]any{"value": float64(0), "arp": float64(1), "pa": float64(2)},
+				"data": []any{
+					[]any{float64(10), []any{float64(1), float64(0), float64(0)}},
+					[]any{float64(20), []any{float64(2), float64(0), float64(0)}},
+				},
+			},
+		}
+	}
+	if result := validateL10Response(t, spec, build()); !result.valid ||
+		len(result.grid) != 2 || result.grid[0] != 10 || result.grid[1] != 20 {
+		t.Fatal("L10 response guard rejected the valid control")
+	}
+
+	mutations := map[string]func(map[string]any){
+		"missing-row": func(doc map[string]any) {
+			result := doc["result"].(map[string]any)
+			result["data"] = result["data"].([]any)[:1]
+		},
+		"duplicate-timestamp": func(doc map[string]any) {
+			rows := doc["result"].(map[string]any)["data"].([]any)
+			rows[1].([]any)[0] = float64(10)
+		},
+		"shifted-timestamp": func(doc map[string]any) {
+			rows := doc["result"].(map[string]any)["data"].([]any)
+			rows[0].([]any)[0] = float64(11)
+		},
+		"out-of-order": func(doc map[string]any) {
+			rows := doc["result"].(map[string]any)["data"].([]any)
+			rows[0], rows[1] = rows[1], rows[0]
+		},
+		"wrong-group": func(doc map[string]any) {
+			timeGroup := doc["request"].(map[string]any)["aggregations"].(map[string]any)["time"].(map[string]any)
+			timeGroup["time_group"] = "average"
+		},
+		"wrong-condition": func(doc map[string]any) {
+			timeGroup := doc["request"].(map[string]any)["aggregations"].(map[string]any)["time"].(map[string]any)
+			timeGroup["time_group_options"] = "<0"
+		},
+		"wrong-tier": func(doc map[string]any) {
+			tiers := doc["db"].(map[string]any)["per_tier"].([]any)
+			tiers[0].(map[string]any)["points"] = float64(0)
+			tiers[1].(map[string]any)["points"] = float64(2)
+		},
+		"missing-dimension": func(doc map[string]any) {
+			result := doc["result"].(map[string]any)
+			result["labels"] = []any{"time"}
+			result["data"] = []any{}
+		},
+		"extra-dimension": func(map[string]any) {},
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			doc := build()
+			if name == "extra-dimension" {
+				result := doc["result"].(map[string]any)
+				result["labels"] = []any{"time", "value", "extra"}
+				rows := result["data"].([]any)
+				for i, rowAny := range rows {
+					rows[i] = append(rowAny.([]any),
+						[]any{float64(0), float64(0), float64(0)})
+				}
+			} else {
+				mutate(doc)
+			}
+			if validateL10Response(t, spec, doc).valid {
+				t.Errorf("L10 response guard accepted the %s mutation", name)
+			}
+		})
+	}
+
+	t.Run("response-declared-grid-cannot-drop-leading-bucket", func(t *testing.T) {
+		doc := build()
+		view := doc["view"].(map[string]any)
+		view["after"] = float64(11)
+		result := doc["result"].(map[string]any)
+		result["data"] = result["data"].([]any)[1:]
+		declared := spec
+		declared.responseDeclaredGrid = true
+		if validateL10Response(t, declared, doc).valid {
+			t.Error("response-declared grid accepted a missing leading bucket")
+		}
+	})
+	t.Run("ordinary-nondivisible-grid-cannot-drop-leading-bucket", func(t *testing.T) {
+		doc := build()
+		view := doc["view"].(map[string]any)
+		view["after"] = float64(11)
+		result := doc["result"].(map[string]any)
+		result["data"] = result["data"].([]any)[1:]
+		nondivisible := spec
+		nondivisible.points = 3
+		if validateL10Response(t, nondivisible, doc).valid {
+			t.Error("ordinary nondivisible grid accepted a missing leading bucket")
+		}
+	})
+	t.Run("ordinary-single-bucket-inclusive-view", func(t *testing.T) {
+		doc := build()
+		doc["view"] = map[string]any{
+			"after": float64(0), "before": float64(20), "update_every": float64(21),
+		}
+		result := doc["result"].(map[string]any)
+		result["data"] = []any{
+			[]any{float64(20), []any{float64(2), float64(0), float64(0)}},
+		}
+		single := spec
+		single.points = 1
+		if !validateL10Response(t, single, doc).valid {
+			t.Error("ordinary single-bucket validator rejected the exact inclusive view")
+		}
+
+		doc = build()
+		single = spec
+		single.points = 1
+		if validateL10Response(t, single, doc).valid {
+			t.Error("ordinary single-bucket validator accepted a two-row response")
+		}
+	})
+
+	value, other := 1.0, 2.0
+	count, otherCount := int64(3), int64(4)
+	hidden, otherHidden := 4.0, 5.0
+	base := canon.Pt{T: 10, Value: &value, ARP: 5, PA: 6, Count: &count, Hidden: &hidden}
+	if !samePoint(base, base) {
+		t.Fatal("complete point equality rejected the valid control")
+	}
+	pointMutations := map[string]canon.Pt{
+		"value":          {T: 10, Value: &other, ARP: 5, PA: 6, Count: &count, Hidden: &hidden},
+		"arp":            {T: 10, Value: &value, ARP: 7, PA: 6, Count: &count, Hidden: &hidden},
+		"pa":             {T: 10, Value: &value, ARP: 5, PA: 7, Count: &count, Hidden: &hidden},
+		"missing-count":  {T: 10, Value: &value, ARP: 5, PA: 6, Hidden: &hidden},
+		"count":          {T: 10, Value: &value, ARP: 5, PA: 6, Count: &otherCount, Hidden: &hidden},
+		"missing-hidden": {T: 10, Value: &value, ARP: 5, PA: 6, Count: &count},
+		"hidden":         {T: 10, Value: &value, ARP: 5, PA: 6, Count: &count, Hidden: &otherHidden},
+	}
+	for name, point := range pointMutations {
+		t.Run("point/"+name, func(t *testing.T) {
+			if samePoint(base, point) {
+				t.Errorf("complete point equality accepted the %s mutation", name)
+			}
+		})
+	}
+
+	zero, ten := 0.0, 10.0
+	if !l10EnvelopeHolds("average", [][]float64{{0, 10}}, []*float64{&zero}, 0) ||
+		!l10EnvelopeHolds("average", [][]float64{{0, 10}}, []*float64{&ten}, 0) {
+		t.Fatal("L10 envelope rejected an exact lower or upper bound")
+	}
+	below, above := -0.1, 10.1
+	if l10EnvelopeHolds("average", [][]float64{{0, 10}}, []*float64{&below}, 0) ||
+		l10EnvelopeHolds("average", [][]float64{{0, 10}}, []*float64{&above}, 0) {
+		t.Fatal("L10 envelope accepted a value outside the bucket source range")
+	}
+	if l10EnvelopeHolds("average", [][]float64{{}}, []*float64{nil}, 0) {
+		t.Fatal("L10 envelope accepted an empty source and null answer")
+	}
+	fifty := 50.0
+	if !l10EnvelopeHolds("ses", [][]float64{{0}, {100}}, []*float64{&zero, &fifty}, 0) {
+		t.Fatal("L10 SES envelope rejected a value inside its cumulative source range")
+	}
+	if l10EnvelopeHolds("average", [][]float64{{0}, {100}}, []*float64{&zero, &fifty}, 0) {
+		t.Fatal("L10 bucket-local envelope accepted a value outside its current bucket")
+	}
+}
+
+func l10Integer(value any) (int64, bool) {
+	number, ok := value.(float64)
+	if !ok || math.IsNaN(number) || math.IsInf(number, 0) ||
+		math.Trunc(number) != number || number < -math.Exp2(63) || number >= math.Exp2(63) {
+		return 0, false
+	}
+	return int64(number), true
+}
+
+func l10EnvelopeHolds(group string, sources [][]float64, got []*float64, tolerance float64) bool {
+	if len(sources) == 0 || len(got) != len(sources) || tolerance < 0 {
+		return false
+	}
+	cumulative := group == "ses"
+	lo, hi := math.Inf(1), math.Inf(-1)
+	for i, source := range sources {
+		if len(source) == 0 || got[i] == nil ||
+			math.IsNaN(*got[i]) || math.IsInf(*got[i], 0) {
+			return false
+		}
+		if !cumulative {
+			lo, hi = math.Inf(1), math.Inf(-1)
+		}
+		for _, value := range source {
+			if math.IsNaN(value) || math.IsInf(value, 0) {
+				return false
+			}
+			lo, hi = math.Min(lo, value), math.Max(hi, value)
+		}
+		if *got[i] < lo-tolerance || *got[i] > hi+tolerance {
+			return false
+		}
+	}
+	return true
+}
+
+func l10NumericPoints(column []canon.Pt) int {
+	count := 0
+	for _, point := range column {
+		if point.Value != nil {
+			count++
+		}
+	}
+	return count
+}
+
+func l10SourceBuckets(
+	t *testing.T,
+	query l10QueryResult,
+	group string,
+	tier int,
+	dimension string,
+) [][]float64 {
 	t.Helper()
+	var fixtureDimension *fixture.Dimension
+	for i := range l10FixtureChart.Dimensions {
+		if l10FixtureChart.Dimensions[i].ID == dimension {
+			fixtureDimension = &l10FixtureChart.Dimensions[i]
+			break
+		}
+	}
+	if fixtureDimension == nil {
+		t.Fatalf("L10 fixture has no dimension %q", dimension)
+	}
 
-	// DataParamsTier already builds on DataParams, so only one of them is
-	// ever needed
-	var params url.Values
-	if tier >= 0 {
-		params = daemon.DataParamsTier(l10Context, tier, after, before, points, group)
+	view := query.doc["view"].(map[string]any)
+	viewAfter, afterOK := l10Integer(view["after"])
+	updateEvery, everyOK := l10Integer(view["update_every"])
+	if !afterOK || !everyOK || updateEvery <= 0 || len(query.grid) == 0 {
+		t.Fatalf("L10 response has no usable view for source oracle: %v", query.doc["view"])
+	}
+
+	var dbPoints []fixture.DBPoint
+	switch tier {
+	case 0:
+		dbPoints = fixtureDimension.DBPoints(1)
+	case 1:
+		windows := fixtureDimension.TierWindows(tier1Gran)
+		ends := make([]int64, 0, len(windows))
+		for end := range windows {
+			ends = append(ends, end)
+		}
+		sort.Slice(ends, func(i, j int) bool { return ends[i] < ends[j] })
+		dbPoints = make([]fixture.DBPoint, 0, len(ends))
+		for _, end := range ends {
+			point := windows[end]
+			dbPoint := fixture.DBPoint{
+				Start: end - tier1Gran,
+				End:   end,
+				Gap:   point.Empty,
+			}
+			if !point.Empty {
+				dbPoint.Value = fixture.TierFetchValue(group, point)
+			}
+			dbPoints = append(dbPoints, dbPoint)
+		}
+	default:
+		t.Fatalf("L10 source oracle does not model tier %d", tier)
+	}
+	return fixture.ViewBuckets(dbPoints, viewAfter-1, updateEvery, len(query.grid))
+}
+
+func validateL10Response(t *testing.T, spec l10QuerySpec, doc map[string]any) l10QueryResult {
+	t.Helper()
+	result := l10QueryResult{doc: doc, valid: true}
+
+	request, requestOK := doc["request"].(map[string]any)
+	aggregations, aggregationsOK := request["aggregations"].(map[string]any)
+	timeAggregation, timeOK := aggregations["time"].(map[string]any)
+	group, groupOK := timeAggregation["time_group"].(string)
+	if !requestOK || !aggregationsOK || !timeOK || !groupOK || group != spec.canonicalGroup {
+		t.Logf("%s request time_group echo is %v, want %q",
+			spec.requestedGroup, timeAggregation["time_group"], spec.canonicalGroup)
+		result.valid = false
+	}
+	if spec.condition != "" {
+		condition, ok := timeAggregation["time_group_options"].(string)
+		if !ok || condition != spec.condition {
+			t.Logf("%s request condition echo is %v, want %q",
+				spec.requestedGroup, timeAggregation["time_group_options"], spec.condition)
+			result.valid = false
+		}
+	}
+
+	view, viewOK := doc["view"].(map[string]any)
+	viewAfter, afterOK := l10Integer(view["after"])
+	viewBefore, beforeOK := l10Integer(view["before"])
+	updateEvery, everyOK := l10Integer(view["update_every"])
+	if !viewOK || !afterOK || !beforeOK || !everyOK ||
+		updateEvery <= 0 || viewBefore < viewAfter {
+		t.Logf("%s view is malformed: %v", spec.requestedGroup, doc["view"])
+		result.valid = false
 	} else {
-		params = daemon.DataParams(l10Context, after, before, points)
-		params.Set("time_group", group)
-	}
-	params.Set("options", "jsonwrap|unaligned")
-	if dims != "" {
-		params.Set("scope_dimensions", dims)
+		span := viewBefore - viewAfter + 1
+		if span%updateEvery != 0 {
+			t.Logf("%s view span %d is not divisible by update_every %d",
+				spec.requestedGroup, span, updateEvery)
+			result.valid = false
+		} else {
+			rows := span / updateEvery
+			result.grid = make([]int64, rows)
+			for i := range result.grid {
+				result.grid[i] = viewAfter + updateEvery - 1 + int64(i)*updateEvery
+			}
+		}
+		if !spec.responseDeclaredGrid && spec.points == 1 {
+			wantEvery := spec.before - spec.after + 1
+			if viewAfter != spec.after || viewBefore != spec.before ||
+				updateEvery != wantEvery || len(result.grid) != 1 {
+				t.Logf("%s one-bucket view is %d/%d/%d with %d rows, want %d/%d/%d with 1 row",
+					spec.requestedGroup, viewAfter, viewBefore, updateEvery, len(result.grid),
+					spec.after, spec.before, wantEvery)
+				result.valid = false
+			}
+		} else if !spec.responseDeclaredGrid && spec.points > 0 &&
+			(spec.before-spec.after)%spec.points == 0 {
+			wantEvery := (spec.before - spec.after) / spec.points
+			if viewAfter != spec.after+1 || viewBefore != spec.before ||
+				updateEvery != wantEvery || int64(len(result.grid)) != spec.points {
+				t.Logf("%s view is %d/%d/%d with %d rows, want %d/%d/%d with %d rows",
+					spec.requestedGroup, viewAfter, viewBefore, updateEvery, len(result.grid),
+					spec.after+1, spec.before, wantEvery, spec.points)
+				result.valid = false
+			}
+		} else {
+			if viewBefore != spec.before {
+				t.Logf("%s nondivisible request ends at %d, want requested before %d",
+					spec.requestedGroup, viewBefore, spec.before)
+				result.valid = false
+			}
+			if viewAfter > spec.after+updateEvery {
+				t.Logf("%s response-derived grid starts at %d, after the first requested bucket ending at %d",
+					spec.requestedGroup, viewAfter, spec.after+updateEvery)
+				result.valid = false
+			}
+		}
 	}
 
-	doc, err := td.DataV3("l10", params)
-	if err != nil {
-		t.Fatalf("%s: %v", group, err)
+	rawResult, rawResultOK := doc["result"].(map[string]any)
+	rows, rowsOK := rawResult["data"].([]any)
+	if !rawResultOK || !rowsOK || len(rows) != len(result.grid) {
+		t.Logf("%s raw result has %d rows, want exact view grid of %d",
+			spec.requestedGroup, len(rows), len(result.grid))
+		result.valid = false
+	} else {
+		for i, rowAny := range rows {
+			row, ok := rowAny.([]any)
+			var timestamp int64
+			if ok && len(row) > 0 {
+				timestamp, ok = l10Integer(row[0])
+			}
+			if !ok || timestamp != result.grid[i] {
+				t.Logf("%s raw row %d timestamp is %v, want %d in wire order",
+					spec.requestedGroup, i, rowAny, result.grid[i])
+				result.valid = false
+			}
+		}
 	}
+
 	cols, err := canon.Columns(doc)
 	if err != nil {
-		t.Fatalf("%s: %v", group, err)
+		t.Logf("%s canonical decode failed: %v", spec.requestedGroup, err)
+		result.valid = false
+	} else {
+		result.cols = cols
+		if !assertExactColumnSet(t, cols, spec.expectedDimensions) {
+			result.valid = false
+		}
+		for _, dimension := range spec.expectedDimensions {
+			column := cols[dimension]
+			if len(column) != len(result.grid) {
+				t.Logf("%s dimension %q has %d rows, want %d",
+					spec.requestedGroup, dimension, len(column), len(result.grid))
+				result.valid = false
+				continue
+			}
+			for i, point := range column {
+				if point.T != result.grid[i] {
+					t.Logf("%s dimension %q row %d ends at %d, want %d",
+						spec.requestedGroup, dimension, i, point.T, result.grid[i])
+					result.valid = false
+				}
+			}
+		}
 	}
-	return cols
+	if !assertSelectedTier(t, doc, spec.tier) {
+		result.valid = false
+	}
+	return result
+}
+
+// l10Query runs and validates one grouping query without a second API call.
+func l10Query(t *testing.T, spec l10QuerySpec) l10QueryResult {
+	t.Helper()
+	if spec.host == "" {
+		spec.host = "l10"
+	}
+	if spec.context == "" {
+		spec.context = l10Context
+	}
+	if spec.canonicalGroup == "" {
+		spec.canonicalGroup = spec.requestedGroup
+	}
+	if len(spec.expectedDimensions) == 0 {
+		spec.expectedDimensions = l10Dims
+	}
+	if spec.tier < 0 {
+		t.Fatalf("%s: L10 validated queries require an explicit tier", spec.requestedGroup)
+	}
+
+	params := daemon.DataParamsTier(
+		spec.context, spec.tier, spec.after, spec.before, spec.points, spec.requestedGroup)
+	options := "jsonwrap|unaligned|flip|debug"
+	if spec.extraOptions != "" {
+		options += "|" + spec.extraOptions
+	}
+	params.Set("options", options)
+	if spec.condition != "" {
+		params.Set("time_group_options", spec.condition)
+	}
+	if spec.scopeDimensions != "" {
+		params.Set("scope_dimensions", spec.scopeDimensions)
+	}
+
+	doc, err := td.DataV3(spec.host, params)
+	if err != nil {
+		t.Fatalf("%s: %v", spec.requestedGroup, err)
+	}
+	return validateL10Response(t, spec, doc)
 }
 
 // The roster guard. Everything else in this layer is only as complete as this
@@ -363,14 +803,7 @@ func TestLayer10NoHolesInsideData(t *testing.T) {
 	after, before := int64(l10SpanAfter), int64(l10SpanBefore)
 
 	ok := true
-	skipped := 0
 	for _, c := range r.Order {
-		if groupingRules[c].knownSinglePointEmpty {
-			// its own red case owns this; leaving it in would keep the
-			// general sweep red and blind to the next grouping that breaks
-			skipped++
-			continue
-		}
 		group := r.Canonical[c]
 		for _, probe := range []struct {
 			tier   int
@@ -383,7 +816,17 @@ func TestLayer10NoHolesInsideData(t *testing.T) {
 			{tier: 1, points: (before - after) / 300, what: "tier 1, 300s buckets"},
 			{tier: 1, points: (before - after) / 600, what: "tier 1, 600s buckets"},
 		} {
-			cols := l10Query(t, group, probe.tier, after, before, probe.points, "")
+			result := l10Query(t, l10QuerySpec{
+				requestedGroup: group,
+				tier:           probe.tier,
+				after:          after,
+				before:         before,
+				points:         probe.points,
+			})
+			if !result.valid {
+				ok = false
+			}
+			cols := result.cols
 			for _, dim := range l10Dims {
 				col := cols[dim]
 				if len(col) == 0 {
@@ -407,9 +850,6 @@ func TestLayer10NoHolesInsideData(t *testing.T) {
 		}
 	}
 
-	if skipped > 0 {
-		t.Logf("%d grouping(s) skipped as known-broken - see L10/single-point-buckets-answer", skipped)
-	}
 	assertContract(t, "L10/no-holes-inside-data", ok)
 }
 
@@ -439,15 +879,22 @@ func TestLayer10BucketsFinerThanStoredDataAnswer(t *testing.T) {
 
 	ok := true
 	for _, c := range r.Order {
-		if groupingRules[c].knownSinglePointEmpty {
-			continue // its own red case owns it
-		}
 		group := r.Canonical[c]
 
 		// 3, 5 and 10 buckets per 60s stored window: every bucket after the
 		// first of each window is covered by a re-delivery alone
 		for _, perWindow := range []int64{3, 5, 10} {
-			cols := l10Query(t, group, 1, after, before, 20*perWindow, "")
+			result := l10Query(t, l10QuerySpec{
+				requestedGroup: group,
+				tier:           1,
+				after:          after,
+				before:         before,
+				points:         20 * perWindow,
+			})
+			if !result.valid {
+				ok = false
+			}
+			cols := result.cols
 			for _, dim := range l10Dims {
 				col := cols[dim]
 				if len(col) == 0 {
@@ -502,25 +949,30 @@ func TestLayer10OrderStatisticsStayInRange(t *testing.T) {
 		group := r.Canonical[c]
 
 		for _, tier := range []int{0, 1} {
-			cols := l10Query(t, group, tier, after, before, (before-after)/30, "")
+			result := l10Query(t, l10QuerySpec{
+				requestedGroup: group,
+				tier:           tier,
+				after:          after,
+				before:         before,
+				points:         (before - after) / 30,
+			})
+			if !result.valid {
+				ok = false
+				continue
+			}
 			for _, dim := range l10Dims {
-				lo, hi := l10Range(dim)
-				// the storage keeps f32, and a tier point is an average of
-				// f32s - a hair outside the integer range is the format,
-				// not the aggregation
-				const tol = 1e-3
-				for _, pt := range cols[dim] {
-					if pt.Value == nil {
-						continue
-					}
-					checked++
-					if *pt.Value < lo-tol || *pt.Value > hi+tol {
-						t.Logf("invariant not met: %s (tier %d) reads %v for %q at t0%+d, "+
-							"outside the samples' own range [%v, %v]",
-							group, tier, *pt.Value, dim, pt.T-fixture.T0, lo, hi)
-						ok = false
-					}
+				sources := l10SourceBuckets(t, result, group, tier, dim)
+				values := make([]*float64, len(result.cols[dim]))
+				for i := range result.cols[dim] {
+					values[i] = result.cols[dim][i].Value
 				}
+				if !l10EnvelopeHolds(group, sources, values, printTol) {
+					t.Logf("invariant not met: %s (tier %d) returned an empty value or left the "+
+						"fixture-derived source envelope for %q", group, tier, dim)
+					ok = false
+					continue
+				}
+				checked++
 			}
 		}
 	}
@@ -528,7 +980,7 @@ func TestLayer10OrderStatisticsStayInRange(t *testing.T) {
 	if checked == 0 {
 		t.Fatalf("no order-statistic buckets were checked")
 	}
-	t.Logf("%d bucket values checked against their dimension's range", checked)
+	t.Logf("%d grouping/tier/dimension combinations checked against exact source envelopes", checked)
 	assertContract(t, "L10/order-statistics-stay-in-range", ok)
 }
 
@@ -558,12 +1010,42 @@ func TestLayer10DimensionsAreIndependent(t *testing.T) {
 		group := r.Canonical[c]
 
 		for _, tier := range []int{0, 1} {
-			together := l10Query(t, group, tier, after, before, points, "")
+			togetherResult := l10Query(t, l10QuerySpec{
+				requestedGroup: group,
+				tier:           tier,
+				after:          after,
+				before:         before,
+				points:         points,
+			})
+			if !togetherResult.valid {
+				ok = false
+			}
+			together := togetherResult.cols
 
 			for _, dim := range l10Dims {
-				alone := l10Query(t, group, tier, after, before, points, dim)
+				aloneResult := l10Query(t, l10QuerySpec{
+					requestedGroup:  group,
+					tier:            tier,
+					after:           after,
+					before:          before,
+					points:          points,
+					scopeDimensions: dim,
+					expectedDimensions: []string{
+						dim,
+					},
+				})
+				if !aloneResult.valid {
+					ok = false
+				}
+				alone := aloneResult.cols
 
 				a, b := alone[dim], together[dim]
+				if l10NumericPoints(a) == 0 || l10NumericPoints(b) == 0 {
+					t.Logf("invariant not met: %s (tier %d) returned no numeric buckets for %q "+
+						"alone or alongside its neighbours", group, tier, dim)
+					ok = false
+					continue
+				}
 				if len(a) != len(b) {
 					t.Logf("invariant not met: %s (tier %d) returned %d buckets for %q alone "+
 						"and %d alongside its neighbours",
@@ -617,17 +1099,39 @@ func TestLayer10CountsDoNotInflateWithZoom(t *testing.T) {
 		// a condition that the wave dimension satisfies inside every stored
 		// window, so there is something to over-count
 		total := func(perWindow int64) float64 {
-			cols := l10QueryCond(t, group, 1, after, before, 20*perWindow, ">30")
+			result := l10Query(t, l10QuerySpec{
+				requestedGroup: group,
+				canonicalGroup: group,
+				condition:      ">30",
+				tier:           1,
+				after:          after,
+				before:         before,
+				points:         20 * perWindow,
+			})
+			if !result.valid {
+				ok = false
+			}
 			sum := 0.0
-			for _, pt := range cols["wave"] {
+			numeric := 0
+			for _, pt := range result.cols["wave"] {
 				if pt.Value != nil {
 					sum += *pt.Value
+					numeric++
 				}
+			}
+			if numeric == 0 {
+				t.Logf("invariant not met: %s returned no numeric count buckets at %d buckets per window",
+					group, perWindow)
+				ok = false
 			}
 			return sum
 		}
 
 		base := total(1)
+		if base <= 0 {
+			t.Logf("invariant not met: %s count baseline is %v, want a positive discriminator", group, base)
+			ok = false
+		}
 		for _, perWindow := range []int64{2, 3, 5} {
 			got := total(perWindow)
 			if got > base+1e-6 {
@@ -679,9 +1183,18 @@ func TestLayer10TotalsAreExactAcrossZoom(t *testing.T) {
 
 		for _, tier := range []int{0, 1} {
 			for _, points := range []int64{20, 60, 300, 1200} {
-				cols := l10Query(t, group, tier, after, before, points, "")
+				result := l10Query(t, l10QuerySpec{
+					requestedGroup: group,
+					tier:           tier,
+					after:          after,
+					before:         before,
+					points:         points,
+				})
+				if !result.valid {
+					ok = false
+				}
 				got := 0.0
-				for _, pt := range cols["flat"] {
+				for _, pt := range result.cols["flat"] {
 					if pt.Value != nil {
 						got += *pt.Value
 					}
@@ -707,11 +1220,10 @@ func TestLayer10TotalsAreExactAcrossZoom(t *testing.T) {
 // most natural resolution there is. A dashboard drawn at the collection
 // interval must not come back blank.
 //
-// An aggregation that genuinely needs two samples - an increment is a
-// difference between two of them - has the previous bucket's last sample to
-// work from, and `incremental-sum` is built to carry exactly that across the
-// flush. Needing two samples is a reason to look backwards, not a reason to
-// answer nothing.
+// `incremental-sum` may legitimately leave the opening bucket empty because
+// the query has no predecessor yet. Its flush path carries the bucket's last
+// sample forward, so every subsequent one-sample bucket has a baseline and
+// must answer; losing that carry makes the whole remaining chain empty.
 func TestLayer10SinglePointBucketsAnswer(t *testing.T) {
 	trackContract(t, "L10/single-point-buckets-answer")
 
@@ -728,7 +1240,17 @@ func TestLayer10SinglePointBucketsAnswer(t *testing.T) {
 	ok := true
 	for _, c := range r.Order {
 		group := r.Canonical[c]
-		cols := l10Query(t, group, 0, after, before, before-after, "")
+		result := l10Query(t, l10QuerySpec{
+			requestedGroup: group,
+			tier:           0,
+			after:          after,
+			before:         before,
+			points:         before - after,
+		})
+		if !result.valid {
+			ok = false
+		}
+		cols := result.cols
 
 		for _, dim := range l10Dims {
 			col := cols[dim]
@@ -737,19 +1259,26 @@ func TestLayer10SinglePointBucketsAnswer(t *testing.T) {
 				ok = false
 				continue
 			}
-			empty := 0
-			for _, pt := range col {
+			invalidEmpty := 0
+			firstInvalidEmpty := 0
+			for i, pt := range col {
 				if pt.Value == nil {
-					empty++
+					if i != 0 || !groupingRules[c].firstBucketMayBeEmpty {
+						if invalidEmpty == 0 {
+							firstInvalidEmpty = i + 1
+						}
+						invalidEmpty++
+					}
 				}
 			}
-			// the FIRST bucket of a dimension has nothing behind it, so an
-			// aggregation that looks backwards may legitimately have nothing
-			// to say there - one bucket, not all of them
-			if empty > 1 {
-				t.Logf("invariant not met: %s left %d of %d buckets EMPTY for %q at one bucket per "+
-					"collected sample - a chart drawn at the collection interval comes back blank",
-					group, empty, len(col), dim)
+			if invalidEmpty != 0 {
+				t.Logf("invariant not met: %s left %d/%d buckets EMPTY for %q at one bucket "+
+					"per sample (first at bucket %d)", group, invalidEmpty, len(col), dim,
+					firstInvalidEmpty)
+				ok = false
+			}
+			if l10NumericPoints(col) == 0 {
+				t.Logf("invariant not met: %s returned no numeric one-sample buckets for %q", group, dim)
 				ok = false
 			}
 		}
@@ -795,21 +1324,41 @@ func TestLayer10TimeSharesAreStableAcrossZoom(t *testing.T) {
 			// `wave` would let the bug through.
 			for _, dim := range l10Dims {
 				mean := func(perWindow int64) float64 {
-					cols := l10QueryCond(t, group, 1, after, before, 20*perWindow, cond)
-					col := cols[dim]
+					result := l10Query(t, l10QuerySpec{
+						requestedGroup: group,
+						canonicalGroup: group,
+						condition:      cond,
+						tier:           1,
+						after:          after,
+						before:         before,
+						points:         20 * perWindow,
+					})
+					if !result.valid {
+						ok = false
+					}
+					col := result.cols[dim]
 					if len(col) == 0 {
 						t.Fatalf("%s(%s): no rows for %q", group, cond, dim)
 					}
 					sum := 0.0
 					for _, pt := range col {
-						if pt.Value != nil {
-							sum += *pt.Value
+						if pt.Value == nil {
+							t.Logf("invariant not met: %s(%s) returned an EMPTY bucket for %q",
+								group, cond, dim)
+							ok = false
+							continue
 						}
+						sum += *pt.Value
 					}
 					return sum / float64(len(col))
 				}
 
 				base := mean(1)
+				if cond == ">=0" && base <= 0 {
+					t.Logf("invariant not met: %s(%s) positive control for %q is %v",
+						group, cond, dim, base)
+					ok = false
+				}
 				for _, perWindow := range []int64{2, 3, 5} {
 					got := mean(perWindow)
 					// the buckets are equal width, so the plain mean IS the
@@ -853,13 +1402,40 @@ func TestLayer10AliasesResolveToTheSameGrouping(t *testing.T) {
 		if len(r.Aliases[c]) == 0 {
 			continue
 		}
-		canonical := l10Query(t, r.Canonical[c], 0, after, before, points, "")
+		canonicalResult := l10Query(t, l10QuerySpec{
+			requestedGroup: r.Canonical[c],
+			tier:           0,
+			after:          after,
+			before:         before,
+			points:         points,
+		})
+		if !canonicalResult.valid {
+			ok = false
+		}
+		canonical := canonicalResult.cols
 
 		for _, alias := range r.Aliases[c] {
 			checked++
-			got := l10Query(t, alias, 0, after, before, points, "")
+			gotResult := l10Query(t, l10QuerySpec{
+				requestedGroup: alias,
+				canonicalGroup: r.Canonical[c],
+				tier:           0,
+				after:          after,
+				before:         before,
+				points:         points,
+			})
+			if !gotResult.valid {
+				ok = false
+			}
+			got := gotResult.cols
 			for _, dim := range l10Dims {
 				a, b := got[dim], canonical[dim]
+				if l10NumericPoints(a) == 0 || l10NumericPoints(b) == 0 {
+					t.Logf("invariant not met: alias %s or canonical %s returned no numeric rows for %q",
+						alias, r.Canonical[c], dim)
+					ok = false
+					continue
+				}
 				if len(a) != len(b) {
 					t.Logf("invariant not met: time_group=%s returned %d buckets where %s returned %d",
 						alias, len(a), r.Canonical[c], len(b))
@@ -908,11 +1484,33 @@ func TestLayer10QueriesAreDeterministic(t *testing.T) {
 	ok := true
 	for _, c := range r.Order {
 		group := r.Canonical[c]
-		first := l10Query(t, group, 1, after, before, points, "")
-		second := l10Query(t, group, 1, after, before, points, "")
+		firstResult := l10Query(t, l10QuerySpec{
+			requestedGroup: group,
+			tier:           1,
+			after:          after,
+			before:         before,
+			points:         points,
+		})
+		secondResult := l10Query(t, l10QuerySpec{
+			requestedGroup: group,
+			tier:           1,
+			after:          after,
+			before:         before,
+			points:         points,
+		})
+		if !firstResult.valid || !secondResult.valid {
+			ok = false
+		}
+		first, second := firstResult.cols, secondResult.cols
 
 		for _, dim := range l10Dims {
 			a, b := first[dim], second[dim]
+			if l10NumericPoints(a) == 0 || l10NumericPoints(b) == 0 {
+				t.Logf("invariant not met: %s returned no numeric rows for %q on one or both runs",
+					group, dim)
+				ok = false
+				continue
+			}
 			if len(a) != len(b) {
 				t.Logf("invariant not met: %s returned %d buckets then %d for %q", group, len(a), len(b), dim)
 				ok = false
@@ -953,7 +1551,17 @@ func TestLayer10BucketsAreOrderedAndUnique(t *testing.T) {
 		group := r.Canonical[c]
 		for _, tier := range []int{0, 1} {
 			for _, points := range []int64{7, 60, 300} {
-				cols := l10Query(t, group, tier, after, before, points, "")
+				result := l10Query(t, l10QuerySpec{
+					requestedGroup: group,
+					tier:           tier,
+					after:          after,
+					before:         before,
+					points:         points,
+				})
+				if !result.valid {
+					ok = false
+				}
+				cols := result.cols
 				for _, dim := range l10Dims {
 					prev := int64(math.MinInt64)
 					for i, pt := range cols[dim] {
@@ -974,36 +1582,28 @@ func TestLayer10BucketsAreOrderedAndUnique(t *testing.T) {
 	assertContract(t, "L10/buckets-are-ordered-and-unique", ok)
 }
 
-// l10QueryCond runs a grouping that takes a condition.
-func l10QueryCond(t *testing.T, group string, tier int, after, before, points int64, cond string) map[string][]canon.Pt {
-	t.Helper()
-	params := daemon.DataParamsTier(l10Context, tier, after, before, points, group)
-	params.Set("time_group_options", cond)
-	params.Set("options", "jsonwrap|unaligned")
-	doc, err := td.DataV3("l10", params)
-	if err != nil {
-		t.Fatalf("%s(%s): %v", group, cond, err)
-	}
-	cols, err := canon.Columns(doc)
-	if err != nil {
-		t.Fatalf("%s(%s): %v", group, cond, err)
-	}
-	return cols
-}
-
 func samePoint(a, b canon.Pt) bool {
 	if a.T != b.T {
 		return false
 	}
+	equalFloat := func(x, y float64) bool {
+		return x == y || (math.IsNaN(x) && math.IsNaN(y))
+	}
 	if (a.Value == nil) != (b.Value == nil) {
 		return false
 	}
-	if a.Value == nil {
-		return true
+	if a.Value != nil && !equalFloat(*a.Value, *b.Value) {
+		return false
 	}
-	// bit-identical, not "close": these are two runs of the same query over
-	// the same data, so anything but equality is a defect
-	return *a.Value == *b.Value || (math.IsNaN(*a.Value) && math.IsNaN(*b.Value))
+	if !equalFloat(a.ARP, b.ARP) || a.PA != b.PA ||
+		(a.Count == nil) != (b.Count == nil) ||
+		(a.Hidden == nil) != (b.Hidden == nil) {
+		return false
+	}
+	if a.Count != nil && *a.Count != *b.Count {
+		return false
+	}
+	return a.Hidden == nil || equalFloat(*a.Hidden, *b.Hidden)
 }
 
 func valueOf(p canon.Pt) any {
@@ -1053,7 +1653,7 @@ func l10GapFixture(t *testing.T) {
 	ch := fixture.Chart{
 		ID: l10GapContext, Title: "holes", Units: "units",
 		Family: "fixture", Context: l10GapContext, UpdateEvery: 1,
-		Dimensions: []fixture.Dimension{{ID: "holes"}, {ID: "anom"}},
+		Dimensions: []fixture.Dimension{{ID: "holes"}, {ID: "anom"}, {ID: "zero"}},
 	}
 	for i := 1; i <= l10GapSamples; i++ {
 		ts := fixture.T0 + int64(i)
@@ -1069,6 +1669,11 @@ func l10GapFixture(t *testing.T) {
 		// carrying this magnitude came from the metric instead
 		ch.Dimensions[1].Points = append(ch.Dimensions[1].Points,
 			fixture.Point{T: ts, Collected: "1000000", Flags: stream.FlagNotAnomalous})
+		// The independent zero-valued control has the same anomaly-rate input
+		// as "anom". Every grouping must therefore return the same point,
+		// including any mathematically legitimate EMPTY placement.
+		ch.Dimensions[2].Points = append(ch.Dimensions[2].Points,
+			fixture.Point{T: ts, Collected: "0", Flags: stream.FlagNotAnomalous})
 	}
 
 	pushLiveBurst(t, "l10gap", guid(231), ch)
@@ -1125,19 +1730,22 @@ func TestLayer10TotalsAreExactOverGapsAndOffGrid(t *testing.T) {
 
 			for _, tier := range []int{0, 1} {
 				for _, points := range []int64{20, 60, 300, 1200} {
-					params := daemon.DataParamsTier(l10GapContext, tier, span.after, span.before, points, group)
-					params.Set("options", "jsonwrap|unaligned")
-					doc, err := td.DataV3("l10gap", params)
-					if err != nil {
-						t.Fatalf("%s: %v", group, err)
-					}
-					cols, err := canon.Columns(doc)
-					if err != nil {
-						t.Fatalf("%s: %v", group, err)
+					result := l10Query(t, l10QuerySpec{
+						host:               "l10gap",
+						context:            l10GapContext,
+						requestedGroup:     group,
+						tier:               tier,
+						after:              span.after,
+						before:             span.before,
+						points:             points,
+						expectedDimensions: []string{"holes", "anom", "zero"},
+					})
+					if !result.valid {
+						ok = false
 					}
 
 					got := 0.0
-					for _, pt := range cols["holes"] {
+					for _, pt := range result.cols["holes"] {
 						if pt.Value != nil {
 							got += *pt.Value
 						}
@@ -1170,9 +1778,11 @@ func TestLayer10TotalsAreExactOverGapsAndOffGrid(t *testing.T) {
 // answers in the metric's units - and the two domains are unrelated, so the
 // number it produces is not wrong by a little, it is meaningless.
 //
-// The fixture makes that impossible to miss: a dimension holding 1000000,
-// never anomalous. Every answer about it under anomaly-bit is an answer about
-// zero.
+// The fixture makes that impossible to miss: a dimension holding 1000000 and
+// an otherwise identical zero-valued control are both never anomalous. Their
+// complete points must match under anomaly-bit. This permits a grouping such
+// as CV to remain EMPTY for the undefined 0/0 case without permitting metric
+// statistics to leak into the anomaly-rate answer.
 func TestLayer10AnomalyBitAnswersAboutRates(t *testing.T) {
 	trackContract(t, "L10/anomaly-bit-answers-about-rates")
 
@@ -1199,29 +1809,33 @@ func TestLayer10AnomalyBitAnswersAboutRates(t *testing.T) {
 
 		for _, tier := range []int{0, 1} {
 			for _, points := range []int64{20, 300, 1200} {
-				params := daemon.DataParamsTier(l10GapContext, tier, after, before, points, group)
-				params.Set("options", "jsonwrap|unaligned|anomaly-bit")
-				doc, err := td.DataV3("l10gap", params)
-				if err != nil {
-					t.Fatalf("%s: %v", group, err)
-				}
-				cols, err := canon.Columns(doc)
-				if err != nil {
-					t.Fatalf("%s: %v", group, err)
+				result := l10Query(t, l10QuerySpec{
+					host:               "l10gap",
+					context:            l10GapContext,
+					requestedGroup:     group,
+					extraOptions:       "anomaly-bit",
+					tier:               tier,
+					after:              after,
+					before:             before,
+					points:             points,
+					expectedDimensions: []string{"holes", "anom", "zero"},
+				})
+				if !result.valid {
+					ok = false
 				}
 
-				for _, pt := range cols["anom"] {
-					if pt.Value == nil {
-						continue
-					}
-					// nothing in this series was ever anomalous, so every
-					// grouping of its anomaly rate is zero. A value anywhere
-					// near the metric's own magnitude came from the metric.
-					if math.Abs(*pt.Value) > 1e-6 {
-						t.Logf("invariant not met: %s (tier %d, points=%d) reads %v under "+
-							"options=anomaly-bit at t0%+d, on a dimension that was never anomalous - "+
-							"the metric itself holds %d, so this is an answer about the wrong domain",
-							group, tier, points, *pt.Value, pt.T-fixture.T0, 1000000)
+				anom, zero := result.cols["anom"], result.cols["zero"]
+				if len(anom) != len(zero) {
+					t.Logf("invariant not met: %s (tier %d, points=%d) returned %d anomaly rows and %d zero-control rows",
+						group, tier, points, len(anom), len(zero))
+					ok = false
+					continue
+				}
+				for i := range anom {
+					if !samePoint(anom[i], zero[i]) {
+						t.Logf("invariant not met: %s (tier %d, points=%d) anomaly bucket %d is %v, "+
+							"zero-control bucket is %v; both delivered anomaly rate zero",
+							group, tier, points, i, valueOf(anom[i]), valueOf(zero[i]))
 						ok = false
 						break
 					}

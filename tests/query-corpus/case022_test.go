@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/tests/query-corpus/canon"
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
 	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
@@ -88,54 +89,22 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		}
 	}
 
-	dig := func(m map[string]any, path ...string) any {
-		var cur any = m
-		for _, k := range path {
-			mm, is := cur.(map[string]any)
-			if !is {
-				return nil
-			}
-			cur = mm[k]
+	decode := func(resp map[string]any, dimensions ...string) map[string][]canon.Pt {
+		t.Helper()
+		cols, err := canon.Columns(resp)
+		if err != nil {
+			t.Fatal(err)
 		}
-		return cur
+		if !assertExactColumnSet(t, cols, dimensions) {
+			ok = false
+		}
+		return cols
 	}
-
-	// row value of a dimension: data rows are [t, [v, ar, pa], ...];
-	// dimension order follows the labels array
-	rowVal := func(resp map[string]any, row, dim int) (float64, bool) {
-		data, _ := dig(resp, "result", "data").([]any)
-		if row >= len(data) {
-			return 0, false
+	exact := func(cols map[string][]canon.Pt, dimension string, want []expectedColumnPoint, tolerance float64) {
+		t.Helper()
+		if !assertExactColumn(t, cols, dimension, want, tolerance) {
+			ok = false
 		}
-		r, _ := data[row].([]any)
-		if dim+1 >= len(r) {
-			return 0, false
-		}
-		point, _ := r[dim+1].([]any)
-		if len(point) < 1 {
-			return 0, false
-		}
-		v, is := point[0].(float64)
-		return v, is
-	}
-	rowAr := func(resp map[string]any, row, dim int) float64 {
-		data, _ := dig(resp, "result", "data").([]any)
-		r, _ := data[row].([]any)
-		point, _ := r[dim+1].([]any)
-		if len(point) < 2 {
-			return -1
-		}
-		ar, _ := point[1].(float64)
-		return ar
-	}
-	dimIndex := func(resp map[string]any, name string) int {
-		labels, _ := dig(resp, "result", "labels").([]any)
-		for i, l := range labels {
-			if l == name {
-				return i - 1 // labels[0] is "time"
-			}
-		}
-		return -1
 	}
 
 	// ------------------------------------------------------------------
@@ -146,19 +115,23 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		"points":  "4",
 		"options": "debug", // the request echo is emitted only with debug
 	})
-	echo := dig(resp, "request", "aggregations", "time", "time_group")
-	check(echo == "latest", "time_group echo is %v, want latest", echo)
+	request, requestOK := resp["request"].(map[string]any)
+	aggregations, aggregationsOK := request["aggregations"].(map[string]any)
+	timeAggregation, timeOK := aggregations["time"].(map[string]any)
+	echo, echoOK := timeAggregation["time_group"].(string)
+	check(requestOK && aggregationsOK && timeOK && echoOK && echo == "latest",
+		"time_group echo is %v, want latest", timeAggregation["time_group"])
 
 	// per-bucket semantics: buckets of 2 keep the LAST value of each pair
-	pi := dimIndex(resp, "plain")
-	check(pi >= 0, "plain dimension missing")
-	if pi >= 0 {
-		want := []float64{8, 6, 4, 2} // newest first (default order)
-		for row, w := range want {
-			v, is := rowVal(resp, row, pi)
-			check(is && v == w, "bucket row %d of plain = %v (num=%v), want %v", row, v, is, w)
-		}
-	}
+	cols := decode(resp, "plain", "big", "neg")
+	exact(cols, "plain", []expectedColumnPoint{
+		wantNumberAt(fixture.T0+2, 2),
+		wantNumberAt(fixture.T0+4, 4),
+		wantNumberAt(fixture.T0+6, 6),
+		wantNumberAt(fixture.T0+8, 8),
+	}, 0)
+	check(assertExactView(t, resp, fixture.T0, fixture.T0+8, 2),
+		"four-bucket response view is not the exact requested grid")
 
 	// identity sweep: one bucket per sample - buckets covering the gap
 	// samples stay EMPTY (null), every other bucket is its own sample
@@ -167,25 +140,28 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		"before": strconv.FormatInt(fixture.T0+12, 10),
 		"points": "12",
 	})
-	if pi := dimIndex(respID, "plain"); pi >= 0 {
-		wantByT := map[int64]float64{ // absent keys must be null
-			fixture.T0 + 1: 1, fixture.T0 + 2: 2, fixture.T0 + 3: 3, fixture.T0 + 4: 4,
-			fixture.T0 + 5: 5, fixture.T0 + 6: 6, fixture.T0 + 7: 7, fixture.T0 + 8: 8,
-			fixture.T0 + 11: 9, fixture.T0 + 12: 10,
+	colsID := decode(respID, "plain", "big", "neg")
+	plainWant := make([]expectedColumnPoint, 0, 12)
+	bigWant := make([]expectedColumnPoint, 0, 12)
+	negWant := make([]expectedColumnPoint, 0, 12)
+	for i := 1; i <= 12; i++ {
+		ts := fixture.T0 + int64(i)
+		switch {
+		case i <= 8:
+			plainWant = append(plainWant, wantNumberAt(ts, float64(i)))
+		case i <= 10:
+			plainWant = append(plainWant, wantEmptyAt(ts))
+		default:
+			plainWant = append(plainWant, wantNumberAt(ts, float64(i-2)))
 		}
-		data, _ := dig(respID, "result", "data").([]any)
-		check(len(data) == 12, "identity sweep rows = %d, want 12", len(data))
-		for row := range data {
-			r, _ := data[row].([]any)
-			ts, _ := r[0].(float64)
-			v, is := rowVal(respID, row, pi)
-			if w, has := wantByT[int64(ts)]; has {
-				check(is && v == w, "identity row t=%d of plain = %v (num=%v), want %v", int64(ts), v, is, w)
-			} else {
-				check(!is, "gap row t=%d of plain = %v, want null", int64(ts), v)
-			}
-		}
+		bigWant = append(bigWant, wantNumberAt(ts, fixture.SNRoundTrip(float64(big))))
+		negWant = append(negWant, wantNumberAt(ts, -5))
 	}
+	exact(colsID, "plain", plainWant, 0)
+	exact(colsID, "big", bigWant, 0)
+	exact(colsID, "neg", negWant, 0)
+	check(assertExactView(t, respID, fixture.T0, fixture.T0+12, 1),
+		"identity response view is not the exact requested grid")
 
 	// ------------------------------------------------------------------
 	// the hot edge: points=1 before=0 anchors at the newest sample and
@@ -196,27 +172,21 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		"before": "0",
 		"points": "1",
 	})
-	tier0points, _ := dig(respFast, "db", "per_tier").([]any)
-	check(len(tier0points) > 0, "no db.per_tier in the response")
-	if len(tier0points) > 0 {
-		p0, _ := tier0points[0].(map[string]any)
-		check(p0["points"] == float64(0), "fast path read %v tier0 points, want 0", p0["points"])
-	}
-	check(dig(respFast, "view", "before") == float64(fixture.T0+12),
-		"hot-edge window.before = %v, want %d (the newest sample)", dig(respFast, "view", "before"), fixture.T0+12)
-	if bi := dimIndex(respFast, "big"); bi >= 0 {
-		v, is := rowVal(respFast, 0, bi)
-		check(is && v == float64(big), "fast big = %v, want the RAW %d", v, big)
-	}
-	if pi := dimIndex(respFast, "plain"); pi >= 0 {
-		v, is := rowVal(respFast, 0, pi)
-		check(is && v == 10, "fast plain = %v, want 10", v)
-		check(rowAr(respFast, 0, pi) == 0, "fast plain ar = %v, want 0 by design", rowAr(respFast, 0, pi))
-	}
-	if ni := dimIndex(respFast, "neg"); ni >= 0 {
-		v, is := rowVal(respFast, 0, ni)
-		check(is && v == -5, "fast neg = %v, want -5 (sign preserved without absolute)", v)
-	}
+	check(assertTierPresence(t, respFast, []bool{false, false, false}),
+		"fast path read storage points")
+	viewFast, viewFastOK := respFast["view"].(map[string]any)
+	check(viewFastOK && viewFast["before"] == float64(fixture.T0+12),
+		"hot-edge window.before = %v, want %d (the newest sample)", viewFast["before"], fixture.T0+12)
+	colsFast := decode(respFast, "plain", "big", "neg")
+	exact(colsFast, "big", []expectedColumnPoint{
+		wantNumberAt(fixture.T0+12, float64(big)),
+	}, 0)
+	exact(colsFast, "plain", []expectedColumnPoint{
+		wantNumberWithARPAt(fixture.T0+12, 10, 0),
+	}, 0)
+	exact(colsFast, "neg", []expectedColumnPoint{
+		wantNumberAt(fixture.T0+12, -5),
+	}, 0)
 
 	// options=absolute keeps the fast path AND erases the sign, exactly
 	// like the storage path does at fetch
@@ -226,15 +196,12 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		"points":  "1",
 		"options": "absolute",
 	})
-	absTier, _ := dig(respAbs, "db", "per_tier").([]any)
-	if len(absTier) > 0 {
-		p0, _ := absTier[0].(map[string]any)
-		check(p0["points"] == float64(0), "absolute fast path read %v tier0 points, want 0", p0["points"])
-	}
-	if ni := dimIndex(respAbs, "neg"); ni >= 0 {
-		v, is := rowVal(respAbs, 0, ni)
-		check(is && v == 5, "absolute fast neg = %v, want 5", v)
-	}
+	check(assertTierPresence(t, respAbs, []bool{false, false, false}),
+		"absolute fast path read storage points")
+	colsAbs := decode(respAbs, "plain", "big", "neg")
+	exact(colsAbs, "plain", []expectedColumnPoint{wantNumberAt(fixture.T0+12, 10)}, 0)
+	exact(colsAbs, "big", []expectedColumnPoint{wantNumberAt(fixture.T0+12, float64(big))}, 0)
+	exact(colsAbs, "neg", []expectedColumnPoint{wantNumberAt(fixture.T0+12, 5)}, 0)
 
 	// a relative before near now resolves to the hot edge the same way
 	// (the rule compares the RESOLVED before against now - update_every)
@@ -243,15 +210,12 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		"before": "-1",
 		"points": "1",
 	})
-	relTier, _ := dig(respRel, "db", "per_tier").([]any)
-	if len(relTier) > 0 {
-		p0, _ := relTier[0].(map[string]any)
-		check(p0["points"] == float64(0), "relative-before fast path read %v tier0 points, want 0", p0["points"])
-	}
-	if bi := dimIndex(respRel, "big"); bi >= 0 {
-		v, is := rowVal(respRel, 0, bi)
-		check(is && v == float64(big), "relative-before fast big = %v, want the RAW %d", v, big)
-	}
+	check(assertTierPresence(t, respRel, []bool{false, false, false}),
+		"relative-before fast path read storage points")
+	colsRel := decode(respRel, "plain", "big", "neg")
+	exact(colsRel, "plain", []expectedColumnPoint{wantNumberAt(fixture.T0+12, 10)}, 0)
+	exact(colsRel, "big", []expectedColumnPoint{wantNumberAt(fixture.T0+12, float64(big))}, 0)
+	exact(colsRel, "neg", []expectedColumnPoint{wantNumberAt(fixture.T0+12, -5)}, 0)
 
 	// the storage path (selected-tier disables the fast path) returns the
 	// SN-quantized value and the engine-generic bucket anomaly rate
@@ -262,14 +226,21 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		"options": "selected-tier",
 		"tier":    "0",
 	})
-	if bi := dimIndex(respSlow, "big"); bi >= 0 {
-		v, is := rowVal(respSlow, 0, bi)
-		want := fixture.SNRoundTrip(float64(big))
-		check(is && v == want, "slow big = %v, want the quantized %v", v, want)
-	}
-	if pi := dimIndex(respSlow, "plain"); pi >= 0 {
-		check(rowAr(respSlow, 0, pi) > 0, "slow plain ar = %v, want > 0 (engine-generic)", rowAr(respSlow, 0, pi))
-	}
+	check(assertSelectedTier(t, respSlow, 0), "storage path did not select only tier 0")
+	colsSlow := decode(respSlow, "plain", "big", "neg")
+	// Without unaligned, the 12-second single bucket ends on the next
+	// absolute 12-second boundary.
+	slowEnd := int64((fixture.T0 + 12 + 11) / 12 * 12)
+	exact(colsSlow, "big", []expectedColumnPoint{
+		wantNumberAt(slowEnd, fixture.SNRoundTrip(float64(big))),
+	}, 0)
+	exact(colsSlow, "neg", []expectedColumnPoint{wantNumberAt(slowEnd, -5)}, 0)
+	plainSlow := colsSlow["plain"]
+	check(len(plainSlow) == 1 && plainSlow[0].T == slowEnd &&
+		plainSlow[0].Value != nil && *plainSlow[0].Value == 10 &&
+		plainSlow[0].ARP > 0 && plainSlow[0].PA&canon.AnnotationEmpty == 0,
+		"slow plain = %v, want one numeric value 10 at %d with positive engine-generic anomaly rate",
+		plainSlow, slowEnd)
 
 	assertContract(t, "CASE-022/time-group-latest", ok)
 }

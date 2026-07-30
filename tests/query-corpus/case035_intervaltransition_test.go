@@ -260,20 +260,30 @@ func c035ExpectedVolume(samples []c035Sample, after, before, step int64) []expec
 	return want
 }
 
-func c035ConditionQuery(
-	t *testing.T,
-	context, host, dimension string,
-	tier int,
-	after, before, step int64,
-	group, expression string,
-	want []expectedColumnPoint,
-) bool {
+type c035QuerySpec struct {
+	context    string
+	host       string
+	dimension  string
+	tier       int
+	after      int64
+	before     int64
+	step       int64
+	group      string
+	expression string
+	want       []expectedColumnPoint
+}
+
+func c035QueryExact(t *testing.T, spec c035QuerySpec) bool {
 	t.Helper()
-	params := daemon.DataParamsTier(context, tier, after, before, (before-after)/step, group)
+	params := daemon.DataParamsTier(
+		spec.context, spec.tier, spec.after, spec.before,
+		(spec.before-spec.after)/spec.step, spec.group)
 	params.Set("options", "jsonwrap|unaligned")
-	params.Set("time_group_options", expression)
-	params.Set("scope_dimensions", dimension)
-	doc, err := td.DataV3(host, params)
+	if spec.expression != "" {
+		params.Set("time_group_options", spec.expression)
+	}
+	params.Set("scope_dimensions", spec.dimension)
+	doc, err := td.DataV3(spec.host, params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,18 +292,18 @@ func c035ConditionQuery(
 		t.Fatal(err)
 	}
 
-	ok := assertExactView(t, doc, after, before, step)
-	if !assertSelectedTier(t, doc, tier) {
+	ok := assertExactView(t, doc, spec.after, spec.before, spec.step)
+	if !assertSelectedTier(t, doc, spec.tier) {
 		ok = false
 	}
-	if !assertOnlyColumn(t, cols, dimension) {
+	if !assertOnlyColumn(t, cols, spec.dimension) {
 		ok = false
 	}
 	tolerance := 0.0
-	if group == "percentage-of-time" {
+	if spec.group == "percentage-of-time" {
 		tolerance = printTol
 	}
-	if !assertExactColumn(t, cols, dimension, want, tolerance) {
+	if !assertExactColumn(t, cols, spec.dimension, spec.want, tolerance) {
 		ok = false
 	}
 	return ok
@@ -324,20 +334,24 @@ func c035AvailabilityMatrix(
 		before := straddleStart + granularity
 
 		records := c035Records(base, tc, target.tier, before, samples)
-		if !c035ConditionQuery(t, context, host, c035AvailabilityDim,
-			target.tier, after, before, granularity,
-			"percentage-of-time", "==1",
-			c035ExpectedAvailability(records, after, before, granularity)) {
+		if !c035QueryExact(t, c035QuerySpec{
+			context: context, host: host, dimension: c035AvailabilityDim,
+			tier: target.tier, after: after, before: before, step: granularity,
+			group: "percentage-of-time", expression: "==1",
+			want: c035ExpectedAvailability(records, after, before, granularity),
+		}) {
 			ok = false
 		}
 
 		// The same window on tier 0 proves the exact elapsed-time answer
 		// independently of the higher-tier sample-weighted estimator.
 		records = c035Records(base, tc, 0, before, samples)
-		if !c035ConditionQuery(t, context, host, c035AvailabilityDim,
-			0, after, before, granularity,
-			"percentage-of-time", "==1",
-			c035ExpectedAvailability(records, after, before, granularity)) {
+		if !c035QueryExact(t, c035QuerySpec{
+			context: context, host: host, dimension: c035AvailabilityDim,
+			tier: 0, after: after, before: before, step: granularity,
+			group: "percentage-of-time", expression: "==1",
+			want: c035ExpectedAvailability(records, after, before, granularity),
+		}) {
 			ok = false
 		}
 	}
@@ -403,60 +417,13 @@ func c035GapMatrix(
 		step := 2 * granularity
 		want := c035ExpectedGapRows(tc, tier, after, before, step, samples)
 
-		params := daemon.DataParamsTier(context, tier, after, before, 2, "percentage-of-samples")
-		params.Set("options", "jsonwrap|unaligned")
-		params.Set("time_group_options", "==gap")
-		params.Set("scope_dimensions", c035GapDim)
-		doc, err := td.DataV3(host, params)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cols, err := canon.Columns(doc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !assertExactView(t, doc, after, before, step) ||
-			!assertSelectedTier(t, doc, tier) ||
-			!assertOnlyColumn(t, cols, c035GapDim) ||
-			!assertExactColumn(t, cols, c035GapDim, want, 0) {
+		if !c035QueryExact(t, c035QuerySpec{
+			context: context, host: host, dimension: c035GapDim,
+			tier: tier, after: after, before: before, step: step,
+			group: "percentage-of-samples", expression: "==gap", want: want,
+		}) {
 			ok = false
 		}
-	}
-	return ok
-}
-
-func c035QueryVolume(
-	t *testing.T,
-	context, host string,
-	tier int,
-	after, before, step int64,
-	want []expectedColumnPoint,
-) bool {
-	t.Helper()
-
-	params := daemon.DataParamsTier(context, tier, after, before, (before-after)/step, "sum")
-	params.Set("options", "jsonwrap|unaligned")
-	params.Set("scope_dimensions", c035RateDim)
-	doc, err := td.DataV3(host, params)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cols, err := canon.Columns(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ok := assertExactView(t, doc, after, before, step)
-	if !assertSelectedTier(t, doc, tier) {
-		ok = false
-	}
-	if !assertOnlyColumn(t, cols, c035RateDim) {
-		ok = false
-	}
-	if !assertExactColumn(t, cols, c035RateDim, want, 0) {
-		t.Logf("tier%d query over (%d,%d] did not preserve each row's exact "+
-			"fixture-measured rate x collection interval volume", tier, after, before)
-		ok = false
 	}
 	return ok
 }
@@ -540,15 +507,26 @@ func TestCase035RateVolumeAcrossIntervalChange(t *testing.T) {
 			} {
 				after, before, step := c035TransitionWindow(state.base, tc, target.grouping)
 				want := c035ExpectedVolume(state.samples, after, before, step)
-				if !c035QueryVolume(t, state.context, state.host, target.tier,
-					after, before, step, want) {
+				if !c035QueryExact(t, c035QuerySpec{
+					context: state.context, host: state.host, dimension: c035RateDim,
+					tier: target.tier, after: after, before: before, step: step,
+					group: "sum", want: want,
+				}) {
+					t.Logf("tier%d query over (%d,%d] did not preserve each row's exact "+
+						"fixture-measured rate x collection interval volume",
+						target.tier, after, before)
 					ok = false
 				}
 
 				// The same window on tier 0 independently proves the
 				// fixture-ledger interpretation at this row width.
-				if !c035QueryVolume(t, state.context, state.host, 0,
-					after, before, step, want) {
+				if !c035QueryExact(t, c035QuerySpec{
+					context: state.context, host: state.host, dimension: c035RateDim,
+					tier: 0, after: after, before: before, step: step,
+					group: "sum", want: want,
+				}) {
+					t.Logf("tier0 query over (%d,%d] did not preserve each row's exact "+
+						"fixture-measured rate x collection interval volume", after, before)
 					ok = false
 				}
 			}

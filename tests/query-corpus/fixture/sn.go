@@ -4,15 +4,19 @@ package fixture
 
 import "math"
 
-// SNRoundTrip models netdata's tier0 storage quantization: the
-// pack/unpack cycle of the 32-bit storage_number
-// (src/libnetdata/storage_number/storage_number.c:81-174). Values carry a
-// 24-bit mantissa scaled by 10^m (m 0..7, multiplier or divider; factor
-// 100 for huge values), rounded with round-half-even (lrint), unpacked as
-// mantissa × LUT where LUT holds pow(10,m) or 1/pow(10,m) as doubles.
-// The oracle mirrors the arithmetic order so expected values match the
-// engine to double precision; the JSON print layer adds only formatting
-// rounding on top.
+// SNRoundTrip models Netdata's tier-0 32-bit storage_number pack/unpack.
+//
+// Source: netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d
+//   - pack: src/libnetdata/storage_number/storage_number.c:81-157
+//   - unpack LUT initialization: the same file, lines 159-173
+//   - unpack bit extraction/application:
+//     src/libnetdata/storage_number/storage_number.h:133-169
+//
+// Values carry a 24-bit mantissa scaled by 10^m (m 0..7, multiplier or
+// divider; factor 100 for huge values). The C packer uses lrint(), whose
+// rounding follows the active floating-point rounding mode. This oracle uses
+// RoundToEven, matching the normal/default round-to-nearest mode used by the
+// corpus process, and mirrors the relevant binary64 arithmetic order.
 func SNRoundTrip(v float64) float64 {
 	if math.IsNaN(v) || math.IsInf(v, 0) {
 		return math.NaN() // stored as an empty slot

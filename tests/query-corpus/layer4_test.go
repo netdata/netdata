@@ -23,19 +23,6 @@ import (
 	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
 
-// perTierPoints extracts db.per_tier[].points from a json2 reply.
-func perTierPoints(doc map[string]any) []int64 {
-	db, _ := doc["db"].(map[string]any)
-	tiersAny, _ := db["per_tier"].([]any)
-	out := make([]int64, 0, len(tiersAny))
-	for _, ta := range tiersAny {
-		tier, _ := ta.(map[string]any)
-		points, _ := tier["points"].(float64)
-		out = append(out, int64(points))
-	}
-	return out
-}
-
 // tierFetchBuckets slices the dimension's stored tier windows into view
 // buckets of bucketSpan seconds starting after `after`, yielding the
 // fetched value sequence per bucket (empty/never-stored windows skipped)
@@ -122,9 +109,16 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if !assertSelectedTier(t, doc, 1) {
+				t.Error("forced tier-1 query was not served exclusively from tier 1")
+			}
 			cols, err := canon.Columns(doc)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if !assertExactView(t, doc, after, after+buckets*bucketSpan, bucketSpan) ||
+				!assertOnlyColumn(t, cols, d.ID) {
+				t.Fail()
 			}
 			col := cols[d.ID]
 			if len(col) != buckets {
@@ -156,6 +150,15 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 					if !tierValueMatch(pt.ARP, expARP, 0) {
 						t.Errorf("bucket t0%+d: arp %v, want %v (%d/%d)", pt.T-fixture.T0, pt.ARP, expARP, st.AC, st.Count)
 					}
+				} else if pt.ARP != 0 {
+					t.Errorf("bucket t0%+d: arp %v, want 0 with no contributors", pt.T-fixture.T0, pt.ARP)
+				}
+				wantPA := int64(0)
+				if want.Empty {
+					wantPA = canon.AnnotationEmpty
+				}
+				if pt.PA != wantPA {
+					t.Errorf("bucket t0%+d: pa %d, want %d", pt.T-fixture.T0, pt.PA, wantPA)
 				}
 			}
 		})
@@ -212,41 +215,56 @@ func TestLayer4AutoTierSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			perTier := perTierPoints(doc)
-			for tier, points := range perTier {
-				switch {
-				case tier == tc.tier && points == 0:
-					t.Errorf("expected tier %d to serve the query, but it read 0 points (per_tier %v)", tc.tier, perTier)
-				case tier != tc.tier && points != 0:
-					t.Errorf("tier %d read %d points, expected only tier %d to serve (per_tier %v)", tier, points, tc.tier, perTier)
-				}
+			if !assertSelectedTier(t, doc, tc.tier) {
+				t.Errorf("expected only tier %d to serve the automatic-tier query", tc.tier)
 			}
 
 			cols, err := canon.Columns(doc)
 			if err != nil {
 				t.Fatal(err)
 			}
+			span := (tc.before - tc.after) / tc.points
+			if !assertExactView(t, doc, tc.after, tc.before, span) ||
+				!assertOnlyColumn(t, cols, d.ID) {
+				t.Fail()
+			}
 			col := cols[d.ID]
 			if int64(len(col)) != tc.points {
 				t.Fatalf("got %d buckets, want %d", len(col), tc.points)
 			}
 
-			span := (tc.before - tc.after) / tc.points
-			var exp []fixture.TGResult
+			var (
+				exp   []fixture.TGResult
+				stats []struct{ AC, Count int }
+			)
 			if tc.tier == 0 {
+				vals := make([][]float64, tc.points)
+				stats = make([]struct{ AC, Count int }, tc.points)
 				for _, p := range d.Points {
 					if p.T > tc.after && p.T <= tc.before {
-						v, _ := strconv.ParseFloat(p.Collected, 64)
-						exp = append(exp, fixture.TGResult{Value: fixture.SNRoundTrip(v)})
+						bucket := (p.T - tc.after - 1) / span
+						if v, collected := p.CollectedValue(d.ID); collected {
+							vals[bucket] = append(vals[bucket], fixture.SNRoundTrip(v))
+							stats[bucket].Count++
+							if p.Flags == stream.FlagAnomalous {
+								stats[bucket].AC++
+							}
+						}
 					}
 				}
+				exp = fixture.TGOracle("average", "", vals, int(span), int(tc.points))
 			} else {
-				vals, _ := tierFetchBuckets(d, "average", tier1Gran, tc.after, span, int(tc.points))
+				var vals [][]float64
+				vals, stats = tierFetchBuckets(d, "average", tier1Gran, tc.after, span, int(tc.points))
 				exp = fixture.TGOracle("average", "", vals, int(span), int(tc.points))
 			}
 
 			for i, pt := range col {
 				want := exp[i]
+				wantT := tc.after + int64(i+1)*span
+				if pt.T != wantT {
+					t.Errorf("bucket %d: time %d, want %d", i, pt.T, wantT)
+				}
 				switch {
 				case want.Empty && pt.Value != nil:
 					t.Errorf("bucket t0%+d: value %v, want null", pt.T-fixture.T0, *pt.Value)
@@ -254,6 +272,21 @@ func TestLayer4AutoTierSelection(t *testing.T) {
 					t.Errorf("bucket t0%+d: null, want %v", pt.T-fixture.T0, want.Value)
 				case !want.Empty && !tierValueMatch(*pt.Value, want.Value, 1e-9):
 					t.Errorf("bucket t0%+d: value %v, want %v", pt.T-fixture.T0, *pt.Value, want.Value)
+				}
+				wantARP := 0.0
+				if stats[i].Count > 0 {
+					wantARP = 100 * float64(stats[i].AC) / float64(stats[i].Count)
+				}
+				if !tierValueMatch(pt.ARP, wantARP, 0) {
+					t.Errorf("bucket t0%+d: arp %v, want %v (%d/%d)",
+						pt.T-fixture.T0, pt.ARP, wantARP, stats[i].AC, stats[i].Count)
+				}
+				wantPA := int64(0)
+				if want.Empty {
+					wantPA = canon.AnnotationEmpty
+				}
+				if pt.PA != wantPA {
+					t.Errorf("bucket t0%+d: pa %d, want %d", pt.T-fixture.T0, pt.PA, wantPA)
 				}
 			}
 		})

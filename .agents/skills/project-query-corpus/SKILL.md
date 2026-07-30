@@ -7,12 +7,12 @@ type: project
 # Query Contract Corpus — developer contract
 
 `tests/query-corpus/` is an end-to-end correctness suite for the query
-engine of a completely **stock** `netdata` daemon. Fixtures are ingested
-through the real streaming protocol by a fake child, queries run over the
-normal HTTP API, and every response is checked against expectations
-computed **outside** the daemon. `tests/query-corpus/README.md` describes
-the layered ladder (L0 harness → L9 window/API surface); this skill is the
-contract for working on the suite.
+engine of a stock `netdata` daemon. Fixtures enter through the real
+streaming protocol and queries use the normal HTTP API. Structured responses
+are strictly decoded before semantic checks; expectations are
+fixture-derived, source-derived, or explicitly labeled stability/parity pins
+under the classes below. `tests/query-corpus/README.md` describes L0-L11
+plus cross-cutting API, options, and weights surfaces.
 
 The suite is a self-contained Go module
 (`github.com/netdata/netdata/tests/query-corpus`). Always run `go` commands
@@ -20,25 +20,28 @@ from inside `tests/query-corpus/`.
 
 ## Correctness model — why this suite means something
 
-The founding rule: **expectations MUST be derived from the fixture
-definitions, never captured from the engine.** A harness whose expected
-values come from the system under test proves nothing. Every check in the
-corpus belongs to one of three classes, with different rules:
+The founding rule: **semantic correctness expectations MUST be derived
+independently of engine output.** Capturing engine output is allowed only for
+an explicitly labeled Class C stability pin; such a pin is not a correctness
+oracle. Every check in the corpus belongs to one of three classes, with
+different rules:
 
-- **Class A — first-principles oracles (the default).** Fixtures are
-  literal Go definitions: charts, dimensions, explicit
-  `(timestamp, collected value, SN flags)` points at the fixed epoch
-  `fixture.T0 = 1700000000`. Expected values are computed in the test from
-  those definitions (algorithm application, sums, averages, group-by folds,
-  weights math, anomaly bit counts). New checks MUST be Class A unless the
-  transform genuinely cannot be derived from first principles.
+- **Class A — first-principles oracles (the default).** Fixtures are literal
+  Go definitions: charts, dimensions, and explicit
+  `(timestamp, collected value, SN flags)` points. Most deterministic
+  fixtures anchor at `fixture.T0`; wall-clock-only cases use bounded
+  envelopes. Expected values come from fixture arithmetic, conservation,
+  additivity, metadata laws, group-by folds, weights math, and anomaly-bit
+  counts. New checks MUST be Class A unless the transform genuinely cannot
+  be derived from first principles.
 - **Class B — ports of engine algorithms.** Some transforms are engine
-  design decisions, not derivable math: storage-number quantization
-  (`fixture/sn.go`), tier rollups (`fixture/tier.go`), the time-grouping
-  internals (`fixture/timegroup.go`), virtual-points interpolation
-  (`fixture/viewpoints.go`). These are **reimplementations written from
-  reading the C source** — never captures of engine output. Rules:
-  - A port MUST cite the C source it mirrors (file:line in comments).
+  design decisions, not derivable math. `fixture/sn.go`, `fixture/tier.go`,
+  `fixture/timegroup.go`, and `fixture/viewpoints.go` contain source-derived
+  ports; they also contain explicitly labeled Class A or contract helpers.
+  Class B code is written from the C source, never captured from engine
+  output. Rules:
+  - A port MUST cite `owner/repo @ commit` plus the exact
+    repository-relative source path and line range it mirrors.
   - Every divergence found between a port and the engine MUST be resolved
     explicitly: either it is an engine bug (author a case for it) or an engine
     quirk adopted into the oracle **with a recorded pending ruling** in the
@@ -49,14 +52,13 @@ corpus belongs to one of three classes, with different rules:
   - A port MUST NOT be the oracle for a quantity that obeys an independent
     law. Where one exists — conservation, monotonicity, additivity — that
     law is derivable, so the check is Class A and the port has nothing to
-    contribute but the engine's own opinion. `sum` is the worked example:
-    `viewpoints.go` faithfully ports the virtual-points loop, which is the
-    right model for average/min/max/stddev (each answers "the LEVEL at this
-    instant"), and the wrong one for a volume — it served L9 a bucket
-    holding 98.33 where the fixture had put 88.33, agreeing with the engine
-    while both broke the L10/L11 totals. `fixture.ViewSumVolume` replaces it
-    for `sum`. Ask of every Class B use: is there a law here the port could
-    contradict? If yes, assert the law instead.
+    contribute but the engine's own opinion. `ViewBuckets` is a
+    source-derived model of the default tier-0 point-selection/interpolation
+    subset exercised by L9, not a port of the complete query executor. It is
+    appropriate only for those covered level-at-an-instant shapes.
+    `ViewSumVolume` is a Class A conservation oracle for volume and is
+    deliberately independent of that selection model. For every Class B
+    use, prefer an independent law when one exists.
 - **Fixtures MUST make the answer exact where the contract is exact.** A
   conservation check reads a difference, so anything else that moves the total
   is noise the check will report as a defect. Above tier 0 the loudest such
@@ -75,10 +77,10 @@ corpus belongs to one of three classes, with different rules:
     answer 7,200,000 to the digit at every zoom. Had the noisy version been
     committed, the corpus would have reported accepted rollup as an engine
     bug — the mirror image of fit-to-engine, and just as damaging.
-- **Class C — byte-pins and parity checks.** Formatter byte-pins (L7/L8,
-  options) capture engine output once and pin **stability** — they detect
-  contract regressions, not first-principles correctness. Parity checks
-  (v2 vs v3, same-response) prove internal coherence only. Rules:
+- **Class C — stability pins and parity checks.** Formatter byte pins
+  (primarily L7 and selected option tests) detect output-contract changes;
+  parity checks prove internal coherence only. Neither establishes
+  first-principles correctness. Rules:
   - A Class C pin MUST be paired with independent validity checks where
     they exist (e.g. "the payload parses as JSON", "values equal the
     fixture-derived numbers inside the pinned envelope").
@@ -98,21 +100,24 @@ acceptable.
 
 - `stream/stream.go` — the fixture child. Speaks plugins.d over the
   streaming socket: `CHART`/`DIMENSION`/`CLABEL`, live samples
-  (`BEGIN2/SET2/END2`), v1 paced samples (`BEGIN/SET/END`), replication
+  (`BEGIN2/SET2/END2`), v1 paced samples (`BEGIN/SET/END`), and replication
   (`RBEGIN/RSET/REND`). Protocol words quote-switch per word (`qw()`):
   plugins.d accepts both `'` and `"` delimiters, so ids carrying an
-  apostrophe ship double-quoted. `SET2` sends the value explicitly (the
-  `#` shorthand truncates fractional values to integers on the parser side).
-- `daemon/daemon.go` — the harness. Boots the stock binary with a scratch
-  run dir, waits for the HTTP API, exposes query helpers (`DataV3`,
-  `DataV1Raw`, `HostJSON`, …) and the settle primitive `WaitRetention(host,
-  context, first, last, timeout)`.
-- `fixture/` — the fixture model (`Chart`, `Dimension`, `Point`) and the
-  Class B oracles (`sn.go`, `tier.go`, `timegroup.go`, `viewpoints.go`).
-- `canon/` — canonical response comparison helpers.
-- `*_test.go` — the ladder layers (`layerN_*.go`), surface files
-  (`weights_`, `selectors_`, `options_`, `anomalybit_`, `resets_`,
-  `rates_`, `updateevery_`), and per-bug files (`caseNNN_test.go`).
+  apostrophe ship double-quoted. `SET2` sends the value explicitly because
+  the `#` shorthand truncates fractional values on the parser side. Exact
+  parser citations are listed under "Changing oracles, pins, and the
+  harness."
+- `daemon/daemon.go` — the harness. Resolves the binary and source tree as a
+  pair, boots the stock binary with a scratch run dir, assigns a unique
+  daemon identity, waits for that identity through the HTTP API, exposes
+  query helpers and `WaitRetention`, and uses bounded shutdown.
+- `fixture/` — the fixture model plus source-derived Class B ports and
+  explicitly labeled Class A or contract helpers.
+- `canon/` — the strict typed json2 decoder and point-column helpers. It
+  rejects invalid schema indices, widths, labels, types, null placement, and
+  non-finite metadata.
+- `*_test.go` — `layer*.go` ladder tests, cross-cutting surface tests, and
+  per-bug `caseNNN_test.go` files.
 - `manifest.go` + `MANIFEST.md` — the ledger (below). Keep both in sync in
   the same commit.
 - `reference-python/` — local-only cross-check implementation. It is NOT
@@ -157,13 +162,19 @@ its test as the regression guard and records `FixedBy: "#PR"`.
 
 ## Running
 
-- Build the daemon first: `ninja -C build netdata` from the repo root
-  (prefer `nice -n 19` on shared workstations). The suite uses
-  `../../build/netdata` by default; override with `QUERY_CORPUS_NETDATA=
-  /path/to/netdata`.
-- Full suite: `cd tests/query-corpus && go test ./... -count=1` (~6 min,
-  one shared daemon plus per-scenario daemons).
-- One test: `go test -count=1 -run 'TestName' .`
+- Build the daemon first: `ninja -C build netdata` from the repo root. By
+  default the suite pairs `../../build/netdata` with `../../src`.
+- For another checkout, set both paths:
+  `QUERY_CORPUS_NETDATA=/absolute/path/to/build/netdata
+  QUERY_CORPUS_SRC=/absolute/path/to/src go test ...`. One-sided overrides
+  are rejected. The pair is operator-declared provenance; the harness does
+  not inspect binary build metadata.
+- Full suite: `cd tests/query-corpus && go test ./... -count=1`. Expect
+  several minutes; duration is hardware and case-selection dependent.
+- One test: `go test -count=1 -run 'TestName' .`. Some tests consume a
+  shared palette authored by an earlier layer; include that fixture-producing
+  test in the filter or run the full suite when a test reports that its
+  palette is unavailable. A prerequisite skip is not correctness evidence.
 - Keep the daemon run dir for inspection: `QUERY_CORPUS_KEEP=1` (it is
   always kept on failure; the path is printed as `daemon run dir kept:`).
 - Capture the verdict honestly: `go test ... ; echo "exit=$?"` — piping
@@ -187,10 +198,10 @@ its test as the regression guard and records `FixedBy: "#PR"`.
   range; ranges used by loops (e.g. soak attempts) reserve their whole
   span.
 - **Settle discipline**: after pushing, block on `td.WaitRetention(...)`
-  before querying. Keep the pusher connection OPEN until after the settle
-  barrier and assertions (`connect()` closes at test cleanup) — the
-  receiver discards in-flight data when a child disconnects immediately
-  after writing.
+  before querying. Ordinary helpers keep the connection open through
+  assertions to isolate storage/query checks from teardown timing. CASE-015
+  deliberately closes immediately and guards the #23118 delivered-data
+  drain guarantee; immediate close is no longer documented as data loss.
 - **Weights fixtures**: rrdcontexts stamps retention ~1–2s after chart
   creation; weights queries return empty until then. Settle on the
   contexts `first_time_t` (see `weightsSettle`), not only on retention.
@@ -243,8 +254,10 @@ lands, and the broken list is what the corpus is for.
 5. Validate the fix branch against the corpus before opening the PR:
    - build the fix branch, save the binary aside;
    - from the corpus checkout:
-     `QUERY_CORPUS_NETDATA=<fix-binary> go test -count=1 -run '<the case
+     `QUERY_CORPUS_NETDATA=<fix-checkout>/build/netdata
+     QUERY_CORPUS_SRC=<fix-checkout>/src go test -count=1 -run '<the case
      plus neighboring pins>' .`
+     Both paths MUST describe the same operator-declared checkout.
    - the case MUST now hold, and every other case that was holding MUST
      still hold (zero collateral).
 6. When the fix merges: rebase the corpus branch onto the merge, record
@@ -266,9 +279,19 @@ lands, and the broken list is what the corpus is for.
 - Determinism: expectations MUST NOT depend on wall-clock time. Tests that
   must touch "now" (live edge, relative windows) assert ENVELOPES (bounded
   ranges, row-count bounds), not exact values.
-- Protocol emitters (`stream/`) mirror the parser's actual grammar
-  (`src/libnetdata/line_splitter/`); extend them when a fixture needs a
-  protocol feature, citing the parser code.
+- Protocol emitters (`stream/`) mirror the parser's actual grammar. At
+  `netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d`, the
+  authoritative surfaces are:
+  - quote/token splitting:
+    `src/libnetdata/line_splitter/line_splitter.h:34-119`;
+  - `BEGIN2`: `src/plugins.d/pluginsd_parser.c:815-960`;
+  - `SET2`: `src/plugins.d/pluginsd_parser.c:963-1125`;
+  - `END2`: `src/plugins.d/pluginsd_parser.c:1128-1163`;
+  - A/R/E flags: `src/plugins.d/pluginsd_internals.h:461-485`;
+  - `RBEGIN`/`RSET`/`REND`:
+    `src/plugins.d/pluginsd_replication.c:112-215,217-280,367-441`.
+  Extend emitters only from the relevant parser path and update the checked
+  revision/ranges when the port changes.
 
 ## Known boundaries (extension points, not history)
 
@@ -280,8 +303,6 @@ states what it takes:
 - **Natural-points full oracle**: natural mode pins count/values and a
   two-candidate boundary check; a full oracle needs the natural-mode point
   walk ported.
-- **Three-tier straddle windows**: plan switching is covered across two
-  tiers; a three-tier straddle needs longer synthetic retention.
 - **64-bit counter wrap**: unreachable through the signed text protocol;
   needs a different ingestion vector.
 - **Float collected values on the reset path**: the v1 SET path parses
@@ -298,9 +319,9 @@ states what it takes:
 - Values print through the engine's number formatter: a stored
   `22.000000000000004` prints as `22`. Compare parsed numbers, not
   strings, unless the check IS a byte-pin.
-- The shared daemon serves ALL tests: never restart or reconfigure it from
-  a test — scenario tests that need restarts boot their own daemon
-  (`daemon.Start` with `t.TempDir()`).
+- The default shared daemon serves most tests. Tests that need isolation,
+  rotation, or restarts boot dedicated daemons; never restart or reconfigure
+  the default shared daemon from an unrelated test.
 - After system library upgrades, rebuild `build/netdata` before blaming a
   test failure on the suite.
 - IDE diagnostics on the Go files can be stale; `go vet ./...` is the

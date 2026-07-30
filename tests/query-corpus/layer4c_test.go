@@ -68,15 +68,42 @@ const (
 	c4cNegativeValue = -37
 )
 
-// c4cValue is the deterministic sample generator: a 24-bit full-mantissa
-// mix per (dim, offset), SN-exact as an integer and incompressible as a
-// page — the quota must fill with real bytes for rotation to happen.
+// c4cValue is the deterministic sample generator: 23 mixed low bits keep
+// pages incompressible while the high bit alternates by sample and dimension.
+// The alternation guarantees a stateful fine-tier flap at any seam with at
+// least three retained fine samples, without weakening quota-driven rotation.
 func c4cValue(dim, off int64) int64 {
 	x := uint64(off)*2654435761 + uint64(dim)*0x9E3779B97F4A7C15
 	x ^= x >> 29
 	x *= 0xBF58476D1CE4E5B9
 	x ^= x >> 32
-	return int64(x & 0xFFFFFF)
+	return int64(x&0x7FFFFF) | (((off + dim) & 1) << 23)
+}
+
+func TestC4CFlapFixtureGuard(t *testing.T) {
+	const threshold = int64(1 << 23)
+	for dim := int64(0); dim < c4cDims; dim++ {
+		for start := int64(0); start < 2; start++ {
+			state := true
+			flaps := 0
+			for off := start; off < start+3; off++ {
+				value := c4cValue(dim, off)
+				if value < 0 || value >= 1<<24 {
+					t.Fatalf("dimension %d offset %d value %d is outside the 24-bit fixture range",
+						dim, off, value)
+				}
+				now := value >= threshold
+				if !state && now {
+					flaps++
+				}
+				state = now
+			}
+			if flaps < 1 {
+				t.Fatalf("dimension %d phase %d has no false-to-true transition in three samples",
+					dim, start)
+			}
+		}
+	}
 }
 
 func c4cDimID(d int) string { return fmt.Sprintf("d%02d", d) }
@@ -142,11 +169,15 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dd.Stop() })
+	t.Cleanup(func() {
+		if err := dd.Stop(); err != nil {
+			t.Errorf("stop dedicated daemon: %v", err)
+		}
+	})
 
 	// stream the fixture: rows are generated per replication request —
 	// materializing 11M points would cost hundreds of MB
-	conn, err := stream.Connect(dd.Addr, daemon.StreamKey, stream.HostInfo{
+	conn, err := stream.Connect(dd.Addr, dd.StreamKey, stream.HostInfo{
 		Hostname: "l4c-child", MachineGUID: guid(80),
 	}, stream.CapsReplication)
 	if err != nil {
@@ -612,6 +643,61 @@ func c4DimensionRetention(
 	return tiers
 }
 
+type c4cFineSeamQuerySpec struct {
+	label      string
+	dimension  string
+	after      int64
+	before     int64
+	group      string
+	expression string
+}
+
+func c4cFineSeamRows(
+	t *testing.T,
+	dd *daemon.Daemon,
+	spec c4cFineSeamQuerySpec,
+) ([]canon.Pt, bool) {
+	t.Helper()
+
+	params := daemon.DataParams(c4cContext, spec.after, spec.before, spec.before-spec.after)
+	params.Set("time_group", spec.group)
+	params.Set("time_group_options", spec.expression)
+	params.Set("scope_dimensions", spec.dimension)
+	params.Set("options", "jsonwrap|unaligned")
+	doc, err := dd.DataV3("l4c-child", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok := true
+	if !assertTierPresence(t, doc, []bool{true, true, false}) {
+		t.Logf("%s query did not cross the tier1-to-tier0 seam", spec.label)
+		ok = false
+	}
+	if !assertExactView(t, doc, spec.after, spec.before, 1) {
+		t.Logf("%s query returned the wrong view grid", spec.label)
+		ok = false
+	}
+	if !assertOnlyColumn(t, cols, spec.dimension) {
+		t.Logf("%s query returned the wrong columns", spec.label)
+		return nil, false
+	}
+	if !assertEventColumnContract(t, cols, spec.dimension, eventColumnContract{
+		after: spec.after, before: spec.before, rowSpan: 1,
+		maxEventsPerRow: 1,
+		total:           columnTotalBounds{min: 0, max: float64(spec.before - spec.after)},
+	}) {
+		t.Logf("%s query returned an invalid event-row sequence", spec.label)
+		ok = false
+	}
+
+	return cols[spec.dimension], ok
+}
+
 // c4cFineEventsAuthoritative proves the automatic seam never hides exact
 // events available from the finer tier. The crossing coarse record remains the
 // approximation for its unavailable prefix, but it cannot consume any event
@@ -628,7 +714,10 @@ func c4cFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bo
 		candidateBoundary := retention[0].FirstEntry
 		candidateCoarseEnd := c4AlignUp(
 			candidateBoundary, c4cConditionEpoch, c4cCounterPeriod)
-		if candidateCoarseEnd-candidateBoundary >= 2 {
+		fineSuffix := candidateCoarseEnd - candidateBoundary + 1
+		// Leave a nonempty coarse-only prefix so this is a real overlap seam,
+		// not a coarse record whose entire interval is available from tier0.
+		if fineSuffix >= 3 && fineSuffix < tier1Gran {
 			dimension = candidate
 			boundary = candidateBoundary
 			coarseEnd = candidateCoarseEnd
@@ -641,36 +730,17 @@ func c4cFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bo
 	}
 
 	after, before := coarseEnd-120, coarseEnd+60
-	params := daemon.DataParams(c4cContext, after, before, before-after)
-	params.Set("time_group", "number-of-times")
-	params.Set("time_group_options", ">=-1")
-	params.Set("scope_dimensions", dimension)
-	params.Set("options", "jsonwrap|unaligned")
-	doc, err := dd.DataV3("l4c-child", params)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cols, err := canon.Columns(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ok := true
-	if !assertTierPresence(t, doc, []bool{true, true, false}) {
-		t.Log("fine-event authority query did not cross the tier1-to-tier0 seam")
-		ok = false
-	}
-	if !assertExactView(t, doc, after, before, 1) {
-		t.Log("fine-event authority query returned the wrong view grid")
-		ok = false
-	}
-	if !assertOnlyColumn(t, cols, dimension) {
-		t.Log("fine-event authority query returned the wrong columns")
+	rows, ok := c4cFineSeamRows(t, dd, c4cFineSeamQuerySpec{
+		label: "fine-event authority", dimension: dimension,
+		after: after, before: before,
+		group: "number-of-times", expression: ">=-1",
+	})
+	if rows == nil {
 		return false
 	}
 
 	fineRows, retainedEvents := 0, 0
-	for _, point := range cols[dimension] {
+	for _, point := range rows {
 		if point.T < boundary || point.T > coarseEnd {
 			continue
 		}
@@ -698,14 +768,15 @@ func c4cFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bo
 }
 
 // c4cFineFlapsAuthoritative is the stateful counterpart of
-// c4cFineEventsAuthoritative. It finds a deterministic threshold with multiple
-// false-to-true transitions under one crossing coarse record and requires every
-// transition visible in the fine tier to survive.
+// c4cFineEventsAuthoritative. The fixture's alternating high bit guarantees a
+// false-to-true transition under a crossing coarse record with three fine
+// samples, and every transition visible in the fine tier must survive.
 func c4cFineFlapsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 	t.Helper()
 
+	const threshold = int64(1 << 23)
 	var dimension string
-	var boundary, coarseEnd, threshold int64
+	var boundary, coarseEnd int64
 	var expected map[int64]float64
 	wantFlaps := 0
 	for d := 0; d < c4cDims && dimension == ""; d++ {
@@ -715,76 +786,55 @@ func c4cFineFlapsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) boo
 		candidateBoundary := retention[0].FirstEntry
 		candidateCoarseEnd := c4AlignUp(
 			candidateBoundary, c4cConditionEpoch, c4cCounterPeriod)
-		if candidateCoarseEnd-candidateBoundary < 4 {
+		fineSuffix := candidateCoarseEnd - candidateBoundary + 1
+		// As above, require both a fine suffix and a coarse-only prefix.
+		if fineSuffix < 3 || fineSuffix >= tier1Gran {
 			continue
 		}
 
-		values := make([]int64, 0, candidateCoarseEnd-candidateBoundary+1)
+		// The coarse record spans alternating low/high values, so its stored
+		// min/max straddles the threshold and leaves the coarse state true.
+		state := true
+		candidateExpected := make(map[int64]float64, fineSuffix)
+		candidateFlaps := 0
 		for ts := candidateBoundary; ts <= candidateCoarseEnd; ts++ {
-			values = append(values, c4cValue(int64(d), ts-fixture.T0))
-		}
-		for _, candidateThreshold := range values {
-			state := true // a mixed crossing record leaves flap state true
-			candidateExpected := make(map[int64]float64, len(values))
-			candidateFlaps := 0
-			for i, value := range values {
-				now := value >= candidateThreshold
-				event := !state && now
-				state = now
-				if event {
-					candidateFlaps++
-					candidateExpected[candidateBoundary+int64(i)] = 1
-				} else {
-					candidateExpected[candidateBoundary+int64(i)] = 0
-				}
-			}
-			if candidateFlaps >= 2 {
-				dimension = candidate
-				boundary = candidateBoundary
-				coarseEnd = candidateCoarseEnd
-				threshold = candidateThreshold
-				expected = candidateExpected
-				wantFlaps = candidateFlaps
-				break
+			now := c4cValue(int64(d), ts-fixture.T0) >= threshold
+			event := !state && now
+			state = now
+			if event {
+				candidateFlaps++
+				candidateExpected[ts] = 1
+			} else {
+				candidateExpected[ts] = 0
 			}
 		}
+		if candidateFlaps < 1 {
+			t.Fatalf("alternating flap fixture produced no transition over %d fine samples", fineSuffix)
+		}
+		dimension = candidate
+		boundary = candidateBoundary
+		coarseEnd = candidateCoarseEnd
+		expected = candidateExpected
+		wantFlaps = candidateFlaps
 	}
 	if dimension == "" {
-		t.Log("no crossing tier1 record has multiple deterministic fine-tier flaps")
+		t.Log("no dimension has three exact fine points under its crossing tier1 record")
 		return false
 	}
 
 	after, before := coarseEnd-120, coarseEnd+60
-	params := daemon.DataParams(c4cContext, after, before, before-after)
-	params.Set("time_group", "number-of-flaps")
-	params.Set("time_group_options", ">="+strconv.FormatInt(threshold, 10))
-	params.Set("scope_dimensions", dimension)
-	params.Set("options", "jsonwrap|unaligned")
-	doc, err := dd.DataV3("l4c-child", params)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cols, err := canon.Columns(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ok := true
-	if !assertTierPresence(t, doc, []bool{true, true, false}) {
-		t.Log("fine-flap authority query did not cross the tier1-to-tier0 seam")
-		ok = false
-	}
-	if !assertExactView(t, doc, after, before, 1) {
-		t.Log("fine-flap authority query returned the wrong view grid")
-		ok = false
-	}
-	if !assertOnlyColumn(t, cols, dimension) {
-		t.Log("fine-flap authority query returned the wrong columns")
+	rows, ok := c4cFineSeamRows(t, dd, c4cFineSeamQuerySpec{
+		label: "fine-flap authority", dimension: dimension,
+		after: after, before: before,
+		group:      "number-of-flaps",
+		expression: ">=" + strconv.FormatInt(threshold, 10),
+	})
+	if rows == nil {
 		return false
 	}
 
 	fineRows, retainedFlaps := 0, 0
-	for _, point := range cols[dimension] {
+	for _, point := range rows {
 		want, fine := expected[point.T]
 		if !fine {
 			continue
@@ -1004,10 +1054,14 @@ func c4ConditionContract(t *testing.T, dd *daemon.Daemon, spec c4ConditionSpec) 
 			if spec.rowSpan > 1 {
 				maxEventsPerRow += seams
 			}
-			if !assertEventColumnShapeAndTotalRange(
-				t, cols, query.dimension, spec.after, spec.before, spec.rowSpan,
-				maxEventsPerRow,
-				exactTotal, exactTotal+float64(seams)) {
+			if !assertEventColumnContract(t, cols, query.dimension, eventColumnContract{
+				after: spec.after, before: spec.before, rowSpan: spec.rowSpan,
+				maxEventsPerRow: maxEventsPerRow,
+				total: columnTotalBounds{
+					min: exactTotal,
+					max: exactTotal + float64(seams),
+				},
+			}) {
 				// Fine-tier events are authoritative. A crossing coarse
 				// record is the estimate for its unavailable prefix, but its
 				// aggregate still includes the fine suffix and may therefore
@@ -1193,8 +1247,9 @@ func c4cSumConserves(
 			}
 		}
 
+		tierPoints, _ := strictTierPoints(t, doc)
 		t.Logf("plan-switch conservation [%s]: %ds buckets (%d points, per_tier %v) total %.10g, want %.10g",
-			label, rowSpan, points, perTierPoints(doc), total, want)
+			label, rowSpan, points, tierPoints, total, want)
 	}
 
 	return ok

@@ -93,41 +93,9 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 		}
 	}
 
-	dig := func(m map[string]any, path ...string) any {
-		var cur any = m
-		for _, k := range path {
-			mm, is := cur.(map[string]any)
-			if !is {
-				return nil
-			}
-			cur = mm[k]
-		}
-		return cur
-	}
-	dimIndex := func(resp map[string]any, name string) int {
-		labels, _ := dig(resp, "result", "labels").([]any)
-		for i, l := range labels {
-			if l == name {
-				return i - 1 // labels[0] is "time"
-			}
-		}
-		return -1
-	}
-	rowVal := func(resp map[string]any, row, dim int) (float64, bool) {
-		data, _ := dig(resp, "result", "data").([]any)
-		if row >= len(data) {
-			return 0, false
-		}
-		r, _ := data[row].([]any)
-		if dim+1 >= len(r) {
-			return 0, false
-		}
-		point, _ := r[dim+1].([]any)
-		if len(point) < 1 {
-			return 0, false
-		}
-		v, is := point[0].(float64)
-		return v, is
+	type wholeResult struct {
+		doc  map[string]any
+		cols map[string][]canon.Pt
 	}
 
 	// one whole-window bucket: after..before covers every sample, points=1,
@@ -137,7 +105,7 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 	// 12s window, and the aligned path rounds `before` to a multiple of the
 	// group, which slides the window off the fixture (measured: it served
 	// t4..t12, nine samples, so every hand-derived count would be wrong).
-	whole := func(group, options string, extra map[string]string) map[string]any {
+	whole := func(group, options string, extra map[string]string) wholeResult {
 		t.Helper()
 		opts := "unaligned"
 		if extraOpts, has := extra["options"]; has {
@@ -166,15 +134,51 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return resp
+		cols, err := canon.Columns(resp)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		dimensions := []string{"bool", "counter", "sparse"}
+		if scoped := extra["scope_dimensions"]; scoped != "" {
+			dimensions = []string{scoped}
+		}
+		if !assertExactColumnSet(t, cols, dimensions) {
+			ok = false
+		}
+		points := 1
+		if raw := extra["points"]; raw != "" {
+			points, err = strconv.Atoi(raw)
+			if err != nil || points <= 0 || 12%points != 0 {
+				t.Fatalf("invalid whole-window point count %q", raw)
+			}
+		}
+		step := int64(12 / points)
+		viewOK := false
+		if points == 1 {
+			// The one-bucket unaligned path reports its inclusive view
+			// envelope, including the empty lower-bound second.
+			viewOK = assertViewFields(t, resp, fixture.T0, fixture.T0+12, 13)
+		} else {
+			viewOK = assertExactView(t, resp, fixture.T0, fixture.T0+12, step)
+		}
+		if !viewOK {
+			ok = false
+		}
+		for _, dimension := range dimensions {
+			if !assertColumnExactGrid(t, cols, dimension, fixture.T0, fixture.T0+12, step) {
+				ok = false
+			}
+		}
+		return wholeResult{doc: resp, cols: cols}
 	}
 	// value of one dimension in the single whole-window bucket
-	val := func(resp map[string]any, dim string) (float64, bool) {
-		di := dimIndex(resp, dim)
-		if di < 0 {
+	val := func(result wholeResult, dim string) (float64, bool) {
+		column, has := result.cols[dim]
+		if !has || len(column) != 1 || column[0].Value == nil {
 			return 0, false
 		}
-		return rowVal(resp, 0, di)
+		return *column[0].Value, true
 	}
 	// json2 rounds values to seven decimals, so an exact ratio like 2/12
 	// arrives as 16.6666667
@@ -189,13 +193,21 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 		"percentage-of-samples", "percentage-of-time", "number-of-flaps", "number-of-times",
 	} {
 		resp := whole(name, ">0", map[string]string{"options": "debug"})
-		echo := dig(resp, "request", "aggregations", "time", "time_group")
-		check(echo == name, "echo for %s is %v, want %s", name, echo, name)
+		request, requestOK := resp.doc["request"].(map[string]any)
+		aggregations, aggregationsOK := request["aggregations"].(map[string]any)
+		timeAggregation, timeOK := aggregations["time"].(map[string]any)
+		echo, echoOK := timeAggregation["time_group"].(string)
+		check(requestOK && aggregationsOK && timeOK && echoOK && echo == name,
+			"echo for %s is %v, want %s", name, timeAggregation["time_group"], name)
 	}
 	respAlias := whole("countif", ">0", map[string]string{"options": "debug"})
-	echoAlias := dig(respAlias, "request", "aggregations", "time", "time_group")
-	check(echoAlias == "percentage-of-samples",
-		"countif echo is %v, want percentage-of-samples (alias resolves to the canonical name)", echoAlias)
+	request, requestOK := respAlias.doc["request"].(map[string]any)
+	aggregations, aggregationsOK := request["aggregations"].(map[string]any)
+	timeAggregation, timeOK := aggregations["time"].(map[string]any)
+	echoAlias, echoOK := timeAggregation["time_group"].(string)
+	check(requestOK && aggregationsOK && timeOK && echoOK && echoAlias == "percentage-of-samples",
+		"countif echo is %v, want percentage-of-samples (alias resolves to the canonical name)",
+		timeAggregation["time_group"])
 
 	// ------------------------------------------------------------------
 	// 2. bool: the four groupings over `==0`
@@ -320,14 +332,12 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 	{
 		params := map[string]string{"points": "6", "options": "flip"}
 		r := whole("percentage-of-time", "==gap", params)
-		si := dimIndex(r, "sparse")
-		check(si >= 0, "sparse dimension missing from the 6-bucket sweep")
-		if si >= 0 {
-			want := []float64{0, 0, 100, 100, 0, 0} // oldest-first with flip
-			for row, w := range want {
-				v, is := rowVal(r, row, si)
-				check(is && near(v, w), "6-bucket percentage-of-time ==gap row %d = %v (num=%v), want %v", row, v, is, w)
-			}
+		want := make([]expectedColumnPoint, 0, 6)
+		for i, value := range []float64{0, 0, 100, 100, 0, 0} {
+			want = append(want, wantNumberAt(fixture.T0+int64((i+1)*2), value))
+		}
+		if !assertExactColumn(t, r.cols, "sparse", want, 1e-6) {
+			check(false, "6-bucket percentage-of-time ==gap did not return the exact expected sparse sequence")
 		}
 	}
 
@@ -352,12 +362,7 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 			r := whole("percentage-of-samples", "==gap", map[string]string{
 				"points": points, "options": "flip", "scope_dimensions": "bool",
 			})
-			cols, err := canon.Columns(r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !assertOnlyColumn(t, cols, "bool") ||
-				!assertExactColumn(t, cols, "bool", want, 0) {
+			if !assertExactColumn(t, r.cols, "bool", want, 0) {
 				check(false, "points=%s: percentage-of-samples ==gap did not return exactly %d numeric zero rows",
 					points, n)
 			}
@@ -365,12 +370,7 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 			rt := whole("number-of-times", "==gap", map[string]string{
 				"points": points, "options": "flip", "scope_dimensions": "bool",
 			})
-			cols, err = canon.Columns(rt)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !assertOnlyColumn(t, cols, "bool") ||
-				!assertExactColumn(t, cols, "bool", want, 0) {
+			if !assertExactColumn(t, rt.cols, "bool", want, 0) {
 				check(false, "points=%s: number-of-times ==gap did not return exactly %d numeric zero rows",
 					points, n)
 			}
@@ -388,7 +388,7 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 			{"countif", "%"},
 		} {
 			r := whole(tc.group, ">0", nil)
-			u := viewUnits(r)
+			u := viewUnits(r.doc)
 			check(u == tc.units, "units for %s = %q, want %q", tc.group, u, tc.units)
 		}
 	}

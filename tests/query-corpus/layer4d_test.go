@@ -81,9 +81,13 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dd.Stop() })
+	t.Cleanup(func() {
+		if err := dd.Stop(); err != nil {
+			t.Errorf("stop dedicated daemon: %v", err)
+		}
+	})
 
-	conn, err := stream.Connect(dd.Addr, daemon.StreamKey, stream.HostInfo{
+	conn, err := stream.Connect(dd.Addr, dd.StreamKey, stream.HostInfo{
 		Hostname: "l4d-child", MachineGUID: guid(81),
 	}, stream.CapsReplication)
 	if err != nil {
@@ -347,8 +351,8 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 				}
 			}
 		}
-		if !c4dFineEventsAuthoritative(t, dd, lastT) {
-			fail("tier2-to-tier1 seam hid an event emitted by the finer tier")
+		if !c4dFineEventGroupingsAuthoritative(t, dd, lastT) {
+			fail("tier2-to-tier1 seam hid an event or flap emitted by the finer tier")
 		}
 
 		assertContract(t, "L4/three-tier-join", ok)
@@ -661,15 +665,16 @@ func c4dAlignedResultExact(
 	return empty, ok
 }
 
-// c4dFineEventsAuthoritative compares the tier1 suffix of an automatic
-// tier2-to-tier1 seam with a forced-tier1 control. Tier1 is still rolled up,
-// but it is the finest retained evidence for that interval and every event it
-// emits must survive the join with tier2.
-func c4dFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
+type c4dFineSeam struct {
+	dimension     string
+	boundary      int64
+	coarseEnd     int64
+	flapThreshold int64
+}
+
+func c4dFindFineSeam(t *testing.T, dd *daemon.Daemon, lastT int64) (c4dFineSeam, bool) {
 	t.Helper()
 
-	var dimension string
-	var boundary, coarseEnd int64
 	for d := 0; d < c4dDims; d++ {
 		candidate := c4cDimID(d)
 		retention := c4DimensionRetention(
@@ -677,24 +682,82 @@ func c4dFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bo
 		candidateBoundary := retention[1].FirstEntry
 		candidateCoarseEnd := c4AlignUp(
 			candidateBoundary, c4dConditionEpoch, c4dTier2Granularity)
-		if candidateCoarseEnd-candidateBoundary >= c4dTier1Grouping {
-			dimension = candidate
-			boundary = candidateBoundary
-			coarseEnd = candidateCoarseEnd
-			break
+		fineSuffix := candidateCoarseEnd - candidateBoundary
+		if fineSuffix < 2*c4dTier1Grouping || fineSuffix >= c4dTier2Granularity {
+			continue
 		}
-	}
-	if dimension == "" {
-		t.Log("no dimension has multiple tier1 records under its crossing tier2 record")
-		return false
+
+		// The automatic fine plan starts after candidateBoundary, so its two
+		// retained tier1 records end at boundary+5 and boundary+10. Find a
+		// threshold strictly inside both records' exact min/max ranges; each
+		// record then emits one deterministic higher-tier flap.
+		commonMin, commonMax := int64(0), int64(0xFFFFFF)
+		fineRecords := 0
+		for end := candidateBoundary + c4dTier1Grouping; end <= candidateCoarseEnd; end += c4dTier1Grouping {
+			recordMin := c4cValue(int64(d), end-c4dTier1Grouping+1-fixture.T0)
+			recordMax := recordMin
+			for ts := end - c4dTier1Grouping + 2; ts <= end; ts++ {
+				value := c4cValue(int64(d), ts-fixture.T0)
+				if value < recordMin {
+					recordMin = value
+				}
+				if value > recordMax {
+					recordMax = value
+				}
+			}
+			if recordMin > commonMin {
+				commonMin = recordMin
+			}
+			if recordMax < commonMax {
+				commonMax = recordMax
+			}
+			fineRecords++
+		}
+		if fineRecords < 2 || commonMax-commonMin < 2 {
+			continue
+		}
+
+		threshold := commonMin + (commonMax-commonMin)/2
+		if threshold <= commonMin || threshold >= commonMax {
+			continue
+		}
+		return c4dFineSeam{
+			dimension:     candidate,
+			boundary:      candidateBoundary,
+			coarseEnd:     candidateCoarseEnd,
+			flapThreshold: threshold,
+		}, true
 	}
 
-	after, before := coarseEnd-30, coarseEnd+30
+	t.Log("no dimension has two authoritative tier1 records with a shared flap threshold under its crossing tier2 record")
+	return c4dFineSeam{}, false
+}
+
+type c4dFineAuthoritySpec struct {
+	label         string
+	group         string
+	expression    string
+	minimumEvents int
+}
+
+// c4dFineAuthority compares the tier1 suffix of an automatic tier2-to-tier1
+// seam with a forced-tier1 control. Tier1 is still rolled up, but it is the
+// finest retained evidence for that interval and every event it emits must
+// survive the join with tier2.
+func c4dFineAuthority(
+	t *testing.T,
+	dd *daemon.Daemon,
+	seam c4dFineSeam,
+	spec c4dFineAuthoritySpec,
+) bool {
+	t.Helper()
+
+	after, before := seam.coarseEnd-30, seam.coarseEnd+30
 	points := before - after
 	autoParams := daemon.DataParams(c4dContext, after, before, points)
-	autoParams.Set("time_group", "number-of-times")
-	autoParams.Set("time_group_options", ">=-1")
-	autoParams.Set("scope_dimensions", dimension)
+	autoParams.Set("time_group", spec.group)
+	autoParams.Set("time_group_options", spec.expression)
+	autoParams.Set("scope_dimensions", seam.dimension)
 	autoParams.Set("options", "jsonwrap|unaligned")
 	autoDoc, err := dd.DataV3("l4d-child", autoParams)
 	if err != nil {
@@ -702,9 +765,9 @@ func c4dFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bo
 	}
 
 	fineParams := daemon.DataParamsTier(
-		c4dContext, 1, after, before, points, "number-of-times")
-	fineParams.Set("time_group_options", ">=-1")
-	fineParams.Set("scope_dimensions", dimension)
+		c4dContext, 1, after, before, points, spec.group)
+	fineParams.Set("time_group_options", spec.expression)
+	fineParams.Set("scope_dimensions", seam.dimension)
 	fineParams.Set("options", "jsonwrap|unaligned")
 	fineDoc, err := dd.DataV3("l4d-child", fineParams)
 	if err != nil {
@@ -722,33 +785,42 @@ func c4dFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bo
 
 	ok := true
 	if !assertTierPresence(t, autoDoc, []bool{false, true, true}) {
-		t.Log("fine-event authority query did not cross the tier2-to-tier1 seam")
+		t.Logf("%s query did not cross the tier2-to-tier1 seam", spec.label)
 		ok = false
 	}
 	if !assertExactView(t, autoDoc, after, before, 1) ||
 		!assertExactView(t, fineDoc, after, before, 1) {
-		t.Log("fine-event authority query or control returned the wrong view grid")
+		t.Logf("%s query or control returned the wrong view grid", spec.label)
 		ok = false
 	}
 	if !assertSelectedTier(t, fineDoc, 1) {
-		t.Log("fine-event authority control did not stay on tier1")
+		t.Logf("%s control did not stay on tier1", spec.label)
 		ok = false
 	}
-	if !assertOnlyColumn(t, autoCols, dimension) ||
-		!assertOnlyColumn(t, fineCols, dimension) {
+	if !assertOnlyColumn(t, autoCols, seam.dimension) ||
+		!assertOnlyColumn(t, fineCols, seam.dimension) {
 		return false
 	}
+	if !assertColumnExactGrid(t, autoCols, seam.dimension, after, before, 1) {
+		t.Logf("%s automatic query returned an invalid event-row sequence", spec.label)
+		ok = false
+	}
+	if !assertColumnExactGrid(t, fineCols, seam.dimension, after, before, 1) {
+		t.Logf("%s forced-tier1 control returned an invalid event-row sequence", spec.label)
+		ok = false
+	}
 
-	autoByTime := make(map[int64]*float64, len(autoCols[dimension]))
-	for _, point := range autoCols[dimension] {
+	autoByTime := make(map[int64]*float64, len(autoCols[seam.dimension]))
+	for _, point := range autoCols[seam.dimension] {
 		autoByTime[point.T] = point.Value
 	}
 
-	fineEvents := 0
-	for _, point := range fineCols[dimension] {
-		if point.T < boundary || point.T > coarseEnd {
+	fineRows, fineEvents := 0, 0
+	for _, point := range fineCols[seam.dimension] {
+		if point.T <= seam.boundary || point.T > seam.coarseEnd {
 			continue
 		}
+		fineRows++
 		got, found := autoByTime[point.T]
 		if !found {
 			t.Logf("automatic seam is missing tier1 result row %d", point.T)
@@ -784,14 +856,43 @@ func c4dFineEventsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bo
 		}
 		fineEvents += int(*point.Value)
 	}
-	if fineEvents < 2 {
-		t.Logf("tier1 emits only %d events under the crossing tier2 record", fineEvents)
+	wantFineRows := int(seam.coarseEnd - seam.boundary)
+	if fineRows != wantFineRows {
+		t.Logf("%s compared %d fine rows, want %d", spec.label, fineRows, wantFineRows)
+		ok = false
+	}
+	if fineEvents < spec.minimumEvents {
+		t.Logf("%s tier1 emits only %d events under the crossing tier2 record, want at least %d",
+			spec.label, fineEvents, spec.minimumEvents)
 		ok = false
 	}
 
-	t.Logf("%s crossing tier2 record ends at %d; tier1 starts at %d; tier1 emits %d exact finer-tier events",
-		dimension, coarseEnd, boundary, fineEvents)
+	t.Logf("%s: %s crossing tier2 record ends at %d; tier1 starts after %d; tier1 emits %d authoritative finer-tier events",
+		spec.label, seam.dimension, seam.coarseEnd, seam.boundary, fineEvents)
 	return ok
+}
+
+func c4dFineEventGroupingsAuthoritative(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
+	t.Helper()
+
+	seam, found := c4dFindFineSeam(t, dd, lastT)
+	if !found {
+		return false
+	}
+
+	timesOK := c4dFineAuthority(t, dd, seam, c4dFineAuthoritySpec{
+		label:         "number-of-times fine authority",
+		group:         "number-of-times",
+		expression:    ">=-1",
+		minimumEvents: 2,
+	})
+	flapsOK := c4dFineAuthority(t, dd, seam, c4dFineAuthoritySpec{
+		label:         "number-of-flaps fine authority",
+		group:         "number-of-flaps",
+		expression:    ">=" + strconv.FormatInt(seam.flapThreshold, 10),
+		minimumEvents: 2,
+	})
+	return timesOK && flapsOK
 }
 
 func c4dRequireSeamWindow(

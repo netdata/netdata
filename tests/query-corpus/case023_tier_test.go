@@ -467,7 +467,7 @@ func TestCase023TierAnomalyBit(t *testing.T) {
 	d := ch.Dimensions[0]
 	stored := d.TierWindows(tier1Gran)
 
-	query := func(options string) []canon.Pt {
+	query := func(options string) map[string][]canon.Pt {
 		t.Helper()
 		params := daemon.DataParamsTier(ch.Context, 1, after, lastEnd, points, "percentage-of-time")
 		params.Set("options", "jsonwrap|anomaly-bit")
@@ -480,16 +480,45 @@ func TestCase023TierAnomalyBit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return cols[d.ID]
+		return cols
 	}
 
-	atLeast := query(">=50")
-	below := query("<50")
+	atLeastCols := query(">=50")
+	belowCols := query("<50")
+	if !assertOnlyColumn(t, atLeastCols, d.ID) || !assertOnlyColumn(t, belowCols, d.ID) {
+		ok = false
+	}
+	atLeast, below := atLeastCols[d.ID], belowCols[d.ID]
+
+	atLeastWant := make([]expectedColumnPoint, 0, points)
+	belowWant := make([]expectedColumnPoint, 0, points)
+	for row := int64(1); row <= points; row++ {
+		ts := after + row*tier1Gran
+		window, has := stored[ts]
+		if !has || window.Count == 0 {
+			t.Fatalf("fixture has no stored window at %d", ts)
+		}
+		rate := 100 * float64(window.AnomalyCount) / float64(window.Count)
+		atLeastValue := 0.0
+		if rate >= 50 {
+			atLeastValue = 100
+		}
+		atLeastWant = append(atLeastWant, wantNumberAt(ts, atLeastValue))
+		belowWant = append(belowWant, wantNumberAt(ts, 100-atLeastValue))
+	}
+	if !assertExactColumn(t, atLeastCols, d.ID, atLeastWant, 1e-6) ||
+		!assertExactColumn(t, belowCols, d.ID, belowWant, 1e-6) {
+		ok = false
+	}
 
 	checked, above, under := 0, 0, 0
 	for i, pt := range atLeast {
 		w, has := stored[pt.T]
-		if !has || w.Count == 0 || pt.Value == nil {
+		if !has || w.Count == 0 {
+			t.Fatalf("response timestamp %d has no fixture window", pt.T)
+		}
+		if pt.Value == nil {
+			ok = false
 			continue
 		}
 		checked++

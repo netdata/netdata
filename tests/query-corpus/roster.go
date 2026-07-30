@@ -20,40 +20,39 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
-// engineSrcDir is the src/ tree of the agent under test. It defaults to the
-// checkout the corpus lives in, which is the case that matters: in-tree, the
-// engine and the corpus move together. QUERY_CORPUS_SRC overrides it for a
-// run against a binary built from a DIFFERENT worktree (validating a fix
-// branch), where the corpus checkout's enum is not the one that was compiled.
+// engineSourceDir is resolved together with netdataBinary by TestMain.
+var engineSourceDir string
+
 func engineSrcDir() (string, error) {
-	dir := os.Getenv("QUERY_CORPUS_SRC")
+	dir := engineSourceDir
 	if dir == "" {
-		dir = "../../src"
+		var err error
+		dir, err = filepath.Abs("../../src")
+		if err != nil {
+			return "", err
+		}
 	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return "", err
+	if _, err := os.Stat(filepath.Join(dir, "web/api/queries/query.h")); err != nil {
+		return "", fmt.Errorf("engine source not found at %s: %w", dir, err)
 	}
-	if _, err := os.Stat(filepath.Join(abs, "web/api/queries/query.h")); err != nil {
-		return "", fmt.Errorf("engine source not found at %s (set QUERY_CORPUS_SRC): %w", abs, err)
-	}
-	return abs, nil
+	return dir, nil
 }
 
 var (
-	// A member of the enum. The character class is deliberately wide and the
-	// comma may be preceded by a C block comment: this regex is the SOLE gate
-	// that notices a new grouping, so anything it fails to match is a
-	// grouping nothing tests. Better to accept a spelling the codebase does
-	// not use than to miss one it might.
+	reGroupingEnum = regexp.MustCompile(
+		`(?s)typedef\s+enum\s+rrdr_time_grouping\s*\{`)
 	reGroupingEnumMember = regexp.MustCompile(
-		`^\s*(RRDR_GROUPING_[A-Za-z0-9_]+)\s*(?:=\s*[^,/]+)?\s*(?:/\*.*?\*/\s*)*,`)
-	// the registry's canonical name and the value it stands for
-	reRegistryName  = regexp.MustCompile(`\.name\s*=\s*"([^"]+)"`)
-	reRegistryValue = regexp.MustCompile(`\.value\s*=\s*(RRDR_GROUPING_[A-Z0-9_]+)`)
+		`^\s*(RRDR_GROUPING_[A-Za-z0-9_]+)\b`)
+	reGroupingRegistry = regexp.MustCompile(
+		`(?s)\bapi_v1_data_groups\s*\[\s*\]\s*=\s*\{`)
+	reRegistryName = regexp.MustCompile(
+		`(?s)\.name\s*=\s*("(?:\\.|[^"\\])*")`)
+	reRegistryValue = regexp.MustCompile(
+		`(?s)\.value\s*=\s*(RRDR_GROUPING_[A-Za-z0-9_]+)\b`)
 )
 
 // groupingRoster is what the engine offers: every enum constant that names a
@@ -84,85 +83,292 @@ func readGroupingRoster() (*groupingRoster, error) {
 		return nil, err
 	}
 
+	r, err := parseGroupingRoster(enumBody, registry)
+	if err != nil {
+		return nil, fmt.Errorf("parse grouping roster from %s: %w", src, err)
+	}
+	return r, nil
+}
+
+func parseGroupingRoster(enumSource, registrySource []byte) (*groupingRoster, error) {
+	enumText, err := stripCComments(string(enumSource))
+	if err != nil {
+		return nil, fmt.Errorf("enum source: %w", err)
+	}
+	registryText, err := stripCComments(string(registrySource))
+	if err != nil {
+		return nil, fmt.Errorf("registry source: %w", err)
+	}
+
+	enumBody, err := delimitedBody(enumText, reGroupingEnum)
+	if err != nil {
+		return nil, fmt.Errorf("time-grouping enum: %w", err)
+	}
+	registryBody, err := delimitedBody(registryText, reGroupingRegistry)
+	if err != nil {
+		return nil, fmt.Errorf("time-grouping registry: %w", err)
+	}
+
 	r := &groupingRoster{
 		Canonical: map[string]string{},
 		Aliases:   map[string][]string{},
 	}
-
-	// the enum, between `typedef enum rrdr_time_grouping {` and its close
-	inEnum := false
-	declared := map[string]bool{}
-	for _, line := range strings.Split(string(enumBody), "\n") {
-		if !inEnum {
-			if strings.Contains(line, "typedef enum rrdr_time_grouping") {
-				inEnum = true
+	declared := make(map[string]bool)
+	for _, entry := range splitTopLevel(enumBody, ',') {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		match := reGroupingEnumMember.FindStringSubmatch(entry)
+		if match == nil {
+			if strings.Contains(entry, "RRDR_GROUPING_") {
+				return nil, fmt.Errorf("cannot parse enum member %q", entry)
 			}
 			continue
 		}
-		if strings.HasPrefix(strings.TrimSpace(line), "}") {
-			break
-		}
-		m := reGroupingEnumMember.FindStringSubmatch(line)
-		if m == nil {
+		constant := match[1]
+		if constant == "RRDR_GROUPING_UNDEFINED" || constant == "RRDR_GROUPING_SENTINEL" {
 			continue
 		}
-		c := m[1]
-		// UNDEFINED is the "no grouping" answer and SENTINEL is the loop
-		// bound - neither is a grouping anyone can ask for
-		if c == "RRDR_GROUPING_UNDEFINED" || c == "RRDR_GROUPING_SENTINEL" {
-			continue
+		if declared[constant] {
+			return nil, fmt.Errorf("grouping %s declared twice in the enum", constant)
 		}
-		if declared[c] {
-			return nil, fmt.Errorf("grouping %s declared twice in the enum", c)
-		}
-		declared[c] = true
-		r.Order = append(r.Order, c)
+		declared[constant] = true
+		r.Order = append(r.Order, constant)
 	}
-
 	if len(r.Order) == 0 {
-		return nil, fmt.Errorf("no groupings found in %s/web/api/queries/query.h", src)
+		return nil, fmt.Errorf("no requestable grouping constants found")
 	}
 
-	// the registry: `.name = "x"` then, a few lines down, `.value = CONST`.
-	// The first name a constant gets is its canonical one - that is the one
-	// time_grouping_id2txt() echoes back.
-	var pendingName string
-	for _, line := range strings.Split(string(registry), "\n") {
-		if m := reRegistryName.FindStringSubmatch(line); m != nil {
-			pendingName = m[1]
-			continue
-		}
-		m := reRegistryValue.FindStringSubmatch(line)
-		if m == nil || pendingName == "" {
-			continue
-		}
-		c, name := m[1], pendingName
-		pendingName = ""
+	registryEntries, err := directBraceEntries(registryBody)
+	if err != nil {
+		return nil, fmt.Errorf("time-grouping registry entries: %w", err)
+	}
 
-		if c == "RRDR_GROUPING_UNDEFINED" || c == "RRDR_GROUPING_SENTINEL" {
-			// the registry terminator and the fallback entry
+	publicNames := make(map[string]string)
+	for _, entry := range registryEntries {
+		nameMatches := reRegistryName.FindAllStringSubmatch(entry, -1)
+		valueMatches := reRegistryValue.FindAllStringSubmatch(entry, -1)
+		if len(nameMatches) > 1 || len(valueMatches) > 1 {
+			return nil, fmt.Errorf("registry entry has duplicate name or value fields: %q", entry)
+		}
+		if len(nameMatches) == 0 && len(valueMatches) == 0 {
 			continue
 		}
-		if !declared[c] {
-			return nil, fmt.Errorf("registry offers %q for %s, which the enum does not declare", name, c)
+
+		constant := ""
+		if len(valueMatches) == 1 {
+			constant = valueMatches[0][1]
 		}
-		if _, seen := r.Canonical[c]; seen {
-			r.Aliases[c] = append(r.Aliases[c], name)
+		if constant == "RRDR_GROUPING_UNDEFINED" || constant == "RRDR_GROUPING_SENTINEL" {
 			continue
 		}
-		r.Canonical[c] = name
+		if len(nameMatches) == 0 {
+			return nil, fmt.Errorf("registry entry for %s has no string name", constant)
+		}
+		if constant == "" {
+			name, _ := strconv.Unquote(nameMatches[0][1])
+			return nil, fmt.Errorf("registry name %q has no grouping value", name)
+		}
+
+		name, err := strconv.Unquote(nameMatches[0][1])
+		if err != nil || name == "" {
+			return nil, fmt.Errorf("registry has invalid grouping name %q", nameMatches[0][1])
+		}
+		if !declared[constant] {
+			return nil, fmt.Errorf(
+				"registry offers %q for %s, which the enum does not declare",
+				name, constant)
+		}
+		if previous, duplicate := publicNames[name]; duplicate {
+			return nil, fmt.Errorf(
+				"registry name %q is offered twice for %s and %s",
+				name, previous, constant)
+		}
+		publicNames[name] = constant
+		if _, seen := r.Canonical[constant]; seen {
+			r.Aliases[constant] = append(r.Aliases[constant], name)
+		} else {
+			r.Canonical[constant] = name
+		}
 	}
 
 	var unnamed []string
-	for _, c := range r.Order {
-		if r.Canonical[c] == "" {
-			unnamed = append(unnamed, c)
+	for _, constant := range r.Order {
+		if r.Canonical[constant] == "" {
+			unnamed = append(unnamed, constant)
 		}
 	}
 	if len(unnamed) > 0 {
-		return nil, fmt.Errorf("the enum declares %s but the registry gives no name for them - "+
-			"an unnamed grouping cannot be reached through time_group= at all", strings.Join(unnamed, ", "))
+		return nil, fmt.Errorf(
+			"the enum declares %s but the registry gives no name for them",
+			strings.Join(unnamed, ", "))
 	}
-
 	return r, nil
+}
+
+func delimitedBody(source string, marker *regexp.Regexp) (string, error) {
+	match := marker.FindStringIndex(source)
+	if match == nil {
+		return "", fmt.Errorf("opening declaration not found")
+	}
+	open := strings.LastIndex(source[match[0]:match[1]], "{")
+	if open < 0 {
+		return "", fmt.Errorf("opening brace not found")
+	}
+	open += match[0]
+	close, err := matchingBrace(source, open)
+	if err != nil {
+		return "", err
+	}
+	return source[open+1 : close], nil
+}
+
+func matchingBrace(source string, open int) (int, error) {
+	depth := 0
+	quote := byte(0)
+	escaped := false
+	for i := open; i < len(source); i++ {
+		c := source[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+			} else if c == '\\' {
+				escaped = true
+			} else if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' {
+			quote = c
+			continue
+		}
+		switch c {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("closing brace not found")
+}
+
+func directBraceEntries(source string) ([]string, error) {
+	var entries []string
+	for i := 0; i < len(source); {
+		if source[i] != '{' {
+			i++
+			continue
+		}
+		close, err := matchingBrace(source, i)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, source[i+1:close])
+		i = close + 1
+	}
+	return entries, nil
+}
+
+func splitTopLevel(source string, separator byte) []string {
+	var entries []string
+	start := 0
+	depth := 0
+	quote := byte(0)
+	escaped := false
+	for i := 0; i < len(source); i++ {
+		c := source[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+			} else if c == '\\' {
+				escaped = true
+			} else if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' {
+			quote = c
+			continue
+		}
+		switch c {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		default:
+			if c == separator && depth == 0 {
+				entries = append(entries, source[start:i])
+				start = i + 1
+			}
+		}
+	}
+	entries = append(entries, source[start:])
+	return entries
+}
+
+func stripCComments(source string) (string, error) {
+	out := []byte(source)
+	inBlock, inLine := false, false
+	quote := byte(0)
+	escaped := false
+	for i := 0; i < len(out); i++ {
+		c := out[i]
+		if inLine {
+			if c == '\n' {
+				inLine = false
+			} else {
+				out[i] = ' '
+			}
+			continue
+		}
+		if inBlock {
+			if c == '*' && i+1 < len(out) && out[i+1] == '/' {
+				out[i], out[i+1] = ' ', ' '
+				i++
+				inBlock = false
+			} else if c != '\n' {
+				out[i] = ' '
+			}
+			continue
+		}
+		if quote != 0 {
+			if escaped {
+				escaped = false
+			} else if c == '\\' {
+				escaped = true
+			} else if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' {
+			quote = c
+			continue
+		}
+		if c == '/' && i+1 < len(out) {
+			switch out[i+1] {
+			case '/':
+				out[i], out[i+1] = ' ', ' '
+				i++
+				inLine = true
+			case '*':
+				out[i], out[i+1] = ' ', ' '
+				i++
+				inBlock = true
+			}
+		}
+	}
+	if inBlock {
+		return "", fmt.Errorf("unterminated block comment")
+	}
+	if quote != 0 {
+		return "", fmt.Errorf("unterminated quoted literal")
+	}
+	return string(out), nil
 }

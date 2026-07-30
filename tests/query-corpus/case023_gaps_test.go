@@ -20,7 +20,6 @@
 package corpus
 
 import (
-	"math"
 	"strconv"
 	"testing"
 	"time"
@@ -90,6 +89,7 @@ func TestCase023TrailingGapsRunToTheEnd(t *testing.T) {
 	params := daemon.DataParams(ch.Context, after, before, buckets)
 	params.Set("time_group", "percentage-of-time")
 	params.Set("time_group_options", "==gap")
+	params.Set("scope_dimensions", "stops")
 	doc, err := td.DataV3("c023trail", params)
 	if err != nil {
 		t.Fatal(err)
@@ -99,31 +99,19 @@ func TestCase023TrailingGapsRunToTheEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	col := cols["stops"]
-	if len(col) == 0 {
-		t.Fatalf("no rows for the stopped dimension")
-	}
-
-	tail := 0
-	for _, pt := range col {
-		// a bucket that starts after the last collected sample is entirely
-		// uncollected, whatever the engine decided to walk
-		if pt.T-bucketSpan < fixture.T0+stops {
-			continue
+	want := make([]expectedColumnPoint, 0, buckets)
+	for bucket := 1; bucket <= buckets; bucket++ {
+		value := 0.0
+		if bucket > stops/bucketSpan {
+			value = 100
 		}
-		tail++
-		if pt.Value == nil {
-			check(false, "bucket t0%+d past the last sample is EMPTY, want 100%% gap", pt.T-fixture.T0)
-			continue
-		}
-		check(math.Abs(*pt.Value-100) < 1e-6,
-			"bucket t0%+d past the last sample reads %v, want 100", pt.T-fixture.T0, *pt.Value)
+		want = append(want,
+			wantNumberWithMetadataAt(after+int64(bucket*bucketSpan), value, 0, 0))
 	}
-
-	// the case only proves something if it reaches well beyond the point
-	// the walk used to stop
-	if tail < 20 {
-		t.Fatalf("only %d trailing buckets were examined, want at least 20", tail)
+	if !assertExactView(t, doc, after, before, bucketSpan) ||
+		!assertOnlyColumn(t, cols, "stops") ||
+		!assertExactColumn(t, cols, "stops", want, 1e-6) {
+		check(false, "stopped dimension did not return the exact 30-row 0%%/100%% grid")
 	}
 
 	assertContract(t, "CASE-023/trailing-gaps", ok)
@@ -181,26 +169,14 @@ func TestCase023GapWeightFollowsCollectionInterval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok := true
-	checked := 0
-	for _, pt := range cols["d"] {
-		if pt.Value == nil {
-			continue
-		}
-		checked++
-		// half the slots of every bucket were never collected. Counting a
-		// gap in seconds instead of slots would read ~91% here, because one
-		// missing 10s slot would count as ten.
-		if math.Abs(*pt.Value-50) >= 1e-6 {
-			t.Logf("gap weight contract not met: bucket t0%+d reads %v%%, want 50%% "+
-				"(ten collected slots and ten missing ones)", pt.T-fixture.T0, *pt.Value)
-			ok = false
-		}
+	want := make([]expectedColumnPoint, 0, buckets)
+	for bucket := int64(1); bucket <= buckets; bucket++ {
+		want = append(want,
+			wantNumberWithMetadataAt(after+bucket*perBucket*ue, 50, 0, 0))
 	}
-
-	if checked == 0 {
-		t.Fatalf("no buckets carried a value")
-	}
+	ok := assertExactView(t, doc, after, before, perBucket*ue) &&
+		assertOnlyColumn(t, cols, "d") &&
+		assertExactColumn(t, cols, "d", want, 1e-6)
 
 	assertContract(t, "CASE-023/gap-weight", ok)
 }
@@ -249,12 +225,13 @@ func TestCase023PercentageOfTimeCountsTheWholeWindow(t *testing.T) {
 	}
 
 	ok := true
-	ask := func(group, options string) *float64 {
+	ask := func(group, options string, want float64) bool {
 		t.Helper()
 		params := daemon.DataParams(ch.Context, fixture.T0, fixture.T0+window, 1)
 		params.Set("time_group", group)
 		params.Set("time_group_options", options)
 		params.Set("options", "jsonwrap|unaligned")
+		params.Set("scope_dimensions", "stops")
 		doc, err := td.DataV3("c023denom", params)
 		if err != nil {
 			t.Fatal(err)
@@ -263,40 +240,29 @@ func TestCase023PercentageOfTimeCountsTheWholeWindow(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		col := cols["stops"]
-		if len(col) != 1 {
-			t.Fatalf("%s(%s): got %d buckets, want 1", group, options, len(col))
-		}
-		return col[0].Value
+		return assertViewFields(t, doc, fixture.T0, fixture.T0+window, window+1) &&
+			assertOnlyColumn(t, cols, "stops") &&
+			assertExactColumn(t, cols, "stops", []expectedColumnPoint{
+				wantNumberWithMetadataAt(fixture.T0+window, want, 0, 0),
+			}, 1e-6)
 	}
 
 	// one second of the hundred satisfied the condition
-	if v := ask("percentage-of-time", "==1"); v == nil {
-		t.Logf("denominator contract not met: percentage-of-time ==1 is empty")
-		ok = false
-	} else if math.Abs(*v-1) >= 1e-6 {
-		t.Logf("denominator contract not met: percentage-of-time ==1 reads %v%%, want 1%% "+
-			"(1 collected second satisfying it, %d seconds of window)", *v, window)
+	if !ask("percentage-of-time", "==1", 1) {
+		t.Logf("denominator contract not met: percentage-of-time ==1 is not the exact 1%% answer")
 		ok = false
 	}
 
 	// and the ninety-nine uncollected seconds are the rest of it
-	if v := ask("percentage-of-time", "==gap"); v == nil {
-		t.Logf("denominator contract not met: percentage-of-time ==gap is empty")
-		ok = false
-	} else if math.Abs(*v-99) >= 1e-6 {
-		t.Logf("denominator contract not met: percentage-of-time ==gap reads %v%%, want 99%%", *v)
+	if !ask("percentage-of-time", "==gap", 99) {
+		t.Logf("denominator contract not met: percentage-of-time ==gap is not the exact 99%% answer")
 		ok = false
 	}
 
 	// percentage-of-samples keeps its own contract: it answers about the
 	// samples it was handed, so the single collected one is all of them
-	if v := ask("percentage-of-samples", "==1"); v == nil {
-		t.Logf("denominator contract not met: percentage-of-samples ==1 is empty")
-		ok = false
-	} else if math.Abs(*v-100) >= 1e-6 {
-		t.Logf("denominator contract not met: percentage-of-samples ==1 reads %v%%, want 100%% "+
-			"(this grouping counts samples, not time)", *v)
+	if !ask("percentage-of-samples", "==1", 100) {
+		t.Logf("denominator contract not met: percentage-of-samples ==1 is not the exact 100%% answer")
 		ok = false
 	}
 
@@ -364,25 +330,14 @@ func TestCase023WindowOutsideRetention(t *testing.T) {
 		return
 	}
 
-	col, has := cols["gone"]
-	if !has || len(col) == 0 {
-		t.Logf("a window entirely past the dimension's retention returned no rows for it at all, "+
-			"want %d buckets of 100%% gap", buckets)
-		assertContract(t, "CASE-023/window-outside-retention", false)
-		return
+	want := make([]expectedColumnPoint, 0, buckets)
+	for bucket := int64(1); bucket <= buckets; bucket++ {
+		want = append(want,
+			wantNumberWithMetadataAt(after+bucket*bucketSpan, 100, 0, 0))
 	}
-
-	for _, pt := range col {
-		if pt.Value == nil {
-			t.Logf("bucket t0%+d, entirely past retention, is EMPTY, want 100%% gap", pt.T-fixture.T0)
-			ok = false
-			continue
-		}
-		if math.Abs(*pt.Value-100) > 1e-6 {
-			t.Logf("bucket t0%+d, entirely past retention, reads %v, want 100", pt.T-fixture.T0, *pt.Value)
-			ok = false
-		}
-	}
+	ok = assertExactView(t, doc, after, before, bucketSpan) &&
+		assertOnlyColumn(t, cols, "gone") &&
+		assertExactColumn(t, cols, "gone", want, 1e-6)
 
 	assertContract(t, "CASE-023/window-outside-retention", ok)
 }

@@ -7,9 +7,12 @@
 package daemon
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,14 +20,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
 
-// StreamKey is the stream.conf api key the fixture children connect
-// with — a fixed random UUID identifying the corpus child on a local
-// throwaway daemon, not a credential.
-const StreamKey = "6c41aa90-b303-49a6-83c8-4859b042e4a0"
+const (
+	autoPortAttempts = 5
+	defaultTermWait  = 30 * time.Second
+	defaultKillWait  = 5 * time.Second
+)
+
+var errProcessNotReaped = errors.New("daemon: failed startup process is not reaped")
 
 // Options configures the daemon under test.
 type Options struct {
@@ -53,15 +60,27 @@ type Options struct {
 
 // Daemon is one running netdata under test.
 type Daemon struct {
-	Opts    Options
-	BaseURL string
-	Addr    string // host:port for streaming connections
-	cmd     *exec.Cmd
+	Opts      Options
+	BaseURL   string
+	Addr      string // host:port for streaming connections
+	Hostname  string
+	StreamKey string
+
+	process daemonProcess
 	waitCh  chan error
+
+	// Tests shorten these bounds; zero selects the production defaults.
+	termTimeout time.Duration
+	killTimeout time.Duration
+}
+
+type daemonProcess interface {
+	Signal(os.Signal) error
+	Kill() error
 }
 
 const netdataConfTemplate = `[global]
-    hostname = corpus-parent
+    hostname = %[2]s
 
 [directories]
     config = %[1]s/etc
@@ -71,18 +90,18 @@ const netdataConfTemplate = `[global]
     home = %[1]s/lib
 
 [web]
-    bind to = 127.0.0.1:%[2]d
+    bind to = 127.0.0.1:%[3]d
 
 [db]
     db = dbengine
     update every = 1
-    storage tiers = %[3]d
+    storage tiers = %[4]d
     replication period = 3650d
-    replication step = %[4]s
+    replication step = %[5]s
     dbengine tier 0 retention time = 0
     dbengine tier 1 retention time = 0
     dbengine tier 2 retention time = 0
-%[5]s
+%[6]s
 [ml]
     enabled = no
 
@@ -135,18 +154,26 @@ func freePort() (int, error) {
 	return port, l.Close()
 }
 
+func newDaemonIdentity() (hostname, streamKey string, err error) {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", "", fmt.Errorf("daemon: generate identity: %w", err)
+	}
+	raw[6] = raw[6]&0x0f | 0x40
+	raw[8] = raw[8]&0x3f | 0x80
+
+	hostname = fmt.Sprintf("query-corpus-%x", raw[:8])
+	streamKey = fmt.Sprintf(
+		"%x-%x-%x-%x-%x",
+		raw[0:4], raw[4:6], raw[6:8], raw[8:10], raw[10:16])
+	return hostname, streamKey, nil
+}
+
 // Start writes the test configuration under RunDir, boots the daemon in the
 // foreground and waits until the HTTP API answers.
 func Start(o Options) (*Daemon, error) {
 	if o.StorageTiers <= 0 {
 		o.StorageTiers = 3
-	}
-	if o.Port == 0 {
-		port, err := freePort()
-		if err != nil {
-			return nil, fmt.Errorf("daemon: free port: %w", err)
-		}
-		o.Port = port
 	}
 
 	for _, sub := range []string{"etc", "cache", "lib", "log"} {
@@ -155,6 +182,65 @@ func Start(o Options) (*Daemon, error) {
 		}
 	}
 
+	hostname, streamKey, err := newDaemonIdentity()
+	if err != nil {
+		return nil, err
+	}
+	streamConf := fmt.Sprintf(streamConfTemplate, streamKey)
+	if err := os.WriteFile(filepath.Join(o.RunDir, "etc", "stream.conf"), []byte(streamConf), 0o644); err != nil {
+		return nil, fmt.Errorf("daemon: write stream.conf: %w", err)
+	}
+	// Opt out of anonymous statistics before first boot.
+	if err := os.WriteFile(filepath.Join(o.RunDir, "etc", ".opt-out-from-anonymous-statistics"), nil, 0o644); err != nil {
+		return nil, fmt.Errorf("daemon: write opt-out: %w", err)
+	}
+
+	return startWithPortRetries(
+		o,
+		func(attempt Options) (*Daemon, error) {
+			return startAttempt(attempt, hostname, streamKey)
+		},
+		freePort,
+		func(err error) bool {
+			return !errors.Is(err, errProcessNotReaped) &&
+				startupLogShowsBindCollision(o.RunDir)
+		},
+	)
+}
+
+func startWithPortRetries(
+	o Options,
+	start func(Options) (*Daemon, error),
+	pickPort func() (int, error),
+	retryable func(error) bool,
+) (*Daemon, error) {
+	if o.Port != 0 {
+		return start(o)
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= autoPortAttempts; attempt++ {
+		port, err := pickPort()
+		if err != nil {
+			return nil, fmt.Errorf("daemon: select free port: %w", err)
+		}
+		candidate := o
+		candidate.Port = port
+		d, err := start(candidate)
+		if err == nil {
+			return d, nil
+		}
+		lastErr = err
+		if !retryable(err) {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf(
+		"daemon: automatic port selection exhausted after %d bind collisions: %w",
+		autoPortAttempts, lastErr)
+}
+
+func startAttempt(o Options, hostname, streamKey string) (*Daemon, error) {
 	step := "3650d"
 	if o.ReplicationStepSeconds > 0 {
 		step = fmt.Sprintf("%ds", o.ReplicationStepSeconds)
@@ -170,26 +256,23 @@ func Start(o Options) (*Daemon, error) {
 			extraDB += fmt.Sprintf("    dbengine tier %d update every iterations = %d\n", tier, every)
 		}
 	}
-	conf := fmt.Sprintf(netdataConfTemplate, o.RunDir, o.Port, o.StorageTiers, step, extraDB)
+	conf := fmt.Sprintf(netdataConfTemplate, o.RunDir, hostname, o.Port, o.StorageTiers, step, extraDB)
 	confPath := filepath.Join(o.RunDir, "etc", "netdata.conf")
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return nil, fmt.Errorf("daemon: write netdata.conf: %w", err)
 	}
-	streamConf := fmt.Sprintf(streamConfTemplate, StreamKey)
-	if err := os.WriteFile(filepath.Join(o.RunDir, "etc", "stream.conf"), []byte(streamConf), 0o644); err != nil {
-		return nil, fmt.Errorf("daemon: write stream.conf: %w", err)
-	}
-	// opt out of anonymous statistics before first boot
-	if err := os.WriteFile(filepath.Join(o.RunDir, "etc", ".opt-out-from-anonymous-statistics"), nil, 0o644); err != nil {
-		return nil, fmt.Errorf("daemon: write opt-out: %w", err)
-	}
 
 	d := &Daemon{
-		Opts:    o,
-		BaseURL: fmt.Sprintf("http://127.0.0.1:%d", o.Port),
-		Addr:    fmt.Sprintf("127.0.0.1:%d", o.Port),
+		Opts:      o,
+		BaseURL:   fmt.Sprintf("http://127.0.0.1:%d", o.Port),
+		Addr:      fmt.Sprintf("127.0.0.1:%d", o.Port),
+		Hostname:  hostname,
+		StreamKey: streamKey,
 	}
 	if err := d.launch(); err != nil {
+		if d.process != nil {
+			err = errors.Join(err, errProcessNotReaped)
+		}
 		return nil, err
 	}
 	return d, nil
@@ -208,7 +291,7 @@ func (d *Daemon) launch() error {
 		stdout.Close()
 		return fmt.Errorf("daemon: start %s: %w", d.Opts.Binary, err)
 	}
-	d.cmd = cmd
+	d.process = cmd.Process
 	d.waitCh = make(chan error, 1)
 	go func() {
 		d.waitCh <- cmd.Wait()
@@ -219,45 +302,126 @@ func (d *Daemon) launch() error {
 	// that accepts TCP but never answers cannot hang the readiness loop
 	client := &http.Client{Timeout: 5 * time.Second}
 	deadline := time.Now().Add(60 * time.Second)
+	var lastProbeErr error
 	for {
-		resp, err := client.Get(d.BaseURL + "/api/v1/info")
+		info, err := getJSONWithClient(client, d.BaseURL+"/api/v1/info")
 		if err == nil {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
+			if err := infoHasDaemonIdentity(info, d.Hostname); err == nil {
 				return nil
+			} else {
+				lastProbeErr = err
 			}
+		} else {
+			lastProbeErr = err
 		}
 		select {
 		case werr := <-d.waitCh:
 			// the process is already reaped; make a later Stop() a no-op
 			// instead of blocking forever on the drained wait channel
-			d.cmd = nil
-			return fmt.Errorf("daemon: exited during startup: %v (see %s/log/stdout.log)", werr, d.Opts.RunDir)
+			d.process = nil
+			return fmt.Errorf(
+				"daemon: exited during startup: %v; last readiness probe: %v (see %s/log/stdout.log)",
+				werr, lastProbeErr, d.Opts.RunDir)
 		default:
 		}
 		if time.Now().After(deadline) {
-			_ = d.Stop()
-			return fmt.Errorf("daemon: HTTP API not ready after 60s (see %s/log/stdout.log)", d.Opts.RunDir)
+			stopErr := d.Stop()
+			return errors.Join(
+				fmt.Errorf(
+					"daemon: correct HTTP API identity not ready after 60s: %v (see %s/log/stdout.log)",
+					lastProbeErr, d.Opts.RunDir),
+				stopErr)
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
 }
 
+func infoHasDaemonIdentity(doc map[string]any, hostname string) error {
+	uid, ok := doc["uid"].(string)
+	if !ok || uid == "" {
+		return fmt.Errorf("daemon: /api/v1/info has no local uid")
+	}
+	statuses, ok := doc["mirrored_hosts_status"].([]any)
+	if !ok {
+		return fmt.Errorf("daemon: /api/v1/info has no mirrored_hosts_status array")
+	}
+
+	matches := 0
+	for i, statusAny := range statuses {
+		status, ok := statusAny.(map[string]any)
+		if !ok {
+			return fmt.Errorf("daemon: mirrored_hosts_status[%d] is not an object", i)
+		}
+		gotHostname, hostOK := status["hostname"].(string)
+		hops, hopsOK := status["hops"].(float64)
+		reachable, reachableOK := status["reachable"].(bool)
+		guid, guidOK := status["guid"].(string)
+		if !hostOK || !hopsOK || math.IsNaN(hops) || math.IsInf(hops, 0) ||
+			math.Trunc(hops) != hops || !reachableOK || !guidOK {
+			return fmt.Errorf("daemon: malformed mirrored_hosts_status[%d]: %v", i, status)
+		}
+		if gotHostname == hostname && hops == 0 && reachable && guid == uid {
+			matches++
+		}
+	}
+	if matches != 1 {
+		return fmt.Errorf(
+			"daemon: /api/v1/info has %d reachable local entries for hostname %q, want exactly one",
+			matches, hostname)
+	}
+	return nil
+}
+
+func startupLogShowsBindCollision(runDir string) bool {
+	log, err := os.ReadFile(filepath.Join(runDir, "log", "stdout.log"))
+	if err != nil {
+		return false
+	}
+	text := string(log)
+	return strings.Contains(text, "Cannot bind to ip") ||
+		(strings.Contains(text, "bind() on ip") && strings.Contains(text, "failed"))
+}
+
 // Stop terminates the daemon gracefully, escalating to SIGKILL.
 func (d *Daemon) Stop() error {
-	if d.cmd == nil || d.cmd.Process == nil {
+	if d.process == nil {
 		return nil
 	}
-	_ = d.cmd.Process.Signal(syscall.SIGTERM)
+
+	termWait := d.termTimeout
+	if termWait <= 0 {
+		termWait = defaultTermWait
+	}
+	killWait := d.killTimeout
+	if killWait <= 0 {
+		killWait = defaultKillWait
+	}
+
+	termErr := d.process.Signal(syscall.SIGTERM)
+	if errors.Is(termErr, os.ErrProcessDone) {
+		termErr = nil
+	}
 	select {
 	case <-d.waitCh:
-	case <-time.After(30 * time.Second):
-		_ = d.cmd.Process.Kill()
-		<-d.waitCh
+		d.process = nil
+		return termErr
+	case <-time.After(termWait):
 	}
-	d.cmd = nil
-	return nil
+
+	killErr := d.process.Kill()
+	if errors.Is(killErr, os.ErrProcessDone) {
+		killErr = nil
+	}
+	select {
+	case <-d.waitCh:
+		d.process = nil
+		return errors.Join(termErr, killErr)
+	case <-time.After(killWait):
+		return errors.Join(
+			termErr,
+			killErr,
+			fmt.Errorf("daemon: process did not deliver reap result within %s after SIGKILL", killWait))
+	}
 }
 
 // Restart stops the daemon and boots it again on the same run dir and port,
@@ -276,7 +440,11 @@ var queryClient = &http.Client{Timeout: 30 * time.Second}
 
 // getRawBody performs a bounded GET and returns the raw response body.
 func getRawBody(u string) ([]byte, error) {
-	resp, err := queryClient.Get(u)
+	return getRawBodyWithClient(queryClient, u)
+}
+
+func getRawBodyWithClient(client *http.Client, u string) ([]byte, error) {
+	resp, err := client.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("daemon: GET %s: %w", u, err)
 	}
@@ -293,7 +461,11 @@ func getRawBody(u string) ([]byte, error) {
 
 // getJSON performs a bounded GET and parses the JSON response.
 func getJSON(u string) (map[string]any, error) {
-	body, err := getRawBody(u)
+	return getJSONWithClient(queryClient, u)
+}
+
+func getJSONWithClient(client *http.Client, u string) (map[string]any, error) {
+	body, err := getRawBodyWithClient(client, u)
 	if err != nil {
 		return nil, err
 	}
