@@ -9,6 +9,12 @@
 
 struct prometheus_remote_write_specific_data {
     void *write_request;
+    int as_collected;
+    int homogeneous;
+    char context[PROMETHEUS_ELEMENT_MAX + 1];
+    char chart[PROMETHEUS_ELEMENT_MAX + 1];
+    char family[PROMETHEUS_ELEMENT_MAX + 1];
+    char units[PROMETHEUS_ELEMENT_MAX + 1];
 };
 
 struct prometheus_remote_write_variables_callback_options {
