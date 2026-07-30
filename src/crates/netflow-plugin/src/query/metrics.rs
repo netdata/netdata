@@ -102,6 +102,7 @@ impl FlowQueryService {
             layout.before,
             layout.bucket_seconds,
             setup.sort_by,
+            &setup.effective_group_by,
             &top_rows,
             &series_buckets,
         );

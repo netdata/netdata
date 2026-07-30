@@ -243,7 +243,7 @@ fn grouped_other_bucket_preserves_single_group_values_and_summarizes_mixed_field
 
     let result = build_grouped_flows(
         &records,
-        &["PROTOCOL".to_string(), "SRC_AS_NAME".to_string()],
+        &["SRC_AS_NAME".to_string(), "PROTOCOL".to_string()],
         SortBy::Bytes,
         1,
     );
@@ -254,6 +254,15 @@ fn grouped_other_bucket_preserves_single_group_values_and_summarizes_mixed_field
     assert_eq!(result.flows[1]["key"]["_bucket"], "__other__");
     assert_eq!(result.flows[1]["key"]["PROTOCOL"], "6");
     assert_eq!(result.flows[1]["key"]["SRC_AS_NAME"], "Other (2)");
+    assert_eq!(
+        result.flows[1]["key"]
+            .as_object()
+            .expect("other key")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "_bucket"]
+    );
 }
 
 #[test]
@@ -397,6 +406,25 @@ fn normalized_group_by_is_capped_to_ten_fields() {
             "SRC_PORT".to_string(),
             "DST_PORT".to_string(),
             "SRC_AS_NAME".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn normalized_group_by_keeps_first_occurrence_order() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{
+            "group_by":["DST_ADDR","PROTOCOL","DST_ADDR","SRC_ADDR","PROTOCOL"]
+        }"#,
+    )
+    .expect("request should deserialize");
+
+    assert_eq!(
+        request.normalized_group_by(),
+        vec![
+            "DST_ADDR".to_string(),
+            "PROTOCOL".to_string(),
+            "SRC_ADDR".to_string(),
         ]
     );
 }
@@ -922,6 +950,87 @@ fn labels_for_group_uses_stored_as_name_values() {
     assert_eq!(
         labels.get("DST_AS_NAME").map(String::as_str),
         Some("AS0 Unknown ASN")
+    );
+}
+
+#[test]
+fn grouped_response_objects_preserve_group_by_order() {
+    let group_by = vec![
+        "SRC_AS_NAME".to_string(),
+        "PROTOCOL".to_string(),
+        "DST_AS_NAME".to_string(),
+    ];
+    let record = super::QueryFlowRecord::new(
+        42,
+        BTreeMap::from([
+            ("SRC_AS_NAME".to_string(), "Source".to_string()),
+            ("PROTOCOL".to_string(), "6".to_string()),
+            ("DST_AS_NAME".to_string(), "Destination".to_string()),
+            ("BYTES".to_string(), "100".to_string()),
+            ("PACKETS".to_string(), "10".to_string()),
+        ]),
+    );
+
+    let result = super::build_grouped_flows(&[record], &group_by, SortBy::Bytes, 25);
+    let key = result.flows[0]["key"].as_object().expect("grouped key");
+    assert_eq!(
+        key.keys().map(String::as_str).collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]
+    );
+
+    let columns = crate::presentation::build_table_columns(&group_by);
+    assert_eq!(
+        columns
+            .as_object()
+            .expect("table columns")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME", "bytes", "packets"]
+    );
+}
+
+#[test]
+fn timeseries_dimension_ids_and_names_preserve_group_by_order() {
+    let group_by = vec![
+        "SRC_AS_NAME".to_string(),
+        "PROTOCOL".to_string(),
+        "DST_AS_NAME".to_string(),
+    ];
+    let row = super::AggregatedFlow {
+        labels: BTreeMap::from([
+            ("DST_AS_NAME".to_string(), "Destination".to_string()),
+            ("PROTOCOL".to_string(), "6".to_string()),
+            ("SRC_AS_NAME".to_string(), "Source".to_string()),
+        ]),
+        metrics: super::QueryFlowMetrics {
+            bytes: 100,
+            packets: 10,
+        },
+        ..super::AggregatedFlow::default()
+    };
+
+    let chart = super::metrics_chart_from_top_groups(
+        0,
+        60,
+        60,
+        SortBy::Bytes,
+        &group_by,
+        &[row],
+        &[vec![100]],
+    );
+
+    assert_eq!(
+        chart["view"]["dimensions"]["ids"][0],
+        r#"{"SRC_AS_NAME":"Source","PROTOCOL":"6","DST_AS_NAME":"Destination"}"#
+    );
+    assert_eq!(
+        chart["view"]["dimensions"]["names"][0],
+        "Source AS Name=Source, Protocol=TCP, Destination AS Name=Destination"
+    );
+    assert_eq!(
+        chart["result"]["labels"][1],
+        "Source AS Name=Source, Protocol=TCP, Destination AS Name=Destination"
     );
 }
 
@@ -1769,7 +1878,7 @@ fn grouped_accumulator_routes_new_groups_to_overflow_after_cap() {
 
 #[test]
 fn grouped_overflow_bucket_preserves_single_group_values_and_summarizes_mixed_fields() {
-    let group_by = vec!["PROTOCOL".to_string(), "SRC_AS_NAME".to_string()];
+    let group_by = vec!["SRC_AS_NAME".to_string(), "PROTOCOL".to_string()];
     let records = vec![
         super::QueryFlowRecord {
             timestamp_usec: 1,
@@ -1813,10 +1922,20 @@ fn grouped_overflow_bucket_preserves_single_group_values_and_summarizes_mixed_fi
         );
     }
 
-    let flow = super::flow_value_from_aggregate(overflow.aggregate.expect("overflow row"));
+    let flow =
+        super::flow_value_from_aggregate(overflow.aggregate.expect("overflow row"), &group_by);
     assert_eq!(flow["key"]["_bucket"], "__overflow__");
     assert_eq!(flow["key"]["PROTOCOL"], "6");
     assert_eq!(flow["key"]["SRC_AS_NAME"], "Other (2)");
+    assert_eq!(
+        flow["key"]
+            .as_object()
+            .expect("overflow key")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "_bucket"]
+    );
 }
 
 #[test]
@@ -1883,7 +2002,7 @@ fn compact_grouped_accumulator_routes_new_groups_to_overflow_after_cap() {
 
 #[test]
 fn compact_other_bucket_preserves_single_group_values_and_summarizes_mixed_fields() {
-    let group_by = vec!["PROTOCOL".to_string(), "SRC_AS_NAME".to_string()];
+    let group_by = vec!["SRC_AS_NAME".to_string(), "PROTOCOL".to_string()];
     let mut aggregates =
         super::CompactGroupAccumulator::new(&group_by).expect("compact accumulator");
 
@@ -1933,10 +2052,20 @@ fn compact_other_bucket_preserves_single_group_values_and_summarizes_mixed_field
     let other = ranked.other.expect("other bucket");
     let flow = super::flow_value_from_aggregate(
         super::synthetic_aggregate_from_compact(other).expect("materialize compact other"),
+        &group_by,
     );
     assert_eq!(flow["key"]["_bucket"], "__other__");
     assert_eq!(flow["key"]["PROTOCOL"], "6");
     assert_eq!(flow["key"]["SRC_AS_NAME"], "Other (2)");
+    assert_eq!(
+        flow["key"]
+            .as_object()
+            .expect("compact other key")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["SRC_AS_NAME", "PROTOCOL", "_bucket"]
+    );
 }
 
 #[test]
@@ -1979,6 +2108,7 @@ fn compact_overflow_bucket_preserves_single_group_values_and_summarizes_mixed_fi
         .expect("compact overflow aggregate");
     let flow = super::flow_value_from_aggregate(
         super::synthetic_aggregate_from_compact(overflow).expect("materialize compact overflow"),
+        &group_by,
     );
     assert_eq!(flow["key"]["_bucket"], "__overflow__");
     assert_eq!(flow["key"]["PROTOCOL"], "6");
@@ -2116,6 +2246,7 @@ fn metrics_chart_uses_only_discovered_top_n_groups() {
         layout.before,
         layout.bucket_seconds,
         SortBy::Bytes,
+        &group_by,
         &ranked.rows,
         &series_buckets,
     );

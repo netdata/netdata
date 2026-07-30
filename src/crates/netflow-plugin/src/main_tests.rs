@@ -23,6 +23,37 @@ use tokio_util::sync::CancellationToken;
 
 const E2E_INGEST_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
 
+fn assert_json_object_key_order(value: &serde_json::Value, expected: &[&str]) {
+    let actual = value
+        .as_object()
+        .expect("JSON object")
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert_eq!(actual, expected);
+
+    let serialized = serde_json::to_string(value).expect("serialize JSON object");
+    let mut cursor = 0;
+    for key in expected {
+        let needle = format!("\"{key}\":");
+        let offset = serialized[cursor..]
+            .find(&needle)
+            .unwrap_or_else(|| panic!("missing {key} in {serialized}"));
+        cursor += offset + needle.len();
+    }
+}
+
+fn assert_group_description_order(description: &str, expected: &[&str]) {
+    let mut cursor = 0;
+    for field in expected {
+        let needle = format!("{field}=");
+        let offset = description[cursor..]
+            .find(&needle)
+            .unwrap_or_else(|| panic!("missing {field} in {description}"));
+        cursor += offset + needle.len();
+    }
+}
+
 #[tokio::test]
 async fn background_facet_work_waits_for_udp_listener_readiness() {
     let listener_ready = CancellationToken::new();
@@ -1431,8 +1462,15 @@ async fn e2e_projected_timeseries_tolerates_torn_raw_tail() {
 }
 
 #[test]
-fn default_group_by_required_param_preserves_selected_field_order() {
-    let request = query::FlowsRequest::default();
+fn group_by_required_param_preserves_selected_field_order() {
+    let request = query::FlowsRequest {
+        group_by: vec![
+            "DST_ADDR".to_string(),
+            "PROTOCOL".to_string(),
+            "SRC_ADDR".to_string(),
+        ],
+        ..Default::default()
+    };
     let params = flows_required_params(
         request.normalized_view(),
         &request.normalized_group_by(),
@@ -1452,10 +1490,7 @@ fn default_group_by_required_param_preserves_selected_field_order() {
         .map(|option| option.id.as_str())
         .collect();
 
-    assert_eq!(
-        selected_fields,
-        vec!["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]
-    );
+    assert_eq!(selected_fields, vec!["DST_ADDR", "PROTOCOL", "SRC_ADDR"]);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1469,17 +1504,20 @@ async fn e2e_flows_function_returns_expected_response_sections() {
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
+    let expected_group_by = vec![
+        "SRC_ADDR".to_string(),
+        "PROTOCOL".to_string(),
+        "DST_AS_NAME".to_string(),
+        "SRC_AS_NAME".to_string(),
+        "DST_ADDR".to_string(),
+    ];
 
     let response = handler
         .handle_request(query::FlowsRequest {
             view: query::ViewMode::TableSankey,
             after: Some(1),
             before: Some(before),
-            group_by: vec![
-                "SRC_ADDR".to_string(),
-                "DST_ADDR".to_string(),
-                "PROTOCOL".to_string(),
-            ],
+            group_by: expected_group_by.clone(),
             top_n: query::TopN::N100,
             ..Default::default()
         })
@@ -1496,6 +1534,7 @@ async fn e2e_flows_function_returns_expected_response_sections() {
     assert_eq!(response.update_every, FLOWS_UPDATE_EVERY_SECONDS);
     assert_eq!(response.response_type, "flows");
     assert_eq!(response.data.view, "table-sankey");
+    assert_eq!(response.data.group_by, expected_group_by);
     assert_eq!(
         response
             .data
@@ -1503,8 +1542,20 @@ async fn e2e_flows_function_returns_expected_response_sections() {
             .as_object()
             .map(|columns| columns.len())
             .unwrap_or_default(),
-        5,
+        7,
         "expected grouped table columns to include only group_by fields plus bytes and packets"
+    );
+    assert_json_object_key_order(
+        &response.data.columns,
+        &[
+            "SRC_ADDR",
+            "PROTOCOL",
+            "DST_AS_NAME",
+            "SRC_AS_NAME",
+            "DST_ADDR",
+            "bytes",
+            "packets",
+        ],
     );
     assert!(response.data.columns.get("timestamp").is_none());
     assert!(response.data.columns.get("durationSec").is_none());
@@ -1517,6 +1568,16 @@ async fn e2e_flows_function_returns_expected_response_sections() {
         "expected non-empty flows data section"
     );
     let first = response.data.flows.first().expect("first grouped flow");
+    assert_json_object_key_order(
+        &first["key"],
+        &[
+            "SRC_ADDR",
+            "PROTOCOL",
+            "DST_AS_NAME",
+            "SRC_AS_NAME",
+            "DST_ADDR",
+        ],
+    );
     assert!(first.get("timestamp").is_none());
     assert!(first.get("duration_sec").is_none());
     assert!(first.get("exporter").is_none());
@@ -1862,6 +1923,11 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let after = before.saturating_sub(3600);
+    let expected_group_by = vec![
+        "SRC_AS_NAME".to_string(),
+        "PROTOCOL".to_string(),
+        "DST_AS_NAME".to_string(),
+    ];
     let materialized_tier_files = tier_file_count(&cfg.journal.hour_1_tier_dir())
         + tier_file_count(&cfg.journal.minute_5_tier_dir())
         + tier_file_count(&cfg.journal.minute_1_tier_dir());
@@ -1871,7 +1937,7 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
             view: query::ViewMode::TimeSeries,
             after: Some(after),
             before: Some(before),
-            group_by: vec!["PROTOCOL".to_string()],
+            group_by: expected_group_by.clone(),
             sort_by: query::SortBy::Bytes,
             top_n: query::TopN::N50,
             ..Default::default()
@@ -1890,7 +1956,11 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
     assert_eq!(response.response_type, "flows");
     assert_eq!(response.data.view, "timeseries");
     assert_eq!(response.data.metric, "bytes");
-    assert_eq!(response.data.group_by, vec!["PROTOCOL".to_string()]);
+    assert_eq!(response.data.group_by, expected_group_by);
+    assert_json_object_key_order(
+        &response.data.columns,
+        &["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"],
+    );
     assert_eq!(response.data.columns["PROTOCOL"]["name"], "Protocol");
     assert_eq!(response.data.chart["view"]["units"], "bytes/s");
     assert_eq!(
@@ -1940,6 +2010,25 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
             .unwrap_or(false),
         "expected Top-N chart dimensions limited by request"
     );
+    for id in response.data.chart["view"]["dimensions"]["ids"]
+        .as_array()
+        .expect("timeseries dimension ids")
+    {
+        let labels: serde_json::Value =
+            serde_json::from_str(id.as_str().expect("dimension id string"))
+                .expect("dimension id object");
+        assert_json_object_key_order(&labels, &["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]);
+    }
+    for name in response.data.chart["view"]["dimensions"]["names"]
+        .as_array()
+        .expect("timeseries dimension names")
+    {
+        let name = name.as_str().expect("dimension name string");
+        assert_group_description_order(
+            name,
+            &["Source AS Name", "Protocol", "Destination AS Name"],
+        );
+    }
     assert!(
         response.data.chart["result"]["data"]
             .as_array()
@@ -1969,6 +2058,38 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
             .and_then(|param| param.options.iter().find(|option| option.id == "PROTOCOL"))
             .map(|option| option.name.as_str()),
         Some("Protocol")
+    );
+
+    let generic_response = handler
+        .handle_request(query::FlowsRequest {
+            view: query::ViewMode::TimeSeries,
+            after: Some(after),
+            before: Some(before),
+            query: "FLOW_VERSION=v5".to_string(),
+            group_by: expected_group_by,
+            sort_by: query::SortBy::Bytes,
+            top_n: query::TopN::N50,
+            ..Default::default()
+        })
+        .await
+        .expect("generic flow metrics function call");
+    let generic_response = match generic_response {
+        FlowsFunctionResponse::Metrics(response) => response,
+        FlowsFunctionResponse::Table(_) => panic!("expected metrics response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected metrics response"),
+    };
+    let generic_id = generic_response.data.chart["view"]["dimensions"]["ids"][0]
+        .as_str()
+        .expect("generic dimension id");
+    let generic_labels: serde_json::Value =
+        serde_json::from_str(generic_id).expect("generic dimension id object");
+    assert_json_object_key_order(&generic_labels, &["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]);
+    let generic_name = generic_response.data.chart["view"]["dimensions"]["names"][0]
+        .as_str()
+        .expect("generic dimension name");
+    assert_group_description_order(
+        generic_name,
+        &["Source AS Name", "Protocol", "Destination AS Name"],
     );
 }
 
@@ -2180,6 +2301,10 @@ async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
         4,
         "expected country-map columns to include only country keys plus bytes and packets"
     );
+    assert_json_object_key_order(
+        &response.data.columns,
+        &["SRC_COUNTRY", "DST_COUNTRY", "bytes", "packets"],
+    );
     assert!(response.data.columns.get("timestamp").is_none());
     assert!(response.data.columns.get("durationSec").is_none());
     assert!(response.data.columns.get("exporterIp").is_none());
@@ -2188,6 +2313,7 @@ async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
     assert!(response.data.columns.get("samplingRate").is_none());
 
     let first = response.data.flows.first().expect("first flow row");
+    assert_json_object_key_order(&first["key"], &["SRC_COUNTRY", "DST_COUNTRY"]);
     assert!(
         first["key"].get("SRC_COUNTRY").is_some(),
         "expected country-map rows to expose SRC_COUNTRY"
@@ -2249,6 +2375,26 @@ async fn e2e_state_map_reuses_tuple_table_shape_with_state_keys() {
     assert!(
         !response.data.flows.is_empty(),
         "expected non-empty state-map rows"
+    );
+    assert_json_object_key_order(
+        &response.data.columns,
+        &[
+            "SRC_COUNTRY",
+            "SRC_GEO_STATE",
+            "DST_COUNTRY",
+            "DST_GEO_STATE",
+            "bytes",
+            "packets",
+        ],
+    );
+    assert_json_object_key_order(
+        &response.data.flows[0]["key"],
+        &[
+            "SRC_COUNTRY",
+            "SRC_GEO_STATE",
+            "DST_COUNTRY",
+            "DST_GEO_STATE",
+        ],
     );
     assert!(
         !response
@@ -2332,6 +2478,38 @@ async fn e2e_city_map_reuses_tuple_table_shape_with_city_and_coordinate_keys() {
     assert!(
         !response.data.flows.is_empty(),
         "expected non-empty city-map rows"
+    );
+    assert_json_object_key_order(
+        &response.data.columns,
+        &[
+            "SRC_COUNTRY",
+            "SRC_GEO_STATE",
+            "SRC_GEO_CITY",
+            "SRC_GEO_LATITUDE",
+            "SRC_GEO_LONGITUDE",
+            "DST_COUNTRY",
+            "DST_GEO_STATE",
+            "DST_GEO_CITY",
+            "DST_GEO_LATITUDE",
+            "DST_GEO_LONGITUDE",
+            "bytes",
+            "packets",
+        ],
+    );
+    assert_json_object_key_order(
+        &response.data.flows[0]["key"],
+        &[
+            "SRC_COUNTRY",
+            "SRC_GEO_STATE",
+            "SRC_GEO_CITY",
+            "SRC_GEO_LATITUDE",
+            "SRC_GEO_LONGITUDE",
+            "DST_COUNTRY",
+            "DST_GEO_STATE",
+            "DST_GEO_CITY",
+            "DST_GEO_LATITUDE",
+            "DST_GEO_LONGITUDE",
+        ],
     );
     assert!(
         response

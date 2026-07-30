@@ -36,13 +36,19 @@ impl FlowQueryService {
             let materialized =
                 self.materialize_compact_aggregate(&setup.effective_group_by, &index, agg)?;
             totals.add(materialized.metrics);
-            flows.push(flow_value_from_aggregate(materialized));
+            flows.push(flow_value_from_aggregate(
+                materialized,
+                &setup.effective_group_by,
+            ));
         }
 
         if let Some(other_agg) = other {
             let materialized = synthetic_aggregate_from_compact(other_agg)?;
             totals.add(materialized.metrics);
-            flows.push(flow_value_from_aggregate(materialized));
+            flows.push(flow_value_from_aggregate(
+                materialized,
+                &setup.effective_group_by,
+            ));
         }
 
         Ok(CompactBuildResult {
@@ -93,13 +99,19 @@ impl FlowQueryService {
                 agg,
             )?;
             totals.add(materialized.metrics);
-            flows.push(flow_value_from_aggregate(materialized));
+            flows.push(flow_value_from_aggregate(
+                materialized,
+                &setup.effective_group_by,
+            ));
         }
 
         if let Some(other_agg) = other {
             let materialized = synthetic_aggregate_from_compact(other_agg)?;
             totals.add(materialized.metrics);
-            flows.push(flow_value_from_aggregate(materialized));
+            flows.push(flow_value_from_aggregate(
+                materialized,
+                &setup.effective_group_by,
+            ));
         }
 
         Ok(CompactBuildResult {
