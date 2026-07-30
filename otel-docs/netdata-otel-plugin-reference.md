@@ -145,7 +145,6 @@ first):
 |:-------|:--------|:------------|
 | `rotation.default.max_file_size` | `25MB` | Maximum size of the current file. |
 | `rotation.default.max_entries` | `50000` | Maximum log records per file. |
-| `rotation.default.max_file_duration` | `15min` | Maximum age of the current file; seals idle streams promptly. Hidden from the stock file. |
 
 **Retention** — how much data is kept on local disk (oldest files are deleted
 when any limit is exceeded):
@@ -155,19 +154,6 @@ when any limit is exceeded):
 | `retention.default.max_files` | `100000` | Maximum number of stored files. |
 | `retention.default.max_total_size` | `1GB` | Maximum total size on disk. |
 | `retention.default.max_age` | `7 days` | Maximum age of stored data. |
-| `retention.default.horizon` | `10 years` | How long catalog (index metadata) files are kept — the remote-archive depth. Hidden from the stock file. Must exceed `max_age` by more than a day; a violation is a startup error. |
-
-**Advanced knobs** (hidden from the stock file, available in the user file
-and via environment variables):
-
-| Option | Default | Description |
-|:-------|:--------|:------------|
-| `crc_enabled` | `true` | Verify stored data with checksums. |
-| `compression_enabled` | `true` | Compress stored data (LZ4). |
-| `catalog.rotation_count` | `10` | Index-file entries accumulated before a catalog file is written. |
-| `catalog.rotation_period` | `15min` | Age at which a non-empty catalog accumulator is written even below `rotation_count`. |
-| `ingest.max_age` | `24h` | Reject records with timestamps older than this. Rejections are reported to the sender via OTLP `partial_success`. |
-| `ingest.future_skew` | `10min` | Accept records dated at most this far in the future (clock-skew tolerance). |
 
 **Legacy viewer:**
 
@@ -200,17 +186,9 @@ capitals with dots replaced by underscores. An unrecognized
 | `NETDATA_OTEL_CFG_REMOTE_STORAGE_STARTUP_OP_TIMEOUT` | `remote_storage.startup_op_timeout` |
 | `NETDATA_OTEL_CFG_LOGS_ROTATION_MAX_FILE_SIZE` | `logs.rotation.default.max_file_size` |
 | `NETDATA_OTEL_CFG_LOGS_ROTATION_MAX_ENTRIES` | `logs.rotation.default.max_entries` |
-| `NETDATA_OTEL_CFG_LOGS_ROTATION_MAX_FILE_DURATION` | `logs.rotation.default.max_file_duration` |
 | `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_FILES` | `logs.retention.default.max_files` |
 | `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_TOTAL_SIZE` | `logs.retention.default.max_total_size` |
 | `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE` | `logs.retention.default.max_age` |
-| `NETDATA_OTEL_CFG_LOGS_RETENTION_HORIZON` | `logs.retention.default.horizon` |
-| `NETDATA_OTEL_CFG_LOGS_CATALOG_ROTATION_COUNT` | `logs.catalog.rotation_count` |
-| `NETDATA_OTEL_CFG_LOGS_CATALOG_ROTATION_PERIOD` | `logs.catalog.rotation_period` |
-| `NETDATA_OTEL_CFG_LOGS_INGEST_MAX_AGE` | `logs.ingest.max_age` |
-| `NETDATA_OTEL_CFG_LOGS_INGEST_FUTURE_SKEW` | `logs.ingest.future_skew` |
-| `NETDATA_OTEL_CFG_LOGS_CRC_ENABLED` | `logs.crc_enabled` |
-| `NETDATA_OTEL_CFG_LOGS_COMPRESSION_ENABLED` | `logs.compression_enabled` |
 
 `logs.journal_dir` has no environment variable (YAML-only).
 
@@ -267,5 +245,4 @@ The plugin refuses to start — with a specific error — when:
 - `remote_storage.enabled` is `true` with an empty `uri`;
 - TLS certificate and key are not provided together, or a CA certificate is
   provided without both;
-- `endpoint.path` is not `host:port`;
-- `retention.horizon` does not exceed `retention.max_age` by more than a day.
+- `endpoint.path` is not `host:port`.

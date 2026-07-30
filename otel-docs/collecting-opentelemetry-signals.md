@@ -637,8 +637,7 @@ logs:
 
 By default, log records with timestamps older than 24 hours (or more than 10
 minutes in the future) are rejected at ingestion — relevant when replaying
-old backlogs; see `ingest.max_age` in the
-[plugin reference](netdata-otel-plugin-reference.md).
+old backlogs.
 
 > **NOTE — upgrading from the experimental plugin**
 >
@@ -1215,8 +1214,7 @@ receivers:
 Check their timestamps: log records older than 24 hours (or more than 10
 minutes in the future) are rejected at ingestion and reported to the sender
 via OTLP `partial_success` — most senders log that. Clock skew between sender
-and agent shows up here. See `ingest.max_age` in the
-[plugin reference](netdata-otel-plugin-reference.md).
+and agent shows up here.
 
 ### The log-derived count metric does not appear
 
