@@ -206,6 +206,13 @@ impl FlowQueryService {
             .collect::<Vec<_>>();
         let mut data_offsets = Vec::new();
         let mut decompress_buf = Vec::new();
+        let mut sink = ProjectedGroupingSink::new(
+            grouped_aggregates,
+            &setup.effective_group_by,
+            row_group_field_ids,
+            row_missing_values,
+            self.max_groups,
+        );
 
         for span in &setup.spans {
             if span.files.is_empty() {
@@ -266,10 +273,7 @@ impl FlowQueryService {
                         continue;
                     }
 
-                    row_group_field_ids.fill(None);
-                    for value in row_missing_values.iter_mut() {
-                        let _ = value.take();
-                    }
+                    sink.reset_row();
                     for value in projected_captured_values.iter_mut() {
                         let _ = value.take();
                     }
@@ -402,11 +406,8 @@ impl FlowQueryService {
                                         projected_field_specs,
                                         &mut remaining_mask,
                                         &mut metrics,
-                                        grouped_aggregates,
-                                        row_group_field_ids,
-                                        row_missing_values,
+                                        &mut sink,
                                         projected_captured_values,
-                                        self.max_groups,
                                     );
                                 } else {
                                     apply_projected_payload(
@@ -415,11 +416,8 @@ impl FlowQueryService {
                                         pending_spec_indexes,
                                         &mut remaining,
                                         &mut metrics,
-                                        grouped_aggregates,
-                                        row_group_field_ids,
-                                        row_missing_values,
+                                        &mut sink,
                                         projected_captured_values,
-                                        self.max_groups,
                                     );
                                 }
                             }
@@ -444,17 +442,13 @@ impl FlowQueryService {
                                 continue;
                             }
 
-                            grouped_aggregates.accumulate_projected(
-                                &setup.effective_group_by,
+                            sink.consume_row(
                                 timestamp_usec,
                                 RecordHandle::JournalRealtime {
                                     tier: span.span.tier,
                                     timestamp_usec,
                                 },
                                 metrics,
-                                row_group_field_ids,
-                                row_missing_values,
-                                self.max_groups,
                             )?;
                             result.matched_entries = result.matched_entries.saturating_add(1);
                         }

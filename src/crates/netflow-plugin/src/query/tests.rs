@@ -2067,6 +2067,412 @@ fn metrics_chart_uses_only_discovered_top_n_groups() {
     assert_eq!(total, 2.5);
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct TestTimeseriesResult {
+    rows: Vec<(BTreeMap<String, String>, u64, u64)>,
+    buckets: Vec<Vec<u64>>,
+    grouped_total: usize,
+    truncated: bool,
+    other_count: usize,
+    overflow_records: u64,
+}
+
+fn test_timeseries_layout() -> super::TimeseriesLayout {
+    super::TimeseriesLayout {
+        after: 0,
+        before: 180,
+        bucket_seconds: 60,
+        bucket_count: 3,
+    }
+}
+
+fn consume_projected_test_record<S: super::ProjectedRowSink + ?Sized>(
+    sink: &mut S,
+    record: &super::QueryFlowRecord,
+    group_by: &[String],
+    tier: super::TierKind,
+) {
+    sink.reset_row();
+    for (field_index, field) in group_by.iter().enumerate() {
+        if let Some(value) = record.fields.get(field) {
+            sink.observe_group_value(field_index, value);
+        }
+    }
+    sink.consume_row(
+        record.timestamp_usec,
+        super::RecordHandle::JournalRealtime {
+            tier,
+            timestamp_usec: record.timestamp_usec,
+        },
+        super::sampled_metrics_from_fields(&record.fields),
+    )
+    .expect("consume projected test record");
+}
+
+fn materialized_test_timeseries(
+    records: &[super::QueryFlowRecord],
+    tiers: &[super::TierKind],
+    group_by: &[String],
+    sort_by: SortBy,
+    max_groups: usize,
+    limit: usize,
+) -> TestTimeseriesResult {
+    assert_eq!(records.len(), tiers.len());
+    let mut aggregates: HashMap<super::GroupKey, super::AggregatedFlow> = HashMap::new();
+    let mut overflow = super::GroupOverflow::default();
+    for record in records {
+        super::accumulate_grouped_record(
+            record,
+            super::sampled_metrics_from_fields(&record.fields),
+            group_by,
+            &mut aggregates,
+            &mut overflow,
+            max_groups,
+        );
+    }
+
+    let retained_group_keys = aggregates.keys().cloned().collect::<HashSet<_>>();
+    let overflow_records = overflow.dropped_records;
+    let ranked = super::rank_aggregates(aggregates, overflow.aggregate.take(), sort_by, limit);
+    let overflow_dimension = ranked.rows.iter().position(|row| {
+        row.labels.get("_bucket").map(String::as_str) == Some(super::OVERFLOW_BUCKET_LABEL)
+    });
+    let top_group_keys = ranked
+        .rows
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| !row.labels.contains_key("_bucket"))
+        .map(|(index, row)| (super::group_key_from_labels(&row.labels), index))
+        .collect::<HashMap<_, _>>();
+    let layout = test_timeseries_layout();
+    let mut buckets = vec![vec![0_u64; ranked.rows.len()]; layout.bucket_count];
+
+    for (record, _) in records.iter().zip(tiers) {
+        let key = super::group_key_from_labels(&super::labels_for_group(record, group_by));
+        let Some(dimension_index) = super::materialized_timeseries_dimension(
+            &key,
+            &top_group_keys,
+            &retained_group_keys,
+            overflow_dimension,
+        ) else {
+            continue;
+        };
+        super::accumulate_series_bucket(
+            &mut buckets,
+            record.timestamp_usec,
+            layout.after,
+            layout.before,
+            layout.bucket_seconds,
+            dimension_index,
+            super::sampled_metric_value(sort_by, &record.fields),
+        );
+    }
+
+    let rows = ranked
+        .rows
+        .iter()
+        .map(|row| (row.labels.clone(), row.metrics.bytes, row.metrics.packets))
+        .collect();
+    TestTimeseriesResult {
+        rows,
+        buckets,
+        grouped_total: ranked.grouped_total,
+        truncated: ranked.truncated,
+        other_count: ranked.other_count,
+        overflow_records,
+    }
+}
+
+fn projected_test_timeseries(
+    records: &[super::QueryFlowRecord],
+    tiers: &[super::TierKind],
+    group_by: &[String],
+    sort_by: SortBy,
+    max_groups: usize,
+    limit: usize,
+) -> TestTimeseriesResult {
+    assert_eq!(records.len(), tiers.len());
+    let mut aggregates = super::ProjectedGroupAccumulator::new(group_by);
+    let mut row_group_field_ids = vec![None; group_by.len()];
+    let mut row_missing_values = std::iter::repeat_with(|| None)
+        .take(group_by.len())
+        .collect::<Vec<Option<String>>>();
+    {
+        let mut sink = super::ProjectedGroupingSink::new(
+            &mut aggregates,
+            group_by,
+            &mut row_group_field_ids,
+            &mut row_missing_values,
+            max_groups,
+        );
+        for (record, tier) in records.iter().zip(tiers) {
+            consume_projected_test_record(&mut sink, record, group_by, *tier);
+        }
+    }
+
+    let grouped_total = aggregates.grouped_total();
+    let overflow_records = aggregates.overflow.dropped_records;
+    let super::ProjectedGroupAccumulator {
+        fields,
+        rows,
+        row_indexes: retained_group_keys,
+        overflow,
+        ..
+    } = aggregates;
+    let ranked = super::rank_compact_top_aggregates(rows, overflow.aggregate, sort_by, limit);
+    let top_group_keys = ranked
+        .rows
+        .iter()
+        .enumerate()
+        .filter_map(|(dimension_index, row)| {
+            row.group_field_ids
+                .as_ref()
+                .map(|group_key| (group_key.clone(), dimension_index))
+        })
+        .collect::<hashbrown::HashMap<_, _>>();
+    let overflow_dimension = ranked
+        .rows
+        .iter()
+        .position(|row| row.bucket_label == Some(super::OVERFLOW_BUCKET_LABEL));
+    let rows = ranked
+        .rows
+        .iter()
+        .map(|row| {
+            let labels = if let Some(bucket_label) = row.bucket_label {
+                super::synthetic_bucket_labels(bucket_label)
+            } else {
+                super::labels_for_projected_compact_flow(
+                    &fields,
+                    group_by,
+                    row.group_field_ids
+                        .as_deref()
+                        .expect("projected group field ids"),
+                )
+                .expect("materialize projected labels")
+            };
+            (labels, row.metrics.bytes, row.metrics.packets)
+        })
+        .collect();
+
+    let layout = test_timeseries_layout();
+    let mut buckets = vec![vec![0_u64; ranked.rows.len()]; layout.bucket_count];
+    {
+        let mut sink = super::ProjectedTimeseriesSink::new(
+            &fields,
+            &retained_group_keys,
+            &top_group_keys,
+            overflow_dimension,
+            sort_by,
+            layout,
+            &mut buckets,
+            group_by.len(),
+        );
+        for (record, tier) in records.iter().zip(tiers) {
+            consume_projected_test_record(&mut sink, record, group_by, *tier);
+        }
+    }
+
+    TestTimeseriesResult {
+        rows,
+        buckets,
+        grouped_total,
+        truncated: ranked.truncated,
+        other_count: ranked.other_count,
+        overflow_records,
+    }
+}
+
+fn timeseries_test_records() -> Vec<super::QueryFlowRecord> {
+    vec![
+        super::QueryFlowRecord {
+            timestamp_usec: 10_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "6".to_string()),
+                ("BYTES".to_string(), "100".to_string()),
+                ("PACKETS".to_string(), "5".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 70_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "17".to_string()),
+                ("BYTES".to_string(), "80".to_string()),
+                ("PACKETS".to_string(), "20".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 130_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "6".to_string()),
+                ("BYTES".to_string(), "50".to_string()),
+                ("PACKETS".to_string(), "10".to_string()),
+            ]),
+        },
+    ]
+}
+
+#[test]
+fn projected_timeseries_accumulation_matches_materialized_for_raw_rollup_and_mixed_handles() {
+    let records = timeseries_test_records();
+    let group_by = vec!["PROTOCOL".to_string()];
+    let tier_cases = [
+        vec![super::TierKind::Raw; records.len()],
+        vec![super::TierKind::Minute5; records.len()],
+        vec![
+            super::TierKind::Raw,
+            super::TierKind::Minute1,
+            super::TierKind::Minute5,
+        ],
+    ];
+
+    for tiers in tier_cases {
+        for sort_by in [SortBy::Bytes, SortBy::Packets] {
+            let materialized =
+                materialized_test_timeseries(&records, &tiers, &group_by, sort_by, 100, 2);
+            let projected = projected_test_timeseries(&records, &tiers, &group_by, sort_by, 100, 2);
+            assert_eq!(projected, materialized);
+        }
+    }
+}
+
+#[test]
+fn projected_and_materialized_timeseries_populate_ranked_overflow() {
+    let records = vec![
+        super::QueryFlowRecord {
+            timestamp_usec: 10_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "6".to_string()),
+                ("BYTES".to_string(), "1".to_string()),
+                ("PACKETS".to_string(), "1".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 70_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "17".to_string()),
+                ("BYTES".to_string(), "100".to_string()),
+                ("PACKETS".to_string(), "10".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 130_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "1".to_string()),
+                ("BYTES".to_string(), "200".to_string()),
+                ("PACKETS".to_string(), "20".to_string()),
+            ]),
+        },
+    ];
+    let tiers = vec![super::TierKind::Raw; records.len()];
+    let group_by = vec!["PROTOCOL".to_string()];
+
+    for (sort_by, expected_total) in [(SortBy::Bytes, 300), (SortBy::Packets, 30)] {
+        let materialized = materialized_test_timeseries(&records, &tiers, &group_by, sort_by, 1, 1);
+        let projected = projected_test_timeseries(&records, &tiers, &group_by, sort_by, 1, 1);
+        assert_eq!(projected, materialized);
+        assert_eq!(
+            projected.rows[0].0.get("_bucket").map(String::as_str),
+            Some(super::OVERFLOW_BUCKET_LABEL)
+        );
+        assert_eq!(
+            projected
+                .buckets
+                .iter()
+                .map(|bucket| bucket[0])
+                .sum::<u64>(),
+            expected_total
+        );
+        assert_eq!(projected.overflow_records, 2);
+    }
+}
+
+#[test]
+fn projected_timeseries_keeps_unseen_value_distinct_from_retained_missing_group() {
+    let records = vec![
+        super::QueryFlowRecord {
+            timestamp_usec: 10_000_000,
+            fields: BTreeMap::from([
+                ("BYTES".to_string(), "1".to_string()),
+                ("PACKETS".to_string(), "1".to_string()),
+            ]),
+        },
+        super::QueryFlowRecord {
+            timestamp_usec: 70_000_000,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "17".to_string()),
+                ("BYTES".to_string(), "100".to_string()),
+                ("PACKETS".to_string(), "10".to_string()),
+            ]),
+        },
+    ];
+    let tiers = vec![super::TierKind::Raw; records.len()];
+    let group_by = vec!["PROTOCOL".to_string()];
+
+    let materialized =
+        materialized_test_timeseries(&records, &tiers, &group_by, SortBy::Bytes, 1, 1);
+    let projected = projected_test_timeseries(&records, &tiers, &group_by, SortBy::Bytes, 1, 1);
+
+    assert_eq!(projected, materialized);
+    assert_eq!(
+        projected.rows[0].0.get("_bucket").map(String::as_str),
+        Some(super::OVERFLOW_BUCKET_LABEL)
+    );
+    assert_eq!(projected.rows[0].1, 100);
+    assert_eq!(
+        projected
+            .buckets
+            .iter()
+            .map(|bucket| bucket[0])
+            .sum::<u64>(),
+        100
+    );
+    assert_eq!(projected.overflow_records, 1);
+}
+
+#[test]
+fn projected_timeseries_plan_reads_only_the_selected_pass_two_metric() {
+    let request = super::FlowsRequest {
+        selections: HashMap::from([("PROTOCOL".to_string(), vec!["6".to_string()])]),
+        group_by: vec!["SRC_AS_NAME".to_string()],
+        ..super::FlowsRequest::default()
+    };
+    let setup = super::QuerySetup {
+        sort_by: SortBy::Packets,
+        timeseries_layout: None,
+        effective_group_by: request.group_by.clone(),
+        limit: 25,
+        spans: Vec::new(),
+        stats: HashMap::new(),
+    };
+
+    let pass1 = super::ProjectedScanPlan::for_group_totals(&setup, &request);
+    let pass2 = super::ProjectedScanPlan::for_timeseries(&setup, &request, SortBy::Packets);
+    let metric_targets = |plan: &super::ProjectedScanPlan| {
+        plan.field_specs
+            .iter()
+            .filter_map(|spec| spec.targets.metric)
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        metric_targets(&pass1),
+        vec![
+            super::ProjectedMetricField::Bytes,
+            super::ProjectedMetricField::Packets
+        ]
+    );
+    assert_eq!(
+        metric_targets(&pass2),
+        vec![super::ProjectedMetricField::Packets]
+    );
+    assert!(pass2.capture_positions.contains_key("PROTOCOL"));
+    assert!(
+        pass2.field_specs.iter().any(|spec| {
+            spec.key == b"SRC_AS_NAME" && spec.targets.action.group_slot == Some(0)
+        })
+    );
+}
+
 fn synthetic_rollup_record(group: usize, timestamp_usec: u64) -> super::QueryFlowRecord {
     let protocol = if group % 2 == 0 { "6" } else { "17" };
     let src_as = 64_512 + (group % 4_096);

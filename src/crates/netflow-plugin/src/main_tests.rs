@@ -114,6 +114,13 @@ async fn startup_reconciles_reopened_online_journal_as_active_across_restarts() 
             .await
             .expect("create second query service");
     let mut second_ingest = offline_ingest_with_facet_runtime(&cfg, Arc::clone(&second_runtime));
+    assert_eq!(
+        second_runtime
+            .build_reconcile_plan(&[])
+            .current_active_paths,
+        BTreeSet::from([active_path.to_string_lossy().into_owned()]),
+        "the first restart must reopen and register the original journal as the sole active path"
+    );
     second_query
         .initialize_facets_before_ingest()
         .await
@@ -169,6 +176,11 @@ async fn startup_reconciles_reopened_online_journal_as_active_across_restarts() 
             .await
             .expect("create third query service");
     let third_ingest = offline_ingest_with_facet_runtime(&cfg, Arc::clone(&third_runtime));
+    assert_eq!(
+        third_runtime.build_reconcile_plan(&[]).current_active_paths,
+        BTreeSet::from([active_path.to_string_lossy().into_owned()]),
+        "the second restart must reopen and register the original journal as the sole active path"
+    );
     third_query
         .initialize_facets_before_ingest()
         .await
@@ -1305,7 +1317,7 @@ fn truncate_newest_journal_mid_last_entry(dir: &Path) {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn e2e_query_service_timeseries_path_returns_chart_data() {
+async fn e2e_query_service_timeseries_paths_return_chart_data() {
     let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
@@ -1313,28 +1325,77 @@ async fn e2e_query_service_timeseries_path_returns_chart_data() {
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let after = before.saturating_sub(3600);
 
+    for query in ["", "PROTOCOL="] {
+        let output = query_service
+            .query_flow_metrics(&query::FlowsRequest {
+                view: query::ViewMode::TimeSeries,
+                after: Some(after),
+                before: Some(before),
+                query: query.to_string(),
+                group_by: vec!["PROTOCOL".to_string()],
+                sort_by: query::SortBy::Bytes,
+                top_n: query::TopN::N25,
+                ..Default::default()
+            })
+            .await
+            .expect("query timeseries metrics");
+
+        assert_eq!(output.metric, "bytes");
+        assert_eq!(output.group_by, vec!["PROTOCOL".to_string()]);
+        assert!(
+            output.chart["result"]["data"]
+                .as_array()
+                .map(|rows| !rows.is_empty())
+                .unwrap_or(false),
+            "expected timeseries chart rows from query service"
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_projected_timeseries_tolerates_torn_raw_tail() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    for tier_dir in [
+        cfg.journal.raw_tier_dir(),
+        cfg.journal.minute_1_tier_dir(),
+        cfg.journal.minute_5_tier_dir(),
+        cfg.journal.hour_1_tier_dir(),
+    ] {
+        fs::create_dir_all(&tier_dir)
+            .unwrap_or_else(|err| panic!("create tier dir {}: {}", tier_dir.display(), err));
+    }
+    let base = closed_5m_base();
+    write_raw_flows(
+        &cfg,
+        0x42,
+        1,
+        &[
+            (base + 1_000_000, 1),
+            (base + 61_000_000, 2),
+            (base + 121_000_000, 3),
+        ],
+    );
+    truncate_newest_journal_mid_last_entry(&cfg.journal.raw_tier_dir());
+
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service over torn raw journal");
     let output = query_service
         .query_flow_metrics(&query::FlowsRequest {
             view: query::ViewMode::TimeSeries,
-            after: Some(after),
-            before: Some(before),
-            group_by: vec!["PROTOCOL".to_string()],
+            after: Some((base / 1_000_000) as i64),
+            before: Some((base / 1_000_000) as i64 + 180),
+            group_by: vec!["SRC_ADDR".to_string()],
             sort_by: query::SortBy::Bytes,
             top_n: query::TopN::N25,
             ..Default::default()
         })
         .await
-        .expect("query timeseries metrics");
+        .expect("projected time-series query must tolerate the torn raw tail");
 
-    assert_eq!(output.metric, "bytes");
-    assert_eq!(output.group_by, vec!["PROTOCOL".to_string()]);
-    assert!(
-        output.chart["result"]["data"]
-            .as_array()
-            .map(|rows| !rows.is_empty())
-            .unwrap_or(false),
-        "expected timeseries chart rows from query service"
-    );
+    assert_eq!(output.stats.get("query_pass_1_matched_entries"), Some(&2));
+    assert_eq!(output.stats.get("query_pass_2_matched_entries"), Some(&2));
+    assert_eq!(output.stats.get("query_returned_dimensions"), Some(&2));
 }
 
 #[test]
@@ -1502,44 +1563,47 @@ async fn e2e_flows_function_returns_expected_response_sections() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn e2e_flows_function_marks_progress_complete_with_execution_context() {
+async fn e2e_flows_function_marks_table_and_timeseries_progress_complete() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
-    let progress = ProgressState::default();
-    let execution = query::QueryExecutionContext::new(progress.clone(), CancellationToken::new());
+    for view in [query::ViewMode::TableSankey, query::ViewMode::TimeSeries] {
+        let progress = ProgressState::default();
+        let execution =
+            query::QueryExecutionContext::new(progress.clone(), CancellationToken::new());
 
-    let response = handler
-        .handle_request_with_execution(
-            Some(execution),
-            query::FlowsRequest {
-                view: query::ViewMode::TableSankey,
-                after: Some(1),
-                before: Some(before),
-                group_by: vec![
-                    "SRC_ADDR".to_string(),
-                    "DST_ADDR".to_string(),
-                    "PROTOCOL".to_string(),
-                ],
-                top_n: query::TopN::N100,
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("flows function call with execution");
+        let response = handler
+            .handle_request_with_execution(
+                Some(execution),
+                query::FlowsRequest {
+                    view,
+                    after: Some(1),
+                    before: Some(before),
+                    group_by: vec![
+                        "SRC_ADDR".to_string(),
+                        "DST_ADDR".to_string(),
+                        "PROTOCOL".to_string(),
+                    ],
+                    top_n: query::TopN::N100,
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("flows function call with execution");
 
-    match response {
-        FlowsFunctionResponse::Table(_) => {}
-        FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
-        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
+        match (view, response) {
+            (query::ViewMode::TableSankey, FlowsFunctionResponse::Table(_))
+            | (query::ViewMode::TimeSeries, FlowsFunctionResponse::Metrics(_)) => {}
+            _ => panic!("response type did not match the requested view"),
+        }
+
+        let (done, total) = progress.snapshot();
+        assert!(total > 0, "expected progress total to be initialized");
+        assert_eq!(done, total, "expected completed progress after response");
     }
-
-    let (done, total) = progress.snapshot();
-    assert!(total > 0, "expected progress total to be initialized");
-    assert_eq!(done, total, "expected completed progress after response");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1604,41 +1668,43 @@ async fn e2e_flows_function_marks_progress_complete_for_empty_projected_query() 
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn e2e_flows_function_honors_cancelled_execution_context() {
+async fn e2e_flows_function_honors_cancelled_table_and_timeseries_contexts() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
-    let cancellation = CancellationToken::new();
-    cancellation.cancel();
-    let execution = query::QueryExecutionContext::new(ProgressState::default(), cancellation);
+    for view in [query::ViewMode::TableSankey, query::ViewMode::TimeSeries] {
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        let execution = query::QueryExecutionContext::new(ProgressState::default(), cancellation);
 
-    let err = handler
-        .handle_request_with_execution(
-            Some(execution),
-            query::FlowsRequest {
-                view: query::ViewMode::TableSankey,
-                after: Some(1),
-                before: Some(before),
-                group_by: vec![
-                    "SRC_ADDR".to_string(),
-                    "DST_ADDR".to_string(),
-                    "PROTOCOL".to_string(),
-                ],
-                top_n: query::TopN::N100,
-                ..Default::default()
-            },
-        )
-        .await
-        .expect_err("cancelled execution should fail");
+        let err = handler
+            .handle_request_with_execution(
+                Some(execution),
+                query::FlowsRequest {
+                    view,
+                    after: Some(1),
+                    before: Some(before),
+                    group_by: vec![
+                        "SRC_ADDR".to_string(),
+                        "DST_ADDR".to_string(),
+                        "PROTOCOL".to_string(),
+                    ],
+                    top_n: query::TopN::N100,
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect_err("cancelled execution should fail");
 
-    let message = err.to_string();
-    assert!(
-        message.contains("cancelled"),
-        "expected cancellation error, got: {message}"
-    );
+        let message = err.to_string();
+        assert!(
+            message.contains("cancelled"),
+            "expected cancellation error, got: {message}"
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1743,6 +1809,32 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
     assert_eq!(
         response.data.stats.get("query_bucket_seconds").copied(),
         Some(60)
+    );
+    assert_eq!(
+        response
+            .data
+            .stats
+            .get("query_pass_1_streamed_entries")
+            .copied(),
+        response
+            .data
+            .stats
+            .get("query_pass_2_streamed_entries")
+            .copied(),
+        "expected both time-series passes to scan the same planned source rows"
+    );
+    assert_eq!(
+        response
+            .data
+            .stats
+            .get("query_pass_1_matched_entries")
+            .copied(),
+        response
+            .data
+            .stats
+            .get("query_pass_2_matched_entries")
+            .copied(),
+        "expected both time-series passes to apply the same filters"
     );
     assert_eq!(
         response.data.stats.get("decoded_parse_attempts").copied(),

@@ -61,7 +61,7 @@ Operational limits are driven by sustained flow records/s, exporter batching, ca
 
 #### Performance Impact
 
-Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate and cardinality; size retention and storage from observed flow records/s.
+Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate, template volume, and cardinality; size retention and storage from observed flow records/s.
 
 ## Setup
 

@@ -78,7 +78,7 @@ where
         .map(|(field, index)| (field.as_bytes().to_vec(), *index))
         .collect::<FastHashMap<_, _>>();
     let prefilter_matches = build_prefilter_matches(prefilter_pairs);
-    scan_journal_files_forward(
+    scan_journal_files_forward_with_checkpoint(
         file_paths,
         None,
         None,
@@ -87,7 +87,8 @@ where
         0,
         &prefilter_matches,
         "targeted facet vocabulary scan",
-        |file_path, journal, _timestamp_usec, data_offsets, decompress_buf| {
+        check_cancelled,
+        |file_path, journal, _timestamp_usec, data_offsets, decompress_buf, check_cancelled| {
             check_cancelled()?;
             for value in &mut captured_values {
                 let _ = value.take();
