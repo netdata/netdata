@@ -278,20 +278,20 @@ Column legend:
 
 | Field | Type | v5 | v7 | v9 | IPFIX | sFlow | Source | Tiers | Selectivity | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Canonical byte counter, scaled by `SAMPLING_RATE` at ingest. Ordinary v9/IPFIX prefer IEs 1/2 and fall back to IEs 23/24 as a matched family. Cisco ASA NSEL event 5 uses initiator/responder IEs 231/232. sFlow derives it from decoded L3 length |
+| `BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric | Canonical byte counter, scaled by `SAMPLING_RATE` at ingest. Ordinary v9/IPFIX prefer IEs 1/2 and fall back to IEs 23/24 as a matched family. Cisco ASA NSEL event 5 uses initiator/responder IEs 231/232. sFlow derives it from decoded L3 length |
 | `DIRECTION` | string | — | — | ◐ | ◐ | — | decoder | all | facet, group-by, filter | v9 IE 61, IPFIX IE 61/239. sFlow has no native direction |
 | `DST_ADDR` | IP | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 12/28; sFlow `SampledHeader`/`SampledIPv4`/`SampledIPv6`. Raw-only |
 | `DST_ADDR_NAT` | IP | — | — | ◐ | ◐ | — | decoder | raw | facet, group-by, filter | v9 IE 226/282; IPFIX `postNATdestinationIPv4/IPv6Address` |
 | `DST_AS` | uint32 | ✓ | ✓ | ◐ | ◐ | ◐ | both | all | facet, group-by, filter | decoder IE 17 / sFlow `ExtendedGateway` last AS in path. Enrichment chain: `asn_providers` (default `[flow, routing, geoip]`); per-CIDR `enrichment.networks.<cidr>.asn` overrides |
 | `DST_AS_NAME` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `format_as_name(DST_AS, attrs.asn_name)` → `AS{n} {name}`; falls back to `AS0 Unknown ASN` or `AS0 Private IP Address Space` |
-| `DST_AS_PATH` | string | — | — | — | — | ◐ | both | raw | filter | sFlow `ExtendedGateway` BGP path. Routing enrichment overlay (BMP / BioRIS) for non-sFlow exporters |
-| `DST_COMMUNITIES` | string | — | — | — | — | ◐ | both | raw | filter | sFlow `ExtendedGateway` communities. Routing enrichment overlay (BMP / BioRIS) |
+| `DST_AS_PATH` | string | — | — | — | — | ◐ | both | raw | facet, group-by, filter | sFlow `ExtendedGateway` BGP path. Routing enrichment overlay (BMP / BioRIS) for non-sFlow exporters |
+| `DST_COMMUNITIES` | string | — | — | — | — | ◐ | both | raw | facet, group-by, filter | sFlow `ExtendedGateway` communities. Routing enrichment overlay (BMP / BioRIS) |
 | `DST_COUNTRY` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | GeoIP MMDB on `DST_ADDR` → optional override from `enrichment.networks.<cidr>.country` |
 | `DST_GEO_CITY` | string | — | — | — | — | — | enrichment | raw | facet, group-by, filter | GeoIP city MMDB. Raw-only (dropped at rollup) |
 | `DST_GEO_LATITUDE` | string | — | — | — | — | — | enrichment | raw | filter, hidden | GeoIP coordinates. Raw-only; hidden in default table view |
 | `DST_GEO_LONGITUDE` | string | — | — | — | — | — | enrichment | raw | filter, hidden | GeoIP coordinates. Raw-only; hidden in default table view |
 | `DST_GEO_STATE` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | GeoIP subdivision. Preserved in rollups |
-| `DST_LARGE_COMMUNITIES` | string | — | — | — | — | — | enrichment | raw | filter | RFC 8092 large communities from routing enrichment (BMP / BioRIS) |
+| `DST_LARGE_COMMUNITIES` | string | — | — | — | — | — | enrichment | raw | facet, group-by, filter | RFC 8092 large communities from routing enrichment (BMP / BioRIS) |
 | `DST_MAC` | MAC | — | — | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9 IE 80/57; IPFIX same. sFlow from `SampledHeader` datalink or `SampledEthernet` |
 | `DST_MASK` | uint8 | ✓ | ✓ | ◐ | ◐ | ◐ | both | raw | facet, group-by, filter | v9 IE 13/29; sFlow `ExtendedRouter`. Enrichment overlay via `net_providers` (default `[flow, routing]`) plus per-CIDR overrides |
 | `DST_NET_NAME` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `enrichment.networks.<cidr>.name` (static) merged with network sources by ascending prefix length |
@@ -301,7 +301,7 @@ Column legend:
 | `DST_NET_TENANT` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `enrichment.networks.<cidr>.tenant` from static + network sources |
 | `DST_PORT` | uint16 | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 11. sFlow from `SampledIPv4`/`SampledIPv6` or `SampledHeader` transport parse. Raw-only |
 | `DST_PORT_NAT` | uint16 | — | — | ◐ | ◐ | — | decoder | raw | facet, group-by, filter | v9 IE 228; IPFIX `postNAPTdestinationTransportPort` |
-| `DST_PREFIX` | IP | ✓ | ✓ | ◐ | — | — | decoder | raw | filter | v5/v7 derived from `DST_ADDR` & `DST_MASK`. v9 IE 45 (`Ipv4DstPrefix`). IPFIX has no canonical mapping; sFlow none |
+| `DST_PREFIX` | IP | ✓ | ✓ | ◐ | — | — | decoder | raw | facet, group-by, filter | v5/v7 derived from `DST_ADDR` & `DST_MASK`. v9 IE 45 (`Ipv4DstPrefix`). IPFIX has no canonical mapping; sFlow none |
 | `DST_VLAN` | uint16 | — | — | ◐ | ◐ | ◐ | decoder | all | facet, group-by, filter | v9 IE 59; IPFIX IE 254 (`PostVlanId`/`PostDot1qVlanId`). sFlow only via `ExtendedSwitch` (NOT from 802.1Q tag in `SampledHeader`) |
 | `ETYPE` | uint16 | ✓ (IPv4) | ✓ (IPv4) | ◐ | ◐ | ◐ | decoder | all | facet, group-by, filter | v5/v7 hardcoded to 2048. v9/IPFIX IE 60 `IpProtocolVersion` (4→2048, 6→34525). sFlow from sampled L2 etype |
 | `EXPORTER_GROUP` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.group`. Classifiers fill it when static metadata didn't |
@@ -312,7 +312,7 @@ Column legend:
 | `EXPORTER_ROLE` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.role`. Classifiers may fill |
 | `EXPORTER_SITE` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.site`. Classifiers may fill |
 | `EXPORTER_TENANT` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.tenant`. Classifiers may fill |
-| `FLOWS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Always 1 for raw records; sums during rollup aggregation |
+| `FLOWS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Always 1 for raw records; not stored in rollups |
 | `FLOW_END_USEC` | uint64 | ✓ | ✓ | ◐ | ◐ | — | decoder | raw | hidden | v5/v7 from header `sysUpTime` + `LastSwitched`. v9 `LastSwitched` is relative to system init; `flowEndMilliseconds` is an absolute Unix timestamp. IPFIX uses the flow-end time family. Not populated for sFlow |
 | `FLOW_START_USEC` | uint64 | ✓ | ✓ | ◐ | ◐ | — | decoder | raw | hidden | v5/v7 from header `sysUpTime` + `FirstSwitched`. v9 `FirstSwitched` is relative to system init; `flowStartMilliseconds` is an absolute Unix timestamp. IPFIX uses the flow-start time family. Not populated for sFlow |
 | `FLOW_VERSION` | string | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | facet, group-by, filter | One of `v5`, `v7`, `v9`, `ipfix`, `sflow` |
@@ -333,7 +333,7 @@ Column legend:
 | `IPV6_FLOW_LABEL` | uint32 | — | — | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 31 `FlowLabelIpv6`. sFlow from parsed IPv6 header |
 | `IP_FRAGMENT_ID` | uint32 | — | — | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9 IE 54 `Ipv4Ident`. IPFIX IE 54 `FragmentIdentification`. sFlow from parsed IPv4 header |
 | `IP_FRAGMENT_OFFSET` | uint16 | — | — | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 88 `FragmentOffset`. sFlow from parsed IPv4 header |
-| `MPLS_LABELS` | string | — | — | ◐ | ◐ | ◐ | decoder | raw | filter | v9 IE 70-79 `MplsLabel1..10`. IPFIX IE 70 `MplsTopLabelStackSection` + 71-79 `MplsLabelStackSection2..10`. sFlow from MPLS in `SampledHeader`. Comma-separated decimal labels |
+| `MPLS_LABELS` | string | — | — | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9 IE 70-79 `MplsLabel1..10`. IPFIX IE 70 `MplsTopLabelStackSection` + 71-79 `MplsLabelStackSection2..10`. sFlow from MPLS in `SampledHeader`. Comma-separated decimal labels |
 | `NEXT_HOP` | IP | ✓ | ✓ | ◐ | ◐ | ◐ | both | all | facet, group-by, filter | v9 IE 15/18/62/63; IPFIX same. sFlow `ExtendedRouter`/`ExtendedGateway`. Enrichment overlay via `net_providers` chain (default `[flow, routing]`) |
 | `OBSERVATION_TIME_MILLIS` | uint64 | — | — | ◐ | — | — | decoder | raw | hidden | v9 IE 323 `ObservationTimeMilliseconds`. For Cisco ASA NSEL this remains metadata; collector receive time determines journal/query placement. IPFIX observation-time fields are not exposed |
 | `OUT_IF` | uint32 | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | all | facet, group-by, filter | v9 IE 14 `OutputSnmp`; IPFIX IE 14/253. sFlow flow-sample `output` (single index only; LOCAL→0) |
@@ -343,7 +343,7 @@ Column legend:
 | `OUT_IF_NAME` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.if_indexes.<idx>.name` |
 | `OUT_IF_PROVIDER` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | Static metadata or interface classifier provider tag |
 | `OUT_IF_SPEED` | uint64 | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.if_indexes.<idx>.speed` (bps) |
-| `PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Canonical packet counter, selected with `BYTES` from the same family and scaled by `SAMPLING_RATE`. Cisco ASA NSEL event 5 uses initiator/responder IEs 298/299 without sampling. sFlow always 1 per sample |
+| `PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric | Canonical packet counter, selected with `BYTES` from the same family and scaled by `SAMPLING_RATE`. Cisco ASA NSEL event 5 uses initiator/responder IEs 298/299 without sampling. sFlow always 1 per sample |
 | `PROTOCOL` | uint8 | ✓ | ✓ | ✓ | ✓ | ◐ | decoder | all | facet, group-by, filter | IP protocol number: v5/v7 protocol_number; v9 IE 4; IPFIX IE 4 `ProtocolIdentifier`. sFlow from `SampledIPv4`/`SampledIPv6` or parsed L3. Zero (`HOPOPT`) is retained explicitly |
 | `RAW_BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Unscaled byte value from the selected canonical counter family; the non-selected family is discarded. Equal to `BYTES` for Cisco ASA NSEL |
 | `RAW_PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Unscaled packet value from the selected canonical counter family; the non-selected family is discarded. Equal to `PACKETS` for Cisco ASA NSEL |
@@ -366,7 +366,7 @@ Column legend:
 | `SRC_NET_TENANT` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `enrichment.networks.<cidr>.tenant` from static + network sources |
 | `SRC_PORT` | uint16 | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 7. sFlow from `SampledIPv4`/`SampledIPv6` or transport parse. Raw-only |
 | `SRC_PORT_NAT` | uint16 | — | — | ◐ | ◐ | — | decoder | raw | facet, group-by, filter | v9 IE 227; IPFIX `postNAPTsourceTransportPort` |
-| `SRC_PREFIX` | IP | ✓ | ✓ | ◐ | — | — | decoder | raw | filter | v5/v7 derived from `SRC_ADDR` & `SRC_MASK`. v9 IE 44 (`Ipv4SrcPrefix`). IPFIX has no canonical mapping; sFlow none |
+| `SRC_PREFIX` | IP | ✓ | ✓ | ◐ | — | — | decoder | raw | facet, group-by, filter | v5/v7 derived from `SRC_ADDR` & `SRC_MASK`. v9 IE 44 (`Ipv4SrcPrefix`). IPFIX has no canonical mapping; sFlow none |
 | `SRC_VLAN` | uint16 | — | — | ◐ | ◐ | ◐ | decoder | all | facet, group-by, filter | v9 IE 58; IPFIX IE 58/243 (`VlanId`/`Dot1qVlanId`). sFlow only via `ExtendedSwitch` (NOT from 802.1Q tag in `SampledHeader`) |
 | `TCP_FLAGS` | uint8 | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | all | facet, group-by, filter | OR of all TCP control bits seen in the flow. v9/IPFIX IE 6. sFlow from parsed TCP header in `SampledHeader` |
 

@@ -53,7 +53,9 @@ netgauze-bmp-pkt = { workspace = true, features = ["codec"] }
 notify = { workspace = true }
 roaring = { workspace = true, features = ["allocative"] }
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
+# The Function contract uses object key order for grouped columns and labels.
+# Declare this here so the plugin does not rely on another crate unifying it.
+serde_json = { workspace = true, features = ["preserve_order"] }
 serde_yaml = { workspace = true }
 sflow-parser = { workspace = true }
 tokio = { workspace = true }

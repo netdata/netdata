@@ -86,7 +86,7 @@ journal:
     hour_1:   { size_of_journal_files: 20GB,  duration_of_journal_files: 365d }
 ```
 
-For lighter loads, scale `size_of_journal_files` on the raw tier down proportionally — at 10 000 flow records/s ~350 GB / 24 h is enough; at 1 000 flow records/s ~35 GB / 24 h is enough. Whichever limit (size or duration) is hit first triggers rotation; size your raw tier so the **duration limit fires first** under normal load and the size cap is a safety net for traffic surges.
+For lighter loads, scale `size_of_journal_files` on the raw tier down proportionally — at 10 000 flow records/s ~350 GB / 24 h is enough; at 1 000 flow records/s ~35 GB / 24 h is enough. The size budget covers journal data and finalized per-journal facet sidecars. Whichever limit (size or duration) is hit first triggers rotation; size your raw tier so the **duration limit fires first** under normal load and the size budget is a safety net for traffic surges.
 
 ### Use fast NVMe for the raw tier
 

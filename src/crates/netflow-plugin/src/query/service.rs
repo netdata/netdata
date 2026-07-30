@@ -1,6 +1,7 @@
 use super::*;
 use crate::local_journal_host::load_local_journal_provider;
 use crate::memory_allocator::trim_allocator_if_worthwhile;
+use tokio_util::sync::CancellationToken;
 
 pub(crate) struct FlowQueryService {
     pub(super) registry: Registry,
@@ -77,45 +78,216 @@ impl FlowQueryService {
     }
 
     pub(crate) async fn initialize_facets(&self) -> Result<()> {
-        let registry_files = self
-            .registry
-            .find_files_in_range(Seconds(0), Seconds(u32::MAX))
-            .context(
-                "failed to enumerate retained netflow journal files for facet initialization",
-            )?;
-        let plan = self.facet_runtime.build_reconcile_plan(&registry_files);
-        if self.facet_runtime.is_ready()
-            && plan.archived_files_to_scan.is_empty()
-            && plan.active_files_to_scan.is_empty()
-        {
-            return Ok(());
+        self.initialize_facets_with_inventory(false, None)
+            .await
+            .map(|_| ())
+    }
+
+    pub(crate) async fn initialize_facets_cancellable(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<bool> {
+        self.initialize_facets_with_inventory(false, Some(cancellation))
+            .await
+    }
+
+    async fn initialize_facets_with_inventory(
+        &self,
+        disk_first: bool,
+        cancellation: Option<CancellationToken>,
+    ) -> Result<bool> {
+        const MAX_RECONCILE_ATTEMPTS: usize = 3;
+
+        for attempt in 1..=MAX_RECONCILE_ATTEMPTS {
+            if cancellation
+                .as_ref()
+                .is_some_and(CancellationToken::is_cancelled)
+            {
+                return Ok(false);
+            }
+            let registry_files = if attempt == 1 && !disk_first {
+                self.registry
+                    .find_files_in_range(Seconds(0), Seconds(u32::MAX))
+                    .context(
+                        "failed to enumerate retained netflow journal files for facet initialization",
+                    )?
+            } else {
+                self.enumerate_facet_files_from_disk()?
+            };
+            let plan = self.facet_runtime.build_reconcile_plan(&registry_files);
+            let archived_files = plan.archived_files_to_scan.clone();
+            let active_files = plan.active_files_to_scan.clone();
+            let scan_cancellation = cancellation.clone();
+            let scans = tokio::task::spawn_blocking(move || {
+                Ok::<_, anyhow::Error>((
+                    scan_facet_contributions_with_cancellation(
+                        &archived_files,
+                        scan_cancellation.as_ref(),
+                    )?,
+                    scan_facet_contributions_with_cancellation(
+                        &active_files,
+                        scan_cancellation.as_ref(),
+                    )?,
+                ))
+            })
+            .await
+            .context("facet initialization task join failed")?;
+            let (archived_scans, active_scans) = match scans {
+                Ok(scans) => scans,
+                Err(_)
+                    if cancellation
+                        .as_ref()
+                        .is_some_and(CancellationToken::is_cancelled) =>
+                {
+                    return Ok(false);
+                }
+                Err(err) => return Err(err),
+            };
+            if cancellation
+                .as_ref()
+                .is_some_and(CancellationToken::is_cancelled)
+            {
+                return Ok(false);
+            }
+
+            if self
+                .facet_runtime
+                .apply_reconcile_plan(plan, archived_scans, active_scans)?
+            {
+                if let Some(trimmed) = trim_allocator_if_worthwhile() {
+                    tracing::info!(
+                        before_heap_free = trimmed.before.heap_free_bytes,
+                        after_heap_free = trimmed.after.heap_free_bytes,
+                        before_heap_arena = trimmed.before.heap_arena_bytes,
+                        after_heap_arena = trimmed.after.heap_arena_bytes,
+                        "trimmed glibc heap after netflow facet reconciliation"
+                    );
+                }
+                return Ok(true);
+            }
+
+            tracing::debug!(
+                attempt,
+                "retained journals changed during netflow facet reconciliation; retrying"
+            );
+            tokio::task::yield_now().await;
         }
 
-        let archived_files = plan.archived_files_to_scan.clone();
-        let active_files = plan.active_files_to_scan.clone();
-        let (archived_scans, active_scans) = tokio::task::spawn_blocking(move || {
-            Ok::<_, anyhow::Error>((
-                scan_facet_contributions(&archived_files)?,
-                scan_facet_contributions(&active_files)?,
-            ))
+        anyhow::bail!(
+            "retained journals changed during all {} netflow facet reconciliation attempts",
+            MAX_RECONCILE_ATTEMPTS
+        )
+    }
+
+    fn enumerate_facet_files_from_disk(&self) -> Result<Vec<FileInfo>> {
+        let mut tier_dirs = self.tier_dirs.values().collect::<Vec<_>>();
+        tier_dirs.sort();
+        let mut files = Vec::new();
+
+        for tier_dir in tier_dirs {
+            let tier_dir = tier_dir
+                .to_str()
+                .context("netflow tier directory contains invalid UTF-8")?;
+            let discovered = journal_sdk_registry::repository::file::scan_journal_files(tier_dir)
+                .with_context(|| {
+                format!("failed to rescan netflow tier directory {tier_dir}")
+            })?;
+            files.extend(discovered.into_iter().map(|file| FileInfo {
+                file,
+                time_range: TimeRange::Unknown,
+            }));
+        }
+        files.sort_by(|left, right| left.file.path().cmp(right.file.path()));
+        files.dedup_by(|left, right| left.file.path() == right.file.path());
+        Ok(files)
+    }
+
+    pub(crate) async fn initialize_facets_before_ingest(&self) -> Result<()> {
+        if !self.facet_runtime.direction_migration_pending() {
+            return self
+                .initialize_facets_with_inventory(true, None)
+                .await
+                .map(|_| ());
+        }
+
+        let retained_files = self.enumerate_facet_files_from_disk()?;
+        let active_files = self
+            .facet_runtime
+            .build_reconcile_plan(&retained_files)
+            .active_files_to_scan;
+        let active_scans =
+            tokio::task::spawn_blocking(move || scan_facet_contributions(&active_files))
+                .await
+                .context("active facet initialization task join failed")??;
+        self.facet_runtime
+            .apply_active_scan_before_direction_migration(active_scans)
+    }
+
+    /// Rebuild archived DIRECTION after ingestion is listening. Returns `false`
+    /// when the retained journal set changed during the scan and a retry is
+    /// required.
+    pub(crate) async fn migrate_direction_facets(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<bool> {
+        if !self.facet_runtime.direction_migration_pending() {
+            return Ok(true);
+        }
+
+        let retained_files = self.enumerate_facet_files_from_disk()?;
+        let plan = self.facet_runtime.build_reconcile_plan(&retained_files);
+        if plan.rebuild_archived || !plan.archived_files_to_scan.is_empty() {
+            if !self
+                .initialize_facets_with_inventory(false, Some(cancellation.clone()))
+                .await?
+            {
+                return Ok(false);
+            }
+            if !self.facet_runtime.direction_migration_pending() {
+                return Ok(true);
+            }
+        }
+
+        if cancellation.is_cancelled() {
+            return Ok(false);
+        }
+        let retained_files = self.enumerate_facet_files_from_disk()?;
+        let plan = self.facet_runtime.build_reconcile_plan(&retained_files);
+        if plan.rebuild_archived || !plan.archived_files_to_scan.is_empty() {
+            return Ok(false);
+        }
+        let expected_archived_paths = plan.current_archived_paths;
+        let archived_files = retained_files
+            .into_iter()
+            .filter(|file_info| expected_archived_paths.contains(file_info.file.path()))
+            .collect::<Vec<_>>();
+        let scan_cancellation = cancellation.clone();
+        let archived_scans = tokio::task::spawn_blocking(move || {
+            scan_facet_contributions_for_fields_strict(
+                &archived_files,
+                &["DIRECTION".to_string()],
+                &scan_cancellation,
+            )
         })
         .await
-        .context("facet initialization task join failed")??;
+        .context("DIRECTION facet migration task join failed")?;
+        let archived_scans = match archived_scans {
+            Ok(scans) => scans,
+            Err(_) if cancellation.is_cancelled() => return Ok(false),
+            Err(err) => return Err(err),
+        };
 
-        self.facet_runtime
-            .apply_reconcile_plan(plan, archived_scans, active_scans)?;
-
-        if let Some(trimmed) = trim_allocator_if_worthwhile() {
+        let applied = self
+            .facet_runtime
+            .complete_direction_migration(&expected_archived_paths, archived_scans)?;
+        if applied && let Some(trimmed) = trim_allocator_if_worthwhile() {
             tracing::info!(
                 before_heap_free = trimmed.before.heap_free_bytes,
                 after_heap_free = trimmed.after.heap_free_bytes,
-                before_heap_arena = trimmed.before.heap_arena_bytes,
-                after_heap_arena = trimmed.after.heap_arena_bytes,
-                "trimmed glibc heap after netflow facet reconciliation"
+                "trimmed glibc heap after netflow DIRECTION migration"
             );
         }
-
-        Ok(())
+        Ok(applied)
     }
 }
 
@@ -161,11 +333,34 @@ fn is_journal_notify_path(path: &Path) -> bool {
 fn scan_facet_contributions(
     files: &[FileInfo],
 ) -> Result<BTreeMap<String, crate::facet_runtime::FacetFileContribution>> {
+    scan_facet_contributions_with_cancellation(files, None)
+}
+
+fn scan_facet_contributions_with_cancellation(
+    files: &[FileInfo],
+    cancellation: Option<&CancellationToken>,
+) -> Result<BTreeMap<String, crate::facet_runtime::FacetFileContribution>> {
     let mut contributions = BTreeMap::new();
     for file_info in files {
+        if cancellation.is_some_and(CancellationToken::is_cancelled) {
+            anyhow::bail!("facet contribution scan cancelled");
+        }
         let path = file_info.file.path().to_string();
-        let contribution = match crate::facet_runtime::scan_registry_file_contribution(file_info) {
+        let scan = match cancellation {
+            Some(cancellation) => {
+                crate::facet_runtime::scan_registry_file_contribution_for_fields_cancellable(
+                    file_info,
+                    crate::facet_catalog::FACET_ALLOWED_OPTIONS.as_slice(),
+                    cancellation,
+                )
+            }
+            None => crate::facet_runtime::scan_registry_file_contribution(file_info),
+        };
+        let contribution = match scan {
             Ok(contribution) => contribution,
+            Err(err) if cancellation.is_some_and(CancellationToken::is_cancelled) => {
+                return Err(err);
+            }
             Err(err) => {
                 if is_not_found_error(&err) {
                     tracing::debug!(
@@ -188,6 +383,34 @@ fn scan_facet_contributions(
     Ok(contributions)
 }
 
+fn scan_facet_contributions_for_fields_strict(
+    files: &[FileInfo],
+    requested_fields: &[String],
+    cancellation: &CancellationToken,
+) -> Result<BTreeMap<String, crate::facet_runtime::FacetFileContribution>> {
+    let mut contributions = BTreeMap::new();
+    for file_info in files {
+        if cancellation.is_cancelled() {
+            anyhow::bail!("DIRECTION facet migration cancelled");
+        }
+        let path = file_info.file.path().to_string();
+        let contribution =
+            crate::facet_runtime::scan_registry_file_contribution_for_fields_cancellable(
+                file_info,
+                requested_fields,
+                cancellation,
+            )
+            .with_context(|| {
+                format!(
+                    "failed to scan retained journal {} during DIRECTION migration",
+                    path
+                )
+            })?;
+        contributions.insert(path, contribution);
+    }
+    Ok(contributions)
+}
+
 fn is_not_found_error(err: &anyhow::Error) -> bool {
     err.chain().any(|cause| {
         cause
@@ -203,6 +426,7 @@ mod tests {
         Event,
         event::{CreateKind, EventKind, ModifyKind, RemoveKind, RenameMode},
     };
+    use std::fs;
 
     fn path(value: &str) -> PathBuf {
         PathBuf::from(value)
@@ -288,6 +512,23 @@ mod tests {
     }
 
     #[test]
+    fn direction_migration_fails_when_any_journal_cannot_be_scanned() {
+        let missing = "/tmp/netflow-missing-direction-migration-test/system.journal";
+
+        let err = scan_facet_contributions_for_fields_strict(
+            &[file_info(missing)],
+            &["DIRECTION".to_string()],
+            &CancellationToken::new(),
+        )
+        .expect_err("strict migration scan must not skip a missing journal");
+
+        assert!(
+            err.to_string().contains(missing),
+            "migration error should identify the unreadable journal: {err:#}"
+        );
+    }
+
+    #[test]
     fn not_found_errors_are_classified_through_context_layers() {
         let not_found = anyhow::Error::new(std::io::Error::from(std::io::ErrorKind::NotFound))
             .context("outer context");
@@ -297,5 +538,74 @@ mod tests {
 
         assert!(is_not_found_error(&not_found));
         assert!(!is_not_found_error(&permission_denied));
+    }
+
+    #[tokio::test]
+    async fn facet_reconcile_recovers_from_registry_lag_without_dropping_live_values() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let tier_dirs = HashMap::from([
+            (TierKind::Raw, tmp.path().join("raw")),
+            (TierKind::Minute1, tmp.path().join("1m")),
+            (TierKind::Minute5, tmp.path().join("5m")),
+            (TierKind::Hour1, tmp.path().join("1h")),
+        ]);
+        for tier_dir in tier_dirs.values() {
+            fs::create_dir_all(tier_dir).expect("create tier directory");
+        }
+        let raw_dir = tier_dirs.get(&TierKind::Raw).expect("raw tier");
+        let archived_path = raw_dir.join(
+            "system@22222222222222222222222222222222-\
+             0000000000000001-00000000000f4240.journal",
+        );
+        let active_path = raw_dir.join("system.journal");
+        fs::File::create(&archived_path).expect("create archived journal placeholder");
+        fs::File::create(&active_path).expect("create active journal placeholder");
+
+        let facet_runtime = Arc::new(crate::facet_runtime::FacetRuntime::new(tmp.path()));
+        let mut archived_fields = crate::flow::FlowFields::new();
+        archived_fields.insert("PROTOCOL", "6".to_string());
+        facet_runtime
+            .observe_active_contribution(
+                &archived_path,
+                &crate::facet_runtime::facet_contribution_from_flow_fields(&archived_fields),
+            )
+            .expect("observe contribution before rotation");
+        facet_runtime
+            .observe_rotation(&archived_path, &active_path)
+            .expect("observe rotation before registry catches up");
+        facet_runtime
+            .observe_active_path_created(&active_path)
+            .expect("observe active path before registry catches up");
+        let mut fields = crate::flow::FlowFields::new();
+        fields.insert("PROTOCOL", "17".to_string());
+        facet_runtime
+            .observe_active_contribution(
+                &active_path,
+                &crate::facet_runtime::facet_contribution_from_flow_fields(&fields),
+            )
+            .expect("observe live value");
+
+        let (monitor, _notify_rx) = Monitor::new().expect("create registry monitor");
+        let service = FlowQueryService {
+            registry: Registry::new(monitor),
+            agent_id: "test-agent".to_string(),
+            tier_dirs,
+            max_groups: 100,
+            facet_runtime: Arc::clone(&facet_runtime),
+        };
+        service
+            .initialize_facets()
+            .await
+            .expect("retry reconciliation from a fresh disk inventory");
+
+        assert_eq!(
+            facet_runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("protocol field")
+                .values,
+            vec!["6".to_string(), "17".to_string()]
+        );
     }
 }

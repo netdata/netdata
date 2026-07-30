@@ -225,7 +225,7 @@ Note: the live (open) tier rows shown by queries refresh on a 1-second cadence, 
 sudo du -sh /var/cache/netdata/flows/*
 ```
 
-Default retention is `10GB` per tier with no time-based age limit. The default is applied separately to raw, 1m, 5m, and 1h tiers, so total can reach roughly 40 GB plus some. If your config left this default and your collector is busy, expect to hit the size cap quickly; quiet collectors may keep data for longer than seven days. See [Configuration](/docs/npm/network-flows/configuration.md) for per-tier overrides — most production deployments need them.
+Default retention is `10GB` per tier with no time-based age limit. The default is applied separately to raw, 1m, 5m, and 1h tiers, and each budget includes journal files plus finalized per-journal facet sidecars. Retained artifacts therefore target roughly 40 GB total. Protected active journals can temporarily push usage above that target, and shared facet state is outside the per-tier budgets. If your collector is busy, expect to hit the size budget quickly; quiet collectors may keep data for longer than seven days. See [Configuration](/docs/npm/network-flows/configuration.md) for per-tier overrides — most production deployments need them.
 
 ## Things that look like bugs but aren't
 

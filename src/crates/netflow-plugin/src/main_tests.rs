@@ -1,20 +1,20 @@
 use super::{
     FLOWS_FUNCTION_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowsFunctionResponse, NetflowFlowsHandler,
-    flows_required_params, ingest, plugin_config, query, tiering,
+    flows_required_params, ingest, plugin_config, query, tiering, wait_for_listener_ready,
 };
 use chrono::Utc;
 use etherparse::{SlicedPacket, TransportSlice};
-use journal_sdk_core::file::Mmap;
+use journal_sdk_core::file::{JournalState, Mmap, MmapMut};
 use journal_sdk_core::repository::File as RepoFile;
 use journal_sdk_core::{Direction, JournalFile, JournalReader, Location};
 use pcap_file::pcap::PcapReader;
 use rt::ProgressState;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::net::UdpSocket as StdUdpSocket;
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
@@ -22,6 +22,214 @@ use tokio::net::UdpSocket;
 use tokio_util::sync::CancellationToken;
 
 const E2E_INGEST_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
+
+fn assert_json_object_key_order(value: &serde_json::Value, expected: &[&str]) {
+    let actual = value
+        .as_object()
+        .expect("JSON object")
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert_eq!(actual, expected);
+
+    let serialized = serde_json::to_string(value).expect("serialize JSON object");
+    let mut cursor = 0;
+    for key in expected {
+        let needle = format!("\"{key}\":");
+        let offset = serialized[cursor..]
+            .find(&needle)
+            .unwrap_or_else(|| panic!("missing {key} in {serialized}"));
+        cursor += offset + needle.len();
+    }
+}
+
+fn assert_group_description_order(description: &str, expected: &[&str]) {
+    let mut cursor = 0;
+    for field in expected {
+        let needle = format!("{field}=");
+        let offset = description[cursor..]
+            .find(&needle)
+            .unwrap_or_else(|| panic!("missing {field} in {description}"));
+        cursor += offset + needle.len();
+    }
+}
+
+#[tokio::test]
+async fn background_facet_work_waits_for_udp_listener_readiness() {
+    let listener_ready = CancellationToken::new();
+    let shutdown = CancellationToken::new();
+    let started = Arc::new(AtomicBool::new(false));
+    let task_listener_ready = listener_ready.clone();
+    let task_shutdown = shutdown.clone();
+    let task_started = Arc::clone(&started);
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let task = tokio::spawn(async move {
+        let _ = entered_tx.send(());
+        if wait_for_listener_ready(&task_listener_ready, &task_shutdown).await {
+            task_started.store(true, Ordering::Release);
+        }
+    });
+
+    tokio::time::timeout(Duration::from_secs(1), entered_rx)
+        .await
+        .expect("listener gate task should start promptly")
+        .expect("listener gate task should report entry");
+    assert!(
+        !started.load(Ordering::Acquire),
+        "background facet work must not begin before the UDP listener is ready"
+    );
+    listener_ready.cancel();
+    tokio::time::timeout(Duration::from_secs(1), task)
+        .await
+        .expect("listener gate should open promptly")
+        .expect("listener gate task should finish");
+    assert!(started.load(Ordering::Acquire));
+
+    let listener_ready = CancellationToken::new();
+    let shutdown = CancellationToken::new();
+    shutdown.cancel();
+    assert!(
+        !wait_for_listener_ready(&listener_ready, &shutdown).await,
+        "shutdown must not be mistaken for listener readiness"
+    );
+
+    listener_ready.cancel();
+    assert!(
+        !wait_for_listener_ready(&listener_ready, &shutdown).await,
+        "shutdown must win when readiness and shutdown are both signalled"
+    );
+}
+
+#[tokio::test]
+async fn startup_reconciles_reopened_online_journal_as_active_across_restarts() {
+    let (mut cfg, _tmp) = offline_journal_cfg();
+    cfg.listener.sync_every_entries = 1;
+    let raw_dir = cfg.journal.raw_tier_dir();
+    let first_record = crate::flow::FlowRecord {
+        flow_version: "ipfix",
+        protocol: 6,
+        bytes: 100,
+        packets: 1,
+        flows: 1,
+        ..Default::default()
+    };
+
+    let first_runtime = Arc::new(crate::facet_runtime::FacetRuntime::new(
+        &cfg.journal.base_dir(),
+    ));
+    let mut first_ingest = offline_ingest_with_facet_runtime(&cfg, Arc::clone(&first_runtime));
+    assert_eq!(
+        first_ingest.handle_decoded_batch_raw_only_for_test(
+            1_000_000,
+            std::slice::from_ref(&first_record),
+            0,
+        ),
+        0,
+        "the first record should be synced"
+    );
+    drop(first_ingest);
+    drop(first_runtime);
+
+    let journal_paths = journal_files(&raw_dir);
+    assert_eq!(journal_paths.len(), 1, "expected one raw journal");
+    let active_path = journal_paths[0].clone();
+    set_journal_state(&active_path, JournalState::Online);
+
+    // Production startup order: start watching, construct writers so they
+    // register reopened files, then reconcile from a fresh disk inventory.
+    let second_runtime = Arc::new(crate::facet_runtime::FacetRuntime::new(
+        &cfg.journal.base_dir(),
+    ));
+    let (second_query, _notify_rx) =
+        query::FlowQueryService::new_with_facet_runtime(&cfg, Arc::clone(&second_runtime))
+            .await
+            .expect("create second query service");
+    let mut second_ingest = offline_ingest_with_facet_runtime(&cfg, Arc::clone(&second_runtime));
+    assert_eq!(
+        second_runtime
+            .build_reconcile_plan(&[])
+            .current_active_paths,
+        BTreeSet::from([active_path.to_string_lossy().into_owned()]),
+        "the first restart must reopen and register the original journal as the sole active path"
+    );
+    second_query
+        .initialize_facets_before_ingest()
+        .await
+        .expect("reconcile reopened journal");
+    assert_eq!(
+        second_runtime
+            .snapshot()
+            .fields
+            .get("PROTOCOL")
+            .expect("protocol facet after first restart")
+            .values
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["6".to_string()])
+    );
+
+    let second_record = crate::flow::FlowRecord {
+        protocol: 17,
+        ..first_record
+    };
+    assert_eq!(
+        second_ingest.handle_decoded_batch_raw_only_for_test(
+            2_000_000,
+            std::slice::from_ref(&second_record),
+            0,
+        ),
+        0,
+        "the post-restart record should be synced"
+    );
+    assert_eq!(
+        second_runtime
+            .snapshot()
+            .fields
+            .get("PROTOCOL")
+            .expect("protocol facet after append")
+            .values
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["6".to_string(), "17".to_string()])
+    );
+    drop(second_ingest);
+    drop(second_query);
+    drop(second_runtime);
+    set_journal_state(&active_path, JournalState::Online);
+
+    let third_runtime = Arc::new(crate::facet_runtime::FacetRuntime::new(
+        &cfg.journal.base_dir(),
+    ));
+    let (third_query, _notify_rx) =
+        query::FlowQueryService::new_with_facet_runtime(&cfg, Arc::clone(&third_runtime))
+            .await
+            .expect("create third query service");
+    let third_ingest = offline_ingest_with_facet_runtime(&cfg, Arc::clone(&third_runtime));
+    assert_eq!(
+        third_runtime.build_reconcile_plan(&[]).current_active_paths,
+        BTreeSet::from([active_path.to_string_lossy().into_owned()]),
+        "the second restart must reopen and register the original journal as the sole active path"
+    );
+    third_query
+        .initialize_facets_before_ingest()
+        .await
+        .expect("reconcile journal after second restart");
+    assert_eq!(
+        third_runtime
+            .snapshot()
+            .fields
+            .get("PROTOCOL")
+            .expect("protocol facet after second restart")
+            .values
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["6".to_string(), "17".to_string()])
+    );
+    drop(third_ingest);
+}
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_ingest_writes_journals_and_query_reads_flows() {
@@ -237,6 +445,38 @@ async fn e2e_sflow_fixture_persists_expected_raw_journal_fields_and_query_reads_
         output.metrics.get("bytes").copied().unwrap_or(0) > 0,
         "expected selected FLOW_VERSION=sflow query to aggregate bytes"
     );
+
+    let ipv6_network = "2a0c:8880:2::/48"
+        .parse::<ipnet::IpNet>()
+        .expect("fixture IPv6 network");
+    let ipv6_output = query_service
+        .query_flows(&query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            selections: HashMap::from([("SRC_ADDR".to_string(), vec![ipv6_network.to_string()])]),
+            group_by: vec!["SRC_ADDR".to_string(), "DST_ADDR".to_string()],
+            top_n: query::TopN::N100,
+            ..Default::default()
+        })
+        .await
+        .expect("query sFlow rows with IPv6 CIDR selection");
+
+    assert!(
+        ipv6_output
+            .stats
+            .get("query_matched_entries")
+            .copied()
+            .unwrap_or_default()
+            > 0,
+        "expected IPv6 CIDR to match a persisted sFlow row"
+    );
+    assert!(ipv6_output.flows.iter().all(|row| {
+        row["key"]["SRC_ADDR"]
+            .as_str()
+            .and_then(|value| value.parse::<std::net::IpAddr>().ok())
+            .is_some_and(|address| ipv6_network.contains(&address))
+    }));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -845,6 +1085,29 @@ fn offline_journal_cfg() -> (plugin_config::PluginConfig, TempDir) {
     (cfg, tmp)
 }
 
+fn offline_ingest_with_facet_runtime(
+    cfg: &plugin_config::PluginConfig,
+    facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
+) -> ingest::IngestService {
+    ingest::IngestService::new_with_facet_runtime(
+        cfg.clone(),
+        Arc::new(ingest::IngestMetrics::default()),
+        Arc::new(RwLock::new(tiering::OpenTierState::default())),
+        Arc::new(RwLock::new(tiering::TierFlowIndexStore::default())),
+        facet_runtime,
+    )
+    .expect("create offline ingest service")
+}
+
+fn set_journal_state(path: &Path, state: JournalState) {
+    let repository_file = RepoFile::from_path(path).expect("parse journal path");
+    let mut journal_file =
+        JournalFile::<MmapMut>::open_for_append(&repository_file, 8 * 1024 * 1024)
+            .expect("open journal for state update");
+    journal_file.journal_header_mut().state = state as u8;
+    journal_file.sync().expect("persist journal state");
+}
+
 /// Start of a fully closed 5m bucket ~20-25 minutes in the past: 1m and 5m
 /// buckets derived from it are deterministically closed, and the timestamps
 /// stay inside the rebuild's ~1h raw-file window (a fully closed 1h bucket
@@ -1117,7 +1380,7 @@ fn truncate_newest_journal_mid_last_entry(dir: &Path) {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn e2e_query_service_timeseries_path_returns_chart_data() {
+async fn e2e_query_service_timeseries_paths_return_chart_data() {
     let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
@@ -1125,33 +1388,89 @@ async fn e2e_query_service_timeseries_path_returns_chart_data() {
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let after = before.saturating_sub(3600);
 
+    for query in ["", "PROTOCOL="] {
+        let output = query_service
+            .query_flow_metrics(&query::FlowsRequest {
+                view: query::ViewMode::TimeSeries,
+                after: Some(after),
+                before: Some(before),
+                query: query.to_string(),
+                group_by: vec!["PROTOCOL".to_string()],
+                sort_by: query::SortBy::Bytes,
+                top_n: query::TopN::N25,
+                ..Default::default()
+            })
+            .await
+            .expect("query timeseries metrics");
+
+        assert_eq!(output.metric, "bytes");
+        assert_eq!(output.group_by, vec!["PROTOCOL".to_string()]);
+        assert!(
+            output.chart["result"]["data"]
+                .as_array()
+                .map(|rows| !rows.is_empty())
+                .unwrap_or(false),
+            "expected timeseries chart rows from query service"
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_projected_timeseries_tolerates_torn_raw_tail() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    for tier_dir in [
+        cfg.journal.raw_tier_dir(),
+        cfg.journal.minute_1_tier_dir(),
+        cfg.journal.minute_5_tier_dir(),
+        cfg.journal.hour_1_tier_dir(),
+    ] {
+        fs::create_dir_all(&tier_dir)
+            .unwrap_or_else(|err| panic!("create tier dir {}: {}", tier_dir.display(), err));
+    }
+    let base = closed_5m_base();
+    write_raw_flows(
+        &cfg,
+        0x42,
+        1,
+        &[
+            (base + 1_000_000, 1),
+            (base + 61_000_000, 2),
+            (base + 121_000_000, 3),
+        ],
+    );
+    truncate_newest_journal_mid_last_entry(&cfg.journal.raw_tier_dir());
+
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service over torn raw journal");
     let output = query_service
         .query_flow_metrics(&query::FlowsRequest {
             view: query::ViewMode::TimeSeries,
-            after: Some(after),
-            before: Some(before),
-            group_by: vec!["PROTOCOL".to_string()],
+            after: Some((base / 1_000_000) as i64),
+            before: Some((base / 1_000_000) as i64 + 180),
+            group_by: vec!["SRC_ADDR".to_string()],
             sort_by: query::SortBy::Bytes,
             top_n: query::TopN::N25,
             ..Default::default()
         })
         .await
-        .expect("query timeseries metrics");
+        .expect("projected time-series query must tolerate the torn raw tail");
 
-    assert_eq!(output.metric, "bytes");
-    assert_eq!(output.group_by, vec!["PROTOCOL".to_string()]);
-    assert!(
-        output.chart["result"]["data"]
-            .as_array()
-            .map(|rows| !rows.is_empty())
-            .unwrap_or(false),
-        "expected timeseries chart rows from query service"
-    );
+    assert_eq!(output.stats.get("query_pass_1_matched_entries"), Some(&2));
+    assert_eq!(output.stats.get("query_pass_2_matched_entries"), Some(&2));
+    assert_eq!(output.stats.get("query_returned_dimensions"), Some(&2));
 }
 
 #[test]
-fn default_group_by_required_param_preserves_selected_field_order() {
-    let request = query::FlowsRequest::default();
+fn group_by_required_param_preserves_selected_field_order() {
+    let request = query::FlowsRequest {
+        group_by: vec![
+            "DST_ADDR".to_string(),
+            "PROTOCOL".to_string(),
+            "SRC_ADDR".to_string(),
+        ],
+        ..Default::default()
+    };
     let params = flows_required_params(
         request.normalized_view(),
         &request.normalized_group_by(),
@@ -1171,10 +1490,7 @@ fn default_group_by_required_param_preserves_selected_field_order() {
         .map(|option| option.id.as_str())
         .collect();
 
-    assert_eq!(
-        selected_fields,
-        vec!["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]
-    );
+    assert_eq!(selected_fields, vec!["DST_ADDR", "PROTOCOL", "SRC_ADDR"]);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1188,17 +1504,20 @@ async fn e2e_flows_function_returns_expected_response_sections() {
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
+    let expected_group_by = vec![
+        "SRC_ADDR".to_string(),
+        "PROTOCOL".to_string(),
+        "DST_AS_NAME".to_string(),
+        "SRC_AS_NAME".to_string(),
+        "DST_ADDR".to_string(),
+    ];
 
     let response = handler
         .handle_request(query::FlowsRequest {
             view: query::ViewMode::TableSankey,
             after: Some(1),
             before: Some(before),
-            group_by: vec![
-                "SRC_ADDR".to_string(),
-                "DST_ADDR".to_string(),
-                "PROTOCOL".to_string(),
-            ],
+            group_by: expected_group_by.clone(),
             top_n: query::TopN::N100,
             ..Default::default()
         })
@@ -1215,6 +1534,7 @@ async fn e2e_flows_function_returns_expected_response_sections() {
     assert_eq!(response.update_every, FLOWS_UPDATE_EVERY_SECONDS);
     assert_eq!(response.response_type, "flows");
     assert_eq!(response.data.view, "table-sankey");
+    assert_eq!(response.data.group_by, expected_group_by);
     assert_eq!(
         response
             .data
@@ -1222,8 +1542,20 @@ async fn e2e_flows_function_returns_expected_response_sections() {
             .as_object()
             .map(|columns| columns.len())
             .unwrap_or_default(),
-        5,
+        7,
         "expected grouped table columns to include only group_by fields plus bytes and packets"
+    );
+    assert_json_object_key_order(
+        &response.data.columns,
+        &[
+            "SRC_ADDR",
+            "PROTOCOL",
+            "DST_AS_NAME",
+            "SRC_AS_NAME",
+            "DST_ADDR",
+            "bytes",
+            "packets",
+        ],
     );
     assert!(response.data.columns.get("timestamp").is_none());
     assert!(response.data.columns.get("durationSec").is_none());
@@ -1236,6 +1568,16 @@ async fn e2e_flows_function_returns_expected_response_sections() {
         "expected non-empty flows data section"
     );
     let first = response.data.flows.first().expect("first grouped flow");
+    assert_json_object_key_order(
+        &first["key"],
+        &[
+            "SRC_ADDR",
+            "PROTOCOL",
+            "DST_AS_NAME",
+            "SRC_AS_NAME",
+            "DST_ADDR",
+        ],
+    );
     assert!(first.get("timestamp").is_none());
     assert!(first.get("duration_sec").is_none());
     assert!(first.get("exporter").is_none());
@@ -1314,44 +1656,47 @@ async fn e2e_flows_function_returns_expected_response_sections() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn e2e_flows_function_marks_progress_complete_with_execution_context() {
+async fn e2e_flows_function_marks_table_and_timeseries_progress_complete() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
-    let progress = ProgressState::default();
-    let execution = query::QueryExecutionContext::new(progress.clone(), CancellationToken::new());
+    for view in [query::ViewMode::TableSankey, query::ViewMode::TimeSeries] {
+        let progress = ProgressState::default();
+        let execution =
+            query::QueryExecutionContext::new(progress.clone(), CancellationToken::new());
 
-    let response = handler
-        .handle_request_with_execution(
-            Some(execution),
-            query::FlowsRequest {
-                view: query::ViewMode::TableSankey,
-                after: Some(1),
-                before: Some(before),
-                group_by: vec![
-                    "SRC_ADDR".to_string(),
-                    "DST_ADDR".to_string(),
-                    "PROTOCOL".to_string(),
-                ],
-                top_n: query::TopN::N100,
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("flows function call with execution");
+        let response = handler
+            .handle_request_with_execution(
+                Some(execution),
+                query::FlowsRequest {
+                    view,
+                    after: Some(1),
+                    before: Some(before),
+                    group_by: vec![
+                        "SRC_ADDR".to_string(),
+                        "DST_ADDR".to_string(),
+                        "PROTOCOL".to_string(),
+                    ],
+                    top_n: query::TopN::N100,
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("flows function call with execution");
 
-    match response {
-        FlowsFunctionResponse::Table(_) => {}
-        FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
-        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
+        match (view, response) {
+            (query::ViewMode::TableSankey, FlowsFunctionResponse::Table(_))
+            | (query::ViewMode::TimeSeries, FlowsFunctionResponse::Metrics(_)) => {}
+            _ => panic!("response type did not match the requested view"),
+        }
+
+        let (done, total) = progress.snapshot();
+        assert!(total > 0, "expected progress total to be initialized");
+        assert_eq!(done, total, "expected completed progress after response");
     }
-
-    let (done, total) = progress.snapshot();
-    assert!(total > 0, "expected progress total to be initialized");
-    assert_eq!(done, total, "expected completed progress after response");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1416,41 +1761,43 @@ async fn e2e_flows_function_marks_progress_complete_for_empty_projected_query() 
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn e2e_flows_function_honors_cancelled_execution_context() {
+async fn e2e_flows_function_honors_cancelled_table_and_timeseries_contexts() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
-    let cancellation = CancellationToken::new();
-    cancellation.cancel();
-    let execution = query::QueryExecutionContext::new(ProgressState::default(), cancellation);
+    for view in [query::ViewMode::TableSankey, query::ViewMode::TimeSeries] {
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        let execution = query::QueryExecutionContext::new(ProgressState::default(), cancellation);
 
-    let err = handler
-        .handle_request_with_execution(
-            Some(execution),
-            query::FlowsRequest {
-                view: query::ViewMode::TableSankey,
-                after: Some(1),
-                before: Some(before),
-                group_by: vec![
-                    "SRC_ADDR".to_string(),
-                    "DST_ADDR".to_string(),
-                    "PROTOCOL".to_string(),
-                ],
-                top_n: query::TopN::N100,
-                ..Default::default()
-            },
-        )
-        .await
-        .expect_err("cancelled execution should fail");
+        let err = handler
+            .handle_request_with_execution(
+                Some(execution),
+                query::FlowsRequest {
+                    view,
+                    after: Some(1),
+                    before: Some(before),
+                    group_by: vec![
+                        "SRC_ADDR".to_string(),
+                        "DST_ADDR".to_string(),
+                        "PROTOCOL".to_string(),
+                    ],
+                    top_n: query::TopN::N100,
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect_err("cancelled execution should fail");
 
-    let message = err.to_string();
-    assert!(
-        message.contains("cancelled"),
-        "expected cancellation error, got: {message}"
-    );
+        let message = err.to_string();
+        assert!(
+            message.contains("cancelled"),
+            "expected cancellation error, got: {message}"
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1504,6 +1851,66 @@ async fn e2e_flows_function_supports_autocomplete_mode() {
             .contains_key("query_facet_autocomplete_values"),
         "expected autocomplete response stats to include query-specific counters"
     );
+
+    let cidr_response = handler
+        .handle_request(query::FlowsRequest {
+            mode: query::RequestMode::Autocomplete,
+            field: Some("SRC_ADDR".to_string()),
+            term: "10.1/1".to_string(),
+            ..Default::default()
+        })
+        .await
+        .expect("CIDR autocomplete function call");
+    let cidr_response = match cidr_response {
+        FlowsFunctionResponse::Autocomplete(response) => response,
+        FlowsFunctionResponse::Table(_) => panic!("expected autocomplete response"),
+        FlowsFunctionResponse::Metrics(_) => panic!("expected autocomplete response"),
+    };
+    assert!(
+        cidr_response
+            .data
+            .values
+            .iter()
+            .any(|entry| entry["value"] == "0.0.0.0/1"),
+        "a generated CIDR containing a retained source address must be returned"
+    );
+    assert!(
+        cidr_response
+            .data
+            .values
+            .iter()
+            .all(|entry| entry["value"] != "10.1.0.0/16"),
+        "a generated CIDR containing no retained source address must be omitted"
+    );
+    assert_eq!(
+        cidr_response.data.values[0]["value"], "0.0.0.0/1",
+        "filtering must preserve the generated CIDR ranking"
+    );
+    assert!(
+        cidr_response.data.values.iter().all(|entry| entry["value"]
+            .as_str()
+            .is_some_and(|value| value.contains('/'))),
+        "slash autocomplete must return only canonical CIDR candidates"
+    );
+
+    let trailing_dot_response = handler
+        .handle_request(query::FlowsRequest {
+            mode: query::RequestMode::Autocomplete,
+            field: Some("SRC_ADDR".to_string()),
+            term: "10.1./1".to_string(),
+            ..Default::default()
+        })
+        .await
+        .expect("trailing-dot CIDR autocomplete function call");
+    let trailing_dot_response = match trailing_dot_response {
+        FlowsFunctionResponse::Autocomplete(response) => response,
+        FlowsFunctionResponse::Table(_) => panic!("expected autocomplete response"),
+        FlowsFunctionResponse::Metrics(_) => panic!("expected autocomplete response"),
+    };
+    assert_eq!(
+        trailing_dot_response.data.values, cidr_response.data.values,
+        "one trailing IPv4 dot before slash must preserve CIDR candidates"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1516,6 +1923,11 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let after = before.saturating_sub(3600);
+    let expected_group_by = vec![
+        "SRC_AS_NAME".to_string(),
+        "PROTOCOL".to_string(),
+        "DST_AS_NAME".to_string(),
+    ];
     let materialized_tier_files = tier_file_count(&cfg.journal.hour_1_tier_dir())
         + tier_file_count(&cfg.journal.minute_5_tier_dir())
         + tier_file_count(&cfg.journal.minute_1_tier_dir());
@@ -1525,7 +1937,7 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
             view: query::ViewMode::TimeSeries,
             after: Some(after),
             before: Some(before),
-            group_by: vec!["PROTOCOL".to_string()],
+            group_by: expected_group_by.clone(),
             sort_by: query::SortBy::Bytes,
             top_n: query::TopN::N50,
             ..Default::default()
@@ -1544,7 +1956,11 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
     assert_eq!(response.response_type, "flows");
     assert_eq!(response.data.view, "timeseries");
     assert_eq!(response.data.metric, "bytes");
-    assert_eq!(response.data.group_by, vec!["PROTOCOL".to_string()]);
+    assert_eq!(response.data.group_by, expected_group_by);
+    assert_json_object_key_order(
+        &response.data.columns,
+        &["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"],
+    );
     assert_eq!(response.data.columns["PROTOCOL"]["name"], "Protocol");
     assert_eq!(response.data.chart["view"]["units"], "bytes/s");
     assert_eq!(
@@ -1555,6 +1971,32 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
     assert_eq!(
         response.data.stats.get("query_bucket_seconds").copied(),
         Some(60)
+    );
+    assert_eq!(
+        response
+            .data
+            .stats
+            .get("query_pass_1_streamed_entries")
+            .copied(),
+        response
+            .data
+            .stats
+            .get("query_pass_2_streamed_entries")
+            .copied(),
+        "expected both time-series passes to scan the same planned source rows"
+    );
+    assert_eq!(
+        response
+            .data
+            .stats
+            .get("query_pass_1_matched_entries")
+            .copied(),
+        response
+            .data
+            .stats
+            .get("query_pass_2_matched_entries")
+            .copied(),
+        "expected both time-series passes to apply the same filters"
     );
     assert_eq!(
         response.data.stats.get("decoded_parse_attempts").copied(),
@@ -1568,6 +2010,25 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
             .unwrap_or(false),
         "expected Top-N chart dimensions limited by request"
     );
+    for id in response.data.chart["view"]["dimensions"]["ids"]
+        .as_array()
+        .expect("timeseries dimension ids")
+    {
+        let labels: serde_json::Value =
+            serde_json::from_str(id.as_str().expect("dimension id string"))
+                .expect("dimension id object");
+        assert_json_object_key_order(&labels, &["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]);
+    }
+    for name in response.data.chart["view"]["dimensions"]["names"]
+        .as_array()
+        .expect("timeseries dimension names")
+    {
+        let name = name.as_str().expect("dimension name string");
+        assert_group_description_order(
+            name,
+            &["Source AS Name", "Protocol", "Destination AS Name"],
+        );
+    }
     assert!(
         response.data.chart["result"]["data"]
             .as_array()
@@ -1597,6 +2058,38 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
             .and_then(|param| param.options.iter().find(|option| option.id == "PROTOCOL"))
             .map(|option| option.name.as_str()),
         Some("Protocol")
+    );
+
+    let generic_response = handler
+        .handle_request(query::FlowsRequest {
+            view: query::ViewMode::TimeSeries,
+            after: Some(after),
+            before: Some(before),
+            query: "FLOW_VERSION=v5".to_string(),
+            group_by: expected_group_by,
+            sort_by: query::SortBy::Bytes,
+            top_n: query::TopN::N50,
+            ..Default::default()
+        })
+        .await
+        .expect("generic flow metrics function call");
+    let generic_response = match generic_response {
+        FlowsFunctionResponse::Metrics(response) => response,
+        FlowsFunctionResponse::Table(_) => panic!("expected metrics response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected metrics response"),
+    };
+    let generic_id = generic_response.data.chart["view"]["dimensions"]["ids"][0]
+        .as_str()
+        .expect("generic dimension id");
+    let generic_labels: serde_json::Value =
+        serde_json::from_str(generic_id).expect("generic dimension id object");
+    assert_json_object_key_order(&generic_labels, &["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]);
+    let generic_name = generic_response.data.chart["view"]["dimensions"]["names"][0]
+        .as_str()
+        .expect("generic dimension name");
+    assert_group_description_order(
+        generic_name,
+        &["Source AS Name", "Protocol", "Destination AS Name"],
     );
 }
 
@@ -1639,6 +2132,39 @@ async fn e2e_aggregated_safe_group_by_falls_back_to_on_disk_lower_tiers() {
         "expected grouped query tier to reflect on-disk materialized-tier availability"
     );
 
+    let exporter_cidr_output = query_service
+        .query_flows(&query::FlowsRequest {
+            selections: HashMap::from([(
+                "EXPORTER_IP".to_string(),
+                vec!["127.0.0.0/8".to_string()],
+            )]),
+            ..request.clone()
+        })
+        .await
+        .expect("query rollup-safe exporter CIDR");
+    assert_eq!(
+        exporter_cidr_output
+            .stats
+            .get("query_forced_raw_tier")
+            .copied(),
+        Some(0),
+        "CIDR must not add a raw-tier requirement to a rollup-safe address field"
+    );
+    assert_eq!(
+        exporter_cidr_output
+            .stats
+            .get("query_tier")
+            .copied()
+            .unwrap_or(0)
+            > 0,
+        materialized_tier_files > 0,
+        "exporter CIDR must retain the same on-disk tier availability"
+    );
+    assert_eq!(
+        exporter_cidr_output.metrics, output.metrics,
+        "the fixture's exporter CIDR must match every aggregated row"
+    );
+
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
     let response = handler
         .handle_request(request)
@@ -1671,6 +2197,61 @@ async fn e2e_aggregated_safe_group_by_falls_back_to_on_disk_lower_tiers() {
         materialized_tier_files > 0,
         "expected function response query tier to reflect on-disk materialized-tier availability"
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_fields_absent_from_rollups_force_raw_tier() {
+    let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+        ingest_fixture_with_timestamp_source("nfv5.pcap", plugin_config::TimestampSource::Input)
+            .await;
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
+
+    let requests = [
+        (
+            "group-by",
+            query::FlowsRequest {
+                view: query::ViewMode::TableSankey,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec!["DST_AS_PATH".to_string()],
+                ..Default::default()
+            },
+        ),
+        (
+            "selection",
+            query::FlowsRequest {
+                view: query::ViewMode::TableSankey,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec!["PROTOCOL".to_string()],
+                selections: HashMap::from([(
+                    "MPLS_LABELS".to_string(),
+                    vec!["synthetic-no-match".to_string()],
+                )]),
+                ..Default::default()
+            },
+        ),
+    ];
+
+    for (case, request) in requests {
+        let output = query_service
+            .query_flows(&request)
+            .await
+            .unwrap_or_else(|error| panic!("{case} raw-tier query failed: {error}"));
+        assert_eq!(
+            output.stats.get("query_forced_raw_tier").copied(),
+            Some(1),
+            "{case} on a field absent from rollups must force the raw tier"
+        );
+        assert_eq!(
+            output.stats.get("query_tier").copied(),
+            Some(0),
+            "{case} on a field absent from rollups must execute on raw data"
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1720,6 +2301,10 @@ async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
         4,
         "expected country-map columns to include only country keys plus bytes and packets"
     );
+    assert_json_object_key_order(
+        &response.data.columns,
+        &["SRC_COUNTRY", "DST_COUNTRY", "bytes", "packets"],
+    );
     assert!(response.data.columns.get("timestamp").is_none());
     assert!(response.data.columns.get("durationSec").is_none());
     assert!(response.data.columns.get("exporterIp").is_none());
@@ -1728,6 +2313,7 @@ async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
     assert!(response.data.columns.get("samplingRate").is_none());
 
     let first = response.data.flows.first().expect("first flow row");
+    assert_json_object_key_order(&first["key"], &["SRC_COUNTRY", "DST_COUNTRY"]);
     assert!(
         first["key"].get("SRC_COUNTRY").is_some(),
         "expected country-map rows to expose SRC_COUNTRY"
@@ -1789,6 +2375,26 @@ async fn e2e_state_map_reuses_tuple_table_shape_with_state_keys() {
     assert!(
         !response.data.flows.is_empty(),
         "expected non-empty state-map rows"
+    );
+    assert_json_object_key_order(
+        &response.data.columns,
+        &[
+            "SRC_COUNTRY",
+            "SRC_GEO_STATE",
+            "DST_COUNTRY",
+            "DST_GEO_STATE",
+            "bytes",
+            "packets",
+        ],
+    );
+    assert_json_object_key_order(
+        &response.data.flows[0]["key"],
+        &[
+            "SRC_COUNTRY",
+            "SRC_GEO_STATE",
+            "DST_COUNTRY",
+            "DST_GEO_STATE",
+        ],
     );
     assert!(
         !response
@@ -1873,6 +2479,38 @@ async fn e2e_city_map_reuses_tuple_table_shape_with_city_and_coordinate_keys() {
         !response.data.flows.is_empty(),
         "expected non-empty city-map rows"
     );
+    assert_json_object_key_order(
+        &response.data.columns,
+        &[
+            "SRC_COUNTRY",
+            "SRC_GEO_STATE",
+            "SRC_GEO_CITY",
+            "SRC_GEO_LATITUDE",
+            "SRC_GEO_LONGITUDE",
+            "DST_COUNTRY",
+            "DST_GEO_STATE",
+            "DST_GEO_CITY",
+            "DST_GEO_LATITUDE",
+            "DST_GEO_LONGITUDE",
+            "bytes",
+            "packets",
+        ],
+    );
+    assert_json_object_key_order(
+        &response.data.flows[0]["key"],
+        &[
+            "SRC_COUNTRY",
+            "SRC_GEO_STATE",
+            "SRC_GEO_CITY",
+            "SRC_GEO_LATITUDE",
+            "SRC_GEO_LONGITUDE",
+            "DST_COUNTRY",
+            "DST_GEO_STATE",
+            "DST_GEO_CITY",
+            "DST_GEO_LATITUDE",
+            "DST_GEO_LONGITUDE",
+        ],
+    );
     assert!(
         response
             .data
@@ -1914,7 +2552,7 @@ async fn e2e_selection_filter_uses_streaming_reader_path() {
     };
     let request_match = query::FlowsRequest {
         selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["v5".to_string()])]),
-        ..request_base
+        ..request_base.clone()
     };
     let matched = query_service
         .query_flows(&request_match)
@@ -1981,6 +2619,88 @@ async fn e2e_selection_filter_uses_streaming_reader_path() {
                 .unwrap_or(false)
         }),
         "expected every returned row to respect the multi-value protocol filter"
+    );
+
+    let selected_row = matched.flows.first().expect("matching fixture row");
+    let selected_src = selected_row["key"]["SRC_ADDR"]
+        .as_str()
+        .expect("source address in grouped key");
+    let selected_protocol = selected_row["key"]["PROTOCOL"]
+        .as_str()
+        .expect("protocol in grouped key");
+    let selected_address = selected_src
+        .parse::<std::net::IpAddr>()
+        .expect("fixture source address");
+    let broad_prefix = if selected_address.is_ipv4() { 23 } else { 119 };
+    let broad_network = ipnet::IpNet::new(selected_address, broad_prefix)
+        .expect("valid broad prefix")
+        .trunc();
+    let exact_address = if selected_address.is_ipv4() {
+        "2001:db8::dead"
+    } else {
+        "203.0.113.255"
+    };
+    let cidr_selections = HashMap::from([
+        (
+            "SRC_ADDR".to_string(),
+            vec![exact_address.to_string(), broad_network.to_string()],
+        ),
+        ("PROTOCOL".to_string(), vec![selected_protocol.to_string()]),
+    ]);
+    let request_cidr = query::FlowsRequest {
+        selections: cidr_selections,
+        ..request_base.clone()
+    };
+    let cidr_table = query_service
+        .query_flows(&request_cidr)
+        .await
+        .expect("projected table query with mixed exact and CIDR selection");
+    let cidr_matches = cidr_table
+        .stats
+        .get("query_matched_entries")
+        .copied()
+        .unwrap_or_default();
+    assert!(
+        cidr_matches > 0,
+        "broad CIDR must not be lost when its field also contains an exact address"
+    );
+    assert!(cidr_table.flows.iter().all(|row| {
+        row["key"]["SRC_ADDR"]
+            .as_str()
+            .and_then(|value| value.parse::<std::net::IpAddr>().ok())
+            .is_some_and(|address| {
+                broad_network.contains(&address) || address.to_string() == exact_address
+            })
+            && row["key"]["PROTOCOL"].as_str() == Some(selected_protocol)
+    }));
+
+    let cidr_timeseries = query_service
+        .query_flow_metrics(&query::FlowsRequest {
+            view: query::ViewMode::TimeSeries,
+            ..request_cidr.clone()
+        })
+        .await
+        .expect("projected time-series query with CIDR selection");
+    assert_eq!(
+        cidr_timeseries
+            .stats
+            .get("query_pass_1_matched_entries")
+            .copied(),
+        Some(cidr_matches),
+        "projected table and time-series pass one must apply the same CIDR matcher"
+    );
+
+    let cidr_generic = query_service
+        .query_flows(&query::FlowsRequest {
+            query: "FLOW_VERSION=v5".to_string(),
+            ..request_cidr
+        })
+        .await
+        .expect("generic table query with CIDR selection");
+    assert_eq!(
+        cidr_generic.stats.get("query_matched_entries").copied(),
+        Some(cidr_matches),
+        "generic and projected scans must apply the same CIDR matcher"
     );
 
     let request_miss = query::FlowsRequest {
