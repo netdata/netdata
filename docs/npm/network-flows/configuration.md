@@ -186,7 +186,7 @@ Per-tier values:
 
 | Key | Default per tier | Notes |
 |---|---|---|
-| `size_of_journal_files` | `10GB` | Retained-artifact budget for committed journal data and finalized per-journal facet sidecars. Minimum `100MB`. Set to `null` to disable size-based retention on this tier. |
+| `size_of_journal_files` | `10GB` | Retained-artifact budget for journal data and finalized per-journal facet sidecars. Minimum `100MB`. Set to `null` to disable size-based retention on this tier. |
 | `duration_of_journal_files` | `null` | Optional time budget for this tier. The default disables time-based eviction; set a duration such as `24h` or `14d` to add an age cap. |
 
 Either configured limit can evict old files. The tier expires whichever configured limit is hit first. At least one of the two must be set per tier (validation enforces this).

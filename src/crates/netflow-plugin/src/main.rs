@@ -203,23 +203,40 @@ async fn async_main() -> i32 {
     let query_service_for_events = Arc::clone(&query_service);
     let notify_listener_ready = listener_ready.clone();
     let notify_shutdown = shutdown.clone();
-    tokio::spawn(async move {
+    let notify_task = tokio::spawn(async move {
         let mut notify_rx = notify_rx;
         if direction_migration_pending
             && !wait_for_listener_ready(&notify_listener_ready, &notify_shutdown).await
         {
             return;
         }
-        while let Some(event) = notify_rx.recv().await {
+        loop {
+            let event = tokio::select! {
+                biased;
+                _ = notify_shutdown.cancelled() => break,
+                event = notify_rx.recv() => event,
+            };
+            let Some(event) = event else {
+                break;
+            };
             let mut reconcile_required = query_service_for_events.process_notify_event(event);
             while let Ok(event) = notify_rx.try_recv() {
                 reconcile_required |= query_service_for_events.process_notify_event(event);
             }
 
-            if reconcile_required
-                && let Err(err) = query_service_for_events.initialize_facets().await
-            {
-                tracing::warn!("netflow facet reconcile after file notification failed: {err:#}");
+            if reconcile_required {
+                match query_service_for_events
+                    .initialize_facets_cancellable(notify_shutdown.clone())
+                    .await
+                {
+                    Ok(true) => {}
+                    Ok(false) => break,
+                    Err(err) => {
+                        tracing::warn!(
+                            "netflow facet reconcile after file notification failed: {err:#}"
+                        );
+                    }
+                }
             }
         }
         tracing::info!("netflow journal notify event task terminated");
@@ -410,6 +427,14 @@ async fn async_main() -> i32 {
             Err(_) => {}
         }
     }
+    match notify_task.await {
+        Ok(()) => {}
+        Err(err) if !err.is_cancelled() => {
+            tracing::error!("journal notify event task join error: {err}");
+            exit_code = 1;
+        }
+        Err(_) => {}
+    }
     if let Some(task) = bmp_task {
         match task.await {
             Ok(()) => {}
@@ -449,8 +474,9 @@ async fn wait_for_listener_ready(
     shutdown: &CancellationToken,
 ) -> bool {
     tokio::select! {
-        _ = listener_ready.cancelled() => true,
+        biased;
         _ = shutdown.cancelled() => false,
+        _ = listener_ready.cancelled() => true,
     }
 }
 

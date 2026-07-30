@@ -24,6 +24,7 @@ use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
+use tokio_util::sync::CancellationToken;
 use twox_hash::XxHash64;
 
 #[allow(unused_imports)]
@@ -890,6 +891,33 @@ pub(crate) fn scan_registry_file_contribution_for_fields(
     file_info: &FileInfo,
     requested_fields: &[String],
 ) -> Result<FacetFileContribution> {
+    scan_registry_file_contribution_for_fields_with_check(file_info, requested_fields, &mut || {
+        Ok(())
+    })
+}
+
+pub(crate) fn scan_registry_file_contribution_for_fields_cancellable(
+    file_info: &FileInfo,
+    requested_fields: &[String],
+    cancellation: &CancellationToken,
+) -> Result<FacetFileContribution> {
+    scan_registry_file_contribution_for_fields_with_check(file_info, requested_fields, &mut || {
+        if cancellation.is_cancelled() {
+            bail!("facet contribution scan cancelled");
+        }
+        Ok(())
+    })
+}
+
+fn scan_registry_file_contribution_for_fields_with_check<F>(
+    file_info: &FileInfo,
+    requested_fields: &[String],
+    check_cancelled: &mut F,
+) -> Result<FacetFileContribution>
+where
+    F: FnMut() -> Result<()>,
+{
+    check_cancelled()?;
     let simple_fields = requested_fields
         .iter()
         .filter(|field| !facet_field_requires_protocol_scan(field))
@@ -904,13 +932,18 @@ pub(crate) fn scan_registry_file_contribution_for_fields(
                 file_info.file.path()
             )
         })?;
-    accumulate_simple_closed_file_facet_values(&journal, &simple_fields, &mut values)
-        .with_context(|| {
-            format!(
-                "failed to enumerate simple facet values from {}",
-                file_info.file.path()
-            )
-        })?;
+    accumulate_simple_closed_file_facet_values(
+        &journal,
+        &simple_fields,
+        &mut values,
+        check_cancelled,
+    )
+    .with_context(|| {
+        format!(
+            "failed to enumerate simple facet values from {}",
+            file_info.file.path()
+        )
+    })?;
     if requested_fields.iter().any(|field| field == "ICMPV4") {
         accumulate_targeted_facet_values(
             std::slice::from_ref(&file_path),
@@ -918,6 +951,7 @@ pub(crate) fn scan_registry_file_contribution_for_fields(
             &[("PROTOCOL".to_string(), "1".to_string())],
             virtual_flow_field_dependencies("ICMPV4"),
             &mut values,
+            check_cancelled,
         )
         .with_context(|| {
             format!(
@@ -933,6 +967,7 @@ pub(crate) fn scan_registry_file_contribution_for_fields(
             &[("PROTOCOL".to_string(), "58".to_string())],
             virtual_flow_field_dependencies("ICMPV6"),
             &mut values,
+            check_cancelled,
         )
         .with_context(|| {
             format!(
@@ -1604,6 +1639,7 @@ mod tests {
     use journal_sdk_core::repository::File as JournalRepositoryFile;
     use journal_sdk_core::{JournalFile, JournalFileOptions, JournalWriter};
     use journal_sdk_registry::TimeRange;
+    use std::cell::Cell;
     use std::sync::Arc;
     use std::sync::MutexGuard;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1754,6 +1790,36 @@ mod tests {
                 .expect("parse archived registry path"),
             time_range: TimeRange::Unknown,
         }
+    }
+
+    #[test]
+    fn archived_facet_scan_checks_cancellation_inside_a_journal() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let file_info = write_archived_direction_journal(
+            tmp.path(),
+            &[FlowDirection::Ingress, FlowDirection::Egress],
+        );
+        let checks = Cell::new(0);
+
+        let err = scan_registry_file_contribution_for_fields_with_check(
+            &file_info,
+            &["DIRECTION".to_string()],
+            &mut || {
+                let next = checks.get() + 1;
+                checks.set(next);
+                if next >= 4 {
+                    bail!("test cancellation");
+                }
+                Ok(())
+            },
+        )
+        .expect_err("the scan should stop between field data objects");
+
+        assert_eq!(checks.get(), 4);
+        assert!(
+            format!("{err:#}").contains("test cancellation"),
+            "the cancellation error should escape the journal scan: {err:#}"
+        );
     }
 
     #[test]

@@ -31,13 +31,18 @@ async fn background_facet_work_waits_for_udp_listener_readiness() {
     let task_listener_ready = listener_ready.clone();
     let task_shutdown = shutdown.clone();
     let task_started = Arc::clone(&started);
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
     let task = tokio::spawn(async move {
+        let _ = entered_tx.send(());
         if wait_for_listener_ready(&task_listener_ready, &task_shutdown).await {
             task_started.store(true, Ordering::Release);
         }
     });
 
-    tokio::task::yield_now().await;
+    tokio::time::timeout(Duration::from_secs(1), entered_rx)
+        .await
+        .expect("listener gate task should start promptly")
+        .expect("listener gate task should report entry");
     assert!(
         !started.load(Ordering::Acquire),
         "background facet work must not begin before the UDP listener is ready"
@@ -55,6 +60,12 @@ async fn background_facet_work_waits_for_udp_listener_readiness() {
     assert!(
         !wait_for_listener_ready(&listener_ready, &shutdown).await,
         "shutdown must not be mistaken for listener readiness"
+    );
+
+    listener_ready.cancel();
+    assert!(
+        !wait_for_listener_ready(&listener_ready, &shutdown).await,
+        "shutdown must win when readiness and shutdown are both signalled"
     );
 }
 

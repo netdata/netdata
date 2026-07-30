@@ -78,13 +78,33 @@ impl FlowQueryService {
     }
 
     pub(crate) async fn initialize_facets(&self) -> Result<()> {
-        self.initialize_facets_with_inventory(false).await
+        self.initialize_facets_with_inventory(false, None)
+            .await
+            .map(|_| ())
     }
 
-    async fn initialize_facets_with_inventory(&self, disk_first: bool) -> Result<()> {
+    pub(crate) async fn initialize_facets_cancellable(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<bool> {
+        self.initialize_facets_with_inventory(false, Some(cancellation))
+            .await
+    }
+
+    async fn initialize_facets_with_inventory(
+        &self,
+        disk_first: bool,
+        cancellation: Option<CancellationToken>,
+    ) -> Result<bool> {
         const MAX_RECONCILE_ATTEMPTS: usize = 3;
 
         for attempt in 1..=MAX_RECONCILE_ATTEMPTS {
+            if cancellation
+                .as_ref()
+                .is_some_and(CancellationToken::is_cancelled)
+            {
+                return Ok(false);
+            }
             let registry_files = if attempt == 1 && !disk_first {
                 self.registry
                     .find_files_in_range(Seconds(0), Seconds(u32::MAX))
@@ -97,14 +117,38 @@ impl FlowQueryService {
             let plan = self.facet_runtime.build_reconcile_plan(&registry_files);
             let archived_files = plan.archived_files_to_scan.clone();
             let active_files = plan.active_files_to_scan.clone();
-            let (archived_scans, active_scans) = tokio::task::spawn_blocking(move || {
+            let scan_cancellation = cancellation.clone();
+            let scans = tokio::task::spawn_blocking(move || {
                 Ok::<_, anyhow::Error>((
-                    scan_facet_contributions(&archived_files)?,
-                    scan_facet_contributions(&active_files)?,
+                    scan_facet_contributions_with_cancellation(
+                        &archived_files,
+                        scan_cancellation.as_ref(),
+                    )?,
+                    scan_facet_contributions_with_cancellation(
+                        &active_files,
+                        scan_cancellation.as_ref(),
+                    )?,
                 ))
             })
             .await
-            .context("facet initialization task join failed")??;
+            .context("facet initialization task join failed")?;
+            let (archived_scans, active_scans) = match scans {
+                Ok(scans) => scans,
+                Err(_)
+                    if cancellation
+                        .as_ref()
+                        .is_some_and(CancellationToken::is_cancelled) =>
+                {
+                    return Ok(false);
+                }
+                Err(err) => return Err(err),
+            };
+            if cancellation
+                .as_ref()
+                .is_some_and(CancellationToken::is_cancelled)
+            {
+                return Ok(false);
+            }
 
             if self
                 .facet_runtime
@@ -119,7 +163,7 @@ impl FlowQueryService {
                         "trimmed glibc heap after netflow facet reconciliation"
                     );
                 }
-                return Ok(());
+                return Ok(true);
             }
 
             tracing::debug!(
@@ -160,7 +204,10 @@ impl FlowQueryService {
 
     pub(crate) async fn initialize_facets_before_ingest(&self) -> Result<()> {
         if !self.facet_runtime.direction_migration_pending() {
-            return self.initialize_facets_with_inventory(true).await;
+            return self
+                .initialize_facets_with_inventory(true, None)
+                .await
+                .map(|_| ());
         }
 
         let retained_files = self.enumerate_facet_files_from_disk()?;
@@ -190,7 +237,12 @@ impl FlowQueryService {
         let retained_files = self.enumerate_facet_files_from_disk()?;
         let plan = self.facet_runtime.build_reconcile_plan(&retained_files);
         if plan.rebuild_archived || !plan.archived_files_to_scan.is_empty() {
-            self.initialize_facets().await?;
+            if !self
+                .initialize_facets_with_inventory(false, Some(cancellation.clone()))
+                .await?
+            {
+                return Ok(false);
+            }
             if !self.facet_runtime.direction_migration_pending() {
                 return Ok(true);
             }
@@ -281,11 +333,34 @@ fn is_journal_notify_path(path: &Path) -> bool {
 fn scan_facet_contributions(
     files: &[FileInfo],
 ) -> Result<BTreeMap<String, crate::facet_runtime::FacetFileContribution>> {
+    scan_facet_contributions_with_cancellation(files, None)
+}
+
+fn scan_facet_contributions_with_cancellation(
+    files: &[FileInfo],
+    cancellation: Option<&CancellationToken>,
+) -> Result<BTreeMap<String, crate::facet_runtime::FacetFileContribution>> {
     let mut contributions = BTreeMap::new();
     for file_info in files {
+        if cancellation.is_some_and(CancellationToken::is_cancelled) {
+            anyhow::bail!("facet contribution scan cancelled");
+        }
         let path = file_info.file.path().to_string();
-        let contribution = match crate::facet_runtime::scan_registry_file_contribution(file_info) {
+        let scan = match cancellation {
+            Some(cancellation) => {
+                crate::facet_runtime::scan_registry_file_contribution_for_fields_cancellable(
+                    file_info,
+                    crate::facet_catalog::FACET_ALLOWED_OPTIONS.as_slice(),
+                    cancellation,
+                )
+            }
+            None => crate::facet_runtime::scan_registry_file_contribution(file_info),
+        };
+        let contribution = match scan {
             Ok(contribution) => contribution,
+            Err(err) if cancellation.is_some_and(CancellationToken::is_cancelled) => {
+                return Err(err);
+            }
             Err(err) => {
                 if is_not_found_error(&err) {
                     tracing::debug!(
@@ -319,16 +394,18 @@ fn scan_facet_contributions_for_fields_strict(
             anyhow::bail!("DIRECTION facet migration cancelled");
         }
         let path = file_info.file.path().to_string();
-        let contribution = crate::facet_runtime::scan_registry_file_contribution_for_fields(
-            file_info,
-            requested_fields,
-        )
-        .with_context(|| {
-            format!(
-                "failed to scan retained journal {} during DIRECTION migration",
-                path
+        let contribution =
+            crate::facet_runtime::scan_registry_file_contribution_for_fields_cancellable(
+                file_info,
+                requested_fields,
+                cancellation,
             )
-        })?;
+            .with_context(|| {
+                format!(
+                    "failed to scan retained journal {} during DIRECTION migration",
+                    path
+                )
+            })?;
         contributions.insert(path, contribution);
     }
     Ok(contributions)

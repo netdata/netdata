@@ -1,17 +1,26 @@
 use super::*;
 
-pub(crate) fn accumulate_simple_closed_file_facet_values(
+pub(crate) fn accumulate_simple_closed_file_facet_values<F>(
     journal: &JournalFileMap,
     requested_fields: &[String],
     by_field: &mut BTreeMap<String, BTreeSet<String>>,
-) -> Result<()> {
+    check_cancelled: &mut F,
+) -> Result<()>
+where
+    F: FnMut() -> Result<()>,
+{
     let mut decompress_buf = Vec::new();
 
     for field in requested_fields {
+        check_cancelled()?;
         let mut iter = journal
             .field_data_objects(field.as_bytes())
             .with_context(|| format!("failed to enumerate field {}", field))?;
-        while let Some(data_guard) = iter.next().transpose()? {
+        loop {
+            check_cancelled()?;
+            let Some(data_guard) = iter.next().transpose()? else {
+                break;
+            };
             let payload = if data_guard.is_compressed() {
                 data_guard.decompress(&mut decompress_buf)?;
                 decompress_buf.as_slice()
@@ -35,16 +44,21 @@ pub(crate) fn accumulate_simple_closed_file_facet_values(
     Ok(())
 }
 
-pub(crate) fn accumulate_targeted_facet_values(
+pub(crate) fn accumulate_targeted_facet_values<F>(
     file_paths: &[PathBuf],
     requested_field: &str,
     prefilter_pairs: &[(String, String)],
     dependency_fields: &[&str],
     by_field: &mut BTreeMap<String, BTreeSet<String>>,
-) -> Result<()> {
+    check_cancelled: &mut F,
+) -> Result<()>
+where
+    F: FnMut() -> Result<()>,
+{
     if file_paths.is_empty() || dependency_fields.is_empty() {
         return Ok(());
     }
+    check_cancelled()?;
 
     let mut captured_fields = dependency_fields
         .iter()
@@ -74,6 +88,7 @@ pub(crate) fn accumulate_targeted_facet_values(
         &prefilter_matches,
         "targeted facet vocabulary scan",
         |file_path, journal, _timestamp_usec, data_offsets, decompress_buf| {
+            check_cancelled()?;
             for value in &mut captured_values {
                 let _ = value.take();
             }
@@ -84,6 +99,7 @@ pub(crate) fn accumulate_targeted_facet_values(
                 data_offsets,
                 decompress_buf,
                 |payload| {
+                    check_cancelled()?;
                     let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
                         return Ok(());
                     };
