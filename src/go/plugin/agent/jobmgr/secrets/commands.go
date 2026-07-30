@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -192,6 +193,14 @@ func (c *Controller) prepareTest(
 	}
 	defer operation.releaseUntransferred(&transaction, &resultErr)
 	result := operation.result
+	if errors.Is(result.err, jobmgr.ErrProcessAttemptQuarantined) {
+		return c.noopMessage(
+			scope,
+			current,
+			503,
+			"Secretstore test is unavailable until the plugin restarts.",
+		)
+	}
 	if result.retryable {
 		return c.noopMessage(scope, current, 503, "Secretstore test is still busy.")
 	}

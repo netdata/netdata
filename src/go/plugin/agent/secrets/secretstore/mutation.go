@@ -130,6 +130,8 @@ func newPreparedSecretMutation(
 	}
 }
 
+// Validate performs configuration-only provider conformance without invoking
+// the optional operational test or installing the temporary Store.
 func (store *SecretStore) Validate(
 	ctx context.Context,
 	catalog *CreatorCatalog,

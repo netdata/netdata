@@ -28,10 +28,7 @@ type operationalTestError struct {
 }
 
 func (err *operationalTestError) Error() string {
-	if err == nil || err.cause == nil {
-		return "service discovery operational test failed"
-	}
-	return err.cause.Error()
+	return "service discovery operational test failed"
 }
 
 func (err *operationalTestError) Unwrap() error {
@@ -152,24 +149,7 @@ func (d *ServiceDiscovery) prepareDyncfgConfig(
 		key,
 		true,
 		func(context.Context) (sdConfig, error) {
-			if _, err := parseDyncfgPayload(
-				fn.Payload(),
-				discovererType,
-				name,
-				d.configDefaults,
-				d.discovererRegistry(),
-				true,
-			); err != nil {
-				return nil, err
-			}
-			return newSDConfigFromJSON(
-				fn.Payload(),
-				name,
-				fn.Source(),
-				"dyncfg",
-				discovererType,
-				pipelineID,
-			)
+			return d.materializeDyncfgConfig(fn, discovererType, name, pipelineID)
 		},
 	)
 }
@@ -191,24 +171,7 @@ func (d *ServiceDiscovery) testDyncfgConfig(
 		key,
 		false,
 		func(ctx context.Context) (bool, error) {
-			if _, err := parseDyncfgPayload(
-				fn.Payload(),
-				discovererType,
-				name,
-				d.configDefaults,
-				d.discovererRegistry(),
-				true,
-			); err != nil {
-				return false, err
-			}
-			config, err := newSDConfigFromJSON(
-				fn.Payload(),
-				name,
-				fn.Source(),
-				"dyncfg",
-				discovererType,
-				pipelineID,
-			)
+			config, err := d.materializeDyncfgConfig(fn, discovererType, name, pipelineID)
 			if err != nil {
 				return false, err
 			}
@@ -226,6 +189,32 @@ func (d *ServiceDiscovery) testDyncfgConfig(
 			}
 			return fullyTested, nil
 		},
+	)
+}
+
+func (d *ServiceDiscovery) materializeDyncfgConfig(
+	fn dyncfg.Function,
+	discovererType string,
+	name string,
+	pipelineID string,
+) (sdConfig, error) {
+	if _, err := parseDyncfgPayload(
+		fn.Payload(),
+		discovererType,
+		name,
+		d.configDefaults,
+		d.discovererRegistry(),
+		true,
+	); err != nil {
+		return nil, err
+	}
+	return newSDConfigFromJSON(
+		fn.Payload(),
+		name,
+		fn.Source(),
+		"dyncfg",
+		discovererType,
+		pipelineID,
 	)
 }
 

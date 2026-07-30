@@ -117,6 +117,46 @@ func TestSecretStoreTestResponseClassification(t *testing.T) {
 	}
 }
 
+func TestSecretStoreTestQuarantineIsUnavailable(t *testing.T) {
+	state := &storeTestCapabilityState{panicOnTest: true}
+	operations, store, attempts := newStoreTestCapabilityOperations(t, func() secretstore.Store {
+		return &storeTestCapableProvider{state: state}
+	})
+	defer shutdownStoreTestCapabilityOperations(t, store, attempts)
+	controller, target := newStoreTestCapabilityController(t)
+
+	for range 2 {
+		stage, err := operations.prepare(storeOperationSpec{
+			target:       target,
+			config:       storeTestCapabilityConfig(),
+			mode:         storeOperationValidation,
+			testIdentity: true,
+		})
+		require.NoError(t, err)
+		stage.Start()
+		select {
+		case <-stage.Ready():
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "panicking Store test did not settle")
+		}
+
+		prepared, err := controller.prepareTest(
+			lifecycle.ResourceTransactionScope{ID: "secretstore:vault:main"},
+			nil,
+			target,
+			stage,
+		)
+		require.NoError(t, err)
+		applied, err := prepared.Apply(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, 503, applied.ResultStatus())
+		stage.Release()
+	}
+
+	require.Equal(t, 1, state.calls)
+	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+}
+
 func newStoreTestCapabilityOperations(
 	t *testing.T,
 	create func() secretstore.Store,
@@ -201,8 +241,9 @@ func storeTestCapabilityConfig() secretstore.Config {
 }
 
 type storeTestCapabilityState struct {
-	calls int
-	err   error
+	calls       int
+	err         error
+	panicOnTest bool
 }
 
 type storeTestCapableProvider struct {
@@ -226,5 +267,8 @@ func (s *storeTestCapableProvider) Publish() secretstore.PublishedStore {
 
 func (s *storeTestCapableProvider) Test(context.Context) error {
 	s.state.calls++
+	if s.state.panicOnTest {
+		panic("provider panic")
+	}
 	return s.state.err
 }

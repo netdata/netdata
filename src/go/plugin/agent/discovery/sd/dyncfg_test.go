@@ -1552,14 +1552,16 @@ FUNCTION_RESULT_END
 					},
 					newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
 						return &testPipeline{name: cfg.Name, test: func(context.Context) error {
-							return errors.New("endpoint unavailable")
+							return errors.New(
+								"dial tcp://user:[REDACTED_SECRET]@[PRIVATE_ENDPOINT]:2375: daemon response",
+							)
 						}}, nil
 					},
 					wantExposed: []wantExposedConfig{},
 					wantRunning: []string{},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-test 422 application/json
-{"status":422,"errorMessage":"Configuration test failed: endpoint unavailable"}
+{"status":422,"errorMessage":"Configuration test failed: service discovery operational test failed"}
 FUNCTION_RESULT_END
 `,
 				}
