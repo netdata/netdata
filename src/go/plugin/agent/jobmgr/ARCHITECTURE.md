@@ -686,6 +686,12 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    retained retries drive it as a pre-claim stage so the command holds no claim while it prepares
    (`secrets/store_stage.go`, `secrets/pending.go`). The prepared generation is then committed by compare-and-swap
    against the expected generation.
+   - A DynCfg `test` creates the same temporary configured Store but never publishes it. If the Store implements
+     `dyncfg.Testable`, its context-aware operational check runs inside the test's config-hash-specific contained
+     attempt.
+   - A Store without that optional capability remains configuration-valid, and the response explicitly says that the
+     result was validation-only. Configuration failures return 400, operational failures return 422, and
+     busy/contained attempts return 503.
 2. **Restart dependents as one composite command.** If any running jobs depend on that store key: stop dependents →
    commit the new generation → start dependents. The parent retains `dyncfg:dependency-graph` throughout, and each
    start child temporarily yields only the `dyncfg:jobs` acquisition suffix while its probe runs, so unrelated
@@ -883,6 +889,16 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
 - The controller materializes and applies configurations **serially**, after deterministic source-winner selection.
 - Each materialization is individually contained, so a non-cooperative identity cannot occupy the controller loop
   beyond its logical containment deadline.
+- DynCfg `test` builds a complete temporary pipeline under a payload-specific test identity and never submits it to the
+  pipeline manager. It invokes `dyncfg.Testable.Test(ctx)` sequentially on every discoverer that provides the optional
+  capability.
+- Resource-authored parsing, construction, and operational failures retain their causes internally but cross one
+  sanitized response/diagnostic boundary. Unmarked failures render only their generic phase. A `dyncfg.PublicError`
+  may add static, code-authored detail; its public message must never derive from submitted/resolved values, endpoints,
+  credentials, backend errors, or response bodies. Resource callbacks return failures rather than logging raw
+  configuration or endpoint material.
+- A discoverer without the capability produces an explicit validation-only success. Configuration/construction
+  failures return 400, operational failures return 422, and busy/contained attempts return 503.
 - File-backed stock/user state keeps one latest pending retry after a busy/contained result; synchronous DynCfg
   commands do not.
 - The complete service-discovery DynCfg Function is also contained, so a non-cooperative command cannot pin the

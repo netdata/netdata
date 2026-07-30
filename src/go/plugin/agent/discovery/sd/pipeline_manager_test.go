@@ -460,6 +460,10 @@ func newMockPipelineWithGroups(name string, groups []*confgroup.Group) *testMock
 	return &testMockPipeline{name: name, groups: groups}
 }
 
+func (p *testMockPipeline) Test(context.Context) (bool, error) {
+	return false, nil
+}
+
 func (p *testMockPipeline) Run(ctx context.Context, out chan<- []*confgroup.Group) {
 	// Send initial groups if any
 	if len(p.groups) > 0 {
@@ -477,6 +481,10 @@ func (p *testMockPipeline) Run(ctx context.Context, out chan<- []*confgroup.Grou
 // trackingMockPipeline tracks when it stops for leak detection
 type trackingMockPipeline struct {
 	stopped *atomic.Int64
+}
+
+func (p *trackingMockPipeline) Test(context.Context) (bool, error) {
+	return false, nil
 }
 
 func (p *trackingMockPipeline) Run(ctx context.Context, _ chan<- []*confgroup.Group) {

@@ -558,7 +558,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 			payload: `{"value":"backend-sensitive-detail"}`, status: 400,
 		},
 		{uid: "secret-get-after-invalid", command: "config go.d:secretstore:vault:main get", status: 200},
-		{uid: "secret-test", command: "config go.d:secretstore:vault:main test", status: 202},
+		{uid: "secret-test", command: "config go.d:secretstore:vault:main test", status: 200},
 		{
 			uid:     "secret-update",
 			command: "config go.d:secretstore:vault:main update",
@@ -594,6 +594,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json")
 	}
 	require.Contains(t, output.String(), `"Value":"initial"`)
+	require.Contains(t, output.String(), "this secretstore does not provide an operational test")
 	require.NotContains(t, output.String(), "backend-sensitive-detail")
 
 	controls.sendTerminate(testProcessControl())

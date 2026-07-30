@@ -82,6 +82,7 @@ func newTestSNMPConfig(name string, cfg testSNMPConfig, services []pipeline.Serv
 type dyncfgSim struct {
 	do func(sd *ServiceDiscovery)
 
+	newPipeline    func(pipeline.Config) (sdPipeline, error)
 	wantExposed    []wantExposedConfig
 	wantRunning    []string
 	wantDyncfg     string
@@ -101,6 +102,12 @@ func (s *dyncfgSim) run(t *testing.T) {
 	require.NotNil(t, s.do, "s.do is nil")
 
 	var buf bytes.Buffer
+	newPipeline := s.newPipeline
+	if newPipeline == nil {
+		newPipeline = func(cfg pipeline.Config) (sdPipeline, error) {
+			return newTestPipeline(cfg.Name), nil
+		}
+	}
 	sd := &ServiceDiscovery{
 		epoch:       1,
 		attempts:    newTestAttemptAuthority(t),
@@ -111,9 +118,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 		exposed:     dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:    make(chan dyncfg.Function, 1),
 		discoverers: testDiscovererRegistry(),
-		newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
-			return newTestPipeline(cfg.Name), nil
-		},
+		newPipeline: newPipeline,
 	}
 	sd.sdCb = &sdCallbacks{sd: sd}
 	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
@@ -972,7 +977,8 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 400 application/json")
 						assert.Contains(t, got, "Failed to parse config")
-						assert.Contains(t, got, "expected")
+						assert.Contains(t, got, "configured discoverer type does not match the command target")
+						assert.NotContains(t, got, "docker")
 					},
 				}
 			},
@@ -1502,7 +1508,64 @@ func TestServiceDiscovery_DyncfgTest(t *testing.T) {
 					wantRunning: []string{},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-test 200 application/json
+{"status":200,"message":"Configuration is valid; this discoverer does not provide an operational test."}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"test operational check succeeds": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-test",
+							[]string{sd.dyncfgTemplateID(testDiscovererTypeNetListeners), "test"},
+							payload, "user=test")
+					},
+					newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
+						if cfg.Source != "dyncfg=user=test" {
+							return nil, fmt.Errorf("unexpected pipeline source %q", cfg.Source)
+						}
+						return &testPipeline{name: cfg.Name, test: func(context.Context) error {
+							return nil
+						}}, nil
+					},
+					wantExposed: []wantExposedConfig{},
+					wantRunning: []string{},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-test 200 application/json
 {"status":200,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"test operational check fails": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-test",
+							[]string{sd.dyncfgTemplateID(testDiscovererTypeNetListeners), "test"},
+							payload, "")
+					},
+					newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
+						return &testPipeline{name: cfg.Name, test: func(context.Context) error {
+							return errors.New(
+								"dial tcp://user:[REDACTED_SECRET]@[PRIVATE_ENDPOINT]:2375: daemon response",
+							)
+						}}, nil
+					},
+					wantExposed: []wantExposedConfig{},
+					wantRunning: []string{},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-test 422 application/json
+{"status":422,"errorMessage":"Configuration test failed: service discovery operational test failed"}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1541,7 +1604,7 @@ FUNCTION_RESULT_END
 					wantRunning: []string{},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-test 200 application/json
-{"status":200,"message":""}
+{"status":200,"message":"Configuration is valid; this discoverer does not provide an operational test."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1562,7 +1625,7 @@ FUNCTION_RESULT_END
 					wantRunning: []string{},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-test 200 application/json
-{"status":200,"message":""}
+{"status":200,"message":"Configuration is valid; this discoverer does not provide an operational test."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1586,7 +1649,7 @@ FUNCTION_RESULT_END
 					wantRunning: []string{},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-test 200 application/json
-{"status":200,"message":""}
+{"status":200,"message":"Configuration is valid; this discoverer does not provide an operational test."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1655,7 +1718,7 @@ FUNCTION_RESULT_END
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-add 202 application/json")
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-test 400 application/json")
-						assert.Contains(t, got, "Failed to parse config")
+						assert.Contains(t, got, "Configuration test failed")
 					},
 				}
 			},
@@ -2341,10 +2404,18 @@ func TestServiceDiscovery_DyncfgFileRemovalWithDyncfgOverride(t *testing.T) {
 // testPipeline is a simple pipeline for testing that just waits for cancellation.
 type testPipeline struct {
 	name string
+	test func(context.Context) error
 }
 
 func newTestPipeline(name string) *testPipeline {
 	return &testPipeline{name: name}
+}
+
+func (p *testPipeline) Test(ctx context.Context) (bool, error) {
+	if p.test == nil {
+		return false, nil
+	}
+	return true, p.test(ctx)
 }
 
 func (p *testPipeline) Run(ctx context.Context, out chan<- []*confgroup.Group) {

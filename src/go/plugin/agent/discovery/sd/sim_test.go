@@ -251,6 +251,10 @@ type mockPipeline struct {
 	stopped bool
 }
 
+func (m *mockPipeline) Test(context.Context) (bool, error) {
+	return false, nil
+}
+
 func (m *mockPipeline) Run(ctx context.Context, _ chan<- []*confgroup.Group) {
 	lock.Lock()
 	m.started = true

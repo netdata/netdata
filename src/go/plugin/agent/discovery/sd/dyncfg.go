@@ -98,7 +98,7 @@ func (cb *sdCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (sdConf
 	if !netdataapi.ValidSingleQuotedProtocolField(fn.Source()) {
 		return nil, fmt.Errorf("invalid Function source")
 	}
-	return cb.sd.prepareDyncfgConfig(fn, name, false)
+	return cb.sd.prepareDyncfgConfig(fn, name)
 }
 
 func (cb *sdCallbacks) Start(fn dyncfg.Function, cfg sdConfig) error {
@@ -164,7 +164,7 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 		d.dyncfgCmdUserconfig(fn)
 		return
 	case dyncfg.CommandTest:
-		// Test command validates config without creating a job
+		// Test command validates and tests config without creating a job.
 		d.dyncfgCmdTest(fn)
 		return
 	}
@@ -256,7 +256,7 @@ func (d *ServiceDiscovery) dyncfgCmdGet(fn dyncfg.Function) {
 	d.dyncfgApi.SendJSON(fn, string(bs))
 }
 
-// dyncfgCmdTest handles the test command for templates and jobs (validates config without applying it)
+// dyncfgCmdTest handles the test command for templates and jobs without applying the config.
 func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 	id := fn.ID()
 
@@ -282,15 +282,16 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 		return
 	}
 
-	// Parse and validate the config without storing it
-	_, err := d.prepareDyncfgConfig(fn, name, true)
+	fullyTested, err := d.testDyncfgConfig(fn, name)
 	if err != nil {
-		d.Warningf("dyncfg: test: failed to parse config for '%s': %v", dt, err)
+		d.Warningf("dyncfg: test: config test failed for '%s': %v", dt, err)
 		code := 400
-		if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
+		if resourceErr, ok := errors.AsType[*resourceError](err); ok {
+			code = resourceErr.dyncfgTestCode()
+		} else if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
 			code = coded.DyncfgCode()
 		}
-		d.dyncfgApi.SendCodef(fn, code, "Failed to parse config: %v", err)
+		d.dyncfgApi.SendCodef(fn, code, "Configuration test failed: %v", err)
 		return
 	}
 
@@ -298,6 +299,14 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 		d.Infof("dyncfg: test: config for '%s:%s' is valid", dt, name)
 	} else {
 		d.Infof("dyncfg: test: config for '%s' is valid", dt)
+	}
+	if !fullyTested {
+		d.dyncfgApi.SendCodef(
+			fn,
+			200,
+			"Configuration is valid; this discoverer does not provide an operational test.",
+		)
+		return
 	}
 	d.dyncfgApi.SendCodef(fn, 200, "")
 }

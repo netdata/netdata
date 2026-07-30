@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 // ErrMutationBusy reports transient generation ownership that prevents a
@@ -70,13 +72,7 @@ func (store *SecretStore) PrepareMutation(
 		ctx,
 		store.resolver,
 		cfg,
-		func(kind StoreKind) (Store, bool) {
-			creator, ok := catalog.Lookup(kind)
-			if !ok || creator.Create == nil {
-				return nil, false
-			}
-			return creator.Create(), true
-		},
+		catalog.New,
 	)
 	if prepareErr != nil {
 		return newPreparedSecretMutation(
@@ -134,6 +130,8 @@ func newPreparedSecretMutation(
 	}
 }
 
+// Validate performs configuration-only provider conformance without invoking
+// the optional operational test or installing the temporary Store.
 func (store *SecretStore) Validate(
 	ctx context.Context,
 	catalog *CreatorCatalog,
@@ -146,15 +144,40 @@ func (store *SecretStore) Validate(
 		ctx,
 		store.resolver,
 		cfg,
-		func(kind StoreKind) (Store, bool) {
-			creator, ok := catalog.Lookup(kind)
-			if !ok || creator.Create == nil {
-				return nil, false
-			}
-			return creator.Create(), true
-		},
+		catalog.New,
 	)
 	return err
+}
+
+// Test validates a temporary Store and runs its optional operational test.
+// The bool reports whether the Store provided an operational test.
+func (store *SecretStore) Test(
+	ctx context.Context,
+	catalog *CreatorCatalog,
+	cfg Config,
+) (bool, error) {
+	if store == nil || ctx == nil || catalog == nil {
+		return false, errors.New("secretstore: invalid test")
+	}
+	// Atomic resolution rejects cancellation before Store construction or Init.
+	configured, err := configureStore(ctx, store.resolver, cfg, catalog.New)
+	if err != nil {
+		return false, err
+	}
+	if configured.store.Publish() == nil {
+		return false, fmt.Errorf(
+			"store '%s': published resolver state is nil",
+			configured.key,
+		)
+	}
+	testable, ok := configured.store.(dyncfg.Testable)
+	if !ok {
+		return false, nil
+	}
+	if err := testable.Test(ctx); err != nil {
+		return true, err
+	}
+	return true, nil
 }
 
 func (store *SecretStore) PrepareRemoval(
