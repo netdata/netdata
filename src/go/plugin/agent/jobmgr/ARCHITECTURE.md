@@ -688,7 +688,9 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    against the expected generation.
    - A DynCfg `test` creates the same temporary configured Store but never publishes it. If the Store implements
      `dyncfg.Testable`, its context-aware operational check runs inside the test's config-hash-specific contained
-     attempt.
+     attempt. The shared Store Test boundary rejects caller cancellation before temporary construction and makes its
+     cause take precedence after configuration/`Init` and after the optional provider Test callback. Providers classify
+     their configured timeouts but need not repeat caller cancellation checks.
    - A Store without that optional capability remains configuration-valid, and the response explicitly says that the
      result was validation-only. Configuration failures return 400, operational failures return 422, and
      busy/contained attempts return 503.
@@ -891,7 +893,9 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
   beyond its logical containment deadline.
 - DynCfg `test` builds a complete temporary pipeline under a payload-specific test identity and never submits it to the
   pipeline manager. It invokes `dyncfg.Testable.Test(ctx)` sequentially on every discoverer that provides the optional
-  capability.
+  capability. After each callback returns, the shared Pipeline Test boundary makes the caller's cancellation cause take
+  precedence over the discoverer result. Discoverers classify their configured timeouts but need not repeat caller
+  cancellation checks.
 - Resource-authored parsing, construction, and operational failures retain their causes internally but cross one
   sanitized response/diagnostic boundary. Unmarked failures render only their generic phase. A `dyncfg.PublicError`
   may add static, code-authored detail; its public message must never derive from submitted/resolved values, endpoints,
@@ -899,6 +903,11 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
   configuration or endpoint material.
 - A discoverer without the capability produces an explicit validation-only success. Configuration/construction
   failures return 400, operational failures return 422, and busy/contained attempts return 503.
+- Operational guarantees are discoverer-specific. Docker performs a one-item container-list query. `net_listeners`
+  executes and parses one production helper snapshot, then discards the targets without rule rendering, cache
+  reconciliation, publication, or installation. Its process count and elapsed time are bounded to one invocation and the
+  caller/configured timeout; work and buffered output still scale with the host socket/process inventory. Other shipped
+  discoverers currently remain validation-only.
 - File-backed stock/user state keeps one latest pending retry after a busy/contained result; synchronous DynCfg
   commands do not.
 - The complete service-discovery DynCfg Function is also contained, so a non-cooperative command cannot pin the

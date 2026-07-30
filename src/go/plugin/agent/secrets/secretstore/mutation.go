@@ -159,8 +159,14 @@ func (store *SecretStore) Test(
 	if store == nil || ctx == nil || catalog == nil {
 		return false, errors.New("secretstore: invalid test")
 	}
-	// Atomic resolution rejects cancellation before Store construction or Init.
+	if cause := context.Cause(ctx); cause != nil {
+		return false, cause
+	}
 	configured, err := configureStore(ctx, store.resolver, cfg, catalog.New)
+	// Configuration and Init may reduce a custom cause to a standard context error.
+	if cause := context.Cause(ctx); cause != nil {
+		return false, cause
+	}
 	if err != nil {
 		return false, err
 	}
@@ -174,7 +180,12 @@ func (store *SecretStore) Test(
 	if !ok {
 		return false, nil
 	}
-	if err := testable.Test(ctx); err != nil {
+	err = testable.Test(ctx)
+	// Caller cancellation wins even when it races a provider failure.
+	if cause := context.Cause(ctx); cause != nil {
+		return true, cause
+	}
+	if err != nil {
 		return true, err
 	}
 	return true, nil

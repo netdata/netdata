@@ -17,9 +17,14 @@ import (
 )
 
 func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
+	prepareNetListenersExecutableFixture(t)
+
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
-	output := &dyncfgTestOutput{results: make(chan dyncfg.Result, 1)}
+	output := &dyncfgTestOutput{
+		results: make(chan dyncfg.Result, 1),
+		creates: make(chan struct{}, 16),
+	}
 	registry := &dyncfgTestRegistry{registered: make(chan functions.Handler, 1)}
 	discovery, err := sd.NewServiceDiscovery(sd.Config{
 		Epoch:        1,
@@ -33,9 +38,10 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
+	groups := make(chan []*confgroup.Group, 1)
 	go func() {
 		defer close(done)
-		discovery.Run(ctx, make(chan []*confgroup.Group))
+		discovery.Run(ctx, groups)
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -56,6 +62,13 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "service discovery did not register DynCfg")
 	}
+	for range len(Registry(true).Types()) {
+		select {
+		case <-output.creates:
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "service discovery did not expose every DynCfg template")
+		}
+	}
 	tests := []struct {
 		name    string
 		uid     string
@@ -63,6 +76,7 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 		payload string
 		message string
 		code    int
+		mode    string
 	}{
 		{
 			name:    "resource parser",
@@ -96,9 +110,36 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			message: "service discovery operational test failed: cannot connect to the configured Docker endpoint",
 			code:    422,
 		},
+		{
+			name:    "net listeners operational success",
+			uid:     "test-net-listeners-operational-success",
+			id:      "go.d:sd:net_listeners",
+			payload: `{"discoverer":{"net_listeners":{}},"services":[{"id":"test","match":"true"}]}`,
+			message: `"message":""`,
+			code:    200,
+		},
+		{
+			name:    "net listeners helper failure",
+			uid:     "test-net-listeners-operational-failure",
+			id:      "go.d:sd:net_listeners",
+			payload: `{"discoverer":{"net_listeners":{}},"services":[{"id":"test","match":"true"}]}`,
+			message: "service discovery operational test failed: cannot inspect local network listeners",
+			code:    422,
+			mode:    "failure",
+		},
+		{
+			name:    "net listeners invalid output",
+			uid:     "test-net-listeners-invalid-output",
+			id:      "go.d:sd:net_listeners",
+			payload: `{"discoverer":{"net_listeners":{}},"services":[{"id":"test","match":"true"}]}`,
+			message: "service discovery operational test failed: local listener inspection returned invalid data",
+			code:    422,
+			mode:    "invalid",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("NETDATA_TEST_LOCAL_LISTENER_MODE", test.mode)
 			handler(t.Context(), functions.Function{
 				UID:         test.uid,
 				Args:        []string{test.id, "test", "job"},
@@ -112,8 +153,18 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 				require.Equal(t, test.code, result.Code)
 				require.Contains(t, result.Payload, test.message)
 				require.NotContains(t, result.Payload, "[REDACTED_SECRET]")
-			case <-time.After(time.Second):
+			case <-time.After(10 * time.Second):
 				require.FailNow(t, "test failed", "DynCfg test did not return a result")
+			}
+			select {
+			case <-groups:
+				require.FailNow(t, "test failed", "temporary DynCfg test published discovery groups")
+			default:
+			}
+			select {
+			case <-output.creates:
+				require.FailNow(t, "test failed", "temporary DynCfg test installed configuration")
+			default:
 			}
 		})
 	}
@@ -132,13 +183,18 @@ func (*dyncfgTestRegistry) UnregisterPrefix(string, string) {
 
 type dyncfgTestOutput struct {
 	results chan dyncfg.Result
+	creates chan struct{}
 }
 
 func (o *dyncfgTestOutput) FunctionResult(result dyncfg.Result) {
 	o.results <- result
 }
 
-func (*dyncfgTestOutput) ConfigCreate(netdataapi.ConfigOpts) {
+func (o *dyncfgTestOutput) ConfigCreate(netdataapi.ConfigOpts) {
+	select {
+	case o.creates <- struct{}{}:
+	default:
+	}
 }
 
 func (*dyncfgTestOutput) ConfigStatus(string, dyncfg.Status) {

@@ -19,11 +19,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 var (
-	shortName = "net_listeners"
-	fullName  = fmt.Sprintf("sd:%s", shortName)
+	shortName                          = "net_listeners"
+	fullName                           = fmt.Sprintf("sd:%s", shortName)
+	errInvalidLocalListenerData        = errors.New("invalid local listener data")
+	errLocalListenerInspectionCanceled = errors.New("local listener inspection canceled")
 )
 
 type Config struct {
@@ -89,6 +92,28 @@ func (d *Discoverer) String() string {
 	return fullName
 }
 
+func (d *Discoverer) Test(ctx context.Context) error {
+	if d == nil || ctx == nil {
+		return errors.New("invalid local listener discovery test")
+	}
+
+	_, err := d.inspectLocalListeners(ctx)
+	if err == nil {
+		return nil
+	}
+
+	switch {
+	case errors.Is(err, errLocalListenerInspectionCanceled):
+		return err
+	case errors.Is(err, context.DeadlineExceeded):
+		return dyncfg.NewPublicError("local listener inspection did not complete before the timeout", err)
+	case errors.Is(err, errInvalidLocalListenerData):
+		return dyncfg.NewPublicError("local listener inspection returned invalid data", err)
+	default:
+		return dyncfg.NewPublicError("cannot inspect local network listeners", err)
+	}
+}
+
 func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup) {
 	d.Info("instance is started")
 	d.Debugf("used config: interval: %s, timeout: %s, cache expiration time: %s", d.interval, d.timeout, d.expiryTime)
@@ -122,8 +147,11 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 }
 
 func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []model.TargetGroup) error {
-	bs, err := d.ll.discover(ctx)
+	tgts, err := d.inspectLocalListeners(ctx)
 	if err != nil {
+		if errors.Is(err, errLocalListenerInspectionCanceled) {
+			return nil
+		}
 		if errors.Is(err, context.DeadlineExceeded) {
 			// there is no point in continuing pointless attempts/use cpu
 			// https://github.com/netdata/netdata/discussions/18751#discussioncomment-10908472
@@ -138,11 +166,6 @@ func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []mod
 
 	d.successRuns++
 
-	tgts, err := d.parseLocalListeners(bs)
-	if err != nil {
-		return err
-	}
-
 	tggs := d.processTargets(tgts)
 
 	select {
@@ -151,6 +174,25 @@ func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []mod
 	}
 
 	return nil
+}
+
+func (d *Discoverer) inspectLocalListeners(ctx context.Context) ([]model.Target, error) {
+	bs, err := d.ll.discover(ctx)
+	if err != nil {
+		if cause := context.Cause(ctx); cause != nil {
+			return nil, fmt.Errorf("%w: %w", errLocalListenerInspectionCanceled, cause)
+		}
+		return nil, fmt.Errorf("execute local listener inspection: %w", err)
+	}
+
+	tgts, err := d.parseLocalListeners(bs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errInvalidLocalListenerData, err)
+	}
+	if cause := context.Cause(ctx); cause != nil {
+		return nil, fmt.Errorf("%w: %w", errLocalListenerInspectionCanceled, cause)
+	}
+	return tgts, nil
 }
 
 func (d *Discoverer) processTargets(tgts []model.Target) []model.TargetGroup {
@@ -238,12 +280,15 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 
 		hash, err := model.CalcHash(tgt)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("hash target: %w", err)
 		}
 
 		tgt.hash = hash
 
 		targets = append(targets, tgt)
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("scan local listener data: %w", err)
 	}
 
 	// order: TCP, TCP6, UDP, UDP6

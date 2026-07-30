@@ -91,8 +91,8 @@ func (p *Pipeline) Test(ctx context.Context) (bool, error) {
 	if p == nil || ctx == nil {
 		return false, errors.New("service discovery pipeline: invalid test")
 	}
-	if err := ctx.Err(); err != nil {
-		return false, err
+	if cause := context.Cause(ctx); cause != nil {
+		return false, cause
 	}
 	fullyTested := len(p.discoverers) != 0
 	for _, discoverer := range p.discoverers {
@@ -101,10 +101,15 @@ func (p *Pipeline) Test(ctx context.Context) (bool, error) {
 			fullyTested = false
 			continue
 		}
-		if err := ctx.Err(); err != nil {
-			return false, err
+		if cause := context.Cause(ctx); cause != nil {
+			return false, cause
 		}
-		if err := testable.Test(ctx); err != nil {
+		err := testable.Test(ctx)
+		// Caller cancellation wins even when it races a resource failure.
+		if cause := context.Cause(ctx); cause != nil {
+			return false, cause
+		}
+		if err != nil {
 			return false, fmt.Errorf("discoverer operational test: %w", err)
 		}
 	}
