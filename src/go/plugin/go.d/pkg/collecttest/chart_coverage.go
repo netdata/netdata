@@ -307,9 +307,14 @@ func collectExpectedDimensionNames(
 	nameFromLabel := strings.TrimSpace(dim.NameFromLabel)
 	names := make(map[string]struct{})
 	matched := false
+	lastSuccessSeq := reader.CollectMeta().LastSuccessSeq
 
 	reader.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, meta metrix.SeriesMeta, metricName string, labels metrix.LabelView, _ metrix.SampleValue) {
 		if err != nil {
+			return
+		}
+		// Keep expected coverage aligned with chartengine's default series selection.
+		if meta.LastSeenSuccessSeq != lastSuccessSeq {
 			return
 		}
 		if !sel.Matches(metricName, labels) {
