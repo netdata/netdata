@@ -5,6 +5,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -342,6 +343,12 @@ func TestTaskSupervisorPreservesAppliedOwnershipAlongsideError(t *testing.T) {
 
 func TestTaskSupervisorParksStartFailureOutsideRunnableQueue(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseWork := func() {
+		releaseOnce.Do(func() { close(release) })
+	}
+	t.Cleanup(releaseWork)
 	owner := ResourceIdentity{ID: "job", Generation: 1}
 	scope := ResourceTransactionScope{ID: owner.ID, Successor: owner}
 	plan, err := NewResourceTransactionPermitTaskPlan(
@@ -357,6 +364,7 @@ func TestTaskSupervisorParksStartFailureOutsideRunnableQueue(t *testing.T) {
 			ResourceTransactionScope,
 			LongLivedPermit,
 		) (PreparedResourceTransaction, error) {
+			<-release
 			return nil, nil
 		},
 	)
@@ -368,7 +376,7 @@ func TestTaskSupervisorParksStartFailureOutsideRunnableQueue(t *testing.T) {
 
 	var started [TaskStartServiceQuantum]TaskStart
 	count, more, err := supervisor.Dispatch(context.Background(), 2, &started)
-	require.Error(t, err)
+	require.ErrorContains(t, err, "duplicate owner")
 	require.Equal(t, 1, count)
 	require.False(t, more)
 	require.Zero(t, supervisor.Pending())
@@ -378,6 +386,7 @@ func TestTaskSupervisorParksStartFailureOutsideRunnableQueue(t *testing.T) {
 	_, err = supervisor.CancelPendingOutcome(first)
 	require.Error(t, err)
 
+	releaseWork()
 	completion := <-supervisor.CompletionCh()
 	require.NoError(t, supervisor.SendAction(TaskAction{
 		Ref:      completion.Ref,
