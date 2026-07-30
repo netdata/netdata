@@ -688,7 +688,9 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    against the expected generation.
    - A DynCfg `test` creates the same temporary configured Store but never publishes it. If the Store implements
      `dyncfg.Testable`, its context-aware operational check runs inside the test's config-hash-specific contained
-     attempt.
+     attempt. After the callback returns, the shared Store Test boundary makes the caller's cancellation cause take
+     precedence over any provider result. Providers classify their configured timeouts but need not repeat caller
+     cancellation checks.
    - A Store without that optional capability remains configuration-valid, and the response explicitly says that the
      result was validation-only. Configuration failures return 400, operational failures return 422, and
      busy/contained attempts return 503.
@@ -891,7 +893,9 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
   beyond its logical containment deadline.
 - DynCfg `test` builds a complete temporary pipeline under a payload-specific test identity and never submits it to the
   pipeline manager. It invokes `dyncfg.Testable.Test(ctx)` sequentially on every discoverer that provides the optional
-  capability.
+  capability. After each callback returns, the shared Pipeline Test boundary makes the caller's cancellation cause take
+  precedence over the discoverer result. Discoverers classify their configured timeouts but need not repeat caller
+  cancellation checks.
 - Resource-authored parsing, construction, and operational failures retain their causes internally but cross one
   sanitized response/diagnostic boundary. Unmarked failures render only their generic phase. A `dyncfg.PublicError`
   may add static, code-authored detail; its public message must never derive from submitted/resolved values, endpoints,

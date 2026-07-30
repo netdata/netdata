@@ -14,6 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 
 	"github.com/gohugoio/hashstructure"
 	"github.com/stretchr/testify/assert"
@@ -127,8 +128,9 @@ func TestPipeline_Test(t *testing.T) {
 	})
 
 	t.Run("honors caller cancellation before testing", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel()
+		cancelCause := errors.New("test request superseded")
+		ctx, cancel := context.WithCancelCause(t.Context())
+		cancel(cancelCause)
 		var calls []string
 		p := &Pipeline{discoverers: []model.Discoverer{
 			&pipelineTestDiscoverer{name: "first", calls: &calls},
@@ -137,8 +139,37 @@ func TestPipeline_Test(t *testing.T) {
 		fullyTested, err := p.Test(ctx)
 
 		require.False(t, fullyTested)
-		require.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, cancelCause)
 		require.Empty(t, calls)
+	})
+
+	t.Run("caller cancellation wins a resource operational failure", func(t *testing.T) {
+		cancelCause := errors.New("test request superseded")
+		resourceErr := dyncfg.NewPublicError(
+			"resource operation timed out",
+			context.DeadlineExceeded,
+		)
+		ctx, cancel := context.WithCancelCause(t.Context())
+		var calls []string
+		p := &Pipeline{discoverers: []model.Discoverer{
+			&pipelineTestDiscoverer{
+				name:  "first",
+				calls: &calls,
+				test: func(context.Context) error {
+					cancel(cancelCause)
+					return resourceErr
+				},
+			},
+		}}
+
+		fullyTested, err := p.Test(ctx)
+
+		require.False(t, fullyTested)
+		require.ErrorIs(t, err, cancelCause)
+		require.NotErrorIs(t, err, resourceErr)
+		_, hasPublicMessage := dyncfg.PublicMessage(err)
+		require.False(t, hasPublicMessage)
+		require.Equal(t, []string{"first"}, calls)
 	})
 }
 
@@ -355,13 +386,17 @@ type pipelineTestDiscoverer struct {
 	name  string
 	calls *[]string
 	err   error
+	test  func(context.Context) error
 }
 
 func (d *pipelineTestDiscoverer) Discover(context.Context, chan<- []model.TargetGroup) {
 }
 
-func (d *pipelineTestDiscoverer) Test(context.Context) error {
+func (d *pipelineTestDiscoverer) Test(ctx context.Context) error {
 	*d.calls = append(*d.calls, d.name)
+	if d.test != nil {
+		return d.test(ctx)
+	}
 	return d.err
 }
 

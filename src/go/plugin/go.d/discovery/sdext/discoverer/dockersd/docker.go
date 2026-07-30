@@ -111,8 +111,6 @@ func (d *Discoverer) Test(ctx context.Context) error {
 	if _, err := client.ContainerList(testCtx, docker.ContainerListOptions{Limit: 1}); err != nil {
 		cause := fmt.Errorf("list docker containers: %w", err)
 		switch {
-		case ctx.Err() != nil:
-			return cause
 		case errors.Is(testCtx.Err(), context.DeadlineExceeded):
 			return dyncfg.NewPublicError(
 				"the configured Docker endpoint did not respond before the timeout",
