@@ -93,7 +93,7 @@ func TestDiscovererTest(t *testing.T) {
 		require.Equal(t, "local listener inspection did not complete before the timeout", err.Error())
 	})
 
-	t.Run("preserves preexisting caller cancellation cause without invoking helper", func(t *testing.T) {
+	t.Run("preserves preexisting caller cancellation cause after entering helper path", func(t *testing.T) {
 		cancelCause := errors.New("test attempt superseded")
 		ctx, cancel := context.WithCancelCause(t.Context())
 		cancel(cancelCause)
@@ -111,7 +111,7 @@ func TestDiscovererTest(t *testing.T) {
 		require.ErrorIs(t, err, cancelCause)
 		_, public := dyncfg.PublicMessage(err)
 		require.False(t, public)
-		require.Zero(t, calls)
+		require.Equal(t, 1, calls)
 	})
 
 	t.Run("preserves inflight caller cancellation cause", func(t *testing.T) {
@@ -131,6 +131,24 @@ func TestDiscovererTest(t *testing.T) {
 		require.ErrorIs(t, err, cancelCause)
 		_, public := dyncfg.PublicMessage(err)
 		require.False(t, public)
+	})
+
+	t.Run("parser failure wins over cancellation racing the fast parse", func(t *testing.T) {
+		cancelCause := errors.New("test attempt superseded")
+		ctx, cancel := context.WithCancelCause(t.Context())
+
+		d, err := NewDiscoverer(Config{})
+		require.NoError(t, err)
+		d.ll = localListenersFunc(func(context.Context) ([]byte, error) {
+			cancel(cancelCause)
+			return []byte("invalid [REDACTED_SECRET]\n"), nil
+		})
+
+		err = d.Test(ctx)
+
+		require.Equal(t, "local listener inspection returned invalid data", err.Error())
+		require.NotContains(t, err.Error(), "[REDACTED_SECRET]")
+		require.NotErrorIs(t, err, cancelCause)
 	})
 
 	t.Run("does not classify the caller deadline as the configured helper timeout", func(t *testing.T) {

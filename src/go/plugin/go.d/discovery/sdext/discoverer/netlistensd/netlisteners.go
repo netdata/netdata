@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	shortName                   = "net_listeners"
-	fullName                    = fmt.Sprintf("sd:%s", shortName)
-	errInvalidLocalListenerData = errors.New("invalid local listener data")
+	shortName                          = "net_listeners"
+	fullName                           = fmt.Sprintf("sd:%s", shortName)
+	errInvalidLocalListenerData        = errors.New("invalid local listener data")
+	errLocalListenerInspectionCanceled = errors.New("local listener inspection canceled")
 )
 
 type Config struct {
@@ -98,17 +99,12 @@ func (d *Discoverer) Test(ctx context.Context) error {
 
 	_, err := d.inspectLocalListeners(ctx)
 	if err == nil {
-		if cause := callerCancellationCause(ctx); cause != nil {
-			return fmt.Errorf("inspect local network listeners: %w", cause)
-		}
 		return nil
 	}
 
-	if cause := callerCancellationCause(ctx); cause != nil {
-		return fmt.Errorf("inspect local network listeners: %w", cause)
-	}
-
 	switch {
+	case errors.Is(err, errLocalListenerInspectionCanceled):
+		return err
 	case errors.Is(err, context.DeadlineExceeded):
 		return dyncfg.NewPublicError("local listener inspection did not complete before the timeout", err)
 	case errors.Is(err, errInvalidLocalListenerData):
@@ -153,7 +149,7 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []model.TargetGroup) error {
 	tgts, err := d.inspectLocalListeners(ctx)
 	if err != nil {
-		if ctx.Err() != nil {
+		if errors.Is(err, errLocalListenerInspectionCanceled) {
 			return nil
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -166,9 +162,6 @@ func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []mod
 			return nil
 		}
 		return err
-	}
-	if ctx.Err() != nil {
-		return nil
 	}
 
 	d.successRuns++
@@ -184,19 +177,12 @@ func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []mod
 }
 
 func (d *Discoverer) inspectLocalListeners(ctx context.Context) ([]model.Target, error) {
-	if cause := callerCancellationCause(ctx); cause != nil {
-		return nil, fmt.Errorf("inspect local network listeners: %w", cause)
-	}
-
 	bs, err := d.ll.discover(ctx)
 	if err != nil {
 		if cause := callerCancellationCause(ctx); cause != nil {
-			return nil, fmt.Errorf("inspect local network listeners: %w", cause)
+			return nil, fmt.Errorf("%w: %w", errLocalListenerInspectionCanceled, cause)
 		}
 		return nil, fmt.Errorf("execute local listener inspection: %w", err)
-	}
-	if cause := callerCancellationCause(ctx); cause != nil {
-		return nil, fmt.Errorf("inspect local network listeners: %w", cause)
 	}
 
 	tgts, err := d.parseLocalListeners(bs)
@@ -204,7 +190,7 @@ func (d *Discoverer) inspectLocalListeners(ctx context.Context) ([]model.Target,
 		return nil, fmt.Errorf("%w: %w", errInvalidLocalListenerData, err)
 	}
 	if cause := callerCancellationCause(ctx); cause != nil {
-		return nil, fmt.Errorf("inspect local network listeners: %w", cause)
+		return nil, fmt.Errorf("%w: %w", errLocalListenerInspectionCanceled, cause)
 	}
 	return tgts, nil
 }
