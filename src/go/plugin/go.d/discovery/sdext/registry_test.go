@@ -121,7 +121,7 @@ func TestRegistry_NetListenersOperationalTestUsesShippedConstructionPath(t *test
 	require.True(t, fullyTested)
 	invocations, err := os.ReadFile(fixture.invocationsPath)
 	require.NoError(t, err)
-	require.Equal(t, "invoked\n", string(invocations))
+	require.Equal(t, "nd-run\ninvoked\n", string(invocations))
 	args, err := os.ReadFile(fixture.argsPath)
 	require.NoError(t, err)
 	require.Equal(
@@ -197,7 +197,10 @@ esac
 `), 0o755))
 
 	ndRun := filepath.Join(tmp, "nd-run")
-	require.NoError(t, os.WriteFile(ndRun, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o755))
+	require.NoError(t, os.WriteFile(ndRun, []byte(`#!/bin/sh
+printf 'nd-run\n' >> "$NETDATA_TEST_LOCAL_LISTENER_INVOCATIONS"
+exec "$@"
+`), 0o755))
 	t.Cleanup(ndexec.SetRunnerPathsForTests(ndRun, ""))
 
 	return fixture

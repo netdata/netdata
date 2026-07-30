@@ -688,9 +688,9 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    against the expected generation.
    - A DynCfg `test` creates the same temporary configured Store but never publishes it. If the Store implements
      `dyncfg.Testable`, its context-aware operational check runs inside the test's config-hash-specific contained
-     attempt. After the callback returns, the shared Store Test boundary makes the caller's cancellation cause take
-     precedence over any provider result. Providers classify their configured timeouts but need not repeat caller
-     cancellation checks.
+     attempt. The shared Store Test boundary rejects caller cancellation before temporary construction and makes its
+     cause take precedence after configuration/`Init` and after the optional provider Test callback. Providers classify
+     their configured timeouts but need not repeat caller cancellation checks.
    - A Store without that optional capability remains configuration-valid, and the response explicitly says that the
      result was validation-only. Configuration failures return 400, operational failures return 422, and
      busy/contained attempts return 503.

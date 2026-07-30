@@ -162,8 +162,8 @@ func (store *SecretStore) Test(
 	if cause := context.Cause(ctx); cause != nil {
 		return false, cause
 	}
-	// Atomic resolution rejects cancellation before Store construction or Init.
 	configured, err := configureStore(ctx, store.resolver, cfg, catalog.New)
+	// Configuration and Init may reduce a custom cause to a standard context error.
 	if cause := context.Cause(ctx); cause != nil {
 		return false, cause
 	}

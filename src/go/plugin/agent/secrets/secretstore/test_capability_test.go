@@ -78,6 +78,29 @@ func TestSecretStoreTestCapability(t *testing.T) {
 		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
 	})
 
+	t.Run("caller cancellation wins a Store initialization failure", func(t *testing.T) {
+		cancelCause := errors.New("test request superseded")
+		initErr := errors.New("provider initialization failed")
+		ctx, cancel := context.WithCancelCause(t.Context())
+		state := &testCapabilityState{
+			init: func(context.Context) error {
+				cancel(cancelCause)
+				return initErr
+			},
+		}
+		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
+			return &testCapableStore{state: state}
+		})
+
+		tested, err := store.Test(ctx, catalog, testCapabilityConfig())
+
+		require.False(t, tested)
+		require.ErrorIs(t, err, cancelCause)
+		require.NotErrorIs(t, err, initErr)
+		require.Zero(t, state.calls)
+		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
+	})
+
 	t.Run("caller cancellation wins a provider operational failure", func(t *testing.T) {
 		cancelCause := errors.New("test request superseded")
 		providerErr := dyncfg.NewPublicError(
@@ -141,6 +164,7 @@ func testCapabilityConfig() secretstore.Config {
 type testCapabilityState struct {
 	calls int
 	err   error
+	init  func(context.Context) error
 	test  func(context.Context) error
 	value string
 }
@@ -156,7 +180,10 @@ func (s *testCapableStore) Configuration() any {
 	return &s.config
 }
 
-func (s *testCapableStore) Init(context.Context) error {
+func (s *testCapableStore) Init(ctx context.Context) error {
+	if s.state.init != nil {
+		return s.state.init(ctx)
+	}
 	return nil
 }
 

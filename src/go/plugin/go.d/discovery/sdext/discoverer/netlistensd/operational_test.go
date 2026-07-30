@@ -3,8 +3,10 @@
 package netlistensd
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,6 +80,20 @@ func TestDiscovererTest(t *testing.T) {
 		require.Error(t, err)
 		require.Equal(t, "local listener inspection returned invalid data", err.Error())
 		require.NotContains(t, err.Error(), "[REDACTED_SECRET]")
+	})
+
+	t.Run("rejects a snapshot truncated by the scanner", func(t *testing.T) {
+		d, err := NewDiscoverer(Config{})
+		require.NoError(t, err)
+		d.ll = localListenersFunc(func(context.Context) ([]byte, error) {
+			line := "TCP|127.0.0.1|19999|/" + strings.Repeat("x", bufio.MaxScanTokenSize)
+			return []byte(line + "\n"), nil
+		})
+
+		err = d.Test(t.Context())
+
+		require.Error(t, err)
+		require.Equal(t, "local listener inspection returned invalid data", err.Error())
 	})
 
 	t.Run("classifies configured helper timeout", func(t *testing.T) {

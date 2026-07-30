@@ -280,12 +280,15 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 
 		hash, err := model.CalcHash(tgt)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("hash target: %w", err)
 		}
 
 		tgt.hash = hash
 
 		targets = append(targets, tgt)
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("scan local listener data: %w", err)
 	}
 
 	// order: TCP, TCP6, UDP, UDP6

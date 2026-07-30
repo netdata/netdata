@@ -353,8 +353,8 @@ func TestRunUnprivilegedWithOptionsUsageContextCancellation(t *testing.T) {
 
 	target := filepath.Join(tmp, "target.sh")
 	require.NoError(t, os.WriteFile(target, []byte(`#!/bin/sh
-touch "$1"
 (
+	touch "$1"
 	sleep 0.4
 	touch "$2"
 ) &
@@ -381,7 +381,7 @@ wait
 		result <- err
 	}()
 
-	waitUntil := time.Now().Add(2 * time.Second)
+	waitUntil := time.Now().Add(10 * time.Second)
 	for {
 		if _, err := os.Stat(ready); err == nil {
 			break
@@ -400,6 +400,6 @@ wait
 		require.FailNow(t, "canceled execution did not return")
 	}
 
-	time.Sleep(600 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 	require.NoFileExists(t, leaked)
 }
