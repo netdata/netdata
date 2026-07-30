@@ -179,7 +179,7 @@ func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []mod
 func (d *Discoverer) inspectLocalListeners(ctx context.Context) ([]model.Target, error) {
 	bs, err := d.ll.discover(ctx)
 	if err != nil {
-		if cause := callerCancellationCause(ctx); cause != nil {
+		if cause := context.Cause(ctx); cause != nil {
 			return nil, fmt.Errorf("%w: %w", errLocalListenerInspectionCanceled, cause)
 		}
 		return nil, fmt.Errorf("execute local listener inspection: %w", err)
@@ -189,20 +189,10 @@ func (d *Discoverer) inspectLocalListeners(ctx context.Context) ([]model.Target,
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errInvalidLocalListenerData, err)
 	}
-	if cause := callerCancellationCause(ctx); cause != nil {
+	if cause := context.Cause(ctx); cause != nil {
 		return nil, fmt.Errorf("%w: %w", errLocalListenerInspectionCanceled, cause)
 	}
 	return tgts, nil
-}
-
-func callerCancellationCause(ctx context.Context) error {
-	if ctx == nil || ctx.Err() == nil {
-		return nil
-	}
-	if cause := context.Cause(ctx); cause != nil {
-		return cause
-	}
-	return ctx.Err()
 }
 
 func (d *Discoverer) processTargets(tgts []model.Target) []model.TargetGroup {
