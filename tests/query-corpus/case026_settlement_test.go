@@ -1,31 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// CASE-026 a row that reports a value reports an anomaly rate with it.
+// CASE-026 pins the value and metadata of every row when 10-second records
+// are sliced into 35-second rows.
 //
-// Every row of a query answers two things: how much happened (the value)
-// and how much of it was anomalous (the anomaly rate). Exactly which
-// samples the rate is averaged over is an OPEN CONTRACT - the shipped
-// documentation says the raw samples inside the row, the engine merges
-// every record its read loop touched for that row, and the two disagree
-// whenever records do not line up with rows. This case deliberately does
-// not decide that. It asserts the one thing true under every candidate: a
-// row whose value came from anomalous seconds cannot report zero.
-//
-// `sum` is the grouping that can break the pair, because it is the only one
-// that pays a row seconds belonging to a record the row was never handed:
-// a record wider than the row is delivered to the row it ends inside, and
-// the seconds before that row's start are owed backwards. A row can
-// therefore be paid entirely by a record it never received - and if the
-// anomaly rate is taken only from what the row RECEIVED, such a row reports
-// a value out of nowhere and calls it perfectly healthy.
-//
-// The fixture makes every stored second anomalous, so there is nothing to
-// weigh and every candidate answers 100. A row reading 0 is a row whose
-// value came from seconds its anomaly rate never looked at.
+// At tier 0, anomaly rate is exact: it describes the raw samples whose
+// timestamps are inside the result row. Alternating all-healthy and
+// all-anomalous rows makes a fetched-record or interpolation-based rate
+// visibly wrong. The last stored sample is also a RESET, so the final
+// five-second sum share, its anomaly rate, and its annotation must remain
+// paired on the settlement row.
 package corpus
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -42,94 +28,94 @@ func TestCase026SettlementCarriesAnomaly(t *testing.T) {
 		ctx     = "fixture.c026anom"
 		host    = "c026anom"
 		ue      = 10
-		samples = 60 // 600s of data, every second of it anomalous
+		value   = 7
+		samples = 60
+		rowSpan = 35
 	)
 
 	base := fixture.T0 - fixture.T0%int64(ue)
 	ch := fixture.Series(ctx, ctx, base, samples, ue,
 		func(int) string { return "7" },
-		func(int) string { return stream.FlagAnomalous })
+		func(i int) string {
+			// The lower bound is exclusive, so subtract one before assigning
+			// a sample timestamp to its 35-second result row.
+			anomalous := ((i*ue-1)/rowSpan)%2 == 1
+			if i == samples {
+				if anomalous {
+					return stream.FlagReset
+				}
+				return "AR"
+			}
+			if anomalous {
+				return stream.FlagAnomalous
+			}
+			return stream.FlagNotAnomalous
+		})
 
 	pushLiveBurst(t, host, guid(252), ch)
 	if _, err := td.WaitRetention(host, ch.Context, ch.FirstT(), ch.LastT(), 20*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
-	first := base
 	last := base + int64(samples*ue)
-
 	ok := true
 
-	// Buckets of 35s over 10s records: no boundary falls on a record edge,
-	// so records straddle rows and owe seconds backwards. The window runs
-	// 100s past the data, so the final debt is owed to a row that receives
-	// no record of its own at all.
 	for _, group := range []string{"sum", "average"} {
-		after := first
+		after := base
 		before := last + 100
-		points := (before - after) / 35
+		points := (before - after) / rowSpan
 
 		params := daemon.DataParamsTier(ctx, 0, after, before, points, group)
 		params.Set("options", "jsonwrap|unaligned")
+		params.Set("scope_dimensions", ch.Dimensions[0].ID)
 		doc, err := td.DataV3(host, params)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertSelectedTier(t, doc, 0) {
+			ok = false
+		}
+		if !assertExactView(t, doc, after, before, rowSpan) {
+			ok = false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		col, has := cols[ch.Dimensions[0].ID]
-		if !has {
-			t.Logf("anomaly-pairing contract not met: %s returned no column", group)
-			ok = false
-			continue
-		}
-
-		// The settlement-only row: it starts inside the LAST stored record
-		// (so it is owed that record's closing seconds) and no record ends
-		// within it (so nothing is delivered to it). Identify it from the
-		// fixture, and require it to be there - a run where it does not
-		// exist is not evidence that the settlement works.
-		settleOnly := int64(-1)
-		for _, pt := range col {
-			rowStart := pt.T - 35
-			if rowStart > last-int64(ue) && rowStart < last {
-				settleOnly = pt.T
-			}
-		}
-		// only sum carries seconds into a row that received nothing; under
-		// every other grouping such a row is legitimately empty
-		if group != "sum" {
-			settleOnly = -1
-		} else if settleOnly < 0 {
-			t.Logf("anomaly-pairing contract not met: %s produced no row that opens inside "+
-				"the last stored record - the shape this case is about is absent", group)
+		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
 			ok = false
 		}
 
-		for _, pt := range col {
-			if pt.T == settleOnly {
-				if pt.Value == nil {
-					t.Logf("anomaly-pairing contract not met: %s row t0%+d is the row owed the "+
-						"last record's closing seconds and it answered nothing - those seconds "+
-						"were paid nowhere", group, pt.T-fixture.T0)
-					ok = false
-					continue
-				}
-			}
-			if pt.Value == nil {
+		want := make([]expectedColumnPoint, points)
+		for row := range want {
+			rowStart := after + int64(row)*rowSpan
+			rowEnd := rowStart + rowSpan
+			if rowStart >= last {
+				want[row] = wantEmptyWithMetadataAt(rowEnd, 0, canon.AnnotationEmpty)
 				continue
 			}
-			if math.Abs(pt.ARP-100.0) > 1e-6 {
-				t.Logf("anomaly-pairing contract not met: %s row t0%+d reports %.4f "+
-					"with anomaly rate %.4f, want 100 - every stored second under "+
-					"this window is anomalous, so a row with a value has no seconds "+
-					"left that could be healthy",
-					group, pt.T-fixture.T0, *pt.Value, pt.ARP)
-				ok = false
+
+			overlapEnd := rowEnd
+			if overlapEnd > last {
+				overlapEnd = last
 			}
+			rowValue := float64(value)
+			if group == "sum" {
+				rowValue *= float64(overlapEnd-rowStart) / ue
+			}
+			arp := float64(0)
+			if (row % 2) == 1 {
+				arp = 100
+			}
+			pa := int64(0)
+			if rowStart < last && last <= rowEnd {
+				pa = canon.AnnotationReset
+			}
+			want[row] = wantNumberWithMetadataAt(rowEnd, rowValue, arp, pa)
+		}
+		if !assertExactColumn(t, cols, ch.Dimensions[0].ID, want, 1e-9) {
+			t.Logf("%s did not keep each row's value, anomaly membership, and RESET paired", group)
+			ok = false
 		}
 	}
 

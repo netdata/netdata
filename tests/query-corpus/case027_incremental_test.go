@@ -70,24 +70,31 @@ func TestCase027IncrementalSumConservesAcrossZoom(t *testing.T) {
 		int64(samples / 5),  // five records per bucket
 		int64(samples / 10), // ten records per bucket
 	} {
-		params := daemon.DataParams(ctx, after, before, points)
-		params.Set("time_group", "incremental-sum")
+		params := daemon.DataParamsTier(ctx, 0, after, before, points, "incremental-sum")
 		params.Set("options", "jsonwrap|unaligned")
+		params.Set("scope_dimensions", ch.Dimensions[0].ID)
 		doc, err := td.DataV3(host, params)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertSelectedTier(t, doc, 0) {
+			ok = false
+		}
+		rowSpan := (before - after) / points
+		if !assertExactView(t, doc, after, before, rowSpan) {
+			ok = false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		col, has := cols[ch.Dimensions[0].ID]
-		if !has {
-			t.Logf("incremental-sum contract not met: %d buckets returned no column", points)
+		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
 			ok = false
-			continue
 		}
+		if !assertColumnExactGrid(t, cols, ch.Dimensions[0].ID, after, before, rowSpan) {
+			ok = false
+		}
+		col := cols[ch.Dimensions[0].ID]
 
 		total := 0.0
 		empties := 0
@@ -114,6 +121,18 @@ func TestCase027IncrementalSumConservesAcrossZoom(t *testing.T) {
 				"a window measure one after another and must add up to the whole rise",
 				points, total, base0, base0+(samples-1)*step, want)
 			ok = false
+		}
+
+		if points == samples {
+			exact := make([]expectedColumnPoint, samples)
+			exact[0] = wantEmptyWithMetadataAt(base+ue, 0, canon.AnnotationEmpty)
+			for i := 1; i < samples; i++ {
+				exact[i] = wantNumberWithMetadataAt(base+int64(i+1)*ue, step, 0, 0)
+			}
+			if !assertExactColumn(t, cols, ch.Dimensions[0].ID, exact, 0) {
+				t.Logf("one-row-per-sample grid did not preserve the previous sample as the next row's baseline")
+				ok = false
+			}
 		}
 	}
 

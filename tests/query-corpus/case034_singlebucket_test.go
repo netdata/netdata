@@ -60,15 +60,16 @@ func c034Fixture(t *testing.T, ue, machineGUID int) (context, host string) {
 
 func TestCase034SingleBucketRespectsRequestedWindow(t *testing.T) {
 	const contract = "CASE-034/single-bucket-respects-requested-window"
-	cases := map[string]struct {
+	cases := []struct {
+		name            string
 		ue, machineGUID int
 	}{
-		"ue1":  {ue: 1, machineGUID: 294},
-		"ue10": {ue: 10, machineGUID: 295},
+		{name: "ue1", ue: 1, machineGUID: 294},
+		{name: "ue10", ue: 10, machineGUID: 295},
 	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			trackContractComponent(t, contract, name)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			trackContractComponent(t, contract, tc.name)
 
 			ok := true
 			ue := tc.ue
@@ -79,7 +80,7 @@ func TestCase034SingleBucketRespectsRequestedWindow(t *testing.T) {
 			duration := before - after
 
 			for _, tier := range []int{0, 1, 2} {
-				for group := range map[string]struct{}{"average": {}, "sum": {}} {
+				for _, group := range []string{"average", "sum"} {
 					params := daemon.DataParamsTier(context, tier, after, before, 1, group)
 					params.Set("options", "jsonwrap|unaligned")
 					params.Set("scope_dimensions", "rate")
@@ -91,15 +92,9 @@ func TestCase034SingleBucketRespectsRequestedWindow(t *testing.T) {
 						ok = false
 					}
 
-					view, hasView := doc["view"].(map[string]any)
-					viewAfter, afterOK := view["after"].(float64)
-					viewBefore, beforeOK := view["before"].(float64)
-					viewEvery, everyOK := view["update_every"].(float64)
-					if !hasView || !afterOK || !beforeOK || !everyOK ||
-						int64(viewAfter) != after || int64(viewBefore) != before || int64(viewEvery) != duration {
-						t.Logf("ue%d tier%d %s view: after=%v before=%v update_every=%v, want %d/%d/%d",
-							ue, tier, group, view["after"], view["before"], view["update_every"],
-							after, before, duration)
+					if !assertExactView(t, doc, after, before, duration) {
+						t.Logf("ue%d tier%d %s did not return the exact one-bucket (after,before] view",
+							ue, tier, group)
 						ok = false
 					}
 
@@ -115,7 +110,7 @@ func TestCase034SingleBucketRespectsRequestedWindow(t *testing.T) {
 					if group == "sum" {
 						wantValue *= float64(duration)
 					}
-					want := []expectedColumnPoint{wantNumberAt(before, wantValue)}
+					want := []expectedColumnPoint{wantNumberWithMetadataAt(before, wantValue, 0, 0)}
 					if !assertExactColumn(t, cols, "rate", want, 0) {
 						t.Logf("ue%d tier%d %s over (%d,%d] did not return exact value %.10g; "+
 							"the %d/s record ending at after is outside the requested window",
@@ -124,8 +119,55 @@ func TestCase034SingleBucketRespectsRequestedWindow(t *testing.T) {
 					}
 				}
 			}
+
+			// Natural points changes the executor's query granularity from one
+			// second to the selected tier's stored-record cadence. The same
+			// outside sentinel must remain excluded in that branch too.
+			for _, tier := range []int{1, 2} {
+				queryGranularity := int64(ue * 60)
+				if tier == 2 {
+					queryGranularity = int64(ue * 3600)
+				}
+				naturalBefore := after + queryGranularity
+				for _, group := range []string{"average", "sum"} {
+					params := daemon.DataParamsTier(context, tier, after, naturalBefore, 1, group)
+					params.Set("options", "jsonwrap|unaligned|natural-points")
+					params.Set("scope_dimensions", "rate")
+					doc, err := td.DataV3(host, params)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !assertSelectedTier(t, doc, tier) {
+						ok = false
+					}
+					if !assertExactView(t, doc, after, naturalBefore, queryGranularity) {
+						t.Logf("ue%d tier%d natural %s did not return the exact one-record view",
+							ue, tier, group)
+						ok = false
+					}
+					cols, err := canon.Columns(doc)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !assertOnlyColumn(t, cols, "rate") {
+						ok = false
+					}
+					wantValue := float64(c034InsideRate)
+					if group == "sum" {
+						wantValue *= float64(queryGranularity)
+					}
+					want := []expectedColumnPoint{
+						wantNumberWithMetadataAt(naturalBefore, wantValue, 0, 0),
+					}
+					if !assertExactColumn(t, cols, "rate", want, 0) {
+						t.Logf("ue%d tier%d natural %s did not return the exact one-record result",
+							ue, tier, group)
+						ok = false
+					}
+				}
+			}
 			if !ok {
-				t.Errorf("BROKEN %s (%s): %s", contract, name, manifest[contract].Proves)
+				t.Errorf("BROKEN %s (%s): %s", contract, tc.name, manifest[contract].Proves)
 			}
 		})
 	}

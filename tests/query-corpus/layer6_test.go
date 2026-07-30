@@ -6,8 +6,10 @@
 // those groups.
 //
 // Consequences, pinned here:
-//   - sum→sum, min→min, max→max, extremes→extremes and sum→avg are covered
-//     directly;
+//   - chains without an average boundary are the surgical contributor-weight
+//     contract;
+//   - sum→average is held separately because its value and metadata need
+//     different denominators;
 //   - CASE-018 distinguishes the correct mean of finalized pass-1 averages
 //     from the current avg-of-sums defect;
 //   - [instance, percentage] → [selected, avg] returns the MEAN of the
@@ -161,11 +163,32 @@ func l6Groups(key1, key2 string, members []l5Member) map[string][][]l5Member {
 	return out
 }
 
-// TestLayer6TwoPassMatrix covers chains whose pass-1 accumulator is already
-// the group's final value (sum and the champions), plus contributor-weighted
-// anomaly metadata in non-raw and raw responses.
+type l6AggChain struct{ agg1, agg2 string }
+
+// TestLayer6TwoPassMatrix covers chains with no average boundary. Their
+// pass-1 accumulator is already the value consumed by pass 2, so raw
+// contributor counts can be propagated without changing a value divisor.
 func TestLayer6TwoPassMatrix(t *testing.T) {
 	trackContract(t, "L6/two-pass-matrix")
+
+	testLayer6TwoPassChains(t, []l6AggChain{
+		{"sum", "sum"}, {"min", "min"}, {"max", "max"},
+		{"extremes", "extremes"},
+		{"sum", "min"}, {"max", "sum"}, {"min", "extremes"},
+	})
+}
+
+// An average at pass 2 needs two denominators: contributing pass-1 groups for
+// the value, and raw metric contributors for anomaly metadata. Keep this held
+// contract separate so the surgical no-average fix cannot corrupt its value.
+func TestLayer6TwoPassAverageBoundary(t *testing.T) {
+	trackContract(t, "L6/two-pass-average-boundary")
+
+	testLayer6TwoPassChains(t, []l6AggChain{{"sum", "average"}})
+}
+
+func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) {
+	t.Helper()
 
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
@@ -184,12 +207,6 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 		{"label", "node"},
 		{"instance", "label"},
 		{"instance", "units"},
-	}
-	aggCombos := []struct{ agg1, agg2 string }{
-		{"sum", "sum"}, {"min", "min"}, {"max", "max"},
-		{"extremes", "extremes"}, {"sum", "average"},
-		// mixed chains: pass 2 consumes pass-1 accumulators as-is
-		{"sum", "min"}, {"max", "sum"}, {"min", "extremes"},
 	}
 
 	for _, mode := range []string{"non-raw", "raw"} {

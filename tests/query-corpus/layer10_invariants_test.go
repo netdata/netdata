@@ -386,10 +386,10 @@ func TestL10QueryResultGuards(t *testing.T) {
 			t.Error("ordinary nondivisible grid accepted a missing leading bucket")
 		}
 	})
-	t.Run("ordinary-single-bucket-inclusive-view", func(t *testing.T) {
+	t.Run("ordinary-single-bucket-exclusive-lower-bound", func(t *testing.T) {
 		doc := build()
 		doc["view"] = map[string]any{
-			"after": float64(0), "before": float64(20), "update_every": float64(21),
+			"after": float64(1), "before": float64(20), "update_every": float64(20),
 		}
 		result := doc["result"].(map[string]any)
 		result["data"] = []any{
@@ -398,7 +398,7 @@ func TestL10QueryResultGuards(t *testing.T) {
 		single := spec
 		single.points = 1
 		if !validateL10Response(t, single, doc).valid {
-			t.Error("ordinary single-bucket validator rejected the exact inclusive view")
+			t.Error("ordinary single-bucket validator rejected the exact (after,before] view")
 		}
 
 		doc = build()
@@ -591,16 +591,7 @@ func validateL10Response(t *testing.T, spec l10QuerySpec, doc map[string]any) l1
 				result.grid[i] = viewAfter + updateEvery - 1 + int64(i)*updateEvery
 			}
 		}
-		if !spec.responseDeclaredGrid && spec.points == 1 {
-			wantEvery := spec.before - spec.after + 1
-			if viewAfter != spec.after || viewBefore != spec.before ||
-				updateEvery != wantEvery || len(result.grid) != 1 {
-				t.Logf("%s one-bucket view is %d/%d/%d with %d rows, want %d/%d/%d with 1 row",
-					spec.requestedGroup, viewAfter, viewBefore, updateEvery, len(result.grid),
-					spec.after, spec.before, wantEvery)
-				result.valid = false
-			}
-		} else if !spec.responseDeclaredGrid && spec.points > 0 &&
+		if !spec.responseDeclaredGrid && spec.points > 0 &&
 			(spec.before-spec.after)%spec.points == 0 {
 			wantEvery := (spec.before - spec.after) / spec.points
 			if viewAfter != spec.after+1 || viewBefore != spec.before ||

@@ -62,10 +62,25 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	get := func(extra map[string]string) map[string]any {
+	const slowChart = "fixture.c022slow"
+	slowBase := int64(fixture.T0) - int64(fixture.T0)%10
+	slow := fixture.Series(slowChart, slowChart, slowBase, 12, 10,
+		func(int) string { return strconv.Itoa(big) },
+		func(i int) string {
+			if i == 12 {
+				return stream.FlagAnomalous
+			}
+			return stream.FlagNotAnomalous
+		})
+	pushLiveBurst(t, "c022-slow", guid(296), slow)
+	if _, err := td.WaitRetention("c022-slow", slow.Context, slow.FirstT(), slow.LastT(), 15*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	getFor := func(host, context string, extra map[string]string) map[string]any {
 		t.Helper()
 		params := map[string][]string{
-			"scope_contexts": {chart},
+			"scope_contexts": {context},
 			"time_group":     {"latest"},
 			"format":         {"json2"},
 			"group_by":       {"dimension"},
@@ -73,11 +88,15 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		for k, v := range extra {
 			params[k] = []string{v}
 		}
-		resp, err := td.HostJSON("c022", "api/v3/data", params)
+		resp, err := td.HostJSON(host, "api/v3/data", params)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return resp
+	}
+	get := func(extra map[string]string) map[string]any {
+		t.Helper()
+		return getFor("c022", chart, extra)
 	}
 
 	ok := true
@@ -216,6 +235,27 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 	exact(colsRel, "plain", []expectedColumnPoint{wantNumberAt(fixture.T0+12, 10)}, 0)
 	exact(colsRel, "big", []expectedColumnPoint{wantNumberAt(fixture.T0+12, float64(big))}, 0)
 	exact(colsRel, "neg", []expectedColumnPoint{wantNumberAt(fixture.T0+12, -5)}, 0)
+
+	// The same hot-edge fast path with update_every=10 exercises a natural
+	// query granularity greater than one. Its only row ends at the newest
+	// sample. An internal-check build also requires the fast executor to
+	// address that prefilled row, not the prior query-granularity boundary.
+	respNaturalFast := getFor("c022-slow", slowChart, map[string]string{
+		"after":   strconv.FormatInt(slowBase, 10),
+		"before":  "0",
+		"points":  "1",
+		"options": "natural-points",
+	})
+	check(assertTierPresence(t, respNaturalFast, []bool{false, false, false}),
+		"update_every=10 natural fast path read storage points")
+	viewNaturalFast, viewNaturalFastOK := respNaturalFast["view"].(map[string]any)
+	check(viewNaturalFastOK && viewNaturalFast["before"] == float64(slow.LastT()),
+		"update_every=10 hot-edge window.before = %v, want %d",
+		viewNaturalFast["before"], slow.LastT())
+	colsNaturalFast := decode(respNaturalFast, slow.Dimensions[0].ID)
+	exact(colsNaturalFast, slow.Dimensions[0].ID, []expectedColumnPoint{
+		wantNumberWithMetadataAt(slow.LastT(), float64(big), 0, 0),
+	}, 0)
 
 	// the storage path (selected-tier disables the fast path) returns the
 	// SN-quantized value and the engine-generic bucket anomaly rate
