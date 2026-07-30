@@ -45,16 +45,21 @@ func newResourceError(phase resourceErrorPhase, cause error) error {
 
 func (err *resourceError) Error() string {
 	// Resource errors may contain credential-bearing configuration.
+	var message string
 	switch {
 	case err == nil:
 		return "service discovery resource failed"
 	case err.phase == resourceErrorConfiguration:
-		return "service discovery resource configuration is invalid"
+		message = "service discovery resource configuration is invalid"
 	case err.phase == resourceErrorOperationalTest:
-		return "service discovery operational test failed"
+		message = "service discovery operational test failed"
 	default:
-		return "service discovery resource construction failed"
+		message = "service discovery resource construction failed"
 	}
+	if detail, ok := dyncfg.PublicMessage(err.cause); ok {
+		return message + ": " + detail
+	}
+	return message
 }
 
 func (err *resourceError) Unwrap() error {

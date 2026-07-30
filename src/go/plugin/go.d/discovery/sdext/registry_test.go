@@ -62,5 +62,5 @@ func TestRegistry_DockerOperationalTestRejectsUnreachableEndpoint(t *testing.T) 
 
 	require.False(t, fullyTested)
 	require.Error(t, err)
-	require.ErrorContains(t, err, "list docker containers")
+	require.ErrorContains(t, err, "cannot connect to the configured Docker endpoint")
 }

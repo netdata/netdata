@@ -4,6 +4,7 @@ package dockersd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 
 	typesContainer "github.com/moby/moby/api/types/container"
@@ -97,14 +99,36 @@ func (d *Discoverer) Test(ctx context.Context) error {
 	}
 	client, err := d.newDockerClient(d.addr)
 	if err != nil {
-		return fmt.Errorf("create docker client: %w", err)
+		return dyncfg.NewPublicError(
+			"the configured Docker endpoint is invalid",
+			fmt.Errorf("create docker client: %w", err),
+		)
 	}
 	defer func() { _ = client.Close() }()
 
 	testCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
 	if _, err := client.ContainerList(testCtx, docker.ContainerListOptions{Limit: 1}); err != nil {
-		return fmt.Errorf("list docker containers: %w", err)
+		cause := fmt.Errorf("list docker containers: %w", err)
+		switch {
+		case ctx.Err() != nil:
+			return cause
+		case errors.Is(testCtx.Err(), context.DeadlineExceeded):
+			return dyncfg.NewPublicError(
+				"the configured Docker endpoint did not respond before the timeout",
+				cause,
+			)
+		case docker.IsErrConnectionFailed(err):
+			return dyncfg.NewPublicError(
+				"cannot connect to the configured Docker endpoint",
+				cause,
+			)
+		default:
+			return dyncfg.NewPublicError(
+				"cannot query containers from the configured Docker endpoint",
+				cause,
+			)
+		}
 	}
 	return nil
 }

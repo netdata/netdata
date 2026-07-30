@@ -10,7 +10,8 @@ import (
 )
 
 // Descriptor callbacks return resource failures to orchestration for sanitized
-// diagnostics; they must not log raw configuration or credentials.
+// diagnostics; they must not log raw configuration or credentials. Callbacks
+// may use dyncfg.NewPublicError only with static, code-authored explanations.
 type Descriptor struct {
 	Type            string
 	Schema          string

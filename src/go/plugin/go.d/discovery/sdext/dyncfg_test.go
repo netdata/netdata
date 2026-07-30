@@ -62,6 +62,7 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 		id      string
 		payload string
 		message string
+		code    int
 	}{
 		{
 			name:    "resource parser",
@@ -69,6 +70,7 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			id:      "go.d:sd:docker",
 			payload: `{"discoverer":{"docker":{"timeout":"[REDACTED_SECRET]"}},"services":[{"id":"test","match":"true"}]}`,
 			message: "service discovery resource configuration is invalid",
+			code:    400,
 		},
 		{
 			name:    "resource constructor",
@@ -76,6 +78,23 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			id:      "go.d:sd:http",
 			payload: `{"discoverer":{"http":{"url":"http://example.invalid","proxy_url":"http://user:[REDACTED_SECRET]@%zz"}},"services":[{"id":"test","match":"true"}]}`,
 			message: "service discovery resource construction failed",
+			code:    400,
+		},
+		{
+			name:    "semantic validation",
+			uid:     "test-docker-semantics",
+			id:      "go.d:sd:docker",
+			payload: `{"discoverer":{"docker":{}},"services":[{"id":"[REDACTED_SECRET]","match":""}]}`,
+			message: "service discovery resource configuration is invalid: service discovery service rules are invalid",
+			code:    400,
+		},
+		{
+			name:    "operational connection",
+			uid:     "test-docker-operational",
+			id:      "go.d:sd:docker",
+			payload: `{"discoverer":{"docker":{"address":"unix:///tmp/netdata-[REDACTED_SECRET].sock","timeout":"50ms"}},"services":[{"id":"test","match":"true"}]}`,
+			message: "service discovery operational test failed: cannot connect to the configured Docker endpoint",
+			code:    422,
 		},
 	}
 	for _, test := range tests {
@@ -90,7 +109,7 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 
 			select {
 			case result := <-output.results:
-				require.Equal(t, 400, result.Code)
+				require.Equal(t, test.code, result.Code)
 				require.Contains(t, result.Payload, test.message)
 				require.NotContains(t, result.Payload, "[REDACTED_SECRET]")
 			case <-time.After(time.Second):

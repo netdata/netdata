@@ -977,7 +977,8 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 400 application/json")
 						assert.Contains(t, got, "Failed to parse config")
-						assert.Contains(t, got, "expected")
+						assert.Contains(t, got, "configured discoverer type does not match the command target")
+						assert.NotContains(t, got, "docker")
 					},
 				}
 			},

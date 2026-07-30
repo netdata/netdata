@@ -107,6 +107,21 @@ func (sim *discoverySim) run(t *testing.T) {
 }
 
 func TestDiscoverer_Test(t *testing.T) {
+	t.Run("sanitizes client construction failure", func(t *testing.T) {
+		clientErr := errors.New("invalid endpoint [REDACTED_SECRET]")
+		d, err := NewDiscoverer(Config{})
+		require.NoError(t, err)
+		d.newDockerClient = func(string) (dockerClient, error) {
+			return nil, clientErr
+		}
+
+		err = d.Test(t.Context())
+
+		require.ErrorIs(t, err, clientErr)
+		require.Equal(t, "the configured Docker endpoint is invalid", err.Error())
+		require.NotContains(t, err.Error(), "[REDACTED_SECRET]")
+	})
+
 	t.Run("lists one container and closes the temporary client", func(t *testing.T) {
 		d, err := NewDiscoverer(Config{
 			Address: "unix:///tmp/test-docker.sock",
@@ -126,7 +141,7 @@ func TestDiscoverer_Test(t *testing.T) {
 	})
 
 	t.Run("returns an unreachable endpoint failure", func(t *testing.T) {
-		listErr := errors.New("endpoint unavailable")
+		listErr := errors.New("endpoint [REDACTED_SECRET] unavailable")
 		d, err := NewDiscoverer(Config{})
 		require.NoError(t, err)
 		client := &testDockerClient{listErr: listErr}
@@ -137,6 +152,8 @@ func TestDiscoverer_Test(t *testing.T) {
 		err = d.Test(t.Context())
 
 		require.ErrorIs(t, err, listErr)
+		require.Equal(t, "cannot query containers from the configured Docker endpoint", err.Error())
+		require.NotContains(t, err.Error(), "[REDACTED_SECRET]")
 		require.True(t, client.closed)
 	})
 
@@ -152,6 +169,7 @@ func TestDiscoverer_Test(t *testing.T) {
 		err = d.Test(t.Context())
 
 		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Equal(t, "the configured Docker endpoint did not respond before the timeout", err.Error())
 		require.True(t, client.closed)
 	})
 }

@@ -53,7 +53,8 @@ const (
 // Testable is an optional operational-test capability for configured resources.
 // Implementations must honor ctx and release resources acquired by the test.
 // They must return failures for caller-side sanitization instead of logging raw
-// user configuration, credentials, or endpoint material.
+// user configuration, credentials, or endpoint material. NewPublicError may
+// attach a static, code-authored explanation that is safe to render publicly.
 type Testable interface {
 	Test(ctx context.Context) error
 }
