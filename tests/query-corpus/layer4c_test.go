@@ -1589,40 +1589,60 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 		t.Fatalf("split retention cannot prove the intended tail seam: %+v", splitTiers[:2])
 	}
 
-	const (
-		splitRowSpan = int64(700)
-		splitPoints  = int64(3)
-	)
 	splitAfter := splitTiers[1].FirstEntry
-	splitBefore := splitAfter + splitPoints*splitRowSpan
-
-	splitParams := daemon.DataParams(
-		c4cContext, splitAfter, splitBefore, splitPoints)
-	splitParams.Set("time_group", "sum")
-	splitParams.Set("scope_dimensions", c4cSplitDim)
-	splitParams.Set("options", "jsonwrap|unaligned")
-	splitDoc, err := dd.DataV3("l4c-child", splitParams)
-	if err != nil {
-		t.Fatal(err)
+	expiredCoarseWant := make([]expectedColumnPoint, 17)
+	expiredCoarseWant[0] = wantNumberAt(splitAfter+120, 100*c4cSplitValue)
+	for i := 1; i < len(expiredCoarseWant)-1; i++ {
+		expiredCoarseWant[i] = wantEmptyWithMetadataAt(
+			splitAfter+int64(i+1)*120, 0, canon.AnnotationEmpty)
 	}
-	splitCols, err := canon.Columns(splitDoc)
-	if err != nil {
-		t.Fatal(err)
-	}
+	expiredCoarseWant[len(expiredCoarseWant)-1] =
+		wantNumberAt(splitAfter+17*120, 61*c4cSplitValue)
 
-	splitWant := []expectedColumnPoint{
-		wantNumberAt(splitAfter+splitRowSpan, 100*c4cSplitValue),
-		wantEmptyWithMetadataAt(
-			splitAfter+2*splitRowSpan, 0, canon.AnnotationEmpty),
-		wantNumberAt(splitBefore, 61*c4cSplitValue),
-	}
+	for _, split := range []struct {
+		label           string
+		rowSpan, points int64
+		want            []expectedColumnPoint
+	}{
+		{
+			label:   "wide rows",
+			rowSpan: 700,
+			points:  3,
+			want: []expectedColumnPoint{
+				wantNumberAt(splitAfter+700, 100*c4cSplitValue),
+				wantEmptyWithMetadataAt(splitAfter+2*700, 0, canon.AnnotationEmpty),
+				wantNumberAt(splitAfter+3*700, 61*c4cSplitValue),
+			},
+		},
+		{
+			label:   "expired coarse record",
+			rowSpan: 120,
+			points:  17,
+			want:    expiredCoarseWant,
+		},
+	} {
+		splitBefore := splitAfter + split.points*split.rowSpan
+		splitParams := daemon.DataParams(
+			c4cContext, splitAfter, splitBefore, split.points)
+		splitParams.Set("time_group", "sum")
+		splitParams.Set("scope_dimensions", c4cSplitDim)
+		splitParams.Set("options", "jsonwrap|unaligned")
+		splitDoc, err := dd.DataV3("l4c-child", splitParams)
+		if err != nil {
+			t.Fatal(err)
+		}
+		splitCols, err := canon.Columns(splitDoc)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if !assertExactView(t, splitDoc, splitAfter, splitBefore, splitRowSpan) ||
-		!assertTierPresence(t, splitDoc, []bool{true, true, false}) ||
-		!assertOnlyColumn(t, splitCols, c4cSplitDim) ||
-		!assertExactColumn(t, splitCols, c4cSplitDim, splitWant, 0) {
-		t.Log("split storage-gap tail violated exact coarse/fine ownership")
-		ok = false
+		if !assertExactView(t, splitDoc, splitAfter, splitBefore, split.rowSpan) ||
+			!assertTierPresence(t, splitDoc, []bool{true, true, false}) ||
+			!assertOnlyColumn(t, splitCols, c4cSplitDim) ||
+			!assertExactColumn(t, splitCols, c4cSplitDim, split.want, 0) {
+			t.Logf("split storage-gap tail %s violated exact coarse/fine ownership", split.label)
+			ok = false
+		}
 	}
 
 	return ok
