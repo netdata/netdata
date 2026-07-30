@@ -215,8 +215,10 @@ EOF
 ```
 
 For CIDR autocomplete, loose address and prefix-length fragments are accepted.
-One trailing dot before `/` is also tolerated after one through three complete
-IPv4 octets, so `10.1./1` is equivalent to `10.1/1`:
+Digits after `/` are an autocomplete fragment, not a completed selection:
+`/1` considers `/1` and `/10` through `/19`. One trailing dot before `/` is
+also tolerated after one through three complete IPv4 octets, so `10.1./1` is
+equivalent to `10.1/1`:
 
 ```json
 {
@@ -226,10 +228,11 @@ IPv4 octets, so `10.1./1` is equivalent to `10.1/1`:
 }
 ```
 
-The naturally implied `10.1.0.0/16` is ranked first when the retained
-`DST_ADDR` vocabulary contains an address in it. Candidates containing no
-retained destination address are omitted, so another canonical network may be
-first. Use one of the returned canonical values in `selections`:
+The two complete address octets naturally imply `10.1.0.0/16`, so that
+candidate is ranked first when the retained `DST_ADDR` vocabulary contains an
+address in it. Candidates containing no retained destination address are
+omitted, so another canonical network may be first. Use one of the returned
+canonical values in `selections`:
 
 ```json
 {
