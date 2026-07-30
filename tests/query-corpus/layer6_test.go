@@ -216,6 +216,10 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
+					if err := queryPointSchemaField(doc, "hidden", false); err != nil {
+						t.Errorf("%s/%s-%s/%s-%s: %v",
+							mode, kc.key1, ac.agg1, kc.key2, ac.agg2, err)
+					}
 					cols, err := canon.Columns(doc)
 					if err != nil {
 						t.Fatal(err)
@@ -259,9 +263,6 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 								}
 							} else if pt.Count != nil {
 								t.Errorf("%q row %d: count %d is present, want absent", gname, i, *pt.Count)
-							}
-							if pt.Hidden != nil {
-								t.Errorf("%q row %d: hidden %v is present, want absent", gname, i, *pt.Hidden)
 							}
 							wantPA := int64(0)
 							if wantEmpty {
@@ -440,6 +441,9 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 				doc, err := td.DataV3All(params)
 				if err != nil {
 					t.Fatal(err)
+				}
+				if err := queryPointSchemaField(doc, "hidden", raw); err != nil {
+					t.Errorf("%s/%s/%s: %v", mode, kc.key1, kc.key2, err)
 				}
 				cols, err := canon.Columns(doc)
 				if err != nil {

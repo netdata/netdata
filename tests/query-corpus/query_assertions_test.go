@@ -3,6 +3,7 @@
 package corpus
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -219,6 +220,138 @@ func queryObject(t *testing.T, parent map[string]any, key, path string) map[stri
 		t.Fatalf("%s is missing or not an object: %v", path, parent[key])
 	}
 	return value
+}
+
+func queryFiniteNumber(value any) (float64, bool) {
+	number, ok := value.(float64)
+	return number, ok && !math.IsNaN(number) && !math.IsInf(number, 0)
+}
+
+func queryInteger(value any) (int64, bool) {
+	number, ok := queryFiniteNumber(value)
+	if !ok || math.Trunc(number) != number ||
+		number < -math.Exp2(63) || number >= math.Exp2(63) {
+		return 0, false
+	}
+	return int64(number), true
+}
+
+// queryPointSchemaField verifies response-wide json2 schema presence. A nil
+// decoded cell cannot answer this because both an absent field and a declared
+// null cell intentionally decode to nil.
+func queryPointSchemaField(doc map[string]any, field string, wantPresent bool) error {
+	result, ok := doc["result"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("result is missing or not an object: %v", doc["result"])
+	}
+	point, ok := result["point"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("result.point is missing or not an object: %v", result["point"])
+	}
+	_, present := point[field]
+	if present != wantPresent {
+		return fmt.Errorf("result.point field %q presence is %v, want %v", field, present, wantPresent)
+	}
+	return nil
+}
+
+// queryRawTimestampsExact validates result.data before canon.Columns sorts the
+// decoded columns. The order of want is therefore the public wire order.
+func queryRawTimestampsExact(doc map[string]any, want []int64) error {
+	result, ok := doc["result"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("result is missing or not an object: %v", doc["result"])
+	}
+	rows, ok := result["data"].([]any)
+	if !ok {
+		return fmt.Errorf("result.data is missing or not an array: %v", result["data"])
+	}
+	if len(rows) != len(want) {
+		return fmt.Errorf("result.data has %d rows, want %d", len(rows), len(want))
+	}
+	for i, rowAny := range rows {
+		row, ok := rowAny.([]any)
+		if !ok || len(row) == 0 {
+			return fmt.Errorf("result.data[%d] is not a nonempty row: %v", i, rowAny)
+		}
+		timestamp, ok := queryInteger(row[0])
+		if !ok || timestamp != want[i] {
+			return fmt.Errorf(
+				"result.data[%d] timestamp is %v, want %d in wire order",
+				i, row[0], want[i])
+		}
+	}
+	return nil
+}
+
+func TestQueryStructuredResponseGuards(t *testing.T) {
+	t.Run("point-schema-presence", func(t *testing.T) {
+		withHidden := func() map[string]any {
+			return map[string]any{"result": map[string]any{
+				"point": map[string]any{
+					"value": float64(0), "arp": float64(1), "pa": float64(2),
+					"count": float64(3), "hidden": float64(4),
+				},
+				"data": []any{
+					[]any{float64(1), []any{float64(2), float64(0), float64(0), float64(1), nil}},
+				},
+			}}
+		}
+
+		control := withHidden()
+		if err := queryPointSchemaField(control, "hidden", true); err != nil {
+			t.Fatalf("valid hidden schema rejected: %v", err)
+		}
+
+		removed := withHidden()
+		result := removed["result"].(map[string]any)
+		delete(result["point"].(map[string]any), "hidden")
+		row := result["data"].([]any)[0].([]any)
+		row[1] = row[1].([]any)[:4]
+		if err := queryPointSchemaField(removed, "hidden", true); err == nil {
+			t.Fatal("accepted coherent hidden schema-and-cell removal")
+		}
+
+		absent := withHidden()
+		absentResult := absent["result"].(map[string]any)
+		delete(absentResult["point"].(map[string]any), "hidden")
+		absentRow := absentResult["data"].([]any)[0].([]any)
+		absentRow[1] = absentRow[1].([]any)[:4]
+		if err := queryPointSchemaField(absent, "hidden", false); err != nil {
+			t.Fatalf("valid absent hidden schema rejected: %v", err)
+		}
+		absentResult["point"].(map[string]any)["hidden"] = float64(4)
+		absentRow[1] = append(absentRow[1].([]any), nil)
+		if err := queryPointSchemaField(absent, "hidden", false); err == nil {
+			t.Fatal("accepted coherent hidden schema-and-null-cell addition")
+		}
+	})
+
+	t.Run("raw-wire-order", func(t *testing.T) {
+		build := func() map[string]any {
+			return map[string]any{"result": map[string]any{"data": []any{
+				[]any{float64(30), []any{float64(3)}},
+				[]any{float64(20), []any{float64(2)}},
+				[]any{float64(10), []any{float64(1)}},
+			}}}
+		}
+		want := []int64{30, 20, 10}
+		if err := queryRawTimestampsExact(build(), want); err != nil {
+			t.Fatalf("valid raw wire order rejected: %v", err)
+		}
+		for name, mutate := range map[string]func([]any){
+			"adjacent-swap": func(rows []any) { rows[0], rows[1] = rows[1], rows[0] },
+			"reverse":       func(rows []any) { rows[0], rows[2] = rows[2], rows[0] },
+		} {
+			t.Run(name, func(t *testing.T) {
+				doc := build()
+				mutate(doc["result"].(map[string]any)["data"].([]any))
+				if err := queryRawTimestampsExact(doc, want); err == nil {
+					t.Errorf("accepted %s raw row mutation", name)
+				}
+			})
+		}
+	})
 }
 
 func queryStrictOneUnit(t *testing.T, value any, path string) string {

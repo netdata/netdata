@@ -221,12 +221,20 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 				fail("points=%d: the one-second query did not cross both seams in one plan walk", points)
 			}
 
+			grid := c4dExpectedAlignedGrid(t, after, before, points)
+			rawGrid := make([]int64, grid.rows)
+			for i := range rawGrid {
+				rawGrid[i] = grid.before - int64(i)*grid.updateEvery
+			}
+			if err := queryRawTimestampsExact(doc, rawGrid); err != nil {
+				fail("points=%d: default newest-first wire order: %v", points, err)
+			}
+
 			cols, err := canon.Columns(doc)
 			if err != nil {
 				fail("points=%d: %v", points, err)
 				continue
 			}
-			grid := c4dExpectedAlignedGrid(t, after, before, points)
 			empty, gridOK := c4dAlignedResultExact(
 				t, doc, cols, c4cDimID(0), after, before, grid)
 			if !gridOK {
@@ -527,9 +535,13 @@ func TestC4DAlignedGridOracleGuardsOffByOne(t *testing.T) {
 }
 
 // c4dExpectedAlignedGrid is the Class B port of the no-resampling,
-// one-second-granularity path in query-window.c:214-268, 297-302 and 333-364.
-// It independently fixes the exact row count and timestamps expected from each
-// broad three-tier query instead of trusting the returned view metadata.
+// one-second-granularity path. It independently fixes the exact row count and
+// timestamps expected from each broad three-tier query instead of trusting the
+// returned view metadata.
+//
+// Source: netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d
+// src/web/api/queries/query-window.c:214-269,297-302,333-364
+// query_target_calculate_window()
 func c4dExpectedAlignedGrid(
 	t *testing.T,
 	after, before, requestedPoints int64,

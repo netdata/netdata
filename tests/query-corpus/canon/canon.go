@@ -19,9 +19,9 @@ const (
 
 // Pt is one decoded json2 point of one dimension: T in seconds, Value nil
 // for nulls, ARP the anomaly rate percent, PA the annotation bits. Count
-// and Hidden are present only in aggregatable (raw) responses, where the
-// point schema adds them (Count = raw metric contributors, Hidden = the
-// percentage denominator accumulator).
+// and Hidden come from aggregatable (raw) responses. Count is nonnil when
+// declared by the point schema. Hidden is nonnil only for a finite percentage
+// denominator accumulator; an absent field or null cell leaves it nil.
 type Pt struct {
 	T      int64
 	Value  *float64
@@ -268,7 +268,7 @@ func Columns(doc map[string]any) (map[string][]Pt, error) {
 				}
 				pt.Count = &count
 			}
-			if ps.hidden >= 0 {
+			if ps.hidden >= 0 && point[ps.hidden] != nil {
 				hidden, err := finiteNumber(
 					point[ps.hidden],
 					fmt.Sprintf("result.data[%d][%d].hidden", rowIndex, i+1))

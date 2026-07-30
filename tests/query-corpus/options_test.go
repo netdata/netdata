@@ -16,6 +16,7 @@ package corpus
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -44,6 +45,128 @@ func optsGet(t *testing.T, format, options string, extra map[string]string) stri
 		t.Fatal(err)
 	}
 	return body
+}
+
+func optionsStringArrayExact(value any, want []string, path string) error {
+	values, ok := value.([]any)
+	if !ok {
+		return fmt.Errorf("%s is not an array: %v", path, value)
+	}
+	if len(values) != len(want) {
+		return fmt.Errorf("%s has %d values, want %d: %v", path, len(values), len(want), values)
+	}
+	for i, wantValue := range want {
+		got, ok := values[i].(string)
+		if !ok || got != wantValue {
+			return fmt.Errorf("%s[%d] is %v, want %q", path, i, values[i], wantValue)
+		}
+	}
+	return nil
+}
+
+func optionsStringPairSetExact(value any, want map[[2]string]struct{}, path string) error {
+	values, ok := value.([]any)
+	if !ok {
+		return fmt.Errorf("%s is not an array: %v", path, value)
+	}
+	if len(values) != len(want) {
+		return fmt.Errorf("%s has %d pairs, want %d: %v", path, len(values), len(want), values)
+	}
+	seen := make(map[[2]string]struct{}, len(values))
+	for i, value := range values {
+		row, ok := value.([]any)
+		if !ok || len(row) != 2 {
+			return fmt.Errorf("%s[%d] is not a two-cell pair: %v", path, i, value)
+		}
+		left, leftOK := row[0].(string)
+		right, rightOK := row[1].(string)
+		if !leftOK || !rightOK || left == "" || right == "" {
+			return fmt.Errorf("%s[%d] is not a nonempty string pair: %v", path, i, row)
+		}
+		pair := [2]string{left, right}
+		if _, expected := want[pair]; !expected {
+			return fmt.Errorf("%s[%d] has unexpected pair %q/%q", path, i, left, right)
+		}
+		if _, duplicate := seen[pair]; duplicate {
+			return fmt.Errorf("%s repeats pair %q/%q", path, left, right)
+		}
+		seen[pair] = struct{}{}
+	}
+	return nil
+}
+
+func optionsL7AllDimensionsExact(doc map[string]any) error {
+	if err := optionsStringArrayExact(
+		doc["dimension_names"], []string{"plain"}, "dimension_names"); err != nil {
+		return err
+	}
+	if err := optionsStringPairSetExact(doc["full_dimension_list"], map[[2]string]struct{}{
+		{"plain", "plain"}:         {},
+		{"comma,dim", "comma,dim"}: {},
+	}, "full_dimension_list"); err != nil {
+		return err
+	}
+	if err := optionsStringPairSetExact(doc["full_chart_list"], map[[2]string]struct{}{
+		{l7Chart, l7Chart}: {},
+	}, "full_chart_list"); err != nil {
+		return err
+	}
+	return optionsStringPairSetExact(doc["full_chart_labels"], map[[2]string]struct{}{
+		{"_collect_plugin", "fixture-pusher"}: {},
+		{"_collect_module", "corpus"}:         {},
+	}, "full_chart_labels")
+}
+
+func TestOptionsAllDimensionsMetadataGuards(t *testing.T) {
+	build := func() map[string]any {
+		return map[string]any{
+			"dimension_names": []any{"plain"},
+			"full_dimension_list": []any{
+				[]any{"plain", "plain"},
+				[]any{"comma,dim", "comma,dim"},
+			},
+			"full_chart_list": []any{
+				[]any{l7Chart, l7Chart},
+			},
+			"full_chart_labels": []any{
+				[]any{"_collect_plugin", "fixture-pusher"},
+				[]any{"_collect_module", "corpus"},
+			},
+		}
+	}
+	if err := optionsL7AllDimensionsExact(build()); err != nil {
+		t.Fatalf("valid all-dimensions metadata rejected: %v", err)
+	}
+
+	mutations := map[string]func(map[string]any){
+		"wrong-selection": func(doc map[string]any) {
+			doc["dimension_names"] = []any{"comma,dim"}
+		},
+		"duplicate-dimension": func(doc map[string]any) {
+			doc["full_dimension_list"] = []any{
+				[]any{"plain", "plain"},
+				[]any{"plain", "plain"},
+			}
+		},
+		"null-chart-list": func(doc map[string]any) {
+			doc["full_chart_list"] = nil
+		},
+		"missing-label-list": func(doc map[string]any) {
+			delete(doc, "full_chart_labels")
+		},
+		"malformed-label-pair": func(doc map[string]any) {
+			doc["full_chart_labels"].([]any)[0] = []any{"_collect_plugin", nil}
+		},
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			doc := build()
+			mutate(doc)
+			if err := optionsL7AllDimensionsExact(doc); err == nil {
+				t.Errorf("accepted %s all-dimensions metadata mutation", name)
+			}
+		})
+	}
 }
 
 func TestOptionsTimestamps(t *testing.T) {
@@ -94,19 +217,8 @@ func TestOptionsV1JSONShapes(t *testing.T) {
 		if err := json.Unmarshal([]byte(got), &doc); err != nil {
 			t.Fatalf("objectrows not valid JSON: %v", err)
 		}
-		data, _ := doc["data"].([]any)
-		if len(data) != l7Rows {
-			t.Fatalf("objectrows: %d rows, want %d", len(data), l7Rows)
-		}
-		row, ok := data[0].(map[string]any)
-		if !ok {
-			t.Fatalf("objectrows row is not an object: %v", data[0])
-		}
-		if _, ok := row["time"]; !ok {
-			t.Errorf("objectrows row lacks a time field: %v", row)
-		}
-		if v, ok := row["plain"].(float64); !ok || v != 6.5 {
-			t.Errorf("objectrows newest plain = %v, want 6.5", row["plain"])
+		if err := l7ObjectRowsExact(doc); err != nil {
+			t.Errorf("objectrows structure/value mismatch: %v", err)
 		}
 	})
 
@@ -119,15 +231,8 @@ func TestOptionsV1JSONShapes(t *testing.T) {
 		if err := json.Unmarshal([]byte(got), &doc); err != nil {
 			t.Fatalf("not valid JSON: %v", err)
 		}
-		if names, _ := doc["dimension_names"].([]any); len(names) != 1 {
-			t.Errorf("queried dimension_names %v, want just the selection", names)
-		}
-		full, _ := doc["full_dimension_list"].([]any)
-		if len(full) != 2 {
-			t.Errorf("full_dimension_list %v, want both dims", full)
-		}
-		if _, ok := doc["full_chart_list"]; !ok {
-			t.Errorf("full_chart_list missing")
+		if err := optionsL7AllDimensionsExact(doc); err != nil {
+			t.Errorf("all-dimensions metadata: %v", err)
 		}
 	})
 }
