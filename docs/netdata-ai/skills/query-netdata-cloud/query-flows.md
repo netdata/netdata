@@ -83,7 +83,7 @@ Verified against `src/crates/netflow-plugin/src/api/flows/handler.rs`:
 | `sort_by` | flows | `bytes` or `packets` |
 | `top_n` | flows | One of `25`, `50`, `100`, `200`, `500` |
 | `field` | autocomplete | Facet field to autocomplete (`SRC_ADDR`, etc.) |
-| `term` | autocomplete | Search term. For an IP address field, a term containing `/` generates canonical IPv4/IPv6 CIDR candidates from loose input. |
+| `term` | autocomplete | Search term. For an IP address field, a term containing `/` generates canonical IPv4/IPv6 CIDR candidates from loose input and returns only candidates containing an address in that field's retention-wide vocabulary. |
 
 ---
 
@@ -136,7 +136,7 @@ totals) suitable for map rendering.
 | `mode` | `autocomplete` |
 | `field` | Echo of requested field |
 | `term` | Echo of requested search term |
-| `values[]` | Matching retained values, or canonical CIDR candidates when an IP-field term contains `/` |
+| `values[]` | Matching retained values, or canonical CIDR candidates containing at least one retained address for that IP field when the term contains `/` |
 | `stats` / `warnings` | Same as flows mode |
 
 ---
@@ -214,7 +214,9 @@ read -r -d '' PAYLOAD <<'EOF'
 EOF
 ```
 
-For CIDR autocomplete, loose address and prefix-length fragments are accepted:
+For CIDR autocomplete, loose address and prefix-length fragments are accepted.
+One trailing dot before `/` is also tolerated after one through three complete
+IPv4 octets, so `10.1./1` is equivalent to `10.1/1`:
 
 ```json
 {
@@ -224,7 +226,10 @@ For CIDR autocomplete, loose address and prefix-length fragments are accepted:
 }
 ```
 
-The first candidate is the naturally implied `10.1.0.0/16`; all returned values are canonical CIDRs. Use one of those canonical values in `selections`:
+The naturally implied `10.1.0.0/16` is ranked first when the retained
+`DST_ADDR` vocabulary contains an address in it. Candidates containing no
+retained destination address are omitted, so another canonical network may be
+first. Use one of the returned canonical values in `selections`:
 
 ```json
 {
@@ -270,6 +275,10 @@ curl -sS -X POST \
   `10.0.0.0/8`, not `10/8`. Valid non-network addresses are
   normalized before matching. Address-field CIDRs use the same
   raw-tier availability as exact address filters.
+- **CIDR suggestions are retention-wide.** They prove that the
+  selected field contains a matching address somewhere in retained
+  data. The current time window and other selections can still make
+  the selected CIDR return no rows.
 - **Negative selections are not supported.** The current contract
   is OR between values of one field and AND between fields.
 - **AS names depend on the configured GeoIP/AS database.** If the

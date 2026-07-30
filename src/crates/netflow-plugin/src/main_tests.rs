@@ -1805,13 +1805,50 @@ async fn e2e_flows_function_supports_autocomplete_mode() {
         FlowsFunctionResponse::Table(_) => panic!("expected autocomplete response"),
         FlowsFunctionResponse::Metrics(_) => panic!("expected autocomplete response"),
     };
-    assert_eq!(cidr_response.data.values[0]["value"], "10.1.0.0/16");
-    assert_eq!(cidr_response.data.values[1]["value"], "0.0.0.0/1");
+    assert!(
+        cidr_response
+            .data
+            .values
+            .iter()
+            .any(|entry| entry["value"] == "0.0.0.0/1"),
+        "a generated CIDR containing a retained source address must be returned"
+    );
+    assert!(
+        cidr_response
+            .data
+            .values
+            .iter()
+            .all(|entry| entry["value"] != "10.1.0.0/16"),
+        "a generated CIDR containing no retained source address must be omitted"
+    );
+    assert_eq!(
+        cidr_response.data.values[0]["value"], "0.0.0.0/1",
+        "filtering must preserve the generated CIDR ranking"
+    );
     assert!(
         cidr_response.data.values.iter().all(|entry| entry["value"]
             .as_str()
             .is_some_and(|value| value.contains('/'))),
         "slash autocomplete must return only canonical CIDR candidates"
+    );
+
+    let trailing_dot_response = handler
+        .handle_request(query::FlowsRequest {
+            mode: query::RequestMode::Autocomplete,
+            field: Some("SRC_ADDR".to_string()),
+            term: "10.1./1".to_string(),
+            ..Default::default()
+        })
+        .await
+        .expect("trailing-dot CIDR autocomplete function call");
+    let trailing_dot_response = match trailing_dot_response {
+        FlowsFunctionResponse::Autocomplete(response) => response,
+        FlowsFunctionResponse::Table(_) => panic!("expected autocomplete response"),
+        FlowsFunctionResponse::Metrics(_) => panic!("expected autocomplete response"),
+    };
+    assert_eq!(
+        trailing_dot_response.data.values, cidr_response.data.values,
+        "one trailing IPv4 dot before slash must preserve CIDR candidates"
     );
 }
 

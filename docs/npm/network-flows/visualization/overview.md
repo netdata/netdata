@@ -17,7 +17,7 @@ The Network Flows view exposes the same query engine through five panel types: S
 The dashboard sends one of two query modes to the plugin:
 
 - **`flows`** — the normal aggregation request. Returns top-N groups, sums of bytes and packets, optional facet counts.
-- **`autocomplete`** — for the filter ribbon. Returns up to 256 retained facet values or generated CIDR candidates. Matching policy for retained values is per-field: text fields use substring matching, IP and numeric fields use prefix. For IP address fields, `/` generates canonical IPv4/IPv6 CIDR suggestions without scanning retained values. Term is capped at 256 bytes. Retained-value lookup runs against in-memory facet snapshots and on-disk FST sidecars; neither autocomplete path scans tier files. Selected non-IP values use exact equality; selected IP values use exact-address or CIDR containment.
+- **`autocomplete`** — for the filter ribbon. Returns up to 256 retained facet values or generated CIDR candidates. Matching policy for retained values is per-field: text fields use substring matching, IP and numeric fields use prefix. For IP address fields, `/` generates canonical IPv4/IPv6 CIDRs and returns only networks containing an address in that field's compact retention-wide vocabulary. Term is capped at 256 bytes. Retained-value lookup runs against in-memory facet snapshots and on-disk FST sidecars; CIDR validation uses only the in-memory typed IP vocabulary. Neither path scans flow tiers. Selected non-IP values use exact equality; selected IP values use exact-address or CIDR containment.
 
 A `flows` query carries:
 

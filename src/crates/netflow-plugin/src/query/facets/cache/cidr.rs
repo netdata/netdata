@@ -11,16 +11,16 @@ struct LooseIpAddress {
     max_prefix: u8,
 }
 
-pub(crate) fn cidr_autocomplete_values(field: &str, term: &str) -> Option<Vec<String>> {
+pub(crate) fn cidr_autocomplete_networks(field: &str, term: &str) -> Option<Vec<IpNet>> {
     let spec = facet_field_spec(field)?;
     if spec.kind != FacetValueKind::IpAddr || !term.contains('/') {
         return None;
     }
 
-    Some(generate_cidr_candidates(term))
+    Some(generate_cidr_candidate_networks(term))
 }
 
-fn generate_cidr_candidates(term: &str) -> Vec<String> {
+fn generate_cidr_candidate_networks(term: &str) -> Vec<IpNet> {
     let Some((address_fragment, prefix_fragment)) = term.split_once('/') else {
         return Vec::new();
     };
@@ -43,9 +43,9 @@ fn generate_cidr_candidates(term: &str) -> Vec<String> {
         let Ok(network) = IpNet::new(loose.address, prefix) else {
             continue;
         };
-        let value = network.trunc().to_string();
-        if seen.insert(value.clone()) {
-            values.push(value);
+        let network = network.trunc();
+        if seen.insert(network) {
+            values.push(network);
             if values.len() >= FACET_AUTOCOMPLETE_LIMIT {
                 break;
             }
@@ -63,8 +63,12 @@ fn parse_loose_ip_address(fragment: &str) -> Option<LooseIpAddress> {
 }
 
 fn parse_loose_ipv4(fragment: &str) -> Option<LooseIpAddress> {
+    let (fragment, trailing_dot) = match fragment.strip_suffix('.') {
+        Some(fragment) => (fragment, true),
+        None => (fragment, false),
+    };
     let octets = fragment.split('.').collect::<Vec<_>>();
-    if octets.is_empty() || octets.len() > 4 {
+    if octets.is_empty() || octets.len() > 4 || (trailing_dot && octets.len() == 4) {
         return None;
     }
 
@@ -159,11 +163,18 @@ fn matching_prefix_lengths(fragment: &str, natural: u8, max: u8) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    fn generate_cidr_candidates(term: &str) -> Vec<String> {
+        generate_cidr_candidate_networks(term)
+            .into_iter()
+            .map(|network| network.to_string())
+            .collect()
+    }
+
     #[test]
     fn slash_is_required_and_only_ip_fields_are_synthetic() {
-        assert_eq!(cidr_autocomplete_values("SRC_ADDR", "10"), None);
-        assert_eq!(cidr_autocomplete_values("PROTOCOL", "10/8"), None);
-        assert_eq!(cidr_autocomplete_values("SRC_PREFIX", "10/8"), None);
+        assert_eq!(cidr_autocomplete_networks("SRC_ADDR", "10"), None);
+        assert_eq!(cidr_autocomplete_networks("PROTOCOL", "10/8"), None);
+        assert_eq!(cidr_autocomplete_networks("SRC_PREFIX", "10/8"), None);
         for field in [
             "EXPORTER_IP",
             "SRC_ADDR",
@@ -173,8 +184,8 @@ mod tests {
             "DST_ADDR_NAT",
         ] {
             assert_eq!(
-                cidr_autocomplete_values(field, "10/8"),
-                Some(vec!["10.0.0.0/8".to_string()]),
+                cidr_autocomplete_networks(field, "10/8"),
+                Some(vec!["10.0.0.0/8".parse().expect("valid network")]),
                 "{field}"
             );
         }
@@ -184,8 +195,11 @@ mod tests {
     fn loose_ipv4_completion_returns_canonical_networks() {
         for (term, expected) in [
             ("10/", "10.0.0.0/8"),
+            ("10./", "10.0.0.0/8"),
             ("10/8", "10.0.0.0/8"),
             ("10.1/", "10.1.0.0/16"),
+            ("10.1./", "10.1.0.0/16"),
+            ("10.1.2./", "10.1.2.0/24"),
             ("10.1.2.3/24", "10.1.2.0/24"),
         ] {
             assert_eq!(
@@ -227,7 +241,9 @@ mod tests {
     fn invalid_or_incomplete_cidr_fragments_return_no_candidates() {
         for term in [
             "/8",
-            "10./8",
+            "10../8",
+            "10..1/8",
+            "10.1.2.3./24",
             "10.300/8",
             "10/33",
             "10/a",

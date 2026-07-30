@@ -14,6 +14,7 @@ use crate::query::{
     facet_field_requires_protocol_scan, virtual_flow_field_dependencies,
 };
 use anyhow::{Context, Result, bail};
+use ipnet::IpNet;
 use journal_sdk_core::file::JournalFileMap;
 use journal_sdk_registry::FileInfo;
 use serde::{Deserialize, Serialize};
@@ -715,6 +716,41 @@ impl FacetRuntime {
 
         Ok(matches)
     }
+
+    /// Returns per-network presence in the retention-wide typed facet vocabulary.
+    /// This path must remain independent of journal and tier scans.
+    pub(crate) fn retained_ip_network_presence(
+        &self,
+        field: &str,
+        networks: &[IpNet],
+    ) -> Result<Vec<bool>> {
+        if networks.is_empty() {
+            return Ok(Vec::new());
+        }
+        let normalized = field.trim().to_ascii_uppercase();
+        if !facet_field_spec(&normalized).is_some_and(|spec| spec.kind == FacetValueKind::IpAddr) {
+            return Ok(vec![false; networks.len()]);
+        }
+
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
+        let mut matched = vec![false; networks.len()];
+        if let Some(store) = state.archived_fields.get(normalized.as_str()) {
+            store.mark_matching_ip_networks(networks, &mut matched);
+        }
+        for contribution in state.active_contributions.values() {
+            if matched.iter().all(|matched| *matched) {
+                break;
+            }
+            if let Some(store) = contribution.field(normalized.as_str()) {
+                store.mark_matching_ip_networks(networks, &mut matched);
+            }
+        }
+        Ok(matched)
+    }
+
     fn mark_ready(&self) {
         self.ready.store(true, Ordering::Release);
     }
@@ -3514,6 +3550,84 @@ mod tests {
         assert!(
             middle_octet_miss.is_empty(),
             "IP autocomplete must remain prefix-only; got {middle_octet_miss:?}"
+        );
+    }
+
+    #[test]
+    fn runtime_retained_ip_network_presence_matches_active_and_archived_values_by_field_and_family()
+    {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let archived_path = tmp.path().join("flows-ip-networks.journal");
+        let active_path = tmp.path().join("flows-ip-networks-next.journal");
+
+        let mut archived_fields = FlowFields::new();
+        archived_fields.insert("SRC_ADDR", "10.42.1.9".to_string());
+        archived_fields.insert("DST_ADDR", "2001:db8:1::9".to_string());
+        runtime
+            .observe_active_contribution(
+                &archived_path,
+                &facet_contribution_from_flow_fields(&archived_fields),
+            )
+            .expect("observe archived IP contribution");
+        runtime
+            .observe_rotation(&archived_path, &active_path)
+            .expect("rotate IP contribution");
+
+        let mut active_fields = FlowFields::new();
+        active_fields.insert("SRC_ADDR", "2001:db8:2::7".to_string());
+        active_fields.insert("DST_ADDR", "192.0.2.20".to_string());
+        runtime
+            .observe_active_contribution(
+                &active_path,
+                &facet_contribution_from_flow_fields(&active_fields),
+            )
+            .expect("observe active IP contribution");
+
+        let networks = [
+            "10.0.0.0/8",
+            "192.0.2.0/24",
+            "2001:db8:1::/48",
+            "2001:db8:2::/48",
+            "0.0.0.0/0",
+            "::/0",
+        ]
+        .map(|network| network.parse::<IpNet>().expect("valid test network"));
+
+        assert_eq!(
+            runtime
+                .retained_ip_network_presence("SRC_ADDR", &networks)
+                .expect("match source networks"),
+            [true, false, false, true, true, true]
+        );
+        assert_eq!(
+            runtime
+                .retained_ip_network_presence("DST_ADDR", &networks)
+                .expect("match destination networks"),
+            [false, true, true, false, true, true]
+        );
+        assert_eq!(
+            runtime
+                .retained_ip_network_presence("PROTOCOL", &networks)
+                .expect("reject non-IP facet"),
+            [false; 6]
+        );
+    }
+
+    #[test]
+    fn runtime_retained_ip_network_presence_returns_no_match_for_an_empty_facet() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let networks = [
+            "0.0.0.0/0".parse::<IpNet>().expect("valid IPv4 network"),
+            "::/0".parse::<IpNet>().expect("valid IPv6 network"),
+        ];
+
+        assert_eq!(
+            runtime
+                .retained_ip_network_presence("NEXT_HOP", &networks)
+                .expect("match empty facet"),
+            [false, false]
         );
     }
 

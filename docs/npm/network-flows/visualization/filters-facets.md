@@ -56,12 +56,13 @@ For high-cardinality fields, autocomplete is the only practical way to discover 
 
 ### CIDR autocomplete
 
-Typing `/` in an IP address facet switches that request from retained-value lookup to CIDR generation. This path is bounded and does not scan the facet vocabulary or flow tiers.
+Typing `/` in an IP address facet switches that request from retained-value lookup to CIDR generation. The backend generates a bounded candidate set, then returns only networks containing at least one address in that field's compact retention-wide vocabulary. It does not scan journal rows or flow tiers.
 
-- Loose IPv4 input fills missing octets: `10/8` suggests `10.0.0.0/8`; `10.1/` suggests `10.1.0.0/16`.
-- Loose IPv6 input fills omitted trailing groups: `2001:db8/32` suggests `2001:db8::/32`.
-- Digits after `/` are an autocomplete fragment. `10.1/1` ranks the naturally implied `10.1.0.0/16` first, then the exact prefix-length match `0.0.0.0/1`, followed by the other canonical matches `/10` through `/19`.
+- Loose IPv4 input fills missing octets: `10/8` can suggest `10.0.0.0/8`; `10.1/` can suggest `10.1.0.0/16`. One trailing dot before `/` is tolerated after one through three octets, so `10./`, `10.1./`, and `10.1.2./` behave like the same inputs without that dot.
+- Loose IPv6 input fills omitted trailing groups: `2001:db8/32` can suggest `2001:db8::/32`.
+- Digits after `/` are an autocomplete fragment. `10.1/1` generates the naturally implied `10.1.0.0/16` first, then the exact prefix-length match `0.0.0.0/1`, followed by the other canonical matches `/10` through `/19`. Candidates with no retained address in the selected facet are omitted, so the first returned value may differ.
 - Suggestions are always canonical IPv4 or IPv6 CIDRs. Loose forms are accepted only while searching; a direct Function selection must contain a complete address and prefix length. The backend normalizes a valid non-network address such as `10.1.2.99/24` to its network before matching.
+- Candidate validation is retention-wide, like ordinary facet discovery. A suggested CIDR can still have no data in the current time window or after other filters are applied.
 
 **Autocomplete and regular filtering are different paths.** The dropdown uses prefix or substring matching only to discover retained values. A selected non-IP value uses exact equality. A selected IP value uses exact-address or CIDR containment, never substring matching over flow data.
 
@@ -90,6 +91,7 @@ A practical note: filters use a structured representation (per-field IN-list) th
 - **Time depth shrinks unexpectedly after typing in search.** Full-text search forces raw tier. Clear the search to use rollup tiers and longer time ranges.
 - **Negative match is unsupported.** Workaround: select-all-minus-one for low-cardinality fields. For high-cardinality fields, use a positive filter that narrows the result set instead.
 - **A loose CIDR works in autocomplete but fails as a direct selection.** Send a complete address and prefix such as `10.0.0.0/8`, not `10/8`.
+- **A suggested CIDR returns no data in the current view.** Suggestions prove that the selected field contains a matching address somewhere in retained data. They are not recalculated for the current time window or other active filters.
 - **Filter on an ICMP virtual facet seems slower than expected.** `ICMPV4` / `ICMPV6` virtual facets aren't optimised by the journal index — they're evaluated per-record. The query still returns; the cost shows up as longer wall time on busy collectors.
 - **`query_max_groups` exceeded.** Result rows after the limit fold into `__overflow__`. Narrow the filter or reduce group-by depth.
 - **GET-style args don't carry selections.** When integrating the function call yourself, send a JSON payload — the dashboard does this automatically.
