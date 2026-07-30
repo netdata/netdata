@@ -77,6 +77,13 @@ const (
 	c4cDisjointEpoch  = int64(fixture.T0 + 41)
 	c4cDisjointBurst  = int64(120)
 	c4cDisjointPeriod = int64(2040)
+
+	// A long gap completes an old partial tier1 rollup. The next 60 samples
+	// guarantee its delayed flush for every collection-spread modulo, while
+	// their complete rollup remains pending. Volume rotation removes the old
+	// tier0 page, leaving an automatic seam across a DBENGINE page hole.
+	c4cSplitDim   = "split"
+	c4cSplitValue = 1000
 )
 
 // c4cValue is the deterministic sample generator: 23 mixed low bits keep
@@ -135,6 +142,12 @@ func c4cDisjointFlags(ts int64) string {
 		return stream.FlagAnomalous
 	}
 	return stream.FlagNotAnomalous
+}
+
+func c4cSplitCollected(ts int64) bool {
+	offset := ts - fixture.T0
+	return (offset >= 41 && offset <= 200) ||
+		(offset >= 2021 && offset <= 2081)
 }
 
 // perTierRetention extracts db.per_tier by its explicit tier ID. Missing,
@@ -221,6 +234,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	conn.Dimension(c4cCounterDim, "", 1, 1)
 	conn.Dimension(c4cNegativeDim, "", 1, 1)
 	conn.Dimension(c4cDisjointDim, "", 1, 1)
+	conn.Dimension(c4cSplitDim, "", 1, 1)
 	firstT := int64(fixture.T0)
 	lastT := int64(fixture.T0 + c4cRows)
 	conn.ChartDefinitionEnd(firstT, lastT, lastT)
@@ -232,7 +246,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 			rows := make([]stream.ReplayRow, 0, before-after)
 			for ts := after + 1; ts <= before; ts++ {
 				row := stream.ReplayRow{
-					T: ts, Dims: make([]stream.ReplayValue, c4cDims+5, c4cDims+6),
+					T: ts, Dims: make([]stream.ReplayValue, c4cDims+5, c4cDims+7),
 				}
 				for d := 0; d < c4cDims; d++ {
 					row.Dims[d] = stream.ReplayValue{
@@ -272,6 +286,13 @@ func TestLayer4PlanSwitching(t *testing.T) {
 						ID:        c4cDisjointDim,
 						Collected: strconv.Itoa(c4cDisjointValue),
 						Flags:     c4cDisjointFlags(ts),
+					})
+				}
+				if c4cSplitCollected(ts) {
+					row.Dims = append(row.Dims, stream.ReplayValue{
+						ID:        c4cSplitDim,
+						Collected: strconv.Itoa(c4cSplitValue),
+						Flags:     stream.FlagNotAnomalous,
 					})
 				}
 				rows = append(rows, row)
@@ -1359,17 +1380,18 @@ func c4cSumFocusedSeams(t *testing.T, dd *daemon.Daemon, boundary int64) bool {
 
 	ok := true
 	for _, seam := range []struct {
-		label string
-		after int64
+		label  string
+		after  int64
+		points int64
 	}{
 		// The first case forces the executor to combine both plans before its
 		// first row is flushed. The second forces a crossing coarse record
 		// carried from row 1 to settle its prefix in row 2.
-		{label: "first-row", after: boundary - 5},
-		{label: "carried-row", after: boundary - 15},
+		{label: "first-row", after: boundary - 5, points: 2},
+		{label: "carried-row", after: boundary - 15, points: 3},
 	} {
-		before := seam.after + 20
-		params := daemon.DataParams(c4cContext, seam.after, before, 2)
+		before := seam.after + seam.points*10
+		params := daemon.DataParams(c4cContext, seam.after, before, seam.points)
 		params.Set("time_group", "sum")
 		params.Set("scope_dimensions", c4cConstDim)
 		params.Set("options", "jsonwrap|unaligned")
@@ -1394,10 +1416,11 @@ func c4cSumFocusedSeams(t *testing.T, dd *daemon.Daemon, boundary int64) bool {
 			t.Logf("%s seam query returned the wrong columns", seam.label)
 			ok = false
 		}
-		if !assertExactColumn(t, cols, c4cConstDim, []expectedColumnPoint{
-			wantNumberAt(seam.after+10, 10*c4cConstValue),
-			wantNumberAt(seam.after+20, 10*c4cConstValue),
-		}, 0) {
+		want := make([]expectedColumnPoint, seam.points)
+		for i := range want {
+			want[i] = wantNumberAt(seam.after+int64(i+1)*10, 10*c4cConstValue)
+		}
+		if !assertExactColumn(t, cols, c4cConstDim, want, 0) {
 			t.Logf("%s seam query did not combine the coarse prefix and fine suffix exactly", seam.label)
 			ok = false
 		}
@@ -1551,6 +1574,55 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 				seam.label)
 			ok = false
 		}
+	}
+
+	splitTiers := c4DimensionRetention(
+		t, dd, c4cContext, "l4c-child", c4cSplitDim, lastT, 2)
+	wantSplitTier1First := int64(fixture.T0 + 100)
+	wantSplitTier1Last := int64(fixture.T0 + 220)
+	wantSplitTier0First := int64(fixture.T0 + 2021)
+	wantSplitTier0Last := int64(fixture.T0 + 2081)
+	if splitTiers[0].FirstEntry != wantSplitTier0First ||
+		splitTiers[0].LastEntry != wantSplitTier0Last ||
+		splitTiers[1].FirstEntry != wantSplitTier1First ||
+		splitTiers[1].LastEntry != wantSplitTier1Last {
+		t.Fatalf("split retention cannot prove the intended tail seam: %+v", splitTiers[:2])
+	}
+
+	const (
+		splitRowSpan = int64(700)
+		splitPoints  = int64(3)
+	)
+	splitAfter := splitTiers[1].FirstEntry
+	splitBefore := splitAfter + splitPoints*splitRowSpan
+
+	splitParams := daemon.DataParams(
+		c4cContext, splitAfter, splitBefore, splitPoints)
+	splitParams.Set("time_group", "sum")
+	splitParams.Set("scope_dimensions", c4cSplitDim)
+	splitParams.Set("options", "jsonwrap|unaligned")
+	splitDoc, err := dd.DataV3("l4c-child", splitParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	splitCols, err := canon.Columns(splitDoc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	splitWant := []expectedColumnPoint{
+		wantNumberAt(splitAfter+splitRowSpan, 100*c4cSplitValue),
+		wantEmptyWithMetadataAt(
+			splitAfter+2*splitRowSpan, 0, canon.AnnotationEmpty),
+		wantNumberAt(splitBefore, 61*c4cSplitValue),
+	}
+
+	if !assertExactView(t, splitDoc, splitAfter, splitBefore, splitRowSpan) ||
+		!assertTierPresence(t, splitDoc, []bool{true, true, false}) ||
+		!assertOnlyColumn(t, splitCols, c4cSplitDim) ||
+		!assertExactColumn(t, splitCols, c4cSplitDim, splitWant, 0) {
+		t.Log("split storage-gap tail violated exact coarse/fine ownership")
+		ok = false
 	}
 
 	return ok
