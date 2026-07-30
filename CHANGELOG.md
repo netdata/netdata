@@ -845,6 +845,15 @@
 - Regenerate integrations docs ([#23298](https://github.com/netdata/netdata/issues/23298))
 - Add NetFlow capacity benchmarks and optimize shared ingestion paths ([#23246](https://github.com/netdata/netdata/issues/23246))
 - Avoid out-of-bounds read in url_percent_escape_decode ([#22965](https://github.com/netdata/netdata/issues/22965))
+- Docs: Document native package removal before static install ([#23240](https://github.com/netdata/netdata/issues/23240))
+- Docs: Add VMware vSphere node counting guidance to billing FAQ ([#23261](https://github.com/netdata/netdata/issues/23261))
+- Docs: Document centralized alert control from parent for children ([#23271](https://github.com/netdata/netdata/issues/23271))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.31 to 1.32.32 in /src/go ([#23309](https://github.com/netdata/netdata/issues/23309))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.35.0 to 1.35.1 in /src/go ([#23308](https://github.com/netdata/netdata/issues/23308))
+- Build(deps): bump github.com/moby/moby/client from 0.5.0 to 0.5.1 in /src/go ([#23310](https://github.com/netdata/netdata/issues/23310))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.65.0 to 1.66.0 in /src/go ([#23311](https://github.com/netdata/netdata/issues/23311))
+- Feat(go.d/jobmgr): contain non-cooperative plugin operations ([#23299](https://github.com/netdata/netdata/issues/23299))
+- Fix(go.d/cloudwatch): make the collector configurable from the dyncfg UI ([#23314](https://github.com/netdata/netdata/issues/23314))
 
 ## [2.10.0] - 2026-04-09
 
