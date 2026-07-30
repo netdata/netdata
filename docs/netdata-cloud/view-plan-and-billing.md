@@ -23,7 +23,7 @@ Billing is based solely on active nodes, excluding offline or stale instances. Y
 
 #### Committed Nodes
 
-Yearly plans offer a discounted rate for a pre-defined number of committed nodes. Any usage exceeding this commitment will be billed at the standard rate.
+Yearly plans offer a discounted rate for a pre-defined number of committed nodes. Overage is the amount by which your [active node count](#active-nodes-and-billing) for the billing period exceeds your committed nodes, and it is billed at the standard rate.
 
 #### Plan Changes and Credit Balance
 
