@@ -286,7 +286,9 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 	if err != nil {
 		d.Warningf("dyncfg: test: config test failed for '%s': %v", dt, err)
 		code := 400
-		if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
+		if resourceErr, ok := errors.AsType[*resourceError](err); ok {
+			code = resourceErr.dyncfgTestCode()
+		} else if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
 			code = coded.DyncfgCode()
 		}
 		d.dyncfgApi.SendCodef(fn, code, "Configuration test failed: %v", err)

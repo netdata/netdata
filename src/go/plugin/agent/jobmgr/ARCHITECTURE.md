@@ -892,6 +892,9 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
 - DynCfg `test` builds a complete temporary pipeline under a payload-specific test identity and never submits it to the
   pipeline manager. It invokes `dyncfg.Testable.Test(ctx)` sequentially on every discoverer that provides the optional
   capability.
+- Resource-authored parsing, construction, and operational failures retain their causes internally but cross one
+  sanitized response/diagnostic boundary. Resource callbacks return failures rather than logging raw configuration,
+  credentials, or endpoint material.
 - A discoverer without the capability produces an explicit validation-only success. Configuration/construction
   failures return 400, operational failures return 422, and busy/contained attempts return 503.
 - File-backed stock/user state keeps one latest pending retry after a busy/contained result; synchronous DynCfg

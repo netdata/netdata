@@ -21,11 +21,18 @@ import (
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
-	d := &Discoverer{
-		Logger: logger.New().With(
+	return newDiscoverer(
+		cfg,
+		logger.New().With(
 			slog.String("component", "service discovery"),
 			slog.String("discoverer", "docker"),
 		),
+	)
+}
+
+func newDiscoverer(cfg Config, log *logger.Logger) (*Discoverer, error) {
+	d := &Discoverer{
+		Logger:    log,
 		cfgSource: cfg.Source,
 		newDockerClient: func(addr string) (dockerClient, error) {
 			return docker.New(docker.WithHost(addr))
@@ -37,16 +44,14 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		started:        make(chan struct{}),
 	}
 
-	if addr := dockerhost.FromEnv(); addr != "" && d.addr == docker.DefaultDockerHost {
-		d.Infof("using docker host from environment: %s ", addr)
-		d.addr = addr
-	}
-
 	if cfg.Timeout.Duration() > 0 {
 		d.timeout = cfg.Timeout.Duration()
 	}
 	if cfg.Address != "" {
 		d.addr = cfg.Address
+	} else if addr := dockerhost.FromEnv(); addr != "" {
+		d.Info("using docker host from environment")
+		d.addr = addr
 	}
 
 	return d, nil

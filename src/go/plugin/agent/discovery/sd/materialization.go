@@ -23,31 +23,52 @@ type materializationError struct {
 	identity jobmgr.ProcessAttemptIdentity
 }
 
-type resourceTestError struct {
+type resourceErrorPhase uint8
+
+const (
+	resourceErrorConfiguration resourceErrorPhase = iota + 1
+	resourceErrorConstruction
+	resourceErrorOperationalTest
+)
+
+type resourceError struct {
 	cause error
-	code  int
+	phase resourceErrorPhase
 }
 
-func (err *resourceTestError) Error() string {
-	// Resource errors may contain credential-bearing configuration.
-	if err != nil && err.code == 422 {
-		return "service discovery operational test failed"
+func newResourceError(phase resourceErrorPhase, cause error) error {
+	if cause == nil {
+		return nil
 	}
-	return "service discovery resource construction failed"
+	return &resourceError{cause: cause, phase: phase}
 }
 
-func (err *resourceTestError) Unwrap() error {
+func (err *resourceError) Error() string {
+	// Resource errors may contain credential-bearing configuration.
+	switch {
+	case err == nil:
+		return "service discovery resource failed"
+	case err.phase == resourceErrorConfiguration:
+		return "service discovery resource configuration is invalid"
+	case err.phase == resourceErrorOperationalTest:
+		return "service discovery operational test failed"
+	default:
+		return "service discovery resource construction failed"
+	}
+}
+
+func (err *resourceError) Unwrap() error {
 	if err == nil {
 		return nil
 	}
 	return err.cause
 }
 
-func (err *resourceTestError) DyncfgCode() int {
-	if err == nil {
-		return 400
+func (err *resourceError) dyncfgTestCode() int {
+	if err != nil && err.phase == resourceErrorOperationalTest {
+		return 422
 	}
-	return err.code
+	return 400
 }
 
 func (err *materializationError) Error() string {
@@ -187,13 +208,13 @@ func (d *ServiceDiscovery) testDyncfgConfig(
 			if err != nil {
 				return false, err
 			}
-			prepared, err := d.newPipeline(pipelineConfig)
+			prepared, err := d.constructPipeline(pipelineConfig)
 			if err != nil {
-				return false, &resourceTestError{cause: err, code: 400}
+				return false, err
 			}
 			fullyTested, err := prepared.Test(ctx)
 			if err != nil {
-				return false, &resourceTestError{cause: err, code: 422}
+				return false, newResourceError(resourceErrorOperationalTest, err)
 			}
 			return fullyTested, nil
 		},
@@ -226,6 +247,14 @@ func (d *ServiceDiscovery) materializeDyncfgConfig(
 	)
 }
 
+func (d *ServiceDiscovery) constructPipeline(config pipeline.Config) (sdPipeline, error) {
+	prepared, err := d.newPipeline(config)
+	if err != nil {
+		return nil, newResourceError(resourceErrorConstruction, err)
+	}
+	return prepared, nil
+}
+
 func (d *ServiceDiscovery) preparePipeline(
 	ctx context.Context,
 	config sdConfig,
@@ -244,7 +273,7 @@ func (d *ServiceDiscovery) preparePipeline(
 			if err != nil {
 				return nil, err
 			}
-			return d.newPipeline(pipelineConfig)
+			return d.constructPipeline(pipelineConfig)
 		},
 	)
 }

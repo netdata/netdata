@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHTTPRegistryDyncfgTestSanitizesResourceConstructionFailure(t *testing.T) {
+func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
 	output := &dyncfgTestOutput{results: make(chan dyncfg.Result, 1)}
@@ -56,21 +56,47 @@ func TestHTTPRegistryDyncfgTestSanitizesResourceConstructionFailure(t *testing.T
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "service discovery did not register DynCfg")
 	}
-	handler(t.Context(), functions.Function{
-		UID:         "test-http",
-		Args:        []string{"go.d:sd:http", "test", "job"},
-		Payload:     []byte(`{"discoverer":{"http":{"url":"http://example.invalid","proxy_url":"http://user:[REDACTED_SECRET]@%zz"}},"services":[{"id":"test","match":"true"}]}`),
-		Source:      "user=test",
-		ContentType: "application/json",
-	})
+	tests := []struct {
+		name    string
+		uid     string
+		id      string
+		payload string
+		message string
+	}{
+		{
+			name:    "resource parser",
+			uid:     "test-docker-parser",
+			id:      "go.d:sd:docker",
+			payload: `{"discoverer":{"docker":{"timeout":"[REDACTED_SECRET]"}},"services":[{"id":"test","match":"true"}]}`,
+			message: "service discovery resource configuration is invalid",
+		},
+		{
+			name:    "resource constructor",
+			uid:     "test-http-constructor",
+			id:      "go.d:sd:http",
+			payload: `{"discoverer":{"http":{"url":"http://example.invalid","proxy_url":"http://user:[REDACTED_SECRET]@%zz"}},"services":[{"id":"test","match":"true"}]}`,
+			message: "service discovery resource construction failed",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handler(t.Context(), functions.Function{
+				UID:         test.uid,
+				Args:        []string{test.id, "test", "job"},
+				Payload:     []byte(test.payload),
+				Source:      "user=test",
+				ContentType: "application/json",
+			})
 
-	select {
-	case result := <-output.results:
-		require.Equal(t, 400, result.Code)
-		require.Contains(t, result.Payload, "service discovery resource construction failed")
-		require.NotContains(t, result.Payload, "[REDACTED_SECRET]")
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "DynCfg test did not return a result")
+			select {
+			case result := <-output.results:
+				require.Equal(t, 400, result.Code)
+				require.Contains(t, result.Payload, test.message)
+				require.NotContains(t, result.Payload, "[REDACTED_SECRET]")
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "DynCfg test did not return a result")
+			}
+		})
 	}
 }
 

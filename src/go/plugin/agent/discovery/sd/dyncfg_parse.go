@@ -37,7 +37,7 @@ func parseDyncfgPayload(payload []byte, discovererType, name string, configDefau
 		return pipeline.Config{}, fmt.Errorf("unknown discoverer type %q", discovererType)
 	}
 	if _, err := desc.ParseJSONConfig(cfg.Discoverer.Config); err != nil {
-		return pipeline.Config{}, fmt.Errorf("invalid %q discoverer config: %w", discovererType, err)
+		return pipeline.Config{}, newResourceError(resourceErrorConfiguration, err)
 	}
 
 	if validate {

@@ -3,6 +3,7 @@
 package dockersd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 
@@ -151,6 +153,38 @@ func TestDiscoverer_Test(t *testing.T) {
 
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.True(t, client.closed)
+	})
+}
+
+func TestNewDiscovererSanitizesDockerHostDiagnostic(t *testing.T) {
+	const dockerHost = "tcp://user:[REDACTED_SECRET]@[PRIVATE_ENDPOINT]:2375"
+	t.Run("selected environment host is not rendered", func(t *testing.T) {
+		t.Setenv("DOCKER_HOST", dockerHost)
+		var buf bytes.Buffer
+
+		d, err := newDiscoverer(Config{}, logger.NewWithWriter(&buf))
+
+		require.NoError(t, err)
+		require.Equal(t, dockerHost, d.addr)
+		require.Contains(t, buf.String(), "using docker host from environment")
+		require.NotContains(t, buf.String(), "[REDACTED_SECRET]")
+		require.NotContains(t, buf.String(), "[PRIVATE_ENDPOINT]")
+	})
+
+	t.Run("explicit address does not announce unused environment host", func(t *testing.T) {
+		t.Setenv("DOCKER_HOST", dockerHost)
+		var buf bytes.Buffer
+
+		d, err := newDiscoverer(
+			Config{Address: "unix:///tmp/configured.sock"},
+			logger.NewWithWriter(&buf),
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, "unix:///tmp/configured.sock", d.addr)
+		require.NotContains(t, buf.String(), "using docker host from environment")
+		require.NotContains(t, buf.String(), "[REDACTED_SECRET]")
+		require.NotContains(t, buf.String(), "[PRIVATE_ENDPOINT]")
 	})
 }
 
