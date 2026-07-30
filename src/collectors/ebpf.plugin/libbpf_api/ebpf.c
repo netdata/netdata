@@ -1382,7 +1382,10 @@ void ebpf_update_module_using_config(
     const char *type_format = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(type_format);
     const char *object_flavor = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_OBJECT_FLAVOR, NULL);
-    if (object_flavor)
+    /* Apply object flavor only when type format is at its auto/default value (PLAY_DICE).
+     * A user who explicitly chose "legacy" or "co-re" keeps that choice;
+     * object flavor cannot silently revert it. */
+    if (object_flavor && !(load & (EBPF_LOAD_LEGACY | EBPF_LOAD_CORE)))
         load = ebpf_convert_object_flavor_to_load_mode(object_flavor);
     load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;

@@ -66,41 +66,46 @@ func TestBuildNetworkProtocolsJSON_BPFMapping(t *testing.T) {
 		return uint64(v)
 	}
 
-	// Values are divided by updateEvery to convert per-interval deltas to per-second rates.
-	if got := got(2); got != p.tcpDimReceivedCalls/updateEvery {
-		t.Errorf("TCP Received = %d, want %d (tcpDimReceivedCalls/updateEvery)", got, p.tcpDimReceivedCalls/updateEvery)
+	// Values are rounded-divided by updateEvery (same rounding as the implementation).
+	// Use (v + inv/2) / inv so a low-traffic host with a small delta doesn't
+	// floor to zero.
+	inv := uint64(updateEvery)
+	roundPS := func(v uint64) uint64 { return (v + inv/2) / inv }
+
+	if got := got(2); got != roundPS(p.tcpDimReceivedCalls) {
+		t.Errorf("TCP Received = %d, want %d (roundPS(tcpDimReceivedCalls))", got, roundPS(p.tcpDimReceivedCalls))
 	}
-	if got := got(3); got != p.tcpDimSentCalls/updateEvery {
-		t.Errorf("TCP Sent = %d, want %d (tcpDimSentCalls/updateEvery)", got, p.tcpDimSentCalls/updateEvery)
+	if got := got(3); got != roundPS(p.tcpDimSentCalls) {
+		t.Errorf("TCP Sent = %d, want %d (roundPS(tcpDimSentCalls))", got, roundPS(p.tcpDimSentCalls))
 	}
-	if got := got(4); got != (p.tcpDimReceivedErr+p.tcpDimSentErr)/updateEvery {
-		t.Errorf("TCP Errors = %d, want %d (sum of Received/Sent Err / updateEvery)", got, (p.tcpDimReceivedErr+p.tcpDimSentErr)/updateEvery)
+	if got := got(4); got != roundPS(p.tcpDimReceivedErr+p.tcpDimSentErr) {
+		t.Errorf("TCP Errors = %d, want %d (roundPS(sum of Received/Sent Err))", got, roundPS(p.tcpDimReceivedErr+p.tcpDimSentErr))
 	}
-	if got := got(5); got != (p.tcpV4Conn+p.tcpV6Conn)/updateEvery {
-		t.Errorf("TCP ConnActive = %d, want %d (V4 + V6 / updateEvery)", got, (p.tcpV4Conn+p.tcpV6Conn)/updateEvery)
+	if got := got(5); got != roundPS(p.tcpV4Conn+p.tcpV6Conn) {
+		t.Errorf("TCP ConnActive = %d, want %d (roundPS(V4+V6))", got, roundPS(p.tcpV4Conn+p.tcpV6Conn))
 	}
-	if got := got(7); got != p.inboundTCP/updateEvery {
-		t.Errorf("TCP ConnPassive = %d, want %d (inboundTCP/updateEvery)", got, p.inboundTCP/updateEvery)
+	if got := got(7); got != roundPS(p.inboundTCP) {
+		t.Errorf("TCP ConnPassive = %d, want %d (roundPS(inboundTCP))", got, roundPS(p.inboundTCP))
 	}
-	if got := got(9); got != (p.tcpDimReceivedCalls+p.tcpDimSentCalls+p.tcpCloseCalls)/updateEvery {
-		t.Errorf("TCP SegsTotal = %d, want %d (Received + Sent + Close / updateEvery)", got, (p.tcpDimReceivedCalls+p.tcpDimSentCalls+p.tcpCloseCalls)/updateEvery)
+	if got := got(9); got != roundPS(p.tcpDimReceivedCalls+p.tcpDimSentCalls+p.tcpCloseCalls) {
+		t.Errorf("TCP SegsTotal = %d, want %d (roundPS(Received+Sent+Close))", got, roundPS(p.tcpDimReceivedCalls+p.tcpDimSentCalls+p.tcpCloseCalls))
 	}
-	if got := got(10); got != p.tcpRetransmit/updateEvery {
-		t.Errorf("TCP SegsRetransmitted = %d, want %d (tcpRetransmit/updateEvery)", got, p.tcpRetransmit/updateEvery)
+	if got := got(10); got != roundPS(p.tcpRetransmit) {
+		t.Errorf("TCP SegsRetransmitted = %d, want %d (roundPS(tcpRetransmit))", got, roundPS(p.tcpRetransmit))
 	}
 
 	udpRow := resp.Data[1]
 	if len(udpRow) < 8 {
 		t.Fatalf("UDP row malformed: %+v", resp.Data[1])
 	}
-	if got := mustUint64(udpRow[2]); got != p.udpRecvCalls/updateEvery {
-		t.Errorf("UDP Received = %d, want %d (udpRecvCalls/updateEvery)", got, p.udpRecvCalls/updateEvery)
+	if got := mustUint64(udpRow[2]); got != roundPS(p.udpRecvCalls) {
+		t.Errorf("UDP Received = %d, want %d (roundPS(udpRecvCalls))", got, roundPS(p.udpRecvCalls))
 	}
-	if got := mustUint64(udpRow[3]); got != p.udpSendCalls/updateEvery {
-		t.Errorf("UDP Sent = %d, want %d (udpSendCalls/updateEvery)", got, p.udpSendCalls/updateEvery)
+	if got := mustUint64(udpRow[3]); got != roundPS(p.udpSendCalls) {
+		t.Errorf("UDP Sent = %d, want %d (roundPS(udpSendCalls))", got, roundPS(p.udpSendCalls))
 	}
-	if got := mustUint64(udpRow[7]); got != p.inboundUDP/updateEvery {
-		t.Errorf("UDP ConnPassive = %d, want %d (inboundUDP/updateEvery)", got, p.inboundUDP/updateEvery)
+	if got := mustUint64(udpRow[7]); got != roundPS(p.inboundUDP) {
+		t.Errorf("UDP ConnPassive = %d, want %d (roundPS(inboundUDP))", got, roundPS(p.inboundUDP))
 	}
 }
 

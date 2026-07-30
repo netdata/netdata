@@ -473,11 +473,14 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
 #endif
 
     value = inicfg_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, EBPF_CFG_DEFAULT_PROGRAM);
+    netdata_ebpf_load_mode_t fmt_load = epbf_convert_string_to_load_mode(value);
+    ebpf_set_load_mode(fmt_load, origin);
 
-    ebpf_update_load_mode(value, origin);
-
+    /* Apply object flavor only when type format is auto/default (PLAY_DICE).
+     * An explicit "legacy" or "co-re" in ebpf type format must not be silently
+     * overridden by the stock "ebpf object flavor = buffer" shipped in ebpf.d.conf. */
     value = inicfg_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_OBJECT_FLAVOR, NULL);
-    if (value)
+    if (value && !(fmt_load & (EBPF_LOAD_LEGACY | EBPF_LOAD_CORE)))
         ebpf_update_object_flavor(value, origin);
 
     ebpf_update_interval(update_every);

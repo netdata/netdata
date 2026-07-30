@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <semaphore.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -163,7 +164,19 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
 
     if (reused) {
         if (ebpfgo_shm_sem_wait(ctx->sem)) {
-            memset(ctx->data, 0, length);
+            /* Read the prior publisher's PID and probe liveness — same protocol
+             * as shared_pid_memory_linux.c.  Only wipe and claim a dead
+             * publisher's segment; leave a live publisher's ring intact. */
+            pid_t prev_pid   = (pid_t)__atomic_load_n(&ctx->data->hdr.publisher_pid, __ATOMIC_ACQUIRE);
+            bool  prev_alive = (prev_pid > 0) &&
+                               (kill(prev_pid, 0) == 0 || errno == EPERM);
+            if (!prev_alive) {
+                memset(ctx->data, 0, length);
+                /* Write publisher_pid inside the semaphore hold so a concurrent
+                 * opener never reads a partially-initialised header. */
+                ctx->data->hdr.publisher_pid = (uint32_t)getpid();
+                ctx->shm_name_created = true;
+            }
             sem_post(ctx->sem);
         } else {
             /* Timed out: see pid_shm_replace_generation for the rationale.
@@ -172,9 +185,11 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
             if (!dns_shm_replace_generation(ctx, length))
                 goto fail;
         }
+    } else {
+        /* Fresh segment: kernel zero-filled; write our PID so liveness checks
+         * can identify the owner without acquiring the semaphore. */
+        ctx->data->hdr.publisher_pid = (uint32_t)getpid();
     }
-
-    ctx->data->hdr.publisher_pid = (uint32_t)getpid();
 
     return ctx;
 

@@ -154,23 +154,27 @@ func sendFunctionError(api *netdataapi.API, uid string, code int, msg string) {
 // breaks the test instead of silently flipping Sent/Received.
 func buildNetworkProtocolsJSON(p socketGlobalPublish, updateEvery int, expires int64) (string, error) {
 	// Convert per-interval deltas to per-second rates to match the declared column units.
+	// Round instead of truncate: on low-traffic hosts a small delta (e.g. 5 calls
+	// in 10 s) would floor to 0, making the entire table look empty.
 	inv := uint64(updateEvery)
 	if inv == 0 {
 		inv = 1
 	}
+	// ratePS rounds a per-interval counter to a per-second rate.
+	ratePS := func(v uint64) uint64 { return (v + inv/2) / inv }
 
-	tcpReceived := p.tcpDimReceivedCalls / inv
-	tcpSent := p.tcpDimSentCalls / inv
-	tcpErrors := (p.tcpDimReceivedErr + p.tcpDimSentErr) / inv
-	tcpConnActive := (p.tcpV4Conn + p.tcpV6Conn) / inv
-	tcpConnPassive := p.inboundTCP / inv
-	tcpSegsTotal := (p.tcpDimReceivedCalls + p.tcpDimSentCalls + p.tcpCloseCalls) / inv
-	tcpSegsRetrans := p.tcpRetransmit / inv
+	tcpReceived := ratePS(p.tcpDimReceivedCalls)
+	tcpSent := ratePS(p.tcpDimSentCalls)
+	tcpErrors := ratePS(p.tcpDimReceivedErr + p.tcpDimSentErr)
+	tcpConnActive := ratePS(p.tcpV4Conn + p.tcpV6Conn)
+	tcpConnPassive := ratePS(p.inboundTCP)
+	tcpSegsTotal := ratePS(p.tcpDimReceivedCalls + p.tcpDimSentCalls + p.tcpCloseCalls)
+	tcpSegsRetrans := ratePS(p.tcpRetransmit)
 
-	udpReceived := p.udpRecvCalls / inv
-	udpSent := p.udpSendCalls / inv
-	udpErrors := (p.udpRecvErr + p.udpSendErr) / inv
-	udpConnPassive := p.inboundUDP / inv
+	udpReceived := ratePS(p.udpRecvCalls)
+	udpSent := ratePS(p.udpSendCalls)
+	udpErrors := ratePS(p.udpRecvErr + p.udpSendErr)
+	udpConnPassive := ratePS(p.inboundUDP)
 
 	resp := fnTableResponse{
 		Status:      200,
