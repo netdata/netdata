@@ -261,7 +261,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     ops->db_total_points_read++;
 
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
-                        storage_point_make_positive(sp);
+                        storage_point_make_positive(sp2);
 
                     if(sp.start_time_s > sp2.start_time_s)
                         // the point from the previous plan is useless
