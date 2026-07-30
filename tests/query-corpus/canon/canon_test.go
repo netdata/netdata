@@ -70,6 +70,36 @@ func TestColumnsValidSchemas(t *testing.T) {
 			t.Fatalf("decoded raw point = %+v", got)
 		}
 	})
+
+	t.Run("nullable raw hidden", func(t *testing.T) {
+		doc := testDocument(
+			map[string]any{
+				"value":  0.0,
+				"arp":    1.0,
+				"pa":     2.0,
+				"count":  3.0,
+				"hidden": 4.0,
+			},
+			[]any{"time", "load"},
+			[]any{
+				[]any{1700000001.0, []any{3.0, 0.0, 0.0, 1.0, nil}},
+			},
+		)
+		result := doc["result"].(map[string]any)
+		point := result["point"].(map[string]any)
+		if _, declared := point["hidden"]; !declared {
+			t.Fatal("nullable raw fixture does not declare result.point.hidden")
+		}
+
+		cols, err := Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := cols["load"][0]
+		if got.Count == nil || *got.Count != 1 || got.Hidden != nil {
+			t.Fatalf("decoded raw point = %+v, want count 1 and null hidden", got)
+		}
+	})
 }
 
 func TestColumnsRejectsMalformedDocumentsWithoutPanicking(t *testing.T) {
@@ -222,8 +252,17 @@ func TestColumnsRejectsMalformedDocumentsWithoutPanicking(t *testing.T) {
 		"non-finite hidden": func() map[string]any {
 			doc := base()
 			result := doc["result"].(map[string]any)
-			result["point"].(map[string]any)["hidden"] = 3.0
-			result["data"] = []any{[]any{1700000001.0, []any{1.0, 0.0, 0.0, math.Inf(1)}}}
+			result["point"].(map[string]any)["count"] = 3.0
+			result["point"].(map[string]any)["hidden"] = 4.0
+			result["data"] = []any{[]any{1700000001.0, []any{1.0, 0.0, 0.0, 1.0, math.Inf(1)}}}
+			return doc
+		},
+		"wrong hidden type": func() map[string]any {
+			doc := base()
+			result := doc["result"].(map[string]any)
+			result["point"].(map[string]any)["count"] = 3.0
+			result["point"].(map[string]any)["hidden"] = 4.0
+			result["data"] = []any{[]any{1700000001.0, []any{1.0, 0.0, 0.0, 1.0, "0"}}}
 			return doc
 		},
 	}

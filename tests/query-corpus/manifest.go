@@ -161,13 +161,13 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"seam", "head-only", "condition-groupings"},
 	},
 	"L4/three-tier-join": {
-		Proves: "three tiers with different retention depths join inside one query: tier0 keeps the newest slice, tier1 outlives it and tier2 outlives both. Five zoom levels pin coverage, ordering, range and outward alignment across both seams; forced tiers pin exact controls, while automatic seams pin exact availability, authoritative finer-tier event/flap rows, and event totals bounded to raw truth plus one crossing coarse representative per seam",
+		Proves: "three tiers with different retention depths join inside one query: tier0 keeps the newest slice, tier1 outlives it and tier2 outlives both. Five zoom levels pin coverage, default newest-first raw wire order, canonical ascending order, range and outward alignment across both seams; forced tiers pin exact controls, while automatic seams pin exact availability, authoritative finer-tier event/flap rows, and event totals bounded to raw truth plus one crossing coarse representative per seam",
 	},
 	"L5/group-by-matrix": {
-		Proves: "level-1 group-by, BOTH contracts: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette returns the exact unique t0+1..t0+60 grid and equals the member-enumeration oracle — non-raw converts (average divides, ar/gbc), raw defers (sums undivided, ar accumulated, per-point counts on the wire); PARTIAL stamping and group naming pinned (instance = id@guid, node = machine guid, label = value)",
+		Proves: "level-1 group-by, BOTH contracts: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette returns the exact unique t0+1..t0+60 grid and equals the member-enumeration oracle — non-raw converts (average divides, ar/gbc), raw defers (sums undivided, ar accumulated, per-point counts on the wire and no hidden schema field); PARTIAL stamping and group naming pinned (instance = id@guid, node = machine guid, label = value)",
 	},
 	"L5/percentage": {
-		Proves: "aggregation=percentage with a dimensions selector returns the exact unique t0+1..t0+60 grid: non-raw converts n*100/(n+h) per group; raw defers (selected sums + hidden denominator on the wire); group_by=dimension is degenerate (hidden dims group separately — flat 100). percentage-of-instance (the exclusive single-key shorthand) converts EVEN IN RAW mode with no hidden — safe, per-instance groups never span agents",
+		Proves: "aggregation=percentage with a dimensions selector returns the exact unique t0+1..t0+60 grid: non-raw converts n*100/(n+h) per group; raw defers with a result-wide hidden field whose cell is the finite hidden sum when the group has hidden contributors and null otherwise; group_by=dimension is degenerate (hidden dims group separately — flat 100). percentage-of-instance (the exclusive single-key shorthand) converts EVEN IN RAW mode with no hidden — safe, per-instance groups never span agents",
 	},
 	"L5/statistics": {
 		Proves:  "per-group view statistics (D-B SETTLED, #23097 verified numerically): non-average aggregations average over view ROWS (mean plotted value, row-extreme min/max); AVERAGE keeps the weighted (pre-division sum, contributions) pair; raw keeps (sum, count) untouched for the cloud",
@@ -180,16 +180,16 @@ var manifest = map[string]ManifestCase{
 		Proves: "multi-key group_by: groups are attribute TUPLES, ids join in the FIXED engine order (dimension, instance, label, node, context, units) regardless of request order; instance drops @node when node is in the mask; selected and percentage-of-instance collapse rules; avg alias; unknown aggregation silently parses to average",
 	},
 	"L6/two-pass-matrix": {
-		Proves: "two-pass oracle over 10 key-chains (including cross-key union partitioning) x 8 aggregation chains x non-raw/raw: pass-2 values, PARTIAL propagation and group_by_label[1]; anomaly metadata stays weighted by the raw metric contributors beneath pass-1 groups — non-raw ARP is their mean, while raw ARP is the numerator and point count is the raw contributor count",
+		Proves: "two-pass oracle over 10 key-chains (including cross-key union partitioning) x 8 aggregation chains x non-raw/raw: pass-2 values, PARTIAL propagation and group_by_label[1]; anomaly metadata stays weighted by the raw metric contributors beneath pass-1 groups — non-raw ARP is their mean, while raw ARP is the numerator, point count is the raw contributor count, and the result has no hidden schema field",
 	},
 	"L6/two-pass-percentage": {
-		Proves: "percentage as the pass-2 aggregation: pass 1 runs in shadow hidden mode, the percentage pass folds hidden sums into each normal group's denominator (v*100/(v+h)), and an incomplete shadow bucket taints PARTIAL; anomaly metadata remains weighted by visible raw metric contributors, while raw mode defers value conversion, carries hidden on the wire and reports the visible raw contributor count",
+		Proves: "percentage as the pass-2 aggregation: pass 1 runs in shadow hidden mode, the percentage pass folds hidden sums into each normal group's denominator (v*100/(v+h)), and an incomplete shadow bucket taints PARTIAL; anomaly metadata remains weighted by visible raw metric contributors, while raw mode defers value conversion, declares a result-wide hidden field with finite sums or null cells, and reports the visible raw contributor count",
 	},
 	"CASE-018/multipass-average": {
 		Proves: "with average at pass 1, pass 2 consumes each finalized pass-1 group average: [dimension,average]→[selected,average] equals the mean of those group averages, not the mean of unfinalized group sums",
 	},
 	"L7/formatters": {
-		Proves: "classic v1 formats over a hostile fixture: csv/tsv byte-exact (newest-first default, natural order option, unquoted header cells pinned as current contract), ssv/ssvcomma/array exact row-sum values, csvjsonarray VALID JSON with NUMERIC timestamps (#23115/#23117 pinned), markdown/html/json/datatable/jsonp structure",
+		Proves: "classic v1 formats over a hostile fixture: csv/tsv byte-exact (newest-first default, natural order option, unquoted header cells pinned as current contract), ssv/ssvcomma/array exact row-sum values, csvjsonarray VALID JSON with NUMERIC timestamps (#23115/#23117 pinned), markdown/html structure, and strict JSON/JSONP/datatable row schemas with exact fixture-derived timestamps, values and gaps",
 	},
 	"CASE-022/time-group-latest": {
 		Proves:  "time_group=latest works end to end: per-bucket last collected value, empty buckets stay empty, sign preserved without options=absolute and erased with it; points=1 with before at/near now (raw zero or resolved within one update_every of now) anchors the window at the newest stored sample and serves it from the collector cache — zero db reads, the RAW un-quantized double, anomaly rate 0 by design — while the storage path (selected-tier) keeps SN quantization and the engine-generic anomaly rate",
@@ -372,7 +372,7 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"interpolated-buckets", "off-grid-identity", "upsampling"},
 	},
 	"L9/window-normalization": {
-		Proves:     "a negative `after` is relative to `before` (identical to the absolute equivalent); (0,0) resolves to the ~600s grid-aligned default window ending NOW — NOT the full retention (the reason backdated fixtures settle via explicit windows); time_resampling (v1 gtime) forces the bucket size up",
+		Proves:     "a negative `after` is relative to `before` (identical to the absolute equivalent); (0,0) resolves to the ~600s grid-aligned default window ending NOW with an exact empty dimension-id array — NOT the full retention (the reason backdated fixtures settle via explicit windows); time_resampling (v1 gtime) forces the bucket size up",
 		Components: []string{"relative-window", "default-relative-window", "time-resampling"},
 	},
 	"L9/natural-points": {
@@ -389,7 +389,7 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"selectors", "match-modes"},
 	},
 	"API/options-long-tail": {
-		Proves:     "ms renders epoch-milliseconds; rfc3339 loses to seconds on the v1 formatters (pinned no-op); objectrows emits named row objects; jsonwrap all-dimensions ADDS full_dimension_list/full_chart_list/full_chart_labels while the queried selection stays; tqx wraps datatable in the gviz envelope echoing reqId; tsv-excel == tsv; csv label-quotes quotes the header; v2 minimal-stats drops totals, long-json-keys switches to descriptive keys, group-by-labels flattens the label values into the view",
+		Proves:     "ms renders epoch-milliseconds; rfc3339 loses to seconds on the v1 formatters (pinned no-op); objectrows emits strict named rows with exact fixture timestamps/values; jsonwrap all-dimensions keeps exactly the selected dimension and adds the exact full dimension/chart/automatic-label string-pair sets; tqx wraps datatable in the gviz envelope echoing reqId; tsv-excel == tsv; csv label-quotes quotes the header; v2 minimal-stats drops totals, long-json-keys switches to descriptive keys, group-by-labels flattens the label values into the view",
 		Components: []string{"timestamps", "v1-json-shapes", "google-viz", "format-aliases", "label-quotes", "v2-shapes"},
 	},
 	"API/row-reductions": {
@@ -400,7 +400,7 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"fallback-pins", "cardinality-limit-sweep"},
 	},
 	"W/value": {
-		Proves:     "weights method=value: per-metric weight = the window average over NATURAL points with the after-INCLUSIVE window (121 points for a 120s span — rulings batch); MULTINODE rollup rows carry the mean of their dimensions; the per-dimension timeframe stats (min/avg/max/sum/count/anomaly_count) are exact; method=value NEVER rank-normalizes",
+		Proves:     "weights method=value: per-metric weight = the window average over NATURAL points with the after-INCLUSIVE window (121 points for a 120s span — rulings batch); strict MULTINODE rows contain exactly one instance, context and node rollup with the mean of their dimensions and the required index/null layout; the per-dimension timeframe stats (min/avg/max/sum/count/anomaly_count) are exact; method=value NEVER rank-normalizes",
 		Components: []string{"multi-node", "never-spreads"},
 	},
 	"W/anomaly-rate-per-metric": {

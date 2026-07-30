@@ -337,6 +337,65 @@ func TestLayer9RelativeWindow(t *testing.T) {
 	}
 }
 
+func l9DefaultWindowView(doc map[string]any) (int64, int64, error) {
+	view, ok := doc["view"].(map[string]any)
+	if !ok {
+		return 0, 0, fmt.Errorf("view is missing or not an object: %v", doc["view"])
+	}
+	after, afterOK := queryInteger(view["after"])
+	before, beforeOK := queryInteger(view["before"])
+	if !afterOK || !beforeOK {
+		return 0, 0, fmt.Errorf(
+			"view after/before are not finite integers: %v/%v",
+			view["after"], view["before"])
+	}
+	dimensions, ok := view["dimensions"].(map[string]any)
+	if !ok {
+		return 0, 0, fmt.Errorf(
+			"view.dimensions is missing or not an object: %v", view["dimensions"])
+	}
+	ids, ok := dimensions["ids"].([]any)
+	if !ok {
+		return 0, 0, fmt.Errorf(
+			"view.dimensions.ids is missing or not an array: %v", dimensions["ids"])
+	}
+	if len(ids) != 0 {
+		return 0, 0, fmt.Errorf("view.dimensions.ids is %v, want empty", ids)
+	}
+	return after, before, nil
+}
+
+func TestL9DefaultWindowShapeGuards(t *testing.T) {
+	build := func() map[string]any {
+		return map[string]any{"view": map[string]any{
+			"after": float64(100), "before": float64(700),
+			"dimensions": map[string]any{"ids": []any{}},
+		}}
+	}
+	if _, _, err := l9DefaultWindowView(build()); err != nil {
+		t.Fatalf("valid default-window view rejected: %v", err)
+	}
+	for name, mutate := range map[string]func(map[string]any){
+		"missing-ids": func(doc map[string]any) {
+			delete(doc["view"].(map[string]any)["dimensions"].(map[string]any), "ids")
+		},
+		"wrong-ids-type": func(doc map[string]any) {
+			doc["view"].(map[string]any)["dimensions"].(map[string]any)["ids"] = "none"
+		},
+		"nonempty-ids": func(doc map[string]any) {
+			doc["view"].(map[string]any)["dimensions"].(map[string]any)["ids"] = []any{"fixture"}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc := build()
+			mutate(doc)
+			if _, _, err := l9DefaultWindowView(doc); err == nil {
+				t.Errorf("accepted %s default-window mutation", name)
+			}
+		})
+	}
+}
+
 // TestLayer9DefaultRelativeWindow: 0 is a RELATIVE time — the (0,0)
 // window resolves to the ~600s default window ENDING NOW (grid-aligned
 // to the chosen view update_every), NOT the full retention. On the
@@ -352,20 +411,17 @@ func TestLayer9DefaultRelativeWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 	// the empty-result response carries a flat view block
-	view, _ := doc["view"].(map[string]any)
-	afterF, _ := view["after"].(float64)
-	beforeF, _ := view["before"].(float64)
+	after, before, err := l9DefaultWindowView(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now().Unix()
-	if beforeF < float64(now-120) || beforeF > float64(now+120) {
-		t.Errorf("(0,0) before resolved to %v, want ~now (%d)", beforeF, now)
+	if before < now-120 || before > now+120 {
+		t.Errorf("(0,0) before resolved to %d, want ~now (%d)", before, now)
 	}
-	span := beforeF - afterF
+	span := before - after
 	if span < 480 || span > 660 {
-		t.Errorf("(0,0) window span %v, want the ~600s default (grid-aligned)", span)
-	}
-	// and the window is empty at the 2023 epoch
-	if ids, _ := view["dimensions"].(map[string]any)["ids"].([]any); len(ids) != 0 {
-		t.Errorf("(0,0) served %d dimensions from the epoch fixture, want none in the last-600s window", len(ids))
+		t.Errorf("(0,0) window span %d, want the ~600s default (grid-aligned)", span)
 	}
 }
 

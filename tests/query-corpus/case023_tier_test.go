@@ -349,6 +349,20 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 		return cols[d.ID]
 	}
 
+	// The wide-record duration share and the once-per-record event state below
+	// are Class B ports.
+	//
+	// Source: netdata/netdata @ c8f9ce4d5622767ea752a2877bf1049a0bc85a46
+	// src/web/api/queries/tg-expression.h:366-436,445-541
+	// tg_expression_window_fraction(), tg_expression_share()
+	// src/web/api/queries/percentage_of_time/percentage_of_time.h:57-75,86-105
+	// tg_percentage_of_time_add_point(), tg_percentage_of_time_flush()
+	// src/web/api/queries/number_of_times/number_of_times.h:46-70,79-98
+	// tg_number_of_times_add_point(), tg_number_of_times_flush()
+	// src/web/api/queries/number_of_flaps/number_of_flaps.h:53-86,95-114
+	// tg_number_of_flaps_add_point(), tg_number_of_flaps_flush()
+	// src/web/api/queries/query-execute.c:78-190,522-570
+	// query_add_point_to_group(), inner point re-delivery loop
 	wantTime := make([]expectedColumnPoint, windows*perWindow)
 	for i := range wantTime {
 		end := after + int64(i+1)*bucketSpan

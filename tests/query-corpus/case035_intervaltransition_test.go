@@ -160,9 +160,13 @@ func c035GapCollected(base, ts int64, every int) bool {
 // in-progress tier rollup. The rollup retains sum/min/max/count, not each
 // sample's historical duration.
 //
-// Source: src/database/rrdset-collection.c:21-32,
-// src/database/rrddim-collection.c:68-80 and
-// src/database/engine/rrdengineapi.c:716-729.
+// Source: netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d
+// src/database/rrdset-collection.c:21-32
+// rrdset_set_update_every_s() callout
+// src/database/rrddim-collection.c:9-12,68-80
+// tier_next_point_time_s(), store_metric_at_tier()
+// src/database/engine/rrdengineapi.c:716-729
+// rrdeng_store_metric_change_collection_frequency()
 func c035Records(
 	base int64,
 	tc c035Case,
@@ -226,7 +230,12 @@ func c035Overlap(record c035Record, after, before int64) int64 {
 func c035ExpectedAvailability(records []c035Record, after, before, step int64) []expectedColumnPoint {
 	// The higher-tier fraction mirrors the approved two-point mass model.
 	// For this 0/1 fixture, avg is exactly the sample-weighted share at 1.
-	// Source: src/web/api/queries/tg-expression.h:366-438.
+	//
+	// Source: netdata/netdata @ c8f9ce4d5622767ea752a2877bf1049a0bc85a46
+	// src/web/api/queries/tg-expression.h:366-436
+	// tg_expression_window_fraction()
+	// src/web/api/queries/percentage_of_time/percentage_of_time.h:57-75,86-105
+	// tg_percentage_of_time_add_point(), tg_percentage_of_time_flush()
 	points := int((before - after) / step)
 	want := make([]expectedColumnPoint, points)
 	for i := range want {

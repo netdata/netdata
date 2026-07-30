@@ -217,23 +217,107 @@ func weightsV1Params(method, context, options string, baseline bool) url.Values 
 	return p
 }
 
-// v1ContextsWeights walks the CONTEXTS format down to {dimension: weight}.
-func v1ContextsWeights(t *testing.T, doc map[string]any, context string) map[string]float64 {
-	t.Helper()
+// decodeV1ContextsWeights walks the CONTEXTS format down to
+// {dimension: weight} while rejecting every malformed object or cell.
+func decodeV1ContextsWeights(doc map[string]any, context string) (map[string]float64, error) {
+	contexts, ok := doc["contexts"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("contexts is missing or not an object: %v", doc["contexts"])
+	}
+	contextAny, exists := contexts[context]
+	if !exists {
+		return nil, fmt.Errorf("context %q is missing", context)
+	}
+	ctx, ok := contextAny.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("context %q is not an object: %v", context, contextAny)
+	}
+	charts, ok := ctx["charts"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("context %q charts is missing or not an object: %v", context, ctx["charts"])
+	}
+
 	out := map[string]float64{}
-	contexts, _ := doc["contexts"].(map[string]any)
-	ctx, _ := contexts[context].(map[string]any)
-	charts, _ := ctx["charts"].(map[string]any)
-	for _, chAny := range charts {
-		chm, _ := chAny.(map[string]any)
-		dims, _ := chm["dimensions"].(map[string]any)
-		for id, w := range dims {
-			if f, ok := w.(float64); ok {
-				out[id] = f
+	for chartID, chartAny := range charts {
+		chart, ok := chartAny.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("chart %q is not an object: %v", chartID, chartAny)
+		}
+		dimensions, ok := chart["dimensions"].(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf(
+				"chart %q dimensions is missing or not an object: %v",
+				chartID, chart["dimensions"])
+		}
+		for id, value := range dimensions {
+			if id == "" {
+				return nil, fmt.Errorf("chart %q has an empty dimension id", chartID)
 			}
+			weight, ok := queryFiniteNumber(value)
+			if !ok {
+				return nil, fmt.Errorf(
+					"chart %q dimension %q weight is not finite: %v",
+					chartID, id, value)
+			}
+			if _, duplicate := out[id]; duplicate {
+				return nil, fmt.Errorf("dimension %q appears in more than one chart", id)
+			}
+			out[id] = weight
 		}
 	}
+	return out, nil
+}
+
+func v1ContextsWeights(t *testing.T, doc map[string]any, context string) map[string]float64 {
+	t.Helper()
+	out, err := decodeV1ContextsWeights(doc, context)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return out
+}
+
+func TestDecodeV1ContextsWeightsRejectsMalformedDimensions(t *testing.T) {
+	build := func() map[string]any {
+		return map[string]any{"contexts": map[string]any{
+			wContext: map[string]any{"charts": map[string]any{
+				wContext: map[string]any{"dimensions": map[string]any{
+					"flat": float64(0),
+				}},
+			}},
+		}}
+	}
+	got, err := decodeV1ContextsWeights(build(), wContext)
+	if err != nil || len(got) != 1 || got["flat"] != 0 {
+		t.Fatalf("valid v1 contexts weights rejected: got=%v err=%v", got, err)
+	}
+	for name, mutate := range map[string]func(map[string]any){
+		"malformed-context": func(doc map[string]any) {
+			doc["contexts"].(map[string]any)[wContext] = nil
+		},
+		"malformed-chart": func(doc map[string]any) {
+			ctx := doc["contexts"].(map[string]any)[wContext].(map[string]any)
+			ctx["charts"].(map[string]any)[wContext] = nil
+		},
+		"extra-malformed-dimension": func(doc map[string]any) {
+			ctx := doc["contexts"].(map[string]any)[wContext].(map[string]any)
+			chart := ctx["charts"].(map[string]any)[wContext].(map[string]any)
+			chart["dimensions"].(map[string]any)["junk"] = "not-a-number"
+		},
+		"nonfinite-dimension": func(doc map[string]any) {
+			ctx := doc["contexts"].(map[string]any)[wContext].(map[string]any)
+			chart := ctx["charts"].(map[string]any)[wContext].(map[string]any)
+			chart["dimensions"].(map[string]any)["flat"] = math.Inf(1)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc := build()
+			mutate(doc)
+			if _, err := decodeV1ContextsWeights(doc, wContext); err == nil {
+				t.Errorf("accepted %s v1 contexts mutation", name)
+			}
+		})
+	}
 }
 
 // weightsHighlightAverages: the after-INCLUSIVE 121-point highlight
@@ -266,11 +350,6 @@ func TestWeightsExpectedIDsExactlyOnce(t *testing.T) {
 	}
 }
 
-func weightsFiniteFloat(value any) (float64, bool) {
-	number, ok := value.(float64)
-	return number, ok && !math.IsNaN(number) && !math.IsInf(number, 0)
-}
-
 func TestWeightsTimeframeStatsRequireFiniteNumbers(t *testing.T) {
 	for name, value := range map[string]any{
 		"string": "0",
@@ -279,12 +358,12 @@ func TestWeightsTimeframeStatsRequireFiniteNumbers(t *testing.T) {
 		"inf":    math.Inf(1),
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, ok := weightsFiniteFloat(value); ok {
+			if _, ok := queryFiniteNumber(value); ok {
 				t.Errorf("accepted malformed timeframe statistic %v", value)
 			}
 		})
 	}
-	if got, ok := weightsFiniteFloat(float64(0)); !ok || got != 0 {
+	if got, ok := queryFiniteNumber(float64(0)); !ok || got != 0 {
 		t.Fatalf("finite zero = %v,%v", got, ok)
 	}
 }
@@ -308,6 +387,405 @@ func weightsExpectedIDsExactlyOnce(ids []string, want map[string]float64) error 
 	return nil
 }
 
+type weightsMultiNodeRow struct {
+	rowType   int64
+	indices   [4]*int64 // node, context, instance, dimension
+	weight    float64
+	timeframe [6]float64
+}
+
+func weightsRequiredIndex(value any, path string) (int64, error) {
+	index, ok := queryInteger(value)
+	if !ok || index < 0 {
+		return 0, fmt.Errorf("%s is not a nonnegative integer: %v", path, value)
+	}
+	return index, nil
+}
+
+func weightsNullableIndex(value any, path string) (*int64, error) {
+	if value == nil {
+		return nil, nil
+	}
+	index, err := weightsRequiredIndex(value, path)
+	if err != nil {
+		return nil, err
+	}
+	return &index, nil
+}
+
+func decodeWeightsIndexDictionary(
+	dictionaries map[string]any,
+	name, indexKey string,
+) (map[int64]map[string]any, error) {
+	entries, ok := dictionaries[name].([]any)
+	if !ok {
+		return nil, fmt.Errorf(
+			"dictionaries.%s is missing or not an array: %v",
+			name, dictionaries[name])
+	}
+	out := make(map[int64]map[string]any, len(entries))
+	for i, entryAny := range entries {
+		entry, ok := entryAny.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf(
+				"dictionaries.%s[%d] is not an object: %v", name, i, entryAny)
+		}
+		index, err := weightsRequiredIndex(
+			entry[indexKey], fmt.Sprintf("dictionaries.%s[%d].%s", name, i, indexKey))
+		if err != nil {
+			return nil, err
+		}
+		if _, duplicate := out[index]; duplicate {
+			return nil, fmt.Errorf("dictionaries.%s repeats index %d", name, index)
+		}
+		out[index] = entry
+	}
+	return out, nil
+}
+
+type weightsMultiNodeDictionaries struct {
+	nodes      map[int64]map[string]any
+	contexts   map[int64]map[string]any
+	instances  map[int64]map[string]any
+	dimensions map[int64]string
+}
+
+func decodeWeightsMultiNodeDictionaries(doc map[string]any) (weightsMultiNodeDictionaries, error) {
+	dictionaries, ok := doc["dictionaries"].(map[string]any)
+	if !ok {
+		return weightsMultiNodeDictionaries{}, fmt.Errorf(
+			"dictionaries is missing or not an object: %v", doc["dictionaries"])
+	}
+	nodes, err := decodeWeightsIndexDictionary(dictionaries, "nodes", "ni")
+	if err != nil {
+		return weightsMultiNodeDictionaries{}, err
+	}
+	contexts, err := decodeWeightsIndexDictionary(dictionaries, "contexts", "ci")
+	if err != nil {
+		return weightsMultiNodeDictionaries{}, err
+	}
+	instances, err := decodeWeightsIndexDictionary(dictionaries, "instances", "ii")
+	if err != nil {
+		return weightsMultiNodeDictionaries{}, err
+	}
+	dimensionEntries, err := decodeWeightsIndexDictionary(dictionaries, "dimensions", "di")
+	if err != nil {
+		return weightsMultiNodeDictionaries{}, err
+	}
+	dimensions := make(map[int64]string, len(dimensionEntries))
+	seenIDs := make(map[string]struct{}, len(dimensionEntries))
+	for index, dimension := range dimensionEntries {
+		id, ok := dimension["id"].(string)
+		if !ok || id == "" {
+			return weightsMultiNodeDictionaries{}, fmt.Errorf(
+				"dictionaries.dimensions index %d id is not a nonempty string: %v",
+				index, dimension["id"])
+		}
+		if _, duplicate := seenIDs[id]; duplicate {
+			return weightsMultiNodeDictionaries{}, fmt.Errorf(
+				"dictionaries.dimensions repeats id %q", id)
+		}
+		dimensions[index] = id
+		seenIDs[id] = struct{}{}
+	}
+	return weightsMultiNodeDictionaries{
+		nodes: nodes, contexts: contexts, instances: instances, dimensions: dimensions,
+	}, nil
+}
+
+func decodeWeightsMultiNodeRows(doc map[string]any) ([]weightsMultiNodeRow, error) {
+	rows, ok := doc["result"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("result is missing or not an array: %v", doc["result"])
+	}
+	out := make([]weightsMultiNodeRow, 0, len(rows))
+	for rowIndex, rowAny := range rows {
+		row, ok := rowAny.([]any)
+		if !ok || len(row) != 7 {
+			return nil, fmt.Errorf(
+				"result[%d] is not an exact seven-cell row: %v", rowIndex, rowAny)
+		}
+		rowType, ok := queryInteger(row[0])
+		if !ok || rowType < 0 || rowType > 3 {
+			return nil, fmt.Errorf(
+				"result[%d].row_type is not an integer in [0,3]: %v", rowIndex, row[0])
+		}
+
+		decoded := weightsMultiNodeRow{rowType: rowType}
+		for i, name := range []string{"node", "context", "instance", "dimension"} {
+			index, err := weightsNullableIndex(
+				row[i+1], fmt.Sprintf("result[%d].%s_index", rowIndex, name))
+			if err != nil {
+				return nil, err
+			}
+			decoded.indices[i] = index
+		}
+		required := 4 - int(rowType)
+		for i, index := range decoded.indices {
+			wantPresent := i < required
+			if (index != nil) != wantPresent {
+				return nil, fmt.Errorf(
+					"result[%d] row type %d %s index presence is %v, want %v",
+					rowIndex, rowType,
+					[]string{"node", "context", "instance", "dimension"}[i],
+					index != nil, wantPresent)
+			}
+		}
+
+		weight, ok := queryFiniteNumber(row[5])
+		if !ok {
+			return nil, fmt.Errorf("result[%d].weight is not finite: %v", rowIndex, row[5])
+		}
+		decoded.weight = weight
+
+		timeframe, ok := row[6].([]any)
+		if !ok || len(timeframe) != 6 {
+			return nil, fmt.Errorf(
+				"result[%d].timeframe is not an exact six-cell array: %v",
+				rowIndex, row[6])
+		}
+		for i, value := range timeframe {
+			number, ok := queryFiniteNumber(value)
+			if !ok {
+				return nil, fmt.Errorf(
+					"result[%d].timeframe[%d] is not finite: %v", rowIndex, i, value)
+			}
+			if i >= 4 {
+				integer, integerOK := queryInteger(value)
+				if !integerOK || integer < 0 {
+					return nil, fmt.Errorf(
+						"result[%d].timeframe[%d] is not a nonnegative integer: %v",
+						rowIndex, i, value)
+				}
+			}
+			decoded.timeframe[i] = number
+		}
+		out = append(out, decoded)
+	}
+	return out, nil
+}
+
+func weightsValueMultiNodeExact(
+	doc map[string]any,
+	want map[string]float64,
+	wantTF map[string][6]float64,
+	rollup float64,
+) error {
+	dictionaries, err := decodeWeightsMultiNodeDictionaries(doc)
+	if err != nil {
+		return err
+	}
+	dimensionByIndex := dictionaries.dimensions
+	dictionaryIDs := make([]string, 0, len(dimensionByIndex))
+	for _, id := range dimensionByIndex {
+		dictionaryIDs = append(dictionaryIDs, id)
+	}
+	if err := weightsExpectedIDsExactlyOnce(dictionaryIDs, want); err != nil {
+		return fmt.Errorf("dimension dictionary identity: %w", err)
+	}
+
+	rows, err := decodeWeightsMultiNodeRows(doc)
+	if err != nil {
+		return err
+	}
+	indexDictionaries := []map[int64]map[string]any{
+		dictionaries.nodes, dictionaries.contexts, dictionaries.instances,
+	}
+	for rowIndex, row := range rows {
+		for indexPosition, dictionary := range indexDictionaries {
+			index := row.indices[indexPosition]
+			if index == nil {
+				continue
+			}
+			if _, exists := dictionary[*index]; !exists {
+				return fmt.Errorf(
+					"result[%d] references unknown %s index %d",
+					rowIndex,
+					[]string{"node", "context", "instance"}[indexPosition],
+					*index)
+			}
+		}
+	}
+	var dimensionIDs, rollupTypes []string
+	var hierarchy [3]int64
+	haveHierarchy := false
+	for rowIndex, row := range rows {
+		if row.rowType != 0 {
+			continue
+		}
+		di := *row.indices[3]
+		id, exists := dimensionByIndex[di]
+		if !exists {
+			return fmt.Errorf("result[%d] references unknown dimension index %d", rowIndex, di)
+		}
+		dimensionIDs = append(dimensionIDs, id)
+		if !tierValueMatch(row.weight, want[id], 1e-9) {
+			return fmt.Errorf(
+				"%s weight is %v, want %v (after-inclusive 121-point window)",
+				id, row.weight, want[id])
+		}
+		for i, wantValue := range wantTF[id] {
+			if !tierValueMatch(row.timeframe[i], wantValue, 1e-9) {
+				return fmt.Errorf(
+					"%s timeframe[%d] is %v, want %v",
+					id, i, row.timeframe[i], wantValue)
+			}
+		}
+		gotHierarchy := [3]int64{*row.indices[0], *row.indices[1], *row.indices[2]}
+		if !haveHierarchy {
+			hierarchy = gotHierarchy
+			haveHierarchy = true
+		} else if gotHierarchy != hierarchy {
+			return fmt.Errorf(
+				"%s hierarchy is %v, want the fixture hierarchy %v",
+				id, gotHierarchy, hierarchy)
+		}
+	}
+	if err := weightsExpectedIDsExactlyOnce(dimensionIDs, want); err != nil {
+		return fmt.Errorf("dimension-row identity: %w", err)
+	}
+	if !haveHierarchy {
+		return fmt.Errorf("result has no dimension row")
+	}
+
+	rollupNames := map[int64]string{1: "instance", 2: "context", 3: "node"}
+	wantRollups := map[string]float64{
+		"instance": rollup, "context": rollup, "node": rollup,
+	}
+	for rowIndex, row := range rows {
+		if row.rowType == 0 {
+			continue
+		}
+		name := rollupNames[row.rowType]
+		rollupTypes = append(rollupTypes, name)
+		if !tierValueMatch(row.weight, rollup, 1e-9) {
+			return fmt.Errorf(
+				"result[%d] %s rollup weight is %v, want %v",
+				rowIndex, name, row.weight, rollup)
+		}
+		required := 4 - int(row.rowType)
+		for i := 0; i < required; i++ {
+			if *row.indices[i] != hierarchy[i] {
+				return fmt.Errorf(
+					"result[%d] %s %s index is %d, want %d",
+					rowIndex, name,
+					[]string{"node", "context", "instance"}[i],
+					*row.indices[i], hierarchy[i])
+			}
+		}
+	}
+	if err := weightsExpectedIDsExactlyOnce(rollupTypes, wantRollups); err != nil {
+		return fmt.Errorf("rollup-row identity: %w", err)
+	}
+	return nil
+}
+
+func TestWeightsValueMultiNodeGuards(t *testing.T) {
+	want := map[string]float64{"flat": 0, "level": 1, "split": 2, "anom": 3}
+	wantTF := map[string][6]float64{
+		"flat": {1, 1, 1, 1, 1, 0}, "level": {2, 2, 2, 2, 1, 0},
+		"split": {3, 3, 3, 3, 1, 0}, "anom": {4, 4, 4, 4, 1, 1},
+	}
+	const rollup = 1.5
+	build := func() map[string]any {
+		dimensions := make([]any, 0, len(want))
+		rows := make([]any, 0, len(want)+3)
+		ids := []string{"flat", "level", "split", "anom"}
+		for index, id := range ids {
+			dimensions = append(dimensions, map[string]any{
+				"di": float64(index), "id": id,
+			})
+			tf := wantTF[id]
+			rows = append(rows, []any{
+				float64(0), float64(0), float64(0), float64(0), float64(index),
+				want[id],
+				[]any{tf[0], tf[1], tf[2], tf[3], tf[4], tf[5]},
+			})
+		}
+		for rowType := 1; rowType <= 3; rowType++ {
+			indices := []any{float64(0), float64(0), float64(0), nil}
+			for i := 4 - rowType; i < len(indices); i++ {
+				indices[i] = nil
+			}
+			rows = append(rows, []any{
+				float64(rowType), indices[0], indices[1], indices[2], indices[3],
+				float64(rollup),
+				[]any{float64(0), float64(0), float64(0), float64(0), float64(0), float64(0)},
+			})
+		}
+		return map[string]any{
+			"dictionaries": map[string]any{
+				"nodes":      []any{map[string]any{"ni": float64(0)}},
+				"contexts":   []any{map[string]any{"ci": float64(0)}},
+				"instances":  []any{map[string]any{"ii": float64(0)}},
+				"dimensions": dimensions,
+			},
+			"result": rows,
+		}
+	}
+	if err := weightsValueMultiNodeExact(build(), want, wantTF, rollup); err != nil {
+		t.Fatalf("valid MULTINODE control rejected: %v", err)
+	}
+
+	mutations := map[string]func(map[string]any){
+		"missing-node-rollup": func(doc map[string]any) {
+			rows := doc["result"].([]any)
+			doc["result"] = rows[:len(rows)-1]
+		},
+		"duplicate-context-rollup": func(doc map[string]any) {
+			rows := doc["result"].([]any)
+			contextRow := rows[len(rows)-2].([]any)
+			duplicate := append([]any(nil), contextRow...)
+			doc["result"] = append(rows, duplicate)
+		},
+		"unexpected-row-type": func(doc map[string]any) {
+			doc["result"].([]any)[0].([]any)[0] = float64(4)
+		},
+		"string-row-type": func(doc map[string]any) {
+			doc["result"].([]any)[0].([]any)[0] = "dimension"
+		},
+		"malformed-dictionary-index": func(doc map[string]any) {
+			dictionaries := doc["dictionaries"].(map[string]any)
+			dictionaries["dimensions"].([]any)[0].(map[string]any)["di"] = "bad"
+		},
+		"fractional-row-index": func(doc map[string]any) {
+			doc["result"].([]any)[0].([]any)[4] = float64(0.5)
+		},
+		"unknown-hierarchy-index": func(doc map[string]any) {
+			for _, rowAny := range doc["result"].([]any) {
+				row := rowAny.([]any)
+				if row[1] != nil {
+					row[1] = float64(999)
+				}
+			}
+		},
+		"trailing-row-field": func(doc map[string]any) {
+			row := doc["result"].([]any)[0].([]any)
+			doc["result"].([]any)[0] = append(row, "extra")
+		},
+		"wrong-null-layout": func(doc map[string]any) {
+			rows := doc["result"].([]any)
+			rows[len(rows)-3].([]any)[4] = float64(0)
+		},
+		"nonfinite-weight": func(doc map[string]any) {
+			doc["result"].([]any)[0].([]any)[5] = math.Inf(1)
+		},
+		"nonfinite-timeframe": func(doc map[string]any) {
+			row := doc["result"].([]any)[0].([]any)
+			row[6].([]any)[0] = math.NaN()
+		},
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			doc := build()
+			mutate(doc)
+			if err := weightsValueMultiNodeExact(doc, want, wantTF, rollup); err == nil {
+				t.Errorf("accepted %s MULTINODE mutation", name)
+			}
+		})
+	}
+}
+
 func TestWeightsValueMultiNode(t *testing.T) {
 	trackContractComponent(t, "W/value", "multi-node")
 
@@ -323,18 +801,6 @@ func TestWeightsValueMultiNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// MULTINODE rows: [row_type, ni, ci, ii, di, weight, [min,avg,max,sum,count,anomaly_count]]
-	dictAny, _ := doc["dictionaries"].(map[string]any)
-	dimsAny, _ := dictAny["dimensions"].([]any)
-	dimID := map[int]string{}
-	for _, dAny := range dimsAny {
-		dm, _ := dAny.(map[string]any)
-		di, _ := dm["di"].(float64)
-		id, _ := dm["id"].(string)
-		dimID[int(di)] = id
-	}
-	rows, _ := doc["result"].([]any)
-
 	want := weightsHighlightAverages()
 	wantTF := map[string][6]float64{
 		"flat":  {50, 50, 50, 6050, 121, 0},
@@ -344,46 +810,12 @@ func TestWeightsValueMultiNode(t *testing.T) {
 	}
 	rollup := (50 + 3611.0/121 + 33521.0/121 + 20) / 4
 
-	var dimensionIDs []string
-	for _, rowAny := range rows {
-		row, _ := rowAny.([]any)
-		if len(row) < 7 {
-			t.Fatalf("malformed result row %v", rowAny)
-		}
-		rowType, _ := row[0].(float64)
-		weight, _ := row[5].(float64)
-		if rowType != 0 {
-			// instance/context/node rollups carry the mean of their dims
-			if !tierValueMatch(weight, rollup, 1e-9) {
-				t.Errorf("rollup row type %v: weight %v, want %v", rowType, weight, rollup)
-			}
-			continue
-		}
-		di, _ := row[4].(float64)
-		id := dimID[int(di)]
-		w, ok := want[id]
-		if !ok {
-			t.Errorf("unexpected dimension %q", id)
-			continue
-		}
-		dimensionIDs = append(dimensionIDs, id)
-		if !tierValueMatch(weight, w, 1e-9) {
-			t.Errorf("%s: weight %v, want %v (after-inclusive 121-point window)", id, weight, w)
-		}
-		tf, _ := row[6].([]any)
-		if len(tf) != 6 {
-			t.Errorf("%s: timeframe %v, want 6 stats", id, tf)
-			continue
-		}
-		for j, wantV := range wantTF[id] {
-			got, ok := weightsFiniteFloat(tf[j])
-			if !ok || !tierValueMatch(got, wantV, 1e-9) {
-				t.Errorf("%s: timeframe[%d] = %v, want %v", id, j, got, wantV)
-			}
-		}
-	}
-	if err := weightsExpectedIDsExactlyOnce(dimensionIDs, want); err != nil {
-		t.Errorf("dimension-row identity: %v", err)
+	// MULTINODE rows are exactly
+	// [row_type, ni, ci, ii, di, weight, [min,avg,max,sum,count,anomaly_count]].
+	// The one-node fixture must expose four dimensions plus one rollup at each
+	// instance/context/node level.
+	if err := weightsValueMultiNodeExact(doc, want, wantTF, rollup); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -444,6 +876,9 @@ func TestWeightsMultiDimAnomalyRate(t *testing.T) {
 			t.Fatal(err)
 		}
 		got := v1ContextsWeights(t, doc, wContext)
+		if len(got) != len(rates) {
+			t.Fatalf("options=%q got %d dims %v, want %d", options, len(got), got, len(rates))
+		}
 		for id, w := range rates {
 			g, ok := got[id]
 			if !ok || !tierValueMatch(g, w, 1e-9) {
@@ -514,7 +949,11 @@ func TestWeightsKS2(t *testing.T) {
 		t.Fatal(err)
 	}
 	got = v1ContextsWeights(t, doc, wKS2Context)
-	for id, w := range spreadEvenly(want) {
+	spreadWant := spreadEvenly(want)
+	if len(got) != len(spreadWant) {
+		t.Fatalf("spread got %d dims %v, want %d", len(got), got, len(spreadWant))
+	}
+	for id, w := range spreadWant {
 		if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
 			t.Errorf("%s: spread weight %v, want %v", id, got[id], w)
 		}
@@ -532,7 +971,11 @@ func TestWeightsValueNeverSpreads(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := v1ContextsWeights(t, doc, wContext)
-	for id, w := range weightsHighlightAverages() {
+	want := weightsHighlightAverages()
+	if len(got) != len(want) {
+		t.Fatalf("got %d dims %v, want %d", len(got), got, len(want))
+	}
+	for id, w := range want {
 		if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
 			t.Errorf("%s: weight %v, want the raw average %v (value method never spreads)", id, got[id], w)
 		}

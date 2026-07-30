@@ -296,6 +296,9 @@ func TestLayer5GroupByMatrix(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
+					if err := queryPointSchemaField(doc, "hidden", false); err != nil {
+						t.Errorf("%s/%s/%s: %v", mode, key, agg, err)
+					}
 					cols, err := canon.Columns(doc)
 					if err != nil {
 						t.Fatal(err)
@@ -405,6 +408,10 @@ func TestLayer5Percentage(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				wantHiddenSchema := raw && key != "percentage-of-instance"
+				if err := queryPointSchemaField(doc, "hidden", wantHiddenSchema); err != nil {
+					t.Errorf("%s/%s: %v", mode, key, err)
+				}
 				cols, err := canon.Columns(doc)
 				if err != nil {
 					t.Fatal(err)
@@ -456,6 +463,9 @@ func TestLayer5Percentage(t *testing.T) {
 								if pt.Hidden == nil || !tierValueMatch(*pt.Hidden, h, 0) {
 									t.Errorf("%q row %d: raw hidden %v, want %v", gname, i, pt.Hidden, h)
 								}
+							} else if pt.Hidden != nil {
+								t.Errorf("%q row %d: raw hidden %v, want null without a hidden contributor",
+									gname, i, *pt.Hidden)
 							}
 							continue
 						}

@@ -163,9 +163,13 @@ func c023Overlap(w fixture.TierPoint, granularity, from, to int64) int64 {
 	return hi - lo
 }
 
-// c023WindowFractionEqual is the deliberate higher-tier two-point model,
-// ported from src/web/api/queries/tg-expression.h:387-435. It is Class B:
-// a rollup preserves min/max/average but not the interior distribution.
+// c023WindowFractionEqual is the deliberate higher-tier two-point model. It
+// is Class B because a rollup preserves min/max/average but not the interior
+// distribution.
+//
+// Source: netdata/netdata @ c8f9ce4d5622767ea752a2877bf1049a0bc85a46
+// src/web/api/queries/tg-expression.h:366-436
+// tg_expression_window_fraction()
 func c023WindowFractionEqual(w fixture.TierPoint, target float64) float64 {
 	if w.Empty || w.Count == 0 {
 		return 0
@@ -192,7 +196,6 @@ func c023RawPercentageEqual(
 	after, before int64,
 	points int,
 	target float64,
-	byTime bool,
 ) []expectedColumnPoint {
 	step := (before - after) / int64(points)
 	matched := make([]float64, points)
@@ -203,16 +206,9 @@ func c023RawPercentageEqual(
 			continue
 		}
 		value, collected := c023PointValue(p)
-		if byTime {
-			total[bucket] += c023ResolutionUE
-			if collected && value == target {
-				matched[bucket] += c023ResolutionUE
-			}
-		} else if collected {
-			total[bucket]++
-			if value == target {
-				matched[bucket]++
-			}
+		total[bucket] += c023ResolutionUE
+		if collected && value == target {
+			matched[bucket] += c023ResolutionUE
 		}
 	}
 
@@ -228,12 +224,20 @@ func c023RawPercentageEqual(
 	return out
 }
 
+// Class B duration-weighted percentage-of-time delivery.
+//
+// Source: netdata/netdata @ c8f9ce4d5622767ea752a2877bf1049a0bc85a46
+// src/web/api/queries/tg-expression.h:366-436
+// tg_expression_window_fraction()
+// src/web/api/queries/percentage_of_time/percentage_of_time.h:57-75,86-105
+// tg_percentage_of_time_add_point(), tg_percentage_of_time_flush()
+// src/web/api/queries/query-execute.c:78-190
+// query_add_point_to_group()
 func c023TierPercentageEqual(
 	d fixture.Dimension,
 	granularity, after, before int64,
 	points int,
 	target float64,
-	byTime bool,
 ) []expectedColumnPoint {
 	step := (before - after) / int64(points)
 	records := c023WindowRecords(d, granularity)
@@ -246,20 +250,11 @@ func c023TierPercentageEqual(
 			if !c023Overlaps(w, granularity, from, to) {
 				continue
 			}
-			if byTime {
-				duration := float64(c023Overlap(w, granularity, from, to))
-				total += duration
-				matched += c023WindowFractionEqual(w, target) * duration
-			} else if !w.Empty && w.Count > 0 {
-				// percentage-of-samples keeps the delivered-point model:
-				// the stored average is one sample on every delivery.
-				total++
-				if w.Sum/float64(w.Count) == target {
-					matched++
-				}
-			}
+			duration := float64(c023Overlap(w, granularity, from, to))
+			total += duration
+			matched += c023WindowFractionEqual(w, target) * duration
 		}
-		if byTime && total < float64(step) {
+		if total < float64(step) {
 			// Uncovered time is an explicit non-match in this grouping.
 			total = float64(step)
 		}
@@ -279,15 +274,14 @@ func c023PercentageEqual(
 	after, before int64,
 	points int,
 	target float64,
-	byTime bool,
 ) []expectedColumnPoint {
 	switch tier {
 	case 0:
-		return c023RawPercentageEqual(d, after, before, points, target, byTime)
+		return c023RawPercentageEqual(d, after, before, points, target)
 	case 1:
-		return c023TierPercentageEqual(d, c023ResolutionTier1, after, before, points, target, byTime)
+		return c023TierPercentageEqual(d, c023ResolutionTier1, after, before, points, target)
 	case 2:
-		return c023TierPercentageEqual(d, c023ResolutionTier2, after, before, points, target, byTime)
+		return c023TierPercentageEqual(d, c023ResolutionTier2, after, before, points, target)
 	default:
 		panic("unsupported tier")
 	}
@@ -329,8 +323,11 @@ func c023RawPercentageGreater(
 	return out
 }
 
-// c023TierDeliveredAverage ports the partial-delivery interpolation in
-// src/web/api/queries/query-execute.c:59-75.
+// c023TierDeliveredAverage is the Class B partial-delivery interpolation.
+//
+// Source: netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d
+// src/web/api/queries/query-execute.c:59-75
+// query_interpolate_point
 func c023TierDeliveredAverage(
 	w fixture.TierPoint,
 	byEnd map[int64]fixture.TierPoint,
@@ -350,6 +347,13 @@ func c023TierDeliveredAverage(
 	return priorAverage + (average-priorAverage)*fraction
 }
 
+// Class B percentage-of-samples delivery over re-delivered stored records.
+//
+// Source: netdata/netdata @ c8f9ce4d5622767ea752a2877bf1049a0bc85a46
+// src/web/api/queries/countif/countif.h:46-70,79-98
+// tg_countif_add_point(), tg_countif_flush()
+// src/web/api/queries/query-execute.c:60-76,522-570
+// query_interpolate_point, inner point re-delivery loop
 func c023TierPercentageGreater(
 	d fixture.Dimension,
 	granularity, after, before int64,
@@ -446,6 +450,15 @@ func c023RawNumberTimes(
 	return out
 }
 
+// Class B once-per-stored-record occurrence delivery.
+//
+// Source: netdata/netdata @ c8f9ce4d5622767ea752a2877bf1049a0bc85a46
+// src/web/api/queries/number_of_times/number_of_times.h:46-70,79-98
+// tg_number_of_times_add_point(), tg_number_of_times_flush()
+// src/web/api/queries/tg-expression.h:366-436,445-541
+// tg_expression_window_fraction(), tg_expression_share()
+// src/web/api/queries/query-execute.c:78-190
+// query_add_point_to_group()
 func c023TierNumberTimes(
 	d fixture.Dimension,
 	granularity, after, before int64,
@@ -565,6 +578,15 @@ func c023RawFlaps(
 	return out
 }
 
+// Class B once-per-stored-record flap delivery.
+//
+// Source: netdata/netdata @ c8f9ce4d5622767ea752a2877bf1049a0bc85a46
+// src/web/api/queries/number_of_flaps/number_of_flaps.h:53-86,95-114
+// tg_number_of_flaps_add_point(), tg_number_of_flaps_flush()
+// src/web/api/queries/tg-expression.h:366-436,445-541
+// tg_expression_window_fraction(), tg_expression_share()
+// src/web/api/queries/query-execute.c:78-190
+// query_add_point_to_group()
 func c023TierFlaps(
 	d fixture.Dimension,
 	granularity, after, before int64,
@@ -673,8 +695,14 @@ func c023TierPreviousDrops(
 	granularity, after, before int64,
 	points int,
 ) []expectedColumnPoint {
-	// The higher-tier <previous inference and post-drop floor are Class B,
-	// ported from src/web/api/queries/tg-expression.h:471-520.
+	// The higher-tier <previous inference, post-drop floor, and once-per-record
+	// occurrence delivery are Class B.
+	//
+	// Source: netdata/netdata @ c8f9ce4d5622767ea752a2877bf1049a0bc85a46
+	// src/web/api/queries/tg-expression.h:445-541
+	// tg_expression_share()
+	// src/web/api/queries/number_of_times/number_of_times.h:46-70,79-98
+	// tg_number_of_times_add_point(), tg_number_of_times_flush()
 	step := (before - after) / int64(points)
 	records := c023WindowRecords(d, granularity)
 	delivered := make(map[int64]bool, len(records))
@@ -822,7 +850,7 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 		// Four tier-2 buckets: tier0 and tier1 downsample; tier2 is identity.
 		const points = 4
 		run(tier, points, "percentage-of-time", "==1", "availability",
-			c023PercentageEqual(availability, tier, after, before, points, 1, true))
+			c023PercentageEqual(availability, tier, after, before, points, 1))
 		run(tier, points, "number-of-times", "==gap", "availability",
 			c023NumberTimes(availability, tier, after, before, points, 0, true))
 		run(tier, points, "number-of-times", "==1", "availability",
@@ -832,7 +860,7 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 		run(tier, points, "number-of-times", "<previous", "counter",
 			c023PreviousDrops(counter, tier, after, before, points))
 		run(tier, points, "percentage-of-time", "==5", "nonbinary",
-			c023PercentageEqual(nonbinary, tier, after, before, points, 5, true))
+			c023PercentageEqual(nonbinary, tier, after, before, points, 5))
 		run(tier, points, "percentage-of-samples", ">5", "nonbinary",
 			c023PercentageGreater(nonbinary, tier, after, before, points, 5))
 
@@ -840,13 +868,13 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 			// 240: tier0 downsamples, tier1 is identity, tier2 upsamples.
 			// 720: every tier1 point is re-delivered three times.
 			run(tier, points, "percentage-of-time", "==1", "availability",
-				c023PercentageEqual(availability, tier, after, before, points, 1, true))
+				c023PercentageEqual(availability, tier, after, before, points, 1))
 			run(tier, points, "number-of-flaps", "==1", "availability",
 				c023Flaps(availability, tier, after, before, points, 1))
 			run(tier, points, "number-of-times", "<previous", "counter",
 				c023PreviousDrops(counter, tier, after, before, points))
 			run(tier, points, "percentage-of-time", "==5", "nonbinary",
-				c023PercentageEqual(nonbinary, tier, after, before, points, 5, true))
+				c023PercentageEqual(nonbinary, tier, after, before, points, 5))
 			run(tier, points, "percentage-of-samples", ">5", "nonbinary",
 				c023PercentageGreater(nonbinary, tier, after, before, points, 5))
 		}

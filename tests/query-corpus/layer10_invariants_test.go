@@ -455,15 +455,6 @@ func TestL10QueryResultGuards(t *testing.T) {
 	}
 }
 
-func l10Integer(value any) (int64, bool) {
-	number, ok := value.(float64)
-	if !ok || math.IsNaN(number) || math.IsInf(number, 0) ||
-		math.Trunc(number) != number || number < -math.Exp2(63) || number >= math.Exp2(63) {
-		return 0, false
-	}
-	return int64(number), true
-}
-
 func l10EnvelopeHolds(group string, sources [][]float64, got []*float64, tolerance float64) bool {
 	if len(sources) == 0 || len(got) != len(sources) || tolerance < 0 {
 		return false
@@ -521,8 +512,8 @@ func l10SourceBuckets(
 	}
 
 	view := query.doc["view"].(map[string]any)
-	viewAfter, afterOK := l10Integer(view["after"])
-	updateEvery, everyOK := l10Integer(view["update_every"])
+	viewAfter, afterOK := queryInteger(view["after"])
+	updateEvery, everyOK := queryInteger(view["update_every"])
 	if !afterOK || !everyOK || updateEvery <= 0 || len(query.grid) == 0 {
 		t.Fatalf("L10 response has no usable view for source oracle: %v", query.doc["view"])
 	}
@@ -580,9 +571,9 @@ func validateL10Response(t *testing.T, spec l10QuerySpec, doc map[string]any) l1
 	}
 
 	view, viewOK := doc["view"].(map[string]any)
-	viewAfter, afterOK := l10Integer(view["after"])
-	viewBefore, beforeOK := l10Integer(view["before"])
-	updateEvery, everyOK := l10Integer(view["update_every"])
+	viewAfter, afterOK := queryInteger(view["after"])
+	viewBefore, beforeOK := queryInteger(view["before"])
+	updateEvery, everyOK := queryInteger(view["update_every"])
 	if !viewOK || !afterOK || !beforeOK || !everyOK ||
 		updateEvery <= 0 || viewBefore < viewAfter {
 		t.Logf("%s view is malformed: %v", spec.requestedGroup, doc["view"])
@@ -633,25 +624,9 @@ func validateL10Response(t *testing.T, spec l10QuerySpec, doc map[string]any) l1
 		}
 	}
 
-	rawResult, rawResultOK := doc["result"].(map[string]any)
-	rows, rowsOK := rawResult["data"].([]any)
-	if !rawResultOK || !rowsOK || len(rows) != len(result.grid) {
-		t.Logf("%s raw result has %d rows, want exact view grid of %d",
-			spec.requestedGroup, len(rows), len(result.grid))
+	if err := queryRawTimestampsExact(doc, result.grid); err != nil {
+		t.Logf("%s raw result grid: %v", spec.requestedGroup, err)
 		result.valid = false
-	} else {
-		for i, rowAny := range rows {
-			row, ok := rowAny.([]any)
-			var timestamp int64
-			if ok && len(row) > 0 {
-				timestamp, ok = l10Integer(row[0])
-			}
-			if !ok || timestamp != result.grid[i] {
-				t.Logf("%s raw row %d timestamp is %v, want %d in wire order",
-					spec.requestedGroup, i, rowAny, result.grid[i])
-				result.valid = false
-			}
-		}
 	}
 
 	cols, err := canon.Columns(doc)
