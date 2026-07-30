@@ -4,17 +4,24 @@ package fixture
 
 import (
 	"math"
-	"strconv"
 	"strings"
 )
 
-// TierPoint is the oracle's view of one tier rollup window of one dimension,
-// mirroring store_metric_at_tier (src/database/rrddim-collection.c) and the
-// tier page slot storage_number_tier1_t — float32 sum/min/max with exact
-// uint16 count/anomaly_count (src/libnetdata/storage_number/storage_number.h,
-// src/database/engine/page.c write/read paths). Sum/Min/Max already carry
-// the single float32 write-rounding; EndT is the wall-clock-aligned window
-// end, which is the tier point's stored timestamp.
+// TierPoint is the oracle's view of one persisted higher-tier rollup window
+// of one dimension.
+//
+// Source: netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d
+//   - alignment and completed-point lifecycle:
+//     src/database/rrddim-collection.c:9-11,17-60,63-108
+//   - the original collected double feeding every higher tier:
+//     src/database/rrddim-collection.c:149-180
+//   - page slot layout:
+//     src/libnetdata/storage_number/storage_number.h:78-84
+//   - float32 page write/read, which does not retain generic flags:
+//     src/database/engine/page.c:954-967,1088-1099
+//
+// Sum/Min/Max already carry the single float32 page-write rounding. EndT is
+// the wall-clock-aligned window end and stored timestamp.
 type TierPoint struct {
 	EndT         int64
 	Sum          float64
@@ -22,7 +29,6 @@ type TierPoint struct {
 	Max          float64
 	Count        int
 	AnomalyCount int
-	Reset        bool // a reset sample fell in the window — LOST at tier1+ (pages store no flags)
 	Empty        bool // stored, but every sample in the window was a gap (NAN/count-0 point)
 }
 
@@ -57,23 +63,18 @@ func (d Dimension) TierWindows(granularity int64) map[int64]TierPoint {
 		}
 		// gap samples advance the window but contribute nothing — not even
 		// flags (the engine merges only non-NAN points into the virtual point)
-		if !strings.ContainsRune(p.Flags, 'E') {
-			if v, err := strconv.ParseFloat(p.Collected, 64); err == nil {
-				if tp.Empty {
-					tp.Sum, tp.Min, tp.Max = v, v, v
-					tp.Empty = false
-				} else {
-					tp.Sum += v
-					tp.Min = math.Min(tp.Min, v)
-					tp.Max = math.Max(tp.Max, v)
-				}
-				tp.Count++
-				if !strings.ContainsRune(p.Flags, 'A') {
-					tp.AnomalyCount++
-				}
-				if strings.ContainsRune(p.Flags, 'R') {
-					tp.Reset = true
-				}
+		if v, collected := p.CollectedValue(d.ID); collected {
+			if tp.Empty {
+				tp.Sum, tp.Min, tp.Max = v, v, v
+				tp.Empty = false
+			} else {
+				tp.Sum += v
+				tp.Min = math.Min(tp.Min, v)
+				tp.Max = math.Max(tp.Max, v)
+			}
+			tp.Count++
+			if !strings.ContainsRune(p.Flags, 'A') {
+				tp.AnomalyCount++
 			}
 		}
 		out[end] = tp

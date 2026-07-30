@@ -7,17 +7,16 @@
 // receiving a burst must be fully visible without the historical
 // "first point alone, then wait" workaround.
 //
-// Pusher discipline (CASE-015): connections stay open until the pushed data
-// has settled and been verified — the receiver DISCARDS in-flight data when
-// the child disconnects right after writing (see case015_test.go). Closing
-// only after the settle barrier makes every green case deterministic.
+// Pusher discipline: ordinary fixtures keep their connections open until
+// settlement so storage/query checks remain isolated from teardown timing.
+// CASE-015 separately proves that an immediate orderly close drains every
+// delivered command before the child is removed.
 package corpus
 
 import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -38,20 +37,35 @@ var netdataBinary string
 var roundTripOK bool
 
 func TestMain(m *testing.M) {
-	binary := os.Getenv("QUERY_CORPUS_NETDATA")
-	if binary == "" {
-		binary = "../../build/netdata"
+	if !flag.Parsed() {
+		flag.Parse()
 	}
-	abs, err := filepath.Abs(binary)
-	if err == nil {
-		_, err = os.Stat(abs)
+	if !daemonRunRequired(
+		flag.Lookup("test.run").Value.String(),
+		flag.Lookup("test.list").Value.String()) {
+		code := m.Run()
+		if testFlagSet("test.list") {
+			fmt.Fprintln(os.Stderr, "query contract corpus: listing tests only; no contract verdict")
+		}
+		os.Exit(code)
 	}
+
+	workingDir, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "netdata binary not usable (%v)\nbuild it or set QUERY_CORPUS_NETDATA\n", err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	paths, err := resolveCorpusPaths(
+		os.Getenv("QUERY_CORPUS_NETDATA"),
+		os.Getenv("QUERY_CORPUS_SRC"),
+		workingDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\nbuild in-tree or set QUERY_CORPUS_NETDATA and QUERY_CORPUS_SRC together\n", err)
 		os.Exit(1)
 	}
 
-	netdataBinary = abs
+	netdataBinary = paths.Binary
+	engineSourceDir = paths.Source
 
 	runDir, err := os.MkdirTemp("", "query-corpus-")
 	if err != nil {
@@ -59,14 +73,17 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	td, err = daemon.Start(daemon.Options{Binary: abs, RunDir: runDir})
+	td, err = daemon.Start(daemon.Options{Binary: paths.Binary, RunDir: runDir})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
 	code := m.Run()
-	_ = td.Stop()
+	if err := td.Stop(); err != nil {
+		fmt.Fprintf(os.Stderr, "query corpus daemon shutdown failed: %v\n", err)
+		code = 1
+	}
 
 	// The run's actual answer: which contracts the query engine does not
 	// hold, and whether the requested run exercised the complete ledger.
@@ -109,11 +126,11 @@ func guid(n int) string {
 	return fmt.Sprintf("11111111-1111-4111-8111-%012d", n)
 }
 
-// connect opens a pusher connection that closes at test cleanup — i.e.
-// AFTER the settle barrier and assertions, per the CASE-015 discipline.
+// connect keeps the pusher open through assertions so ordinary storage/query
+// tests do not also exercise teardown timing. CASE-015 owns immediate close.
 func connect(t *testing.T, hostname, machineGUID string, caps uint32) *stream.Conn {
 	t.Helper()
-	conn, err := stream.Connect(td.Addr, daemon.StreamKey, stream.HostInfo{Hostname: hostname, MachineGUID: machineGUID}, caps)
+	conn, err := stream.Connect(td.Addr, td.StreamKey, stream.HostInfo{Hostname: hostname, MachineGUID: machineGUID}, caps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,6 +159,14 @@ func settleAndVerify(t *testing.T, host string, ch fixture.Chart) {
 	cols, err := canon.Columns(doc)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	dimensions := make([]string, 0, len(ch.Dimensions))
+	for _, dim := range ch.Dimensions {
+		dimensions = append(dimensions, dim.ID)
+	}
+	if !assertExactColumnSet(t, cols, dimensions) {
+		t.Fatalf("read-back columns do not match fixture dimensions")
 	}
 
 	for _, dim := range ch.Dimensions {
@@ -278,8 +303,9 @@ func pushReplication(t *testing.T, hostname, machineGUID string, ch fixture.Char
 	if err != nil {
 		t.Fatalf("replication dialogue: %v (served %v)", err, served)
 	}
-	if served[ch.ID] != len(ch.Dimensions[0].Points) {
-		t.Fatalf("replication served %d rows, want %d", served[ch.ID], len(ch.Dimensions[0].Points))
+	wantRows := len(ch.ReplayWindow(firstT, lastT))
+	if served[ch.ID] != wantRows {
+		t.Fatalf("replication served %d rows, want timestamp union size %d", served[ch.ID], wantRows)
 	}
 }
 

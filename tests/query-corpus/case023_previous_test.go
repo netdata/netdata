@@ -55,6 +55,7 @@ func TestCase023PreviousSurvivesRedelivery(t *testing.T) {
 
 	// buckets is how many result points the tier-1 window is cut into: 1 is
 	// one delivery per window, anything above it re-delivers
+	ok := true
 	ask := func(buckets int64) []canon.Pt {
 		t.Helper()
 		params := daemon.DataParamsTier(ch.Context, 1, after, before, windows*buckets, "percentage-of-time")
@@ -68,16 +69,22 @@ func TestCase023PreviousSurvivesRedelivery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
+			ok = false
+		}
+		rowSpan := tier1Gran / buckets
+		want := make([]expectedColumnPoint, 0, windows*buckets)
+		for row := int64(1); row <= windows*buckets; row++ {
+			want = append(want, wantNumberAt(after+row*rowSpan, 0))
+		}
+		if !assertExactColumn(t, cols, ch.Dimensions[0].ID, want, 1e-6) {
+			ok = false
+		}
 		return cols[ch.Dimensions[0].ID]
 	}
 
-	ok := true
-
 	for _, perWindow := range []int64{1, 3, 5} {
 		col := ask(perWindow)
-		if len(col) == 0 {
-			t.Fatalf("perWindow=%d returned no rows", perWindow)
-		}
 
 		worst, worstAt, nonzero := 0.0, int64(0), 0
 		for _, pt := range col {

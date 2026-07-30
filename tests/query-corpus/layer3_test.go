@@ -42,10 +42,7 @@ func tgBuckets(d fixture.Dimension, group int) [][]float64 {
 		end := min(start+group, len(d.Points))
 		var bucket []float64
 		for _, p := range d.Points[start:end] {
-			if p.Flags == stream.FlagEmpty {
-				continue
-			}
-			if v, err := strconv.ParseFloat(p.Collected, 64); err == nil {
+			if v, collected := p.CollectedValue(d.ID); collected {
 				bucket = append(bucket, fixture.SNRoundTrip(v))
 			}
 		}

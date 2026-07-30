@@ -105,81 +105,104 @@ func TestLayer8PostProcessing(t *testing.T) {
 		// (api_v2_data.c) — the share is computed over |values|, signs
 		// are erased at fetch time
 		cols := l8Query(t, "l8-post", l8Context, "jsonwrap|percentage", nil)
-		if len(cols) != len(l8Dims) {
-			t.Fatalf("got %d dims %v, want %d", len(cols), keys2(cols), len(l8Dims))
+		if !assertExactColumnSet(t, cols, l8Dims) {
+			t.Fail()
 		}
-		for i := 1; i <= l8Rows; i++ {
-			total := 0.0
-			for _, dim := range l8Dims {
-				if v, gap := l8Value(dim, i); !gap {
-					total += math.Abs(v)
-				}
-			}
-			divisor := total
-			if divisor == 0 {
-				divisor = 1.0
-			}
-			for _, dim := range l8Dims {
-				v, gap := l8Value(dim, i)
-				pt := cols[dim][i-1]
-				if int(pt.T-fixture.T0) != i {
-					t.Fatalf("row alignment broke: %d vs %d", pt.T-fixture.T0, i)
-				}
-				if gap {
-					if pt.Value != nil {
-						t.Errorf("%s row %d: value %v, want null", dim, i, *pt.Value)
+		for _, dim := range l8Dims {
+			want := make([]expectedColumnPoint, 0, l8Rows)
+			for i := 1; i <= l8Rows; i++ {
+				total := 0.0
+				for _, member := range l8Dims {
+					if v, gap := l8Value(member, i); !gap {
+						total += math.Abs(v)
 					}
+				}
+				v, gap := l8Value(dim, i)
+				if gap {
+					want = append(want,
+						wantEmptyWithMetadataAt(fixture.T0+int64(i), 0, canon.AnnotationEmpty))
 					continue
 				}
-				want := math.Abs(v) * 100.0 / divisor
-				if pt.Value == nil || !tierValueMatch(*pt.Value, want, 1e-9) {
-					t.Errorf("%s row %d: value %v, want %v (total %v)", dim, i, fmtPt(pt), want, total)
+				divisor := total
+				if divisor == 0 {
+					divisor = 1
 				}
+				want = append(want,
+					wantNumberWithMetadataAt(fixture.T0+int64(i), math.Abs(v)*100/divisor, 0, 0))
+			}
+			if !assertExactColumn(t, cols, dim, want, printTol) {
+				t.Fail()
 			}
 		}
 	})
 
 	t.Run("absolute", func(t *testing.T) {
 		cols := l8Query(t, "l8-post", l8Context, "jsonwrap|absolute", nil)
+		if !assertExactColumnSet(t, cols, l8Dims) {
+			t.Fail()
+		}
 		for _, dim := range l8Dims {
-			for _, pt := range cols[dim] {
-				i := int(pt.T - fixture.T0)
+			want := make([]expectedColumnPoint, 0, l8Rows)
+			for i := 1; i <= l8Rows; i++ {
 				v, gap := l8Value(dim, i)
 				if gap {
-					if pt.Value != nil {
-						t.Errorf("%s row %d: value %v, want null", dim, i, *pt.Value)
-					}
+					want = append(want,
+						wantEmptyWithMetadataAt(fixture.T0+int64(i), 0, canon.AnnotationEmpty))
 					continue
 				}
-				want := math.Abs(v)
-				if pt.Value == nil || !tierValueMatch(*pt.Value, want, 0) {
-					t.Errorf("%s row %d: value %v, want abs %v", dim, i, fmtPt(pt), want)
-				}
+				want = append(want,
+					wantNumberWithMetadataAt(fixture.T0+int64(i), math.Abs(v), 0, 0))
+			}
+			if !assertExactColumn(t, cols, dim, want, 0) {
+				t.Fail()
 			}
 		}
 	})
 
 	t.Run("nonzero", func(t *testing.T) {
 		cols := l8Query(t, "l8-post", l8Context, "jsonwrap|nonzero", nil)
-		if _, ok := cols["zero"]; ok {
-			t.Errorf("nonzero kept the all-zero dimension (have %v)", keys2(cols))
+		dimensions := []string{"pos", "neg", "gappy"}
+		if !assertExactColumnSet(t, cols, dimensions) {
+			t.Fail()
 		}
-		if len(cols) != len(l8Dims)-1 {
-			t.Errorf("got %d dims %v, want %d", len(cols), keys2(cols), len(l8Dims)-1)
+		for _, dim := range dimensions {
+			want := make([]expectedColumnPoint, 0, l8Rows)
+			for i := 1; i <= l8Rows; i++ {
+				v, gap := l8Value(dim, i)
+				if gap {
+					want = append(want,
+						wantEmptyWithMetadataAt(fixture.T0+int64(i), 0, canon.AnnotationEmpty))
+				} else {
+					want = append(want,
+						wantNumberWithMetadataAt(fixture.T0+int64(i), v, 0, 0))
+				}
+			}
+			if !assertExactColumn(t, cols, dim, want, 0) {
+				t.Fail()
+			}
 		}
 	})
 
 	t.Run("null2zero", func(t *testing.T) {
 		cols := l8Query(t, "l8-post", l8Context, "jsonwrap|null2zero", nil)
-		for _, pt := range cols["gappy"] {
-			i := int(pt.T - fixture.T0)
-			v, gap := l8Value("gappy", i)
-			want := v
-			if gap {
-				want = 0 // the point of the option
+		if !assertExactColumnSet(t, cols, l8Dims) {
+			t.Fail()
+		}
+		for _, dim := range l8Dims {
+			want := make([]expectedColumnPoint, 0, l8Rows)
+			for i := 1; i <= l8Rows; i++ {
+				v, gap := l8Value(dim, i)
+				if gap {
+					v = 0
+					want = append(want,
+						wantNumberWithMetadataAt(fixture.T0+int64(i), v, 0, canon.AnnotationEmpty))
+					continue
+				}
+				want = append(want,
+					wantNumberWithMetadataAt(fixture.T0+int64(i), v, 0, 0))
 			}
-			if pt.Value == nil || !tierValueMatch(*pt.Value, want, 0) {
-				t.Errorf("gappy row %d: value %v, want %v", i, pt.Value, want)
+			if !assertExactColumn(t, cols, dim, want, 0) {
+				t.Fail()
 			}
 		}
 	})
@@ -217,8 +240,19 @@ func TestLayer8NonzeroAllZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cols) != 2 {
-		t.Errorf("all-zero chart with nonzero: got %d dims %v, want both (option self-neutralizes)", len(cols), keys2(cols))
+	dimensions := []string{"za", "zb"}
+	if !assertExactColumnSet(t, cols, dimensions) {
+		t.Fail()
+	}
+	for _, dimension := range dimensions {
+		want := make([]expectedColumnPoint, 0, 10)
+		for i := 1; i <= 10; i++ {
+			want = append(want,
+				wantNumberWithMetadataAt(fixture.T0+int64(i), 0, 0, 0))
+		}
+		if !assertExactColumn(t, cols, dimension, want, 0) {
+			t.Fail()
+		}
 	}
 }
 
@@ -262,19 +296,17 @@ func TestLayer8CardinalityLimit(t *testing.T) {
 		"d6": 6, "d5": 5, "d4": 4,
 		"remaining 3 dimensions": 1 + 2 + 3,
 	}
-	if len(cols) != len(want) {
-		t.Fatalf("got %d dims %v, want %v", len(cols), keys2(cols), keys2(want))
+	if !assertExactColumnSet(t, cols, keys2(want)) {
+		t.Fail()
 	}
 	for name, wantV := range want {
-		col, ok := cols[name]
-		if !ok {
-			t.Errorf("column %q missing (have %v)", name, keys2(cols))
-			continue
+		rows := make([]expectedColumnPoint, 0, 20)
+		for i := 1; i <= 20; i++ {
+			rows = append(rows,
+				wantNumberWithMetadataAt(fixture.T0+int64(i), wantV, 0, 0))
 		}
-		for _, pt := range col {
-			if pt.Value == nil || !tierValueMatch(*pt.Value, wantV, 0) {
-				t.Errorf("%q row t0%+d: value %v, want %v", name, pt.T-fixture.T0, pt.Value, wantV)
-			}
+		if !assertExactColumn(t, cols, name, rows, 0) {
+			t.Fail()
 		}
 	}
 }

@@ -7,6 +7,8 @@
 package fixture
 
 import (
+	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -53,9 +55,13 @@ type Chart struct {
 // FirstT returns the earliest point timestamp across the chart's dimensions.
 func (c Chart) FirstT() int64 {
 	var first int64
+	found := false
 	for _, d := range c.Dimensions {
-		if len(d.Points) > 0 && (first == 0 || d.Points[0].T < first) {
-			first = d.Points[0].T
+		for _, p := range d.Points {
+			if !found || p.T < first {
+				first = p.T
+				found = true
+			}
 		}
 	}
 	return first
@@ -64,12 +70,87 @@ func (c Chart) FirstT() int64 {
 // LastT returns the latest point timestamp across the chart's dimensions.
 func (c Chart) LastT() int64 {
 	var last int64
+	found := false
 	for _, d := range c.Dimensions {
-		if n := len(d.Points); n > 0 && d.Points[n-1].T > last {
-			last = d.Points[n-1].T
+		for _, p := range d.Points {
+			if !found || p.T > last {
+				last = p.T
+				found = true
+			}
 		}
 	}
 	return last
+}
+
+// CollectedValue returns one finite numeric fixture value. An E flag is the
+// only way a fixture can represent a gap; every other malformed or non-finite
+// wire value is a harness defect and panics before it can be mistaken for
+// missing data.
+func (p Point) CollectedValue(dimensionID string) (float64, bool) {
+	if strings.ContainsRune(p.Flags, 'E') {
+		return 0, false
+	}
+
+	value, err := parseFiniteDecimal(p.Collected)
+	if err != nil {
+		panic(
+			"fixture: collected value " + strconv.Quote(p.Collected) +
+				" is not finite for dimension " + strconv.Quote(dimensionID) +
+				" at timestamp " + strconv.FormatInt(p.T, 10))
+	}
+	return value, true
+}
+
+// parseFiniteDecimal accepts only the corpus fixture's canonical decimal
+// number syntax. Wire encodings such as hexadecimal storage numbers are
+// deliberately excluded: fixtures model collected values, not protocol
+// shorthand, so the oracle cannot parse a different value than ingestion.
+func parseFiniteDecimal(text string) (float64, error) {
+	if text == "" {
+		return 0, fmt.Errorf("empty decimal")
+	}
+
+	i := 0
+	if text[i] == '+' || text[i] == '-' {
+		i++
+	}
+	mantissaDigits := 0
+	for i < len(text) && text[i] >= '0' && text[i] <= '9' {
+		i++
+		mantissaDigits++
+	}
+	if i < len(text) && text[i] == '.' {
+		i++
+		for i < len(text) && text[i] >= '0' && text[i] <= '9' {
+			i++
+			mantissaDigits++
+		}
+	}
+	if mantissaDigits == 0 {
+		return 0, fmt.Errorf("decimal has no mantissa digits")
+	}
+	if i < len(text) && (text[i] == 'e' || text[i] == 'E') {
+		i++
+		if i < len(text) && (text[i] == '+' || text[i] == '-') {
+			i++
+		}
+		exponentStart := i
+		for i < len(text) && text[i] >= '0' && text[i] <= '9' {
+			i++
+		}
+		if i == exponentStart {
+			return 0, fmt.Errorf("decimal has no exponent digits")
+		}
+	}
+	if i != len(text) {
+		return 0, fmt.Errorf("decimal has trailing syntax")
+	}
+
+	value, err := strconv.ParseFloat(text, 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, fmt.Errorf("decimal is not finite")
+	}
+	return value, nil
 }
 
 // Define buffers the chart metadata (CHART, DIMENSION, CLABEL) on conn.
@@ -212,16 +293,10 @@ func (d Dimension) Expected() []ExpectedPoint {
 	for _, p := range d.Points {
 		ep := ExpectedPoint{T: p.T}
 		flags := string(p.Flags)
-		switch {
-		case strings.ContainsRune(flags, 'E'):
+		if value, collected := p.CollectedValue(d.ID); !collected {
 			ep.PA = PAEmpty
-		default:
-			v, err := strconv.ParseFloat(p.Collected, 64)
-			if err != nil {
-				// a malformed fixture must fail loudly, not read as a gap
-				panic("fixture: unparsable collected value " + strconv.Quote(p.Collected) + " for dimension " + d.ID)
-			}
-			q := SNRoundTrip(v)
+		} else {
+			q := SNRoundTrip(value)
 			ep.Value = &q
 			if strings.ContainsRune(flags, 'R') {
 				ep.PA |= PAReset

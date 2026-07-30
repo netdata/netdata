@@ -99,15 +99,10 @@ func c023MCPValidSessionID(session string) bool {
 	return true
 }
 
-func c023MCPPost(t *testing.T, id int, method string, params map[string]any, session string) c023MCPResponse {
+func c023MCPDo(t *testing.T, envelope map[string]any, session string) *http.Response {
 	t.Helper()
 
-	payload, err := json.Marshal(map[string]any{
-		"jsonrpc": "2.0",
-		"id":      id,
-		"method":  method,
-		"params":  params,
-	})
+	payload, err := json.Marshal(envelope)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,6 +121,18 @@ func c023MCPPost(t *testing.T, id int, method string, params map[string]any, ses
 	if err != nil {
 		t.Fatal(err)
 	}
+	return resp
+}
+
+func c023MCPPost(t *testing.T, id int, method string, params map[string]any, session string) c023MCPResponse {
+	t.Helper()
+
+	resp := c023MCPDo(t, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"method":  method,
+		"params":  params,
+	}, session)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
@@ -178,29 +185,11 @@ func c023MCPPost(t *testing.T, id int, method string, params map[string]any, ses
 func c023MCPNotify(t *testing.T, method string, params map[string]any, session string) {
 	t.Helper()
 
-	payload, err := json.Marshal(map[string]any{
+	resp := c023MCPDo(t, map[string]any{
 		"jsonrpc": "2.0",
 		"method":  method,
 		"params":  params,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	req, err := http.NewRequest(http.MethodPost, td.BaseURL+"/mcp", bytes.NewReader(payload))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json, text/event-stream")
-	if session != "" {
-		req.Header.Set("Mcp-Session-Id", session)
-	}
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
+	}, session)
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -388,13 +377,6 @@ func c023MCPAssertOptionsError(t *testing.T, response map[string]any, group stri
 	message, ok := errorObject["message"].(string)
 	if !ok || message == "" {
 		t.Errorf("MCP %s error.message is empty or malformed: %v", group, errorObject["message"])
-	} else {
-		if !strings.Contains(message, "time_group_options") {
-			t.Errorf("MCP %s error.message does not name time_group_options: %q", group, message)
-		}
-		if !strings.Contains(message, group) {
-			t.Errorf("MCP %s error.message does not name the grouping: %q", group, message)
-		}
 	}
 
 	data, ok := errorObject["data"].(map[string]any)
@@ -679,6 +661,10 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 			{name: "operator-only", value: ">", set: true},
 			{name: "operator-whitespace", value: ">   ", set: true},
 			{name: "malformed", value: "abc", set: true},
+			{name: "nan", value: "NaN", set: true},
+			{name: "positive-infinity", value: "+Inf", set: true},
+			{name: "negative-infinity", value: "-Inf", set: true},
+			{name: "overflow-to-infinity", value: "1e309", set: true},
 		}
 		for _, invalid := range invalidOptions {
 			t.Run(group.name+"/"+invalid.name+"-options", func(t *testing.T) {

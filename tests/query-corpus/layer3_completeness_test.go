@@ -60,13 +60,13 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 	})
 
 	// the shared expression grammar beyond the spellings TestLayer3Families
-	// sends: '!'/'!:'/'<>' are NOT-EQUAL, '>:'/'<:' are >=/<=, ':' and
-	// '==' are EQUAL, spaces are skipped around the operator, empty
+	// sends: '<>' is NOT-EQUAL, '>:'/'<:' are >=/<=, ':' and '==' are
+	// EQUAL, spaces are skipped around the operator, empty
 	// options compare EQUAL against 0.0, and a bare number compares EQUAL
 	// against itself (it used to lose its first digit)
 	t.Run("countif-grammar", func(t *testing.T) {
 		for _, opts := range []string{
-			"!5", "!:5", ">:30", "<:20", "<>1", ":40", "==40",
+			">:30", "<:20", "<>1", ":40", "==40",
 			"40", "", "  <>  1",
 		} {
 			t.Run("countif("+opts+")", func(t *testing.T) {

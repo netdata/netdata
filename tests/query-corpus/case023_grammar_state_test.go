@@ -14,6 +14,16 @@ import (
 	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
 
+type c023GrammarQuery struct {
+	group          string
+	expression     string
+	dimension      string
+	after          int64
+	before         int64
+	points         int64
+	sendExpression bool
+}
+
 // TestCase023ExpressionGrammarAndState keeps parser validity separate from
 // the grouping arithmetic. It also puts predecessor and flap transitions
 // exactly on bucket boundaries, where resetting state during flush would
@@ -61,57 +71,63 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	query := func(t *testing.T, group, expression, dimension string, after, before, points int64, sendExpression bool) []canon.Pt {
+	query := func(t *testing.T, spec c023GrammarQuery) []canon.Pt {
 		t.Helper()
 
-		params := daemon.DataParams(ch.Context, after, before, points)
-		params.Set("time_group", group)
-		params.Set("dimensions", dimension)
+		params := daemon.DataParams(ch.Context, spec.after, spec.before, spec.points)
+		params.Set("time_group", spec.group)
+		params.Set("dimensions", spec.dimension)
 		params.Set("options", "jsonwrap,unaligned")
-		if sendExpression {
-			params.Set("time_group_options", expression)
+		if spec.sendExpression {
+			params.Set("time_group_options", spec.expression)
 		}
 
 		doc, err := td.DataV3(host, params)
 		if err != nil {
-			t.Fatalf("%s(%q) on %s: %v", group, expression, dimension, err)
+			t.Fatalf("%s(%q) on %s: %v", spec.group, spec.expression, spec.dimension, err)
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
-			t.Fatalf("%s(%q) on %s: %v", group, expression, dimension, err)
+			t.Fatalf("%s(%q) on %s: %v", spec.group, spec.expression, spec.dimension, err)
 		}
 		if len(cols) != 1 {
 			t.Fatalf("%s(%q) on %s: got columns %v, want exactly [%s]",
-				group, expression, dimension, keys(cols), dimension)
+				spec.group, spec.expression, spec.dimension, keys(cols), spec.dimension)
 		}
-		col, ok := cols[dimension]
+		col, ok := cols[spec.dimension]
 		if !ok {
-			t.Fatalf("%s(%q): dimension %s is absent", group, expression, dimension)
+			t.Fatalf("%s(%q): dimension %s is absent", spec.group, spec.expression, spec.dimension)
 		}
 		return col
 	}
 
-	requireValues := func(t *testing.T, group, expression, dimension string, after, before int64, got []canon.Pt, want []float64) {
+	requireValues := func(t *testing.T, spec c023GrammarQuery, got []canon.Pt, want []float64) {
 		t.Helper()
 
-		span := before - after
+		span := spec.before - spec.after
 		if span%int64(len(want)) != 0 {
 			t.Fatalf("test bug: span %d does not divide %d rows", span, len(want))
 		}
 		step := span / int64(len(want))
 		expected := make([]expectedColumnPoint, len(want))
 		for i, value := range want {
-			expected[i] = wantNumberAt(after+int64(i+1)*step, value)
+			expected[i] = wantNumberAt(spec.after+int64(i+1)*step, value)
 		}
-		if !assertExactColumn(t, map[string][]canon.Pt{dimension: got}, dimension, expected, 0) {
-			t.Errorf("%s(%q) on %s did not match the exact fixture-derived rows", group, expression, dimension)
+		if !assertExactColumn(
+			t, map[string][]canon.Pt{spec.dimension: got}, spec.dimension, expected, 0) {
+			t.Errorf("%s(%q) on %s did not match the exact fixture-derived rows",
+				spec.group, spec.expression, spec.dimension)
 		}
 	}
 
 	whole := func(t *testing.T, group, expression, dimension string, sendExpression bool, want float64) {
 		t.Helper()
-		got := query(t, group, expression, dimension, fixture.T0, fixture.T0+8, 1, sendExpression)
-		requireValues(t, group, expression, dimension, fixture.T0, fixture.T0+8, got, []float64{want})
+		spec := c023GrammarQuery{
+			group: group, expression: expression, dimension: dimension,
+			after: fixture.T0, before: fixture.T0 + 8, points: 1,
+			sendExpression: sendExpression,
+		}
+		requireValues(t, spec, query(t, spec), []float64{want})
 	}
 
 	// Every accepted operator spelling is independently discriminated on
@@ -120,7 +136,7 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		expression string
 		want       float64
 	}{
-		{"!1", 75}, {"!=1", 75}, {"!:1", 75}, {"<>1", 75},
+		{"!=1", 75}, {"<>1", 75},
 		{">0", 50}, {">=1", 50}, {">:1", 50},
 		{"<1", 50}, {"<=1", 75}, {"<:1", 75},
 		{"=1", 25}, {"==1", 25}, {":1", 25},
@@ -133,9 +149,8 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		})
 	}
 
-	// Missing, empty and whitespace-only options retain the documented =0
-	// default at every entry point. They are different from supplying an
-	// operator with no value.
+	// An absent option or a zero-length expression retains the documented
+	// =0 default at every entry point.
 	for _, group := range []struct {
 		name string
 		want float64
@@ -149,7 +164,6 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		t.Run("default/"+group.name, func(t *testing.T) {
 			whole(t, group.name, "", "state", false, group.want)
 			whole(t, group.name, "", "state", true, group.want)
-			whole(t, group.name, "   ", "state", true, group.want)
 		})
 	}
 
@@ -186,33 +200,36 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 
 	// A first sample has no predecessor and therefore cannot match.
 	t.Run("previous-first-sample", func(t *testing.T) {
-		got := query(t, "number-of-times", "<previous", "counter",
-			fixture.T0, fixture.T0+1, 1, true)
-		requireValues(t, "number-of-times", "<previous", "counter",
-			fixture.T0, fixture.T0+1, got, []float64{0})
+		spec := c023GrammarQuery{
+			group: "number-of-times", expression: "<previous", dimension: "counter",
+			after: fixture.T0, before: fixture.T0 + 1, points: 1, sendExpression: true,
+		}
+		requireValues(t, spec, query(t, spec), []float64{0})
 	})
 
 	// The predecessor from t2 must survive both the t3/t4 gap and the
 	// bucket flush, so the drop at t5 belongs to the second bucket.
 	t.Run("previous-across-gap-and-flush", func(t *testing.T) {
-		got := query(t, "number-of-times", "<previous", "counter",
-			fixture.T0, fixture.T0+8, 2, true)
-		requireValues(t, "number-of-times", "<previous", "counter",
-			fixture.T0, fixture.T0+8, got, []float64{0, 1})
+		spec := c023GrammarQuery{
+			group: "number-of-times", expression: "<previous", dimension: "counter",
+			after: fixture.T0, before: fixture.T0 + 8, points: 2, sendExpression: true,
+		}
+		requireValues(t, spec, query(t, spec), []float64{0, 1})
 	})
 
 	// Four 2-second buckets put both state transitions at the first sample
 	// of a new bucket. Flush must reset only the per-bucket count, not the
 	// boolean state or predecessor.
 	t.Run("flap-state-across-flush", func(t *testing.T) {
-		got := query(t, "number-of-flaps", ">0", "state",
-			fixture.T0, fixture.T0+8, 4, true)
-		requireValues(t, "number-of-flaps", ">0", "state",
-			fixture.T0, fixture.T0+8, got, []float64{0, 1, 0, 1})
+		spec := c023GrammarQuery{
+			group: "number-of-flaps", expression: ">0", dimension: "state",
+			after: fixture.T0, before: fixture.T0 + 8, points: 4, sendExpression: true,
+		}
+		requireValues(t, spec, query(t, spec), []float64{0, 1, 0, 1})
 	})
 
-	// Operators always require a complete operand. Only an absent or blank
-	// whole expression defaults to =0.
+	// Operators always require a complete operand. Only an absent or
+	// zero-length whole expression defaults to =0.
 	operatorOnly := []string{
 		"!", "!=", "!:", ">", ">=", ">:", "<", "<=", "<:", "<>", "=", "==", ":",
 		">   ",
@@ -230,7 +247,9 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		"percentage-of-samples", "percentage-of-time", "number-of-flaps", "number-of-times",
 	} {
 		group := group
-		for _, expression := range []string{">", "abc"} {
+		for _, expression := range []string{
+			"   ", ">", "abc", ">1e309", "NaN", "+Inf", "-Inf",
+		} {
 			expression := expression
 			t.Run("reject/"+group+"/"+testName(expression), func(t *testing.T) {
 				requireExpressionRejected(t, host, ch.Context, group, expression)
@@ -238,7 +257,7 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		}
 	}
 
-	for _, expression := range []string{">.", ">==5", ">0junk", "==previous-junk", "==gap and x"} {
+	for _, expression := range []string{"!1", "!:1", ">.", ">==5", ">0junk", "==previous-junk", "==gap and x"} {
 		expression := expression
 		t.Run("reject/malformed/"+testName(expression), func(t *testing.T) {
 			requireExpressionRejected(t, host, ch.Context, "percentage-of-samples", expression)

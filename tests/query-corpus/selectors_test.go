@@ -116,44 +116,43 @@ func TestSelectorsMatchModes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if canon.EmptyResult(doc) {
+			return map[string][]canon.Pt{}
+		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
-			// a no-match response carries a bare [time] labels row —
-			// that IS the empty result
-			if strings.Contains(err.Error(), "too short") {
-				return map[string][]canon.Pt{}
-			}
 			t.Fatal(err)
 		}
 		return cols
 	}
 
-	sole := func(t *testing.T, cols map[string][]canon.Pt, wantValue float64) {
+	sole := func(t *testing.T, cols map[string][]canon.Pt, wantName string, wantValue float64) {
 		t.Helper()
-		if len(cols) != 1 {
-			t.Fatalf("got %d dimensions %v, want 1", len(cols), keys2(cols))
+		if !assertOnlyColumn(t, cols, wantName) {
+			t.Fail()
 		}
-		for _, col := range cols {
-			for _, pt := range col {
-				if pt.Value == nil || *pt.Value != wantValue {
-					t.Errorf("row t0%+d: %s, want %v", pt.T-fixture.T0, fmtPt(pt), wantValue)
-				}
-			}
+		want := make([]expectedColumnPoint, 0, 10)
+		for i := 1; i <= 10; i++ {
+			want = append(want,
+				wantNumberWithMetadataAt(fixture.T0+int64(i), wantValue, 0, 0))
+		}
+		if !assertExactColumn(t, cols, wantName, want, 0) {
+			t.Fail()
 		}
 	}
 
 	t.Run("default-matches-both", func(t *testing.T) {
-		sole(t, query("alpha_name", ""), 10) // by name
-		sole(t, query("d2", ""), 20)         // by id
+		sole(t, query("alpha_name", ""), "alpha_name", 10) // by name
+		sole(t, query("d2", ""), "beta_name", 20)          // by id
 	})
 	t.Run("match-ids-only", func(t *testing.T) {
-		sole(t, query("d1", "match-ids"), 10)
+		sole(t, query("d1", "match-ids"), "alpha_name", 10)
 		if cols := query("alpha_name", "match-ids"); len(cols) != 0 {
 			t.Errorf("match-ids matched a NAME: %v", keys2(cols))
 		}
 	})
 	t.Run("match-names-only", func(t *testing.T) {
-		sole(t, query("beta_name", "match-names"), 20)
+		sole(t, query("beta_name", "match-names"), "beta_name", 20)
 		if cols := query("d2", "match-names"); len(cols) != 0 {
 			t.Errorf("match-names matched an ID: %v", keys2(cols))
 		}
@@ -228,40 +227,40 @@ func TestCardinalityLimitSweep(t *testing.T) {
 
 	t.Run("limit-2", func(t *testing.T) {
 		cols := query(2)
-		if len(cols) != 2 {
-			t.Fatalf("got %d columns %v, want top-1 + the fold", len(cols), keys2(cols))
+		if !assertExactColumnSet(t, cols, []string{"d6", "remaining 5 dimensions"}) {
+			t.Fail()
 		}
-		top, ok := cols["d6"]
-		if !ok {
-			t.Fatalf("d6 (largest |sum|) missing: %v", keys2(cols))
+		topWant := make([]expectedColumnPoint, 0, 20)
+		foldWant := make([]expectedColumnPoint, 0, 20)
+		for i := 1; i <= 20; i++ {
+			ts := fixture.T0 + int64(i)
+			topWant = append(topWant, wantNumberWithMetadataAt(ts, 6, 0, 0))
+			foldWant = append(foldWant, wantNumberWithMetadataAt(ts, 15, 0, 0))
 		}
-		for _, pt := range top {
-			if pt.Value == nil || *pt.Value != 6 {
-				t.Errorf("d6 row: %s, want 6", fmtPt(pt))
-			}
+		if !assertExactColumn(t, cols, "d6", topWant, 0) {
+			t.Fail()
 		}
-		fold, ok := cols["remaining 5 dimensions"]
-		if !ok {
-			t.Fatalf("fold column missing: %v", keys2(cols))
-		}
-		for _, pt := range fold {
-			if pt.Value == nil || *pt.Value != 1+2+3+4+5 {
-				t.Errorf("fold row: %s, want 15", fmtPt(pt))
-			}
+		if !assertExactColumn(t, cols, "remaining 5 dimensions", foldWant, 0) {
+			t.Fail()
 		}
 	})
 
 	for _, limit := range []int{6, 7} {
 		t.Run("limit-"+strconv.Itoa(limit), func(t *testing.T) {
 			cols := query(limit)
-			if len(cols) != 6 {
-				t.Errorf("limit %d folded a 6-dim chart: %d columns %v", limit, len(cols), keys2(cols))
+			dimensions := []string{"d1", "d2", "d3", "d4", "d5", "d6"}
+			if !assertExactColumnSet(t, cols, dimensions) {
+				t.Fail()
 			}
-			for id, col := range cols {
-				if strings.HasPrefix(id, "remaining") {
-					t.Errorf("unexpected fold column %q at limit %d", id, limit)
+			for value, id := range dimensions {
+				want := make([]expectedColumnPoint, 0, 20)
+				for i := 1; i <= 20; i++ {
+					want = append(want,
+						wantNumberWithMetadataAt(fixture.T0+int64(i), float64(value+1), 0, 0))
 				}
-				_ = col
+				if !assertExactColumn(t, cols, id, want, 0) {
+					t.Fail()
+				}
 			}
 		})
 	}

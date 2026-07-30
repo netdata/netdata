@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package canon canonicalizes query responses for corpus assertions:
-// volatile fields (timings, agent identities, versions) are stripped, and
-// json2 result payloads are decoded into typed per-dimension columns.
+// Package canon decodes json2 query results into typed per-dimension columns
+// for corpus assertions.
 package canon
 
 import (
 	"fmt"
-	"maps"
+	"math"
 	"slices"
 )
 
@@ -21,7 +20,7 @@ const (
 // Pt is one decoded json2 point of one dimension: T in seconds, Value nil
 // for nulls, ARP the anomaly rate percent, PA the annotation bits. Count
 // and Hidden are present only in aggregatable (raw) responses, where the
-// point schema adds them (Count = group contributions, Hidden = the
+// point schema adds them (Count = raw metric contributors, Hidden = the
 // percentage denominator accumulator).
 type Pt struct {
 	T      int64
@@ -36,38 +35,145 @@ type Pt struct {
 // short (arp, pa) or long (anomaly_rate, point_annotations) key forms.
 type pointSchema struct {
 	value, arp, pa, count, hidden int
+	width                         int
 }
 
-func decodePointSchema(result map[string]any) pointSchema {
-	ps := pointSchema{value: 0, arp: 1, pa: 2, count: -1, hidden: -1}
+func decodePointSchema(result map[string]any) (pointSchema, error) {
+	ps := pointSchema{value: -1, arp: -1, pa: -1, count: -1, hidden: -1}
 	schema, ok := result["point"].(map[string]any)
 	if !ok {
-		return ps
+		return ps, fmt.Errorf("canon: result.point missing or not an object")
 	}
+
+	semanticIndices := make(map[string]int, len(schema))
 	for name, idxAny := range schema {
-		idx, ok := idxAny.(float64)
-		if !ok {
-			continue
+		switch name {
+		case "value", "arp", "anomaly_rate", "pa", "point_annotations", "count", "hidden":
+		default:
+			return ps, fmt.Errorf("canon: result.point has unknown field %q", name)
 		}
+
+		idx, err := schemaIndex(idxAny, "result.point."+name)
+		if err != nil {
+			return ps, err
+		}
+
+		semantic := name
 		switch name {
 		case "value":
-			ps.value = int(idx)
 		case "arp", "anomaly_rate":
-			ps.arp = int(idx)
+			semantic = "arp"
 		case "pa", "point_annotations":
-			ps.pa = int(idx)
-		case "count":
-			ps.count = int(idx)
-		case "hidden":
-			ps.hidden = int(idx)
+			semantic = "pa"
+		}
+		if previous, seen := semanticIndices[semantic]; seen {
+			if previous != idx {
+				return ps, fmt.Errorf(
+					"canon: result.point aliases for %s disagree: %d and %d",
+					semantic, previous, idx)
+			}
+			continue
+		}
+		semanticIndices[semantic] = idx
+	}
+
+	for _, required := range []string{"value", "arp", "pa"} {
+		if _, ok := semanticIndices[required]; !ok {
+			return ps, fmt.Errorf("canon: result.point has no %s index", required)
 		}
 	}
-	return ps
+
+	indexOwners := make(map[int]string, len(semanticIndices))
+	for semantic, idx := range semanticIndices {
+		if owner, duplicate := indexOwners[idx]; duplicate {
+			return ps, fmt.Errorf(
+				"canon: result.point index %d is shared by %s and %s",
+				idx, owner, semantic)
+		}
+		indexOwners[idx] = semantic
+	}
+	for idx := 0; idx < len(indexOwners); idx++ {
+		if _, ok := indexOwners[idx]; !ok {
+			return ps, fmt.Errorf("canon: result.point has no field at index %d", idx)
+		}
+	}
+
+	ps.value = semanticIndices["value"]
+	ps.arp = semanticIndices["arp"]
+	ps.pa = semanticIndices["pa"]
+	if idx, ok := semanticIndices["count"]; ok {
+		ps.count = idx
+	}
+	if idx, ok := semanticIndices["hidden"]; ok {
+		ps.hidden = idx
+	}
+	if ps.hidden >= 0 && ps.count < 0 {
+		return ps, fmt.Errorf("canon: result.point has hidden without count")
+	}
+	ps.width = len(indexOwners)
+	return ps, nil
+}
+
+func finiteNumber(value any, path string) (float64, error) {
+	number, ok := value.(float64)
+	if !ok || math.IsNaN(number) || math.IsInf(number, 0) {
+		return 0, fmt.Errorf("canon: %s is not a finite number: %v", path, value)
+	}
+	return number, nil
+}
+
+func integer(value any, path string) (int64, error) {
+	number, err := finiteNumber(value, path)
+	if err != nil {
+		return 0, err
+	}
+	if math.Trunc(number) != number || number < -math.Exp2(63) || number >= math.Exp2(63) {
+		return 0, fmt.Errorf("canon: %s is not an int64: %v", path, value)
+	}
+	return int64(number), nil
+}
+
+func nonnegativeInt64(value any, path string) (int64, error) {
+	number, err := integer(value, path)
+	if err != nil {
+		return 0, err
+	}
+	if number < 0 {
+		return 0, fmt.Errorf("canon: %s is negative: %v", path, value)
+	}
+	return number, nil
+}
+
+func schemaIndex(value any, path string) (int, error) {
+	number, err := nonnegativeInt64(value, path)
+	if err != nil {
+		return 0, err
+	}
+	if uint64(number) > uint64(^uint(0)>>1) {
+		return 0, fmt.Errorf("canon: %s exceeds the platform index range: %v", path, value)
+	}
+	return int(number), nil
+}
+
+// EmptyResult recognizes the exact labels/data subshape for a no-match
+// json2 result. Other result metadata is allowed.
+func EmptyResult(doc map[string]any) bool {
+	result, ok := doc["result"].(map[string]any)
+	if !ok {
+		return false
+	}
+	labels, ok := result["labels"].([]any)
+	if !ok || len(labels) != 1 || labels[0] != "time" {
+		return false
+	}
+	data, ok := result["data"].([]any)
+	return ok && len(data) == 0
 }
 
 // Columns decodes a json2 document's result payload into per-dimension
-// point columns keyed by the dimension label, sorted by time. json2 rows are
-// [time_ms, [value, arp, pa], ...] with one triplet per labeled dimension.
+// point columns keyed by the dimension label, sorted by time. Timestamps may
+// be seconds or milliseconds and are normalized to seconds; point width and
+// fields are declared by result.point.
 func Columns(doc map[string]any) (map[string][]Pt, error) {
 	result, ok := doc["result"].(map[string]any)
 	if !ok {
@@ -77,12 +183,20 @@ func Columns(doc map[string]any) (map[string][]Pt, error) {
 	if !ok || len(labelsAny) < 2 {
 		return nil, fmt.Errorf("canon: result.labels missing or too short: %v", result["labels"])
 	}
+	if labelsAny[0] != "time" {
+		return nil, fmt.Errorf("canon: result.labels[0] is %v, want time", labelsAny[0])
+	}
 	labels := make([]string, 0, len(labelsAny)-1)
-	for _, l := range labelsAny[1:] {
+	labelSet := make(map[string]struct{}, len(labelsAny)-1)
+	for i, l := range labelsAny[1:] {
 		s, ok := l.(string)
-		if !ok {
-			return nil, fmt.Errorf("canon: non-string label %v", l)
+		if !ok || s == "" {
+			return nil, fmt.Errorf("canon: result.labels[%d] is not a nonempty string: %v", i+1, l)
 		}
+		if _, duplicate := labelSet[s]; duplicate {
+			return nil, fmt.Errorf("canon: duplicate result label %q", s)
+		}
+		labelSet[s] = struct{}{}
 		labels = append(labels, s)
 	}
 
@@ -90,49 +204,78 @@ func Columns(doc map[string]any) (map[string][]Pt, error) {
 	if !ok {
 		return nil, fmt.Errorf("canon: result.data missing")
 	}
-	ps := decodePointSchema(result)
+	ps, err := decodePointSchema(result)
+	if err != nil {
+		return nil, err
+	}
 
 	cols := make(map[string][]Pt, len(labels))
-	for _, rowAny := range rowsAny {
+	for rowIndex, rowAny := range rowsAny {
 		row, ok := rowAny.([]any)
 		if !ok || len(row) != len(labels)+1 {
 			return nil, fmt.Errorf("canon: malformed row %v (want time + %d points)", rowAny, len(labels))
 		}
-		tRaw, ok := row[0].(float64)
-		if !ok {
-			return nil, fmt.Errorf("canon: non-numeric row time %v", row[0])
+		tsec, err := integer(row[0], fmt.Sprintf("result.data[%d][0]", rowIndex))
+		if err != nil {
+			return nil, err
 		}
 		// v2/v3 emit seconds; v1-era options emit milliseconds — normalize
 		// by magnitude (the fixed 2023 epoch makes the ranges unambiguous)
-		tsec := int64(tRaw)
-		if tsec > 1_000_000_000_000 {
+		if tsec > 1_000_000_000_000 || tsec < -1_000_000_000_000 {
+			if tsec%1000 != 0 {
+				return nil, fmt.Errorf(
+					"canon: result.data[%d][0] millisecond timestamp is not second-aligned: %d",
+					rowIndex, tsec)
+			}
 			tsec /= 1000
 		}
 		for i, lbl := range labels {
 			point, ok := row[1+i].([]any)
-			if !ok || len(point) < 3 {
-				return nil, fmt.Errorf("canon: malformed point %v for %s", row[1+i], lbl)
+			if !ok || len(point) != ps.width {
+				return nil, fmt.Errorf(
+					"canon: malformed point %v for %s (want exactly %d fields)",
+					row[1+i], lbl, ps.width)
 			}
 			pt := Pt{T: tsec}
-			if v, ok := point[ps.value].(float64); ok {
+			if point[ps.value] != nil {
+				v, err := finiteNumber(
+					point[ps.value],
+					fmt.Sprintf("result.data[%d][%d].value", rowIndex, i+1))
+				if err != nil {
+					return nil, err
+				}
 				pt.Value = &v
 			}
-			if arp, ok := point[ps.arp].(float64); ok {
-				pt.ARP = arp
+			pt.ARP, err = finiteNumber(
+				point[ps.arp],
+				fmt.Sprintf("result.data[%d][%d].arp", rowIndex, i+1))
+			if err != nil {
+				return nil, err
 			}
-			if pa, ok := point[ps.pa].(float64); ok {
-				pt.PA = int64(pa)
+			pa, err := nonnegativeInt64(
+				point[ps.pa],
+				fmt.Sprintf("result.data[%d][%d].pa", rowIndex, i+1))
+			if err != nil {
+				return nil, err
 			}
-			if ps.count >= 0 && ps.count < len(point) {
-				if c, ok := point[ps.count].(float64); ok {
-					n := int64(c)
-					pt.Count = &n
+			pt.PA = pa
+			if ps.count >= 0 {
+				count, err := nonnegativeInt64(
+					point[ps.count],
+					fmt.Sprintf("result.data[%d][%d].count", rowIndex, i+1))
+				if err != nil {
+					return nil, err
 				}
+				pt.Count = &count
 			}
-			if ps.hidden >= 0 && ps.hidden < len(point) {
-				if h, ok := point[ps.hidden].(float64); ok {
-					pt.Hidden = &h
+			if ps.hidden >= 0 {
+				hidden, err := finiteNumber(
+					point[ps.hidden],
+					fmt.Sprintf("result.data[%d][%d].hidden", rowIndex, i+1))
+				if err != nil {
+					return nil, err
 				}
+				pt.Hidden = &hidden
 			}
 			cols[lbl] = append(cols[lbl], pt)
 		}
@@ -140,22 +283,15 @@ func Columns(doc map[string]any) (map[string][]Pt, error) {
 
 	for lbl := range cols {
 		slices.SortFunc(cols[lbl], func(a, b Pt) int {
-			return int(a.T - b.T)
+			switch {
+			case a.T < b.T:
+				return -1
+			case a.T > b.T:
+				return 1
+			default:
+				return 0
+			}
 		})
 	}
 	return cols, nil
-}
-
-// volatileTopLevel are document keys that vary between runs and carry no
-// contract: they are dropped from canonical documents.
-var volatileTopLevel = []string{"timings", "agents", "versions"}
-
-// Canonicalize returns a shallow-copied document with volatile fields
-// removed. The strip list grows as corpus layers pin more of the payload.
-func Canonicalize(doc map[string]any) map[string]any {
-	out := maps.Clone(doc)
-	for _, k := range volatileTopLevel {
-		delete(out, k)
-	}
-	return out
 }

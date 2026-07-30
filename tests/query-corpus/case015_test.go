@@ -1,21 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// CASE-015 — receiver discards in-flight data on child disconnect.
+// CASE-015 — receiver drains delivered data before orderly child disconnect.
 //
-// When a child closes its socket right after its last write, the parent's
-// stream thread handles the poll HUP event BEFORE the pending READ
-// (stream-receiver.c stream_receive_process_poll_events: the
-// ND_POLL_ERROR|ND_POLL_HUP branch removes the receiver without draining),
-// discarding data TCP had already delivered — from a few tail rows up to
-// the entire burst, depending on timing. Real-world victims: the final
-// samples of every child that restarts or crashes, and a child that
-// completes replication and rotates to another parent, which can lose the
-// whole replicated window.
+// Before #23118, an orderly close immediately after the last write could let
+// the parent's HUP handling remove the receiver before its pending READ was
+// drained. These regressions require every delivered fixture row to survive
+// that exact flush-and-close path. Socket errors and invalid descriptors use
+// a different teardown path and are not claimed here.
 //
-// Both cases push a burst far larger than the receiver can drain before the
-// FIN registers (30k rows ≈ 1.7MB in ONE write() syscall — the receiver
-// reads ~15KB per poll cycle), then disconnect immediately. RED until the
-// receiver drains readable data before honoring HUP.
+// Both cases push enough data to leave multiple receiver-read buffers queued
+// when FIN/HUP arrives, then disconnect immediately. Retention endpoints and
+// the complete typed fixture readback must still match exactly.
 package corpus
 
 import (
@@ -23,22 +18,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/tests/query-corpus/daemon"
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
 	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
 
 const case015Points = 30000
 
-func case015Settled(t *testing.T, hostname string, ch fixture.Chart) bool {
+func case015Verify(t *testing.T, hostname string, ch fixture.Chart) {
 	t.Helper()
-	ret, err := td.WaitRetention(hostname, ch.Context, ch.FirstT(), ch.LastT(), 10*time.Second)
-	if err != nil {
-		t.Logf("data lost: %v", err)
-		return false
-	}
-	t.Logf("no loss: retention [%d,%d]", ret.FirstEntry, ret.LastEntry)
-	return true
+	settleAndVerify(t, hostname, ch)
 }
 
 func TestCase015LiveDisconnectDiscard(t *testing.T) {
@@ -46,7 +34,7 @@ func TestCase015LiveDisconnectDiscard(t *testing.T) {
 
 	ch := fixture.FullPalette("fixture.c015live", "fixture.c015live", fixture.T0, case015Points)
 
-	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
+	conn, err := stream.Connect(td.Addr, td.StreamKey,
 		stream.HostInfo{Hostname: "c015-live", MachineGUID: guid(15)}, stream.CapsLive)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +46,7 @@ func TestCase015LiveDisconnectDiscard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertContract(t, "CASE-015/live-disconnect-discard", case015Settled(t, "c015-live", ch))
+	case015Verify(t, "c015-live", ch)
 }
 
 // TestCase015MidDialogueDisconnect declares retention and disconnects
@@ -73,7 +61,7 @@ func TestCase015MidDialogueDisconnect(t *testing.T) {
 
 	ch := fixture.FullPalette("fixture.c015mid", "fixture.c015mid", fixture.T0, 60)
 
-	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
+	conn, err := stream.Connect(td.Addr, td.StreamKey,
 		stream.HostInfo{Hostname: "c015-mid", MachineGUID: guid(17)}, stream.CapsReplication)
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +91,7 @@ func TestCase015DisconnectSoak(t *testing.T) {
 	for i := 0; i < cycles; i++ {
 		host := fmt.Sprintf("c015-soak-%02d", i)
 		ch := fixture.FullPalette(fmt.Sprintf("fixture.c015s%02d", i), fmt.Sprintf("fixture.c015s%02d", i), fixture.T0, 500)
-		conn, err := stream.Connect(td.Addr, daemon.StreamKey,
+		conn, err := stream.Connect(td.Addr, td.StreamKey,
 			stream.HostInfo{Hostname: host, MachineGUID: guid(100 + i)}, stream.CapsLive)
 		if err != nil {
 			t.Fatalf("cycle %d: %v", i, err)
@@ -127,7 +115,7 @@ func TestCase015ReplicationDisconnectDiscard(t *testing.T) {
 
 	ch := fixture.FullPalette("fixture.c015repl", "fixture.c015repl", fixture.T0, case015Points)
 
-	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
+	conn, err := stream.Connect(td.Addr, td.StreamKey,
 		stream.HostInfo{Hostname: "c015-repl", MachineGUID: guid(16)}, stream.CapsReplication)
 	if err != nil {
 		t.Fatal(err)
@@ -150,5 +138,5 @@ func TestCase015ReplicationDisconnectDiscard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertContract(t, "CASE-015/replication-disconnect-discard", case015Settled(t, "c015-repl", ch))
+	case015Verify(t, "c015-repl", ch)
 }

@@ -6,7 +6,6 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/tests/query-corpus/canon"
@@ -125,14 +124,7 @@ func c023ResolutionDimension(ch fixture.Chart, id string) fixture.Dimension {
 }
 
 func c023PointValue(p fixture.Point) (float64, bool) {
-	if strings.ContainsRune(p.Flags, 'E') {
-		return 0, false
-	}
-	v, err := strconv.ParseFloat(p.Collected, 64)
-	if err != nil {
-		panic("CASE-023 resolution fixture has invalid value " + strconv.Quote(p.Collected))
-	}
-	return v, true
+	return p.CollectedValue("CASE-023 resolution fixture")
 }
 
 func c023BucketIndex(ts, after, step int64, points int) int {
@@ -479,7 +471,7 @@ func c023TierNumberTimes(
 					// Gap deliveries represent stored slots. The matrix asks
 					// this only at rows at least as wide as a record.
 					contributed = true
-					count += float64(c023Overlap(w, granularity, from, to) / granularity)
+					count += float64(c023Overlap(w, granularity, from, to)) / float64(granularity)
 				}
 				continue
 			}
@@ -518,6 +510,19 @@ func c023NumberTimes(
 		return c023TierNumberTimes(d, c023ResolutionTier2, after, before, points, target, gaps)
 	default:
 		panic("unsupported tier")
+	}
+}
+
+func TestC023TierNumberTimesPartialGapOverlap(t *testing.T) {
+	ch := c023ResolutionFixture()
+	d := c023ResolutionDimension(ch, "availability")
+	base := c023ResolutionBase()
+	after := base + c023ResolutionTier2 + c023ResolutionTier2/2
+	before := after + c023ResolutionTier2
+
+	got := c023TierNumberTimes(d, c023ResolutionTier2, after, before, 1, 0, true)
+	if len(got) != 1 || got[0].Value == nil || *got[0].Value != 0.5 {
+		t.Fatalf("half-overlapped empty tier record = %v, want exactly 0.5", got)
 	}
 }
 
@@ -725,19 +730,27 @@ func c023PreviousDrops(
 	}
 }
 
+type c023ResolutionQuerySpec struct {
+	context   string
+	tier      int
+	after     int64
+	before    int64
+	points    int
+	group     string
+	options   string
+	dimension string
+}
+
 func c023ResolutionQuery(
 	t *testing.T,
-	ch fixture.Chart,
-	tier int,
-	after, before int64,
-	points int,
-	group, options, dimension string,
+	spec c023ResolutionQuerySpec,
 ) (map[string]any, map[string][]canon.Pt) {
 	t.Helper()
-	params := daemon.DataParamsTier(ch.Context, tier, after, before, int64(points), group)
+	params := daemon.DataParamsTier(
+		spec.context, spec.tier, spec.after, spec.before, int64(spec.points), spec.group)
 	params.Set("options", "jsonwrap|unaligned")
-	params.Set("time_group_options", options)
-	params.Set("scope_dimensions", dimension)
+	params.Set("time_group_options", spec.options)
+	params.Set("scope_dimensions", spec.dimension)
 	doc, err := td.DataV3("c023-resolution", params)
 	if err != nil {
 		t.Fatal(err)
@@ -776,7 +789,10 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 	ok := true
 	run := func(tier, points int, group, options, dimension string, want []expectedColumnPoint) {
 		t.Helper()
-		doc, cols := c023ResolutionQuery(t, ch, tier, after, before, points, group, options, dimension)
+		doc, cols := c023ResolutionQuery(t, c023ResolutionQuerySpec{
+			context: ch.Context, tier: tier, after: after, before: before, points: points,
+			group: group, options: options, dimension: dimension,
+		})
 		label := "tier " + strconv.Itoa(tier) + ", points " + strconv.Itoa(points) +
 			", " + group + "(" + options + "), " + dimension
 		if !assertSelectedTier(t, doc, tier) {
@@ -859,9 +875,11 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 		{"number-of-flaps", "==1", "availability", 0},
 		{"number-of-times", "<previous", "counter", 0},
 	} {
-		doc, cols := c023ResolutionQuery(
-			t, ch, 0, upsampleAfter, upsampleBefore, upsamplePoints,
-			tc.group, tc.options, tc.dimension)
+		doc, cols := c023ResolutionQuery(t, c023ResolutionQuerySpec{
+			context: ch.Context, tier: 0, after: upsampleAfter, before: upsampleBefore,
+			points: upsamplePoints,
+			group:  tc.group, options: tc.options, dimension: tc.dimension,
+		})
 		label := "tier 0 upsampling, " + tc.group + "(" + tc.options + "), " + tc.dimension
 		if !assertSelectedTier(t, doc, 0) {
 			t.Logf("%s: selected-tier proof failed", label)

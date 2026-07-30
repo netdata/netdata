@@ -55,7 +55,10 @@ func TestOptionsTimestamps(t *testing.T) {
 		got := optsGet(t, "csv", "ms", nil)
 		wantFirst := strconv.FormatInt((fixture.T0+6)*1000, 10) + ","
 		lines := strings.Split(got, "\r\n")
-		if len(lines) < 2 || !strings.HasPrefix(lines[1], wantFirst) {
+		if len(lines) < 2 {
+			t.Fatalf("options=ms has no data row: %q", got)
+		}
+		if !strings.HasPrefix(lines[1], wantFirst) {
 			t.Errorf("options=ms first row %q, want prefix %q", lines[1], wantFirst)
 		}
 	})

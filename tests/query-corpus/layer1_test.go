@@ -8,6 +8,7 @@
 package corpus
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -132,15 +133,18 @@ func TestLayer1SinglePoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, pt := range cols["load"] {
-		switch {
-		case pt.T == fixture.T0+1 && (pt.Value == nil || *pt.Value != 7):
-			t.Errorf("t0+1: got %v, want 7", pt.Value)
-		case pt.T != fixture.T0+1 && pt.Value != nil:
-			t.Errorf("t0+%d: got %v, want null", pt.T-fixture.T0, *pt.Value)
+	want := make([]expectedColumnPoint, 0, 10)
+	for ts := int64(fixture.T0 - 3); ts <= fixture.T0+6; ts++ {
+		if ts == fixture.T0+1 {
+			want = append(want, wantNumberAt(ts, 7))
+		} else {
+			want = append(want, wantEmptyAt(ts))
 		}
 	}
-
+	if !assertOnlyColumn(t, cols, "load") ||
+		!assertExactColumn(t, cols, "load", want, 0) {
+		t.Fatal("single-point query did not return its exact ten-row grid")
+	}
 }
 
 // TestLayer1TrailingWindow pins the beyond-retention read: querying past
@@ -163,20 +167,18 @@ func TestLayer1TrailingWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	col := cols["load"]
-	if len(col) == 0 {
-		t.Fatal("no rows returned for beyond-retention window")
-	}
-	for _, pt := range col {
-		i := pt.T - fixture.T0
-		switch {
-		case i <= 45 && pt.Value == nil:
-			t.Errorf("t0+%d: null inside retention", i)
-		case i > 45 && pt.Value != nil:
-			t.Errorf("t0+%d: value %v beyond retention, want null", i, *pt.Value)
+	want := make([]expectedColumnPoint, 0, 60)
+	for i := int64(1); i <= 60; i++ {
+		if i <= 45 {
+			want = append(want, wantNumberAt(fixture.T0+i, float64(i%10)))
+		} else {
+			want = append(want, wantEmptyAt(fixture.T0+i))
 		}
 	}
-	t.Logf("beyond-retention window returned %d rows (values to +45, nulls after)", len(col))
+	if !assertOnlyColumn(t, cols, "load") ||
+		!assertExactColumn(t, cols, "load", want, 0) {
+		t.Fatal("beyond-retention query did not return 45 numeric and 15 EMPTY rows")
+	}
 }
 
 // TestLayer1Precision pins the storage_number quantization contract: the
@@ -248,47 +250,74 @@ func TestLayer1ZGapStates(t *testing.T) {
 	// forgotten across restarts entirely — see case016_test.go)
 	time.Sleep(8 * time.Second)
 
-	ghostRetention := func() (daemon.Retention, int, error) {
-		params := daemon.DataParams(context, t0, t0+60, 60)
+	type ghostObservation struct {
+		ret   daemon.Retention
+		empty bool
+		cols  map[string][]canon.Pt
+	}
+	ghostRetention := func(after, before int64) (ghostObservation, error) {
+		params := daemon.DataParams(context, after, before, before-after)
 		params.Set("scope_dimensions", "ghost")
 		doc, err := td.DataV3(host, params)
 		if err != nil {
-			return daemon.Retention{}, 0, err
+			return ghostObservation{}, err
 		}
-		ret, _ := daemon.QueryRetention(doc)
+		ret, ok := daemon.QueryRetention(doc)
+		if !ok {
+			return ghostObservation{}, fmt.Errorf("ghost query has no retention metadata")
+		}
+		if canon.EmptyResult(doc) {
+			return ghostObservation{ret: ret, empty: true}, nil
+		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
-			return ret, 0, nil // no result payload at all
+			return ghostObservation{}, fmt.Errorf("decode ghost result: %w", err)
 		}
-		nonNull := 0
-		for _, pt := range cols["ghost"] {
-			if pt.Value != nil {
-				nonNull++
-			}
+		return ghostObservation{ret: ret, cols: cols}, nil
+	}
+	assertGhostGrid := func(state string, after int64, observation ghostObservation) bool {
+		t.Helper()
+		if observation.empty {
+			t.Errorf("state %s: exact empty result, want the ghost column", state)
+			return false
 		}
-		return ret, len(cols["ghost"]), nil
+		want := make([]expectedColumnPoint, 0, 60)
+		for i := int64(1); i <= 60; i++ {
+			want = append(want,
+				wantEmptyWithMetadataAt(after+i, 0, canon.AnnotationEmpty))
+		}
+		return assertOnlyColumn(t, observation.cols, "ghost") &&
+			assertExactColumn(t, observation.cols, "ghost", want, 0)
 	}
 
 	// (a) LIVE: phantom retention advancing, all values null
-	ret, rows, err := ghostRetention()
+	live, err := ghostRetention(t0, t0+60)
 	if err != nil {
 		t.Fatalf("state (a) live query: %v", err)
 	}
-	if ret.FirstEntry == 0 || ret.LastEntry == 0 {
-		t.Errorf("state (a) LIVE: expected phantom retention for ghost-only query, got [%d,%d]", ret.FirstEntry, ret.LastEntry)
+	if live.ret.FirstEntry == 0 || live.ret.LastEntry == 0 {
+		t.Errorf("state (a) LIVE: expected phantom retention for ghost-only query, got [%d,%d]",
+			live.ret.FirstEntry, live.ret.LastEntry)
 	}
-	t.Logf("state (a) LIVE: ghost retention [%d,%d], %d rows (phantom, as ruled)", ret.FirstEntry, ret.LastEntry, rows)
+	if !assertGhostGrid("(a) LIVE", t0, live) {
+		t.Fail()
+	}
+	t.Logf("state (a) LIVE: ghost retention [%d,%d], %d rows (phantom, as ruled)",
+		live.ret.FirstEntry, live.ret.LastEntry, len(live.cols["ghost"]))
 
 	// (b) RESTART: gap-only pages discarded, retention gone
 	if err := td.Restart(); err != nil {
 		t.Fatal(err)
 	}
-	retB, rowsB, errB := ghostRetention()
+	restarted, errB := ghostRetention(t0, t0+60)
 	if errB != nil {
 		t.Logf("state (b) RESTART: ghost-only query errored (%v) — pinning as no-retention", errB)
-	} else if retB.FirstEntry != 0 || retB.LastEntry != 0 {
-		t.Errorf("state (b) RESTART: expected NO retention for gap-only dim after journal replay, got [%d,%d] (%d rows)",
-			retB.FirstEntry, retB.LastEntry, rowsB)
+	} else if !restarted.empty {
+		t.Errorf("state (b) RESTART: got a nonempty result with retention [%d,%d], want query error or exact empty result",
+			restarted.ret.FirstEntry, restarted.ret.LastEntry)
+	} else if restarted.ret.FirstEntry != 0 || restarted.ret.LastEntry != 0 {
+		t.Errorf("state (b) RESTART: exact empty result has retention [%d,%d], want [0,0]",
+			restarted.ret.FirstEntry, restarted.ret.LastEntry)
 	} else {
 		t.Logf("state (b) RESTART: ghost retention gone [0,0] as ruled")
 	}
@@ -307,13 +336,18 @@ func TestLayer1ZGapStates(t *testing.T) {
 	if _, err := td.WaitRetention(host, context, t0+1, t0+61, 15*time.Second); err != nil {
 		t.Fatalf("state (c): context retention after new iteration: %v", err)
 	}
-	retC, rowsC, errC := ghostRetention()
+	nextAfter := t0 + 1
+	next, errC := ghostRetention(nextAfter, t0+61)
 	if errC != nil {
 		t.Fatalf("state (c) query: %v", errC)
 	}
-	if retC.FirstEntry == 0 && retC.LastEntry == 0 {
+	if next.ret.FirstEntry == 0 && next.ret.LastEntry == 0 {
 		t.Errorf("state (c) NEXT ITERATION: ghost did not reappear (retention [0,0])")
 	} else {
-		t.Logf("state (c) NEXT ITERATION: ghost back with retention [%d,%d], %d rows, as ruled", retC.FirstEntry, retC.LastEntry, rowsC)
+		if !assertGhostGrid("(c) NEXT ITERATION", nextAfter, next) {
+			t.Fail()
+		}
+		t.Logf("state (c) NEXT ITERATION: ghost back with retention [%d,%d], %d rows, as ruled",
+			next.ret.FirstEntry, next.ret.LastEntry, len(next.cols["ghost"]))
 	}
 }

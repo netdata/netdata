@@ -33,6 +33,37 @@ const (
 	l5Rows    = 60
 )
 
+func l5ExactGrid(col []canon.Pt) bool {
+	if len(col) != l5Rows {
+		return false
+	}
+	for row, pt := range col {
+		if pt.T != int64(fixture.T0+row+1) {
+			return false
+		}
+	}
+	return true
+}
+
+func TestL5ExactGridGuard(t *testing.T) {
+	control := make([]canon.Pt, l5Rows)
+	for row := range control {
+		control[row].T = int64(fixture.T0 + row + 1)
+	}
+	if !l5ExactGrid(control) {
+		t.Fatal("L5 exact-grid guard rejected the valid control")
+	}
+
+	duplicate := append([]canon.Pt(nil), control...)
+	duplicate[7].T = duplicate[0].T
+	if l5ExactGrid(duplicate) {
+		t.Fatal("L5 exact-grid guard accepted a duplicate timestamp and missing expected row")
+	}
+	if l5ExactGrid(control[:len(control)-1]) {
+		t.Fatal("L5 exact-grid guard accepted a dropped row")
+	}
+}
+
 // l5Member is one metric of the palette: 2 nodes × 2 instances × 3 dims.
 type l5Member struct {
 	Host, GUID string
@@ -279,12 +310,12 @@ func TestLayer5GroupByMatrix(t *testing.T) {
 							t.Errorf("group %q missing (have %v)", gname, keys2(cols))
 							continue
 						}
-						if len(col) != l5Rows {
-							t.Errorf("group %q: %d rows, want %d", gname, len(col), l5Rows)
+						if !l5ExactGrid(col) {
+							t.Errorf("group %q does not contain the exact unique grid t0+1 through t0+%d", gname, l5Rows)
 							continue
 						}
-						for _, pt := range col {
-							i := int(pt.T - fixture.T0)
+						for row, pt := range col {
+							i := row + 1
 							wantV, wantAR, wantGBC, wantPartial, wantEmpty := l5Expected(agg, group, i, raw)
 							switch {
 							case wantEmpty && pt.Value != nil:
@@ -388,12 +419,12 @@ func TestLayer5Percentage(t *testing.T) {
 						t.Errorf("group %q missing (have %v)", gname, keys2(cols))
 						continue
 					}
-					if len(col) != l5Rows {
-						t.Errorf("%q: got %d rows, want %d", gname, len(col), l5Rows)
+					if !l5ExactGrid(col) {
+						t.Errorf("%q does not contain the exact unique grid t0+1 through t0+%d", gname, l5Rows)
 						continue
 					}
-					for _, pt := range col {
-						i := int(pt.T - fixture.T0)
+					for row, pt := range col {
+						i := row + 1
 						var n, h float64
 						nCount, hCount := 0, 0
 						for _, m := range sel {
@@ -462,28 +493,173 @@ func TestLayer5Percentage(t *testing.T) {
 	}
 }
 
-// viewSts decodes view.dimensions {ids, sts{min,max,avg,sum,cnt}} into
-// per-group arrays keyed by id.
-func viewSts(doc map[string]any) map[string]map[string]float64 {
-	view, _ := doc["view"].(map[string]any)
-	dims, _ := view["dimensions"].(map[string]any)
-	idsAny, _ := dims["ids"].([]any)
-	sts, _ := dims["sts"].(map[string]any)
-	out := map[string]map[string]float64{}
-	for idx, idAny := range idsAny {
-		id, _ := idAny.(string)
-		vals := map[string]float64{}
-		for field, arrAny := range sts {
-			arr, _ := arrAny.([]any)
-			if idx < len(arr) {
-				if v, ok := arr[idx].(float64); ok {
-					vals[field] = v
-				}
+func TestStrictDimensionStatsGuards(t *testing.T) {
+	valid := func() map[string]any {
+		return map[string]any{"view": map[string]any{"dimensions": map[string]any{
+			"ids": []any{"a", "b"},
+			"sts": map[string]any{
+				"sum": []any{float64(1), float64(2)},
+				"cnt": []any{float64(3), float64(4)},
+			},
+		}}}
+	}
+	if stats, ok := strictDimensionStats(t, valid(), "view", []string{"a", "b"}, []string{"sum", "cnt"}); !ok ||
+		stats["a"]["sum"] != 1 || stats["b"]["cnt"] != 4 {
+		t.Fatal("strict dimension statistics rejected the valid control")
+	}
+
+	mutations := map[string]func(map[string]any){
+		"missing-required": func(doc map[string]any) {
+			sts := doc["view"].(map[string]any)["dimensions"].(map[string]any)["sts"].(map[string]any)
+			delete(sts, "cnt")
+		},
+		"short-array": func(doc map[string]any) {
+			sts := doc["view"].(map[string]any)["dimensions"].(map[string]any)["sts"].(map[string]any)
+			sts["sum"] = []any{float64(1)}
+		},
+		"duplicate-id": func(doc map[string]any) {
+			dims := doc["view"].(map[string]any)["dimensions"].(map[string]any)
+			dims["ids"] = []any{"a", "a"}
+		},
+		"non-numeric": func(doc map[string]any) {
+			sts := doc["view"].(map[string]any)["dimensions"].(map[string]any)["sts"].(map[string]any)
+			sts["cnt"] = []any{float64(3), "four"}
+		},
+		"non-finite": func(doc map[string]any) {
+			sts := doc["view"].(map[string]any)["dimensions"].(map[string]any)["sts"].(map[string]any)
+			sts["cnt"] = []any{float64(3), math.Inf(1)}
+		},
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			doc := valid()
+			mutate(doc)
+			if _, ok := strictDimensionStats(t, doc, "view", []string{"a", "b"}, []string{"sum", "cnt"}); ok {
+				t.Errorf("strict dimension statistics accepted the %s mutation", name)
+			}
+		})
+	}
+}
+
+// strictDimensionStats validates one jsonwrap-v2 dimensions statistics
+// section and returns every advertised array keyed by its unique id.
+func strictDimensionStats(
+	t *testing.T,
+	doc map[string]any,
+	section string,
+	wantIDs, requiredFields []string,
+) (map[string]map[string]float64, bool) {
+	t.Helper()
+
+	parent, ok := doc[section].(map[string]any)
+	if !ok {
+		t.Logf("response has no %s object", section)
+		return nil, false
+	}
+	dimensions, ok := parent["dimensions"].(map[string]any)
+	if !ok {
+		t.Logf("%s has no dimensions object", section)
+		return nil, false
+	}
+	idsAny, ok := dimensions["ids"].([]any)
+	if !ok {
+		t.Logf("%s.dimensions.ids is missing or malformed: %v", section, dimensions["ids"])
+		return nil, false
+	}
+	sts, ok := dimensions["sts"].(map[string]any)
+	if !ok {
+		t.Logf("%s.dimensions.sts is missing or malformed: %v", section, dimensions["sts"])
+		return nil, false
+	}
+
+	valid := true
+	ids := make([]string, len(idsAny))
+	seenIDs := make(map[string]struct{}, len(idsAny))
+	for i, idAny := range idsAny {
+		id, isString := idAny.(string)
+		if !isString || id == "" {
+			t.Logf("%s.dimensions.ids[%d] is not a nonempty string: %v", section, i, idAny)
+			valid = false
+			continue
+		}
+		if _, duplicate := seenIDs[id]; duplicate {
+			t.Logf("%s.dimensions.ids repeats %q", section, id)
+			valid = false
+		}
+		seenIDs[id] = struct{}{}
+		ids[i] = id
+	}
+
+	wanted := make(map[string]struct{}, len(wantIDs))
+	for _, id := range wantIDs {
+		if id == "" {
+			t.Fatal("strict dimension statistics expected a nonempty id")
+		}
+		if _, duplicate := wanted[id]; duplicate {
+			t.Fatalf("strict dimension statistics expected duplicate id %q", id)
+		}
+		wanted[id] = struct{}{}
+	}
+	if len(seenIDs) != len(wanted) {
+		t.Logf("%s.dimensions.ids has %v, want exactly %v", section, ids, wantIDs)
+		valid = false
+	}
+	for id := range wanted {
+		if _, has := seenIDs[id]; !has {
+			t.Logf("%s.dimensions.ids is missing %q", section, id)
+			valid = false
+		}
+	}
+	for id := range seenIDs {
+		if _, expected := wanted[id]; !expected {
+			t.Logf("%s.dimensions.ids has unexpected id %q", section, id)
+			valid = false
+		}
+	}
+
+	required := make(map[string]struct{}, len(requiredFields))
+	for _, field := range requiredFields {
+		if field == "" {
+			t.Fatal("strict dimension statistics requires a nonempty field")
+		}
+		if _, duplicate := required[field]; duplicate {
+			t.Fatalf("strict dimension statistics repeats required field %q", field)
+		}
+		required[field] = struct{}{}
+		if _, has := sts[field]; !has {
+			t.Logf("%s.dimensions.sts is missing required field %q", section, field)
+			valid = false
+		}
+	}
+
+	out := make(map[string]map[string]float64, len(ids))
+	for _, id := range ids {
+		if id != "" {
+			out[id] = make(map[string]float64, len(sts))
+		}
+	}
+	for field, valuesAny := range sts {
+		values, isArray := valuesAny.([]any)
+		if !isArray || len(values) != len(ids) {
+			t.Logf("%s.dimensions.sts.%s is %v, want exactly %d values",
+				section, field, valuesAny, len(ids))
+			valid = false
+			continue
+		}
+		for i, valueAny := range values {
+			value, isNumber := valueAny.(float64)
+			if !isNumber || math.IsNaN(value) || math.IsInf(value, 0) {
+				t.Logf("%s.dimensions.sts.%s[%d] is not finite numeric: %v",
+					section, field, i, valueAny)
+				valid = false
+				continue
+			}
+			if ids[i] != "" {
+				out[ids[i]][field] = value
 			}
 		}
-		out[id] = vals
 	}
-	return out
+	return out, valid
 }
 
 // TestLayer5Statistics pins the per-group view statistics (the D-B / SUM-sts
@@ -522,7 +698,15 @@ func TestLayer5Statistics(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				sts := viewSts(doc)
+				requiredFields := []string{"avg", "min", "max"}
+				if raw {
+					requiredFields = []string{"sum", "cnt"}
+				}
+				sts, statsOK := strictDimensionStats(
+					t, doc, "view", keys2(groups), requiredFields)
+				if !statsOK {
+					t.Errorf("view dimension statistics are malformed")
+				}
 
 				for gname, group := range groups {
 					got, ok := sts[gname]
@@ -564,7 +748,7 @@ func TestLayer5Statistics(t *testing.T) {
 							t.Errorf("%q: raw sts sum %v, want %v", gname, got["sum"], rowSum)
 						}
 						wantCnt := contributions
-						if cnt, ok := got["cnt"]; ok && int(cnt) != wantCnt {
+						if cnt := got["cnt"]; int(cnt) != wantCnt || cnt != float64(wantCnt) {
 							t.Errorf("%q: raw sts count %v, want %d", gname, cnt, wantCnt)
 						}
 						continue

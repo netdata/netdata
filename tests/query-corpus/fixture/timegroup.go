@@ -3,17 +3,41 @@
 package fixture
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-// Per-family Go ports of the engine's time-grouping arithmetic
-// (src/web/api/queries/<family>/<family>.h), used as layer-3 oracles.
-// Inputs are the numeric (non-gap) sample values of each view bucket, in
-// timestamp order, already SNRoundTrip'd (that is what tier0 feeds the
-// grouping: query_add_point_to_group adds only finite values).
+// Source-derived time-grouping arithmetic used by layer 3.
+//
+// Source: netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d
+//   - considered-equal:
+//     src/libnetdata/storage_number/storage_number.h:60-61
+//   - percentile interpolation:
+//     src/libnetdata/statistical/statistical.c:171-189
+//   - average/sum/min/max:
+//     src/web/api/queries/average/average.h:34-59
+//     src/web/api/queries/sum/sum.h:31-53
+//     src/web/api/queries/min/min.h:31-56
+//     src/web/api/queries/max/max.h:31-56
+//   - latest/extremes/stddev and coefficient-of-variation:
+//     src/web/api/queries/latest/latest.h:35-60
+//     src/web/api/queries/extremes/extremes.h:37-98
+//     src/web/api/queries/stddev/stddev.h:33-117
+//   - median/trimmed-mean/percentile:
+//     src/web/api/queries/median/median.h:17-34,81-144
+//     src/web/api/queries/trimmed_mean/trimmed_mean.h:17-34,78-170
+//     src/web/api/queries/percentile/percentile.h:17-34,81-173
+//   - SES/DES:
+//     src/web/api/queries/ses/ses.h:28-89
+//     src/web/api/queries/des/des.h:33-135
+//   - countif numeric add/flush:
+//     src/web/api/queries/countif/countif.h:104-150
+//
+// Inputs are the numeric sample values of each view bucket in timestamp
+// order, already SNRoundTrip'd as tier 0 feeds them to the grouping.
 
 // TGResult is one bucket's oracle output. Empty mirrors RRDR_VALUE_EMPTY
 // (a null value in json2).
@@ -186,7 +210,10 @@ func tgSimple(name, options string, values []float64) TGResult {
 		if n == 0 {
 			return TGResult{Empty: true}
 		}
-		cmp, target := parseCountifOptions(options)
+		cmp, target, err := parseCountifOptions(options)
+		if err != nil {
+			panic("fixture: invalid countif expression: " + err.Error())
+		}
 		matched := 0
 		for _, v := range values {
 			ok := false
@@ -414,61 +441,55 @@ func tgSlotWindowMean(values []float64, percentArg float64, percentileMode bool)
 	return TGResult{Value: value}
 }
 
-// parseCountifOptions mirrors tg_countif_create's grammar.
-func parseCountifOptions(options string) (cmp string, target float64) {
-	s := strings.TrimLeft(options, " \t")
+// parseCountifOptions is the approved finite-numeric strict-contract subset,
+// not a port of the historical fail-open C parser. A zero-length expression
+// retains the API's ==0 default; whitespace-only, incomplete, malformed,
+// trailing-junk and non-finite operands are invalid. CASE-023 owns the
+// gap-token and predecessor grammar.
+func parseCountifOptions(options string) (cmp string, target float64, err error) {
+	if options == "" {
+		return "==", 0, nil
+	}
+	s := strings.TrimSpace(options)
 	if s == "" {
-		return "==", 0.0
+		return "", 0, fmt.Errorf("whitespace-only expression")
 	}
-	switch s[0] {
-	case '!':
-		cmp = "!="
-		if len(s) > 1 && (s[1] == '=' || s[1] == ':') {
-			s = s[2:]
-		} else {
-			s = s[1:]
-		}
-	case '>':
-		if len(s) > 1 && (s[1] == '=' || s[1] == ':') {
-			cmp = ">="
-			s = s[2:]
-		} else {
-			cmp = ">"
-			s = s[1:]
-		}
-	case '<':
-		if len(s) > 1 && s[1] == '>' {
-			cmp = "!="
-			s = s[2:]
-		} else if len(s) > 1 && (s[1] == '=' || s[1] == ':') {
-			cmp = "<="
-			s = s[2:]
-		} else {
-			cmp = "<"
-			s = s[1:]
-		}
-	case '=':
-		cmp = "=="
-		if len(s) > 1 && s[1] == '=' {
-			s = s[2:]
-		} else {
-			s = s[1:]
-		}
-	case ':':
-		// ':' compares EQUAL
-		cmp = "=="
-		s = s[1:]
-	default:
-		// a bare number stands alone and compares EQUAL. The old parser
-		// advanced one character here regardless of whether an operator
-		// matched, so "40" targeted 0 and "440" targeted 40; the shared
-		// expression grammar no longer does, which aligns the API with
-		// health (health_config.c has always parsed countif(40) as =40).
-		cmp = "=="
+
+	type operator struct {
+		spelling string
+		cmp      string
 	}
-	s = strings.TrimLeft(s, " \t")
-	target, _ = strconv.ParseFloat(s, 64)
-	return cmp, target
+	operators := [...]operator{
+		{"!=", "!="},
+		{"<>", "!="},
+		{">=", ">="},
+		{">:", ">="},
+		{"<=", "<="},
+		{"<:", "<="},
+		{"==", "=="},
+		{">", ">"},
+		{"<", "<"},
+		{"=", "=="},
+		{":", "=="},
+	}
+	cmp = "=="
+	operand := s
+	for _, operator := range operators {
+		if strings.HasPrefix(s, operator.spelling) {
+			cmp = operator.cmp
+			operand = strings.TrimSpace(s[len(operator.spelling):])
+			break
+		}
+	}
+	if operand == "" {
+		return "", 0, fmt.Errorf("expression %q has no operand", options)
+	}
+
+	target, err = parseFiniteDecimal(operand)
+	if err != nil {
+		return "", 0, fmt.Errorf("expression %q has invalid finite numeric operand", options)
+	}
+	return cmp, target, nil
 }
 
 // sesWindow mirrors tg_ses_window/tg_des_window: group for grouped views,
@@ -542,7 +563,10 @@ func TGOracleDES(buckets [][]float64, group, pointsWanted int) []TGResult {
 	return out
 }
 
-// TGOracleIncrementalSum computes per-bucket incremental-sum results:
+// TGOracleIncrementalSum is a Class A telescoping/conservation oracle, not a
+// port of the current C implementation
+// (src/web/api/queries/incremental_sum/incremental_sum.h:17-68 at the checked
+// revision above). It computes per-bucket incremental-sum results:
 // bucket value = last - first, where first carries from the previous
 // bucket's last. A bucket with nothing to measure against yields EMPTY,
 // but it does NOT throw the baseline away.
@@ -589,10 +613,13 @@ func TGOracleIncrementalSum(buckets [][]float64) []TGResult {
 	return out
 }
 
-// TierFetchValue mirrors the registry's tier_query_fetch mapping
-// (query-group-over-time.c + query-execute.c): on tier>=1 data, min/max/
-// sum consume the tier point's min/max/sum, every other family consumes
-// the per-point AVERAGE (sum/count).
+// TierFetchValue mirrors the registry's tier_query_fetch mapping at the
+// checked revision above:
+//   - src/web/api/queries/query-group-over-time.c:58-642
+//   - src/web/api/queries/query-execute.c:284-308
+//
+// On tier>=1 data, min/max/sum consume the tier point's min/max/sum and every
+// other family consumes the per-point average (sum/count).
 func TierFetchValue(name string, tp TierPoint) float64 {
 	switch name {
 	case "min":

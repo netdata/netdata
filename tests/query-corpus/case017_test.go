@@ -50,8 +50,13 @@ func TestCase017TierBoundaryAbsorption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if col := cols["load"]; len(col) != 5 || col[0].Value == nil || *col[0].Value != 1 {
-		t.Errorf("tier0 control: first bucket %+v, want value 1 (sample at `after` excluded) — tier0 gained the absorption?", col[0])
+	tier0Want := make([]expectedColumnPoint, 0, 5)
+	for i := int64(11); i <= 15; i++ {
+		tier0Want = append(tier0Want, wantNumberAt(fixture.T0+i, float64(i%10)))
+	}
+	if !assertOnlyColumn(t, cols, "load") ||
+		!assertExactColumn(t, cols, "load", tier0Want, 0) {
+		t.Fatal("tier0 control does not exactly exclude the sample at `after`")
 	}
 
 	// tier1: after = T0+100 coincides with a stored tier1 window end.
@@ -68,8 +73,12 @@ func TestCase017TierBoundaryAbsorption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !assertOnlyColumn(t, cols, "load") ||
+		!assertColumnExactGrid(t, cols, "load", fixture.T0+100, fixture.T0+280, tier1Gran) {
+		t.Fatal("tier1 probe returned an incomplete or malformed grid")
+	}
 	col := cols["load"]
-	if len(col) != 3 || col[0].T != fixture.T0+160 || col[0].Value == nil {
+	if col[0].Value == nil {
 		t.Fatalf("tier1 probe returned unexpected shape: %+v", col)
 	}
 

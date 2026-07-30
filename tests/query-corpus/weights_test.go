@@ -34,6 +34,8 @@
 package corpus
 
 import (
+	"fmt"
+	"math"
 	"net/url"
 	"sort"
 	"strconv"
@@ -245,6 +247,67 @@ func weightsHighlightAverages() map[string]float64 {
 	}
 }
 
+func TestWeightsExpectedIDsExactlyOnce(t *testing.T) {
+	want := map[string]float64{"flat": 0, "level": 0, "split": 0, "anom": 0}
+	if err := weightsExpectedIDsExactlyOnce(
+		[]string{"flat", "level", "split", "anom"}, want); err != nil {
+		t.Fatalf("valid id sequence rejected: %v", err)
+	}
+	for name, ids := range map[string][]string{
+		"duplicate-masks-missing": {"flat", "flat", "split", "anom"},
+		"unexpected":              {"flat", "level", "split", "other"},
+		"short":                   {"flat", "level", "split"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := weightsExpectedIDsExactlyOnce(ids, want); err == nil {
+				t.Errorf("accepted %s id sequence %v", name, ids)
+			}
+		})
+	}
+}
+
+func weightsFiniteFloat(value any) (float64, bool) {
+	number, ok := value.(float64)
+	return number, ok && !math.IsNaN(number) && !math.IsInf(number, 0)
+}
+
+func TestWeightsTimeframeStatsRequireFiniteNumbers(t *testing.T) {
+	for name, value := range map[string]any{
+		"string": "0",
+		"null":   nil,
+		"nan":    math.NaN(),
+		"inf":    math.Inf(1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, ok := weightsFiniteFloat(value); ok {
+				t.Errorf("accepted malformed timeframe statistic %v", value)
+			}
+		})
+	}
+	if got, ok := weightsFiniteFloat(float64(0)); !ok || got != 0 {
+		t.Fatalf("finite zero = %v,%v", got, ok)
+	}
+}
+
+func weightsExpectedIDsExactlyOnce(ids []string, want map[string]float64) error {
+	counts := make(map[string]int, len(want))
+	for _, id := range ids {
+		if _, expected := want[id]; !expected {
+			return fmt.Errorf("unexpected dimension %q", id)
+		}
+		counts[id]++
+		if counts[id] > 1 {
+			return fmt.Errorf("dimension %q appears %d times", id, counts[id])
+		}
+	}
+	for id := range want {
+		if counts[id] != 1 {
+			return fmt.Errorf("dimension %q appears %d times, want exactly once", id, counts[id])
+		}
+	}
+	return nil
+}
+
 func TestWeightsValueMultiNode(t *testing.T) {
 	trackContractComponent(t, "W/value", "multi-node")
 
@@ -281,7 +344,7 @@ func TestWeightsValueMultiNode(t *testing.T) {
 	}
 	rollup := (50 + 3611.0/121 + 33521.0/121 + 20) / 4
 
-	seen := 0
+	var dimensionIDs []string
 	for _, rowAny := range rows {
 		row, _ := rowAny.([]any)
 		if len(row) < 7 {
@@ -303,7 +366,7 @@ func TestWeightsValueMultiNode(t *testing.T) {
 			t.Errorf("unexpected dimension %q", id)
 			continue
 		}
-		seen++
+		dimensionIDs = append(dimensionIDs, id)
 		if !tierValueMatch(weight, w, 1e-9) {
 			t.Errorf("%s: weight %v, want %v (after-inclusive 121-point window)", id, weight, w)
 		}
@@ -313,14 +376,14 @@ func TestWeightsValueMultiNode(t *testing.T) {
 			continue
 		}
 		for j, wantV := range wantTF[id] {
-			got, _ := tf[j].(float64)
-			if !tierValueMatch(got, wantV, 1e-9) {
+			got, ok := weightsFiniteFloat(tf[j])
+			if !ok || !tierValueMatch(got, wantV, 1e-9) {
 				t.Errorf("%s: timeframe[%d] = %v, want %v", id, j, got, wantV)
 			}
 		}
 	}
-	if seen != len(want) {
-		t.Errorf("saw %d dimension rows, want %d", seen, len(want))
+	if err := weightsExpectedIDsExactlyOnce(dimensionIDs, want); err != nil {
+		t.Errorf("dimension-row identity: %v", err)
 	}
 }
 

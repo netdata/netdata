@@ -16,14 +16,32 @@ const queryCorpusStorageTiers = 3
 type expectedColumnPoint struct {
 	T     int64
 	Value *float64
+	ARP   *float64
+	PA    *int64
 }
 
 func wantNumberAt(t int64, value float64) expectedColumnPoint {
 	return expectedColumnPoint{T: t, Value: &value}
 }
 
+func wantNumberWithARPAt(t int64, value, arp float64) expectedColumnPoint {
+	return expectedColumnPoint{T: t, Value: &value, ARP: &arp}
+}
+
+func wantNumberWithPAAt(t int64, value float64, pa int64) expectedColumnPoint {
+	return expectedColumnPoint{T: t, Value: &value, PA: &pa}
+}
+
 func wantEmptyAt(t int64) expectedColumnPoint {
 	return expectedColumnPoint{T: t}
+}
+
+func wantNumberWithMetadataAt(t int64, value, arp float64, pa int64) expectedColumnPoint {
+	return expectedColumnPoint{T: t, Value: &value, ARP: &arp, PA: &pa}
+}
+
+func wantEmptyWithMetadataAt(t int64, arp float64, pa int64) expectedColumnPoint {
+	return expectedColumnPoint{T: t, ARP: &arp, PA: &pa}
 }
 
 // assertExactColumn rejects every vacuous-success path: a missing column,
@@ -76,6 +94,17 @@ func assertExactColumn(
 			report("dimension %q row %d ends at %d, want %d", dimension, i, pt.T, exp.T)
 			ok = false
 		}
+		if exp.ARP != nil &&
+			(math.IsNaN(pt.ARP) || math.IsInf(pt.ARP, 0) || pt.ARP != *exp.ARP) {
+			report("dimension %q row %d at %d has ARP %v, want exactly %v",
+				dimension, i, pt.T, pt.ARP, *exp.ARP)
+			ok = false
+		}
+		if exp.PA != nil && pt.PA != *exp.PA {
+			report("dimension %q row %d at %d has PA %d, want exactly %d",
+				dimension, i, pt.T, pt.PA, *exp.PA)
+			ok = false
+		}
 
 		if exp.Value == nil {
 			if pt.Value != nil {
@@ -95,7 +124,8 @@ func assertExactColumn(
 			ok = false
 			continue
 		}
-		if pt.PA&canon.AnnotationEmpty != 0 {
+		if pt.PA&canon.AnnotationEmpty != 0 &&
+			(exp.PA == nil || *exp.PA&canon.AnnotationEmpty == 0) {
 			report("dimension %q row %d at %d has numeric value %v but PA=%d includes EMPTY",
 				dimension, i, pt.T, *pt.Value, pt.PA)
 			ok = false
@@ -116,23 +146,53 @@ func assertExactColumn(
 
 func assertOnlyColumn(t *testing.T, cols map[string][]canon.Pt, dimension string) bool {
 	t.Helper()
+	return assertExactColumnSet(t, cols, []string{dimension})
+}
 
-	if len(cols) != 1 {
-		t.Logf("result has %d columns, want exactly %q: %v", len(cols), dimension, keys(cols))
-		return false
+func assertExactColumnSet(t *testing.T, cols map[string][]canon.Pt, dimensions []string) bool {
+	t.Helper()
+
+	wanted := make(map[string]struct{}, len(dimensions))
+	for _, dimension := range dimensions {
+		if dimension == "" {
+			t.Fatal("exact column set contains an empty dimension")
+		}
+		if _, duplicate := wanted[dimension]; duplicate {
+			t.Fatalf("exact column set repeats %q", dimension)
+		}
+		wanted[dimension] = struct{}{}
 	}
-	if _, has := cols[dimension]; !has {
-		t.Logf("result has column %v, want exactly %q", keys(cols), dimension)
-		return false
+
+	ok := true
+	if len(cols) != len(wanted) {
+		t.Logf("result has %d columns, want exactly %d: got %v want %v",
+			len(cols), len(wanted), keys(cols), dimensions)
+		ok = false
 	}
-	return true
+	for dimension := range wanted {
+		if _, has := cols[dimension]; !has {
+			t.Logf("result is missing column %q (have %v)", dimension, keys(cols))
+			ok = false
+		}
+	}
+	for dimension := range cols {
+		if _, expected := wanted[dimension]; !expected {
+			t.Logf("result has unexpected column %q", dimension)
+			ok = false
+		}
+	}
+	return ok
 }
 
 // assertExactView checks an unaligned multi-row json2 view. The request's
 // lower bound is exclusive, while view.after is the first selected second.
 func assertExactView(t *testing.T, doc map[string]any, after, before, updateEvery int64) bool {
 	t.Helper()
+	return assertViewFields(t, doc, after+1, before, updateEvery)
+}
 
+func assertViewFields(t *testing.T, doc map[string]any, after, before, updateEvery int64) bool {
+	t.Helper()
 	view, ok := doc["view"].(map[string]any)
 	if !ok {
 		t.Logf("response has no view object")
@@ -141,13 +201,12 @@ func assertExactView(t *testing.T, doc map[string]any, after, before, updateEver
 	gotAfter, afterOK := view["after"].(float64)
 	gotBefore, beforeOK := view["before"].(float64)
 	gotEvery, everyOK := view["update_every"].(float64)
-	viewAfter := after + 1
 	if !afterOK || !beforeOK || !everyOK ||
-		gotAfter != float64(viewAfter) || gotBefore != float64(before) ||
+		gotAfter != float64(after) || gotBefore != float64(before) ||
 		gotEvery != float64(updateEvery) {
 		t.Logf("view after=%v before=%v update_every=%v, want %d/%d/%d",
 			view["after"], view["before"], view["update_every"],
-			viewAfter, before, updateEvery)
+			after, before, updateEvery)
 		return false
 	}
 	return true
@@ -204,7 +263,64 @@ func assertColumnShapeAndTotal(
 ) bool {
 	t.Helper()
 	return assertColumnShapeAndTotalRange(
-		t, cols, dimension, after, before, rowSpan, wantTotal, wantTotal)
+		t, cols, dimension, after, before, rowSpan,
+		columnTotalBounds{min: wantTotal, max: wantTotal})
+}
+
+type columnTotalBounds struct {
+	min float64
+	max float64
+}
+
+// assertColumnExactGrid validates only row identity and placement. Values may
+// be null so a forced-tier control can prove its complete response grid even
+// when part of the requested window predates that tier's retention.
+func assertColumnExactGrid(
+	t *testing.T,
+	cols map[string][]canon.Pt,
+	dimension string,
+	after, before, rowSpan int64,
+) bool {
+	t.Helper()
+
+	if rowSpan <= 0 || before < after || (before-after)%rowSpan != 0 {
+		t.Fatalf("invalid exact grid (%d,%d] at row span %d", after, before, rowSpan)
+	}
+	if before == after {
+		t.Logf("exact grid (%d,%d] has zero rows", after, before)
+		return false
+	}
+
+	col, has := cols[dimension]
+	if !has {
+		t.Logf("dimension %q missing", dimension)
+		return false
+	}
+
+	points := int((before - after) / rowSpan)
+	ok := true
+	if len(col) != points {
+		t.Logf("dimension %q has %d rows, want exactly %d", dimension, len(col), points)
+		ok = false
+	}
+
+	seen := make(map[int64]bool, len(col))
+	for i, point := range col {
+		if seen[point.T] {
+			t.Logf("dimension %q repeats timestamp %d", dimension, point.T)
+			ok = false
+		}
+		seen[point.T] = true
+
+		if i < points {
+			wantT := after + int64(i+1)*rowSpan
+			if point.T != wantT {
+				t.Logf("dimension %q row %d ends at %d, want %d", dimension, i, point.T, wantT)
+				ok = false
+			}
+		}
+	}
+	return ok
 }
 
 // assertColumnShapeAndTotalRange is the bounded-approximation counterpart of
@@ -215,21 +331,22 @@ func assertColumnShapeAndTotalRange(
 	cols map[string][]canon.Pt,
 	dimension string,
 	after, before, rowSpan int64,
-	minTotal, maxTotal float64,
+	bounds columnTotalBounds,
 ) bool {
 	t.Helper()
 
-	if minTotal > maxTotal {
-		t.Fatalf("invalid total range %.12g through %.12g", minTotal, maxTotal)
+	if bounds.min > bounds.max {
+		t.Fatalf("invalid total range %.12g through %.12g", bounds.min, bounds.max)
+	}
+	if !assertColumnExactGrid(t, cols, dimension, after, before, rowSpan) {
+		return false
 	}
 
 	col, has := cols[dimension]
 	if !has {
-		t.Logf("dimension %q missing", dimension)
 		return false
 	}
 
-	points := int((before - after) / rowSpan)
 	ok := true
 	const maxDetailedFailures = 10
 	reported, suppressed := 0, 0
@@ -241,27 +358,8 @@ func assertColumnShapeAndTotalRange(
 			suppressed++
 		}
 	}
-	if len(col) != points {
-		report("dimension %q has %d rows, want exactly %d", dimension, len(col), points)
-		ok = false
-	}
-
 	total := 0.0
-	seen := make(map[int64]bool, len(col))
 	for i, point := range col {
-		if seen[point.T] {
-			report("dimension %q repeats timestamp %d", dimension, point.T)
-			ok = false
-		}
-		seen[point.T] = true
-
-		if i < points {
-			wantT := after + int64(i+1)*rowSpan
-			if point.T != wantT {
-				report("dimension %q row %d ends at %d, want %d", dimension, i, point.T, wantT)
-				ok = false
-			}
-		}
 		if point.Value == nil {
 			report("dimension %q row %d at %d is null", dimension, i, point.T)
 			ok = false
@@ -279,12 +377,12 @@ func assertColumnShapeAndTotalRange(
 		total += *point.Value
 	}
 
-	if total < minTotal || total > maxTotal {
-		if minTotal == maxTotal {
-			t.Logf("dimension %q totals %.12g, want exactly %.12g", dimension, total, minTotal)
+	if total < bounds.min || total > bounds.max {
+		if bounds.min == bounds.max {
+			t.Logf("dimension %q totals %.12g, want exactly %.12g", dimension, total, bounds.min)
 		} else {
 			t.Logf("dimension %q totals %.12g, want %.12g through %.12g",
-				dimension, total, minTotal, maxTotal)
+				dimension, total, bounds.min, bounds.max)
 		}
 		ok = false
 	}
@@ -294,41 +392,31 @@ func assertColumnShapeAndTotalRange(
 	return ok
 }
 
-// assertEventColumnShapeAndTotal validates an event-count series without
-// inventing where an event inside a rolled-up storage window occurred. Every
-// row must be a whole count within the fixture-derived maximum; the total pins
-// loss and duplication across the query.
-func assertEventColumnShapeAndTotal(
-	t *testing.T,
-	cols map[string][]canon.Pt,
-	dimension string,
-	after, before, rowSpan int64,
-	maxEventsPerRow int64,
-	wantTotal float64,
-) bool {
-	t.Helper()
-	return assertEventColumnShapeAndTotalRange(
-		t, cols, dimension, after, before, rowSpan,
-		maxEventsPerRow, wantTotal, wantTotal)
+type eventColumnContract struct {
+	after           int64
+	before          int64
+	rowSpan         int64
+	maxEventsPerRow int64
+	total           columnTotalBounds
 }
 
-// assertEventColumnShapeAndTotalRange keeps the row-level event contract
-// strict while allowing only the documented aggregate uncertainty.
-func assertEventColumnShapeAndTotalRange(
+// assertEventColumnContract validates an event-count series without inventing
+// where an event inside a rolled-up storage window occurred. Every row must be
+// a whole count within the fixture-derived maximum; the total stays within the
+// contract's explicit inclusive bound.
+func assertEventColumnContract(
 	t *testing.T,
 	cols map[string][]canon.Pt,
 	dimension string,
-	after, before, rowSpan int64,
-	maxEventsPerRow int64,
-	minTotal, maxTotal float64,
+	contract eventColumnContract,
 ) bool {
 	t.Helper()
 
-	if maxEventsPerRow < 0 {
-		t.Fatalf("event-count maximum cannot be negative: %d", maxEventsPerRow)
+	if contract.maxEventsPerRow < 0 {
+		t.Fatalf("event-count maximum cannot be negative: %d", contract.maxEventsPerRow)
 	}
 	if !assertColumnShapeAndTotalRange(
-		t, cols, dimension, after, before, rowSpan, minTotal, maxTotal) {
+		t, cols, dimension, contract.after, contract.before, contract.rowSpan, contract.total) {
 		return false
 	}
 
@@ -337,10 +425,10 @@ func assertEventColumnShapeAndTotalRange(
 		if point.Value == nil {
 			continue
 		}
-		if *point.Value < 0 || *point.Value > float64(maxEventsPerRow) ||
+		if *point.Value < 0 || *point.Value > float64(contract.maxEventsPerRow) ||
 			math.Trunc(*point.Value) != *point.Value {
 			t.Logf("dimension %q row %d at %d is %v, want a whole event count from 0 through %d",
-				dimension, i, point.T, *point.Value, maxEventsPerRow)
+				dimension, i, point.T, *point.Value, contract.maxEventsPerRow)
 			ok = false
 		}
 	}
@@ -466,21 +554,60 @@ func TestQueryAssertionGuardsDetectMutations(t *testing.T) {
 	if !assertOnlyColumn(t, map[string][]canon.Pt{"value": validColumn}, "value") {
 		t.Fatal("only-column guard rejected its valid control")
 	}
+	if !assertExactColumnSet(t, map[string][]canon.Pt{
+		"value": validColumn,
+		"other": validColumn,
+	}, []string{"value", "other"}) {
+		t.Fatal("exact-column-set guard rejected its valid control")
+	}
+	metadataWant := []expectedColumnPoint{
+		wantNumberWithMetadataAt(10, number, 25, canon.AnnotationPartial),
+		wantEmptyWithMetadataAt(20, 0, canon.AnnotationEmpty),
+	}
+	metadataColumn := []canon.Pt{
+		{T: 10, Value: &number, ARP: 25, PA: canon.AnnotationPartial},
+		{T: 20, PA: canon.AnnotationEmpty},
+	}
+	if !assertExactColumn(t, map[string][]canon.Pt{"value": metadataColumn}, "value", metadataWant, 0) {
+		t.Fatal("exact metadata guard rejected its valid control")
+	}
+	numericEmpty := map[string][]canon.Pt{
+		"value": {{T: 10, Value: &number, PA: canon.AnnotationEmpty}},
+	}
+	if !assertExactColumn(t, numericEmpty, "value", []expectedColumnPoint{
+		wantNumberWithPAAt(10, number, canon.AnnotationEmpty),
+	}, 0) {
+		t.Fatal("exact metadata guard rejected an explicitly expected null2zero annotation")
+	}
+	if assertColumnShapeAndTotal(
+		t, map[string][]canon.Pt{"value": {}}, "value", 0, 0, 1, 0,
+	) {
+		t.Error("shape-and-total guard accepted a zero-row request")
+	}
 	five := 5.0
 	validEvents := map[string][]canon.Pt{
 		"events": {{T: 300, Value: &five}, {T: 600, Value: &five}},
 	}
-	if !assertEventColumnShapeAndTotal(t, validEvents, "events", 0, 600, 300, 5, 10) {
+	exactEvents := eventColumnContract{
+		after: 0, before: 600, rowSpan: 300, maxEventsPerRow: 5,
+		total: columnTotalBounds{min: 10, max: 10},
+	}
+	if !assertEventColumnContract(t, validEvents, "events", exactEvents) {
 		t.Fatal("event-count guard rejected its valid control")
 	}
-	if !assertEventColumnShapeAndTotalRange(t, validEvents, "events", 0, 600, 300, 5, 10, 11) {
+	boundedEvents := eventColumnContract{
+		after: 0, before: 600, rowSpan: 300, maxEventsPerRow: 5,
+		total: columnTotalBounds{min: 10, max: 11},
+	}
+	if !assertEventColumnContract(t, validEvents, "events", boundedEvents) {
 		t.Fatal("bounded event-count guard rejected its lower-bound control")
 	}
 	six := 6.0
 	boundedUpper := map[string][]canon.Pt{
 		"events": {{T: 300, Value: &six}, {T: 600, Value: &five}},
 	}
-	if !assertEventColumnShapeAndTotalRange(t, boundedUpper, "events", 0, 600, 300, 6, 10, 11) {
+	boundedEvents.maxEventsPerRow = 6
+	if !assertEventColumnContract(t, boundedUpper, "events", boundedEvents) {
 		t.Fatal("bounded event-count guard rejected its upper-bound control")
 	}
 	validView := map[string]any{"view": map[string]any{
@@ -490,6 +617,9 @@ func TestQueryAssertionGuardsDetectMutations(t *testing.T) {
 	}}
 	if !assertExactView(t, validView, 0, 20, 10) {
 		t.Fatal("exact-view guard rejected its valid control")
+	}
+	if !assertViewFields(t, validView, 1, 20, 10) {
+		t.Fatal("explicit-view guard rejected its valid control")
 	}
 
 	columnMutations := map[string]map[string][]canon.Pt{
@@ -524,6 +654,27 @@ func TestQueryAssertionGuardsDetectMutations(t *testing.T) {
 			}
 		})
 	}
+	for name, column := range map[string][]canon.Pt{
+		"wrong-arp": {
+			{T: 10, Value: &number, ARP: 50, PA: canon.AnnotationPartial},
+			{T: 20, PA: canon.AnnotationEmpty},
+		},
+		"wrong-numeric-pa": {
+			{T: 10, Value: &number, ARP: 25, PA: 0},
+			{T: 20, PA: canon.AnnotationEmpty},
+		},
+		"extra-empty-pa": {
+			{T: 10, Value: &number, ARP: 25, PA: canon.AnnotationPartial},
+			{T: 20, PA: canon.AnnotationEmpty | canon.AnnotationReset},
+		},
+	} {
+		t.Run("column/metadata-"+name, func(t *testing.T) {
+			if assertExactColumn(
+				t, map[string][]canon.Pt{"value": column}, "value", metadataWant, 0) {
+				t.Errorf("exact-column guard accepted the %s mutation", name)
+			}
+		})
+	}
 	t.Run("column/extra-column", func(t *testing.T) {
 		if assertOnlyColumn(t, map[string][]canon.Pt{
 			"value": validColumn,
@@ -532,27 +683,45 @@ func TestQueryAssertionGuardsDetectMutations(t *testing.T) {
 			t.Error("only-column guard accepted an extra result column")
 		}
 	})
+	t.Run("column/set-missing-column", func(t *testing.T) {
+		if assertExactColumnSet(t, map[string][]canon.Pt{
+			"value": validColumn,
+		}, []string{"value", "other"}) {
+			t.Error("exact-column-set guard accepted a missing result column")
+		}
+	})
+	t.Run("column/set-extra-column", func(t *testing.T) {
+		if assertExactColumnSet(t, map[string][]canon.Pt{
+			"value": validColumn,
+			"other": validColumn,
+			"leak":  validColumn,
+		}, []string{"value", "other"}) {
+			t.Error("exact-column-set guard accepted an extra result column")
+		}
+	})
 	t.Run("column/balanced-event-duplication", func(t *testing.T) {
 		four := 4.0
-		if assertEventColumnShapeAndTotal(t, map[string][]canon.Pt{
+		if assertEventColumnContract(t, map[string][]canon.Pt{
 			"events": {{T: 300, Value: &six}, {T: 600, Value: &four}},
-		}, "events", 0, 600, 300, 5, 10) {
+		}, "events", exactEvents) {
 			t.Error("event-count guard accepted balanced duplication and loss")
 		}
 	})
 	t.Run("column/event-total-below-bound", func(t *testing.T) {
 		four := 4.0
-		if assertEventColumnShapeAndTotalRange(t, map[string][]canon.Pt{
+		if assertEventColumnContract(t, map[string][]canon.Pt{
 			"events": {{T: 300, Value: &five}, {T: 600, Value: &four}},
-		}, "events", 0, 600, 300, 5, 10, 11) {
+		}, "events", boundedEvents) {
 			t.Error("bounded event-count guard accepted a total below its lower bound")
 		}
 	})
 	t.Run("column/event-total-above-bound", func(t *testing.T) {
 		seven := 7.0
-		if assertEventColumnShapeAndTotalRange(t, map[string][]canon.Pt{
+		aboveBound := boundedEvents
+		aboveBound.maxEventsPerRow = 7
+		if assertEventColumnContract(t, map[string][]canon.Pt{
 			"events": {{T: 300, Value: &seven}, {T: 600, Value: &five}},
-		}, "events", 0, 600, 300, 7, 10, 11) {
+		}, "events", aboveBound) {
 			t.Error("bounded event-count guard accepted a total above its upper bound")
 		}
 	})
@@ -602,6 +771,11 @@ func TestQueryAssertionGuardsDetectMutations(t *testing.T) {
 	}
 
 	tierMutations := map[string]map[string]any{
+		"missing-db": {},
+		"missing-per-tier": {
+			"db": map[string]any{},
+		},
+		"empty-per-tier": tierDocument(),
 		"missing-configured-tier": tierDocument(
 			tierEntry(0, 4),
 			tierEntry(1, 0),

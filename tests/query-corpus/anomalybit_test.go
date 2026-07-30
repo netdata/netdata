@@ -101,24 +101,23 @@ func TestAnomalyBitOption(t *testing.T) {
 
 	t.Run("identity", func(t *testing.T) {
 		cols := query(nil)
-		for _, pt := range cols["aa"] {
-			i := int(pt.T - fixture.T0)
-			switch {
-			case aaGap(i):
-				if pt.Value != nil {
-					t.Errorf("aa row %d: value %v, want null (gap)", i, *pt.Value)
-				}
-			case pt.Value == nil:
-				t.Errorf("aa row %d: null, want %v", i, abRate(aaAnom(i)))
-			case *pt.Value != abRate(aaAnom(i)):
-				t.Errorf("aa row %d: value %v, want %v", i, *pt.Value, abRate(aaAnom(i)))
-			}
+		if !assertExactColumnSet(t, cols, []string{"aa", "bb"}) {
+			t.Fail()
 		}
-		for _, pt := range cols["bb"] {
-			i := int(pt.T - fixture.T0)
-			if pt.Value == nil || *pt.Value != abRate(bbAnom(i)) {
-				t.Errorf("bb row %d: value %s, want %v", i, fmtPt(pt), abRate(bbAnom(i)))
+		aaWant := make([]expectedColumnPoint, 0, 60)
+		bbWant := make([]expectedColumnPoint, 0, 60)
+		for i := 1; i <= 60; i++ {
+			ts := fixture.T0 + int64(i)
+			if aaGap(i) {
+				aaWant = append(aaWant, wantEmptyAt(ts))
+			} else {
+				aaWant = append(aaWant, wantNumberAt(ts, abRate(aaAnom(i))))
 			}
+			bbWant = append(bbWant, wantNumberAt(ts, abRate(bbAnom(i))))
+		}
+		if !assertExactColumn(t, cols, "aa", aaWant, 0) ||
+			!assertExactColumn(t, cols, "bb", bbWant, 0) {
+			t.Fail()
 		}
 	})
 
@@ -148,19 +147,21 @@ func TestAnomalyBitOption(t *testing.T) {
 				p["points"] = []string{"6"}
 				p["time_group"] = []string{tg}
 			})
-			for _, pt := range cols["aa"] {
-				b := int(pt.T-fixture.T0) / 10
-				want := bucketWant(aaAnom, aaGap, b, tg == "max")
-				if pt.Value == nil || !tierValueMatch(*pt.Value, want, 1e-9) {
-					t.Errorf("aa bucket %d: %s, want %v", b, fmtPt(pt), want)
-				}
+			if !assertExactColumnSet(t, cols, []string{"aa", "bb"}) {
+				t.Fail()
 			}
-			for _, pt := range cols["bb"] {
-				b := int(pt.T-fixture.T0) / 10
-				want := bucketWant(bbAnom, nil, b, tg == "max")
-				if pt.Value == nil || !tierValueMatch(*pt.Value, want, 1e-9) {
-					t.Errorf("bb bucket %d: %s, want %v", b, fmtPt(pt), want)
-				}
+			aaWant := make([]expectedColumnPoint, 0, 6)
+			bbWant := make([]expectedColumnPoint, 0, 6)
+			for bucket := 1; bucket <= 6; bucket++ {
+				ts := fixture.T0 + int64(bucket*10)
+				aaWant = append(aaWant, wantNumberAt(
+					ts, bucketWant(aaAnom, aaGap, bucket, tg == "max")))
+				bbWant = append(bbWant, wantNumberAt(
+					ts, bucketWant(bbAnom, nil, bucket, tg == "max")))
+			}
+			if !assertExactColumn(t, cols, "aa", aaWant, printTol) ||
+				!assertExactColumn(t, cols, "bb", bbWant, printTol) {
+				t.Fail()
 			}
 		})
 	}
@@ -171,8 +172,9 @@ func TestAnomalyBitOption(t *testing.T) {
 			p["aggregation"] = []string{"sum"}
 		})
 		col := cols["selected"]
-		if len(col) != 60 {
-			t.Fatalf("got %d rows, want 60", len(col))
+		if !assertOnlyColumn(t, cols, "selected") ||
+			!assertColumnExactGrid(t, cols, "selected", fixture.T0, fixture.T0+60, 1) {
+			t.Fatal("group-by sum returned an incomplete result grid")
 		}
 		for _, pt := range col {
 			i := int(pt.T - fixture.T0)
@@ -220,7 +222,11 @@ func TestAnomalyStsArrays(t *testing.T) {
 		"aa": 100.0 * 10 / 55,
 		"bb": 100.0 * 20 / 60,
 	}
-	view := viewSts(doc)
+	wantIDs := keys2(wantView)
+	view, viewOK := strictDimensionStats(t, doc, "view", wantIDs, []string{"arp"})
+	if !viewOK {
+		t.Errorf("view anomaly statistics are malformed")
+	}
 	for id, want := range wantView {
 		got, ok := view[id]["arp"]
 		if !ok {
@@ -232,8 +238,10 @@ func TestAnomalyStsArrays(t *testing.T) {
 		}
 	}
 
-	db, _ := doc["db"].(map[string]any)
-	dbSts := viewSts(map[string]any{"view": db})
+	dbSts, dbOK := strictDimensionStats(t, doc, "db", wantIDs, []string{"arp"})
+	if !dbOK {
+		t.Errorf("db anomaly statistics are malformed")
+	}
 	for id, want := range wantView {
 		got, ok := dbSts[id]["arp"]
 		if !ok {
@@ -284,8 +292,9 @@ func TestAnomalyBitTierRates(t *testing.T) {
 		t.Fatal(err)
 	}
 	col := cols[ch.Dimensions[0].ID]
-	if int64(len(col)) != points {
-		t.Fatalf("got %d windows, want %d", len(col), points)
+	if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) ||
+		!assertColumnExactGrid(t, cols, ch.Dimensions[0].ID, after, lastEnd, 60) {
+		t.Fatal("tier anomaly-rate query returned an incomplete result grid")
 	}
 	for _, pt := range col {
 		w, ok := windows[pt.T]

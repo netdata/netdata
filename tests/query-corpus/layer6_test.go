@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Layer 6 — two-pass (hierarchical) group-by: pass 2 consumes pass 1's
-// groups. The mechanics (query-group-by-finalize.c): pass-1 accumulations
-// flow into pass 2 UNCONVERTED — only percentage converts per pass; the
-// AVERAGE division happens once, at the END, with the FINAL pass's
-// contribution counts (= number of pass-1 groups).
+// Layer 6 — two-pass (hierarchical) group-by: pass 2 consumes finalized
+// pass-1 groups. Pass-2 average divides by contributing pass-1 groups;
+// anomaly metadata remains weighted by the raw metric contributors beneath
+// those groups.
 //
 // Consequences, pinned here:
-//   - sum→sum, min→min, max→max, extremes→extremes and sum→avg are
-//     mechanically correct (green);
-//   - any chain with AVERAGE at pass 1 is the KNOWN avg-of-sums bug
-//     family (bug-list item 3; SOW-20260701-query-rollup-hierarchical-
-//     correctness, in planning): pass 2 sees group SUMS where group
-//     averages were meant — CASE-018 pins it red;
+//   - sum→sum, min→min, max→max, extremes→extremes and sum→avg are covered
+//     directly;
+//   - CASE-018 distinguishes the correct mean of finalized pass-1 averages
+//     from the current avg-of-sums defect;
 //   - [instance, percentage] → [selected, avg] returns the MEAN of the
 //     per-instance percentages (pct converts per pass, then avg over
 //     groups) — pinned as current behavior; whether the contract should
@@ -66,21 +63,16 @@ func l6Pass1(agg string, group []l5Member, i int) (acc, ar float64, gbc int) {
 	return acc, ar, gbc
 }
 
-// l6Expected computes the CURRENT two-pass mechanics for a final group
+// l6Expected computes the two-pass value and metadata contract for a final group
 // (the pass-1 groups it contains) at row i: pass-1 accumulators flow
 // unconverted into the pass-2 aggregation; a final AVERAGE divides by
-// the number of contributing pass-1 groups. The anomaly rate accumulates
-// RAW through both passes and divides ONCE by the final contribution
-// count (query-group-by-finalize.c:421) — so non-raw two-pass ARP is
-// sum(member ARPs)/groups, INFLATED by members-per-group for every
-// chain (the ar analog of the avg-of-sums family; pinned as current
-// mechanics). In raw mode nothing divides: the value stays the pass-2
-// accumulator, ar the total, and the point count is the number of
-// contributing pass-1 GROUPS (not members) — the pin the cloud layers
-// depend on.
+// the number of contributing pass-1 groups. ARP instead divides the sum
+// of raw member anomaly rates by the number of raw metric contributors.
+// Raw mode keeps that numerator and exposes the raw contributor count.
 func l6Expected(agg1, agg2 string, pass1Groups [][]l5Member, i int, raw bool) (val, ar float64, gbc int, partial, empty bool) {
 	var acc, arTotal float64
 	groups := 0
+	contributors := 0
 	expectedGroups := 0
 	first := true
 	for _, g := range pass1Groups {
@@ -111,20 +103,43 @@ func l6Expected(agg1, agg2 string, pass1Groups [][]l5Member, i int, raw bool) (v
 		first = false
 		arTotal += ar1
 		groups++
+		contributors += gbc1
 	}
-	if groups == 0 {
+	if contributors == 0 {
 		return 0, 0, 0, false, true
 	}
 	if groups < expectedGroups {
 		partial = true
 	}
 	if raw {
-		return acc, arTotal, groups, partial, false
+		return acc, arTotal, contributors, partial, false
 	}
 	if agg2 == "average" {
 		acc /= float64(groups)
 	}
-	return acc, arTotal / float64(groups), groups, partial, false
+	return acc, arTotal / float64(contributors), contributors, partial, false
+}
+
+func TestL6ContributorWeightedMetadataOracle(t *testing.T) {
+	groups := [][]l5Member{
+		{{Base: 1}},
+		{
+			{Base: 2, AnomLo: 1, AnomHi: 1},
+			{Base: 3},
+			{Base: 4},
+		},
+	}
+	for _, raw := range []bool{false, true} {
+		_, arp, contributors, _, empty := l6Expected("sum", "sum", groups, 1, raw)
+		wantARP := 25.0
+		if raw {
+			wantARP = 100
+		}
+		if empty || arp != wantARP || contributors != 4 {
+			t.Errorf("raw=%v: arp=%v contributors=%d empty=%v, want %v/4/false",
+				raw, arp, contributors, empty, wantARP)
+		}
+	}
 }
 
 // l6Groups builds the two-pass structure: final groups (by key2) of
@@ -146,9 +161,9 @@ func l6Groups(key1, key2 string, members []l5Member) map[string][][]l5Member {
 	return out
 }
 
-// TestLayer6TwoPassMatrix pins the mechanically-correct two-pass combos
-// green: chains whose pass-1 accumulator IS the group's final value (sum
-// and the champions), so pass 2 consumes exactly what the semantics mean.
+// TestLayer6TwoPassMatrix covers chains whose pass-1 accumulator is already
+// the group's final value (sum and the champions), plus contributor-weighted
+// anomaly metadata in non-raw and raw responses.
 func TestLayer6TwoPassMatrix(t *testing.T) {
 	trackContract(t, "L6/two-pass-matrix")
 
@@ -218,9 +233,13 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 							t.Errorf("%q: got %d rows, want %d", gname, len(col), l5Rows)
 							continue
 						}
-						for _, pt := range col {
-							i := int(pt.T - fixture.T0)
+						for rowIndex, pt := range col {
+							i := rowIndex + 1
+							wantT := fixture.T0 + int64(i)
 							want, wantAR, wantGbc, wantPartial, wantEmpty := l6Expected(ac.agg1, ac.agg2, pass1Groups, i, raw)
+							if pt.T != wantT {
+								t.Errorf("%q row %d: timestamp %d, want %d", gname, i, pt.T, wantT)
+							}
 							switch {
 							case wantEmpty && pt.Value != nil:
 								t.Errorf("%q row %d: value %v, want null", gname, i, *pt.Value)
@@ -229,19 +248,29 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 							case !wantEmpty && !tierValueMatch(*pt.Value, want, 1e-9):
 								t.Errorf("%q row %d: value %v, want %v", gname, i, *pt.Value, want)
 							}
-							if !wantEmpty && !tierValueMatch(pt.ARP, wantAR, 1e-9) {
+							if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
 								t.Errorf("%q row %d: arp %v, want %v", gname, i, pt.ARP, wantAR)
 							}
 							if raw && !wantEmpty {
 								if pt.Count == nil {
 									t.Errorf("%q row %d: raw point has no count", gname, i)
 								} else if *pt.Count != int64(wantGbc) {
-									t.Errorf("%q row %d: count %d, want %d pass-1 groups", gname, i, *pt.Count, wantGbc)
+									t.Errorf("%q row %d: count %d, want %d raw contributors", gname, i, *pt.Count, wantGbc)
 								}
+							} else if pt.Count != nil {
+								t.Errorf("%q row %d: count %d is present, want absent", gname, i, *pt.Count)
 							}
-							gotPartial := pt.PA&canon.AnnotationPartial != 0
-							if gotPartial != wantPartial {
-								t.Errorf("%q row %d: partial %v, want %v (pa %d)", gname, i, gotPartial, wantPartial, pt.PA)
+							if pt.Hidden != nil {
+								t.Errorf("%q row %d: hidden %v is present, want absent", gname, i, *pt.Hidden)
+							}
+							wantPA := int64(0)
+							if wantEmpty {
+								wantPA = canon.AnnotationEmpty
+							} else if wantPartial {
+								wantPA = canon.AnnotationPartial
+							}
+							if pt.PA != wantPA {
+								t.Errorf("%q row %d: pa %d, want exactly %d", gname, i, pt.PA, wantPA)
 							}
 						}
 					}
@@ -251,11 +280,8 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 	}
 }
 
-// TestCase018MultipassAverage pins the KNOWN avg-of-sums bug: with
-// AVERAGE at pass 1, pass 2 consumes the groups' SUMS (the per-group
-// division never happens), so [dimension,avg]→[selected,avg] returns
-// sum-of-all divided by the GROUP count — inflated by roughly the members
-// per group versus the mean of the group averages.
+// TestCase018MultipassAverage discriminates the correct mean of finalized
+// pass-1 group averages from the current avg-of-sums defect.
 func TestCase018MultipassAverage(t *testing.T) {
 	trackContract(t, "CASE-018/multipass-average")
 
@@ -279,12 +305,13 @@ func TestCase018MultipassAverage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	col := cols["selected"]
-	if len(col) == 0 {
-		t.Fatal("no selected column")
+	ok := assertOnlyColumn(t, cols, "selected")
+	if !assertColumnExactGrid(t, cols, "selected", fixture.T0, fixture.T0+l5Rows, 1) {
+		ok = false
 	}
+	col := cols["selected"]
 
-	reproduced := 0
+	reproduced, classified := 0, 0
 	for _, pt := range col {
 		i := int(pt.T - fixture.T0)
 
@@ -302,7 +329,14 @@ func TestCase018MultipassAverage(t *testing.T) {
 			meanOfAvgs += sum / float64(gbc)
 			groupsSeen++
 		}
-		if groupsSeen == 0 || pt.Value == nil {
+		if groupsSeen == 0 {
+			t.Logf("row %d has no contributing fixture groups", i)
+			ok = false
+			continue
+		}
+		if pt.Value == nil {
+			t.Logf("row %d is null, want a numeric avg-of-sums or mean-of-averages result", i)
+			ok = false
 			continue
 		}
 		broken := brokenAcc / float64(groupsSeen)
@@ -311,16 +345,23 @@ func TestCase018MultipassAverage(t *testing.T) {
 		switch {
 		case tierValueMatch(*pt.Value, broken, 1e-9) && !tierValueMatch(broken, meanOfAvgs, 1e-9):
 			reproduced++
+			classified++
 		case tierValueMatch(*pt.Value, meanOfAvgs, 1e-9):
 			// the fix landed: the engine now averages group averages
+			classified++
 		default:
-			t.Fatalf("row %d: value %v matches neither avg-of-sums %v nor mean-of-averages %v — new behavior, investigate",
+			t.Logf("row %d: value %v matches neither avg-of-sums %v nor mean-of-averages %v — new behavior, investigate",
 				i, *pt.Value, broken, meanOfAvgs)
+			ok = false
 		}
+	}
+	if classified != l5Rows {
+		t.Logf("classified %d/%d expected rows", classified, l5Rows)
+		ok = false
 	}
 
 	t.Logf("avg-of-sums reproduced on %d/%d rows", reproduced, len(col))
-	assertContract(t, "CASE-018/multipass-average", reproduced == 0)
+	assertContract(t, "CASE-018/multipass-average", ok && reproduced == 0)
 }
 
 // TestLayer6TwoPassPercentage pins percentage as the PASS-2 aggregation.
@@ -333,7 +374,7 @@ func TestCase018MultipassAverage(t *testing.T) {
 // hidden member) taints the final point PARTIAL through the hgbc top
 // bit. Non-raw converts v*100/(v+h); raw converts NOTHING — the value
 // stays the visible accumulator, the hidden accumulator rides the wire,
-// and the point count is the number of visible pass-1 groups.
+// and the point count is the number of visible raw metric contributors.
 func TestLayer6TwoPassPercentage(t *testing.T) {
 	trackContract(t, "L6/two-pass-percentage")
 
@@ -418,11 +459,17 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 						t.Errorf("%q: got %d rows, want %d", fk, len(col), l5Rows)
 						continue
 					}
-					for _, pt := range col {
-						i := int(pt.T - fixture.T0)
+					for rowIndex, pt := range col {
+						i := rowIndex + 1
+						wantT := fixture.T0 + int64(i)
+						if pt.T != wantT {
+							t.Errorf("%q row %d: timestamp %d, want %d", fk, i, pt.T, wantT)
+						}
 
 						var v, h, arTot float64
-						gbc := 0
+						visibleGroups := 0
+						visibleContributors := 0
+						hiddenContributors := 0
 						partial := false
 						for _, g := range b.vis {
 							sum, ar1, gbc1 := l6Pass1("sum", g, i)
@@ -434,13 +481,14 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 							}
 							v += sum
 							arTot += ar1
-							gbc++
+							visibleGroups++
+							visibleContributors += gbc1
 						}
 						// a visible pass-1 group contributing NOTHING on a
 						// row (all members gapped) shorts the engine's gbc
 						// against its expected count → PARTIAL, mirroring
 						// the hidden-side check below
-						if gbc > 0 && gbc < len(b.vis) {
+						if visibleGroups > 0 && visibleGroups < len(b.vis) {
 							partial = true
 						}
 						hidContrib := 0
@@ -454,44 +502,55 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 							}
 							h += sum
 							hidContrib++
+							hiddenContributors += gbc1
 						}
 						if hidContrib < len(b.hid) {
 							partial = true
 						}
 
-						if gbc == 0 {
-							if pt.Value != nil {
-								t.Errorf("%q row %d: value %v, want null", fk, i, *pt.Value)
-							}
-							continue
-						}
-
-						want := v
-						wantAR := arTot
-						if !raw {
+						empty := visibleContributors == 0
+						want, wantAR := v, arTot
+						if !raw && !empty {
 							want = v * 100 / (v + h)
-							wantAR = arTot / float64(gbc)
+							wantAR = arTot / float64(visibleContributors)
 						}
 						switch {
-						case pt.Value == nil:
+						case empty && pt.Value != nil:
+							t.Errorf("%q row %d: value %v, want null", fk, i, *pt.Value)
+						case !empty && pt.Value == nil:
 							t.Errorf("%q row %d: null, want %v", fk, i, want)
-						case !tierValueMatch(*pt.Value, want, 1e-9):
+						case !empty && !tierValueMatch(*pt.Value, want, 1e-9):
 							t.Errorf("%q row %d: value %v, want %v", fk, i, *pt.Value, want)
 						}
 						if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
 							t.Errorf("%q row %d: arp %v, want %v", fk, i, pt.ARP, wantAR)
 						}
-						if raw {
-							if pt.Count == nil || *pt.Count != int64(gbc) {
-								t.Errorf("%q row %d: count %v, want %d visible pass-1 groups", fk, i, pt.Count, gbc)
+						if raw && !empty {
+							if pt.Count == nil {
+								t.Errorf("%q row %d: count is absent, want %d visible raw contributors",
+									fk, i, visibleContributors)
+							} else if *pt.Count != int64(visibleContributors) {
+								t.Errorf("%q row %d: count %d, want %d visible raw contributors",
+									fk, i, *pt.Count, visibleContributors)
 							}
+						} else if pt.Count != nil {
+							t.Errorf("%q row %d: count %d is present, want absent", fk, i, *pt.Count)
+						}
+						if raw && hiddenContributors > 0 {
 							if pt.Hidden == nil || !tierValueMatch(*pt.Hidden, h, 1e-9) {
 								t.Errorf("%q row %d: hidden %v, want %v", fk, i, pt.Hidden, h)
 							}
+						} else if pt.Hidden != nil {
+							t.Errorf("%q row %d: hidden %v is present, want absent", fk, i, *pt.Hidden)
 						}
-						gotPartial := pt.PA&canon.AnnotationPartial != 0
-						if gotPartial != partial {
-							t.Errorf("%q row %d: partial %v, want %v (pa %d)", fk, i, gotPartial, partial, pt.PA)
+						wantPA := int64(0)
+						if empty {
+							wantPA = canon.AnnotationEmpty
+						} else if partial {
+							wantPA = canon.AnnotationPartial
+						}
+						if pt.PA != wantPA {
+							t.Errorf("%q row %d: pa %d, want exactly %d", fk, i, pt.PA, wantPA)
 						}
 					}
 				}

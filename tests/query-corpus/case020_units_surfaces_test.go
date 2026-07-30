@@ -114,15 +114,25 @@ func c020OnlyColumn(t *testing.T, doc map[string]any, timestamp int64) (string, 
 	panic("unreachable")
 }
 
-func c020Query(t *testing.T, host, context, timeGroup, groupBy, aggregation string, after, before int64) map[string]any {
+type c020QuerySpec struct {
+	host        string
+	context     string
+	timeGroup   string
+	groupBy     string
+	aggregation string
+	after       int64
+	before      int64
+}
+
+func c020Query(t *testing.T, spec c020QuerySpec) map[string]any {
 	t.Helper()
 
-	params := daemon.DataParams(context, after, before, 1)
-	params.Set("time_group", timeGroup)
-	params.Set("group_by", groupBy)
-	params.Set("aggregation", aggregation)
+	params := daemon.DataParams(spec.context, spec.after, spec.before, 1)
+	params.Set("time_group", spec.timeGroup)
+	params.Set("group_by", spec.groupBy)
+	params.Set("aggregation", spec.aggregation)
 	params.Set("options", "jsonwrap,unaligned")
-	doc, err := td.DataV3(host, params)
+	doc, err := td.DataV3(spec.host, params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,10 +191,11 @@ func TestCase020UnitsAcrossQuerySurfaces(t *testing.T) {
 						wantLabel = metric.dimension + "," + resultUnits
 					}
 
-					doc := c020Query(
-						t, metric.host, metric.context, timeGroup, groupBy, "average",
-						fixtureFirst, fixtureBefore,
-					)
+					doc := c020Query(t, c020QuerySpec{
+						host: metric.host, context: metric.context,
+						timeGroup: timeGroup, groupBy: groupBy, aggregation: "average",
+						after: fixtureFirst, before: fixtureBefore,
+					})
 					db := queryObject(t, doc, "db", "db")
 					view := queryObject(t, doc, "view", "view")
 
@@ -234,10 +245,11 @@ func c020PushMixedOrder(t *testing.T, host, machineGUID, context string, rateFir
 func c020MixedResult(t *testing.T, host, context, groupBy string) c020MixedObservation {
 	t.Helper()
 
-	doc := c020Query(
-		t, host, context, "sum", groupBy, "sum",
-		fixture.T0, fixture.T0+c020Samples,
-	)
+	doc := c020Query(t, c020QuerySpec{
+		host: host, context: context,
+		timeGroup: "sum", groupBy: groupBy, aggregation: "sum",
+		after: fixture.T0, before: fixture.T0 + c020Samples,
+	})
 	view := queryObject(t, doc, "view", "view")
 	dimensions := queryObject(t, view, "dimensions", "view.dimensions")
 	aggregated, ok := dimensions["aggregated"].([]any)
@@ -303,20 +315,26 @@ func TestCase020MixedRateGaugeUnitsAreOrderIndependent(t *testing.T) {
 	}
 }
 
-func c020Badge(
-	t *testing.T,
-	baseURL, host, chart, dimension, group string,
-	after, before int64,
-) string {
+type c020BadgeSpec struct {
+	baseURL   string
+	host      string
+	chart     string
+	dimension string
+	group     string
+	after     int64
+	before    int64
+}
+
+func c020Badge(t *testing.T, spec c020BadgeSpec) string {
 	t.Helper()
 
 	params := url.Values{
-		"chart":           {chart},
-		"dimensions":      {dimension},
-		"after":           {strconv.FormatInt(after, 10)},
-		"before":          {strconv.FormatInt(before, 10)},
+		"chart":           {spec.chart},
+		"dimensions":      {spec.dimension},
+		"after":           {strconv.FormatInt(spec.after, 10)},
+		"before":          {strconv.FormatInt(spec.before, 10)},
 		"points":          {"1"},
-		"group":           {group},
+		"group":           {spec.group},
 		"options":         {"unaligned"},
 		"label":           {"CASE-020"},
 		"precision":       {"0"},
@@ -325,7 +343,7 @@ func c020Badge(
 	}
 	endpoint := fmt.Sprintf(
 		"%s/host/%s/api/v1/badge.svg?%s",
-		baseURL, url.PathEscape(host), params.Encode(),
+		spec.baseURL, url.PathEscape(spec.host), params.Encode(),
 	)
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -402,7 +420,10 @@ func TestCase020BadgeUnitsAndValues(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			svg := c020Badge(t, td.BaseURL, host, tc.chart, "value", tc.group, first, before)
+			svg := c020Badge(t, c020BadgeSpec{
+				baseURL: td.BaseURL, host: host, chart: tc.chart,
+				dimension: "value", group: tc.group, after: first, before: before,
+			})
 			c020AssertBadgeValue(t, svg, tc.want)
 		})
 	}
@@ -437,14 +458,18 @@ func TestCase020BadgeArchivedFilteredRateUnits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = d.Stop() })
+	t.Cleanup(func() {
+		if err := d.Stop(); err != nil {
+			t.Errorf("stop dedicated daemon: %v", err)
+		}
+	})
 
 	rate := c020Chart(chart, chart, "requests/s", "incremental", 5, fixture.T0)
 	rate.Dimensions[0].ID = rateDim
 	first, last := rate.FirstT(), rate.LastT()
 
 	rateConn, err := stream.Connect(
-		d.Addr, daemon.StreamKey,
+		d.Addr, d.StreamKey,
 		stream.HostInfo{Hostname: host, MachineGUID: machineGUID},
 		stream.CapsLive,
 	)
@@ -475,7 +500,7 @@ func TestCase020BadgeArchivedFilteredRateUnits(t *testing.T) {
 	liveLast := gauge.LastT()
 
 	gaugeConn, err := stream.Connect(
-		d.Addr, daemon.StreamKey,
+		d.Addr, d.StreamKey,
 		stream.HostInfo{Hostname: host, MachineGUID: machineGUID},
 		stream.CapsLive,
 	)
@@ -503,6 +528,9 @@ func TestCase020BadgeArchivedFilteredRateUnits(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 
-	svg := c020Badge(t, d.BaseURL, host, chart, rateDim, "sum", first-1, last)
+	svg := c020Badge(t, c020BadgeSpec{
+		baseURL: d.BaseURL, host: host, chart: chart,
+		dimension: rateDim, group: "sum", after: first - 1, before: last,
+	})
 	c020AssertBadgeValue(t, svg, "20 requests")
 }
