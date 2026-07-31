@@ -50,7 +50,7 @@ func TestECSCredentialsEndpoint(t *testing.T) {
 			wantErr:     true,
 		},
 		"authority-shaped value": {
-			relativeURI: "@metadata.example/credentials",
+			relativeURI: "//metadata.example/credentials",
 			wantErr:     true,
 		},
 		"fragment": {
@@ -84,6 +84,7 @@ func TestECSCredentialsResponses(t *testing.T) {
 		status          int
 		body            string
 		reader          io.Reader
+		wantToken       string
 		wantErrContains string
 		wantTooLarge    bool
 	}{
@@ -92,8 +93,9 @@ func TestECSCredentialsResponses(t *testing.T) {
 			body:   `{"AccessKeyId":"test-access","SecretAccessKey":"test-secret"}`,
 		},
 		"session token is accepted": {
-			status: http.StatusOK,
-			body:   `{"AccessKeyId":"test-access","SecretAccessKey":"test-secret","Token":"test-token"}`,
+			status:    http.StatusOK,
+			body:      `{"AccessKeyId":"test-access","SecretAccessKey":"test-secret","Token":"test-token"}`,
+			wantToken: "test-token",
 		},
 		"missing required key fails": {
 			status:          http.StatusOK,
@@ -145,6 +147,7 @@ func TestECSCredentialsResponses(t *testing.T) {
 				require.NotNil(t, creds)
 				assert.Equal(t, "test-access", creds.accessKeyID)
 				assert.Equal(t, "test-secret", creds.secretAccessKey)
+				assert.Equal(t, tc.wantToken, creds.sessionToken)
 				return
 			}
 			require.ErrorContains(t, err, tc.wantErrContains)
@@ -161,6 +164,7 @@ func TestIMDSCredentialsRequestPath(t *testing.T) {
 		role            string
 		credentials     string
 		wantRole        string
+		wantToken       string
 		wantRequests    int64
 		wantErrContains string
 	}{
@@ -176,6 +180,7 @@ func TestIMDSCredentialsRequestPath(t *testing.T) {
 			role:         strings.Repeat("a", 64),
 			credentials:  `{"AccessKeyId":"test-access","SecretAccessKey":"test-secret","Token":"test-token"}`,
 			wantRole:     strings.Repeat("a", 64),
+			wantToken:    "test-token",
 			wantRequests: 3,
 		},
 		"empty token fails": {
@@ -220,6 +225,7 @@ func TestIMDSCredentialsRequestPath(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			var requests atomic.Int64
+			var tokenBody, roleBody, credentialBody *trackingReadCloser
 			s := publishedWithMetadataTransport(t, roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				request := requests.Add(1)
 				switch request {
@@ -227,17 +233,19 @@ func TestIMDSCredentialsRequestPath(t *testing.T) {
 					assert.Equal(t, http.MethodPut, req.Method)
 					assert.Equal(t, "/latest/api/token", req.URL.Path)
 					assert.Equal(t, "21600", req.Header.Get("X-aws-ec2-metadata-token-ttl-seconds"))
-					return awsHTTPResponse(http.StatusOK, tc.token), nil
+					return trackedAWSHTTPResponse(http.StatusOK, tc.token, &tokenBody), nil
 				case 2:
+					require.True(t, tokenBody.closed.Load(), "token response must close before role request")
 					assert.Equal(t, http.MethodGet, req.Method)
 					assert.Equal(t, "/latest/meta-data/iam/security-credentials/", req.URL.Path)
 					assert.Equal(t, "imds-token", req.Header.Get("X-aws-ec2-metadata-token"))
-					return awsHTTPResponse(http.StatusOK, tc.role), nil
+					return trackedAWSHTTPResponse(http.StatusOK, tc.role, &roleBody), nil
 				case 3:
+					require.True(t, roleBody.closed.Load(), "role response must close before credential request")
 					assert.Equal(t, http.MethodGet, req.Method)
 					assert.Equal(t, "/latest/meta-data/iam/security-credentials/"+tc.wantRole, req.URL.Path)
 					assert.Equal(t, "imds-token", req.Header.Get("X-aws-ec2-metadata-token"))
-					return awsHTTPResponse(http.StatusOK, tc.credentials), nil
+					return trackedAWSHTTPResponse(http.StatusOK, tc.credentials, &credentialBody), nil
 				default:
 					return nil, fmt.Errorf("unexpected IMDS request %d", request)
 				}
@@ -246,6 +254,11 @@ func TestIMDSCredentialsRequestPath(t *testing.T) {
 			creds, err := s.imdsCredentials(t.Context())
 
 			assert.Equal(t, tc.wantRequests, requests.Load())
+			for _, body := range []*trackingReadCloser{tokenBody, roleBody, credentialBody} {
+				if body != nil {
+					assert.True(t, body.closed.Load())
+				}
+			}
 			if tc.wantErrContains != "" {
 				require.ErrorContains(t, err, tc.wantErrContains)
 				return
@@ -254,6 +267,107 @@ func TestIMDSCredentialsRequestPath(t *testing.T) {
 			require.NotNil(t, creds)
 			assert.Equal(t, "test-access", creds.accessKeyID)
 			assert.Equal(t, "test-secret", creds.secretAccessKey)
+			assert.Equal(t, tc.wantToken, creds.sessionToken)
+		})
+	}
+}
+
+func TestIMDSCredentialsStageFailures(t *testing.T) {
+	readErr := errors.New("response read failed")
+	tests := map[string]struct {
+		stage           int64
+		status          int
+		body            string
+		reader          io.Reader
+		wantErrContains string
+		wantTooLarge    bool
+	}{
+		"token HTTP failure": {
+			stage:           1,
+			status:          http.StatusInternalServerError,
+			body:            "private token failure",
+			wantErrContains: "IMDS token request returned HTTP 500",
+		},
+		"token oversized response": {
+			stage:           1,
+			body:            strings.Repeat("x", responseBodyLimit+1),
+			wantErrContains: "reading IMDS token request response",
+			wantTooLarge:    true,
+		},
+		"role HTTP failure": {
+			stage:           2,
+			status:          http.StatusInternalServerError,
+			body:            "private role failure",
+			wantErrContains: "IMDS role request returned HTTP 500",
+		},
+		"role read failure": {
+			stage:           2,
+			reader:          errorReader{err: readErr},
+			wantErrContains: "reading IMDS role request response",
+		},
+		"credential HTTP failure": {
+			stage:           3,
+			status:          http.StatusInternalServerError,
+			body:            "private credential failure",
+			wantErrContains: "IMDS credentials request returned HTTP 500",
+		},
+		"credential oversized response": {
+			stage:           3,
+			body:            strings.Repeat("x", responseBodyLimit+1),
+			wantErrContains: "reading IMDS credentials request response",
+			wantTooLarge:    true,
+		},
+		"credential malformed JSON": {
+			stage:           3,
+			body:            `{"AccessKeyId":`,
+			wantErrContains: "parsing IMDS credentials response",
+		},
+	}
+
+	normalBodies := map[int64]string{
+		1: "imds-token",
+		2: "test-role",
+		3: `{"AccessKeyId":"test-access","SecretAccessKey":"test-secret"}`,
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var requests atomic.Int64
+			var bodies []*trackingReadCloser
+			s := publishedWithMetadataTransport(t, roundTripFunc(func(*http.Request) (*http.Response, error) {
+				stage := requests.Add(1)
+				for _, body := range bodies {
+					require.True(t, body.closed.Load(), "previous IMDS response must close before request %d", stage)
+				}
+
+				status := http.StatusOK
+				reader := io.Reader(strings.NewReader(normalBodies[stage]))
+				if stage == tc.stage {
+					if tc.status != 0 {
+						status = tc.status
+					}
+					switch {
+					case tc.reader != nil:
+						reader = tc.reader
+					case tc.body != "":
+						reader = strings.NewReader(tc.body)
+					}
+				}
+				body := &trackingReadCloser{Reader: reader}
+				bodies = append(bodies, body)
+				return &http.Response{StatusCode: status, Body: body, Header: make(http.Header)}, nil
+			}))
+
+			_, err := s.imdsCredentials(t.Context())
+
+			assert.Equal(t, tc.stage, requests.Load())
+			for _, body := range bodies {
+				assert.True(t, body.closed.Load())
+			}
+			require.ErrorContains(t, err, tc.wantErrContains)
+			if tc.wantTooLarge {
+				require.ErrorIs(t, err, httpx.ErrResponseTooLarge)
+			}
 		})
 	}
 }
@@ -530,6 +644,15 @@ func awsHTTPResponse(status int, body string) *http.Response {
 	return &http.Response{
 		StatusCode: status,
 		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     make(http.Header),
+	}
+}
+
+func trackedAWSHTTPResponse(status int, body string, tracked **trackingReadCloser) *http.Response {
+	*tracked = &trackingReadCloser{Reader: strings.NewReader(body)}
+	return &http.Response{
+		StatusCode: status,
+		Body:       *tracked,
 		Header:     make(http.Header),
 	}
 }

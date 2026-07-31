@@ -33,6 +33,8 @@ The Dynamic Configuration **Test** action runs the configured production credent
 
 Operational success proves only that the selected source returned non-empty access-key and secret-key values at that time. The session token remains optional and is not part of the guarantee. Test does not contact AWS Secrets Manager, STS, KMS, or another AWS data-plane endpoint, so it does not prove that AWS accepts the credentials, that they are current or temporary, that the configured region is correct, or that the identity can read or decrypt any secret.
 
+Test requires no additional AWS IAM permission beyond the configured credential source and does not mutate an AWS resource or policy. IMDS mode creates only the normal short-lived metadata-service token and can produce ordinary metadata-service telemetry.
+
 Each credential-source response is limited to 1 MiB. Every request uses the configured `timeout`; IMDS can consume approximately three sequential timeout periods, while an earlier Dynamic Configuration caller deadline or cancellation wins.
 
 

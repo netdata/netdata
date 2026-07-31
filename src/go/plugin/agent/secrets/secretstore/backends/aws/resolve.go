@@ -142,8 +142,7 @@ func (s *publishedStore) ecsCredentials(ctx context.Context, relativeURI string)
 	if err != nil {
 		return nil, fmt.Errorf("ECS credentials request failed: %w", err)
 	}
-	defer resp.Body.Close()
-	body, err := readAWSResponse(resp, "ECS credentials", true)
+	body, err := readAndCloseAWSResponse(resp, "ECS credentials", true)
 	if err != nil {
 		return nil, err
 	}
@@ -175,8 +174,7 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 	if err != nil {
 		return nil, fmt.Errorf("IMDS token request failed: %w", err)
 	}
-	defer tokenResp.Body.Close()
-	tokenBody, err := readAWSResponse(tokenResp, "IMDS token request", false)
+	tokenBody, err := readAndCloseAWSResponse(tokenResp, "IMDS token request", false)
 	if err != nil {
 		return nil, err
 	}
@@ -194,8 +192,7 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 	if err != nil {
 		return nil, fmt.Errorf("IMDS role request failed: %w", err)
 	}
-	defer roleResp.Body.Close()
-	roleBody, err := readAWSResponse(roleResp, "IMDS role request", false)
+	roleBody, err := readAndCloseAWSResponse(roleResp, "IMDS role request", false)
 	if err != nil {
 		return nil, err
 	}
@@ -213,8 +210,7 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 	if err != nil {
 		return nil, fmt.Errorf("IMDS credentials request failed: %w", err)
 	}
-	defer credResp.Body.Close()
-	credBody, err := readAWSResponse(credResp, "IMDS credentials request", false)
+	credBody, err := readAndCloseAWSResponse(credResp, "IMDS credentials request", false)
 	if err != nil {
 		return nil, err
 	}
@@ -270,8 +266,7 @@ func (s *publishedStore) secretValue(ctx context.Context, creds *credentials, re
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': request failed: %w", original, err)
 	}
-	defer resp.Body.Close()
-	body, err := readAWSResponse(resp, "AWS Secrets Manager", true)
+	body, err := readAndCloseAWSResponse(resp, "AWS Secrets Manager", true)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': %w", original, err)
 	}
@@ -304,7 +299,9 @@ func ecsCredentialsEndpoint(relativeURI string) (string, error) {
 	return endpoint, nil
 }
 
-func readAWSResponse(resp *http.Response, operation string, includeErrorBody bool) ([]byte, error) {
+func readAndCloseAWSResponse(resp *http.Response, operation string, includeErrorBody bool) ([]byte, error) {
+	defer func() { _ = resp.Body.Close() }()
+
 	body, err := httpx.ReadResponseBody(resp.Body, responseBodyLimit)
 	if resp.StatusCode != http.StatusOK {
 		if err != nil && !errors.Is(err, httpx.ErrResponseTooLarge) {

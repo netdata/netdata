@@ -5,6 +5,7 @@ package httpx
 import (
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -137,6 +138,11 @@ func TestReadResponseBody(t *testing.T) {
 			reader:  strings.NewReader("abc"),
 			limit:   -1,
 			wantErr: errors.New("HTTP response size limit cannot be negative"),
+		},
+		"maximum integer limit": {
+			reader:  strings.NewReader("abc"),
+			limit:   math.MaxInt64,
+			wantErr: errors.New("HTTP response size limit is too large"),
 		},
 	}
 

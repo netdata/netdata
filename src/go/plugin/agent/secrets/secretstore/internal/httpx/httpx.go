@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -75,6 +76,9 @@ func TruncateBody(body []byte) string {
 func ReadResponseBody(r io.Reader, limit int64) ([]byte, error) {
 	if limit < 0 {
 		return nil, errors.New("HTTP response size limit cannot be negative")
+	}
+	if limit == math.MaxInt64 {
+		return nil, errors.New("HTTP response size limit is too large")
 	}
 	body, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
