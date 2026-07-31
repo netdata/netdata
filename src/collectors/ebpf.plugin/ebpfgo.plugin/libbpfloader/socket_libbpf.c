@@ -121,6 +121,14 @@ typedef struct {
     } udp;
 } netdata_socket_bpf_value_t;
 
+/* Ring-buffer event emitted by the buffer-flavor socket BPF program.
+ * One event per kprobe invocation: idx identifies the connection, data holds
+ * exactly one counter incremented (or set for byte bandwidth fields). */
+typedef struct {
+    netdata_socket_bpf_key_t   idx;  /* connection key */
+    netdata_socket_bpf_value_t data; /* per-event delta counters */
+} netdata_socket_rb_event_t;
+
 /* Per-PID aggregated socket metrics — output type for per-PID snapshot.
  * Field order mirrors ebpf_socket_publish_apps_t in ebpf-ipc.h so the Go
  * layer can copy directly into ebpfSocketPublishApps. */
@@ -190,6 +198,17 @@ struct netdata_ebpf_socket_runtime {
      * matches the BPF map capacity and guarantees no entry is silently skipped. */
     netdata_socket_bpf_key_t *nd_del_keys;
     uint32_t                   nd_del_cap;
+
+#if defined(LIBBPF_MAJOR_VERSION)
+    /* Ring-buffer accumulator for the buffer flavor (socket_events map).
+     * rb is non-NULL when the loaded object is the buffer flavor. */
+    struct ring_buffer *rb;
+    struct netdata_socket_per_pid_entry *acc; /* dense per-PID accumulator array */
+    uint32_t acc_cap;
+    uint32_t acc_count;
+    uint32_t *acc_htable;    /* PID → (acc_index + 1); 0 = empty slot */
+    uint32_t acc_htable_sz;  /* power-of-two capacity */
+#endif
 };
 
 /* Snapshot output: raw counters from tbl_global_sock and tbl_lports. */
@@ -383,6 +402,139 @@ static uint32_t next_pow2_u32(uint32_t n)
 }
 
 /* -------------------------------------------------------------------------
+ * Ring-buffer accumulator (buffer flavor — socket_events)
+ * ring_buffer__new is unavailable in old libbpf (0.0.9 / CentOS 7);
+ * guard the whole path so old builds compile cleanly on base-flavor objects.
+ * ---------------------------------------------------------------------- */
+
+#if defined(LIBBPF_MAJOR_VERSION)
+
+static uint32_t socket_acc_htable_slot(uint32_t pid, uint32_t cap)
+{
+    return (pid * 2654435761u) & (cap - 1u);
+}
+
+static void socket_acc_htable_rebuild(struct netdata_ebpf_socket_runtime *rt)
+{
+    memset(rt->acc_htable, 0, (size_t)rt->acc_htable_sz * sizeof(*rt->acc_htable));
+    for (uint32_t i = 0; i < rt->acc_count; i++) {
+        uint32_t h = socket_acc_htable_slot(rt->acc[i].pid, rt->acc_htable_sz);
+        while (rt->acc_htable[h])
+            h = (h + 1u) & (rt->acc_htable_sz - 1u);
+        rt->acc_htable[h] = i + 1u;
+    }
+}
+
+/* Find or create a per-PID accumulator entry.  Returns NULL only on OOM. */
+static struct netdata_socket_per_pid_entry *
+socket_acc_find_or_add(struct netdata_ebpf_socket_runtime *rt, uint32_t pid)
+{
+    if (!rt->acc_htable || rt->acc_htable_sz == 0)
+        return NULL;
+
+    uint32_t cap = rt->acc_htable_sz;
+    uint32_t h   = socket_acc_htable_slot(pid, cap);
+
+    while (rt->acc_htable[h]) {
+        uint32_t idx = rt->acc_htable[h] - 1u;
+        if (rt->acc[idx].pid == pid)
+            return &rt->acc[idx];
+        h = (h + 1u) & (cap - 1u);
+    }
+
+    /* Not found: grow arrays if needed, then insert. */
+    if (rt->acc_count >= rt->acc_cap) {
+        uint32_t new_cap = rt->acc_cap ? rt->acc_cap * 2u : 256u;
+        rt->acc = reallocz(rt->acc, (size_t)new_cap * sizeof(*rt->acc));
+        rt->acc_cap = new_cap;
+    }
+
+    /* Grow hash table when load factor would exceed 50%. */
+    if (rt->acc_count + 1u > rt->acc_htable_sz / 2u) {
+        uint32_t new_sz = rt->acc_htable_sz * 2u;
+        rt->acc_htable = reallocz(rt->acc_htable, (size_t)new_sz * sizeof(*rt->acc_htable));
+        rt->acc_htable_sz = new_sz;
+        socket_acc_htable_rebuild(rt);
+        cap = rt->acc_htable_sz;
+        h   = socket_acc_htable_slot(pid, cap);
+        while (rt->acc_htable[h])
+            h = (h + 1u) & (cap - 1u);
+    }
+
+    struct netdata_socket_per_pid_entry *entry = &rt->acc[rt->acc_count];
+    memset(entry, 0, sizeof(*entry));
+    entry->pid = pid;
+    rt->acc_htable[h] = rt->acc_count + 1u;
+    rt->acc_count++;
+    return entry;
+}
+
+static int socket_rb_callback(void *ctx, void *data, size_t data_sz)
+{
+    if (data_sz < sizeof(netdata_socket_rb_event_t))
+        return 0;
+
+    struct netdata_ebpf_socket_runtime *rt = ctx;
+    const netdata_socket_rb_event_t *ev    = data;
+
+    uint32_t pid = ev->idx.pid;
+    if (!pid)
+        return 0;
+
+    struct netdata_socket_per_pid_entry *entry = socket_acc_find_or_add(rt, pid);
+    if (!entry)
+        return 0;
+
+    entry->bytes_sent             += ev->data.tcp.tcp_bytes_sent;
+    entry->bytes_received         += ev->data.tcp.tcp_bytes_received;
+    entry->call_tcp_sent          += ev->data.tcp.call_tcp_sent;
+    entry->call_tcp_received      += ev->data.tcp.call_tcp_received;
+    entry->retransmit             += ev->data.tcp.retransmit;
+    entry->call_udp_sent          += ev->data.udp.call_udp_sent;
+    entry->call_udp_received      += ev->data.udp.call_udp_received;
+    entry->call_close             += ev->data.tcp.close;
+    entry->call_tcp_v4_connection += ev->data.tcp.ipv4_connect;
+    entry->call_tcp_v6_connection += ev->data.tcp.ipv6_connect;
+    return 0;
+}
+
+static void socket_setup_ring_buffer(struct netdata_ebpf_socket_runtime *rt)
+{
+    struct bpf_map *map = bpf_object__find_map_by_name(rt->obj, "socket_events");
+    if (!map) {
+        fprintf(stderr, "ebpf-go.plugin: socket: ring buffer map 'socket_events' not found\n");
+        return;
+    }
+
+    int fd = bpf_map__fd(map);
+    if (fd < 0) {
+        fprintf(stderr, "ebpf-go.plugin: socket: ring buffer map fd invalid (%d)\n", fd);
+        return;
+    }
+
+    rt->rb = ring_buffer__new(fd, socket_rb_callback, rt, NULL);
+    if (!rt->rb)
+        fprintf(stderr, "ebpf-go.plugin: socket: ring_buffer__new failed (errno %d)\n", errno);
+}
+
+static void socket_destroy_ring_buffer(struct netdata_ebpf_socket_runtime *rt)
+{
+    if (rt->rb) {
+        ring_buffer__free(rt->rb);
+        rt->rb = NULL;
+    }
+    freez(rt->acc);
+    freez(rt->acc_htable);
+    rt->acc           = NULL;
+    rt->acc_htable    = NULL;
+    rt->acc_cap       = 0;
+    rt->acc_count     = 0;
+    rt->acc_htable_sz = 0;
+}
+
+#endif /* LIBBPF_MAJOR_VERSION */
+
+/* -------------------------------------------------------------------------
  * Public API
  * ---------------------------------------------------------------------- */
 
@@ -483,6 +635,19 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     if (!rt->per_pid_entries)
         return -1;
 
+#if defined(LIBBPF_MAJOR_VERSION)
+    /* Ring-buffer accumulator: pre-allocated here so close() can always free
+     * them regardless of flavor.  Unused on base/arena flavor (rb stays NULL). */
+    rt->acc_cap = 256u;
+    rt->acc = callocz((size_t)rt->acc_cap, sizeof(*rt->acc));
+    if (!rt->acc)
+        return -1;
+    rt->acc_htable_sz = 512u; /* 2× initial cap → ~50% max load factor */
+    rt->acc_htable = callocz((size_t)rt->acc_htable_sz, sizeof(*rt->acc_htable));
+    if (!rt->acc_htable)
+        return -1;
+#endif
+
     return 0;
 }
 
@@ -490,7 +655,15 @@ int netdata_socket_runtime_load(struct netdata_ebpf_socket_runtime *rt)
 {
     if (!rt || !rt->obj)
         return -1;
-    return bpf_object__load(rt->obj);
+    int rc = bpf_object__load(rt->obj);
+    if (rc != 0)
+        return rc;
+#if defined(LIBBPF_MAJOR_VERSION)
+    /* Detect buffer flavor by the presence of the socket_events ring buffer map. */
+    if (bpf_object__find_map_by_name(rt->obj, "socket_events"))
+        socket_setup_ring_buffer(rt);
+#endif
+    return 0;
 }
 
 int netdata_socket_runtime_attach(struct netdata_ebpf_socket_runtime *rt)
@@ -625,6 +798,10 @@ void netdata_socket_runtime_close(struct netdata_ebpf_socket_runtime *rt)
     rt->per_pid_count = 0;
     rt->per_pid_cap   = 0;
 
+#if defined(LIBBPF_MAJOR_VERSION)
+    socket_destroy_ring_buffer(rt);
+#endif
+
     if (rt->obj)
         bpf_object__close(rt->obj);
 
@@ -677,7 +854,43 @@ static bool pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
 const struct netdata_socket_per_pid_entry *
 netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out_count)
 {
-    if (!rt || !rt->obj || !rt->pid_ht || !out_count)
+    if (!rt || !rt->obj || !out_count)
+        return NULL;
+
+#if defined(LIBBPF_MAJOR_VERSION)
+    /* Buffer flavor: drain the ring-buffer accumulator and return its contents.
+     * One ring_buffer__consume() drains all events queued since the last call.
+     * The accumulator is reset after each snapshot so callers receive per-cycle
+     * deltas, matching the base-flavor's per-interval behavior. */
+    if (rt->rb) {
+        ring_buffer__consume(rt->rb);
+
+        /* Sort by PID to match the tbl_nd_socket base-flavor output contract. */
+        if (rt->acc_count > 1u)
+            qsort(rt->acc, (size_t)rt->acc_count, sizeof(*rt->acc), pid_ht_compare);
+
+        /* Grow the persistent output buffer if needed. */
+        if ((int)rt->acc_count > rt->per_pid_cap) {
+            rt->per_pid_entries = reallocz(rt->per_pid_entries,
+                                           (size_t)rt->acc_count * sizeof(*rt->per_pid_entries));
+            rt->per_pid_cap = (int)rt->acc_count;
+        }
+        if (rt->acc_count > 0u)
+            memcpy(rt->per_pid_entries, rt->acc,
+                   (size_t)rt->acc_count * sizeof(*rt->per_pid_entries));
+        rt->per_pid_count = (int)rt->acc_count;
+        *out_count = (int)rt->acc_count;
+
+        /* Reset accumulator: deltas are per-cycle, not cumulative. */
+        rt->acc_count = 0u;
+        if (rt->acc_htable)
+            memset(rt->acc_htable, 0, (size_t)rt->acc_htable_sz * sizeof(*rt->acc_htable));
+
+        return rt->per_pid_entries;
+    }
+#endif
+
+    if (!rt->pid_ht)
         return NULL;
 
     struct bpf_map *ndmap = bpf_object__find_map_by_name(rt->obj, "tbl_nd_socket");
