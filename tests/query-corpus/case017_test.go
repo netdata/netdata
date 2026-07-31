@@ -69,6 +69,9 @@ func TestCase017TierBoundaryAbsorption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !assertSelectedTier(t, doc, 1) {
+		t.Fatal("tier1 boundary probe was not served only by forced tier 1")
+	}
 	cols, err = canon.Columns(doc)
 	if err != nil {
 		t.Fatal(err)

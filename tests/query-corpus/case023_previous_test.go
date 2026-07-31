@@ -65,6 +65,9 @@ func TestCase023PreviousSurvivesRedelivery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertSelectedTier(t, doc, 1) {
+			ok = false
+		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
@@ -156,6 +159,7 @@ func TestCase023PreviousFindsARealDropAtEveryZoom(t *testing.T) {
 	// the share of the whole span that reads "below the predecessor",
 	// weighted by each bucket's own width - the quantity percentage-of-time
 	// exists to report, and one that must not move with the zoom
+	ok := true
 	weighted := func(perWindow int64) float64 {
 		t.Helper()
 		params := daemon.DataParamsTier(ch.Context, 1, after, before, windows*perWindow, "percentage-of-time")
@@ -164,6 +168,9 @@ func TestCase023PreviousFindsARealDropAtEveryZoom(t *testing.T) {
 		doc, err := td.DataV3("c023prevdrop", params)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !assertSelectedTier(t, doc, 1) {
+			ok = false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
@@ -182,8 +189,6 @@ func TestCase023PreviousFindsARealDropAtEveryZoom(t *testing.T) {
 		}
 		return sum / float64(len(col))
 	}
-
-	ok := true
 
 	// one delivery per stored window: exactly one of the twenty windows
 	// contains the restart, so it is 1/20 of the span

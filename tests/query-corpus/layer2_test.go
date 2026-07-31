@@ -81,6 +81,9 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 		if err != nil {
 			t.Fatalf("tier%d %s query: %v", tier, tg, err)
 		}
+		if !assertSelectedTier(t, doc, tier) {
+			t.Fatalf("tier%d %s query was not served only by the forced tier", tier, tg)
+		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatalf("tier%d %s decode: %v", tier, tg, err)
