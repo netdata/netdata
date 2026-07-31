@@ -15,119 +15,148 @@ import (
 )
 
 func TestSecretStoreTestCapability(t *testing.T) {
-	t.Run("validation does not run the operational test", func(t *testing.T) {
-		state := &testCapabilityState{}
-		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
-			return &testCapableStore{state: state}
-		})
+	cancelCause := errors.New("test request superseded")
+	testErr := errors.New("provider unavailable")
+	initErr := errors.New("provider initialization failed")
+	providerErr := dyncfg.NewPublicError(
+		"provider operation timed out",
+		context.DeadlineExceeded,
+	)
+	tests := map[string]struct {
+		validationOnly      bool
+		validateFirst       bool
+		storeErr            error
+		initErr             error
+		testResult          error
+		cancelBefore        bool
+		cancelDuringInit    bool
+		cancelDuringTest    bool
+		wantTested          bool
+		wantErr             error
+		wantNotErr          error
+		wantCalls           int
+		wantValue           string
+		wantNoCreates       bool
+		wantNoPublicMessage bool
+	}{
+		"validation does not run the operational test": {
+			validateFirst: true,
+			wantTested:    true,
+			wantCalls:     1,
+			wantValue:     "configured",
+		},
+		"reports validation only for a Store without the capability": {
+			validationOnly: true,
+		},
+		"reports validation only when the configured Store does not support a test": {
+			storeErr:  dyncfg.ErrTestUnsupported,
+			wantCalls: 1,
+			wantValue: "configured",
+		},
+		"returns an operational failure as a tested result": {
+			storeErr:   testErr,
+			wantTested: true,
+			wantErr:    testErr,
+			wantCalls:  1,
+			wantValue:  "configured",
+		},
+		"rejects an already-canceled request before Store creation": {
+			validationOnly: true,
+			cancelBefore:   true,
+			wantErr:        cancelCause,
+			wantNoCreates:  true,
+		},
+		"caller cancellation wins a Store initialization failure": {
+			initErr:          initErr,
+			cancelDuringInit: true,
+			wantErr:          cancelCause,
+			wantNotErr:       initErr,
+		},
+		"caller cancellation wins a provider operational failure": {
+			testResult:          providerErr,
+			cancelDuringTest:    true,
+			wantTested:          true,
+			wantErr:             cancelCause,
+			wantNotErr:          providerErr,
+			wantCalls:           1,
+			wantValue:           "configured",
+			wantNoPublicMessage: true,
+		},
+		"caller cancellation wins an unsupported result": {
+			testResult:       dyncfg.ErrTestUnsupported,
+			cancelDuringTest: true,
+			wantTested:       true,
+			wantErr:          cancelCause,
+			wantNotErr:       dyncfg.ErrTestUnsupported,
+			wantCalls:        1,
+			wantValue:        "configured",
+		},
+	}
 
-		require.NoError(t, store.Validate(t.Context(), catalog, testCapabilityConfig()))
-		require.Zero(t, state.calls)
-
-		tested, err := store.Test(t.Context(), catalog, testCapabilityConfig())
-		require.NoError(t, err)
-		require.True(t, tested)
-		require.Equal(t, 1, state.calls)
-		require.Equal(t, "configured", state.value)
-		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
-	})
-
-	t.Run("reports validation only for a Store without the capability", func(t *testing.T) {
-		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
-			return &testValidationOnlyStore{}
-		})
-
-		tested, err := store.Test(t.Context(), catalog, testCapabilityConfig())
-
-		require.NoError(t, err)
-		require.False(t, tested)
-		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
-	})
-
-	t.Run("returns an operational failure as a tested result", func(t *testing.T) {
-		testErr := errors.New("provider unavailable")
-		state := &testCapabilityState{err: testErr}
-		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
-			return &testCapableStore{state: state}
-		})
-
-		tested, err := store.Test(t.Context(), catalog, testCapabilityConfig())
-
-		require.True(t, tested)
-		require.ErrorIs(t, err, testErr)
-		require.Equal(t, 1, state.calls)
-		require.Equal(t, "configured", state.value)
-		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
-	})
-
-	t.Run("rejects an already-canceled request before Store creation", func(t *testing.T) {
-		cancelCause := errors.New("test request superseded")
-		var creates int
-		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
-			creates++
-			return &testValidationOnlyStore{}
-		})
-		ctx, cancel := context.WithCancelCause(t.Context())
-		cancel(cancelCause)
-
-		tested, err := store.Test(ctx, catalog, testCapabilityConfig())
-
-		require.False(t, tested)
-		require.ErrorIs(t, err, cancelCause)
-		require.Zero(t, creates)
-		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
-	})
-
-	t.Run("caller cancellation wins a Store initialization failure", func(t *testing.T) {
-		cancelCause := errors.New("test request superseded")
-		initErr := errors.New("provider initialization failed")
-		ctx, cancel := context.WithCancelCause(t.Context())
-		state := &testCapabilityState{
-			init: func(context.Context) error {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			var cancel context.CancelCauseFunc
+			if tc.cancelBefore || tc.cancelDuringInit || tc.cancelDuringTest {
+				ctx, cancel = context.WithCancelCause(ctx)
+				defer cancel(nil)
+			}
+			state := &testCapabilityState{err: tc.storeErr}
+			if tc.initErr != nil {
+				state.init = func(context.Context) error {
+					if tc.cancelDuringInit {
+						cancel(cancelCause)
+					}
+					return tc.initErr
+				}
+			}
+			if tc.testResult != nil {
+				state.test = func(context.Context) error {
+					if tc.cancelDuringTest {
+						cancel(cancelCause)
+					}
+					return tc.testResult
+				}
+			}
+			var creates int
+			store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
+				creates++
+				if tc.validationOnly {
+					return &testValidationOnlyStore{}
+				}
+				return &testCapableStore{state: state}
+			})
+			if tc.validateFirst {
+				require.NoError(t, store.Validate(ctx, catalog, testCapabilityConfig()))
+				require.Zero(t, state.calls)
+			}
+			if tc.cancelBefore {
 				cancel(cancelCause)
-				return initErr
-			},
-		}
-		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
-			return &testCapableStore{state: state}
+			}
+
+			tested, err := store.Test(ctx, catalog, testCapabilityConfig())
+
+			require.Equal(t, tc.wantTested, tested)
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+			}
+			if tc.wantNotErr != nil {
+				require.NotErrorIs(t, err, tc.wantNotErr)
+			}
+			if tc.wantNoPublicMessage {
+				_, hasPublicMessage := dyncfg.PublicMessage(err)
+				require.False(t, hasPublicMessage)
+			}
+			require.Equal(t, tc.wantCalls, state.calls)
+			require.Equal(t, tc.wantValue, state.value)
+			if tc.wantNoCreates {
+				require.Zero(t, creates)
+			}
+			require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
 		})
-
-		tested, err := store.Test(ctx, catalog, testCapabilityConfig())
-
-		require.False(t, tested)
-		require.ErrorIs(t, err, cancelCause)
-		require.NotErrorIs(t, err, initErr)
-		require.Zero(t, state.calls)
-		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
-	})
-
-	t.Run("caller cancellation wins a provider operational failure", func(t *testing.T) {
-		cancelCause := errors.New("test request superseded")
-		providerErr := dyncfg.NewPublicError(
-			"provider operation timed out",
-			context.DeadlineExceeded,
-		)
-		ctx, cancel := context.WithCancelCause(t.Context())
-		state := &testCapabilityState{
-			test: func(context.Context) error {
-				cancel(cancelCause)
-				return providerErr
-			},
-		}
-		store, catalog := newTestCapabilityAuthority(t, func() secretstore.Store {
-			return &testCapableStore{state: state}
-		})
-
-		tested, err := store.Test(ctx, catalog, testCapabilityConfig())
-
-		require.True(t, tested)
-		require.ErrorIs(t, err, cancelCause)
-		require.NotErrorIs(t, err, providerErr)
-		_, hasPublicMessage := dyncfg.PublicMessage(err)
-		require.False(t, hasPublicMessage)
-		require.Equal(t, 1, state.calls)
-		require.Equal(t, secretstore.SecretStoreCensus{}, store.Census())
-	})
+	}
 }
 
 func newTestCapabilityAuthority(

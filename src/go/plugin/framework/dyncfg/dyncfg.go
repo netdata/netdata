@@ -55,9 +55,15 @@ const (
 // They must return failures for caller-side sanitization instead of logging raw
 // user configuration, credentials, or endpoint material. NewPublicError may
 // attach a static, code-authored explanation that is safe to render publicly.
+// Test may return ErrTestUnsupported when a valid configured instance cannot
+// safely perform an operational test.
 type Testable interface {
 	Test(ctx context.Context) error
 }
+
+// ErrTestUnsupported reports that a Testable resource cannot safely run an
+// operational test for the configured instance.
+var ErrTestUnsupported = errors.New("operational test is not supported")
 
 func JoinCommands(commands ...Command) string {
 	strs := make([]string, len(commands))

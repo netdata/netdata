@@ -83,94 +83,143 @@ func TestNew(t *testing.T) {
 }
 
 func TestPipeline_Test(t *testing.T) {
-	t.Run("tests capable discoverers sequentially", func(t *testing.T) {
-		var calls []string
-		p := &Pipeline{discoverers: []model.Discoverer{
-			&pipelineTestDiscoverer{name: "first", calls: &calls},
-			&pipelineTestDiscoverer{name: "second", calls: &calls},
-		}}
-
-		fullyTested, err := p.Test(t.Context())
-
-		require.NoError(t, err)
-		require.True(t, fullyTested)
-		require.Equal(t, []string{"first", "second"}, calls)
-	})
-
-	t.Run("reports validation only when a discoverer has no test", func(t *testing.T) {
-		var calls []string
-		p := &Pipeline{discoverers: []model.Discoverer{
-			newMockDiscoverer("", newMockTargetGroup("test")),
-			&pipelineTestDiscoverer{name: "capable", calls: &calls},
-		}}
-
-		fullyTested, err := p.Test(t.Context())
-
-		require.NoError(t, err)
-		require.False(t, fullyTested)
-		require.Equal(t, []string{"capable"}, calls)
-	})
-
-	t.Run("stops at the first operational failure", func(t *testing.T) {
-		testErr := errors.New("unavailable")
-		var calls []string
-		p := &Pipeline{discoverers: []model.Discoverer{
-			&pipelineTestDiscoverer{name: "first", calls: &calls},
-			&pipelineTestDiscoverer{name: "second", calls: &calls, err: testErr},
-			&pipelineTestDiscoverer{name: "third", calls: &calls},
-		}}
-
-		fullyTested, err := p.Test(t.Context())
-
-		require.False(t, fullyTested)
-		require.ErrorIs(t, err, testErr)
-		require.Equal(t, []string{"first", "second"}, calls)
-	})
-
-	t.Run("honors caller cancellation before testing", func(t *testing.T) {
-		cancelCause := errors.New("test request superseded")
-		ctx, cancel := context.WithCancelCause(t.Context())
-		cancel(cancelCause)
-		var calls []string
-		p := &Pipeline{discoverers: []model.Discoverer{
-			&pipelineTestDiscoverer{name: "first", calls: &calls},
-		}}
-
-		fullyTested, err := p.Test(ctx)
-
-		require.False(t, fullyTested)
-		require.ErrorIs(t, err, cancelCause)
-		require.Empty(t, calls)
-	})
-
-	t.Run("caller cancellation wins a resource operational failure", func(t *testing.T) {
-		cancelCause := errors.New("test request superseded")
-		resourceErr := dyncfg.NewPublicError(
-			"resource operation timed out",
-			context.DeadlineExceeded,
-		)
-		ctx, cancel := context.WithCancelCause(t.Context())
-		var calls []string
-		p := &Pipeline{discoverers: []model.Discoverer{
-			&pipelineTestDiscoverer{
-				name:  "first",
-				calls: &calls,
-				test: func(context.Context) error {
-					cancel(cancelCause)
-					return resourceErr
-				},
+	cancelCause := errors.New("test request superseded")
+	testErr := errors.New("unavailable")
+	resourceErr := dyncfg.NewPublicError(
+		"resource operation timed out",
+		context.DeadlineExceeded,
+	)
+	tests := map[string]struct {
+		build               func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer)
+		wantFullyTested     bool
+		wantErr             error
+		wantNotErr          error
+		wantCalls           []string
+		wantNoPublicMessage bool
+	}{
+		"tests capable discoverers sequentially": {
+			build: func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer) {
+				return t.Context(), []model.Discoverer{
+					&pipelineTestDiscoverer{name: "first", calls: calls},
+					&pipelineTestDiscoverer{name: "second", calls: calls},
+				}
 			},
-		}}
+			wantFullyTested: true,
+			wantCalls:       []string{"first", "second"},
+		},
+		"reports validation only when a discoverer has no test": {
+			build: func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer) {
+				return t.Context(), []model.Discoverer{
+					newMockDiscoverer("", newMockTargetGroup("test")),
+					&pipelineTestDiscoverer{name: "capable", calls: calls},
+				}
+			},
+			wantCalls: []string{"capable"},
+		},
+		"continues after a configured discoverer does not support a test": {
+			build: func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer) {
+				return t.Context(), []model.Discoverer{
+					&pipelineTestDiscoverer{name: "unsupported", calls: calls, err: dyncfg.ErrTestUnsupported},
+					&pipelineTestDiscoverer{name: "capable", calls: calls},
+				}
+			},
+			wantCalls: []string{"unsupported", "capable"},
+		},
+		"does not hide a later operational failure after an unsupported test": {
+			build: func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer) {
+				return t.Context(), []model.Discoverer{
+					&pipelineTestDiscoverer{name: "unsupported", calls: calls, err: dyncfg.ErrTestUnsupported},
+					&pipelineTestDiscoverer{name: "failure", calls: calls, err: testErr},
+				}
+			},
+			wantErr:    testErr,
+			wantNotErr: dyncfg.ErrTestUnsupported,
+			wantCalls:  []string{"unsupported", "failure"},
+		},
+		"stops at the first operational failure": {
+			build: func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer) {
+				return t.Context(), []model.Discoverer{
+					&pipelineTestDiscoverer{name: "first", calls: calls},
+					&pipelineTestDiscoverer{name: "second", calls: calls, err: testErr},
+					&pipelineTestDiscoverer{name: "third", calls: calls},
+				}
+			},
+			wantErr:   testErr,
+			wantCalls: []string{"first", "second"},
+		},
+		"honors caller cancellation before testing": {
+			build: func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer) {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				cancel(cancelCause)
+				return ctx, []model.Discoverer{
+					&pipelineTestDiscoverer{name: "first", calls: calls},
+				}
+			},
+			wantErr: cancelCause,
+		},
+		"caller cancellation wins a resource operational failure": {
+			build: func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer) {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				return ctx, []model.Discoverer{
+					&pipelineTestDiscoverer{
+						name:  "first",
+						calls: calls,
+						test: func(context.Context) error {
+							cancel(cancelCause)
+							return resourceErr
+						},
+					},
+				}
+			},
+			wantErr:             cancelCause,
+			wantNotErr:          resourceErr,
+			wantCalls:           []string{"first"},
+			wantNoPublicMessage: true,
+		},
+		"caller cancellation wins an unsupported result": {
+			build: func(t *testing.T, calls *[]string) (context.Context, []model.Discoverer) {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				return ctx, []model.Discoverer{
+					&pipelineTestDiscoverer{
+						name:  "first",
+						calls: calls,
+						test: func(context.Context) error {
+							cancel(cancelCause)
+							return dyncfg.ErrTestUnsupported
+						},
+					},
+				}
+			},
+			wantErr:    cancelCause,
+			wantNotErr: dyncfg.ErrTestUnsupported,
+			wantCalls:  []string{"first"},
+		},
+	}
 
-		fullyTested, err := p.Test(ctx)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			ctx, discoverers := tc.build(t, &calls)
+			p := &Pipeline{discoverers: discoverers}
 
-		require.False(t, fullyTested)
-		require.ErrorIs(t, err, cancelCause)
-		require.NotErrorIs(t, err, resourceErr)
-		_, hasPublicMessage := dyncfg.PublicMessage(err)
-		require.False(t, hasPublicMessage)
-		require.Equal(t, []string{"first"}, calls)
-	})
+			fullyTested, err := p.Test(ctx)
+
+			require.Equal(t, tc.wantFullyTested, fullyTested)
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+			}
+			if tc.wantNotErr != nil {
+				require.NotErrorIs(t, err, tc.wantNotErr)
+			}
+			if tc.wantNoPublicMessage {
+				_, hasPublicMessage := dyncfg.PublicMessage(err)
+				require.False(t, hasPublicMessage)
+			}
+			require.Equal(t, tc.wantCalls, calls)
+		})
+	}
 }
 
 func TestPipeline_Run(t *testing.T) {

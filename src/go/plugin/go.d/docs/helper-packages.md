@@ -21,6 +21,7 @@ already owns the behavior.
 | Duration and tri-state config option types | `src/go/pkg/confopt` |
 | HTTP request/client config | `src/go/pkg/web` |
 | TLS config outside HTTP | `src/go/pkg/tlscfg` |
+| Bounded configured-file reads | `src/go/pkg/safefile` |
 | Prometheus exposition parsing | `src/go/pkg/prometheus` |
 | User selector/matcher grammar | `src/go/pkg/matcher` |
 | Collector logging and log limiting | `src/go/logger` |
@@ -85,6 +86,15 @@ type Config struct {
 
 Use `src/go/pkg/tlscfg` directly only when the collector is not HTTP-based but still needs TLS, such as Redis or
 x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConfig`.
+
+### Configured credential and TLS files
+
+`web` bearer-token files and `tlscfg` CA files use `src/go/pkg/safefile`; certificate and key files use it when both are
+configured. The helper opens the path once, verifies the opened object is a regular file, reads at most 1 MiB, and closes
+it. Symlinks to regular files are supported; non-regular objects and larger files are rejected.
+
+Use `safefile.Read` for new bounded credential or key-material paths that share this contract. Do not add a separate
+preflight followed by `os.ReadFile`: that checks a different filesystem object and leaves the production read unbounded.
 
 ## Prometheus Endpoints
 

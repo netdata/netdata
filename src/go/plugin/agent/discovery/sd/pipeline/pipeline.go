@@ -109,6 +109,10 @@ func (p *Pipeline) Test(ctx context.Context) (bool, error) {
 		if cause := context.Cause(ctx); cause != nil {
 			return false, cause
 		}
+		if errors.Is(err, dyncfg.ErrTestUnsupported) {
+			fullyTested = false
+			continue
+		}
 		if err != nil {
 			return false, fmt.Errorf("discoverer operational test: %w", err)
 		}
