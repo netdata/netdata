@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 	"unsafe"
@@ -2372,12 +2373,13 @@ groups:
 		want              float64
 		wantFloat         bool
 		checkScratchReset bool
+		highFanIn         bool
 	}{
 		"default sum": {want: 300},
 		"chart sum":   {chartAggregation: "aggregation: sum", want: 300},
 		"chart min":   {chartAggregation: "aggregation: min", want: 100},
 		"chart max":   {chartAggregation: "aggregation: max", want: 200},
-		"chart avg":   {chartAggregation: "aggregation: avg", want: 150, wantFloat: true, checkScratchReset: true},
+		"chart avg":   {chartAggregation: "aggregation: avg", want: 4999.5, wantFloat: true, checkScratchReset: true, highFanIn: true},
 	}
 
 	for name, tc := range tests {
@@ -2394,14 +2396,23 @@ groups:
 			lastUsed := m.Gauge("api_key_last_used_timestamp")
 
 			cc.BeginCycle()
-			lastUsed.Observe(100, m.LabelSet(
-				metrix.Label{Key: "team", Value: "team-a"},
-				metrix.Label{Key: "api_key", Value: "key-1"},
-			))
-			lastUsed.Observe(200, m.LabelSet(
-				metrix.Label{Key: "team", Value: "team-a"},
-				metrix.Label{Key: "api_key", Value: "key-2"},
-			))
+			if tc.highFanIn {
+				for i := range 10_000 {
+					lastUsed.Observe(metrix.SampleValue(i), m.LabelSet(
+						metrix.Label{Key: "team", Value: "team-a"},
+						metrix.Label{Key: "api_key", Value: "key-" + strconv.Itoa(i)},
+					))
+				}
+			} else {
+				lastUsed.Observe(100, m.LabelSet(
+					metrix.Label{Key: "team", Value: "team-a"},
+					metrix.Label{Key: "api_key", Value: "key-1"},
+				))
+				lastUsed.Observe(200, m.LabelSet(
+					metrix.Label{Key: "team", Value: "team-a"},
+					metrix.Label{Key: "api_key", Value: "key-2"},
+				))
+			}
 			cc.CommitCycleSuccess()
 
 			plan, err := buildPlan(e, store.Read())
@@ -2411,7 +2422,11 @@ groups:
 			require.NotNil(t, update)
 			require.Len(t, update.Values, 1)
 			assert.Equal(t, "last_used", update.Values[0].Name)
-			assert.Equal(t, tc.want, update.Values[0].Float64)
+			if tc.highFanIn {
+				assert.InDelta(t, tc.want, update.Values[0].Float64, 1e-9)
+			} else {
+				assert.Equal(t, tc.want, update.Values[0].Float64)
+			}
 			assert.Equal(t, tc.wantFloat, update.Values[0].IsFloat)
 
 			if tc.checkScratchReset {
@@ -2465,17 +2480,14 @@ func TestDimBuildEntryAggregation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require.NotEmpty(t, tc.values)
 			entry := dimBuildEntry{
-				value: tc.values[0],
+				observations: 1,
+				value:        tc.values[0],
 				dimensionState: dimensionState{
 					aggregation: tc.aggregation,
 				},
 			}
-			for i, value := range tc.values[1:] {
-				if tc.aggregation == program.AggregationAvg {
-					entry.aggregateAverage(value, uint64(i+2))
-				} else {
-					entry.aggregate(value)
-				}
+			for _, value := range tc.values[1:] {
+				entry.aggregate(value)
 			}
 
 			switch {
@@ -2497,32 +2509,26 @@ func TestDimBuildEntry64BitSizeBudget(t *testing.T) {
 	assert.LessOrEqual(t, unsafe.Sizeof(dimBuildEntry{}), uintptr(80))
 }
 
-func TestDimBuildEntryAggregationHighFanIn(t *testing.T) {
-	entries := map[program.Aggregation]*dimBuildEntry{}
-	for _, aggregation := range []program.Aggregation{
-		program.AggregationSum,
-		program.AggregationMin,
-		program.AggregationMax,
-		program.AggregationAvg,
+func TestDimBuildEntryAggregationDoesNotAllocate(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		aggregation program.Aggregation
+	}{
+		{name: "sum", aggregation: program.AggregationSum},
+		{name: "min", aggregation: program.AggregationMin},
+		{name: "max", aggregation: program.AggregationMax},
+		{name: "avg", aggregation: program.AggregationAvg},
 	} {
-		entries[aggregation] = &dimBuildEntry{
-			dimensionState: dimensionState{aggregation: aggregation},
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			entry := dimBuildEntry{dimensionState: dimensionState{aggregation: tc.aggregation}}
+			allocs := testing.AllocsPerRun(100, func() {
+				entry.observations = 1
+				entry.value = 1
+				entry.aggregate(2)
+			})
+			assert.Zero(t, allocs)
+		})
 	}
-
-	const observations = 10_000
-	for i := 1; i < observations; i++ {
-		value := metrix.SampleValue(i)
-		entries[program.AggregationSum].aggregate(value)
-		entries[program.AggregationMin].aggregate(value)
-		entries[program.AggregationMax].aggregate(value)
-		entries[program.AggregationAvg].aggregateAverage(value, uint64(i+1))
-	}
-
-	assert.Equal(t, float64(49_995_000), entries[program.AggregationSum].value)
-	assert.Equal(t, float64(0), entries[program.AggregationMin].value)
-	assert.Equal(t, float64(9_999), entries[program.AggregationMax].value)
-	assert.InDelta(t, 4_999.5, entries[program.AggregationAvg].value, 1e-9)
 }
 
 func runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles(t *testing.T) {
@@ -2904,7 +2910,7 @@ groups:
 			liveDim, dimCreated := liveChart.ensureDimension("stale_mode", dimensionState{
 				static:     false,
 				order:      1,
-				algorithm:  program.AlgorithmAbsolute,
+				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})

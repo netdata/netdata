@@ -153,6 +153,7 @@ func BenchmarkBuildPlanAggregationFanIn(b *testing.B) {
 				for _, seriesCount := range seriesCounts {
 					name := fmt.Sprintf("%s/%s/%s/series_%d", mode.name, aggregation.name, fanIn.name, seriesCount)
 					b.Run(name, func(b *testing.B) {
+						b.StopTimer()
 						reader := benchmarkAggregationReader(b, seriesCount, fanIn.chartCount(seriesCount))
 						aggregationLine := ""
 						if aggregation.value != "" {
@@ -167,6 +168,7 @@ func BenchmarkBuildPlanAggregationFanIn(b *testing.B) {
 								b.Fatalf("warm build plan: %v", err)
 							}
 							b.ResetTimer()
+							b.StartTimer()
 							for i := 0; i < b.N; i++ {
 								if _, err := buildPlan(engine, reader); err != nil {
 									b.Fatalf("build plan: %v", err)
@@ -175,7 +177,7 @@ func BenchmarkBuildPlanAggregationFanIn(b *testing.B) {
 							return
 						}
 
-						b.StopTimer()
+						b.ResetTimer()
 						for i := 0; i < b.N; i++ {
 							engine := benchmarkAggregationEngine(b, tmpl)
 							b.StartTimer()

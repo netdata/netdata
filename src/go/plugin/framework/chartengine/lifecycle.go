@@ -135,6 +135,7 @@ func (s *materializedState) ensureChart(
 }
 
 func (c *materializedChartState) ensureDimension(name string, state dimensionState) (*materializedDimensionState, bool) {
+	algorithm := state.algorithm.programAlgorithm()
 	dim, ok := c.dimensions[name]
 	if ok {
 		if dim.static != state.static || dim.order != state.order || dim.sortKey != state.sortKey {
@@ -145,7 +146,7 @@ func (c *materializedChartState) ensureDimension(name string, state dimensionSta
 		dim.static = state.static
 		dim.order = state.order
 		dim.sortKey = state.sortKey
-		dim.algorithm = state.algorithm
+		dim.algorithm = algorithm
 		dim.multiplier = state.multiplier
 		dim.divisor = state.divisor
 		return dim, false
@@ -156,7 +157,7 @@ func (c *materializedChartState) ensureDimension(name string, state dimensionSta
 		static:     state.static,
 		order:      state.order,
 		sortKey:    state.sortKey,
-		algorithm:  state.algorithm,
+		algorithm:  algorithm,
 		multiplier: state.multiplier,
 		divisor:    state.divisor,
 	}
