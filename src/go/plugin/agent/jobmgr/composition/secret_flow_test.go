@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	awsbackend "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends/aws"
 	vaultbackend "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends/vault"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -779,6 +780,108 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 	require.NotContains(t, wire, restrictedToken)
 	require.NotContains(t, wire, invalidToken)
 	require.NotContains(t, wire, srv.URL)
+
+	controls.sendTerminate(testProcessControl())
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "process did not terminate")
+	}
+}
+
+func TestProcessCoreAWSOperationalTest(t *testing.T) {
+	const (
+		accessKey = "synthetic-access-key"
+		secretKey = "synthetic-secret-key"
+	)
+	t.Setenv("AWS_ACCESS_KEY_ID", accessKey)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", secretKey)
+	t.Setenv("AWS_SESSION_TOKEN", "")
+	t.Setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "")
+
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{awsbackend.New()})
+	require.NoError(t, err)
+	jobs := testRunJobServices(t)
+	jobs.StoreCreators = creators
+	reader, writer := io.Pipe()
+	defer func() { require.NoError(t, writer.Close()) }()
+	output := newProcessSynchronizedBuffer()
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	output.waitContains(t, "CONFIG go.d:secretstore:aws-sm create accepted template")
+
+	storedPayload := `{"auth_mode":"env","region":"us-east-1"}`
+	temporaryECSPayload := `{"auth_mode":"ecs","region":"us-east-1"}`
+	steps := []struct {
+		uid     string
+		command string
+		payload string
+		status  int
+	}{
+		{
+			uid:     "aws-add",
+			command: "config go.d:secretstore:aws-sm add main",
+			payload: storedPayload,
+			status:  200,
+		},
+		{
+			uid:     "aws-test-stored",
+			command: "config go.d:secretstore:aws-sm:main test",
+			status:  202,
+		},
+		{
+			uid:     "aws-test-temporary-ecs",
+			command: "config go.d:secretstore:aws-sm:main test",
+			payload: temporaryECSPayload,
+			status:  422,
+		},
+		{
+			uid:     "aws-test-stored-again",
+			command: "config go.d:secretstore:aws-sm:main test",
+			status:  202,
+		},
+	}
+	for _, step := range steps {
+		if step.payload == "" {
+			_, err = io.WriteString(
+				writer,
+				"FUNCTION "+step.uid+" 30 \""+step.command+"\" 0xFFFF \"user=test\"\n",
+			)
+		} else {
+			_, err = io.WriteString(
+				writer,
+				"FUNCTION_PAYLOAD "+step.uid+" 30 \""+
+					step.command+"\" 0xFFFF \"user=test\" application/json\n"+
+					step.payload+"\nFUNCTION_PAYLOAD_END\n",
+			)
+		}
+		require.NoError(t, err)
+		output.waitContains(
+			t,
+			"FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json",
+		)
+	}
+
+	wire := output.String()
+	require.Contains(t, wire, "Secretstore operational test failed: AWS credentials are unavailable")
+	require.Contains(t, wire, "Stored configuration is valid. No jobs are currently using this secretstore.")
+	require.NotContains(t, wire, "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI")
+	require.NotContains(t, wire, accessKey)
+	require.NotContains(t, wire, secretKey)
 
 	controls.sendTerminate(testProcessControl())
 	select {
