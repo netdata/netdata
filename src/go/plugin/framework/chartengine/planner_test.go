@@ -495,6 +495,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries":   {run: runTestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries},
 		"BuildPlanAutogenRemovalLifecycleExpiry":                       {run: runTestBuildPlanAutogenRemovalLifecycleExpiry},
 		"BuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes":         {run: runTestBuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes},
+		"BuildPlanAggregatesProjectedSeriesByDimensionPolicy":          {run: runTestBuildPlanAggregatesProjectedSeriesByDimensionPolicy},
 		"BuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles":       {run: runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles},
 		"BuildPlanAutogenContextNamespacePrefixesContext":              {run: runTestBuildPlanAutogenContextNamespacePrefixesContext},
 		"BuildPlanAutogenContextNamespaceStubGroupOnly":                {run: runTestBuildPlanAutogenContextNamespaceStubGroupOnly},
@@ -2343,6 +2344,145 @@ groups:
 	assert.True(t, update.Values[0].IsFloat)
 	assert.Equal(t, "total", update.Values[0].Name)
 	assert.Equal(t, float64(8), update.Values[0].Float64)
+}
+
+func runTestBuildPlanAggregatesProjectedSeriesByDimensionPolicy(t *testing.T) {
+	const tmpl = `
+version: v1
+groups:
+  - family: LiteLLM
+    metrics:
+      - api_key_last_used_timestamp
+    charts:
+      - id: api_key_last_used
+        title: API key last used
+        context: api_key_last_used
+        units: seconds
+        CHART_AGGREGATION
+        instances:
+          by_labels: [team]
+        dimensions:
+          - selector: api_key_last_used_timestamp
+            name: last_used
+`
+
+	tests := map[string]struct {
+		chartAggregation  string
+		want              float64
+		wantFloat         bool
+		checkScratchReset bool
+	}{
+		"default sum": {want: 300},
+		"chart sum":   {chartAggregation: "aggregation: sum", want: 300},
+		"chart min":   {chartAggregation: "aggregation: min", want: 100},
+		"chart max":   {chartAggregation: "aggregation: max", want: 200},
+		"chart avg":   {chartAggregation: "aggregation: avg", want: 150, wantFloat: true, checkScratchReset: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			e, err := New()
+			require.NoError(t, err)
+
+			yaml := strings.ReplaceAll(tmpl, "CHART_AGGREGATION", tc.chartAggregation)
+			require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+			store := metrix.NewCollectorStore()
+			cc := mustCycleController(t, store)
+			m := store.Write().SnapshotMeter("")
+			lastUsed := m.Gauge("api_key_last_used_timestamp")
+
+			cc.BeginCycle()
+			lastUsed.Observe(100, m.LabelSet(
+				metrix.Label{Key: "team", Value: "team-a"},
+				metrix.Label{Key: "api_key", Value: "key-1"},
+			))
+			lastUsed.Observe(200, m.LabelSet(
+				metrix.Label{Key: "team", Value: "team-a"},
+				metrix.Label{Key: "api_key", Value: "key-2"},
+			))
+			cc.CommitCycleSuccess()
+
+			plan, err := buildPlan(e, store.Read())
+			require.NoError(t, err)
+
+			update := findUpdateAction(plan)
+			require.NotNil(t, update)
+			require.Len(t, update.Values, 1)
+			assert.Equal(t, "last_used", update.Values[0].Name)
+			assert.Equal(t, tc.want, update.Values[0].Float64)
+			assert.Equal(t, tc.wantFloat, update.Values[0].IsFloat)
+
+			if tc.checkScratchReset {
+				cc.BeginCycle()
+				lastUsed.Observe(10, m.LabelSet(
+					metrix.Label{Key: "team", Value: "team-a"},
+					metrix.Label{Key: "api_key", Value: "key-1"},
+				))
+				lastUsed.Observe(20, m.LabelSet(
+					metrix.Label{Key: "team", Value: "team-a"},
+					metrix.Label{Key: "api_key", Value: "key-2"},
+				))
+				cc.CommitCycleSuccess()
+
+				nextPlan, err := buildPlan(e, store.Read())
+				require.NoError(t, err)
+				nextUpdate := findUpdateAction(nextPlan)
+				require.NotNil(t, nextUpdate)
+				require.Len(t, nextUpdate.Values, 1)
+				assert.Equal(t, float64(15), nextUpdate.Values[0].Float64,
+					"scratch aggregation state must reset between successful snapshots")
+			}
+		})
+	}
+}
+
+func TestDimBuildEntryAggregation(t *testing.T) {
+	tests := map[string]struct {
+		aggregation program.Aggregation
+		values      []metrix.SampleValue
+		want        float64
+		wantNaN     bool
+		wantPosInf  bool
+	}{
+		"sum":                         {aggregation: program.AggregationSum, values: []metrix.SampleValue{5, 3, -1}, want: 7},
+		"sum propagates NaN":          {aggregation: program.AggregationSum, values: []metrix.SampleValue{5, metrix.SampleValue(math.NaN())}, wantNaN: true},
+		"min":                         {aggregation: program.AggregationMin, values: []metrix.SampleValue{5, -1, 3}, want: -1},
+		"min ignores trailing NaN":    {aggregation: program.AggregationMin, values: []metrix.SampleValue{5, metrix.SampleValue(math.NaN())}, want: 5},
+		"min replaces leading NaN":    {aggregation: program.AggregationMin, values: []metrix.SampleValue{metrix.SampleValue(math.NaN()), 5}, want: 5},
+		"max":                         {aggregation: program.AggregationMax, values: []metrix.SampleValue{5, 9, 3}, want: 9},
+		"max ignores trailing NaN":    {aggregation: program.AggregationMax, values: []metrix.SampleValue{5, metrix.SampleValue(math.NaN())}, want: 5},
+		"max replaces leading NaN":    {aggregation: program.AggregationMax, values: []metrix.SampleValue{metrix.SampleValue(math.NaN()), 5}, want: 5},
+		"avg preserves fraction":      {aggregation: program.AggregationAvg, values: []metrix.SampleValue{1, 2}, want: 1.5},
+		"avg avoids finite overflow":  {aggregation: program.AggregationAvg, values: []metrix.SampleValue{math.MaxFloat64, math.MaxFloat64}, want: math.MaxFloat64},
+		"avg keeps positive infinity": {aggregation: program.AggregationAvg, values: []metrix.SampleValue{metrix.SampleValue(math.Inf(1)), 5}, wantPosInf: true},
+		"avg opposite infinities":     {aggregation: program.AggregationAvg, values: []metrix.SampleValue{metrix.SampleValue(math.Inf(1)), metrix.SampleValue(math.Inf(-1))}, wantNaN: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotEmpty(t, tc.values)
+			entry := dimBuildEntry{
+				observations: 1,
+				value:        tc.values[0],
+				dimensionState: dimensionState{
+					aggregation: tc.aggregation,
+				},
+			}
+			for _, value := range tc.values[1:] {
+				entry.aggregate(value)
+			}
+
+			switch {
+			case tc.wantNaN:
+				assert.True(t, math.IsNaN(entry.value))
+			case tc.wantPosInf:
+				assert.True(t, math.IsInf(entry.value, 1))
+			default:
+				assert.Equal(t, tc.want, float64(entry.value))
+			}
+		})
+	}
 }
 
 func runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles(t *testing.T) {

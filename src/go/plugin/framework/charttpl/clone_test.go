@@ -71,6 +71,7 @@ func richGroup() Group {
 				Title:         "Chart A",
 				Context:       "chart_a",
 				Units:         "units/s",
+				Aggregation:   AggregationMax,
 				Type:          "line",
 				LabelPromoted: []string{"zone"},
 				Instances:     &Instances{ByLabels: []string{"id"}},
