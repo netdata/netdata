@@ -370,7 +370,8 @@ static int socket_attach_kprobes(struct netdata_ebpf_socket_runtime *rt)
         rt->links[rt->nlinks++] = link;
     }
 
-    return 0;
+    /* All programs absent from the BPF object is a hard failure. */
+    return rt->nlinks == 0 ? -1 : 0;
 }
 
 /* -------------------------------------------------------------------------

@@ -721,9 +721,6 @@ _Atomic int ebpf_cgroup_systemd_enabled = 0;
 _Atomic int ebpf_cgroup_integration_active = 0;
 netdata_mutex_t mutex_cgroup_shm;
 
-//Network viewer
-ebpf_network_viewer_options_t network_viewer_opt;
-
 // Statistic
 ebpf_plugin_stats_t plugin_statistics = {
     .core = 0,
@@ -1138,9 +1135,6 @@ static void ebpf_parse_args(int argc, char **argv)
         {"core", no_argument, 0, 0},
         {"unittest", no_argument, 0, 0},
         {0, 0, 0, 0}};
-
-    memset(&network_viewer_opt, 0, sizeof(network_viewer_opt));
-    rw_spinlock_init(&network_viewer_opt.rw_spinlock);
 
     if (argc > 1) {
         int n = (int)str2l(argv[1]);
@@ -2160,8 +2154,6 @@ int main(int argc, char **argv)
     libbpf_set_print(netdata_silent_libbpf_vfprintf);
 #endif
 #endif
-
-    ebpf_read_local_addresses_unsafe();
 
     ebpf_set_static_routine();
 

@@ -117,8 +117,14 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
-    /* New SHM is kernel-zero-filled; no explicit memset needed. */
-    ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0660, 1);
+    /* New SHM is kernel-zero-filled; no explicit memset needed.
+     * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
+     * EEXIST means an attacker squatted in the window; evict and retry once. */
+    ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
+    if (ctx->sem == SEM_FAILED && errno == EEXIST) {
+        (void)sem_unlink(ctx->sem_name);
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
+    }
     if (ctx->sem == SEM_FAILED) {
         /* mapping is set but sem is not — next publish would write without a
          * lock.  Null out mapping so the publish guard catches it. */
@@ -195,6 +201,18 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
     ctx->total = total;
     size_t length = shared_pid_memory_nbytes(ctx);
 
+    /* Reject a foreign-owned EEXIST segment: publisher_pid in the header is
+     * attacker-controlled when the segment is not ours.  An attacker can set
+     * publisher_pid = 1 (init) so kill(1,0) always returns 0, permanently
+     * blocking the takeover path.  Evict and recreate instead. */
+    if (!ctx->shm_name_created && pre_stat.st_uid != getuid()) {
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
+        if (!pid_shm_replace_generation(ctx, length))
+            goto fail;
+        return ctx;
+    }
+
     /* If a crashed writer left a segment whose size differs from what this
      * run needs, unlink and re-create to get a new inode.  Consumers detect
      * the inode change on their next refresh and remap, preventing a SIGBUS
@@ -224,15 +242,19 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
-    /* Do NOT sem_unlink here.  Unlinking followed by O_CREAT creates a new
-     * semaphore object.  Consumers only reopen the semaphore when the SHM
-     * inode changes; because close() preserves the SHM inode, a restart
-     * with sem_unlink leaves consumers holding a stale handle to the old
-     * object while the writer uses the new one — mutual exclusion gone.
-     * Opening the existing semaphore (O_CREAT opens it if it already exists,
-     * ignoring the initial value) keeps writer and all consumers on the same
-     * underlying object. */
-    ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0660, 1);
+    /* For a fresh segment (reused=false) no legitimate semaphore exists;
+     * O_CREAT|O_EXCL prevents squatting.  On EEXIST evict and retry once.
+     * For a reused segment the semaphore already exists and must be joined
+     * with O_CREAT so all parties share the same underlying object. */
+    if (!reused) {
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
+        if (ctx->sem == SEM_FAILED && errno == EEXIST) {
+            (void)sem_unlink(ctx->sem_name);
+            ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
+        }
+    } else {
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0660, 1);
+    }
     if (ctx->sem == SEM_FAILED)
         goto fail;
 

@@ -90,8 +90,14 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
         return false;
     }
 
-    /* New SHM is kernel-zero-filled; no explicit memset needed. */
-    ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
+    /* New SHM is kernel-zero-filled; no explicit memset needed.
+     * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
+     * EEXIST means an attacker squatted in the window; evict and retry once. */
+    ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
+    if (ctx->sem == SEM_FAILED && errno == EEXIST) {
+        (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
+    }
     if (ctx->sem == SEM_FAILED) {
         /* mapping is set but sem is not — next publish would write without a
          * lock.  Null out mapping so the publish guard catches it. */
@@ -137,6 +143,17 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
     }
     size_t length = sizeof(struct ebpfgo_dns_shared);
 
+    /* Reject a foreign-owned EEXIST segment.  Same rationale as
+     * shared_pid_memory_linux.c: attacker-controlled publisher_pid can
+     * defeat the liveness check permanently.  Evict and recreate. */
+    if (!ctx->shm_name_created && pre_stat.st_uid != getuid()) {
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
+        if (!dns_shm_replace_generation(ctx, length))
+            goto fail;
+        return ctx;
+    }
+
     /* Same size-mismatch guard as shared_pid_memory_linux.c: unlink and
      * re-create when a crashed writer left a segment of a different size. */
     if (reused && pre_stat.st_size != (off_t)length) {
@@ -162,12 +179,19 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         goto fail;
     }
 
-    /* Do NOT sem_unlink here — same reason as shared_pid_memory_linux.c:
-     * unlinking creates a new semaphore object, leaving consumers with a
-     * stale handle and no mutual exclusion.  O_CREAT opens the existing
-     * semaphore when it already exists, keeping all parties on the same
-     * underlying object. */
-    ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
+    /* For a fresh segment (reused=false) no legitimate semaphore exists, so use
+     * O_CREAT|O_EXCL to prevent squatting; on EEXIST evict and retry once.
+     * For a reused segment the existing semaphore must be joined with O_CREAT
+     * (which opens it when already present) so all parties share one object. */
+    if (!reused) {
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
+        if (ctx->sem == SEM_FAILED && errno == EEXIST) {
+            (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
+            ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
+        }
+    } else {
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
+    }
     if (ctx->sem == SEM_FAILED)
         goto fail;
 
@@ -184,7 +208,8 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
                 /* Write publisher_pid inside the semaphore hold so a concurrent
                  * opener never reads a partially-initialised header. */
                 ctx->data->hdr.publisher_pid = (uint32_t)getpid();
-                ctx->shm_name_created = true;
+                /* shm_name_created intentionally NOT set: this context did not
+                 * create the SHM name and must not unlink it on close. */
             }
             sem_post(ctx->sem);
         } else {

@@ -125,9 +125,6 @@ void ebpf_set_thread_mode(netdata_run_mode_t lmode);
 void ebpf_enable_chart(int idx, int disable_cgroup);
 void ebpf_enable_specific_chart(ebpf_module_t *em, int disable_cgroup);
 void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_load_mode_t origin);
-void parse_network_viewer_section(struct config *cfg);
-void ebpf_parse_ips_unsafe(const char *ptr);
-void ebpf_read_local_addresses_unsafe();
 int ebpf_load_collector_config(char *path, int *disable_cgroups, int update_every);
 void ebpf_load_thread_config();
 

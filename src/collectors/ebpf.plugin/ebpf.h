@@ -110,76 +110,7 @@ typedef struct netdata_ebpf_judy_pid_stats {
     char *cmdline;
 } netdata_ebpf_judy_pid_stats_t;
 
-#define EBPF_NETWORK_VIEWER_SECTION "network connections"
-#define EBPF_CONFIG_RESOLVE_HOSTNAME "resolve hostnames"
-#define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
-#define EBPF_CONFIG_PORTS "ports"
-#define EBPF_CONFIG_HOSTNAMES "hostnames"
-#define NETDATA_MINIMUM_PORT_VALUE 1
-#define NETDATA_MAXIMUM_PORT_VALUE 65535
-#define NETDATA_MINIMUM_IPV4_CIDR 0
-#define NETDATA_MAXIMUM_IPV4_CIDR 32
 #define NETDATA_EBPF_PID_STATS_ARAL_TABLE_NAME "ebpf_pid_stats"
-
-typedef struct ebpf_network_viewer_dimension_names {
-    char *name;
-    uint32_t hash;
-
-    uint16_t port;
-
-    struct ebpf_network_viewer_dimension_names *next;
-} ebpf_network_viewer_dim_name_t;
-
-union netdata_ip_t {
-    uint8_t addr8[16];
-    uint16_t addr16[8];
-    uint32_t addr32[4];
-    uint64_t addr64[2];
-};
-
-typedef struct ebpf_network_viewer_ip_list {
-    char *value;
-    uint32_t hash;
-
-    uint8_t ver;
-
-    union netdata_ip_t first;
-    union netdata_ip_t last;
-
-    struct ebpf_network_viewer_ip_list *next;
-} ebpf_network_viewer_ip_list_t;
-
-typedef struct ebpf_network_viewer_hostname_list {
-    char *value;
-    uint32_t hash;
-
-    SIMPLE_PATTERN *value_pattern;
-
-    struct ebpf_network_viewer_hostname_list *next;
-} ebpf_network_viewer_hostname_list_t;
-
-typedef struct ebpf_network_viewer_options {
-    RW_SPINLOCK rw_spinlock;
-
-    uint32_t enabled;
-    uint32_t family;
-
-    uint32_t hostname_resolution_enabled;
-    uint32_t service_resolution_enabled;
-
-    ebpf_network_viewer_dim_name_t *names;
-
-    ebpf_network_viewer_ip_list_t *excluded_ips;
-    ebpf_network_viewer_ip_list_t *included_ips;
-
-    ebpf_network_viewer_hostname_list_t *excluded_hostnames;
-    ebpf_network_viewer_hostname_list_t *included_hostnames;
-
-    ebpf_network_viewer_ip_list_t *ipv4_local_ip;
-    ebpf_network_viewer_ip_list_t *ipv6_local_ip;
-} ebpf_network_viewer_options_t;
-
-extern ebpf_network_viewer_options_t network_viewer_opt;
 
 extern ebpf_module_t ebpf_modules[];
 extern bool ebpf_program_loaded_any;
@@ -377,10 +308,6 @@ void ebpf_read_global_table_stats(
     uint32_t end);
 void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
 netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
-
-void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
-void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
-void ebpf_read_local_addresses_unsafe();
 
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];

@@ -250,7 +250,9 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
 		if store != nil {
 			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
-			if err == nil {
+			if err != nil {
+				logPluginErr("cachestat.snapshot", "cachestat", "snapshot-apps", err)
+			} else {
 				staleCandidates := store.UpdateApps(apps)
 				if len(staleCandidates) > 0 {
 					// Authoritative liveness check matching the C-version
