@@ -106,6 +106,7 @@ The defaults are designed so a minimal configuration collects something useful:
 - A rule that omits `metrics` collects the default-enabled metrics from those profiles.
 - A metric group changes only its named profile; other selected profiles keep their defaults. The group keeps the profile's defaults unless `defaults: false`; either way, it adds the exact AWS MetricNames it lists.
 - Statistics resolve from the metric entry, then the group, then the profile declaration.
+- Query timing resolves field-by-field from the metric item, metric group, rule, rule defaults, profile metric, and profile defaults. A group query applies only to its explicit `include[]` expansions; unlisted defaults keep lower-precedence timing.
 - Charts appear only for profiles with live metrics.
 - Discovery and the query blueprint are cached; discovery refreshes every `discovery.refresh_every` seconds (default 300).
 
@@ -114,8 +115,10 @@ The defaults are designed so a minimal configuration collects something useful:
 
 **Timing**
 
-- The minimum collection interval is 60 seconds (CloudWatch's minimum metric period).
-- Query timing resolves field-by-field: `rules[].query`, then `rule_defaults.query`, then metric and profile defaults, then the built-in 10-minute publication delay. The combined `publication_delay + lookback + period` horizon cannot exceed 14 days.
+- The minimum collection interval is 60 seconds. Every per-series policy is evaluated on the job's shared `update_every` ticks; there are no independent per-selection timers.
+- Query timing resolves field-by-field, from highest to lowest precedence: `rules[].metrics[].include[].query`, `rules[].metrics[].query`, `rules[].query`, `rule_defaults.query`, profile metric query, profile query, then built-in fallbacks. The combined `publication_delay + lookback + period` horizon cannot exceed 14 days.
+- The rolling window is `end = align_down(now - publication_delay, period)` and `start = end - lookback`; `end` is exclusive. One-period lookback is valid. Longer lookback tolerates sparse or late data but increases response work.
+- If `period < update_every`, period still controls CloudWatch aggregation and rate normalization, but the first available collection tick queries only the newest eligible window; intermediate windows may be skipped.
 - The stock S3 storage profile uses a conservative one-day delay policy: AWS documents that S3 storage metrics are reported once per day, without guaranteeing publication within one day.
 - A successful sparse query can replay its newest eligible CloudWatch value for up to `lookback`. During transient AWS failures, the retained value can be replayed longer, until a successful query replaces or expires it.
 
@@ -145,19 +148,19 @@ AWS bills CloudWatch API usage. `GetMetricData` is the cost driver -- roughly $0
 To estimate a job's normal daily cost:
 
 ```text
-billable metric requests/day ≈ instances × billable metrics per instance × (86,400 / period seconds)
+billable metric requests/day ≈ Σ effective-policy groups (instances × calculated metric-request units per instance × 86,400 / max(period seconds, update_every seconds))
 ```
 
-For example, one Billing series at the stock 10-minute period is 86,400 / 600 = 144 requests per day. For a running job, skip the arithmetic and read the **CloudWatch Metric Requests** chart described below -- it reports the billable metric requests actually submitted.
+This is a healthy steady-state estimate; retries add work, and alignment near the observation boundary can shift a short sample. For example, one Billing series at the stock 10-minute period with `update_every <= 600` is 86,400 / 600 = 144 requests per day. For a running job, skip the arithmetic and read the **CloudWatch Metric Requests** chart described below -- it reports the billable metric requests actually submitted.
 
 **How the collector keeps cost down**
 
-- Each series is queried once per newly eligible period window, not once per Netdata collection cycle.
+- Each series is queried on the first shared collection tick that observes a newer eligible period window. If several windows become eligible between ticks, only the newest is queried.
 - Curated profiles, exact metric/statistic/resource-tag selection, and single-statistic defaults keep the selected set small.
 - Compatible rules and profiles share discovery scans; discovery and query plans are cached; `recently_active_only` narrows scans to active resources.
-- A transient failure retries after one `update_every`, then doubles the delay within the same eligible window, capped at the effective period. Retries are billable, so `update_every` affects failure-time cost even though it does not set the normal query cadence.
+- A transient failure retries after one `update_every`, then doubles the delay within the same eligible window, capped at the effective period. Retries are billable. `update_every` also limits successful request frequency when it is longer than the effective period.
 
-Cost scales with selected targets, instances, metrics, statistics beyond AWS's grouping, periods, and lookback length. Longer lookbacks increase requested datapoints and can disable CloudWatch's three-hour recently-active discovery filter. To reduce cost, narrow `rules[].targets`, `rules[].profiles`, `rules[].metrics`, `rules[].regions`, or configure resource tag filters.
+Cost scales with selected targets, instances, metrics, statistics beyond AWS's grouping, effective request frequency, and lookback length. Statistics of one structural metric can share a calculated request unit only when their complete effective policies match; per-selection differences split the group and can increase cost. Longer lookbacks increase requested datapoints and can disable CloudWatch's three-hour recently-active discovery filter. To reduce cost, narrow `rules[].targets`, `rules[].profiles`, `rules[].metrics`, `rules[].regions`, or configure resource tag filters.
 
 **Watching collector-issued work**
 
@@ -274,7 +277,7 @@ A user profile file with the same basename as a stock profile overrides it.
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Collection** | update_every | Data collection interval (seconds). Must be at least 60 (CloudWatch's minimum period). | 60 | no |
+| **Collection** | update_every | Shared Netdata collection interval (seconds), minimum 60. Every per-series policy is evaluated on these ticks; a shorter period does not create an independent timer and intermediate eligible windows may be skipped. | 60 | no |
 |  | autodetection_retry | Recheck interval (seconds) when the job fails to start. Default `0` means no retry; set a positive value to keep retrying. | 0 | no |
 |  | timeout | AWS operation timeout (seconds). Identity, resource-tag, and query operations use it for their operation scope; discovery shares one timeout across its whole refresh stage. | 30 | no |
 | **Credentials** | credentials | Up to 64 named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials in `type_static`). Multiple targets can share one credential source. |  | yes |
@@ -299,17 +302,25 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | rules[].metrics[].profile | Profile basename. It must already be selected by `rules[].profiles` and may appear in only one metrics group per rule. Other selected profiles keep their default-enabled metrics. |  | yes |
 |  | rules[].metrics[].defaults | Include this profile's default-enabled metrics before adding the exact MetricNames below. Set `false` for an exact-only selection. | yes | no |
 |  | rules[].metrics[].statistics | Optional non-empty AWS statistics inherited by included metrics that omit their own list. When both lists are omitted, the profile-declared statistics are used. Named statistics are case-insensitive. |  | no |
-|  | rules[].metrics[].include | Non-empty list of exact, case-sensitive AWS CloudWatch MetricNames added by this group. Duplicate names are rejected. |  | yes |
+| **Rules / Query Policy** | rules[].metrics[].query | Optional field-by-field timing override applied only to series expanded from this group's explicit `include[]` items. Unlisted default-selected series keep rule/profile timing. |  | no |
+|  | rules[].metrics[].query.period | CloudWatch aggregation period for explicitly included series, from `1m` through `24h` as an exact multiple of `1m`. Eligibility is still evaluated only on shared `update_every` ticks. |  | no |
+|  | rules[].metrics[].query.lookback | Rolling window for explicitly included series. It must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap. |  | no |
+|  | rules[].metrics[].query.publication_delay | Collector wait after a bucket closes for explicitly included series. This is a scheduling policy, not an AWS publication guarantee; explicit `0s` is allowed. |  | no |
+| **Rules** | rules[].metrics[].include | Non-empty list of exact, case-sensitive AWS CloudWatch MetricNames added by this group. A MetricName may repeat only when the items expand to disjoint statistic sets. |  | yes |
 |  | rules[].metrics[].include[].name | Exact, case-sensitive AWS CloudWatch MetricName exported by the profile. |  | yes |
 |  | rules[].metrics[].include[].statistics | Optional non-empty replacement for the group statistics. When both are omitted, inherit every statistic declared for the metric by the profile. Use `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`; named statistics are case-insensitive. |  | no |
-|  | rules[].regions | Canonical lowercase AWS region codes selected by this rule. The compiler intersects them with intrinsic profile restrictions; CloudFront and the Billing profiles support only `us-east-1`. |  | yes |
+| **Rules / Query Policy** | rules[].metrics[].include[].query | Optional field-by-field timing override for this item's expanded metric/statistic series. It overrides the enclosing metric-group query; omitted fields inherit independently. |  | no |
+|  | rules[].metrics[].include[].query.period | CloudWatch aggregation period for this item's expanded series, from `1m` through `24h` as an exact multiple of `1m`. It remains the aggregation and rate divisor when shorter than `update_every`. |  | no |
+|  | rules[].metrics[].include[].query.lookback | Rolling window for this item's expanded series. It must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap. |  | no |
+|  | rules[].metrics[].include[].query.publication_delay | Collector wait after a bucket closes for this item's expanded series. This is a scheduling policy, not an AWS publication guarantee; explicit `0s` is allowed. |  | no |
+| **Rules** | rules[].regions | Canonical lowercase AWS region codes selected by this rule. The compiler intersects them with intrinsic profile restrictions; CloudFront and the Billing profiles support only `us-east-1`. |  | yes |
 | **Rules / Query Policy** | rule_defaults.query | Shared query timing inherited field-by-field by collection rules. Omitted fields fall through to profile or built-in fallbacks. The resolved `publication_delay + lookback + period` horizon cannot exceed 14 days. |  | no |
-|  | rule_defaults.query.period | Default CloudWatch aggregation period from `1m` through `24h`, as an exact multiple of `1m`. An omitted rule period inherits this value before nested metric and profile query defaults. |  | no |
-|  | rule_defaults.query.lookback | Default rolling window searched for the newest eligible datapoint. It must be at least the effective period, an exact period multiple, and no more than 1,440 buckets (a bucket is one period). |  | no |
+|  | rule_defaults.query.period | Default CloudWatch aggregation period from `1m` through `24h`, as an exact multiple of `1m`. It overrides profile timing and is inherited unless a rule, metric group, or metric item replaces it. |  | no |
+|  | rule_defaults.query.lookback | Default rolling window searched for the newest eligible datapoint. It must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap. |  | no |
 |  | rule_defaults.query.publication_delay | Default collector wait after a bucket closes before it becomes eligible. This is a scheduling policy, not an AWS publication guarantee. Omission falls through to the profile value and then the built-in `10m` fallback. Setting this option overrides profile-specific delays for every inheriting rule, including the stock S3 storage profile's conservative `1d`; AWS documents only that S3 storage metrics are reported once per day, so use a shorter default only after verifying each workload's publication timing. |  | no |
-|  | rules[].query | Optional query timing overrides for this rule. Each omitted field independently inherits `rule_defaults.query`, then the relevant profile or built-in fallback. |  | no |
-|  | rules[].query.period | CloudWatch aggregation period for every series selected by this rule, from `1m` through `24h` as an exact multiple of `1m`. Rate metrics are normalized using this effective period. |  | no |
-|  | rules[].query.lookback | Rolling window searched for the newest complete finite datapoint. It must be at least the effective period, an exact period multiple, and no more than 1,440 buckets (a bucket is one period). Successful queries may present the retained datapoint as current for up to this duration; longer lookbacks increase response work. |  | no |
+|  | rules[].query | Optional query timing overrides for this rule. Each omitted field independently inherits `rule_defaults.query`, then the relevant profile or built-in fallback; explicit metric-group and item values take precedence. |  | no |
+|  | rules[].query.period | CloudWatch aggregation period for series selected by this rule, from `1m` through `24h` as an exact multiple of `1m`; metric-group and item values can replace it. Rate metrics are normalized using the final effective period. |  | no |
+|  | rules[].query.lookback | Rolling window searched for the newest complete finite datapoint. It must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap. Successful queries may present the retained datapoint as current for up to this duration; longer lookbacks increase response work. |  | no |
 |  | rules[].query.publication_delay | Collector wait after a bucket closes before querying it. This is a scheduling policy, not an AWS publication guarantee. Explicit `0s` is allowed for metrics known to publish immediately. |  | no |
 | **Rules / Resource Filters** | rule_defaults.filters.resource_tags | Job-wide list of exact, case-sensitive AWS resource tag predicates inherited by rules that omit `rules[].filters.resource_tags`. All keys must match; any listed value for one key may match. The Resource Groups Tagging API performs the focused lookup and requires `tag:GetResources`. |  | no |
 |  | rule_defaults.filters.resource_tags[].key | Exact AWS resource tag key. A filter list supports at most 50 distinct keys. |  | yes |
@@ -456,7 +467,7 @@ jobs:
 
 ###### Different timing for metrics in one profile
 
-Use disjoint exact metric selections when one service needs different query timing. Earlier rules own only the metric/statistic series they select, so these two Lambda rules do not shadow each other.
+Use one profile metric group with disjoint statistic items when one AWS MetricName needs different timing. The group query is the default for its explicit items; the p90 item overrides it. Repeated MetricNames whose expanded statistic sets overlap are rejected.
 
 <details open><summary>Config</summary>
 
@@ -470,7 +481,7 @@ jobs:
       - name: base
         credentials: sdk_default
     rules:
-      - name: lambda-activity
+      - name: lambda-duration
         targets: [base]
         profiles:
           defaults: false
@@ -478,37 +489,27 @@ jobs:
         metrics:
           - profile: lambda
             defaults: false
-            statistics: [Sum]
-            include:
-              - name: Invocations
-        regions: [us-east-1]
-        query:
-          period: 5m
-          lookback: 30m
-          publication_delay: 10m
-      - name: lambda-latency
-        targets: [base]
-        profiles:
-          defaults: false
-          include: [lambda]
-        metrics:
-          - profile: lambda
-            defaults: false
-            statistics: [Average, p90]
+            query:
+              period: 5m
+              lookback: 30m
+              publication_delay: 10m
             include:
               - name: Duration
+                statistics: [Average]
+              - name: Duration
+                statistics: [p90]
+                query:
+                  period: 1m
+                  lookback: 5m
+                  publication_delay: 5m
         regions: [us-east-1]
-        query:
-          period: 1m
-          lookback: 5m
-          publication_delay: 5m
 
 ```
 </details>
 
 ###### Lower resolution to reduce cost
 
-Collect the default profiles at five-minute resolution and refresh discovery less often. `rule_defaults.query` applies field-by-field to every rule that does not override it, replacing profile timing defaults -- the daily S3 storage profile is excluded here so the job-wide five-minute policy does not query it before AWS publishes. `update_every` controls how often charts update and the failure-retry cadence, not the normal query cost.
+Collect the default profiles at five-minute resolution and refresh discovery less often. `rule_defaults.query` applies field-by-field to every rule that does not override it, replacing profile timing defaults -- the daily S3 storage profile is excluded here so the job-wide five-minute policy does not query it before AWS publishes. Matching `update_every` to the period lets every newly eligible window be observed without extra cached-only collection ticks.
 
 <details open><summary>Config</summary>
 
@@ -540,7 +541,7 @@ jobs:
 
 ###### AWS Billing estimated charges
 
-Collect each available exact Billing grain independently. Billing metrics must be enabled first, are published only in `us-east-1`, and do not support resource-tag filters or resource-tag-derived labels. The stock profiles use a 10-minute period and 24-hour retrieval window; a `rules[].query` block would override only the fields it sets.
+Collect each available exact Billing grain independently. Billing metrics must be enabled first, are published only in `us-east-1`, and do not support resource-tag filters or resource-tag-derived labels. The stock profiles use a 10-minute period and 24-hour retrieval window; job query blocks override only the fields they set according to selection precedence.
 
 <details open><summary>Config</summary>
 
@@ -593,7 +594,7 @@ jobs:
           - key: environment
             values: [production]
     rules:
-      - name: endpoint-averages
+      - name: endpoint-split-timing
         targets: [base]
         profiles:
           defaults: false
@@ -601,32 +602,24 @@ jobs:
         metrics:
           - profile: privatelink_endpoint
             defaults: false
-            statistics: [Average]
+            query:
+              period: 1m
+              lookback: 5m
+              publication_delay: 5m
             include:
               - name: ActiveConnections
+                statistics: [Average]
               - name: BytesProcessed
+                statistics: [Average]
               - name: NewConnections
-        regions: [us-east-1]
-        query:
-          period: 1m
-          lookback: 5m
-          publication_delay: 5m
-      - name: endpoint-six-hour-bytes
-        targets: [base]
-        profiles:
-          defaults: false
-          include: [privatelink_endpoint]
-        metrics:
-          - profile: privatelink_endpoint
-            defaults: false
-            include:
+                statistics: [Average]
               - name: BytesProcessed
                 statistics: [Sum]
+                query:
+                  period: 6h
+                  lookback: 6h
+                  publication_delay: 5m
         regions: [us-east-1]
-        query:
-          period: 6h
-          lookback: 6h
-          publication_delay: 5m
       - name: endpoint-subnets
         targets: [base]
         profiles:
@@ -661,7 +654,7 @@ jobs:
           - key: environment
             values: [production]
     rules:
-      - name: service-traffic-averages
+      - name: service-split-timing
         targets: [base]
         profiles:
           defaults: false
@@ -669,49 +662,32 @@ jobs:
         metrics:
           - profile: privatelink_service
             defaults: false
-            statistics: [Average]
+            query:
+              period: 1m
+              lookback: 5m
+              publication_delay: 5m
             include:
               - name: ActiveConnections
+                statistics: [Average]
               - name: BytesProcessed
+                statistics: [Average]
               - name: NewConnections
+                statistics: [Average]
               - name: RstPacketsSent
-        regions: [us-east-1]
-        query:
-          period: 1m
-          lookback: 5m
-          publication_delay: 5m
-      - name: service-endpoint-count
-        targets: [base]
-        profiles:
-          defaults: false
-          include: [privatelink_service]
-        metrics:
-          - profile: privatelink_service
-            defaults: false
-            include:
+                statistics: [Average]
               - name: EndpointsCount
                 statistics: [Average]
-        regions: [us-east-1]
-        query:
-          period: 5m
-          lookback: 5m
-          publication_delay: 5m
-      - name: service-six-hour-bytes
-        targets: [base]
-        profiles:
-          defaults: false
-          include: [privatelink_service]
-        metrics:
-          - profile: privatelink_service
-            defaults: false
-            include:
+                query:
+                  period: 5m
+                  lookback: 5m
+                  publication_delay: 5m
               - name: BytesProcessed
                 statistics: [Sum]
+                query:
+                  period: 6h
+                  lookback: 6h
+                  publication_delay: 5m
         regions: [us-east-1]
-        query:
-          period: 6h
-          lookback: 6h
-          publication_delay: 5m
     labels:
       resource_tags:
         - key: Name
@@ -966,7 +942,7 @@ These disabled opt-in profiles are collected when a rule names them in `profiles
 
 **PrivateLink service grains.** The default `privatelink_service` profile identifies the provider service by `service_id` and is the only grain that exports `EndpointsCount`. The opt-in profiles split by `availability_zone`, `load_balancer_arn`, both, or consumer `vpc_endpoint_id`. All five share one `AWS/PrivateLinkServices` discovery scan and join tags through the parent endpoint service (`ec2:vpc-endpoint-service`). The collector deliberately does not attach endpoint or load-balancer tags to detailed children -- a `vpc_endpoint_id` can identify a consumer endpoint outside the service-owning account. `EndpointsCount` is read on its documented five-minute cadence and records zero when no datapoint is published; traffic gauges show gaps when absent.
 
-**PrivateLink cost.** At stock timing (five-minute period, lookback, and publication delay), an endpoint, subnet, or default service instance has five structural CloudWatch metrics: (86,400 / 300) × 5 = 1,440 billable metric requests per day before retries. Each opt-in detailed service instance has four, or 1,152 per day. A one-minute override runs its selected metrics five times as often; narrow profiles, metrics, regions, grains, and resource tags when that freshness is not required.
+**PrivateLink cost.** At stock timing (five-minute period, lookback, and publication delay) and `update_every <= 300`, an endpoint, subnet, or default service instance has five structural CloudWatch metrics: (86,400 / 300) × 5 = 1,440 billable metric requests per day before retries. Each opt-in detailed service instance has four, or 1,152 per day. With `update_every <= 60`, a one-minute override runs its selected metrics five times as often; a slower collection interval limits execution and skips intermediate windows. Narrow profiles, metrics, regions, grains, and resource tags when that freshness is not required.
 
 **Cardinality warning.** These opt-in profiles include potentially high-cardinality data. **S3 Request Metrics** additionally require per-bucket request-metrics configuration in AWS and are billed at CloudWatch custom-metric rates; they collect nothing until enabled on the bucket. PrivateLink cardinality grows with endpoint subnets, service Availability Zones, load balancers, and consumer endpoints; the combined Availability Zone/load-balancer grain multiplies those dimensions. The Billing service/account grains grow with the payer's services and linked accounts.
 
@@ -1128,10 +1104,10 @@ Check the following:
 
 CloudWatch publishes metrics with a delay.
 
-- Keep `rules[].query.period` at or above the metric's real publication cadence. A shorter override increases billed query frequency but cannot make AWS publish more often, so it can create empty windows.
-- Set `rules[].query.publication_delay` when a workload publishes completed buckets later than its profile or the built-in `10m` fallback.
+- Keep the effective query `period` at or above the metric's real publication cadence. A shorter override can increase billed query frequency but cannot make AWS publish more often, so it can create empty windows. When it is also shorter than `update_every`, request execution remains limited to shared collection ticks and intermediate windows may be skipped.
+- Set a rule, metric-group, or metric-item `publication_delay` when a workload publishes completed buckets later than its profile or the built-in `10m` fallback.
 - Check `rule_defaults.query.publication_delay` before overriding an individual rule. A job-wide value replaces profile-specific delays for inheriting rules, including the stock S3 storage profile's conservative `1d`, and a shorter value can query daily data before it is published.
-- Set `rules[].query.lookback` to search a wider rolling window for sparse datapoints. It must be an exact multiple of the effective period.
+- Set `lookback` at the narrowest applicable query level to search a wider rolling window for sparse datapoints. It must be at least one effective period and an exact period multiple; one period is valid.
 - **Stale-looking values** -- a successful query presents its newest eligible datapoint on every Netdata collection cycle, so an old CloudWatch value can appear current for up to `lookback`. During transient AWS failures, replay can continue longer until a successful query replaces or expires it.
 - Longer lookbacks increase response work and may disable `recently_active_only` for the shared discovery scan.
 - Transient query failures preserve the retained value and retry after one `update_every`; later delays double within the same eligible window up to the effective period. A newly eligible window resets the backoff.

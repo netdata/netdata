@@ -6,7 +6,7 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, measured in seconds. CloudWatch's minimum period is 60s.",
+        "description": "Shared Netdata collection interval, measured in seconds. Per-series CloudWatch eligibility is evaluated on these ticks; a shorter metric period does not create an independent timer.",
         "type": "integer",
         "minimum": 60,
         "default": 60
@@ -287,9 +287,37 @@
                       "pattern": "^\\S(?:.*\\S)?$"
                     }
                   },
+                  "query": {
+                    "title": "Included-metric query policy",
+                    "description": "Optional field-by-field query timing applied only to series expanded from this group's include list. Unlisted profile defaults do not receive it. Omitted fields inherit the rule and lower-precedence values.",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "period": {
+                        "title": "Aggregation period",
+                        "description": "CloudWatch aggregation period for explicitly included series. Must be from 1m through 1d and an exact multiple of 1m.",
+                        "type": "string",
+                        "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                      },
+                      "lookback": {
+                        "title": "Rolling lookback",
+                        "description": "Rolling query horizon. Must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap.",
+                        "type": "string",
+                        "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                      },
+                      "publication_delay": {
+                        "title": "Publication delay",
+                        "description": "Collector policy for how long to wait after a bucket closes before querying explicitly included series. This is not an AWS publication guarantee.",
+                        "type": "string",
+                        "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                      }
+                    }
+                  },
                   "include": {
                     "title": "Included metrics",
-                    "description": "Exact, case-sensitive AWS MetricNames added by this group. A metric-level statistics list replaces the group statistics; when neither is set, the profile-declared statistics are inherited.",
+                    "description": "Exact, case-sensitive AWS MetricNames added by this group. A metric-level statistics list replaces the group statistics; when neither is set, the profile-declared statistics are inherited. Repeated MetricNames are allowed only when their expanded statistic sets are disjoint.",
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 256,
@@ -315,6 +343,34 @@
                           "items": {
                             "type": "string",
                             "pattern": "^\\S(?:.*\\S)?$"
+                          }
+                        },
+                        "query": {
+                          "title": "Metric/statistic query policy",
+                          "description": "Optional field-by-field query timing for this item's expanded metric/statistic series. This overrides the enclosing metric-group query.",
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "period": {
+                              "title": "Aggregation period",
+                              "description": "CloudWatch aggregation period for this item's expanded series. Must be from 1m through 1d and an exact multiple of 1m.",
+                              "type": "string",
+                              "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                            },
+                            "lookback": {
+                              "title": "Rolling lookback",
+                              "description": "Rolling query horizon. Must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap.",
+                              "type": "string",
+                              "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                            },
+                            "publication_delay": {
+                              "title": "Publication delay",
+                              "description": "Collector policy for how long to wait after a bucket closes before querying this item's expanded series. This is not an AWS publication guarantee.",
+                              "type": "string",
+                              "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                            }
                           }
                         }
                       },
@@ -387,7 +443,7 @@
             },
             "query": {
               "title": "Query policy",
-              "description": "Optional CloudWatch query timing overrides for this rule. Omitted fields inherit rule defaults and profile values.",
+              "description": "Optional CloudWatch query timing overrides for this rule. Omitted fields inherit rule defaults and profile values; explicit metric-group and item values take precedence.",
               "type": [
                 "object",
                 "null"
@@ -401,7 +457,7 @@
                 },
                 "lookback": {
                   "title": "Rolling lookback",
-                  "description": "Rolling query horizon. Must be at least the effective period, an exact period multiple, and no more than 1,440 buckets.",
+                  "description": "Rolling query horizon. Must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap.",
                   "type": "string",
                   "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                 },
@@ -718,9 +774,24 @@
                 "ui:placeholder": "Average"
               }
             },
+            "query": {
+              "ui:help": "Override CloudWatch timing only for series expanded from this group's include list. Unlisted default-selected series keep rule/profile timing.",
+              "period": {
+                "ui:help": "Aggregation period for explicitly included series. Eligibility is still evaluated only on shared update_every ticks.",
+                "ui:placeholder": "5m"
+              },
+              "lookback": {
+                "ui:help": "Rolling window searched for the newest eligible datapoint.",
+                "ui:placeholder": "30m"
+              },
+              "publication_delay": {
+                "ui:help": "Collector wait after a period closes. This is not an AWS publication guarantee.",
+                "ui:placeholder": "10m"
+              }
+            },
             "include": {
               "ui:listFlavour": "list",
-              "ui:help": "Exact AWS MetricNames to add. A metric-level statistics list replaces the group list; if both are omitted, the profile-declared statistics are used.",
+              "ui:help": "Exact AWS MetricNames to add. A metric-level statistics list replaces the group list; if both are omitted, the profile-declared statistics are used. Repeat a MetricName only for disjoint statistics.",
               "items": {
                 "name": {
                   "ui:help": "Exact, case-sensitive AWS MetricName from the profile.",
@@ -731,6 +802,21 @@
                   "ui:help": "Optional replacement statistics for this metric. Leave empty with no group statistics to inherit the profile declaration.",
                   "items": {
                     "ui:placeholder": "Maximum"
+                  }
+                },
+                "query": {
+                  "ui:help": "Override CloudWatch timing for this item's expanded metric/statistic series. Omitted fields inherit the group, rule, and profile chain.",
+                  "period": {
+                    "ui:help": "CloudWatch aggregation period for this item. Execution remains quantized to update_every ticks.",
+                    "ui:placeholder": "1m"
+                  },
+                  "lookback": {
+                    "ui:help": "Rolling window searched for the newest eligible datapoint.",
+                    "ui:placeholder": "5m"
+                  },
+                  "publication_delay": {
+                    "ui:help": "Collector wait after a period closes. Explicit 0s is allowed.",
+                    "ui:placeholder": "5m"
                   }
                 }
               }

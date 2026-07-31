@@ -244,24 +244,21 @@ func validateMetricSelectors(path string, selectors []ProfileMetricSelectorConfi
 			seenProfiles[selector.Profile] = struct{}{}
 		}
 		errs = append(errs, validateMetricStatistics(groupPath+".statistics", selector.Statistics))
+		errs = append(errs, cwquery.Validate(groupPath+".query", selector.Query))
 		if len(selector.Include) == 0 {
 			errs = append(errs, fmt.Errorf("%s.include must contain at least one metric", groupPath))
 			continue
 		}
 
-		seenMetrics := make(map[string]struct{}, len(selector.Include))
 		for j, metric := range selector.Include {
 			metricPath := fmt.Sprintf("%s.include[%d]", groupPath, j)
 			if err := validateCanonicalString(metricPath+".name", metric.Name); err != nil {
 				errs = append(errs, err)
 			} else if metric.Name == "" {
 				errs = append(errs, fmt.Errorf("%s.name must not be empty", metricPath))
-			} else if _, ok := seenMetrics[metric.Name]; ok {
-				errs = append(errs, fmt.Errorf("%s.include contains duplicate metric %q", groupPath, metric.Name))
-			} else {
-				seenMetrics[metric.Name] = struct{}{}
 			}
 			errs = append(errs, validateMetricStatistics(metricPath+".statistics", metric.Statistics))
+			errs = append(errs, cwquery.Validate(metricPath+".query", metric.Query))
 		}
 	}
 	return errors.Join(errs...)

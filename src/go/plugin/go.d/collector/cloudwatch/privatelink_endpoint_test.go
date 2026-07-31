@@ -206,37 +206,33 @@ func TestPrivateLinkEndpointProfiles_ShareDiscoveryAndMatchExactGrains(t *testin
 	}, instances["privatelink_endpoint_subnet"])
 }
 
-func TestPrivateLinkEndpointProfiles_ExactRulePoliciesRemainDisjoint(t *testing.T) {
+func TestPrivateLinkEndpointProfiles_PerSelectionPoliciesRemainDisjoint(t *testing.T) {
 	catalog, err := cwprofiles.LoadFromDefaultDirs()
 	require.NoError(t, err)
 	defaults := false
 	cfg := validBaseConfig()
-	cfg.Rules = []RuleConfig{
-		{
-			Name: "one-minute-averages", Targets: []string{"base"}, Regions: []string{"us-east-1"},
-			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"privatelink_endpoint"}},
-			Metrics: []ProfileMetricSelectorConfig{{
-				Profile: "privatelink_endpoint", Defaults: &defaults, Statistics: []string{"Average"},
-				Include: []MetricSelectionConfig{{Name: "ActiveConnections"}, {Name: "BytesProcessed"}, {Name: "NewConnections"}},
-			}},
+	cfg.Rules = []RuleConfig{{
+		Name: "endpoint-split-timing", Targets: []string{"base"}, Regions: []string{"us-east-1"},
+		Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"privatelink_endpoint"}},
+		Metrics: []ProfileMetricSelectorConfig{{
+			Profile: "privatelink_endpoint", Defaults: &defaults,
 			Query: &cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(5 * time.Minute), PublicationDelay: longDuration(5 * time.Minute)},
-		},
-		{
-			Name: "six-hour-bytes", Targets: []string{"base"}, Regions: []string{"us-east-1"},
-			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"privatelink_endpoint"}},
-			Metrics: []ProfileMetricSelectorConfig{{
-				Profile: "privatelink_endpoint", Defaults: &defaults,
-				Include: []MetricSelectionConfig{{Name: "BytesProcessed", Statistics: []string{"Sum"}}},
-			}},
-			Query: &cwquery.Config{Period: longDuration(6 * time.Hour), Lookback: longDuration(6 * time.Hour), PublicationDelay: longDuration(5 * time.Minute)},
-		},
-	}
+			Include: []MetricSelectionConfig{
+				{Name: "ActiveConnections", Statistics: []string{"Average"}},
+				{Name: "BytesProcessed", Statistics: []string{"Average"}},
+				{Name: "NewConnections", Statistics: []string{"Average"}},
+				{Name: "BytesProcessed", Statistics: []string{"Sum"}, Query: &cwquery.Config{
+					Period: longDuration(6 * time.Hour), Lookback: longDuration(6 * time.Hour), PublicationDelay: longDuration(5 * time.Minute),
+				}},
+			},
+		}},
+	}}
 	cfg.applyDefaults()
 
 	plan, diagnostics, err := compileConfig(cfg, catalog)
 	require.NoError(t, err)
 	require.Empty(t, diagnostics)
-	require.Len(t, plan.Scopes, 2)
+	require.Len(t, plan.Scopes, 1)
 	policies := make(map[string]cwquery.Policy)
 	for _, scope := range plan.Scopes {
 		for _, series := range scope.SelectedSeries {

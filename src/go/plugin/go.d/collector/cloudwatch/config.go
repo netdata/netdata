@@ -81,6 +81,7 @@ type ProfileMetricSelectorConfig struct {
 	Profile    string                  `yaml:"profile" json:"profile"`
 	Defaults   *bool                   `yaml:"defaults,omitempty" json:"defaults,omitempty"`
 	Statistics []string                `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Query      *cwquery.Config         `yaml:"query,omitempty" json:"query,omitempty"`
 	Include    []MetricSelectionConfig `yaml:"include" json:"include"`
 }
 
@@ -89,8 +90,9 @@ func (c ProfileMetricSelectorConfig) includesDefaults() bool {
 }
 
 type MetricSelectionConfig struct {
-	Name       string   `yaml:"name" json:"name"`
-	Statistics []string `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Name       string          `yaml:"name" json:"name"`
+	Statistics []string        `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Query      *cwquery.Config `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type RuleDefaultsConfig struct {

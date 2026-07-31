@@ -189,7 +189,7 @@ An explicitly empty list is invalid; omit the field for unrestricted profiles.
 | Field               |       Required       | Description                                                                                                                                                                           |
 |:--------------------|:--------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `period`            | yes at profile level | CloudWatch aggregation period. It must be from `1m` through `24h` and an exact multiple of `1m`.                                                                                      |
-| `lookback`          |          no          | Rolling retrieval horizon. It must be positive, at least one period, an exact multiple of the effective period, and no more than 1,440 buckets. Omission follows the resolved period. |
+| `lookback`          |          no          | Rolling retrieval horizon. It must be positive, at least one period, an exact multiple of the effective period, and no more than the collector's 1,440-bucket safety cap. Omission follows the resolved period. |
 | `publication_delay` |          no          | Delay before querying a closed bucket -- collector scheduling policy, not an AWS publication SLA. Default `10m`; `0` is valid.                                                        |
 
 Durations accept duration strings or numeric seconds and must resolve to whole seconds. Stock profiles use canonical
@@ -198,13 +198,21 @@ strings such as `1m`, `10m`, and `24h`; custom profiles should do the same for r
 Every metric may define an optional `query` object with the same fields. Job configuration resolves each field
 independently in this order, from highest to lowest precedence:
 
-1. `rules[].query` (job configuration)
-2. `rule_defaults.query` (job configuration)
-3. `metrics[].query` (profile)
-4. profile `query`
+1. `rules[].metrics[].include[].query` (job metric/statistic item)
+2. `rules[].metrics[].query` (job profile-metric group, for explicit `include[]` expansions only)
+3. `rules[].query` (job rule)
+4. `rule_defaults.query` (job defaults)
+5. `metrics[].query` (profile metric)
+6. profile `query`
 
 After inheritance, the collector validates the complete policy. The combined `publication_delay + lookback + period`
 horizon must not exceed 14 days.
+
+The query window is `end = align_down(now - publication_delay, period)` and `start = end - lookback`; CloudWatch
+`EndTime` is exclusive. One-period lookback is valid. Longer lookback improves tolerance for sparse or late data but
+increases response work; it is not needed to repair alignment. Policies are evaluated only on the job's shared
+`update_every` ticks. A `period` shorter than `update_every` still controls CloudWatch aggregation and rate
+normalization, but intermediate eligible windows may be skipped.
 
 ## Instance dimensions
 
@@ -284,6 +292,14 @@ metrics:
 Set `defaults: false` when the profile must use only the listed MetricNames. If both the group and metric omit
 `statistics`, the collector uses every statistic declared for that metric in the profile.
 
+A metric group and each included metric may also define `query` with `period`, `lookback`, and/or
+`publication_delay`. The group query applies only to series expanded from `include[]`, even when `defaults: true`;
+unlisted default-selected series keep rule/profile timing. The item query overrides the group field by field.
+
+Repeat one MetricName only to assign policies to disjoint statistic sets. Statistic expansion is item statistics,
+then group statistics, then all profile-declared statistics. For example, separate `Average` and `Sum` items are
+valid; two items that both expand to `Average` are rejected with their configuration paths.
+
 ## Chart template rules
 
 The `template` uses Netdata's dynamic chart-template format. See the complete
@@ -307,4 +323,3 @@ are ignored (see "How profiles work").
 
 The collector divides rate totals by the effective query period before emission and marks all emitted CloudWatch metric
 families as floating-point values.
-

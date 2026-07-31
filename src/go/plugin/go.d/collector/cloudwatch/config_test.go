@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -201,6 +202,14 @@ func TestConfig_validateMetricSelector(t *testing.T) {
 				},
 			}},
 		},
+		"valid group and metric query overrides": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "ec2", Query: &cwquery.Config{Period: longDuration(5 * time.Minute)},
+				Include: []MetricSelectionConfig{{
+					Name: "CPUUtilization", Query: &cwquery.Config{PublicationDelay: longDuration(0)},
+				}},
+			}},
+		},
 		"empty group statistics": {
 			selectors: []ProfileMetricSelectorConfig{{
 				Profile: "ec2", Statistics: []string{},
@@ -235,12 +244,25 @@ func TestConfig_validateMetricSelector(t *testing.T) {
 			selectors: []ProfileMetricSelectorConfig{{Profile: "ec2", Statistics: []string{"Average"}, Include: []MetricSelectionConfig{{}}}},
 			wantErr:   ".name must not be empty",
 		},
-		"duplicate metric": {
+		"repeated metric with potentially disjoint statistics is validated after profile expansion": {
 			selectors: []ProfileMetricSelectorConfig{{
-				Profile: "ec2", Statistics: []string{"Average"},
-				Include: []MetricSelectionConfig{{Name: "CPUUtilization"}, {Name: "CPUUtilization", Statistics: []string{"Maximum"}}},
+				Profile: "ec2",
+				Include: []MetricSelectionConfig{{Name: "CPUUtilization", Statistics: []string{"Average"}}, {Name: "CPUUtilization", Statistics: []string{"Maximum"}}},
 			}},
-			wantErr: "duplicate metric",
+		},
+		"invalid group query": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "ec2", Query: &cwquery.Config{Period: longDuration(30 * time.Second)},
+				Include: []MetricSelectionConfig{{Name: "CPUUtilization"}},
+			}},
+			wantErr: "rules[0].metrics[0].query.period",
+		},
+		"invalid metric query": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "ec2",
+				Include: []MetricSelectionConfig{{Name: "CPUUtilization", Query: &cwquery.Config{PublicationDelay: longDuration(-time.Second)}}},
+			}},
+			wantErr: "rules[0].metrics[0].include[0].query.publication_delay",
 		},
 		"metric name surrounding whitespace": {
 			selectors: []ProfileMetricSelectorConfig{{Profile: "ec2", Statistics: []string{"Average"}, Include: []MetricSelectionConfig{{Name: " CPUUtilization"}}}},
@@ -288,12 +310,14 @@ func TestConfigSchema_FormContract(t *testing.T) {
 	var doc map[string]any
 	require.NoError(t, json.Unmarshal(data, &doc))
 
-	// Query timing resolves rule -> rule_defaults -> profile -> built-in. A schema default makes
+	// Query timing resolves item -> group -> rule -> rule_defaults -> profile -> built-in. A schema default makes
 	// the form emit a value the operator never chose, collapsing that chain.
 	ruleQuery := schemaObjectAt(t, doc, "jsonSchema", "properties", "rules", "items", "properties", "query", "properties")
 	defaultQuery := schemaObjectAt(t, doc, "jsonSchema", "properties", "rule_defaults", "properties", "query", "properties")
+	groupQuery := schemaObjectAt(t, doc, "jsonSchema", "properties", "rules", "items", "properties", "metrics", "items", "properties", "query", "properties")
+	itemQuery := schemaObjectAt(t, doc, "jsonSchema", "properties", "rules", "items", "properties", "metrics", "items", "properties", "include", "items", "properties", "query", "properties")
 	for _, field := range []string{"period", "lookback", "publication_delay"} {
-		for _, query := range []map[string]any{ruleQuery, defaultQuery} {
+		for _, query := range []map[string]any{ruleQuery, defaultQuery, groupQuery, itemQuery} {
 			assert.NotContainsf(t, schemaObjectAt(t, query, field), "default",
 				"%s must stay omitted so runtime precedence resolves it", field)
 		}

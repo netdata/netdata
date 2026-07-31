@@ -58,6 +58,14 @@ type profileSeriesSpec struct {
 	Name        string
 }
 
+// selectedSeriesSpec carries the job-selection query sources attached to one
+// profile-defined series. They are resolved once while compiling the plan.
+type selectedSeriesSpec struct {
+	profileSeriesSpec
+	groupQuery cwquery.Source
+	itemQuery  cwquery.Source
+}
+
 type compiledSeries struct {
 	Ordinal     int
 	MetricIndex int
