@@ -676,15 +676,23 @@ When user decisions are needed:
 Review findings are leads until they are verified against the shipped code and
 its contracts.
 
-- A merge blocker MUST identify a production-reachable trigger, the violated
+- A shipping blocker MUST identify a production-reachable trigger, the violated
   contract or invariant, the concrete consequence, and supporting code or test
   evidence.
+- Failing required validation or an unmet explicit acceptance criterion is also
+  a shipping blocker, regardless of the reviewer's severity label.
 - An unreachable defensive scenario, optional refactor, style preference, or
   speculative future risk MUST NOT be promoted to a blocker. Reject it with
   evidence, or track it separately when it has independent value.
-- After a validated material correction, repeat the required full review scope.
-  Stop when no verified material correctness, security, deadlock, leak,
-  protocol, resource-consumption, or test-coverage defect remains. Nits alone
+- Optional test expansion, documentation polish, and maintainability suggestions
+  without a concrete current defect MUST NOT extend the review cycle by
+  themselves.
+- One complete review round is the default. Repeat the same full scope only when
+  a verified shipping blocker required a material change to shipped
+  implementation or behavior, or when the prior review could not assess the
+  complete change.
+- Stop when no verified shipping blocker remains. Reviewer unanimity, exact
+  readiness phrases, and zero optional suggestions are NOT required. Nits alone
   MUST NOT keep a review cycle open.
 
 ### Followup Discipline
