@@ -694,6 +694,18 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    - A Store without that optional capability remains configuration-valid, and the response explicitly says that the
      result was validation-only. Configuration failures return 400, operational failures return 422, and
      busy/contained attempts return 503.
+   - Provider failures retain their private causes. A marked `dyncfg.PublicError` may append only static,
+     code-authored detail to Test 400/422 and add/update preparation 400 responses; unmarked failures remain generic,
+     and every rendered SecretStore operator message stays within the existing 4 KiB bound.
+   - Vault performs one real authenticated `GET /v1/auth/token/lookup-self` through the same token, namespace, client,
+     TLS/proxy, timeout, and cancellation path used for secret resolution. HTTP 200 is operational success by status; its
+     body is not inspected. An exact permission-only HTTP 403 body returns `dyncfg.ErrTestUnsupported` and becomes explicit
+     validation-only success because the response cannot reliably prove token validity across Vault versions and
+     authentication restrictions. Invalid-token, ambiguous, malformed, or oversized HTTP 403 bodies fail, as does every
+     other status. The Test reads no secret and does not prove secret-path permission, that Vault accepted the token, or
+     that an intermediary preserved the namespace header. It buffers at most 1 MiB plus one size-detection byte of a
+     classified 403 body. When the request reaches Vault, it creates audit/activity evidence and can consume the final use
+     of a limited-use service token. Vault token files use the shared regular-file-only 1 MiB configured-file reader.
 2. **Restart dependents as one composite command.** If any running jobs depend on that store key: stop dependents →
    commit the new generation → start dependents. The parent retains `dyncfg:dependency-graph` throughout, and each
    start child temporarily yields only the `dyncfg:jobs` acquisition suffix while its probe runs, so unrelated

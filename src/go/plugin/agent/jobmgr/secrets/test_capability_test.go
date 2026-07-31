@@ -5,6 +5,8 @@ package secrets
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +18,65 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSecretStoreFailureMessage(t *testing.T) {
+	privateErr := errors.New("private provider failure")
+	tests := map[string]struct {
+		err             error
+		want            string
+		wantNotContains []string
+	}{
+		"unmarked error stays generic": {
+			err:             privateErr,
+			want:            msgSecretStoreTestFailed,
+			wantNotContains: []string{privateErr.Error()},
+		},
+		"marked static detail is appended": {
+			err: dyncfg.NewPublicError(
+				"the configured provider endpoint is unavailable",
+				privateErr,
+			),
+			want: "Secretstore operational test failed: the configured provider endpoint is unavailable",
+			wantNotContains: []string{
+				privateErr.Error(),
+			},
+		},
+		"wrapped marked detail is appended": {
+			err: fmt.Errorf(
+				"private wrapper: %w",
+				dyncfg.NewPublicError(
+					"the configured provider credential is unavailable",
+					privateErr,
+				),
+			),
+			want: "Secretstore operational test failed: the configured provider credential is unavailable",
+			wantNotContains: []string{
+				"private wrapper",
+				privateErr.Error(),
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := secretFailureMessage(msgSecretStoreTestFailed, tc.err)
+
+			require.Equal(t, tc.want, got)
+			require.LessOrEqual(t, len(got), maximumSecretJobSummaryBytes)
+			for _, value := range tc.wantNotContains {
+				require.NotContains(t, got, value)
+			}
+		})
+	}
+
+	got := secretFailureMessage(
+		msgSecretStoreTestFailed,
+		dyncfg.NewPublicError(strings.Repeat("é", maximumSecretJobSummaryBytes), privateErr),
+	)
+	require.LessOrEqual(t, len(got), maximumSecretJobSummaryBytes)
+	require.True(t, strings.HasSuffix(got, "... [truncated]"))
+	require.True(t, strings.ToValidUTF8(got, "") == got)
+}
 
 func TestStoreOperationRunsOptionalOperationalTest(t *testing.T) {
 	testErr := errors.New("provider unavailable")

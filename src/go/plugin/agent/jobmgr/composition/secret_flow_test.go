@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -18,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	vaultbackend "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends/vault"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -561,6 +564,11 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 			payload: `{"value":"initial"}`, status: 200,
 		},
 		{
+			uid:     "secret-update-public-invalid",
+			command: "config go.d:secretstore:vault:main update",
+			payload: `{"value":"public-failure"}`, status: 400,
+		},
+		{
 			uid:     "secret-update-invalid",
 			command: "config go.d:secretstore:vault:main update",
 			payload: `{"value":"backend-sensitive-detail"}`, status: 400,
@@ -602,8 +610,169 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json")
 	}
 	require.Contains(t, output.String(), `"Value":"initial"`)
-	require.Contains(t, output.String(), "this secretstore does not provide an operational test")
+	require.Contains(
+		t,
+		output.String(),
+		"an operational result is unavailable for this secretstore configuration",
+	)
+	require.Contains(
+		t,
+		output.String(),
+		"Secretstore configuration validation failed: the configured provider credential is unavailable",
+	)
 	require.NotContains(t, output.String(), "backend-sensitive-detail")
+	require.NotContains(t, output.String(), "private provider response")
+
+	controls.sendTerminate(testProcessControl())
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "process did not terminate")
+	}
+}
+
+func TestProcessCoreVaultOperationalTest(t *testing.T) {
+	const (
+		validToken      = "synthetic-valid-token"
+		restrictedToken = "synthetic-restricted-token"
+		invalidToken    = "synthetic-invalid-token"
+	)
+	var requests atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		requests.Add(1)
+		if req.Method != http.MethodGet || req.URL.Path != "/v1/auth/token/lookup-self" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch req.Header.Get("X-Vault-Token") {
+		case validToken:
+			_, _ = io.WriteString(w, `{"data":{}}`)
+		case restrictedToken:
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, `{"errors":["permission denied"]}`)
+		default:
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(
+				w,
+				"{\"errors\":[\"2 errors occurred:\\n\\t* permission denied\\n\\t* invalid token\\n\\n\"]}",
+			)
+		}
+	}))
+	defer srv.Close()
+
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{vaultbackend.New()})
+	require.NoError(t, err)
+	jobs := testRunJobServices(t)
+	jobs.StoreCreators = creators
+	reader, writer := io.Pipe()
+	defer func() { require.NoError(t, writer.Close()) }()
+	output := newProcessSynchronizedBuffer()
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
+
+	validPayload := `{"mode":"token","mode_token":{"token":"` + validToken +
+		`"},"addr":"` + srv.URL + `"}`
+	restrictedPayload := `{"mode":"token","mode_token":{"token":"` + restrictedToken +
+		`"},"addr":"` + srv.URL + `"}`
+	invalidPayload := `{"mode":"token","mode_token":{"token":"` + invalidToken +
+		`"},"addr":"` + srv.URL + `"}`
+	steps := []struct {
+		uid     string
+		command string
+		payload string
+		status  int
+	}{
+		{
+			uid:     "vault-add",
+			command: "config go.d:secretstore:vault add main",
+			payload: validPayload,
+			status:  200,
+		},
+		{
+			uid:     "vault-test-stored",
+			command: "config go.d:secretstore:vault:main test",
+			status:  202,
+		},
+		{
+			uid:     "vault-test-restricted",
+			command: "config go.d:secretstore:vault:main test",
+			payload: restrictedPayload,
+			status:  200,
+		},
+		{
+			uid:     "vault-test-invalid",
+			command: "config go.d:secretstore:vault:main test",
+			payload: invalidPayload,
+			status:  422,
+		},
+		{
+			uid:     "vault-test-stored-again",
+			command: "config go.d:secretstore:vault:main test",
+			status:  202,
+		},
+	}
+	for _, step := range steps {
+		if step.payload == "" {
+			_, err = io.WriteString(
+				writer,
+				"FUNCTION "+step.uid+" 30 \""+step.command+"\" 0xFFFF \"user=test\"\n",
+			)
+		} else {
+			_, err = io.WriteString(
+				writer,
+				"FUNCTION_PAYLOAD "+step.uid+" 30 \""+step.command+
+					"\" 0xFFFF \"user=test\" application/json\n"+
+					step.payload+"\nFUNCTION_PAYLOAD_END\n",
+			)
+		}
+		require.NoError(t, err)
+		output.waitContains(
+			t,
+			"FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json",
+		)
+	}
+
+	wire := output.String()
+	restrictedStart := strings.Index(wire, "FUNCTION_RESULT_BEGIN vault-test-restricted ")
+	require.NotEqual(t, -1, restrictedStart)
+	restrictedEnd := strings.Index(wire[restrictedStart:], "FUNCTION_RESULT_END")
+	require.NotEqual(t, -1, restrictedEnd)
+	restrictedResult := wire[restrictedStart : restrictedStart+restrictedEnd]
+
+	require.EqualValues(t, 4, requests.Load())
+	require.Contains(
+		t,
+		wire,
+		"Secretstore operational test failed: the configured Vault authentication check failed",
+	)
+	require.Contains(
+		t,
+		restrictedResult,
+		"an operational result is unavailable for this secretstore configuration",
+	)
+	require.Contains(t, restrictedResult, "No jobs currently use this secretstore.")
+	require.Contains(t, wire, "Stored configuration is valid. No jobs are currently using this secretstore.")
+	require.NotContains(t, wire, "invalid token")
+	require.NotContains(t, wire, validToken)
+	require.NotContains(t, wire, restrictedToken)
+	require.NotContains(t, wire, invalidToken)
+	require.NotContains(t, wire, srv.URL)
 
 	controls.sendTerminate(testProcessControl())
 	select {
@@ -1216,6 +1385,12 @@ func (pss *processSecretStore) Configuration() any {
 }
 
 func (pss *processSecretStore) Init(context.Context) error {
+	if pss.config.Value == "public-failure" {
+		return dyncfg.NewPublicError(
+			"the configured provider credential is unavailable",
+			errors.New("private provider response"),
+		)
+	}
 	if pss.config.Value == "backend-sensitive-detail" {
 		return errors.New("backend rejected backend-sensitive-detail")
 	}

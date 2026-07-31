@@ -19,10 +19,10 @@ import (
 )
 
 const (
-	// A rendered response is capped at maximumSecretJobSummaryBytes. Each job-name
-	// list gets the content budget below, reserving secretJobSummaryReserveBytes
-	// for surrounding prose and its truncation marker; boundSecretMessage enforces
-	// the total after lists combine.
+	// An operator-facing message is capped at maximumSecretJobSummaryBytes. Each
+	// job-name list gets the content budget below, reserving
+	// secretJobSummaryReserveBytes for surrounding prose and its truncation marker;
+	// boundSecretMessage enforces the total after lists combine.
 	maximumSecretJobSummaryBytes = 4 * 1024
 	secretJobSummaryReserveBytes = 512
 	secretJobSummaryContentBytes = maximumSecretJobSummaryBytes - secretJobSummaryReserveBytes
@@ -34,7 +34,7 @@ const (
 	msgInvalidSecretStoreConfig    = "Invalid secretstore configuration."
 	msgSecretStoreValidationFailed = "Secretstore configuration validation failed."
 	msgSecretStoreTestFailed       = "Secretstore operational test failed."
-	msgSecretStoreTestUnsupported  = "Configuration is valid; this secretstore does not provide an operational test."
+	msgSecretStoreTestUnsupported  = "Configuration is valid; an operational result is unavailable for this secretstore configuration."
 )
 
 func (c *Controller) Stage(input CommandInput) (*PreparedStoreOperation, error) {
@@ -209,9 +209,19 @@ func (c *Controller) prepareTest(
 	}
 	if result.err != nil {
 		if result.operational {
-			return c.noopMessage(scope, current, 422, msgSecretStoreTestFailed)
+			return c.noopMessage(
+				scope,
+				current,
+				422,
+				secretFailureMessage(msgSecretStoreTestFailed, result.err),
+			)
 		}
-		return c.noopMessage(scope, current, 400, msgSecretStoreValidationFailed)
+		return c.noopMessage(
+			scope,
+			current,
+			400,
+			secretFailureMessage(msgSecretStoreValidationFailed, result.err),
+		)
 	}
 	if !result.operational {
 		message := msgSecretStoreTestUnsupported
@@ -488,11 +498,14 @@ func (c *Controller) prepareStoreMutation(
 	}
 	if prepareErr != nil {
 		spec := preparedSecretSpec{
-			scope:      scope,
-			current:    current,
-			store:      c.store,
-			storeKey:   config.ExposedKey(),
-			result:     mustSecretMessage(400, msgSecretStoreValidationFailed),
+			scope:    scope,
+			current:  current,
+			store:    c.store,
+			storeKey: config.ExposedKey(),
+			result: mustSecretMessage(
+				400,
+				secretFailureMessage(msgSecretStoreValidationFailed, prepareErr),
+			),
 			cleanup:    func() error { return nil },
 			controller: c,
 			commit: func() {
@@ -676,6 +689,13 @@ func secretImpactMessage(affected string, restartable string, validationOnly boo
 			affected +
 			". Running jobs that would be restarted automatically: " +
 			restartable + "."
+	}
+	return boundSecretMessage(message)
+}
+
+func secretFailureMessage(message string, err error) string {
+	if detail, ok := dyncfg.PublicMessage(err); ok {
+		message = strings.TrimSuffix(message, ".") + ": " + detail
 	}
 	return boundSecretMessage(message)
 }
