@@ -453,6 +453,48 @@ func TestL10QueryResultGuards(t *testing.T) {
 	if l10EnvelopeHolds("average", [][]float64{{0}, {100}}, []*float64{&zero, &fifty}, 0) {
 		t.Fatal("L10 bucket-local envelope accepted a value outside its current bucket")
 	}
+
+	t.Run("gap-total-slack-is-only-for-cut-tier1-records", func(t *testing.T) {
+		alignedAfter := int64(fixture.T0 + 40 + tier1Gran)
+		alignedBefore := alignedAfter + 20*tier1Gran
+		if alignedAfter%tier1Gran != 0 || alignedBefore%tier1Gran != 0 {
+			t.Fatal("L10 exact-span control is not aligned to the tier1 grid")
+		}
+
+		const oneRecord = float64(l10GapCollected * l10GapValue)
+		for _, tc := range []struct {
+			name          string
+			tier          int
+			after, before int64
+			want          float64
+		}{
+			{name: "tier0 aligned", tier: 0, after: alignedAfter, before: alignedBefore},
+			{name: "tier0 off-grid", tier: 0, after: alignedAfter + 17, before: alignedBefore + 17},
+			{name: "tier1 aligned", tier: 1, after: alignedAfter, before: alignedBefore},
+			{name: "tier1 cut lower edge", tier: 1, after: alignedAfter + 17, before: alignedBefore, want: oneRecord},
+			{name: "tier1 cut upper edge", tier: 1, after: alignedAfter, before: alignedBefore + 17, want: oneRecord},
+			{name: "tier1 cut both edges", tier: 1, after: alignedAfter + 17, before: alignedBefore + 17, want: oneRecord},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if got := l10GapTotalSlack(tc.tier, tc.after, tc.before); got != tc.want {
+					t.Fatalf("gap total slack = %v, want %v", got, tc.want)
+				}
+			})
+		}
+
+		for _, delta := range []float64{-oneRecord, oneRecord} {
+			if math.Abs(delta) <= l10GapTotalSlack(0, alignedAfter, alignedBefore) ||
+				math.Abs(delta) <= l10GapTotalSlack(1, alignedAfter, alignedBefore) {
+				t.Fatalf("an exact path accepted a one-record total mutation of %+v", delta)
+			}
+		}
+		if math.Abs(oneRecord) > l10GapTotalSlack(1, alignedAfter+17, alignedBefore+17) {
+			t.Fatal("cut tier1 span rejected its one-record allowance")
+		}
+		if math.Abs(oneRecord+1) <= l10GapTotalSlack(1, alignedAfter+17, alignedBefore+17) {
+			t.Fatal("cut tier1 span accepted more than one record of slack")
+		}
+	})
 }
 
 func l10EnvelopeHolds(group string, sources [][]float64, got []*float64, tolerance float64) bool {
@@ -1662,6 +1704,13 @@ func l10GapCollectedIn(after, before int64) int {
 	return n
 }
 
+func l10GapTotalSlack(tier int, after, before int64) float64 {
+	if tier != 1 || (after%tier1Gran == 0 && before%tier1Gran == 0) {
+		return 0
+	}
+	return float64(l10GapCollected * l10GapValue)
+}
+
 // INV-4c: a total is exact over a span with HOLES in it, and over a span that
 // does not start on the tier grid.
 //
@@ -1716,10 +1765,11 @@ func TestLayer10TotalsAreExactOverGapsAndOffGrid(t *testing.T) {
 							got += *pt.Value
 						}
 					}
-					// a stored point straddling either end of the span is
-					// legitimately split, so allow one stored point of slack
-					// at each edge rather than demanding the exact integer
-					slack := float64(l10GapCollected*l10GapValue) * 1.05
+					// Tier0 edges are exact sample boundaries. At tier1 only
+					// an edge cutting a stored record may carry one record of
+					// uncertainty because a rollup does not expose where its
+					// interior gaps fall.
+					slack := l10GapTotalSlack(tier, span.after, span.before)
 					if math.Abs(got-want) > slack {
 						t.Logf("invariant not met: %s (tier %d, %s) totals %.0f at %d buckets, "+
 							"but the span holds %.0f - the fixture collected %d samples of %d in it",

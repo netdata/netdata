@@ -287,6 +287,9 @@ func TestAnomalyBitTierRates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !assertSelectedTier(t, doc, 1) {
+		t.Fatal("tier anomaly-rate query was not served only by forced tier 1")
+	}
 	cols, err := canon.Columns(doc)
 	if err != nil {
 		t.Fatal(err)

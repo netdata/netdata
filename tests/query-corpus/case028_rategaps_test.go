@@ -253,18 +253,22 @@ func c028VolumeMatches(t *testing.T, q c028Query) bool {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ok := assertSelectedTier(t, doc, q.tier)
+	rowSpan := (q.before - q.after) / q.points
+	if !assertExactView(t, doc, q.after, q.before, rowSpan) {
+		ok = false
+	}
 	cols, err := canon.Columns(doc)
 	if err != nil {
 		t.Logf("volume contract not met: %s tier %d at %d buckets: %v",
 			q.label, q.tier, q.points, err)
 		return false
 	}
-	col, has := cols["rate"]
-	if !has || len(col) == 0 {
-		t.Logf("volume contract not met: %s tier %d at %d buckets returned no data",
-			q.label, q.tier, q.points)
-		return false
+	if !assertOnlyColumn(t, cols, "rate") ||
+		!assertColumnExactGrid(t, cols, "rate", q.after, q.before, rowSpan) {
+		ok = false
 	}
+	col := cols["rate"]
 
 	total := 0.0
 	for _, pt := range col {
@@ -279,7 +283,7 @@ func c028VolumeMatches(t *testing.T, q c028Query) bool {
 			"unmeasured seconds contribute nothing",
 			q.label, q.tier, q.after-int64(fixture.T0), q.before-int64(fixture.T0), q.points,
 			total, q.want/float64(c028Rate), c028Rate, q.want)
-		return false
+		ok = false
 	}
-	return true
+	return ok
 }

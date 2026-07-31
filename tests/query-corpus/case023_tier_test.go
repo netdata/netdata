@@ -490,6 +490,9 @@ func TestCase023TierAnomalyBit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if !assertSelectedTier(t, doc, 1) {
+			ok = false
+		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
