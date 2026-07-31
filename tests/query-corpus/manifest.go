@@ -105,7 +105,7 @@ var manifest = map[string]ManifestCase{
 		FixedBy: "#23127",
 	},
 	"CASE-016/fresh-host-forgotten-on-restart": {
-		Proves:  "a child first connected < one metadata scan cycle (5s) before a graceful restart SURVIVES it: the metasync shutdown path now runs a final host scan, so the fresh host's metadata reaches sqlite regardless of scan phase (was: forgotten — host 404 after boot, dbengine data orphaned)",
+		Proves:  "best-effort graceful-restart regression: a freshly connected child remains queryable after restart. The bounded 10-second attempt prevents unbounded timing drift but exceeds the ordinary 5-second metadata scan, so it does not isolate the final shutdown scan from periodic persistence (was: fresh host forgotten after boot, dbengine data orphaned)",
 		FixedBy: "#23120",
 	},
 	"L3/families": {
@@ -184,10 +184,12 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"matrix", "live-edge-trimming"},
 	},
 	"L6/two-pass-average-boundary": {
-		Proves: "sum→average needs separate denominators across two passes: non-raw value divides by contributing pass-1 groups, while anomaly rate remains weighted by the raw metric contributors beneath those groups; raw mode deliberately leaves both numerators undivided and reports the prior-pass group count required by the old Agent-Cloud average merge contract. This contract is separated from the no-average matrix so contributor propagation cannot silently change the average value divisor",
+		Proves:     "sum→average needs separate denominators across two passes: non-raw value divides by contributing pass-1 groups, while anomaly rate remains weighted by the raw metric contributors beneath those groups; raw mode deliberately leaves both numerators undivided and reports the prior-pass group count required by the old Agent-Cloud average merge contract. Class C average→sum stability separately preserves the released prior-group anomaly divisor without ruling on average composition",
+		Components: []string{"sum-to-average", "average-to-sum-held"},
 	},
 	"L6/two-pass-percentage": {
-		Proves: "percentage as the pass-2 aggregation: pass 1 runs in shadow hidden mode, the percentage pass folds hidden sums into each normal group's denominator (v*100/(v+h)), and an incomplete shadow bucket taints PARTIAL; non-raw anomaly metadata remains weighted by visible raw metric contributors, while raw mode defers value conversion, declares a result-wide hidden field with finite sums or null cells, and preserves the visible prior-pass group count",
+		Proves:     "percentage as the pass-2 aggregation: pass 1 runs in shadow hidden mode, the percentage pass folds hidden sums into each normal group's denominator (v*100/(v+h)), and an incomplete shadow bucket taints PARTIAL; non-raw anomaly metadata remains weighted by visible raw metric contributors, while raw mode defers value conversion, declares a result-wide hidden field with finite sums or null cells, and preserves the visible prior-pass group count. Class C stability controls for percentage→sum and percentage-of-instance→sum separately prove that complete rows remain non-PARTIAL without ruling on percentage pooling or weighting",
+		Components: []string{"sum-to-percentage", "percentage-to-sum-held", "percentage-of-instance-to-sum-held"},
 	},
 	"CASE-018/multipass-average": {
 		Proves: "with average at pass 1, pass 2 consumes each finalized pass-1 group average: [dimension,average]→[selected,average] equals the mean of those group averages, not the mean of unfinalized group sums",
