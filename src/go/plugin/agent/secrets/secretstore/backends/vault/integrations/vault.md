@@ -29,7 +29,9 @@ This page covers Vault specific setup. For the full resolver overview and syntax
 
 Netdata reads existing secrets from Vault. It does not create or renew Vault tokens. If the configured token expires or becomes invalid, secret resolution fails until Netdata can read a valid token again. If you use `token_file` mode, Netdata re-reads the file on every secret resolution, so an external process (e.g. Vault Agent, a cron job) can renew the token by writing to the file. For KV v2 secrets, Netdata does not add `/data/` to the path automatically.
 
-The Dynamic Configuration **Test** action performs one real authenticated `GET /v1/auth/token/lookup-self` request using the configured token, namespace, TLS settings, proxy path, and timeout. HTTP 200 succeeds. Vault's documented permission-only HTTP 403 also succeeds because a valid token may not have permission to look itself up; an invalid-token response fails. This verifies that Vault accepts the token, but it does not read a secret or prove access to any secret path. Vault counts this authenticated request as a use of a limited-use token.
+The Dynamic Configuration **Test** action initiates one real authenticated `GET /v1/auth/token/lookup-self` request using the configured token, namespace header, TLS settings, proxy path, and timeout. HTTP 200 is operational success. An exact permission-only HTTP 403 is reported as validation-only because it cannot reliably distinguish a valid token without self-lookup permission from an invalid token on older Vault versions or another authentication restriction. Invalid-token, ambiguous, malformed, oversized, and unexpected responses fail.
+
+The request does not read a secret or prove access to any secret path. It also cannot prove that an intermediary preserved the namespace header or that Vault used it. A gateway or allowlist can block the self-lookup route even when configured secret reads would work. Vault creates normal audit and activity evidence for the request. For a limited-use service token, Test can consume the final remaining use and cause later secret resolution to fail; an external proxy or service mesh can also retry independently.
 
 A configured token file must resolve to a regular file no larger than 1 MiB. Symlinks to regular files are supported.
 
@@ -262,9 +264,9 @@ Check the Vault token policy and, if you use Vault Enterprise namespaces, confir
 
 ### The Dynamic Configuration Test fails
 
-The Test action makes a real authenticated request to Vault's token self-lookup endpoint. It accepts a successful lookup and Vault's documented permission-only denial, but rejects an invalid token, an unreachable endpoint, and malformed or unexpected responses.
+The Test action makes a real authenticated request to Vault's token self-lookup endpoint. HTTP 200 is operational success. An exact permission-only HTTP 403 is reported as validation-only because it cannot reliably prove whether the token is valid. Invalid-token responses, an unreachable endpoint, and ambiguous, malformed, oversized, or unexpected responses fail.
 
-A successful Test proves that Vault accepted the configured token at that time. It does not prove that the token can read a particular secret path. Check secret-path policies separately.
+Operational success proves that the responding endpoint accepted the token for self-lookup at that time. It does not prove that the token can read a particular secret path. Check secret-path policies separately. A gateway or deployment allowlist can reject the self-lookup route even when configured secret reads would work.
 
 
 ### Secret or key is not found

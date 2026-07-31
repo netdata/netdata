@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -45,6 +46,9 @@ func (s *store) Test(ctx context.Context) error {
 	if err != nil {
 		return dyncfg.NewPublicError(publicErrEndpoint, err)
 	}
+	// Keep the GET bodyless on the wire while making it non-replayable to
+	// net/http; a replay could consume another use from a limited-use token.
+	req.Body = io.NopCloser(strings.NewReader(""))
 
 	resp, err := s.published.client().Do(req)
 	if err != nil {
@@ -55,14 +59,16 @@ func (s *store) Test(ctx context.Context) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	accepted := resp.StatusCode == http.StatusOK
 	if resp.StatusCode == http.StatusForbidden {
-		accepted, err = acceptsPermissionDenied(resp.Body)
+		permissionOnly, err := isPermissionOnlyDenied(resp.Body)
 		if err != nil {
 			return dyncfg.NewPublicError(publicErrAuthentication, err)
 		}
+		if permissionOnly {
+			return dyncfg.ErrTestUnsupported
+		}
 	}
-	if !accepted {
+	if resp.StatusCode != http.StatusOK {
 		return dyncfg.NewPublicError(
 			publicErrAuthentication,
 			fmt.Errorf("Vault authentication check returned HTTP %d", resp.StatusCode),
@@ -71,7 +77,7 @@ func (s *store) Test(ctx context.Context) error {
 	return nil
 }
 
-func acceptsPermissionDenied(r io.Reader) (bool, error) {
+func isPermissionOnlyDenied(r io.Reader) (bool, error) {
 	body, err := io.ReadAll(io.LimitReader(r, responseBodyLimit+1))
 	if err != nil {
 		return false, fmt.Errorf("reading Vault authentication response: %w", err)
@@ -87,12 +93,64 @@ func acceptsPermissionDenied(r io.Reader) (bool, error) {
 	}
 	var permissionDenied bool
 	for _, message := range response.Errors {
-		if strings.Contains(message, "invalid token") {
-			return false, errAuthenticationTokenInvalid
+		semanticErrors, ok := parseVaultErrors(message)
+		if !ok {
+			return false, nil
 		}
-		if strings.Contains(message, "permission denied") {
-			permissionDenied = true
+		for _, err := range semanticErrors {
+			switch err {
+			case "invalid token":
+				return false, errAuthenticationTokenInvalid
+			case "permission denied":
+				permissionDenied = true
+			default:
+				return false, nil
+			}
 		}
 	}
 	return permissionDenied, nil
+}
+
+func parseVaultErrors(message string) ([]string, bool) {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return nil, false
+	}
+	if !strings.Contains(message, "\n") {
+		return []string{message}, true
+	}
+
+	lines := strings.Split(message, "\n")
+	countText, suffix, ok := strings.Cut(lines[0], " ")
+	if !ok {
+		return nil, false
+	}
+	count, err := strconv.Atoi(countText)
+	if err != nil || count <= 0 {
+		return nil, false
+	}
+	if count == 1 {
+		if suffix != "error occurred:" {
+			return nil, false
+		}
+	} else if suffix != "errors occurred:" {
+		return nil, false
+	}
+
+	semanticErrors := make([]string, 0, count)
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "* ") {
+			return nil, false
+		}
+		message := strings.TrimSpace(strings.TrimPrefix(line, "* "))
+		if message == "" {
+			return nil, false
+		}
+		semanticErrors = append(semanticErrors, message)
+	}
+	return semanticErrors, len(semanticErrors) == count
 }

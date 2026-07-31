@@ -36,6 +36,8 @@ func TestStoreTestUsesAuthenticatedSelfLookup(t *testing.T) {
 		tokenHeader string
 		namespace   string
 		body        string
+		contentLen  int64
+		transferEnc []string
 	}
 	requests := make(chan requestRecord, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -46,6 +48,8 @@ func TestStoreTestUsesAuthenticatedSelfLookup(t *testing.T) {
 			tokenHeader: req.Header.Get("X-Vault-Token"),
 			namespace:   req.Header.Get("X-Vault-Namespace"),
 			body:        string(body),
+			contentLen:  req.ContentLength,
+			transferEnc: req.TransferEncoding,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"data":{"accessor":"synthetic-accessor"}}`)
@@ -69,6 +73,8 @@ func TestStoreTestUsesAuthenticatedSelfLookup(t *testing.T) {
 		assert.Equal(t, "test-token", got.tokenHeader)
 		assert.Equal(t, "team-a", got.namespace)
 		assert.Empty(t, got.body)
+		assert.Zero(t, got.contentLen)
+		assert.Empty(t, got.transferEnc)
 	default:
 		require.FailNow(t, "test failed", "Vault authentication request was not observed")
 	}
@@ -76,24 +82,27 @@ func TestStoreTestUsesAuthenticatedSelfLookup(t *testing.T) {
 
 func TestStoreTestAuthenticationResponses(t *testing.T) {
 	tests := map[string]struct {
-		status        int
-		body          string
-		wantErr       bool
-		wantPublic    string
-		wantCause     error
-		privateValues []string
+		status          int
+		body            string
+		wantErr         bool
+		wantUnsupported bool
+		wantPublic      string
+		wantCause       error
+		privateValues   []string
 	}{
 		"self lookup succeeds": {
 			status: http.StatusOK,
 			body:   `{"data":{"accessor":"synthetic-accessor"}}`,
 		},
-		"valid token without self lookup permission succeeds": {
-			status: http.StatusForbidden,
-			body:   `{"errors":["permission denied"]}`,
+		"valid token without self lookup permission is unsupported": {
+			status:          http.StatusForbidden,
+			body:            `{"errors":["permission denied"]}`,
+			wantUnsupported: true,
 		},
-		"wrapped permission denial succeeds": {
-			status: http.StatusForbidden,
-			body:   "{\"errors\":[\"1 error occurred:\\n\\t* permission denied\\n\\n\"]}",
+		"wrapped permission denial is unsupported": {
+			status:          http.StatusForbidden,
+			body:            "{\"errors\":[\"1 error occurred:\\n\\t* permission denied\\n\\n\"]}",
+			wantUnsupported: true,
 		},
 		"invalid token fails": {
 			status: http.StatusForbidden,
@@ -117,6 +126,41 @@ func TestStoreTestAuthenticationResponses(t *testing.T) {
 			wantErr:       true,
 			wantPublic:    publicErrAuthentication,
 			privateValues: []string{"backend unavailable"},
+		},
+		"compound permission denial fails": {
+			status:        http.StatusForbidden,
+			body:          `{"errors":["permission denied","backend unavailable"]}`,
+			wantErr:       true,
+			wantPublic:    publicErrAuthentication,
+			privateValues: []string{"permission denied", "backend unavailable"},
+		},
+		"negated permission denial fails": {
+			status:        http.StatusForbidden,
+			body:          `{"errors":["not permission denied"]}`,
+			wantErr:       true,
+			wantPublic:    publicErrAuthentication,
+			privateValues: []string{"not permission denied"},
+		},
+		"qualified permission denial fails": {
+			status:        http.StatusForbidden,
+			body:          `{"errors":["permission denied: token expired"]}`,
+			wantErr:       true,
+			wantPublic:    publicErrAuthentication,
+			privateValues: []string{"permission denied: token expired"},
+		},
+		"wrapped denial count mismatch fails": {
+			status:        http.StatusForbidden,
+			body:          "{\"errors\":[\"2 errors occurred:\\n\\t* permission denied\\n\\n\"]}",
+			wantErr:       true,
+			wantPublic:    publicErrAuthentication,
+			privateValues: []string{"permission denied"},
+		},
+		"wrapped denial grammar mismatch fails": {
+			status:        http.StatusForbidden,
+			body:          "{\"errors\":[\"1 errors occurred:\\n\\t* permission denied\\n\\n\"]}",
+			wantErr:       true,
+			wantPublic:    publicErrAuthentication,
+			privateValues: []string{"permission denied"},
 		},
 		"unauthorized fails": {
 			status:     http.StatusUnauthorized,
@@ -167,6 +211,12 @@ func TestStoreTestAuthenticationResponses(t *testing.T) {
 			err := s.Test(t.Context())
 
 			assert.EqualValues(t, 1, requests.Load())
+			if tc.wantUnsupported {
+				require.ErrorIs(t, err, dyncfg.ErrTestUnsupported)
+				_, public := dyncfg.PublicMessage(err)
+				assert.False(t, public)
+				return
+			}
 			if !tc.wantErr {
 				require.NoError(t, err)
 				return
@@ -180,6 +230,47 @@ func TestStoreTestAuthenticationResponses(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStoreTestDoesNotReplayProcessedRequest(t *testing.T) {
+	var lookups atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/warm" {
+			_, _ = io.WriteString(w, "warm")
+			return
+		}
+		if req.URL.Path != "/v1/auth/token/lookup-self" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if lookups.Add(1) == 1 {
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err == nil {
+				_ = conn.Close()
+			}
+			return
+		}
+		_, _ = io.WriteString(w, `{"data":{}}`)
+	}))
+	defer srv.Close()
+
+	s := newOperationalStore(t, Config{
+		Mode:      "token",
+		ModeToken: &ModeTokenConfig{Token: "test-token"},
+		Addr:      srv.URL,
+	})
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/warm", nil)
+	require.NoError(t, err)
+	resp, err := s.runtime.httpClient.Do(req)
+	require.NoError(t, err)
+	_, err = io.Copy(io.Discard, resp.Body)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+
+	err = s.Test(t.Context())
+
+	requireVaultPublicError(t, err, publicErrEndpoint)
+	assert.EqualValues(t, 1, lookups.Load())
 }
 
 func TestStoreTestTokenSources(t *testing.T) {
@@ -367,6 +458,70 @@ func TestStoreTestUsesConfiguredClientAndContext(t *testing.T) {
 	}
 }
 
+func TestStoreTestBodyReadHonorsContext(t *testing.T) {
+	tests := map[string]struct {
+		cancelAfterHeaders bool
+		timeout            confopt.Duration
+		wantErr            error
+	}{
+		"caller cancellation": {
+			cancelAfterHeaders: true,
+			timeout:            confopt.Duration(time.Second),
+			wantErr:            context.Canceled,
+		},
+		"configured timeout": {
+			timeout: confopt.Duration(100 * time.Millisecond),
+			wantErr: context.DeadlineExceeded,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			headers := make(chan struct{}, 1)
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = io.WriteString(w, `{"errors":[`)
+				w.(http.Flusher).Flush()
+				headers <- struct{}{}
+				<-req.Context().Done()
+			}))
+			defer srv.Close()
+
+			s := newOperationalStore(t, Config{
+				Mode:      "token",
+				ModeToken: &ModeTokenConfig{Token: "test-token"},
+				Addr:      srv.URL,
+				Timeout:   tc.timeout,
+			})
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			result := make(chan error, 1)
+			go func() {
+				result <- s.Test(ctx)
+			}()
+
+			select {
+			case <-headers:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "Vault response headers were not observed")
+			}
+			if tc.cancelAfterHeaders {
+				cancel()
+			}
+
+			select {
+			case err := <-result:
+				require.Error(t, err)
+				_, public := dyncfg.PublicMessage(err)
+				require.True(t, public)
+				require.ErrorIs(t, err, tc.wantErr)
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "Vault body read did not stop")
+			}
+		})
+	}
+}
+
 func TestStoreTestUsesConfiguredTLSVerification(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"data":{}}`)
@@ -429,36 +584,56 @@ func TestStoreTestClosesResponseAndOwnedIdleConnections(t *testing.T) {
 }
 
 func TestSecretStoreTestUsesVaultOperationalCapability(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = io.WriteString(w, `{"errors":["permission denied"]}`)
-	}))
-	defer srv.Close()
-
-	resolver, err := secretresolver.NewAtomicResolver(nil)
-	require.NoError(t, err)
-	authority, err := secretstore.NewSecretStore(resolver)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, authority.Close(context.Background()))
-	})
-	catalog, err := secretstore.NewCreatorCatalog([]secretstore.Creator{New()})
-	require.NoError(t, err)
-	config := secretstore.Config{
-		"name":            "main",
-		"kind":            string(secretstore.KindVault),
-		"mode":            "token",
-		"mode_token":      map[string]any{"token": "test-token"},
-		"addr":            srv.URL,
-		"__source__":      confgroup.TypeDyncfg,
-		"__source_type__": confgroup.TypeDyncfg,
+	tests := map[string]struct {
+		status     int
+		body       string
+		wantTested bool
+	}{
+		"successful self lookup is operational": {
+			status:     http.StatusOK,
+			body:       `{"data":{}}`,
+			wantTested: true,
+		},
+		"permission-only denial is validation-only": {
+			status: http.StatusForbidden,
+			body:   `{"errors":["permission denied"]}`,
+		},
 	}
 
-	tested, err := authority.Test(t.Context(), catalog, config)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer srv.Close()
 
-	require.NoError(t, err)
-	assert.True(t, tested)
-	assert.Equal(t, secretstore.SecretStoreCensus{}, authority.Census())
+			resolver, err := secretresolver.NewAtomicResolver(nil)
+			require.NoError(t, err)
+			authority, err := secretstore.NewSecretStore(resolver)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				require.NoError(t, authority.Close(context.Background()))
+			})
+			catalog, err := secretstore.NewCreatorCatalog([]secretstore.Creator{New()})
+			require.NoError(t, err)
+			config := secretstore.Config{
+				"name":            "main",
+				"kind":            string(secretstore.KindVault),
+				"mode":            "token",
+				"mode_token":      map[string]any{"token": "test-token"},
+				"addr":            srv.URL,
+				"__source__":      confgroup.TypeDyncfg,
+				"__source_type__": confgroup.TypeDyncfg,
+			}
+
+			tested, err := authority.Test(t.Context(), catalog, config)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantTested, tested)
+			assert.Equal(t, secretstore.SecretStoreCensus{}, authority.Census())
+		})
+	}
 }
 
 func newOperationalStore(t *testing.T, config Config) *store {

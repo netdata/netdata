@@ -630,8 +630,9 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 
 func TestProcessCoreVaultOperationalTest(t *testing.T) {
 	const (
-		validToken   = "synthetic-valid-token"
-		invalidToken = "synthetic-invalid-token"
+		validToken      = "synthetic-valid-token"
+		restrictedToken = "synthetic-restricted-token"
+		invalidToken    = "synthetic-invalid-token"
 	)
 	var requests atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -641,15 +642,19 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		if req.Header.Get("X-Vault-Token") == validToken {
+		switch req.Header.Get("X-Vault-Token") {
+		case validToken:
+			_, _ = io.WriteString(w, `{"data":{}}`)
+		case restrictedToken:
+			w.WriteHeader(http.StatusForbidden)
 			_, _ = io.WriteString(w, `{"errors":["permission denied"]}`)
-			return
+		default:
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(
+				w,
+				"{\"errors\":[\"2 errors occurred:\\n\\t* permission denied\\n\\t* invalid token\\n\\n\"]}",
+			)
 		}
-		_, _ = io.WriteString(
-			w,
-			"{\"errors\":[\"2 errors occurred:\\n\\t* permission denied\\n\\t* invalid token\\n\\n\"]}",
-		)
 	}))
 	defer srv.Close()
 
@@ -679,6 +684,8 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 
 	validPayload := `{"mode":"token","mode_token":{"token":"` + validToken +
 		`"},"addr":"` + srv.URL + `"}`
+	restrictedPayload := `{"mode":"token","mode_token":{"token":"` + restrictedToken +
+		`"},"addr":"` + srv.URL + `"}`
 	invalidPayload := `{"mode":"token","mode_token":{"token":"` + invalidToken +
 		`"},"addr":"` + srv.URL + `"}`
 	steps := []struct {
@@ -697,6 +704,12 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 			uid:     "vault-test-stored",
 			command: "config go.d:secretstore:vault:main test",
 			status:  202,
+		},
+		{
+			uid:     "vault-test-restricted",
+			command: "config go.d:secretstore:vault:main test",
+			payload: restrictedPayload,
+			status:  200,
 		},
 		{
 			uid:     "vault-test-invalid",
@@ -731,15 +744,17 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 		)
 	}
 
-	require.EqualValues(t, 3, requests.Load())
+	require.EqualValues(t, 4, requests.Load())
 	require.Contains(
 		t,
 		output.String(),
 		"Secretstore operational test failed: the configured Vault authentication check failed",
 	)
+	require.Contains(t, output.String(), "this secretstore does not provide an operational test")
 	require.Contains(t, output.String(), "Stored configuration is valid. No jobs are currently using this secretstore.")
 	require.NotContains(t, output.String(), "invalid token")
 	require.NotContains(t, output.String(), validToken)
+	require.NotContains(t, output.String(), restrictedToken)
 	require.NotContains(t, output.String(), invalidToken)
 	require.NotContains(t, output.String(), srv.URL)
 
