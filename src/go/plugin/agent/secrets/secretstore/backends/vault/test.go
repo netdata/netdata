@@ -55,22 +55,20 @@ func (s *store) Test(ctx context.Context) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode == http.StatusOK {
-		return nil
-	}
+	accepted := resp.StatusCode == http.StatusOK
 	if resp.StatusCode == http.StatusForbidden {
-		accepted, err := acceptsPermissionDenied(resp.Body)
+		accepted, err = acceptsPermissionDenied(resp.Body)
 		if err != nil {
 			return dyncfg.NewPublicError(publicErrAuthentication, err)
 		}
-		if accepted {
-			return nil
-		}
 	}
-	return dyncfg.NewPublicError(
-		publicErrAuthentication,
-		fmt.Errorf("Vault authentication check returned HTTP %d", resp.StatusCode),
-	)
+	if !accepted {
+		return dyncfg.NewPublicError(
+			publicErrAuthentication,
+			fmt.Errorf("Vault authentication check returned HTTP %d", resp.StatusCode),
+		)
+	}
+	return nil
 }
 
 func acceptsPermissionDenied(r io.Reader) (bool, error) {
