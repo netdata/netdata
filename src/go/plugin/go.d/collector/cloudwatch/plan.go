@@ -3,6 +3,7 @@
 package cloudwatch
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -125,8 +126,8 @@ func compileProfileSeries(profile cwprofiles.ResolvedProfile) []profileSeriesSpe
 type profileSeriesCatalog struct {
 	series            []profileSeriesSpec
 	metricByName      map[string]int
-	seriesByMetric    [][]profileSeriesSpec
-	seriesByStatistic []map[string]profileSeriesSpec
+	seriesByMetric    [][]int
+	seriesByStatistic []map[string]int
 }
 
 type resolvedSeriesSelection struct {
@@ -139,16 +140,16 @@ func indexProfileSeries(profile cwprofiles.ResolvedProfile) profileSeriesCatalog
 	catalog := profileSeriesCatalog{
 		series:            series,
 		metricByName:      make(map[string]int, len(profile.Config.Metrics)),
-		seriesByMetric:    make([][]profileSeriesSpec, len(profile.Config.Metrics)),
-		seriesByStatistic: make([]map[string]profileSeriesSpec, len(profile.Config.Metrics)),
+		seriesByMetric:    make([][]int, len(profile.Config.Metrics)),
+		seriesByStatistic: make([]map[string]int, len(profile.Config.Metrics)),
 	}
 	for i, metric := range profile.Config.Metrics {
 		catalog.metricByName[metric.MetricName] = i
-		catalog.seriesByStatistic[i] = make(map[string]profileSeriesSpec, len(metric.Statistics))
+		catalog.seriesByStatistic[i] = make(map[string]int, len(metric.Statistics))
 	}
-	for _, item := range series {
-		catalog.seriesByMetric[item.MetricIndex] = append(catalog.seriesByMetric[item.MetricIndex], item)
-		catalog.seriesByStatistic[item.MetricIndex][item.Statistic] = item
+	for ordinal, item := range series {
+		catalog.seriesByMetric[item.MetricIndex] = append(catalog.seriesByMetric[item.MetricIndex], ordinal)
+		catalog.seriesByStatistic[item.MetricIndex][item.Statistic] = ordinal
 	}
 	return catalog
 }
@@ -208,6 +209,7 @@ func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, pr
 func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profile cwprofiles.ResolvedProfile, catalog profileSeriesCatalog, selected []resolvedSeriesSelection) (int, error) {
 	expanded := 0
 	explicitOwners := make([]string, len(catalog.series))
+	var overlapErrs []error
 	for i, entry := range selector.Include {
 		metricPath := fmt.Sprintf("%s.include[%d]", path, i)
 		metricIndex, ok := catalog.metricByName[entry.Name]
@@ -220,26 +222,28 @@ func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profi
 			statistics = selector.Statistics
 			statisticsPath = path + ".statistics"
 		}
-		var expandedSeries []profileSeriesSpec
+		var expandedOrdinals []int
 		if statistics == nil {
-			expandedSeries = catalog.seriesByMetric[metricIndex]
+			expandedOrdinals = catalog.seriesByMetric[metricIndex]
 		} else {
-			expandedSeries = make([]profileSeriesSpec, 0, len(statistics))
+			expandedOrdinals = make([]int, 0, len(statistics))
 			for j, raw := range statistics {
 				statistic := normalizeMetricStatistic(raw)
-				series, ok := catalog.seriesByStatistic[metricIndex][statistic]
+				ordinal, ok := catalog.seriesByStatistic[metricIndex][statistic]
 				if !ok {
 					return 0, fmt.Errorf("%s[%d] %q is not exported for MetricName %q in profile %q", statisticsPath, j, raw, entry.Name, profile.Name)
 				}
-				expandedSeries = append(expandedSeries, series)
+				expandedOrdinals = append(expandedOrdinals, ordinal)
 			}
 		}
-		for _, series := range expandedSeries {
-			if owner := explicitOwners[series.Ordinal]; owner != "" {
-				return 0, fmt.Errorf("%s selects MetricName %q statistic %q already selected by %s", metricPath, entry.Name, cwprofiles.StatString(series.Statistic), owner)
+		for _, ordinal := range expandedOrdinals {
+			series := catalog.series[ordinal]
+			if owner := explicitOwners[ordinal]; owner != "" {
+				overlapErrs = append(overlapErrs, fmt.Errorf("%s selects MetricName %q statistic %q already selected by %s", metricPath, entry.Name, cwprofiles.StatString(series.Statistic), owner))
+				continue
 			}
-			explicitOwners[series.Ordinal] = metricPath
-			selected[series.Ordinal] = resolvedSeriesSelection{
+			explicitOwners[ordinal] = metricPath
+			selected[ordinal] = resolvedSeriesSelection{
 				selected: true,
 				series: selectedSeriesSpec{
 					profileSeriesSpec: series,
@@ -250,7 +254,7 @@ func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profi
 			expanded++
 		}
 	}
-	return expanded, nil
+	return expanded, errors.Join(overlapErrs...)
 }
 
 func normalizeMetricStatistic(raw string) string {

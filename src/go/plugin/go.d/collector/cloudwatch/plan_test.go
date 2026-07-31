@@ -346,6 +346,57 @@ func TestCompileConfig_PerSelectionQueryPolicy(t *testing.T) {
 	}, got)
 }
 
+func TestCompileConfig_PerSelectionQueryPolicyExpandsToEverySelectedStatistic(t *testing.T) {
+	defaults := false
+	tests := map[string]struct {
+		groupStatistics []string
+		wantSeries      []string
+	}{
+		"profile statistics": {
+			wantSeries: []string{
+				"lambda.duration_average",
+				"lambda.duration_maximum",
+				"lambda.duration_p90",
+			},
+		},
+		"inherited group statistics": {
+			groupStatistics: []string{"Average", "Maximum"},
+			wantSeries: []string{
+				"lambda.duration_average",
+				"lambda.duration_maximum",
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := validBaseConfig()
+			cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
+			cfg.Rules[0].Query = &cwquery.Config{PublicationDelay: longDuration(15 * time.Minute)}
+			cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
+				Profile: "lambda", Defaults: &defaults, Statistics: tc.groupStatistics,
+				Query: &cwquery.Config{Period: longDuration(10 * time.Minute)},
+				Include: []MetricSelectionConfig{{
+					Name: "Duration", Query: &cwquery.Config{Lookback: longDuration(20 * time.Minute), PublicationDelay: longDuration(0)},
+				}},
+			}}
+
+			plan, _, err := compileTestConfig(t, cfg)
+			require.NoError(t, err)
+			require.Len(t, plan.Scopes, 1)
+			got := make(map[string]cwquery.Policy)
+			for _, series := range plan.Scopes[0].SelectedSeries {
+				got[series.Name] = series.Policy
+			}
+			want := make(map[string]cwquery.Policy, len(tc.wantSeries))
+			for _, series := range tc.wantSeries {
+				want[series] = cwquery.Policy{Period: 10 * time.Minute, Lookback: 20 * time.Minute, PublicationDelay: 0}
+			}
+			assert.Equal(t, want, got)
+		})
+	}
+}
+
 func TestCompileConfig_GroupQueryAppliesOnlyToExplicitIncludes(t *testing.T) {
 	defaults := false
 	cfg := validBaseConfig()
@@ -440,6 +491,25 @@ func TestCompileConfig_RepeatedMetricNameRequiresDisjointStatistics(t *testing.T
 			assert.ErrorContains(t, err, "rules[0].metrics[0].include[1]")
 		})
 	}
+}
+
+func TestCompileConfig_RepeatedMetricNameReportsAllOverlaps(t *testing.T) {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
+	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
+		Profile: "lambda", Defaults: &defaults,
+		Include: []MetricSelectionConfig{
+			{Name: "Duration", Statistics: []string{"Average", "Maximum"}},
+			{Name: "Duration", Statistics: []string{"Average"}},
+			{Name: "Duration", Statistics: []string{"Maximum"}},
+		},
+	}}
+
+	_, _, err := compileTestConfig(t, cfg)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `rules[0].metrics[0].include[1] selects MetricName "Duration" statistic "Average" already selected by rules[0].metrics[0].include[0]`)
+	assert.ErrorContains(t, err, `rules[0].metrics[0].include[2] selects MetricName "Duration" statistic "Maximum" already selected by rules[0].metrics[0].include[0]`)
 }
 
 func TestCompileConfig_OneRuleSelectionPolicyMatchesDisjointRules(t *testing.T) {
@@ -637,6 +707,26 @@ func BenchmarkResolveRuleMetricsPerSelectionPolicy(b *testing.B) {
 		}
 		if len(selected["synthetic"]) != maxReferencesPerRule {
 			b.Fatalf("selected %d series", len(selected["synthetic"]))
+		}
+	}
+}
+
+func BenchmarkIndexProfileSeries(b *testing.B) {
+	const metricCount = maxReferencesPerRule / 2
+	profile := cwprofiles.ResolvedProfile{Name: "synthetic", Config: cwprofiles.Profile{
+		Metrics: make([]cwprofiles.Metric, metricCount),
+	}}
+	for i := range metricCount {
+		profile.Config.Metrics[i] = cwprofiles.Metric{
+			ID: fmt.Sprintf("metric_%d", i), MetricName: fmt.Sprintf("Metric%d", i), Statistics: []string{"average", "maximum"},
+		}
+	}
+
+	b.ReportAllocs()
+	for range b.N {
+		catalog := indexProfileSeries(profile)
+		if len(catalog.series) != maxReferencesPerRule {
+			b.Fatalf("indexed %d series", len(catalog.series))
 		}
 	}
 }
