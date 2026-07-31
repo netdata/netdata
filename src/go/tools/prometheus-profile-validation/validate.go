@@ -104,6 +104,7 @@ func validateProfile(opts validationOptions) report {
 		r.addError("profile_template", opts.profilePath, err.Error(), "Observed semantic prompts require the same strictly decoded authored template.")
 		return r
 	}
+	addAuthoredProfileHeuristics(authoredTemplate, r.RawFamilies, &r)
 	addObservedDistributionHeuristics(authoredTemplate, r.RawFamilies, &r)
 
 	coll := promcollector.New()
@@ -831,7 +832,6 @@ func inspectAuthoredCharts(profile promprofiles.Profile, r *report) ([]authoredC
 	if err != nil {
 		return nil, err
 	}
-	addAuthoredProfileHeuristics(root, r)
 	var charts []authoredChart
 	seenPriorities := make(map[int]string)
 	var previous *authoredChart

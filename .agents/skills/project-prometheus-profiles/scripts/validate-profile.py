@@ -57,9 +57,10 @@ def main() -> None:
     tool = go_root / "tools" / "prometheus-profile-validation"
     arguments = normalize_file_arguments(sys.argv[1:], Path.cwd())
 
-    go = shutil.which("go")
-    if go is None:
+    go_path = shutil.which("go")
+    if go_path is None:
         raise SystemExit("error: go is not available in PATH")
+    go = str(Path(go_path).resolve())
     if not tool.is_dir():
         raise SystemExit(f"error: validator source not found: {tool}")
 

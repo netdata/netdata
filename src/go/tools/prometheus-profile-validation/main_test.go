@@ -933,6 +933,41 @@ func TestValidateProfileRejectsIncorrectHistogramBucketPresentation(t *testing.T
 	}
 }
 
+func TestValidateProfileDoesNotTreatGaugeBucketSuffixAsHistogram(t *testing.T) {
+	profile := `
+match: app_capacity_bucket
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_capacity_bucket]
+  charts:
+    - title: Capacity
+      context: capacity
+      units: items
+      algorithm: absolute
+      type: line
+      priority: 100
+      dimensions:
+        - selector: app_capacity_bucket
+          name: capacity
+`
+	dump := `
+# TYPE app_capacity_bucket gauge
+app_capacity_bucket 7
+`
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("a gauge name ending in _bucket is not a histogram bucket\nreport:\n%s", result.stdout)
+	}
+	for _, item := range result.report.Findings {
+		switch item.Code {
+		case "histogram_type_runtime_override", "histogram_bucket_units", "histogram_bucket_algorithm":
+			t.Fatalf("unexpected histogram presentation finding %q: %#v", item.Code, result.report.Findings)
+		}
+	}
+}
+
 func TestValidateProfileRejectsChartWithEveryDimensionHidden(t *testing.T) {
 	profile := `
 match: app_*

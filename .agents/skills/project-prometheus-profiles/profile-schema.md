@@ -134,7 +134,7 @@ proceeds. Unique increasing values are usually the clearest total order, while
 intentional ties remain a design choice because runtime placement then falls
 back to chart-ID ordering.
 
-Presentation invariants enforced by the validator:
+Presentation rules checked by the profile-validation tool:
 
 - Every chart needs at least one visible dimension. Hidden dimensions MAY
   support a visible comparison but MUST NOT make the entire chart invisible.

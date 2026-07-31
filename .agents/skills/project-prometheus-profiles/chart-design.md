@@ -426,7 +426,7 @@ under multiple families.
 
 ### Job policy versus profile coverage
 
-A profile cannot chart a series filtered or rejected before metrix. Decide the
+A profile cannot chart a series filtered or rejected before `metrix` ingestion. Decide the
 job policy and profile together. An exclusion is correct only when losing that
 signal is intentional and explained; `metrics:` declaration is never a drop or
 coverage mechanism.

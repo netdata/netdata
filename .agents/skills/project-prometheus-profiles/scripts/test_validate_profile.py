@@ -4,7 +4,11 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 
@@ -53,6 +57,55 @@ class NormalizeFileArgumentsTest(unittest.TestCase):
             launcher.normalize_file_arguments(["--profile=", "--dump"], caller),
             ["--profile=", "--dump"],
         )
+
+    def test_main_resolves_go_from_relative_path_before_chdir(self) -> None:
+        launcher_path = Path(__file__).with_name("validate-profile.py").resolve()
+        go_root = launcher_path.parents[4] / "src" / "go"
+
+        with tempfile.TemporaryDirectory() as temporary:
+            caller = Path(temporary)
+            bin_dir = caller / "bin"
+            bin_dir.mkdir()
+            fake_go = bin_dir / "go"
+            fake_go.write_text(
+                "#!/bin/sh\n"
+                "printf 'cwd=%s\\n' \"$PWD\"\n"
+                "printf 'arg=%s\\n' \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_go.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = "bin"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(launcher_path),
+                    "--profile",
+                    "profile.yaml",
+                    "--dump=dump.prom",
+                    "-job",
+                    "job.yaml",
+                ],
+                cwd=caller,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"cwd={go_root}\n", result.stdout)
+        for argument in [
+            "run",
+            "./tools/prometheus-profile-validation",
+            "--profile",
+            str(caller / "profile.yaml"),
+            f"--dump={caller / 'dump.prom'}",
+            "-job",
+            str(caller / "job.yaml"),
+        ]:
+            self.assertIn(f"arg={argument}\n", result.stdout)
 
 
 if __name__ == "__main__":

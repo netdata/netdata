@@ -525,7 +525,8 @@ type metricDeclaration struct {
 // addAuthoredProfileHeuristics checks source intent before collector merge or
 // compiler defaulting can hide it. It reports objective presentation failures
 // as errors and leaves judgment-dependent findings as warnings.
-func addAuthoredProfileHeuristics(root charttpl.Group, r *report) {
+func addAuthoredProfileHeuristics(root charttpl.Group, rawFamilies []rawFamilyReport, r *report) {
+	familyTypes := observedDistributionTypes(rawFamilies)
 	var declarations []*metricDeclaration
 	var walk func(group charttpl.Group, path string, active map[string]*metricDeclaration)
 	walk = func(group charttpl.Group, path string, active map[string]*metricDeclaration) {
@@ -541,7 +542,7 @@ func addAuthoredProfileHeuristics(root charttpl.Group, r *report) {
 
 		for i, chart := range group.Charts {
 			chartPath := fmt.Sprintf("%s.charts[%d]", path, i)
-			reviewAuthoredChart(chart, chartPath, scoped, r)
+			reviewAuthoredChart(chart, chartPath, scoped, familyTypes, r)
 		}
 		for i, child := range group.Groups {
 			walk(
@@ -570,6 +571,7 @@ func reviewAuthoredChart(
 	chart charttpl.Chart,
 	path string,
 	active map[string]*metricDeclaration,
+	familyTypes map[string]commonmodel.MetricType,
 	r *report,
 ) {
 	hasBucket := false
@@ -586,7 +588,7 @@ func reviewAuthoredChart(
 			if decl := active[name]; decl != nil {
 				decl.used = true
 			}
-			if strings.HasSuffix(name, "_bucket") {
+			if _, role, ok := distributionRole(name, familyTypes); ok && role == "bucket" {
 				hasBucket = true
 			}
 		}
@@ -802,13 +804,7 @@ func addObservedDistributionHeuristics(
 	rawFamilies []rawFamilyReport,
 	r *report,
 ) {
-	familyTypes := make(map[string]commonmodel.MetricType)
-	for _, family := range rawFamilies {
-		typ := commonmodel.MetricType(family.Type)
-		if typ == commonmodel.MetricTypeHistogram || typ == commonmodel.MetricTypeSummary {
-			familyTypes[family.Name] = typ
-		}
-	}
+	familyTypes := observedDistributionTypes(rawFamilies)
 
 	var walk func(group charttpl.Group, path string)
 	walk = func(group charttpl.Group, path string) {
@@ -855,6 +851,17 @@ func addObservedDistributionHeuristics(
 		}
 	}
 	walk(root, "template")
+}
+
+func observedDistributionTypes(rawFamilies []rawFamilyReport) map[string]commonmodel.MetricType {
+	familyTypes := make(map[string]commonmodel.MetricType)
+	for _, family := range rawFamilies {
+		typ := commonmodel.MetricType(family.Type)
+		if typ == commonmodel.MetricTypeHistogram || typ == commonmodel.MetricTypeSummary {
+			familyTypes[family.Name] = typ
+		}
+	}
+	return familyTypes
 }
 
 func distributionRole(
