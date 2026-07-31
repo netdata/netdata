@@ -114,8 +114,10 @@ acceptable.
 - `fixture/` — the fixture model plus source-derived Class B ports and
   explicitly labeled Class A or contract helpers.
 - `canon/` — the strict typed json2 decoder and point-column helpers. It
-  rejects invalid schema indices, widths, labels, types, null placement, and
-  non-finite metadata.
+  rejects invalid schema indices, widths, labels, field types/ranges, and
+  non-finite numeric metadata while decoding nullable value/hidden cells.
+  Query-specific assertion helpers enforce whether those nulls are semantically
+  valid and carry the required annotations.
 - `*_test.go` — `layer*.go` ladder tests, cross-cutting surface tests, and
   per-bug `caseNNN_test.go` files.
 - `manifest.go` + `MANIFEST.md` — the ledger (below). Keep both in sync in
@@ -150,8 +152,10 @@ whether or not the break is already known.
   contracts and fails if any manifest contract or required component did
   not run. **That complete list is the corpus's answer** — the open-defect
   list produced by measurement rather than by hand.
-- A filtered run reports how many contracts were fully evaluated and never
-  claims the complete corpus holds. `-list` prints no contract verdict.
+- A filtered daemon-backed run reports how many contracts were fully evaluated
+  and never claims the complete corpus holds. The deliberately named
+  daemon-free harness/unit fast path prints only its Go test result and no
+  query-contract verdict. `-list` also prints no contract verdict.
 - `go test ./...` therefore exits non-zero while any contract is broken or
   the ledger is incomplete. That is the intended signal, not a problem to
   suppress. The corpus is not wired into CI.
