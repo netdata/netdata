@@ -19,10 +19,10 @@ import (
 )
 
 const (
-	// A rendered response is capped at maximumSecretJobSummaryBytes. Each job-name
-	// list gets the content budget below, reserving secretJobSummaryReserveBytes
-	// for surrounding prose and its truncation marker; boundSecretMessage enforces
-	// the total after lists combine.
+	// An operator-facing message is capped at maximumSecretJobSummaryBytes. Each
+	// job-name list gets the content budget below, reserving
+	// secretJobSummaryReserveBytes for surrounding prose and its truncation marker;
+	// boundSecretMessage enforces the total after lists combine.
 	maximumSecretJobSummaryBytes = 4 * 1024
 	secretJobSummaryReserveBytes = 512
 	secretJobSummaryContentBytes = maximumSecretJobSummaryBytes - secretJobSummaryReserveBytes

@@ -150,7 +150,9 @@ func (store *SecretStore) Validate(
 }
 
 // Test validates a temporary Store and runs its optional operational test.
-// The bool reports whether the Store provided an operational test.
+// The bool reports whether the result is operational. It is false when
+// configuration fails, the Store has no Test capability, or Test returns
+// dyncfg.ErrTestUnsupported.
 func (store *SecretStore) Test(
 	ctx context.Context,
 	catalog *CreatorCatalog,

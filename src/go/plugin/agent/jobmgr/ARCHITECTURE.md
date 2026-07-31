@@ -696,7 +696,7 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
      busy/contained attempts return 503.
    - Provider failures retain their private causes. A marked `dyncfg.PublicError` may append only static,
      code-authored detail to Test 400/422 and add/update preparation 400 responses; unmarked failures remain generic,
-     and every rendered SecretStore response stays within the existing 4 KiB bound.
+     and every rendered SecretStore operator message stays within the existing 4 KiB bound.
    - Vault performs one real authenticated `GET /v1/auth/token/lookup-self` through the same token, namespace, client,
      TLS/proxy, timeout, and cancellation path used for secret resolution. HTTP 200 is operational success by status; its
      body is not inspected. An exact permission-only HTTP 403 body returns `dyncfg.ErrTestUnsupported` and becomes explicit
