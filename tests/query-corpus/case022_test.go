@@ -72,7 +72,7 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 			}
 			return stream.FlagNotAnomalous
 		})
-	pushLiveBurst(t, "c022-slow", guid(296), slow)
+	pushLiveBurst(t, "c022-slow", guid(340), slow)
 	if _, err := td.WaitRetention("c022-slow", slow.Context, slow.FirstT(), slow.LastT(), 15*time.Second); err != nil {
 		t.Fatal(err)
 	}

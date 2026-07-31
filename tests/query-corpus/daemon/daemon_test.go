@@ -4,12 +4,69 @@ package daemon
 
 import (
 	"errors"
+	"math"
 	"os"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
+
+func TestNetdataConfigDisablesUnlistedPlugins(t *testing.T) {
+	const disabled = "\n    enable running new plugins = no\n"
+	if !strings.Contains(netdataConfTemplate, disabled) {
+		t.Fatal("generated [plugins] configuration allows unlisted installed collectors")
+	}
+}
+
+func TestQueryRetentionRejectsMalformedNumbers(t *testing.T) {
+	doc := func(first, last any) map[string]any {
+		return map[string]any{"db": map[string]any{
+			"first_entry": first,
+			"last_entry":  last,
+		}}
+	}
+
+	maxInt64Float := math.Nextafter(float64(uint64(1)<<63), 0)
+	valid := []struct {
+		name        string
+		first, last float64
+		want        Retention
+	}{
+		{"ordinary", 10, 20, Retention{FirstEntry: 10, LastEntry: 20}},
+		{"int64 bounds", -float64(uint64(1) << 63), maxInt64Float,
+			Retention{FirstEntry: -1 << 63, LastEntry: int64(maxInt64Float)}},
+	}
+	for _, tc := range valid {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := QueryRetention(doc(tc.first, tc.last))
+			if !ok || got != tc.want {
+				t.Fatalf("QueryRetention() = %+v/%v, want %+v/true", got, ok, tc.want)
+			}
+		})
+	}
+
+	invalid := []struct {
+		name        string
+		first, last any
+	}{
+		{"fractional first", 10.5, 20.0},
+		{"fractional last", 10.0, 20.5},
+		{"nan", math.NaN(), 20.0},
+		{"positive infinity", 10.0, math.Inf(1)},
+		{"negative infinity", math.Inf(-1), 20.0},
+		{"above int64", 10.0, float64(uint64(1) << 63)},
+		{"below int64", math.Nextafter(-float64(uint64(1)<<63), math.Inf(-1)), 20.0},
+		{"wrong type", "10", 20.0},
+	}
+	for _, tc := range invalid {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, ok := QueryRetention(doc(tc.first, tc.last)); ok {
+				t.Fatalf("QueryRetention() accepted malformed numbers: %+v", got)
+			}
+		})
+	}
+}
 
 func TestInfoHasDaemonIdentity(t *testing.T) {
 	valid := func() map[string]any {
@@ -214,7 +271,7 @@ func testStoppingDaemon(process *fakeProcess, waitCh chan error) *Daemon {
 func TestStopIsCheckedAndBounded(t *testing.T) {
 	t.Run("term and reap", func(t *testing.T) {
 		waitCh := make(chan error, 1)
-		process := &fakeProcess{onSignal: func() { waitCh <- errors.New("signal: terminated") }}
+		process := &fakeProcess{onSignal: func() { waitCh <- nil }}
 		d := testStoppingDaemon(process, waitCh)
 
 		if err := d.Stop(); err != nil {
@@ -222,6 +279,17 @@ func TestStopIsCheckedAndBounded(t *testing.T) {
 		}
 		if len(process.signals) != 1 || process.signals[0] != syscall.SIGTERM || process.kills != 0 {
 			t.Fatalf("signals=%v kills=%d", process.signals, process.kills)
+		}
+	})
+
+	t.Run("graceful wait failure is reported", func(t *testing.T) {
+		waitCh := make(chan error, 1)
+		waitErr := errors.New("exit status 7")
+		process := &fakeProcess{onSignal: func() { waitCh <- waitErr }}
+		d := testStoppingDaemon(process, waitCh)
+
+		if err := d.Stop(); !errors.Is(err, waitErr) {
+			t.Fatalf("Stop() error = %v, want wait failure", err)
 		}
 	})
 

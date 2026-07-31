@@ -407,7 +407,7 @@ func c023MCPPushCadenceFixture(t *testing.T, host, context string) (int64, int64
 		secondEvery   = 10
 	)
 	base := int64(fixture.T0 + 1000)
-	conn := connect(t, host, guid(335), stream.CapsLive)
+	conn := connect(t, host, guid(342), stream.CapsLive)
 
 	first := fixture.Chart{
 		ID: context, Title: "MCP cadence", Units: "units", Family: "fixture",

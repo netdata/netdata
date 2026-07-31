@@ -196,6 +196,9 @@ func perTierRetention(t *testing.T, doc map[string]any) []daemon.Retention {
 }
 
 func TestLayer4PlanSwitching(t *testing.T) {
+	completeSetup := trackInfrastructureSetup(
+		t, infrastructureFailures, "layer4c-shared-fixture/setup")
+
 	dd, err := daemon.Start(daemon.Options{
 		Binary:                 netdataBinary,
 		RunDir:                 t.TempDir(),
@@ -206,7 +209,8 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := dd.Stop(); err != nil {
+		if err := infrastructureFailures.run(
+			"layer4c-shared-fixture/shutdown", dd.Stop); err != nil {
 			t.Errorf("stop dedicated daemon: %v", err)
 		}
 	})
@@ -354,6 +358,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	boundary := tiers[0].FirstEntry
 	t.Logf("tier0 head rotated to t0%+d; tier1 keeps t0%+d — plan-switch boundary discovered",
 		boundary-fixture.T0, tiers[1].FirstEntry-fixture.T0)
+	completeSetup()
 
 	t.Run("plan-switching-seam", func(t *testing.T) {
 		trackContractComponent(t, "L4/plan-switching", "seam")
