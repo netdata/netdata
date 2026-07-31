@@ -740,6 +740,12 @@ collector frame:
   profile. It materializes per `(account_id, region, profile)` with a fixed
   `query_items` dimension.
 
+For one account and region over the same interval, after summing all profile
+instances and considering only the `GetMetricData` operation, the counts satisfy:
+query items ≥ summed profile metric-request estimates ≥ calculated metric
+requests ≥ `GetMetricData` SDK invocations. The profile sum can exceed the
+calculated total because cross-profile overlap is counted independently.
+
 The calculated total is attributed only to account and region because one query
 batch can serve multiple profiles. Profile estimates and query items keep the source
 profile because every planned series has exactly one. Different effective policies
@@ -748,9 +754,10 @@ account aggregate.
 
 `buildQueryBatches` computes one immutable activity summary per physical request
 after packing. Initial and continuation pages replay that same summary, so each
-submitted page counts the complete request footprint. Recording performs no query
-scan or allocation while holding the activity mutex; its work is proportional only
-to the number of profiles represented in the batch.
+submitted page counts the complete request footprint. Recording scans and hashes no
+queries. Once the bounded scope keys exist, steady-state page recording allocates
+nothing; first insertion or map growth may allocate while holding the activity mutex.
+Per-page work is proportional only to the number of profiles represented in the batch.
 
 `netdata.go.plugin.collector.cloudwatch.*` names the internal `metrix` selectors;
 it is not a chart-context prefix. The chart spec's `context_namespace: cloudwatch`

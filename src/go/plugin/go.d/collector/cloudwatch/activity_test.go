@@ -37,6 +37,7 @@ func TestMetricRequestUnitsForBillingGroups(t *testing.T) {
 				groups[testStructuralID(fmt.Sprintf("metric-%d", group))] = count
 			}
 			assert.Equal(t, tc.want, metricRequestUnitsForBillingGroups(groups))
+			assert.Len(t, billingUnitShapes(groups), tc.want, "activity accounting must match request packing")
 		})
 	}
 }
@@ -68,6 +69,43 @@ func TestBuildQueryBatchActivity(t *testing.T) {
 					{profile: "alpha", metricRequestEstimate: 1, queryItems: 3},
 					{profile: "beta", metricRequestEstimate: 1, queryItems: 2},
 				},
+			},
+		},
+		"cross-profile one plus one": {
+			queries: makeActivityQueries(1, 1),
+			want: queryBatchActivity{
+				calculatedMetricRequests: 1,
+				profiles: []queryBatchProfileActivity{
+					{profile: "alpha", metricRequestEstimate: 1, queryItems: 1},
+					{profile: "beta", metricRequestEstimate: 1, queryItems: 1},
+				},
+			},
+		},
+		"cross-profile five plus five": {
+			queries: makeActivityQueries(5, 5),
+			want: queryBatchActivity{
+				calculatedMetricRequests: 2,
+				profiles: []queryBatchProfileActivity{
+					{profile: "alpha", metricRequestEstimate: 1, queryItems: 5},
+					{profile: "beta", metricRequestEstimate: 1, queryItems: 5},
+				},
+			},
+		},
+		"cross-profile six plus one": {
+			queries: makeActivityQueries(6, 1),
+			want: queryBatchActivity{
+				calculatedMetricRequests: 2,
+				profiles: []queryBatchProfileActivity{
+					{profile: "alpha", metricRequestEstimate: 2, queryItems: 6},
+					{profile: "beta", metricRequestEstimate: 1, queryItems: 1},
+				},
+			},
+		},
+		"one profile eleven statistics": {
+			queries: makeActivityQueries(11),
+			want: queryBatchActivity{
+				calculatedMetricRequests: 3,
+				profiles:                 []queryBatchProfileActivity{{profile: "alpha", metricRequestEstimate: 3, queryItems: 11}},
 			},
 		},
 	}
