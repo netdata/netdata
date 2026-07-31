@@ -393,7 +393,7 @@ trap 'trap_handler 15 0' TERM
 
 # Check if a URL is valid, and ensure it uses one of the specified protocols.
 is_valid_url() {
-  echo "${1}" | grep -qE "^(${2})+://([^@\/:[:space:]]+(:[^@\/:[:space:]]*)?@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(:[0-9]{1,5})?(/[-A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=]*)?$" || return 1
+  printf "%s\n" "${1}" | grep -qE "^(${2})://([^@\/:[:space:]]+(:[^@\/:[:space:]]*)?@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(:[0-9]{1,5})?(/[-A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=]*)?$" || return 1
 }
 
 sanitize_string() {
@@ -1406,20 +1406,19 @@ write_claim_config() {
 
   progress "Writing claiming configuration to ${claim_config}"
 
-  config="[global]"
-  config="${config}\n    url = ${NETDATA_CLAIM_URL}"
-  config="${config}\n    token = ${NETDATA_CLAIM_TOKEN}"
+  printf "[global]\n" > "${claim_config_tmp}" || return 1
+  printf "    url = %s\n" "${NETDATA_CLAIM_URL}" >> "${claim_config_tmp}" || return 1
+  printf "    token = %s\n" "${NETDATA_CLAIM_TOKEN}" >> "${claim_config_tmp}" || return 1
   if [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
-      config="${config}\n    rooms = ${NETDATA_CLAIM_ROOMS}"
+    printf "    rooms = %s\n" "${NETDATA_CLAIM_ROOMS}" >> "${claim_config_tmp}" || return 1
   fi
   if [ -n "${NETDATA_CLAIM_PROXY}" ]; then
-      config="${config}\n    proxy = ${NETDATA_CLAIM_PROXY}"
+    printf "    proxy = %s\n" "${NETDATA_CLAIM_PROXY}" >> "${claim_config_tmp}" || return 1
   fi
   if [ -n "${NETDATA_CLAIM_INSECURE}" ]; then
-      config="${config}\n    insecure = ${NETDATA_CLAIM_INSECURE}"
+    printf "    insecure = %s\n" "${NETDATA_CLAIM_INSECURE}" >> "${claim_config_tmp}" || return 1
   fi
 
-  printf "%s\n" "${config}" > "${claim_config_tmp}" || return 1
   run_as_root chown "root:${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config_tmp}" || return 1
   run_as_root chmod 0640 "${claim_config_tmp}" || return 1
   run_as_root mv -f "${claim_config_tmp}" "${claim_config}" || return 1
