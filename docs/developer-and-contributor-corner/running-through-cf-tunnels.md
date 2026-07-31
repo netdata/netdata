@@ -8,6 +8,12 @@
 - Make sure the parent node uses port `19999` for both web and tcp streams
 - Make sure that the child nodes have `mode = none` in the `[web]` section of the `netdata.conf` file, and `destination = tcp:127.0.0.1:19999` in the `[stream]` section of the `stream.conf` file
 
+> ### Note
+>
+> Netdata's local dashboard serves plain **HTTP** on port `19999` and does not terminate TLS by default. This is why `https://localhost:19999` does not work — the browser attempts a TLS handshake against a plain HTTP server. When connecting directly to the Agent, use `http://localhost:19999`.
+>
+> Because of this, the cloudflared tunnel origin **must** be `http://localhost:19999`, not `https://`. Cloudflare terminates TLS at its edge, so you still reach the dashboard over HTTPS through your tunnel hostname (`https://netdata-web.my.domain`), while the connection between `cloudflared` and the Agent stays plain HTTP.
+
 ## Detailed instructions with commands and service files
 
 - Install the `cloudflared` package on all your Netdata nodes, follow the repository instructions [here](https://pkg.cloudflare.com/index.html)
