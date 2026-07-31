@@ -276,9 +276,10 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
 
   Metric type does not determine the right reducer: Prometheus gauges can be stocks, states, timestamps, limits, or
   averages. Summary quantiles cannot be merged into a global quantile; `avg` is not a weighted mean; and non-sum
-  reduction of cumulative counters can produce misleading rates when source membership changes. Aggregation lowers
-  emitted chart cardinality, but every scraped series is still processed and retained in the collector's metric store.
-  This chart reduction is separate from Prometheus relabeling: it does not remove or rewrite stored series labels.
+  reduction of cumulative counters can produce misleading rates when source membership changes. `instances.by_labels`
+  lowers emitted chart cardinality; `aggregation` only selects the value for resulting collisions. Every scraped series is
+  still processed and retained in the collector's metric store. This chart reduction is separate from Prometheus
+  relabeling: it does not remove or rewrite stored series labels.
 - **Only collected series can be charted.** `*_info` families are skipped. Untyped families are collected only when the
   name ends in `_total` (treated as a counter) or the job's `fallback_type` option maps them to a gauge or counter
   (`fallback_type.gauge` takes precedence, so a `_total`-suffixed name mapped to gauge is charted as a gauge). A profile

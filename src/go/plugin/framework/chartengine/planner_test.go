@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -2454,6 +2455,7 @@ func TestDimBuildEntryAggregation(t *testing.T) {
 		"max ignores trailing NaN":    {aggregation: program.AggregationMax, values: []metrix.SampleValue{5, metrix.SampleValue(math.NaN())}, want: 5},
 		"max replaces leading NaN":    {aggregation: program.AggregationMax, values: []metrix.SampleValue{metrix.SampleValue(math.NaN()), 5}, want: 5},
 		"avg preserves fraction":      {aggregation: program.AggregationAvg, values: []metrix.SampleValue{1, 2}, want: 1.5},
+		"avg preserves subnormal":     {aggregation: program.AggregationAvg, values: []metrix.SampleValue{math.SmallestNonzeroFloat64, math.SmallestNonzeroFloat64}, want: math.SmallestNonzeroFloat64},
 		"avg avoids finite overflow":  {aggregation: program.AggregationAvg, values: []metrix.SampleValue{math.MaxFloat64, math.MaxFloat64}, want: math.MaxFloat64},
 		"avg keeps positive infinity": {aggregation: program.AggregationAvg, values: []metrix.SampleValue{metrix.SampleValue(math.Inf(1)), 5}, wantPosInf: true},
 		"avg opposite infinities":     {aggregation: program.AggregationAvg, values: []metrix.SampleValue{metrix.SampleValue(math.Inf(1)), metrix.SampleValue(math.Inf(-1))}, wantNaN: true},
@@ -2463,14 +2465,17 @@ func TestDimBuildEntryAggregation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require.NotEmpty(t, tc.values)
 			entry := dimBuildEntry{
-				observations: 1,
-				value:        tc.values[0],
+				value: tc.values[0],
 				dimensionState: dimensionState{
 					aggregation: tc.aggregation,
 				},
 			}
-			for _, value := range tc.values[1:] {
-				entry.aggregate(value)
+			for i, value := range tc.values[1:] {
+				if tc.aggregation == program.AggregationAvg {
+					entry.aggregateAverage(value, uint64(i+2))
+				} else {
+					entry.aggregate(value)
+				}
 			}
 
 			switch {
@@ -2483,6 +2488,41 @@ func TestDimBuildEntryAggregation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDimBuildEntry64BitSizeBudget(t *testing.T) {
+	if unsafe.Sizeof(uintptr(0)) != 8 {
+		t.Skip("64-bit hot-path size budget")
+	}
+	assert.LessOrEqual(t, unsafe.Sizeof(dimBuildEntry{}), uintptr(80))
+}
+
+func TestDimBuildEntryAggregationHighFanIn(t *testing.T) {
+	entries := map[program.Aggregation]*dimBuildEntry{}
+	for _, aggregation := range []program.Aggregation{
+		program.AggregationSum,
+		program.AggregationMin,
+		program.AggregationMax,
+		program.AggregationAvg,
+	} {
+		entries[aggregation] = &dimBuildEntry{
+			dimensionState: dimensionState{aggregation: aggregation},
+		}
+	}
+
+	const observations = 10_000
+	for i := 1; i < observations; i++ {
+		value := metrix.SampleValue(i)
+		entries[program.AggregationSum].aggregate(value)
+		entries[program.AggregationMin].aggregate(value)
+		entries[program.AggregationMax].aggregate(value)
+		entries[program.AggregationAvg].aggregateAverage(value, uint64(i+1))
+	}
+
+	assert.Equal(t, float64(49_995_000), entries[program.AggregationSum].value)
+	assert.Equal(t, float64(0), entries[program.AggregationMin].value)
+	assert.Equal(t, float64(9_999), entries[program.AggregationMax].value)
+	assert.InDelta(t, 4_999.5, entries[program.AggregationAvg].value, 1e-9)
 }
 
 func runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles(t *testing.T) {

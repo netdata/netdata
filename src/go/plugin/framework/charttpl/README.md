@@ -740,10 +740,11 @@ limits, or averages. Authors must choose from the metric's meaning. Additional c
 - `avg` is unweighted. Averaging pre-aggregated averages does not produce a global weighted average.
 - Histogram buckets, counts, and sums are mergeable with `sum`; other reducers do not produce a merged histogram.
 - Summary quantiles cannot be merged into a global quantile with these reducers.
-- Reduction happens before Netdata applies the dimension multiplier/divisor and chart algorithm. A negative multiplier
-  reverses the displayed ordering of `min` and `max`. Non-sum reduction of cumulative counter totals can produce
+- Reduction happens before Netdata applies the dimension multiplier/divisor and chart algorithm. A negative multiplier or
+  divisor reverses the displayed ordering of `min` and `max`. Non-sum reduction of cumulative counter totals can produce
   misleading deltas when source membership changes.
-- Aggregation reduces emitted chart cardinality only. Every source series is still collected, stored, and routed.
+- `instances.by_labels` controls emitted chart cardinality; `aggregation` only selects the value for collisions created by
+  that projection. Every source series is still collected, stored, and routed.
 
 #### selectors
 

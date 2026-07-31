@@ -120,6 +120,13 @@ func BenchmarkBuildPlanAutogenUnmatchedBaseline(b *testing.B) {
 
 func BenchmarkBuildPlanAggregationFanIn(b *testing.B) {
 	seriesCounts := []int{100, 1000, 10000}
+	modes := []struct {
+		name string
+		warm bool
+	}{
+		{name: "warm", warm: true},
+		{name: "cold"},
+	}
 	aggregations := []struct {
 		name  string
 		value string
@@ -140,37 +147,60 @@ func BenchmarkBuildPlanAggregationFanIn(b *testing.B) {
 		}},
 	}
 
-	for _, aggregation := range aggregations {
-		for _, fanIn := range fanIns {
-			for _, seriesCount := range seriesCounts {
-				name := fmt.Sprintf("%s/%s/series_%d", aggregation.name, fanIn.name, seriesCount)
-				b.Run(name, func(b *testing.B) {
-					reader := benchmarkAggregationReader(b, seriesCount, fanIn.chartCount(seriesCount))
-
-					engine, err := New()
-					if err != nil {
-						b.Fatalf("new engine: %v", err)
-					}
-					aggregationLine := ""
-					if aggregation.value != "" {
-						aggregationLine = "aggregation: " + aggregation.value
-					}
-					tmpl := strings.ReplaceAll(benchAggregationTemplateYAML, "aggregation: AGGREGATION", aggregationLine)
-					if err := engine.LoadYAML([]byte(tmpl), 1); err != nil {
-						b.Fatalf("load template: %v", err)
-					}
-
-					b.ReportAllocs()
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						if _, err := buildPlan(engine, reader); err != nil {
-							b.Fatalf("build plan: %v", err)
+	for _, mode := range modes {
+		for _, aggregation := range aggregations {
+			for _, fanIn := range fanIns {
+				for _, seriesCount := range seriesCounts {
+					name := fmt.Sprintf("%s/%s/%s/series_%d", mode.name, aggregation.name, fanIn.name, seriesCount)
+					b.Run(name, func(b *testing.B) {
+						reader := benchmarkAggregationReader(b, seriesCount, fanIn.chartCount(seriesCount))
+						aggregationLine := ""
+						if aggregation.value != "" {
+							aggregationLine = "aggregation: " + aggregation.value
 						}
-					}
-				})
+						tmpl := strings.ReplaceAll(benchAggregationTemplateYAML, "aggregation: AGGREGATION", aggregationLine)
+
+						b.ReportAllocs()
+						if mode.warm {
+							engine := benchmarkAggregationEngine(b, tmpl)
+							if _, err := buildPlan(engine, reader); err != nil {
+								b.Fatalf("warm build plan: %v", err)
+							}
+							b.ResetTimer()
+							for i := 0; i < b.N; i++ {
+								if _, err := buildPlan(engine, reader); err != nil {
+									b.Fatalf("build plan: %v", err)
+								}
+							}
+							return
+						}
+
+						b.StopTimer()
+						for i := 0; i < b.N; i++ {
+							engine := benchmarkAggregationEngine(b, tmpl)
+							b.StartTimer()
+							if _, err := buildPlan(engine, reader); err != nil {
+								b.Fatalf("build plan: %v", err)
+							}
+							b.StopTimer()
+						}
+					})
+				}
 			}
 		}
 	}
+}
+
+func benchmarkAggregationEngine(b *testing.B, tmpl string) *Engine {
+	b.Helper()
+	engine, err := New(WithRuntimePlannerMode())
+	if err != nil {
+		b.Fatalf("new engine: %v", err)
+	}
+	if err := engine.LoadYAML([]byte(tmpl), 1); err != nil {
+		b.Fatalf("load template: %v", err)
+	}
+	return engine
 }
 
 func benchmarkCollectorReader(b *testing.B, seriesCount int) metrix.Reader {

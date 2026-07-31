@@ -95,9 +95,8 @@ type dimensionSortKey struct {
 }
 
 type dimBuildEntry struct {
-	seenSeq      uint64
-	observations uint64
-	value        metrix.SampleValue
+	seenSeq uint64
+	value   metrix.SampleValue
 	dimensionState
 }
 
@@ -119,10 +118,11 @@ func (e *dimBuildEntry) aggregateNonSum(value metrix.SampleValue) {
 		if math.IsNaN(e.value) || (!math.IsNaN(value) && value > e.value) {
 			e.value = value
 		}
-	case program.AggregationAvg:
-		e.observations++
-		e.value = runningAverage(e.value, value, e.observations)
 	}
+}
+
+func (e *dimBuildEntry) aggregateAverage(value metrix.SampleValue, observations uint64) {
+	e.value = runningAverage(e.value, value, observations)
 }
 
 func runningAverage(current, value metrix.SampleValue, observations uint64) metrix.SampleValue {
@@ -139,7 +139,12 @@ func runningAverage(current, value metrix.SampleValue, observations uint64) metr
 		return value
 	}
 
-	n := metrix.SampleValue(observations)
+	n := float64(observations)
+	delta := value - current
+	if !math.IsInf(delta, 0) {
+		return math.FMA(delta, 1/n, current)
+	}
+
 	return current*((n-1)/n) + value/n
 }
 
@@ -168,10 +173,24 @@ type planBuildContext struct {
 	chartsByID       map[string]*chartState
 	chartOwners      map[string]string
 	dimCapHints      map[string]int
+	avgObservations  map[*dimBuildEntry]uint64
 	materialized     *materializedState
 	materializedByID map[string]*materializedChartState
 
 	planRouteStats
+}
+
+func (ctx *planBuildContext) aggregateAverage(entry *dimBuildEntry, value metrix.SampleValue) {
+	if ctx.avgObservations == nil {
+		ctx.avgObservations = make(map[*dimBuildEntry]uint64)
+	}
+	observations := ctx.avgObservations[entry]
+	if observations == 0 {
+		observations = 1
+	}
+	observations++
+	ctx.avgObservations[entry] = observations
+	entry.aggregateAverage(value, observations)
 }
 
 type flattenedReadChecker interface {
@@ -604,7 +623,6 @@ func (ctx *planBuildContext) accumulateRoute(
 	}
 	if entry.seenSeq != cs.currentBuildSeq {
 		entry.seenSeq = cs.currentBuildSeq
-		entry.observations = 1
 		entry.value = value
 		entry.dimensionState = dimensionState{
 			hidden:      route.Hidden,
@@ -625,7 +643,11 @@ func (ctx *planBuildContext) accumulateRoute(
 		if entry.float != route.Float {
 			// First-observed float flag wins within one build; conflicting routes are ignored.
 		}
-		entry.aggregate(value)
+		if entry.aggregation == program.AggregationAvg {
+			ctx.aggregateAverage(entry, value)
+		} else {
+			entry.aggregate(value)
+		}
 	}
 
 	if cs.labelTracker.observeMembership(identity, route.DimensionKeyLabel) {
