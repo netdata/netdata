@@ -34,7 +34,7 @@ const (
 	msgInvalidSecretStoreConfig    = "Invalid secretstore configuration."
 	msgSecretStoreValidationFailed = "Secretstore configuration validation failed."
 	msgSecretStoreTestFailed       = "Secretstore operational test failed."
-	msgSecretStoreTestUnsupported  = "Configuration is valid; this secretstore does not provide an operational test."
+	msgSecretStoreTestUnsupported  = "Configuration is valid; an operational result is unavailable for this secretstore configuration."
 )
 
 func (c *Controller) Stage(input CommandInput) (*PreparedStoreOperation, error) {

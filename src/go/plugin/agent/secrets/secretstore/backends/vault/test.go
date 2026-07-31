@@ -136,6 +136,9 @@ func parseVaultErrors(message string) ([]string, bool) {
 	} else if suffix != "errors occurred:" {
 		return nil, false
 	}
+	if count > len(lines)-1 {
+		return nil, false
+	}
 
 	semanticErrors := make([]string, 0, count)
 	for _, line := range lines[1:] {

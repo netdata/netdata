@@ -610,7 +610,11 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json")
 	}
 	require.Contains(t, output.String(), `"Value":"initial"`)
-	require.Contains(t, output.String(), "this secretstore does not provide an operational test")
+	require.Contains(
+		t,
+		output.String(),
+		"an operational result is unavailable for this secretstore configuration",
+	)
 	require.Contains(
 		t,
 		output.String(),
@@ -744,19 +748,31 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 		)
 	}
 
+	wire := output.String()
+	restrictedStart := strings.Index(wire, "FUNCTION_RESULT_BEGIN vault-test-restricted ")
+	require.NotEqual(t, -1, restrictedStart)
+	restrictedEnd := strings.Index(wire[restrictedStart:], "FUNCTION_RESULT_END")
+	require.NotEqual(t, -1, restrictedEnd)
+	restrictedResult := wire[restrictedStart : restrictedStart+restrictedEnd]
+
 	require.EqualValues(t, 4, requests.Load())
 	require.Contains(
 		t,
-		output.String(),
+		wire,
 		"Secretstore operational test failed: the configured Vault authentication check failed",
 	)
-	require.Contains(t, output.String(), "this secretstore does not provide an operational test")
-	require.Contains(t, output.String(), "Stored configuration is valid. No jobs are currently using this secretstore.")
-	require.NotContains(t, output.String(), "invalid token")
-	require.NotContains(t, output.String(), validToken)
-	require.NotContains(t, output.String(), restrictedToken)
-	require.NotContains(t, output.String(), invalidToken)
-	require.NotContains(t, output.String(), srv.URL)
+	require.Contains(
+		t,
+		restrictedResult,
+		"an operational result is unavailable for this secretstore configuration",
+	)
+	require.Contains(t, restrictedResult, "No jobs currently use this secretstore.")
+	require.Contains(t, wire, "Stored configuration is valid. No jobs are currently using this secretstore.")
+	require.NotContains(t, wire, "invalid token")
+	require.NotContains(t, wire, validToken)
+	require.NotContains(t, wire, restrictedToken)
+	require.NotContains(t, wire, invalidToken)
+	require.NotContains(t, wire, srv.URL)
 
 	controls.sendTerminate(testProcessControl())
 	select {

@@ -155,6 +155,13 @@ func TestStoreTestAuthenticationResponses(t *testing.T) {
 			wantPublic:    publicErrAuthentication,
 			privateValues: []string{"permission denied"},
 		},
+		"wrapped denial absurd count fails without amplified allocation": {
+			status:        http.StatusForbidden,
+			body:          "{\"errors\":[\"1000000000 errors occurred:\\n\\t* permission denied\\n\\n\"]}",
+			wantErr:       true,
+			wantPublic:    publicErrAuthentication,
+			privateValues: []string{"permission denied"},
+		},
 		"wrapped denial grammar mismatch fails": {
 			status:        http.StatusForbidden,
 			body:          "{\"errors\":[\"1 errors occurred:\\n\\t* permission denied\\n\\n\"]}",
