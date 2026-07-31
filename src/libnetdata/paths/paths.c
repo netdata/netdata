@@ -67,6 +67,17 @@ int verify_netdata_host_prefix(bool log_msg) {
 
     strncpyz(path, netdata_configured_host_prefix, sizeof(path) - 1);
 
+    // the host prefix is concatenated into printf format strings (the various
+    // "path to ..." templates), so a '%' in it would be parsed as a conversion
+    // directive. a real host prefix never contains one.
+    // check the original, not the truncated copy in path[] - on success the
+    // untruncated value is what stays in netdata_configured_host_prefix.
+    if(strchr(netdata_configured_host_prefix, '%')) {
+        errno = EINVAL;
+        reason = "contains '%'";
+        goto failed;
+    }
+
     struct stat sb;
     if (stat(path, &sb) == -1) {
         reason = "failed to stat()";
@@ -280,4 +291,91 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
     freez(udir);
     freez(sdir);
+}
+
+int paths_unittest(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    // a prefix whose only '%' sits past the FILENAME_MAX truncation that
+    // verify_netdata_host_prefix() applies internally. it must still be
+    // rejected, because the check looks at the original string, not the copy.
+    char long_prefix[FILENAME_MAX + 16];
+    memset(long_prefix, 'a', sizeof(long_prefix));
+    long_prefix[0] = '/';
+    long_prefix[sizeof(long_prefix) - 3] = '%';
+    long_prefix[sizeof(long_prefix) - 2] = 's';
+    long_prefix[sizeof(long_prefix) - 1] = '\0';
+
+    // the host prefix ends up inside printf format strings, so a '%' in it must
+    // never survive verification. "/" is here to prove the '%' check did not
+    // start rejecting working prefixes.
+    const struct {
+        const char *name;
+        const char *prefix;
+        bool accept;
+    } cases[] = {
+        { "empty",            "",           true  },
+#if !defined(OS_WINDOWS)
+        // needs a real procfs+sysfs under the prefix; on macOS/FreeBSD those
+        // checks are compiled out, but native Windows would probe and fail
+        { "root",             "/",          true  },
+#endif
+        { "trailing %s",      "/host%s",    false },
+        { "bare %n",          "%n",         false },
+        { "embedded %",       "/a%b",       false },
+        { "escaped %%",       "/host%%",    false },
+        { "% past truncation", long_prefix, false },
+    };
+
+    const char *saved = netdata_configured_host_prefix;
+    int errors = 0;
+
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        netdata_configured_host_prefix = cases[i].prefix;
+        errno_clear();
+        int rc = verify_netdata_host_prefix(false);
+        int err = errno;
+
+        if((rc == 0) != cases[i].accept) {
+            fprintf(stderr, "  FAILED %s: '%s' expected %s, got rc=%d\n",
+                    cases[i].name, cases[i].prefix, cases[i].accept ? "accepted" : "rejected", rc);
+            if(cases[i].accept && *cases[i].prefix)
+                fprintf(stderr, "         (is /proc or /sys mounted? this case needs both)\n");
+            errors++;
+            continue;
+        }
+
+        if(cases[i].accept) {
+            // an accepted prefix must survive untouched
+            if(strcmp(netdata_configured_host_prefix, cases[i].prefix) != 0) {
+                fprintf(stderr, "  FAILED %s: '%s' accepted but prefix changed to '%s'\n",
+                        cases[i].name, cases[i].prefix, netdata_configured_host_prefix);
+                errors++;
+            }
+        }
+        else {
+            // a rejected prefix must be cleared, because runtime-paths.c
+            // discards the return value and relies on this
+            if(*netdata_configured_host_prefix) {
+                fprintf(stderr, "  FAILED %s: '%s' rejected but prefix left as '%s'\n",
+                        cases[i].name, cases[i].prefix, netdata_configured_host_prefix);
+                errors++;
+            }
+
+            // none of these paths exist, so stat() would reject them anyway.
+            // assert the rejection came from the '%' check (EINVAL) and not
+            // from stat() (ENOENT) - without this the whole table still passes
+            // with the '%' check deleted.
+            if(err != EINVAL) {
+                fprintf(stderr, "  FAILED %s: '%s' rejected by errno=%d, expected EINVAL (%d)\n",
+                        cases[i].name, cases[i].prefix, err, EINVAL);
+                errors++;
+            }
+        }
+    }
+
+    netdata_configured_host_prefix = saved;
+
+    fprintf(stderr, "%s() %s\n", __FUNCTION__, errors ? "FAILED" : "passed");
+    return errors;
 }

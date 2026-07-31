@@ -23,4 +23,6 @@ void recursive_config_double_dir_load(
     , size_t depth
 );
 
+int paths_unittest(void);
+
 #endif //NETDATA_PATHS_H

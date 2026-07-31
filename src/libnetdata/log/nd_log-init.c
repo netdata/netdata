@@ -96,7 +96,10 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 
     if(!netdata_configured_host_prefix) {
         s = getenv("NETDATA_HOST_PREFIX");
-        if(s && *s)
+        // reject a '%' here too - this assignment bypasses
+        // verify_netdata_host_prefix(), and the prefix ends up inside printf
+        // format strings.
+        if(s && *s && !strchr(s, '%'))
             netdata_configured_host_prefix = (char *)s;
     }
 
