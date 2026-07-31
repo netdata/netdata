@@ -132,6 +132,25 @@ A custom helper must emit one newline-terminated record containing at most 8190
 bytes before the newline. Netdata rejects oversized or incomplete records
 rather than applying a truncated name or label set.
 
+#### Note on Docker container names
+
+The `cgroup-name` helper resolves Docker container names using `docker inspect` when the Docker CLI is available, or
+the Docker Engine API at the `DOCKER_HOST` endpoint (default `unix:///var/run/docker.sock`) when it is not. When Netdata
+runs inside a container, the Docker CLI is usually absent, so the host Docker socket must be mounted for the helper to
+reach the API:
+
+```sh
+docker run -v /var/run/docker.sock:/var/run/docker.sock:ro ...
+```
+
+Without socket or CLI access, container names fall back to the first 12 characters of the container ID (for example,
+`b1ac7256e198`).
+
+[Docker Socket Proxy (HAProxy)](https://github.com/Tecnativa/docker-socket-proxy)
+or [CetusGuard](https://github.com/hectorm/cetusguard)
+can also be used to give Netdata restricted access to the socket. Note that `DOCKER_HOST` in Netdata's environment
+should be set to the proxy's URL in this case.
+
 #### Note on Podman container names
 
 Podman's security model is a lot more restrictive than Docker's, so Netdata will not be able to detect container names
