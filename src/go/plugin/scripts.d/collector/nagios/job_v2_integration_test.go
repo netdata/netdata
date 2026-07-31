@@ -67,14 +67,9 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 			},
 			run: func(t *testing.T, state jobCaseState) {
 				t.Helper()
-				state.job.Tick(1)
-				deadline := time.Now().Add(2 * time.Second)
-				for time.Now().Before(deadline) {
-					if state.out.Len() > 0 {
-						break
-					}
-					time.Sleep(10 * time.Millisecond)
-				}
+				tickJobUntil(t, state.job, func() bool {
+					return state.out.Len() > 0
+				}, "timed out waiting for emitted metrics")
 
 				wire := state.out.String()
 				assert.Contains(t, wire, "CHART '")
@@ -107,16 +102,10 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 			},
 			run: func(t *testing.T, state jobCaseState) {
 				t.Helper()
-				state.job.Tick(1)
-				deadline := time.Now().Add(2 * time.Second)
-				for time.Now().Before(deadline) {
-					if _, err := os.Stat(state.startedFile); err == nil {
-						break
-					}
-					time.Sleep(10 * time.Millisecond)
-				}
-				_, err := os.Stat(state.startedFile)
-				require.NoError(t, err, "timed out waiting for in-flight script start")
+				tickJobUntil(t, state.job, func() bool {
+					_, err := os.Stat(state.startedFile)
+					return err == nil
+				}, "timed out waiting for in-flight script start")
 				stopStarted := time.Now()
 				state.job.Stop()
 				assert.LessOrEqual(t, time.Since(stopStarted), 3*time.Second)
@@ -151,6 +140,26 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 				state.job.Cleanup()
 			}
 		})
+	}
+}
+
+func tickJobUntil(t *testing.T, job *jobruntime.JobV2, observed func() bool, failureMessage string) {
+	t.Helper()
+	timeout := time.NewTimer(2 * time.Second)
+	defer timeout.Stop()
+	retry := time.NewTicker(10 * time.Millisecond)
+	defer retry.Stop()
+
+	for {
+		job.Tick(1)
+		if observed() {
+			return
+		}
+		select {
+		case <-retry.C:
+		case <-timeout.C:
+			require.FailNow(t, failureMessage)
+		}
 	}
 }
 
