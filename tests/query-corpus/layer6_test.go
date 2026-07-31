@@ -313,7 +313,7 @@ func TestLayer6TwoPassLiveEdgeTrimming(t *testing.T) {
 // the value, and raw metric contributors for anomaly metadata. Keep this held
 // contract separate so the surgical no-average fix cannot corrupt its value.
 func TestLayer6TwoPassAverageBoundary(t *testing.T) {
-	trackContract(t, "L6/two-pass-average-boundary")
+	trackContractComponent(t, "L6/two-pass-average-boundary", "sum-to-average")
 
 	testLayer6TwoPassChains(t, []l6AggChain{{"sum", "average"}})
 }
@@ -559,7 +559,7 @@ func TestCase018MultipassAverage(t *testing.T) {
 // stays the visible accumulator, the hidden accumulator rides the wire,
 // and the point count remains the number of visible prior-pass groups.
 func TestLayer6TwoPassPercentage(t *testing.T) {
-	trackContract(t, "L6/two-pass-percentage")
+	trackContractComponent(t, "L6/two-pass-percentage", "sum-to-percentage")
 
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
@@ -743,4 +743,111 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestLayer6TwoPassHeldBoundaryPreservation(t *testing.T) {
+	const (
+		context = "fixture.l6held"
+		host    = "l6-held"
+	)
+	point := func(value, flags string) []fixture.Point {
+		// Two rows keep this control independent of the separately broken
+		// points=1 query-window contract.
+		return []fixture.Point{
+			{T: fixture.T0 + 1, Collected: value, Flags: flags},
+			{T: fixture.T0 + 2, Collected: value, Flags: flags},
+		}
+	}
+	ch := fixture.Chart{
+		ID: context, Title: "held multipass boundaries", Units: "units", Family: "fixture",
+		Context: context, UpdateEvery: 1,
+		Dimensions: []fixture.Dimension{
+			{ID: "avg_a", Points: point("0", stream.FlagAnomalous)},
+			{ID: "avg_b", Points: point("0", stream.FlagNotAnomalous)},
+			{ID: "pct_a", Points: point("1", stream.FlagNotAnomalous)},
+			{ID: "pct_b", Points: point("1", stream.FlagNotAnomalous)},
+		},
+	}
+	pushed := false
+	requireFixture := func(t *testing.T) {
+		t.Helper()
+		if !pushed {
+			pushLiveBurst(t, host, guid(337), ch)
+			if _, err := td.WaitRetention(
+				host, context, fixture.T0+1, fixture.T0+2, 15*time.Second); err != nil {
+				t.Fatal(err)
+			}
+			pushed = true
+		}
+	}
+	assert := func(t *testing.T, group1, aggregation1, scope, selected string, value, arp float64) {
+		t.Helper()
+		requireFixture(t)
+
+		params := daemon.DataParams(context, fixture.T0, fixture.T0+2, 2)
+		params.Set("group_by[0]", group1)
+		params.Set("aggregation[0]", aggregation1)
+		params.Set("group_by[1]", "selected")
+		params.Set("aggregation[1]", "sum")
+		if scope != "" {
+			params.Set("scope_dimensions", scope)
+		}
+		if selected != "" {
+			params.Set("dimensions", selected)
+		}
+		doc, err := td.DataV3(host, params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := queryPointSchemaField(doc, "hidden", false); err != nil {
+			t.Error(err)
+		}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !assertOnlyColumn(t, cols, "selected") ||
+			!assertColumnExactGrid(t, cols, "selected", fixture.T0, fixture.T0+2, 1) {
+			t.FailNow()
+		}
+		for row, pt := range cols["selected"] {
+			var gotValue any
+			if pt.Value != nil {
+				gotValue = *pt.Value
+			}
+			if pt.Value == nil || !tierValueMatch(*pt.Value, value, 0) {
+				t.Errorf("row %d: value %v, want %v", row+1, gotValue, value)
+			}
+			if !tierValueMatch(pt.ARP, arp, 0) {
+				t.Errorf("row %d: arp %v, want held-boundary stability value %v", row+1, pt.ARP, arp)
+			}
+			if pt.PA != 0 {
+				t.Errorf("row %d: pa %d, want exactly 0", row+1, pt.PA)
+			}
+			if pt.Count != nil || pt.Hidden != nil {
+				t.Errorf("row %d: non-raw count/hidden = %v/%v, want absent", row+1, pt.Count, pt.Hidden)
+			}
+		}
+	}
+
+	// Class C stability controls, not correctness rulings for average or
+	// percentage composition. Zero-valued average inputs and a single instance
+	// make the values invariant across the held redesign forks; only released
+	// anomaly-divisor behavior and the absence of spurious PARTIAL on complete
+	// rows are pinned:
+	// netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862,
+	// src/web/api/queries/query-group-by-init.c:258-326,492-523;
+	// src/web/api/queries/query-group-by-finalize.c:10-117,158-186,284-421.
+	t.Run("average-to-sum-held", func(t *testing.T) {
+		trackContractComponent(t, "L6/two-pass-average-boundary", "average-to-sum-held")
+		assert(t, "instance", "average", "avg*", "", 0, 100)
+	})
+	t.Run("percentage-to-sum-held", func(t *testing.T) {
+		trackContractComponent(t, "L6/two-pass-percentage", "percentage-to-sum-held")
+		assert(t, "instance", "percentage", "", "pct*", 100, 0)
+	})
+	t.Run("percentage-of-instance-to-sum-held", func(t *testing.T) {
+		trackContractComponent(t, "L6/two-pass-percentage", "percentage-of-instance-to-sum-held")
+		assert(t, "percentage-of-instance", "sum", "", "pct*", 100, 0)
+	})
 }
