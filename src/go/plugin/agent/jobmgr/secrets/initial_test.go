@@ -764,7 +764,7 @@ func TestFailedStoreUpdateReplacesFailedProjectionWhenNoActiveGenerationExists(t
 
 func TestStoreTestIdentityDoesNotBlockMutationsOrDifferentTests(t *testing.T) {
 	gate := make(chan struct{})
-	entered := make(chan struct{})
+	entered := make(chan struct{}, 1)
 	var releaseOnce sync.Once
 	t.Cleanup(func() {
 		releaseOnce.Do(func() { close(gate) })
