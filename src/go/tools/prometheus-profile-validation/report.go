@@ -328,6 +328,91 @@ func writeTextReport(w io.Writer, r report) error {
 			)
 		}
 	}
+	if len(r.DeadCharts) > 0 {
+		fmt.Fprintln(&b, "\nDead authored charts:")
+		for _, item := range r.DeadCharts {
+			fmt.Fprintf(
+				&b,
+				"  - %s title=%q context=%q priority=%d\n",
+				item.Path,
+				item.Title,
+				item.Context,
+				item.Priority,
+			)
+		}
+	}
+	if len(r.DeadDimensions) > 0 {
+		fmt.Fprintln(&b, "\nDead authored dimensions:")
+		for _, item := range r.DeadDimensions {
+			fmt.Fprintf(&b, "  - %s selector=%q name=%q\n", item.Path, item.Selector, item.Name)
+		}
+	}
+	if len(r.DimensionLosses) > 0 {
+		fmt.Fprintln(&b, "\nDimension materialization losses:")
+		for _, item := range r.DimensionLosses {
+			fmt.Fprintf(
+				&b,
+				"  - %s observed=%d planned=%d cause=%q\n",
+				item.Path,
+				item.ObservedDimensions,
+				item.PlannedDimensions,
+				item.Cause,
+			)
+		}
+	}
+	if len(r.Collisions) > 0 {
+		fmt.Fprintln(&b, "\nRendered chart ID collisions:")
+		for _, item := range r.Collisions {
+			fmt.Fprintf(
+				&b,
+				"  - id=%s charts=%s\n",
+				item.RenderedIDFingerprint,
+				strings.Join(item.Charts, ","),
+			)
+		}
+	}
+	if len(r.InstanceLosses) > 0 {
+		fmt.Fprintln(&b, "\nChart instance materialization losses:")
+		for _, item := range r.InstanceLosses {
+			fmt.Fprintf(
+				&b,
+				"  - %s observed=%d rendered=%d cause=%q\n",
+				item.Path,
+				item.ObservedIdentities,
+				item.RenderedIDs,
+				item.Cause,
+			)
+		}
+	}
+	if len(r.ChartWireCollisions) > 0 {
+		fmt.Fprintln(&b, "\nPublic wire chart ID collisions:")
+		for _, item := range r.ChartWireCollisions {
+			fmt.Fprintf(&b, "  - id=%s occurrences=%d\n", item.WireIDFingerprint, item.Occurrences)
+		}
+	}
+	if len(r.ContextCollisions) > 0 {
+		fmt.Fprintln(&b, "\nPublic wire context collisions:")
+		for _, item := range r.ContextCollisions {
+			fmt.Fprintf(
+				&b,
+				"  - context=%s raw_contexts=%s\n",
+				item.WireContextFingerprint,
+				strings.Join(item.RawContextFingerprints, ","),
+			)
+		}
+	}
+	if len(r.DimensionCollisions) > 0 {
+		fmt.Fprintln(&b, "\nPublic wire dimension ID collisions:")
+		for _, item := range r.DimensionCollisions {
+			fmt.Fprintf(
+				&b,
+				"  - chart=%s dimension=%s occurrences=%d\n",
+				item.ChartIDFingerprint,
+				item.DimensionIDFingerprint,
+				item.Occurrences,
+			)
+		}
+	}
 	if len(r.Findings) > 0 {
 		fmt.Fprintln(&b, "\nFindings:")
 		for _, item := range r.Findings {

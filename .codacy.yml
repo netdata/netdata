@@ -20,5 +20,6 @@ exclude_paths:
   - src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/**
   - src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
   - src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt
+  - "**/integrations/*.md"
   - .agents/**
   - docs/netdata-ai/skills/**

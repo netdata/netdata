@@ -79,6 +79,12 @@ dump as finding evidence. If GitHub check-run annotations are empty too, use
 `pr-issues.sh` with `CODACY_TOKEN`; without that token, record the evidence gap
 and re-check after the next push.
 
+When the local CLI emits valid JSON, its top-level shape is commonly an array
+of wrappers with findings under `.Issue` (for example `.Issue.filename` and
+`.Issue.patternId.value`), not the Codacy v3 API's `.data[].commitIssue` shape.
+Inspect the first item before writing filters; do not reuse Cloud-API filters on
+local analyzer dumps.
+
 One common local cause is gitignored generated output with restrictive file
 permissions. For example, if local scratch output under `.local/` contains files
 not readable by the Docker container, Codacy logs `Could not read file` messages
@@ -103,6 +109,13 @@ after a new push. If `pr-issues.sh` still reports findings but the Codacy
 check-run for the current head SHA is green, inspect `.commitIssue.commitInfo.sha`
 in the dump. Findings anchored to an older commit are stale cache and should not
 be treated as current-head blockers.
+
+Generated integration Markdown under `**/integrations/*.md` is excluded in
+`.codacy.yml`. Those files are overwritten by `integrations/gen_docs_integrations.py`
+and intentionally contain HTML badges, details blocks, generated image markup,
+and template-controlled spacing that conflict with the repository's markdownlint
+rules. Validate `metadata.yaml`, generator source, generated-doc reproducibility,
+and Learn ingestion instead; never hand-edit generated pages to clear Codacy.
 
 To restrict to a single tool (matches what Codacy reported on a CI run):
 

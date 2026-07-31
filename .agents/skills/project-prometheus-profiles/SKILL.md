@@ -1,5 +1,5 @@
 ---
-name: prometheus-profiles
+name: project-prometheus-profiles
 description: Create, review, validate, iterate, or install Netdata Prometheus collector chart profiles (`go.d/prometheus.profiles/*.yaml`) from Prometheus exposition dumps. Use for exporter dashboard design, profile schema/runtime problems, selector/relabel/fallback policy, chart coverage, NIDL hierarchy, or profile installation and live verification.
 ---
 

@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD043 -->
+
 # Prometheus profile validation
 
 This developer tool validates one candidate `go.d/prometheus.profiles` file

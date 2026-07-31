@@ -865,12 +865,12 @@ func distributionRole(
 		familyTypes[base] == commonmodel.MetricTypeHistogram {
 		return base, "bucket", true
 	}
-	if base := strings.TrimSuffix(name, "_count"); base != name {
+	if base, ok := strings.CutSuffix(name, "_count"); ok {
 		if typ := familyTypes[base]; typ == commonmodel.MetricTypeHistogram || typ == commonmodel.MetricTypeSummary {
 			return base, "count", true
 		}
 	}
-	if base := strings.TrimSuffix(name, "_sum"); base != name {
+	if base, ok := strings.CutSuffix(name, "_sum"); ok {
 		if typ := familyTypes[base]; typ == commonmodel.MetricTypeHistogram || typ == commonmodel.MetricTypeSummary {
 			return base, "sum", true
 		}

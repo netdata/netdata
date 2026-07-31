@@ -112,11 +112,14 @@ func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func()
 	executable.Directory = execDir
 	buildinfo.UserConfigDir = ""
 	buildinfo.StockConfigDir = ""
-	if err := os.Setenv("NETDATA_USER_CONFIG_DIR", ""); err != nil {
-		return fail(fmt.Errorf("isolate user config environment: %w", err))
-	}
-	if err := os.Setenv("NETDATA_STOCK_CONFIG_DIR", ""); err != nil {
-		return fail(fmt.Errorf("isolate stock config environment: %w", err))
+	for _, key := range []string{
+		"NETDATA_CYGWIN_BASE_PATH",
+		"NETDATA_USER_CONFIG_DIR",
+		"NETDATA_STOCK_CONFIG_DIR",
+	} {
+		if err := os.Setenv(key, ""); err != nil {
+			return fail(fmt.Errorf("isolate %s environment: %w", key, err))
+		}
 	}
 	pluginconfig.MustInit(pluginconfig.InitInput{ConfDir: []string{userRoot}})
 

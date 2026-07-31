@@ -968,8 +968,10 @@ litellm_proxy_pre_call_total_requests_total{proxy_pre_call="proxy_pre_call-a"} 3
 litellm_proxy_pre_call_total_requests_created{proxy_pre_call="proxy_pre_call-a"} 1700000000.0
 # HELP litellm_pod_lock_manager_size Gauge for pod_lock_manager service
 # TYPE litellm_pod_lock_manager_size gauge
-litellm_pod_lock_manager_size{pod_lock_manager="pod_lock_manager-a",pid="1001"} 7.0
-litellm_pod_lock_manager_size{pod_lock_manager="pod_lock_manager-a",pid="1002"} 7.0
+litellm_pod_lock_manager_size{pod_lock_manager="job-a:pod-a",pid="1001"} 1.0
+litellm_pod_lock_manager_size{pod_lock_manager="job-a:pod-a",pid="1002"} 1.0
+litellm_pod_lock_manager_size{pod_lock_manager="job-b:pod-a",pid="1001"} 0.0
+litellm_pod_lock_manager_size{pod_lock_manager="job-b:pod-a",pid="1002"} 0.0
 # HELP litellm_in_memory_daily_spend_update_queue_size Gauge for in_memory_daily_spend_update_queue service
 # TYPE litellm_in_memory_daily_spend_update_queue_size gauge
 litellm_in_memory_daily_spend_update_queue_size{in_memory_daily_spend_update_queue="in_memory_daily_spend_update_queue-a",pid="1001"} 7.0

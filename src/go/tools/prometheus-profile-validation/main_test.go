@@ -1836,6 +1836,77 @@ func TestWriteTextReportIncludesAuthoredMapping(t *testing.T) {
 	}
 }
 
+func TestWriteTextReportIncludesDetailedDiagnostics(t *testing.T) {
+	r := newReport()
+	r.DeadCharts = []deadChartReport{{
+		Path:     "template.charts[0]",
+		Title:    "Dead chart",
+		Context:  "dead",
+		Priority: 100,
+	}}
+	r.DeadDimensions = []deadDimensionReport{{
+		Path:     "template.charts[1].dimensions[0]",
+		Selector: "app_missing",
+		Name:     "missing",
+	}}
+	r.DimensionLosses = []dimensionMaterializationLossReport{{
+		Path:               "template.charts[2]",
+		ObservedDimensions: 3,
+		PlannedDimensions:  2,
+		Cause:              "dimension lifecycle cap",
+	}}
+	r.Collisions = []collisionReport{{
+		RenderedIDFingerprint: "sha256:rendered",
+		Charts:                []string{"template.charts[3]", "template.charts[4]"},
+	}}
+	r.InstanceLosses = []instanceMaterializationLossReport{{
+		Path:               "template.charts[5]",
+		ObservedIdentities: 2,
+		RenderedIDs:        1,
+		Cause:              "rendered IDs collapsed",
+	}}
+	r.ChartWireCollisions = []wireChartCollisionReport{{
+		WireIDFingerprint: "sha256:wire-chart",
+		Occurrences:       2,
+	}}
+	r.ContextCollisions = []wireContextCollisionReport{{
+		WireContextFingerprint: "sha256:wire-context",
+		RawContextFingerprints: []string{"sha256:raw-a", "sha256:raw-b"},
+	}}
+	r.DimensionCollisions = []dimensionCollisionReport{{
+		ChartIDFingerprint:     "sha256:chart",
+		DimensionIDFingerprint: "sha256:dimension",
+		Occurrences:            2,
+	}}
+
+	var out bytes.Buffer
+	if err := writeTextReport(&out, r); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Dead authored charts:",
+		`template.charts[0] title="Dead chart"`,
+		"Dead authored dimensions:",
+		`selector="app_missing" name="missing"`,
+		"Dimension materialization losses:",
+		`observed=3 planned=2 cause="dimension lifecycle cap"`,
+		"Rendered chart ID collisions:",
+		"id=sha256:rendered charts=template.charts[3],template.charts[4]",
+		"Chart instance materialization losses:",
+		`observed=2 rendered=1 cause="rendered IDs collapsed"`,
+		"Public wire chart ID collisions:",
+		"id=sha256:wire-chart occurrences=2",
+		"Public wire context collisions:",
+		"context=sha256:wire-context raw_contexts=sha256:raw-a,sha256:raw-b",
+		"Public wire dimension ID collisions:",
+		"chart=sha256:chart dimension=sha256:dimension occurrences=2",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("text report missing %q:\n%s", want, out.String())
+		}
+	}
+}
+
 type errorWriter struct{}
 
 func (errorWriter) Write(_ []byte) (int, error) {
@@ -1878,8 +1949,14 @@ func runValidation(t *testing.T, profile, dump, job string) validationResult {
 
 	cmd := exec.Command(os.Args[0], args...)
 	cmd.Env = append(
-		withoutEnvironmentKeys(os.Environ(), "NETDATA_USER_CONFIG_DIR", "NETDATA_STOCK_CONFIG_DIR"),
+		withoutEnvironmentKeys(
+			os.Environ(),
+			"NETDATA_CYGWIN_BASE_PATH",
+			"NETDATA_USER_CONFIG_DIR",
+			"NETDATA_STOCK_CONFIG_DIR",
+		),
 		"NETDATA_PROFILE_VALIDATOR_HELPER=1",
+		"NETDATA_CYGWIN_BASE_PATH=/hostile/ambient/cygwin",
 		"NETDATA_USER_CONFIG_DIR=/hostile/ambient/user/config",
 		"NETDATA_STOCK_CONFIG_DIR=/hostile/ambient/stock/config",
 	)
@@ -1935,15 +2012,6 @@ func requireFinding(t *testing.T, result validationResult, code string) {
 		}
 	}
 	t.Fatalf("missing finding %q in %#v", code, result.report.Findings)
-}
-
-func hasFindingPrefix(r report, prefix string) bool {
-	for _, item := range r.Findings {
-		if strings.HasPrefix(item.Code, prefix) {
-			return true
-		}
-	}
-	return false
 }
 
 func hasFinding(r report, code, severity string) bool {

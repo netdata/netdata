@@ -982,6 +982,9 @@ template:
         - 'litellm_redis_spend_update_queue_size'
         - 'litellm_pod_lock_manager_size'
       charts:
+        # Request/latency and spend-queue families carry constant self-named
+        # labels. Excluding them keeps those families as dimensions of shared
+        # charts instead of creating one chart instance per metric family.
         - title: Internal Service Requests
           context: internal_service_requests
           units: requests/s
@@ -1259,8 +1262,10 @@ template:
           algorithm: absolute
           type: line
           priority: 2830
+          # Unlike the constant service/queue labels above, this value identifies
+          # the dynamic <cronjob>:<pod> lock and must remain in chart identity.
           instances:
-            by_labels: ['*', '!pod_lock_manager']
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_pod_lock_manager_size'
               name: locks

@@ -4592,7 +4592,7 @@ modules:
       id: collector-go.d.plugin-prometheus-vllm
       monitored_instance:
         name: vLLM
-        link: https://docs.vllm.ai/
+        link: https://docs.vllm.ai/en/stable/design/metrics/
         icon_filename: prometheus.svg
         categories:
           - data-collection.applications

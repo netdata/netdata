@@ -65,3 +65,26 @@ For every stock profile:
   staged or committed.
 - Review the generated catalog sentence and operator-model brief as public
   product copy.
+
+## How I figured this out
+
+Files read:
+
+- `../SKILL.md`
+- `../pipeline.md`
+- `../schema-reference.md`
+- `integrations/_common.py`
+- `integrations/gen_integrations.py`
+- `integrations/gen_docs_integrations.py`
+- `integrations/gen_taxonomy.py`
+- `src/go/plugin/go.d/collector/prometheus/metadata.yaml`
+- `src/go/plugin/go.d/collector/prometheus/promprofiles/profile.go`
+- `src/go/plugin/go.d/collector/prometheus/taxonomy.yaml`
+
+Commands run:
+
+- `rg 'metadata.yaml|prometheus.profiles|taxonomy.yaml' integrations src/go/plugin/go.d/collector/prometheus`
+- `python3 integrations/gen_integrations.py`
+- `python3 integrations/gen_docs_integrations.py -c go.d.plugin/prometheus`
+- `python3 integrations/gen_taxonomy.py --check-only`
+- `git diff --check`

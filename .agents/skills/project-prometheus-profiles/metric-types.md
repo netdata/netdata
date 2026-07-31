@@ -15,7 +15,7 @@ whether and how it belongs in the dashboard.
 - [Untyped families and fallback](#untyped-families-and-fallback)
 - [Writer rejection and schema drift](#writer-rejection-and-schema-drift)
 - [Collection filtering and relabeling](#collection-filtering-and-relabeling)
-- [Proving a replacement is actually redundant](#proving-a-replacement-is-actually-redundant)
+  - [Proving a replacement is actually redundant](#proving-a-replacement-is-actually-redundant)
 
 ## The ingestion model
 
