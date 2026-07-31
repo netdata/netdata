@@ -75,31 +75,42 @@ func TestActivityChartGroupContract(t *testing.T) {
 	group := spec.Groups[0]
 	assert.Equal(t, "Collector Activity", group.Family)
 	assert.ElementsMatch(t, []string{
-		activityAPICallsMetric,
-		activityMetricRequestsMetric,
-		activityQueriesMetric,
+		activitySDKInvocationsMetric,
+		activityCalculatedMetricRequestsMetric,
+		activityProfileMetricRequestEstimatesMetric,
+		activityQueryItemsMetric,
 	}, group.Metrics)
 
 	want := map[string]struct {
+		title     string
 		context   string
 		units     string
 		selector  string
 		name      string
 		instances []string
 	}{
-		"aws_cloudwatch_collector_api_calls": {
-			context: "collector_api_calls", units: "calls",
-			selector: activityAPICallsMetric, name: "calls",
+		"aws_cloudwatch_collector_sdk_invocations": {
+			title:   "CloudWatch SDK Invocations",
+			context: "collector_sdk_invocations", units: "invocations",
+			selector: activitySDKInvocationsMetric, name: "invocations",
 			instances: []string{"account_id", "region", "operation"},
 		},
-		"aws_cloudwatch_collector_metric_requests": {
-			context: "collector_metric_requests", units: "requests",
-			selector: activityMetricRequestsMetric, name: "requests",
+		"aws_cloudwatch_collector_get_metric_data_calculated_metric_requests": {
+			title:   "GetMetricData Calculated Metric Requests",
+			context: "collector_get_metric_data_calculated_metric_requests", units: "metric requests",
+			selector: activityCalculatedMetricRequestsMetric, name: "calculated_metric_requests",
 			instances: []string{"account_id", "region"},
 		},
-		"aws_cloudwatch_collector_queries": {
-			context: "collector_queries", units: "queries",
-			selector: activityQueriesMetric, name: "queries",
+		"aws_cloudwatch_collector_get_metric_data_profile_metric_request_estimates": {
+			title:   "GetMetricData Profile Metric Request Estimates",
+			context: "collector_get_metric_data_profile_metric_request_estimates", units: "metric requests",
+			selector: activityProfileMetricRequestEstimatesMetric, name: "estimated_metric_requests",
+			instances: []string{"account_id", "region", "profile"},
+		},
+		"aws_cloudwatch_collector_get_metric_data_query_items": {
+			title:   "GetMetricData Query Items",
+			context: "collector_get_metric_data_query_items", units: "query items",
+			selector: activityQueryItemsMetric, name: "query_items",
 			instances: []string{"account_id", "region", "profile"},
 		},
 	}
@@ -107,6 +118,7 @@ func TestActivityChartGroupContract(t *testing.T) {
 	for _, chart := range group.Charts {
 		expected, ok := want[chart.ID]
 		require.True(t, ok, "unexpected chart %q", chart.ID)
+		assert.Equal(t, expected.title, chart.Title)
 		assert.Equal(t, expected.context, chart.Context)
 		assert.Equal(t, "cloudwatch."+expected.context, spec.ContextNamespace+"."+chart.Context)
 		assert.Equal(t, expected.units, chart.Units)

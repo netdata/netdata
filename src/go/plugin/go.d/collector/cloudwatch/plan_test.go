@@ -619,7 +619,7 @@ func calculatedMetricRequestUnits(queries []plannedQuery) int {
 	batches := buildQueryBatches(queries, clients, time.Unix(1_000_000_000, 0))
 	units := 0
 	for _, batch := range batches {
-		units += queryMetricRequestUnits(batch.queries)
+		units += int(batch.activityCounts.calculatedMetricRequests)
 	}
 	return units
 }

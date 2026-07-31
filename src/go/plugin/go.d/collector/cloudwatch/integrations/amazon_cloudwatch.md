@@ -77,7 +77,7 @@ The collector works in three stages:
 - **Discover** -- a profile with identifying dimensions finds its resources with one CloudWatch `ListMetrics` scan per target, region, and namespace, then applies its exact dimension matcher. A profile whose dimensions are all constants is a known static instance and skips `ListMetrics`. Optional resource-tag filters are resolved with the Resource Groups Tagging API before queries are expanded.
 - **Query** -- every selected series gets a resolved timing policy: aggregation period, rolling lookback, and publication delay. `GetMetricData` searches the aligned rolling window for the newest complete datapoint, and Netdata receives the retained value on every collection cycle.
 
-Built-in collector-activity charts show CloudWatch API calls, calculated billable metric requests, and raw queries, so you can tune the plan and relate collector work to AWS billing.
+Built-in collector-activity charts show CloudWatch SDK invocations, calculated `GetMetricData` metric requests, per-profile metric-request estimates, and submitted query items, so you can tune the plan and relate collector work to AWS billing.
 
 To start collecting, jump to [Setup](#setup) -- every job needs three blocks: `credentials` (how to authenticate), `targets` (which AWS identity to monitor), and `rules` (which services and regions to collect). The sections in between are tuning and cost reference.
 
@@ -151,7 +151,7 @@ To estimate a job's normal daily cost:
 billable metric requests/day ≈ Σ effective-policy groups (instances × calculated metric-request units per instance × 86,400 / max(period seconds, update_every seconds))
 ```
 
-This is a healthy steady-state estimate; retries add work, and alignment near the observation boundary can shift a short sample. For example, one Billing series at the stock 10-minute period with `update_every <= 600` is 86,400 / 600 = 144 requests per day. For a running job, skip the arithmetic and read the **CloudWatch Metric Requests** chart described below -- it reports the billable metric requests actually submitted.
+This is a healthy steady-state estimate; retries add work, and alignment near the observation boundary can shift a short sample. For example, one Billing series at the stock 10-minute period with `update_every <= 600` is 86,400 / 600 = 144 requests per day. For a running job, skip the arithmetic and read the **GetMetricData Calculated Metric Requests** chart described below -- it reports the calculated metric requests actually submitted.
 
 **How the collector keeps cost down**
 
@@ -164,15 +164,18 @@ Cost scales with selected targets, instances, metrics, statistics beyond AWS's g
 
 **Watching collector-issued work**
 
-Three collector-activity chart types expose the inputs behind that cost model:
+Four collector-activity chart types expose the inputs behind that cost model:
 
 | Chart | Counts | Instance labels |
 |:------|:-------|:----------------|
-| CloudWatch API Calls | Collector-issued `ListMetrics` and `GetMetricData` calls, including every pagination page | `account_id`, `region`, `operation` |
-| CloudWatch Metric Requests | Calculated billable `GetMetricData` metric requests, using AWS's up-to-five-statistics grouping | `account_id`, `region` |
-| CloudWatch Raw Queries | Submitted `MetricDataQuery` items, for plan tuning | `account_id`, `region`, `profile` |
+| CloudWatch SDK Invocations | Attempted collector-issued `ListMetrics` and `GetMetricData` SDK method invocations, including failed attempts and every requested pagination page | `account_id`, `region`, `operation` |
+| GetMetricData Calculated Metric Requests | Calculated `GetMetricData` metric requests, using AWS's up-to-five-statistics grouping | `account_id`, `region` |
+| GetMetricData Profile Metric Request Estimates | Each profile's independently calculated footprint within every submitted request, for relative cost ranking | `account_id`, `region`, `profile` |
+| GetMetricData Query Items | Submitted `MetricDataQuery` items, for plan tuning | `account_id`, `region`, `profile` |
 
-Calls and billable metric requests deliberately have no profile attribution because one shared scan or request can serve multiple profiles; targets that resolve to the same account are aggregated. Each chart reports an absolute count for the interval since the preceding successfully committed collector frame: a cached interval with no real AWS work reports zero, activity from failed cycles carries into the next successful frame, and job replacement or a process restart resets it. The gauges exclude SDK-internal retries and are billing inputs, not an AWS invoice.
+The calculated metric-request total deliberately has no profile attribution because one request can contain statistics from several profiles. The profile view applies the same up-to-five-statistics calculation independently to each profile's items in each submitted request. It is a non-additive estimate for ranking: profiles sharing a structural metric can each receive an estimate for the same request unit, so profile values need not sum to the calculated total. Different effective query policies are submitted in separate requests and therefore estimated separately. No `_shared` profile is emitted.
+
+Targets that resolve to the same account are aggregated. Every initial or continuation page replays the same request footprint and increments all applicable counts. Each chart reports an absolute count for the interval since the preceding successfully committed collector frame: a cached interval with no real AWS work reports zero, activity from failed cycles carries into the next successful frame, and job replacement or a process restart resets it. SDK invocation counts include failed attempts but exclude retries performed internally by the AWS SDK. They cover CloudWatch `ListMetrics` and `GetMetricData`, not Resource Groups Tagging API, STS, or credential-provider calls. These gauges are cost-visibility inputs, not an AWS invoice.
 
 **Billing profile cost**
 
@@ -863,7 +866,7 @@ Charts are generated at runtime from the **active service profiles**:
 - Metrics land on the job's configured `vnode` when present, otherwise on the node running the collector. Individual AWS resources are distinguished by labels, not created as separate Netdata nodes.
 - CloudWatch publishes with a delay, so allow a few minutes for the first datapoints.
 
-Every job also emits three **collector-activity** chart types in the same `cloudwatch.*` namespace: `cloudwatch.collector_api_calls` (labeled operation instances, `calls` dimension), `cloudwatch.collector_metric_requests` (`requests` dimension), and `cloudwatch.collector_queries` (labeled profile instances, `queries` dimension). They report absolute counts for the interval since the preceding successfully committed collector frame; they measure collector-issued work, not an AWS invoice.
+Every job also emits four **collector-activity** chart types in the same `cloudwatch.*` namespace: `cloudwatch.collector_sdk_invocations` (labeled operation instances, `invocations` dimension), `cloudwatch.collector_get_metric_data_calculated_metric_requests` (`calculated_metric_requests` dimension), `cloudwatch.collector_get_metric_data_profile_metric_request_estimates` (labeled profile instances, `estimated_metric_requests` dimension), and `cloudwatch.collector_get_metric_data_query_items` (labeled profile instances, `query_items` dimension). They report absolute counts for the interval since the preceding successfully committed collector frame. The profile estimate is non-additive and intended for relative cost ranking; none of these gauges is an AWS invoice.
 
 The built-in profiles ship the following charts by default. Each service links to its profile -- the authoritative definition of its exact metrics, statistics, dimensions, and charts:
 
@@ -950,26 +953,26 @@ These disabled opt-in profiles are collected when a rule names them in `profiles
 
 ### Per AWS account, region, and operation
 
-Collector-issued CloudWatch API work attributed to one resolved AWS account, region, and API operation.
+Collector-issued CloudWatch SDK work attributed to one resolved AWS account, region, and SDK operation.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
 | account_id | Resolved AWS account ID. |
-| region | AWS region where the collector issued the operation. |
-| operation | Collector-issued CloudWatch API operation (`list_metrics` or `get_metric_data`). |
+| region | AWS region where the collector attempted the SDK invocation. |
+| operation | Collector-issued CloudWatch SDK operation (`list_metrics` or `get_metric_data`). |
 
 Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| cloudwatch.collector_api_calls | CloudWatch API calls issued in the interval since the preceding successfully committed collector frame. | calls | calls |
+| cloudwatch.collector_sdk_invocations | Attempted CloudWatch SDK method invocations in the interval since the preceding successfully committed collector frame. Failed attempts and requested pagination pages count; SDK-internal retries do not. | invocations | invocations |
 
 
 ### Per AWS account and region
 
-Calculated billable CloudWatch metric requests attributed to one resolved AWS account and region.
+Calculated CloudWatch metric requests attributed to one resolved AWS account and region.
 
 Labels:
 
@@ -982,26 +985,27 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| cloudwatch.collector_metric_requests | Calculated billable `GetMetricData` metric requests submitted in the interval since the preceding successfully committed collector frame. | requests | requests |
+| cloudwatch.collector_get_metric_data_calculated_metric_requests | Calculated `GetMetricData` metric requests submitted in the interval since the preceding successfully committed collector frame, using the request&#39;s structural-metric and up-to-five-statistics grouping. | calculated_metric_requests | metric requests |
 
 
 ### Per AWS account, region, and profile
 
-Raw CloudWatch metric-data queries attributed to their source profile for collection-plan tuning.
+CloudWatch metric-data request estimates and query items attributed to their source profile for cost ranking and collection-plan tuning.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
 | account_id | Resolved AWS account ID. |
-| region | AWS region where the collector submitted the queries. |
-| profile | CloudWatch profile that produced the submitted raw queries. |
+| region | AWS region where the collector submitted the requests. |
+| profile | CloudWatch profile that produced the submitted query items. |
 
 Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| cloudwatch.collector_queries | Raw `MetricDataQuery` items submitted in the interval since the preceding successfully committed collector frame. | queries | queries |
+| cloudwatch.collector_get_metric_data_profile_metric_request_estimates | Non-additive estimate of the `GetMetricData` metric-request footprint driven by this profile. Each profile is calculated independently within each submitted request, so profile values need not sum to the overall calculated total. | estimated_metric_requests | metric requests |
+| cloudwatch.collector_get_metric_data_query_items | `MetricDataQuery` items submitted in the interval since the preceding successfully committed collector frame. | query_items | query items |
 
 
 
