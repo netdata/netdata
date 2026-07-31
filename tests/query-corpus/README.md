@@ -83,7 +83,9 @@ layers; each layer declares which entries it consumes:
   worse than no corpus, because it is the thing you would trust. An unfiltered
   run ends with the complete, deduplicated list of broken contracts and fails
   if any manifest contract or required test component did not run. A filtered
-  run reports its partial coverage and never claims the complete corpus holds.
+  daemon-backed run reports its partial coverage and never claims the complete
+  corpus holds. The explicitly named daemon-free harness/unit fast path prints
+  only its Go test result and no query-contract verdict.
 - The manifest tracks case -> proves-what -> cloud status -> fixed-by. It
   records no expected outcome; only running a case can say whether it holds.
 
