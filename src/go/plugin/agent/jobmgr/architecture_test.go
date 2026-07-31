@@ -33,6 +33,7 @@ type packageRule struct {
 
 var activePackageRules = map[string]packageRule{
 	"lifecycle":   {neutral: true},
+	"containment": {},
 	"functions":   {},
 	"joboutput":   {},
 	"secrets":     {},

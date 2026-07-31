@@ -77,13 +77,13 @@ Verified against `src/crates/netflow-plugin/src/api/flows/handler.rs`:
 | `after` | flows | Unix seconds, lower bound. Negative = relative seconds from `before` |
 | `before` | flows | Unix seconds, upper bound. `0` = now |
 | `query` | flows | Free-text filter |
-| `selections` | flows | Pre-applied facet filters as `{ "FIELD_NAME": ["val", "val2"] }`. Common fields: `SRC_ADDR`, `DST_ADDR`, `SRC_PORT`, `DST_PORT`, `PROTOCOL`, `SRC_AS_NAME`, `DST_AS_NAME`, `SRC_COUNTRY`, `DST_COUNTRY`, `INTERFACE`, ... |
-| `facets` | flows | Array of facet field names whose value-distributions should appear in the response |
+| `selections` | flows | Pre-applied facet filters as `{ "FIELD_NAME": ["val", "val2"] }`. Values within a field are ORed; fields are ANDed. `EXPORTER_IP`, `SRC_ADDR`, `DST_ADDR`, `NEXT_HOP`, `SRC_ADDR_NAT`, and `DST_ADDR_NAT` accept exact IPv4/IPv6 addresses or canonical CIDRs. |
+| `facets` | flows | Array of requested facet fields. Fields with no retained values are omitted unless they have an active selection. |
 | `group_by` | flows | Up to 10 tuple-key field names (e.g. `["SRC_ADDR","DST_ADDR","PROTOCOL"]`) -- order defines the aggregation tuple |
 | `sort_by` | flows | `bytes` or `packets` |
 | `top_n` | flows | One of `25`, `50`, `100`, `200`, `500` |
 | `field` | autocomplete | Facet field to autocomplete (`SRC_ADDR`, etc.) |
-| `term` | autocomplete | Search prefix |
+| `term` | autocomplete | Search term. For an IP address field, a term containing `/` generates canonical IPv4/IPv6 CIDR candidates from loose input and returns only candidates containing an address in that field's retention-wide vocabulary. |
 
 ---
 
@@ -116,7 +116,7 @@ envelope (same shape as topology and logs):
 | `stats` | Counters: `flows_total`, `packets_total`, `bytes_total`, etc. |
 | `metrics` | Optional metric block |
 | `warnings[]` | Optional non-fatal diagnostics |
-| `facets` | When `facets` was requested in body, per-field value-counts plus `selections` echo |
+| `facets` | Retention-wide vocabularies for requested fields. Empty unselected fields are omitted; selected fields remain. Non-IP fields with up to 256 retained values return the complete static list; larger fields set `autocomplete: true` and omit inline values. IP address fields always set `autocomplete: true` for CIDR generation, but still return their complete inline list through 256 values. `truncated` states whether inline values were omitted. `auto.facets` echoes the requested field list and `auto.selections` echoes selections. |
 
 ### `data` object -- mode `flows`, view `timeseries`
 
@@ -136,7 +136,7 @@ totals) suitable for map rendering.
 | `mode` | `autocomplete` |
 | `field` | Echo of requested field |
 | `term` | Echo of requested search term |
-| `values[]` | Matching values for the field |
+| `values[]` | Matching retained values, or canonical CIDR candidates containing at least one retained address for that IP field when the term contains `/` |
 | `stats` / `warnings` | Same as flows mode |
 
 ---
@@ -214,6 +214,39 @@ read -r -d '' PAYLOAD <<'EOF'
 EOF
 ```
 
+For CIDR autocomplete, loose address and prefix-length fragments are accepted.
+Digits after `/` are an autocomplete fragment, not a completed selection:
+`/1` considers `/1` and `/10` through `/19`. One trailing dot before `/` is
+also tolerated after one through three complete IPv4 octets, so `10.1./1` is
+equivalent to `10.1/1`:
+
+```json
+{
+  "mode":  "autocomplete",
+  "field": "DST_ADDR",
+  "term":  "10.1/1"
+}
+```
+
+The two complete address octets naturally imply `10.1.0.0/16`, so that
+candidate is ranked first when the retained `DST_ADDR` vocabulary contains an
+address in it. Candidates containing no retained destination address are
+omitted, so another canonical network may be first. Use one of the returned
+canonical values in `selections`:
+
+```json
+{
+  "mode":       "flows",
+  "view":       "timeseries",
+  "after":      -86400,
+  "before":     0,
+  "selections": {"DST_ADDR": ["10.1.0.0/16", "2001:db8::7"]},
+  "group_by":   ["SRC_ADDR"],
+  "sort_by":    "bytes",
+  "top_n":      25
+}
+```
+
 ### Example 5: discover the live parameter set first
 
 ```bash
@@ -240,6 +273,17 @@ curl -sS -X POST \
   100, 200, 500. Other integers are rejected.
 - **`group_by` accepts up to 10 fields.** The order matters --
   it's the tuple ordering for the aggregation key.
+- **CIDR shorthand is autocomplete-only.** Direct selections must
+  contain a complete IPv4/IPv6 address and prefix such as
+  `10.0.0.0/8`, not `10/8`. Valid non-network addresses are
+  normalized before matching. Address-field CIDRs use the same
+  raw-tier availability as exact address filters.
+- **CIDR suggestions are retention-wide.** They prove that the
+  selected field contains a matching address somewhere in retained
+  data. The current time window and other selections can still make
+  the selected CIDR return no rows.
+- **Negative selections are not supported.** The current contract
+  is OR between values of one field and AND between fields.
 - **AS names depend on the configured GeoIP/AS database.** If the
   collector has no AS database, `SRC_AS_NAME` / `DST_AS_NAME`
   will be empty strings. Same for country/city fields.

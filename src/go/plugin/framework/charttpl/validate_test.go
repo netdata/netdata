@@ -1058,3 +1058,39 @@ func TestSpecValidateRejectsNegationOnlyInstances(t *testing.T) {
 		})
 	}
 }
+
+func TestSpecValidateChartAggregation(t *testing.T) {
+	for _, aggregation := range []Aggregation{"", AggregationSum, AggregationMin, AggregationMax, AggregationAvg} {
+		t.Run("accepts_"+string(aggregation), func(t *testing.T) {
+			spec := validationSpec()
+			spec.Groups[0].Charts[0].Aggregation = aggregation
+			require.NoError(t, spec.Validate())
+		})
+	}
+
+	spec := validationSpec()
+	spec.Groups[0].Charts[0].Aggregation = Aggregation("median")
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "groups[0].charts[0].aggregation")
+	assert.ErrorContains(t, err, "must be one of [sum min max avg]")
+}
+
+func validationSpec() Spec {
+	return Spec{
+		Version: VersionV1,
+		Groups: []Group{{
+			Family:  "Service",
+			Metrics: []string{"service_metric"},
+			Charts: []Chart{{
+				Title:   "Service metric",
+				Context: "service_metric",
+				Units:   "value",
+				Dimensions: []Dimension{{
+					Selector: "service_metric",
+					Name:     "value",
+				}},
+			}},
+		}},
+	}
+}

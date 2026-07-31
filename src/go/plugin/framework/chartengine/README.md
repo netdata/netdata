@@ -147,10 +147,15 @@ The following rules apply when routing conflicts arise:
 |-----------------------------------------------|------------------------------------------------------------------------------------------------|
 | Template vs autogen chart ID collision        | Template wins; autogen chart is replaced                                                       |
 | Cross-template chart ID collision             | Existing owner keeps ownership; subsequent series are **silently ignored** (see warning below) |
-| Duplicate dimension observations within build | First observed dimension metadata wins; values are reduced (summed)                            |
+| Duplicate dimension observations within build | First observed dimension metadata wins; values use the chart's configured reducer            |
 
 > [!WARNING]
 > Cross-template chart ID collisions cause silent data loss — conflicting series are dropped with no error and no log entry. If metrics are missing, check for duplicate rendered chart IDs across template groups.
+
+Authored charts can set one reducer for all their dimensions. Supported values are `sum` (default), `min`, `max`, and
+`avg`. Reduction is scoped to one successful plan build and happens before multiplier/divisor and
+`absolute`/`incremental` chart processing. Autogen routes retain their existing sum behavior. See the chart-template
+format's [aggregation section](../charttpl/README.md#aggregation) for semantics and metric-type constraints.
 
 ## Lifecycle Defaults and Policy
 

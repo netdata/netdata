@@ -15,12 +15,10 @@ type InheritedTaskRole uint8
 const (
 	InheritedPipelineSupervisor InheritedTaskRole = iota + 1
 	InheritedPipelineProvider
-	InheritedV1Runtime
-	InheritedV2Runner
 )
 
 func (itr InheritedTaskRole) valid() bool {
-	return itr >= InheritedPipelineSupervisor && itr <= InheritedV2Runner
+	return itr == InheritedPipelineSupervisor || itr == InheritedPipelineProvider
 }
 
 // InheritedTaskRef is a monotonic task identity. IDs are never reused during a
@@ -47,7 +45,7 @@ type inheritedTaskRegistry struct {
 
 type inheritedTaskSlot struct {
 	owner          ResourceIdentity        // owning resource identity
-	role           InheritedTaskRole       // inherited task role (V1 runtime / V2 runner / pipeline)
+	role           InheritedTaskRole       // inherited pipeline task role
 	key            string                  // identity tuple key into the owners map
 	cancel         context.CancelCauseFunc // child context canceller
 	done           chan struct{}           // closed when the child goroutine exits
@@ -55,7 +53,7 @@ type inheritedTaskSlot struct {
 	finished       bool                    // child completed
 	joined         bool                    // child goroutine joined
 	releasing      bool                    // release is in flight
-	permit         LongLivedPermitRef      // long-lived permit backing this task, if any
+	permit         LongLivedPermitRef      // long-lived permit backing this task
 	err            error                   // captured child error
 	activePrevious InheritedTaskRef        // previous task in the active list (shutdown cursor)
 	activeNext     InheritedTaskRef        // next task in the active list (shutdown cursor)
@@ -65,18 +63,6 @@ type inheritedOwnerRole struct {
 	owner ResourceIdentity
 	role  InheritedTaskRole
 	key   string
-}
-
-func (ts *TaskSupervisor) StartInherited(
-	parent context.Context,
-	owner ResourceIdentity,
-	role InheritedTaskRole,
-	work InheritedTaskWork,
-) (InheritedTaskRef, error) {
-	if role == InheritedPipelineSupervisor || role == InheritedPipelineProvider {
-		return 0, errors.New("jobmgr task supervisor: pipeline task requires a permit")
-	}
-	return ts.startInherited(parent, owner, role, "", work, 0)
 }
 
 func (ts *TaskSupervisor) StartInheritedWithPermit(
@@ -137,7 +123,7 @@ func (ts *TaskSupervisor) startInherited(
 	work InheritedTaskWork,
 	permit LongLivedPermitRef,
 ) (InheritedTaskRef, error) {
-	if ts == nil || parent == nil || !owner.Valid() || !role.valid() || work == nil {
+	if ts == nil || parent == nil || !owner.Valid() || !role.valid() || work == nil || !permit.valid() {
 		return 0, errors.New("jobmgr task supervisor: invalid inherited task")
 	}
 	registry := &ts.inherited
@@ -192,15 +178,15 @@ func (ts *TaskSupervisor) startInherited(
 	return ref, nil
 }
 
-func (registry *inheritedTaskRegistry) allocateSlot() (InheritedTaskRef, *inheritedTaskSlot, error) {
-	next := registry.nextSlot + 1
+func (itr *inheritedTaskRegistry) allocateSlot() (InheritedTaskRef, *inheritedTaskSlot, error) {
+	next := itr.nextSlot + 1
 	if next == 0 {
 		return 0, nil, errors.New("jobmgr task supervisor: inherited reference space exhausted")
 	}
-	registry.nextSlot = next
+	itr.nextSlot = next
 	ref := InheritedTaskRef(next)
 	slot := &inheritedTaskSlot{}
-	registry.slots[ref] = slot
+	itr.slots[ref] = slot
 	return ref, slot, nil
 }
 
@@ -290,24 +276,22 @@ func (ts *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner ResourceI
 		return errors.New("jobmgr task supervisor: inherited release before cancel and join")
 	}
 	permit := slot.permit
-	if permit.valid() {
-		role, taskKey := slot.role, slot.key
-		slot.releasing = true
-		registry.mu.Unlock()
-		if err := ts.releaseLongLivedG(permit, owner, role, taskKey); err != nil {
-			registry.mu.Lock()
-			if current, lookupErr := registry.slot(ref, owner); lookupErr == nil {
-				current.releasing = false
-			}
-			registry.mu.Unlock()
-			return err
-		}
+	role, taskKey := slot.role, slot.key
+	slot.releasing = true
+	registry.mu.Unlock()
+	if err := ts.releaseLongLivedG(permit, owner, role, taskKey); err != nil {
 		registry.mu.Lock()
-		slot, err = registry.slot(ref, owner)
-		if err != nil || !slot.releasing {
-			registry.mu.Unlock()
-			return errors.Join(err, errors.New("jobmgr task supervisor: inherited release changed"))
+		if current, lookupErr := registry.slot(ref, owner); lookupErr == nil {
+			current.releasing = false
 		}
+		registry.mu.Unlock()
+		return err
+	}
+	registry.mu.Lock()
+	slot, err = registry.slot(ref, owner)
+	if err != nil || !slot.releasing {
+		registry.mu.Unlock()
+		return errors.Join(err, errors.New("jobmgr task supervisor: inherited release changed"))
 	}
 	key := inheritedOwnerRole{
 		owner: slot.owner,

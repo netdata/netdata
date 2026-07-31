@@ -11,6 +11,6 @@ type Handler func(context.Context, Function)
 // Job Manager and service discovery use it to publish handlers without owning
 // ingress or invocation lifecycle.
 type Registry interface {
-	RegisterPrefix(name, prefix string, fn func(Function))
+	RegisterPrefix(name, prefix string, fn Handler)
 	UnregisterPrefix(name string, prefix string)
 }

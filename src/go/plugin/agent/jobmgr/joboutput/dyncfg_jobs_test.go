@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -649,7 +650,7 @@ func (err dynCfgCodedAutoDetectionError) DyncfgCode() int {
 	return err.code
 }
 
-func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
+func TestDynCfgCommandsCommitFailedForQuarantinedCandidateIdentity(t *testing.T) {
 	type prepareCommand func(
 		context.Context,
 		*DynCfgJobController,
@@ -759,10 +760,21 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 			}
 
 			transaction, err := test.prepare(context.Background(), controller, target, record, scope, permit)
-			require.Nil(t, transaction)
-			require.True(t, lifecycle.OwnershipRetained(err))
-			census := permitTasks.LongLivedCensus()
-			require.EqualValues(t, 1, census.Active)
+			require.NoError(t, err)
+			applied, err := transaction.Apply(context.Background())
+			require.NoError(t, err)
+			_, disposition, current := applied.Ownership()
+			require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+			require.Nil(t, current)
+			require.Equal(t, 503, applied.ResultStatus())
+
+			record, exists = graph.Lookup(config.FullName())
+			require.True(t, exists)
+			require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, permitTasks.LongLivedCensus())
+			attempts, ok := controller.factory.config.Attempts.(*containment.Authority)
+			require.True(t, ok)
+			require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
 		})
 	}
 }
@@ -1237,6 +1249,156 @@ func TestRunningUpdateTransientConstructionFailureCommitsFailedAndSchedulesRetry
 	commands.waitForSubmissions(t, 1)
 }
 
+func TestRunningUpdateRejectsStaleStoreCandidateAndPreservesIncumbent(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	scopeState := &factoryTestAtomicScope{value: "initial"}
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(func(context.Context) error {
+			scopeState.current.Store(false)
+			return nil
+		}, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+	controller.factory.config.ConfigModules.config.StoreScope =
+		func([]string) (secretresolver.AtomicScope, error) {
+			scopeState.current.Store(true)
+			return scopeState, nil
+		}
+
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider(confgroup.TypeDyncfg)
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+	incumbentPayload := record.Payload()
+
+	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
+	current := &transactionTestReadyResource{identity: currentIdentity}
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 2)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:        config.FullName(),
+		Current:   currentIdentity,
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+	}
+	target := dynCfgTarget{
+		module:     config.Module(),
+		name:       config.Name(),
+		resourceID: config.FullName(),
+		creator:    creator,
+	}
+	transaction, err := controller.prepareUpdate(
+		context.Background(),
+		DynCfgJobRequest{
+			Payload:      []byte(`{"option_str":"${store:vault:test:key}"}`),
+			ContentType:  "application/json",
+			CallerSource: "user=test",
+			HasPayload:   true,
+		},
+		target,
+		record,
+		true,
+		current,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, active := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Same(t, current, active)
+	require.Equal(t, 503, applied.ResultStatus())
+	record, exists = graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+	require.Equal(t, incumbentPayload, record.Payload())
+	require.Eventually(t, func() bool {
+		return tasks.LongLivedCensus() == (lifecycle.LongLivedCensus{})
+	}, time.Second, time.Millisecond)
+	requireFactoryAttemptsIdle(t, controller.factory)
+	require.EqualValues(t, 1, state.collectorCleanup)
+}
+
+func TestRunningUpdateCommitsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	delegate := controller.factory.config.Attempts.(*containment.Authority)
+	controller.factory.config.Attempts = runtimeBusyTestAuthority{delegate: delegate}
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(nil, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider(confgroup.TypeDyncfg)
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+
+	var events []string
+	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 2)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:        config.FullName(),
+		Current:   currentIdentity,
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+	}
+	target := dynCfgTarget{
+		module:     config.Module(),
+		name:       config.Name(),
+		resourceID: config.FullName(),
+		creator:    creator,
+	}
+	transaction, err := controller.prepareUpdate(
+		context.Background(),
+		DynCfgJobRequest{
+			Payload:      []byte(`{"option":"replacement"}`),
+			ContentType:  "application/json",
+			CallerSource: "user=test",
+			HasPayload:   true,
+		},
+		target,
+		record,
+		true,
+		current,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, active := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
+	require.Nil(t, active)
+	require.Equal(t, 503, applied.ResultStatus())
+	record, exists = graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.Contains(t, record.Payload(), "replacement")
+	require.Equal(t, []string{"current-stop", "current-finalize"}, events)
+	require.Eventually(t, func() bool {
+		return tasks.LongLivedCensus() == (lifecycle.LongLivedCensus{}) &&
+			delegate.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
+	require.EqualValues(t, 1, state.collectorCleanup)
+}
+
 func installFailingFixtureResolver(t *testing.T, controller *DynCfgJobController) {
 	t.Helper()
 	resolver, err := secretresolver.NewAtomicResolver(map[string]secretresolver.AtomicProvider{
@@ -1248,6 +1410,43 @@ func installFailingFixtureResolver(t *testing.T, controller *DynCfgJobController
 	})
 	require.NoError(t, err)
 	controller.factory.config.ConfigModules.config.Resolver = resolver
+}
+
+type runtimeBusyTestAuthority struct {
+	delegate jobmgr.ProcessAttemptAuthority
+}
+
+func (rbta runtimeBusyTestAuthority) StartProcessAttempt(
+	ctx context.Context,
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		return nil, jobmgr.ErrProcessAttemptBusy
+	}
+	return rbta.delegate.StartProcessAttempt(ctx, plan)
+}
+
+func (rbta runtimeBusyTestAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		return jobmgr.ErrProcessAttemptBusy
+	}
+	return rbta.delegate.SupersedeProcessAttempt(ctx, identity)
+}
+
+func (rbta runtimeBusyTestAuthority) CutProcessAttempt(
+	identity jobmgr.ProcessAttemptIdentity,
+	cause error,
+) bool {
+	return rbta.delegate.CutProcessAttempt(identity, cause)
+}
+
+func (rbta runtimeBusyTestAuthority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return rbta.delegate.ProcessAttemptReleased(identity)
 }
 
 type nonRetryableAutoDetectionError struct{}
@@ -1572,6 +1771,8 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 	output := &bytes.Buffer{}
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
+	cleanupOutput, err := NewCleanupOutputGate(frames)
+	require.NoError(t, err)
 	supervisor, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	state := &factoryTestState{}
@@ -1596,19 +1797,28 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 		},
 	)
 	require.NoError(t, err)
+	attempts, err := containment.NewAuthority(diagnostics)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(shutdownCtx))
+	})
 	factory, err := NewFactory(
 		FactoryConfig{
-			PluginName:       "go.d",
-			Modules:          modules,
-			Tasks:            supervisor,
-			Frames:           frames,
-			ConfigModules:    configModules,
-			Vnodes:           vnoderegistry.New(),
-			Scheduler:        newTestScheduler(t),
-			RunWithoutClaims: testRunWithoutClaims,
+			PluginName:    "go.d",
+			Epoch:         9,
+			Attempts:      attempts,
+			Modules:       modules,
+			Frames:        frames,
+			CleanupOutput: cleanupOutput,
+			ConfigModules: configModules,
+			Vnodes:        vnoderegistry.New(),
+			Scheduler:     newTestScheduler(t),
 		},
 	)
 	require.NoError(t, err)
+	factory.runWithoutClaims = testRunWithoutClaims
 	graph, err := dyncfg.NewGraph(nil)
 	require.NoError(t, err)
 	controller, err := NewDynCfgJobController(

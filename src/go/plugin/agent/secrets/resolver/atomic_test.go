@@ -253,6 +253,73 @@ func TestResolverStoreScopeLinear(t *testing.T) {
 	}
 }
 
+func TestResolverCapturesStoreSnapshotBeforeScopeRelease(t *testing.T) {
+	resolver, err := NewAtomicResolver(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := &atomicSnapshotTestScope{
+		atomicTestScope: atomicTestScope{
+			values: map[string]string{"vault:main/key": "resolved"},
+		},
+		snapshot: atomicTestSnapshot(true),
+	}
+	resolved, references, snapshot, err := resolver.ResolveWithSnapshot(
+		context.Background(),
+		"${store:vault:main:key}",
+		func([]string) (AtomicScope, error) {
+			return scope, nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved != "resolved" || !references || snapshot == nil || !snapshot.Current() {
+		t.Fatalf(
+			"resolved=%#v references=%v snapshot=%v",
+			resolved,
+			references,
+			snapshot,
+		)
+	}
+	if !scope.snapshotBeforeRelease || scope.releases != 1 {
+		t.Fatalf(
+			"snapshotBeforeRelease=%v releases=%d",
+			scope.snapshotBeforeRelease,
+			scope.releases,
+		)
+	}
+}
+
+func TestResolverSnapshotRequiresVersionedStoreScope(t *testing.T) {
+	resolver, err := NewAtomicResolver(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := &atomicTestScope{
+		values: map[string]string{"vault:main/key": "resolved"},
+	}
+	resolved, references, snapshot, err := resolver.ResolveWithSnapshot(
+		context.Background(),
+		"${store:vault:main:key}",
+		func([]string) (AtomicScope, error) {
+			return scope, nil
+		},
+	)
+	if resolved != nil || !references || snapshot != nil {
+		t.Fatalf(
+			"resolved=%#v references=%v snapshot=%v",
+			resolved,
+			references,
+			snapshot,
+		)
+	}
+	requireAtomicErrorKind(t, err, AtomicErrorScope)
+	if scope.releases != 1 {
+		t.Fatalf("scope releases=%d", scope.releases)
+	}
+}
+
 func TestStoreReferencesIgnoresNonStoreProviderReferences(t *testing.T) {
 	input := map[string]any{
 		"store":   "${store:vault:main:key}",
@@ -318,6 +385,23 @@ func (scope *atomicTestScope) Resolve(
 func (scope *atomicTestScope) Release(context.Context) error {
 	scope.releases++
 	return nil
+}
+
+type atomicTestSnapshot bool
+
+func (snapshot atomicTestSnapshot) Current() bool {
+	return bool(snapshot)
+}
+
+type atomicSnapshotTestScope struct {
+	atomicTestScope
+	snapshot              AtomicScopeSnapshot
+	snapshotBeforeRelease bool
+}
+
+func (scope *atomicSnapshotTestScope) Snapshot() AtomicScopeSnapshot {
+	scope.snapshotBeforeRelease = scope.releases == 0
+	return scope.snapshot
 }
 
 func atomicNestedMap(edges int) map[string]any {

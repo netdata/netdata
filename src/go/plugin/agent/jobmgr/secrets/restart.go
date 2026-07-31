@@ -157,6 +157,7 @@ func (src *SecretRestartCommand) start(
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) &&
 				!errors.Is(err, jobmgr.ErrCompositeRecoveryUnresolved) {
+				state.RetainPending()
 				operationalErr = errors.Join(operationalErr, err)
 			} else {
 				integrityErr = errors.Join(integrityErr, err)

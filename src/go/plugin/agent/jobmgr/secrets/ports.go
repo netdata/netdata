@@ -21,6 +21,7 @@ type DependentStopResult interface {
 
 type DependentStartResult interface {
 	Err() error
+	RetainPending()
 }
 
 // DependentJobPort supplies acknowledged stop/start plans without coupling the

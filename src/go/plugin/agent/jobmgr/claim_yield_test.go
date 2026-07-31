@@ -561,12 +561,12 @@ type claimYieldPanicTestLease struct {
 	reacquires int
 }
 
-func (lease *claimYieldPanicTestLease) release(context.Context) error {
-	lease.releases++
+func (cyptl *claimYieldPanicTestLease) release(context.Context) error {
+	cyptl.releases++
 	return nil
 }
 
-func (lease *claimYieldPanicTestLease) reacquire(context.Context) error {
-	lease.reacquires++
+func (cyptl *claimYieldPanicTestLease) reacquire(context.Context) error {
+	cyptl.reacquires++
 	return nil
 }

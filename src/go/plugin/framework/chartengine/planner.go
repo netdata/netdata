@@ -70,15 +70,37 @@ type InferredDimension struct {
 	Name            string
 }
 
+type dimensionAlgorithm uint8
+
+const (
+	dimensionAlgorithmAbsolute dimensionAlgorithm = iota
+	dimensionAlgorithmIncremental
+)
+
+func compactDimensionAlgorithm(algorithm program.Algorithm) dimensionAlgorithm {
+	if algorithm == program.AlgorithmIncremental {
+		return dimensionAlgorithmIncremental
+	}
+	return dimensionAlgorithmAbsolute
+}
+
+func (a dimensionAlgorithm) programAlgorithm() program.Algorithm {
+	if a == dimensionAlgorithmIncremental {
+		return program.AlgorithmIncremental
+	}
+	return program.AlgorithmAbsolute
+}
+
 type dimensionState struct {
-	hidden     bool
-	float      bool
-	static     bool
-	order      int
-	sortKey    dimensionSortKey
-	algorithm  program.Algorithm
-	multiplier int
-	divisor    int
+	sortKey     dimensionSortKey
+	order       int
+	multiplier  int
+	divisor     int
+	algorithm   dimensionAlgorithm
+	hidden      bool
+	float       bool
+	static      bool
+	aggregation program.Aggregation
 }
 
 type dimensionSortKind uint8
@@ -94,9 +116,57 @@ type dimensionSortKey struct {
 }
 
 type dimBuildEntry struct {
-	seenSeq uint64
-	value   metrix.SampleValue
+	seenSeq      uint64
+	observations uint64
+	value        metrix.SampleValue
 	dimensionState
+}
+
+func (e *dimBuildEntry) aggregate(value metrix.SampleValue) {
+	if e.aggregation == program.AggregationSum {
+		e.value += value
+		return
+	}
+	e.aggregateNonSum(value)
+}
+
+func (e *dimBuildEntry) aggregateNonSum(value metrix.SampleValue) {
+	switch e.aggregation {
+	case program.AggregationMin:
+		if math.IsNaN(e.value) || (!math.IsNaN(value) && value < e.value) {
+			e.value = value
+		}
+	case program.AggregationMax:
+		if math.IsNaN(e.value) || (!math.IsNaN(value) && value > e.value) {
+			e.value = value
+		}
+	case program.AggregationAvg:
+		e.observations++
+		e.value = runningAverage(e.value, value, e.observations)
+	}
+}
+
+func runningAverage(current, value metrix.SampleValue, observations uint64) metrix.SampleValue {
+	if math.IsNaN(current) || math.IsNaN(value) {
+		return math.NaN()
+	}
+	if math.IsInf(current, 0) {
+		if math.IsInf(value, 0) && math.Signbit(current) != math.Signbit(value) {
+			return math.NaN()
+		}
+		return current
+	}
+	if math.IsInf(value, 0) {
+		return value
+	}
+
+	n := float64(observations)
+	delta := value - current
+	if !math.IsInf(delta, 0) {
+		return math.FMA(delta, 1/n, current)
+	}
+
+	return current*((n-1)/n) + value/n
 }
 
 type chartState struct {
@@ -560,16 +630,18 @@ func (ctx *planBuildContext) accumulateRoute(
 	}
 	if entry.seenSeq != cs.currentBuildSeq {
 		entry.seenSeq = cs.currentBuildSeq
+		entry.observations = 1
 		entry.value = value
 		entry.dimensionState = dimensionState{
-			hidden:     route.Hidden,
-			float:      route.Float,
-			static:     route.Static,
-			order:      route.DimensionIndex,
-			sortKey:    sortKey,
-			algorithm:  route.Algorithm,
-			multiplier: route.Multiplier,
-			divisor:    route.Divisor,
+			hidden:      route.Hidden,
+			float:       route.Float,
+			static:      route.Static,
+			order:       route.DimensionIndex,
+			sortKey:     sortKey,
+			aggregation: route.Aggregation,
+			algorithm:   compactDimensionAlgorithm(route.Algorithm),
+			multiplier:  route.Multiplier,
+			divisor:     route.Divisor,
 		}
 		cs.observedCount++
 	} else {
@@ -579,7 +651,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		if entry.float != route.Float {
 			// First-observed float flag wins within one build; conflicting routes are ignored.
 		}
-		entry.value += value
+		entry.aggregate(value)
 	}
 
 	if cs.labelTracker.observeMembership(identity, route.DimensionKeyLabel) {
@@ -676,7 +748,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 					Name:       name,
 					Hidden:     entry.hidden,
 					Float:      entry.float,
-					Algorithm:  entry.algorithm,
+					Algorithm:  entry.algorithm.programAlgorithm(),
 					Multiplier: entry.multiplier,
 					Divisor:    entry.divisor,
 				})

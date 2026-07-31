@@ -45,8 +45,18 @@ async fn recv_from_any_listener(
 }
 
 impl IngestService {
+    #[allow(dead_code)]
     pub(crate) async fn run(self, shutdown: CancellationToken) -> Result<()> {
         self.run_with_listener_ready(shutdown, |_| {}).await
+    }
+
+    pub(crate) async fn run_with_listener_ready_signal(
+        self,
+        shutdown: CancellationToken,
+        listener_ready: CancellationToken,
+    ) -> Result<()> {
+        self.run_with_listener_ready(shutdown, move |_| listener_ready.cancel())
+            .await
     }
 
     async fn run_with_listener_ready(

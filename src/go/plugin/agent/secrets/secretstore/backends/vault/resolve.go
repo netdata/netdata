@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
@@ -42,27 +42,18 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 		return "", fmt.Errorf("resolving secret '%s': store '%s': %w", req.Original, req.StoreKey, err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(addr, "/")+"/v1/"+path, nil)
+	httpReq, err := s.newRequest(ctx, addr, path, token)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': %w", req.Original, req.StoreKey, err)
 	}
-	httpReq.Header.Set("X-Vault-Token", token)
-	if ns, ok := s.namespace(); ok {
-		httpReq.Header.Set("X-Vault-Namespace", ns)
-	}
 
-	client := s.runtime.httpClient
-	if s.skipVerify() {
-		client = s.runtime.httpClientInsecure
-	}
-
-	resp, err := client.Do(httpReq)
+	resp, err := s.client().Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': vault request failed: %w", req.Original, req.StoreKey, err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, responseBodyLimit))
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': reading vault response: %w", req.Original, req.StoreKey, err)
 	}
@@ -81,6 +72,35 @@ func logResolvedRequest(ctx context.Context, req secretstore.ResolveRequest, pat
 	if log, ok := logger.LoggerFromContext(ctx); ok {
 		log.Infof("resolved secret via vault secretstore '%s' path '%s' key '%s'", req.StoreKey, path, key)
 	}
+}
+
+func (s *publishedStore) newRequest(
+	ctx context.Context,
+	addr string,
+	path string,
+	token string,
+) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		strings.TrimRight(addr, "/")+"/v1/"+path,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Vault-Token", token)
+	if ns, ok := s.namespace(); ok {
+		req.Header.Set("X-Vault-Namespace", ns)
+	}
+	return req, nil
+}
+
+func (s *publishedStore) client() *http.Client {
+	if s.skipVerify() {
+		return s.runtime.httpClientInsecure
+	}
+	return s.runtime.httpClient
 }
 
 func (s *publishedStore) address() (string, error) {
@@ -113,7 +133,7 @@ func (s *publishedStore) token() (string, error) {
 		if path == "" {
 			return "", fmt.Errorf("mode_token_file.path is required")
 		}
-		data, err := os.ReadFile(path)
+		data, err := safefile.Read(path)
 		if err != nil {
 			return "", fmt.Errorf("cannot read token file '%s': %w", path, err)
 		}

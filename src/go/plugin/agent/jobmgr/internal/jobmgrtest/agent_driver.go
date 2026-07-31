@@ -64,73 +64,73 @@ type agentFixtureState struct {
 	checkErr            error
 }
 
-func (state *agentFixtureState) cleanup() {
-	state.record("cleanup")
-	if state.cleanupEntered != nil {
-		state.cleanupOnce.Do(func() { close(state.cleanupEntered) })
+func (afs *agentFixtureState) cleanup() {
+	afs.record("cleanup")
+	if afs.cleanupEntered != nil {
+		afs.cleanupOnce.Do(func() { close(afs.cleanupEntered) })
 	}
-	if state.cleanupGate != nil {
+	if afs.cleanupGate != nil {
 		select {
-		case <-state.cleanupGate:
-		case <-state.ownerDone:
+		case <-afs.cleanupGate:
+		case <-afs.ownerDone:
 		}
 	}
-	if state.cleanupReturned != nil {
-		state.cleanupReturnOnce.Do(func() {
-			close(state.cleanupReturned)
+	if afs.cleanupReturned != nil {
+		afs.cleanupReturnOnce.Do(func() {
+			close(afs.cleanupReturned)
 		})
 	}
 }
 
-func (state *agentFixtureState) check() error {
-	state.record("check")
-	if state.checkEntered != nil {
-		state.checkOnce.Do(func() { close(state.checkEntered) })
+func (afs *agentFixtureState) check() error {
+	afs.record("check")
+	if afs.checkEntered != nil {
+		afs.checkOnce.Do(func() { close(afs.checkEntered) })
 	}
-	if state.checkGate != nil {
+	if afs.checkGate != nil {
 		select {
-		case <-state.checkGate:
-		case <-state.ownerDone:
+		case <-afs.checkGate:
+		case <-afs.ownerDone:
 		}
 	}
-	return state.checkErr
+	return afs.checkErr
 }
 
-func (state *agentFixtureState) handle(ctx context.Context, event string) {
-	state.record(event)
-	state.record(event + ":entered")
-	if state.handleEntered != nil {
-		state.handleOnce.Do(func() { close(state.handleEntered) })
+func (afs *agentFixtureState) handle(ctx context.Context, event string) {
+	afs.record(event)
+	afs.record(event + ":entered")
+	if afs.handleEntered != nil {
+		afs.handleOnce.Do(func() { close(afs.handleEntered) })
 	}
-	if state.handleGate != nil {
-		if state.handleCancelReturns {
+	if afs.handleGate != nil {
+		if afs.handleCancelReturns {
 			select {
-			case <-state.handleGate:
+			case <-afs.handleGate:
 			case <-ctx.Done():
-				state.record(event + ":cancelled")
-			case <-state.ownerDone:
+				afs.record(event + ":cancelled")
+			case <-afs.ownerDone:
 			}
 		} else {
 			select {
-			case <-state.handleGate:
-			case <-state.ownerDone:
+			case <-afs.handleGate:
+			case <-afs.ownerDone:
 			}
 		}
 	}
-	state.record(event + ":returned")
+	afs.record(event + ":returned")
 }
 
-func (state *agentFixtureState) record(event string) {
-	state.mu.Lock()
-	state.events = append(state.events, event)
-	state.mu.Unlock()
+func (afs *agentFixtureState) record(event string) {
+	afs.mu.Lock()
+	afs.events = append(afs.events, event)
+	afs.mu.Unlock()
 }
 
-func (state *agentFixtureState) count(event string) int {
-	state.mu.Lock()
-	defer state.mu.Unlock()
+func (afs *agentFixtureState) count(event string) int {
+	afs.mu.Lock()
+	defer afs.mu.Unlock()
 	count := 0
-	for _, observed := range state.events {
+	for _, observed := range afs.events {
 		if observed == event {
 			count++
 		}
@@ -138,10 +138,10 @@ func (state *agentFixtureState) count(event string) int {
 	return count
 }
 
-func (state *agentFixtureState) snapshot() []string {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	return append([]string(nil), state.events...)
+func (afs *agentFixtureState) snapshot() []string {
+	afs.mu.Lock()
+	defer afs.mu.Unlock()
+	return append([]string(nil), afs.events...)
 }
 
 type synchronizedBuffer struct {
@@ -149,38 +149,38 @@ type synchronizedBuffer struct {
 	data bytes.Buffer
 }
 
-func (buffer *synchronizedBuffer) Write(payload []byte) (int, error) {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
-	return buffer.data.Write(payload)
+func (sb *synchronizedBuffer) Write(payload []byte) (int, error) {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.data.Write(payload)
 }
 
-func (buffer *synchronizedBuffer) contains(fragment string) bool {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
-	return bytes.Contains(buffer.data.Bytes(), []byte(fragment))
+func (sb *synchronizedBuffer) contains(fragment string) bool {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return bytes.Contains(sb.data.Bytes(), []byte(fragment))
 }
 
-func (buffer *synchronizedBuffer) count(fragment string) int {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
-	return bytes.Count(buffer.data.Bytes(), []byte(fragment))
+func (sb *synchronizedBuffer) count(fragment string) int {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return bytes.Count(sb.data.Bytes(), []byte(fragment))
 }
 
-func (buffer *synchronizedBuffer) snapshot() []byte {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
-	return append([]byte(nil), buffer.data.Bytes()...)
+func (sb *synchronizedBuffer) snapshot() []byte {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return append([]byte(nil), sb.data.Bytes()...)
 }
 
-func (buffer *synchronizedBuffer) String() string {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
-	if buffer.data.Len() > 8*1024 {
-		data := buffer.data.Bytes()
+func (sb *synchronizedBuffer) String() string {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	if sb.data.Len() > 8*1024 {
+		data := sb.data.Bytes()
 		return fmt.Sprintf("%q...%q (%d bytes)", data[:4*1024], data[len(data)-4*1024:], len(data))
 	}
-	return buffer.data.String()
+	return sb.data.String()
 }
 
 type observedFunctionResult struct {
@@ -191,11 +191,11 @@ type observedFunctionResult struct {
 	payloadSHA   [sha256.Size]byte
 }
 
-func (buffer *synchronizedBuffer) functionResult(uid string) (observedFunctionResult, bool, error) {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
+func (sb *synchronizedBuffer) functionResult(uid string) (observedFunctionResult, bool, error) {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
 	prefix := []byte("FUNCTION_RESULT_BEGIN " + uid + " ")
-	data := buffer.data.Bytes()
+	data := sb.data.Bytes()
 	start := bytes.Index(data, prefix)
 	if start < 0 {
 		return observedFunctionResult{}, false, nil
@@ -1102,25 +1102,25 @@ type fixtureCollectorV2 struct {
 	store metrix.CollectorStore
 }
 
-func (collector *fixtureCollectorV2) Init(context.Context) error {
-	collector.state.record("init")
+func (fcv2 *fixtureCollectorV2) Init(context.Context) error {
+	fcv2.state.record("init")
 	return nil
 }
 
-func (collector *fixtureCollectorV2) Check(context.Context) error {
-	return collector.state.check()
+func (fcv2 *fixtureCollectorV2) Check(context.Context) error {
+	return fcv2.state.check()
 }
 
-func (collector *fixtureCollectorV2) Collect(context.Context) error {
-	collector.state.record("collect")
-	if collector.state.emitCharts {
-		collector.store.Write().SnapshotMeter("jobmgrtest").Gauge("value").Observe(1)
+func (fcv2 *fixtureCollectorV2) Collect(context.Context) error {
+	fcv2.state.record("collect")
+	if fcv2.state.emitCharts {
+		fcv2.store.Write().SnapshotMeter("jobmgrtest").Gauge("value").Observe(1)
 	}
 	return nil
 }
 
-func (collector *fixtureCollectorV2) Cleanup(context.Context) {
-	collector.state.cleanup()
+func (fcv2 *fixtureCollectorV2) Cleanup(context.Context) {
+	fcv2.state.cleanup()
 }
 
 func (*fixtureCollectorV2) Configuration() any {
@@ -1131,8 +1131,8 @@ func (*fixtureCollectorV2) VirtualNode() *vnodes.VirtualNode {
 	return nil
 }
 
-func (collector *fixtureCollectorV2) MetricStore() metrix.CollectorStore {
-	return collector.store
+func (fcv2 *fixtureCollectorV2) MetricStore() metrix.CollectorStore {
+	return fcv2.store
 }
 
 func (*fixtureCollectorV2) ChartTemplateYAML() string {
@@ -1159,20 +1159,20 @@ func (fixtureFunctionHandler) MethodParams(context.Context, string) ([]funcapi.P
 	return nil, nil
 }
 
-func (handler fixtureFunctionHandler) Handle(
+func (ffh fixtureFunctionHandler) Handle(
 	ctx context.Context,
 	method string,
 	_ funcapi.ResolvedParams,
 ) *funcapi.FunctionResponse {
-	handler.state.handle(ctx, "handle:"+method)
+	ffh.state.handle(ctx, "handle:"+method)
 	return funcapi.RawResponse(map[string]any{"method": method, "status": 200})
 }
 
-func (handler fixtureFunctionHandler) HandleRaw(
+func (ffh fixtureFunctionHandler) HandleRaw(
 	ctx context.Context,
 	request funcapi.RawMethodRequest,
 ) *funcapi.FunctionResponse {
-	handler.state.handle(ctx, "raw:"+request.Method)
+	ffh.state.handle(ctx, "raw:"+request.Method)
 	if deferred, ok := requestedDeferredBytes(request.Args); ok {
 		const fixedBytes = len(`{"pad":""}`)
 		if deferred <= fixedBytes {
@@ -1196,8 +1196,8 @@ func (handler fixtureFunctionHandler) HandleRaw(
 	})
 }
 
-func (handler fixtureFunctionHandler) Cleanup(context.Context) {
-	handler.state.record("handler-cleanup")
+func (ffh fixtureFunctionHandler) Cleanup(context.Context) {
+	ffh.state.record("handler-cleanup")
 }
 
 func requestedDeferredBytes(arguments []string) (int, bool) {

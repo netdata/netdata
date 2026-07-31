@@ -29,7 +29,7 @@ This page covers `net_listeners`-specific setup. For the broader Service Discove
 
 Each discovery cycle, the discoverer:
 
-1. **Reads the kernel's TCP/UDP listening-socket table** via the bundled `local-listeners` helper (which reads `/proc` on Linux, `netstat`-equivalents elsewhere).
+1. **Reads the kernel's TCP/UDP listening-socket table** via the bundled `local-listeners` helper, which reads Linux procfs socket and process data.
 2. **Builds one target per `(protocol, IP, port, process)` tuple**, exposing `.Protocol`, `.IPAddress`, `.Port`, `.Comm` (process basename), `.Cmdline` (full command line), and `.Address` (the convenience `IPAddress:Port`).
 3. **Caches** each target for 10 minutes so a brief disappearance (process restart) does not churn collector jobs.
 4. **Runs the `services:` rules** against each target. The stock conf carries ~100 curated rules covering the bulk of go.d modules (databases, web servers, caches, message queues, exporters).
@@ -40,6 +40,7 @@ Each discovery cycle, the discoverer:
 
 - Only **local** listeners are visible. Discovering services on other hosts requires another discoverer (`http`, `snmp`, `k8s`, or a custom one).
 - The discoverer needs to **read kernel socket information**. On Linux this works for processes owned by other users only when Netdata can read the appropriate `/proc/<pid>/net` files; the Netdata installer configures this via the `local-listeners` setuid helper.
+- The bundled `local-listeners` helper is currently built for Linux. A missing or non-executable helper makes both normal discovery and the DynCfg operational test fail.
 - **Containerised services in `host` networking** appear as listeners and are picked up here, not by the Docker discoverer. Services in private container networks must be discovered by the Docker discoverer instead.
 - The discoverer does not introspect process runtime — anything beyond port/`comm`/`cmdline` (e.g. config-file path, version, runtime URL prefix) must be inferred via service rules or known by convention.
 
@@ -239,6 +240,13 @@ The last rule in the stock conf catches generic Prometheus exporters by port. `p
 
 After enabling the discoverer, confirm it is finding listeners and producing jobs.
 
+### Test a candidate configuration without applying it
+
+A DynCfg `test` runs the same installed `nd-run` and `local-listeners` path once, with the production flags and configured `timeout`, then parses the complete snapshot and discards it. Success proves that this one helper invocation and parse worked on the local host at that instant.
+
+The test does not start discovery, cache or publish targets, evaluate `services:` rules, create collector jobs, or prove that a generated job can connect to its service. It requires no permissions beyond normal local-listener discovery. Work and buffered output scale with the host's socket/process inventory; caller cancellation and `timeout` bound elapsed time, not the number of inspected entries.
+
+
 ### Confirm listeners are being scanned
 
 Watch the agent log for `discoverer=net_listeners` messages. With systemd:
@@ -287,4 +295,4 @@ The stock `exporter` catch-all rule (last in the file) is greedy by design — a
 
 ### Generated jobs fail to start
 
-The discoverer creates jobs but does not run them. Common causes: the rendered template assumes credentials the local service rejects (e.g. RabbitMQ default `guest:guest`); `0.0.0.0` listeners produce `0.0.0.0:port` addresses that the collector cannot connect to (use `127.0.0.1` in the template if appropriate); the service has TLS but the template uses HTTP.
+The discoverer creates jobs but does not run them. Common causes: the rendered template assumes credentials the local service rejects (e.g. RabbitMQ default `guest:guest`); a rule renders the wrong port or protocol; or the service has TLS but the template uses HTTP.

@@ -63,7 +63,7 @@ modules:
         limits:
           description: "Operational limits are driven by sustained flow records/s, exporter batching, cardinality, retention, storage speed, and enrichment. On modern hardware with fast storage, plan around 50k-100k sustained flow records/s per well-provisioned agent for the full raw + rollup pipeline, provided the underlying disks can sustain the required journal write activity; use distributed agents for larger deployments."
         performance_impact:
-          description: "Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate and cardinality; size retention and storage from observed flow records/s."
+          description: "Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate, template volume, and cardinality; size retention and storage from observed flow records/s."
     setup:
       prerequisites:
         list:
@@ -114,7 +114,7 @@ modules:
               default_value: flows
               required: false
             - name: journal.tiers.&lt;tier&gt;.size_of_journal_files
-              description: Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention.
+              description: Per-tier retained-artifact budget for journal data and finalized per-journal facet sidecars. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The protected active journal can temporarily exceed the budget. Set to `null` for time-only retention.
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files
@@ -418,7 +418,7 @@ modules:
               default_value: flows
               required: false
             - name: journal.tiers.&lt;tier&gt;.size_of_journal_files
-              description: Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention.
+              description: Per-tier retained-artifact budget for journal data and finalized per-journal facet sidecars. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The protected active journal can temporarily exceed the budget. Set to `null` for time-only retention.
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files
@@ -556,7 +556,7 @@ modules:
               default_value: flows
               required: false
             - name: journal.tiers.&lt;tier&gt;.size_of_journal_files
-              description: Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention.
+              description: Per-tier retained-artifact budget for journal data and finalized per-journal facet sidecars. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The protected active journal can temporarily exceed the budget. Set to `null` for time-only retention.
               default_value: "10GB"
               required: false
             - name: journal.tiers.&lt;tier&gt;.duration_of_journal_files

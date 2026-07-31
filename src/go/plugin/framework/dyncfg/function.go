@@ -3,6 +3,7 @@
 package dyncfg
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -10,19 +11,25 @@ import (
 
 // Function wraps functions.Function with dyncfg-specific accessor and helper methods.
 type Function struct {
-	fn functions.Function
+	ctx context.Context
+	fn  functions.Function
 }
 
 // NewFunction creates a new dyncfg Function wrapper.
-func NewFunction(fn functions.Function) Function {
+func NewFunction(ctx context.Context, fn functions.Function) Function {
 	return Function{
-		fn: fn,
+		ctx: ctx,
+		fn:  fn,
 	}
 }
 
 // UID returns the function's unique identifier.
 func (f Function) UID() string {
 	return f.fn.UID
+}
+
+func (f Function) Context() context.Context {
+	return f.ctx
 }
 
 // Source returns the function's source field.

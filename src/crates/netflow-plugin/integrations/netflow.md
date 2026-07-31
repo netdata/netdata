@@ -61,7 +61,7 @@ Operational limits are driven by sustained flow records/s, exporter batching, ca
 
 #### Performance Impact
 
-Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate and cardinality; size retention and storage from observed flow records/s.
+Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate, template volume, and cardinality; size retention and storage from observed flow records/s.
 
 ## Setup
 
@@ -96,7 +96,7 @@ The plugin is configured via `netflow.yaml` in the Netdata configuration directo
 | protocols.sampling_cache_max_entries | Maximum learned NetFlow v9/IPFIX sampling-rate entries across all exporter streams. Must be positive. | 100000 | no |
 | protocols.sampling_cache_max_entries_per_stream | Maximum learned sampling-rate entries for one exporter stream. Must be positive; values above the global limit are clamped. | 65536 | no |
 | journal.journal_dir | Directory for journal files (relative to NETDATA_CACHE_DIR). | flows | no |
-| journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention. | 10GB | no |
+| journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier retained-artifact budget for journal data and finalized per-journal facet sidecars. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The protected active journal can temporarily exceed the budget. Set to `null` for time-only retention. | 10GB | no |
 | journal.tiers.&lt;tier&gt;.duration_of_journal_files | Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap. | null | no |
 
 

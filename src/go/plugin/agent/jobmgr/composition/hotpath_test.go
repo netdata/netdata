@@ -67,17 +67,18 @@ func BenchmarkBProcessRestart(b *testing.B) {
 	started := make(chan struct{})
 	close(started)
 	process := &Process{
-		commands: make(chan processControl),
+		controls: newProcessControls(),
 		started:  started,
 		done:     make(chan struct{}),
 	}
 	go func() {
-		for control := range process.commands {
+		for control := range process.controls.restart {
 			control.result <- nil
 		}
 	}()
 	b.Cleanup(func() {
-		close(process.commands)
+		close(process.controls.restart)
+		close(process.controls.terminate)
 	})
 	b.ReportAllocs()
 	for b.Loop() {

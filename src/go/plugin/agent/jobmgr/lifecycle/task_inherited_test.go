@@ -37,6 +37,50 @@ func (mew *malformedErrorWrapper) Unwrap() error {
 	return mew.child
 }
 
+func issueInheritedTestPermit(
+	t testing.TB,
+	supervisor *TaskSupervisor,
+	owner ResourceIdentity,
+) LongLivedPermit {
+	t.Helper()
+	plan, err := NewPipelineLongLivedPlan([]string{"unused"})
+	require.NoError(t, err)
+	permit, err := supervisor.IssueLongLivedPermit(owner, plan)
+	require.NoError(t, err)
+	return permit
+}
+
+func startInheritedTestTask(
+	t testing.TB,
+	supervisor *TaskSupervisor,
+	owner ResourceIdentity,
+	work InheritedTaskWork,
+) (InheritedTaskRef, LongLivedPermit) {
+	t.Helper()
+	permit := issueInheritedTestPermit(t, supervisor, owner)
+	ref, err := supervisor.StartInheritedWithPermit(
+		context.Background(),
+		owner,
+		InheritedPipelineSupervisor,
+		permit,
+		work,
+	)
+	require.NoError(t, err)
+	return ref, permit
+}
+
+func releaseInheritedTestTask(
+	t testing.TB,
+	supervisor *TaskSupervisor,
+	ref InheritedTaskRef,
+	owner ResourceIdentity,
+	permit LongLivedPermit,
+) {
+	t.Helper()
+	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+	require.NoError(t, permit.AbortUnused())
+}
+
 func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	owner := ResourceIdentity{
@@ -44,17 +88,16 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 		Generation: 7,
 	}
 	entered := make(chan struct{})
-	ref, err := supervisor.StartInherited(
-		context.Background(),
+	ref, permit := startInheritedTestTask(
+		t,
+		supervisor,
 		owner,
-		InheritedV1Runtime,
 		func(ctx context.Context) error {
 			close(entered)
 			<-ctx.Done()
 			return nil
 		},
 	)
-	require.NoError(t, err)
 	<-entered
 	require.EqualValues(t, 0, supervisor.Active())
 	require.EqualValues(t, 1, supervisor.InheritedActive())
@@ -65,7 +108,7 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 	require.NoError(t, joinInheritedErr)
 	require.True(t, joinInheritedJoined)
 
-	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+	releaseInheritedTestTask(t, supervisor, ref, owner, permit)
 
 	require.EqualValues(t, 0, supervisor.InheritedActive())
 
@@ -100,16 +143,15 @@ func TestInheritedShutdownNormalizesOnlyCurrentStoppingCause(t *testing.T) {
 				ID:         "pipeline",
 				Generation: 1,
 			}
-			ref, err := supervisor.StartInherited(
-				context.Background(),
+			ref, permit := startInheritedTestTask(
+				t,
+				supervisor,
 				owner,
-				InheritedV1Runtime,
 				func(ctx context.Context) error {
 					<-ctx.Done()
 					return test.result(ctx)
 				},
 			)
-			require.NoError(t, err)
 
 			run.BeginStopping()
 			require.NoError(t, supervisor.SealInherited())
@@ -124,7 +166,7 @@ func TestInheritedShutdownNormalizesOnlyCurrentStoppingCause(t *testing.T) {
 			} else {
 				require.ErrorIs(t, err, test.wantErr)
 			}
-			require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+			releaseInheritedTestTask(t, supervisor, ref, owner, permit)
 		})
 	}
 }
@@ -146,16 +188,15 @@ func TestInheritedSpontaneousFailureDirtiesAndWakesRun(t *testing.T) {
 	}
 	release := make(chan struct{})
 	failure := errors.New("provider failed")
-	ref, err := supervisor.StartInherited(
-		context.Background(),
+	ref, permit := startInheritedTestTask(
+		t,
+		supervisor,
 		owner,
-		InheritedV1Runtime,
 		func(context.Context) error {
 			<-release
 			return failure
 		},
 	)
-	require.NoError(t, err)
 
 	close(release)
 	select {
@@ -170,7 +211,7 @@ func TestInheritedSpontaneousFailureDirtiesAndWakesRun(t *testing.T) {
 	joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
 	require.True(t, joined)
 	require.ErrorIs(t, err, failure)
-	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+	releaseInheritedTestTask(t, supervisor, ref, owner, permit)
 }
 
 func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
@@ -273,10 +314,9 @@ func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 		ID:         "pipeline",
 		Generation: 1,
 	}
-	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV2Runner, func(context.Context) error {
+	ref, permit := startInheritedTestTask(t, supervisor, owner, func(context.Context) error {
 		panic("boom")
 	})
-	require.NoError(t, err)
 	wrongOwner := ResourceIdentity{
 		ID:         owner.ID,
 		Generation: owner.Generation + 1,
@@ -290,19 +330,21 @@ func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	require.True(t, joinInheritedJoined)
 	require.ErrorIs(t, joinInheritedErr, ErrTaskPanic)
 
-	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+	releaseInheritedTestTask(t, supervisor, ref, owner, permit)
 
 	got := observer.counter(RuntimeCounterTaskPanics)
 	require.EqualValues(t, 1, got)
 
-	_, startInheritedErr := supervisor.StartInherited(
+	invalidPermit := issueInheritedTestPermit(t, supervisor, owner)
+	_, startInheritedErr := supervisor.StartInheritedWithPermit(
 		context.Background(),
 		owner,
 		0,
+		invalidPermit,
 		func(context.Context) error { return nil },
 	)
 	require.Error(t, startInheritedErr)
-
+	require.NoError(t, invalidPermit.AbortUnused())
 }
 
 type recordingRuntimeObserver struct {
@@ -338,12 +380,11 @@ func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {
 	}
 	releaseWork := make(chan struct{})
 	finished := make(chan struct{})
-	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV1Runtime, func(context.Context) error {
+	ref, permit := startInheritedTestTask(t, supervisor, owner, func(context.Context) error {
 		defer close(finished)
 		<-releaseWork
 		return nil
 	})
-	require.NoError(t, err)
 
 	require.NoError(t, supervisor.CancelInherited(ref, owner))
 
@@ -359,28 +400,33 @@ func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {
 	require.EqualValues(t, 1, supervisor.InheritedActive())
 	close(releaseWork)
 	<-finished
+	joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
+	require.NoError(t, err)
+	require.True(t, joined)
+	releaseInheritedTestTask(t, supervisor, ref, owner, permit)
 }
 
 func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 	const population = 2*formerFixedPopulation + 1
 	supervisor := newResourceTaskSupervisor(t)
 	refs := make([]InheritedTaskRef, 0, population)
+	permits := make([]LongLivedPermit, 0, population)
 	for index := range population {
 		owner := ResourceIdentity{
 			ID:         "pipeline",
 			Generation: uint64(index + 1),
 		}
-		ref, err := supervisor.StartInherited(
-			context.Background(),
+		ref, permit := startInheritedTestTask(
+			t,
+			supervisor,
 			owner,
-			InheritedV1Runtime,
 			func(ctx context.Context) error {
 				<-ctx.Done()
 				return nil
 			},
 		)
-		require.NoError(t, err)
 		refs = append(refs, ref)
+		permits = append(permits, permit)
 	}
 	for index, ref := range refs {
 		owner := ResourceIdentity{
@@ -400,30 +446,7 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, joined)
 
-		require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+		releaseInheritedTestTask(t, supervisor, ref, owner, permits[index])
 	}
 	require.EqualValues(t, 0, supervisor.InheritedActive())
-}
-
-func TestInheritedPipelineTasksRequirePermit(t *testing.T) {
-	tests := map[string]InheritedTaskRole{
-		"provider":   InheritedPipelineProvider,
-		"supervisor": InheritedPipelineSupervisor,
-	}
-	supervisor := newResourceTaskSupervisor(t)
-	owner := ResourceIdentity{
-		ID:         "pipeline",
-		Generation: 1,
-	}
-	for name, role := range tests {
-		t.Run(name, func(t *testing.T) {
-			_, err := supervisor.StartInherited(
-				context.Background(),
-				owner,
-				role,
-				func(context.Context) error { return nil },
-			)
-			require.Error(t, err)
-		})
-	}
 }

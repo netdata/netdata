@@ -53,9 +53,10 @@ func TestCompileScenarios(t *testing.T) {
 						Metrics: []string{"svc_requests_total"},
 						Charts: []charttpl.Chart{
 							{
-								Title:   "Requests",
-								Context: "requests",
-								Units:   "requests/s",
+								Title:       "Requests",
+								Context:     "requests",
+								Units:       "requests/s",
+								Aggregation: charttpl.AggregationMin,
 								Dimensions: []charttpl.Dimension{
 									{
 										Selector: "svc_requests_total",
@@ -67,6 +68,10 @@ func TestCompileScenarios(t *testing.T) {
 											Divisor:    1000,
 										},
 									},
+									{
+										Selector: "svc_requests_total",
+										Name:     "inherited",
+									},
 								},
 							},
 						},
@@ -77,11 +82,13 @@ func TestCompileScenarios(t *testing.T) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
-				require.Len(t, charts[0].Dimensions, 1)
+				require.Len(t, charts[0].Dimensions, 2)
 				assert.True(t, charts[0].Dimensions[0].Hidden)
 				assert.True(t, charts[0].Dimensions[0].Float)
 				assert.Equal(t, -8, charts[0].Dimensions[0].Multiplier)
 				assert.Equal(t, 1000, charts[0].Dimensions[0].Divisor)
+				assert.Equal(t, program.AggregationMin, charts[0].Dimensions[0].Aggregation)
+				assert.Equal(t, program.AggregationMin, charts[0].Dimensions[1].Aggregation)
 			},
 		},
 		"applies default lifecycle when omitted": {
@@ -112,6 +119,7 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, 5, charts[0].Lifecycle.ExpireAfterCycles)
 				assert.Equal(t, 0, charts[0].Lifecycle.Dimensions.MaxDims)
 				assert.Equal(t, 0, charts[0].Lifecycle.Dimensions.ExpireAfterCycles)
+				assert.Equal(t, program.AggregationSum, charts[0].Dimensions[0].Aggregation)
 			},
 		},
 		"defaults chart priority when omitted": {

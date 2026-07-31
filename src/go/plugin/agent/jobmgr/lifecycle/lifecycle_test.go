@@ -1009,6 +1009,103 @@ func TestFrameOwnerLateControlReadyBindingReplaysPendingWake(t *testing.T) {
 	require.Error(t, owner.BindRunNotifications(2, func() {}, func(error) {}, nil))
 }
 
+func TestFrameOwnerRunIdleNotificationIsArmedAndCoalesced(t *testing.T) {
+	writer := newStepWriter()
+	ready := make(chan struct{}, 2)
+	owner, err := NewFrameOwner(writer)
+	require.NoError(t, err)
+	require.NoError(t, owner.BindRunNotifications(
+		1,
+		func() { ready <- struct{}{} },
+		func(error) {},
+		nil,
+	))
+
+	committed := make(chan error, 1)
+	go func() {
+		committed <- owner.CommitBorrowedProtocolFrame([]byte("ordinary"))
+	}()
+	require.Equal(t, []byte("ordinary"), <-writer.offered)
+
+	idle, err := owner.ArmRunIdleNotification(1)
+	require.NoError(t, err)
+	require.False(t, idle)
+	idle, err = owner.ArmRunIdleNotification(1)
+	require.NoError(t, err)
+	require.False(t, idle)
+	require.ErrorIs(t, owner.TryCommitControl(ControlFramePlan{
+		UID:    "control",
+		Status: ControlDeadline,
+		Expiry: 1,
+	}), ErrFrameOwnerBusy)
+
+	writer.release <- struct{}{}
+	require.NoError(t, <-committed)
+	select {
+	case <-ready:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "frame release did not wake the retiring run")
+	}
+	select {
+	case <-ready:
+		require.FailNow(t, "test failed", "duplicate idle arms produced duplicate wakes")
+	default:
+	}
+
+	controlDone := make(chan error, 1)
+	go func() {
+		controlDone <- owner.TryCommitControl(ControlFramePlan{
+			UID:    "control",
+			Status: ControlDeadline,
+			Expiry: 1,
+		})
+	}()
+	require.Contains(t, string(<-writer.offered), "FUNCTION_RESULT_BEGIN control 504 ")
+	writer.release <- struct{}{}
+	require.NoError(t, <-controlDone)
+	select {
+	case <-ready:
+		require.FailNow(t, "test failed", "control completion emitted an unarmed idle wake")
+	default:
+	}
+
+	idle, err = owner.ArmRunIdleNotification(1)
+	require.NoError(t, err)
+	require.True(t, idle)
+	require.NoError(t, owner.ReleaseRunNotifications(1))
+}
+
+func TestFrameOwnerRunReleaseClearsIdleNotification(t *testing.T) {
+	writer := newStepWriter()
+	ready := make(chan struct{}, 1)
+	owner, err := NewFrameOwner(writer)
+	require.NoError(t, err)
+	require.NoError(t, owner.BindRunNotifications(
+		1,
+		func() { ready <- struct{}{} },
+		func(error) {},
+		nil,
+	))
+
+	committed := make(chan error, 1)
+	go func() {
+		committed <- owner.CommitBorrowedProtocolFrame([]byte("ordinary"))
+	}()
+	require.Equal(t, []byte("ordinary"), <-writer.offered)
+	idle, err := owner.ArmRunIdleNotification(1)
+	require.NoError(t, err)
+	require.False(t, idle)
+
+	require.NoError(t, owner.ReleaseRunNotifications(1))
+	writer.release <- struct{}{}
+	require.NoError(t, <-committed)
+	select {
+	case <-ready:
+		require.FailNow(t, "test failed", "retired run received a stale idle wake")
+	default:
+	}
+}
+
 func TestFrameOwnerRunReleaseAbandonsPendingControlReservation(t *testing.T) {
 	writer := newStepWriter()
 	owner, err := NewFrameOwner(writer)
@@ -1399,10 +1496,10 @@ type protocolTestTransaction struct {
 	abort  func() error
 }
 
-func (transaction protocolTestTransaction) Commit() error {
-	return transaction.commit()
+func (ptt protocolTestTransaction) Commit() error {
+	return ptt.commit()
 }
 
-func (transaction protocolTestTransaction) Abort() error {
-	return transaction.abort()
+func (ptt protocolTestTransaction) Abort() error {
+	return ptt.abort()
 }

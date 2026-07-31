@@ -85,7 +85,7 @@ Each flow record is enriched at ingestion with:
 - **Live BGP attributes** (AS path, communities, next-hop) — from BMP, BioRIS, or static prefix configuration
 - **Decapsulated inner-packet fields** for SRv6 / VXLAN traffic
 
-Flow records land in a four-tier journal: raw + 1-minute + 5-minute + 1-hour rollups, with independent retention per tier. Rollup tiers drop a few high-cardinality fields (IPs, ports, city/coordinates) to stay compact, so any query that filters or groups by those fields is served from the raw tier; everything else can use a coarser tier. The dashboard auto-picks the best tier for each query.
+Flow records land in a four-tier journal: raw + 1-minute + 5-minute + 1-hour rollups, with independent retention per tier. Rollup tiers drop high-cardinality and protocol-specific details such as addresses, prefixes, ports, cities/coordinates, MACs, BGP paths/communities, NAT fields, fragmentation details, and MPLS labels. Any query that filters or groups by a field absent from rollups is served from the raw tier; everything else can use a coarser tier. The dashboard auto-picks the best tier for each query.
 
 ## What sampling does to your numbers
 

@@ -31,6 +31,7 @@ func (ck *CommandKernel) cancelOperationWithCause(uid string, cause error) {
 		ck.recordCompositeChildTerminalCause(operation, cause)
 	}
 	operation.cancelled = true
+	ck.cancelPreClaimStage(operation, cause)
 	if operation.Child == lifecycle.ChildExecuting {
 		_ = ck.tasks.CancelWithCause(operation.Task, cause)
 		if operation.Response != lifecycle.ResponseNotRequired && !operation.plan.CooperativeCancel {
@@ -162,6 +163,7 @@ func (ck *CommandKernel) markOperationTimedOut(operation *commandOperation) {
 		return
 	}
 	operation.MarkTimedOut()
+	ck.cancelPreClaimStage(operation, context.DeadlineExceeded)
 	ck.recordCompositeChildTerminalCause(operation, context.DeadlineExceeded)
 	if ck.runtimeObserver != nil {
 		ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterOperationTimeouts, 1)
@@ -271,6 +273,7 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 			return
 		}
 	}
+	ck.releasePreClaimStage(operation)
 	if operation.functionInvocation.Valid() {
 		ref := operation.functionInvocation
 		operation.functionInvocation = FunctionInvocationRef{}
@@ -566,7 +569,12 @@ func (ck *CommandKernel) removingLaneOperation(lane *commandLane, operation *com
 }
 
 func (ck *CommandKernel) markReady(lane *commandLane) {
-	if lane == nil || lane.active != nil || lane.head == nil || lane.head.fenceBlocked || ck.claims.waiting(lane.head) {
+	if lane == nil ||
+		lane.active != nil ||
+		lane.head == nil ||
+		lane.head.stagePending ||
+		lane.head.fenceBlocked ||
+		ck.claims.waiting(lane.head) {
 		return
 	}
 	index := sourceIndex(lane.head.Source)

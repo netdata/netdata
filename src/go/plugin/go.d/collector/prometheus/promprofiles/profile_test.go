@@ -49,6 +49,56 @@ template:
           name: d0
 `,
 		},
+		"valid chart aggregation": {
+			yaml: `match: "a_*"
+template:
+  family: fam
+  metrics:
+    - a_timestamp
+  charts:
+    - title: Title
+      context: ctx
+      units: seconds
+      aggregation: max
+      dimensions:
+        - selector: a_timestamp
+          name: latest
+`,
+		},
+		"rejects dimension-level aggregation": {
+			yaml: `match: "a_*"
+template:
+  family: fam
+  metrics:
+    - a_timestamp
+  charts:
+    - title: Title
+      context: ctx
+      units: seconds
+      dimensions:
+        - selector: a_timestamp
+          name: latest
+          aggregation: max
+`,
+			wantErr: true,
+		},
+		"invalid chart aggregation": {
+			yaml: `match: "a_*"
+template:
+  family: fam
+  metrics:
+    - a_timestamp
+  charts:
+    - title: Title
+      context: ctx
+      units: seconds
+      aggregation: median
+      dimensions:
+        - selector: a_timestamp
+          name: latest
+`,
+			wantErr: true,
+		},
 		"invalid app format": {
 			yaml: `match: "a_*"
 app: "Bad App!"

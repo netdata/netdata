@@ -1225,6 +1225,38 @@ func TestJobV2_CleanupCanBeCalledRepeatedly(t *testing.T) {
 	assert.True(t, mod.cleaned)
 }
 
+func TestJobV2CleanupUsesDedicatedOutput(t *testing.T) {
+	store := metrix.NewCollectorStore()
+	module := &mockModuleV2{
+		store:    store,
+		template: chartTemplateV2(),
+		collectFunc: func(context.Context) error {
+			store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(1)
+			return nil
+		},
+	}
+	var liveOutput bytes.Buffer
+	var cleanupOutput bytes.Buffer
+	job := NewJobV2(JobV2Config{
+		PluginName: pluginName,
+		Name:       jobName,
+		ModuleName: modName,
+		FullName:   modName + "_" + jobName,
+		Module:     module,
+		Out:        &liveOutput,
+		CleanupOut: &cleanupOutput,
+	})
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
+
+	job.runOnce()
+	require.Contains(t, liveOutput.String(), "CHART")
+	liveOutput.Reset()
+
+	job.Cleanup()
+	require.Empty(t, liveOutput.Bytes())
+	require.Contains(t, cleanupOutput.String(), "obsolete")
+}
+
 func TestJobV2_CleanupObservesStoppedRuntime(t *testing.T) {
 	cleanupStarted := make(chan struct{})
 	cleanupRelease := make(chan struct{})
@@ -1896,7 +1928,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				require.Equal(t, []vnoderegistry.Owner{vnoderegistry.Owner("module_job\xffjob\xffnode-guid")}, registry.Owners("node-guid"))
 
 				ownerPresentDuringWrite := false
-				job.out = writeFunc(func(p []byte) (int, error) {
+				job.cleanupOut = writeFunc(func(p []byte) (int, error) {
 					ownerPresentDuringWrite = assert.Contains(t, registry.Owners("node-guid"), vnoderegistry.Owner("module_job\xffjob\xffnode-guid"))
 					return len(p), nil
 				})

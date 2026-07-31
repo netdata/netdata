@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -21,6 +22,8 @@ type (
 		ServiceDiscoveryConfigDir multipath.MultiPath
 	}
 	BuildContext struct {
+		Epoch        uint64
+		Attempts     jobmgr.ProcessAttemptAuthority
 		RunMode      policy.RunModePolicy
 		Identity     PluginIdentity
 		DyncfgOutput dyncfg.Output

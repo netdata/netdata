@@ -11,7 +11,9 @@ type Creator struct {
 	Create func() Store
 }
 
-// Store is a mutable provider instance used during configuration.
+// Store is a mutable provider instance used during configuration. Provider
+// methods return failures for sanitized diagnostics instead of logging raw
+// configuration or credentials.
 type Store interface {
 	Configuration() any
 	Init(context.Context) error

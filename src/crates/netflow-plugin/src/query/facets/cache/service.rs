@@ -21,7 +21,20 @@ impl FlowQueryService {
             .context("autocomplete mode requires a field")?;
         let term = request.normalized_autocomplete_term().to_string();
         let started = Instant::now();
-        let values = self.facet_runtime.autocomplete(&field, &term)?;
+        let values = match cidr_autocomplete_networks(&field, &term) {
+            Some(networks) => {
+                let retained = self
+                    .facet_runtime
+                    .retained_ip_network_presence(&field, &networks)?;
+                networks
+                    .into_iter()
+                    .zip(retained)
+                    .filter(|(_, retained)| *retained)
+                    .map(|(network, _)| network.to_string())
+                    .collect()
+            }
+            None => self.facet_runtime.autocomplete(&field, &term)?,
+        };
         let elapsed = started.elapsed().as_millis() as u64;
 
         let rows = values

@@ -9,6 +9,16 @@ import (
 // VersionV1 is the supported chart-template schema version.
 const VersionV1 = "v1"
 
+// Aggregation defines how source series that map to one chart dimension combine.
+type Aggregation string
+
+const (
+	AggregationSum Aggregation = "sum"
+	AggregationMin Aggregation = "min"
+	AggregationMax Aggregation = "max"
+	AggregationAvg Aggregation = "avg"
+)
+
 // Spec is the user-facing chart template file.
 type Spec struct {
 	Version          string  `yaml:"version" json:"version"`
@@ -64,15 +74,16 @@ type ChartDefaults struct {
 
 // Chart describes one chart template in compact DSL form.
 type Chart struct {
-	ID            string   `yaml:"id,omitempty" json:"id,omitempty"`
-	Title         string   `yaml:"title" json:"title"`
-	Family        string   `yaml:"family,omitempty" json:"family,omitempty"`
-	Context       string   `yaml:"context" json:"context"`
-	Units         string   `yaml:"units" json:"units"`
-	Algorithm     string   `yaml:"algorithm,omitempty" json:"algorithm,omitempty"`
-	Type          string   `yaml:"type,omitempty" json:"type,omitempty"`
-	Priority      int      `yaml:"priority,omitempty" json:"priority,omitempty"`
-	LabelPromoted []string `yaml:"label_promotion,omitempty" json:"label_promotion,omitempty"`
+	ID            string      `yaml:"id,omitempty" json:"id,omitempty"`
+	Title         string      `yaml:"title" json:"title"`
+	Family        string      `yaml:"family,omitempty" json:"family,omitempty"`
+	Context       string      `yaml:"context" json:"context"`
+	Units         string      `yaml:"units" json:"units"`
+	Algorithm     string      `yaml:"algorithm,omitempty" json:"algorithm,omitempty"`
+	Aggregation   Aggregation `yaml:"aggregation,omitempty" json:"aggregation,omitempty"`
+	Type          string      `yaml:"type,omitempty" json:"type,omitempty"`
+	Priority      int         `yaml:"priority,omitempty" json:"priority,omitempty"`
+	LabelPromoted []string    `yaml:"label_promotion,omitempty" json:"label_promotion,omitempty"`
 
 	Instances *Instances `yaml:"instances,omitempty" json:"instances,omitempty"`
 

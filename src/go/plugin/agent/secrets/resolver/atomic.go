@@ -82,6 +82,16 @@ type AtomicScope interface {
 	Release(context.Context) error
 }
 
+// AtomicScopeSnapshot proves whether the exact Store generations used by one
+// completed resolution are still current.
+type AtomicScopeSnapshot interface {
+	Current() bool
+}
+
+type AtomicScopeSnapshotter interface {
+	Snapshot() AtomicScopeSnapshot
+}
+
 type AtomicScopeAcquirer func([]string) (AtomicScope, error)
 
 // AtomicResolver clones, validates, scopes, and resolves one value without
@@ -157,14 +167,40 @@ func (resolver *AtomicResolver) ResolveWithReferences(
 	input any,
 	acquire AtomicScopeAcquirer,
 ) (any, bool, error) {
+	resolved, references, _, err := resolver.resolveWithReferences(
+		ctx,
+		input,
+		acquire,
+		false,
+	)
+	return resolved, references, err
+}
+
+// ResolveWithSnapshot also returns a freshness proof for the exact Store
+// generations used by the resolution. A non-nil Store scope must expose a
+// snapshot; provider-only resolutions return a nil snapshot.
+func (resolver *AtomicResolver) ResolveWithSnapshot(
+	ctx context.Context,
+	input any,
+	acquire AtomicScopeAcquirer,
+) (any, bool, AtomicScopeSnapshot, error) {
+	return resolver.resolveWithReferences(ctx, input, acquire, true)
+}
+
+func (resolver *AtomicResolver) resolveWithReferences(
+	ctx context.Context,
+	input any,
+	acquire AtomicScopeAcquirer,
+	captureSnapshot bool,
+) (any, bool, AtomicScopeSnapshot, error) {
 	if resolver == nil {
-		return nil, false, errors.New("secret resolver: nil atomic resolver")
+		return nil, false, nil, errors.New("secret resolver: nil atomic resolver")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 	compiler := atomicCompiler{
 		providers:         resolver.providers,
@@ -174,7 +210,7 @@ func (resolver *AtomicResolver) ResolveWithReferences(
 	}
 	cloned, err := compiler.clone(input, 0, true)
 	if err != nil {
-		return nil, compiler.references != 0, err
+		return nil, compiler.references != 0, nil, err
 	}
 	hasReferences := compiler.references != 0
 	keys := make([]string, 0, len(compiler.storeKeys))
@@ -186,7 +222,7 @@ func (resolver *AtomicResolver) ResolveWithReferences(
 	var scope AtomicScope
 	if len(keys) != 0 {
 		if acquire == nil {
-			return nil, hasReferences, &AtomicResolveError{
+			return nil, hasReferences, nil, &AtomicResolveError{
 				Kind: AtomicErrorScope, Cause: errors.New("no Store scope acquirer"),
 			}
 		}
@@ -195,10 +231,10 @@ func (resolver *AtomicResolver) ResolveWithReferences(
 			if scope != nil {
 				err = errors.Join(err, callAtomicRelease(ctx, scope))
 			}
-			return nil, hasReferences, &AtomicResolveError{Kind: AtomicErrorScope, Cause: err}
+			return nil, hasReferences, nil, &AtomicResolveError{Kind: AtomicErrorScope, Cause: err}
 		}
 		if scope == nil {
-			return nil, hasReferences, &AtomicResolveError{
+			return nil, hasReferences, nil, &AtomicResolveError{
 				Kind: AtomicErrorScope, Cause: errors.New("acquirer returned nil scope"),
 			}
 		}
@@ -209,6 +245,14 @@ func (resolver *AtomicResolver) ResolveWithReferences(
 		resolvedBytes: compiler.resultBytes,
 	}
 	resolved, resolveErr := call.resolveValue(cloned, true)
+	var snapshot AtomicScopeSnapshot
+	var snapshotErr error
+	if resolveErr == nil && scope != nil && captureSnapshot {
+		snapshot, snapshotErr = callAtomicSnapshot(scope)
+		if snapshotErr != nil {
+			snapshotErr = &AtomicResolveError{Kind: AtomicErrorScope, Cause: snapshotErr}
+		}
+	}
 	var releaseErr error
 	if scope != nil {
 		releaseErr = callAtomicRelease(ctx, scope)
@@ -216,10 +260,10 @@ func (resolver *AtomicResolver) ResolveWithReferences(
 			releaseErr = &AtomicResolveError{Kind: AtomicErrorScope, Cause: releaseErr}
 		}
 	}
-	if resolveErr != nil || releaseErr != nil {
-		return nil, hasReferences, errors.Join(resolveErr, releaseErr)
+	if resolveErr != nil || snapshotErr != nil || releaseErr != nil {
+		return nil, hasReferences, nil, errors.Join(resolveErr, snapshotErr, releaseErr)
 	}
-	return resolved, hasReferences, nil
+	return resolved, hasReferences, snapshot, nil
 }
 
 func callAtomicAcquire(
@@ -242,6 +286,24 @@ func callAtomicRelease(ctx context.Context, scope AtomicScope) (err error) {
 		}
 	}()
 	return scope.Release(context.WithoutCancel(ctx))
+}
+
+func callAtomicSnapshot(scope AtomicScope) (snapshot AtomicScopeSnapshot, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			snapshot = nil
+			err = errors.New("Store scope snapshot panic")
+		}
+	}()
+	snapshotter, ok := scope.(AtomicScopeSnapshotter)
+	if !ok {
+		return nil, errors.New("Store scope does not expose a generation snapshot")
+	}
+	snapshot = snapshotter.Snapshot()
+	if snapshot == nil {
+		return nil, errors.New("Store scope returned a nil generation snapshot")
+	}
+	return snapshot, nil
 }
 
 type atomicContainerIdentity struct {

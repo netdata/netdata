@@ -3,14 +3,15 @@
 package cloudwatch
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 const (
@@ -122,20 +123,53 @@ func compileProfileSeries(profile cwprofiles.ResolvedProfile) []profileSeriesSpe
 	return series
 }
 
-func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, profiles []cwprofiles.ResolvedProfile, seriesByProfile map[string][]profileSeriesSpec) (map[string][]profileSeriesSpec, map[string]struct{}, error) {
-	selected := make(map[string][]profileSeriesSpec, len(profiles))
+type profileSeriesCatalog struct {
+	series            []profileSeriesSpec
+	metricByName      map[string]int
+	seriesByMetric    [][]int
+	seriesByStatistic []map[string]int
+}
+
+type resolvedSeriesSelection struct {
+	series   selectedSeriesSpec
+	selected bool
+}
+
+func indexProfileSeries(profile cwprofiles.ResolvedProfile) profileSeriesCatalog {
+	series := compileProfileSeries(profile)
+	catalog := profileSeriesCatalog{
+		series:            series,
+		metricByName:      make(map[string]int, len(profile.Config.Metrics)),
+		seriesByMetric:    make([][]int, len(profile.Config.Metrics)),
+		seriesByStatistic: make([]map[string]int, len(profile.Config.Metrics)),
+	}
+	for i, metric := range profile.Config.Metrics {
+		catalog.metricByName[metric.MetricName] = i
+		catalog.seriesByStatistic[i] = make(map[string]int, len(metric.Statistics))
+	}
+	for ordinal, item := range series {
+		catalog.seriesByMetric[item.MetricIndex] = append(catalog.seriesByMetric[item.MetricIndex], ordinal)
+		catalog.seriesByStatistic[item.MetricIndex][item.Statistic] = ordinal
+	}
+	return catalog
+}
+
+func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, profiles []cwprofiles.ResolvedProfile, seriesByProfile map[string]profileSeriesCatalog) (map[string][]selectedSeriesSpec, map[string]struct{}, error) {
+	selected := make(map[string][]selectedSeriesSpec, len(profiles))
 	explicitProfiles := make(map[string]struct{})
 	profilesByName := make(map[string]cwprofiles.ResolvedProfile, len(profiles))
-	selectedOrdinals := make(map[string]map[int]struct{}, len(profiles))
+	seriesSelections := make(map[string][]resolvedSeriesSelection, len(profiles))
 	for _, profile := range profiles {
 		profilesByName[profile.Name] = profile
-		ordinals := make(map[int]struct{})
-		for _, series := range seriesByProfile[profile.Name] {
-			if !profile.Config.Metrics[series.MetricIndex].Disabled {
-				ordinals[series.Ordinal] = struct{}{}
+		catalog := seriesByProfile[profile.Name]
+		selections := make([]resolvedSeriesSelection, len(catalog.series))
+		for i, series := range catalog.series {
+			selections[i] = resolvedSeriesSelection{
+				series:   selectedSeriesSpec{profileSeriesSpec: series},
+				selected: !profile.Config.Metrics[series.MetricIndex].Disabled,
 			}
 		}
-		selectedOrdinals[profile.Name] = ordinals
+		seriesSelections[profile.Name] = selections
 	}
 
 	explicitSelections := 0
@@ -146,12 +180,13 @@ func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, pr
 			return nil, nil, fmt.Errorf("%s.profile references profile %q not selected by this rule", groupPath, selector.Profile)
 		}
 		explicitProfiles[profile.Name] = struct{}{}
-		ordinals := selectedOrdinals[profile.Name]
+		selections := seriesSelections[profile.Name]
 		if !selector.includesDefaults() {
-			ordinals = make(map[int]struct{})
-			selectedOrdinals[profile.Name] = ordinals
+			for i := range selections {
+				selections[i] = resolvedSeriesSelection{series: selectedSeriesSpec{profileSeriesSpec: selections[i].series.profileSeriesSpec}}
+			}
 		}
-		count, err := resolveMetricGroup(groupPath, selector, profile, seriesByProfile[profile.Name], ordinals)
+		count, err := resolveMetricGroup(groupPath, selector, profile, seriesByProfile[profile.Name], selections)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -162,24 +197,23 @@ func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, pr
 	}
 
 	for _, profile := range profiles {
-		ordinals := selectedOrdinals[profile.Name]
-		for _, series := range seriesByProfile[profile.Name] {
-			if _, ok := ordinals[series.Ordinal]; ok {
-				selected[profile.Name] = append(selected[profile.Name], series)
+		for _, selection := range seriesSelections[profile.Name] {
+			if selection.selected {
+				selected[profile.Name] = append(selected[profile.Name], selection.series)
 			}
 		}
 	}
 	return selected, explicitProfiles, nil
 }
 
-func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profile cwprofiles.ResolvedProfile, available []profileSeriesSpec, selected map[int]struct{}) (int, error) {
+func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profile cwprofiles.ResolvedProfile, catalog profileSeriesCatalog, selected []resolvedSeriesSelection) (int, error) {
 	expanded := 0
+	explicitOwners := make([]string, len(catalog.series))
+	var overlapErrs []error
 	for i, entry := range selector.Include {
 		metricPath := fmt.Sprintf("%s.include[%d]", path, i)
-		metricIndex := slices.IndexFunc(profile.Config.Metrics, func(metric cwprofiles.Metric) bool {
-			return metric.MetricName == entry.Name
-		})
-		if metricIndex < 0 {
+		metricIndex, ok := catalog.metricByName[entry.Name]
+		if !ok {
 			return 0, fmt.Errorf("%s.name references unknown MetricName %q in profile %q", metricPath, entry.Name, profile.Name)
 		}
 		statistics := entry.Statistics
@@ -188,35 +222,39 @@ func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profi
 			statistics = selector.Statistics
 			statisticsPath = path + ".statistics"
 		}
+		var expandedOrdinals []int
 		if statistics == nil {
-			for _, series := range available {
-				if series.MetricIndex == metricIndex {
-					selected[series.Ordinal] = struct{}{}
-					expanded++
+			expandedOrdinals = catalog.seriesByMetric[metricIndex]
+		} else {
+			expandedOrdinals = make([]int, 0, len(statistics))
+			for j, raw := range statistics {
+				statistic := normalizeMetricStatistic(raw)
+				ordinal, ok := catalog.seriesByStatistic[metricIndex][statistic]
+				if !ok {
+					return 0, fmt.Errorf("%s[%d] %q is not exported for MetricName %q in profile %q", statisticsPath, j, raw, entry.Name, profile.Name)
 				}
+				expandedOrdinals = append(expandedOrdinals, ordinal)
 			}
-			continue
 		}
-		for j, raw := range statistics {
-			statistic := normalizeMetricStatistic(raw)
-			series, ok := findProfileSeries(available, metricIndex, statistic)
-			if !ok {
-				return 0, fmt.Errorf("%s[%d] %q is not exported for MetricName %q in profile %q", statisticsPath, j, raw, entry.Name, profile.Name)
+		for _, ordinal := range expandedOrdinals {
+			series := catalog.series[ordinal]
+			if owner := explicitOwners[ordinal]; owner != "" {
+				overlapErrs = append(overlapErrs, fmt.Errorf("%s selects MetricName %q statistic %q already selected by %s", metricPath, entry.Name, cwprofiles.StatString(series.Statistic), owner))
+				continue
 			}
-			selected[series.Ordinal] = struct{}{}
+			explicitOwners[ordinal] = metricPath
+			selected[ordinal] = resolvedSeriesSelection{
+				selected: true,
+				series: selectedSeriesSpec{
+					profileSeriesSpec: series,
+					groupQuery:        cwquery.Source{Config: selector.Query, Path: path + ".query"},
+					itemQuery:         cwquery.Source{Config: entry.Query, Path: metricPath + ".query"},
+				},
+			}
 			expanded++
 		}
 	}
-	return expanded, nil
-}
-
-func findProfileSeries(series []profileSeriesSpec, metricIndex int, statistic string) (profileSeriesSpec, bool) {
-	for _, candidate := range series {
-		if candidate.MetricIndex == metricIndex && candidate.Statistic == statistic {
-			return candidate, true
-		}
-	}
-	return profileSeriesSpec{}, false
+	return expanded, errors.Join(overlapErrs...)
 }
 
 func normalizeMetricStatistic(raw string) string {

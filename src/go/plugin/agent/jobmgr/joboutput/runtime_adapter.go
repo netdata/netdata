@@ -19,26 +19,27 @@ type ManagedJob interface {
 	Cleanup()
 }
 
-// newManagedJob transfers one constructed collector loop into a generation.
-// Runtime join is TaskSupervisor-owned; Cleanup remains the final opaque
-// collector boundary after runtime support is released.
-func newManagedJob(
+func newProcessManagedJob(
 	variant JobVariant,
 	job RuntimeJob,
-	tasks *lifecycle.TaskSupervisor,
 	identity lifecycle.ResourceIdentity,
 	scheduler *Scheduler,
 	collectorCleanup func(context.Context) error,
+	owner *stagedJobOwner,
 ) (ConstructedJob, error) {
-	if !variant.Valid() || job == nil ||
-		tasks == nil || !identity.Valid() || scheduler == nil ||
-		collectorCleanup == nil {
-		return ConstructedJob{}, errors.New("job output: invalid managed job")
+	if !variant.Valid() ||
+		job == nil ||
+		!identity.Valid() ||
+		scheduler == nil ||
+		collectorCleanup == nil ||
+		owner == nil {
+		return ConstructedJob{}, errors.New("job output: invalid process-managed job")
 	}
-	support := &managedLoopSupport{
-		job:      job,
-		tasks:    tasks,
-		identity: identity,
+	if err := owner.BindAttachment(); err != nil {
+		return ConstructedJob{}, err
+	}
+	physical := &processManagedLoopSupport{
+		owner: owner,
 	}
 	scheduled := &scheduledJobSupport{
 		scheduler: scheduler,
@@ -48,17 +49,80 @@ func newManagedJob(
 	var runtime jobruntime.Runtime
 	switch variant {
 	case JobVariantV1:
-		support.role = lifecycle.InheritedV1Runtime
-		runtime = jobruntime.NewV1Runtime([]jobruntime.Support{support, scheduled})
+		runtime = jobruntime.NewV1Runtime([]jobruntime.Support{physical, scheduled})
 	case JobVariantV2:
-		support.role = lifecycle.InheritedV2Runner
-		runtime = jobruntime.NewV2Runtime([]jobruntime.Support{support, scheduled})
+		runtime = jobruntime.NewV2Runtime([]jobruntime.Support{physical, scheduled})
 	}
 	return ConstructedJob{
 		Variant:          variant,
 		Runtime:          runtime,
 		CollectorCleanup: collectorCleanup,
+		candidateJob:     job,
+		processOwner:     owner,
 	}, nil
+}
+
+type processManagedLoopSupport struct {
+	mu sync.Mutex
+
+	owner    *stagedJobOwner
+	started  bool
+	stopped  bool
+	released bool
+}
+
+func (pmls *processManagedLoopSupport) Start(ctx context.Context) error {
+	if pmls == nil || ctx == nil {
+		return errors.New("job output: invalid process-managed loop start")
+	}
+	pmls.mu.Lock()
+	if pmls.owner == nil || pmls.started || pmls.stopped || pmls.released {
+		pmls.mu.Unlock()
+		return errors.New("job output: invalid process-managed loop state")
+	}
+	owner := pmls.owner
+	pmls.mu.Unlock()
+	if err := owner.Start(ctx); err != nil {
+		owner.Retire()
+		return err
+	}
+	pmls.mu.Lock()
+	pmls.started = true
+	pmls.mu.Unlock()
+	return nil
+}
+
+func (pmls *processManagedLoopSupport) Stop(context.Context) error {
+	if pmls == nil {
+		return errors.New("job output: nil process-managed loop stop")
+	}
+	pmls.mu.Lock()
+	if !pmls.started || pmls.released {
+		pmls.mu.Unlock()
+		return errors.New("job output: invalid process-managed loop stop")
+	}
+	if pmls.stopped {
+		pmls.mu.Unlock()
+		return nil
+	}
+	pmls.stopped = true
+	owner := pmls.owner
+	pmls.mu.Unlock()
+	owner.Retire()
+	return nil
+}
+
+func (pmls *processManagedLoopSupport) Release(context.Context) error {
+	if pmls == nil {
+		return errors.New("job output: nil process-managed loop release")
+	}
+	pmls.mu.Lock()
+	defer pmls.mu.Unlock()
+	if !pmls.started || !pmls.stopped || pmls.released {
+		return errors.New("job output: invalid process-managed loop release")
+	}
+	pmls.released = true
+	return nil
 }
 
 type scheduledJobSupport struct {
@@ -120,119 +184,6 @@ func (sjs *scheduledJobSupport) Release(context.Context) error {
 	return nil
 }
 
-type managedLoopSupport struct {
-	mu sync.Mutex // guards the fields below
-
-	job      ManagedJob                  // managed collector loop
-	tasks    *lifecycle.TaskSupervisor   // supervisor owning the run goroutine
-	identity lifecycle.ResourceIdentity  // resource identity of the job
-	role     lifecycle.InheritedTaskRole // inherited task role (V1 runtime / V2 runner)
-	ref      lifecycle.InheritedTaskRef  // supervisor task handle
-	started  bool                        // StartManaged launched
-	joined   bool                        // run goroutine joined
-}
-
-func (mls *managedLoopSupport) Start(ctx context.Context) error {
-	if mls == nil || ctx == nil {
-		return errors.New("job output: invalid managed loop start")
-	}
-	mls.mu.Lock()
-	defer mls.mu.Unlock()
-	if mls.started {
-		return errors.New("job output: managed loop already started")
-	}
-	ready := make(chan struct{})
-	exited := make(chan struct{})
-	ref, err := mls.tasks.StartInherited(
-		context.WithoutCancel(ctx),
-		mls.identity,
-		mls.role,
-		func(context.Context) error {
-			defer close(exited)
-			mls.job.StartManaged(ready)
-			return nil
-		},
-	)
-	if err != nil {
-		return err
-	}
-	mls.ref = ref
-	mls.started = true
-	mls.mu.Unlock()
-
-	select {
-	case <-ready:
-		mls.mu.Lock()
-		return nil
-	case <-exited:
-		cleanupErr := mls.abortStart(ref)
-		mls.mu.Lock()
-		return errors.Join(errors.New("job output: managed loop exited before readiness"), cleanupErr)
-	case <-ctx.Done():
-		cleanupErr := mls.abortStart(ref)
-		mls.mu.Lock()
-		return errors.Join(ctx.Err(), cleanupErr)
-	}
-}
-
-func (mls *managedLoopSupport) abortStart(ref lifecycle.InheritedTaskRef) error {
-	cancelErr := mls.tasks.CancelInherited(ref, mls.identity)
-	mls.job.Stop()
-	joined, joinErr := mls.tasks.JoinInherited(context.Background(), ref, mls.identity)
-	if !joined {
-		joinErr = errors.Join(joinErr, errors.New("job output: managed loop did not join after failed start"))
-		return errors.Join(cancelErr, joinErr)
-	}
-	return errors.Join(cancelErr, joinErr, mls.tasks.ReleaseInherited(ref, mls.identity))
-}
-
-func (mls *managedLoopSupport) Stop(ctx context.Context) error {
-	if mls == nil || ctx == nil {
-		return errors.New("job output: invalid managed loop stop")
-	}
-	mls.mu.Lock()
-	if !mls.started {
-		mls.mu.Unlock()
-		return errors.New("job output: managed loop was not started")
-	}
-	if mls.joined {
-		mls.mu.Unlock()
-		return nil
-	}
-	ref := mls.ref
-	mls.mu.Unlock()
-
-	if err := mls.tasks.CancelInherited(ref, mls.identity); err != nil {
-		return err
-	}
-	mls.job.Stop()
-	joined, err := mls.tasks.JoinInherited(ctx, ref, mls.identity)
-	if err != nil {
-		return err
-	}
-	if !joined {
-		return errors.New("job output: managed loop did not join")
-	}
-	mls.mu.Lock()
-	mls.joined = true
-	mls.mu.Unlock()
-	return nil
-}
-
-func (mls *managedLoopSupport) Release(context.Context) error {
-	if mls == nil {
-		return errors.New("job output: nil managed loop release")
-	}
-	mls.mu.Lock()
-	if !mls.joined {
-		mls.mu.Unlock()
-		return errors.New("job output: managed loop release before join")
-	}
-	ref := mls.ref
-	mls.mu.Unlock()
-	return mls.tasks.ReleaseInherited(ref, mls.identity)
-}
-
 // FrameWriter is the only collector-output writer used by the new graph.
 // Successful writes are whole FrameOwner commits.
 type FrameWriter struct {
@@ -266,4 +217,37 @@ func (fw FrameWriter) PoisonOutput(err error) {
 	if fw.Owner != nil {
 		fw.Owner.Poison(err)
 	}
+}
+
+func finalizeProcessOwnedConstructed(constructed ConstructedJob) (resultErr error) {
+	defer func() {
+		if constructed.resolvedReferences {
+			resultErr = redactResolvedLifecycleError(resultErr)
+		}
+	}()
+	if handlers := constructed.Handlers; handlers != nil {
+		resultErr = errors.Join(
+			resultErr,
+			callJobLifecycle("process-owned handler finalization", func() error {
+				return handlers.Finalize(context.Background())
+			}),
+		)
+	}
+	if staged := constructed.StagedHandlers; staged != nil {
+		resultErr = errors.Join(
+			resultErr,
+			callJobLifecycle("process-owned staged handler close/drain", func() error {
+				return staged.CloseAndDrain(context.Background())
+			}),
+		)
+	}
+	if cleanup := constructed.CollectorCleanup; cleanup != nil {
+		resultErr = errors.Join(
+			resultErr,
+			callJobLifecycle("process-owned collector Cleanup", func() error {
+				return cleanup(context.Background())
+			}),
+		)
+	}
+	return resultErr
 }

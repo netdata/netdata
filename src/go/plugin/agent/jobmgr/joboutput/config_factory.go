@@ -162,9 +162,36 @@ func (cmf *ConfigModuleFactory) applyResolved(
 	config confgroup.Config,
 	module any,
 ) (redactLifecycle bool, resultErr error) {
+	redactLifecycle, _, resultErr = cmf.applyResolvedInternal(ctx, config, module, false)
+	return redactLifecycle, resultErr
+}
+
+func (cmf *ConfigModuleFactory) applyResolvedWithSnapshot(
+	ctx context.Context,
+	config confgroup.Config,
+	module any,
+) (
+	redactLifecycle bool,
+	snapshot secretresolver.AtomicScopeSnapshot,
+	resultErr error,
+) {
+	return cmf.applyResolvedInternal(ctx, config, module, true)
+}
+
+func (cmf *ConfigModuleFactory) applyResolvedInternal(
+	ctx context.Context,
+	config confgroup.Config,
+	module any,
+	captureSnapshot bool,
+) (
+	redactLifecycle bool,
+	snapshot secretresolver.AtomicScopeSnapshot,
+	resultErr error,
+) {
 	hasReferences := false
 	defer func() {
 		if recovered := recover(); recovered != nil {
+			snapshot = nil
 			if hasReferences {
 				redactLifecycle = true
 				resultErr = invalidJobConfiguration(errors.New(
@@ -182,15 +209,23 @@ func (cmf *ConfigModuleFactory) applyResolved(
 		ctx,
 		cmf.logger.With(slog.String("collector", config.Module()), slog.String("job", config.Name())),
 	)
-	resolved, references, err :=
-		cmf.config.Resolver.ResolveWithReferences(resolveCtx, map[string]any(config), cmf.config.StoreScope)
+	var resolved any
+	var references bool
+	var err error
+	if captureSnapshot {
+		resolved, references, snapshot, err =
+			cmf.config.Resolver.ResolveWithSnapshot(resolveCtx, map[string]any(config), cmf.config.StoreScope)
+	} else {
+		resolved, references, err =
+			cmf.config.Resolver.ResolveWithReferences(resolveCtx, map[string]any(config), cmf.config.StoreScope)
+	}
 	hasReferences = references
 	if err != nil {
 		err = fmt.Errorf("job output: resolving configuration secrets: %w", err)
 		if hasReferences {
-			return true, redactResolvedLifecycleError(err)
+			return true, nil, redactResolvedLifecycleError(err)
 		}
-		return false, err
+		return false, nil, err
 	}
 	if hasReferences {
 		if configured, ok := module.(interface{ GetBase() *collectorapi.Base }); ok && configured.GetBase() != nil {
@@ -199,26 +234,26 @@ func (cmf *ConfigModuleFactory) applyResolved(
 	}
 	payload, err := yaml.Marshal(resolved)
 	if err != nil {
-		return false, invalidJobConfiguration(
+		return false, nil, invalidJobConfiguration(
 			fmt.Errorf("job output: marshaling resolved configuration: %w", err),
 		)
 	}
 	if len(payload) > secretresolver.MaximumAtomicResolvedBytes {
-		return false, invalidJobConfiguration(
+		return false, nil, invalidJobConfiguration(
 			errors.New("job output: serialized configuration exceeds maximum size"),
 		)
 	}
 	if err := yaml.Unmarshal(payload, module); err != nil {
 		if hasReferences {
-			return true, invalidJobConfiguration(
+			return true, nil, invalidJobConfiguration(
 				errors.New("job output: applying resolved configuration failed; details redacted"),
 			)
 		}
-		return false, invalidJobConfiguration(
+		return false, nil, invalidJobConfiguration(
 			fmt.Errorf("job output: applying resolved configuration: %w", err),
 		)
 	}
-	return hasReferences, nil
+	return hasReferences, snapshot, nil
 }
 
 func (cmf *ConfigModuleFactory) moduleLogger(config confgroup.Config, redact bool) *logger.Logger {

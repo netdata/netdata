@@ -14,9 +14,9 @@ pub(crate) enum FacetValueKind {
 
 /// How the autocomplete dropdown matches user input against stored values.
 ///
-/// This is exclusively about the autocomplete/dropdown UX. Regular facet
-/// matching (selections / `key in [values]`) is always exact equality and
-/// uses indexes — never a substring scan.
+/// This is exclusively about the autocomplete/dropdown UX. Regular non-IP
+/// selections use exact equality; address facets additionally accept typed CIDR
+/// containment. Neither path uses substring matching over flow rows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AutocompleteMatchKind {
     /// `value.starts_with(term)`. Cheap on FST sidecars (automaton-driven).
@@ -31,7 +31,6 @@ pub(crate) enum AutocompleteMatchKind {
 pub(crate) struct FacetFieldSpec {
     pub(crate) name: &'static str,
     pub(crate) kind: FacetValueKind,
-    pub(crate) supports_autocomplete: bool,
     pub(crate) uses_sidecar: bool,
     pub(crate) autocomplete_match: AutocompleteMatchKind,
 }
@@ -40,14 +39,12 @@ const VIRTUAL_FACET_FIELDS: &[FacetFieldSpec] = &[
     FacetFieldSpec {
         name: "ICMPV4",
         kind: FacetValueKind::Text,
-        supports_autocomplete: true,
         uses_sidecar: false,
         autocomplete_match: AutocompleteMatchKind::Substring,
     },
     FacetFieldSpec {
         name: "ICMPV6",
         kind: FacetValueKind::Text,
-        supports_autocomplete: true,
         uses_sidecar: false,
         autocomplete_match: AutocompleteMatchKind::Substring,
     },
@@ -134,9 +131,9 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
         }
         "EXPORTER_PORT" | "ETYPE" | "SRC_PORT" | "DST_PORT" | "SRC_PORT_NAT" | "DST_PORT_NAT"
         | "SRC_VLAN" | "DST_VLAN" | "IP_FRAGMENT_OFFSET" => FacetValueKind::DenseU16,
-        "PROTOCOL" | "FORWARDING_STATUS" | "DIRECTION" | "SRC_MASK" | "DST_MASK"
-        | "IN_IF_BOUNDARY" | "OUT_IF_BOUNDARY" | "IPTTL" | "IPTOS" | "TCP_FLAGS"
-        | "ICMPV4_TYPE" | "ICMPV4_CODE" | "ICMPV6_TYPE" | "ICMPV6_CODE" => FacetValueKind::DenseU8,
+        "PROTOCOL" | "FORWARDING_STATUS" | "SRC_MASK" | "DST_MASK" | "IN_IF_BOUNDARY"
+        | "OUT_IF_BOUNDARY" | "IPTTL" | "IPTOS" | "TCP_FLAGS" | "ICMPV4_TYPE" | "ICMPV4_CODE"
+        | "ICMPV6_TYPE" | "ICMPV6_CODE" => FacetValueKind::DenseU8,
         "SRC_AS" | "DST_AS" | "IN_IF" | "OUT_IF" | "IPV6_FLOW_LABEL" | "IP_FRAGMENT_ID" => {
             FacetValueKind::SparseU32
         }
@@ -144,30 +141,32 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
         _ => FacetValueKind::Text,
     };
 
-    let autocomplete_match = match kind {
-        FacetValueKind::Text => AutocompleteMatchKind::Substring,
+    let autocomplete_match = match field {
+        "SRC_PREFIX" | "DST_PREFIX" => AutocompleteMatchKind::Prefix,
+        _ if matches!(kind, FacetValueKind::Text) => AutocompleteMatchKind::Substring,
         _ => AutocompleteMatchKind::Prefix,
     };
 
     Some(FacetFieldSpec {
         name: field,
         kind,
-        supports_autocomplete: true,
-        uses_sidecar: matches!(
-            kind,
-            FacetValueKind::Text
-                | FacetValueKind::IpAddr
-                | FacetValueKind::SparseU32
-                | FacetValueKind::SparseU64
-                | FacetValueKind::DenseU16
-        ),
+        uses_sidecar: field != "DIRECTION"
+            && matches!(
+                kind,
+                FacetValueKind::Text
+                    | FacetValueKind::IpAddr
+                    | FacetValueKind::SparseU32
+                    | FacetValueKind::SparseU64
+                    | FacetValueKind::DenseU16
+            ),
         autocomplete_match,
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{FacetValueKind, facet_field_spec};
+    use super::{FACET_FIELD_SPECS, FacetValueKind, facet_field_spec};
+    use std::collections::BTreeSet;
 
     #[test]
     fn facet_field_spec_trims_and_matches_case_insensitively() {
@@ -195,5 +194,34 @@ mod tests {
             facet_field_spec("IP_FRAGMENT_ID").map(|spec| spec.kind),
             Some(FacetValueKind::SparseU32)
         );
+    }
+
+    #[test]
+    fn direction_uses_its_logical_text_representation() {
+        let direction = facet_field_spec("DIRECTION").expect("direction facet");
+        assert_eq!(direction.kind, FacetValueKind::Text);
+        assert!(!direction.uses_sidecar);
+    }
+
+    #[test]
+    fn network_prefixes_use_prefix_autocomplete() {
+        for field in ["SRC_PREFIX", "DST_PREFIX"] {
+            assert_eq!(
+                facet_field_spec(field).map(|spec| spec.autocomplete_match),
+                Some(super::AutocompleteMatchKind::Prefix),
+                "{field}"
+            );
+        }
+    }
+
+    #[test]
+    fn facet_catalog_has_expected_unique_fields() {
+        let names = FACET_FIELD_SPECS
+            .iter()
+            .map(|spec| spec.name)
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(FACET_FIELD_SPECS.len(), 80);
+        assert_eq!(names.len(), FACET_FIELD_SPECS.len());
     }
 }

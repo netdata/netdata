@@ -83,8 +83,7 @@ func TestNewProgramScenarios(t *testing.T) {
 						Mode:       PromotionModeAutoIntersection,
 						Precedence: DefaultLabelPrecedence(),
 					},
-					Lifecycle:       LifecyclePolicy{},
-					CollisionReduce: ReduceSum,
+					Lifecycle: LifecyclePolicy{},
 					Dimensions: []Dimension{
 						{
 							Selector: SelectorBinding{
@@ -104,6 +103,18 @@ func TestNewProgramScenarios(t *testing.T) {
 				func() Chart {
 					chart := sampleChart("invalid-type")
 					chart.Meta.Type = ChartType("bars")
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects invalid dimension aggregation": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("invalid-aggregation")
+					chart.Dimensions[0].Aggregation = Aggregation(255)
 					return chart
 				}(),
 			},
@@ -195,7 +206,6 @@ func TestNewProgramReportsJoinedChartErrors(t *testing.T) {
 	chart.Identity.InstanceByLabels = []InstanceLabelSelector{
 		{Exclude: true, Key: "nic"},
 	}
-	chart.CollisionReduce = ""
 	chart.Dimensions = []Dimension{{}}
 
 	_, err := New("v1", 42, []string{"windows_rx_total"}, []Chart{chart})
@@ -203,7 +213,6 @@ func TestNewProgramReportsJoinedChartErrors(t *testing.T) {
 	assert.ErrorContains(t, err, "context is required")
 	assert.ErrorContains(t, err, "units is required")
 	assert.ErrorContains(t, err, "identity: instance selectors must include at least one positive selector")
-	assert.ErrorContains(t, err, "collision reduce op is required")
 	assert.ErrorContains(t, err, "dimension[0]: selector expression is required")
 	assert.ErrorContains(t, err, "selector matcher is required")
 	assert.ErrorContains(t, err, "dimension name is required")
@@ -243,7 +252,6 @@ func sampleChart(templateID string) Chart {
 				ExpireAfterCycles: 10,
 			},
 		},
-		CollisionReduce: ReduceSum,
 		Dimensions: []Dimension{
 			{
 				Selector: SelectorBinding{

@@ -5,91 +5,17 @@ package joboutput
 import (
 	"bytes"
 	"context"
-	"errors"
-	"slices"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/stretchr/testify/require"
 )
 
 var _ lifecycle.PreparedResource = PreparedJob{}
 var _ lifecycle.ReadyResource = (*JobGeneration)(nil)
-
-func TestJobFactoryRejectCleanup(t *testing.T) {
-	tests := map[string]struct {
-		build func(*testing.T, *jobEventLog) (ConstructedJob, error)
-		want  []string
-	}{
-		"construction error": {
-			build: func(t *testing.T, events *jobEventLog) (ConstructedJob, error) {
-				return testConstructedJob(t, JobVariantV1, events), errors.New("construction failed")
-			},
-			want: []string{"handler-close", "runtime-abort", "collector"},
-		},
-		"invalid construction": {
-			build: func(_ *testing.T, events *jobEventLog) (ConstructedJob, error) {
-				return ConstructedJob{
-					Runtime: &recordingJobRuntime{
-						events: events,
-					},
-					CollectorCleanup: func(context.Context) error {
-						events.add("collector")
-						return nil
-					},
-				}, nil
-			},
-			want: []string{"runtime-abort", "collector"},
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			events := &jobEventLog{}
-			permit, tasks := issueTestJobPermit(t, "job", 1)
-			prepared, err := prepareJob(
-				context.Background(),
-				"job",
-				1,
-				permit,
-				func(context.Context) (ConstructedJob, error) {
-					return test.build(t, events)
-				},
-			)
-			require.Error(t, err)
-			require.False(t, prepared.Valid())
-
-			got := events.snapshot()
-			require.Equal(t, test.want, got)
-
-			require.NoError(t, permit.AbortUnused())
-			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-		})
-	}
-}
-
-func TestJobPreparationLeavesCleanRejectedPermitWithTaskSupervisor(t *testing.T) {
-	permit, tasks := issueTestJobPermit(t, "job", 1)
-	events := &jobEventLog{}
-
-	prepared, err := prepareJob(
-		context.Background(),
-		"job",
-		1,
-		permit,
-		func(context.Context) (ConstructedJob, error) {
-			return testConstructedJob(t, JobVariantV1, events), errors.New("construction failed")
-		},
-	)
-	require.Error(t, err)
-	require.False(t, prepared.Valid())
-
-	require.NoError(t, permit.AbortUnused())
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-
-}
 
 func TestPreparedTransactionRejectsStaleUnusedPermitAtConstruction(t *testing.T) {
 	permit, _ := issueTestJobPermit(t, "job", 1)
@@ -112,301 +38,336 @@ func TestPreparedTransactionRejectsStaleUnusedPermitAtConstruction(t *testing.T)
 		nil,
 	)
 	require.Error(t, err)
-
-}
-
-func TestJobGenerationV1V2(t *testing.T) {
-	tests := map[string]struct {
-		variant JobVariant
-	}{
-		"V1": {variant: JobVariantV1},
-		"V2": {variant: JobVariantV2},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			events := &jobEventLog{}
-			permit, tasks := issueTestJobPermit(t, "job", 7)
-			prepared, err := prepareJob(
-				context.Background(),
-				"job",
-				7,
-				permit,
-				func(context.Context) (ConstructedJob, error) {
-					return testConstructedJob(t, test.variant, events), nil
-				},
-			)
-			require.NoError(t, err)
-			require.NoError(t, prepared.Probe(context.Background()))
-			generation, err := prepared.Accept(context.Background(), 7)
-			require.NoError(t, err)
-
-			require.NoError(t, generation.Start(context.Background()))
-
-			require.NoError(t, generation.Publish())
-
-			require.NoError(t, generation.Stop(context.Background()))
-
-			require.EqualValues(t, JobStopped, generation.State())
-
-			require.NoError(t, generation.Finalize())
-
-			require.NoError(t, generation.Stop(context.Background()))
-
-			require.NoError(t, generation.Finalize())
-
-			want := []string{
-				"runtime-start", "handler-publish", "handler-close", "runtime-stop",
-				"runtime-release", "collector",
-			}
-
-			got := events.snapshot()
-			require.Equal(t, want, got)
-
-			require.EqualValues(t, JobTerminal, generation.State())
-			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-		})
-	}
-}
-
-func TestJobGenerationPermitReturnLast(t *testing.T) {
-	events := &jobEventLog{}
-	release := make(chan struct{})
-	permit, tasks := issueTestJobPermit(t, "job", 1)
-	prepared, err := prepareJob(
-		context.Background(),
-		"job",
-		1,
-		permit,
-		func(context.Context) (ConstructedJob, error) {
-			constructed := testConstructedJob(t, JobVariantV1, events)
-			constructed.Runtime = &recordingJobRuntime{
-				events:   events,
-				stopGate: release,
-			}
-			return constructed, nil
-		},
-	)
-	require.NoError(t, err)
-	require.NoError(t, prepared.Probe(context.Background()))
-	generation, err := prepared.Accept(context.Background(), 1)
-	require.NoError(t, err)
-
-	require.NoError(t, generation.Start(context.Background()))
-
-	require.NoError(t, generation.Publish())
-
-	done := make(chan error, 1)
-	go func() { done <- generation.Stop(context.Background()) }()
-	events.waitFor(t, "runtime-stop-enter")
-	require.EqualValues(t, JobStopping, generation.State())
-	require.EqualValues(t, 1, tasks.LongLivedCensus().Active)
-	close(release)
-
-	require.NoError(t, <-done)
-
-	require.EqualValues(t, JobStopped, generation.State())
-	census := tasks.LongLivedCensus()
-	require.EqualValues(t, 1, census.Active)
-
-	require.NoError(t, generation.Finalize())
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-}
-
-func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
-	tests := map[string]struct {
-		configure func(*ConstructedJob)
-		start     bool
-	}{
-		"start abort failure": {
-			configure: func(constructed *ConstructedJob) {
-				constructed.Runtime = &recordingJobRuntime{
-					events:   constructed.Runtime.(*recordingJobRuntime).events,
-					startErr: errors.New("start failed"),
-					abortErr: errors.New("abort failed"),
-				}
-			},
-		},
-		"runtime stop panic": {
-			configure: func(constructed *ConstructedJob) {
-				constructed.Runtime = &recordingJobRuntime{
-					events:    constructed.Runtime.(*recordingJobRuntime).events,
-					panicStop: true,
-				}
-			},
-			start: true,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			events := &jobEventLog{}
-			permit, tasks := issueTestJobPermit(t, "job", 1)
-			prepared, err := prepareJob(
-				context.Background(),
-				"job",
-				1,
-				permit,
-				func(context.Context) (ConstructedJob, error) {
-					constructed := testConstructedJob(t, JobVariantV2, events)
-					test.configure(&constructed)
-					return constructed, nil
-				},
-			)
-			require.NoError(t, err)
-			require.NoError(t, prepared.Probe(context.Background()))
-			generation, err := prepared.Accept(context.Background(), 1)
-			require.NoError(t, err)
-			startErr := generation.Start(context.Background())
-			if !test.start {
-				require.Error(t, startErr)
-			} else {
-				require.NoError(t, startErr)
-
-				require.NoError(t, generation.Publish())
-
-				require.Error(t, generation.Stop(context.Background()))
-			}
-			require.EqualValues(t, JobRetained, generation.State())
-			require.NotZero(t, tasks.LongLivedCensus().Active)
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
-
-			require.Error(t, generation.Stop(ctx))
-		})
-	}
 }
 
 func TestJobLifecyclePanicsPreserveTaskClassification(t *testing.T) {
-	tests := map[string]func() error{
-		"job lifecycle": func() error {
-			return callJobLifecycle("test", func() error {
-				panic("lifecycle")
-			})
-		},
-	}
-	for name, run := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := run()
-			require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
-		})
-	}
+	err := callJobLifecycle("test", func() error {
+		panic("lifecycle")
+	})
+	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
 }
 
-func TestPreparedJobProbeOwnsResourcesThroughFailureClassification(t *testing.T) {
-	events := &jobEventLog{}
-	permit, tasks := issueTestJobPermit(t, "job", 1)
-	retryEntered := make(chan struct{})
-	allowRetry := make(chan struct{})
-	var releaseRetry sync.Once
-	release := func() {
-		releaseRetry.Do(func() {
-			close(allowRetry)
-		})
+func TestPreparedJobAcceptanceTransfersFinalCleanupToProcessOwner(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		attempts.BeginShutdown()
+		require.NoError(t, attempts.Shutdown(context.Background()))
+	})
+	var rejected, final int
+	identity := lifecycle.ResourceIdentity{ID: "module_job", Generation: 1}
+	candidate := ConstructedJob{
+		Variant:          JobVariantV1,
+		CollectorCleanup: func(context.Context) error { rejected++; return nil },
+		finalCleanup:     func(context.Context) error { final++; return nil },
 	}
-	defer release()
-
-	prepared, err := prepareJob(
+	owner := newStagedJobOwner(
 		context.Background(),
-		"job",
+		candidate,
+		attempts,
 		1,
-		permit,
-		func(context.Context) (ConstructedJob, error) {
-			constructed := testConstructedJob(t, JobVariantV1, events)
-			constructed.autoDetection = func(context.Context) error {
-				return errors.New("probe failed")
-			}
-			constructed.retryAutoDetection = func() bool {
-				close(retryEntered)
-				<-allowRetry
-				return true
-			}
-			return constructed, nil
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       identity.ID,
+			Resource:  identity.ID,
 		},
 	)
-	require.NoError(t, err)
-
-	probeDone := make(chan error, 1)
-	go func() {
-		probeDone <- prepared.Probe(context.Background())
-	}()
-
-	select {
-	case <-retryEntered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "probe did not enter failure classification")
+	candidate.attach = func(
+		lifecycle.ResourceIdentity,
+		*stagedJobOwner,
+	) (ConstructedJob, error) {
+		require.NoError(t, owner.BindAttachment())
+		return candidate, nil
 	}
-	disposeErr := prepared.Dispose(context.Background())
-	release()
-	probeErr := <-probeDone
+	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
+	prepared := PreparedJob{state: &preparedJobState{
+		id:          identity.ID,
+		generation:  identity.Generation,
+		constructed: candidate,
+		permit:      permit,
+		owner:       owner,
+	}}
 
-	require.ErrorContains(t, disposeErr, "probe is active")
-	require.ErrorContains(t, probeErr, "probe failed")
-	require.NoError(t, prepared.Dispose(context.Background()))
-	require.Equal(t, []string{"handler-close", "runtime-abort", "collector"}, events.snapshot())
+	generation, err := prepared.Accept(context.Background(), identity.Generation)
+	require.NoError(t, err)
+	require.NotNil(t, generation)
+	owner.Reject()
+	select {
+	case <-owner.done:
+	case <-time.After(time.Second):
+		t.Fatal("accepted process owner did not finalize")
+	}
+	require.NoError(t, permit.ReleaseExternal())
+	require.NoError(t, permit.Return())
+
+	require.Zero(t, rejected)
+	require.EqualValues(t, 1, final)
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
-func BenchmarkBJobFactoryCold(b *testing.B) {
-	for b.Loop() {
-		events := &jobEventLog{}
-		permit, _ := issueTestJobPermit(b, "job", 1)
-		prepared, err := prepareJob(
-			context.Background(),
-			"job",
-			1,
-			permit,
-			func(context.Context) (ConstructedJob, error) {
-				return testConstructedJob(b, JobVariantV1, events), nil
-			},
-		)
-		if err != nil {
-			require.FailNow(b, "benchmark failed", err)
+func TestPreparedJobRetirementBeforeResourceAcceptanceLeavesPermitUnused(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		attempts.BeginShutdown()
+		require.NoError(t, attempts.Shutdown(context.Background()))
+	})
+	identity := lifecycle.ResourceIdentity{ID: "module_job", Generation: 1}
+	candidate := ConstructedJob{
+		Variant:          JobVariantV1,
+		CollectorCleanup: func(context.Context) error { return nil },
+		finalCleanup:     func(context.Context) error { return nil },
+	}
+	owner := newStagedJobOwner(
+		context.Background(),
+		candidate,
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       identity.ID,
+			Resource:  identity.ID,
+		},
+	)
+	candidate.attach = func(
+		lifecycle.ResourceIdentity,
+		*stagedJobOwner,
+	) (ConstructedJob, error) {
+		require.NoError(t, owner.BindAttachment())
+		candidate.activateAttachment = func() error {
+			owner.Retire()
+			return nil
 		}
-		if err := prepared.Dispose(context.Background()); err != nil {
-			require.FailNow(b, "benchmark failed", err)
-		}
+		return candidate, nil
+	}
+	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
+	prepared := PreparedJob{state: &preparedJobState{
+		id:          identity.ID,
+		generation:  identity.Generation,
+		constructed: candidate,
+		permit:      permit,
+		owner:       owner,
+	}}
+
+	_, err = prepared.Accept(context.Background(), identity.Generation)
+	require.Error(t, err)
+
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
+func TestCandidateCancellationBeforePromotionPreservesRetirementCause(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	outputGate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	var cleanups int
+	ctx, cancel := context.WithCancelCause(context.Background())
+	owner := newStagedJobOwner(
+		ctx,
+		ConstructedJob{
+			Variant:          JobVariantV1,
+			CollectorCleanup: func(context.Context) error { cleanups++; return nil },
+			outputGate:       outputGate,
+		},
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module_job",
+			Resource:  "module_job",
+		},
+	)
+	finished := make(chan error, 1)
+	go func() {
+		finished <- owner.finishCandidate(ctx)
+	}()
+
+	cancel(jobmgr.ErrProcessAttemptStopped)
+	select {
+	case <-owner.rejectCandidate:
+	case <-time.After(time.Second):
+		t.Fatal("candidate cancellation did not reject its ownership")
+	}
+	require.ErrorIs(t, owner.Promote(context.Background()), jobmgr.ErrProcessAttemptStopped)
+	require.NoError(t, <-finished)
+	require.EqualValues(t, 1, cleanups)
+
+	attempts.BeginShutdown()
+	require.NoError(t, attempts.Shutdown(context.Background()))
+}
+
+func TestCandidateCancellationDoesNotRejectPromotionInProgress(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attempts := &promotionGateAuthority{
+		ProcessAttemptAuthority: delegate,
+		entered:                 make(chan struct{}),
+		release:                 make(chan struct{}),
+	}
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	outputGate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	var cleanups int
+	candidateCtx, cancelCandidate := context.WithCancelCause(context.Background())
+	owner := newStagedJobOwner(
+		candidateCtx,
+		ConstructedJob{
+			Variant:          JobVariantV1,
+			CollectorCleanup: func(context.Context) error { cleanups++; return nil },
+			outputGate:       outputGate,
+		},
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module_job",
+			Resource:  "module_job",
+		},
+	)
+	finished := make(chan error, 1)
+	go func() {
+		finished <- owner.finishCandidate(candidateCtx)
+	}()
+	promoted := make(chan error, 1)
+	go func() {
+		promoted <- owner.Promote(context.Background())
+	}()
+	select {
+	case <-attempts.entered:
+	case <-time.After(time.Second):
+		t.Fatal("promotion did not reach runtime-attempt admission")
+	}
+
+	cancelCandidate(jobmgr.ErrProcessAttemptStopped)
+	close(attempts.release)
+	require.NoError(t, <-promoted)
+	require.NoError(t, <-finished)
+	owner.mu.Lock()
+	ownership, retiring, decided := owner.ownership, owner.retiring, owner.decided
+	owner.mu.Unlock()
+	require.Equal(t, stagedJobOwnedByRuntime, ownership)
+	require.False(t, retiring)
+	require.False(t, decided)
+
+	owner.Reject()
+	select {
+	case <-owner.done:
+	case <-time.After(time.Second):
+		t.Fatal("promoted runtime did not retire")
+	}
+	require.EqualValues(t, 1, cleanups)
+	delegate.BeginShutdown()
+	require.NoError(t, delegate.Shutdown(context.Background()))
+}
+
+func TestCandidateCancellationControlsFailedPromotion(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attempts := &busyPromotionGateAuthority{
+		ProcessAttemptAuthority: delegate,
+		entered:                 make(chan struct{}),
+		release:                 make(chan struct{}),
+	}
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	outputGate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	var cleanups int
+	candidateCtx, cancelCandidate := context.WithCancelCause(context.Background())
+	owner := newStagedJobOwner(
+		candidateCtx,
+		ConstructedJob{
+			Variant:          JobVariantV1,
+			CollectorCleanup: func(context.Context) error { cleanups++; return nil },
+			outputGate:       outputGate,
+		},
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       "module_job",
+			Resource:  "module_job",
+		},
+	)
+	finished := make(chan error, 1)
+	go func() {
+		finished <- owner.finishCandidate(candidateCtx)
+	}()
+	promoted := make(chan error, 1)
+	go func() {
+		promoted <- owner.Promote(context.Background())
+	}()
+	select {
+	case <-attempts.entered:
+	case <-time.After(time.Second):
+		t.Fatal("promotion did not reach busy runtime supersession")
+	}
+
+	cancelCandidate(jobmgr.ErrProcessAttemptStopped)
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case err := <-promoted:
+		require.ErrorIs(t, err, jobmgr.ErrProcessAttemptStopped)
+	case <-timer.C:
+		close(attempts.release)
+		<-promoted
+		t.Fatal("candidate cancellation did not interrupt busy runtime supersession")
+	}
+	require.NoError(t, <-finished)
+	require.EqualValues(t, 1, cleanups)
+
+	delegate.BeginShutdown()
+	require.NoError(t, delegate.Shutdown(context.Background()))
+}
+
+type promotionGateAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (a *promotionGateAuthority) StartProcessAttempt(
+	ctx context.Context,
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	close(a.entered)
+	<-a.release
+	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+}
+
+type busyPromotionGateAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (*busyPromotionGateAuthority) StartProcessAttempt(
+	context.Context,
+	jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	return nil, jobmgr.ErrProcessAttemptBusy
+}
+
+func (a *busyPromotionGateAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	_ jobmgr.ProcessAttemptIdentity,
+) error {
+	close(a.entered)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-a.release:
+		return jobmgr.ErrProcessAttemptBusy
 	}
 }
 
 type testingHelper interface {
 	require.TestingT
 	Helper()
-}
-
-func testConstructedJob(t testingHelper, variant JobVariant, events *jobEventLog) ConstructedJob {
-	t.Helper()
-	return ConstructedJob{
-		Variant: variant,
-		Runtime: &recordingJobRuntime{
-			events: events,
-		},
-		Handlers: &recordingHandlerLifecycle{
-			publish: func() error {
-				events.add("handler-publish")
-				return nil
-			},
-			closeAndDrain: func(context.Context) error {
-				events.add("handler-close")
-				return nil
-			},
-		},
-		CollectorCleanup: func(context.Context) error {
-			events.add("collector")
-			return nil
-		},
-	}
-}
-
-type recordingHandlerLifecycle struct {
-	publish       func() error
-	closeAndDrain func(context.Context) error
-}
-
-func (rhl *recordingHandlerLifecycle) Publish() error {
-	return rhl.publish()
-}
-
-func (rhl *recordingHandlerLifecycle) CloseAndDrain(ctx context.Context) error {
-	return rhl.closeAndDrain(ctx)
 }
 
 func issueTestJobPermit(
@@ -429,74 +390,4 @@ func issueTestJobPermit(
 	}, plan)
 	require.NoError(t, err)
 	return permit, tasks
-}
-
-type recordingJobRuntime struct {
-	events    *jobEventLog
-	stopGate  <-chan struct{}
-	startErr  error
-	abortErr  error
-	panicStop bool
-}
-
-func (rjr *recordingJobRuntime) Start(context.Context) error {
-	rjr.events.add("runtime-start")
-	return rjr.startErr
-}
-
-func (rjr *recordingJobRuntime) Abort(context.Context) error {
-	rjr.events.add("runtime-abort")
-	return rjr.abortErr
-}
-
-func (rjr *recordingJobRuntime) Stop(context.Context) error {
-	if rjr.stopGate != nil {
-		rjr.events.add("runtime-stop-enter")
-		<-rjr.stopGate
-	}
-	if rjr.panicStop {
-		panic("stop panic")
-	}
-	rjr.events.add("runtime-stop")
-	return nil
-}
-
-func (rjr *recordingJobRuntime) ReleaseAfterCleanup(context.Context) error {
-	rjr.events.add("runtime-release")
-	return nil
-}
-
-var _ jobruntime.Runtime = (*recordingJobRuntime)(nil)
-
-type jobEventLog struct {
-	mu     sync.Mutex
-	events []string
-}
-
-func (log *jobEventLog) add(event string) {
-	log.mu.Lock()
-	log.events = append(log.events, event)
-	log.mu.Unlock()
-}
-
-func (log *jobEventLog) snapshot() []string {
-	log.mu.Lock()
-	defer log.mu.Unlock()
-	return append([]string(nil), log.events...)
-}
-
-func (log *jobEventLog) contains(want string) bool {
-	return slices.Contains(log.snapshot(), want)
-}
-
-func (log *jobEventLog) waitFor(t *testing.T, want string) {
-	t.Helper()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		if log.contains(want) {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	require.FailNowf(t, "test failed", "event %q not observed: %v", want, log.snapshot())
 }

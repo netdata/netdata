@@ -71,6 +71,7 @@ groups:
         context: queries_total
         units: queries/s
         algorithm: incremental
+        aggregation: min
         dimensions:
           - selector: mysql_queries_total
             name: total
@@ -85,6 +86,7 @@ groups:
 				require.Len(t, spec.Groups, 1)
 				require.Len(t, spec.Groups[0].Charts, 1)
 				assert.Equal(t, "line", spec.Groups[0].Charts[0].Type)
+				assert.Equal(t, AggregationMin, spec.Groups[0].Charts[0].Aggregation)
 				require.Len(t, spec.Groups[0].Charts[0].Dimensions, 1)
 				require.NotNil(t, spec.Groups[0].Charts[0].Dimensions[0].Options)
 				assert.Equal(t, -8, spec.Groups[0].Charts[0].Dimensions[0].Options.Multiplier)
@@ -384,6 +386,9 @@ func TestConfigSchemaJSON(t *testing.T) {
 	chartLabelPromotionItems, ok := chartLabelPromotion["items"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, `\S`, chartLabelPromotionItems["pattern"])
+	chartAggregation, ok := chartProps["aggregation"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, []any{"sum", "min", "max", "avg"}, chartAggregation["enum"])
 
 	chartDefaults, ok := defs["chart_defaults"].(map[string]any)
 	require.True(t, ok)

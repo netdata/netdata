@@ -19,7 +19,7 @@ impl FlowRecord {
     /// their default value (0, empty string, None) are skipped; required fields
     /// such as `PROTOCOL` are retained even when zero. The reader (`from_fields`)
     /// defaults missing optional fields to the same values, so the round-trip is
-    /// lossless. This reduces typical per-entry item counts from 87 to ~20-25.
+    /// lossless. This reduces typical per-entry item counts from 91 to ~20-25.
     pub(crate) fn encode_to_journal_buf(
         &self,
         data: &mut Vec<u8>,

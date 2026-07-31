@@ -6,9 +6,8 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,18 +23,24 @@ func (reas releaseErrorAtomicScope) Release(context.Context) error {
 	return reas.err
 }
 
-func TestRunOwnedAtomicScopeDirtiesRunOnReleaseFailure(t *testing.T) {
+func TestProcessOwnedAtomicScopeReportsReleaseFailureWithoutRunOwnership(t *testing.T) {
 	releaseErr := errors.New("store scope release failed")
-	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, time.Second)
-	require.NoError(t, err)
-	scope := &runOwnedAtomicScope{
-		run: run,
+	diagnostics := &recordingCompositionDiagnosticObserver{}
+	scope := &processOwnedAtomicScope{
+		generation:  7,
+		diagnostics: diagnostics,
 		scope: releaseErrorAtomicScope{
 			err: releaseErr,
 		},
 	}
 
 	require.ErrorIs(t, scope.Release(t.Context()), releaseErr)
+	require.Nil(t, scope.scope)
 
-	require.ErrorIs(t, run.DirtyCause(), releaseErr)
+	events := diagnostics.snapshot()
+	require.Len(t, events, 1)
+	require.Equal(t, jobmgr.DiagnosticError, events[0].Level)
+	require.Equal(t, "secret Store scope release failed", events[0].Name)
+	require.EqualValues(t, 7, events[0].Generation)
+	require.ErrorIs(t, events[0].Err, releaseErr)
 }

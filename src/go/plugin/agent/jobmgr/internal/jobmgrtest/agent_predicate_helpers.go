@@ -647,36 +647,36 @@ type predicateFaultWriter struct {
 	once     sync.Once
 }
 
-func (writer *predicateFaultWriter) Write(payload []byte) (int, error) {
-	if !writer.match(payload) {
-		return writer.target.Write(payload)
+func (pfw *predicateFaultWriter) Write(payload []byte) (int, error) {
+	if !pfw.match(payload) {
+		return pfw.target.Write(payload)
 	}
 	var count int
 	var err error
-	writer.once.Do(func() {
-		switch writer.mode {
+	pfw.once.Do(func() {
+		switch pfw.mode {
 		case injectedShortNil:
 			count = len(payload) / 2
 			if count == 0 {
 				count = 1
 			}
-			_, _ = writer.target.Write(payload[:count])
+			_, _ = pfw.target.Write(payload[:count])
 		case injectedShortError:
 			count = len(payload) / 2
 			if count == 0 {
 				count = 1
 			}
-			_, _ = writer.target.Write(payload[:count])
+			_, _ = pfw.target.Write(payload[:count])
 			err = errors.New("injected short write")
 		case injectedPreByteError:
 			err = errors.New("injected pre-byte write failure")
 		case injectedEPIPE:
 			err = syscall.EPIPE
 		}
-		close(writer.injected)
+		close(pfw.injected)
 	})
 	if count == 0 && err == nil {
-		return writer.target.Write(payload)
+		return pfw.target.Write(payload)
 	}
 	return count, err
 }

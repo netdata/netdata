@@ -30,16 +30,25 @@ func (fn runFinalizerFunc) FinalizeRun(ctx context.Context, generation uint64) e
 	return fn(ctx, generation)
 }
 
+type externalHoldingFrameWriter struct {
+	offered chan []byte
+	release chan struct{}
+}
+
+func (w *externalHoldingFrameWriter) Write(payload []byte) (int, error) {
+	w.offered <- bytes.Clone(payload)
+	<-w.release
+	return len(payload), nil
+}
+
 func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	var cleanupCalls atomic.Int32
-	handled := make(chan struct{})
 	catalog, err := functionadapter.NewCatalog([]functionadapter.Declaration{
 		{
 			ID: "method", PublicName: "direct",
 			Generation: &functionadapter.HandlerGenerationDeclaration{
 				ID: "external-test",
 				Handler: func(context.Context, functionadapter.HandlerInput) (lifecycle.SealedResult, error) {
-					close(handled)
 					return lifecycle.NewControlResult(lifecycle.ControlInternal)
 				},
 				Cleanup: func(context.Context) error {
@@ -55,8 +64,12 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	uids := lifecycle.NewUIDLedger()
-	var output bytes.Buffer
-	frames, err := lifecycle.NewFrameOwner(&output)
+	writer := &externalHoldingFrameWriter{
+		offered: make(chan []byte, 1),
+		release: make(chan struct{}),
+	}
+	var releaseFrame sync.Once
+	frames, err := lifecycle.NewFrameOwner(writer)
 	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
@@ -67,6 +80,13 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 		catalog,
 	)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		kernel.Stop()
+		releaseFrame.Do(func() { close(writer.release) })
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer waitCancel()
+		_ = kernel.Wait(waitCtx)
+	})
 
 	require.NoError(t, run.OpenAdmission())
 	require.NoError(t, kernel.Start(context.Background()))
@@ -77,18 +97,19 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 		Route:  "direct",
 	}),
 	)
+	var frame []byte
 	select {
-	case <-handled:
+	case frame = <-writer.offered:
 	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "Function handler did not run")
+		require.FailNow(t, "test failed", "Function result frame was not offered")
 	}
+	require.Contains(t, string(frame), "FUNCTION_RESULT_BEGIN concrete-catalog 500 application/json ")
 	kernel.Stop()
+	releaseFrame.Do(func() { close(writer.release) })
 
-	require.NoError(t, kernel.Wait(context.Background()))
-	require.True(
-		t,
-		bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN concrete-catalog 500 application/json ")),
-	)
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer waitCancel()
+	require.NoError(t, kernel.Wait(waitCtx))
 
 	require.True(t, catalog.LifecycleDrained())
 	require.EqualValues(t, 1, cleanupCalls.Load())

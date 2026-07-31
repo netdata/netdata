@@ -25,7 +25,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		}
 		quantum--
 		operation := lane.head
-		if operation == nil || operation.fenceBlocked || lane.active != nil {
+		if operation == nil || operation.stagePending || operation.fenceBlocked || lane.active != nil {
 			ck.run.Dirty(errors.New("jobmgr kernel: invalid ready lane"))
 			return false
 		}
@@ -133,7 +133,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 				}
 			}
 			var err error
-			if scope.Successor.Valid() {
+			if scope.Successor.Valid() && transaction.Permit.Class() != 0 {
 				taskPlan, err = lifecycle.NewResourceTransactionPermitTaskPlan(
 					operation.Source,
 					operation.request.Deadline,

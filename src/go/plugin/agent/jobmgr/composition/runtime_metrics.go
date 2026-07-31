@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
@@ -19,7 +20,17 @@ const (
 	runtimeMetricPrefix  = "netdata.go.plugin.agent.jobmgr.runtime"
 )
 
+type processAttemptGauges struct {
+	active      metrix.StatefulGauge
+	probing     metrix.StatefulGauge
+	admitted    metrix.StatefulGauge
+	contained   metrix.StatefulGauge
+	quarantined metrix.StatefulGauge
+}
+
 type runMetrics struct {
+	attempts           *containment.Authority
+	attemptGauges      processAttemptGauges
 	store              metrix.RuntimeStore                                                // runtime metrics store
 	gauges             [lifecycle.RuntimeGaugeJobsActive + 1]metrix.StatefulGauge         // stateful gauges by RuntimeGauge id
 	gaugeValues        [lifecycle.RuntimeGaugeJobsActive + 1]atomic.Int64                 // current gauge values (written by mutation owners)
@@ -31,12 +42,21 @@ type runMetrics struct {
 	projectionUpdateMu sync.Mutex                                                         // serializes projection snapshots
 }
 
-func newRunMetrics() *runMetrics {
+func newRunMetrics(attempts *containment.Authority) (*runMetrics, error) {
+	if attempts == nil {
+		return nil, errors.New("jobmgr runtime metrics: nil process-attempt authority")
+	}
 	store := metrix.NewRuntimeStore()
 	meter := store.Write().StatefulMeter(runtimeMetricPrefix)
 	metrics := &runMetrics{
-		store: store,
+		attempts: attempts,
+		store:    store,
 	}
+	metrics.attemptGauges.active = runtimeGauge(meter, "process_attempts_active", "attempts")
+	metrics.attemptGauges.probing = runtimeGauge(meter, "process_attempts_probing", "attempts")
+	metrics.attemptGauges.admitted = runtimeGauge(meter, "process_attempts_admitted", "attempts")
+	metrics.attemptGauges.contained = runtimeGauge(meter, "process_attempts_contained", "attempts")
+	metrics.attemptGauges.quarantined = runtimeGauge(meter, "process_attempts_quarantined", "identities")
 	metrics.gauges[lifecycle.RuntimeGaugeOperationsActive] = runtimeGauge(meter, "operations_active", "operations")
 	metrics.gauges[lifecycle.RuntimeGaugeFunctionInvocationsActive] =
 		runtimeGauge(meter, "function_invocations_active", "invocations")
@@ -67,7 +87,7 @@ func newRunMetrics() *runMetrics {
 	metrics.ages[lifecycle.RuntimeTimestampOldestOperation] = runtimeAgeGauge(meter, "oldest_operation_age")
 	metrics.ages[lifecycle.RuntimeTimestampOldestClaimWait] = runtimeAgeGauge(meter, "oldest_claim_wait_age")
 	metrics.ages[lifecycle.RuntimeTimestampOldestTaskWait] = runtimeAgeGauge(meter, "oldest_task_wait_age")
-	return metrics
+	return metrics, nil
 }
 
 func runtimeGauge(meter metrix.StatefulMeter, name string, unit string) metrix.StatefulGauge {
@@ -139,6 +159,12 @@ func (rm *runMetrics) refreshProjection() error {
 	rm.projectionUpdateMu.Lock()
 	defer rm.projectionUpdateMu.Unlock()
 
+	attempts := rm.attempts.Census()
+	rm.attemptGauges.active.Set(float64(attempts.Active))
+	rm.attemptGauges.probing.Set(float64(attempts.Probing))
+	rm.attemptGauges.admitted.Set(float64(attempts.Admitted))
+	rm.attemptGauges.contained.Set(float64(attempts.Contained))
+	rm.attemptGauges.quarantined.Set(float64(attempts.Quarantined))
 	for kind := lifecycle.RuntimeGaugeOperationsActive; kind <= lifecycle.RuntimeGaugeJobsActive; kind++ {
 		rm.gauges[kind].Set(float64(rm.gaugeValues[kind].Load()))
 	}

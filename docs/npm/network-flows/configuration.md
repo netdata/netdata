@@ -186,12 +186,14 @@ Per-tier values:
 
 | Key | Default per tier | Notes |
 |---|---|---|
-| `size_of_journal_files` | `10GB` | Disk budget for this tier. Minimum `100MB`. Set to `null` to disable size-based retention on this tier. |
+| `size_of_journal_files` | `10GB` | Retained-artifact budget for journal data and finalized per-journal facet sidecars. Minimum `100MB`. Set to `null` to disable size-based retention on this tier. |
 | `duration_of_journal_files` | `null` | Optional time budget for this tier. The default disables time-based eviction; set a duration such as `24h` or `14d` to add an age cap. |
 
 Either configured limit can evict old files. The tier expires whichever configured limit is hit first. At least one of the two must be set per tier (validation enforces this).
 
 If you omit a tier entry entirely, that tier uses the built-in defaults (`10GB` / no time limit). If you provide a tier entry but omit one of the two knobs, the omitted knob falls back to its built-in default. Setting either to `null` explicitly disables that limit on that tier.
+
+The size budget is not a strict filesystem quota. The active journal counts toward the budget but is protected from deletion, so a tier can temporarily exceed its limit until rotation. Shared `facet-state.bin`, temporary sidecar files, and unrelated files are not charged to an individual tier.
 
 Standalone CLI runs still accept the legacy uniform retention flags:
 `--netflow-retention-size-of-journal-files` and

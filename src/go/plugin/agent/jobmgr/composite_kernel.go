@@ -253,6 +253,9 @@ func (ck *CommandKernel) validateCompositeAdmission(
 	if !recovery && (parent.cancelled || parent.TimedOut()) && !parent.ownershipChain {
 		return nil, errors.New("jobmgr composite: cancelled parent rejected normal child")
 	}
+	if plan.Stage != nil {
+		return nil, errors.New("jobmgr composite: child cannot start process-owned pre-claim work")
+	}
 	childClaims, err := normalizeAuthorityClaims(plan.Claims)
 	if err != nil {
 		return nil, err

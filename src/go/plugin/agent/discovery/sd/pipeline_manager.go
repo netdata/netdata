@@ -4,13 +4,12 @@ package sd
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"maps"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
@@ -25,8 +24,7 @@ const (
 type PipelineManager struct {
 	*logger.Logger
 
-	newPipeline func(cfg pipeline.Config) (sdPipeline, error)
-	send        func(ctx context.Context, groups []*confgroup.Group)
+	send func(ctx context.Context, groups []*confgroup.Group)
 
 	mux             sync.Mutex
 	pipelines       map[string]*runningPipeline    // [pipelineKey]
@@ -47,12 +45,10 @@ type pendingRemoval struct {
 // NewPipelineManager creates a new PipelineManager.
 func NewPipelineManager(
 	log *logger.Logger,
-	newPipeline func(cfg pipeline.Config) (sdPipeline, error),
 	send func(ctx context.Context, groups []*confgroup.Group),
 ) *PipelineManager {
 	return &PipelineManager{
 		Logger:          log,
-		newPipeline:     newPipeline,
 		send:            send,
 		pipelines:       make(map[string]*runningPipeline),
 		pipelineSources: make(map[string]map[string]struct{}),
@@ -60,9 +56,12 @@ func NewPipelineManager(
 	}
 }
 
-// Start starts a new pipeline with the given key and config.
-// If a pipeline with the same key is already running, it will be stopped first.
-func (m *PipelineManager) Start(ctx context.Context, key string, cfg pipeline.Config) error {
+// StartPrepared starts an already-materialized pipeline. If a pipeline with
+// the same key is already running, it is stopped first.
+func (m *PipelineManager) StartPrepared(ctx context.Context, key string, prepared sdPipeline) error {
+	if ctx == nil || key == "" || prepared == nil {
+		return errors.New("service discovery: invalid prepared pipeline start")
+	}
 	m.mux.Lock()
 
 	// Stop existing pipeline if any (no grace period - this is initial start or replace)
@@ -78,7 +77,7 @@ func (m *PipelineManager) Start(ctx context.Context, key string, cfg pipeline.Co
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	return m.startPipelineLocked(ctx, key, cfg)
+	return m.startPipelineWithInstanceLocked(ctx, key, prepared)
 }
 
 // Stop stops a pipeline and sends removal groups for all its tracked sources.
@@ -93,15 +92,14 @@ func (m *PipelineManager) Stop(key string) {
 	}
 }
 
-// Restart stops a pipeline and starts it with new config, using grace period
-// to avoid removing discovered jobs that will be re-discovered.
-func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.Config) error {
-	// Validate new config first by creating the pipeline (outside lock)
-	pl, err := m.newPipeline(cfg)
-	if err != nil {
-		return dyncfg.MarkNonDisruptiveUpdate(fmt.Errorf("failed to create new pipeline config: %w", err))
+// RestartPrepared replaces a pipeline with an already-materialized instance,
+// using a grace period to avoid removing jobs that are re-discovered.
+func (m *PipelineManager) RestartPrepared(ctx context.Context, key string, prepared sdPipeline) error {
+	if ctx == nil || key == "" || prepared == nil {
+		return dyncfg.MarkNonDisruptiveUpdate(
+			errors.New("service discovery: invalid prepared pipeline restart"),
+		)
 	}
-
 	m.mux.Lock()
 
 	// Mark current sources as pending removal (grace period)
@@ -137,7 +135,7 @@ func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.
 	defer m.mux.Unlock()
 
 	// Start the already-created new pipeline
-	return m.startPipelineWithInstanceLocked(ctx, key, pl)
+	return m.startPipelineWithInstanceLocked(ctx, key, prepared)
 }
 
 // StopAll stops all running pipelines with cleanup.
@@ -181,15 +179,6 @@ func (m *PipelineManager) IsRunning(key string) bool {
 
 	_, ok := m.pipelines[key]
 	return ok
-}
-
-func (m *PipelineManager) startPipelineLocked(ctx context.Context, key string, cfg pipeline.Config) error {
-	pl, err := m.newPipeline(cfg)
-	if err != nil {
-		return err
-	}
-
-	return m.startPipelineWithInstanceLocked(ctx, key, pl)
 }
 
 func (m *PipelineManager) startPipelineWithInstanceLocked(ctx context.Context, key string, pl sdPipeline) error {

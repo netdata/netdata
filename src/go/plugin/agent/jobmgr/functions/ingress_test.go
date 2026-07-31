@@ -75,8 +75,8 @@ type ingressTestClock struct {
 	now time.Time
 }
 
-func (clock ingressTestClock) Now() time.Time {
-	return clock.now
+func (itc ingressTestClock) Now() time.Time {
+	return itc.now
 }
 
 func (ingressTestClock) Arm(string, time.Duration) (<-chan time.Time, func()) {

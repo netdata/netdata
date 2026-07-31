@@ -22,6 +22,16 @@ type SelectorLabels interface {
 	Range(fn func(key, value string) bool)
 }
 
+// Aggregation defines how source observations mapped to one dimension combine.
+type Aggregation uint8
+
+const (
+	AggregationSum Aggregation = iota
+	AggregationMin
+	AggregationMax
+	AggregationAvg
+)
+
 // SelectorBinding stores selector expression + compiled runtime matcher metadata.
 type SelectorBinding struct {
 	// Expression is original selector text (for diagnostics/debugging).
@@ -45,6 +55,7 @@ type Dimension struct {
 	// InferNameFromSeriesMeta requests runtime inference based on series origin
 	// metadata (e.g. histogram/state-set flatten semantics).
 	InferNameFromSeriesMeta bool
+	Aggregation             Aggregation
 
 	// Hidden maps to DIMENSION hidden option.
 	Hidden bool
@@ -68,6 +79,11 @@ func validateDimension(dimension Dimension) error {
 	}
 	if dimension.NameTemplate.Raw == "" && dimension.NameFromLabel == "" && !dimension.InferNameFromSeriesMeta {
 		errs = append(errs, fmt.Errorf("dimension name is required (name template or name_from_label)"))
+	}
+	switch dimension.Aggregation {
+	case AggregationSum, AggregationMin, AggregationMax, AggregationAvg:
+	default:
+		errs = append(errs, fmt.Errorf("invalid aggregation %d", dimension.Aggregation))
 	}
 	return errors.Join(errs...)
 }

@@ -336,6 +336,55 @@ func TestJob_StopBeforeStartDoesNotBlock(t *testing.T) {
 	}
 }
 
+func TestJobCleanupUsesDedicatedOutputWithOutFallback(t *testing.T) {
+	for _, dedicated := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dedicated=%v", dedicated), func(t *testing.T) {
+			var liveOutput bytes.Buffer
+			var cleanupOutput bytes.Buffer
+			charts := collectorapi.Charts{
+				&collectorapi.Chart{
+					ID:    "work",
+					Title: "Work",
+					Units: "units",
+					Dims:  collectorapi.Dims{{ID: "value"}},
+				},
+			}
+			module := &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts { return &charts },
+				CollectFunc: func(context.Context) map[string]int64 {
+					return map[string]int64{"value": 1}
+				},
+			}
+			config := JobConfig{
+				PluginName: pluginName,
+				Name:       jobName,
+				ModuleName: modName,
+				FullName:   modName + "_" + jobName,
+				Module:     module,
+				Out:        &liveOutput,
+			}
+			if dedicated {
+				config.CleanupOut = &cleanupOutput
+			}
+			job := NewJob(config)
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+
+			job.runOnce()
+			require.Contains(t, liveOutput.String(), "CHART")
+			liveOutput.Reset()
+
+			job.Cleanup()
+			if dedicated {
+				require.Empty(t, liveOutput.Bytes())
+				require.Contains(t, cleanupOutput.String(), "obsolete")
+			} else {
+				require.Contains(t, liveOutput.String(), "obsolete")
+				require.Empty(t, cleanupOutput.Bytes())
+			}
+		})
+	}
+}
+
 func TestJob_MainLoop_Panic(t *testing.T) {
 	m := &collectorapi.MockCollectorV1{
 		CollectFunc: func(context.Context) map[string]int64 {

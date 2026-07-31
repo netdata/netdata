@@ -21,7 +21,6 @@ func TestProviderBackedGenerationScopeOperandValidation(t *testing.T) {
 		mutation, err := store.PrepareMutation(
 			context.Background(),
 			catalog,
-			&providerGenerationCarrier{},
 			providerStoreConfig(t, provider.kind, provider.config),
 			0,
 		)

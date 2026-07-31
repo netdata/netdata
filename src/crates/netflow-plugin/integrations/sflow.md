@@ -87,7 +87,7 @@ Enable sFlow via the `protocols.sflow` option.
 | listener.listen | UDP listener endpoints for NetFlow/IPFIX and sFlow datagrams. YAML accepts either a scalar endpoint or a list of endpoints; CLI accepts repeated `--netflow-listen` flags or comma-delimited values. | 0.0.0.0:2055, 0.0.0.0:6343 | no |
 | protocols.sflow | Enable sFlow decoding. | yes | no |
 | journal.journal_dir | Directory for journal files (relative to NETDATA_CACHE_DIR). | flows | no |
-| journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention. | 10GB | no |
+| journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier retained-artifact budget for journal data and finalized per-journal facet sidecars. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The protected active journal can temporarily exceed the budget. Set to `null` for time-only retention. | 10GB | no |
 | journal.tiers.&lt;tier&gt;.duration_of_journal_files | Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap. | null | no |
 
 

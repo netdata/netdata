@@ -11,13 +11,14 @@ import (
 )
 
 type queryBatch struct {
-	key       queryBatchKey
-	client    cloudwatchClient
-	activity  *collectorActivity
-	accountID string
-	queries   []plannedQuery
-	start     time.Time
-	end       time.Time
+	key            queryBatchKey
+	client         cloudwatchClient
+	activity       *collectorActivity
+	activityCounts queryBatchActivity
+	accountID      string
+	queries        []plannedQuery
+	start          time.Time
+	end            time.Time
 }
 
 type queryBatchResult struct {
@@ -145,7 +146,7 @@ func buildQueryBatches(queries []plannedQuery, clients map[clientKey]cloudwatchC
 		for _, chunk := range packQueryGroup(group.queries, queryBatchWidth(group.key.policy)) {
 			batches = append(batches, queryBatch{
 				key: group.key, client: client, accountID: chunk[0].accountID,
-				queries: chunk, start: start, end: end,
+				activityCounts: buildQueryBatchActivity(chunk), queries: chunk, start: start, end: end,
 			})
 		}
 	}

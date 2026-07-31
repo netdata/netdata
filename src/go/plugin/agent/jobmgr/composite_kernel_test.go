@@ -996,7 +996,7 @@ func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWo
 		[]string{"graph"},
 		func() { close(conflictingApplied) },
 	)
-	permit := lifecycle.NewSecretStoreLongLivedPlan()
+	permit := lifecycle.NewJobLongLivedPlan()
 	conflictingPlan.Transaction.AllocateSuccessor = true
 	conflictingPlan.Transaction.Permit = permit
 	conflictingPlan, err := prepareOwnedJobPlan(conflictingRequest, conflictingPlan)

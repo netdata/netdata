@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	validAlgorithms = []string{"absolute", "incremental"}
-	validChartTypes = []string{"line", "area", "stacked", "heatmap"}
+	validAlgorithms   = []string{"absolute", "incremental"}
+	validChartTypes   = []string{"line", "area", "stacked", "heatmap"}
+	validAggregations = []Aggregation{AggregationSum, AggregationMin, AggregationMax, AggregationAvg}
 )
 
 // Validation contains immutable runtime artifacts derived while validating a
@@ -143,6 +144,9 @@ func validateChartCore(chart Chart, path string) error {
 	if chart.Algorithm != "" && !slices.Contains(validAlgorithms, chart.Algorithm) {
 		errs = append(errs, semErr(path+".algorithm", fmt.Sprintf("must be one of %v", validAlgorithms)))
 	}
+	if err := validateAggregation(chart.Aggregation, path+".aggregation"); err != nil {
+		errs = append(errs, err)
+	}
 	if chart.Type != "" && !slices.Contains(validChartTypes, chart.Type) {
 		errs = append(errs, semErr(path+".type", fmt.Sprintf("must be one of %v", validChartTypes)))
 	}
@@ -256,6 +260,13 @@ func validateDimensions(dimensions []Dimension, path string, effectiveMetrics ma
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func validateAggregation(aggregation Aggregation, path string) error {
+	if aggregation == "" || slices.Contains(validAggregations, aggregation) {
+		return nil
+	}
+	return semErr(path, fmt.Sprintf("must be one of %v", validAggregations))
 }
 
 func validateEngine(engine *Engine) ([]ValidatedAutogenRule, error) {

@@ -42,6 +42,16 @@ The difference is **data availability**:
 
 Stale nodes remain queryable because the Parent serves as a data cache. This is why you cannot delete Stale nodes from the UI—they still have accessible data.
 
+### Finding When a Node Went Offline
+
+To find when a node went offline on Netdata Cloud, use the [Events tab](/docs/dashboards-and-charts/events-feed.md). It records a timestamped **Node Became Offline** topology event for each node that transitions to Offline. Filter the feed by node and timeframe to pinpoint the disconnection time.
+
+:::tip
+
+The `streaming_disconnected` alert is not a source for this. It counts disconnected permanent nodes in aggregate (`units: nodes`) and fires on Parent dashboards, so it cannot identify which node disconnected or when. For details on that alert, see [No alerts received when node went offline](#no-alerts-received-when-node-went-offline).
+
+:::
+
 ## States on Parent Dashboards
 
 Parents display nodes that stream (or have streamed) to them:
