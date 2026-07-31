@@ -1,0 +1,232 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Redfish Service Discovery",
+    "description": "Discovers Redfish ServiceRoot endpoints in explicitly configured networks.",
+    "type": "object",
+    "properties": {
+      "discoverer": {
+        "title": "Discoverer",
+        "type": "object",
+        "properties": {
+          "redfish": {
+            "title": "Redfish",
+            "type": "object",
+            "properties": {
+              "rescan_interval": {
+                "title": "Rescan interval",
+                "description": "How often to scan. Set to 0 for one scan per discoverer start.",
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+                "default": "30m"
+              },
+              "device_cache_ttl": {
+                "title": "Endpoint cache TTL",
+                "description": "How long a validated endpoint remains trusted. Set to 0 for no age expiry.",
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+                "default": "12h"
+              },
+              "max_concurrent_scans": {
+                "title": "Concurrent scans",
+                "type": "integer",
+                "minimum": 1,
+                "default": 32
+              },
+              "profiles": {
+                "title": "Connection profiles",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {"type": "string"},
+                    "scheme": {"type": "string", "enum": ["https", "http"], "default": "https"},
+                    "node_mode": {"type": "string", "enum": ["local", "system_vnodes"], "default": "system_vnodes"},
+                    "vnode": {"type": "string"},
+                    "auth_method": {"type": "string", "enum": ["auto", "session", "basic", "none"], "default": "auto"},
+                    "username": {"type": "string", "sensitive": true},
+                    "password": {"type": "string", "sensitive": true},
+                    "autodetection_retry": {"type": "integer", "minimum": 0, "default": 0},
+                    "timeout": {"type": "number", "exclusiveMinimum": 0, "default": 15},
+                    "retries": {"type": "integer", "minimum": 0, "default": 2},
+                    "max_concurrent_requests": {"type": "integer", "minimum": 1, "default": 3},
+                    "proxy_url": {"type": "string", "sensitive": true},
+                    "tls_ca": {"type": "string"},
+                    "tls_cert": {"type": "string"},
+                    "tls_key": {"type": "string", "sensitive": true},
+                    "tls_skip_verify": {"type": "boolean", "default": false},
+                    "collect": {"type": "string", "default": "*"},
+                    "charts": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "aggregates": {"type": "boolean", "default": true},
+                        "details": {"type": "boolean", "default": true},
+                        "max_detailed_components_per_family": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 100
+                        }
+                      }
+                    },
+                    "alarms": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "evaluate_thresholds": {"type": "boolean", "default": true}
+                      }
+                    },
+                    "logs": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "enabled": {"type": "boolean", "default": true},
+                        "backend": {
+                          "type": "string",
+                          "description": "Exact redfish_logs job name, limited to 256 UTF-8 bytes after surrounding whitespace is trimmed. Omit to use default.",
+                          "minLength": 1,
+                          "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                        },
+                        "service_selector": {"type": "string", "default": "*"},
+                        "max_services": {"type": "integer", "minimum": 1, "default": 256},
+                        "full_reconciliation_every": {"type": "number", "minimum": 0, "default": 1800},
+                        "cursor": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "orphan_retention": {"type": "number", "minimum": 0, "default": 2592000}
+                          }
+                        }
+                      }
+                    },
+                    "update_every": {"type": "integer", "minimum": 1, "default": 60}
+                  },
+                  "required": ["name"],
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "auth_method": {"const": "none"}
+                        },
+                        "required": ["auth_method"]
+                      },
+                      "then": {
+                        "properties": {
+                          "username": {
+                            "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+                          },
+                          "password": {"maxLength": 0}
+                        }
+                      },
+                      "else": {
+                        "properties": {
+                          "username": {
+                            "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                          },
+                          "password": {"minLength": 1}
+                        },
+                        "required": ["username", "password"]
+                      }
+                    },
+                    {
+                      "oneOf": [
+                        {
+                          "properties": {
+                            "tls_cert": {
+                              "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+                            },
+                            "tls_key": {
+                              "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+                            }
+                          }
+                        },
+                        {
+                          "properties": {
+                            "tls_cert": {
+                              "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                            },
+                            "tls_key": {
+                              "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                            }
+                          },
+                          "required": ["tls_cert", "tls_key"]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              "networks": {
+                "title": "Networks",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "subnet": {"type": "string"},
+                    "ports": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {"type": "integer", "minimum": 1, "maximum": 65535}
+                    },
+                    "profile": {"type": "string"}
+                  },
+                  "required": ["subnet", "ports", "profile"]
+                }
+              }
+            },
+            "required": ["profiles", "networks"]
+          }
+        },
+        "required": ["redfish"]
+      },
+      "services": {
+        "title": "Service rules",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {"type": "string", "default": "redfish"},
+            "match": {"type": "string", "default": "{{ true }}"},
+            "config_template": {
+              "type": "string",
+              "default": "module: redfish\nname: discovered-{{ .EndpointKey }}\nurl: {{ .URL }}\n{{ .JobConfig | toYaml }}"
+            }
+          },
+          "required": ["id", "match"]
+        }
+      }
+    },
+    "required": ["discoverer", "services"]
+  },
+  "uiSchema": {
+    "uiOptions": {"fullPage": true},
+    "ui:flavour": "tabs",
+    "discoverer": {
+      "redfish": {
+        "profiles": {
+          "ui:listFlavour": "list",
+          "items": {
+            "password": {"ui:widget": "password"},
+            "tls_key": {"ui:widget": "password"},
+            "proxy_url": {"ui:widget": "password"}
+          }
+        },
+        "networks": {"ui:listFlavour": "list"}
+      }
+    },
+    "services": {
+      "ui:listFlavour": "list",
+      "items": {
+        "match": {"ui:widget": "textarea"},
+        "config_template": {"ui:widget": "textarea"}
+      }
+    }
+  }
+}

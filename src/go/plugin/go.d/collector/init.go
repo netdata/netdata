@@ -3,6 +3,9 @@
 package collector
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish"
+	redfishlogs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish_logs"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfishruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
@@ -144,6 +147,12 @@ import (
 )
 
 func init() {
+	// Redfish endpoint jobs and named log backends share only feature-local
+	// routing and Function snapshot state.
+	redfishFeature := redfishruntime.New()
+	redfish.Register(redfishFeature)
+	redfishlogs.Register(redfishFeature)
+
 	// These collectors share SNMP state; wire them together here instead of
 	// exposing package-global registries from the individual collector packages.
 	deviceStore := ddsnmp.NewDeviceStore()

@@ -12,6 +12,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish"
+	redfishlogs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish_logs"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
@@ -54,6 +56,34 @@ func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestRedfishFamilyRegistrationUsesSharedRuntime(t *testing.T) {
+	endpointCreator := requireCreator(t, "redfish")
+	logsCreator := requireCreator(t, "redfish_logs")
+
+	assert.Nil(t, endpointCreator.Create)
+	assert.NotNil(t, endpointCreator.CreateV2)
+	assert.NotNil(t, endpointCreator.Config)
+	assert.NotNil(t, endpointCreator.AgentFunctions)
+	assert.NotNil(t, endpointCreator.MethodHandler)
+	assert.Equal(t, 60, endpointCreator.Defaults.UpdateEvery)
+
+	assert.Nil(t, logsCreator.Create)
+	assert.NotNil(t, logsCreator.CreateV2)
+	assert.NotNil(t, logsCreator.Config)
+	assert.Nil(t, logsCreator.AgentFunctions)
+	assert.Nil(t, logsCreator.MethodHandler)
+	assert.Equal(t, 1, logsCreator.Defaults.UpdateEvery)
+
+	endpointCollector, ok := endpointCreator.CreateV2().(*redfish.Collector)
+	require.True(t, ok)
+	logsCollector, ok := logsCreator.CreateV2().(*redfishlogs.Collector)
+	require.True(t, ok)
+
+	runtime := pointerField(t, endpointCollector, "runtime")
+	require.NotZero(t, runtime)
+	assert.Equal(t, runtime, pointerField(t, logsCollector, "runtime"))
 }
 
 func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
