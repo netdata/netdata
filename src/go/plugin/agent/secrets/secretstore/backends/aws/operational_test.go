@@ -372,6 +372,85 @@ func TestIMDSCredentialsStageFailures(t *testing.T) {
 	}
 }
 
+func TestIMDSCredentialsContextDuringBodyRead(t *testing.T) {
+	tests := map[string]struct {
+		stage        int64
+		timeout      time.Duration
+		cancelCaller bool
+		wantErr      error
+	}{
+		"caller cancellation during role response": {
+			stage:        2,
+			cancelCaller: true,
+			wantErr:      context.Canceled,
+		},
+		"configured timeout during credential response": {
+			stage:   3,
+			timeout: 30 * time.Millisecond,
+			wantErr: context.DeadlineExceeded,
+		},
+	}
+
+	normalBodies := map[int64]string{
+		1: "imds-token",
+		2: "test-role",
+		3: `{"AccessKeyId":"test-access","SecretAccessKey":"test-secret"}`,
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			started := make(chan struct{}, 1)
+			var requests atomic.Int64
+			var bodies []*trackingReadCloser
+			s := publishedWithMetadataTransport(t, roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				stage := requests.Add(1)
+				for _, body := range bodies {
+					if !body.closed.Load() {
+						return nil, fmt.Errorf("previous IMDS response remained open before request %d", stage)
+					}
+				}
+
+				reader := io.Reader(strings.NewReader(normalBodies[stage]))
+				if stage == tc.stage {
+					reader = contextBlockingReader{ctx: req.Context(), started: started}
+				}
+				body := &trackingReadCloser{Reader: reader}
+				bodies = append(bodies, body)
+				return &http.Response{StatusCode: http.StatusOK, Body: body, Header: make(http.Header)}, nil
+			}))
+			s.runtime.imdsClient.Timeout = tc.timeout
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			result := make(chan error, 1)
+			go func() {
+				_, err := s.imdsCredentials(ctx)
+				result <- err
+			}()
+
+			select {
+			case <-started:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "IMDS response body read did not start")
+			}
+			if tc.cancelCaller {
+				cancel()
+			}
+
+			select {
+			case err := <-result:
+				require.ErrorIs(t, err, tc.wantErr)
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "IMDS response body read did not stop")
+			}
+			assert.Equal(t, tc.stage, requests.Load())
+			for _, body := range bodies {
+				assert.True(t, body.closed.Load())
+			}
+		})
+	}
+}
+
 func TestStoreTestModesAndCleanup(t *testing.T) {
 	tests := map[string]struct {
 		mode         string
@@ -696,3 +775,17 @@ type errorReader struct {
 }
 
 func (r errorReader) Read([]byte) (int, error) { return 0, r.err }
+
+type contextBlockingReader struct {
+	ctx     context.Context
+	started chan<- struct{}
+}
+
+func (r contextBlockingReader) Read([]byte) (int, error) {
+	select {
+	case r.started <- struct{}{}:
+	default:
+	}
+	<-r.ctx.Done()
+	return 0, r.ctx.Err()
+}
