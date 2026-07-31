@@ -75,24 +75,28 @@ int main(void) {
     // stay refused however the caller spells it. A trailing "." is the subtle
     // one: it also makes the parent-trust lookup stat() through the symlink and
     // read the trust class off the target.
-    snprintfz(p, sizeof(p), "%s/to_real/", exclusive);
-    check("symlink, trailing slash", p, false);
-    snprintfz(p, sizeof(p), "%s/to_real/.", exclusive);
-    check("symlink, trailing dot", p, false);
-    snprintfz(p, sizeof(p), "%s/to_real/./", exclusive);
-    check("symlink, trailing dot-slash", p, false);
-    snprintfz(p, sizeof(p), "%s/to_real/.//./", exclusive);
-    check("symlink, repeated dots and slashes", p, false);
-    snprintfz(p, sizeof(p), "%s/to_real//.", exclusive);
-    check("symlink, doubled slash then dot", p, false);
+    // The last two cases are ".." and "." themselves: they reach a directory
+    // through the component before them, so ".." has no entry left to judge and
+    // must be refused rather than validated against the wrong inode, while "."
+    // on a real directory simply normalises away.
+    static const struct {
+        const char *suffix;
+        const char *what;
+        bool expected;
+    } spellings[] = {
+        { "to_real/",      "symlink, trailing slash",                   false },
+        { "to_real/.",     "symlink, trailing dot",                     false },
+        { "to_real/./",    "symlink, trailing dot-slash",               false },
+        { "to_real/.//./", "symlink, repeated dots and slashes",        false },
+        { "to_real//.",    "symlink, doubled slash then dot",           false },
+        { "real/..",       "path ending in '..'",                       false },
+        { "real/.",        "real directory, trailing dot (normalises)", true  },
+    };
 
-    // "." and ".." reach a directory through the component before them, so there
-    // is no entry left to judge - they must be refused rather than validated
-    // against the wrong inode.
-    snprintfz(p, sizeof(p), "%s/real/..", exclusive);
-    check("path ending in '..'", p, false);
-    snprintfz(p, sizeof(p), "%s/real/.", exclusive);
-    check("real directory, trailing dot (normalises)", p, true);
+    for (size_t i = 0; i < _countof(spellings); i++) {
+        snprintfz(p, sizeof(p), "%s/%s", exclusive, spellings[i].suffix);
+        check(spellings[i].what, p, spellings[i].expected);
+    }
 
     snprintfz(p, sizeof(p), "%s/afile", exclusive);
     int fd = open(p, O_WRONLY | O_CREAT | O_EXCL, 0644);
