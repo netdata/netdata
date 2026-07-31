@@ -29,6 +29,10 @@ This page covers Vault specific setup. For the full resolver overview and syntax
 
 Netdata reads existing secrets from Vault. It does not create or renew Vault tokens. If the configured token expires or becomes invalid, secret resolution fails until Netdata can read a valid token again. If you use `token_file` mode, Netdata re-reads the file on every secret resolution, so an external process (e.g. Vault Agent, a cron job) can renew the token by writing to the file. For KV v2 secrets, Netdata does not add `/data/` to the path automatically.
 
+The Dynamic Configuration **Test** action performs one real authenticated `GET /v1/auth/token/lookup-self` request using the configured token, namespace, TLS settings, proxy path, and timeout. HTTP 200 succeeds. Vault's documented permission-only HTTP 403 also succeeds because a valid token may not have permission to look itself up; an invalid-token response fails. This verifies that Vault accepts the token, but it does not read a secret or prove access to any secret path. Vault counts this authenticated request as a use of a limited-use token.
+
+A configured token file must resolve to a regular file no larger than 1 MiB. Symlinks to regular files are supported.
+
 
 ## Setup
 
@@ -84,7 +88,7 @@ The following options can be defined for this secretstore backend.
 |  | [tls_skip_verify](#option-tls-skip-verify) | Disable TLS certificate verification for Vault requests. | no | no |
 |  | timeout | Timeout in seconds for HTTP requests made by this secretstore backend. | 3 | no |
 | **Token** | mode_token.token | Vault token value. Required when `mode` is `token`. |  | yes |
-| **Token File** | mode_token_file.path | Path to a file containing the Vault token. Required when `mode` is `token_file`. |  | yes |
+| **Token File** | [mode_token_file.path](#option-token-file-mode-token-file-path) | Path to a file containing the Vault token. Required when `mode` is `token_file`. |  | yes |
 
 <a id="option-mode"></a>
 ##### mode
@@ -101,6 +105,12 @@ Prefer `token_file` for production so the token is stored separately from the se
 ##### tls_skip_verify
 
 This is insecure. Use it only as a temporary workaround or in a non-production environment.
+
+
+<a id="option-token-file-mode-token-file-path"></a>
+##### mode_token_file.path
+
+The path may be a regular file or a symlink to a regular file. The file must be no larger than 1 MiB.
 
 
 
@@ -248,6 +258,13 @@ Check the Netdata Agent logs when the collector starts or restarts. Vault resolv
 ### Vault returns permission denied or the token has expired
 
 Check the Vault token policy and, if you use Vault Enterprise namespaces, confirm that `namespace` is correct. If you use a short-lived token, make sure the token is renewed or replaced before it expires.
+
+
+### The Dynamic Configuration Test fails
+
+The Test action makes a real authenticated request to Vault's token self-lookup endpoint. It accepts a successful lookup and Vault's documented permission-only denial, but rejects an invalid token, an unreachable endpoint, and malformed or unexpected responses.
+
+A successful Test proves that Vault accepted the configured token at that time. It does not prove that the token can read a particular secret path. Check secret-path policies separately.
 
 
 ### Secret or key is not found

@@ -15,6 +15,8 @@ import (
 //go:embed config_schema.json
 var configSchema string
 
+const responseBodyLimit = 1 << 20
+
 var defaultTimeout = confopt.Duration(3 * time.Second)
 
 type Config struct {

@@ -694,6 +694,15 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    - A Store without that optional capability remains configuration-valid, and the response explicitly says that the
      result was validation-only. Configuration failures return 400, operational failures return 422, and
      busy/contained attempts return 503.
+   - Provider failures retain their private causes. A marked `dyncfg.PublicError` may append only static,
+     code-authored detail to Test 400/422 and add/update preparation 400 responses; unmarked failures remain generic,
+     and every rendered SecretStore response stays within the existing 4 KiB bound.
+   - Vault performs one real authenticated `GET /v1/auth/token/lookup-self` through the same token, namespace, client,
+     TLS/proxy, timeout, and cancellation path used for secret resolution. HTTP 200 succeeds; Vault's documented
+     permission-only HTTP 403 also succeeds so Test requires no broader policy than normal path-only use. Invalid-token,
+     malformed, oversized, and unexpected responses fail. The Test buffers at most 1 MiB, reads no secret, and does not
+     prove secret-path permission. Vault counts the request as a use of a limited-use token. Vault token files use the
+     shared regular-file-only 1 MiB configured-file reader.
 2. **Restart dependents as one composite command.** If any running jobs depend on that store key: stop dependents →
    commit the new generation → start dependents. The parent retains `dyncfg:dependency-graph` throughout, and each
    start child temporarily yields only the `dyncfg:jobs` acquisition suffix while its probe runs, so unrelated
