@@ -28,6 +28,7 @@ import (
 	"github.com/netdata/netdata/tests/query-corpus/canon"
 	"github.com/netdata/netdata/tests/query-corpus/daemon"
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
+	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
 
 // l6Pass1 accumulates one pass-1 group for row i per the add_metric
@@ -174,13 +175,138 @@ type l6AggChain struct{ agg1, agg2 string }
 // non-raw anomaly metadata can use raw-contributor weights without changing a
 // value divisor; raw output retains its prior-pass group count.
 func TestLayer6TwoPassMatrix(t *testing.T) {
-	trackContract(t, "L6/two-pass-matrix")
+	trackContractComponent(t, "L6/two-pass-matrix", "matrix")
 
 	testLayer6TwoPassChains(t, []l6AggChain{
 		{"sum", "sum"}, {"min", "min"}, {"max", "max"},
 		{"extremes", "extremes"},
 		{"sum", "min"}, {"max", "sum"}, {"min", "extremes"},
 	})
+}
+
+// TestLayer6TwoPassLiveEdgeTrimming makes the final stored row contributor
+// incomplete inside one pass-1 group. The later pass must retain the raw
+// contributor decline so live-edge trimming can remove that row.
+func TestLayer6TwoPassLiveEdgeTrimming(t *testing.T) {
+	trackContractComponent(t, "L6/two-pass-matrix", "live-edge-trimming")
+
+	const (
+		context = "fixture.l6edge"
+		ue      = int64(300)
+	)
+	boundary := time.Now().Unix() / ue * ue
+	point := func(at int64, value string) fixture.Point {
+		return fixture.Point{T: at, Collected: value, Flags: stream.FlagNotAnomalous}
+	}
+	aPoints := make([]fixture.Point, 0, 5)
+	bPoints := make([]fixture.Point, 0, 4)
+	for at := boundary - 4*ue; at <= boundary; at += ue {
+		aPoints = append(aPoints, point(at, "1"))
+		if at < boundary {
+			bPoints = append(bPoints, point(at, "10"))
+		}
+	}
+	ch := fixture.Chart{
+		ID: context, Title: "multipass live edge", Units: "units", Family: "fixture",
+		Context: context, UpdateEvery: int(ue),
+		Dimensions: []fixture.Dimension{
+			{ID: "a", Points: aPoints},
+			{ID: "b", Points: bPoints},
+		},
+	}
+	pushLiveBurst(t, "l6-edge", guid(336), ch)
+	if _, err := td.WaitRetention("l6-edge", context, boundary-4*ue, boundary, 15*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	// Relative after receives the inclusive +1 adjustment in libnetdata.c,
+	// so -(6*ue+1) requests exactly six update intervals ending one second
+	// before the query engine's current time.
+	params := daemon.DataParams(context, -(6*ue + 1), -1, 6)
+	params.Set("group_by[0]", "instance")
+	params.Set("aggregation[0]", "sum")
+	params.Set("group_by[1]", "selected")
+	params.Set("aggregation[1]", "sum")
+	params.Set("options", "jsonwrap|virtual-points")
+	queryStart := time.Now().Unix()
+	doc, err := td.DataV3("l6-edge", params)
+	queryEnd := time.Now().Unix()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Class B — the relative conversion and grid alignment make the row
+	// count phase-dependent but keep the contributor decline at boundary
+	// trimmable in every allowed phase:
+	// netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862,
+	// src/libnetdata/libnetdata.c:493-540,549-559;
+	// src/database/contexts/query_target.c:1272-1274;
+	// src/web/api/queries/query-window.c:78-102,149-177,214-301,333-364;
+	// src/web/api/queries/query-group-by-init.c:542-549;
+	// src/web/api/queries/query-group-by-finalize.c:119-155.
+	view := queryObject(t, doc, "view", "view")
+	viewBefore, beforeOK := queryInteger(view["before"])
+	viewUpdateEvery, updateEveryOK := queryInteger(view["update_every"])
+	if !beforeOK || !updateEveryOK {
+		t.Fatalf("view before/update_every are not integers: %v/%v", view["before"], view["update_every"])
+	}
+	if viewUpdateEvery != ue || viewBefore%ue != 0 {
+		t.Fatalf("view grid before/update_every = %d/%d, want %d-aligned/%d",
+			viewBefore, viewUpdateEvery, ue, ue)
+	}
+	alignUp := func(value int64) int64 { return (value + ue - 1) / ue * ue }
+	if low, high := alignUp(queryStart-2), alignUp(queryEnd-2); viewBefore < low || viewBefore > high {
+		t.Fatalf("view before %d outside request-time envelope [%d,%d]", viewBefore, low, high)
+	}
+	if viewBefore < boundary || viewBefore > boundary+2*ue {
+		t.Fatalf("view before %d outside fixture envelope [%d,%d]", viewBefore, boundary, boundary+2*ue)
+	}
+
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !assertExactColumnSet(t, cols, []string{"selected"}) {
+		t.Fail()
+	}
+	col := cols["selected"]
+	if len(col) < 3 || len(col) > 5 {
+		t.Fatalf("selected has %d rows, want the live-edge envelope [3,5]", len(col))
+	}
+	numeric, empty := 0, 0
+	for i, pt := range col {
+		var value any
+		if pt.Value != nil {
+			value = *pt.Value
+		}
+		if pt.T < boundary-5*ue || pt.T > boundary-ue {
+			t.Errorf("selected row %d ends at %d outside [%d,%d]",
+				i, pt.T, boundary-5*ue, boundary-ue)
+		}
+		if i > 0 && pt.T-col[i-1].T != ue {
+			t.Errorf("selected row %d spacing is %d, want %d", i, pt.T-col[i-1].T, ue)
+		}
+		if pt.T < boundary-4*ue {
+			empty++
+			if pt.Value != nil || pt.ARP != 0 || pt.PA != canon.AnnotationEmpty {
+				t.Errorf("selected leading row at %d is value/arp/pa %v/%v/%d, want empty/0/%d",
+					pt.T, value, pt.ARP, pt.PA, canon.AnnotationEmpty)
+			}
+			continue
+		}
+		numeric++
+		if pt.Value == nil || *pt.Value != 11 || pt.ARP != 0 || pt.PA != 0 {
+			t.Errorf("selected row at %d is value/arp/pa %v/%v/%d, want 11/0/0",
+				pt.T, value, pt.ARP, pt.PA)
+		}
+	}
+	if numeric < 3 || numeric > 4 || empty > 1 {
+		t.Errorf("selected has %d numeric and %d empty rows, want [3,4] and [0,1]", numeric, empty)
+	}
+	last := col[len(col)-1].T
+	if last < boundary-ue || last >= boundary {
+		t.Errorf("selected last timestamp %d outside [%d,%d)", last, boundary-ue, boundary)
+	}
 }
 
 // An average at pass 2 needs two denominators: contributing pass-1 groups for
@@ -249,6 +375,16 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) {
 					if len(cols) != len(groups) {
 						t.Fatalf("got %d final groups %v, want %d %v", len(cols), keys2(cols), len(groups), keys2(groups))
 					}
+					var viewStats map[string]map[string]float64
+					assertViewARP := !raw && ac.agg1 != "average" && ac.agg2 != "average"
+					if assertViewARP {
+						var statsOK bool
+						viewStats, statsOK = strictDimensionStats(
+							t, doc, "view", keys2(groups), []string{"arp"})
+						if !statsOK {
+							t.Errorf("view dimension anomaly statistics are malformed")
+						}
+					}
 					for gname, pass1Groups := range groups {
 						col, ok := cols[gname]
 						if !ok {
@@ -259,6 +395,8 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) {
 							t.Errorf("%q: got %d rows, want %d", gname, len(col), l5Rows)
 							continue
 						}
+						viewARPTotal := 0.0
+						viewARPRows := 0
 						for rowIndex, pt := range col {
 							i := rowIndex + 1
 							wantT := fixture.T0 + int64(i)
@@ -276,6 +414,10 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) {
 							}
 							if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
 								t.Errorf("%q row %d: arp %v, want %v", gname, i, pt.ARP, wantAR)
+							}
+							if assertViewARP && !wantEmpty {
+								viewARPTotal += wantAR
+								viewARPRows++
 							}
 							if raw && !wantEmpty {
 								if pt.Count == nil {
@@ -295,6 +437,23 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) {
 							}
 							if pt.PA != wantPA {
 								t.Errorf("%q row %d: pa %d, want exactly %d", gname, i, pt.PA, wantPA)
+							}
+						}
+						if assertViewARP {
+							// Class B — dview truncates sum(row ARP)*10 into anomaly_count, then
+							// jsonwrap-v2 divides by the row count and the 1000x dview multiplier:
+							// netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862,
+							// src/web/api/queries/query-group-by-finalize.c:380-460;
+							// src/web/api/queries/rrdr.h:51;
+							// src/libnetdata/storage-point.h:120-121;
+							// src/web/api/formatters/jsonwrap-v2.c:102-104,176-182.
+							got, ok := viewStats[gname]["arp"]
+							if !ok {
+								t.Errorf("%q: view sts arp is missing (have %v)", gname, viewStats[gname])
+							} else if viewARPRows == 0 {
+								t.Errorf("%q: fixture oracle found no rows for view sts arp", gname)
+							} else if want := math.Floor(viewARPTotal*10) / float64(viewARPRows*10); !tierValueMatch(got, want, 1e-9) {
+								t.Errorf("%q: view sts arp %v, want mean row anomaly rate %v", gname, got, want)
 							}
 						}
 					}
