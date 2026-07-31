@@ -1,0 +1,276 @@
+{
+  "release": "2026.1",
+  "schemas": [
+    {
+      "schema": "Assembly",
+      "odata_type": "#Assembly.v1_6_1.Assembly",
+      "source": "mockups/DSP2046-examples/Assembly-v1-example.json"
+    },
+    {
+      "schema": "Battery",
+      "odata_type": "#Battery.v1_5_0.Battery",
+      "source": "mockups/DSP2046-examples/Battery-v1-example.json"
+    },
+    {
+      "schema": "BatteryMetrics",
+      "odata_type": "#BatteryMetrics.v1_1_0.BatteryMetrics",
+      "source": "mockups/DSP2046-examples/BatteryMetrics-v1-example.json"
+    },
+    {
+      "schema": "Chassis",
+      "odata_type": "#Chassis.v1_28_0.Chassis",
+      "source": "mockups/DSP2046-examples/Chassis-v1-example.json"
+    },
+    {
+      "schema": "ComputerSystem",
+      "odata_type": "#ComputerSystem.v1_28_0.ComputerSystem",
+      "source": "mockups/DSP2046-examples/ComputerSystem-v1-example.json"
+    },
+    {
+      "schema": "Control",
+      "odata_type": "#Control.v1_8_0.Control",
+      "source": "mockups/DSP2046-examples/Control-v1-example.json"
+    },
+    {
+      "schema": "CoolantConnector",
+      "odata_type": "#CoolantConnector.v1_4_0.CoolantConnector",
+      "source": "mockups/DSP2046-examples/CoolantConnector-v1-example.json"
+    },
+    {
+      "schema": "Drive",
+      "odata_type": "#Drive.v1_22_0.Drive",
+      "source": "mockups/DSP2046-examples/Drive-v1-example.json"
+    },
+    {
+      "schema": "DriveMetrics",
+      "odata_type": "#DriveMetrics.v1_4_0.DriveMetrics",
+      "source": "mockups/DSP2046-examples/DriveMetrics-v1-example.json"
+    },
+    {
+      "schema": "EnvironmentMetrics",
+      "odata_type": "#EnvironmentMetrics.v1_6_0.EnvironmentMetrics",
+      "source": "mockups/DSP2046-examples/EnvironmentMetrics-v1-example.json"
+    },
+    {
+      "schema": "EthernetInterface",
+      "odata_type": "#EthernetInterface.v1_12_5.EthernetInterface",
+      "source": "mockups/DSP2046-examples/EthernetInterface-v1-example.json"
+    },
+    {
+      "schema": "Fan",
+      "odata_type": "#Fan.v1_6_0.Fan",
+      "source": "mockups/DSP2046-examples/Fan-v1-example.json"
+    },
+    {
+      "schema": "Filter",
+      "odata_type": "#Filter.v1_1_1.Filter",
+      "source": "mockups/DSP2046-examples/Filter-v1-example.json"
+    },
+    {
+      "schema": "Heater",
+      "odata_type": "#Heater.v1_0_2.Heater",
+      "source": "mockups/DSP2046-examples/Heater-v1-example.json"
+    },
+    {
+      "schema": "HeaterMetrics",
+      "odata_type": "#HeaterMetrics.v1_0_2.HeaterMetrics",
+      "source": "mockups/DSP2046-examples/HeaterMetrics-v1-example.json"
+    },
+    {
+      "schema": "LeakDetection",
+      "odata_type": "#LeakDetection.v1_2_0.LeakDetection",
+      "source": "mockups/DSP2046-examples/LeakDetection-v1-example.json"
+    },
+    {
+      "schema": "LeakDetector",
+      "odata_type": "#LeakDetector.v1_6_0.LeakDetector",
+      "source": "mockups/DSP2046-examples/LeakDetector-v1-example.json"
+    },
+    {
+      "schema": "LogEntry",
+      "odata_type": "#LogEntry.v1_21_0.LogEntry",
+      "source": "mockups/DSP2046-examples/LogEntry-v1-example.json"
+    },
+    {
+      "schema": "LogService",
+      "odata_type": "#LogService.v1_9_0.LogService",
+      "source": "mockups/DSP2046-examples/LogService-v1-example.json"
+    },
+    {
+      "schema": "Manager",
+      "odata_type": "#Manager.v1_25_0.Manager",
+      "source": "mockups/DSP2046-examples/Manager-v1-example.json"
+    },
+    {
+      "schema": "Memory",
+      "odata_type": "#Memory.v1_24_0.Memory",
+      "source": "mockups/DSP2046-examples/Memory-v1-example.json"
+    },
+    {
+      "schema": "MemoryMetrics",
+      "odata_type": "#MemoryMetrics.v1_8_0.MemoryMetrics",
+      "source": "mockups/DSP2046-examples/MemoryMetrics-v1-example.json"
+    },
+    {
+      "schema": "NetworkAdapter",
+      "odata_type": "#NetworkAdapter.v1_14_0.NetworkAdapter",
+      "source": "mockups/DSP2046-examples/NetworkAdapter-v1-example.json"
+    },
+    {
+      "schema": "NetworkAdapterMetrics",
+      "odata_type": "#NetworkAdapterMetrics.v1_1_0.NetworkAdapterMetrics",
+      "source": "mockups/DSP2046-examples/NetworkAdapterMetrics-v1-example.json"
+    },
+    {
+      "schema": "NetworkDeviceFunction",
+      "odata_type": "#NetworkDeviceFunction.v1_11_1.NetworkDeviceFunction",
+      "source": "mockups/DSP2046-examples/NetworkDeviceFunction-v1-example.json"
+    },
+    {
+      "schema": "NetworkDeviceFunctionMetrics",
+      "odata_type": "#NetworkDeviceFunctionMetrics.v1_2_0.NetworkDeviceFunctionMetrics",
+      "source": "mockups/DSP2046-examples/NetworkDeviceFunctionMetrics-v1-example.json"
+    },
+    {
+      "schema": "NetworkInterface",
+      "odata_type": "#NetworkInterface.v1_2_3.NetworkInterface",
+      "source": "mockups/DSP2046-examples/NetworkInterface-v1-example.json"
+    },
+    {
+      "schema": "NetworkPort",
+      "odata_type": "#NetworkPort.v1_4_3.NetworkPort",
+      "source": "mockups/DSP2046-examples/NetworkPort-v1-example.json"
+    },
+    {
+      "schema": "PCIeDevice",
+      "odata_type": "#PCIeDevice.v1_22_0.PCIeDevice",
+      "source": "mockups/DSP2046-examples/PCIeDevice-v1-example.json"
+    },
+    {
+      "schema": "PCIeFunction",
+      "odata_type": "#PCIeFunction.v1_7_0.PCIeFunction",
+      "source": "mockups/DSP2046-examples/PCIeFunction-v1-example.json"
+    },
+    {
+      "schema": "Port",
+      "odata_type": "#Port.v1_19_0.Port",
+      "source": "mockups/DSP2046-examples/Port-v1-example.json"
+    },
+    {
+      "schema": "PortMetrics",
+      "odata_type": "#PortMetrics.v1_9_0.PortMetrics",
+      "source": "mockups/DSP2046-examples/PortMetrics-v1-example.json"
+    },
+    {
+      "schema": "Power",
+      "odata_type": "#Power.v1_7_3.Power",
+      "source": "json-schema/Power.v1_7_3.json"
+    },
+    {
+      "schema": "PowerSubsystem",
+      "odata_type": "#PowerSubsystem.v1_1_4.PowerSubsystem",
+      "source": "mockups/DSP2046-examples/PowerSubsystem-v1-example.json"
+    },
+    {
+      "schema": "PowerSupply",
+      "odata_type": "#PowerSupply.v1_7_0.PowerSupply",
+      "source": "mockups/DSP2046-examples/PowerSupply-v1-example.json"
+    },
+    {
+      "schema": "PowerSupplyMetrics",
+      "odata_type": "#PowerSupplyMetrics.v1_2_0.PowerSupplyMetrics",
+      "source": "mockups/DSP2046-examples/PowerSupplyMetrics-v1-example.json"
+    },
+    {
+      "schema": "Processor",
+      "odata_type": "#Processor.v1_23_0.Processor",
+      "source": "mockups/DSP2046-examples/Processor-v1-example.json"
+    },
+    {
+      "schema": "ProcessorMetrics",
+      "odata_type": "#ProcessorMetrics.v1_7_0.ProcessorMetrics",
+      "source": "mockups/DSP2046-examples/ProcessorMetrics-v1-example.json"
+    },
+    {
+      "schema": "Pump",
+      "odata_type": "#Pump.v1_2_0.Pump",
+      "source": "mockups/DSP2046-examples/Pump-v1-example.json"
+    },
+    {
+      "schema": "Sensor",
+      "odata_type": "#Sensor.v1_13_0.Sensor",
+      "source": "mockups/DSP2046-examples/Sensor-v1-example.json"
+    },
+    {
+      "schema": "ServiceRoot",
+      "odata_type": "#ServiceRoot.v1_21_0.ServiceRoot",
+      "source": "mockups/DSP2046-examples/ServiceRoot-v1-example.json"
+    },
+    {
+      "schema": "Session",
+      "odata_type": "#Session.v1_8_0.Session",
+      "source": "mockups/DSP2046-examples/Session-v1-example.json"
+    },
+    {
+      "schema": "SessionService",
+      "odata_type": "#SessionService.v1_2_0.SessionService",
+      "source": "mockups/DSP2046-examples/SessionService-v1-example.json"
+    },
+    {
+      "schema": "SoftwareInventory",
+      "odata_type": "#SoftwareInventory.v1_14_0.SoftwareInventory",
+      "source": "mockups/DSP2046-examples/SoftwareInventory-v1-example.json"
+    },
+    {
+      "schema": "Storage",
+      "odata_type": "#Storage.v1_22_0.Storage",
+      "source": "mockups/DSP2046-examples/Storage-v1-example.json"
+    },
+    {
+      "schema": "StorageController",
+      "odata_type": "#StorageController.v1_12_0.StorageController",
+      "source": "mockups/DSP2046-examples/StorageController-v1-example.json"
+    },
+    {
+      "schema": "StorageControllerMetrics",
+      "odata_type": "#StorageControllerMetrics.v1_1_0.StorageControllerMetrics",
+      "source": "mockups/DSP2046-examples/StorageControllerMetrics-v1-example.json"
+    },
+    {
+      "schema": "StorageMetrics",
+      "odata_type": "#StorageMetrics.v1_0_0.StorageMetrics",
+      "source": "mockups/DSP2046-examples/StorageMetrics-v1-example.json"
+    },
+    {
+      "schema": "Thermal",
+      "odata_type": "#Thermal.v1_7_3.Thermal",
+      "source": "json-schema/Thermal.v1_7_3.json"
+    },
+    {
+      "schema": "ThermalMetrics",
+      "odata_type": "#ThermalMetrics.v1_3_3.ThermalMetrics",
+      "source": "mockups/DSP2046-examples/ThermalMetrics-v1-example.json"
+    },
+    {
+      "schema": "ThermalSubsystem",
+      "odata_type": "#ThermalSubsystem.v1_5_0.ThermalSubsystem",
+      "source": "mockups/DSP2046-examples/ThermalSubsystem-v1-example.json"
+    },
+    {
+      "schema": "UpdateService",
+      "odata_type": "#UpdateService.v1_17_1.UpdateService",
+      "source": "mockups/DSP2046-examples/UpdateService-v1-example.json"
+    },
+    {
+      "schema": "Volume",
+      "odata_type": "#Volume.v1_10_2.Volume",
+      "source": "mockups/DSP2046-examples/Volume-v1-example.json"
+    },
+    {
+      "schema": "VolumeMetrics",
+      "odata_type": "#VolumeMetrics.v1_0_1.VolumeMetrics",
+      "source": "json-schema/Volume.v1_10_2.json",
+      "evidence": "referenced Swordfish schema"
+    }
+  ]
+}

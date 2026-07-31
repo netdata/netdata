@@ -1,0 +1,5 @@
+vnode: hardware-logs
+update_every: 1
+autodetection_retry: 30
+retention:
+  max_size: 10GB

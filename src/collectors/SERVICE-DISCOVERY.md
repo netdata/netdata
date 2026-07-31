@@ -173,6 +173,7 @@ Each discoverer has its own page covering its options, target variables, evaluat
 | [HTTP endpoint](/src/go/plugin/go.d/discovery/sdext/discoverer/httpsd/README.md) | `http` | `/etc/netdata/go.d/sd/http.conf` | Items returned by an HTTP/HTTPS endpoint (JSON or YAML). |
 | [Kubernetes](/src/go/plugin/go.d/discovery/sdext/discoverer/k8ssd/README.md) | `k8s` | `/etc/netdata/go.d/sd/k8s.conf` | Pods and services in a Kubernetes cluster. |
 | [Local listening processes](/src/go/plugin/go.d/discovery/sdext/discoverer/netlistensd/README.md) | `net_listeners` | `/etc/netdata/go.d/sd/net_listeners.conf` | Local processes that listen on TCP/UDP ports. |
+| [Redfish](/src/go/plugin/go.d/discovery/sdext/discoverer/redfishsd/README.md) | `redfish` | `/etc/netdata/go.d/sd/redfish.conf` | Redfish BMC endpoints on explicitly configured network subnets and ports. |
 | [SNMP](/src/go/plugin/go.d/discovery/sdext/discoverer/snmpsd/README.md) | `snmp` | `/etc/netdata/go.d/sd/snmp.conf` | SNMP-capable devices on configured network subnets. |
 
 

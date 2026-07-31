@@ -1,0 +1,51 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: redfish_logs
+placements:
+  - id: redfish-log-backends
+    section_id: remote-devices
+    title: Redfish log backends
+    short_name: Redfish Logs
+    icon: hardware
+    families: true
+    properties:
+      important: false
+      grouping: false
+    items:
+      - type: grid
+        id: redfish-log-backend-overview
+        items:
+          - type: context
+            title: Backend State
+            contexts: [redfish.log_backend.state]
+            chart_library: d3pie
+            layout: {left: 0, top: 0, width: 3, height: 4}
+          - type: context
+            title: Storage
+            contexts: [redfish.log_backend.storage]
+            chart_library: dygraph
+            layout: {left: 3, top: 0, width: 3, height: 4}
+          - type: context
+            title: Pipeline
+            contexts: [redfish.log_backend.pipeline]
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: {left: 6, top: 0, width: 3, height: 4}
+          - type: context
+            title: Producers
+            contexts: [redfish.log_backend.producers]
+            chart_library: number
+            layout: {left: 9, top: 0, width: 3, height: 4}
+      - type: group
+        id: redfish-log-backend-operation
+        title: Backend Operation
+        properties: {grouping: true}
+        items:
+          - redfish.log_backend.state
+          - redfish.log_backend.storage
+          - redfish.log_backend.files
+          - redfish.log_backend.producers
+          - redfish.log_backend.pipeline
+          - redfish.log_backend.retention_files
+          - redfish.log_backend.retention_bytes
+          - redfish.log_backend.sync_duration
