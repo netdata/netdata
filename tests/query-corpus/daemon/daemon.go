@@ -66,8 +66,9 @@ type Daemon struct {
 	Hostname  string
 	StreamKey string
 
-	process daemonProcess
-	waitCh  chan error
+	LaunchStartedAt time.Time
+	process         daemonProcess
+	waitCh          chan error
 
 	// Tests shorten these bounds; zero selects the production defaults.
 	termTimeout time.Duration
@@ -112,6 +113,7 @@ const netdataConfTemplate = `[global]
     enabled = no
 
 [plugins]
+    enable running new plugins = no
     proc = no
     diskspace = no
     cgroups = no
@@ -287,6 +289,7 @@ func (d *Daemon) launch() error {
 	}
 	cmd.Stdout = stdout
 	cmd.Stderr = stdout
+	d.LaunchStartedAt = time.Now()
 	if err := cmd.Start(); err != nil {
 		stdout.Close()
 		return fmt.Errorf("daemon: start %s: %w", d.Opts.Binary, err)
@@ -402,9 +405,9 @@ func (d *Daemon) Stop() error {
 		termErr = nil
 	}
 	select {
-	case <-d.waitCh:
+	case waitErr := <-d.waitCh:
 		d.process = nil
-		return termErr
+		return errors.Join(termErr, waitErr)
 	case <-time.After(termWait):
 	}
 
@@ -551,12 +554,21 @@ func QueryRetention(doc map[string]any) (Retention, bool) {
 	if !ok {
 		return Retention{}, false
 	}
-	first, ok1 := db["first_entry"].(float64)
-	last, ok2 := db["last_entry"].(float64)
+	first, ok1 := jsonInt64(db["first_entry"])
+	last, ok2 := jsonInt64(db["last_entry"])
 	if !ok1 || !ok2 {
 		return Retention{}, false
 	}
-	return Retention{FirstEntry: int64(first), LastEntry: int64(last)}, true
+	return Retention{FirstEntry: first, LastEntry: last}, true
+}
+
+func jsonInt64(value any) (int64, bool) {
+	number, ok := value.(float64)
+	if !ok || math.Trunc(number) != number ||
+		number < -float64(uint64(1)<<63) || number >= float64(uint64(1)<<63) {
+		return 0, false
+	}
+	return int64(number), true
 }
 
 // WaitRetention polls the context on host until the daemon reports exactly

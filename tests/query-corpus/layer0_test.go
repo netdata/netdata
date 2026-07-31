@@ -98,6 +98,11 @@ func TestMain(m *testing.M) {
 			code = 1
 		}
 	}
+	infrastructureReport, infrastructureFailed := infrastructureFailures.summary()
+	fmt.Fprint(os.Stderr, infrastructureReport)
+	if infrastructureFailed {
+		code = 1
+	}
 
 	if code == 0 && os.Getenv("QUERY_CORPUS_KEEP") == "" {
 		_ = os.RemoveAll(runDir)

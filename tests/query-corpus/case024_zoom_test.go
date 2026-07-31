@@ -38,8 +38,8 @@ func TestCase024ZoomIntoSlowMetrics(t *testing.T) {
 		samples int
 		guid    int
 	}{
-		"ue60":   {60, 240, 220},  // 4 hours at one sample per minute
-		"ue600":  {600, 144, 221}, // 24 hours at one sample per 10 minutes
+		"ue60":   {60, 240, 338},  // 4 hours at one sample per minute
+		"ue600":  {600, 144, 339}, // 24 hours at one sample per 10 minutes
 		"ue3600": {3600, 48, 222}, // 2 days at one sample per hour
 	}
 

@@ -58,6 +58,9 @@ const (
 )
 
 func TestLayer4ThreeTierJoin(t *testing.T) {
+	completeSetup := trackInfrastructureSetup(
+		t, infrastructureFailures, "layer4d-shared-fixture/setup")
+
 	dd, err := daemon.Start(daemon.Options{
 		Binary: netdataBinary,
 		RunDir: t.TempDir(),
@@ -82,13 +85,14 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := dd.Stop(); err != nil {
+		if err := infrastructureFailures.run(
+			"layer4d-shared-fixture/shutdown", dd.Stop); err != nil {
 			t.Errorf("stop dedicated daemon: %v", err)
 		}
 	})
 
 	conn, err := stream.Connect(dd.Addr, dd.StreamKey, stream.HostInfo{
-		Hostname: "l4d-child", MachineGUID: guid(81),
+		Hostname: "l4d-child", MachineGUID: guid(341),
 	}, stream.CapsReplication)
 	if err != nil {
 		t.Fatal(err)
@@ -181,6 +185,7 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 	t.Logf("three-tier ladder: tier2 from t0%+d, tier1 from t0%+d, tier0 from t0%+d, last t0%+d",
 		tiers[2].FirstEntry-fixture.T0, tiers[1].FirstEntry-fixture.T0,
 		tiers[0].FirstEntry-fixture.T0, tiers[0].LastEntry-fixture.T0)
+	completeSetup()
 
 	t.Run("retention-and-condition-contracts", func(t *testing.T) {
 		trackContract(t, "L4/three-tier-join")
