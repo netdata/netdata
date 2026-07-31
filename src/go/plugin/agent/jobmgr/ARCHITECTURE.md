@@ -706,6 +706,14 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
      that an intermediary preserved the namespace header. It buffers at most 1 MiB plus one size-detection byte of a
      classified 403 body. When the request reaches Vault, it creates audit/activity evidence and can consume the final use
      of a limited-use service token. Vault token files use the shared regular-file-only 1 MiB configured-file reader.
+   - AWS Secrets Manager Test calls the exact production credential-source dispatcher and discards the credentials. `env`
+     performs no network I/O; ECS performs one logical task-metadata GET; IMDS performs token PUT, role GET, and credential
+     GET sequentially. Metadata redirects and proxies are disabled. The bodyless GETs preserve Go's transparent retry after
+     a qualifying reused-connection failure; Test adds no application retry. Each response is strictly capped at 1 MiB,
+     each request uses the configured/default three-second client timeout, and IMDS can approach three sequential timeout
+     periods before the outer caller bound. Success proves only non-empty access-key and secret-key acquisition; session
+     tokens remain optional. It does not call Secrets Manager, STS, or KMS and therefore does not prove AWS acceptance,
+     credential freshness, region correctness, secret access, or KMS permission.
 2. **Restart dependents as one composite command.** If any running jobs depend on that store key: stop dependents →
    commit the new generation → start dependents. The parent retains `dyncfg:dependency-graph` throughout, and each
    start child temporarily yields only the `dyncfg:jobs` acquisition suffix while its probe runs, so unrelated
