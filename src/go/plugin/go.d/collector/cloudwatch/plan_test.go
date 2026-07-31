@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
@@ -73,9 +74,9 @@ func TestResolveRuleMetrics_DefaultAndExplicitSelection(t *testing.T) {
 			}},
 		},
 	}
-	seriesByProfile := make(map[string][]profileSeriesSpec, len(profiles))
+	seriesByProfile := make(map[string]profileSeriesCatalog, len(profiles))
 	for _, profile := range profiles {
-		seriesByProfile[profile.Name] = compileProfileSeries(profile)
+		seriesByProfile[profile.Name] = indexProfileSeries(profile)
 	}
 
 	tests := map[string]struct {
@@ -314,6 +315,330 @@ func TestCompileConfig_MetricSelectionExpandsMultipleStatistics(t *testing.T) {
 		"lambda.duration_maximum",
 		"lambda.duration_p90",
 	}, compiledSeriesNames(plan.Scopes[0].SelectedSeries))
+}
+
+func TestCompileConfig_PerSelectionQueryPolicy(t *testing.T) {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
+	cfg.Rules[0].Query = &cwquery.Config{
+		Period: longDuration(5 * time.Minute), Lookback: longDuration(10 * time.Minute), PublicationDelay: longDuration(15 * time.Minute),
+	}
+	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
+		Profile: "lambda", Defaults: &defaults,
+		Query: &cwquery.Config{Period: longDuration(10 * time.Minute), PublicationDelay: longDuration(0)},
+		Include: []MetricSelectionConfig{
+			{Name: "Duration", Statistics: []string{"Average"}, Query: &cwquery.Config{Lookback: longDuration(20 * time.Minute)}},
+			{Name: "Duration", Statistics: []string{"Maximum"}, Query: &cwquery.Config{Period: longDuration(15 * time.Minute), Lookback: longDuration(45 * time.Minute)}},
+		},
+	}}
+
+	plan, _, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, plan.Scopes, 1)
+	got := make(map[string]cwquery.Policy)
+	for _, series := range plan.Scopes[0].SelectedSeries {
+		got[series.Name] = series.Policy
+	}
+	assert.Equal(t, map[string]cwquery.Policy{
+		"lambda.duration_average": {Period: 10 * time.Minute, Lookback: 20 * time.Minute, PublicationDelay: 0},
+		"lambda.duration_maximum": {Period: 15 * time.Minute, Lookback: 45 * time.Minute, PublicationDelay: 0},
+	}, got)
+}
+
+func TestCompileConfig_GroupQueryAppliesOnlyToExplicitIncludes(t *testing.T) {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	cfg.Rules[0].Query = &cwquery.Config{Period: longDuration(5 * time.Minute)}
+	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
+		Profile: "ec2", Query: &cwquery.Config{Period: longDuration(15 * time.Minute)},
+		Include: []MetricSelectionConfig{{Name: "NetworkIn", Statistics: []string{"Sum"}}},
+	}}
+
+	plan, _, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, plan.Scopes, 1)
+	got := make(map[string]time.Duration)
+	for _, series := range plan.Scopes[0].SelectedSeries {
+		got[series.Name] = series.Policy.Period
+	}
+	assert.Equal(t, 5*time.Minute, got["ec2.cpu_utilization_average"], "unlisted default-selected series keeps rule policy")
+	assert.Equal(t, 15*time.Minute, got["ec2.network_in_sum"], "explicit include receives group policy")
+}
+
+func TestCompileConfig_AllowsPeriodShorterThanUpdateEvery(t *testing.T) {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.UpdateEvery = 300
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
+		Profile: "ec2", Defaults: &defaults,
+		Include: []MetricSelectionConfig{{
+			Name: "CPUUtilization", Query: &cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(time.Minute)},
+		}},
+	}}
+
+	plan, _, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, plan.Scopes, 1)
+	require.Len(t, plan.Scopes[0].SelectedSeries, 1)
+	assert.Equal(t, time.Minute, plan.Scopes[0].SelectedSeries[0].Policy.Period)
+}
+
+func TestCompileConfig_RepeatedMetricNameRequiresDisjointStatistics(t *testing.T) {
+	defaults := false
+	tests := map[string]struct {
+		statistics []string
+		include    []MetricSelectionConfig
+		wantErr    bool
+	}{
+		"disjoint explicit statistics": {
+			include: []MetricSelectionConfig{
+				{Name: "Duration", Statistics: []string{"Average"}},
+				{Name: "Duration", Statistics: []string{"Maximum"}},
+			},
+		},
+		"overlapping explicit statistics": {
+			include: []MetricSelectionConfig{
+				{Name: "Duration", Statistics: []string{"Average"}},
+				{Name: "Duration", Statistics: []string{"Average", "Maximum"}},
+			},
+			wantErr: true,
+		},
+		"overlap inherited from group statistics": {
+			statistics: []string{"Average"},
+			include:    []MetricSelectionConfig{{Name: "Duration"}, {Name: "Duration"}},
+			wantErr:    true,
+		},
+		"all profile statistics overlap explicit statistic": {
+			include: []MetricSelectionConfig{
+				{Name: "Duration"},
+				{Name: "Duration", Statistics: []string{"Maximum"}},
+			},
+			wantErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := validBaseConfig()
+			cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
+			cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
+				Profile: "lambda", Defaults: &defaults, Statistics: tc.statistics, Include: tc.include,
+			}}
+
+			plan, _, err := compileTestConfig(t, cfg)
+			if !tc.wantErr {
+				require.NoError(t, err)
+				require.Len(t, plan.Scopes, 1)
+				assert.Equal(t, []string{"lambda.duration_average", "lambda.duration_maximum"}, compiledSeriesNames(plan.Scopes[0].SelectedSeries))
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "rules[0].metrics[0].include[0]")
+			assert.ErrorContains(t, err, "rules[0].metrics[0].include[1]")
+		})
+	}
+}
+
+func TestCompileConfig_OneRuleSelectionPolicyMatchesDisjointRules(t *testing.T) {
+	defaults := false
+	profile := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
+	average := &cwquery.Config{
+		Period: longDuration(5 * time.Minute), Lookback: longDuration(10 * time.Minute), PublicationDelay: longDuration(0),
+	}
+	maximum := &cwquery.Config{
+		Period: longDuration(15 * time.Minute), Lookback: longDuration(45 * time.Minute), PublicationDelay: longDuration(5 * time.Minute),
+	}
+	metric := func(statistic string) []ProfileMetricSelectorConfig {
+		return []ProfileMetricSelectorConfig{{
+			Profile: "lambda", Defaults: &defaults,
+			Include: []MetricSelectionConfig{{Name: "Duration", Statistics: []string{statistic}}},
+		}}
+	}
+
+	oldConfig := validBaseConfig()
+	oldConfig.Rules = []RuleConfig{
+		{Name: "average", Targets: []string{"base"}, Profiles: profile, Metrics: metric("Average"), Regions: []string{"us-east-1"}, Query: average},
+		{Name: "maximum", Targets: []string{"base"}, Profiles: profile, Metrics: metric("Maximum"), Regions: []string{"us-east-1"}, Query: maximum},
+	}
+	newConfig := validBaseConfig()
+	newConfig.Rules = []RuleConfig{{
+		Name: "duration", Targets: []string{"base"}, Profiles: profile, Regions: []string{"us-east-1"},
+		Metrics: []ProfileMetricSelectorConfig{{
+			Profile: "lambda", Defaults: &defaults, Query: average,
+			Include: []MetricSelectionConfig{
+				{Name: "Duration", Statistics: []string{"Average"}},
+				{Name: "Duration", Statistics: []string{"Maximum"}, Query: maximum},
+			},
+		}},
+	}}
+
+	oldPlan, _, err := compileTestConfig(t, oldConfig)
+	require.NoError(t, err)
+	newPlan, _, err := compileTestConfig(t, newConfig)
+	require.NoError(t, err)
+	oldQueries := buildPlanQueriesForOneInstance(t, oldPlan, "lambda")
+	newQueries := buildPlanQueriesForOneInstance(t, newPlan, "lambda")
+	require.Len(t, oldQueries, 2)
+	require.Len(t, newQueries, 2)
+
+	type queryContract struct {
+		key, billingKey structuralID
+		policy          cwquery.Policy
+		statistic       string
+		period          int32
+	}
+	contract := func(queries []plannedQuery) map[string]queryContract {
+		out := make(map[string]queryContract, len(queries))
+		for _, query := range queries {
+			out[query.seriesName] = queryContract{
+				key: query.key, billingKey: query.billingKey, policy: query.policy,
+				statistic: aws.ToString(query.query.MetricStat.Stat), period: aws.ToInt32(query.query.MetricStat.Period),
+			}
+		}
+		return out
+	}
+	assert.Equal(t, contract(oldQueries), contract(newQueries), "rule shape must not change AWS work or stable identity")
+	assert.Equal(t, calculatedMetricRequestUnits(oldQueries), calculatedMetricRequestUnits(newQueries))
+	assert.Equal(t, 2, calculatedMetricRequestUnits(newQueries), "different policies split one structural metric into two billed groups")
+
+	samePolicyConfig := newConfig
+	samePolicyConfig.Rules = append([]RuleConfig(nil), newConfig.Rules...)
+	samePolicyConfig.Rules[0].Metrics = append([]ProfileMetricSelectorConfig(nil), newConfig.Rules[0].Metrics...)
+	samePolicyConfig.Rules[0].Metrics[0].Include = append([]MetricSelectionConfig(nil), newConfig.Rules[0].Metrics[0].Include...)
+	samePolicyConfig.Rules[0].Metrics[0].Include[1].Query = nil
+	samePlan, _, err := compileTestConfig(t, samePolicyConfig)
+	require.NoError(t, err)
+	sameQueries := buildPlanQueriesForOneInstance(t, samePlan, "lambda")
+	assert.Equal(t, 1, calculatedMetricRequestUnits(sameQueries), "two statistics sharing one policy use one calculated request unit")
+}
+
+func buildPlanQueriesForOneInstance(t *testing.T, plan *collectionPlan, profileName string) []plannedQuery {
+	t.Helper()
+	c := New()
+	c.plan = plan
+	c.resolvedByRef = map[string]resolvedTarget{
+		"base": {target: plan.Targets[0], accountID: "000000000000"},
+	}
+	for _, scope := range plan.Scopes {
+		if scope.Profile.Name != profileName {
+			continue
+		}
+		values := make([]string, len(scope.Profile.Config.Instance.Dimensions))
+		for i, dimension := range scope.Profile.Config.Instance.Dimensions {
+			values[i] = "instance"
+			if dimension.Constant != nil {
+				values[i] = *dimension.Constant
+			}
+		}
+		c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
+			{Target: "base", Profile: profileName, Region: scope.Region}: {{DimensionValues: values}},
+		}}
+		queries, err := c.buildQueryPlan()
+		require.NoError(t, err)
+		return queries
+	}
+	require.FailNow(t, "profile scope not found", profileName)
+	return nil
+}
+
+func calculatedMetricRequestUnits(queries []plannedQuery) int {
+	clients := map[clientKey]cloudwatchClient{{target: "base", region: "us-east-1"}: &gmdCloudWatch{}}
+	batches := buildQueryBatches(queries, clients, time.Unix(1_000_000_000, 0))
+	units := 0
+	for _, batch := range batches {
+		units += queryMetricRequestUnits(batch.queries)
+	}
+	return units
+}
+
+func TestPerSelectionQueryPolicy_BatchLimitRemainsEnforced(t *testing.T) {
+	const count = maxPlannedQueryBatches + 1
+	defaults := false
+	profile := cwprofiles.ResolvedProfile{Name: "synthetic", Config: cwprofiles.Profile{
+		Namespace: "AWS/Synthetic",
+		Query:     cwquery.Config{Period: longDuration(time.Minute)},
+		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
+			{Name: "Instance", Label: "instance"},
+		}},
+		Metrics: make([]cwprofiles.Metric, count),
+	}}
+	selector := ProfileMetricSelectorConfig{
+		Profile: "synthetic", Defaults: &defaults, Include: make([]MetricSelectionConfig, count),
+	}
+	for i := range count {
+		profile.Config.Metrics[i] = cwprofiles.Metric{
+			ID: fmt.Sprintf("metric_%d", i), MetricName: fmt.Sprintf("Metric%d", i), Statistics: []string{"average"},
+		}
+		selector.Include[i] = MetricSelectionConfig{
+			Name: fmt.Sprintf("Metric%d", i),
+			Query: &cwquery.Config{
+				PublicationDelay: longDuration(time.Duration(i) * time.Second),
+			},
+		}
+	}
+	selected, _, err := resolveRuleMetrics(
+		"rules[0]",
+		[]ProfileMetricSelectorConfig{selector},
+		[]cwprofiles.ResolvedProfile{profile},
+		map[string]profileSeriesCatalog{"synthetic": indexProfileSeries(profile)},
+	)
+	require.NoError(t, err)
+	series, err := resolveSeriesPolicies("rules[0]", nil, nil, profile, selected[profile.Name])
+	require.NoError(t, err)
+
+	identity := awsauth.NewIdentity("base", awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}, nil)
+	target := &collectionTarget{Name: "base", Identity: identity, Regions: []string{"us-east-1"}}
+	c := New()
+	c.plan = &collectionPlan{
+		Targets:  []*collectionTarget{target},
+		Profiles: []cwprofiles.ResolvedProfile{profile},
+		Scopes: []collectionScope{{
+			Target: target, Profile: profile, Region: "us-east-1", SelectedSeries: series,
+		}},
+	}
+	c.resolvedByRef = map[string]resolvedTarget{"base": {target: target, accountID: "000000000000"}}
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
+		{Target: "base", Profile: "synthetic", Region: "us-east-1"}: {{DimensionValues: []string{"instance"}}},
+	}}
+
+	_, err = c.buildQueryPlan()
+	assert.ErrorContains(t, err, "more than 40 GetMetricData batches")
+}
+
+func BenchmarkResolveRuleMetricsPerSelectionPolicy(b *testing.B) {
+	const metricCount = maxReferencesPerRule / 2
+	defaults := false
+	profile := cwprofiles.ResolvedProfile{Name: "synthetic", Config: cwprofiles.Profile{
+		Metrics: make([]cwprofiles.Metric, metricCount),
+	}}
+	selector := ProfileMetricSelectorConfig{
+		Profile: "synthetic", Defaults: &defaults, Include: make([]MetricSelectionConfig, metricCount),
+	}
+	for i := range metricCount {
+		name := fmt.Sprintf("Metric%d", i)
+		profile.Config.Metrics[i] = cwprofiles.Metric{
+			ID: fmt.Sprintf("metric_%d", i), MetricName: name, Statistics: []string{"average", "maximum"},
+		}
+		selector.Include[i] = MetricSelectionConfig{
+			Name: name, Query: &cwquery.Config{PublicationDelay: longDuration(time.Duration(i) * time.Second)},
+		}
+	}
+	profiles := []cwprofiles.ResolvedProfile{profile}
+	catalogs := map[string]profileSeriesCatalog{"synthetic": indexProfileSeries(profile)}
+
+	b.ReportAllocs()
+	for range b.N {
+		selected, _, err := resolveRuleMetrics("rules[0]", []ProfileMetricSelectorConfig{selector}, profiles, catalogs)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(selected["synthetic"]) != maxReferencesPerRule {
+			b.Fatalf("selected %d series", len(selected["synthetic"]))
+		}
+	}
 }
 
 func TestCompileConfig_MetricSelectionRejectsUnknownOrUnselectedEntries(t *testing.T) {

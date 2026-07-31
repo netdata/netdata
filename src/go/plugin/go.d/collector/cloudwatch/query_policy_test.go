@@ -47,6 +47,26 @@ func TestQueryWindow(t *testing.T) {
 	}
 }
 
+func TestDueQueries_PeriodShorterThanCollectionCadenceUsesNewestWindow(t *testing.T) {
+	base := time.Unix(1_000_000_020, 0).UTC()
+	query := plannedQuery{
+		key:    testStructuralID("short-period"),
+		policy: cwquery.Policy{Period: time.Minute, Lookback: time.Minute},
+	}
+	_, completedEnd := queryWindow(base, query.policy)
+	store := observationStore{queries: map[structuralID]queryState{
+		query.key: {lastCompletedEnd: completedEnd},
+	}}
+
+	nextTick := base.Add(5 * time.Minute)
+	due := store.dueQueries([]plannedQuery{query}, nextTick)
+	require.Len(t, due, 1)
+	start, end := queryWindow(nextTick, due[0].policy)
+	assert.Equal(t, nextTick.Truncate(time.Minute), end)
+	assert.Equal(t, end.Add(-time.Minute), start)
+	assert.Equal(t, 5*time.Minute, end.Sub(completedEnd), "intermediate eligible windows are not backfilled")
+}
+
 func TestResolveSeriesPolicies_ProfileMetricAndRulePeriod(t *testing.T) {
 	profile := cwprofiles.ResolvedProfile{Name: "service", Config: cwprofiles.Profile{
 		Query: profileQuery(5 * time.Minute),
@@ -55,7 +75,7 @@ func TestResolveSeriesPolicies_ProfileMetricAndRulePeriod(t *testing.T) {
 			{ID: "normal", MetricName: "Normal", Statistics: []string{"average"}},
 		},
 	}}
-	base := compileProfileSeries(profile)
+	base := testSelectedProfileSeries(profile)
 	require.Len(t, base, 2)
 
 	resolved, err := resolveSeriesPolicies("rules[0]", nil, nil, profile, base)

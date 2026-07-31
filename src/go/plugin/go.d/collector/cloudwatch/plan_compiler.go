@@ -22,7 +22,7 @@ type planCompiler struct {
 	targetRoleARN     map[string]string
 	profiles          []cwprofiles.ResolvedProfile
 	profilesByName    map[string]cwprofiles.ResolvedProfile
-	seriesByProfile   map[string][]profileSeriesSpec
+	seriesByProfile   map[string]profileSeriesCatalog
 	tagJoinErrors     map[string]error
 
 	usedCredentials  map[string]struct{}
@@ -58,10 +58,10 @@ type shadowSample struct {
 func newPlanCompiler(cfg Config, catalog cwprofiles.Catalog) *planCompiler {
 	profiles := catalog.AllProfiles()
 	profilesByName := make(map[string]cwprofiles.ResolvedProfile, len(profiles))
-	seriesByProfile := make(map[string][]profileSeriesSpec, len(profiles))
+	seriesByProfile := make(map[string]profileSeriesCatalog, len(profiles))
 	for _, profile := range profiles {
 		profilesByName[profile.Name] = profile
-		seriesByProfile[profile.Name] = compileProfileSeries(profile)
+		seriesByProfile[profile.Name] = indexProfileSeries(profile)
 	}
 	credentialsByName := make(map[string]awsauth.CredentialConfig, len(cfg.Credentials))
 	for _, source := range cfg.Credentials {
@@ -283,7 +283,7 @@ func (pc *planCompiler) addScope(path, ruleName string, target *collectionTarget
 	return nil
 }
 
-func resolveSeriesPolicies(path string, rule, defaults *cwquery.Config, profile cwprofiles.ResolvedProfile, series []profileSeriesSpec) ([]compiledSeries, error) {
+func resolveSeriesPolicies(path string, rule, defaults *cwquery.Config, profile cwprofiles.ResolvedProfile, series []selectedSeriesSpec) ([]compiledSeries, error) {
 	out := make([]compiledSeries, len(series))
 	for i, item := range series {
 		metric := profile.Config.Metrics[item.MetricIndex]
@@ -299,6 +299,8 @@ func resolveSeriesPolicies(path string, rule, defaults *cwquery.Config, profile 
 			},
 			RuleDefaults: cwquery.Source{Config: defaults, Path: "rule_defaults.query"},
 			Rule:         cwquery.Source{Config: rule, Path: path + ".query"},
+			Group:        item.groupQuery,
+			Item:         item.itemQuery,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("%s profile %q MetricName %q statistic %q: %w", path, profile.Name, metric.MetricName, item.Statistic, err)

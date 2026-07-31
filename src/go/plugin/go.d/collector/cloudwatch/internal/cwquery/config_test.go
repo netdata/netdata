@@ -84,6 +84,20 @@ func TestResolve_Precedence(t *testing.T) {
 	}
 }
 
+func TestResolve_SelectionPrecedence(t *testing.T) {
+	got, err := Resolve(Resolution{
+		Path:         "rules[0]",
+		Profile:      Source{Config: &Config{Period: testDuration(5 * time.Minute), Lookback: testDuration(10 * time.Minute), PublicationDelay: testDuration(15 * time.Minute)}, Path: "profile.query"},
+		Metric:       Source{Config: &Config{Period: testDuration(10 * time.Minute)}, Path: "profile.metrics[0].query"},
+		RuleDefaults: Source{Config: &Config{Lookback: testDuration(20 * time.Minute)}, Path: "rule_defaults.query"},
+		Rule:         Source{Config: &Config{PublicationDelay: testDuration(30 * time.Minute)}, Path: "rules[0].query"},
+		Group:        Source{Config: &Config{Period: testDuration(15 * time.Minute), PublicationDelay: testDuration(0)}, Path: "rules[0].metrics[0].query"},
+		Item:         Source{Config: &Config{Lookback: testDuration(45 * time.Minute)}, Path: "rules[0].metrics[0].include[0].query"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, Policy{Period: 15 * time.Minute, Lookback: 45 * time.Minute, PublicationDelay: 0}, got)
+}
+
 func TestResolve_Validation(t *testing.T) {
 	maxWholeSecondDuration := (time.Duration(1<<63-1) / time.Second) * time.Second
 	tests := map[string]struct {
@@ -171,6 +185,35 @@ func TestResolve_ReportsSelectedSourcePath(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := resolveForTest(tc.rule, tc.defaults, tc.metric, tc.profile)
+
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantPath)
+		})
+	}
+}
+
+func TestResolve_ReportsSelectionSourcePath(t *testing.T) {
+	tests := map[string]struct {
+		group, item *Config
+		wantPath    string
+	}{
+		"group": {
+			group:    &Config{Period: testDuration(90 * time.Second)},
+			wantPath: "rules[0].metrics[0].query.period",
+		},
+		"item": {
+			item:     &Config{Lookback: testDuration(6 * time.Minute)},
+			wantPath: "rules[0].metrics[0].include[0].query.lookback",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := Resolve(Resolution{
+				Path:    "rules[0]",
+				Profile: Source{Config: &Config{Period: testDuration(5 * time.Minute)}, Path: "profile.query"},
+				Group:   Source{Config: tc.group, Path: "rules[0].metrics[0].query"},
+				Item:    Source{Config: tc.item, Path: "rules[0].metrics[0].include[0].query"},
+			})
 
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tc.wantPath)

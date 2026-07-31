@@ -63,9 +63,15 @@
           "statistics": [
             "Average"
           ],
+          "query": {
+            "period": "10m"
+          },
           "include": [
             {
-              "name": "CPUUtilization"
+              "name": "CPUUtilization",
+              "query": {
+                "publication_delay": "0s"
+              }
             }
           ]
         },
