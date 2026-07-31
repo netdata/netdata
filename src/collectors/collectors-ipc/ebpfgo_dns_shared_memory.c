@@ -64,6 +64,14 @@ static bool netdata_ebpfgo_dns_shm_open(
         (size_t)st.st_size != sizeof(struct ebpfgo_dns_shared))
         goto fail;
 
+    /* Reject segments not owned by our real UID.  The producer (ebpfgo.plugin)
+     * runs setuid-root but transfers SHM ownership to its real UID via fchown,
+     * so st_uid matches the real UID of every consumer.  Any other owner means
+     * an unauthorized local process created the segment to inject arbitrary
+     * data into DNS flow consumers. */
+    if (st.st_uid != getuid())
+        goto fail;
+
     ctx->shm = nd_mmap(NULL, sizeof(struct ebpfgo_dns_shared),
                        PROT_READ, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->shm == MAP_FAILED) {

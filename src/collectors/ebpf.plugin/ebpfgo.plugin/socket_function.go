@@ -63,6 +63,8 @@ func (s *socketFunctionStore) snapshot() (socketGlobalPublish, bool) {
 func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, closeStop func()) {
 	defer closeStop()
 	rd := bufio.NewReaderSize(os.Stdin, 1<<20)
+	inPayload := false
+	var payloadUID, payloadName string
 	for {
 		line, err := readBoundedLine(rd)
 		if err != nil {
@@ -71,25 +73,53 @@ func runStdinDispatcher(api *netdataapi.API, fnStore *socketFunctionStore, close
 		if line == "" {
 			continue // empty or oversized line — skip
 		}
+
+		if inPayload {
+			if line == "FUNCTION_PAYLOAD_END" {
+				inPayload = false
+				if payloadUID != "" {
+					dispatchSocketFunction(api, fnStore, payloadUID, payloadName)
+					payloadUID, payloadName = "", ""
+				}
+			}
+			// All payload body lines — including a bare "QUIT" — are data, not commands.
+			continue
+		}
+
 		switch {
 		case line == "QUIT":
 			return
+		case strings.HasPrefix(line, "FUNCTION_PAYLOAD "):
+			// Payload-carrying call: consume the body block before dispatching.
+			// Reuse parseMinimalFunctionLine by replacing the keyword prefix so
+			// the uid/name positions are identical to a plain FUNCTION line.
+			uid, name := parseMinimalFunctionLine("FUNCTION" + line[len("FUNCTION_PAYLOAD"):])
+			if uid != "" {
+				payloadUID = uid
+				payloadName = name
+			}
+			inPayload = true
 		case strings.HasPrefix(line, "FUNCTION "):
 			uid, name := parseMinimalFunctionLine(line)
 			if uid == "" {
 				continue
 			}
-			switch name {
-			case socketFunctionName:
-				if fnStore != nil {
-					handleNetworkProtocols(api, fnStore, uid)
-				} else {
-					sendFunctionError(api, uid, 503, "network-protocols collector not running")
-				}
-			default:
-				sendFunctionError(api, uid, 404, "unknown function: "+name)
-			}
+			dispatchSocketFunction(api, fnStore, uid, name)
 		}
+	}
+}
+
+// dispatchSocketFunction routes a parsed function call to the right handler.
+func dispatchSocketFunction(api *netdataapi.API, fnStore *socketFunctionStore, uid, name string) {
+	switch name {
+	case socketFunctionName:
+		if fnStore != nil {
+			handleNetworkProtocols(api, fnStore, uid)
+		} else {
+			sendFunctionError(api, uid, 503, "network-protocols collector not running")
+		}
+	default:
+		sendFunctionError(api, uid, 404, "unknown function: "+name)
 	}
 }
 
