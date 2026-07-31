@@ -122,6 +122,17 @@ source files for evidence.
   option for V2 charts.
 - Put multipliers, divisors, hidden flags, and float formatting in the chart
   template, not ad hoc chart-emission code.
+- When `instances.by_labels` omits labels so multiple source series can map to
+  one rendered dimension, the effective `aggregation` MUST match the metric
+  meaning. Set it on the chart; it applies to every dimension. Absence means
+  `sum`; available reducers are `sum`, `min`, `max`, and unweighted `avg`
+  (`avg` forces floating-point emission). Use separate charts when metrics need
+  different reducers. Metric kind is not enough to infer this policy: gauges
+  may be additive stocks, states, timestamps, limits, or averages.
+- Histogram buckets/counts/sums are mergeable only with `sum`. Summary
+  quantiles are not globally mergeable with these reducers. Non-sum reduction
+  of cumulative counters happens before Netdata calculates rates and can be
+  misleading when source membership changes.
 - `metrix` keeps ONE descriptor per metric NAME, resolved atomically at commit and
   BOUNDED: a name idle past its retention window (`expireAfterSuccessCycles +
   descriptorGraceCycles`, both configurable on `NewCollectorStore(...)`) is evicted

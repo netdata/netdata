@@ -26,6 +26,7 @@ type routeBinding struct {
 	Static            bool
 	Inferred          bool
 	Autogen           bool
+	Aggregation       program.Aggregation
 	Meta              program.ChartMeta
 	Lifecycle         program.LifecyclePolicy
 }
@@ -137,17 +138,20 @@ func (e *Engine) resolveSeriesRoutes(
 		if !ok {
 			continue
 		}
+		dimensionFloat := candidate.dimension.Float || metricFloat ||
+			candidate.dimension.Aggregation == program.AggregationAvg
 		routes = append(routes, routeBinding{
 			ChartTemplateID:   candidate.chartTemplateID,
 			ChartID:           chartID,
 			DimensionIndex:    candidate.dimensionIndex,
 			DimensionName:     dimName,
 			DimensionKeyLabel: dimKeyLabel,
+			Aggregation:       candidate.dimension.Aggregation,
 			Algorithm:         chart.Meta.Algorithm,
 			Hidden:            candidate.dimension.Hidden,
 			Multiplier:        candidate.dimension.Multiplier,
 			Divisor:           candidate.dimension.Divisor,
-			Float:             candidate.dimension.Float || metricFloat,
+			Float:             dimensionFloat,
 			Static:            !candidate.dimension.Dynamic,
 			Inferred:          candidate.dimension.InferNameFromSeriesMeta,
 			Autogen:           false,

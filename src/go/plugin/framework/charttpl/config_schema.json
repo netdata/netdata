@@ -219,6 +219,15 @@
             "incremental"
           ]
         },
+        "aggregation": {
+          "type": "string",
+          "enum": [
+            "sum",
+            "min",
+            "max",
+            "avg"
+          ]
+        },
         "type": {
           "type": "string",
           "enum": [

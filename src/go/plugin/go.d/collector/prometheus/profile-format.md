@@ -63,6 +63,7 @@ template:                   # REQUIRED. One chart-template group; at least one c
                                         # segment is dropped -- see "How profiles work")
           units: requests/s
           algorithm: incremental        # counters are charted as rates
+          aggregation: sum              # omitted labels are additive for this chart
           instances:
             by_labels: [listener]       # one chart instance per "listener" label value
           dimensions:
@@ -264,6 +265,21 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
   - a summary `bar` is selectable as `bar` (per-`quantile` dimensions), `bar_count`, and `bar_sum`;
   - series keep their scraped labels, which is what `instances.by_labels`, `name_from_label`, and label selectors work
     on.
+- **Choose `aggregation` when an instance identity omits labels.** Multiple full-label series can then map to the same
+  rendered chart and dimension. Set it on the chart; it applies to all dimensions in that chart. When omitted, the reducer
+  is `sum`. Use separate charts when metrics require different reducers. Use `min`, `max`, or `avg` when the metric is not
+  additive:
+  - `sum`: additive counters/gauges and histogram buckets, counts, or sums;
+  - `max`: latest timestamp or "any source active" for a 0/1 state;
+  - `min`: oldest timestamp, lowest limit, or "all sources active" for a 0/1 state;
+  - `avg`: unweighted arithmetic mean or fraction active for a 0/1 state; it emits floating-point values.
+
+  Metric type does not determine the right reducer: Prometheus gauges can be stocks, states, timestamps, limits, or
+  averages. Summary quantiles cannot be merged into a global quantile; `avg` is not a weighted mean; and non-sum
+  reduction of cumulative counters can produce misleading rates when source membership changes. `instances.by_labels`
+  lowers emitted chart cardinality; `aggregation` only selects the value for resulting collisions. Every scraped series is
+  still processed and retained in the collector's metric store. This chart reduction is separate from Prometheus
+  relabeling: it does not remove or rewrite stored series labels.
 - **Only collected series can be charted.** `*_info` families are skipped. Untyped families are collected only when the
   name ends in `_total` (treated as a counter) or the job's `fallback_type` option maps them to a gauge or counter
   (`fallback_type.gauge` takes precedence, so a `_total`-suffixed name mapped to gauge is charted as a gauge). A profile

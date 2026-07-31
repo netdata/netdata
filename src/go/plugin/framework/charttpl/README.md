@@ -528,6 +528,7 @@ charts:
     context: <chart context>
     units: <units string>
     algorithm: <absolute|incremental>
+    aggregation: <sum|min|max|avg>
     type: <line|area|stacked|heatmap>
     priority: <int>
     label_promotion: [<label>, ...]
@@ -551,6 +552,7 @@ charts:
 | `context`         | string        | **yes**  |                        | Chart context leaf. Combined with context namespaces.                        |
 | `units`           | string        | **yes**  |                        | Chart units (e.g., `queries/s`, `bytes`, `percentage`).                      |
 | `algorithm`       | string        | no       | inferred from metrics  | `absolute` or `incremental`. If omitted, inferred from metric suffixes.      |
+| `aggregation`     | string        | no       | `sum`                  | Reducer applied to every dimension in the chart.                             |
 | `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`. Histogram bucket charts are forced to `heatmap`. |
 | `priority`        | int           | no       | `70000`                | Chart ordering priority in the dashboard (`0` = use engine default `70000`). |
 | `label_promotion` | array[string] | no       | from `chart_defaults`  | Labels to promote as chart labels (for filtering/grouping in UI). Entries must be non-empty label keys. |
@@ -713,6 +715,36 @@ dimensions:
 > - **Omit both** — the engine infers the name automatically for histogram buckets (`le`), summary quantiles (`quantile`), and statesets.
 >
 > `name` and `name_from_label` are mutually exclusive. Duplicate static `name` values within the same chart are rejected.
+
+#### aggregation
+
+Aggregation applies when multiple source series map to the same rendered chart ID and dimension name during one
+successful collection snapshot. This commonly happens when `instances.by_labels` intentionally omits high-cardinality
+labels. The source series keep their full identity in `metrix`; only their chart output is reduced.
+
+| Value | Meaning                                  | Typical use                                                |
+|-------|------------------------------------------|------------------------------------------------------------|
+| `sum` | Add all observations.                   | Additive counters, totals, histogram buckets/counts/sums.  |
+| `min` | Keep the smallest non-NaN observation.  | Oldest timestamp, lowest limit, "all" for 0/1 states.      |
+| `max` | Keep the largest non-NaN observation.   | Latest timestamp, highest limit, "any" for 0/1 states.     |
+| `avg` | Compute the unweighted arithmetic mean. | Typical gauge value, fraction active for 0/1 states.       |
+
+Set `aggregation` on the chart; it applies to every dimension in that chart. When omitted, the effective reducer is
+`sum`, preserving historical behavior. A chart cannot mix reducers; use separate charts when dimensions require different
+aggregation semantics. `avg` always emits floating-point dimensions, even when all inputs are integers. `sum` and `avg`
+propagate NaN; `min` and `max` ignore NaN when a finite observation exists. All non-finite final values render as gaps.
+
+The engine cannot infer aggregation from the metric kind: gauges can represent additive stocks, states, timestamps,
+limits, or averages. Authors must choose from the metric's meaning. Additional constraints:
+
+- `avg` is unweighted. Averaging pre-aggregated averages does not produce a global weighted average.
+- Histogram buckets, counts, and sums are mergeable with `sum`; other reducers do not produce a merged histogram.
+- Summary quantiles cannot be merged into a global quantile with these reducers.
+- Reduction happens before Netdata applies the dimension multiplier/divisor and chart algorithm. An overall negative
+  multiplier/divisor scale reverses the displayed ordering of `min` and `max`. Non-sum reduction of cumulative counter
+  totals can produce misleading deltas when source membership changes.
+- `instances.by_labels` controls emitted chart cardinality; `aggregation` only selects the value for collisions created by
+  that projection. Every source series is still collected, stored, and routed.
 
 #### selectors
 
@@ -1069,6 +1101,7 @@ All rules below produce semantic validation errors unless noted:
 | `group.metrics[]` entries must not be empty; no duplicates within same group            | semantic                        |
 | `chart.title`, `chart.context`, `chart.units` must be non-empty                         | semantic                        |
 | `chart.algorithm` must be `absolute` or `incremental` (when specified)                  | semantic                        |
+| `chart.aggregation` must be `sum`, `min`, `max`, or `avg` (when specified)               | semantic                        |
 | `chart.type` must be `line`, `area`, `stacked`, or `heatmap` (when specified)           | semantic                        |
 | `dimension.selector` must include explicit metric name (prefix before `{`)              | semantic                        |
 | Selector metric must be visible in current group metric scope                           | semantic                        |

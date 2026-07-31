@@ -212,7 +212,7 @@ func benchmarkLifecycleCapFixture(
 		for dimIndex := range dimCount {
 			name := fmt.Sprintf("dimension_%02d", dimIndex)
 			dim, _ := matChart.ensureDimension(name, dimensionState{
-				algorithm:  program.AlgorithmAbsolute,
+				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})

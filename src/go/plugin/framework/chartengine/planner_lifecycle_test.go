@@ -56,7 +56,7 @@ func runTestEnforceLifecycleCapsDimensionCapEvictsLRU(t *testing.T) {
 			require.True(t, created)
 
 			oldA, created := matChart.ensureDimension("old_a", dimensionState{
-				algorithm:  program.AlgorithmAbsolute,
+				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})
@@ -64,7 +64,7 @@ func runTestEnforceLifecycleCapsDimensionCapEvictsLRU(t *testing.T) {
 			oldA.lastSeenSuccessSeq = 1
 
 			oldB, created := matChart.ensureDimension("old_b", dimensionState{
-				algorithm:  program.AlgorithmAbsolute,
+				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})
@@ -85,7 +85,7 @@ func runTestEnforceLifecycleCapsDimensionCapEvictsLRU(t *testing.T) {
 							dimensionState: dimensionState{
 								static:     false,
 								order:      0,
-								algorithm:  program.AlgorithmAbsolute,
+								algorithm:  dimensionAlgorithmAbsolute,
 								multiplier: 1,
 								divisor:    1,
 							},
@@ -125,7 +125,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 	disabledActive.lastSeenSuccessSeq = 1
 	for _, name := range []string{"old_a", "old_b"} {
 		dim, created := disabledActive.ensureDimension(name, dimensionState{
-			algorithm:  program.AlgorithmAbsolute,
+			algorithm:  dimensionAlgorithmAbsolute,
 			multiplier: 1,
 			divisor:    1,
 		})
@@ -157,7 +157,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 	require.True(t, created)
 	dimsActive.lastSeenSuccessSeq = currentSeq
 	oldDim, created := dimsActive.ensureDimension("old", dimensionState{
-		algorithm:  program.AlgorithmAbsolute,
+		algorithm:  dimensionAlgorithmAbsolute,
 		multiplier: 1,
 		divisor:    1,
 	})
@@ -300,7 +300,7 @@ func observedDimensionEntry(seenSeq uint64) *dimBuildEntry {
 	return &dimBuildEntry{
 		seenSeq: seenSeq,
 		dimensionState: dimensionState{
-			algorithm:  program.AlgorithmAbsolute,
+			algorithm:  dimensionAlgorithmAbsolute,
 			multiplier: 1,
 			divisor:    1,
 		},
@@ -335,7 +335,7 @@ func runTestCollectExpiryRemovalsDimensionAndChartExpiry(t *testing.T) {
 			liveChart.lastSeenSuccessSeq = tc.currentSeq
 
 			staleDim, created := liveChart.ensureDimension("stale_dim", dimensionState{
-				algorithm:  program.AlgorithmAbsolute,
+				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})
@@ -343,7 +343,7 @@ func runTestCollectExpiryRemovalsDimensionAndChartExpiry(t *testing.T) {
 			staleDim.lastSeenSuccessSeq = 2
 
 			freshDim, created := liveChart.ensureDimension("fresh_dim", dimensionState{
-				algorithm:  program.AlgorithmAbsolute,
+				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})
