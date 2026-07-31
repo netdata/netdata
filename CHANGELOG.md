@@ -854,6 +854,16 @@
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.65.0 to 1.66.0 in /src/go ([#23311](https://github.com/netdata/netdata/issues/23311))
 - Feat(go.d/jobmgr): contain non-cooperative plugin operations ([#23299](https://github.com/netdata/netdata/issues/23299))
 - Fix(go.d/cloudwatch): make the collector configurable from the dyncfg UI ([#23314](https://github.com/netdata/netdata/issues/23314))
+- Docs: Point node states doc to Events tab for offline timestamps ([#23273](https://github.com/netdata/netdata/issues/23273))
+- Docs: Clarify P90 billing method in plan and billing docs ([#23277](https://github.com/netdata/netdata/issues/23277))
+- Docs: Correct logrotate signal and rotation count in log README ([#23301](https://github.com/netdata/netdata/issues/23301))
+- Docs: Update Azure AD to Microsoft Entra ID in SSO docs ([#23306](https://github.com/netdata/netdata/issues/23306))
+- Test(go.d/azure_monitor): assert schema behavior instead of restating the file ([#23316](https://github.com/netdata/netdata/issues/23316))
+- Feat(go.d): add operational DynCfg resource tests ([#23317](https://github.com/netdata/netdata/issues/23317))
+- Test(go.d/jobmgr): stabilize task start failure parking ([#23319](https://github.com/netdata/netdata/issues/23319))
+- Test(go.d): align chart coverage with fresh series ([#23320](https://github.com/netdata/netdata/issues/23320))
+- Fix NetFlow filtering and facet retention ([#23313](https://github.com/netdata/netdata/issues/23313))
+- Feat(go.d): add DynCfg operational test for local listeners ([#23324](https://github.com/netdata/netdata/issues/23324))
 
 ## [2.10.0] - 2026-04-09
 
