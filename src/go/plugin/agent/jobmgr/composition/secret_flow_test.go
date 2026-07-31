@@ -366,27 +366,28 @@ func testProcessCoreSecretMutationDependentRestart(
 
 func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.T) {
 	starts := make(chan string, 4)
-	stopEntered := make(chan struct{})
-	releaseStop := make(chan struct{})
+	replacementEntered := make(chan struct{})
+	releaseReplacement := make(chan struct{})
+	var replacementEnteredOnce sync.Once
 	var releaseOnce sync.Once
 	t.Cleanup(func() {
-		releaseOnce.Do(func() { close(releaseStop) })
+		releaseOnce.Do(func() { close(releaseReplacement) })
 	})
 	var cleanups atomic.Int32
-	var armStop atomic.Bool
 	modules := collectorapi.Registry{
 		"module": {
 			Create: func() collectorapi.CollectorV1 {
 				collector := &collectorapi.MockCollectorV1{}
 				collector.InitFunc = func(context.Context) error {
 					starts <- collector.Config.OptionStr
+					if collector.Config.OptionStr == "replacement" {
+						replacementEnteredOnce.Do(func() { close(replacementEntered) })
+						<-releaseReplacement
+					}
 					return nil
 				}
 				collector.CleanupFunc = func(context.Context) {
-					if armStop.Load() && cleanups.Add(1) == 1 {
-						close(stopEntered)
-						<-releaseStop
-					}
+					cleanups.Add(1)
 				}
 				return collector
 			},
@@ -473,7 +474,9 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	case <-time.After(3 * time.Second):
 		require.FailNowf(t, "test failed", "collector did not start with initial secret; output=%q", output.String())
 	}
-	armStop.Store(true)
+	// Collector Init precedes graph publication and dependency acknowledgement.
+	// The Running frame makes the initial dependent authoritative before update.
+	output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
 
 	_, writeStringErr := io.WriteString(
 		writer,
@@ -486,9 +489,9 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	require.NoError(t, writeStringErr)
 
 	select {
-	case <-stopEntered:
+	case <-replacementEntered:
 	case <-time.After(3 * time.Second):
-		require.FailNow(t, "test failed", "dependent stop did not reach collector cleanup")
+		require.FailNow(t, "test failed", "replacement collector did not enter initialization")
 	}
 
 	_, writeStringErr2 := io.WriteString(
@@ -501,8 +504,11 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	// command is the barrier that makes the preceding cancellation authoritative.
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel-barrier 400 application/json")
 
-	releaseOnce.Do(func() { close(releaseStop) })
+	// Replacement Init belongs to the protected recovery child. Releasing it
+	// completes the already-started replacement after parent cancellation.
+	releaseOnce.Do(func() { close(releaseReplacement) })
 	waitSecretStart(t, starts, "replacement")
+	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
 	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-cancel 200 application/json")
 
