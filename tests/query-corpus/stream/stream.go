@@ -9,10 +9,8 @@ package stream
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -133,33 +131,26 @@ func Connect(addr, apiKey string, hi HostInfo, caps uint32) (*Conn, error) {
 		}
 	}
 
-	// the negotiated capabilities integer follows the prompt
-	var digits []byte
-	for {
-		_ = nc.SetReadDeadline(time.Now().Add(2 * time.Second))
+	// The receiver sends exactly the decimal negotiated mask, without a
+	// delimiter. Every capability this fixture advertises is required.
+	expected := strconv.FormatUint(uint64(caps), 10)
+	for i := range expected {
 		b, err := c.r.ReadByte()
 		if err != nil {
-			if len(digits) > 0 && errors.Is(err, os.ErrDeadlineExceeded) {
-				break // stream paused after the number: we have it
-			}
 			nc.Close()
-			return nil, fmt.Errorf("stream: handshake caps read: %w", err)
+			return nil, fmt.Errorf("stream: handshake caps read after %d of %d digits: %w",
+				i, len(expected), err)
 		}
-		if b >= '0' && b <= '9' {
-			digits = append(digits, b)
-			continue
+		if b != expected[i] {
+			nc.Close()
+			return nil, fmt.Errorf(
+				"stream: parent capability mask differs at digit %d: got %q, require %q",
+				i, b, expected[i])
 		}
-		_ = c.r.UnreadByte()
-		break
 	}
 	_ = nc.SetDeadline(time.Time{})
 
-	n, err := strconv.ParseUint(string(digits), 10, 32)
-	if err != nil {
-		nc.Close()
-		return nil, fmt.Errorf("stream: handshake caps parse %q: %w", digits, err)
-	}
-	c.Negotiated = uint32(n)
+	c.Negotiated = caps
 	return c, nil
 }
 
