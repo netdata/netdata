@@ -44,7 +44,7 @@ flowchart LR
     tags("Resolve tags<br/>membership + labels")
     plan("Plan + state<br/>stable query + policy")
     query("Query<br/>GetMetricData<br/>billed — the cost driver")
-    activity("Collector activity<br/>calls · billing units · raw queries")
+    activity("Collector activity<br/>SDK invocations · calculated units · profile estimates · query items")
     store("metrix store<br/>gauges + labels")
     charts("Dynamic charts<br/>cloudwatch.*")
 
@@ -717,32 +717,51 @@ per-region prices on the CloudWatch pricing page.)
 
 ### Collector activity and billing inputs
 
-`activity.go` keeps three bounded activity accumulators. Three chart templates
-under the public `cloudwatch.collector_*` contexts render their exact counts as
+`activity.go` keeps four bounded activity accumulators. Four chart templates
+under the public `cloudwatch.collector_*` contexts render interval counts as
 absolute gauges for the interval since the preceding successfully committed
 collector frame:
 
-- **CloudWatch API Calls** counts collector-issued `ListMetrics` and
-  `GetMetricData` method calls. It materializes one chart per
-  `(account_id, region, operation)` with a fixed `calls` dimension. Every requested
-  continuation page is another call.
-- **CloudWatch Metric Requests** counts the calculated `GetMetricData` billing
-  units submitted by the collector. Up to five statistics for one structural AWS
-  metric in one request form one unit; a pagination page submits those units again.
-  It materializes per `(account_id, region)` with a fixed `requests` dimension.
-- **CloudWatch Raw Queries** counts submitted `MetricDataQuery` items, split by
-  profile. It materializes one chart per `(account_id, region, profile)` with a
-  fixed `queries` dimension. This is the profile-level tuning view, not AWS's
-  billing unit.
+- **CloudWatch SDK Invocations** counts attempted collector-issued `ListMetrics`
+  and `GetMetricData` SDK method invocations. It materializes one chart per
+  `(account_id, region, operation)` with a fixed `invocations` dimension. Failed
+  attempts and every requested continuation page count; SDK-internal retries do not.
+- **GetMetricData Calculated Metric Requests** counts the calculated billing units
+  submitted by the collector. Up to five statistics for one structural AWS metric
+  in one request form one unit. It materializes per `(account_id, region)` with a
+  fixed `calculated_metric_requests` dimension.
+- **GetMetricData Profile Metric Request Estimates** independently applies that
+  calculation to each profile's items within each submitted request. It materializes
+  per `(account_id, region, profile)` with a fixed `estimated_metric_requests`
+  dimension. This is a non-additive estimate for relative cost ranking: shared
+  structural metrics can contribute to several profiles, profile values need not
+  sum to the calculated total, and no `_shared` profile is emitted.
+- **GetMetricData Query Items** counts submitted `MetricDataQuery` items by source
+  profile. It materializes per `(account_id, region, profile)` with a fixed
+  `query_items` dimension.
 
-Physical calls and billing units are attributed only to account and region because
-one shared discovery stream or query batch can serve multiple profiles. Targets that
-resolve to the same account therefore aggregate. Raw queries keep their profile of
-origin because every planned series has exactly one.
+For one account and region over the same interval, after summing all profile
+instances and considering only the `GetMetricData` operation, the counts satisfy:
+query items ≥ summed profile metric-request estimates ≥ calculated metric
+requests ≥ `GetMetricData` SDK invocations. The profile sum can exceed the
+calculated total because cross-profile overlap is counted independently.
+
+The calculated total is attributed only to account and region because one query
+batch can serve multiple profiles. Profile estimates and query items keep the source
+profile because every planned series has exactly one. Different effective policies
+produce separate batches and separate estimates. Targets that resolve to the same
+account aggregate.
+
+`buildQueryBatches` computes one immutable activity summary per physical request
+after packing. Initial and continuation pages replay that same summary, so each
+submitted page counts the complete request footprint. Recording scans and hashes no
+queries. Once the bounded scope keys exist, steady-state page recording allocates
+nothing; first insertion or map growth may allocate while holding the activity mutex.
+Per-page work is proportional only to the number of profiles represented in the batch.
 
 `netdata.go.plugin.collector.cloudwatch.*` names the internal `metrix` selectors;
 it is not a chart-context prefix. The chart spec's `context_namespace: cloudwatch`
-keeps all three activity contexts beside the service-profile contexts in the UI.
+keeps all four activity contexts beside the service-profile contexts in the UI.
 
 Pending activity lives outside the staged `metrix` frame. At the start of the next
 cycle, `activity.go` checks `CollectMeta.LastSuccessSeq` and clears the prior interval
@@ -750,10 +769,10 @@ only when that sequence proves its frame committed. A failed collection or faile
 metric-store commit therefore carries its work into the next successful frame. Once
 a series is known, a successful cached interval with no real AWS work publishes zero.
 Cleanup, job replacement, and process restart reset the pending activity and known
-keys. The gauges count calls issued by the collector, not retry attempts performed
-internally by the AWS SDK. These metrics are cost inputs, not an AWS invoice: AWS owns
-the billing rules, may change them, and does not separately document pagination
-billing semantics.
+keys. SDK invocation counts cover CloudWatch `ListMetrics` and `GetMetricData`, not
+Resource Groups Tagging API, STS, or credential-provider calls. These metrics are
+cost inputs, not an AWS invoice: AWS owns the billing rules, may change them, and does
+not separately document pagination billing semantics.
 
 ## Key Invariants
 

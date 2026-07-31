@@ -325,11 +325,53 @@ func TestCollect_ActivityAttributionAcrossProfiles(t *testing.T) {
 	series, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(t, 1, fake.getCalls, "matching policies from both profiles must share one GetMetricData batch")
-	assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
-	assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
-	assert.Equal(t, metrix.SampleValue(11), series[activityMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
-	assert.Equal(t, metrix.SampleValue(7), series[activityQueriesMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
-	assert.Equal(t, metrix.SampleValue(6), series[activityQueriesMetric+`{account_id="000000000000",profile="lambda",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(2), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(11), series[activityCalculatedMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(7), series[activityProfileMetricRequestEstimatesMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(4), series[activityProfileMetricRequestEstimatesMetric+`{account_id="000000000000",profile="lambda",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(7), series[activityQueryItemsMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(6), series[activityQueryItemsMetric+`{account_id="000000000000",profile="lambda",region="us-east-1"}`])
+}
+
+func TestCollect_ActivityProfileEstimateForShippedOverlap(t *testing.T) {
+	const account = "000000000000"
+	defaults := false
+	fake := &e2eCloudWatch{
+		list: map[string][]cwtypes.Metric{
+			"AWS/ApplicationELB": {
+				mkMetric("UnHealthyHostCount", "LoadBalancer", "app/lb1/aaa", "TargetGroup", "targetgroup/tg1/bbb"),
+			},
+		},
+		values: map[string]float64{
+			e2eKey("AWS/ApplicationELB", "UnHealthyHostCount", "Average", "LoadBalancer", "app/lb1/aaa", "TargetGroup", "targetgroup/tg1/bbb"): 2,
+			e2eKey("AWS/ApplicationELB", "UnHealthyHostCount", "Minimum", "LoadBalancer", "app/lb1/aaa", "TargetGroup", "targetgroup/tg1/bbb"): 1,
+		},
+	}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"alb_target", "alb_target_health"})
+	c.Config.Rules[0].Metrics = []ProfileMetricSelectorConfig{
+		{Profile: "alb_target", Defaults: &defaults, Include: []MetricSelectionConfig{{Name: "UnHealthyHostCount"}}},
+		{Profile: "alb_target_health", Defaults: &defaults, Include: []MetricSelectionConfig{{Name: "UnHealthyHostCount"}}},
+	}
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
+	useFakeClient(c, fake)
+	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
+
+	series, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, 1, fake.getCalls, "matching stock policies must share one GetMetricData batch")
+	assert.Equal(t, map[string]metrix.SampleValue{
+		`alb_target.unhealthy_host_count_average{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1",target_group="targetgroup/tg1/bbb"}`:        2,
+		`alb_target_health.unhealthy_host_count_minimum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1",target_group="targetgroup/tg1/bbb"}`: 1,
+	}, workloadSeries(series))
+	assert.Equal(t, metrix.SampleValue(1), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activityCalculatedMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activityProfileMetricRequestEstimatesMetric+`{account_id="000000000000",profile="alb_target",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activityProfileMetricRequestEstimatesMetric+`{account_id="000000000000",profile="alb_target_health",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activityQueryItemsMetric+`{account_id="000000000000",profile="alb_target",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activityQueryItemsMetric+`{account_id="000000000000",profile="alb_target_health",region="us-east-1"}`])
 }
 
 func TestCollect_ActivitySurvivesMetricStoreCommitFailure(t *testing.T) {
@@ -364,13 +406,16 @@ func TestCollect_ActivitySurvivesMetricStoreCommitFailure(t *testing.T) {
 	require.NoError(t, cycle.CommitCycleSuccess())
 
 	reader := c.store.Read()
-	assertActivityValue(t, reader, activityAPICallsMetric, metrix.Labels{
+	assertActivityValue(t, reader, activitySDKInvocationsMetric, metrix.Labels{
 		"account_id": account, "region": "us-east-1", "operation": activityOperationGetMetricData,
 	}, 2)
-	assertActivityValue(t, reader, activityMetricRequestsMetric, metrix.Labels{
+	assertActivityValue(t, reader, activityCalculatedMetricRequestsMetric, metrix.Labels{
 		"account_id": account, "region": "us-east-1",
 	}, 2)
-	assertActivityValue(t, reader, activityQueriesMetric, metrix.Labels{
+	assertActivityValue(t, reader, activityProfileMetricRequestEstimatesMetric, metrix.Labels{
+		"account_id": account, "region": "us-east-1", "profile": "billing_total",
+	}, 2)
+	assertActivityValue(t, reader, activityQueryItemsMetric, metrix.Labels{
 		"account_id": account, "region": "us-east-1", "profile": "billing_total",
 	}, 2)
 	assert.Equal(t, 2, fake.getCalls)
@@ -601,18 +646,19 @@ func TestCollect_OrderedRulesFirstTargetOwnsSameAccountSeries(t *testing.T) {
 	series, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(t, metrix.SampleValue(5), series[`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`])
-	assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`],
+	assert.Equal(t, metrix.SampleValue(2), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`],
 		"same-account targets aggregate into one account/region activity series")
-	assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
 	assert.Equal(t, 1, first.getCalls)
 	assert.Zero(t, second.getCalls, "the later rule's duplicate final series must not be queried")
 
 	series, err = collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	assert.Equal(t, metrix.SampleValue(0), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
-	assert.Equal(t, metrix.SampleValue(0), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
-	assert.Equal(t, metrix.SampleValue(0), series[activityMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
-	assert.Equal(t, metrix.SampleValue(0), series[activityQueriesMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityCalculatedMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityProfileMetricRequestEstimatesMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityQueryItemsMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
 	assert.Equal(t, 1, first.getCalls, "a cached interval must publish zero activity without making another query")
 }
 
@@ -805,9 +851,9 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 
 		series, err := collecttest.CollectScalarSeries(c)
 		require.NoError(t, err)
-		assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`],
+		assert.Equal(t, metrix.SampleValue(2), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`],
 			"the failed cycle's ListMetrics call must appear after recovery")
-		assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+		assert.Equal(t, metrix.SampleValue(1), series[activitySDKInvocationsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
 	})
 
 	t.Run("partial region failure is tolerated", func(t *testing.T) {

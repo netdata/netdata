@@ -43,9 +43,12 @@ func responseTestBatch(client cloudwatchClient, queries ...plannedQuery) queryBa
 		queries[i].policy = policy
 	}
 	return queryBatch{
-		key:    queryBatchKey{target: "base", region: "us-east-1", policy: policy},
-		client: client, queries: queries,
-		start: time.Unix(0, 0), end: time.Unix(900, 0),
+		key:            queryBatchKey{target: "base", region: "us-east-1", policy: policy},
+		client:         client,
+		activityCounts: buildQueryBatchActivity(queries),
+		queries:        queries,
+		start:          time.Unix(0, 0),
+		end:            time.Unix(900, 0),
 	}
 }
 

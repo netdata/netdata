@@ -142,12 +142,12 @@ func billingUnitShapes(groups map[structuralID]int) []billingUnitShape {
 	return units
 }
 
-func queryMetricRequestUnits(queries []plannedQuery) int {
-	groups := make(map[structuralID]int)
-	for _, query := range queries {
-		groups[queryMetricBillingKey(query)]++
+func metricRequestUnitsForBillingGroups(groups map[structuralID]int) int {
+	units := 0
+	for _, count := range groups {
+		units += (count + maxStatisticsPerMetricBillingUnit - 1) / maxStatisticsPerMetricBillingUnit
 	}
-	return len(billingUnitShapes(groups))
+	return units
 }
 
 func packQueryGroup(queries []plannedQuery, width int) [][]plannedQuery {
