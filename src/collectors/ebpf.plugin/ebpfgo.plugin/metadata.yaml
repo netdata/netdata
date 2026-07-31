@@ -71,11 +71,11 @@ modules:
             enabled: true
           list:
             - name: update every
-              description: Data collection frequency. When Netdata provides a pluginsd interval, the collector follows it and uses this value only as a fallback.
+              description: Data collection frequency. This configuration value takes precedence over the runtime interval passed by pluginsd.
               default_value: 10
               required: false
             - name: ebpf load mode
-              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              description: "Legacy compatibility option. eBPFGo accepts `entry`; `return` is not supported and is ignored with a warning."
               default_value: entry
               required: false
             - name: apps

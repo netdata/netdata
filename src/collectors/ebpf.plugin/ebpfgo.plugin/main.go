@@ -164,6 +164,10 @@ func main() {
 		} else if handle != nil && handle.Runtime != nil {
 			// dns-queries is served by network-viewer.plugin on Linux via SHM;
 			// ebpf-go.plugin only writes the aggregate counters to shared memory.
+			pluginOutputMu.Lock()
+			api.HOST("")
+			pluginOutputMu.Unlock()
+
 			anyStarted = true
 
 			wg.Add(1)
@@ -188,9 +192,8 @@ func main() {
 }
 
 // resolveUpdateEvery returns the first positive value from: config file, CLI arg, fallback.
-// Config wins over argv so that per-plugin defaults (e.g. "update every = 10" in ebpf.d.conf)
-// are not silently overridden by the Netdata global update_every passed in argv[1] (default 1).
-// argv is still honoured when no config value is set, giving the operator a fallback path.
+// Config is the operator-controlled source of truth. argv[1] is only a fallback
+// when no config value is set.
 func resolveUpdateEvery(cliArg, cfgVal, fallback int) int {
 	if cfgVal > 0 {
 		return cfgVal

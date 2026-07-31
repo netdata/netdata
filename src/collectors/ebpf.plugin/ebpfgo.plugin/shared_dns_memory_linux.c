@@ -72,7 +72,7 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
     (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
     (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
 
-    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0660);
+    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0640);
     if (ctx->shm_fd < 0)
         return false;
     /* Mark created before any further steps; close() unlinks on any failure path. */
@@ -124,7 +124,7 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
      * claim creation and cannot unlink a live publisher's segment on failure. */
     struct stat pre_stat = {0};
     bool reused;
-    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0660);
+    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0640);
     if (ctx->shm_fd >= 0) {
         reused = false;
         ctx->shm_name_created = true;
@@ -160,7 +160,7 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
         (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
-        ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0660);
+        ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0640);
         if (ctx->shm_fd < 0)
             goto fail;
         reused = false;

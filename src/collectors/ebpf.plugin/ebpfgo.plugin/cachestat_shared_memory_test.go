@@ -36,6 +36,21 @@ func TestBuildCachestatPublish(t *testing.T) {
 	}
 }
 
+func TestBuildCachestatPublishIdleRatioIsZero(t *testing.T) {
+	current := netdataCachestat{
+		AddToPageCacheLru:  100,
+		MarkPageAccessed:   100,
+		AccountPageDirtied: 20,
+		MarkBufferDirty:    20,
+	}
+	previous := current
+
+	got := buildCachestatPublish(current, previous, 1234, true)
+	if got.Ratio != 0 {
+		t.Fatalf("idle ratio = %d, want 0", got.Ratio)
+	}
+}
+
 func TestCachestatSharedMemoryStoreFlagsStaleAfterStaleCycles(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
 	app := libbpfloader.CachestatAppSnapshot{Pid: 42, Ppid: 1, Ct: 100, MarkPageAccessed: 10}

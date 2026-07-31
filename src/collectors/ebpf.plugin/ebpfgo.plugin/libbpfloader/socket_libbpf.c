@@ -72,6 +72,7 @@ typedef struct {
 
 /* 18 indexed per-CPU counters in the socket BPF program's tbl_global_sock map. */
 #define SOCKET_GLOBAL_MAP_ENTRIES 18
+#define SOCKET_PID_LIVENESS_CACHE 256
 
 /* -------------------------------------------------------------------------
  * tbl_nd_socket per-PID aggregation types
@@ -940,6 +941,11 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
      * drop that could leave the map full and reject new flows. */
     netdata_socket_bpf_key_t *del_keys = rt->nd_del_keys;
     uint32_t ndel = 0;
+    struct {
+        uint32_t pid;
+        bool dead;
+    } live_cache[SOCKET_PID_LIVENESS_CACHE] = {0};
+    uint32_t live_cache_next = 0;
 
     while (bpf_map_get_next_key(ndfd, first_nditer ? NULL : &key, &next) == 0) {
         first_nditer = false;
@@ -967,15 +973,33 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
          * flows.  kill(pid, 0) == -1/ESRCH confirms the process is gone;
          * EPERM means alive but not ours, so we keep those.
          * Mirrors ebpf_socket.c:1930. */
-        if (kill((pid_t)next.pid, 0) != 0 && errno == ESRCH) {
+        bool dead_pid = false;
+        bool cached_pid = false;
+        for (uint32_t i = 0; i < SOCKET_PID_LIVENESS_CACHE; i++) {
+            if (live_cache[i].pid == next.pid) {
+                dead_pid = live_cache[i].dead;
+                cached_pid = true;
+                break;
+            }
+        }
+        if (!cached_pid) {
+            dead_pid = kill((pid_t)next.pid, 0) != 0 && errno == ESRCH;
+            live_cache[live_cache_next].pid = next.pid;
+            live_cache[live_cache_next].dead = dead_pid;
+            live_cache_next = (live_cache_next + 1u) % SOCKET_PID_LIVENESS_CACHE;
+        }
+
+        if (dead_pid) {
             if (ndel < rt->nd_del_cap)
                 del_keys[ndel++] = next;
             continue;
         }
 
+        bool closed_connection = false;
         if (ndcount == 1) {
             if (!pid_ht_accumulate(rt->pid_ht, next.pid, vbuf, rt->pid_ht_size, rt->pid_ht_mask))
                 rt->pid_ht_drops++;
+            closed_connection = vbuf->tcp.close > 0;
         } else {
             /* PERCPU_HASH: sum per-CPU values into a temporary entry. */
             netdata_socket_bpf_value_t agg = {0};
@@ -993,7 +1017,11 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
             }
             if (!pid_ht_accumulate(rt->pid_ht, next.pid, &agg, rt->pid_ht_size, rt->pid_ht_mask))
                 rt->pid_ht_drops++;
+            closed_connection = agg.tcp.close > 0;
         }
+
+        if (closed_connection && ndel < rt->nd_del_cap)
+            del_keys[ndel++] = next;
     }
 
     /* Apply deferred deletions now that traversal is complete. */

@@ -75,6 +75,12 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 			content:    "[global]\nebpf object flavor = legacy\n",
 			wantFlavor: stringPtr("tracing"),
 		},
+		"ebpf load mode entry is accepted as no-op": {
+			content: "[global]\nebpf load mode = entry\n",
+		},
+		"ebpf load mode return is recognized but unsupported": {
+			content: "[global]\nebpf load mode = return\n",
+		},
 		"ebpf object flavor buffer ring maps to buffer flavor": {
 			content:    "[global]\nebpf object flavor = buffer ring\n",
 			wantFlavor: stringPtr("buffer"),
@@ -244,6 +250,26 @@ func TestParsePluginConfigFileEbpfPrograms(t *testing.T) {
 			cfg := parseTempConfig(t, "ebpf.d.conf", tc.content)
 			checkPtr(t, "Socket", cfg.Socket, tc.wantSocket)
 			checkPtr(t, "Cachestat", cfg.Cachestat, tc.wantCachestat)
+		})
+	}
+}
+
+func TestApplySocketTableSizeClamp(t *testing.T) {
+	tests := map[string]struct {
+		value uint32
+		max   uint32
+		want  uint32
+	}{
+		"under max unchanged": {value: 1024, max: 4096, want: 1024},
+		"equal max unchanged": {value: 4096, max: 4096, want: 4096},
+		"over max clamped":    {value: 1 << 30, max: 65536, want: 65536},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := applySocketTableSizeClamp(tc.value, tc.max, "test"); got != tc.want {
+				t.Fatalf("applySocketTableSizeClamp(%d, %d) = %d, want %d", tc.value, tc.max, got, tc.want)
+			}
 		})
 	}
 }

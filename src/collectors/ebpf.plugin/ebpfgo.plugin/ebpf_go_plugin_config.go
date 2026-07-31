@@ -257,6 +257,17 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				cfg.ObjectFlavor = stringPtr(flavor)
 			}
 			found = true
+		case "ebpf load mode":
+			switch strings.ToLower(strings.TrimSpace(value)) {
+			case "entry":
+				// Supported legacy default; eBPFGo object flavor controls the
+				// actual attachment path.
+			case "return":
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: ebpf load mode %q is not supported by eBPFGo, using entry-compatible objects\n", path, value)
+			default:
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf load mode %q, using default\n", path, value)
+			}
+			found = true
 		case "ebpf type format":
 			// Legacy key from the old ebpf.plugin; maps to ebpf object flavor.
 			// "legacy" forces the kprobe-based tracing path; "co-re" and "auto"

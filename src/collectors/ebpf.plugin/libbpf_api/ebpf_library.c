@@ -381,10 +381,14 @@ void ebpf_update_map_per_core()
 
 void ebpf_set_ipc_value(const char *integration)
 {
-    if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM))
+    if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM)) {
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
-    else
+    } else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_DISABLED)) {
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
+    } else {
+        netdata_log_error("unsupported [ipc] integration '%s'; using 'disabled'", integration);
+        integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
+    }
 }
 
 void ebpf_parse_ipc_section()

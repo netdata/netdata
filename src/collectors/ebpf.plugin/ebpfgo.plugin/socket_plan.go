@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
@@ -15,9 +17,14 @@ const (
 	// socketDefaultMonitoringTableSize is the default max_entries for tbl_nd_socket.
 	// Matches the legacy C plugin default (NETDATA_MAXIMUM_CONNECTIONS_ALLOWED).
 	socketDefaultMonitoringTableSize uint32 = 16384
+	// socketMaxMonitoringTableSize bounds userspace pre-allocation for
+	// tbl_nd_socket snapshots. Larger values can allocate hundreds of GB before
+	// the BPF load path gets a chance to reject the map size.
+	socketMaxMonitoringTableSize uint32 = 65536
 	// socketDefaultUDPConnectionTableSize is the default max_entries for tbl_nv_udp.
 	// Matches the legacy C plugin default (NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED).
 	socketDefaultUDPConnectionTableSize uint32 = 4096
+	socketMaxUDPConnectionTableSize     uint32 = 65536
 	// socketMaxBaseSelector is the highest SelectKernelName index for which a
 	// base-flavor (no suffix) socket object file is shipped.  Objects for newer
 	// kernels use the buffer or arena flavor only.
@@ -102,10 +109,16 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
 	if fileCfg.SocketMonitoringTableSize != nil && *fileCfg.SocketMonitoringTableSize > 0 {
-		cfg.SocketMonitoringTableSize = *fileCfg.SocketMonitoringTableSize
+		cfg.SocketMonitoringTableSize = applySocketTableSizeClamp(
+			*fileCfg.SocketMonitoringTableSize,
+			socketMaxMonitoringTableSize,
+			"socket monitoring table size")
 	}
 	if fileCfg.UDPConnectionTableSize != nil && *fileCfg.UDPConnectionTableSize > 0 {
-		cfg.UDPConnectionTableSize = *fileCfg.UDPConnectionTableSize
+		cfg.UDPConnectionTableSize = applySocketTableSizeClamp(
+			*fileCfg.UDPConnectionTableSize,
+			socketMaxUDPConnectionTableSize,
+			"udp connection table size")
 	}
 	if fileCfg.PidTable != nil && *fileCfg.PidTable > 0 {
 		cfg.PidTableSize = applyPidTableSizeClamp(*fileCfg.PidTable)
@@ -119,6 +132,14 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 	cfg.IsRHF = isRHF
 
 	return cfg, nil
+}
+
+func applySocketTableSizeClamp(value, max uint32, name string) uint32 {
+	if value <= max {
+		return value
+	}
+	logPluginErr("socket.config", "socket", name, fmt.Errorf("configured value %d exceeds maximum %d; clamping", value, max))
+	return max
 }
 
 func BuildSocketLegacyPlan(cfg SocketLegacyConfig) LoadPlan {

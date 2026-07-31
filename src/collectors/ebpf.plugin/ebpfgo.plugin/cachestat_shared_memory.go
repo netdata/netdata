@@ -148,7 +148,7 @@ func buildCachestatPublish(current, previous netdataCachestat, ct uint64, hasPre
 	if total > 0 {
 		publish.Ratio = int64((float64(hits) / float64(total)) * 100)
 	} else {
-		publish.Ratio = 100
+		publish.Ratio = 0
 	}
 
 	publish.Hit = hits

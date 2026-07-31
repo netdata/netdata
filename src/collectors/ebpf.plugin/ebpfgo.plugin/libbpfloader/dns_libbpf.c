@@ -99,6 +99,7 @@ struct netdata_sock_fprog {
 #define DNS_FLOW_TTL_US_DEFAULT (20ULL * 1000000ULL) /* 20 s default live window */
 #define DNS_DOMAIN_MAX          256
 #define DNS_PACKET_BUF          65536
+#define DNS_MAX_DRAIN_PACKETS   4096        /* per snapshot, per AF_PACKET socket */
 
 /* -------------------------------------------------------------------------
  * Shared flow record type — identical layout to ebpfgo_dns_flow_record in
@@ -241,6 +242,10 @@ static int dns_read_name(const char *msg, int msg_len, int off,
             uint8_t ch = (uint8_t)msg[current + i];
             if (ch >= 'A' && ch <= 'Z')
                 ch = (uint8_t)(ch - 'A' + 'a');
+            if (!((ch >= 'a' && ch <= 'z') ||
+                  (ch >= '0' && ch <= '9') ||
+                  ch == '-' || ch == '_'))
+                ch = '_';
             out[out_len++] = (char)ch;
         }
 
@@ -613,9 +618,13 @@ static void dns_drain_socket(struct netdata_dns_runtime *rt)
     char    buf[DNS_PACKET_BUF];
     ssize_t n;
     uint64_t now_us = dns_now_us();
+    int drained = 0;
 
-    while ((n = recv(rt->sock_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0)
+    while (drained < DNS_MAX_DRAIN_PACKETS &&
+           (n = recv(rt->sock_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0) {
         dns_parse_raw_packet(rt, buf, n, now_us, NULL, NULL, NULL);
+        drained++;
+    }
 }
 
 /* -------------------------------------------------------------------------
@@ -629,9 +638,13 @@ static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
     char    buf[DNS_PACKET_BUF];
     ssize_t n;
     uint64_t now_us = dns_now_us();
+    int drained = 0;
 
-    while ((n = recv(rt->flow_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0)
+    while (drained < DNS_MAX_DRAIN_PACKETS &&
+           (n = recv(rt->flow_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0) {
         dns_parse_raw_packet(rt, buf, n, now_us, NULL, NULL, NULL);
+        drained++;
+    }
 
     /* Read kernel-side drop counter.  PACKET_STATISTICS resets tp_drops on each
      * getsockopt call so this always reports drops since the previous drain. */
