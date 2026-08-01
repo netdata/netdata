@@ -1256,8 +1256,8 @@ func c4cRateVolume(t *testing.T, dd *daemon.Daemon, label string, after, before 
 	want := float64(before-after) * float64(c4cRateValue)
 	ok := true
 
-	// CASE-034 covers the known single-bucket window-normalization defect.
-	// These two zooms isolate rate conservation and tier selection.
+	// Avoid a one-bucket value boundary here: these two zooms isolate rate
+	// conservation and tier selection across the seam.
 	for _, points := range []int64{(before - after) / 60, before - after} {
 		params := daemon.DataParams(c4cContext, after, before, points)
 		params.Set("time_group", "sum")

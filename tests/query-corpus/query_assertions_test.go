@@ -213,6 +213,82 @@ func assertViewFields(t *testing.T, doc map[string]any, after, before, updateEve
 	return true
 }
 
+type queryExpectedGrid struct {
+	after, before, updateEvery int64
+	rows                       int
+}
+
+// queryExpectedVirtualGrid is an independent port of the explicit absolute,
+// one-second-granularity query-window path. It pins the public time geometry;
+// values and storage availability cannot influence this result.
+//
+// Source: netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862
+// src/web/api/queries/query-window.c:214-269,297-302,333-364
+// query_target_calculate_window()
+func queryExpectedVirtualGrid(
+	t *testing.T,
+	after, before, requestedPoints int64,
+	aligned bool,
+) queryExpectedGrid {
+	t.Helper()
+
+	duration := before - after
+	if duration <= 0 || requestedPoints <= 0 || requestedPoints > duration ||
+		requestedPoints > 86400 {
+		t.Fatalf("unsupported virtual-grid fixture: after=%d before=%d points=%d",
+			after, before, requestedPoints)
+	}
+
+	// At one-second query granularity both endpoint seconds participate in
+	// layout arithmetic. Required coverage remains the requested duration.
+	available := duration + 1
+	points := requestedPoints
+	if points > available {
+		points = available
+	}
+	group := available / points
+	if group == 0 {
+		group = 1
+	}
+	if available%points > points/2 {
+		group++
+	}
+	if points*group < duration {
+		points = (available + group - 1) / group
+	}
+
+	viewBefore := before
+	if aligned {
+		if remainder := viewBefore % group; remainder != 0 {
+			viewBefore += group - remainder
+		}
+	}
+	viewAfter := viewBefore - ((points-1)*group + group - 1)
+	return queryExpectedGrid{
+		after:       viewAfter,
+		before:      viewBefore,
+		updateEvery: group,
+		rows:        int(points),
+	}
+}
+
+// queryTimestampGridExact validates the public view geometry and raw wire
+// timestamps. It intentionally does not decode or compare values.
+func queryTimestampGridExact(t *testing.T, doc map[string]any, want queryExpectedGrid) bool {
+	t.Helper()
+
+	ok := assertViewFields(t, doc, want.after, want.before, want.updateEvery)
+	wantWire := make([]int64, want.rows)
+	for i := range wantWire {
+		wantWire[i] = want.before - int64(i)*want.updateEvery
+	}
+	if err := queryRawTimestampsExact(doc, wantWire); err != nil {
+		t.Logf("timestamp grid: %v", err)
+		ok = false
+	}
+	return ok
+}
+
 func queryObject(t *testing.T, parent map[string]any, key, path string) map[string]any {
 	t.Helper()
 	value, ok := parent[key].(map[string]any)

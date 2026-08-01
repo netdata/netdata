@@ -146,9 +146,8 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 				// Zooms that divide the span exactly, so the engine covers
 				// the window that was asked for rather than a rounded one.
 				//
-				// A single bucket is covered separately by CASE-034. Keeping
-				// that known window-normalization defect out of this matrix
-				// lets this contract isolate rate arithmetic over gaps.
+				// Keep this a multi-bucket matrix so it isolates whole-record
+				// rate arithmetic over gaps from one-bucket value boundaries.
 				for _, points := range []int64{(before - after) / gran1, (before - after) / (gran1 * 2)} {
 					if !c028VolumeMatches(t, c028Query{
 						context: ctx,

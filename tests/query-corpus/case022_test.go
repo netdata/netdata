@@ -7,16 +7,18 @@
 //   - time_group=latest is accepted and echoed back;
 //   - each output bucket keeps the LAST collected value inside it;
 //     buckets without any collected sample stay EMPTY (gaps visible);
-//   - points=1 with before=0 anchors the window at the newest stored
-//     sample (the now-1 clamp would race the end-stamped collector tick)
-//     and serves it from the collector cache WITHOUT touching storage:
+//   - points=1 over an explicit window containing the newest stored sample
+//     serves it from the collector cache WITHOUT touching storage while
+//     keeping the public timestamp grid derived only from the request:
 //     zero db reads, the RAW un-quantized double (2^24+1 stays 2^24+1),
 //     and anomaly rate 0 by design — while the storage path returns the
 //     SN-quantized value and the engine-generic bucket anomaly rate
-//     (pinned via options=selected-tier, which disables the fast path).
+//     (pinned via options=selected-tier, which disables the fast path);
+//   - before=0 retains its established, explicit database-end meaning.
 package corpus
 
 import (
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
@@ -62,25 +64,31 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	const slowChart = "fixture.c022slow"
-	slowBase := int64(fixture.T0) - int64(fixture.T0)%10
-	slow := fixture.Series(slowChart, slowChart, slowBase, 12, 10,
-		func(int) string { return strconv.Itoa(big) },
-		func(i int) string {
-			if i == 12 {
-				return stream.FlagAnomalous
-			}
-			return stream.FlagNotAnomalous
+	// A natural-points before=0 query can expose an off-grid database end.
+	// Keep this fixture separate from the v2/v3 matrix: those APIs request
+	// virtual points by default, while v1 can exercise the established natural
+	// alert-shaped geometry directly.
+	const databaseEndChart = "fixture.c022_database_end"
+	databaseEnd := fixture.Chart{
+		ID: databaseEndChart, Title: "latest database end", Units: "units", Family: "fixture",
+		Context: databaseEndChart, UpdateEvery: 10,
+		Dimensions: []fixture.Dimension{{ID: "value", Algorithm: "absolute"}},
+	}
+	for offset := int64(3); offset <= 63; offset += 10 {
+		databaseEnd.Dimensions[0].Points = append(databaseEnd.Dimensions[0].Points, fixture.Point{
+			T: fixture.T0 + offset, Collected: strconv.FormatInt(offset, 10), Flags: stream.FlagNotAnomalous,
 		})
-	pushLiveBurst(t, "c022-slow", guid(340), slow)
-	if _, err := td.WaitRetention("c022-slow", slow.Context, slow.FirstT(), slow.LastT(), 15*time.Second); err != nil {
+	}
+	pushLiveBurst(t, "c022-database-end", guid(345), databaseEnd)
+	if _, err := td.WaitRetention(
+		"c022-database-end", databaseEnd.Context, fixture.T0+3, fixture.T0+63, 15*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
-	getFor := func(host, context string, extra map[string]string) map[string]any {
+	get := func(extra map[string]string) map[string]any {
 		t.Helper()
 		params := map[string][]string{
-			"scope_contexts": {context},
+			"scope_contexts": {chart},
 			"time_group":     {"latest"},
 			"format":         {"json2"},
 			"group_by":       {"dimension"},
@@ -88,15 +96,11 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		for k, v := range extra {
 			params[k] = []string{v}
 		}
-		resp, err := td.HostJSON(host, "api/v3/data", params)
+		resp, err := td.HostJSON("c022", "api/v3/data", params)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return resp
-	}
-	get := func(extra map[string]string) map[string]any {
-		t.Helper()
-		return getFor("c022", chart, extra)
 	}
 
 	ok := true
@@ -183,79 +187,112 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		"identity response view is not the exact requested grid")
 
 	// ------------------------------------------------------------------
-	// the hot edge: points=1 before=0 anchors at the newest sample and
-	// serves it from the collector cache - zero storage reads, the RAW
-	// un-quantized value, anomaly rate 0
+	// One output point whose requested window contains the newest sample is
+	// served from the collector cache: zero storage reads, the RAW
+	// un-quantized value, anomaly rate 0. Its row stays on the requested
+	// grid rather than moving to the source sample timestamp.
+	fastAfter := int64(fixture.T0)
+	fastBefore := int64(fixture.T0 + 20)
+	fastGrid := queryExpectedVirtualGrid(t, fastAfter, fastBefore, 1, false)
 	respFast := get(map[string]string{
-		"after":  strconv.FormatInt(fixture.T0, 10),
-		"before": "0",
-		"points": "1",
+		"after":   strconv.FormatInt(fastAfter, 10),
+		"before":  strconv.FormatInt(fastBefore, 10),
+		"points":  "1",
+		"options": "unaligned",
 	})
 	check(assertTierPresence(t, respFast, []bool{false, false, false}),
 		"fast path read storage points")
-	viewFast, viewFastOK := respFast["view"].(map[string]any)
-	check(viewFastOK && viewFast["before"] == float64(fixture.T0+12),
-		"hot-edge window.before = %v, want %d (the newest sample)", viewFast["before"], fixture.T0+12)
+	check(queryTimestampGridExact(t, respFast, fastGrid),
+		"collector-cache response changed the requested timestamp grid")
 	colsFast := decode(respFast, "plain", "big", "neg")
 	exact(colsFast, "big", []expectedColumnPoint{
-		wantNumberAt(fixture.T0+12, float64(big)),
+		wantNumberAt(fastBefore, float64(big)),
 	}, 0)
 	exact(colsFast, "plain", []expectedColumnPoint{
-		wantNumberWithARPAt(fixture.T0+12, 10, 0),
+		wantNumberWithARPAt(fastBefore, 10, 0),
 	}, 0)
 	exact(colsFast, "neg", []expectedColumnPoint{
-		wantNumberAt(fixture.T0+12, -5),
+		wantNumberAt(fastBefore, -5),
 	}, 0)
 
 	// options=absolute keeps the fast path AND erases the sign, exactly
 	// like the storage path does at fetch
 	respAbs := get(map[string]string{
-		"after":   strconv.FormatInt(fixture.T0, 10),
-		"before":  "0",
+		"after":   strconv.FormatInt(fastAfter, 10),
+		"before":  strconv.FormatInt(fastBefore, 10),
 		"points":  "1",
-		"options": "absolute",
+		"options": "absolute|unaligned",
 	})
 	check(assertTierPresence(t, respAbs, []bool{false, false, false}),
 		"absolute fast path read storage points")
 	colsAbs := decode(respAbs, "plain", "big", "neg")
-	exact(colsAbs, "plain", []expectedColumnPoint{wantNumberAt(fixture.T0+12, 10)}, 0)
-	exact(colsAbs, "big", []expectedColumnPoint{wantNumberAt(fixture.T0+12, float64(big))}, 0)
-	exact(colsAbs, "neg", []expectedColumnPoint{wantNumberAt(fixture.T0+12, 5)}, 0)
+	exact(colsAbs, "plain", []expectedColumnPoint{wantNumberAt(fastBefore, 10)}, 0)
+	exact(colsAbs, "big", []expectedColumnPoint{wantNumberAt(fastBefore, float64(big))}, 0)
+	exact(colsAbs, "neg", []expectedColumnPoint{wantNumberAt(fastBefore, 5)}, 0)
 
-	// a relative before near now resolves to the hot edge the same way
-	// (the rule compares the RESOLVED before against now - update_every)
-	respRel := get(map[string]string{
+	// before=0 is the API's explicit database-end sentinel, not an absolute
+	// timestamp. Preserve that existing contract for alert-style queries while
+	// keeping explicit and relative windows independent of stored timestamps.
+	respDatabaseEnd := get(map[string]string{
 		"after":  strconv.FormatInt(fixture.T0, 10),
-		"before": "-1",
+		"before": "0",
 		"points": "1",
 	})
-	check(assertTierPresence(t, respRel, []bool{false, false, false}),
-		"relative-before fast path read storage points")
-	colsRel := decode(respRel, "plain", "big", "neg")
-	exact(colsRel, "plain", []expectedColumnPoint{wantNumberAt(fixture.T0+12, 10)}, 0)
-	exact(colsRel, "big", []expectedColumnPoint{wantNumberAt(fixture.T0+12, float64(big))}, 0)
-	exact(colsRel, "neg", []expectedColumnPoint{wantNumberAt(fixture.T0+12, -5)}, 0)
-
-	// The same hot-edge fast path with update_every=10 exercises a natural
-	// query granularity greater than one. Its only row ends at the newest
-	// sample. An internal-check build also requires the fast executor to
-	// address that prefilled row, not the prior query-granularity boundary.
-	respNaturalFast := getFor("c022-slow", slowChart, map[string]string{
-		"after":   strconv.FormatInt(slowBase, 10),
-		"before":  "0",
-		"points":  "1",
-		"options": "natural-points",
-	})
-	check(assertTierPresence(t, respNaturalFast, []bool{false, false, false}),
-		"update_every=10 natural fast path read storage points")
-	viewNaturalFast, viewNaturalFastOK := respNaturalFast["view"].(map[string]any)
-	check(viewNaturalFastOK && viewNaturalFast["before"] == float64(slow.LastT()),
-		"update_every=10 hot-edge window.before = %v, want %d",
-		viewNaturalFast["before"], slow.LastT())
-	colsNaturalFast := decode(respNaturalFast, slow.Dimensions[0].ID)
-	exact(colsNaturalFast, slow.Dimensions[0].ID, []expectedColumnPoint{
-		wantNumberWithMetadataAt(slow.LastT(), float64(big), 0, 0),
+	check(assertTierPresence(t, respDatabaseEnd, []bool{false, false, false}),
+		"database-end sentinel fast path read storage points")
+	check(queryTimestampGridExact(t, respDatabaseEnd, queryExpectedGrid{
+		after: fixture.T0, before: fixture.T0 + 12, updateEvery: 13, rows: 1,
+	}), "database-end sentinel changed its existing newest-sample grid")
+	colsDatabaseEnd := decode(respDatabaseEnd, "plain", "big", "neg")
+	exact(colsDatabaseEnd, "big", []expectedColumnPoint{
+		wantNumberAt(fixture.T0+12, float64(big)),
 	}, 0)
+	exact(colsDatabaseEnd, "plain", []expectedColumnPoint{
+		wantNumberWithARPAt(fixture.T0+12, 10, 0),
+	}, 0)
+	exact(colsDatabaseEnd, "neg", []expectedColumnPoint{
+		wantNumberAt(fixture.T0+12, -5),
+	}, 0)
+
+	// The established sentinel restores the exact newest stored timestamp after
+	// natural update-every rounding. Merely skipping the final alignment would
+	// return T0+60 here and silently move alert-style results off T0+63.
+	v1Body, err := td.DataV1Raw("c022-database-end", map[string][]string{
+		"context": {databaseEndChart},
+		"after":   {strconv.FormatInt(fixture.T0+3, 10)},
+		"before":  {"0"},
+		"points":  {"1"},
+		"group":   {"latest"},
+		"format":  {"json"},
+		"options": {"jsonwrap|seconds|natural-points"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v1 map[string]any
+	if err := json.Unmarshal([]byte(v1Body), &v1); err != nil {
+		t.Fatalf("parse v1 database-end response: %v (body %.300q)", err, v1Body)
+	}
+	exactInteger := func(value any, want int64) bool {
+		got, integer := queryInteger(value)
+		return integer && got == want
+	}
+	check(exactInteger(v1["after"], fixture.T0+13) &&
+		exactInteger(v1["before"], fixture.T0+63) &&
+		exactInteger(v1["view_update_every"], 60) &&
+		exactInteger(v1["points"], 1),
+		"natural database-end view = after %v before %v update_every %v points %v, want %d/%d/60/1",
+		v1["after"], v1["before"], v1["view_update_every"], v1["points"], fixture.T0+13, fixture.T0+63)
+	v1Result, v1ResultOK := v1["result"].(map[string]any)
+	v1Data, v1DataOK := v1Result["data"].([]any)
+	var v1Row []any
+	v1RowOK := false
+	if v1DataOK && len(v1Data) == 1 {
+		v1Row, v1RowOK = v1Data[0].([]any)
+	}
+	check(v1ResultOK && v1DataOK && len(v1Data) == 1 && v1RowOK && len(v1Row) >= 1 &&
+		exactInteger(v1Row[0], fixture.T0+63),
+		"natural database-end data = %v, want one row timestamped %d", v1Result["data"], fixture.T0+63)
 
 	// the storage path (selected-tier disables the fast path) returns the
 	// SN-quantized value and the engine-generic bucket anomaly rate
