@@ -116,45 +116,6 @@ static void rrd2rrdr_group_by_stamp_partial(RRDR *r, const uint32_t *expected_gb
     }
 }
 
-void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
-    time_t trimmable_after = r->partial_data_trimming.expected_after;
-
-    // find the point just before the trimmable ones
-    ssize_t i = (ssize_t)r->n - 1;
-    for( ; i >= 0 ;i--) {
-        if (r->t[i] < trimmable_after)
-            break;
-    }
-
-    if(unlikely(i < 0))
-        return;
-
-    // internal_error(true, "Found trimmable index %zd (from 0 to %zu)", i, r->n - 1);
-
-    size_t last_row_gbc = 0;
-    for (; i < (ssize_t)r->n; i++) {
-        size_t row_gbc = 0;
-        for (size_t d = 0; d < r->d; d++) {
-            if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
-                continue;
-
-            row_gbc += r->gbc[ i * r->d + d ];
-        }
-
-        // internal_error(true, "GBC of index %zd is %zu", i, row_gbc);
-
-        if (unlikely(r->t[i] >= trimmable_after && (row_gbc < last_row_gbc || !row_gbc))) {
-            // discard the rest of the points
-            // internal_error(true, "Discarding points %zd to %zu", i, r->n - 1);
-            r->partial_data_trimming.trimmed_after = r->t[i];
-            r->rows = i;
-            break;
-        }
-        else
-            last_row_gbc = row_gbc;
-    }
-}
-
 void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r) {
     if(!r->vh)
         return;
@@ -367,9 +328,6 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
         if(qt->request.group_by[g].group_by != RRDR_GROUP_BY_NONE)
             aggregation = qt->request.group_by[g].aggregation;
-
-    if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
-        rrdr2rrdr_group_by_partial_trimming(r);
 
     // for every aggregation except AVERAGE the plotted value is already the
     // final group aggregate (the percentage, the sum, the min, the max), so

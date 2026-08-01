@@ -126,7 +126,6 @@ int rrdlabels_traversal_cb_to_group_by_label_key(const char *name, const char *v
 void rrd2rrdr_set_timestamps(RRDR *r);
 RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt);
 void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r);
-void rrdr2rrdr_group_by_partial_trimming(RRDR *r);
 void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
                                   RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
                                   STORAGE_POINT *query_points, size_t pass);
