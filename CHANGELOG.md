@@ -864,6 +864,16 @@
 - Test(go.d): align chart coverage with fresh series ([#23320](https://github.com/netdata/netdata/issues/23320))
 - Fix NetFlow filtering and facet retention ([#23313](https://github.com/netdata/netdata/issues/23313))
 - Feat(go.d): add DynCfg operational test for local listeners ([#23324](https://github.com/netdata/netdata/issues/23324))
+- Test(go.d): stabilize jobmgr lifecycle integrations ([#23328](https://github.com/netdata/netdata/issues/23328))
+- Feat(go.d/discovery): test HTTP configurations operationally ([#23327](https://github.com/netdata/netdata/issues/23327))
+- Feat(go.d/secrets): test Vault configurations operationally ([#23333](https://github.com/netdata/netdata/issues/23333))
+- Feat(go.d/cloudwatch): add per-selection query policies ([#23338](https://github.com/netdata/netdata/issues/23338))
+- Feat(go.d/cloudwatch): add profile-aware collector activity metrics ([#23340](https://github.com/netdata/netdata/issues/23340))
+- Feat(go.d): support chart series aggregation ([#23341](https://github.com/netdata/netdata/issues/23341))
+- Feat(codeql): filter out build results from CodeQL analysis ([#23336](https://github.com/netdata/netdata/issues/23336))
+- Test(go.d): stabilize jobmgr secret lifecycle tests ([#23346](https://github.com/netdata/netdata/issues/23346))
+- Feat(go.d/secretstore): add AWS operational test ([#23349](https://github.com/netdata/netdata/issues/23349))
+- Docs(agents): bound review iteration ([#23350](https://github.com/netdata/netdata/issues/23350))
 
 ## [2.10.0] - 2026-04-09
 
