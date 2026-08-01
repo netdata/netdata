@@ -67,9 +67,30 @@ int verify_netdata_host_prefix(bool log_msg) {
 
     strncpyz(path, netdata_configured_host_prefix, sizeof(path) - 1);
 
-    // the host prefix is concatenated into printf format strings (the various
-    // "path to ..." templates), so a '%' in it would be parsed as a conversion
-    // directive. a real host prefix never contains one.
+    // most consumers pass the host prefix as a %s argument, where a '%' would be
+    // harmless. these do not: they prepend it to a path template that is later
+    // used AS the format string, so a '%' in it becomes a conversion directive.
+    //
+    //   proc_diskstats.c  path_to_sys_block_device        "<prefix>/sys/block/%s"
+    //                     path_to_sys_block_device_bcache
+    //                     path_to_sys_devices_virtual_block_device
+    //                     path_to_sys_dev_block_major_minor_string
+    //   proc_stat.c       core_throttle_count_filename, package_throttle_count_filename,
+    //                     scaling_cur_freq_filename, time_in_state_filename,
+    //                     cpuidle_name_filename, cpuidle_time_filename
+    //   proc_net_dev.c    path_to_sys_devices_virtual_net, path_to_sys_class_net_speed,
+    //                     and the _duplex/_operstate/_carrier/_mtu variants
+    //   proc_mdstat.c     mismatch_cnt_filename
+    //
+    // each is consumed like snprintfz(buffer, FILENAME_MAX, path_to_sys_block_device, disk).
+    // a prefix carrying its own '%s' consumes that single argument early, leaving
+    // the template's real '%s' to dereference a vararg that was never passed;
+    // '%n' would be a write primitive. even a plain trailing '%' yields an
+    // undefined conversion ('%/'), which glibc and musl do not treat alike.
+    //
+    // a real host prefix never contains a '%'. supporting one would mean escaping
+    // '%' -> '%%' at every template site above, not relaxing the check here.
+    //
     // check the original, not the truncated copy in path[] - on success the
     // untruncated value is what stays in netdata_configured_host_prefix.
     if(strchr(netdata_configured_host_prefix, '%')) {
