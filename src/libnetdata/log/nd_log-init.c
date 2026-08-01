@@ -96,10 +96,9 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 
     if(!netdata_configured_host_prefix) {
         s = getenv("NETDATA_HOST_PREFIX");
-        // reject a '%' here too - this assignment bypasses
-        // verify_netdata_host_prefix(); see the call sites listed there for why
-        // a '%' in the prefix is a format-string hazard.
-        if(s && *s && !strchr(s, '%'))
+        // this assignment bypasses verify_netdata_host_prefix(), so apply the
+        // same rule here - see netdata_host_prefix_has_format_specifier().
+        if(s && *s && !netdata_host_prefix_has_format_specifier(s))
             netdata_configured_host_prefix = (char *)s;
     }
 

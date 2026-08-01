@@ -54,6 +54,33 @@ static int is_sysfs(const char *path, char **reason) {
     return 0;
 }
 
+// most consumers pass the host prefix as a %s argument, where a '%' would be
+// harmless. these do not: they prepend it to a path template that is later
+// used AS the format string, so a '%' in it becomes a conversion directive.
+//
+//   proc_diskstats.c  path_to_sys_block_device        "<prefix>/sys/block/%s"
+//                     path_to_sys_block_device_bcache
+//                     path_to_sys_devices_virtual_block_device
+//                     path_to_sys_dev_block_major_minor_string
+//   proc_stat.c       core_throttle_count_filename, package_throttle_count_filename,
+//                     scaling_cur_freq_filename, time_in_state_filename,
+//                     cpuidle_name_filename, cpuidle_time_filename
+//   proc_net_dev.c    path_to_sys_devices_virtual_net, path_to_sys_class_net_speed,
+//                     and the _duplex/_operstate/_carrier/_mtu variants
+//   proc_mdstat.c     mismatch_cnt_filename
+//
+// each is consumed like snprintfz(buffer, FILENAME_MAX, path_to_sys_block_device, disk).
+// a prefix carrying its own '%s' consumes that single argument early, leaving
+// the template's real '%s' to dereference a vararg that was never passed;
+// '%n' would be a write primitive. even a plain trailing '%' yields an
+// undefined conversion ('%/'), which glibc and musl do not treat alike.
+//
+// a real host prefix never contains a '%'. supporting one would mean escaping
+// '%' -> '%%' at every template site above, not relaxing this rule.
+bool netdata_host_prefix_has_format_specifier(const char *prefix) {
+    return prefix && strchr(prefix, '%') != NULL;
+}
+
 int verify_netdata_host_prefix(bool log_msg) {
     if(!netdata_configured_host_prefix)
         netdata_configured_host_prefix = "";
@@ -67,33 +94,9 @@ int verify_netdata_host_prefix(bool log_msg) {
 
     strncpyz(path, netdata_configured_host_prefix, sizeof(path) - 1);
 
-    // most consumers pass the host prefix as a %s argument, where a '%' would be
-    // harmless. these do not: they prepend it to a path template that is later
-    // used AS the format string, so a '%' in it becomes a conversion directive.
-    //
-    //   proc_diskstats.c  path_to_sys_block_device        "<prefix>/sys/block/%s"
-    //                     path_to_sys_block_device_bcache
-    //                     path_to_sys_devices_virtual_block_device
-    //                     path_to_sys_dev_block_major_minor_string
-    //   proc_stat.c       core_throttle_count_filename, package_throttle_count_filename,
-    //                     scaling_cur_freq_filename, time_in_state_filename,
-    //                     cpuidle_name_filename, cpuidle_time_filename
-    //   proc_net_dev.c    path_to_sys_devices_virtual_net, path_to_sys_class_net_speed,
-    //                     and the _duplex/_operstate/_carrier/_mtu variants
-    //   proc_mdstat.c     mismatch_cnt_filename
-    //
-    // each is consumed like snprintfz(buffer, FILENAME_MAX, path_to_sys_block_device, disk).
-    // a prefix carrying its own '%s' consumes that single argument early, leaving
-    // the template's real '%s' to dereference a vararg that was never passed;
-    // '%n' would be a write primitive. even a plain trailing '%' yields an
-    // undefined conversion ('%/'), which glibc and musl do not treat alike.
-    //
-    // a real host prefix never contains a '%'. supporting one would mean escaping
-    // '%' -> '%%' at every template site above, not relaxing the check here.
-    //
     // check the original, not the truncated copy in path[] - on success the
     // untruncated value is what stays in netdata_configured_host_prefix.
-    if(strchr(netdata_configured_host_prefix, '%')) {
+    if(netdata_host_prefix_has_format_specifier(netdata_configured_host_prefix)) {
         errno = EINVAL;
         reason = "contains '%'";
         goto failed;
@@ -327,40 +330,39 @@ int paths_unittest(void) {
     long_prefix[sizeof(long_prefix) - 2] = 's';
     long_prefix[sizeof(long_prefix) - 1] = '\0';
 
-    // accepting a non-empty prefix requires a real procfs and sysfs under it,
-    // which minimal or chrooted environments may not have. probe with the same
-    // predicates verify_netdata_host_prefix() uses, so such a case is skipped
-    // instead of failing on something unrelated to '%' validation.
+    // "/" is accepted only where a real procfs and sysfs exist under it, which
+    // minimal or chrooted environments may not have. probe with the same
+    // predicates verify_netdata_host_prefix() uses, so the expectation is
+    // computed rather than assumed and the case stays a real assertion in every
+    // environment instead of testing host mount availability.
     bool host_mounts_available = is_procfs("/proc", NULL) == 0 && is_sysfs("/sys", NULL) == 0;
 
     // the host prefix ends up inside printf format strings, so a '%' in it must
     // never survive verification. "/" is here to prove the '%' check did not
     // start rejecting working prefixes.
+    // expect_einval marks the cases that must be rejected by the '%' check
+    // itself: none of those paths exist, so stat() would reject them anyway, and
+    // without asserting the errno the whole table still passes with the '%'
+    // check deleted.
     const struct {
         const char *name;
         const char *prefix;
         bool accept;
-        bool needs_host_mounts;
+        bool expect_einval;
     } cases[] = {
-        { "empty",            "",           true,  false },
-        { "root",             "/",          true,  true  },
-        { "trailing %s",      "/host%s",    false, false },
-        { "bare %n",          "%n",         false, false },
-        { "embedded %",       "/a%b",       false, false },
-        { "escaped %%",       "/host%%",    false, false },
-        { "% past truncation", long_prefix, false, false },
+        { "empty",            "",           true,                  false },
+        { "root",             "/",          host_mounts_available, false },
+        { "trailing %s",      "/host%s",    false,                 true  },
+        { "bare %n",          "%n",         false,                 true  },
+        { "embedded %",       "/a%b",       false,                 true  },
+        { "escaped %%",       "/host%%",    false,                 true  },
+        { "% past truncation", long_prefix, false,                 true  },
     };
 
     const char *saved = netdata_configured_host_prefix;
     int errors = 0;
 
     for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        if(cases[i].needs_host_mounts && !host_mounts_available) {
-            fprintf(stderr, "  SKIPPED %s: '%s' (no procfs at /proc or sysfs at /sys)\n",
-                    cases[i].name, cases[i].prefix);
-            continue;
-        }
-
         netdata_configured_host_prefix = cases[i].prefix;
         errno_clear();
         int rc = verify_netdata_host_prefix(false);
@@ -390,11 +392,10 @@ int paths_unittest(void) {
                 errors++;
             }
 
-            // none of these paths exist, so stat() would reject them anyway.
             // assert the rejection came from the '%' check (EINVAL) and not
-            // from stat() (ENOENT) - without this the whole table still passes
-            // with the '%' check deleted.
-            if(err != EINVAL) {
+            // from stat() (ENOENT). "/" is exempt: when it lands here it was
+            // rejected by the procfs/sysfs probes, which report their own errno.
+            if(cases[i].expect_einval && err != EINVAL) {
                 fprintf(stderr, "  FAILED %s: '%s' rejected by errno=%d, expected EINVAL (%d)\n",
                         cases[i].name, cases[i].prefix, err, EINVAL);
                 errors++;
