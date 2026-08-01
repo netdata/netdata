@@ -306,6 +306,12 @@ int paths_unittest(void) {
     long_prefix[sizeof(long_prefix) - 2] = 's';
     long_prefix[sizeof(long_prefix) - 1] = '\0';
 
+    // accepting a non-empty prefix requires a real procfs and sysfs under it,
+    // which minimal or chrooted environments may not have. probe with the same
+    // predicates verify_netdata_host_prefix() uses, so such a case is skipped
+    // instead of failing on something unrelated to '%' validation.
+    bool host_mounts_available = is_procfs("/proc", NULL) == 0 && is_sysfs("/sys", NULL) == 0;
+
     // the host prefix ends up inside printf format strings, so a '%' in it must
     // never survive verification. "/" is here to prove the '%' check did not
     // start rejecting working prefixes.
@@ -313,24 +319,27 @@ int paths_unittest(void) {
         const char *name;
         const char *prefix;
         bool accept;
+        bool needs_host_mounts;
     } cases[] = {
-        { "empty",            "",           true  },
-#if !defined(OS_WINDOWS)
-        // needs a real procfs+sysfs under the prefix; on macOS/FreeBSD those
-        // checks are compiled out, but native Windows would probe and fail
-        { "root",             "/",          true  },
-#endif
-        { "trailing %s",      "/host%s",    false },
-        { "bare %n",          "%n",         false },
-        { "embedded %",       "/a%b",       false },
-        { "escaped %%",       "/host%%",    false },
-        { "% past truncation", long_prefix, false },
+        { "empty",            "",           true,  false },
+        { "root",             "/",          true,  true  },
+        { "trailing %s",      "/host%s",    false, false },
+        { "bare %n",          "%n",         false, false },
+        { "embedded %",       "/a%b",       false, false },
+        { "escaped %%",       "/host%%",    false, false },
+        { "% past truncation", long_prefix, false, false },
     };
 
     const char *saved = netdata_configured_host_prefix;
     int errors = 0;
 
     for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        if(cases[i].needs_host_mounts && !host_mounts_available) {
+            fprintf(stderr, "  SKIPPED %s: '%s' (no procfs at /proc or sysfs at /sys)\n",
+                    cases[i].name, cases[i].prefix);
+            continue;
+        }
+
         netdata_configured_host_prefix = cases[i].prefix;
         errno_clear();
         int rc = verify_netdata_host_prefix(false);
@@ -339,8 +348,6 @@ int paths_unittest(void) {
         if((rc == 0) != cases[i].accept) {
             fprintf(stderr, "  FAILED %s: '%s' expected %s, got rc=%d\n",
                     cases[i].name, cases[i].prefix, cases[i].accept ? "accepted" : "rejected", rc);
-            if(cases[i].accept && *cases[i].prefix)
-                fprintf(stderr, "         (is /proc or /sys mounted? this case needs both)\n");
             errors++;
             continue;
         }
