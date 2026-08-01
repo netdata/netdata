@@ -119,6 +119,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 	scanner := bufio.NewScanner(file)
 	inGlobal := false
 	inEbpfPrograms := false
+	inIPC := false
 	found := false
 
 	for scanner.Scan() {
@@ -131,6 +132,29 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			section := strings.ToLower(strings.TrimSpace(line[1 : len(line)-1]))
 			inGlobal = section == "global"
 			inEbpfPrograms = section == "ebpf programs"
+			inIPC = section == "ipc"
+			continue
+		}
+
+		if inIPC {
+			key, value, ok := strings.Cut(line, "=")
+			if !ok {
+				continue
+			}
+			key = strings.ToLower(strings.TrimSpace(key))
+			value = strings.TrimSpace(value)
+			if key == "integration" {
+				switch strings.ToLower(value) {
+				case "disabled", "shm":
+					// accepted silently; the Go plugin controls SHM sharing via the
+					// apps/cgroups config and does not implement the legacy socket mode
+				default:
+					fmt.Fprintf(os.Stderr,
+						"ebpf-go.plugin: %s: [ipc] integration %q is not supported by eBPFGo; data sharing uses shared memory when enabled\n",
+						path, value)
+				}
+				found = true
+			}
 			continue
 		}
 
