@@ -3,15 +3,18 @@
 package snmp_traps
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 )
 
 type staticJournalHostProvider struct {
@@ -110,7 +113,7 @@ func TestNetdataHostFilesystemPrefixIgnoresEmptyNetdataHostPrefix(t *testing.T) 
 	}
 }
 
-func TestJournalHostLoadOptionsIncludesHostFilesystemPrefix(t *testing.T) {
+func TestJournalHostLoadConfigIncludesHostFilesystemPrefix(t *testing.T) {
 	if pluginconfig.VarLibDir() != "" {
 		t.Skip("pluginconfig VarLibDir is already initialized")
 	}
@@ -120,17 +123,17 @@ func TestJournalHostLoadOptionsIncludesHostFilesystemPrefix(t *testing.T) {
 	libDir := filepath.Join(t.TempDir(), "opt", "netdata", "var", "lib", "netdata")
 	withTestBuildinfoVarLibDir(t, libDir)
 
-	opts := journalHostLoadOptions()
+	cfg := journalHostLoadConfig()
 
-	if got, want := opts.StateDir, filepath.Join(libDir, journalHostStateDirName); got != want {
+	if got, want := cfg.StateDir, filepath.Join(libDir, journalHostStateDirName); got != want {
 		t.Fatalf("StateDir = %q, want %q", got, want)
 	}
-	if got, want := opts.HostFilesystemPrefix, "/host"; got != want {
+	if got, want := cfg.HostFilesystemPrefix, "/host"; got != want {
 		t.Fatalf("HostFilesystemPrefix = %q, want %q", got, want)
 	}
 }
 
-func TestEngineBootsBaseDirUsesJournalHostLibDirResolver(t *testing.T) {
+func TestNetdataEngineStateRootUsesNetdataLibDir(t *testing.T) {
 	if pluginconfig.VarLibDir() != "" {
 		t.Skip("pluginconfig VarLibDir is already initialized")
 	}
@@ -140,7 +143,28 @@ func TestEngineBootsBaseDirUsesJournalHostLibDirResolver(t *testing.T) {
 	withTestBuildinfoVarLibDir(t, libDir)
 
 	want := filepath.Join(libDir, "snmp-trap")
-	if got := engineBootsBaseDir(); got != want {
-		t.Fatalf("engineBootsBaseDir() = %q, want %q", got, want)
+	if got := netdataEngineStateRoot(); got != want {
+		t.Fatalf("netdataEngineStateRoot() = %q, want %q", got, want)
+	}
+}
+
+func TestDecodeErrorRealtimeSurvivesCachedHostIdentityFailure(t *testing.T) {
+	service := hostidentity.NewWithLoader(
+		func() hostidentity.LoadConfig { return hostidentity.LoadConfig{} },
+		func(hostidentity.LoadConfig) (hostidentity.Provider, error) {
+			return nil, errors.New("identity unavailable")
+		},
+	)
+	c := &Collector{hostIdentity: service}
+
+	before := time.Now().UnixMicro()
+	entry := newDecodeErrorEntry("test", decodeErrorRecord{kind: "decode_failed", err: errors.New("bad packet")}, c.monotonicUsec())
+	after := time.Now().UnixMicro()
+
+	if entry.ReceivedMonotonicUsec != 0 {
+		t.Fatalf("monotonic timestamp = %d, want 0", entry.ReceivedMonotonicUsec)
+	}
+	if entry.ReceivedRealtimeUsec < before || entry.ReceivedRealtimeUsec > after {
+		t.Fatalf("realtime timestamp = %d, want between %d and %d", entry.ReceivedRealtimeUsec, before, after)
 	}
 }

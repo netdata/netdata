@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 const (
@@ -44,6 +46,110 @@ var validPrivProtos = map[string]bool{
 var validRateLimitModes = map[string]bool{
 	"drop":   true,
 	"sample": true,
+}
+
+type validatedConfig struct {
+	versions       []string
+	v3Enabled      bool
+	allowlist      []netip.Prefix
+	trustedRelays  []netip.Prefix
+	otlp           otlpRuntimeConfig
+	journalEnabled bool
+	retention      RetentionConfig
+	profileMetrics normalizedProfileMetricsConfig
+}
+
+func (c Config) Validate() error {
+	_, err := validateConfig(c)
+	return err
+}
+
+func validateConfig(c Config) (validatedConfig, error) {
+	var validated validatedConfig
+
+	if err := validateJobName(c.Name); err != nil {
+		return validated, err
+	}
+	if err := validateListenConfig(c.Listen); err != nil {
+		return validated, err
+	}
+
+	versions, err := validateVersions(c.Versions)
+	if err != nil {
+		return validated, err
+	}
+	validated.versions = versions
+	validated.v3Enabled = versionListContains(versions, "v3")
+
+	if err := validateUSMUsers(c.USMUsers, c.DynamicEngineID); err != nil {
+		return validated, err
+	}
+	if err := validateEngineIDWhitelist(c.EngineIDWhitelist); err != nil {
+		return validated, err
+	}
+	if err := validateLocalEngineID(c.LocalEngineID); err != nil {
+		return validated, err
+	}
+
+	allowlist, err := validateAllowlist(c.Allowlist)
+	if err != nil {
+		return validated, err
+	}
+	validated.allowlist = allowlist
+
+	trustedRelays, err := validateTrustedRelays(c.Source)
+	if err != nil {
+		return validated, err
+	}
+	validated.trustedRelays = trustedRelays
+
+	if err := validateRateLimit(c.RateLimit); err != nil {
+		return validated, err
+	}
+	if err := validateDedupConfig(c.Dedup); err != nil {
+		return validated, err
+	}
+
+	otlp, err := validateOTLPConfig(c.OTLP)
+	if err != nil {
+		return validated, err
+	}
+	validated.otlp = otlp
+	validated.journalEnabled = c.Journal.enabled()
+	if !validated.journalEnabled && !c.OTLP.Enabled {
+		return validated, errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled")
+	}
+
+	if err := validateOverrides(c.Overrides); err != nil {
+		return validated, err
+	}
+	if err := validateDeferredConfig(c); err != nil {
+		return validated, err
+	}
+	if validated.v3Enabled {
+		if len(c.USMUsers) == 0 {
+			return validated, errors.New("SNMPv3 requires at least one usm_users entry")
+		}
+		if !c.DynamicEngineID && len(c.EngineIDWhitelist) == 0 {
+			return validated, errors.New("SNMPv3 requires engine_id_whitelist when dynamic_engine_id_discovery is disabled")
+		}
+	}
+
+	if validated.journalEnabled {
+		retention, err := parseRetentionConfig(c.Retention)
+		if err != nil {
+			return validated, err
+		}
+		validated.retention = retention
+	}
+
+	profileMetrics, err := normalizeProfileMetricsConfig(c.ProfileMetrics)
+	if err != nil {
+		return validated, err
+	}
+	validated.profileMetrics = profileMetrics
+
+	return validated, nil
 }
 
 func validateJobName(name string) error {
@@ -297,7 +403,7 @@ func validateOverrides(overrides []OverrideConfig) error {
 		if o.OID == "" {
 			return fmt.Errorf("overrides[%d]: oid is required", i)
 		}
-		if !isNumericOID(o.OID) {
+		if !model.IsNumericOID(o.OID) {
 			return fmt.Errorf("overrides[%d]: invalid oid %q", i, o.OID)
 		}
 		if o.Category != "" && !validCategories[o.Category] {

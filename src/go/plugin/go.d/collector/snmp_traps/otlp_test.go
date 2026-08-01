@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	collogpb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
@@ -271,7 +272,7 @@ func TestOTLPTrapEntrySerializationOmitsCommunityVarbind(t *testing.T) {
 		PduType:              PduTypeTrap,
 		SnmpVersion:          SnmpVersionV1,
 		Varbinds: []VarbindValue{
-			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 			{Name: "ifName", OID: "1.3.6.1.2.1.31.1.1.1.1.7", Type: "OctetString", Value: "Gi1/0/1"},
 		},
 	}

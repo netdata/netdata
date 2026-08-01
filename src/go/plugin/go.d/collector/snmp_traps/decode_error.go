@@ -44,7 +44,7 @@ func (c *Collector) writeDecodeErrorEntry(rec decodeErrorRecord) {
 		}
 	}
 
-	entry := newDecodeErrorEntry(c.jobName, rec, c.monotonicUsec())
+	entry := newDecodeErrorEntry(c.Name, rec, c.monotonicUsec())
 	if err := c.trapWriter.Write(entry); err != nil {
 		c.incTrapError(c.trapWriteFailureDim())
 	}

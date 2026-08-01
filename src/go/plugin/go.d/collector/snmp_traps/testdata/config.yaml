@@ -1,0 +1,8 @@
+name: ok
+listen:
+  endpoints:
+    - protocol: udp
+      address: 127.0.0.1
+      port: 9162
+versions:
+  - v2c

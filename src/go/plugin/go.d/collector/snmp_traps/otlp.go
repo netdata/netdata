@@ -24,6 +24,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 const (
@@ -776,7 +778,7 @@ func otlpVarbindsValue(entry *TrapEntry) *commonpb.AnyValue {
 	seenKeys := make(map[string]int)
 	values := make([]*commonpb.KeyValue, 0, len(entry.Varbinds))
 	for _, vb := range entry.Varbinds {
-		if isSensitiveTrapVarbind(vb) {
+		if model.IsSensitiveVarbind(vb) {
 			continue
 		}
 		key := vb.Name

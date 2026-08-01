@@ -46,7 +46,7 @@ func setSingleTestTrap(t *testing.T, trap *TrapDef) {
 
 func newTestV2Collector(jobName string, writer TrapWriter, prefixes []netip.Prefix, communities []string) *Collector {
 	return &Collector{
-		jobName:     jobName,
+		Config:      Config{Name: jobName},
 		trapWriter:  writer,
 		journalHost: newTestJournalHostProvider(),
 		versions:    map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
@@ -115,7 +115,7 @@ func newDedupTestV2Collector(t *testing.T, jobName string, writer TrapWriter) (*
 	metrics := withCleanJobMetrics(t, jobName)
 	metrics.setDedupEnabled(true)
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-	c.Config = Config{Dedup: DedupConfig{Enabled: true}}
+	c.Dedup = DedupConfig{Enabled: true}
 	c.metrics = metrics
 	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, "", c.monotonicUsec)
 	return c, metrics
@@ -164,7 +164,7 @@ func newTestV3Collector(
 	engineIDs map[string]struct{},
 ) *Collector {
 	return &Collector{
-		jobName:     jobName,
+		Config:      Config{Name: jobName},
 		trapWriter:  writer,
 		journalHost: newTestJournalHostProvider(),
 		versions:    map[SnmpVersion]struct{}{SnmpVersionV3: {}},
@@ -192,9 +192,8 @@ func newDynamicEngineIDTestCollector(
 	}
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:            jobName,
+		Config:             Config{Name: jobName, USMUsers: []USMUserConfig{user}},
 		trapWriter:         writer,
-		Config:             Config{USMUsers: []USMUserConfig{user}},
 		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
 		allowlist:          NewAllowlist(nil, nil),
 		v3SecTable:         secTable,

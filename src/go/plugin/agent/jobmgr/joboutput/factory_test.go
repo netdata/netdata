@@ -71,6 +71,38 @@ func TestCreatorDeclaresFunctions(t *testing.T) {
 	}
 }
 
+func TestFactoryDecodesJobNameIntoCollector(t *testing.T) {
+	state := &factoryTestState{}
+	var module *factoryTestV2
+	creator := collectorapi.Creator{
+		CreateV2: func() collectorapi.CollectorV2 {
+			module = &factoryTestV2{
+				state:    state,
+				store:    metrix.NewCollectorStore(),
+				template: factoryTestChartTemplate,
+			}
+			return module
+		},
+	}
+	factory, _ := newFactoryTestHarness(t, creator, nil)
+	permit, tasks := issueTestJobPermit(t, "module_job", 1)
+
+	prepared, failure, err := prepareFactoryTestCandidate(
+		context.Background(),
+		factory,
+		factoryTestConfig(false),
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		permit,
+	)
+	require.NoError(t, err)
+	require.Nil(t, failure)
+	require.Equal(t, "job", module.Name)
+
+	require.NoError(t, prepared.Dispose(context.Background()))
+	requireFactoryAttemptsIdle(t, factory)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
 func TestFactoryStagesFunctionsAfterManagedProbe(t *testing.T) {
 	tests := map[string]func(*factoryTestState) collectorapi.Creator{
 		"V1": func(state *factoryTestState) collectorapi.Creator {
@@ -1482,6 +1514,7 @@ type factoryTestState struct {
 
 type factoryTestV2 struct {
 	collectorapi.Base
+	Name           string `yaml:"name"`
 	OptionStr      string `yaml:"option_str"`
 	state          *factoryTestState
 	init           func(context.Context) error

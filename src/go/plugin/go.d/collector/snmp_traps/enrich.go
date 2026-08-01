@@ -14,6 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 type reverseDNSResolver struct {
@@ -539,7 +540,7 @@ func isNamedOrOIDPrefixedVarbind(vb VarbindValue, name, oidPrefix string) bool {
 	if vbName == name || strings.HasPrefix(vbName, name+".") {
 		return true
 	}
-	oid := normalizeOID(vb.OID)
+	oid := model.NormalizeOID(vb.OID)
 	return oid == oidPrefix || strings.HasPrefix(oid, oidPrefix+".")
 }
 

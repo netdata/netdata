@@ -17,6 +17,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +92,7 @@ func TestCollectorInitAcquiresProfileCache(t *testing.T) {
 	port := freeUDPPort(t)
 
 	c := newTestSNMPTrapsCollector()
-	c.SetJobName("local")
+	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
 	err := c.Init(context.Background())
@@ -110,11 +111,11 @@ func TestMultipleCollectorsShareSameCache(t *testing.T) {
 	port2 := freeUDPPort(t)
 
 	c1 := newTestSNMPTrapsCollector()
-	c1.SetJobName("job1")
+	c1.Name = "job1"
 	c1.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port1}}
 
 	c2 := newTestSNMPTrapsCollector()
-	c2.SetJobName("job2")
+	c2.Name = "job2"
 	c2.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port2}}
 
 	err := c1.Init(context.Background())
@@ -143,7 +144,7 @@ func TestInitBindFailureReleasesProfileRef(t *testing.T) {
 	defer conn.Close()
 
 	c := newTestSNMPTrapsCollector()
-	c.SetJobName("local")
+	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: conn.LocalAddr().(*net.UDPAddr).Port}}
 
 	err = c.Init(context.Background())
@@ -650,7 +651,7 @@ func TestAlternateTrapOID(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.want, alternateTrapOID(tt.oid))
+			assert.Equal(t, tt.want, model.AlternateTrapOID(tt.oid))
 		})
 	}
 }
@@ -1408,7 +1409,7 @@ func TestRenderMessageAndLabelsRedactSensitiveCommunityVarbind(t *testing.T) {
 	entry := &TrapEntry{
 		SourceIP: "198.51.100.10",
 		Varbinds: []VarbindValue{
-			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 		},
 	}
 	td := testSensitiveCommunityTrapDef(
@@ -1420,15 +1421,15 @@ func TestRenderMessageAndLabelsRedactSensitiveCommunityVarbind(t *testing.T) {
 	labels := renderLabels(entry, td)
 
 	assert.NotContains(t, msg, "private-community")
-	assert.Contains(t, msg, redactedTrapVarbind)
-	assert.Equal(t, redactedTrapVarbind, labels["community"])
+	assert.Contains(t, msg, model.RedactedVarbindValue)
+	assert.Equal(t, model.RedactedVarbindValue, labels["community"])
 }
 
 func TestRenderGoTemplateMessageAndLabelsRedactSensitiveCommunityVarbind(t *testing.T) {
 	entry := &TrapEntry{
 		SourceIP: "198.51.100.10",
 		Varbinds: []VarbindValue{
-			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 		},
 	}
 	td := testSensitiveCommunityTrapDef(
@@ -1440,8 +1441,8 @@ func TestRenderGoTemplateMessageAndLabelsRedactSensitiveCommunityVarbind(t *test
 	labels := renderLabels(entry, td)
 
 	assert.NotContains(t, msg, "private-community")
-	assert.Contains(t, msg, redactedTrapVarbind)
-	assert.Equal(t, redactedTrapVarbind, labels["community"])
+	assert.Contains(t, msg, model.RedactedVarbindValue)
+	assert.Equal(t, model.RedactedVarbindValue, labels["community"])
 }
 
 func TestLoadProfileRejectsGoTemplateIfBlock(t *testing.T) {
@@ -1600,8 +1601,8 @@ func testSensitiveCommunityTrapDef(description string, labels map[string]string)
 		Description: description,
 		Labels:      labels,
 		sharedVarbinds: map[string]*VarbindDef{
-			strings.TrimSuffix(snmpTrapCommunityOID, ".0"): {
-				OID:     strings.TrimSuffix(snmpTrapCommunityOID, ".0"),
+			strings.TrimSuffix(model.SNMPTrapCommunityOID, ".0"): {
+				OID:     strings.TrimSuffix(model.SNMPTrapCommunityOID, ".0"),
 				rawName: "snmpTrapCommunity",
 			},
 		},
@@ -1625,7 +1626,7 @@ func TestFindVarbindForProfileOIDExactMatchWins(t *testing.T) {
 		},
 	}
 
-	got, ok := findVarbindForProfileOID(entry, testIFMIBIfIndexOID)
+	got, ok := model.FindVarbindForProfileOID(entry.Varbinds, testIFMIBIfIndexOID)
 
 	require.True(t, ok)
 	assert.Equal(t, testIFMIBIfIndexOID, got.OID)
@@ -1633,9 +1634,9 @@ func TestFindVarbindForProfileOIDExactMatchWins(t *testing.T) {
 }
 
 func TestOIDMatchesColumnRequiresArcBoundary(t *testing.T) {
-	assert.True(t, oidMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID+".1"))
-	assert.False(t, oidMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID))
-	assert.False(t, oidMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID+"0.1"))
+	assert.True(t, model.OIDMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID+".1"))
+	assert.False(t, model.OIDMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID))
+	assert.False(t, model.OIDMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID+"0.1"))
 }
 
 func TestFindVarbindForProfileOIDFirstMatchingInstanceWins(t *testing.T) {
@@ -1646,7 +1647,7 @@ func TestFindVarbindForProfileOIDFirstMatchingInstanceWins(t *testing.T) {
 		},
 	}
 
-	got, ok := findVarbindForProfileOID(entry, testIFMIBIfIndexOID)
+	got, ok := model.FindVarbindForProfileOID(entry.Varbinds, testIFMIBIfIndexOID)
 
 	require.True(t, ok)
 	assert.Equal(t, testIFMIBIfIndexOID+".2", got.OID)
@@ -1661,7 +1662,7 @@ func TestFindVarbindForProfileOIDMatchesScalarZeroInstance(t *testing.T) {
 		},
 	}
 
-	got, ok := findVarbindForProfileOID(entry, sysNameOID)
+	got, ok := model.FindVarbindForProfileOID(entry.Varbinds, sysNameOID)
 
 	require.True(t, ok)
 	assert.Equal(t, sysNameOID+".0", got.OID)

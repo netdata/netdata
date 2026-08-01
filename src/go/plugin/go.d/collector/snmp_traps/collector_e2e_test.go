@@ -18,7 +18,7 @@ func TestCollectorReplayPcapThroughListenerToJournal(t *testing.T) {
 
 	port := freeUDPPort(t)
 	c := newTestSNMPTrapsCollector()
-	c.SetJobName("e2e")
+	c.Name = "e2e"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 	c.Versions = []string{"v2c"}
 	c.Communities = []string{"public"}

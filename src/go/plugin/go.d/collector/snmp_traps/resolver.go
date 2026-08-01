@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 const maxMessageLen = 512
-
-const redactedTrapVarbind = "<redacted>"
 
 // renderMessage renders a trap description template into a human-readable MESSAGE.
 // It resolves {varname}, {varname.raw}, {numeric.oid}, and special vars against the
@@ -121,7 +121,7 @@ func resolveReference(ref string, entry *TrapEntry, td *TrapDef) string {
 	}
 
 	// numeric OID fallback
-	if isNumericOID(ref) {
+	if model.IsNumericOID(ref) {
 		return resolveVarbindByOID(ref, entry, td)
 	}
 
@@ -181,7 +181,7 @@ func resolveVarbindRaw(name string, entry *TrapEntry, td *TrapDef) string {
 			oid = vb.OID
 		}
 	}
-	if oid == "" && isNumericOID(name) {
+	if oid == "" && model.IsNumericOID(name) {
 		oid = name
 	}
 	if oid == "" {
@@ -191,9 +191,12 @@ func resolveVarbindRaw(name string, entry *TrapEntry, td *TrapDef) string {
 }
 
 func resolveVarbindValue(name, oid string, vb *VarbindDef, entry *TrapEntry) string {
-	if v, ok := findVarbindForProfileOID(entry, oid); ok {
-		if isSensitiveTrapVarbind(v) {
-			return redactedTrapVarbind
+	if entry == nil {
+		return "<missing>"
+	}
+	if v, ok := model.FindVarbindForProfileOID(entry.Varbinds, oid); ok {
+		if model.IsSensitiveVarbind(v) {
+			return model.RedactedVarbindValue
 		}
 		return varbindDisplayValue(v, vb)
 	}
@@ -201,49 +204,29 @@ func resolveVarbindValue(name, oid string, vb *VarbindDef, entry *TrapEntry) str
 }
 
 func resolveRawVarbindByName(name string, entry *TrapEntry) string {
-	for _, v := range entry.Varbinds {
-		if v.Name == name {
-			if isSensitiveTrapVarbind(v) {
-				return redactedTrapVarbind
-			}
-			return varbindRawValue(v)
+	if entry == nil {
+		return fmt.Sprintf("<unresolved:%s>", name)
+	}
+	if v, ok := model.FindVarbindByName(entry.Varbinds, name); ok {
+		if model.IsSensitiveVarbind(v) {
+			return model.RedactedVarbindValue
 		}
+		return model.VarbindRawValue(v)
 	}
 	return fmt.Sprintf("<unresolved:%s>", name)
 }
 
 func resolveRawVarbindByOID(oid string, entry *TrapEntry) string {
-	if v, ok := findVarbindForProfileOID(entry, oid); ok {
-		if isSensitiveTrapVarbind(v) {
-			return redactedTrapVarbind
+	if entry == nil {
+		return "<missing>"
+	}
+	if v, ok := model.FindVarbindForProfileOID(entry.Varbinds, oid); ok {
+		if model.IsSensitiveVarbind(v) {
+			return model.RedactedVarbindValue
 		}
-		return varbindRawValue(v)
+		return model.VarbindRawValue(v)
 	}
 	return "<missing>"
-}
-
-func oidMatchesColumn(profileOID, observedOID string) bool {
-	if profileOID == "" || observedOID == "" || profileOID == observedOID {
-		return false
-	}
-	return strings.HasPrefix(observedOID, profileOID+".")
-}
-
-func findVarbindForProfileOID(entry *TrapEntry, profileOID string) (VarbindValue, bool) {
-	if entry == nil || profileOID == "" {
-		return VarbindValue{}, false
-	}
-	for _, v := range entry.Varbinds {
-		if v.OID == profileOID {
-			return v, true
-		}
-	}
-	for _, v := range entry.Varbinds {
-		if oidMatchesColumn(profileOID, v.OID) {
-			return v, true
-		}
-	}
-	return VarbindValue{}, false
 }
 
 func findVarbindDefForObservedOID(td *TrapDef, observedOID string) *VarbindDef {
@@ -264,7 +247,7 @@ func findVarbindDefForObservedOID(td *TrapDef, observedOID string) *VarbindDef {
 		if profileOID == "" {
 			profileOID = oid
 		}
-		if oidMatchesColumn(profileOID, observedOID) && len(profileOID) > bestLen {
+		if model.OIDMatchesColumn(profileOID, observedOID) && len(profileOID) > bestLen {
 			best = vb
 			bestLen = len(profileOID)
 		}
@@ -280,32 +263,7 @@ func varbindDisplayValue(v VarbindValue, vb *VarbindDef) string {
 			return label
 		}
 	}
-	return varbindRawValue(v)
-}
-
-// varbindRawValue renders a varbind value as a plain string.
-func varbindRawValue(v VarbindValue) string {
-	switch val := v.Value.(type) {
-	case nil:
-		return ""
-	case string:
-		return val
-	case []byte:
-		return string(val)
-	case int64:
-		return fmt.Sprintf("%d", val)
-	case uint64:
-		return fmt.Sprintf("%d", val)
-	case float64:
-		return fmt.Sprintf("%v", val)
-	case bool:
-		if val {
-			return "true"
-		}
-		return "false"
-	default:
-		return fmt.Sprintf("%v", val)
-	}
+	return model.VarbindRawValue(v)
 }
 
 func truncateUTF8(s string, maxBytes int) string {
