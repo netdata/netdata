@@ -21,7 +21,6 @@ package corpus
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"reflect"
 	"strconv"
 	"testing"
@@ -32,135 +31,6 @@ import (
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
 	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
-
-func l9LiveEdgeViewSpan(doc map[string]any) (int64, error) {
-	view, ok := doc["view"].(map[string]any)
-	if !ok {
-		return 0, fmt.Errorf("response has no view object")
-	}
-	value, ok := view["update_every"].(float64)
-	if !ok || math.IsNaN(value) || math.IsInf(value, 0) ||
-		value <= 0 || math.Trunc(value) != value || value >= math.Exp2(63) {
-		return 0, fmt.Errorf("view.update_every is not a positive integer: %v", view["update_every"])
-	}
-	return int64(value), nil
-}
-
-func l9LiveEdgeEnvelope(points []canon.Pt, firstCollected, lastCollected, observedAt, span int64) error {
-	if len(points) == 0 {
-		return fmt.Errorf("no rows")
-	}
-	if span <= 0 {
-		return fmt.Errorf("non-positive view span %d", span)
-	}
-	if firstCollected > lastCollected {
-		return fmt.Errorf("collected range is reversed: [%d,%d]", firstCollected, lastCollected)
-	}
-	for i := 1; i < len(points); i++ {
-		if got := points[i].T - points[i-1].T; got != span {
-			return fmt.Errorf("row %d spacing is %ds, want %ds", i, got, span)
-		}
-	}
-
-	future := 0
-	for _, point := range points {
-		if point.T <= observedAt+2 {
-			continue
-		}
-		future++
-		if point.T > observedAt+span+2 {
-			return fmt.Errorf("row at %d is beyond one bucket past now", point.T)
-		}
-		if point.Value == nil {
-			return fmt.Errorf("future-stamped tail bucket at %d is null", point.T)
-		}
-	}
-	if future > 1 {
-		return fmt.Errorf("%d rows are past now, want at most one", future)
-	}
-
-	last := points[len(points)-1]
-	// If the grid ends before the first collected sample, the whole live
-	// bucket was trimmed and an all-null response is the correct phase.
-	if last.T >= firstCollected && last.Value == nil {
-		return fmt.Errorf("tail row at %d overlaps collected data but is null", last.T)
-	}
-	if last.T < lastCollected-span {
-		return fmt.Errorf("last row at %d is over-trimmed for span %ds", last.T, span)
-	}
-	return nil
-}
-
-func TestQueryAssertionGuardsLiveEdgeViewSpan(t *testing.T) {
-	tests := map[string]struct {
-		value any
-		valid bool
-	}{
-		"positive integer": {value: float64(360), valid: true},
-		"missing":          {value: nil},
-		"zero":             {value: float64(0)},
-		"negative":         {value: float64(-1)},
-		"fractional":       {value: 1.5},
-		"nan":              {value: math.NaN()},
-		"infinite":         {value: math.Inf(1)},
-		"string":           {value: "360"},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			doc := map[string]any{"view": map[string]any{}}
-			if tc.value != nil {
-				doc["view"].(map[string]any)["update_every"] = tc.value
-			}
-			_, err := l9LiveEdgeViewSpan(doc)
-			if (err == nil) != tc.valid {
-				t.Fatalf("error = %v, want valid=%v", err, tc.valid)
-			}
-		})
-	}
-}
-
-func TestQueryAssertionGuardsLiveEdgeEnvelope(t *testing.T) {
-	number := func(value float64) *float64 { return &value }
-	tests := map[string]struct {
-		points                        []canon.Pt
-		firstCollected, lastCollected int64
-		observedAt, span              int64
-		valid                         bool
-	}{
-		"one near-now row": {
-			points:         []canon.Pt{{T: 990, Value: number(1)}},
-			firstCollected: 970, lastCollected: 1000, observedAt: 1000, span: 60, valid: true,
-		},
-		"zero span": {
-			points:         []canon.Pt{{T: 990, Value: number(1)}},
-			firstCollected: 970, lastCollected: 1000, observedAt: 1000,
-		},
-		"stale one-row tail": {
-			points:         []canon.Pt{{T: 800, Value: number(1)}},
-			firstCollected: 970, lastCollected: 1000, observedAt: 1000, span: 60,
-		},
-		"null tail overlapping collected data": {
-			points:         []canon.Pt{{T: 990}},
-			firstCollected: 970, lastCollected: 1000, observedAt: 1000, span: 60,
-		},
-		"null trimmed tail before collected data": {
-			points:         []canon.Pt{{T: 940}},
-			firstCollected: 970, lastCollected: 1000, observedAt: 1000, span: 60, valid: true,
-		},
-		"two-bucket-stale boundary": {
-			points:         []canon.Pt{{T: 881, Value: number(1)}},
-			firstCollected: 970, lastCollected: 1000, observedAt: 1000, span: 60,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := l9LiveEdgeEnvelope(tc.points, tc.firstCollected, tc.lastCollected, tc.observedAt, tc.span)
-			if (err == nil) != tc.valid {
-				t.Fatalf("error = %v, want valid=%v", err, tc.valid)
-			}
-		})
-	}
-}
 
 // l9 fixture: ue=30 at the RAW epoch — T0%30=20, so sample ends sit
 // OFF the absolute 30s grid and every default-mode bucket boundary
@@ -631,11 +501,9 @@ func TestLayer9NaturalPoints(t *testing.T) {
 	}
 }
 
-// TestLayer9LiveEdgeTrimming: on a live (wall-clocked) chart, a query
-// reaching past NOW serves at most ONE bucket-end beyond now — the
-// incomplete tail bucket at its grid position, holding the collected
-// tail — and nothing further into the future.
-func TestLayer9LiveEdgeTrimming(t *testing.T) {
+// TestLayer9LiveEdgeGrid: a live chart cannot shorten the request-derived
+// timestamp grid. Buckets after the collected edge remain explicit EMPTY rows.
+func TestLayer9LiveEdgeGrid(t *testing.T) {
 	trackContract(t, "L9/live-edge")
 
 	const ue = 1
@@ -649,10 +517,14 @@ func TestLayer9LiveEdgeTrimming(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Ask past now. The requested grid is not clamped, but the served tail is
-	// bounded to the collected edge.
-	params := daemon.DataParams(ctx, base, now+3600, 10)
+	// Ask past now. Clock normalization shifts the window back to NOW, but data
+	// availability must not shorten the resulting grid at the collected edge.
+	requestedBefore := now + 3600
+	params := daemon.DataParams(ctx, base, requestedBefore, 10)
+	params.Set("options", "jsonwrap|virtual-points|unaligned")
+	queryStart := time.Now().Unix()
 	doc, err := td.DataV3("l9-edge", params)
+	queryEnd := time.Now().Unix()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -661,20 +533,30 @@ func TestLayer9LiveEdgeTrimming(t *testing.T) {
 		t.Fatal(err)
 	}
 	col := cols["load"]
-	// PINNED CONTRACT: the grid derives from the REQUESTED before (no
-	// clamp to now) — the incomplete tail bucket is stamped at its grid
-	// end, which may sit up to one bucket past now, holding the real
-	// collected tail; nothing is served beyond that (dashboards always
-	// send before=now, so the future stamp never reaches them)
-	span, err := l9LiveEdgeViewSpan(doc)
-	if err != nil {
-		t.Fatal(err)
+	view := queryObject(t, doc, "view", "view")
+	viewBefore, integer := queryInteger(view["before"])
+	if !integer || viewBefore < queryStart-1 || viewBefore > queryEnd-1 {
+		t.Fatalf("future request resolved before to %v, want query-time range [%d,%d]",
+			view["before"], queryStart-1, queryEnd-1)
 	}
-	nowAfter := time.Now().Unix()
-	if err := l9LiveEdgeEnvelope(col, ch.FirstT(), ch.LastT(), nowAfter, span); err != nil {
-		t.Fatal(err)
+	// Future normalization shifts both absolute endpoints by the same amount,
+	// preserving the requested duration while ending at the query-time clock.
+	resolvedAfter := viewBefore - (requestedBefore - base)
+	wantGrid := queryExpectedVirtualGrid(t, resolvedAfter, viewBefore, 10, false)
+	if !queryTimestampGridExact(t, doc, wantGrid) {
+		t.Fail()
 	}
-	// the tail bucket is served OR trimmed depending on where now falls
-	// against the grid (sub-second query phase) — the deterministic pin
-	// is the envelope: the series ends within one bucket of now
+	emptyOutsideRetention := 0
+	for _, point := range col {
+		if point.T < ch.FirstT() {
+			emptyOutsideRetention++
+			if point.Value != nil || point.ARP != 0 || point.PA != canon.AnnotationEmpty {
+				t.Errorf("pre-retention row at %d is value/arp/pa %v/%v/%d, want empty/0/%d",
+					point.T, point.Value, point.ARP, point.PA, canon.AnnotationEmpty)
+			}
+		}
+	}
+	if emptyOutsideRetention == 0 {
+		t.Error("fixture did not produce any grid row outside retention")
+	}
 }

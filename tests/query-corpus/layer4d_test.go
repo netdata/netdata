@@ -226,7 +226,7 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 				fail("points=%d: the one-second query did not cross both seams in one plan walk", points)
 			}
 
-			grid := c4dExpectedAlignedGrid(t, after, before, points)
+			grid := queryExpectedVirtualGrid(t, after, before, points, true)
 			rawGrid := make([]int64, grid.rows)
 			for i := range rawGrid {
 				rawGrid[i] = grid.before - int64(i)*grid.updateEvery
@@ -504,11 +504,6 @@ func c4dRateAcrossCadenceAndSeams(
 	return ok
 }
 
-type c4dAlignedGrid struct {
-	after, before, updateEvery int64
-	rows                       int
-}
-
 func TestC4DAlignedGridOracleGuardsOffByOne(t *testing.T) {
 	for _, tc := range []struct {
 		name                 string
@@ -528,7 +523,7 @@ func TestC4DAlignedGridOracleGuardsOffByOne(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := c4dExpectedAlignedGrid(t, 0, tc.duration, tc.points)
+			got := queryExpectedVirtualGrid(t, 0, tc.duration, tc.points, true)
 			if got.after != tc.after || got.before != tc.before ||
 				got.updateEvery != tc.every || got.rows != tc.rows {
 				t.Errorf("grid = after:%d before:%d every:%d rows:%d, want %d/%d/%d/%d",
@@ -539,66 +534,13 @@ func TestC4DAlignedGridOracleGuardsOffByOne(t *testing.T) {
 	}
 }
 
-// c4dExpectedAlignedGrid is the Class B port of the no-resampling,
-// one-second-granularity path. It independently fixes the exact row count and
-// timestamps expected from each broad three-tier query instead of trusting the
-// returned view metadata.
-//
-// Source: netdata/netdata @ 043f50ec075441010c1495250871d37a8ac69f8d
-// src/web/api/queries/query-window.c:214-269,297-302,333-364
-// query_target_calculate_window()
-func c4dExpectedAlignedGrid(
-	t *testing.T,
-	after, before, requestedPoints int64,
-) c4dAlignedGrid {
-	t.Helper()
-
-	duration := before - after
-	if duration <= 0 || requestedPoints <= 0 || requestedPoints > duration ||
-		requestedPoints > 86400 {
-		t.Fatalf("unsupported aligned-grid fixture: after=%d before=%d points=%d",
-			after, before, requestedPoints)
-	}
-
-	// query-window treats both endpoint seconds as available at one-second
-	// granularity, while required coverage remains the exclusive/inclusive
-	// request duration.
-	available := duration + 1
-	points := requestedPoints
-	if points > available {
-		points = available
-	}
-	group := available / points
-	if group == 0 {
-		group = 1
-	}
-	if available%points > points/2 {
-		group++
-	}
-	if points*group < duration {
-		points = (available + group - 1) / group
-	}
-
-	alignedBefore := before
-	if remainder := alignedBefore % group; remainder != 0 {
-		alignedBefore += group - remainder
-	}
-	viewAfter := alignedBefore - ((points-1)*group + group - 1)
-	return c4dAlignedGrid{
-		after:       viewAfter,
-		before:      alignedBefore,
-		updateEvery: group,
-		rows:        int(points),
-	}
-}
-
 func c4dAlignedResultExact(
 	t *testing.T,
 	doc map[string]any,
 	cols map[string][]canon.Pt,
 	dimension string,
 	requestedAfter, requestedBefore int64,
-	grid c4dAlignedGrid,
+	grid queryExpectedGrid,
 ) (int, bool) {
 	t.Helper()
 

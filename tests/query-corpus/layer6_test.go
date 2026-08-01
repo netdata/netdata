@@ -184,11 +184,11 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 	})
 }
 
-// TestLayer6TwoPassLiveEdgeTrimming makes the final stored row contributor
-// incomplete inside one pass-1 group. The later pass must retain the raw
-// contributor decline so live-edge trimming can remove that row.
-func TestLayer6TwoPassLiveEdgeTrimming(t *testing.T) {
-	trackContractComponent(t, "L6/two-pass-matrix", "live-edge-trimming")
+// TestLayer6TwoPassLiveEdgePartialRow makes the final stored row incomplete
+// inside one pass-1 group. The later pass must retain that row and mark its
+// reduced contributor count PARTIAL without shortening the timestamp grid.
+func TestLayer6TwoPassLiveEdgePartialRow(t *testing.T) {
+	trackContractComponent(t, "L6/two-pass-matrix", "live-edge-partial-row")
 
 	const (
 		context = "fixture.l6edge"
@@ -219,47 +219,20 @@ func TestLayer6TwoPassLiveEdgeTrimming(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Relative after receives the inclusive +1 adjustment in libnetdata.c,
-	// so -(6*ue+1) requests exactly six update intervals ending one second
-	// before the query engine's current time.
-	params := daemon.DataParams(context, -(6*ue + 1), -1, 6)
+	after, before := boundary-6*ue, boundary
+	params := daemon.DataParams(context, after, before, 6)
 	params.Set("group_by[0]", "instance")
 	params.Set("aggregation[0]", "sum")
 	params.Set("group_by[1]", "selected")
 	params.Set("aggregation[1]", "sum")
-	params.Set("options", "jsonwrap|virtual-points")
-	queryStart := time.Now().Unix()
+	params.Set("options", "jsonwrap|virtual-points|unaligned")
 	doc, err := td.DataV3("l6-edge", params)
-	queryEnd := time.Now().Unix()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Class B — the relative conversion and grid alignment make the row
-	// count phase-dependent but keep the contributor decline at boundary
-	// trimmable in every allowed phase:
-	// netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862,
-	// src/libnetdata/libnetdata.c:493-540,549-559;
-	// src/database/contexts/query_target.c:1272-1274;
-	// src/web/api/queries/query-window.c:78-102,149-177,214-301,333-364;
-	// src/web/api/queries/query-group-by-init.c:542-549;
-	// src/web/api/queries/query-group-by-finalize.c:119-155.
-	view := queryObject(t, doc, "view", "view")
-	viewBefore, beforeOK := queryInteger(view["before"])
-	viewUpdateEvery, updateEveryOK := queryInteger(view["update_every"])
-	if !beforeOK || !updateEveryOK {
-		t.Fatalf("view before/update_every are not integers: %v/%v", view["before"], view["update_every"])
-	}
-	if viewUpdateEvery != ue || viewBefore%ue != 0 {
-		t.Fatalf("view grid before/update_every = %d/%d, want %d-aligned/%d",
-			viewBefore, viewUpdateEvery, ue, ue)
-	}
-	alignUp := func(value int64) int64 { return (value + ue - 1) / ue * ue }
-	if low, high := alignUp(queryStart-2), alignUp(queryEnd-2); viewBefore < low || viewBefore > high {
-		t.Fatalf("view before %d outside request-time envelope [%d,%d]", viewBefore, low, high)
-	}
-	if viewBefore < boundary || viewBefore > boundary+2*ue {
-		t.Fatalf("view before %d outside fixture envelope [%d,%d]", viewBefore, boundary, boundary+2*ue)
+	if !queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, after, before, 6, false)) {
+		t.Fail()
 	}
 
 	cols, err := canon.Columns(doc)
@@ -269,44 +242,14 @@ func TestLayer6TwoPassLiveEdgeTrimming(t *testing.T) {
 	if !assertExactColumnSet(t, cols, []string{"selected"}) {
 		t.Fail()
 	}
-	col := cols["selected"]
-	if len(col) < 3 || len(col) > 5 {
-		t.Fatalf("selected has %d rows, want the live-edge envelope [3,5]", len(col))
-	}
-	numeric, empty := 0, 0
-	for i, pt := range col {
-		var value any
-		if pt.Value != nil {
-			value = *pt.Value
-		}
-		if pt.T < boundary-5*ue || pt.T > boundary-ue {
-			t.Errorf("selected row %d ends at %d outside [%d,%d]",
-				i, pt.T, boundary-5*ue, boundary-ue)
-		}
-		if i > 0 && pt.T-col[i-1].T != ue {
-			t.Errorf("selected row %d spacing is %d, want %d", i, pt.T-col[i-1].T, ue)
-		}
-		if pt.T < boundary-4*ue {
-			empty++
-			if pt.Value != nil || pt.ARP != 0 || pt.PA != canon.AnnotationEmpty {
-				t.Errorf("selected leading row at %d is value/arp/pa %v/%v/%d, want empty/0/%d",
-					pt.T, value, pt.ARP, pt.PA, canon.AnnotationEmpty)
-			}
-			continue
-		}
-		numeric++
-		if pt.Value == nil || *pt.Value != 11 || pt.ARP != 0 || pt.PA != 0 {
-			t.Errorf("selected row at %d is value/arp/pa %v/%v/%d, want 11/0/0",
-				pt.T, value, pt.ARP, pt.PA)
-		}
-	}
-	if numeric < 3 || numeric > 4 || empty > 1 {
-		t.Errorf("selected has %d numeric and %d empty rows, want [3,4] and [0,1]", numeric, empty)
-	}
-	last := col[len(col)-1].T
-	if last < boundary-ue || last >= boundary {
-		t.Errorf("selected last timestamp %d outside [%d,%d)", last, boundary-ue, boundary)
-	}
+	assertExactColumn(t, cols, "selected", []expectedColumnPoint{
+		wantEmptyAt(boundary - 5*ue),
+		wantNumberAt(boundary-4*ue, 11),
+		wantNumberAt(boundary-3*ue, 11),
+		wantNumberAt(boundary-2*ue, 11),
+		wantNumberAt(boundary-ue, 11),
+		wantNumberWithMetadataAt(boundary, 1, 0, canon.AnnotationPartial),
+	}, 0)
 }
 
 // An average at pass 2 needs two denominators: contributing pass-1 groups for

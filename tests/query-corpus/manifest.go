@@ -60,7 +60,7 @@ var manifest = map[string]ManifestCase{
 		Proves: "tier0 ingestion identity for the edge-data palette: complete, leading/interior-run gaps, trailing short retention, reset (AR and lone-R), anomaly runs, negatives, all-zero, update_every=5",
 	},
 	"L1/single-point": {
-		Proves: "single-point ingestion is exact through a window wider than retention: the value stays at its stored timestamp and surrounding rows stay empty. CASE-034 separately covers the semantics of asking for one result bucket",
+		Proves: "single-point ingestion is exact through a window wider than retention: the value stays at its stored timestamp and surrounding rows stay empty. CASE-034 separately pins the public API timestamp grid, including one-point queries",
 	},
 	"L1/trailing-window": {
 		Proves: "beyond-retention reads return null points at the fixed epoch (no now-trimming)",
@@ -180,8 +180,8 @@ var manifest = map[string]ManifestCase{
 		Proves: "multi-key group_by: groups are attribute TUPLES, ids join in the FIXED engine order (dimension, instance, label, node, context, units) regardless of request order; instance drops @node when node is in the mask; selected and percentage-of-instance collapse rules; avg alias; unknown aggregation silently parses to average",
 	},
 	"L6/two-pass-matrix": {
-		Proves:     "two-pass oracle over 10 key-chains (including cross-key union partitioning) x 7 aggregation chains with no average boundary x non-raw/raw: pass-2 values, PARTIAL propagation and group_by_label[1]; non-raw point and final view-statistics anomaly metadata is weighted by the raw metric contributors beneath pass-1 groups, while raw keeps the anomaly numerator and the old Agent-Cloud prior-group count because the same field can be a Cloud-rewritten average divisor; the result has no hidden schema field; a live-edge fixture proves that a raw-contributor decline inside one pass-1 group trims the incomplete final row",
-		Components: []string{"matrix", "live-edge-trimming"},
+		Proves:     "two-pass oracle over 10 key-chains (including cross-key union partitioning) x 7 aggregation chains with no average boundary x non-raw/raw: pass-2 values, PARTIAL propagation and group_by_label[1]; non-raw point and final view-statistics anomaly metadata is weighted by the raw metric contributors beneath pass-1 groups, while raw keeps the anomaly numerator and the old Agent-Cloud prior-group count because the same field can be a Cloud-rewritten average divisor; the result has no hidden schema field; a live-edge fixture proves that a raw-contributor decline inside one pass-1 group retains the incomplete final row, marks it PARTIAL, and does not shorten the request timestamp grid",
+		Components: []string{"matrix", "live-edge-partial-row"},
 	},
 	"L6/two-pass-average-boundary": {
 		Proves:     "sum→average needs separate denominators across two passes: non-raw value divides by contributing pass-1 groups, while anomaly rate remains weighted by the raw metric contributors beneath those groups; raw mode deliberately leaves both numerators undivided and reports the prior-pass group count required by the old Agent-Cloud average merge contract. Class C average→sum stability separately preserves the released prior-group anomaly divisor without ruling on average composition",
@@ -198,7 +198,7 @@ var manifest = map[string]ManifestCase{
 		Proves: "classic v1 formats over a hostile fixture: csv/tsv byte-exact (newest-first default, natural order option, unquoted header cells pinned as current contract), ssv/ssvcomma/array exact row-sum values, csvjsonarray VALID JSON with NUMERIC timestamps (#23115/#23117 pinned), markdown/html structure, and strict JSON/JSONP/datatable row schemas with exact fixture-derived timestamps, values and gaps",
 	},
 	"CASE-022/time-group-latest": {
-		Proves:  "time_group=latest works end to end: per-bucket last collected value, empty buckets stay empty, sign preserved without options=absolute and erased with it; points=1 with before at/near now (raw zero or resolved within one update_every of now) anchors the window at the newest stored sample and serves it from the collector cache — zero db reads, the RAW un-quantized double, anomaly rate 0 by design — including explicit natural-points with update_every 10, whose only row must still end at the newest stored sample; the storage path (selected-tier) keeps SN quantization and the engine-generic anomaly rate",
+		Proves:  "time_group=latest works end to end: per-bucket last collected value, empty buckets stay empty, sign preserved without options=absolute and erased with it. A one-point explicit window containing the newest stored sample uses the collector cache with zero db reads, the RAW un-quantized double and anomaly rate 0 by design, while its row timestamp remains on the request-derived grid. The API's before=0 database-end sentinel retains its existing newest-sample grid for alert-style queries, including a v1 natural-points update_every=10 fixture whose newest timestamp is off cadence. The storage path (selected-tier) keeps SN quantization and the engine-generic anomaly rate. CASE-034 separately proves across 60-second fixtures that near-now explicit and relative LATEST queries cannot derive their public grids from stored timestamps",
 		FixedBy: "#23257",
 	},
 	"CASE-023/fleet-time-groupings": {
@@ -299,9 +299,9 @@ var manifest = map[string]ManifestCase{
 		Proves:     "a result row's anomaly rate describes its source evidence. At tier 0, samples anomalous at +50, +60 and +80 pin exclusive-start membership to exact ARP [0, 100/3, 50, 100/3] under average, max and sum, excluding the row-start and future samples. Across an automatic tier1-to-tier0 seam, an all-anomalous dimension remains ARP 100 on every exact numeric row, proving read-ahead must not lose or reclassify coarse-tier metadata when the active plan changes",
 		Components: []string{"tier0-row", "plan-seam-source"},
 	},
-	"CASE-034/single-bucket-respects-requested-window": {
-		Proves:     "points=1 covers exactly the requested `(after,before]` interval. The complete record ending at `after` is 1000/s and every sample inside is 10/s, so including the outside record is visible under average and sum. Asserted at update_every 1 and 10 on forced tiers 0/1/2 with ordinary query granularity, plus natural-points on tiers 1/2 where query granularity is 60 or 3600 collection intervals; the exact row timestamp, view bounds, update_every, tier and metadata must all describe only the requested window",
-		Components: []string{"ue1", "ue10"},
+	"CASE-034/api-timestamp-grid-is-immutable": {
+		Proves:     "an explicit absolute virtual-points query has one immutable public timestamp grid, independent of values, collection cadence, gaps, retention coverage, requested tier option, and time aggregation. The historical matrix pins view.after, view.before, view.update_every, row count, and every wire timestamp for aligned and unaligned points=1/7 plus aligned points=60 across dense update_every=1 and 10, gapped, and partial-retention hosts; automatic and requested tiers 0/1/2; and average, sum, and latest on /api/v3/data. A representative aligned one-point query pins /api/v2/data on every fixture shape. Near-now aligned and unaligned explicit absolute plus unaligned relative LATEST points=1 queries across two Agents with different newest stored timestamps must keep request/clock-derived grids; the unaligned requests additionally prove collector-cache service with zero storage reads. A near-live six-row matrix proves that losing the final collected sample leaves an EMPTY cell on the same complete grid instead of truncating its timestamp. Historical and hot-edge values are deliberately ignored because value fixes must preserve this timestamp contract",
+		Components: []string{"dense-ue1", "dense-ue10", "gapped-ue1", "partial-ue1", "hot-edge-data-independence", "near-live-partial-data"},
 	},
 	"CASE-035/transition-volume-slowing-down": {
 		Proves: "a metric slowing from update_every 1 to 10 preserves exact fixture-measured rate volume in the complete historical control row and the next row containing both cadences. Asserted at forced tiers 1 and 2 against a raw tier0 control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
@@ -386,7 +386,7 @@ var manifest = map[string]ManifestCase{
 		Proves: "options=natural-points keeps the db count and spacing with raw sample values while timestamps snap onto the absolute update-every grid; boundary slots are pinned to the raw sample or its phase interpolation toward the next as a bounded two-candidate contract",
 	},
 	"L9/live-edge": {
-		Proves: "queries past NOW on a live chart: the grid derives from the requested `before` (no clamp) — at most ONE bucket-end past now is served, holding the collected tail, or the incomplete tail is trimmed, depending on where now falls against the grid; in the trimmed phase every returned row may be null because the last grid end predates the first collected sample (phase-dependent; envelope-pinned: the series ends within a bucket of now, nothing further into the future)",
+		Proves: "queries whose explicit `before` lies past NOW first shift both endpoints to the query-time clock, then retain the complete normalized timestamp grid without data-dependent truncation; grid rows wholly before retention remain explicit EMPTY rows",
 	},
 	"L9/v2-v3-parity": {
 		Proves: "/api/v2/data and /api/v3/data answer identically for identical params (shared api_v23_data_internal) — only the api version field differs",

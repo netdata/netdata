@@ -42,8 +42,6 @@ var daemonFreeTests = map[string]struct{}{
 	"TestManifestDocumentMatchesContracts":                  {},
 	"TestOptionsAllDimensionsMetadataGuards":                {},
 	"TestQueryAssertionGuardsDetectMutations":               {},
-	"TestQueryAssertionGuardsLiveEdgeEnvelope":              {},
-	"TestQueryAssertionGuardsLiveEdgeViewSpan":              {},
 	"TestQueryStructuredResponseGuards":                     {},
 	"TestResolveCorpusPathsRejectsUnusablePair":             {},
 	"TestResolveCorpusPathsRequiresPairedOverrides":         {},

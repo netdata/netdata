@@ -111,8 +111,8 @@ func TestLayer1Palette(t *testing.T) {
 
 // TestLayer1SinglePoint verifies single-point ingestion through a window
 // wider than the retention: the value sits at exactly its timestamp with
-// nulls around it. CASE-034 separately asserts the window semantics of a
-// query asking for one result bucket.
+// nulls around it. CASE-034 separately pins the public timestamp grid,
+// including queries asking for one result bucket.
 func TestLayer1SinglePoint(t *testing.T) {
 	trackContract(t, "L1/single-point")
 
