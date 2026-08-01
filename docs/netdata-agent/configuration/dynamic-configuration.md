@@ -239,6 +239,23 @@ Only jobs created through Dynamic Configuration can be removed. Other job types 
 
 :::
 
+## Deleting Custom Alerts
+
+Custom alerts that you created through the Dynamic Configuration Manager can be deleted from the UI. Deleting removes the alert configuration entirely, including all of its rules and the alert instances it produced.
+
+**To delete a custom alert:**
+
+1. Open the alert from the **Alerts tab** or **Space Settings → Configurations → Health**.
+2. Use the alert's **delete/remove** control to remove it.
+
+:::important
+
+Only alerts created through the Dynamic Configuration Manager can be deleted. Stock alerts and alerts from user-defined `health.d/*.conf` files on the node cannot be deleted through the UI — they originate from the node's built-in definitions or local configuration files and must be disabled or removed by editing those files instead.
+
+:::
+
+For non-deletable alerts, see [Disabled Alert Template Still Appears on Nodes](#disabled-alert-template-still-appears-on-nodes), or follow the manual file-based steps in [How to Disable or Silence Alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts).
+
 ## Multi-Node Deployment
 
 :::tip
