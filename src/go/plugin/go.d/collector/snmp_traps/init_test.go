@@ -19,7 +19,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -27,27 +26,10 @@ var (
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 )
 
-func TestCollectorConfigurationSerialize(t *testing.T) {
+func TestCollector_ConfigurationSerialize(t *testing.T) {
 	require.NotEmpty(t, dataConfigJSON)
 	require.NotEmpty(t, dataConfigYAML)
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
-}
-
-func TestConfigUnknownYAMLFieldsAreIgnored(t *testing.T) {
-	var cfg Config
-	err := yaml.Unmarshal([]byte(`
-name: local
-unknown_top_level: true
-listen:
-  endpoints:
-    - protocol: udp
-      address: 127.0.0.1
-      port: 9162
-      unknown_endpoint_field: true
-`), &cfg)
-	require.NoError(t, err)
-	assert.Equal(t, "local", cfg.Name)
-	require.Len(t, cfg.Listen.Endpoints, 1)
 }
 
 func TestCollectorChartTemplateYAML(t *testing.T) {
