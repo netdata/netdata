@@ -146,9 +146,6 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	if err := c.Config.Validate(); err != nil {
-		return dyncfgConfigError(err)
-	}
 	validated, err := validateConfig(c.Config)
 	if err != nil {
 		return dyncfgConfigError(err)
