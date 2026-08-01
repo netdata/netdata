@@ -85,6 +85,93 @@ func TestProfileCacheReleaseIdempotent(t *testing.T) {
 	assert.Nil(t, CurrentProfileIndex())
 }
 
+func TestProfileCacheUsesOneIndexForActiveJobEpoch(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "test.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+`)
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	first, err := AcquireProfileCache()
+	require.NoError(t, err)
+
+	writeProfileYAML(t, dir, "test.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.4
+    name: IF-MIB::linkUp
+    category: state_change
+    severity: notice
+`)
+
+	second, err := AcquireProfileCache()
+	require.NoError(t, err)
+	assert.Same(t, first, second)
+	assert.NotNil(t, second.Lookup("1.3.6.1.6.3.1.1.5.3"))
+	assert.Nil(t, second.Lookup("1.3.6.1.6.3.1.1.5.4"))
+
+	ReleaseProfileCache()
+	assert.Same(t, first, CurrentProfileIndex())
+	ReleaseProfileCache()
+	assert.Nil(t, CurrentProfileIndex())
+
+	third, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+	assert.NotSame(t, first, third)
+	assert.Nil(t, third.Lookup("1.3.6.1.6.3.1.1.5.3"))
+	assert.NotNil(t, third.Lookup("1.3.6.1.6.3.1.1.5.4"))
+}
+
+func TestProfileCacheRetriesInvalidDiskChangeAfterEpoch(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "test.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+`)
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	active, err := AcquireProfileCache()
+	require.NoError(t, err)
+
+	writeProfileYAML(t, dir, "test.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.4
+    name: IF-MIB::linkUp
+    category: invalid
+    severity: notice
+`)
+	shared, err := AcquireProfileCache()
+	require.NoError(t, err)
+	assert.Same(t, active, shared)
+	ReleaseProfileCache()
+	ReleaseProfileCache()
+
+	_, err = AcquireProfileCache()
+	require.ErrorContains(t, err, "invalid category")
+	assert.Nil(t, CurrentProfileIndex())
+
+	writeProfileYAML(t, dir, "test.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.4
+    name: IF-MIB::linkUp
+    category: state_change
+    severity: notice
+`)
+	recovered, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+	assert.NotNil(t, recovered.Lookup("1.3.6.1.6.3.1.1.5.4"))
+}
+
 func TestCollectorInitAcquiresProfileCache(t *testing.T) {
 	setMinimalProfileDir(t)
 	withTestCacheDir(t)
@@ -216,7 +303,7 @@ traps:
     name: IF-MIB::linkDown
     category: state_change
     severity: warning
-    description: "Interface {ifDescr} down"
+    description: 'Interface {{value "ifDescr"}} down'
     varbinds: [ifIndex, ifDescr]
 `)
 
@@ -235,9 +322,19 @@ traps:
 	assert.NotNil(t, td.sharedVarbinds)
 }
 
-func TestProfileLoadZstdYAML(t *testing.T) {
-	dir := t.TempDir()
-	writeProfileYAMLZstd(t, dir, "test.yaml.zst", `
+func TestProfileLoadSupportedFormats(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		write func(*testing.T, string, string, string)
+	}{
+		{name: "test.yaml", write: writeProfileYAML},
+		{name: "test.yml", write: writeProfileYAML},
+		{name: "test.yaml.zst", write: writeProfileYAMLZstd},
+		{name: "test.yml.zst", write: writeProfileYAMLZstd},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tc.write(t, dir, tc.name, `
 traps:
   - oid: 1.3.6.1.6.3.1.1.5.3
     name: IF-MIB::linkDown
@@ -245,21 +342,25 @@ traps:
     severity: warning
 `)
 
-	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+			setTestDirs(t, dir)
+			resetProfileCacheForTest()
 
-	idx, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
+			idx, err := AcquireProfileCache()
+			require.NoError(t, err)
+			defer ReleaseProfileCache()
 
-	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
-	require.NotNil(t, td)
-	assert.Equal(t, "IF-MIB::linkDown", td.Name)
+			td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
+			require.NotNil(t, td)
+			assert.Equal(t, "IF-MIB::linkDown", td.Name)
+		})
+	}
 }
 
-func TestProfileLoadLegacyGzipYAML(t *testing.T) {
-	dir := t.TempDir()
-	writeProfileYAMLGzip(t, dir, "test.yaml.gz", `
+func TestProfileLoadIgnoresGzipProfiles(t *testing.T) {
+	for _, name := range []string{"test.yaml.gz", "test.yml.gz"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeGzipFile(t, dir, name, `
 traps:
   - oid: 1.3.6.1.6.3.1.1.5.3
     name: IF-MIB::linkDown
@@ -267,16 +368,20 @@ traps:
     severity: warning
 `)
 
-	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+			files, err := profileFilesInDir(dir)
+			require.NoError(t, err)
+			assert.Empty(t, files)
+		})
+	}
+}
 
-	idx, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
+func TestProfileExtendsRejectsGzipFilename(t *testing.T) {
+	dir := t.TempDir()
+	writeGzipFile(t, dir, "_base.yaml.gz", "traps: []\n")
+	writeProfileYAML(t, dir, "test.yaml", "extends: [_base.yaml.gz]\n")
 
-	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
-	require.NotNil(t, td)
-	assert.Equal(t, "IF-MIB::linkDown", td.Name)
+	_, _, err := loadProfile(filepath.Join(dir, "test.yaml"), multipath.New(dir), nil)
+	require.ErrorContains(t, err, "must end with .yaml or .yml")
 }
 
 func TestStockProfileStoreLazyLoadsRoutedZstd(t *testing.T) {
@@ -305,7 +410,7 @@ traps:
 	assert.Len(t, idx.trapsByOID, 1)
 }
 
-func TestReadMaybeCompressedFileRejectsOversizedDecompressedProfile(t *testing.T) {
+func TestReadProfileFileRejectsOversizedDecompressedProfile(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAMLZstd(t, dir, "oversized.yaml.zst", strings.Repeat("x", 32))
 
@@ -313,7 +418,7 @@ func TestReadMaybeCompressedFileRejectsOversizedDecompressedProfile(t *testing.T
 	maxProfileFileBytes = 16
 	t.Cleanup(func() { maxProfileFileBytes = oldLimit })
 
-	_, err := readMaybeCompressedFile(filepath.Join(dir, "oversized.yaml.zst"))
+	_, err := readProfileFile(filepath.Join(dir, "oversized.yaml.zst"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeds maximum decompressed size")
 }
@@ -359,6 +464,35 @@ traps:
 	require.Error(t, err)
 	assert.Nil(t, td)
 	assert.Empty(t, idx.trapsByOID, "negative cache should prevent reparsing until profile cache rebuild")
+}
+
+func TestStockProfileStoreTemporarilyReadsGzipCatalogue(t *testing.T) {
+	rootDir := t.TempDir()
+	stockDir := filepath.Join(rootDir, "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "ciscosystems.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.1
+    name: TEST-CISCO-MIB::testTrap
+    category: diagnostic
+    severity: warning
+`)
+	writeGzipFile(t, rootDir, "catalogue.json.gz", `{
+  "ciscosystems": {
+    "file": "ciscosystems.yaml",
+    "trap_count": 1,
+    "trap_oids": ["1.3.6.1.4.1.9.1.0.1"]
+  }
+}`)
+
+	idx := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
+	require.NoError(t, err)
+	require.NotNil(t, store)
+	assert.Equal(t, "ciscosystems.yaml", store.route("1.3.6.1.4.1.9.1.0.1"))
 }
 
 func TestStockProfileStoreLazyLoadFailureDoesNotPartiallyMutateIndex(t *testing.T) {
@@ -474,6 +608,55 @@ traps:
 	assert.Equal(t, "diagnostic", td.Category)
 	assert.Equal(t, "warning", td.Severity)
 	assert.Equal(t, map[string]string{"vendor": "stock"}, td.Labels)
+}
+
+func TestOverrideReplacesCompiledProfileLabelWithStaticValue(t *testing.T) {
+	dir := t.TempDir()
+	const oid = "1.3.6.1.6.3.1.1.5.3"
+	writeProfileYAML(t, dir, "test.yaml", `
+varbinds:
+  ifOperStatus:
+    oid: 1.3.6.1.2.1.2.2.1.8
+    type: INTEGER
+    enum:
+      '1': up
+      '2': down
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+    labels:
+      status: '{{value "ifOperStatus"}}'
+    varbinds: [ifOperStatus]
+`)
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	idx, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+	td := idx.Lookup(oid)
+	require.NotNil(t, td)
+	require.NotNil(t, td.labelTemplates["status"])
+
+	c := newTestSNMPTrapsCollector()
+	c.overrides = buildOverrideMap([]OverrideConfig{{
+		OID:    oid,
+		Labels: map[string]string{"status": "{{trap_name}}"},
+	}})
+	overridden := c.applyOverrides(td)
+
+	entry := &TrapEntry{
+		TrapName: "IF-MIB::linkDown",
+		Varbinds: []VarbindValue{{
+			OID:   "1.3.6.1.2.1.2.2.1.8",
+			Type:  "INTEGER",
+			Value: int64(2),
+		}},
+	}
+	assert.Equal(t, "{{trap_name}}", renderLabels(entry, overridden)["status"])
+	assert.Equal(t, "down", renderLabels(entry, td)["status"])
 }
 
 func TestStockProfileStoreLazyLoadErrorIsReported(t *testing.T) {
@@ -1032,7 +1215,7 @@ traps:
     name: IF-MIB::linkDown
     category: state_change
     severity: info
-    description: "Link down: {ifDescr}"
+    description: 'Link down: {{value "ifDescr"}}'
     varbinds: [ifIndex, ifDescr]
 `)
 
@@ -1058,7 +1241,7 @@ traps:
 	require.NotNil(t, td)
 	assert.Equal(t, "security", td.Category)
 	assert.Equal(t, "warning", td.Severity)
-	assert.Equal(t, "Link down: {ifDescr}", td.Description)
+	assert.Equal(t, `Link down: {{value "ifDescr"}}`, td.Description)
 }
 
 func TestProfileLoadExtendsLaterBaseOverridesEarlier(t *testing.T) {
@@ -1226,7 +1409,7 @@ traps:
     name: IF-MIB::linkDown
     category: state_change
     severity: warning
-    description: "Interface {ifDescr} (index {ifIndex}) went down on {_HOSTNAME}"
+    description: 'Interface {{value "ifDescr"}} (index {{value "ifIndex"}}) went down on {{hostname}}'
     varbinds: [ifIndex, ifDescr]
 `)
 
@@ -1277,7 +1460,7 @@ traps:
     name: IF-MIB::linkDown
     category: state_change
     severity: warning
-    description: "Test {ifDescr}"
+    description: 'Test {{value "ifDescr"}}'
     varbinds: [ifDescr]
 `)
 
@@ -1298,7 +1481,7 @@ traps:
 	}
 
 	msg := renderMessage(entry, td)
-	assert.Contains(t, msg, "<missing>")
+	assert.Equal(t, "Test ", msg)
 }
 
 func TestRenderMessageGoTemplateFirstFallbackSkipsMissingVarbinds(t *testing.T) {
@@ -1415,44 +1598,19 @@ traps:
 	assert.Equal(t, "Running configuration changed by admin on 198.51.100.10.", renderMessage(entry, td))
 }
 
-func TestRenderMessageAndLabelsRedactSensitiveCommunityVarbind(t *testing.T) {
+func TestRenderGoTemplateMessageRedactsSensitiveCommunityVarbind(t *testing.T) {
 	entry := &TrapEntry{
 		SourceIP: "198.51.100.10",
 		Varbinds: []VarbindValue{
 			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 		},
 	}
-	td := testSensitiveCommunityTrapDef(
-		"Community {snmpTrapCommunity} raw {snmpTrapCommunity.raw} oid {1.3.6.1.6.3.18.1.4}",
-		map[string]string{"community": "{snmpTrapCommunity}"},
-	)
+	td := testSensitiveCommunityTrapDef(t, `Community {{value "snmpTrapCommunity"}} raw {{raw "snmpTrapCommunity"}}`)
 
 	msg := renderMessage(entry, td)
-	labels := renderLabels(entry, td)
 
 	assert.NotContains(t, msg, "private-community")
 	assert.Contains(t, msg, model.RedactedVarbindValue)
-	assert.Equal(t, model.RedactedVarbindValue, labels["community"])
-}
-
-func TestRenderGoTemplateMessageAndLabelsRedactSensitiveCommunityVarbind(t *testing.T) {
-	entry := &TrapEntry{
-		SourceIP: "198.51.100.10",
-		Varbinds: []VarbindValue{
-			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
-		},
-	}
-	td := testSensitiveCommunityTrapDef(
-		`Community {{value "snmpTrapCommunity"}} raw {{raw "snmpTrapCommunity"}}`,
-		map[string]string{"community": `{{value "snmpTrapCommunity"}}`},
-	)
-
-	msg := renderMessage(entry, td)
-	labels := renderLabels(entry, td)
-
-	assert.NotContains(t, msg, "private-community")
-	assert.Contains(t, msg, model.RedactedVarbindValue)
-	assert.Equal(t, model.RedactedVarbindValue, labels["community"])
 }
 
 func TestLoadProfileRejectsGoTemplateIfBlock(t *testing.T) {
@@ -1535,6 +1693,35 @@ traps:
 	}
 }
 
+func TestLoadProfileRejectsLiteralBraces(t *testing.T) {
+	for name, content := range map[string]string{
+		"legacy description": "description: 'Interface {ifIndex}'",
+		"mixed description":  "description: '{{trap_name}} on {hostname}'",
+		"legacy label":       "labels:\n      state: '{ifIndex}'",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeProfileYAML(t, dir, "test.yaml", `
+varbinds:
+  ifIndex:
+    oid: 1.3.6.1.2.1.2.2.1.1
+    type: INTEGER
+    constraints: (1..4)
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+    varbinds: [ifIndex]
+    `+content+"\n")
+			setTestDirs(t, dir)
+			resetProfileCacheForTest()
+			_, err := AcquireProfileCache()
+			require.ErrorContains(t, err, "literal braces are not allowed")
+		})
+	}
+}
+
 func TestLoadProfileRejectsUnboundedGoTemplateLabel(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAML(t, dir, "test.yaml", `
@@ -1560,72 +1747,18 @@ traps:
 	assert.Contains(t, err.Error(), "unbounded varbind")
 }
 
-func TestRenderMessageUnresolvedRef(t *testing.T) {
-	entry := &TrapEntry{
-		TrapName: "IF-MIB::linkDown",
-		SourceIP: "10.0.0.1",
-		Varbinds: []VarbindValue{},
-	}
+func testSensitiveCommunityTrapDef(t *testing.T, description string) *TrapDef {
+	t.Helper()
+	oid := strings.TrimSuffix(model.SNMPTrapCommunityOID, ".0")
+	def := VarbindDef{OID: oid, Type: "OctetString", rawName: "snmpTrapCommunity"}
 	td := &TrapDef{
-		Description: "Test {nonexistent}",
-	}
-
-	msg := renderMessage(entry, td)
-	assert.Contains(t, msg, "<unresolved:nonexistent>")
-}
-
-func TestRenderMessageNumericOIDRef(t *testing.T) {
-	entry := &TrapEntry{
-		TrapName: "IF-MIB::linkDown",
-		SourceIP: "10.0.0.1",
-		Varbinds: []VarbindValue{
-			{OID: "1.3.6.1.2.1.2.2.1.1", Type: "INTEGER", Value: int64(99)},
-		},
-	}
-	td := &TrapDef{
-		Description: "Index {1.3.6.1.2.1.2.2.1.1}",
-	}
-
-	msg := renderMessage(entry, td)
-	assert.Contains(t, msg, "99")
-}
-
-func TestRenderMessageNumericOIDRawRef(t *testing.T) {
-	entry := &TrapEntry{
-		TrapName: "IF-MIB::linkDown",
-		SourceIP: "10.0.0.1",
-		Varbinds: []VarbindValue{
-			{OID: "1.3.6.1.2.1.2.2.1.8", Type: "INTEGER", Value: int64(2), Enum: "down"},
-		},
-	}
-	td := &TrapDef{
-		Description: "Raw status {1.3.6.1.2.1.2.2.1.8.raw}",
-	}
-
-	msg := renderMessage(entry, td)
-	assert.Contains(t, msg, "2")
-}
-
-func testSensitiveCommunityTrapDef(description string, labels map[string]string) *TrapDef {
-	return &TrapDef{
 		Description: description,
-		Labels:      labels,
 		sharedVarbinds: map[string]*VarbindDef{
-			strings.TrimSuffix(model.SNMPTrapCommunityOID, ".0"): {
-				OID:     strings.TrimSuffix(model.SNMPTrapCommunityOID, ".0"),
-				rawName: "snmpTrapCommunity",
-			},
+			oid: &def,
 		},
 	}
-}
-
-func TestResolveVarbindRawResolvesTabularVarbindInstance(t *testing.T) {
-	td := testIFMIBLinkDownTrapDef()
-	entry := testIFMIBLinkDownEntry()
-
-	got := resolveVarbindRaw("ifOperStatus", entry, td)
-
-	assert.Equal(t, "2", got)
+	require.NoError(t, compileTrapTemplates(td, map[string]VarbindDef{"snmpTrapCommunity": def}))
+	return td
 }
 
 func TestFindVarbindForProfileOIDExactMatchWins(t *testing.T) {
@@ -1701,19 +1834,6 @@ func TestFindVarbindDefForObservedOIDUsesLongestColumnPrefix(t *testing.T) {
 	assert.Equal(t, "longColumn", got.rawName)
 }
 
-func TestRenderMessageMalformedNumericOIDRawRef(t *testing.T) {
-	entry := &TrapEntry{
-		TrapName: "IF-MIB::linkDown",
-		SourceIP: "10.0.0.1",
-	}
-	td := &TrapDef{
-		Description: "Bad {1.bad.raw}",
-	}
-
-	msg := renderMessage(entry, td)
-	assert.Contains(t, msg, "<unresolved:1.bad>")
-}
-
 func TestRenderMessageEmptyStringVarbindPresent(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAML(t, dir, "test.yaml", `
@@ -1727,7 +1847,7 @@ traps:
     name: IF-MIB::linkDown
     category: state_change
     severity: warning
-    description: "Alias [{ifAlias}]"
+    description: 'Alias [{{value "ifAlias"}}]'
     varbinds: [ifAlias]
 `)
 
@@ -1770,7 +1890,7 @@ traps:
     name: IF-MIB::linkDown
     category: state_change
     severity: warning
-    description: "OperStatus is {ifOperStatus}"
+    description: 'OperStatus is {{value "ifOperStatus"}}'
     varbinds: [ifOperStatus]
 `)
 
@@ -1812,7 +1932,7 @@ traps:
     name: IF-MIB::linkDown
     category: state_change
     severity: warning
-    description: "Raw: {ifOperStatus.raw}"
+    description: 'Raw: {{raw "ifOperStatus"}}'
     varbinds: [ifOperStatus]
 `)
 
@@ -1879,7 +1999,7 @@ traps:
     category: state_change
     severity: warning
     labels:
-      oper_status: "{ifOperStatus}"
+      oper_status: '{{value "ifOperStatus"}}'
       severity: "warning"
     varbinds: [ifOperStatus]
 `)
@@ -1921,7 +2041,7 @@ traps:
     category: state_change
     severity: warning
     labels:
-      interface: "{ifDescr}"
+      interface: '{{value "ifDescr"}}'
     varbinds: [ifDescr]
 `)
 
@@ -1943,8 +2063,9 @@ func TestRenderMessageSpecialVars(t *testing.T) {
 		TopologyNeighbors: "leaf01,leaf02",
 	}
 	td := &TrapDef{
-		Description: "Host: {_HOSTNAME}, IP: {TRAP_SOURCE_IP}, Name: {TRAP_NAME}, Vendor: {TRAP_DEVICE_VENDOR}, Interface: {TRAP_INTERFACE}, Neighbors: {TRAP_NEIGHBORS}",
+		Description: "Host: {{hostname}}, IP: {{source_ip}}, Name: {{trap_name}}, Vendor: {{vendor}}, Interface: {{trap_interface}}, Neighbors: {{trap_neighbors}}",
 	}
+	require.NoError(t, compileTrapTemplates(td, nil))
 
 	msg := renderMessage(entry, td)
 	assert.Contains(t, msg, "switch01")
@@ -1976,8 +2097,9 @@ func TestRenderMessageHostnameFallback(t *testing.T) {
 		},
 	}
 	td := &TrapDef{
-		Description: "Host: {_HOSTNAME}",
+		Description: "Host: {{hostname}}",
 	}
+	require.NoError(t, compileTrapTemplates(td, nil))
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -2276,12 +2398,12 @@ const (
 )
 
 func testIFMIBLinkDownTrapDef() *TrapDef {
-	return &TrapDef{
+	td := &TrapDef{
 		OID:         testIFMIBLinkDownOID,
 		Name:        "IF-MIB::linkDown",
 		Category:    "state_change",
 		Severity:    "warning",
-		Description: "Link {ifIndex} operational state changed to {ifOperStatus} on {_HOSTNAME}.",
+		Description: `Link {{value "ifIndex"}} operational state changed to {{value "ifOperStatus"}} on {{hostname}}.`,
 		VarbindRefs: []any{"ifIndex", "ifAdminStatus", "ifOperStatus"},
 		sharedVarbinds: map[string]*VarbindDef{
 			testIFMIBIfIndexOID: {
@@ -2311,6 +2433,14 @@ func testIFMIBLinkDownTrapDef() *TrapDef {
 			},
 		},
 	}
+	fileVarbinds := make(map[string]VarbindDef, len(td.sharedVarbinds))
+	for _, vb := range td.sharedVarbinds {
+		fileVarbinds[vb.rawName] = *vb
+	}
+	if err := compileTrapTemplates(td, fileVarbinds); err != nil {
+		panic(err)
+	}
+	return td
 }
 
 func testIFMIBLinkDownEntry() *TrapEntry {
@@ -2362,7 +2492,7 @@ func writeProfileYAMLZstd(t *testing.T, dir, name, content string) {
 	require.NoError(t, zw.Close())
 }
 
-func writeProfileYAMLGzip(t *testing.T, dir, name, content string) {
+func writeGzipFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	path := filepath.Join(dir, name)
 	file, err := os.Create(path)

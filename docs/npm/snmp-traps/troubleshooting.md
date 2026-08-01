@@ -438,4 +438,4 @@ Choose retention based on how long operators need local forensic access. If an e
 - [Metrics](/docs/npm/snmp-traps/metrics.md) - Interpret receiver pipeline, processing errors, dedup counters, and source metrics.
 - [Alerts](/docs/npm/snmp-traps/alerts.md) - Understand the default health alerts and how to route or silence them.
 - [Validation and Data Quality](/docs/npm/snmp-traps/validation-and-data-quality.md) - Validate source identity, profile coverage, output backends, and data handling.
-- [Trap Profiles](/docs/npm/snmp-traps/trap-profiles.md) - Understand unknown OIDs, profile reloads, template failures, overrides, and profile-derived fields.
+- [Trap Profiles](/docs/npm/snmp-traps/trap-profiles.md) - Understand unknown OIDs, profile loading, template failures, overrides, and profile-derived fields.

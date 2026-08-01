@@ -42,6 +42,12 @@ func buildBenchV2cTrap(b testing.TB, community, trapOID string, extra ...gosnmp.
 // setBenchProfileIndex seeds the global profile index for benchmarks.
 func setBenchProfileIndex(b *testing.B, traps map[string]*TrapDef) {
 	b.Helper()
+	for _, trap := range traps {
+		if err := compileTrapTemplates(trap, nil); err != nil {
+			b.Fatalf("compile benchmark trap templates: %v", err)
+		}
+		trap.sharedVarbinds = buildSharedVarbinds(trap, nil)
+	}
 	// Benchmark-only shortcut: swap the atomic current index without touching
 	// the lazy-load/refcount state used by production job creation.
 	prev := globalProfileCache.current.Load()
@@ -130,7 +136,7 @@ func BenchmarkPacketTrap(b *testing.B) {
 		Name:        "TEST-MIB::coldStartSecurity",
 		Category:    "security",
 		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
+		Description: "coldStart from {{source_ip}}",
 	}
 	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
@@ -180,7 +186,7 @@ func BenchmarkMultiJob(b *testing.B) {
 				Name:        "TEST-MIB::coldStart",
 				Category:    "security",
 				Severity:    "warning",
-				Description: "coldStart from {TRAP_SOURCE_IP}",
+				Description: "coldStart from {{source_ip}}",
 			}
 			setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
@@ -258,25 +264,21 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 	idx := benchmarkProfileMetricIndex(b)
 	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
 		Enabled: true,
-		Mode:    profileMetricModeExact,
 		Include: []string{
 			"bench.config.changed",
 			"bench.config.terminal_type",
 			"bench.config.console_state",
 			"bench.port_security.ifindex",
 		},
-		Identity: ProfileMetricIdentityConfig{
-			SourceIDPrivacy: profileMetricSourceIDHash,
-		},
-		Limits: ProfileMetricLimitsConfig{
-			MaxRules:              4,
-			MaxSources:            64,
-			MaxResourcesPerSource: 32,
-			MaxInstancesPerJob:    4096,
-		},
 	})
 	if err != nil {
 		b.Fatalf("normalizeProfileMetricsConfig: %v", err)
+	}
+	cfg.limits = profileMetricLimitsPolicy{
+		MaxRules:              4,
+		MaxSources:            64,
+		MaxResourcesPerSource: 32,
+		MaxInstancesPerJob:    4096,
 	}
 	rt, _, err := newProfileMetricRuntime(cfg, idx, "benchmark")
 	if err != nil {
@@ -621,7 +623,7 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 		Name:        "TEST-MIB::coldStartSecurity",
 		Category:    "security",
 		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
+		Description: "coldStart from {{source_ip}}",
 	}
 	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
@@ -737,7 +739,7 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 		Name:        "TEST-MIB::coldStartSecurity",
 		Category:    "security",
 		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
+		Description: "coldStart from {{source_ip}}",
 	}
 	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 

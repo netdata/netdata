@@ -87,9 +87,9 @@ Useful starting points and the fixed caps that bound capacity — not capacity p
 | `dynamic_engine_id_max_pairs` | 4096 / job | SNMPv3 `(engineID, username)` pairs under dynamic discovery |
 | `retention.max_size` | 10 GB / job | Local journal disk before oldest rows are evicted |
 | Receiver per-source charts | 2000 sources / job (fixed) | Per-source visibility; excess counted as `overflow_dropped` |
-| `profile_metrics.limits.max_instances_per_job` | 50,000 | Profile-derived metric series / job |
+| Profile metric instances | 50,000 / job (fixed) | Profile-derived metric series |
 
-Profile-defined metrics stay **disabled by default** and are the main cardinality risk — a rule with an unbounded label can create uncontrolled series. Enable selected rules only, and keep the caps as guardrails; for the cardinality model and limits see [Configuration](/docs/npm/snmp-traps/configuration.md#profile-metrics).
+Profile-defined metrics stay **disabled by default** and are the main cardinality risk — a rule with an unbounded label can create uncontrolled series. Enable selected rules only; fixed runtime caps provide final guardrails. For the cardinality model see [Configuration](/docs/npm/snmp-traps/configuration.md#profile-metrics).
 
 ## Storm controls
 

@@ -62,19 +62,6 @@
   "overrides": null,
   "profile_metrics": {
     "enabled": false,
-    "mode": "",
-    "include": null,
-    "identity": {
-      "device": "",
-      "unresolved_source": "",
-      "source_id_privacy": ""
-    },
-    "limits": {
-      "max_rules": 0,
-      "max_sources": 0,
-      "max_resources_per_source": 0,
-      "max_instances_per_job": 0,
-      "overflow": ""
-    }
+    "include": null
   }
 }

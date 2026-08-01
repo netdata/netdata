@@ -1,6 +1,6 @@
 # ADR-0001: Go Process Model, Journal Writer Backend, and TrapWriter Contract
 
-**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`; amended on 2026-05-28 to use SDK `go/v0.3.0`; amended on 2026-05-31 to use SDK `go/v0.4.0`; amended on 2026-06-01 by SOW-0045 to route the trap writer hot path through reusable raw journal payload serialization; amended on 2026-06-10 to use SDK `go/v0.6.3`; amended on 2026-06-11 to use SDK `go/v0.6.4`, place direct journals under `${NETDATA_LOG_DIR}/traps/`, and classify startup environment failures as retryable HTTP-503 coded errors.
+**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`; amended on 2026-05-28 to use SDK `go/v0.3.0`; amended on 2026-05-31 to use SDK `go/v0.4.0`; amended on 2026-06-01 by SOW-0045 to route the trap writer hot path through reusable raw journal payload serialization; amended on 2026-06-10 to use SDK `go/v0.6.3`; amended on 2026-06-11 to use SDK `go/v0.6.4`, place direct journals under `${NETDATA_LOG_DIR}/traps/`, and classify startup environment failures as retryable HTTP-503 coded errors; amended on 2026-08-01 to remove profile hot reload and use one active-reference-bounded profile configuration epoch.
 **Date**: 2026-05-25
 **SOW**: SOW-0035 M1
 
@@ -363,40 +363,34 @@ Constants for the closed sets:
 The profile cache is **plugin-wide in-process state**, not per-job:
 
 ```go
-// In profile.go — package-level state protected by sync.Mutex.
-// SOW-0035 has one active generation; the per-generation holder map prevents
-// the SOW-0037 hot-reload path from leaking references when old jobs release
-// an index after a newer generation has become active.
-type profileCacheGeneration struct {
-    index   *ProfileIndex
-    refs    int
-    retired bool
+// In profile.go — plugin-wide state protected by sync.Mutex. Packet-path reads
+// use the atomic pointer without taking this mutex.
+type profileCache struct {
+    mu         sync.Mutex
+    current    atomic.Pointer[ProfileIndex]
+    loaded     bool
+    activeRefs int
 }
 
-var (
-    profileCacheMu       sync.Mutex
-    activeProfileGen     uint64
-    nextProfileGen       uint64
-    profileGenerations   map[uint64]*profileCacheGeneration
-)
-
 // AcquireProfileCache loads profiles on first call, increments refcount.
-// Returns error if load/validation fails — caller surfaces via HTTP-422.
-func AcquireProfileCache() (*ProfileIndex, uint64, error) { ... }
+func AcquireProfileCache() (*ProfileIndex, error) { ... }
 
 // ReleaseProfileCache decrements refcount; drops the index when refs == 0.
-func ReleaseProfileCache(generation uint64) { ... }
+func ReleaseProfileCache() { ... }
 ```
 
 Lifecycle:
-- First `AcquireProfileCache()` call during job creation loads profiles from multipath (user dirs first, then stock), creates a new active generation, increments that generation's holder count, and returns both `*ProfileIndex` and generation ID.
-- Every subsequent job creation increments the active generation's holder count and receives the same `*ProfileIndex`.
-- Every job removal calls `ReleaseProfileCache(generation)`. Release decrements the holder count for the exact generation returned by acquire, even if that generation is no longer active. When a generation's holder count reaches 0, that generation is deleted and GC can reclaim its index.
+- The first `AcquireProfileCache()` call during job creation loads profiles from multipath (user dirs first, then stock),
+  starts one profile configuration epoch, and increments its active reference count.
+- Every subsequent job creation increments the same reference count and receives the same `*ProfileIndex`.
+- Every job removal calls `ReleaseProfileCache()`. The last release clears the index so GC can reclaim it.
+- Profile files are not watched or reloaded while jobs hold references. After changing a profile, restart the Agent or
+  recreate all `snmp_traps` jobs; the next first acquire loads and validates a fresh epoch from disk.
 - Agents with no trap jobs never call `AcquireProfileCache()`, so they never pay the profile memory cost
 - Failed profile loads do not poison future attempts. The implementation must not use `sync.Once`; it must retry loading on the next job creation after a failed attempt.
-- The mutex covers the full acquire-check-load-increment and release-decrement-delete sequence. No goroutine may observe a partially-initialized cache. A failed load creates no generation and leaves `profileGenerations` unchanged.
-- The mutex also covers the entire release and underflow-recovery sequence. Jobs store the generation returned by `AcquireProfileCache()` and pass it to `ReleaseProfileCache(generation)`. Unknown-generation releases are programmer bugs; production recovery logs the error and ignores the release after tests have asserted the path. Underflow is a programmer bug; production recovery logs the error, deletes that generation, and if it was active clears `activeProfileGen` so the next acquire reloads cleanly.
-- SOW-0035 does not implement hot reload, but the lifecycle deliberately reserves generation retirement: a later reload marks the old active generation retired, installs a new active generation, and lets old jobs keep using the immutable old `*ProfileIndex` until their exact-generation releases delete it.
+- The mutex covers the full acquire-check-load-increment and release-decrement-clear sequence. No goroutine may observe a
+  partially initialized cache. A failed load leaves the cache unloaded.
+- Extra releases are ignored; they never underflow the reference count or disturb an active epoch.
 - Tests need a package-private reset helper (for example `resetProfileCacheForTest`) so package-level state does not leak between test cases.
 
 ### 6. Creation-time Failure Detection

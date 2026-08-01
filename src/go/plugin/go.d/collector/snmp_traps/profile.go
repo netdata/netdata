@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"text/template"
 
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
@@ -46,15 +45,6 @@ var validStatuses = map[string]bool{
 }
 
 const maxBoundedVarbindValues = 64
-
-var knownSpecialVars = map[string]bool{
-	"_HOSTNAME":          true,
-	"TRAP_SOURCE_IP":     true,
-	"TRAP_NAME":          true,
-	"TRAP_DEVICE_VENDOR": true,
-	"TRAP_INTERFACE":     true,
-	"TRAP_NEIGHBORS":     true,
-}
 
 // validateLabelKey checks if s matches ^[a-z][a-z0-9_]*$
 func validateLabelKey(s string) bool {
@@ -210,24 +200,17 @@ func (idx *ProfileIndex) lookupLoaded(oid string) *TrapDef {
 	return nil
 }
 
-// profileCache holds the plugin-wide shared profile state.
-// Uses an atomic pointer for lock-free reads on the hot path.
-// On reload, a new index is built and atomically swapped in;
-// the old index becomes unreachable and is garbage-collected.
+// profileCache holds the plugin-wide shared profile state. All active jobs share
+// one profile configuration epoch; the final release unloads it so the next job
+// builds a fresh index from disk.
 type profileCache struct {
 	mu         sync.Mutex
 	current    atomic.Pointer[ProfileIndex]
 	loaded     bool
-	dirty      bool
 	activeRefs int
-	watcher    *profileWatcher
 }
 
 var globalProfileCache profileCache
-
-var errNoActiveProfileJobs = errors.New("snmp_traps profile reload requires at least one active job")
-
-var automaticProfileWatcherEnabled = executable.Name != "test"
 
 // AcquireProfileCache lazily loads profiles on first call.
 // Returns the current profile index and any load error.
@@ -242,22 +225,10 @@ func AcquireProfileCache() (*ProfileIndex, error) {
 		}
 		globalProfileCache.current.Store(idx)
 		globalProfileCache.loaded = true
-		globalProfileCache.dirty = false
-	} else if globalProfileCache.dirty {
-		idx, err := loadUserProfileCache(globalProfileCache.current.Load())
-		if err != nil {
-			return nil, err
-		}
-		globalProfileCache.current.Store(idx)
-		globalProfileCache.loaded = true
-		globalProfileCache.dirty = false
 	}
 
 	if idx := globalProfileCache.current.Load(); idx != nil {
 		globalProfileCache.activeRefs++
-		if globalProfileCache.activeRefs == 1 {
-			globalProfileCache.startUserProfileWatcherLocked()
-		}
 		return idx, nil
 	}
 	return nil, errors.New("snmp_traps profile cache is empty after load")
@@ -274,113 +245,25 @@ func CurrentProfileIndex() *ProfileIndex {
 // the stock profile memory cost.
 func ReleaseProfileCache() {
 	globalProfileCache.mu.Lock()
+	defer globalProfileCache.mu.Unlock()
 
 	if globalProfileCache.activeRefs <= 0 {
-		globalProfileCache.mu.Unlock()
 		return
 	}
-	var watcher *profileWatcher
 	globalProfileCache.activeRefs--
 	if globalProfileCache.activeRefs == 0 {
-		watcher = globalProfileCache.stopUserProfileWatcherLocked()
 		globalProfileCache.current.Store(nil)
 		globalProfileCache.loaded = false
-		globalProfileCache.dirty = false
 	}
-	globalProfileCache.mu.Unlock()
-
-	if watcher != nil {
-		watcher.Stop()
-	}
-}
-
-func MarkProfileCacheDirty() {
-	globalProfileCache.mu.Lock()
-	globalProfileCache.dirty = true
-	globalProfileCache.mu.Unlock()
-}
-
-// ReloadProfileCache re-parses all profile directories and atomically swaps
-// the current index. On failure the previous index stays active and an error
-// is returned.
-func ReloadProfileCache() error {
-	return reloadProfileCache(loadProfileCache)
-}
-
-func ReloadUserProfileCache() error {
-	return reloadProfileCache(func() (*ProfileIndex, error) {
-		return loadUserProfileCache(CurrentProfileIndex())
-	})
-}
-
-func reloadProfileCache(load func() (*ProfileIndex, error)) error {
-	globalProfileCache.mu.Lock()
-	if globalProfileCache.activeRefs == 0 {
-		globalProfileCache.mu.Unlock()
-		return errNoActiveProfileJobs
-	}
-	globalProfileCache.mu.Unlock()
-
-	idx, err := load()
-	if err != nil {
-		globalProfileCache.mu.Lock()
-		active := globalProfileCache.activeRefs > 0
-		globalProfileCache.mu.Unlock()
-		if !active {
-			return errNoActiveProfileJobs
-		}
-		incAllJobsProfileLoadFailed()
-		return err
-	}
-
-	globalProfileCache.mu.Lock()
-	defer globalProfileCache.mu.Unlock()
-	if globalProfileCache.activeRefs == 0 {
-		return errNoActiveProfileJobs
-	}
-	globalProfileCache.current.Store(idx)
-	globalProfileCache.loaded = true
-	globalProfileCache.dirty = false
-	return nil
-}
-
-func (c *profileCache) startUserProfileWatcherLocked() {
-	if !automaticProfileWatcherEnabled || c.watcher != nil {
-		return
-	}
-	paths := getProfileLoadPaths()
-	if len(paths.eagerDirs) == 0 {
-		return
-	}
-	watcher := newUserProfileWatcher(paths.eagerDirs)
-	if err := watcher.Start(); err != nil {
-		return
-	}
-	c.watcher = watcher
-}
-
-func (c *profileCache) stopUserProfileWatcherLocked() *profileWatcher {
-	if c.watcher == nil {
-		return nil
-	}
-	watcher := c.watcher
-	c.watcher = nil
-	return watcher
 }
 
 // resetProfileCacheForTest clears the shared cache for test isolation.
 func resetProfileCacheForTest() {
 	globalProfileCache.mu.Lock()
-	watcher := globalProfileCache.stopUserProfileWatcherLocked()
+	defer globalProfileCache.mu.Unlock()
 	globalProfileCache.current.Store(nil)
 	globalProfileCache.loaded = false
-	globalProfileCache.dirty = false
 	globalProfileCache.activeRefs = 0
-	globalProfileCache.mu.Unlock()
-
-	if watcher != nil {
-		watcher.Stop()
-	}
 }
 
 func validateFileVarbinds(fileVarbinds map[string]VarbindDef, src string) error {
@@ -458,71 +341,11 @@ func validateTrapDef(td *TrapDef, fileVarbinds map[string]VarbindDef) error {
 		}
 	}
 
-	if err := validateLabelTemplates(td, fileVarbinds); err != nil {
-		return err
-	}
-
 	if err := compileTrapTemplates(td, fileVarbinds); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func validateLabelTemplates(td *TrapDef, fileVarbinds map[string]VarbindDef) error {
-	src := td.sourceFile
-	for key, tmpl := range td.Labels {
-		if isGoProfileTemplate(tmpl) {
-			continue
-		}
-		for _, ref := range templateRefs(tmpl) {
-			name := strings.TrimSuffix(ref, ".raw")
-			if name == "" {
-				continue
-			}
-			if knownSpecialVars[name] {
-				if name == "TRAP_NAME" || name == "TRAP_DEVICE_VENDOR" {
-					continue
-				}
-				return fmt.Errorf("%s: trap entry %s: label %q references unbounded field %q", src, td.OID, key, name)
-			}
-			if model.IsNumericOID(name) {
-				return fmt.Errorf("%s: trap entry %s: label %q references raw OID %q without cardinality metadata", src, td.OID, key, name)
-			}
-			vb := fileVarbinds[name]
-			if vb.OID == "" {
-				if inline := td.inlineVarbindByName(name); inline != nil {
-					vb = *inline
-				}
-			}
-			if vb.OID == "" {
-				return fmt.Errorf("%s: trap entry %s: label %q references unknown varbind %q", src, td.OID, key, name)
-			}
-			if !isBoundedLabelVarbind(vb) {
-				return fmt.Errorf("%s: trap entry %s: label %q references unbounded varbind %q", src, td.OID, key, name)
-			}
-		}
-	}
-	return nil
-}
-
-func templateRefs(tmpl string) []string {
-	var refs []string
-	i := 0
-	for i < len(tmpl) {
-		if tmpl[i] != '{' {
-			i++
-			continue
-		}
-		end := strings.IndexByte(tmpl[i:], '}')
-		if end == -1 {
-			i++
-			continue
-		}
-		refs = append(refs, tmpl[i+1:i+end])
-		i += end + 1
-	}
-	return refs
 }
 
 func isBoundedLabelVarbind(vb VarbindDef) bool {

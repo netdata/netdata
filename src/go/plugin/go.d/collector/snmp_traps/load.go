@@ -135,51 +135,6 @@ func loadProfileCache() (*ProfileIndex, error) {
 	return index, nil
 }
 
-// loadUserProfileCache reloads only user profiles and carries over the existing
-// stock store. This is used for live reloads so Netdata upgrades do not live-load
-// changed stock profile metadata without the matching process/job restart.
-func loadUserProfileCache(current *ProfileIndex) (*ProfileIndex, error) {
-	if current == nil || current.stock == nil {
-		return loadProfileCache()
-	}
-
-	paths := getProfileLoadPaths()
-	index, seen, accepted, err := loadUserProfileTraps(paths)
-	if err != nil {
-		return nil, err
-	}
-
-	index.stock = current.stock.cloneFiltered(seen)
-	if err := copyLoadedStockProfiles(index, current, seen); err != nil {
-		return nil, err
-	}
-	if loadedProfilesHaveMetrics(accepted) {
-		if err := index.loadStockProfileMetrics(); err != nil {
-			return nil, err
-		}
-	}
-	if err := addLoadedProfileMetrics(index, accepted); err != nil {
-		return nil, err
-	}
-
-	if len(index.trapsByOID) == 0 && (index.stock == nil || index.stock.empty()) {
-		return nil, fmt.Errorf("no trap profiles found in %v", paths.all)
-	}
-
-	return index, nil
-}
-
-func loadUserProfiles(paths profileLoadPaths) (*ProfileIndex, map[string]bool, error) {
-	index, seen, accepted, err := loadUserProfileTraps(paths)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := addLoadedProfileMetrics(index, accepted); err != nil {
-		return nil, nil, err
-	}
-	return index, seen, nil
-}
-
 func loadUserProfileTraps(paths profileLoadPaths) (*ProfileIndex, map[string]bool, []loadedProfileFile, error) {
 	seen := make(map[string]bool)
 
@@ -573,9 +528,6 @@ func loadProfileBundle(filename string, extendsPaths multipath.MultiPath, stack 
 		if err := normalizeProfileMetricRule(rule); err != nil {
 			return profileLoadBundle{}, fmt.Errorf("%s: metric rule: %w", absFile, err)
 		}
-		if chart := chartFromMetricRule(rule); chart != nil {
-			mergeProfileMetricCharts(&allCharts, allChartPos, []profileMetricChart{*chart}, nil)
-		}
 		allMetrics = append(allMetrics, *rule)
 	}
 	for i := range def.Charts {
@@ -593,10 +545,14 @@ func loadProfileBundle(filename string, extendsPaths multipath.MultiPath, stack 
 }
 
 func readProfileFile(filename string) ([]byte, error) {
-	return readMaybeCompressedFile(filename)
+	return readCompressedFile(filename, false)
 }
 
-func readMaybeCompressedFile(filename string) ([]byte, error) {
+func readCatalogueFile(filename string) ([]byte, error) {
+	return readCompressedFile(filename, true)
+}
+
+func readCompressedFile(filename string, allowGzip bool) ([]byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -614,7 +570,7 @@ func readMaybeCompressedFile(filename string) ([]byte, error) {
 		}
 		defer zr.Close()
 		r = zr
-	case strings.HasSuffix(filename, ".gz"):
+	case allowGzip && strings.HasSuffix(filename, ".gz"):
 		gz, err = gzip.NewReader(file)
 		if err != nil {
 			return nil, err
@@ -635,6 +591,9 @@ func readMaybeCompressedFile(filename string) ([]byte, error) {
 }
 
 func findProfileExtends(paths multipath.MultiPath, name string) (string, error) {
+	if !profilePathIsSupported(name) {
+		return "", fmt.Errorf("unsupported profile filename %q", name)
+	}
 	var lastErr error
 	for _, candidate := range profilePathCandidates(name) {
 		path, err := paths.Find(candidate)
@@ -650,21 +609,18 @@ func isProfileFileName(name string) bool {
 	return strings.HasSuffix(name, ".yaml") ||
 		strings.HasSuffix(name, ".yml") ||
 		strings.HasSuffix(name, ".yaml.zst") ||
-		strings.HasSuffix(name, ".yml.zst") ||
-		strings.HasSuffix(name, ".yaml.gz") ||
-		strings.HasSuffix(name, ".yml.gz")
+		strings.HasSuffix(name, ".yml.zst")
 }
 
 func profileLogicalName(name string) string {
-	name = strings.TrimSuffix(name, ".zst")
-	return strings.TrimSuffix(name, ".gz")
+	return strings.TrimSuffix(name, ".zst")
 }
 
 func profilePathCandidates(name string) []string {
-	if strings.HasSuffix(name, ".zst") || strings.HasSuffix(name, ".gz") {
+	if strings.HasSuffix(name, ".zst") {
 		return []string{name}
 	}
-	return []string{name, name + ".zst", name + ".gz"}
+	return []string{name, name + ".zst"}
 }
 
 type stockProfileStore struct {
@@ -677,124 +633,6 @@ type stockProfileStore struct {
 	failed           map[string]error
 	metricsLoaded    bool
 	mu               sync.Mutex
-}
-
-func (s *stockProfileStore) cloneFiltered(replaced map[string]bool) *stockProfileStore {
-	if s == nil {
-		return nil
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	clone := &stockProfileStore{
-		dir:              s.dir,
-		extendsPaths:     s.extendsPaths,
-		files:            make(map[string]string, len(s.files)),
-		exactRoutes:      make(map[string]string, len(s.exactRoutes)),
-		enterpriseRoutes: make(map[string]string, len(s.enterpriseRoutes)),
-		loaded:           make(map[string]bool, len(s.loaded)),
-		failed:           make(map[string]error, len(s.failed)),
-		metricsLoaded:    s.metricsLoaded,
-	}
-	for name, path := range s.files {
-		if replaced[name] {
-			continue
-		}
-		clone.files[name] = path
-	}
-	for oid, name := range s.exactRoutes {
-		if replaced[name] {
-			continue
-		}
-		clone.exactRoutes[oid] = name
-	}
-	for prefix, name := range s.enterpriseRoutes {
-		if replaced[name] {
-			continue
-		}
-		clone.enterpriseRoutes[prefix] = name
-	}
-	for name, loaded := range s.loaded {
-		if replaced[name] {
-			continue
-		}
-		clone.loaded[name] = loaded
-	}
-	for name, err := range s.failed {
-		if replaced[name] {
-			continue
-		}
-		clone.failed[name] = err
-	}
-
-	return clone
-}
-
-func (s *stockProfileStore) loadedProfilePaths(replaced map[string]bool) map[string]string {
-	if s == nil {
-		return nil
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	paths := make(map[string]string)
-	for name, loaded := range s.loaded {
-		if !loaded || replaced[name] {
-			continue
-		}
-		if path := s.files[name]; path != "" {
-			paths[filepath.Clean(path)] = name
-		}
-	}
-	return paths
-}
-
-func copyLoadedStockProfiles(dst, current *ProfileIndex, replaced map[string]bool) error {
-	if dst == nil || current == nil || current.stock == nil {
-		return nil
-	}
-
-	loadedPaths := current.stock.loadedProfilePaths(replaced)
-	if len(loadedPaths) == 0 {
-		return nil
-	}
-
-	var traps []*TrapDef
-	var metrics []profileMetricRule
-	var charts []profileMetricChart
-	current.mu.RLock()
-	for _, td := range current.trapsByOID {
-		if td == nil {
-			continue
-		}
-		if _, ok := loadedPaths[filepath.Clean(td.sourceFile)]; ok {
-			traps = append(traps, td)
-		}
-	}
-	for _, rule := range current.metricRulesByName {
-		if rule == nil {
-			continue
-		}
-		if _, ok := loadedPaths[filepath.Clean(rule.sourceFile)]; ok {
-			metrics = append(metrics, *rule)
-		}
-	}
-	for _, chart := range current.metricChartsByID {
-		if chart == nil {
-			continue
-		}
-		if _, ok := loadedPaths[filepath.Clean(chart.sourceFile)]; ok {
-			charts = append(charts, *chart)
-		}
-	}
-	current.mu.RUnlock()
-
-	if err := dst.addTraps(traps); err != nil {
-		return err
-	}
-	return dst.addProfileMetrics(metrics, charts)
 }
 
 func (s *stockProfileStore) empty() bool {
@@ -1003,7 +841,7 @@ func loadStockProfileCatalogue(stockDir string) (stockProfileCatalogue, error) {
 func readStockProfileCatalogueFile(dir string) ([]byte, error) {
 	var lastErr error
 	for _, name := range []string{"catalogue.json", "catalogue.json.zst", "catalogue.json.gz"} {
-		data, err := readMaybeCompressedFile(filepath.Join(dir, name))
+		data, err := readCatalogueFile(filepath.Join(dir, name))
 		if err == nil {
 			return data, nil
 		}
@@ -1391,10 +1229,13 @@ func rejectUnknownYAMLKeys(node any, spec yamlKeySpec, path string) error {
 var (
 	profileMetricResourceYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
 		"class":            {},
-		"key":              {},
 		"key_from_varbind": {},
-		"max":              {},
 		"max_per_source":   {},
+	}}
+
+	profileMetricPredicateYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"varbind": {}, "field": {}, "equals": {}, "in": {}, "exists": {}, "absent": {}, "greater_than": {},
+		"less_than": {}, "range": {}, "not": {},
 	}}
 
 	charttplDimensionLifecycleYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
@@ -1411,24 +1252,17 @@ var (
 	profileMetricRuleYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
 		"name":               {},
 		"type":               {},
-		"auto_safe":          {},
 		"enabled":            {},
 		"on_trap":            {},
 		"problem_trap":       {},
 		"clear_trap":         {},
-		"where":              {allowAny: true},
+		"where":              {elem: &profileMetricPredicateYAMLSpec},
 		"identity":           {children: map[string]yamlKeySpec{"device": {}, "resource": profileMetricResourceYAMLSpec}},
-		"resource":           profileMetricResourceYAMLSpec,
 		"output":             {children: map[string]yamlKeySpec{"metric": {}, "dimension": {}, "chart": {}}},
-		"state":              {children: map[string]yamlKeySpec{"set_when": {allowAny: true}, "clear_when": {allowAny: true}, "problem_value": {}, "clear_value": {}, "ttl": {}, "ttl_behavior": {}, "varbind": {}, "set": {}, "clear": {}}},
+		"state":              {children: map[string]yamlKeySpec{"set_when": profileMetricPredicateYAMLSpec, "clear_when": profileMetricPredicateYAMLSpec, "problem_value": {}, "clear_value": {}, "ttl": {}}},
 		"scale":              {children: map[string]yamlKeySpec{"multiplier": {}, "divisor": {}}},
 		"missing":            {},
 		"value_from_varbind": {},
-		"chart_meta":         {children: map[string]yamlKeySpec{"title": {}, "family": {}, "context": {}, "units": {}, "algorithm": {}, "type": {}, "description": {}, "lifecycle": charttplLifecycleYAMLSpec}},
-		"metric":             {},
-		"dimension":          {},
-		"chart_id":           {},
-		"value":              {},
 	}}
 
 	profileMetricChartYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{

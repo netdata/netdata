@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync/atomic"
+	"text/template"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -792,6 +793,10 @@ func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
 		cp.Labels = make(map[string]string, len(td.Labels)+len(ov.Labels))
 		maps.Copy(cp.Labels, td.Labels)
 	}
+	if td.labelTemplates != nil && len(ov.Labels) > 0 {
+		cp.labelTemplates = make(map[string]*template.Template, len(td.labelTemplates))
+		maps.Copy(cp.labelTemplates, td.labelTemplates)
+	}
 	if ov.Category != "" {
 		cp.Category = ov.Category
 	}
@@ -803,6 +808,9 @@ func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
 			cp.Labels = make(map[string]string, len(ov.Labels))
 		}
 		maps.Copy(cp.Labels, ov.Labels)
+		for key := range ov.Labels {
+			delete(cp.labelTemplates, key)
+		}
 	}
 	return &cp
 }

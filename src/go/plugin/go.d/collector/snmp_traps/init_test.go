@@ -68,11 +68,7 @@ func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
 		Enabled: true,
-		Mode:    profileMetricModeExact,
 		Include: []string{"cisco.config.changed"},
-		Identity: ProfileMetricIdentityConfig{
-			SourceIDPrivacy: profileMetricSourceIDRaw,
-		},
 	})
 	require.NoError(t, err)
 
@@ -226,8 +222,6 @@ func TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults(t *testing.T) {
 		{name: "retention", path: []string{"jsonSchema", "properties", "retention"}},
 		{name: "overrides.labels", path: []string{"jsonSchema", "properties", "overrides", "items", "properties", "labels"}},
 		{name: "profile_metrics", path: []string{"jsonSchema", "properties", "profile_metrics"}},
-		{name: "profile_metrics.identity", path: []string{"jsonSchema", "properties", "profile_metrics", "properties", "identity"}},
-		{name: "profile_metrics.limits", path: []string{"jsonSchema", "properties", "profile_metrics", "properties", "limits"}},
 	} {
 		prop := schemaProperty(t, schema, tc.path...)
 		require.Containsf(t, prop, "default", "schema property %q has no default", tc.name)
@@ -293,11 +287,11 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	c := newTestSNMPTrapsCollector()
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: 162}}
-	c.ProfileMetrics = ProfileMetricsConfig{Enabled: true, Mode: "invalid"}
+	c.ProfileMetrics = ProfileMetricsConfig{Enabled: true}
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "profile_metrics.mode")
+	assert.Contains(t, err.Error(), "profile_metrics.include")
 	assert.NotContains(t, err.Error(), "unknown_profile_key")
 	assert.Nil(t, CurrentProfileIndex())
 	assert.Nil(t, c.listener)

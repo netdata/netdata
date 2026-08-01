@@ -20,6 +20,8 @@ func compileTrapTemplates(td *TrapDef, fileVarbinds map[string]VarbindDef) error
 	if td == nil {
 		return nil
 	}
+	td.descriptionTemplate = nil
+	td.labelTemplates = nil
 
 	if isGoProfileTemplate(td.Description) {
 		tpl, err := compileProfileTemplate("description", td.Description, td, fileVarbinds, "")
@@ -27,10 +29,15 @@ func compileTrapTemplates(td *TrapDef, fileVarbinds map[string]VarbindDef) error
 			return err
 		}
 		td.descriptionTemplate = tpl
+	} else if strings.ContainsAny(td.Description, "{}") {
+		return invalidProfileTemplateText(td, "description", "", td.Description)
 	}
 
 	for key, tmpl := range td.Labels {
 		if !isGoProfileTemplate(tmpl) {
+			if strings.ContainsAny(tmpl, "{}") {
+				return invalidProfileTemplateText(td, "label_"+key, key, tmpl)
+			}
 			continue
 		}
 		tpl, err := compileProfileTemplate("label_"+key, tmpl, td, fileVarbinds, key)
@@ -44,6 +51,15 @@ func compileTrapTemplates(td *TrapDef, fileVarbinds map[string]VarbindDef) error
 	}
 
 	return nil
+}
+
+func invalidProfileTemplateText(td *TrapDef, name, labelKey, tmpl string) error {
+	ctx := templateValidationContext{src: "<unknown>", templateName: name, labelKey: labelKey}
+	if td != nil {
+		ctx.src = td.sourceFile
+		ctx.trapOID = td.OID
+	}
+	return ctx.errf("literal braces are not allowed in static text %q; use restricted Go-template syntax", tmpl)
 }
 
 func compileProfileTemplate(name, tmpl string, td *TrapDef, fileVarbinds map[string]VarbindDef, labelKey string) (*template.Template, error) {
@@ -120,6 +136,9 @@ func validateProfileTemplateTree(n parse.Node, ctx templateValidationContext) er
 		}
 		return nil
 	case *parse.TextNode:
+		if strings.ContainsAny(string(node.Text), "{}") {
+			return ctx.errf("literal braces are not allowed in template text")
+		}
 		return nil
 	case *parse.ActionNode:
 		if node == nil {
@@ -257,20 +276,15 @@ func templateVarbindDef(td *TrapDef, fileVarbinds map[string]VarbindDef, name st
 	return VarbindDef{}, false
 }
 
-func renderGoProfileTemplate(tpl *template.Template, tmpl string, entry *TrapEntry, td *TrapDef) string {
-	var err error
+func renderGoProfileTemplate(tpl *template.Template, entry *TrapEntry, td *TrapDef) string {
 	if tpl == nil {
-		tpl, err = template.New("runtime").Funcs(runtimeTemplateFuncMap(entry, td)).Parse(tmpl)
-		if err != nil {
-			return fmt.Sprintf("<unresolved:template:%s>", err.Error())
-		}
-	} else {
-		tpl, err = tpl.Clone()
-		if err != nil {
-			return fmt.Sprintf("<unresolved:template:%s>", err.Error())
-		}
-		tpl.Funcs(runtimeTemplateFuncMap(entry, td))
+		return "<unresolved:template:not compiled>"
 	}
+	tpl, err := tpl.Clone()
+	if err != nil {
+		return fmt.Sprintf("<unresolved:template:%s>", err.Error())
+	}
+	tpl.Funcs(runtimeTemplateFuncMap(entry, td))
 
 	var buf bytes.Buffer
 	if err := tpl.Execute(&buf, ""); err != nil {
