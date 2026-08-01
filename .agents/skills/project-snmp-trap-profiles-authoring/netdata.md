@@ -116,7 +116,13 @@ The plugin is a **DynCfg-managed jobs orchestrator**. Each **job is one listener
 
 Job lifecycle mirrors the established go.d pattern (`src/go/plugin/framework/jobruntime/job_v1.go`; orchestration in `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`):
 
-- **Add / Enable** — create job and synchronously preflight every required resource. Invalid configuration and profile errors return non-retryable coded errors (HTTP 422). Startup/environment failures such as endpoint bind failures (EACCES for privileged port, EADDRINUSE for port collision, etc.), persistent journal directory absence, journal directory create/open failure, writer initialization failure, SNMPv3 state persistence failure, and OTLP preflight failure are still surfaced during DynCfg apply/job creation, but are classified as retryable coded errors (HTTP 503) so file-configured jobs can recover after transient conditions clear. The job is not reported as started when creation fails.
+- **Add / Enable** — create job and synchronously preflight every required resource. Invalid configuration and eager
+  profile-cache errors return non-retryable coded errors (HTTP 422). A malformed lazy stock profile instead fails the
+  first matching lookup. Startup/environment failures such as endpoint bind failures (EACCES for privileged port,
+  EADDRINUSE for port collision, etc.), persistent journal directory absence, journal directory create/open failure,
+  writer initialization failure, SNMPv3 state persistence failure, and OTLP preflight failure are still surfaced during
+  DynCfg apply/job creation, but are classified as retryable coded errors (HTTP 503) so file-configured jobs can recover
+  after transient conditions clear. The job is not reported as started when creation fails.
 - **Update** — stop the running job, recreate from new config, and preflight every required resource. Atomic restart, no plugin-wide restart.
 - **Disable / Remove** — stop the job, close all sockets, retain the journal directory (for forensics) but stop writing.
 
@@ -309,7 +315,11 @@ traps:
     dedup_key_varbinds: [cpsIfViolationMacAddress, cpsIfViolationVlan]
 ```
 
-**Required per trap entry**: `oid`, `name` (MIB-qualified `<MIB-MODULE>::<symbol>` — vendors reuse bare symbolic names across product-line MIBs; the bare symbol is not globally unique), `category`, `severity`. `description` is optional (defaults to `"{{trap_name}} on {{hostname}}."`). `labels`, `varbinds`, and `dedup_key_varbinds` are optional. The plugin loader rejects entries missing required fields at startup with a clear error naming the file + offending entry.
+**Required per trap entry**: `oid`, `name` (MIB-qualified `<MIB-MODULE>::<symbol>` — vendors reuse bare symbolic names
+across product-line MIBs; the bare symbol is not globally unique), `category`, `severity`. `description` is optional
+(defaults to `"{{trap_name}} on {{hostname}}."`). `labels`, `varbinds`, and `dedup_key_varbinds` are optional. The plugin
+loader rejects entries missing required fields with a clear error naming the file and offending entry. Eager profiles fail
+job creation; lazy stock profiles fail the first matching lookup.
 
 ### Trap OID lookup — SMIv1 / SMIv2 `.0.` tolerance
 
@@ -367,7 +377,8 @@ use `with` or `first` when optional context is included.
 
 Unknown functions, unknown varbind names, malformed templates, variables,
 assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
-fail at profile load / job creation.
+fail profile loading. Eager operator/metric-catalogue loads surface the error at
+job creation; lazy stock errors surface on the first matching trap.
 
 If `description` is absent, default template is:
 ```
@@ -390,9 +401,18 @@ evaluates those rules only for listener jobs that enable `profile_metrics`
 
 ### Profile loading — lazy shared cache, multipath, filename-dedup, field-merge on extends-chain
 
-The loader is plugin-wide shared state, not per-listener state. It initializes on first runnable trap job creation, is shared by all listeners, and is released when no runnable trap jobs remain. Agents with all trap jobs disabled (or no trap jobs configured) never pay the profile memory footprint. A profile load or validation failure is a job-creation failure and returns HTTP-422 through DynCfg before any listener is reported as started.
+The loader is plugin-wide shared state, not per-listener state. It initializes on first runnable trap job creation, is
+shared by all listeners, and is released when no runnable trap jobs remain. Agents with all trap jobs disabled (or no trap
+jobs configured) never pay the profile memory footprint. An eager operator-profile, stock-catalogue, or profile-metric
+catalogue validation failure is a job-creation failure and returns HTTP-422 through DynCfg before any listener is reported
+as started. A lazy stock-profile failure is reported when the first matching trap needs that file.
 
-Operator profiles are loaded eagerly at job creation. Stock profiles are validated at job creation, but the loader retains only a small OID-to-stock-file route table until a matching trap arrives. The first matching trap loads the routed stock vendor file into the shared profile index, and later listeners reuse it. Stock YAML remains uncompressed in git for review; installed packages store stock vendor files as `.yaml.zst`, and the runtime loader accepts raw `.yaml`/`.yml` and Zstandard-compressed `.yaml.zst`/`.yml.zst` files.
+Operator profiles and the stock catalogue are loaded and validated eagerly at job creation. The loader retains only a
+small OID-to-stock-file route table until a matching trap arrives. The first matching trap loads and validates the routed
+stock vendor file into the shared profile index, and later listeners reuse it. Stock profiles load eagerly during job
+creation to build the complete metric rule catalogue when an operator profile defines metric rules or the job enables
+profile metrics. Stock YAML remains uncompressed in git for review; installed packages store stock vendor files as
+`.yaml.zst`, and the runtime loader accepts raw `.yaml`/`.yml` and Zstandard-compressed `.yaml.zst`/`.yml.zst` files.
 
 The loader mirrors the established SNMP polling pattern (`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`):
 
@@ -531,7 +551,13 @@ Operators can apply per-OID overrides on top of profile baseline. The `overrides
 
 ### Label naming rules
 
-Labels are free-form key-value pairs. Keys must match `[a-z][a-z0-9_]*` (lowercase plugin convention; uppercased and prefixed with `TRAP_TAG_` when written to journal as `TRAP_TAG_<KEY>=<VALUE>`, emitted as OTLP attribute `trap.<key>`). Static values are arbitrary strings. Dynamic template references must be bounded-cardinality at profile/config load time; the MVP accepts static strings, `TRAP_NAME`, `TRAP_DEVICE_VENDOR`, enum-backed varbinds, booleans, and small numeric ranges, and rejects unbounded values such as hostnames, source IPs, interface descriptions, MAC addresses, usernames, packet contents, and raw numeric OID references without profile metadata. Labels are slicing metadata on the journal and on the metric-instance, not metric dimensions — they don't expand the chart dimension count.
+Labels are free-form key-value pairs. Keys must match `[a-z][a-z0-9_]*` (lowercase plugin convention; uppercased and prefixed
+with `TRAP_TAG_` when written to journal as `TRAP_TAG_<KEY>=<VALUE>`, emitted as OTLP attribute `trap.<key>`). Static
+values are arbitrary strings. Dynamic profile-label template references must be bounded-cardinality at profile load time;
+accepted sources are `{{trap_name}}`, `{{vendor}}`, enum-backed varbinds, booleans, and small numeric ranges. Unbounded
+values such as hostnames, source IPs, interface descriptions, MAC addresses, usernames, packet contents, and raw numeric
+OID references without profile metadata are rejected. Job override labels are always static. Labels are slicing metadata
+on the journal and on the metric-instance, not metric dimensions — they don't expand the chart dimension count.
 
 **Why the `TRAP_TAG_*` namespace?** Labels come from two sources — profile YAMLs (vendor-curated) and operator per-job config. Rejecting labels at config-load would lose vendor data (in the case of profile labels) or annoy operators (in the case of operator labels). Putting all labels in a dedicated `TRAP_TAG_*` sub-namespace means they cannot collide with any current or future plugin-controlled `TRAP_*` field, no rejection logic needed.
 
@@ -1154,7 +1180,13 @@ Phase B resolved most of the original questions. What remains:
 
 1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, 2026-05-31 for SDK `go/v0.4.0`, 2026-06-08 for SDK `go/v0.5.1`, 2026-06-10 for SDK `go/v0.6.3` plus persistent-journal placement, and 2026-06-11 for SDK `go/v0.6.4` plus Netdata log directory placement)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.6.4`. No separate process, no CGo, no subprocess bridge. See `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`.
 
-2. **Profile YAML lifecycle — ACCEPTED (superseded 2026-08-01)**: operators add or edit YAML files under `/etc/netdata/go.d/snmp.trap-profiles/`. Profiles are immutable while the shared profile cache has active job references. After editing profiles, restart the Agent or recreate all running `snmp_traps` jobs; the last release unloads the cache and the next job creation reloads and validates it. The public manual reload Function and the automatic watcher were removed before stable release. Runtime MIB compilation remains out of scope.
+2. **Profile YAML lifecycle — ACCEPTED (superseded 2026-08-01)**: operators add or edit YAML files under
+   `/etc/netdata/go.d/snmp.trap-profiles/`. Profiles are immutable while the shared profile cache has active job
+   references. After editing profiles, restart the Agent or recreate all running `snmp_traps` jobs; the last release
+   unloads the cache and the next job creation eagerly reloads operator profiles and the stock catalogue. Stock vendor
+   YAML remains lazy until a matching trap needs it, unless an operator profile defines metric rules or the job enables
+   profile metrics, which requires the complete rule catalogue at job creation. The public manual reload Function and the
+   automatic watcher were removed before stable release. Runtime MIB compilation remains out of scope.
 
 3. **MIB upload via API**: out of scope for first release. Operators convert MIBs offline using `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the resulting YAML; this is documented user workflow (see §7 and the profile-format documentation). UI-driven upload via DynCfg is a future enhancement.
 

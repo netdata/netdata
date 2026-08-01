@@ -1305,7 +1305,7 @@ Source identity transitions:
 - The transition increments `snmp_trap_profile_metrics_source_transitions` so
   chart discontinuity is explainable.
 - The source-transition history is diagnostic memory and must be bounded. When
-  it exceeds the configured source cap, the oldest raw route entries are
+  it exceeds the fixed source cap, the oldest raw route entries are
   pruned; losing old transition memory is acceptable, but unbounded growth is
   not.
 
@@ -1633,9 +1633,9 @@ Lifecycle:
   not change state.
 - State tables must be synchronized; race-free state updates are a required
   implementation property.
-- The current collector processes trap metric updates serially per job. If a
-  future implementation parallelizes trap processing within a job, state table
-  access must use per-rule, per-resource, or equivalent synchronization.
+- Multi-endpoint listener jobs can deliver trap metric updates concurrently.
+  `profileMetricRuntime.mu` serializes state and series mutations within the
+  job.
 - State tables are in-memory only. After Agent restart, trap-derived state is
   unknown until new traps arrive; the implementation must not claim a persisted
   clear state unless a clear trap was observed after restart.

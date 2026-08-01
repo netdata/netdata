@@ -73,7 +73,7 @@ Netdata SNMP trap profile YAMLs?
 
    Profiles are immutable while the shared cache has active job references.
    The final job release unloads the cache; the next job creation loads and
-   validates operator and stock profile files.
+   validates the operator profile files.
 
 7. Verify that unknown OIDs resolve:
 

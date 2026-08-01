@@ -42,11 +42,14 @@ directory `snmp.trap-profiles/` subdirectory (typically `/etc/netdata/go.d/snmp.
 Profiles are loaded **only when the first runnable SNMP trap job is created** — Netdata agents that do not receive traps
 never pay the memory footprint.
 
-Profile loading is shared across trap jobs: the first runnable job eagerly loads operator profiles, validates stock
-profiles, builds a stock OID route table, and later jobs reuse the same cache. Stock profile definitions are loaded into
-memory only when the first matching trap OID needs that stock file. Failed profile validation is a creation-time job
-failure surfaced to DynCfg; it does not leave a permanently poisoned cache. If all trap jobs are removed, the cache is
-released and the next trap job creation validates profiles again.
+Profile loading is shared across trap jobs: the first runnable job eagerly loads and validates operator profiles and the
+stock catalogue, builds a stock OID route table, and later jobs reuse the same cache. Stock profile definitions are loaded
+and validated when the first matching trap OID needs that stock file. Stock definitions load eagerly during job creation
+to build the complete metric rule catalogue when an operator profile defines metric rules or the job enables profile
+metrics. Failed eager validation is a creation-time job failure surfaced to DynCfg; a failed lazy stock load is reported
+by the matching trap and increments profile-load-failure metrics.
+Neither failure permanently poisons a later cache epoch. If all trap jobs are removed, the cache is released and the next
+trap job creation rebuilds the eager cache surfaces.
 
 ## File layout
 
@@ -494,7 +497,8 @@ description: '{{with first (value "ifDescr") (value "ifName") (value "ifIndex")}
 ```
 
 Unknown functions, unknown varbind names, malformed templates, variables, assignments, `if`, `range`, arbitrary
-pipelines, and template inclusion actions fail at profile load so configuration errors are visible at job creation time.
+pipelines, and template inclusion actions fail profile loading. Eager operator/metric-catalogue loads surface the error at
+job creation; lazy stock errors surface on the first matching trap.
 
 If `description:` is absent the plugin renders the default template `"{{trap_name}} on {{hostname}}."`.
 
@@ -579,10 +583,10 @@ label key happens to match a plugin field name. For example, a profile with
 but in different namespaces: the operator label becomes `TRAP_TAG_INTERFACE_STATE`, the topology field becomes
 `TRAP_INTERFACE`. Both can co-exist on the same trap entry without conflict.
 
-Dynamic label references must be bounded-cardinality at profile-load time. The MVP accepts static strings, `TRAP_NAME`,
-`TRAP_DEVICE_VENDOR`, enum-backed varbinds, booleans, and small numeric ranges. It rejects unbounded values such as
-hostnames, source IPs, interface descriptions, MAC addresses, usernames, packet contents, and raw numeric OID references
-without profile metadata.
+Dynamic label references must be bounded-cardinality at profile-load time. Labels accept static strings, `{{trap_name}}`,
+`{{vendor}}`, enum-backed varbinds, booleans, and small numeric ranges. They reject unbounded values such as hostnames,
+source IPs, interface descriptions, MAC addresses, usernames, packet contents, and raw numeric OID references without
+profile metadata.
 
 ```yaml
 # /etc/netdata/go.d/snmp.trap-profiles/site-additions.yaml
@@ -594,8 +598,9 @@ traps:
       change_window: business_hours
 ```
 
-Per-OID metric extraction lives in profile `metrics:` and `charts:` sections. Listener jobs only enable/select those
-profile rules and choose identity, privacy, and cardinality limits through `profile_metrics`.
+Per-OID metric extraction lives in profile `metrics:` and `charts:` sections. Listener jobs only enable and select those
+rules through `profile_metrics`. Source identity, fallback privacy, and job-level cardinality limits use fixed safe
+policies; canonical rule-local `identity.device` and `identity.resource` fields control rule attribution and resources.
 
 ## Generated stock profiles
 

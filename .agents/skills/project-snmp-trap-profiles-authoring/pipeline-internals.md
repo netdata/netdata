@@ -144,9 +144,10 @@ multipath, filename-dedup, field-merge on extends-chain").
   job is recreated.
 
 Operator-observable effect retained in `docs/npm/snmp-traps/trap-profiles.md`:
-profile changes require an Agent restart or recreation of every trap job; invalid
-profiles fail the next job creation. Lazy-load and shared-cache internals stay
-out of operator documentation.
+profile changes require an Agent restart or recreation of every trap job.
+Invalid operator profiles fail the next job creation; invalid lazy stock
+profiles fail their first matching lookup and increment profile-load-failure
+metrics.
 
 ## 8. Source-attributed metric cap
 

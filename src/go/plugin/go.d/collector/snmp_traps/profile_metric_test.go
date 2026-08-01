@@ -512,7 +512,7 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 	assertProfileMetricValue(t, store, "snmp_trap_profile_metrics_rule_missed", profileMetricJobLabels(), 1)
 }
 
-func TestProfileMetricRuntimeAutoCounterBySource(t *testing.T) {
+func TestProfileMetricRuntimeIncludedCounterBySource(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
@@ -529,7 +529,7 @@ func TestProfileMetricRuntimeAutoCounterBySource(t *testing.T) {
 	}
 }
 
-func TestProfileMetricRuntimeExactSampleUsesVarbindValue(t *testing.T) {
+func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")

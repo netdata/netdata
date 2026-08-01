@@ -132,13 +132,18 @@ overrides:
 
 Label keys become `TRAP_TAG_<KEY_UPPERCASE>` fields. For example, `change_window` becomes `TRAP_TAG_CHANGE_WINDOW`. Label keys must start with a lowercase letter and then use only lowercase letters, digits, and underscores.
 
-Job overrides use static label values. Profile-file labels can also use templates, but templated label values must come from bounded sources such as enum-backed varbinds, booleans, small numeric ranges, `TRAP_NAME`, or `TRAP_DEVICE_VENDOR`; unbounded values such as source IPs, hostnames, interface descriptions, MAC addresses, usernames, packet contents, and free-form descriptions are rejected at profile load time.
+Job overrides use static label values. Profile-file labels can also use templates, but templated label values must come from bounded sources such as enum-backed varbinds, booleans, small numeric ranges, `{{trap_name}}`, or `{{vendor}}`; unbounded values such as source IPs, hostnames, interface descriptions, MAC addresses, usernames, packet contents, and free-form descriptions are rejected at profile load time.
 
 ## Profile loading behavior
 
 - Profiles are immutable while any listener job uses the shared profile cache.
-- After changing operator or stock profiles, restart the Agent or recreate all listener jobs. The final release unloads the cache, and the next job creation loads and validates the files.
-- Invalid profiles fail listener job creation and increment profile-load-failure metrics.
+- After changing operator or stock profiles, restart the Agent or recreate all listener jobs. The final release unloads the
+  cache, and the next job creation loads operator profiles and the stock catalogue.
+- Operator profiles and the stock catalogue are validated at job creation. Stock vendor YAML is loaded and validated on
+  the first matching trap, or eagerly to build the complete metric rule catalogue when an operator profile defines metric
+  rules or the job enables profile metrics.
+- Invalid eager profiles fail listener job creation. An invalid lazily loaded stock profile increments profile-load-failure
+  metrics when a matching trap first needs that file.
 
 Profile validation failures are visible as collector errors and profile-load-failure metrics. After editing profiles, check Logs and receiver metrics before assuming a change is active; see [Metrics](/docs/npm/snmp-traps/metrics.md) for the receiver diagnostics.
 

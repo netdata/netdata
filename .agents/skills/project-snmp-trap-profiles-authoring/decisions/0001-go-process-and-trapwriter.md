@@ -18,7 +18,10 @@ The implementation language is **Go** (user decision, 2026-05-25). The journal w
 
 1. **Fit for purpose** — the architecture must blend with existing Netdata patterns. The go.d framework already owns job orchestration (DynCfg Add/Enable/Update/Disable/Remove), coded-error surfacing in the dashboard, and the V2 collector lifecycle.
 2. **Minimize blast radius** — new process boundaries, CGo dependencies, or IPC bridges add failure modes, build complexity, and operational surface that must be continuously tested.
-3. **Creation-time failure detection** — all job resources (bind, profile load, journal directory, writer init, retention) must be validated before DynCfg reports the job as started. This is a user-facing correctness contract per spec §5.
+3. **Creation-time failure detection** — all job resources (bind, eager profile-cache surfaces, journal directory, writer
+   init, retention) must be validated before DynCfg reports the job as started. Lazy stock vendor YAML is not a job
+   resource; a malformed lazy file fails the first matching lookup. This is a user-facing correctness contract per spec
+   §5.
 4. **Share nothing, share once** — the trap profile cache loads on first runnable job creation, is shared across all listeners, and is released when no runnable jobs remain. In-process sharing is trivial; cross-process sharing adds synchronization, IPC, and lifecycle coordination.
 5. **journalctl compatibility** — the M4 acceptance criterion requires `journalctl --directory=...` to work. This means real systemd journal binary-format files (not plain text, not SQLite). The `journalctl` tool reads the binary format documented at https://systemd.io/JOURNAL_FILE_FORMAT/.
 6. **Simplicity** — avoid over-engineering. Prefer standard go.d module code unless evidence justifies another boundary.
@@ -380,14 +383,18 @@ func ReleaseProfileCache() { ... }
 ```
 
 Lifecycle:
-- The first `AcquireProfileCache()` call during job creation loads profiles from multipath (user dirs first, then stock),
-  starts one profile configuration epoch, and increments its active reference count.
+- The first `AcquireProfileCache()` call during job creation eagerly loads operator profiles and the stock catalogue,
+  starts one profile configuration epoch, and increments its active reference count. Stock vendor files load lazily on
+  first matching use unless an operator profile defines metric rules or the job enables profile metrics, which requires
+  the complete rule catalogue during job creation.
 - Every subsequent job creation increments the same reference count and receives the same `*ProfileIndex`.
 - Every job removal calls `ReleaseProfileCache()`. The last release clears the index so GC can reclaim it.
 - Profile files are not watched or reloaded while jobs hold references. After changing a profile, restart the Agent or
-  recreate all `snmp_traps` jobs; the next first acquire loads and validates a fresh epoch from disk.
+  recreate all `snmp_traps` jobs; the next first acquire rebuilds the eager cache surfaces from disk.
 - Agents with no trap jobs never call `AcquireProfileCache()`, so they never pay the profile memory cost
-- Failed profile loads do not poison future attempts. The implementation must not use `sync.Once`; it must retry loading on the next job creation after a failed attempt.
+- Failed initial eager loads do not poison future attempts. The implementation must not use `sync.Once`; it must retry on
+  the next acquisition. A failed lazy stock load is cached only for the current epoch and retried after the final release
+  and next acquisition.
 - The mutex covers the full acquire-check-load-increment and release-decrement-clear sequence. No goroutine may observe a
   partially initialized cache. A failed load leaves the cache unloaded.
 - Extra releases are ignored; they never underflow the reference count or disturb an active epoch.
@@ -402,12 +409,15 @@ All job resources are validated synchronously in the go.d framework's job `Start
 | Job name | `^[a-zA-Z0-9][a-zA-Z0-9_-]*$`, max 64 chars, no path separators/dots | HTTP-422 |
 | Endpoint list | At least one endpoint, protocol supported (udp), address/port parseable | HTTP-422 |
 | Endpoint bind | `net.ListenUDP()` on every configured endpoint; all-or-nothing cleanup on partial failure | HTTP-503 retryable |
-| Profile cache | `AcquireProfileCache()` returns error on load/parse failure | HTTP-422 |
+| Eager profile cache | `AcquireProfileCache()` validates operator profiles, the stock catalogue, and any required metric catalogue | HTTP-422 |
 | Netdata log directory | `os.Stat("${NETDATA_LOG_DIR}")`; parent must already exist and be a directory | HTTP-503 retryable |
 | Journal directory | SDK creates/opens `${NETDATA_LOG_DIR}/traps/{job_name}/`; failure is all-or-nothing cleanup | HTTP-503 retryable |
 | Journal writer | `NewJournalWriter(dir, cfg)` validates directory and retention config | HTTP-503 retryable for environment failures; HTTP-422 for invalid retention config |
 
-These errors must flow through DynCfg as coded errors with the resource-specific code above. Non-retryable configuration/profile errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement `DyncfgRetryable() bool` so file-configured jobs can retry after the transient condition clears.
+These errors must flow through DynCfg as coded errors with the resource-specific code above. Non-retryable configuration
+and eager profile-cache errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement
+`DyncfgRetryable() bool` so file-configured jobs can retry after the transient condition clears. Lazy stock-profile errors
+are runtime lookup failures and do not pass through DynCfg.
 
 - `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (`collectorCallbacks.Start`) wraps `createCollectorJob()` failures as `codedError{code: 400}`, hiding any inner 422.
 - `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (`collectorCallbacks.Start`) schedules retry and returns a plain error for `AutoDetection(ctx)` failures.
@@ -423,7 +433,10 @@ These errors must flow through DynCfg as coded errors with the resource-specific
 
 Before changing shared DynCfg behavior, M2 must run a same-failure scan (`rg 'CodedError|codedError|MarkNonDisruptiveUpdate' src/go/plugin`) and add handler/jobmgr tests proving existing plain-error retry behavior remains unchanged while coded trap creation failures surface their HTTP status.
 
-The trap plugin must still preflight all resources before it reports successful startup. `AutoDetection(ctx)` should be a no-op for traps unless a future SOW proves a cheap consistency check is needed; bind/profile/journal/writer/retention failures must be creation-time coded errors, not retry-loop events.
+The trap plugin must still preflight all resources before it reports successful startup. `AutoDetection(ctx)` should be a
+no-op for traps unless a future SOW proves a cheap consistency check is needed; bind, eager profile-cache, journal, writer,
+and retention failures must be creation-time coded errors, not retry-loop events. Lazy stock-profile errors remain first
+matching lookup failures.
 
 **Partial resource cleanup**: if endpoint 3 of 5 fails to bind after endpoints 1-2 succeeded, the previously bound endpoints are closed before returning the error. The job never enters the running state.
 
