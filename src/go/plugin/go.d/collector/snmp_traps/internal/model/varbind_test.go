@@ -105,8 +105,13 @@ func BenchmarkFindVarbindForProfileOID(b *testing.B) {
 		values[size-1].OID = target + ".1"
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			b.ReportAllocs()
+			var got VarbindValue
+			var ok bool
 			for b.Loop() {
-				_, _ = FindVarbindForProfileOID(values, target)
+				got, ok = FindVarbindForProfileOID(values, target)
+			}
+			if !ok || got.OID != target+".1" {
+				b.Fatalf("lookup = %#v/%v, want target instance/true", got, ok)
 			}
 		})
 	}

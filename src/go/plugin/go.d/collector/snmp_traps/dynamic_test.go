@@ -313,11 +313,11 @@ func TestSendDiscoveryReportWireFormat(t *testing.T) {
 	defer listenerConn.Close()
 	defer peerConn.Close()
 
-	lid, err := NewLocalEngineID(paths, testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID failed: %v", err)
 	}
-	eb, err := NewEngineBoots(paths)
+	eb, err := newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}

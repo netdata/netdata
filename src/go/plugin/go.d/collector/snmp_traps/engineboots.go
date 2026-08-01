@@ -79,7 +79,7 @@ type EngineBoots struct {
 	valid     bool
 }
 
-func NewEngineBoots(paths engineStatePaths) (*EngineBoots, error) {
+func newEngineBoots(paths engineStatePaths) (*EngineBoots, error) {
 	if err := os.MkdirAll(paths.dir, 0750); err != nil {
 		return nil, fmt.Errorf("engine-boots: create directory %s: %w", paths.dir, err)
 	}
@@ -162,7 +162,7 @@ type LocalEngineID struct {
 	valid bool
 }
 
-func NewLocalEngineID(paths engineStatePaths, configuredHex string) (*LocalEngineID, error) {
+func newLocalEngineID(paths engineStatePaths, configuredHex string) (*LocalEngineID, error) {
 	if err := os.MkdirAll(paths.dir, 0750); err != nil {
 		return nil, fmt.Errorf("local-engine-id: create directory %s: %w", paths.dir, err)
 	}

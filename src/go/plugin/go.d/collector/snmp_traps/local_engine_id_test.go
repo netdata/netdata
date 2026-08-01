@@ -55,7 +55,7 @@ func buildV3InformWithEngineID(t *testing.T, user, engineIDHex, trapOID string, 
 func TestLocalEngineIDConfiguredAcceptedAndPersisted(t *testing.T) {
 	paths := newEngineStatePaths(withEngineStateDir(t), "test-job")
 
-	lid, err := NewLocalEngineID(paths, testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID with configured value failed: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestLocalEngineIDConfiguredAcceptedAndPersisted(t *testing.T) {
 		t.Fatalf("local engine ID hex = %q, want %q", lid.Hex(), testLocalEngineIDHex)
 	}
 
-	lid2, err := NewLocalEngineID(paths, "")
+	lid2, err := newLocalEngineID(paths, "")
 	if err != nil {
 		t.Fatalf("NewLocalEngineID reload failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestLocalEngineIDConfiguredAcceptedAndPersisted(t *testing.T) {
 func TestLocalEngineIDOmittedGeneratesPersistsAndReloads(t *testing.T) {
 	paths := newEngineStatePaths(withEngineStateDir(t), "test-job")
 
-	lid, err := NewLocalEngineID(paths, "")
+	lid, err := newLocalEngineID(paths, "")
 	if err != nil {
 		t.Fatalf("NewLocalEngineID generation failed: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestLocalEngineIDOmittedGeneratesPersistsAndReloads(t *testing.T) {
 		t.Fatalf("generated engine ID first bit is set: %x", raw[0])
 	}
 
-	lid2, err := NewLocalEngineID(paths, "")
+	lid2, err := newLocalEngineID(paths, "")
 	if err != nil {
 		t.Fatalf("NewLocalEngineID reload failed: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestLocalEngineIDInitFailsWhenStateCannotBeWritten(t *testing.T) {
 		t.Fatalf("write corrupt local engine id: %v", err)
 	}
 
-	if _, err := NewLocalEngineID(paths, ""); err == nil {
+	if _, err := newLocalEngineID(paths, ""); err == nil {
 		t.Fatal("expected error for corrupt persisted local engine ID")
 	}
 }
@@ -153,7 +153,7 @@ func TestLocalEngineIDInitFailsWhenDirCannotBeCreated(t *testing.T) {
 		t.Fatalf("create blocker file: %v", err)
 	}
 
-	if _, err := NewLocalEngineID(paths, ""); err == nil {
+	if _, err := newLocalEngineID(paths, ""); err == nil {
 		t.Fatal("expected error when engine dir is a file")
 	}
 }
@@ -197,7 +197,7 @@ func TestV3InformAcceptedWithLocalEngineID(t *testing.T) {
 	paths := newEngineStatePaths(withEngineStateDir(t), jobName)
 	withCleanJobMetrics(t, jobName)
 
-	lid, err := NewLocalEngineID(paths, testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID failed: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestV3InformRejectedWithNonLocalEngineID(t *testing.T) {
 	paths := newEngineStatePaths(withEngineStateDir(t), jobName)
 	withCleanJobMetrics(t, jobName)
 
-	lid, err := NewLocalEngineID(paths, testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID failed: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestV3TrapStillRequiresSenderEngineWhitelist(t *testing.T) {
 	paths := newEngineStatePaths(withEngineStateDir(t), jobName)
 	withCleanJobMetrics(t, jobName)
 
-	lid, err := NewLocalEngineID(paths, testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID failed: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestV3InformResponseContainsLocalEngineID(t *testing.T) {
 	defer listenerConn.Close()
 	defer peerConn.Close()
 
-	lid, err := NewLocalEngineID(paths, testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID failed: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestV3InformResponseContainsLocalEngineID(t *testing.T) {
 		},
 	}
 
-	eb, err := NewEngineBoots(paths)
+	eb, err := newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}
@@ -350,7 +350,7 @@ func TestSendInformResponseV3AuthPriv(t *testing.T) {
 	defer listenerConn.Close()
 	defer peerConn.Close()
 
-	lid, err := NewLocalEngineID(paths, testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID failed: %v", err)
 	}
@@ -379,7 +379,7 @@ func TestSendInformResponseV3AuthPriv(t *testing.T) {
 		t.Fatalf("DecodeTrap failed: %v", err)
 	}
 
-	eb, err := NewEngineBoots(paths)
+	eb, err := newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}
@@ -426,7 +426,7 @@ func TestSendInformResponseV3AuthPriv(t *testing.T) {
 func TestCollectorCleanupWithLocalEngineID(t *testing.T) {
 	const jobName = "test-cleanup-lid"
 	paths := newEngineStatePaths(withEngineStateDir(t), jobName)
-	lid, err := NewLocalEngineID(paths, testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID failed: %v", err)
 	}

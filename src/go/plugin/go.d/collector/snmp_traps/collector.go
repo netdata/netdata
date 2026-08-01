@@ -269,7 +269,7 @@ func (c *Collector) Init(ctx context.Context) error {
 			return dyncfgConfigError(err)
 		}
 
-		lid, err = NewLocalEngineID(enginePaths, c.LocalEngineID)
+		lid, err = newLocalEngineID(enginePaths, c.LocalEngineID)
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
@@ -281,7 +281,7 @@ func (c *Collector) Init(ctx context.Context) error {
 			return dyncfgConfigError(err)
 		}
 
-		eb, err = NewEngineBoots(enginePaths)
+		eb, err = newEngineBoots(enginePaths)
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()

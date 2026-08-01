@@ -71,14 +71,12 @@ func TestCachedFallbackCachesSuccessUnderConcurrency(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 64 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			got, err := service.CachedFallback()
 			if err != nil || got != provider {
 				t.Errorf("CachedFallback = %v/%v", got, err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	if calls.Load() != 1 {

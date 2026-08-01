@@ -163,6 +163,16 @@ func TestInitBindFailureReleasesProfileRef(t *testing.T) {
 // Profile loading tests (using temp dir overrides)
 // =============================================================================
 
+func TestProfileLoadRejectsUnknownTopLevelKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.yaml")
+	writeProfileYAML(t, dir, "bad.yaml", "unknown_profile_key: true\n")
+
+	_, err := loadProfileBundle(path, multipath.New(dir), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `profile: unknown config key "unknown_profile_key"`)
+}
+
 func TestProfileDirPathBuilders(t *testing.T) {
 	assert.Equal(t, filepath.Join("/etc/netdata/go.d", "snmp.trap-profiles"), trapProfilesUserDir("/etc/netdata/go.d"))
 	assert.Equal(t, filepath.Join("/usr/lib/netdata/conf.d/go.d", "snmp.trap-profiles", "default"), trapProfilesStockDir("/usr/lib/netdata/conf.d/go.d"))

@@ -71,7 +71,7 @@ func TestCreatorDeclaresFunctions(t *testing.T) {
 	}
 }
 
-func TestFactoryDecodesJobNameIntoCollector(t *testing.T) {
+func TestFactoryDecodesJobNameAndIgnoresUnknownCollectorFields(t *testing.T) {
 	state := &factoryTestState{}
 	var module *factoryTestV2
 	creator := collectorapi.Creator{
@@ -86,11 +86,14 @@ func TestFactoryDecodesJobNameIntoCollector(t *testing.T) {
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
+	config := factoryTestConfig(false)
+	config["unknown_top_level"] = true
+	config["unknown_nested"] = map[string]any{"field": true}
 
 	prepared, failure, err := prepareFactoryTestCandidate(
 		context.Background(),
 		factory,
-		factoryTestConfig(false),
+		config,
 		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
 		permit,
 	)

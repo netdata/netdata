@@ -302,6 +302,9 @@ func TestConfigValidateIsPure(t *testing.T) {
 }
 
 func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
+	profileDir := t.TempDir()
+	writeProfileYAML(t, profileDir, "invalid.yaml", "unknown_profile_key: true\n")
+	setTestDirs(t, profileDir)
 	resetProfileCacheForTest()
 	t.Cleanup(resetProfileCacheForTest)
 
@@ -313,6 +316,7 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	err := c.Init(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "profile_metrics.mode")
+	assert.NotContains(t, err.Error(), "unknown_profile_key")
 	assert.Nil(t, CurrentProfileIndex())
 	assert.Nil(t, c.listener)
 	assert.Nil(t, c.trapWriter)

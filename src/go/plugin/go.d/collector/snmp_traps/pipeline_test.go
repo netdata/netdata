@@ -1330,7 +1330,7 @@ func TestSnmpEngineBootsPersistence(t *testing.T) {
 	jobName := "test-job"
 	paths := newEngineStatePaths(t.TempDir(), jobName)
 
-	eb, err := NewEngineBoots(paths)
+	eb, err := newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}
@@ -1338,7 +1338,7 @@ func TestSnmpEngineBootsPersistence(t *testing.T) {
 		t.Errorf("expected first boot value 1, got %d", v)
 	}
 
-	eb, err = NewEngineBoots(paths)
+	eb, err = newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("second NewEngineBoots failed: %v", err)
 	}
@@ -1357,7 +1357,7 @@ func TestSnmpEngineBootsCorruptFileFailsCreation(t *testing.T) {
 		t.Fatalf("write engine boots file: %v", err)
 	}
 
-	if _, err := NewEngineBoots(paths); err == nil {
+	if _, err := newEngineBoots(paths); err == nil {
 		t.Fatal("expected corrupt engine-boots state to fail job creation")
 	}
 }
@@ -1372,7 +1372,7 @@ func TestSnmpEngineBootsRejectsMaxValue(t *testing.T) {
 		t.Fatalf("write engine boots file: %v", err)
 	}
 
-	if _, err := NewEngineBoots(paths); err == nil {
+	if _, err := newEngineBoots(paths); err == nil {
 		t.Fatal("expected error for max engine boots value")
 	}
 }
@@ -1384,7 +1384,7 @@ func TestSnmpEngineBootsReadErrorFails(t *testing.T) {
 		t.Fatalf("mkdir engine boots file path: %v", err)
 	}
 
-	if _, err := NewEngineBoots(paths); err == nil {
+	if _, err := newEngineBoots(paths); err == nil {
 		t.Fatal("expected read error when engine boots path is a directory")
 	}
 }
