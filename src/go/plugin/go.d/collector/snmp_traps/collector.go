@@ -19,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 )
 
 //go:embed "config_schema.json"
@@ -54,12 +55,15 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 	if topologyEnricher == nil {
 		panic("snmp_traps Register requires a non-nil trap enrichment handle")
 	}
+	hostIdentity := newHostIdentityService()
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
 		},
-		CreateV2:       func() collectorapi.CollectorV2 { return New(deviceStore, topologyEnricher) },
+		CreateV2: func() collectorapi.CollectorV2 {
+			return newCollector(deviceStore, topologyEnricher, hostIdentity, netdataEngineStateRoot)
+		},
 		Config:         func() any { return &Config{} },
 		AgentFunctions: snmpTrapsMethods,
 		MethodHandler:  snmpTrapsMethodHandler,
@@ -74,6 +78,15 @@ func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnr
 	if topologyEnricher == nil {
 		panic("snmp_traps New requires a non-nil trap enrichment handle")
 	}
+	return newCollector(deviceStore, topologyEnricher, newHostIdentityService(), netdataEngineStateRoot)
+}
+
+func newCollector(
+	deviceStore *ddsnmp.DeviceStore,
+	topologyEnricher *snmptopology.TrapEnrichmentHandle,
+	hostIdentity *hostidentity.Service,
+	engineStateRoot func() string,
+) *Collector {
 	store := metrix.NewCollectorStore()
 
 	return &Collector{
@@ -86,6 +99,8 @@ func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnr
 		store:            store,
 		deviceLookup:     deviceStore,
 		topologyEnricher: topologyEnricher,
+		hostIdentity:     hostIdentity,
+		engineStateRoot:  engineStateRoot,
 	}
 }
 
@@ -100,7 +115,8 @@ type Collector struct {
 	store              metrix.CollectorStore
 	deviceLookup       deviceLookup
 	topologyEnricher   trapTopologyEnricher
-	jobName            string
+	hostIdentity       *hostidentity.Service
+	engineStateRoot    func() string
 	vnode              string
 	versions           map[SnmpVersion]struct{}
 	allowlist          *Allowlist
@@ -129,85 +145,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) SetJobName(name string) {
-	c.jobName = name
-}
-
 func (c *Collector) Init(ctx context.Context) error {
-	if err := validateJobName(c.jobName); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	if err := validateListenConfig(c.Listen); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	versions, err := validateVersions(c.Versions)
+	validated, err := validateConfig(c.Config)
 	if err != nil {
 		return dyncfgConfigError(err)
 	}
-	v3Enabled := versionListContains(versions, "v3")
-
-	if err := validateUSMUsers(c.USMUsers, c.DynamicEngineID); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	if err := validateEngineIDWhitelist(c.EngineIDWhitelist); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	if err := validateLocalEngineID(c.LocalEngineID); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	allowlistPrefixes, err := validateAllowlist(c.Allowlist)
-	if err != nil {
-		return dyncfgConfigError(err)
-	}
-	trustedRelays, err := validateTrustedRelays(c.Source)
-	if err != nil {
-		return dyncfgConfigError(err)
-	}
-	c.warnCatchAllTrustedRelays(trustedRelays)
-
-	if err := validateRateLimit(c.RateLimit); err != nil {
-		return dyncfgConfigError(err)
-	}
-	if err := validateDedupConfig(c.Dedup); err != nil {
-		return dyncfgConfigError(err)
-	}
-	otlpRuntime, err := validateOTLPConfig(c.OTLP)
-	if err != nil {
-		return dyncfgConfigError(err)
-	}
-	journalEnabled := c.Journal.enabled()
-	if !journalEnabled && !c.OTLP.Enabled {
-		return dyncfgConfigError(errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled"))
-	}
-
-	if err := validateOverrides(c.Overrides); err != nil {
-		return dyncfgConfigError(err)
-	}
-	if err := validateDeferredConfig(c.Config); err != nil {
-		return dyncfgConfigError(err)
-	}
-	if v3Enabled {
-		if len(c.USMUsers) == 0 {
-			return dyncfgConfigError(errors.New("SNMPv3 requires at least one usm_users entry"))
-		}
-		if !c.DynamicEngineID && len(c.EngineIDWhitelist) == 0 {
-			return dyncfgConfigError(errors.New("SNMPv3 requires engine_id_whitelist when dynamic_engine_id_discovery is disabled"))
-		}
-	}
-
-	var retCfg RetentionConfig
-	if journalEnabled {
-		ret, err := parseRetentionConfig(c.Retention)
-		if err != nil {
-			return dyncfgConfigError(err)
-		}
-		retCfg = ret
-	}
+	c.warnCatchAllTrustedRelays(validated.trustedRelays)
 
 	if c.listener != nil {
 		return nil
@@ -231,13 +174,8 @@ func (c *Collector) Init(ctx context.Context) error {
 		releaseProfiles()
 		return dyncfgConfigError(errors.New("profile index not available"))
 	}
-	profileMetricCfg, err := normalizeProfileMetricsConfig(c.ProfileMetrics)
-	if err != nil {
-		releaseProfiles()
-		return dyncfgConfigError(err)
-	}
-	if profileMetricCfg.enabled {
-		rt, tmpl, err := newProfileMetricRuntime(profileMetricCfg, idx)
+	if validated.profileMetrics.enabled {
+		rt, tmpl, err := newProfileMetricRuntime(validated.profileMetrics, idx, c.sourceHashSalt())
 		if err != nil {
 			releaseProfiles()
 			return dyncfgConfigError(err)
@@ -247,22 +185,26 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	var journalWriter *JournalWriter
-	if journalEnabled {
+	if validated.journalEnabled {
 		if err := validateNetdataLogRoot(); err != nil {
 			releaseProfiles()
 			return dyncfgStartupError(err)
 		}
-		dir := journalRoot(c.jobName)
-		journalCfg := retCfg.makeJournalConfig()
-		var err error
-		journalWriter, err = NewJournalWriter(dir, journalCfg)
+		dir := journalRoot(c.Name)
+		journalCfg := validated.retention.makeJournalConfig()
+		host, err := c.hostIdentity.FreshJournal()
+		if err != nil {
+			releaseProfiles()
+			return dyncfgStartupError(err)
+		}
+		journalWriter, err = newJournalWriterWithHostProvider(dir, journalCfg, host)
 		if err != nil {
 			releaseProfiles()
 			return dyncfgStartupError(err)
 		}
 	}
 
-	listener, err := newListener(c.jobName, c.Listen)
+	listener, err := newListener(c.Name, c.Listen)
 	if err != nil {
 		releaseProfiles()
 		if journalWriter != nil {
@@ -282,27 +224,33 @@ func (c *Collector) Init(ctx context.Context) error {
 	var lid *LocalEngineID
 	var v3Table *gosnmp.SnmpV3SecurityParametersTable
 	var engineIDWhitelist map[string]struct{}
+	var enginePaths engineStatePaths
 	cleanupCreatedState := func() {
 		// No engine-state files exist unless SNMPv3 setup below creates them.
 	}
-	if v3Enabled {
-		engineBootsExisted, err := engineStatePathExistsChecked(engineBootsPath(c.jobName))
+	if validated.v3Enabled {
+		if c.engineStateRoot == nil {
+			cleanupPreflight()
+			return dyncfgStartupError(errors.New("SNMP engine state root is not configured"))
+		}
+		enginePaths = newEngineStatePaths(c.engineStateRoot(), c.Name)
+		engineBootsExisted, err := engineStatePathExistsChecked(enginePaths.engineBoots)
 		if err != nil {
 			cleanupPreflight()
 			return dyncfgStartupError(err)
 		}
-		localEngineIDExisted, err := engineStatePathExistsChecked(localEngineIDPath(c.jobName))
+		localEngineIDExisted, err := engineStatePathExistsChecked(enginePaths.localEngineID)
 		if err != nil {
 			cleanupPreflight()
 			return dyncfgStartupError(err)
 		}
-		engineStateDirExisted, err := engineStatePathExistsChecked(engineBootsDir(c.jobName))
+		engineStateDirExisted, err := engineStatePathExistsChecked(enginePaths.dir)
 		if err != nil {
 			cleanupPreflight()
 			return dyncfgStartupError(err)
 		}
 		cleanupCreatedState = func() {
-			cleanupCreatedEngineState(c.jobName, !engineBootsExisted, !localEngineIDExisted, !engineStateDirExisted)
+			cleanupCreatedEngineState(enginePaths, !engineBootsExisted, !localEngineIDExisted, !engineStateDirExisted)
 		}
 
 		v3Table, err = buildSnmpV3SecurityTable(c.USMUsers, c.DynamicEngineID)
@@ -318,7 +266,7 @@ func (c *Collector) Init(ctx context.Context) error {
 			return dyncfgConfigError(err)
 		}
 
-		lid, err = NewLocalEngineID(c.jobName, c.LocalEngineID)
+		lid, err = newLocalEngineID(enginePaths, c.LocalEngineID)
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
@@ -330,7 +278,7 @@ func (c *Collector) Init(ctx context.Context) error {
 			return dyncfgConfigError(err)
 		}
 
-		eb, err = NewEngineBoots(c.jobName)
+		eb, err = newEngineBoots(enginePaths)
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
@@ -339,16 +287,17 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	overrides := buildOverrideMap(c.Overrides)
-	metrics := getJobMetrics(c.jobName)
+	metrics := getJobMetrics(c.Name)
+	metrics.setSourceHashSaltProvider(c.sourceHashSalt)
 	listener.metrics = metrics
 	listener.onReadError = c.logListenerReadError
 	c.reportListenerReceiveBufferWarnings(listener.receiveBufferWarnings)
 	var secondaryWriter TrapWriter
 	if c.OTLP.Enabled {
-		c.warnPlaintextOTLP(otlpRuntime)
-		secondaryWriter, err = newOTLPTrapWriterWithRuntimeConfig(ctx, c.jobName, otlpRuntime, metrics, journalWriter == nil)
+		c.warnPlaintextOTLP(validated.otlp)
+		secondaryWriter, err = newOTLPTrapWriterWithRuntimeConfig(ctx, c.Name, validated.otlp, metrics, journalWriter == nil)
 		if err != nil {
-			removeJobMetrics(c.jobName)
+			removeJobMetrics(c.Name)
 			cleanupCreatedState()
 			cleanupPreflight()
 			return dyncfgStartupError(err)
@@ -358,7 +307,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	writeFailureDim := trapWriteFailureJournal
 	if journalWriter != nil {
 		primaryWriter = newJournalTrapWriter(journalWriter, defaultQueueCapacity, func(err error) {
-			c.warnf("SNMP trap journal writer stopped for job %q: %v", c.jobName, err)
+			c.warnf("SNMP trap journal writer stopped for job %q: %v", c.Name, err)
 		})
 	}
 	trapWriter := newFanoutTrapWriter(primaryWriter, secondaryWriter, metrics)
@@ -366,13 +315,13 @@ func (c *Collector) Init(ctx context.Context) error {
 		writeFailureDim = trapWriteFailureOTLP
 	}
 	metrics.setDedupEnabled(c.Dedup.Enabled)
-	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics, writeFailureDim, c.monotonicUsec)
+	deduper := newTrapDeduper(c.Name, c.Dedup, trapWriter, metrics, writeFailureDim, c.monotonicUsec)
 
-	c.Versions = versions
+	c.Versions = validated.versions
 	c.vnode = c.Vnode
-	c.versions = versionSet(versions)
-	c.allowlist = NewAllowlist(allowlistPrefixes, c.Communities)
-	c.trustedRelays = trustedRelays
+	c.versions = versionSet(validated.versions)
+	c.allowlist = NewAllowlist(validated.allowlist, c.Communities)
+	c.trustedRelays = validated.trustedRelays
 	c.rateLimiter = newRateLimiter(c.RateLimit.Enabled, c.RateLimit.PerSourcePPS, c.RateLimit.Mode)
 	c.engineBoots = eb
 	c.localEngineID = lid
@@ -459,7 +408,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.journalDir != "" {
 		activeDirectJournalJobs.Add(-1)
 	}
-	removeJobMetrics(c.jobName)
+	removeJobMetrics(c.Name)
 	c.metrics = nil
 	c.profileMetrics = nil
 	c.dynamicChartYAML = ""
@@ -499,9 +448,9 @@ func (c *Collector) collect(ctx context.Context) error {
 			c.metrics.setBinaryEncoded(w.BinaryEncodedFields())
 		}
 	}
-	collectMetrics(c.store, c.jobName)
+	collectMetrics(c.store, c.Name)
 	if c.profileMetrics != nil {
-		c.profileMetrics.collect(c.store, c.jobName)
+		c.profileMetrics.collect(c.store, c.Name)
 	}
 	return nil
 }
@@ -661,7 +610,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		td = c.applyOverrides(td)
 	}
 
-	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), c.monotonicUsec())
+	entry := trapEntryFromPDU(c.Name, pdu, td, time.Now().UnixMicro(), c.monotonicUsec())
 	entry.PacketSequence = packetSequence
 	c.enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
 	renderTrapEntryTemplates(entry, td)

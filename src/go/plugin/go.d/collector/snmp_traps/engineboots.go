@@ -15,26 +15,24 @@ import (
 	"time"
 )
 
-var engineBootsDirBase string
-
 const (
 	maxSnmpEngineBoots = 2147483647
 	maxSnmpEngineTime  = uint32(4294967295)
 )
 
-func engineBootsDir(jobName string) string {
-	return filepath.Join(engineBootsBaseDir(), jobName)
+type engineStatePaths struct {
+	dir           string
+	engineBoots   string
+	localEngineID string
 }
 
-func engineBootsBaseDir() string {
-	if engineBootsDirBase != "" {
-		return engineBootsDirBase
+func newEngineStatePaths(root, jobName string) engineStatePaths {
+	dir := filepath.Join(root, jobName)
+	return engineStatePaths{
+		dir:           dir,
+		engineBoots:   filepath.Join(dir, "engine-boots"),
+		localEngineID: filepath.Join(dir, "local-engine-id"),
 	}
-	return filepath.Join(netdataLibDir(), "snmp-trap")
-}
-
-func engineBootsPath(jobName string) string {
-	return filepath.Join(engineBootsDir(jobName), "engine-boots")
 }
 
 func engineStatePathExistsChecked(path string) (bool, error) {
@@ -59,17 +57,17 @@ func engineStatePathExistsChecked(path string) (bool, error) {
 	return false, err
 }
 
-func cleanupCreatedEngineState(jobName string, removeEngineBoots, removeLocalEngineID, removeDir bool) {
+func cleanupCreatedEngineState(paths engineStatePaths, removeEngineBoots, removeLocalEngineID, removeDir bool) {
 	if removeEngineBoots {
-		_ = os.Remove(engineBootsPath(jobName))
-		_ = os.Remove(engineBootsPath(jobName) + ".tmp")
+		_ = os.Remove(paths.engineBoots)
+		_ = os.Remove(paths.engineBoots + ".tmp")
 	}
 	if removeLocalEngineID {
-		_ = os.Remove(localEngineIDPath(jobName))
-		_ = os.Remove(localEngineIDPath(jobName) + ".tmp")
+		_ = os.Remove(paths.localEngineID)
+		_ = os.Remove(paths.localEngineID + ".tmp")
 	}
 	if removeDir {
-		_ = os.Remove(engineBootsDir(jobName))
+		_ = os.Remove(paths.dir)
 	}
 }
 
@@ -81,13 +79,12 @@ type EngineBoots struct {
 	valid     bool
 }
 
-func NewEngineBoots(jobName string) (*EngineBoots, error) {
-	dir := engineBootsDir(jobName)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return nil, fmt.Errorf("engine-boots: create directory %s: %w", dir, err)
+func newEngineBoots(paths engineStatePaths) (*EngineBoots, error) {
+	if err := os.MkdirAll(paths.dir, 0750); err != nil {
+		return nil, fmt.Errorf("engine-boots: create directory %s: %w", paths.dir, err)
 	}
 
-	eb := &EngineBoots{path: engineBootsPath(jobName), startedAt: time.Now()}
+	eb := &EngineBoots{path: paths.engineBoots, startedAt: time.Now()}
 	if err := eb.init(); err != nil {
 		return nil, err
 	}
@@ -158,10 +155,6 @@ func (eb *EngineBoots) engineTimeLocked() uint32 {
 	return uint32(elapsed / time.Second)
 }
 
-func localEngineIDPath(jobName string) string {
-	return filepath.Join(engineBootsDir(jobName), "local-engine-id")
-}
-
 type LocalEngineID struct {
 	mu    sync.Mutex
 	path  string
@@ -169,13 +162,12 @@ type LocalEngineID struct {
 	valid bool
 }
 
-func NewLocalEngineID(jobName string, configuredHex string) (*LocalEngineID, error) {
-	dir := engineBootsDir(jobName)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return nil, fmt.Errorf("local-engine-id: create directory %s: %w", dir, err)
+func newLocalEngineID(paths engineStatePaths, configuredHex string) (*LocalEngineID, error) {
+	if err := os.MkdirAll(paths.dir, 0750); err != nil {
+		return nil, fmt.Errorf("local-engine-id: create directory %s: %w", paths.dir, err)
 	}
 
-	lid := &LocalEngineID{path: localEngineIDPath(jobName)}
+	lid := &LocalEngineID{path: paths.localEngineID}
 	if err := lid.init(configuredHex); err != nil {
 		return nil, err
 	}

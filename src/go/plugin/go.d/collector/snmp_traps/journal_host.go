@@ -3,17 +3,13 @@
 package snmp_traps
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
-
-	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
-	"github.com/netdata/systemd-journal-sdk/go/journalhost"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 )
 
 const (
@@ -21,36 +17,14 @@ const (
 	journalHostStateDirName = "systemd-journal-sdk"
 )
 
-type journalHostProvider interface {
-	MachineID() sdkjournal.UUID
-	BootID() sdkjournal.UUID
-	MonotonicUsec() uint64
+type journalHostProvider = hostidentity.Provider
+
+func newHostIdentityService() *hostidentity.Service {
+	return hostidentity.New(journalHostLoadConfig)
 }
 
-var defaultJournalHost struct {
-	once     sync.Once
-	provider journalHostProvider
-	err      error
-}
-
-func loadJournalHostProvider() (journalHostProvider, error) {
-	opts := journalHostLoadOptions()
-	provider, err := journalhost.Load(opts)
-	if err != nil {
-		return nil, fmt.Errorf("load local journal host identity using state directory %s: %w", opts.StateDir, err)
-	}
-	return provider, nil
-}
-
-func defaultJournalHostProvider() (journalHostProvider, error) {
-	defaultJournalHost.once.Do(func() {
-		defaultJournalHost.provider, defaultJournalHost.err = journalhost.Load(journalHostLoadOptions())
-	})
-	return defaultJournalHost.provider, defaultJournalHost.err
-}
-
-func journalHostLoadOptions() journalhost.LoadOptions {
-	return journalhost.LoadOptions{
+func journalHostLoadConfig() hostidentity.LoadConfig {
+	return hostidentity.LoadConfig{
 		StateDir:             netdataJournalHostStateDir(),
 		HostFilesystemPrefix: netdataHostFilesystemPrefix(),
 	}
@@ -80,17 +54,29 @@ func netdataLibDir() string {
 	return filepath.Clean(buildinfo.DefaultVarLibDir)
 }
 
-func defaultMonotonicUsec() int64 {
-	provider, err := defaultJournalHostProvider()
-	if err != nil {
-		return 0
-	}
-	return int64(provider.MonotonicUsec())
+func netdataEngineStateRoot() string {
+	return filepath.Join(netdataLibDir(), "snmp-trap")
 }
 
 func (c *Collector) monotonicUsec() int64 {
 	if c != nil && c.journalHost != nil {
 		return int64(c.journalHost.MonotonicUsec())
 	}
-	return monotonicUsec()
+	if c == nil || c.hostIdentity == nil {
+		return 0
+	}
+	provider, err := c.hostIdentity.CachedFallback()
+	if err != nil {
+		return 0
+	}
+	return int64(provider.MonotonicUsec())
+}
+
+func (c *Collector) sourceHashSalt() string {
+	if c != nil && c.hostIdentity != nil {
+		if provider, err := c.hostIdentity.CachedFallback(); err == nil {
+			return "machine-id:" + provider.MachineID().String()
+		}
+	}
+	return "netdata-agent"
 }

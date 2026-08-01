@@ -16,6 +16,7 @@ import (
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 // ---------------------------------------------------------------------------
@@ -27,8 +28,8 @@ func buildBenchV2cTrap(b testing.TB, community, trapOID string, extra ...gosnmp.
 	b.Helper()
 	x := &gosnmp.GoSNMP{Version: gosnmp.Version2c, Community: community}
 	pdus := []gosnmp.SnmpPDU{
-		{Name: sysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
-		{Name: snmpTrapOIDOID, Type: gosnmp.ObjectIdentifier, Value: trapOID},
+		{Name: model.SysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
+		{Name: model.SNMPTrapOID, Type: gosnmp.ObjectIdentifier, Value: trapOID},
 	}
 	pdus = append(pdus, extra...)
 	data, err := x.MkSnmpPacket(gosnmp.SNMPv2Trap, pdus, 0, 0).MarshalMsg()
@@ -137,7 +138,7 @@ func BenchmarkPacketTrap(b *testing.B) {
 
 	writer := &countingWriter{}
 	c := &Collector{
-		jobName:    jobName,
+		Config:     Config{Name: jobName},
 		trapWriter: writer,
 		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 		allowlist:  NewAllowlist(nil, []string{"public"}),
@@ -191,7 +192,7 @@ func BenchmarkMultiJob(b *testing.B) {
 				peers[i] = net.ParseIP(fmt.Sprintf("10.1.2.%d", i+1))
 				writers[i] = &countingWriter{}
 				collectors[i] = &Collector{
-					jobName:    jn,
+					Config:     Config{Name: jn},
 					trapWriter: writers[i],
 					versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 					allowlist:  NewAllowlist(nil, []string{"public"}),
@@ -277,7 +278,7 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 	if err != nil {
 		b.Fatalf("normalizeProfileMetricsConfig: %v", err)
 	}
-	rt, _, err := newProfileMetricRuntime(cfg, idx)
+	rt, _, err := newProfileMetricRuntime(cfg, idx, "benchmark")
 	if err != nil {
 		b.Fatalf("newProfileMetricRuntime: %v", err)
 	}
@@ -408,8 +409,8 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 						"4": "aux",
 					},
 				},
-				sysUpTimeOID: {
-					OID:     sysUpTimeOID,
+				model.SysUpTimeOID: {
+					OID:     model.SysUpTimeOID,
 					Type:    "TimeTicks",
 					rawName: "sysUpTime.0",
 				},
@@ -496,7 +497,7 @@ func benchmarkProfileMetricConfigTrapEntry(jobName, sourceIP string, terminalTyp
 		}},
 		Varbinds: []VarbindValue{
 			{OID: testCiscoTerminalTypeOID, Type: "INTEGER", Value: terminalType},
-			{OID: sysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
+			{OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
 		},
 	}
 }
@@ -631,7 +632,7 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	}
 	tw := newJournalTrapWriter(w, 1<<20)
 	c := &Collector{
-		jobName:    "bench-full",
+		Config:     Config{Name: "bench-full"},
 		trapWriter: tw,
 		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 		allowlist:  NewAllowlist(nil, []string{"public"}),
@@ -750,7 +751,7 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	})
 
 	c := &Collector{
-		jobName:    "bench-udp",
+		Config:     Config{Name: "bench-udp"},
 		trapWriter: tw,
 		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 		allowlist:  NewAllowlist(nil, []string{"public"}),

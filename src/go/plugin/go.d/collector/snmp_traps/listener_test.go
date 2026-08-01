@@ -175,7 +175,7 @@ func TestCollectorReportsListenerReceiveBufferWarnings(t *testing.T) {
 	const jobName = "test-listener-buffer-degraded"
 	metrics := withCleanJobMetrics(t, jobName)
 	c := newTestSNMPTrapsCollector()
-	c.jobName = jobName
+	c.Name = jobName
 	c.metrics = metrics
 	var buf bytes.Buffer
 	c.Logger = logger.NewWithWriter(&buf)

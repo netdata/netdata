@@ -84,14 +84,6 @@ func validateNetdataLogRoot() error {
 	return nil
 }
 
-func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {
-	host, err := loadJournalHostProvider()
-	if err != nil {
-		return nil, err
-	}
-	return newJournalWriterWithHostProvider(dir, cfg, host)
-}
-
 func newJournalWriterWithHostProvider(dir string, cfg JournalConfig, host journalHostProvider) (*JournalWriter, error) {
 	if host == nil {
 		return nil, errMissingJournalHost

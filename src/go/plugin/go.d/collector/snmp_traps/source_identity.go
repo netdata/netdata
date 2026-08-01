@@ -130,10 +130,3 @@ func fallbackTrapSourceKind(method string) string {
 		return "other"
 	}
 }
-
-func profileMetricSourceHashSalt() string {
-	if provider, err := defaultJournalHostProvider(); err == nil {
-		return "machine-id:" + provider.MachineID().String()
-	}
-	return "netdata-agent"
-}

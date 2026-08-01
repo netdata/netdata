@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 type profileLoadPaths struct {
@@ -1216,7 +1217,7 @@ func (s *stockProfileStore) loadForOID(idx *ProfileIndex, oid string) error {
 }
 
 func (s *stockProfileStore) route(oid string) string {
-	for _, candidate := range []string{oid, alternateTrapOID(oid)} {
+	for _, candidate := range []string{oid, model.AlternateTrapOID(oid)} {
 		if file := s.exactRoutes[candidate]; file != "" {
 			return file
 		}
@@ -1340,6 +1341,51 @@ func mergeStringMaps(base, override map[string]string) map[string]string {
 
 func stacksContains(stack []string, name string) bool {
 	return slices.Contains(stack, name)
+}
+
+type yamlKeySpec struct {
+	children map[string]yamlKeySpec
+	elem     *yamlKeySpec
+	allowAny bool
+}
+
+func rejectUnknownYAMLKeys(node any, spec yamlKeySpec, path string) error {
+	if spec.allowAny || node == nil {
+		return nil
+	}
+
+	switch v := node.(type) {
+	case map[any]any:
+		if spec.children == nil {
+			return nil
+		}
+		for rawKey, rawValue := range v {
+			key, ok := rawKey.(string)
+			if !ok {
+				return fmt.Errorf("%s: config key %v is not a string", path, rawKey)
+			}
+			child, ok := spec.children[key]
+			if !ok {
+				return fmt.Errorf("%s: unknown config key %q", path, key)
+			}
+			childPath := path + "." + key
+			if err := rejectUnknownYAMLKeys(rawValue, child, childPath); err != nil {
+				return err
+			}
+		}
+	case []any:
+		if spec.elem == nil {
+			return nil
+		}
+		for i, item := range v {
+			itemPath := fmt.Sprintf("%s[%d]", path, i)
+			if err := rejectUnknownYAMLKeys(item, *spec.elem, itemPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 var (

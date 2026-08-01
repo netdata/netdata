@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -76,8 +77,8 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 						"4": "aux",
 					},
 				},
-				sysUpTimeOID: {
-					OID:     sysUpTimeOID,
+				model.SysUpTimeOID: {
+					OID:     model.SysUpTimeOID,
 					Type:    "TimeTicks",
 					rawName: "sysUpTime.0",
 				},
@@ -195,7 +196,7 @@ func newTestProfileMetricRuntimeWithConfig(t *testing.T, idx *ProfileIndex, cfg 
 	if err != nil {
 		t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
 	}
-	rt, tmpl, err := newProfileMetricRuntime(normalized, idx)
+	rt, tmpl, err := newProfileMetricRuntime(normalized, idx, "test")
 	if err != nil {
 		t.Fatalf("newProfileMetricRuntime failed: %v", err)
 	}
@@ -230,7 +231,7 @@ func ciscoConfigTrapEntry(jobName string) *TrapEntry {
 		Varbinds: []VarbindValue{
 			{OID: testCiscoCommandSourceOID, Type: "INTEGER", Value: 2},
 			{OID: testCiscoTerminalTypeOID, Type: "INTEGER", Value: 2},
-			{OID: sysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
+			{OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
 		},
 	}
 }
@@ -442,7 +443,7 @@ func TestNewProfileMetricRuntimeRejectsNilProfileIndex(t *testing.T) {
 		t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
 	}
 
-	if _, _, err := newProfileMetricRuntime(cfg, nil); err == nil || !strings.Contains(err.Error(), "profile index not available") {
+	if _, _, err := newProfileMetricRuntime(cfg, nil, "test"); err == nil || !strings.Contains(err.Error(), "profile index not available") {
 		t.Fatalf("newProfileMetricRuntime nil index error = %v, want profile index not available", err)
 	}
 }
@@ -1402,7 +1403,7 @@ func TestProfileMetricChartTemplateUsesResourceLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
 	}
-	_, tmpl, err := newProfileMetricRuntime(cfg, idx)
+	_, tmpl, err := newProfileMetricRuntime(cfg, idx, "test")
 	if err != nil {
 		t.Fatalf("newProfileMetricRuntime failed: %v", err)
 	}
@@ -2386,7 +2387,7 @@ func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
 	}
-	_, _, err = newProfileMetricRuntime(cfg, idx)
+	_, _, err = newProfileMetricRuntime(cfg, idx, "test")
 	if err == nil ||
 		!strings.Contains(err.Error(), "reuses output.dimension") ||
 		!strings.Contains(err.Error(), "cisco.config.changed") {

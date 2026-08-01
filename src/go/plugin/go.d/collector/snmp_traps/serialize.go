@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 var severityToPriority = map[Severity]string{
@@ -224,15 +226,15 @@ func trapVarbindJournalFieldNames(vb VarbindValue, state *trapVarbindFieldState)
 }
 
 func shouldSkipTrapVarbindJournalField(vb VarbindValue) bool {
-	if isSensitiveTrapVarbind(vb) {
+	if model.IsSensitiveVarbind(vb) {
 		return true
 	}
 
-	oid := normalizeOID(vb.OID)
-	if oidMatchesScalar(oid, sysUpTimeOID) ||
-		oidMatchesScalar(oid, snmpTrapOIDOID) ||
-		oidMatchesScalar(oid, snmpTrapAddressOID) ||
-		oidMatchesScalar(oid, snmpTrapEnterpriseOID) {
+	oid := model.NormalizeOID(vb.OID)
+	if oidMatchesScalar(oid, model.SysUpTimeOID) ||
+		oidMatchesScalar(oid, model.SNMPTrapOID) ||
+		oidMatchesScalar(oid, model.SNMPTrapAddressOID) ||
+		oidMatchesScalar(oid, model.SNMPTrapEnterpriseOID) {
 		return true
 	}
 
@@ -252,7 +254,7 @@ func oidMatchesScalar(oid, scalar string) bool {
 func trapVarbindJournalFieldBase(vb VarbindValue) string {
 	source := vb.Name
 	if source == "" {
-		oid := normalizeOID(vb.OID)
+		oid := model.NormalizeOID(vb.OID)
 		if oid == "" {
 			return ""
 		}
@@ -284,7 +286,7 @@ func trapVarbindJournalValue(vb VarbindValue, raw bool) string {
 	if !raw && vb.Enum != "" {
 		return vb.Enum
 	}
-	return varbindRawValue(vb)
+	return model.VarbindRawValue(vb)
 }
 
 type trapVarbindFieldState struct {
@@ -403,7 +405,7 @@ func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 	}
 
 	for _, vb := range entry.Varbinds {
-		if isSensitiveTrapVarbind(vb) {
+		if model.IsSensitiveVarbind(vb) {
 			continue
 		}
 		key := vb.Name
@@ -477,16 +479,6 @@ func buildTrapEnrichmentJSON(entry *TrapEntry) ([]byte, error) {
 		return nil, nil
 	}
 	return json.Marshal(entry.Enrichment)
-}
-
-func isSensitiveTrapVarbind(vb VarbindValue) bool {
-	oid := normalizeOID(vb.OID)
-	if oid == snmpTrapCommunityOID || oid == strings.TrimSuffix(snmpTrapCommunityOID, ".0") {
-		return true
-	}
-
-	name := strings.TrimSuffix(vb.Name, ".0")
-	return name == "snmpTrapCommunity"
 }
 
 type jsonVarbindEntry struct {
@@ -865,7 +857,7 @@ func (s *journalHotSerializer) appendTrapJSONObject(entry *TrapEntry) error {
 	}
 
 	for _, vb := range entry.Varbinds {
-		if isSensitiveTrapVarbind(vb) {
+		if model.IsSensitiveVarbind(vb) {
 			continue
 		}
 		key := vb.Name

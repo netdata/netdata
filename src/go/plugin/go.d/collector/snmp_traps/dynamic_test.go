@@ -307,17 +307,17 @@ func TestDiscoveryReportRateLimitDropSkipsResponse(t *testing.T) {
 }
 
 func TestSendDiscoveryReportWireFormat(t *testing.T) {
-	withEngineStateDir(t)
+	paths := newEngineStatePaths(t.TempDir(), "test-discovery-report")
 
 	listenerConn, peerConn := informUDPConnPair(t)
 	defer listenerConn.Close()
 	defer peerConn.Close()
 
-	lid, err := NewLocalEngineID("test-discovery-report", testLocalEngineIDHex)
+	lid, err := newLocalEngineID(paths, testLocalEngineIDHex)
 	if err != nil {
 		t.Fatalf("NewLocalEngineID failed: %v", err)
 	}
-	eb, err := NewEngineBoots("test-discovery-report")
+	eb, err := newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}

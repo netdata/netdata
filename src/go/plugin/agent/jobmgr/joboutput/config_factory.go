@@ -89,7 +89,6 @@ func (cmf *ConfigModuleFactory) Test(ctx context.Context, config confgroup.Confi
 	defer func() {
 		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
-	setModuleJobName(probe.module, config.Name())
 	redactLifecycle, err := cmf.applyResolved(ctx, config, probe.module)
 	probe.redact = redactLifecycle
 	if err != nil {
@@ -122,7 +121,6 @@ func (cmf *ConfigModuleFactory) Validate(ctx context.Context, config confgroup.C
 	defer func() {
 		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
-	setModuleJobName(probe.module, config.Name())
 	redactLifecycle, err := cmf.applyResolved(ctx, config, probe.module)
 	probe.redact = redactLifecycle
 	return err

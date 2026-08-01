@@ -87,6 +87,7 @@ type perJobMetrics struct {
 	sourceMu           sync.Mutex
 	sourceCollectCycle uint64
 	sourceHashSalt     string
+	sourceSaltProvider func() string
 	sources            map[trapMetricSourceIdentityKey]*perSourceMetrics
 	sourceRoutes       map[string]string
 	sourceRouteSeen    map[string]time.Time
@@ -190,7 +191,7 @@ func (c *Collector) trapMetrics() *perJobMetrics {
 	if c.metrics != nil {
 		return c.metrics
 	}
-	return getJobMetrics(c.jobName)
+	return getJobMetrics(c.Name)
 }
 
 func (m *perJobMetrics) incEvent(category Category) {
@@ -394,7 +395,10 @@ func (m *perJobMetrics) recordWriteFailure(entry *TrapEntry, dim string) {
 
 func (m *perJobMetrics) initSourceMetricsLocked() {
 	if m.sourceHashSalt == "" {
-		m.sourceHashSalt = profileMetricSourceHashSalt()
+		m.sourceHashSalt = "netdata-agent"
+		if m.sourceSaltProvider != nil {
+			m.sourceHashSalt = m.sourceSaltProvider()
+		}
 	}
 	if m.sources == nil {
 		m.sources = make(map[trapMetricSourceIdentityKey]*perSourceMetrics)
@@ -404,6 +408,17 @@ func (m *perJobMetrics) initSourceMetricsLocked() {
 	}
 	if m.sourceRouteSeen == nil {
 		m.sourceRouteSeen = make(map[string]time.Time)
+	}
+}
+
+func (m *perJobMetrics) setSourceHashSaltProvider(provider func() string) {
+	if m == nil || provider == nil {
+		return
+	}
+	m.sourceMu.Lock()
+	defer m.sourceMu.Unlock()
+	if m.sourceHashSalt == "" {
+		m.sourceSaltProvider = provider
 	}
 }
 

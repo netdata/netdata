@@ -8,6 +8,8 @@ import (
 	"strings"
 	"text/template"
 	"text/template/parse"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 func isGoProfileTemplate(tmpl string) bool {
@@ -308,15 +310,15 @@ func resolveTemplateVarbind(name string, entry *TrapEntry, td *TrapDef, raw bool
 	if vb == nil {
 		return ""
 	}
-	v, ok := findVarbindForProfileOID(entry, vb.OID)
+	v, ok := model.FindVarbindForProfileOID(entry.Varbinds, vb.OID)
 	if !ok {
 		return ""
 	}
-	if isSensitiveTrapVarbind(v) {
-		return redactedTrapVarbind
+	if model.IsSensitiveVarbind(v) {
+		return model.RedactedVarbindValue
 	}
 	if raw {
-		return varbindRawValue(v)
+		return model.VarbindRawValue(v)
 	}
 	return varbindDisplayValue(v, vb)
 }

@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 var validCategories = map[string]bool{
@@ -203,46 +204,10 @@ func (idx *ProfileIndex) lookupLoaded(oid string) *TrapDef {
 	if td := idx.trapsByOID[oid]; td != nil {
 		return td
 	}
-	if alt := alternateTrapOID(oid); alt != oid {
+	if alt := model.AlternateTrapOID(oid); alt != oid {
 		return idx.trapsByOID[alt]
 	}
 	return nil
-}
-
-func alternateTrapOID(oid string) string {
-	if len(oid) == 0 || oid[0] == '.' || oid[len(oid)-1] == '.' {
-		return oid
-	}
-
-	dots := 0
-	prevDot := -1
-	lastDot := -1
-	segmentStart := 0
-
-	for i := 0; i < len(oid); i++ {
-		c := oid[i]
-		switch {
-		case c == '.':
-			if i == segmentStart {
-				return oid
-			}
-			dots++
-			prevDot = lastDot
-			lastDot = i
-			segmentStart = i + 1
-		case c < '0' || c > '9':
-			return oid
-		}
-	}
-
-	if dots < 3 || prevDot < 0 || lastDot <= 0 || lastDot >= len(oid)-1 {
-		return oid
-	}
-
-	if oid[prevDot+1:lastDot] == "0" {
-		return oid[:prevDot] + oid[lastDot:]
-	}
-	return oid[:lastDot] + ".0" + oid[lastDot:]
 }
 
 // profileCache holds the plugin-wide shared profile state.
@@ -423,7 +388,7 @@ func validateFileVarbinds(fileVarbinds map[string]VarbindDef, src string) error 
 		if vb.OID == "" {
 			return fmt.Errorf("%s: varbind %q missing required field 'oid'", src, name)
 		}
-		if !isNumericOID(vb.OID) {
+		if !model.IsNumericOID(vb.OID) {
 			return fmt.Errorf("%s: varbind %q has invalid oid %q", src, name, vb.OID)
 		}
 		if vb.Type == "" {
@@ -443,7 +408,7 @@ func validateTrapDef(td *TrapDef, fileVarbinds map[string]VarbindDef) error {
 	if td.OID == "" {
 		return fmt.Errorf("%s: trap entry missing required field 'oid'", src)
 	}
-	if !isNumericOID(td.OID) {
+	if !model.IsNumericOID(td.OID) {
 		return fmt.Errorf("%s: trap entry has invalid oid %q", src, td.OID)
 	}
 	if td.Name == "" {
@@ -521,7 +486,7 @@ func validateLabelTemplates(td *TrapDef, fileVarbinds map[string]VarbindDef) err
 				}
 				return fmt.Errorf("%s: trap entry %s: label %q references unbounded field %q", src, td.OID, key, name)
 			}
-			if isNumericOID(name) {
+			if model.IsNumericOID(name) {
 				return fmt.Errorf("%s: trap entry %s: label %q references raw OID %q without cardinality metadata", src, td.OID, key, name)
 			}
 			vb := fileVarbinds[name]
@@ -643,7 +608,7 @@ func inlineVarbindDef(v map[any]any) (*VarbindDef, error) {
 	if oid == "" {
 		return nil, fmt.Errorf("missing required field 'oid'")
 	}
-	if !isNumericOID(oid) {
+	if !model.IsNumericOID(oid) {
 		return nil, fmt.Errorf("invalid oid %q", oid)
 	}
 	if typ == "" {
@@ -658,23 +623,6 @@ func inlineVarbindDef(v map[any]any) (*VarbindDef, error) {
 		}
 	}
 	return vb, nil
-}
-
-func isNumericOID(oid string) bool {
-	if oid == "" || oid[0] == '.' || oid[len(oid)-1] == '.' {
-		return false
-	}
-	for part := range strings.SplitSeq(oid, ".") {
-		if part == "" {
-			return false
-		}
-		for _, ch := range part {
-			if ch < '0' || ch > '9' {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func categoryList() []string {

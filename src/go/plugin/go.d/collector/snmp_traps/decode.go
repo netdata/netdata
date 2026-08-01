@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 const (
@@ -28,11 +29,6 @@ const (
 
 	snmpV1TrapTypeEnterpriseSpec = 6
 
-	sysUpTimeOID          = "1.3.6.1.2.1.1.3.0"
-	snmpTrapOIDOID        = "1.3.6.1.6.3.1.1.4.1.0"
-	snmpTrapAddressOID    = "1.3.6.1.6.3.18.1.3.0"
-	snmpTrapCommunityOID  = "1.3.6.1.6.3.18.1.4.0"
-	snmpTrapEnterpriseOID = "1.3.6.1.6.3.1.1.4.3.0"
 	maxVarbinds           = 256
 	maxNestingDepth       = 8
 	maxOIDEncodedLen      = 128
@@ -44,18 +40,6 @@ const (
 var (
 	trapDecodeLogger = gosnmp.NewLogger(log.New(io.Discard, "", 0))
 )
-
-type TrapPDU struct {
-	OID         string
-	SourceIP    string
-	PeerIP      string
-	Community   string
-	Version     SnmpVersion
-	PduType     PduType
-	Varbinds    []VarbindValue
-	RequestID   uint32
-	SourceAudit *TrapSourceAudit
-}
 
 type TrapPacketContext struct {
 	Packet *gosnmp.SnmpPacket
@@ -352,13 +336,13 @@ func packetVarbinds(pkt *gosnmp.SnmpPacket) ([]VarbindValue, error) {
 	}
 
 	synthetic := []VarbindValue{
-		{Name: "sysUpTime.0", OID: sysUpTimeOID, Type: "TimeTicks", Value: uint64(pkt.Timestamp)},
-		{Name: "snmpTrapOID.0", OID: snmpTrapOIDOID, Type: "ObjectIdentifier", Value: trapOID},
+		{Name: "sysUpTime.0", OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(pkt.Timestamp)},
+		{Name: "snmpTrapOID.0", OID: model.SNMPTrapOID, Type: "ObjectIdentifier", Value: trapOID},
 	}
 	if pkt.AgentAddress != "" {
 		synthetic = append(synthetic, VarbindValue{
 			Name:  "snmpTrapAddress.0",
-			OID:   snmpTrapAddressOID,
+			OID:   model.SNMPTrapAddressOID,
 			Type:  "IPAddress",
 			Value: pkt.AgentAddress,
 		})
@@ -366,7 +350,7 @@ func packetVarbinds(pkt *gosnmp.SnmpPacket) ([]VarbindValue, error) {
 	if pkt.Community != "" {
 		synthetic = append(synthetic, VarbindValue{
 			Name:  "snmpTrapCommunity.0",
-			OID:   snmpTrapCommunityOID,
+			OID:   model.SNMPTrapCommunityOID,
 			Type:  "OctetString",
 			Value: pkt.Community,
 		})
@@ -374,9 +358,9 @@ func packetVarbinds(pkt *gosnmp.SnmpPacket) ([]VarbindValue, error) {
 	if pkt.Enterprise != "" {
 		synthetic = append(synthetic, VarbindValue{
 			Name:  "snmpTrapEnterprise.0",
-			OID:   snmpTrapEnterpriseOID,
+			OID:   model.SNMPTrapEnterpriseOID,
 			Type:  "ObjectIdentifier",
-			Value: normalizeOID(pkt.Enterprise),
+			Value: model.NormalizeOID(pkt.Enterprise),
 		})
 	}
 
@@ -388,10 +372,10 @@ func convertVarbinds(pdus []gosnmp.SnmpPDU) ([]VarbindValue, error) {
 	for _, pdu := range pdus {
 		val, err := normalizePDUValue(pdu)
 		if err != nil {
-			return nil, fmt.Errorf("varbind %s: %w", normalizeOID(pdu.Name), err)
+			return nil, fmt.Errorf("varbind %s: %w", model.NormalizeOID(pdu.Name), err)
 		}
 		vbs = append(vbs, VarbindValue{
-			OID:   normalizeOID(pdu.Name),
+			OID:   model.NormalizeOID(pdu.Name),
 			Type:  ASN1Type(pdu.Type.String()),
 			Value: val,
 		})
@@ -405,7 +389,7 @@ func normalizePDUValue(pdu gosnmp.SnmpPDU) (any, error) {
 		return nil, nil
 	case string:
 		if pdu.Type == gosnmp.ObjectIdentifier {
-			return normalizeOID(v), nil
+			return model.NormalizeOID(v), nil
 		}
 		if pdu.Type == gosnmp.OctetString && len(v) > maxOctetStringLen {
 			return nil, fmt.Errorf("OctetString too long: %d > %d", len(v), maxOctetStringLen)
@@ -451,11 +435,11 @@ func normalizePDUValue(pdu gosnmp.SnmpPDU) (any, error) {
 
 func trapOIDFromVarbinds(vbs []VarbindValue) string {
 	for _, vb := range vbs {
-		if vb.OID != snmpTrapOIDOID {
+		if vb.OID != model.SNMPTrapOID {
 			continue
 		}
 		if oid, ok := vb.Value.(string); ok {
-			return normalizeOID(oid)
+			return model.NormalizeOID(oid)
 		}
 		return ""
 	}
@@ -469,7 +453,7 @@ type trapSourceSelection struct {
 
 func selectTrapSource(vbs []VarbindValue, udpPeer net.IP, trustedRelay bool) trapSourceSelection {
 	peer := validIPString(ipString(udpPeer))
-	trapAddr, trapAddrReject := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
+	trapAddr, trapAddrReject := sourceFromVarbindWithRejectReason(vbs, model.SNMPTrapAddressOID)
 
 	audit := &TrapSourceAudit{
 		UDPPeer:         peer,
@@ -592,13 +576,9 @@ func snmpPDUType(t gosnmp.PDUType) (PduType, error) {
 	}
 }
 
-func normalizeOID(oid string) string {
-	return strings.TrimPrefix(oid, ".")
-}
-
 func v1TrapOID(enterprise string, genericTrap, specificTrap int) string {
 	if genericTrap == snmpV1TrapTypeEnterpriseSpec {
-		enterprise = normalizeOID(enterprise)
+		enterprise = model.NormalizeOID(enterprise)
 		if enterprise == "" || specificTrap < 0 || specificTrap > maxSNMPv1SpecificTrap {
 			return ""
 		}

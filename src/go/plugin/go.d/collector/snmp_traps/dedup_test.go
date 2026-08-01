@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 func TestValidateDedupConfig(t *testing.T) {
@@ -485,7 +486,7 @@ func dedupTestEntryWithCommunity(sourceIP, community string) *TrapEntry {
 		TrapOID:  "1.3.6.1.6.3.1.1.5.3",
 		Varbinds: []VarbindValue{{
 			Name:  "snmpTrapCommunity",
-			OID:   snmpTrapCommunityOID,
+			OID:   model.SNMPTrapCommunityOID,
 			Type:  "OctetString",
 			Value: community,
 		}},

@@ -14,6 +14,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 const (
@@ -342,8 +344,8 @@ func dedupFingerprint(entry *TrapEntry, td *TrapDef, jobKeys []string) dedupKey 
 		buf = appendFingerprintPart(buf, dedupVarbindPresent)
 		buf = appendFingerprintPart(buf, vb.OID)
 		buf = appendFingerprintPart(buf, string(vb.Type))
-		if isSensitiveTrapVarbind(vb) {
-			buf = appendFingerprintValue(buf, redactedTrapVarbind)
+		if model.IsSensitiveVarbind(vb) {
+			buf = appendFingerprintValue(buf, model.RedactedVarbindValue)
 			continue
 		}
 		buf = appendFingerprintValue(buf, vb.Value)
@@ -382,13 +384,11 @@ func dedupVarbind(entry *TrapEntry, name string) (VarbindValue, bool) {
 	if entry == nil {
 		return VarbindValue{}, false
 	}
-	for _, vb := range entry.Varbinds {
-		if vb.Name == name {
-			return vb, true
-		}
+	if value, ok := model.FindVarbindByName(entry.Varbinds, name); ok {
+		return value, true
 	}
-	if isNumericOID(name) {
-		return findVarbindForProfileOID(entry, name)
+	if model.IsNumericOID(name) {
+		return model.FindVarbindForProfileOID(entry.Varbinds, name)
 	}
 	return VarbindValue{}, false
 }

@@ -383,7 +383,7 @@ traps:
 
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:    "reload-packet",
+		Config:     Config{Name: "reload-packet"},
 		trapWriter: writer,
 		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 		allowlist:  NewAllowlist(nil, []string{"public"}),

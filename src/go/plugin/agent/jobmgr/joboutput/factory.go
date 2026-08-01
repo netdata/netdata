@@ -59,10 +59,6 @@ type JobHandlerAttacher interface {
 	Attach(lifecycle.ResourceIdentity, StagedHandlerLifecycle) (ProcessHandlerLifecycle, error)
 }
 
-type jobNamedModule interface {
-	SetJobName(string)
-}
-
 type FactoryConfig struct {
 	Epoch           uint64                                        // target run generation
 	PluginName      string                                        // owning plugin name stamped into job config
@@ -481,7 +477,6 @@ func (f *Factory) buildV1(
 	if module == nil {
 		return nil, nil, false, fmt.Errorf("job output: module %q returned a nil V1 collector", config.Module())
 	}
-	setModuleJobName(module, config.Name())
 	redactLifecycle, storeSnapshot, err =
 		f.config.ConfigModules.applyResolvedWithSnapshot(ctx, config, module)
 	if err != nil {
@@ -560,7 +555,6 @@ func (f *Factory) buildV2(
 	if module == nil {
 		return nil, nil, nil, false, fmt.Errorf("job output: module %q returned a nil V2 collector", config.Module())
 	}
-	setModuleJobName(module, config.Name())
 	redactLifecycle, storeSnapshot, err =
 		f.config.ConfigModules.applyResolvedWithSnapshot(ctx, config, module)
 	if err != nil {
@@ -667,10 +661,4 @@ func factoryLabels(config confgroup.Config) map[string]string {
 
 func creatorDeclaresFunctions(creator collectorapi.Creator) bool {
 	return creator.SharedFunctions != nil || creator.AgentFunctions != nil || creator.InstanceFunctions != nil
-}
-
-func setModuleJobName(module any, name string) {
-	if named, ok := module.(jobNamedModule); ok {
-		named.SetJobName(name)
-	}
 }

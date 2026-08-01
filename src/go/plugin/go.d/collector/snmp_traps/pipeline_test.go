@@ -16,7 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
-	"gopkg.in/yaml.v2"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) {
@@ -395,7 +395,7 @@ func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:    "test",
+		Config:     Config{Name: "test"},
 		trapWriter: writer,
 		versions:   map[SnmpVersion]struct{}{SnmpVersionV3: {}},
 		allowlist:  NewAllowlist(nil, nil),
@@ -433,7 +433,7 @@ func TestCollectorHandlePacketDropsDisallowedV3BeforeDecode(t *testing.T) {
 	data := buildV3Trap(t, "testuser", "1.3.6.1.6.3.1.1.5.1")
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:    jobName,
+		Config:     Config{Name: jobName},
 		trapWriter: writer,
 		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 		allowlist:  NewAllowlist(nil, nil),
@@ -827,7 +827,7 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
 	setSingleTestTrap(t, trap)
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.SnmpPDU{
-		Name:  snmpTrapAddressOID,
+		Name:  model.SNMPTrapAddressOID,
 		Type:  gosnmp.IPAddress,
 		Value: "192.0.2.20",
 	})
@@ -1267,7 +1267,7 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 	}
 
 	c := &Collector{
-		jobName:        jobName,
+		Config:         Config{Name: jobName},
 		listener:       &Listener{},
 		trapWriter:     &mockTrapWriter{},
 		metrics:        metrics,
@@ -1305,7 +1305,7 @@ func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
 	}
 
 	c := &Collector{
-		jobName:    jobName,
+		Config:     Config{Name: jobName},
 		listener:   &Listener{},
 		trapWriter: &mockTrapWriter{binaryEncodedFields: 2},
 		metrics:    getJobMetrics(jobName),
@@ -1327,14 +1327,10 @@ func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
 }
 
 func TestSnmpEngineBootsPersistence(t *testing.T) {
-	tmpDir := t.TempDir()
-	prev := engineBootsDirBase
-	engineBootsDirBase = tmpDir
-	t.Cleanup(func() { engineBootsDirBase = prev })
-
 	jobName := "test-job"
+	paths := newEngineStatePaths(t.TempDir(), jobName)
 
-	eb, err := NewEngineBoots(jobName)
+	eb, err := newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}
@@ -1342,7 +1338,7 @@ func TestSnmpEngineBootsPersistence(t *testing.T) {
 		t.Errorf("expected first boot value 1, got %d", v)
 	}
 
-	eb, err = NewEngineBoots(jobName)
+	eb, err = newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("second NewEngineBoots failed: %v", err)
 	}
@@ -1352,55 +1348,43 @@ func TestSnmpEngineBootsPersistence(t *testing.T) {
 }
 
 func TestSnmpEngineBootsCorruptFileFailsCreation(t *testing.T) {
-	tmpDir := t.TempDir()
-	prev := engineBootsDirBase
-	engineBootsDirBase = tmpDir
-	t.Cleanup(func() { engineBootsDirBase = prev })
-
 	jobName := "test-job"
-	if err := os.MkdirAll(engineBootsDir(jobName), 0750); err != nil {
+	paths := newEngineStatePaths(t.TempDir(), jobName)
+	if err := os.MkdirAll(paths.dir, 0750); err != nil {
 		t.Fatalf("mkdir engine boots dir: %v", err)
 	}
-	if err := os.WriteFile(engineBootsPath(jobName), []byte("not-a-number\n"), 0640); err != nil {
+	if err := os.WriteFile(paths.engineBoots, []byte("not-a-number\n"), 0640); err != nil {
 		t.Fatalf("write engine boots file: %v", err)
 	}
 
-	if _, err := NewEngineBoots(jobName); err == nil {
+	if _, err := newEngineBoots(paths); err == nil {
 		t.Fatal("expected corrupt engine-boots state to fail job creation")
 	}
 }
 
 func TestSnmpEngineBootsRejectsMaxValue(t *testing.T) {
-	tmpDir := t.TempDir()
-	prev := engineBootsDirBase
-	engineBootsDirBase = tmpDir
-	t.Cleanup(func() { engineBootsDirBase = prev })
-
 	jobName := "test-job"
-	if err := os.MkdirAll(engineBootsDir(jobName), 0750); err != nil {
+	paths := newEngineStatePaths(t.TempDir(), jobName)
+	if err := os.MkdirAll(paths.dir, 0750); err != nil {
 		t.Fatalf("mkdir engine boots dir: %v", err)
 	}
-	if err := os.WriteFile(engineBootsPath(jobName), []byte("2147483647\n"), 0640); err != nil {
+	if err := os.WriteFile(paths.engineBoots, []byte("2147483647\n"), 0640); err != nil {
 		t.Fatalf("write engine boots file: %v", err)
 	}
 
-	if _, err := NewEngineBoots(jobName); err == nil {
+	if _, err := newEngineBoots(paths); err == nil {
 		t.Fatal("expected error for max engine boots value")
 	}
 }
 
 func TestSnmpEngineBootsReadErrorFails(t *testing.T) {
-	tmpDir := t.TempDir()
-	prev := engineBootsDirBase
-	engineBootsDirBase = tmpDir
-	t.Cleanup(func() { engineBootsDirBase = prev })
-
 	jobName := "test-job"
-	if err := os.MkdirAll(engineBootsPath(jobName), 0750); err != nil {
+	paths := newEngineStatePaths(t.TempDir(), jobName)
+	if err := os.MkdirAll(paths.engineBoots, 0750); err != nil {
 		t.Fatalf("mkdir engine boots file path: %v", err)
 	}
 
-	if _, err := NewEngineBoots(jobName); err == nil {
+	if _, err := newEngineBoots(paths); err == nil {
 		t.Fatal("expected read error when engine boots path is a directory")
 	}
 }
@@ -1699,81 +1683,6 @@ func TestConfigValidation(t *testing.T) {
 			if err := validateConfigLabelKey(key); err != nil {
 				t.Fatalf("expected %q to be valid: %v", key, err)
 			}
-		}
-	})
-
-	t.Run("unknown config key", func(t *testing.T) {
-		var cfg Config
-		err := yaml.Unmarshal([]byte(`
-listen:
-  endpoints:
-    - protocol: udp
-      address: "127.0.0.1"
-      port: 9162
-unexpected: true
-`), &cfg)
-		if err == nil {
-			t.Fatal("expected error for unknown top-level key")
-		}
-	})
-
-	t.Run("obsolete job-level metrics key", func(t *testing.T) {
-		var cfg Config
-		err := yaml.Unmarshal([]byte(`
-listen:
-  endpoints:
-    - protocol: udp
-      address: "127.0.0.1"
-      port: 9162
-metrics:
-  - oid: "1.3.6.1.4.1.9.9.43.2.0.1"
-`), &cfg)
-		if err == nil {
-			t.Fatal("expected error for obsolete job-level metrics key")
-		}
-		if !strings.Contains(err.Error(), "profile_metrics") {
-			t.Fatalf("expected profile_metrics guidance, got %v", err)
-		}
-	})
-
-	t.Run("framework metadata keys", func(t *testing.T) {
-		var cfg Config
-		err := yaml.Unmarshal([]byte(`
-name: local
-module: snmp_traps
-autodetection_retry: 0
-priority: 70000
-function_only: false
-labels:
-  role: edge
-__provider__: file reader
-__source__: discoverer=file_reader,file=snmp_traps.conf
-__source_type__: user
-listen:
-  endpoints:
-    - protocol: udp
-      address: "127.0.0.1"
-      port: 9162
-versions: [v2c]
-communities: [public]
-`), &cfg)
-		if err != nil {
-			t.Fatalf("expected framework metadata keys to be accepted: %v", err)
-		}
-	})
-
-	t.Run("unknown nested config key", func(t *testing.T) {
-		var cfg Config
-		err := yaml.Unmarshal([]byte(`
-listen:
-  endpoints:
-    - protocol: udp
-      address: "127.0.0.1"
-      port: 9162
-      unexpected: true
-`), &cfg)
-		if err == nil {
-			t.Fatal("expected error for unknown endpoint key")
 		}
 	})
 

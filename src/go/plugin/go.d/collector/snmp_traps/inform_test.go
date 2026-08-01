@@ -71,7 +71,7 @@ func TestCollectorHandlePacketRespondsBeforeRateLimitDrop(t *testing.T) {
 
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:     jobName,
+		Config:      Config{Name: jobName},
 		trapWriter:  writer,
 		versions:    map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 		allowlist:   NewAllowlist(nil, []string{"public"}),
@@ -110,7 +110,7 @@ func TestCollectorHandlePacketIncrementsInformResponseFailed(t *testing.T) {
 
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:    jobName,
+		Config:     Config{Name: jobName},
 		trapWriter: writer,
 		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 		allowlist:  NewAllowlist(nil, []string{"public"}),

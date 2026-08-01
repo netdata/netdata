@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 func TestSerializeToJournalFields(t *testing.T) {
@@ -443,7 +445,7 @@ func TestSerializeToJournalFieldsTRAPJSONOmitsCommunityVarbind(t *testing.T) {
 		PduType:               PduTypeTrap,
 		SnmpVersion:           SnmpVersionV1,
 		Varbinds: []VarbindValue{
-			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 		},
 	}
@@ -482,11 +484,11 @@ func TestSerializeToJournalFieldsTrapVarbindJournalFields(t *testing.T) {
 		PduType:               PduTypeTrap,
 		SnmpVersion:           SnmpVersionV1,
 		Varbinds: []VarbindValue{
-			{OID: sysUpTimeOID, Name: "sysUpTime.0", Type: "TimeTicks", Value: uint64(129665677)},
-			{OID: snmpTrapOIDOID, Name: "snmpTrapOID.0", Type: "ObjectIdentifier", Value: "1.3.6.1.6.3.1.1.5.3"},
-			{OID: snmpTrapAddressOID, Name: "snmpTrapAddress.0", Type: "IPAddress", Value: "0.0.0.0"},
-			{OID: snmpTrapEnterpriseOID, Name: "snmpTrapEnterprise.0", Type: "ObjectIdentifier", Value: "1.3.6.1.6.3.1.1.5.3"},
-			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+			{OID: model.SysUpTimeOID, Name: "sysUpTime.0", Type: "TimeTicks", Value: uint64(129665677)},
+			{OID: model.SNMPTrapOID, Name: "snmpTrapOID.0", Type: "ObjectIdentifier", Value: "1.3.6.1.6.3.1.1.5.3"},
+			{OID: model.SNMPTrapAddressOID, Name: "snmpTrapAddress.0", Type: "IPAddress", Value: "0.0.0.0"},
+			{OID: model.SNMPTrapEnterpriseOID, Name: "snmpTrapEnterprise.0", Type: "ObjectIdentifier", Value: "1.3.6.1.6.3.1.1.5.3"},
+			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 			{OID: "1.3.6.1.2.1.2.2.1.7.29", Name: "ifAdminStatus", Type: "INTEGER", Value: int64(1), Enum: "up"},
 			{OID: "1.3.6.1.2.1.2.2.1.1.29", Name: "ifIndex", Type: "InterfaceIndex", Value: int64(29)},
 			{OID: "1.3.6.1.2.1.2.2.1.8.29", Name: "ifOperStatus", Type: "INTEGER", Value: int64(2), Enum: "down"},
@@ -742,7 +744,7 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 			SnmpVersion:           SnmpVersionV2c,
 			Labels:                map[string]string{"z_key": "z_val", "a_key": "a_val"},
 			Varbinds: []VarbindValue{
-				{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+				{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 				{OID: "1.3.6.1.2.1.2.2.1.7", Name: "ifAdminStatus", Type: "INTEGER", Value: int64(1), Enum: "up"},
 				{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 				{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifIndex", Type: "OctetString", Value: "eth0"},

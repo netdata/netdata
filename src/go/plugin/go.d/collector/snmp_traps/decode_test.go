@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 const testEngineIDHex = "80001f888077dfe44faa700258"
@@ -36,8 +37,8 @@ func buildV3Trap(t *testing.T, user string, trapOID string, extra ...gosnmp.Snmp
 		Logger: trapDecodeLogger,
 	}
 	pdus := []gosnmp.SnmpPDU{
-		{Name: sysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
-		{Name: snmpTrapOIDOID, Type: gosnmp.ObjectIdentifier, Value: trapOID},
+		{Name: model.SysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
+		{Name: model.SNMPTrapOID, Type: gosnmp.ObjectIdentifier, Value: trapOID},
 	}
 	pdus = append(pdus, extra...)
 	data, err := g.SnmpEncodePacket(gosnmp.SNMPv2Trap, pdus, 0, 0)
@@ -109,8 +110,8 @@ func buildV3SecuredPDU(t *testing.T, pduType gosnmp.PDUType, spec v3SecuredTrapS
 		Logger:             trapDecodeLogger,
 	}
 	pdus := []gosnmp.SnmpPDU{
-		{Name: sysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
-		{Name: snmpTrapOIDOID, Type: gosnmp.ObjectIdentifier, Value: spec.trapOID},
+		{Name: model.SysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
+		{Name: model.SNMPTrapOID, Type: gosnmp.ObjectIdentifier, Value: spec.trapOID},
 	}
 	pdus = append(pdus, spec.extra...)
 	data, err := g.SnmpEncodePacket(pduType, pdus, 0, 0)
@@ -142,8 +143,8 @@ func buildV2cPDU(t *testing.T, pduType gosnmp.PDUType, community, trapOID string
 	t.Helper()
 	x := &gosnmp.GoSNMP{Version: gosnmp.Version2c, Community: community}
 	pdus := []gosnmp.SnmpPDU{
-		{Name: sysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
-		{Name: snmpTrapOIDOID, Type: gosnmp.ObjectIdentifier, Value: trapOID},
+		{Name: model.SysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
+		{Name: model.SNMPTrapOID, Type: gosnmp.ObjectIdentifier, Value: trapOID},
 	}
 	pdus = append(pdus, extra...)
 	return marshalPacket(t, x.MkSnmpPacket(pduType, pdus, 0, 0))
@@ -357,9 +358,9 @@ func TestValidateBERLimitsAcceptsMaxDepth(t *testing.T) {
 
 func TestSourceFromVarbind(t *testing.T) {
 	vbs := []VarbindValue{
-		{OID: snmpTrapAddressOID, Value: "10.0.0.1", Type: "IPAddress"},
+		{OID: model.SNMPTrapAddressOID, Value: "10.0.0.1", Type: "IPAddress"},
 	}
-	addr, _ := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
+	addr, _ := sourceFromVarbindWithRejectReason(vbs, model.SNMPTrapAddressOID)
 	if addr != "10.0.0.1" {
 		t.Errorf("expected 10.0.0.1, got %q", addr)
 	}
@@ -372,9 +373,9 @@ func TestSourceFromVarbind(t *testing.T) {
 
 func TestSourceFromVarbindNotString(t *testing.T) {
 	vbs := []VarbindValue{
-		{OID: snmpTrapAddressOID, Value: int64(42), Type: "INTEGER"},
+		{OID: model.SNMPTrapAddressOID, Value: int64(42), Type: "INTEGER"},
 	}
-	addr, _ := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
+	addr, _ := sourceFromVarbindWithRejectReason(vbs, model.SNMPTrapAddressOID)
 	if addr != "" {
 		t.Errorf("expected empty for non-IP value, got %q", addr)
 	}
@@ -382,9 +383,9 @@ func TestSourceFromVarbindNotString(t *testing.T) {
 
 func TestSourceFromVarbindNetIP(t *testing.T) {
 	vbs := []VarbindValue{
-		{OID: snmpTrapAddressOID, Value: net.ParseIP("192.0.2.1"), Type: "IPAddress"},
+		{OID: model.SNMPTrapAddressOID, Value: net.ParseIP("192.0.2.1"), Type: "IPAddress"},
 	}
-	addr, _ := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
+	addr, _ := sourceFromVarbindWithRejectReason(vbs, model.SNMPTrapAddressOID)
 	if addr != "192.0.2.1" {
 		t.Errorf("expected 192.0.2.1, got %q", addr)
 	}
@@ -392,9 +393,9 @@ func TestSourceFromVarbindNetIP(t *testing.T) {
 
 func TestSourceFromVarbindNotIP(t *testing.T) {
 	vbs := []VarbindValue{
-		{OID: snmpTrapAddressOID, Value: "not-an-ip", Type: "OctetString"},
+		{OID: model.SNMPTrapAddressOID, Value: "not-an-ip", Type: "OctetString"},
 	}
-	addr, _ := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
+	addr, _ := sourceFromVarbindWithRejectReason(vbs, model.SNMPTrapAddressOID)
 	if addr != "" {
 		t.Errorf("expected empty for non-IP value, got %q", addr)
 	}
@@ -404,7 +405,7 @@ func TestIdentifySourceCascade(t *testing.T) {
 	peer := net.ParseIP("10.0.0.5")
 
 	vbsWithSource := []VarbindValue{
-		{OID: snmpTrapAddressOID, Value: "192.168.1.1", Type: "IPAddress"},
+		{OID: model.SNMPTrapAddressOID, Value: "192.168.1.1", Type: "IPAddress"},
 	}
 	addr := selectTrapSource(vbsWithSource, peer, false).sourceIP
 	if addr != "10.0.0.5" {
@@ -412,7 +413,7 @@ func TestIdentifySourceCascade(t *testing.T) {
 	}
 
 	vbsNoSource := []VarbindValue{
-		{OID: sysUpTimeOID, Value: uint64(10), Type: "TimeTicks"},
+		{OID: model.SysUpTimeOID, Value: uint64(10), Type: "TimeTicks"},
 	}
 	addr = selectTrapSource(vbsNoSource, peer, false).sourceIP
 	if addr != "10.0.0.5" {
@@ -434,7 +435,7 @@ func TestIdentifySourceCascade(t *testing.T) {
 	}
 
 	vbsUnspecifiedSource := []VarbindValue{
-		{OID: snmpTrapAddressOID, Value: "0.0.0.0", Type: "IPAddress"},
+		{OID: model.SNMPTrapAddressOID, Value: "0.0.0.0", Type: "IPAddress"},
 	}
 	addr = selectTrapSource(vbsUnspecifiedSource, peer, false).sourceIP
 	if addr != "10.0.0.5" {
@@ -460,7 +461,7 @@ func TestIdentifySourceCascade(t *testing.T) {
 func TestSelectTrapSourceTrustedRelay(t *testing.T) {
 	peer := net.ParseIP("10.0.0.5")
 	vbsWithSource := []VarbindValue{
-		{OID: snmpTrapAddressOID, Value: "192.168.1.1", Type: "IPAddress"},
+		{OID: model.SNMPTrapAddressOID, Value: "192.168.1.1", Type: "IPAddress"},
 	}
 
 	selected := selectTrapSource(vbsWithSource, peer, true)
@@ -484,14 +485,14 @@ func TestSelectTrapSourceTrustedRelay(t *testing.T) {
 		t.Fatalf("sourceIP = %q, want relayed snmpTrapAddress.0 when caller marks peer as trusted", selected.sourceIP)
 	}
 
-	vbsNoSource := []VarbindValue{{OID: sysUpTimeOID, Value: uint64(10), Type: "TimeTicks"}}
+	vbsNoSource := []VarbindValue{{OID: model.SysUpTimeOID, Value: uint64(10), Type: "TimeTicks"}}
 	selected = selectTrapSource(vbsNoSource, peer, true)
 	if selected.sourceIP != "10.0.0.5" {
 		t.Fatalf("sourceIP = %q, want UDP peer when trusted relay has no snmpTrapAddress.0", selected.sourceIP)
 	}
 
 	vbsUnspecifiedSource := []VarbindValue{
-		{OID: snmpTrapAddressOID, Value: "0.0.0.0", Type: "IPAddress"},
+		{OID: model.SNMPTrapAddressOID, Value: "0.0.0.0", Type: "IPAddress"},
 	}
 	selected = selectTrapSource(vbsUnspecifiedSource, peer, true)
 	if selected.sourceIP != "10.0.0.5" {
@@ -574,7 +575,7 @@ func TestV1DecodeConvertsAgentAddressAndSyntheticVarbinds(t *testing.T) {
 	if len(pdu.Varbinds) < 5 {
 		t.Fatalf("expected synthetic varbinds, got %d", len(pdu.Varbinds))
 	}
-	if pdu.Varbinds[2].OID != snmpTrapAddressOID || pdu.Varbinds[2].Value != "192.0.2.10" {
+	if pdu.Varbinds[2].OID != model.SNMPTrapAddressOID || pdu.Varbinds[2].Value != "192.0.2.10" {
 		t.Errorf("snmpTrapAddress.0 mismatch: %+v", pdu.Varbinds[2])
 	}
 }

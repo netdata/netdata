@@ -16,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 const (
@@ -630,7 +631,7 @@ type profileMetricSeriesSnapshot struct {
 	value  float64
 }
 
-func newProfileMetricRuntime(cfg normalizedProfileMetricsConfig, idx *ProfileIndex) (*profileMetricRuntime, string, error) {
+func newProfileMetricRuntime(cfg normalizedProfileMetricsConfig, idx *ProfileIndex, sourceHashSalt string) (*profileMetricRuntime, string, error) {
 	if !cfg.enabled {
 		return nil, "", nil
 	}
@@ -660,7 +661,7 @@ func newProfileMetricRuntime(cfg normalizedProfileMetricsConfig, idx *ProfileInd
 		chartInstances:  make(map[profileMetricChartInstanceKey]struct{}),
 		chartCounts:     make(map[string]int),
 		rulesByOID:      make(map[string][]*compiledProfileMetricRule),
-		sourceHashSalt:  profileMetricSourceHashSalt(),
+		sourceHashSalt:  sourceHashSalt,
 	}
 	for _, rule := range selected {
 		compiled, err := compileProfileMetricRule(rule, cat, idx)
@@ -774,7 +775,7 @@ func resolveProfileMetricTrap(idx *ProfileIndex, ref string) (*TrapDef, error) {
 	if ref == "" {
 		return nil, errors.New("trap reference is empty")
 	}
-	if isNumericOID(ref) {
+	if model.IsNumericOID(ref) {
 		td, err := idx.LookupWithError(ref)
 		if err != nil {
 			return nil, err
@@ -797,7 +798,7 @@ func metricOIDAliasesFromTrap(td *TrapDef) []string {
 		return nil
 	}
 	aliases := []string{td.OID}
-	if alt := alternateTrapOID(td.OID); alt != td.OID {
+	if alt := model.AlternateTrapOID(td.OID); alt != td.OID {
 		aliases = append(aliases, alt)
 	}
 	return aliases
@@ -1101,7 +1102,7 @@ func (rt *profileMetricRuntime) resourceIdentity(rule *compiledProfileMetricRule
 		rt.diagnostics.extractionFailed++
 		return "", false
 	}
-	v, ok := findVarbindForProfileOID(entry, rule.resourceVarbind.OID)
+	v, ok := model.FindVarbindForProfileOID(entry.Varbinds, rule.resourceVarbind.OID)
 	if !ok {
 		if rule.rule.Missing == profileMetricMissingUnknownDimension {
 			return "unknown", true
@@ -1113,7 +1114,7 @@ func (rt *profileMetricRuntime) resourceIdentity(rule *compiledProfileMetricRule
 		rt.diagnostics.extractionFailed++
 		return "", false
 	}
-	resourceID := strings.TrimSpace(varbindRawValue(v))
+	resourceID := strings.TrimSpace(model.VarbindRawValue(v))
 	if resourceID == "" {
 		if rule.rule.Missing == profileMetricMissingUnknownDimension {
 			return "unknown", true
@@ -1351,7 +1352,7 @@ func profileMetricPredicateValue(pred profileMetricPredicate, entry *TrapEntry, 
 	if vb == nil {
 		return false, VarbindValue{}, nil
 	}
-	v, ok := findVarbindForProfileOID(entry, vb.OID)
+	v, ok := model.FindVarbindForProfileOID(entry.Varbinds, vb.OID)
 	return ok, v, vb
 }
 
@@ -1423,7 +1424,7 @@ func profileMetricPredicateResult(pred profileMetricPredicate, present bool, val
 }
 
 func profileMetricValueEquals(value VarbindValue, vb *VarbindDef, want any) bool {
-	actual := varbindRawValue(value)
+	actual := model.VarbindRawValue(value)
 	if vb != nil && len(vb.Enum) > 0 {
 		if label := resolveEnum(vb, value.Value); label != "" && label == fmt.Sprintf("%v", want) {
 			return true
@@ -1497,7 +1498,7 @@ func profileMetricNumericVarbindValue(entry *TrapEntry, vb *VarbindDef) (float64
 	if vb == nil {
 		return 0, profileMetricValueInvalid
 	}
-	v, ok := findVarbindForProfileOID(entry, vb.OID)
+	v, ok := model.FindVarbindForProfileOID(entry.Varbinds, vb.OID)
 	if !ok {
 		return 0, profileMetricValueMissing
 	}
