@@ -43,11 +43,18 @@ parse it.
    separately and fails when a `FileError` makes the analysis incomplete. A
    printed dump path without a successful exit is not a pass.
 
+   The wrapper passes `--fail-if-incomplete` and accepts only runner status 0
+   (complete within the issue threshold) or 102 (complete with findings). It
+   rejects status 101, which means one or more tools failed, before trusting an
+   otherwise valid-looking report.
+
    This is a closed 7.10.1 compatibility contract, not a generic SARIF reader.
-   The Docker runner is pinned to 7.10.1, and the local runner rejects any other
-   reported CLI version before initializing the output path. Upgrade the image,
-   accepted local version, validator, and mock matrix together after checking the
-   new stable release's upstream model and real output.
+   The Docker runner is pinned to the 7.10.1 Linux/amd64 manifest digest, and the
+   local runner rejects any other reported CLI version before initializing the
+   output path. Upgrade the image version and digest, accepted local version,
+   validator, and mock matrix together after checking the new stable release's
+   upstream model and real output. Runner diagnostics stay on stderr; inspect
+   them before trusting a malformed dump.
 
    Codacy 7.10.1 has one known SARIF quirk: in a mixed-category run, a
    non-security result's rule index addresses the non-security subset even

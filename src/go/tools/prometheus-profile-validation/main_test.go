@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -217,9 +218,34 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 		t.Fatalf("missing warning that the deployable job policy was not validated: %#v", result.report.Findings)
 	}
 	for _, chart := range result.report.Charts {
-		if !strings.HasPrefix(chart.IDFingerprint, "sha256:") {
-			t.Fatalf("materialized chart ID was not fingerprinted: %#v", chart)
+		if chart.IDFingerprint == "" {
+			t.Fatalf("materialized chart ID fingerprint is empty: %#v", chart)
 		}
+	}
+}
+
+func TestFingerprintIDUsesStableRedactedReportFormat(t *testing.T) {
+	const raw = "label-derived-sensitive-value"
+	got := fingerprintID(raw)
+	if got != fingerprintID(raw) {
+		t.Fatalf("fingerprint is not deterministic: %q", got)
+	}
+	if got == fingerprintID(raw+"-different") {
+		t.Fatalf("distinct inputs produced the same test fingerprint: %q", got)
+	}
+	if strings.Contains(got, raw) {
+		t.Fatalf("fingerprint leaked its raw input: %q", got)
+	}
+	const prefix = "sha256:"
+	if !strings.HasPrefix(got, prefix) {
+		t.Fatalf("fingerprint prefix: got %q, want %q", got, prefix)
+	}
+	digest := strings.TrimPrefix(got, prefix)
+	if len(digest) != 16 {
+		t.Fatalf("fingerprint digest length: got %d, want 16", len(digest))
+	}
+	if _, err := hex.DecodeString(digest); err != nil {
+		t.Fatalf("fingerprint digest is not hexadecimal: %q: %v", digest, err)
 	}
 }
 
@@ -910,8 +936,8 @@ template:
 	if len(result.report.Collisions) != 1 {
 		t.Fatalf("collisions: got %#v", result.report.Collisions)
 	}
-	if !strings.HasPrefix(result.report.Collisions[0].RenderedIDFingerprint, "sha256:") {
-		t.Fatalf("collision ID was not fingerprinted: %#v", result.report.Collisions[0])
+	if result.report.Collisions[0].RenderedIDFingerprint == "" {
+		t.Fatalf("collision ID fingerprint is empty: %#v", result.report.Collisions[0])
 	}
 }
 

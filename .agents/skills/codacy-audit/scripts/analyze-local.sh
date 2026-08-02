@@ -39,7 +39,8 @@ OUTPUT=
 RUNNER=auto
 RUNNER_TMP=
 CODACY_ANALYSIS_CLI_VERSION=7.10.1
-CODACY_ANALYSIS_CLI_IMAGE="codacy/codacy-analysis-cli:${CODACY_ANALYSIS_CLI_VERSION}"
+CODACY_ANALYSIS_CLI_DIGEST=sha256:d412b2a84e72d0b541e29dd6cdffa78a73afcf35d8aa546988cd2a44edaab15c
+CODACY_ANALYSIS_CLI_IMAGE="codacy/codacy-analysis-cli:${CODACY_ANALYSIS_CLI_VERSION}@${CODACY_ANALYSIS_CLI_DIGEST}"
 
 cleanup() {
     if [ -n "$RUNNER_TMP" ] && [ -d "$RUNNER_TMP" ]; then
@@ -156,14 +157,13 @@ fi
 
 echo -e "${CA_GRAY}[analyze-local] runner=${RUNNER} format=${FORMAT} dir=${SUBDIR}${CA_NC}" >&2
 
+runner_status=0
 case "$RUNNER" in
     local)
         # Local binary expects host paths.
-        local_args=(analyze --directory "$SUBDIR" --format "$FORMAT")
+        local_args=(analyze --directory "$SUBDIR" --format "$FORMAT" --fail-if-incomplete)
         [ -n "$TOOL" ] && local_args+=(--tool "$TOOL")
-        if ! codacy-analysis-cli "${local_args[@]}" > "$OUTPUT" 2>/dev/null; then
-            echo -e "${CA_YELLOW}[analyze-local] cli returned non-zero (this is normal when findings are present)${CA_NC}" >&2
-        fi
+        codacy-analysis-cli "${local_args[@]}" > "$OUTPUT" || runner_status=$?
         ;;
     docker)
         # Per https://github.com/codacy/codacy-analysis-cli the CLI
@@ -178,22 +178,31 @@ case "$RUNNER" in
         # makes Docker turn the missing bind source into a directory.
         RUNNER_TMP="$(mktemp -d "${audit_dir}/runner.XXXXXX")"
         chmod 0755 "$RUNNER_TMP"
-        cli_args=(analyze --directory "$SUBDIR" --format "$FORMAT")
+        cli_args=(analyze --directory "$SUBDIR" --format "$FORMAT" --fail-if-incomplete)
         [ -n "$TOOL" ] && cli_args+=(--tool "$TOOL")
-        if ! docker run --rm \
+        docker run --rm \
                 --env CODACY_CODE="$SUBDIR" \
                 --env "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=$RUNNER_TMP" \
                 --volume /var/run/docker.sock:/var/run/docker.sock \
                 --volume "$SUBDIR":"$SUBDIR" \
                 --volume "$RUNNER_TMP":"$RUNNER_TMP" \
                 "$CODACY_ANALYSIS_CLI_IMAGE" \
-                "${cli_args[@]}" > "$OUTPUT" 2>/dev/null; then
-            echo -e "${CA_YELLOW}[analyze-local] cli returned non-zero (this is normal when findings are present)${CA_NC}" >&2
-        fi
+                "${cli_args[@]}" > "$OUTPUT" || runner_status=$?
         ;;
     *)
         echo -e "${CA_RED}[ERROR]${CA_NC} unknown --runner '${RUNNER}'" >&2
         exit 2
+        ;;
+esac
+
+# With the default zero issue threshold, 102 means a complete analysis found
+# issues. --fail-if-incomplete makes a tool failure return 101 instead, which
+# must never be accepted even when the remaining tools emitted valid JSON.
+case "$runner_status" in
+    0|102) ;;
+    *)
+        echo -e "${CA_RED}[ERROR]${CA_NC} analysis runner failed with status ${runner_status}; inspect the tool-runner diagnostics above" >&2
+        exit 1
         ;;
 esac
 
@@ -209,7 +218,7 @@ if [ ! -s "$OUTPUT" ]; then
 fi
 
 # JSON and SARIF must never contain prepended tool-runner logs or a well-formed
-# error object. A non-zero CLI status can mean findings, so validate the selected
+# error object. Accepted status 102 means findings, so validate the selected
 # formatter's top-level contract instead of trusting the process status alone.
 if [ "$FORMAT" = "json" ]; then
     # $fields and $object are jq variables, not shell expansions.
@@ -387,7 +396,7 @@ else
     '
 fi
 if ! jq -e "$report_shape" "$OUTPUT" >/dev/null 2>&1; then
-    echo -e "${CA_RED}[ERROR]${CA_NC} invalid ${FORMAT} report at ${OUTPUT}; inspect the first tool-runner error before trusting findings" >&2
+    echo -e "${CA_RED}[ERROR]${CA_NC} invalid ${FORMAT} report at ${OUTPUT}; inspect the tool-runner diagnostics above before trusting findings" >&2
     exit 1
 fi
 

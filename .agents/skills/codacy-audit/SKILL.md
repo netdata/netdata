@@ -79,6 +79,10 @@ $ .agents/skills/codacy-audit/scripts/analyze-local.sh
 Run this before `git push`. A report with zero issues, zero duplication clones, and zero file errors is clean local
 evidence (modulo Codacy server-side patterns the local CLI does not bundle). Fix issues and duplication clones locally. A
 `FileError` makes the wrapper fail because the analysis is incomplete; `FileMetrics` records are informational.
+The wrapper also enables the CLI's `--fail-if-incomplete` contract and accepts
+only status 0 (complete within the issue threshold) or 102 (complete with
+findings above the default zero threshold). Status 101 means at least one tool
+failed and is rejected even if another tool emitted syntactically valid output.
 
 Operational gotcha: when the Dockerized Codacy CLI fails before a tool can emit
 results, the output file may have a `.json` suffix but contain tool-runner logs
@@ -101,8 +105,9 @@ exact error recurs, verify the runner still mounts its configured Java temp
 directory at the same absolute path before changing analyzer policy.
 
 For SARIF, a valid top-level envelope alone is not trustworthy. The wrapper pins
-the Docker runner to the current supported stable CLI, 7.10.1, and rejects a
-local binary that does not report that exact version. Its closed contract also
+the Docker runner to the current supported stable CLI, 7.10.1, by its immutable
+Linux/amd64 manifest digest and rejects a local binary that does not report that
+exact version. Its closed contract also
 requires every run to carry its tool driver and rules, result records with valid
 rule references and physical locations, exactly one successful invocation, and
 referenced artifacts. The wrapper validates those nested records and
@@ -120,9 +125,10 @@ directories, must successfully truncate the destination before the analyzer
 starts, and requires a non-empty readable regular file afterward. This prevents
 a failed redirection from reusing a stale report.
 
-The Docker image version, accepted local-binary version, closed JSON/SARIF
-validator, and mock matrix are one compatibility unit. When Codacy publishes a
-new stable CLI, verify its upstream result model and real output first, then
+The Docker image version and digest, accepted local-binary version, closed
+JSON/SARIF validator, and mock matrix are one compatibility unit. When Codacy
+publishes a new stable CLI, verify its upstream result model, image digest, and
+real output first, then
 update all four together. Do not use a moving image tag or make unknown wrappers
 implicitly successful merely to tolerate version drift.
 

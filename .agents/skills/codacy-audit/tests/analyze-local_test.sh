@@ -16,9 +16,21 @@ if [ "${1:-}" = "-v" ]; then
     printf 'codacy-analysis-cli is on version %s\n' "${CODACY_TEST_VERSION:-7.10.1}"
     exit 0
 fi
+[ -z "${CODACY_TEST_STDERR:-}" ] || printf '%s\n' "$CODACY_TEST_STDERR" >&2
 cat "$CODACY_TEST_REPORT"
+exit "${CODACY_TEST_EXIT:-0}"
 EOF
 chmod 0700 "$tmp/bin/codacy-analysis-cli"
+
+cat > "$tmp/bin/docker" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+printf '%s\n' "$@" > "$CODACY_TEST_DOCKER_ARGS"
+[ -z "${CODACY_TEST_STDERR:-}" ] || printf '%s\n' "$CODACY_TEST_STDERR" >&2
+cat "$CODACY_TEST_REPORT"
+exit "${CODACY_TEST_EXIT:-0}"
+EOF
+chmod 0700 "$tmp/bin/docker"
 
 case_number=0
 
@@ -28,17 +40,20 @@ run_case() {
     local format="$3"
     local report="$4"
     local message="$5"
-    local report_path output_path stdout_path stderr_path stdout stderr status
+    local runner_exit="${6:-0}"
+    local report_path output_path stdout_path stderr_path stdout stderr status runner_diagnostic
 
     case_number=$((case_number + 1))
     report_path="$tmp/report-${case_number}.${format}"
     output_path="$tmp/output-${case_number}.${format}"
     stdout_path="$tmp/stdout-${case_number}.txt"
     stderr_path="$tmp/stderr-${case_number}.txt"
+    runner_diagnostic="synthetic local runner diagnostic ${case_number}"
     printf '%s\n' "$report" > "$report_path"
 
     set +e
-    PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$report_path" \
+    PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$report_path" CODACY_TEST_STDERR="$runner_diagnostic" \
+        CODACY_TEST_EXIT="$runner_exit" \
         "$script" --runner local --format "$format" --output "$output_path" \
         > "$stdout_path" 2> "$stderr_path"
     status=$?
@@ -77,6 +92,10 @@ run_case() {
         printf >&2 '[FAIL] %s: missing stderr diagnostic %q\n%s\n' "$name" "$message" "$stderr"
         return 1
     fi
+    if [[ "$stderr" != *"$runner_diagnostic"* ]]; then
+        printf >&2 '[FAIL] %s: runner stderr was not preserved\n%s\n' "$name" "$stderr"
+        return 1
+    fi
     printf '[PASS] %s\n' "$name"
 }
 
@@ -90,7 +109,7 @@ run_case success 'mixed official JSON results' json '[
     "files":[{"filePath":"file.go","startLine":3,"endLine":7}]}},
   {"FileMetrics":{"filename":"file.go","complexity":1,"loc":2,"cloc":null,"nrMethods":null,"nrClasses":null,
     "lineComplexities":[{"line":3,"value":1}]}}
-]' 'wrote 1 issue(s), 1 duplication clone(s), 0 file error(s), and 1 file-metric record(s)'
+]' 'wrote 1 issue(s), 1 duplication clone(s), 0 file error(s), and 1 file-metric record(s)' 102
 
 run_case failure 'file errors make analysis incomplete' json \
     '[{"FileError":{"filename":"file.go","message":"could not parse"}}]' \
@@ -112,6 +131,8 @@ run_case failure 'fractional integer field' json \
     '[{"DuplicationClone":{"cloneLines":"x","nrTokens":1.5,"nrLines":1,"files":[]}}]' 'invalid json report'
 run_case failure 'top-level JSON error object' json '{"error":"runner failed"}' 'invalid json report'
 run_case failure 'malformed JSON' json '[{"Issue":' 'invalid json report'
+run_case failure 'partial analyzer failure with valid empty JSON' json '[]' \
+    'analysis runner failed with status 101' 101
 
 run_case success 'empty valid SARIF report' sarif \
     '{"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json","version":"2.1.0","runs":[]}' \
@@ -275,4 +296,66 @@ if [ -e "$tmp/version-output.json" ]; then
 fi
 printf '[PASS] local version rejection\n'
 
-printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 4))"
+docker_report="$tmp/docker-report.json"
+docker_output="$tmp/docker-output.json"
+docker_stdout_path="$tmp/docker.stdout"
+docker_stderr_path="$tmp/docker.stderr"
+docker_args_path="$tmp/docker.args"
+docker_diagnostic='synthetic Docker runner diagnostic'
+docker_image='codacy/codacy-analysis-cli:7.10.1@sha256:d412b2a84e72d0b541e29dd6cdffa78a73afcf35d8aa546988cd2a44edaab15c'
+printf '%s\n' '[]' > "$docker_report"
+set +e
+PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$docker_report" CODACY_TEST_STDERR="$docker_diagnostic" \
+    CODACY_TEST_DOCKER_ARGS="$docker_args_path" CODACY_TEST_EXIT=0 \
+    "$script" --runner docker --format json --output "$docker_output" \
+    > "$docker_stdout_path" 2> "$docker_stderr_path"
+docker_status=$?
+set -e
+docker_stdout="$(cat "$docker_stdout_path")"
+docker_stderr="$(cat "$docker_stderr_path")"
+mapfile -t docker_args < "$docker_args_path"
+if [ "${#docker_args[@]}" -lt 6 ]; then
+    printf >&2 '[FAIL] Docker runner emitted only %d arguments\n' "${#docker_args[@]}"
+    exit 1
+fi
+runner_tmp="${docker_args[5]#JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=}"
+case "$runner_tmp" in
+    "$repo_root"/.local/audits/codacy/runner.*) ;;
+    *)
+        printf >&2 '[FAIL] Docker runner temp path is outside the audit directory: %q\n' "$runner_tmp"
+        exit 1
+        ;;
+esac
+expected_docker_args_path="$tmp/docker-expected.args"
+printf '%s\n' \
+    run \
+    --rm \
+    --env \
+    "CODACY_CODE=$repo_root" \
+    --env \
+    "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=$runner_tmp" \
+    --volume \
+    /var/run/docker.sock:/var/run/docker.sock \
+    --volume \
+    "$repo_root:$repo_root" \
+    --volume \
+    "$runner_tmp:$runner_tmp" \
+    "$docker_image" \
+    analyze \
+    --directory \
+    "$repo_root" \
+    --format \
+    json \
+    --fail-if-incomplete > "$expected_docker_args_path"
+if [ "$docker_status" -ne 0 ] || [ "$docker_stdout" != "$docker_output" ] || \
+        [[ "$docker_stderr" != *"$docker_diagnostic"* ]] || \
+        [[ "$docker_stderr" != *'wrote 0 issue(s)'* ]] || \
+        ! cmp -s -- "$expected_docker_args_path" "$docker_args_path"; then
+    printf >&2 '[FAIL] Docker runner contract: status=%d\nstdout:\n%s\nstderr:\n%s\nargs:\n%s\n' \
+        "$docker_status" "$docker_stdout" "$docker_stderr" "$(cat "$docker_args_path")"
+    printf >&2 'expected args:\n%s\n' "$(cat "$expected_docker_args_path")"
+    exit 1
+fi
+printf '[PASS] Docker digest and stderr contract\n'
+
+printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 5))"
