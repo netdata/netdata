@@ -210,6 +210,12 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
         now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
+        // A gap projected before its timestamp still belongs to the row containing that timestamp.
+        if(unlikely(new_point.added && new_point.tier == 0 && storage_point_is_gap(new_point.sp) &&
+                    new_point.sp.end_time_s > now_start_time && new_point.sp.end_time_s <= now_end_time)) {
+            storage_point_merge_to(ops->group_point, new_point.sp);
+        }
+
         if(unlikely(query_result_plan_should_switch_plan(ops, now_end_time))) {
             query_planer_next_plan(
                 ops, now_end_time - ops->plan_switch_time_offset, new_point.sp.end_time_s);
