@@ -407,6 +407,15 @@ Choose the least surprising mechanism:
 - Do not “cover” a metric by declaring it under `metrics:`. Coverage exists
   only when a runtime dimension selector actually routes its written series.
 
+Inventory source label names across every observed and synthetic fixture.
+Netdata's Prometheus re-export adds `instance`, `family`, `chart`, and
+`dimension`; a source label with one of those names would otherwise produce a
+duplicate label downstream. Preserve its value with an ordered job relabel:
+copy it to an application-specific name with `labelmap`, then remove only the
+original with `labeldrop`. The fixture MUST retain the authoritative source
+name—renaming fixture evidence hides the deployment requirement instead of
+proving the delivered job policy.
+
 Keep exclusions conservative and explain the lost diagnostic capability.
 Typical justified policy exclusions include creation timestamps or frozen
 epoch metadata that the schema cannot transform, and deprecated families with a

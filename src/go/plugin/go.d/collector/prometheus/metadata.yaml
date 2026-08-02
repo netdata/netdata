@@ -4577,8 +4577,9 @@ modules:
                 enabled: false
               description: |
                 Collect the cluster-wide MGR endpoint and a local official ceph-exporter endpoint with the same exact profile
-                contract. Repeat the exporter job for every exporter endpoint. The relabeling rules preserve the opaque dynamic
-                group key and normalize only source families whose suffix grammar is unambiguous.
+                contract. Repeat the exporter job for every exporter endpoint. The relabeling rules preserve source labels that
+                collide with Netdata's Prometheus re-export labels under a `ceph_` prefix, retain opaque dynamic group keys, and
+                normalize only source families whose suffix grammar is unambiguous.
               config: |
                 jobs:
                   - &ceph_job
@@ -4623,6 +4624,13 @@ modules:
                         - ceph_rgw_metadata
                         - ceph_smb_metadata
                     relabeling:
+                      - match: 'ceph_*'
+                        metric_relabel_configs:
+                          - regex: '(instance|family|chart|dimension)'
+                            action: labelmap
+                            replacement: 'ceph_$1'
+                          - regex: '(instance|family|chart|dimension)'
+                            action: labeldrop
                       - match: 'ceph_data_sync_from_*'
                         metric_relabel_configs:
                           - source_labels: [__name__]

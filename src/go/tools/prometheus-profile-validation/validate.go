@@ -326,7 +326,7 @@ func validateProfile(opts validationOptions) report {
 	}
 
 	if runtimeCountersOK && r.Counts.SeriesAutogen != 0 {
-		if profileExplicitlyAllowsAutogen(profile, r.Charts) {
+		if profileExplicitlyAllowsAutogen(profile, r.Charts, materializedFamilies) {
 			r.addWarning(
 				"profile_allowed_autogen",
 				"autogen.selector.allow",
@@ -505,15 +505,26 @@ func inventoryRawFamilies(families prompkg.MetricFamilies) ([]rawFamilyReport, i
 }
 
 type writerInventory struct {
-	sourceSeries map[string]map[string]struct{}
-	series       int
+	sourceSeries             map[string]map[string]struct{}
+	sourceFamilyBySeriesName map[string]string
+	series                   int
 }
 
 func inventoryWriterSeries(reader metrix.Reader) writerInventory {
-	out := writerInventory{sourceSeries: make(map[string]map[string]struct{})}
+	out := writerInventory{
+		sourceSeries:             make(map[string]map[string]struct{}),
+		sourceFamilyBySeriesName: make(map[string]string),
+	}
 	reader.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, _ metrix.SampleValue) {
 		out.series++
 		family := sourceFamilyName(name, meta)
+		if previous, ok := out.sourceFamilyBySeriesName[name]; ok && previous != family {
+			// An empty mapped family marks inconsistent metadata and keeps validation
+			// fail-closed without guessing from a flattened suffix.
+			out.sourceFamilyBySeriesName[name] = ""
+		} else if !ok {
+			out.sourceFamilyBySeriesName[name] = family
+		}
 		identities := out.sourceSeries[family]
 		if identities == nil {
 			identities = make(map[string]struct{})
@@ -636,7 +647,7 @@ func runtimeMetricInt(engine *chartengine.Engine, suffix string) (int, error) {
 	return int(value), nil
 }
 
-func profileExplicitlyAllowsAutogen(profile promprofiles.Profile, charts []materializedChart) bool {
+func profileExplicitlyAllowsAutogen(profile promprofiles.Profile, charts []materializedChart, writer writerInventory) bool {
 	expr := profile.AutogenSelector()
 	if expr == nil || len(expr.Allow) == 0 {
 		return false
@@ -652,7 +663,16 @@ func profileExplicitlyAllowsAutogen(profile promprofiles.Profile, charts []mater
 		}
 		found = true
 		name, ok := autogenSourceMetric(chart.TemplateID)
-		if !ok || !match.MatchString(name) {
+		if !ok {
+			return false
+		}
+		if family, found := writer.sourceFamilyBySeriesName[name]; found {
+			if family == "" {
+				return false
+			}
+			name = family
+		}
+		if !match.MatchString(name) {
 			return false
 		}
 	}

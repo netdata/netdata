@@ -99,6 +99,51 @@ template:
           name: total
 `
 
+const singleInstanceValueGaugeProfile = `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_value]
+  charts:
+    - title: Value
+      context: value
+      units: values
+      priority: 100
+      instances:
+        by_labels: [instance]
+      dimensions:
+        - selector: app_value
+          name: value
+`
+
+const singleDynamicValueGaugeProfile = `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_value]
+  charts:
+    - title: Value
+      context: value
+      units: values
+      priority: 100
+      dimensions:
+        - selector: app_value
+          name_from_label: state
+`
+
+const twoValueGaugesDump = "# TYPE app_one gauge\napp_one 1\n# TYPE app_two gauge\napp_two 2\n"
+
+const currentCapacityGaugesDump = `
+# TYPE app_current gauge
+app_current 1
+# TYPE app_capacity gauge
+app_capacity 1000
+`
+
 func TestValidatorHelperProcess(t *testing.T) {
 	if os.Getenv("NETDATA_PROFILE_VALIDATOR_HELPER") != "1" {
 		return
@@ -196,24 +241,6 @@ func TestValidateProfileRejectsUnsafeJobFields(t *testing.T) {
 }
 
 func TestValidateProfileAppliesRelabelAndFallbackPolicy(t *testing.T) {
-	profile := `
-match: app_*
-app: app
-template:
-  family: Example
-  context_namespace: app
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      instances:
-        by_labels: [instance]
-      dimensions:
-        - selector: app_value
-          name: value
-`
 	dump := "app_value{node=\"node-a\"} 7\n"
 	job := `
 fallback_type:
@@ -227,7 +254,7 @@ relabeling:
         replacement: $1
         action: replace
 `
-	result := runValidation(t, profile, dump, job)
+	result := runValidation(t, singleInstanceValueGaugeProfile, dump, job)
 	if result.exitCode != 0 {
 		t.Fatalf("expected PASS, got %d\nstderr:\n%s\nreport:\n%s", result.exitCode, result.stderr, result.stdout)
 	}
@@ -293,6 +320,141 @@ func TestValidateProfileAcceptsExplicitGenericFallbackBoundary(t *testing.T) {
 	}
 	if !hasFinding(result.report, "profile_allowed_autogen", "warning") {
 		t.Fatalf("missing profile_allowed_autogen warning in %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAttributesTypedComponentsToTheirSourceFamily(t *testing.T) {
+	tests := map[string]struct {
+		family    string
+		metric    string
+		dimension string
+		dump      string
+	}{
+		"histogram": {
+			family:    "app_latency_seconds",
+			metric:    "app_latency_seconds_bucket",
+			dimension: "le",
+			dump: "# TYPE app_latency_seconds histogram\n" +
+				"app_latency_seconds_bucket{le=\"1\"} 2\n" +
+				"app_latency_seconds_bucket{le=\"+Inf\"} 3\n" +
+				"app_latency_seconds_sum 1.5\n" +
+				"app_latency_seconds_count 3\n",
+		},
+		"summary": {
+			family:    "app_size_bytes",
+			metric:    "app_size_bytes",
+			dimension: "quantile",
+			dump: "# TYPE app_size_bytes summary\n" +
+				"app_size_bytes{quantile=\"0.5\"} 100\n" +
+				"app_size_bytes_sum 500\n" +
+				"app_size_bytes_count 3\n",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profile := fmt.Sprintf(`
+match: %s
+app: app
+autogen:
+  selector:
+    allow: [%s]
+template:
+  family: Example
+  context_namespace: app
+  metrics: [%s]
+  charts:
+    - title: Distribution
+      context: distribution
+      units: observations/s
+      algorithm: incremental
+      priority: 100
+      dimensions:
+        - selector: %s
+          name_from_label: %s
+`, tc.family, tc.family, tc.metric, tc.metric, tc.dimension)
+
+			result := runValidation(t, profile, tc.dump, "")
+			if result.exitCode != 0 {
+				t.Fatalf("typed component fallback should be attributed to %q\nreport:\n%s", tc.family, result.stdout)
+			}
+			if result.report.Counts.AutogenCharts != 2 || result.report.Counts.SeriesAutogen != 2 {
+				t.Fatalf("expected count and sum fallback charts: %#v", result.report.Counts)
+			}
+			if !hasFinding(result.report, "profile_allowed_autogen", "warning") ||
+				hasFinding(result.report, "unexpected_autogen", "error") {
+				t.Fatalf("typed fallback was not accepted under its structured source family: %#v", result.report.Findings)
+			}
+		})
+	}
+}
+
+func TestValidateProfileDoesNotAttributeScalarSuffixToAnotherFamily(t *testing.T) {
+	profile := `
+match: app_value
+app: app
+autogen:
+  selector:
+    allow: [app_value_count]
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_value]
+  charts:
+    - title: Value
+      context: value
+      units: values
+      priority: 100
+      dimensions:
+        - selector: app_value
+          name: value
+`
+	dump := "# TYPE app_value gauge\napp_value 1\n# TYPE app_value_count gauge\napp_value_count 2\n"
+
+	result := runValidation(t, profile, dump, "")
+	requireFinding(t, result, "unexpected_autogen")
+}
+
+func TestValidateProfileFailsClosedOnConflictingSourceFamilyAttribution(t *testing.T) {
+	profile := `
+match: foo*
+app: app
+autogen:
+  selector:
+    allow: [foo]
+template:
+  family: Example
+  context_namespace: app
+  metrics: [foo_bucket, foo_count]
+  charts:
+    - title: Distribution
+      context: distribution
+      units: observations/s
+      algorithm: incremental
+      priority: 100
+      dimensions:
+        - selector: foo_bucket
+          name_from_label: le
+    - title: Scalar Count
+      context: scalar_count
+      units: values
+      priority: 110
+      dimensions:
+        - selector: 'foo_count{kind="scalar"}'
+          name: value
+`
+	dump := "# TYPE foo histogram\n" +
+		"foo_bucket{le=\"1\"} 1\n" +
+		"foo_bucket{le=\"+Inf\"} 1\n" +
+		"foo_sum 0.5\n" +
+		"foo_count 1\n" +
+		"# TYPE foo_count gauge\n" +
+		"foo_count{kind=\"scalar\"} 7\n"
+
+	result := runValidation(t, profile, dump, "")
+	requireFinding(t, result, "unexpected_autogen")
+	if result.report.Counts.AutogenCharts != 2 || result.report.Counts.SeriesAutogen != 2 {
+		t.Fatalf("expected histogram count and sum fallback charts: %#v", result.report.Counts)
 	}
 }
 
@@ -403,24 +565,7 @@ template:
 }
 
 func TestValidateProfileFindsMissingExplicitInstanceIdentity(t *testing.T) {
-	profile := `
-match: app_*
-app: app
-template:
-  family: Example
-  context_namespace: app
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      instances:
-        by_labels: [node]
-      dimensions:
-        - selector: app_value
-          name: value
-`
+	profile := replaceOnce(t, singleInstanceValueGaugeProfile, "by_labels: [instance]", "by_labels: [node]")
 	result := runValidation(t, profile, "# TYPE app_value gauge\napp_value{instance=\"a\"} 1\n", "")
 	requireFinding(t, result, "dead_chart")
 	if len(result.report.DeadCharts) != 1 {
@@ -429,26 +574,8 @@ template:
 }
 
 func TestValidateProfileFindsObservedSameTemplateInstanceIDCollision(t *testing.T) {
-	profile := `
-match: app_*
-app: app
-template:
-  family: Example
-  context_namespace: app
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      instances:
-        by_labels: [instance]
-      dimensions:
-        - selector: app_value
-          name: value
-`
 	dump := "# TYPE app_value gauge\napp_value{instance=\"a.b\"} 1\napp_value{instance=\"a_b\"} 2\n"
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, singleInstanceValueGaugeProfile, dump, "")
 	requireFinding(t, result, "instance_id_collision_observed")
 	if len(result.report.InstanceLosses) != 1 {
 		t.Fatalf("expected one observed instance materialization loss: %#v", result.report.InstanceLosses)
@@ -462,24 +589,8 @@ template:
 }
 
 func TestValidateProfileFindsObservedDimensionWireIDCollision(t *testing.T) {
-	profile := `
-match: app_*
-app: app
-template:
-  family: Example
-  context_namespace: app
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      dimensions:
-        - selector: app_value
-          name_from_label: state
-`
 	dump := "# TYPE app_value gauge\napp_value{state=\"a\"} 1\napp_value{state=\"'a\"} 2\n"
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, singleDynamicValueGaugeProfile, dump, "")
 	requireFinding(t, result, "dimension_id_collision_observed")
 	if len(result.report.DimensionCollisions) != 1 {
 		t.Fatalf("expected one emitted dimension ID collision: %#v", result.report.DimensionCollisions)
@@ -490,23 +601,7 @@ template:
 }
 
 func TestValidateProfileFindsDimensionLostAtWireEmission(t *testing.T) {
-	profile := `
-match: app_*
-app: app
-template:
-  family: Example
-  context_namespace: app
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      dimensions:
-        - selector: app_value
-          name_from_label: state
-`
-	result := runValidation(t, profile, "# TYPE app_value gauge\napp_value{state=\"'\"} 1\n", "")
+	result := runValidation(t, singleDynamicValueGaugeProfile, "# TYPE app_value gauge\napp_value{state=\"'\"} 1\n", "")
 	requireFinding(t, result, "dimension_wire_emission_loss")
 	if strings.Contains(result.stdout, "state=\\\"'\\\"") {
 		t.Fatalf("report leaked label-derived dimension value:\n%s", result.stdout)
@@ -538,8 +633,7 @@ template:
         - selector: app_two
           name: two
 `
-	dump := "# TYPE app_one gauge\napp_one 1\n# TYPE app_two gauge\napp_two 2\n"
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, profile, twoValueGaugesDump, "")
 	requireFinding(t, result, "chart_wire_id_collision_observed")
 	if len(result.report.ChartWireCollisions) != 1 ||
 		result.report.ChartWireCollisions[0].Occurrences != 2 {
@@ -572,8 +666,7 @@ template:
         - selector: app_two
           name: two
 `
-	dump := "# TYPE app_one gauge\napp_one 1\n# TYPE app_two gauge\napp_two 2\n"
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, profile, twoValueGaugesDump, "")
 	requireFinding(t, result, "context_wire_collision_observed")
 	if len(result.report.ContextCollisions) != 1 ||
 		len(result.report.ContextCollisions[0].RawContextFingerprints) != 2 {
@@ -606,8 +699,7 @@ template:
         - selector: app_two
           name: two
 `
-	dump := "# TYPE app_one gauge\napp_one 1\n# TYPE app_two gauge\napp_two 2\n"
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, profile, twoValueGaugesDump, "")
 	if result.exitCode != 0 {
 		t.Fatalf("intentional raw context reuse is not a wire-normalization collision\nreport:\n%s", result.stdout)
 	}
@@ -663,23 +755,7 @@ func TestInspectEmittedPlanHandlesLargeChartLine(t *testing.T) {
 
 func TestValidateProfileDoesNotLeakChartIDFromEmitterError(t *testing.T) {
 	const sentinel = "sensitive-instance-value-"
-	profile := `
-match: app_*
-app: app
-template:
-  family: Example
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      instances:
-        by_labels: [instance]
-      dimensions:
-        - selector: app_value
-          name: value
-`
+	profile := replaceOnce(t, singleInstanceValueGaugeProfile, "  context_namespace: app\n", "")
 	labelValue := sentinel + strings.Repeat("x", 1300)
 	dump := fmt.Sprintf("# TYPE app_value gauge\napp_value{instance=%q} 1\n", labelValue)
 	result := runValidation(t, profile, dump, "")
@@ -803,8 +879,7 @@ template:
         - selector: app_two
           name: two
 `
-	dump := "# TYPE app_one gauge\napp_one 1\n# TYPE app_two gauge\napp_two 2\n"
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, profile, twoValueGaugesDump, "")
 	requireFinding(t, result, "rendered_id_collision")
 	if len(result.report.Collisions) != 1 {
 		t.Fatalf("collisions: got %#v", result.report.Collisions)
@@ -1088,13 +1163,7 @@ template:
           options:
             hidden: true
 `
-	dump := `
-# TYPE app_current gauge
-app_current 1
-# TYPE app_capacity gauge
-app_capacity 1000
-`
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, profile, currentCapacityGaugesDump, "")
 	requireFinding(t, result, "all_dimensions_hidden")
 }
 
@@ -1117,13 +1186,7 @@ template:
         - selector: app_capacity
           name: capacity
 `
-	dump := `
-# TYPE app_current gauge
-app_current 1
-# TYPE app_capacity gauge
-app_capacity 1000
-`
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, profile, currentCapacityGaugesDump, "")
 	if result.exitCode != 0 {
 		t.Fatalf("observed scale review must preserve author judgment\nreport:\n%s", result.stdout)
 	}
@@ -1153,13 +1216,7 @@ template:
           options:
             hidden: true
 `
-	dump := `
-# TYPE app_current gauge
-app_current 1
-# TYPE app_capacity gauge
-app_capacity 1000
-`
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, profile, currentCapacityGaugesDump, "")
 	if result.exitCode != 0 {
 		t.Fatalf("expected PASS\nreport:\n%s", result.stdout)
 	}
@@ -1337,24 +1394,7 @@ func TestValidateProfileAcceptsDerivedIncrementalRateUnits(t *testing.T) {
 }
 
 func TestValidateProfileWarnsAboutObservedLabelsWithoutAnAuthoredRole(t *testing.T) {
-	profile := `
-match: app_*
-app: app
-template:
-  family: Example
-  context_namespace: app
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      instances:
-        by_labels: [instance]
-      dimensions:
-        - selector: 'app_value{mode="sync"}'
-          name: value
-`
+	profile := replaceOnce(t, singleInstanceValueGaugeProfile, "selector: app_value", `selector: 'app_value{mode="sync"}'`)
 	dump := `
 # TYPE app_value gauge
 app_value{instance="node-a",mode="sync",engine="sensitive-engine-value"} 1
@@ -1455,8 +1495,7 @@ template:
             - selector: app_two
               name: two
 `
-	dump := "# TYPE app_one gauge\napp_one 1\n# TYPE app_two gauge\napp_two 2\n"
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, profile, twoValueGaugesDump, "")
 	if result.exitCode != 0 {
 		t.Fatalf("expected PASS\nreport:\n%s", result.stdout)
 	}
@@ -1885,26 +1924,8 @@ fallback_type:
 }
 
 func TestValidateProfileReportsPartialWriterMaterialization(t *testing.T) {
-	profile := `
-match: app_*
-app: app
-template:
-  family: Example
-  context_namespace: app
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      instances:
-        by_labels: [instance]
-      dimensions:
-        - selector: app_value
-          name: value
-`
 	dump := "# TYPE app_value gauge\napp_value{instance=\"finite\"} 1\napp_value{instance=\"nan\"} NaN\n"
-	result := runValidation(t, profile, dump, "")
+	result := runValidation(t, singleInstanceValueGaugeProfile, dump, "")
 	if result.exitCode != 0 {
 		t.Fatalf("one rejected source series should be reported without inventing a profile coverage gap\nreport:\n%s", result.stdout)
 	}
@@ -2050,6 +2071,14 @@ type validationResult struct {
 	stdout   string
 	stderr   string
 	report   report
+}
+
+func replaceOnce(t *testing.T, source, old, replacement string) string {
+	t.Helper()
+	if count := strings.Count(source, old); count != 1 {
+		t.Fatalf("fixture replacement target occurs %d times, want exactly 1: %q", count, old)
+	}
+	return strings.Replace(source, old, replacement, 1)
 }
 
 func runValidation(t *testing.T, profile, dump, job string) validationResult {

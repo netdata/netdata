@@ -2146,7 +2146,7 @@ template:
           priority: 3390
           instances:
             by_labels: ['*', '!in_memory_daily_spend_update_queue', '!in_memory_spend_update_queue', '!redis_daily_agent_spend_update_queue', '!redis_daily_end_user_spend_update_queue',
-              '!redis_daily_spend_update_queue', '!redis_spend_update_queue']
+                        '!redis_daily_spend_update_queue', '!redis_spend_update_queue']
           dimensions:
             - selector: 'litellm_in_memory_daily_spend_update_queue_size'
               name: in_memory_daily

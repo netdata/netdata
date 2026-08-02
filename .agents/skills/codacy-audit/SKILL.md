@@ -85,9 +85,11 @@ Docker daemon, so a config created only in the CLI container's private `/tmp`
 does not exist in the host path namespace; Docker creates a directory at the
 missing bind source and the analyzer reports `read /.codacyrc: is a directory`.
 `analyze-local.sh` gives Java a same-path host-backed temporary directory and
-rejects malformed JSON/SARIF instead of printing a false-success path. If that
-exact error recurs, verify the runner still mounts its configured Java temp
-directory at the same absolute path before changing analyzer policy.
+rejects malformed or wrong-shape JSON/SARIF instead of printing a false-success
+path. JSON must be the CLI's result array; SARIF must declare version 2.1.0 and
+contain a `runs` array. If that exact error recurs, verify the runner still mounts
+its configured Java temp directory at the same absolute path before changing
+analyzer policy.
 
 When the local CLI emits valid JSON, its top-level shape is commonly an array
 of wrappers with findings under `.Issue` (for example `.Issue.filename` and

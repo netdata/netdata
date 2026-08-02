@@ -959,6 +959,20 @@ func cephProfileRelabeling() []RelabelBlock {
 	}
 	blocks := []RelabelBlock{
 		{
+			Match: "ceph_*",
+			MetricRelabelConfigs: []relabel.Config{
+				{
+					Regex:       relabel.MustNewRegexp(`(instance|family|chart|dimension)`),
+					Replacement: "ceph_$1",
+					Action:      relabel.LabelMap,
+				},
+				{
+					Regex:  relabel.MustNewRegexp(`(instance|family|chart|dimension)`),
+					Action: relabel.LabelDrop,
+				},
+			},
+		},
+		{
 			Match: "ceph_data_sync_from_*",
 			MetricRelabelConfigs: []relabel.Config{{
 				SourceLabels: []string{"__name__"},
@@ -1704,11 +1718,25 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 		func(plan chartengine.Plan) {
 			contexts := make(map[string][]chartengine.CreateChartAction)
 			dimensions := make(map[string]map[string]chartengine.CreateDimensionAction)
+			reservedSourceLabelPreserved := map[string]bool{
+				"cluster_mgr": false,
+				"nvme_of":     false,
+			}
 			var pwlFallback, objecterCharts, rawRGWAliasCharts int
 			for _, action := range plan.Actions {
 				switch action := action.(type) {
 				case chartengine.CreateChartAction:
 					contexts[action.Meta.Context] = append(contexts[action.Meta.Context], action)
+					assert.NotContains(t, action.Labels, "instance",
+						"source instance must be renamed before Netdata adds its re-export instance label")
+					if action.Labels["ceph_instance"] != "" {
+						switch {
+						case strings.HasPrefix(action.Meta.Context, "prometheus.ceph.cluster_mgr."):
+							reservedSourceLabelPreserved["cluster_mgr"] = true
+						case strings.HasPrefix(action.Meta.Context, "prometheus.ceph.nvme_of."):
+							reservedSourceLabelPreserved["nvme_of"] = true
+						}
+					}
 					if strings.Contains(action.Meta.Context, ".ceph_librbd_pwl_") {
 						pwlFallback++
 					}
@@ -1728,6 +1756,8 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 			assert.Zero(t, pwlFallback, "normalized PWL families must use curated charts")
 			assert.Zero(t, objecterCharts, "dynamic objecter families must use the curated canonical context")
 			assert.Zero(t, rawRGWAliasCharts, "MGR raw RGW source-zone aliases must not duplicate normalized families")
+			assert.Equal(t, map[string]bool{"cluster_mgr": true, "nvme_of": true}, reservedSourceLabelPreserved,
+				"official source instance labels must remain available under ceph_instance")
 
 			type semanticExpectation struct {
 				units     string

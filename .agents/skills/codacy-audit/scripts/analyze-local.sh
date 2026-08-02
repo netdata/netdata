@@ -58,6 +58,15 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+case "$FORMAT" in
+    json|sarif) ;;
+    *)
+        echo "Unknown format: $FORMAT (expected json or sarif)" >&2
+        usage >&2
+        exit 2
+        ;;
+esac
+
 # shellcheck source=SCRIPTDIR/_lib.sh disable=SC1091
 source "$(cd "$(dirname "$0")" && pwd)/_lib.sh"
 
@@ -149,20 +158,22 @@ if [ ! -s "$OUTPUT" ]; then
     exit 1
 fi
 
-# JSON and SARIF must never contain prepended tool-runner logs. A non-zero CLI
-# status can mean findings, so parseability is the reliable completion gate.
-case "$FORMAT" in
-    json|sarif)
-        if ! jq -e . "$OUTPUT" >/dev/null 2>&1; then
-            echo -e "${CA_RED}[ERROR]${CA_NC} malformed ${FORMAT} output at ${OUTPUT}; inspect the first tool-runner log before trusting findings" >&2
-            exit 1
-        fi
-        ;;
-esac
+# JSON and SARIF must never contain prepended tool-runner logs or a well-formed
+# error object. A non-zero CLI status can mean findings, so validate the selected
+# formatter's top-level contract instead of trusting the process status alone.
+if [ "$FORMAT" = "json" ]; then
+    report_shape='type == "array"'
+else
+    report_shape='type == "object" and .version == "2.1.0" and (.runs | type == "array")'
+fi
+if ! jq -e "$report_shape" "$OUTPUT" >/dev/null 2>&1; then
+    echo -e "${CA_RED}[ERROR]${CA_NC} invalid ${FORMAT} report at ${OUTPUT}; inspect the first tool-runner error before trusting findings" >&2
+    exit 1
+fi
 
 # Quick summary if format=json.
 if [ "$FORMAT" = "json" ]; then
-    n="$(jq 'if type=="array" then ([.[] | select(has("Issue"))] | length) elif type=="object" and has("issues") then (.issues|length) else 0 end' "$OUTPUT")"
+    n="$(jq '[.[] | select(has("Issue"))] | length' "$OUTPUT")"
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT}" >&2
 else
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${OUTPUT} (${FORMAT} format)" >&2

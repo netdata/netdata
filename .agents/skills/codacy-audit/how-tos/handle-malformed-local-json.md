@@ -33,8 +33,11 @@ parse it.
      .agents/skills/codacy-audit/scripts/analyze-local.sh
    ```
 
-   The wrapper now exits nonzero when JSON or SARIF is malformed. A printed dump
-   path without a successful exit is not a pass.
+   The wrapper now exits nonzero when JSON or SARIF is malformed or has the wrong
+   top-level report shape. A parseable error object is not a report: JSON output
+   must be the CLI's result array, while SARIF must declare version 2.1.0 and
+   contain a `runs` array. A printed dump path without a successful exit is not a
+   pass.
 
 4. Check GitHub check-run annotations:
 
