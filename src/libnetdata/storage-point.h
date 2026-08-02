@@ -158,7 +158,8 @@ typedef struct storage_point {
     (NETDATA_DOUBLE)(storage_point_has_value(sp) ? (NETDATA_DOUBLE)((sp).anomaly_count) * 100.0 / (NETDATA_DOUBLE)((sp).count) : 0.0)
 
 #define storage_point_average_value(sp) \
-    ((sp).count ? (sp).sum / (NETDATA_DOUBLE)((sp).count) : 0.0)
+    (storage_point_is_gap(sp) ? NAN : \
+     ((sp).count ? (sp).sum / (NETDATA_DOUBLE)((sp).count) : 0.0))
 
 
 #endif //NETDATA_STORAGE_POINT_H
