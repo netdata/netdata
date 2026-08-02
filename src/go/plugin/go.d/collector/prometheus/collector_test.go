@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -950,119 +951,63 @@ ceph_health_status 0
 	)
 }
 
-func cephProfileRelabeling() []RelabelBlock {
-	const rgwDataSyncCanonicalPattern = `ceph_data_sync_from_zone_(fetch_not_modified|fetch_errors|poll_errors|fetch_bytes_count|fetch_bytes_sum|poll_latency_count|poll_latency_sum|lock_latency_count|lock_latency_sum)`
-	const mdsPattern = `ceph_mds_client_metrics_(.+?)_(cap_hits|cap_miss|avg_read_latency|avg_write_latency|avg_metadata_latency|dentry_lease_hits|dentry_lease_miss|opened_files|opened_inodes|pinned_icaps|total_inodes|total_read_ops|total_read_size|total_write_ops|total_write_size)`
-	const librbdPattern = `ceph_librbd_(.+?)_(rd|rd_bytes|rd_latency_count|rd_latency_sum|wr|wr_bytes|wr_latency_count|wr_latency_sum|discard|discard_bytes|discard_latency_count|discard_latency_sum|flush|flush_latency_count|flush_latency_sum|ws|ws_bytes|ws_latency_count|ws_latency_sum|cmp|cmp_bytes|cmp_latency_count|cmp_latency_sum|snap_create|snap_remove|snap_rollback|snap_rename|notify|resize|readahead|readahead_bytes|invalidate_cache|opened_time|lock_acquired_time)`
-	const pwlPattern = `ceph_librbd_pwl_(.+?)_(rd|rd_bytes|rd_latency_count|rd_latency_sum|hit_rd|rd_hit_bytes|hit_rd_latency_count|hit_rd_latency_sum|part_hit_rd|wr|wr_bytes|wr_def|wr_def_lanes|wr_def_log|wr_def_buf|wr_overlap|wr_q_barrier|log_ops|log_op_bytes_count|log_op_bytes_sum|req_arr_to_all_t_count|req_arr_to_all_t_sum|req_arr_to_dis_t_count|req_arr_to_dis_t_sum|req_all_to_dis_t_count|req_all_to_dis_t_sum|wr_latency_count|wr_latency_sum|caller_wr_latency_count|caller_wr_latency_sum|req_arr_to_all_nw_t_count|req_arr_to_all_nw_t_sum|req_arr_to_dis_nw_t_count|req_arr_to_dis_nw_t_sum|req_all_to_dis_nw_t_count|req_all_to_dis_nw_t_sum|wr_latency_nw_count|wr_latency_nw_sum|caller_wr_latency_nw_count|caller_wr_latency_nw_sum|op_alloc_t_count|op_alloc_t_sum|op_dis_to_buf_t_count|op_dis_to_buf_t_sum|op_dis_to_app_t_count|op_dis_to_app_t_sum|op_dis_to_cmp_t_count|op_dis_to_cmp_t_sum|op_buf_to_app_t_count|op_buf_to_app_t_sum|op_buf_to_bufc_t_count|op_buf_to_bufc_t_sum|op_app_to_cmp_t_count|op_app_to_cmp_t_sum|op_app_to_appc_t_count|op_app_to_appc_t_sum|discard|discard_bytes|discard_lat_count|discard_lat_sum|aio_flush|aio_flush_def|aio_flush_lat_count|aio_flush_lat_sum|ws|ws_bytes|ws_lat_count|ws_lat_sum|cmp|cmp_bytes|cmp_lat_count|cmp_lat_sum|cmp_fails|internal_flush|writeback_lat_count|writeback_lat_sum|invalidate|append_tx_lat_count|append_tx_lat_sum|retire_tx_lat_count|retire_tx_lat_sum)`
-	replace := func(pattern, target, replacement string) relabel.Config {
-		return relabel.Config{
-			SourceLabels: []string{"__name__"},
-			Regex:        relabel.MustNewRegexp(pattern),
-			TargetLabel:  target,
-			Replacement:  replacement,
-			Action:       relabel.Replace,
-		}
-	}
-	dynamic := func(match, pattern, identityLabel, canonicalPrefix string) RelabelBlock {
-		return RelabelBlock{
-			Match: match,
-			MetricRelabelConfigs: []relabel.Config{
-				replace(pattern, identityLabel, "${1}"),
-				replace(pattern, "__name__", canonicalPrefix+"${2}"),
-			},
-		}
-	}
-	blocks := []RelabelBlock{
-		{
-			Match: "ceph_*",
-			MetricRelabelConfigs: []relabel.Config{
-				{
-					Regex:       relabel.MustNewRegexp(`(instance|family|chart|dimension)`),
-					Replacement: "ceph_$1",
-					Action:      relabel.LabelMap,
-				},
-				{
-					Regex:  relabel.MustNewRegexp(`(instance|family|chart|dimension)`),
-					Action: relabel.LabelDrop,
-				},
-			},
-		},
-		{
-			Match: "ceph_data_sync_from_*",
-			MetricRelabelConfigs: []relabel.Config{{
-				SourceLabels: []string{"__name__"},
-				Regex:        relabel.MustNewRegexp(rgwDataSyncCanonicalPattern),
-				Action:       relabel.Keep,
-			}},
-		},
-		{
-			Match: "ceph_mds_client_metrics_*",
-			MetricRelabelConfigs: []relabel.Config{
-				replace(mdsPattern, "mds_filesystem_key", "${1}"),
-				replace(mdsPattern, "__name__", "ceph_mds_per_client_${2}"),
-			},
-		},
-		{
-			Match: "!ceph_librbd_pwl_* ceph_librbd_*",
-			MetricRelabelConfigs: []relabel.Config{
-				replace(librbdPattern, "librbd_image_key", "${1}"),
-				replace(librbdPattern, "__name__", "ceph_rbd_librbd_image_${2}"),
-			},
-		},
-	}
-	blocks = append(blocks,
-		dynamic("ceph_objecter_0x*", `ceph_objecter_(0x[0-9A-Fa-f]+)_(op_active|op_r|op_w|op_rmw)`, "objecter_address", "ceph_objecter_"),
-		dynamic("ceph_rocksdb_cache_*", `ceph_rocksdb_cache_(.+?)_(capacity|usage|pinned|elems|inserts|lookups|hits|misses)`, "rocksdb_cache_key", "ceph_rocksdb_binned_cache_"),
-		dynamic("ceph_librbd_pwl_*", pwlPattern, "librbd_pwl_key", "ceph_rbd_librbd_pwl_"),
-		dynamic("ceph_objectcacher_*", `ceph_objectcacher_(.+?)_(cache_ops_hit|cache_ops_miss|cache_bytes_hit|cache_bytes_miss|data_read|data_written|data_flushed|data_overwritten_while_flushing|write_ops_blocked|write_bytes_blocked|write_time_blocked)`, "objectcacher_key", "ceph_objectcacher_"),
-		dynamic("ceph_finisher_*", `ceph_finisher_(.+?)_(queue_len|complete_latency_count|complete_latency_sum)`, "finisher_key", "ceph_finisher_"),
-		dynamic("ceph_throttle_*", `ceph_throttle_(.+?)_(val|max|get_started|get|get_sum|get_or_fail_fail|get_or_fail_success|take|take_sum|put|put_sum|wait_count|wait_sum)`, "throttle_key", "ceph_throttle_"),
-		dynamic("!ceph_blk_kernel_device_bluestore_* !ceph_blk_kernel_device_db_* ceph_blk_kernel_device_*", `ceph_blk_kernel_device_(.+?)_(discard_op|discard_threads)`, "kernel_device_key", "ceph_kernel_device_"),
-		dynamic("ceph_mclock_shard_queue_*", `ceph_mclock_shard_queue_([^_]+)_(mclock_immediate_queue_len|mclock_client_queue_len|mclock_recovery_queue_len|mclock_best_effort_queue_len|mclock_all_type_queue_len)`, "mclock_shard", "ceph_mclock_shard_"),
-		dynamic("ceph_AsyncMessenger_Worker_*", `ceph_AsyncMessenger_Worker_([0-9]+)_(msgr_recv_messages|msgr_send_messages|msgr_recv_bytes|msgr_send_bytes|msgr_active_connections|msgr_created_connections|msgr_running_total_time|msgr_running_send_time|msgr_running_recv_time|msgr_running_fast_dispatch_time|msgr_send_messages_queue_lat_count|msgr_send_messages_queue_lat_sum|msgr_handle_ack_lat_count|msgr_handle_ack_lat_sum|msgr_recv_encrypted_bytes|msgr_send_encrypted_bytes)`, "messenger_worker", "ceph_async_messenger_worker_"),
-		dynamic("ceph_AsyncMessenger_RDMAWorker_*", `ceph_AsyncMessenger_RDMAWorker_([0-9]+)_(tx_no_mem|tx_parital_mem|tx_failed_post|tx_chunks|tx_bytes|rx_chunks|rx_bytes|pending_sent_conns)`, "rdma_worker", "ceph_async_messenger_rdma_worker_"),
-		dynamic("ceph_queue*_dpdk_*", `ceph_queue([0-9]+)_(dpdk_receive_packets|dpdk_send_packets|dpdk_receive_bad_checksum_errors|dpdk_receive_no_memory_errors|dpdk_receive_bytes|dpdk_send_bytes|dpdk_receive_last_bunch|dpdk_send_last_bunch|dpdk_receive_fragments|dpdk_send_fragments|dpdk_receive_copy_ops|dpdk_send_copy_ops|dpdk_receive_copy_bytes|dpdk_send_copy_bytes|dpdk_receive_linearize_ops|dpdk_send_linearize_ops|dpdk_send_queue_length)`, "dpdk_queue", "ceph_dpdk_queue_"),
-		dynamic("ceph_port*_dpdk_device_*", `ceph_port([0-9]+)_(dpdk_device_receive_multicast_packets|dpdk_device_receive_badcrc_errors|dpdk_device_receive_total_errors|dpdk_device_send_total_errors|dpdk_device_receive_dropped_errors|dpdk_device_receive_nombuf_errors)`, "dpdk_port", "ceph_dpdk_port_"),
-	)
-	const serviceUniqueIDPattern = `ceph_service_unique_id_(.+)`
-	blocks = append(blocks, RelabelBlock{
-		Match: "ceph_service_unique_id_*",
-		MetricRelabelConfigs: []relabel.Config{
-			replace(serviceUniqueIDPattern, "service_unique_id", "${1}"),
-			replace(serviceUniqueIDPattern, "__name__", "ceph_service_unique_id"),
-		},
-	})
-	return blocks
-}
+func configureCephProfileJobFromMetadata(t *testing.T, collr *Collector, jobName string) {
+	t.Helper()
 
-func cephProfileFallbackGauges() []string {
-	return []string{
-		"ceph_disk_occupation",
-		"ceph_disk_occupation_human",
-		"ceph_fs_metadata",
-		"ceph_health_status",
-		"ceph_mds_metadata",
-		"ceph_mon_metadata",
-		"ceph_osd_flag_nobackfill",
-		"ceph_osd_flag_nodeep_scrub",
-		"ceph_osd_flag_nodown",
-		"ceph_osd_flag_noin",
-		"ceph_osd_flag_noout",
-		"ceph_osd_flag_norebalance",
-		"ceph_osd_flag_norecover",
-		"ceph_osd_flag_noscrub",
-		"ceph_osd_flag_noup",
-		"ceph_osd_in",
-		"ceph_osd_metadata",
-		"ceph_osd_up",
-		"ceph_osd_weight",
-		"ceph_pool_metadata",
-		"ceph_rbd_image_metadata",
-		"ceph_rbd_mirror_metadata",
-		"ceph_rgw_metadata",
-		"ceph_smb_metadata",
+	var metadata struct {
+		Modules []struct {
+			Meta struct {
+				ID string `yaml:"id"`
+			} `yaml:"meta"`
+			Setup struct {
+				Configuration struct {
+					Examples struct {
+						List []struct {
+							Config string `yaml:"config"`
+						} `yaml:"list"`
+					} `yaml:"examples"`
+				} `yaml:"configuration"`
+			} `yaml:"setup"`
+		} `yaml:"modules"`
 	}
+	content, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(content, &metadata))
+
+	const integrationID = "collector-go.d.plugin-prometheus-ceph"
+	var rawConfig string
+	for _, module := range metadata.Modules {
+		if module.Meta.ID == integrationID {
+			require.NotEmpty(t, module.Setup.Configuration.Examples.List)
+			rawConfig = module.Setup.Configuration.Examples.List[0].Config
+			break
+		}
+	}
+	require.NotEmptyf(t, rawConfig, "metadata integration %q has no configuration example", integrationID)
+
+	var example struct {
+		Jobs []yaml.Node `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(rawConfig), &example))
+	require.Len(t, example.Jobs, 2)
+
+	var config *Config
+	for idx := range example.Jobs {
+		candidate := New().Config
+		require.NoError(t, example.Jobs[idx].Decode(&candidate))
+		if candidate.Name == jobName {
+			config = &candidate
+			break
+		}
+	}
+	require.NotNilf(t, config, "metadata example has no job %q", jobName)
+	require.Equal(t, ProfilesConfig{
+		Mode:      "exact",
+		ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "ceph"}}},
+	}, config.Profiles)
+
+	config.URL = collr.URL
+	collr.Config = *config
 }
 
 // TestCollector_VLLMProfileAllMetrics proves the stock profile against a
@@ -1656,15 +1601,7 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 		t,
 		"ceph_all_metrics.prom",
 		func(collr *Collector) {
-			collr.Selector = selector.Expr{Deny: []string{"process_start_time_seconds"}}
-			collr.Profiles = ProfilesConfig{
-				Mode:      "exact",
-				ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "ceph"}}},
-			}
-			collr.Relabeling = cephProfileRelabeling()
-			collr.FallbackType.Gauge = cephProfileFallbackGauges()
-			collr.MaxTS = 20000
-			collr.MaxTSPerMetric = 4000
+			configureCephProfileJobFromMetadata(t, collr, "ceph-mgr")
 		},
 		"prometheus.ceph.",
 		map[string][]string{
@@ -1968,28 +1905,32 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 func TestCollector_CephProfileProducerVariants(t *testing.T) {
 	tests := []struct {
 		fixture string
+		jobName string
 		context string
 		dims    []string
 	}{
-		{"ceph_reef_mgr_perf_all_metrics.prom", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
-		{"ceph_squid_mgr_perf_all_metrics.prom", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
-		{"ceph_tentacle_mgr_perf_all_metrics.prom", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
+		{"ceph_reef_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
+		{"ceph_squid_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
+		{"ceph_tentacle_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
 		{
 			"ceph_reef_exporter_prio0_all_metrics.prom",
+			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
 		},
 		{
 			"ceph_squid_exporter_prio0_all_metrics.prom",
+			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
 		},
 		{
 			"ceph_tentacle_exporter_prio0_all_metrics.prom",
+			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
 		},
-		{"ceph_nvmeof_all_metrics.prom", "prometheus.ceph.nvme_of.block_devices.byte_throughput", []string{"read_bytes", "written_bytes"}},
+		{"ceph_nvmeof_all_metrics.prom", "ceph-exporter", "prometheus.ceph.nvme_of.block_devices.byte_throughput", []string{"read_bytes", "written_bytes"}},
 	}
 
 	for _, test := range tests {
@@ -1998,14 +1939,7 @@ func TestCollector_CephProfileProducerVariants(t *testing.T) {
 				t,
 				test.fixture,
 				func(collr *Collector) {
-					collr.Profiles = ProfilesConfig{
-						Mode:      "exact",
-						ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "ceph"}}},
-					}
-					collr.Relabeling = cephProfileRelabeling()
-					collr.FallbackType.Gauge = cephProfileFallbackGauges()
-					collr.MaxTS = 20000
-					collr.MaxTSPerMetric = 4000
+					configureCephProfileJobFromMetadata(t, collr, test.jobName)
 				},
 				"prometheus.ceph.",
 				map[string][]string{test.context: test.dims},

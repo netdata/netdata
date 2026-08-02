@@ -93,6 +93,15 @@ if [ -z "$OUTPUT" ]; then
     [ -n "$TOOL" ] && suffix="-${TOOL}"
     OUTPUT="${audit_dir}/local${suffix}-$(date -u +%Y%m%dT%H%M%SZ).${FORMAT}"
 fi
+if [ -e "$OUTPUT" ] && [ ! -f "$OUTPUT" ]; then
+    echo -e "${CA_RED}[ERROR]${CA_NC} output path must be a regular file: ${OUTPUT}" >&2
+    exit 2
+fi
+output_parent="$(dirname -- "$OUTPUT")"
+if [ ! -d "$output_parent" ]; then
+    echo -e "${CA_RED}[ERROR]${CA_NC} output parent directory does not exist: ${output_parent}" >&2
+    exit 2
+fi
 
 # Pick a runner.
 if [ "$RUNNER" = "auto" ]; then
@@ -107,6 +116,25 @@ if [ "$RUNNER" = "auto" ]; then
         echo "  - cli:      https://github.com/codacy/codacy-analysis-cli#install" >&2
         exit 2
     fi
+fi
+
+case "$RUNNER" in
+    local|docker) ;;
+    *)
+        echo -e "${CA_RED}[ERROR]${CA_NC} unknown --runner '${RUNNER}'" >&2
+        exit 2
+        ;;
+esac
+
+# Truncate the destination before the runner starts. If shell redirection cannot
+# initialize it, a readable stale report must not survive to the shape check.
+if ! : > "$OUTPUT"; then
+    echo -e "${CA_RED}[ERROR]${CA_NC} cannot initialize output file: ${OUTPUT}" >&2
+    exit 2
+fi
+if [ ! -f "$OUTPUT" ]; then
+    echo -e "${CA_RED}[ERROR]${CA_NC} output path must be a regular file: ${OUTPUT}" >&2
+    exit 2
 fi
 
 echo -e "${CA_GRAY}[analyze-local] runner=${RUNNER} format=${FORMAT} dir=${SUBDIR}${CA_NC}" >&2
@@ -152,7 +180,12 @@ case "$RUNNER" in
         ;;
 esac
 
-# Sanity check the output.
+# Sanity check the output. Repeat the regular-file check after the runner so a
+# non-regular runner result is not handed to jq.
+if [ ! -f "$OUTPUT" ] || [ ! -r "$OUTPUT" ]; then
+    echo -e "${CA_RED}[ERROR]${CA_NC} runner output is not a readable regular file: ${OUTPUT}" >&2
+    exit 1
+fi
 if [ ! -s "$OUTPUT" ]; then
     echo -e "${CA_RED}[ERROR]${CA_NC} empty output at ${OUTPUT}; check the runner above" >&2
     exit 1
@@ -234,7 +267,107 @@ if [ "$FORMAT" = "json" ]; then
         type == "array" and all(.[]; valid_result)
     '
 else
-    report_shape='type == "object" and .version == "2.1.0" and (.runs | type == "array")'
+    # codacy-analysis-cli 7.10.1 serializes this closed SARIF model. Validate
+    # nested records and their rule/artifact references so truncated runner
+    # output cannot be mistaken for a clean analysis.
+    # shellcheck disable=SC2016
+    report_shape='
+        def object_has($fields):
+            if type != "object" then false
+            else . as $object | all($fields[]; . as $field | $object | has($field))
+            end;
+        def integer: type == "number" and floor == .;
+        def nonnegative_integer: integer and . >= 0;
+        def positive_integer: integer and . >= 1;
+        def valid_message:
+            object_has(["text"])
+            and (.text | type == "string")
+            and (.markdown? | . == null or type == "string");
+        def valid_rule:
+            object_has(["id", "name", "shortDescription", "help", "properties"])
+            and (.id | type == "string")
+            and (.name | type == "string")
+            and (.shortDescription | valid_message)
+            and (.help | valid_message)
+            and (.properties
+                 | object_has(["category"])
+                   and (.category | type == "string"));
+        def valid_artifact:
+            object_has(["location"])
+            and (.location
+                 | object_has(["uri"])
+                   and (.uri | type == "string"));
+        def valid_invocation:
+            object_has(["executionSuccessful", "workingDirectory"])
+            and .executionSuccessful == true
+            and (.workingDirectory
+                 | object_has(["uri"])
+                   and (.uri | type == "string"));
+        def valid_location($artifacts):
+            object_has(["physicalLocation"])
+            and (.physicalLocation
+                 | object_has(["artifactLocation", "region"])
+                   and (.artifactLocation
+                        | object_has(["index", "uri"])
+                          and (.index | nonnegative_integer)
+                          and (.index < ($artifacts | length))
+                          and (.uri | type == "string")
+                          and (.uri == $artifacts[.index].location.uri))
+                   and (.region
+                        | object_has(["startLine", "startColumn"])
+                          and (.startLine | positive_integer)
+                          and (.startColumn | positive_integer)));
+        # Codacy 7.10.1 publishes security rules before non-security rules, but
+        # indexes non-security results within the hidden subset. The serialized
+        # category is not the partition source of truth, so the unique ruleId
+        # is authoritative while ruleIndex remains range-checked.
+        def valid_rule_reference($rules):
+            .ruleId as $id
+            | any($rules[]; .id == $id);
+        def valid_result($rules; $artifacts):
+            object_has(["ruleIndex", "ruleId", "message", "level", "locations", "partialFingerprints"])
+            and (.ruleIndex | nonnegative_integer)
+            and (.ruleIndex < ($rules | length))
+            and (.ruleId | type == "string")
+            and valid_rule_reference($rules)
+            and (.message | valid_message)
+            and (.level | type == "string" and IN("error", "warning", "note", "none"))
+            and (.locations | type == "array")
+            and (.locations | length == 1)
+            and (.locations | all(.[]; valid_location($artifacts)))
+            and (.partialFingerprints
+                 | object_has(["primaryLocationStartColumnFingerprint", "primaryLocationLineHash"])
+                   and (.primaryLocationStartColumnFingerprint | type == "string")
+                   and (.primaryLocationLineHash | type == "string"));
+        def valid_run:
+            object_has(["tool", "results", "invocations", "artifacts"])
+            and (.tool
+                 | object_has(["driver"])
+                   and (.driver
+                        | object_has(["name", "version", "informationUri", "rules"])
+                          and (.name | type == "string")
+                          and (.version | type == "string")
+                          and (.informationUri | type == "string")
+                          and (.rules | type == "array")
+                          and (.rules | all(.[]; valid_rule))))
+            and (.tool.driver.rules
+                 | [.[].id] as $ids
+                   | ($ids | length) == ($ids | unique | length))
+            and (.results | type == "array")
+            and (.invocations | type == "array")
+            and (.invocations | length == 1)
+            and (.invocations | all(.[]; valid_invocation))
+            and (.artifacts | type == "array")
+            and (.artifacts | all(.[]; valid_artifact))
+            and (. as $run
+                 | all($run.results[];
+                       valid_result($run.tool.driver.rules; $run.artifacts)));
+        type == "object"
+        and .["$schema"] == "https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json"
+        and .version == "2.1.0"
+        and (.runs | type == "array")
+        and (.runs | all(.[]; valid_run))
+    '
 fi
 if ! jq -e "$report_shape" "$OUTPUT" >/dev/null 2>&1; then
     echo -e "${CA_RED}[ERROR]${CA_NC} invalid ${FORMAT} report at ${OUTPUT}; inspect the first tool-runner error before trusting findings" >&2

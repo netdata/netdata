@@ -681,6 +681,28 @@ template:
 	}
 }
 
+func TestInspectEmittedPlanAssociatesContextsInEmitterOrder(t *testing.T) {
+	plan := chartengine.Plan{Actions: []chartengine.EngineAction{
+		chartengine.CreateChartAction{ChartID: "z", Meta: chartengine.ChartMeta{Context: "'shared"}},
+		chartengine.CreateChartAction{ChartID: "a", Meta: chartengine.ChartMeta{Context: "shared"}},
+		chartengine.CreateChartAction{ChartID: "m", Meta: chartengine.ChartMeta{Context: "distinct"}},
+	}}
+
+	result, err := inspectEmittedPlan(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.contextCollisions) != 1 {
+		t.Fatalf("expected one context collision: %#v", result.contextCollisions)
+	}
+	want := []string{fingerprintID("'shared"), fingerprintID("shared")}
+	slices.Sort(want)
+	if !slices.Equal(want, result.contextCollisions[0].RawContextFingerprints) {
+		t.Fatalf("wrong raw contexts associated with emitted collision: got %v, want %v",
+			result.contextCollisions[0].RawContextFingerprints, want)
+	}
+}
+
 func TestValidateProfileAllowsIntentionalRawContextReuse(t *testing.T) {
 	profile := `
 match: app_*

@@ -97,12 +97,30 @@ rejects malformed or wrong-shape JSON/SARIF instead of printing a false-success
 path. JSON must be the CLI's result array, where each item is exactly one supported
 `Issue`, `DuplicationClone`, `FileError`, or `FileMetrics` wrapper with its required
 payload shape. SARIF must declare version 2.1.0 and contain a `runs` array. If that
-exact error recurs, verify the runner still mounts
-its configured Java temp directory at the same absolute path before changing
-analyzer policy.
+exact error recurs, verify the runner still mounts its configured Java temp
+directory at the same absolute path before changing analyzer policy.
 
-The Docker runner follows Codacy's current CLI image. If Codacy changes the result ADT, the closed validation is
-intentionally fail-closed: verify the new upstream model, then update the validator and mock matrix together. Do not make
+For SARIF, a valid top-level envelope alone is not trustworthy. The 7.10.1 CLI
+contract also requires every run to carry its tool driver and rules, result
+records with valid rule references and physical locations, invocations, and
+referenced artifacts. The wrapper validates those nested records and
+cross-references before reporting success. The CLI has one known producer quirk:
+in mixed security/non-security runs, non-security result indexes address the
+non-security rule subset even though the driver publishes security rules first.
+That hidden partition cannot be reconstructed from the serialized rule category,
+which the CLI itself treats as unreliable. The validator therefore keeps every
+index in range but uses the existing unique rule ID as the authoritative
+reference.
+
+An explicit output path must resolve to a writable regular file or a
+not-yet-created file whose parent directory already exists. The wrapper rejects
+directories, must successfully truncate the destination before the analyzer
+starts, and requires a non-empty readable regular file afterward. This prevents
+a failed redirection from reusing a stale report.
+
+The Docker runner follows Codacy's current CLI image. If Codacy changes the
+result ADT, the closed validation is intentionally fail-closed: verify the new
+upstream model, then update the validator and mock matrix together. Do not make
 unknown wrappers implicitly successful merely to tolerate version drift.
 
 When the local CLI emits valid JSON, its top-level shape is an array of tagged

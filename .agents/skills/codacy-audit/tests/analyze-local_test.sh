@@ -96,10 +96,104 @@ run_case failure 'fractional integer field' json \
 run_case failure 'top-level JSON error object' json '{"error":"runner failed"}' 'invalid json report'
 run_case failure 'malformed JSON' json '[{"Issue":' 'invalid json report'
 
-run_case success 'valid SARIF report' sarif \
-    '{"version":"2.1.0","runs":[]}' 'wrote '
+run_case success 'empty valid SARIF report' sarif \
+    '{"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json","version":"2.1.0","runs":[]}' \
+    'wrote '
+run_case success 'nested valid SARIF report' sarif '
+  {"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+   "version":"2.1.0","runs":[{
+     "tool":{"driver":{"name":"Shellcheck (reported by Codacy)","version":"1.0.0",
+       "informationUri":"https://www.codacy.com","rules":[{
+         "id":"rule","name":"rule","shortDescription":{"text":"short"},
+         "help":{"text":"help","markdown":"help"},"properties":{"category":"CodeStyle"}}]}},
+     "results":[{"ruleIndex":0,"ruleId":"rule","message":{"text":"finding"},"level":"warning",
+       "locations":[{"physicalLocation":{"artifactLocation":{"index":0,"uri":"file.sh"},
+         "region":{"startLine":1,"startColumn":1}}}],
+       "partialFingerprints":{"primaryLocationStartColumnFingerprint":"1","primaryLocationLineHash":"abc"}}],
+     "invocations":[{"executionSuccessful":true,"workingDirectory":{"uri":"file:///codacy"}}],
+     "artifacts":[{"location":{"uri":"file.sh"}}]
+   }]}' 'wrote '
+run_case success 'mixed-category Codacy SARIF rule indexes' sarif '
+  {"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+   "version":"2.1.0","runs":[{
+     "tool":{"driver":{"name":"Tool","version":"1","informationUri":"https://www.codacy.com","rules":[
+       {"id":"security","name":"security","shortDescription":{"text":"short"},"help":{"text":"help"},
+        "properties":{"category":"CodeStyle"}},
+       {"id":"style","name":"style","shortDescription":{"text":"short"},"help":{"text":"help"},
+        "properties":{"category":"Security"}}]}},
+     "results":[{"ruleIndex":0,"ruleId":"style","message":{"text":"finding"},"level":"warning",
+       "locations":[{"physicalLocation":{"artifactLocation":{"index":0,"uri":"file.sh"},
+         "region":{"startLine":1,"startColumn":1}}}],
+       "partialFingerprints":{"primaryLocationStartColumnFingerprint":"1","primaryLocationLineHash":"abc"}}],
+     "invocations":[{"executionSuccessful":true,"workingDirectory":{"uri":"file:///codacy"}}],
+     "artifacts":[{"location":{"uri":"file.sh"}}]
+   }]}' 'wrote '
 run_case failure 'wrong SARIF version' sarif \
-    '{"version":"2.0.0","runs":[]}' 'invalid sarif report'
+    '{"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json","version":"2.0.0","runs":[]}' \
+    'invalid sarif report'
+run_case failure 'non-object SARIF run' sarif \
+    '{"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json","version":"2.1.0","runs":[null]}' \
+    'invalid sarif report'
+run_case failure 'SARIF run missing tool driver' sarif \
+    '{"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json","version":"2.1.0","runs":[{"tool":{},"results":[],"invocations":[],"artifacts":[]}]}' \
+    'invalid sarif report'
+run_case failure 'SARIF result has invalid rule reference' sarif '
+  {"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+   "version":"2.1.0","runs":[{
+     "tool":{"driver":{"name":"Tool","version":"1","informationUri":"https://www.codacy.com","rules":[]}},
+     "results":[{"ruleIndex":0,"ruleId":"missing","message":{"text":"finding"},"level":"warning",
+       "locations":[],"partialFingerprints":{"primaryLocationStartColumnFingerprint":"1",
+       "primaryLocationLineHash":"abc"}}],"invocations":[],"artifacts":[]
+   }]}' 'invalid sarif report'
+run_case failure 'SARIF invocation reports failure' sarif '
+  {"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+   "version":"2.1.0","runs":[{
+     "tool":{"driver":{"name":"Tool","version":"1","informationUri":"https://www.codacy.com","rules":[]}},
+     "results":[],"invocations":[{"executionSuccessful":false,
+       "workingDirectory":{"uri":"file:///codacy"}}],"artifacts":[]
+   }]}' 'invalid sarif report'
+run_case failure 'SARIF result has no physical location' sarif '
+  {"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+   "version":"2.1.0","runs":[{
+     "tool":{"driver":{"name":"Tool","version":"1","informationUri":"https://www.codacy.com","rules":[
+       {"id":"rule","name":"rule","shortDescription":{"text":"short"},"help":{"text":"help"},
+        "properties":{"category":"CodeStyle"}}]}},
+     "results":[{"ruleIndex":0,"ruleId":"rule","message":{"text":"finding"},"level":"warning",
+       "locations":[],"partialFingerprints":{"primaryLocationStartColumnFingerprint":"1",
+       "primaryLocationLineHash":"abc"}}],
+     "invocations":[{"executionSuccessful":true,"workingDirectory":{"uri":"file:///codacy"}}],"artifacts":[]
+   }]}' 'invalid sarif report'
+
+output_directory="$tmp/existing-output-directory"
+mkdir "$output_directory"
+set +e
+directory_output="$({
+    PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
+        "$script" --runner local --format json --output "$output_directory"
+} 2>&1)"
+directory_status=$?
+set -e
+if [ "$directory_status" -ne 2 ] || [[ "$directory_output" != *'output path must be a regular file'* ]]; then
+    printf >&2 '[FAIL] output directory rejection: status=%d\n%s\n' "$directory_status" "$directory_output"
+    exit 1
+fi
+printf '[PASS] output directory rejection\n'
+
+stale_output="$tmp/stale-output.json"
+printf '%s\n' '[]' > "$stale_output"
+printf '%s\n' 'set -o noclobber' > "$tmp/noclobber-env"
+set +e
+stale_result="$({
+    BASH_ENV="$tmp/noclobber-env" PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
+        "$script" --runner local --format json --output "$stale_output"
+} 2>&1)"
+stale_status=$?
+set -e
+if [ "$stale_status" -ne 2 ] || [[ "$stale_result" != *'cannot initialize output file'* ]]; then
+    printf >&2 '[FAIL] stale-output initialization rejection: status=%d\n%s\n' "$stale_status" "$stale_result"
+    exit 1
+fi
+printf '[PASS] stale-output initialization rejection\n'
 
 set +e
 unsupported_output="$({ "$script" --format yaml; } 2>&1)"
@@ -111,4 +205,4 @@ if [ "$unsupported_status" -ne 2 ] || [[ "$unsupported_output" != *'expected jso
 fi
 printf '[PASS] unsupported format\n'
 
-printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 1))"
+printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 3))"

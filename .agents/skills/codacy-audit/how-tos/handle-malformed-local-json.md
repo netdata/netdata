@@ -36,10 +36,25 @@ parse it.
    The wrapper now exits nonzero when JSON or SARIF is malformed or has the wrong
    report shape. A parseable error object is not a report: JSON output must be the
    CLI's array of exactly-one-key `Issue`, `DuplicationClone`, `FileError`, or
-   `FileMetrics` wrappers with their required payload fields. SARIF must declare
-   version 2.1.0 and contain a `runs` array. The wrapper reports each JSON result
-   class separately and fails when a `FileError` makes the analysis incomplete.
-   A printed dump path without a successful exit is not a pass.
+   `FileMetrics` wrappers with their required payload fields. SARIF must use the
+   2.1.0 schema and version, and every run must contain a valid tool driver and
+   rules, results with valid rule and artifact references, invocations, and
+   artifacts. The wrapper reports each JSON result class separately and fails
+   when a `FileError` makes the analysis incomplete. A printed dump path without
+   a successful exit is not a pass.
+
+   Codacy 7.10.1 has one known SARIF quirk: in a mixed-category run, a
+   non-security result's rule index addresses the non-security subset even
+   though the combined rule list starts with security rules. The wrapper accepts
+   only an in-range index and treats the existing unique rule ID as authoritative.
+   It cannot reconstruct the hidden partition from the serialized category,
+   because the CLI itself treats that field as unreliable.
+
+   When `--output` is explicit, use a writable regular-file path under an
+   existing parent directory. The wrapper rejects directories, must truncate
+   the destination before starting the analyzer, and requires a non-empty
+   readable regular file after the analyzer returns. If initialization fails,
+   it stops instead of trusting stale report content.
 
 4. Check GitHub check-run annotations:
 
