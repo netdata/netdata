@@ -84,10 +84,17 @@ static NETDATA_DOUBLE query_point_total_projection(
             &(point), (now) - (view_update_every), (now));                           \
 } while(0)
 
+// Numeric values are owned by time grouping; row metadata only needs contributor evidence.
+#define query_merge_evidence_to_group(ops, sp) do {                      \
+    (ops)->group_point.count += (sp).count;                              \
+    (ops)->group_point.anomaly_count += (sp).anomaly_count;              \
+    (ops)->group_point.gap_count += (sp).gap_count;                      \
+} while(0)
+
 #define query_merge_point_evidence(point, ops, sample_in_row) do {       \
     bool _evidence_sample_in_row = (sample_in_row);                      \
     if((point).tier != 0 || _evidence_sample_in_row)                     \
-        storage_point_merge_to((ops)->group_point, (point).sp);          \
+        query_merge_evidence_to_group((ops), (point).sp);                \
     if(!(point).added)                                                   \
         storage_point_merge_to((ops)->query_point, (point).sp);          \
 } while(0)
@@ -213,7 +220,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
         // A gap projected before its timestamp still belongs to the row containing that timestamp.
         if(unlikely(new_point.added && new_point.tier == 0 && storage_point_is_gap(new_point.sp) &&
                     new_point.sp.end_time_s > now_start_time && new_point.sp.end_time_s <= now_end_time)) {
-            storage_point_merge_to(ops->group_point, new_point.sp);
+            query_merge_evidence_to_group(ops, new_point.sp);
         }
 
         if(unlikely(query_result_plan_should_switch_plan(ops, now_end_time))) {
@@ -554,8 +561,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             if(likely(ops->group_points_non_zero))
                 r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
-            if(unlikely(storage_point_is_partial(ops->group_point)))
-                ops->group_value_flags |= RRDR_VALUE_PARTIAL;
+            // This runs for every result row, so materialize PARTIAL without a hot-path branch.
+            ops->group_value_flags |= (RRDR_VALUE_FLAGS)(
+                ((!!ops->group_point.count) & (!!ops->group_point.gap_count)) * RRDR_VALUE_PARTIAL);
 
             // store the specific point options
             *rrdr_value_options_ptr = ops->group_value_flags;
@@ -626,7 +634,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         storage_point_merge_to(ops->query_point, new_point.sp);
                 }
 
-                storage_point_merge_to(ops->group_point, new_point.sp);
+                query_merge_evidence_to_group(ops, new_point.sp);
             }
 
             if(settle_value) {
