@@ -240,6 +240,8 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 	})
 	check(assertTierPresence(t, respDatabaseEnd, []bool{false, false, false}),
 		"database-end sentinel fast path read storage points")
+	// One-point LATEST treats before=0 as a hot-edge sentinel: it restores the
+	// newest stored timestamp and deliberately suppresses normal view alignment.
 	check(queryTimestampGridExact(t, respDatabaseEnd, queryExpectedGrid{
 		after: fixture.T0, before: fixture.T0 + 12, updateEvery: 13, rows: 1,
 	}), "database-end sentinel changed its existing newest-sample grid")

@@ -16,6 +16,7 @@ type corpusPaths struct {
 var daemonFreeTests = map[string]struct{}{
 	"TestC019FormatShapeGuards":                             {},
 	"TestC016PhaseBudgetGuards":                             {},
+	"TestC023ResolutionWindowRecordsUseFixtureCadence":      {},
 	"TestC023TierNumberTimesPartialGapOverlap":              {},
 	"TestC4CFlapFixtureGuard":                               {},
 	"TestC4DAlignedGridOracleGuardsOffByOne":                {},

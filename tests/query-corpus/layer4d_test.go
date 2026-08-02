@@ -521,6 +521,16 @@ func TestC4DAlignedGridOracleGuardsOffByOne(t *testing.T) {
 			duration: 60150, points: 300,
 			after: 1, before: 60300, every: 201, rows: 300,
 		},
+		{
+			name:     "requested-points-clamp-to-available",
+			duration: 10, points: 20,
+			after: 0, before: 10, every: 1, rows: 11,
+		},
+		{
+			name:     "requested-points-clamp-to-production-cap",
+			duration: 1_000_000, points: 100_000,
+			after: -36_791, before: 1_000_008, every: 12, rows: 86_400,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := queryExpectedVirtualGrid(t, 0, tc.duration, tc.points, true)

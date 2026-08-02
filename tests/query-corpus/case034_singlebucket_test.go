@@ -199,13 +199,13 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 			},
 		}
 
-		// Keep the explicit before within one update_every of query execution
-		// so the LATEST hot-edge path is exercised on both fixture Agents.
-		hotBefore := time.Now().Unix() - 1
-		hotAfter := hotBefore - 3600
 		ok := true
-		for _, fixtureHost := range hosts {
-			for _, aligned := range []bool{true, false} {
+		for _, aligned := range []bool{true, false} {
+			// Both Agents receive the same request-derived cutoff. Bound the pair
+			// to one update_every so both requests exercise the LATEST hot edge.
+			hotBefore := time.Now().Unix() - 1
+			hotAfter := hotBefore - 3600
+			for _, fixtureHost := range hosts {
 				params := daemon.DataParams(fixtureHost.context, hotAfter, hotBefore, 1)
 				params.Set("time_group", "latest")
 				params.Set("scope_dimensions", "value")
@@ -216,6 +216,9 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 				doc, err := td.DataV3(fixtureHost.host, params)
 				if err != nil {
 					t.Fatal(err)
+				}
+				if time.Now().Unix()-1-hotBefore > 60 {
+					t.Fatal("hot-edge request pair exceeded its one-update_every timing bound")
 				}
 				if !queryTimestampGridExact(
 					t, doc, queryExpectedVirtualGrid(t, hotAfter, hotBefore, 1, aligned)) {
@@ -229,7 +232,9 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 					ok = false
 				}
 			}
+		}
 
+		for _, fixtureHost := range hosts {
 			// A relative hot-edge request must resolve from the query-time clock,
 			// not from this metric's newest stored timestamp. Wall-clock bounds
 			// make this deterministic without assuming both HTTP calls land in

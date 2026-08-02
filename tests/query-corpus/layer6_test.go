@@ -242,14 +242,16 @@ func TestLayer6TwoPassLiveEdgePartialRow(t *testing.T) {
 	if !assertExactColumnSet(t, cols, []string{"selected"}) {
 		t.Fail()
 	}
-	assertExactColumn(t, cols, "selected", []expectedColumnPoint{
+	if !assertExactColumn(t, cols, "selected", []expectedColumnPoint{
 		wantEmptyAt(boundary - 5*ue),
 		wantNumberAt(boundary-4*ue, 11),
 		wantNumberAt(boundary-3*ue, 11),
 		wantNumberAt(boundary-2*ue, 11),
 		wantNumberAt(boundary-ue, 11),
 		wantNumberWithMetadataAt(boundary, 1, 0, canon.AnnotationPartial),
-	}, 0)
+	}, 0) {
+		t.Fail()
+	}
 }
 
 // An average at pass 2 needs two denominators: contributing pass-1 groups for

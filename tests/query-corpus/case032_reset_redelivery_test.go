@@ -30,7 +30,7 @@ func TestCase032ResetAnnotationIsNotRedelivered(t *testing.T) {
 	ch := fixture.Series(context, context, base, samples, ue,
 		func(int) string { return "100" },
 		func(i int) string {
-			if i == samples {
+			if i == 8 || i == samples {
 				return "AR"
 			}
 			return stream.FlagNotAnomalous
@@ -42,15 +42,19 @@ func TestCase032ResetAnnotationIsNotRedelivered(t *testing.T) {
 
 	ok := true
 	for _, shape := range []struct {
-		name      string
-		before    int64
-		rowSpan   int64
-		resetEnds int64
+		name    string
+		before  int64
+		rowSpan int64
 	}{
-		{name: "upsample", before: base + samples*ue, rowSpan: ue / 2, resetEnds: base + samples*ue},
-		{name: "downsample", before: base + samples*ue, rowSpan: 30, resetEnds: base + samples*ue},
-		{name: "nondividing-tail", before: base + 140, rowSpan: 35, resetEnds: base + 140},
+		{name: "upsample", before: base + samples*ue, rowSpan: ue / 2},
+		{name: "downsample", before: base + samples*ue, rowSpan: 30},
+		{name: "nondividing-tail", before: base + 140, rowSpan: 35},
 	} {
+		resetRows := make(map[int64]bool, 2)
+		for _, resetSample := range []int64{8, samples} {
+			resetOffset := resetSample * ue
+			resetRows[base+((resetOffset+shape.rowSpan-1)/shape.rowSpan)*shape.rowSpan] = true
+		}
 		for _, group := range []string{"average", "sum"} {
 			points := (shape.before - base) / shape.rowSpan
 			params := daemon.DataParamsTier(context, 0, base, shape.before, points, group)
@@ -94,7 +98,7 @@ func TestCase032ResetAnnotationIsNotRedelivered(t *testing.T) {
 					ok = false
 				}
 				wantPA := int64(0)
-				if pt.T == shape.resetEnds {
+				if resetRows[pt.T] {
 					wantPA = canon.AnnotationReset
 				}
 				if pt.PA != wantPA {

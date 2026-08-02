@@ -233,8 +233,7 @@ func queryExpectedVirtualGrid(
 	t.Helper()
 
 	duration := before - after
-	if duration <= 0 || requestedPoints <= 0 || requestedPoints > duration ||
-		requestedPoints > 86400 {
+	if duration <= 0 || requestedPoints <= 0 {
 		t.Fatalf("unsupported virtual-grid fixture: after=%d before=%d points=%d",
 			after, before, requestedPoints)
 	}
@@ -245,6 +244,9 @@ func queryExpectedVirtualGrid(
 	points := requestedPoints
 	if points > available {
 		points = available
+	}
+	if points > 86400 {
+		points = 86400
 	}
 	group := available / points
 	if group == 0 {
