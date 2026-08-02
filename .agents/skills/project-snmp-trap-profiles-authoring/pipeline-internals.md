@@ -49,7 +49,7 @@ terminology stay out of the operator docs.
 
 ## 3. Journal-writer queue depth and flush mechanics
 
-Authoritative home: `netdata.md` §19 ("TrapWriter interface contract", default
+Authoritative home: `netdata.md` §19 ("Output writer interface contract", default
 queue/flush policy) and §11 ("Journal Storage").
 
 - The journal-direct writer accepts entries into a per-job bounded queue

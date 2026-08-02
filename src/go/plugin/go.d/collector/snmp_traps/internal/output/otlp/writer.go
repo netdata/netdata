@@ -810,14 +810,18 @@ func otlpVarbindsValue(entry *model.TrapEntry) *commonpb.AnyValue {
 	if len(entry.Varbinds) == 0 {
 		return nil
 	}
-	var projector output.VarbindProjector
-	projector.Reset(len(entry.Varbinds))
+	// Keep occurrence state local so the compiler can keep the common small map
+	// on the stack; a stateful projector adds a heap allocation per record.
+	seenKeys := make(map[string]int)
 	values := make([]*commonpb.KeyValue, 0, len(entry.Varbinds))
 	for _, vb := range entry.Varbinds {
-		projected, ok := projector.Project(vb)
+		key, ok := output.VarbindKey(vb)
 		if !ok {
 			continue
 		}
+		seenKeys[key]++
+		key = output.NumberedVarbindKey(key, seenKeys[key])
+		projected := output.ProjectVarbind(key, vb)
 		fields := []*commonpb.KeyValue{
 			otlpKVString("oid", projected.OID),
 			otlpKVString("type", string(projected.Type)),

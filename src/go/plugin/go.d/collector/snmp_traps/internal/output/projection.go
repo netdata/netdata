@@ -90,25 +90,41 @@ func (p *VarbindProjector) Reserve(key string) {
 }
 
 func (p *VarbindProjector) Project(vb model.VarbindValue) (ProjectedVarbind, bool) {
-	if model.IsSensitiveVarbind(vb) {
-		return ProjectedVarbind{}, false
-	}
-	key := vb.Name
-	if key == "" {
-		key = vb.OID
-	}
-	if key == "" {
+	key, ok := VarbindKey(vb)
+	if !ok {
 		return ProjectedVarbind{}, false
 	}
 	p.seen[key]++
-	if p.seen[key] > 1 {
-		key = fmt.Sprintf("%s#%d", key, p.seen[key])
+	key = NumberedVarbindKey(key, p.seen[key])
+	return ProjectVarbind(key, vb), true
+}
+
+func VarbindKey(vb model.VarbindValue) (string, bool) {
+	if model.IsSensitiveVarbind(vb) {
+		return "", false
 	}
+	if vb.Name != "" {
+		return vb.Name, true
+	}
+	if vb.OID != "" {
+		return vb.OID, true
+	}
+	return "", false
+}
+
+func NumberedVarbindKey(key string, occurrence int) string {
+	if occurrence <= 1 {
+		return key
+	}
+	return fmt.Sprintf("%s#%d", key, occurrence)
+}
+
+func ProjectVarbind(key string, vb model.VarbindValue) ProjectedVarbind {
 	return ProjectedVarbind{
 		Key:   key,
 		OID:   vb.OID,
 		Type:  vb.Type,
 		Value: CanonicalizeValue(vb.Value),
 		Enum:  vb.Enum,
-	}, true
+	}
 }

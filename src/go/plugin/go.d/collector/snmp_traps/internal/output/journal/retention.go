@@ -204,60 +204,6 @@ func parseComplexDuration(s string) (time.Duration, error) {
 	return total, nil
 }
 
-func FormatSize(bytes uint64) string {
-	switch {
-	case bytes >= bytesPerGB && bytes%bytesPerGB == 0:
-		return fmt.Sprintf("%dGB", bytes/bytesPerGB)
-	case bytes >= bytesPerMB && bytes%bytesPerMB == 0:
-		return fmt.Sprintf("%dMB", bytes/bytesPerMB)
-	case bytes >= bytesPerKB && bytes%bytesPerKB == 0:
-		return fmt.Sprintf("%dKB", bytes/bytesPerKB)
-	default:
-		return fmt.Sprintf("%dB", bytes)
-	}
-}
-
-func FormatDuration(d time.Duration) string {
-	if d == 0 {
-		return "0s"
-	}
-	if d < time.Microsecond {
-		return d.String()
-	}
-	var parts []string
-	remaining := d
-
-	days := remaining / (24 * time.Hour)
-	if days > 0 {
-		parts = append(parts, fmt.Sprintf("%dd", days))
-		remaining -= days * 24 * time.Hour
-	}
-	hours := remaining / time.Hour
-	if hours > 0 {
-		parts = append(parts, fmt.Sprintf("%dh", hours))
-		remaining -= hours * time.Hour
-	}
-	minutes := remaining / time.Minute
-	if minutes > 0 {
-		parts = append(parts, fmt.Sprintf("%dm", minutes))
-		remaining -= minutes * time.Minute
-	}
-	seconds := remaining / time.Second
-	if seconds > 0 {
-		parts = append(parts, fmt.Sprintf("%ds", seconds))
-	}
-	if len(parts) == 0 {
-		ms := remaining / time.Millisecond
-		if ms > 0 {
-			parts = append(parts, fmt.Sprintf("%dms", ms))
-		}
-	}
-	if len(parts) == 0 {
-		return "0s"
-	}
-	return strings.Join(parts, "")
-}
-
 func (rc Retention) Config() Config {
 	cfg := Config{
 		MaxSize:    rc.EffectiveMaxSize(),

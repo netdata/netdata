@@ -14,8 +14,11 @@ var (
 	ErrNotStarted = errors.New("trap writer is not started")
 )
 
-// Writer consumes an entry on every Write call, regardless of the returned
-// authority error. Callers must not use the entry after Write returns.
+// Writer accepts an immutable entry. A coordinator may retain the entry through
+// another backend even when it returns an authority error, so callers must not
+// mutate or reuse the entry or reachable backing state after Write returns.
+// Concurrent immutable reads remain valid. An individual backend retains the
+// entry only when its own Write succeeds.
 type Writer interface {
 	Write(entry *model.TrapEntry) error
 	Flush() error

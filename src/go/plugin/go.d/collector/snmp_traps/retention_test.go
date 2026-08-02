@@ -55,36 +55,6 @@ func TestParseHumanSize(t *testing.T) {
 	}
 }
 
-func TestFormatHumanSizePreservesRoundTrip(t *testing.T) {
-	tests := map[string]struct {
-		bytes uint64
-		want  string
-	}{
-		"exact_gb":      {bytes: 10 * (1024 * 1024 * 1024), want: "10GB"},
-		"exact_mb":      {bytes: 200 * (1024 * 1024), want: "200MB"},
-		"exact_kb":      {bytes: 64 * (1024), want: "64KB"},
-		"fractional_gb": {bytes: uint64(1.5 * (1024 * 1024 * 1024)), want: "1536MB"},
-		"fractional_kb": {bytes: (1024) + 1, want: "1025B"},
-		"plain_bytes":   {bytes: 512, want: "512B"},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			got := journal.FormatSize(tc.bytes)
-			if got != tc.want {
-				t.Fatalf("journal.FormatSize(%d) = %q, want %q", tc.bytes, got, tc.want)
-			}
-			parsed, err := journal.ParseSize(got)
-			if err != nil {
-				t.Fatalf("parse formatted size %q: %v", got, err)
-			}
-			if parsed != tc.bytes {
-				t.Fatalf("journal.ParseSize(journal.FormatSize(%d)) = %d", tc.bytes, parsed)
-			}
-		})
-	}
-}
-
 func TestParseHumanDuration(t *testing.T) {
 	tests := map[string]struct {
 		input    string
@@ -403,9 +373,4 @@ func TestValidateNetdataLogRootRejectsFile(t *testing.T) {
 	if !strings.Contains(err.Error(), "not a directory") {
 		t.Fatalf("expected non-directory root error, got %v", err)
 	}
-}
-
-//go:fix inline
-func stringPtr(s string) *string {
-	return new(s)
 }
