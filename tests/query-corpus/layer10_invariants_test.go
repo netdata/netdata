@@ -565,7 +565,7 @@ func l10SourceBuckets(
 	case 0:
 		dbPoints = fixtureDimension.DBPoints(1)
 	case 1:
-		windows := fixtureDimension.TierWindows(tier1Gran)
+		windows := fixtureDimension.TierWindows(tier1Gran, int64(l10FixtureChart.UpdateEvery))
 		ends := make([]int64, 0, len(windows))
 		for end := range windows {
 			ends = append(ends, end)

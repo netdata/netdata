@@ -27,8 +27,8 @@ import (
 // buckets of bucketSpan seconds starting after `after`, yielding the
 // fetched value sequence per bucket (empty/never-stored windows skipped)
 // plus the per-bucket anomaly totals.
-func tierFetchBuckets(d fixture.Dimension, name string, granularity, after, bucketSpan int64, buckets int) ([][]float64, []struct{ AC, Count int }) {
-	windows := d.TierWindows(granularity)
+func tierFetchBuckets(d fixture.Dimension, name string, granularity, updateEvery, after, bucketSpan int64, buckets int) ([][]float64, []struct{ AC, Count int }) {
+	windows := d.TierWindows(granularity, updateEvery)
 	vals := make([][]float64, buckets)
 	stats := make([]struct{ AC, Count int }, buckets)
 	for k := 0; k < buckets; k++ {
@@ -127,7 +127,7 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 
 			// view group = bucketSpan query-granularity units (virtual
 			// points, qg=1) — drives only the ses/des window (capped 15)
-			vals, stats := tierFetchBuckets(d, tg.name, tier1Gran, after, bucketSpan, buckets)
+			vals, stats := tierFetchBuckets(d, tg.name, tier1Gran, int64(ch.UpdateEvery), after, bucketSpan, buckets)
 			exp := fixture.TGOracle(tg.name, tg.options, vals, bucketSpan, buckets)
 
 			for i, pt := range col {
@@ -255,7 +255,7 @@ func TestLayer4AutoTierSelection(t *testing.T) {
 				exp = fixture.TGOracle("average", "", vals, int(span), int(tc.points))
 			} else {
 				var vals [][]float64
-				vals, stats = tierFetchBuckets(d, "average", tier1Gran, tc.after, span, int(tc.points))
+				vals, stats = tierFetchBuckets(d, "average", tier1Gran, int64(ch.UpdateEvery), tc.after, span, int(tc.points))
 				exp = fixture.TGOracle("average", "", vals, int(span), int(tc.points))
 			}
 

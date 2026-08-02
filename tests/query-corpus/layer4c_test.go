@@ -215,6 +215,10 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		}
 	})
 
+	// Store CASE-038's archived rate first, restart to flush its last tier-0
+	// page, then let the large layer-4c fixture rotate that page away.
+	c038StoreArchivedRate(t, dd)
+
 	// stream the fixture: rows are generated per replication request —
 	// materializing 11M points would cost hundreds of MB
 	conn, err := stream.Connect(dd.Addr, dd.StreamKey, stream.HostInfo{
@@ -652,6 +656,20 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		if !c4cAnomalySourceExact(t, dd, seamAfter, seamAfter+span) {
 			t.Errorf("automatic-seam rows lost the all-anomalous source record's metadata")
 		}
+	})
+
+	t.Run("higher-tier-only-rate-volume", func(t *testing.T) {
+		trackContract(t, "CASE-038/higher-tier-only-rate-volume")
+
+		if err := conn.Close(); err != nil {
+			t.Fatalf("close replication connection before restart: %v", err)
+		}
+		if err := dd.Restart(); err != nil {
+			t.Fatalf("restart dedicated daemon: %v", err)
+		}
+
+		assertContract(t, "CASE-038/higher-tier-only-rate-volume",
+			c038HigherTierOnlyRateVolume(t, dd))
 	})
 }
 

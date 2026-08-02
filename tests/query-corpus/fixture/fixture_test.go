@@ -60,7 +60,7 @@ func TestChartRowTimesAreTheTimestampUnion(t *testing.T) {
 func TestFixtureOraclesRejectInvalidCollectedValues(t *testing.T) {
 	oracles := map[string]func(Dimension){
 		"Expected":    func(d Dimension) { _ = d.Expected() },
-		"TierWindows": func(d Dimension) { _ = d.TierWindows(60) },
+		"TierWindows": func(d Dimension) { _ = d.TierWindows(60, 1) },
 		"DBPoints":    func(d Dimension) { _ = d.DBPoints(1) },
 	}
 	values := map[string]string{
@@ -96,9 +96,9 @@ func TestFixtureGapDoesNotParseCollectedPlaceholder(t *testing.T) {
 	if len(expected) != 1 || expected[0].Value != nil {
 		t.Fatalf("Expected() = %+v, want one gap", expected)
 	}
-	tier := d.TierWindows(60)[60]
-	if !tier.Empty {
-		t.Fatalf("TierWindows() = %+v, want an empty stored window", tier)
+	tier := d.TierWindows(60, 1)[60]
+	if !tier.Empty || tier.Count != 0 || tier.GapCount != 60 {
+		t.Fatalf("TierWindows() = %+v, want an empty stored 0/60 window", tier)
 	}
 	db := d.DBPoints(1)
 	if len(db) != 1 || !db[0].Gap {
@@ -115,8 +115,8 @@ func TestNumericCollectedValueIsFinite(t *testing.T) {
 	if expected[0].Value == nil || math.Abs(*expected[0].Value-SNRoundTrip(1.25)) > 0 {
 		t.Fatalf("Expected() = %+v", expected)
 	}
-	tier := d.TierWindows(60)[60]
-	if tier.Empty || tier.Count != 1 || tier.Sum != float64(float32(1.25)) {
+	tier := d.TierWindows(60, 1)[60]
+	if tier.Empty || tier.Count != 1 || tier.GapCount != 59 || tier.Sum != float64(float32(1.25)) {
 		t.Fatalf("TierWindows() = %+v", tier)
 	}
 	db := d.DBPoints(1)

@@ -62,7 +62,7 @@ func TestCase017TierBoundaryAbsorption(t *testing.T) {
 	// tier1: after = T0+100 coincides with a stored tier1 window end.
 	// Clean (after, before] first bucket (T0+160) = window(T0+160) alone;
 	// the bug merges window(T0+100) — 60 pre-window samples — into it.
-	windows := ch.Dimensions[0].TierWindows(tier1Gran)
+	windows := ch.Dimensions[0].TierWindows(tier1Gran, int64(ch.UpdateEvery))
 	w100, w160 := windows[fixture.T0+100], windows[fixture.T0+160]
 
 	doc, err = td.DataV3("c017", daemon.DataParamsTier(ch.Context, 1, fixture.T0+100, fixture.T0+280, 3, "sum"))

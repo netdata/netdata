@@ -73,7 +73,7 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 
 	oracles := make(map[string]map[int64]fixture.TierPoint, len(ch.Dimensions))
 	for _, d := range ch.Dimensions {
-		oracles[d.ID] = d.TierWindows(granularity)
+		oracles[d.ID] = d.TierWindows(granularity, int64(ch.UpdateEvery))
 	}
 
 	for _, tg := range []string{"sum", "min", "max", "average"} {
@@ -160,11 +160,16 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 						tier, tg, dim.ID, pt.T-fixture.T0, pt.ARP, expARP, want.AnomalyCount, want.Count)
 				}
 
-				// tier pages store no flags: the RESET annotation does not
-				// survive to tier1+ — pinned contract (page.c tier1 slot)
-				if pt.PA != 0 {
-					t.Errorf("tier%d %s dim %q t0%+d: annotations %d, want exactly zero — tier pages gained flags?",
-						tier, tg, dim.ID, pt.T-fixture.T0, pt.PA)
+				// Tier pages do not retain source flags, so RESET is absent.
+				// A reduced source-slot count is nevertheless recoverable for
+				// stable-cadence pages and must mark the numeric result PARTIAL.
+				wantPA := int64(0)
+				if want.GapCount > 0 {
+					wantPA = canon.AnnotationPartial
+				}
+				if pt.PA != wantPA {
+					t.Errorf("tier%d %s dim %q t0%+d: annotations %d, want %d (count %d, gaps %d)",
+						tier, tg, dim.ID, pt.T-fixture.T0, pt.PA, wantPA, want.Count, want.GapCount)
 				}
 			}
 		}
@@ -263,6 +268,51 @@ func TestLayer2Tier1Palette(t *testing.T) {
 			verifyTierWindows(t, tc.hostname, tc.chart, 1, tier1Gran, tc.firstEnd, tc.lastEnd)
 		})
 	}
+}
+
+// TestLayer2PartialWidePoint pins PARTIAL propagation when one partial
+// higher-tier record is projected into several result rows. PARTIAL describes
+// the source evidence behind each derived row, so it must not disappear after
+// the record's first delivery.
+func TestLayer2PartialWidePoint(t *testing.T) {
+	trackContract(t, "L2/partial-wide-point")
+
+	const value = 7
+	ch := fixture.Series("fixture.l2partialwide", "fixture.l2partialwide", fixture.T0, 280, 1,
+		func(int) string { return strconv.Itoa(value) }, notAnom)
+
+	pushLiveBurst(t, "l2-partial-wide", guid(51), ch)
+	if _, err := td.WaitRetention("l2-partial-wide", ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		firstEnd = int64(fixture.T0 + 40)
+		rowSpan  = int64(10)
+		rows     = int64(6)
+	)
+	after := firstEnd - tier1Gran
+	doc, err := td.DataV3("l2-partial-wide",
+		daemon.DataParamsTier(ch.Context, 1, after, firstEnd, rows, "average"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok := assertSelectedTier(t, doc, 1) && assertExactView(t, doc, after, firstEnd, rowSpan)
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
+		ok = false
+	}
+	want := make([]expectedColumnPoint, rows)
+	for i := range want {
+		want[i] = wantNumberWithPAAt(after+int64(i+1)*rowSpan, value, canon.AnnotationPartial)
+	}
+	if !assertExactColumn(t, cols, ch.Dimensions[0].ID, want, 0) {
+		ok = false
+	}
+	assertContract(t, "L2/partial-wide-point", ok)
 }
 
 // TestLayer2WholeChartAbsence pins the two flavors of a missing tier window:

@@ -158,6 +158,8 @@ func TestCase028RateWithGapsTotalsWhatWasMeasured(t *testing.T) {
 						before:  before,
 						points:  points,
 						want:    want,
+						ue:      ue,
+						gapped:  gapped,
 					}) {
 						ok = false
 					}
@@ -225,6 +227,7 @@ func TestCase028PartialAndOffGridWindows(t *testing.T) {
 						before:  before,
 						points:  points,
 						want:    want,
+						ue:      ue,
 					}) {
 						ok = false
 					}
@@ -241,6 +244,8 @@ type c028Query struct {
 	tier                  int
 	after, before, points int64
 	want                  float64
+	ue                    int
+	gapped                bool
 }
 
 func c028VolumeMatches(t *testing.T, q c028Query) bool {
@@ -268,6 +273,22 @@ func c028VolumeMatches(t *testing.T, q c028Query) bool {
 		ok = false
 	}
 	col := cols["rate"]
+	wantPA := int64(0)
+	if q.gapped {
+		wantPA = canon.AnnotationPartial
+	}
+	wantRows := make([]expectedColumnPoint, q.points)
+	for i := range wantRows {
+		rowAfter := q.after + int64(i)*rowSpan
+		rowBefore := rowAfter + rowSpan
+		wantRows[i] = wantNumberWithPAAt(
+			rowBefore,
+			c028Measured(q.ue, q.gapped, rowAfter, rowBefore),
+			wantPA)
+	}
+	if !assertExactColumn(t, cols, "rate", wantRows, 1e-6) {
+		ok = false
+	}
 
 	total := 0.0
 	for _, pt := range col {
