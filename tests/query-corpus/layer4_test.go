@@ -26,17 +26,25 @@ import (
 // tierFetchBuckets slices the dimension's stored tier windows into view
 // buckets of bucketSpan seconds starting after `after`, yielding the
 // fetched value sequence per bucket (empty/never-stored windows skipped)
-// plus the per-bucket anomaly totals.
-func tierFetchBuckets(d fixture.Dimension, name string, granularity, updateEvery, after, bucketSpan int64, buckets int) ([][]float64, []struct{ AC, Count int }) {
+// plus the per-bucket anomaly and stored-gap totals.
+type tierBucketStats struct {
+	AC, Count, GapCount int
+}
+
+func tierFetchBuckets(d fixture.Dimension, name string, granularity, updateEvery, after, bucketSpan int64, buckets int) ([][]float64, []tierBucketStats) {
 	windows := d.TierWindows(granularity, updateEvery)
 	vals := make([][]float64, buckets)
-	stats := make([]struct{ AC, Count int }, buckets)
+	stats := make([]tierBucketStats, buckets)
 	for k := 0; k < buckets; k++ {
 		lo := after + int64(k)*bucketSpan
 		hi := lo + bucketSpan
 		for end := lo + granularity; end <= hi; end += granularity {
 			tp, ok := windows[end]
-			if !ok || tp.Empty {
+			if !ok {
+				continue
+			}
+			stats[k].GapCount += tp.GapCount
+			if tp.Empty {
 				continue
 			}
 			vals[k] = append(vals[k], fixture.TierFetchValue(name, tp))
@@ -156,6 +164,8 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 				wantPA := int64(0)
 				if want.Empty {
 					wantPA = canon.AnnotationEmpty
+				} else if stats[i].GapCount > 0 {
+					wantPA = canon.AnnotationPartial
 				}
 				if pt.PA != wantPA {
 					t.Errorf("bucket t0%+d: pa %d, want %d", pt.T-fixture.T0, pt.PA, wantPA)
@@ -235,11 +245,11 @@ func TestLayer4AutoTierSelection(t *testing.T) {
 
 			var (
 				exp   []fixture.TGResult
-				stats []struct{ AC, Count int }
+				stats []tierBucketStats
 			)
 			if tc.tier == 0 {
 				vals := make([][]float64, tc.points)
-				stats = make([]struct{ AC, Count int }, tc.points)
+				stats = make([]tierBucketStats, tc.points)
 				for _, p := range d.Points {
 					if p.T > tc.after && p.T <= tc.before {
 						bucket := (p.T - tc.after - 1) / span
@@ -284,6 +294,8 @@ func TestLayer4AutoTierSelection(t *testing.T) {
 				wantPA := int64(0)
 				if want.Empty {
 					wantPA = canon.AnnotationEmpty
+				} else if stats[i].GapCount > 0 {
+					wantPA = canon.AnnotationPartial
 				}
 				if pt.PA != wantPA {
 					t.Errorf("bucket t0%+d: pa %d, want %d", pt.T-fixture.T0, pt.PA, wantPA)
