@@ -473,10 +473,14 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
                 if(unlikely(ops->point_mode == QUERY_POINT_MODE_TOTAL &&
                             netdata_double_isnumber(current_point.value))) {
-                    if(unlikely(!netdata_double_isnumber(new_point_total_remaining)))
-                        new_point_total_remaining = new_point.value;
-
-                    new_point_total_remaining -= current_point.value;
+                    if(unlikely(!netdata_double_isnumber(new_point_total_remaining))) {
+                        time_t duration = new_point.sp.end_time_s - new_point.sp.start_time_s;
+                        new_point_total_remaining = likely(duration > 0) ?
+                            new_point.value * (NETDATA_DOUBLE)(new_point.sp.end_time_s - now_end_time) /
+                                (NETDATA_DOUBLE)duration : 0.0;
+                    }
+                    else
+                        new_point_total_remaining -= current_point.value;
                 }
 
 //                internal_error(current_point.id > 0
