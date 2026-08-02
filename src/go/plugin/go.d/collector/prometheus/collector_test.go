@@ -630,6 +630,16 @@ test_gauge_metric{label1="value1"} 11
 	}
 }
 
+func requireAutogenOnlyRuntime(t *testing.T, collr *Collector) {
+	t.Helper()
+
+	require.NotNil(t, collr.runtime)
+	require.Empty(t, collr.runtime.profiles, "profiles.mode none must not retain a selected profile")
+	want, err := buildMergedChartTemplate(collr.resolveApp(nil), nil)
+	require.NoError(t, err)
+	require.Equal(t, want, collr.runtime.chartTemplate, "profiles.mode none must use the pure autogen template")
+}
+
 // TestCollector_HAProxyProfile exercises the full profile path against the stock
 // haproxy profile: selection (auto/exact/combined select it; none falls back to
 // autogen) and the curated charts rendering under the per-app namespace, including
@@ -739,6 +749,9 @@ haproxy_backend_response_time_average_seconds{proxy="app"} 0.05
 			cc.BeginCycle()
 			require.NoError(t, collr.Collect(context.Background()))
 			require.NoError(t, cc.CommitCycleSuccess())
+			if tc.profiles.effectiveMode() == profilesModeNone {
+				requireAutogenOnlyRuntime(t, collr)
+			}
 
 			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: tc.want})
 		})
@@ -872,6 +885,9 @@ func testCollectorStockProfileModes(
 			cc.BeginCycle()
 			require.NoError(t, collr.Collect(context.Background()))
 			require.NoError(t, cc.CommitCycleSuccess())
+			if tc.profiles.effectiveMode() == profilesModeNone {
+				requireAutogenOnlyRuntime(t, collr)
+			}
 
 			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: tc.want})
 		})

@@ -62,15 +62,23 @@ All values live in `<repo>/.env` (gitignored). See `<repo>/.agents/ENV.md` for s
 | `analyze-local.sh` | Run `codacy-analysis-cli` locally; auto-pick local-binary or docker; write JSON dump under `.local/audits/codacy/`. |
 | `pr-issues.sh` | Fetch all Codacy issues for a PR via the v3 API; cluster summary on stdout; full JSON dump on disk. |
 
+The wrapper's closed JSON/SARIF contract has a mock-runner regression suite:
+
+```bash
+bash .agents/skills/codacy-audit/tests/analyze-local_test.sh
+```
+
 ## Workflow -- pre-push prevention
 
 ```
 $ .agents/skills/codacy-audit/scripts/analyze-local.sh
 [analyze-local] runner=docker format=json dir=<repo>
-[analyze-local] wrote 0 finding(s) to <repo>/.local/audits/codacy/local-<ts>.json
+[analyze-local] wrote 0 issue(s), 0 duplication clone(s), 0 file error(s), and 0 file-metric record(s) to <repo>/.local/audits/codacy/local-<ts>.json
 ```
 
-Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR will be green (modulo Codacy server-side patterns the local CLI doesn't bundle). If it returns findings, fix them locally first.
+Run this before `git push`. A report with zero issues, zero duplication clones, and zero file errors is clean local
+evidence (modulo Codacy server-side patterns the local CLI does not bundle). Fix issues and duplication clones locally. A
+`FileError` makes the wrapper fail because the analysis is incomplete; `FileMetrics` records are informational.
 
 Operational gotcha: when the Dockerized Codacy CLI fails before a tool can emit
 results, the output file may have a `.json` suffix but contain tool-runner logs
@@ -86,16 +94,23 @@ does not exist in the host path namespace; Docker creates a directory at the
 missing bind source and the analyzer reports `read /.codacyrc: is a directory`.
 `analyze-local.sh` gives Java a same-path host-backed temporary directory and
 rejects malformed or wrong-shape JSON/SARIF instead of printing a false-success
-path. JSON must be the CLI's result array; SARIF must declare version 2.1.0 and
-contain a `runs` array. If that exact error recurs, verify the runner still mounts
+path. JSON must be the CLI's result array, where each item is exactly one supported
+`Issue`, `DuplicationClone`, `FileError`, or `FileMetrics` wrapper with its required
+payload shape. SARIF must declare version 2.1.0 and contain a `runs` array. If that
+exact error recurs, verify the runner still mounts
 its configured Java temp directory at the same absolute path before changing
 analyzer policy.
 
-When the local CLI emits valid JSON, its top-level shape is commonly an array
-of wrappers with findings under `.Issue` (for example `.Issue.filename` and
-`.Issue.patternId.value`), not the Codacy v3 API's `.data[].commitIssue` shape.
-Inspect the first item before writing filters; do not reuse Cloud-API filters on
-local analyzer dumps.
+The Docker runner follows Codacy's current CLI image. If Codacy changes the result ADT, the closed validation is
+intentionally fail-closed: verify the new upstream model, then update the validator and mock matrix together. Do not make
+unknown wrappers implicitly successful merely to tolerate version drift.
+
+When the local CLI emits valid JSON, its top-level shape is an array of tagged
+result wrappers, not the Codacy v3 API's `.data[].commitIssue` shape. Issue
+findings live under `.Issue` (for example `.Issue.filename` and
+`.Issue.patternId.value`); duplication results, file errors, and file metrics
+use their corresponding wrapper names. Do not reuse Cloud-API filters on local
+analyzer dumps.
 
 One common local cause is gitignored generated output with restrictive file
 permissions. For example, if local scratch output under `.local/` contains files

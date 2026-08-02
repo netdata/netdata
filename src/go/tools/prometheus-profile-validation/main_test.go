@@ -176,6 +176,13 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 	if result.report.Counts.RawFamilies != 4 {
 		t.Fatalf("raw family count: got %d, want 4", result.report.Counts.RawFamilies)
 	}
+	helpByFamily := make(map[string]string, len(result.report.RawFamilies))
+	for _, family := range result.report.RawFamilies {
+		helpByFamily[family.Name] = family.Help
+	}
+	if got := helpByFamily["app_temperature"]; got != "Current temperature." {
+		t.Fatalf("raw family inventory lost HELP source evidence: got %q", got)
+	}
 	if result.report.Counts.SeriesAutogen != 0 || result.report.Counts.SeriesUnmatched != 0 {
 		t.Fatalf("unexpected routing gaps: %#v", result.report.Counts)
 	}
@@ -893,6 +900,20 @@ func TestValidateProfileRequiresExplicitPositivePriority(t *testing.T) {
 	profile := strings.Replace(validProfile, "      priority: 110\n", "", 1)
 	result := runValidation(t, profile, validDump, "")
 	requireFinding(t, result, "priority_missing")
+}
+
+func TestValidateProfileKeepsLastValidPriorityAfterMissingPriority(t *testing.T) {
+	profile := replaceOnce(t, validProfile, "      priority: 110\n", "")
+	profile = replaceOnce(t, profile, "      priority: 120\n", "      priority: 90\n")
+	result := runValidation(t, profile, validDump, "")
+
+	requireFinding(t, result, "priority_missing")
+	requireFinding(t, result, "priority_source_order")
+	for _, finding := range result.report.Findings {
+		if finding.Code == "priority_source_order" && !strings.Contains(finding.Message, "does not follow 100") {
+			t.Fatalf("descending priority did not stay anchored to the last valid priority: %#v", finding)
+		}
+	}
 }
 
 func TestValidateProfileKeepsPriorityTiesAsReviewWarnings(t *testing.T) {

@@ -470,7 +470,9 @@ func inventoryRawFamilies(families prompkg.MetricFamilies) ([]rawFamilyReport, i
 			Name:   family.Name(),
 			Type:   string(family.Type()),
 			Series: len(family.Metrics()),
-			Help:   family.Help(),
+			// HELP is semantic source evidence. Reports stay with the private input dump;
+			// committed fixtures remain responsible for sanitizing deployment data.
+			Help: family.Help(),
 		}
 		series += item.Series
 		switch family.Type() {
@@ -1019,8 +1021,8 @@ func inspectAuthoredCharts(profile promprofiles.Profile, r *report) ([]authoredC
 						"YAML family/chart order must mirror dashboard presentation order so the authored operator journey is reviewable. Reorder the source or correct the priorities; deliberate ties remain available when a total order is unnecessary.",
 					)
 				}
+				previous = &current
 			}
-			previous = &current
 		}
 		for i, child := range group.Groups {
 			childPath := fmt.Sprintf("%s.groups[%d](%s)", path, i, filepath.Base(child.Family))

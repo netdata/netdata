@@ -162,7 +162,77 @@ fi
 # error object. A non-zero CLI status can mean findings, so validate the selected
 # formatter's top-level contract instead of trusting the process status alone.
 if [ "$FORMAT" = "json" ]; then
-    report_shape='type == "array"'
+    # $fields and $object are jq variables, not shell expansions.
+    # shellcheck disable=SC2016
+    report_shape='
+        def object_has($fields):
+            if type != "object" then false
+            else . as $object | all($fields[]; . as $field | $object | has($field))
+            end;
+        def integer: type == "number" and floor == .;
+        def nullable_integer: . == null or integer;
+        def valid_location:
+            if type != "object" then false
+            elif keys == ["LineLocation"] then
+                .LineLocation
+                | object_has(["line"])
+                  and (.line | integer)
+            elif keys == ["FullLocation"] then
+                .FullLocation
+                | object_has(["line", "column"])
+                  and (.line | integer)
+                  and (.column | integer)
+            else false
+            end;
+        def valid_result:
+            if type != "object" then false
+            elif keys == ["Issue"] then
+                .Issue
+                | object_has(["patternId", "filename", "message", "level", "category", "location", "sourceId"])
+                  and (.patternId | type == "object")
+                  and (.patternId.value | type == "string")
+                  and (.filename | type == "string")
+                  and (.message | type == "object")
+                  and (.message.text | type == "string")
+                  and (.level | type == "string")
+                  and (.category | . == null or type == "string")
+                  and (.location | valid_location)
+                  and (.sourceId | . == null or type == "string")
+            elif keys == ["DuplicationClone"] then
+                .DuplicationClone
+                | object_has(["cloneLines", "nrTokens", "nrLines", "files"])
+                  and (.cloneLines | type == "string")
+                  and (.nrTokens | integer)
+                  and (.nrLines | integer)
+                  and (.files | type == "array")
+                  and (.files | all(.[];
+                      object_has(["filePath", "startLine", "endLine"])
+                      and (.filePath | type == "string")
+                      and (.startLine | integer)
+                      and (.endLine | integer)))
+            elif keys == ["FileError"] then
+                .FileError
+                | object_has(["filename", "message"])
+                  and (.filename | type == "string")
+                  and (.message | type == "string")
+            elif keys == ["FileMetrics"] then
+                .FileMetrics
+                | object_has(["filename", "complexity", "loc", "cloc", "nrMethods", "nrClasses", "lineComplexities"])
+                  and (.filename | type == "string")
+                  and (.complexity | nullable_integer)
+                  and (.loc | nullable_integer)
+                  and (.cloc | nullable_integer)
+                  and (.nrMethods | nullable_integer)
+                  and (.nrClasses | nullable_integer)
+                  and (.lineComplexities | type == "array")
+                  and (.lineComplexities | all(.[];
+                      object_has(["line", "value"])
+                      and (.line | integer)
+                      and (.value | integer)))
+            else false
+            end;
+        type == "array" and all(.[]; valid_result)
+    '
 else
     report_shape='type == "object" and .version == "2.1.0" and (.runs | type == "array")'
 fi
@@ -173,8 +243,22 @@ fi
 
 # Quick summary if format=json.
 if [ "$FORMAT" = "json" ]; then
-    n="$(jq '[.[] | select(has("Issue"))] | length' "$OUTPUT")"
-    echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT}" >&2
+    IFS=$'\t' read -r n_issues n_duplications n_file_errors n_file_metrics < <(
+        jq -r '[
+            ([.[] | select(keys == ["Issue"])] | length),
+            ([.[] | select(keys == ["DuplicationClone"])] | length),
+            ([.[] | select(keys == ["FileError"])] | length),
+            ([.[] | select(keys == ["FileMetrics"])] | length)
+        ] | @tsv' "$OUTPUT"
+    )
+    echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n_issues} issue(s)," \
+        "${n_duplications} duplication clone(s), ${n_file_errors} file error(s)," \
+        "and ${n_file_metrics} file-metric record(s) to ${OUTPUT}" >&2
+    if [ "$n_file_errors" -ne 0 ]; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} analysis is incomplete:" \
+            "${n_file_errors} file error(s) are recorded in ${OUTPUT}" >&2
+        exit 1
+    fi
 else
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${OUTPUT} (${FORMAT} format)" >&2
 fi

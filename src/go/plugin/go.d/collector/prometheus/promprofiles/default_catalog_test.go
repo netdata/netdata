@@ -131,6 +131,72 @@ func TestDefaultCatalog_HolisticProfilesHaveClosedFallbackAllowlists(t *testing.
 	}
 }
 
+func TestDefaultCatalog_LiteLLMServiceTierClassifiersStayCanonical(t *testing.T) {
+	const (
+		valuePattern = `^(` +
+			`[^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|` +
+			`No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+` +
+			`)$`
+		positiveFilter          = `{service_tier=~"` + valuePattern + `"}`
+		complementaryFilter     = `{service_tier!~"` + valuePattern + `"}`
+		expectedClassifierPairs = 7
+	)
+	type pair struct {
+		positive      int
+		complementary int
+	}
+
+	catalog, err := LoadFromDefaultDirs()
+	require.NoError(t, err)
+	profile, ok := catalog.Get("litellm")
+	require.True(t, ok)
+	template, err := profile.Template()
+	require.NoError(t, err)
+
+	pairs := make(map[string]pair)
+	var walk func(group charttpl.Group)
+	walk = func(group charttpl.Group) {
+		for _, chart := range group.Charts {
+			for _, dimension := range chart.Dimensions {
+				if !strings.Contains(dimension.Selector, "service_tier") {
+					continue
+				}
+				metric, filter, found := strings.Cut(dimension.Selector, "{")
+				require.Truef(t, found, "service-tier selector %q has no label filter", dimension.Selector)
+				filter = "{" + filter
+				current := pairs[metric]
+				switch filter {
+				case positiveFilter:
+					current.positive++
+					require.Equalf(t, "service_tier", dimension.NameFromLabel,
+						"positive service-tier selector %q must name the exported tier", dimension.Selector)
+					require.Emptyf(t, dimension.Name,
+						"positive service-tier selector %q must not use a fixed dimension", dimension.Selector)
+				case complementaryFilter:
+					current.complementary++
+					require.Equalf(t, "unclassified", dimension.Name,
+						"complementary service-tier selector %q must use the fallback dimension", dimension.Selector)
+					require.Emptyf(t, dimension.NameFromLabel,
+						"complementary service-tier selector %q must not read the absent/sentinel label", dimension.Selector)
+				default:
+					t.Fatalf("service-tier selector %q drifted from the canonical classifier", dimension.Selector)
+				}
+				pairs[metric] = current
+			}
+		}
+		for _, child := range group.Groups {
+			walk(child)
+		}
+	}
+	walk(template)
+
+	require.Len(t, pairs, expectedClassifierPairs)
+	for metric, got := range pairs {
+		require.Equalf(t, pair{positive: 1, complementary: 1}, got,
+			"service-tier metric %q must have one positive and one complementary route", metric)
+	}
+}
+
 // TestDefaultCatalog_CephAlgorithmsFollowSourceLifecycle locks the cases where
 // Ceph's Prometheus wire type is not the value lifecycle. Increment/decrement
 // populations are current state; cumulative gauges and snapshots are raw totals

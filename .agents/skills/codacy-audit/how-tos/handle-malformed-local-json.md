@@ -34,10 +34,12 @@ parse it.
    ```
 
    The wrapper now exits nonzero when JSON or SARIF is malformed or has the wrong
-   top-level report shape. A parseable error object is not a report: JSON output
-   must be the CLI's result array, while SARIF must declare version 2.1.0 and
-   contain a `runs` array. A printed dump path without a successful exit is not a
-   pass.
+   report shape. A parseable error object is not a report: JSON output must be the
+   CLI's array of exactly-one-key `Issue`, `DuplicationClone`, `FileError`, or
+   `FileMetrics` wrappers with their required payload fields. SARIF must declare
+   version 2.1.0 and contain a `runs` array. The wrapper reports each JSON result
+   class separately and fails when a `FileError` makes the analysis incomplete.
+   A printed dump path without a successful exit is not a pass.
 
 4. Check GitHub check-run annotations:
 

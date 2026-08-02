@@ -4,6 +4,7 @@
 # Non-timestamp gauges preserve every emitted label because their populations are not generally additive.
 # Optional identity views disappear when their keys are omitted; optional status dimensions become unclassified.
 # LiteLLM serializes an unset service tier as the literal "None"; only non-whitespace, non-sentinel values are tiers.
+# Keep every service_tier positive/complement selector on this canonical rule; the stock-catalog test prevents drift.
 # Fallback is closed to one source-backed gateway signature; unknown future names require semantic evidence.
 match: 'litellm_*'
 app: litellm
