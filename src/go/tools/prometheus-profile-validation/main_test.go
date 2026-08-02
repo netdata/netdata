@@ -279,6 +279,91 @@ func TestValidateProfileFindsCoverageGap(t *testing.T) {
 	}
 }
 
+func TestValidateProfileAcceptsExplicitGenericFallbackBoundary(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"app: app\n",
+		"app: app\nautogen:\n  selector:\n    allow: [app_extra]\n",
+		1,
+	)
+	dump := validDump + "\n# TYPE app_extra gauge\napp_extra{instance=\"node-a\"} 1\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("explicitly allowlisted generic fallback should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+	if !hasFinding(result.report, "profile_allowed_autogen", "warning") {
+		t.Fatalf("missing profile_allowed_autogen warning in %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsExplicitFallbackSuppression(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"app: app\n",
+		"app: app\nautogen:\n  selector:\n    deny: [app_extra]\n",
+		1,
+	)
+	dump := validDump + "\n# TYPE app_extra gauge\napp_extra{instance=\"node-a\"} 1\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("explicitly suppressed fallback should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+	if !hasFinding(result.report, "profile_suppressed_series", "warning") {
+		t.Fatalf("missing profile_suppressed_series warning in %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileRejectsImplicitAllowBoundarySuppression(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"app: app\n",
+		"app: app\nautogen:\n  selector:\n    allow: [app_temperature]\n",
+		1,
+	)
+	dump := validDump + "\n# TYPE app_extra gauge\napp_extra{instance=\"node-a\"} 1\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 1 {
+		t.Fatalf("allow-boundary suppression should remain a coverage error\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+	if !hasFinding(result.report, "unmatched_series", "error") {
+		t.Fatalf("missing unmatched_series error in %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsExplicitDenyWithinCompleteAllowBoundary(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"app: app\n",
+		"app: app\nautogen:\n  selector:\n    allow: ['app_*']\n    deny: [app_internal]\n",
+		1,
+	)
+	dump := validDump + "\n# TYPE app_internal gauge\napp_internal{instance=\"node-a\"} 1\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("explicit deny inside a complete allow boundary should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+	if !hasFinding(result.report, "profile_suppressed_series", "warning") {
+		t.Fatalf("missing profile_suppressed_series warning in %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsLabelSelectedGenericFallback(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"app: app\n",
+		"app: app\nautogen:\n  selector:\n    allow: ['app_extra{kind=\"accepted\"}']\n",
+		1,
+	)
+	dump := validDump + "\n# TYPE app_extra gauge\napp_extra{instance=\"node-a\",kind=\"accepted\"} 1\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("label-selected generic fallback should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+	if !hasFinding(result.report, "profile_allowed_autogen", "warning") {
+		t.Fatalf("missing profile_allowed_autogen warning in %#v", result.report.Findings)
+	}
+}
+
 func TestValidateProfileFindsDeadChart(t *testing.T) {
 	profile := strings.Replace(
 		validProfile,
@@ -561,6 +646,18 @@ func TestInspectEmittedPlanFindsEmptyContextWireValue(t *testing.T) {
 	}
 	if len(result.emptyContexts) != 1 {
 		t.Fatalf("expected one empty emitted context: %#v", result)
+	}
+}
+
+func TestInspectEmittedPlanHandlesLargeChartLine(t *testing.T) {
+	action := chartengine.CreateChartAction{ChartID: "value"}
+	action.Meta.Title = strings.Repeat("x", 70*1024)
+	result, err := inspectEmittedPlan(chartengine.Plan{Actions: []chartengine.EngineAction{action}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.emittedCharts != 1 {
+		t.Fatalf("expected one emitted chart: %#v", result)
 	}
 }
 

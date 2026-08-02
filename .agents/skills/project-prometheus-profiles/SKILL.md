@@ -94,7 +94,9 @@ of these proofs fails:
 - **Evidence proof:** every writer-capable family is curated or excluded only
   under one of the binding cases, with the lost operator question stated.
 - **Runtime proof:** the exact profile, dump, and job policy pass the objective
-  validator.
+  validator. The default is zero fallback and zero unmatched series; a narrow,
+  explicit profile fallback allow/suppress boundary is valid only under the
+  evidence and exclusion rules below and remains visible as a warning.
 
 Why: each proof catches a different failure class. Runtime coverage cannot prove
 that a `Latency` branch teaches causality; a good family tree cannot make
@@ -167,6 +169,13 @@ If authoritative evidence cannot establish an in-scope shape, record the
 surface as unresolved and preserve generic fallback where safe. Do not fabricate
 it, silently narrow the support scope, or claim holistic completion.
 
+Generic fallback is not a substitute for research. A profile-level
+`autogen.selector.allow` MAY preserve a source-backed dynamic family only when
+the source names cannot be enumerated or normalized faithfully and each generic
+chart still represents a valid operator signal. Keep the allowlist as narrow as
+the source contract. Record the owner, identity encoded in the name/labels,
+cardinality boundary, and why an authored selector cannot represent it.
+
 If `TYPE` is missing, do not guess silently. The collector can recover only
 selected untyped scalar families through `fallback_type`; it cannot reconstruct
 histogram/summary structure that the exposition did not declare. Use
@@ -176,6 +185,38 @@ Treat dumps as potentially sensitive. Keep them in ignored `.local/` or user
 temporary storage, and never copy customer/user label values into committed
 fixtures or documentation. Committed fixtures MUST be sanitized synthetic
 artifacts, not edited operational dumps.
+
+### Do not impose privacy policy on exported metrics
+
+A Prometheus profile MUST NOT decide that an already-exported metric or label is
+unfit for monitoring because its name or value may identify an API key, user,
+team, organization, tenant, endpoint, file, route, or other customer-owned
+entity. The application exporter has already placed that data on the monitored
+endpoint; the profile's responsibility is to represent it correctly for the
+administrators operating that deployment.
+
+Apply these rules:
+
+- **Do not censor by label meaning.** A profile MUST NOT exclude a family, drop
+  a label, aggregate away an identity, hash a value, or refuse metadata solely
+  because the data appears private, sensitive, identifying, or customer-specific.
+- **Preserve semantic identity.** Labels required to distinguish the entity
+  measured by a counter, gauge, histogram, or summary MUST remain available to
+  the chart design. This includes tenant and credential identities when the
+  source metric is defined at that scope.
+- **Keep policy deployment-owned.** Exporter configuration, job selectors,
+  relabeling, Netdata access controls, and the deployment's administrators own
+  any privacy or disclosure policy. A stock profile MUST NOT silently impose
+  one on every deployment.
+- **Evaluate the actual profile concerns.** Identity and label choices MUST be
+  judged by source semantics, mathematical correctness, operator usefulness,
+  stability, cardinality, lifecycle, and resource cost—not presumed privacy.
+
+This rule is separate from repository artifact hygiene. Operational dumps and
+real label values still MUST remain out of committed fixtures, documentation,
+skills, and test output. Sanitizing durable development artifacts prevents
+publishing a specific deployment's data; it does not authorize the shipped
+profile to hide data from that deployment's own administrators.
 
 ## Model what operators expect to see
 
@@ -198,10 +239,17 @@ A Netdata profile must encode those relationships into the metrics metadata:
 
 - recursive `family` paths define navigation;
 - `context` identifies the semantic chart type;
-- `instances.by_labels` defines the monitored entities;
+- `instances.by_labels` defines the complete unique key for each monitored
+  entity instance;
 - dimensions define bounded aspects compared on one chart;
-- promoted labels provide filterable metadata; and
+- promoted ownership and descriptive labels provide filterable metadata; and
 - priority defines the reading order.
+
+The complete instance key can include an ownership path without changing the
+semantic leaf type. For example, `{database, table}` may identify one table when
+table names repeat, while the context and dashboard instance count still
+describe tables. Dimensions deliberately remove bounded aspects such as
+operation or status from that instance identity.
 
 Netdata's generic dashboards organize charts from this metadata. The profile is
 therefore not one hand-authored panel layout; it is the reusable semantic model
@@ -230,16 +278,20 @@ actually use. Model hand-offs and containment, not just a bag of nouns:
 Labels are evidence for this model, not an automatic answer. For every observed
 label, determine whether it represents:
 
-- stable entity identity;
+- stable leaf-entity identity;
+- an ownership path, including whether it is needed to make the leaf key
+  unique;
 - a bounded comparable aspect/dimension;
-- promoted metadata;
+- descriptive detail/promoted metadata;
 - selector/routing information; or
 - detail that is intentionally aggregated.
 
 Use source semantics, observed label combinations, stability, and cardinality
 to decide. A label named `handler`, `database`, or `pod` may identify an entity;
-`status`, `method`, or `operation` may instead be a bounded aspect. Do not infer
-the role from the label name alone.
+`status`, `method`, or `operation` may instead be a bounded aspect. Ownership
+and descriptive details must be stable for the chosen instance; if they vary
+across its dimensions, revisit the model rather than promoting an arbitrary
+value. Do not infer the role from the label name alone.
 
 ### Classify the evidence against that model
 
@@ -263,8 +315,12 @@ evidence fields are mandatory:
   non-additivity.
 - **Unit algebra:** raw unit, algorithm, conversion, rendered unit, and exact
   counted/measured object.
-- **Label roles/cardinality:** identity, dimension, metadata, routing, or
-  intentional aggregation.
+- **Label roles/cardinality:** leaf identity, ownership path, dimension,
+  descriptive metadata, routing, or intentional aggregation. Record whether an
+  ownership label is also required in the technical instance key.
+- **Optional-label behavior:** whether each label is always emitted, optional by
+  configuration/version, or conditional per series, and how the profile keeps
+  the context and instance type valid when it is absent.
 - **Availability gate:** version, configuration, feature, connector, mode, or
   lifecycle condition controlling registration/update.
 - **Evidence/uncertainty:** observed, authoritative, source-derived synthetic,
@@ -302,6 +358,16 @@ paths as distinct entities/functions, their requests should not be mixed into
 one context merely because the final unit is `requests/s`. Conversely, method or
 status can be dimensions when they are bounded aspects of one entity and one
 operator question.
+
+An optional bounded aspect MAY remain a dimension, but it MUST NOT be the sole
+route for its metric. Prove optionality from authoritative exporter source or
+configuration; dynamic naming alone does not prove the label can be absent. Use
+complementary present/nonblank and missing/blank selectors in the same chart,
+with a fixed `unclassified` fallback dimension. This preserves the context and
+instance count whether the exporter includes the label or not. Do not use this
+fallback to merge non-additive gauge states or to pretend that a missing
+entity-identity label is available; see `chart-design.md` and
+`profile-schema.md` for the exact pattern.
 
 Audit the first two family levels without looking at chart names:
 
@@ -358,8 +424,8 @@ acceptable only when at least one of these cases is evidenced:
 2. **Authoritatively superseded:** a supported replacement answers the same
    question across the intended versions, types, labels, and distribution
    population.
-3. **Concrete collection hazard:** bounded evidence shows a privacy,
-   cardinality, correctness, or resource risk that cannot be made safe in the
+3. **Concrete collection hazard:** bounded evidence shows a cardinality,
+   correctness, or resource risk that cannot be represented safely in the
    profile.
 4. **Verified scope delegation:** another enabled integration owns and answers
    the same question, and this dashboard intentionally defines that boundary.
@@ -395,6 +461,19 @@ When the endpoint policy matters, write a structured validation job file. Do
 not validate with a different selector/relabel/fallback policy from the one
 being recommended or installed.
 
+Profile fallback suppression is an exclusion too. A non-empty
+`autogen.selector.allow` rejects every unmatched series outside its allowlist,
+and `autogen.selector.deny` can reject an allowed series. Either path MUST
+satisfy one binding exclusion case above and document the lost operator
+question. The samples remain in the collector store; only their generic charts
+are suppressed. For objective completion, enumerate intentional exclusions in
+`deny`; do not rely on absence from `allow`. The validator keeps an
+allow-boundary rejection as an unmatched-series error, because it cannot
+distinguish the intended boundary from a newly omitted family. It accepts
+explicit denies only when the allow side admits all writer evidence and a
+counterfactual planner run proves that removing the exact profile rule turns
+every unmatched series into fallback.
+
 ## Encode the design
 
 Use `profile-schema.md` as a navigation aid and the chart-template README as
@@ -419,9 +498,11 @@ reviewable; decreasing priorities contradict the journey expressed by the
 file.
 
 Coverage and chart composition are separate decisions. A complete profile MUST
-route every writer-surviving flattened bucket, count, sum, quantile, counter, and
-gauge series, but it MUST NOT mechanically create one chart for every metric or
-three charts for every histogram:
+account for every writer-surviving flattened bucket, count, sum, quantile,
+counter, and gauge series through authored routing, an explicitly justified
+generic-fallback boundary, or one binding exclusion case. It MUST NOT
+mechanically create one chart for every metric or three charts for every
+histogram:
 
 - A dimension selector can curate a series inside a chart that also contains
   compatible series from related families.
@@ -440,9 +521,13 @@ three charts for every histogram:
   counter beside object counters under the object's unit invents a conversion
   ratio that the exporter did not supply.
 
-The operator question decides the chart boundary; zero autogen/unmatched
-decides whether every written series was routed. Conflating those decisions
-produces repetitive metric-type dashboards instead of useful comparisons.
+The operator question decides the chart boundary; the validator's routing
+result decides whether every written series was accounted for. Zero autogen and
+zero unmatched remain the normal result. Explicit fallback warnings require a
+source-backed explanation; they are not permission to replace useful curation
+with generic charts or silent suppression. Conflating coverage with chart
+composition produces repetitive metric-type dashboards instead of useful
+comparisons.
 
 Keep contexts and IDs stable. Changing them creates new chart identities and
 can strand historical metadata. Different source charts that render the same
@@ -486,10 +571,14 @@ A `PASS` proves, for that evidence:
 - strict catalog/profile/template decoding succeeds;
 - the real collector completes `Init`, `Check`, and a committed `Collect`;
 - the real writer and flattening behavior are exercised;
-- every written series is curated, with zero autogen and zero unmatched;
+- every written series is accounted for, normally with zero autogen and zero
+  unmatched; any nonzero result is proved to be the candidate profile's narrow,
+  explicit fallback allow/suppress policy and is reported as a warning;
 - every authored chart and dimension materializes;
 - every selected writer series carries the labels required by the chart's
   effective explicit instance identity;
+- optional dimension-label fixtures route both present/nonblank and missing/blank forms
+  to the same context and instance type without overlap or fallback autogen;
 - isolated planning finds no observed cross-template collision or
   same-template instance-ID collapse;
 - observed per-instance dimensions are not discarded by lifecycle caps or
@@ -516,6 +605,7 @@ denominator is mechanically valid but is not a complete dashboard unless every
 exclusion satisfies the policy above.
 
 Warnings are prompts for model review, not policy decisions. They include
+explicitly allowed generic fallback, explicitly suppressed fallback series,
 generic auto-selection signatures, observed labels with no authored role,
 the job-policy exclusion summary, observed per-rule allow/deny impact, unused
 metric declarations, authored/runtime heatmap divergence, ambiguous or
@@ -552,6 +642,11 @@ Review the rendered design, not merely the YAML:
 - Does every context represent one homogeneous instance type?
 - Does each displayed leaf family contain one effective entity identity?
 - Are dimensions bounded aspects rather than hidden entity explosions?
+- Does every optional dimension label have a mutually exclusive fixed fallback
+  in the same chart, and does the fallback describe only the unlabeled subset?
+- Are ownership and descriptive labels stable for each chosen instance, with
+  ownership included in the instance key only where needed for uniqueness or
+  the identity lattice?
 - Does descendant identity retain the parent labels and add only the labels
   needed for the narrower entity?
 - Do sibling sections share the parent's identity where section-wide filtering

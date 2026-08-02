@@ -1,6 +1,6 @@
 # Synthetic vLLM Prometheus structural-union fixture; this is not a captured scrape.
 # Labels and values are non-production placeholders. Shapes cover vllm-project/vllm
-# @ adf15cadb9d0151663b001a7286674892c4daa3c and @ 837eae64580c885101ee95b073aafb27a485e7ce.
+# @ adf15cadb9d0151663b001a7286674892c4daa3c and @ dc818c198d3ff50a16f38eba567da006478239c8.
 # Mutually exclusive model modes and KV connectors coexist only to exercise profile routing.
 # Deprecated CPU-offload aliases coexist with replacements so policy can prove they are suppressed.
 # HELP python_gc_objects_collected_total Objects collected during gc

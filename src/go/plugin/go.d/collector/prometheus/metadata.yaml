@@ -42,7 +42,7 @@ modules:
     setup: &setup
       prerequisites:
         list: [ ]
-      configuration:
+      configuration: &prometheus_configuration
         file:
           name: go.d/prometheus.conf
         options:
@@ -4532,8 +4532,26 @@ modules:
 
           The built-in profile separates cluster-wide MGR health, quorum, capacity, placement groups, pools, and OSD metadata
           from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. Optional branches cover
-          CephFS/MDS, RBD images, RBD Mirror, SMB, NVMe-oF, and RGW user, bucket, topic, cache, and multisite telemetry. PG state
-          flags and RGW global/user/bucket views are overlapping diagnostic populations and are not additive totals.
+          CephFS/MDS and CephFS Mirror, RBD images, RBD Mirror, SMB, NVMe-oF, RGW user/bucket/topic/cache/multisite and dmClock
+          scheduling, RocksDB binned caches, external block devices, and Ceph client I/O across Reef 18.2.8, Squid 19.2.5,
+          and Tentacle 20.2.2. PG state flags and RGW global/user/bucket views are overlapping diagnostic populations and are
+          not additive totals. Job relabeling turns dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter, RocksDB
+          cache, Finisher, Throttle, KernelDevice, mClock, messenger, RDMA, DPDK, and service-identity family names into stable
+          profile inputs while preserving their source keys as identity labels. The source-complete profile materializes the
+          entire declared release/producer union with zero generic fallback. Its fallback allowlist contains only three known
+          producer signatures; unknown future families require source-backed identity, unit, and operator-model evidence
+          before curation. The recommended job drops raw MGR RGW source-zone aliases because the stable normalized family is
+          already charted.
+
+          The chart model follows the producer's source lifecycle rather than relying on Prometheus wire type alone. Current
+          populations that Ceph increments and decrements remain absolute, while cumulative work published through gauges is
+          rendered incrementally so Netdata performs rate calculation and reset detection. Shared charts compare only the same
+          counted or measured population: requests, objects, bytes, reservations, state transitions, and other unlike units
+          remain separate even when their wire type or numeric scale is similar.
+
+          The profile also covers priority-0 daemon counters exposed when `ceph-exporter` is configured with
+          `exporter_prio_limit=0`, conditional exporter process CPU, memory, thread, and page-fault metrics, and the official
+          NVMe-oF gateway's Python process runtime surface.
         method_description: |
           Netdata periodically scrapes the Ceph MGR Prometheus module or official `ceph-exporter` endpoint and applies the
           built-in `ceph` profile.
@@ -4544,7 +4562,225 @@ modules:
           - title: Enable an official Ceph Prometheus endpoint
             description: |
               Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics or
-              deploy the official `ceph-exporter` for host-local daemon performance metrics.
+              deploy the official `ceph-exporter` for host-local daemon performance metrics. The stock profile supports the
+              default priority threshold and the complete priority-0 surface; use `exporter_prio_limit=0` when those diagnostic
+              counters are required and size the job limits for the resulting series count.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Ceph MGR and ceph-exporter
+              folding:
+                enabled: false
+              description: |
+                Collect the cluster-wide MGR endpoint and a local official ceph-exporter endpoint with the same exact profile
+                contract. Repeat the exporter job for every exporter endpoint. The relabeling rules preserve the opaque dynamic
+                group key and normalize only source families whose suffix grammar is unambiguous.
+              config: |
+                jobs:
+                  - &ceph_job
+                    name: ceph-mgr
+                    url: http://127.0.0.1:9283/metrics
+                    app: ceph
+                    expected_prefix: ceph_
+                    max_time_series: 20000
+                    max_time_series_per_metric: 4000
+                    profiles:
+                      mode: exact
+                      mode_exact:
+                        entries:
+                          - name: ceph
+                    selector:
+                      deny:
+                        - process_start_time_seconds
+                    fallback_type:
+                      gauge:
+                        - ceph_disk_occupation
+                        - ceph_disk_occupation_human
+                        - ceph_fs_metadata
+                        - ceph_health_status
+                        - ceph_mds_metadata
+                        - ceph_mon_metadata
+                        - ceph_osd_flag_nobackfill
+                        - ceph_osd_flag_nodeep_scrub
+                        - ceph_osd_flag_nodown
+                        - ceph_osd_flag_noin
+                        - ceph_osd_flag_noout
+                        - ceph_osd_flag_norebalance
+                        - ceph_osd_flag_norecover
+                        - ceph_osd_flag_noscrub
+                        - ceph_osd_flag_noup
+                        - ceph_osd_in
+                        - ceph_osd_metadata
+                        - ceph_osd_up
+                        - ceph_osd_weight
+                        - ceph_pool_metadata
+                        - ceph_rbd_image_metadata
+                        - ceph_rbd_mirror_metadata
+                        - ceph_rgw_metadata
+                        - ceph_smb_metadata
+                    relabeling:
+                      - match: 'ceph_data_sync_from_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_data_sync_from_zone_(fetch_not_modified|fetch_errors|poll_errors|fetch_bytes_count|fetch_bytes_sum|poll_latency_count|poll_latency_sum|lock_latency_count|lock_latency_sum)'
+                            action: keep
+                      - match: 'ceph_objecter_0x*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_objecter_(0x[0-9A-Fa-f]+)_(op_active|op_r|op_w|op_rmw)'
+                            target_label: objecter_address
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_objecter_(0x[0-9A-Fa-f]+)_(op_active|op_r|op_w|op_rmw)'
+                            target_label: __name__
+                            replacement: 'ceph_objecter_${2}'
+                      - match: 'ceph_rocksdb_cache_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_rocksdb_cache_(.+?)_(capacity|usage|pinned|elems|inserts|lookups|hits|misses)'
+                            target_label: rocksdb_cache_key
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_rocksdb_cache_(.+?)_(capacity|usage|pinned|elems|inserts|lookups|hits|misses)'
+                            target_label: __name__
+                            replacement: 'ceph_rocksdb_binned_cache_${2}'
+                      - match: 'ceph_mds_client_metrics_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_mds_client_metrics_(.+?)_(cap_hits|cap_miss|avg_read_latency|avg_write_latency|avg_metadata_latency|dentry_lease_hits|dentry_lease_miss|opened_files|opened_inodes|pinned_icaps|total_inodes|total_read_ops|total_read_size|total_write_ops|total_write_size)'
+                            target_label: mds_filesystem_key
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_mds_client_metrics_(.+?)_(cap_hits|cap_miss|avg_read_latency|avg_write_latency|avg_metadata_latency|dentry_lease_hits|dentry_lease_miss|opened_files|opened_inodes|pinned_icaps|total_inodes|total_read_ops|total_read_size|total_write_ops|total_write_size)'
+                            target_label: __name__
+                            replacement: 'ceph_mds_per_client_${2}'
+                      - match: '!ceph_librbd_pwl_* ceph_librbd_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_librbd_(.+?)_(rd|rd_bytes|rd_latency_count|rd_latency_sum|wr|wr_bytes|wr_latency_count|wr_latency_sum|discard|discard_bytes|discard_latency_count|discard_latency_sum|flush|flush_latency_count|flush_latency_sum|ws|ws_bytes|ws_latency_count|ws_latency_sum|cmp|cmp_bytes|cmp_latency_count|cmp_latency_sum|snap_create|snap_remove|snap_rollback|snap_rename|notify|resize|readahead|readahead_bytes|invalidate_cache|opened_time|lock_acquired_time)'
+                            target_label: librbd_image_key
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_librbd_(.+?)_(rd|rd_bytes|rd_latency_count|rd_latency_sum|wr|wr_bytes|wr_latency_count|wr_latency_sum|discard|discard_bytes|discard_latency_count|discard_latency_sum|flush|flush_latency_count|flush_latency_sum|ws|ws_bytes|ws_latency_count|ws_latency_sum|cmp|cmp_bytes|cmp_latency_count|cmp_latency_sum|snap_create|snap_remove|snap_rollback|snap_rename|notify|resize|readahead|readahead_bytes|invalidate_cache|opened_time|lock_acquired_time)'
+                            target_label: __name__
+                            replacement: 'ceph_rbd_librbd_image_${2}'
+                      - match: 'ceph_librbd_pwl_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_librbd_pwl_(.+?)_(rd|rd_bytes|rd_latency_count|rd_latency_sum|hit_rd|rd_hit_bytes|hit_rd_latency_count|hit_rd_latency_sum|part_hit_rd|wr|wr_bytes|wr_def|wr_def_lanes|wr_def_log|wr_def_buf|wr_overlap|wr_q_barrier|log_ops|log_op_bytes_count|log_op_bytes_sum|req_arr_to_all_t_count|req_arr_to_all_t_sum|req_arr_to_dis_t_count|req_arr_to_dis_t_sum|req_all_to_dis_t_count|req_all_to_dis_t_sum|wr_latency_count|wr_latency_sum|caller_wr_latency_count|caller_wr_latency_sum|req_arr_to_all_nw_t_count|req_arr_to_all_nw_t_sum|req_arr_to_dis_nw_t_count|req_arr_to_dis_nw_t_sum|req_all_to_dis_nw_t_count|req_all_to_dis_nw_t_sum|wr_latency_nw_count|wr_latency_nw_sum|caller_wr_latency_nw_count|caller_wr_latency_nw_sum|op_alloc_t_count|op_alloc_t_sum|op_dis_to_buf_t_count|op_dis_to_buf_t_sum|op_dis_to_app_t_count|op_dis_to_app_t_sum|op_dis_to_cmp_t_count|op_dis_to_cmp_t_sum|op_buf_to_app_t_count|op_buf_to_app_t_sum|op_buf_to_bufc_t_count|op_buf_to_bufc_t_sum|op_app_to_cmp_t_count|op_app_to_cmp_t_sum|op_app_to_appc_t_count|op_app_to_appc_t_sum|discard|discard_bytes|discard_lat_count|discard_lat_sum|aio_flush|aio_flush_def|aio_flush_lat_count|aio_flush_lat_sum|ws|ws_bytes|ws_lat_count|ws_lat_sum|cmp|cmp_bytes|cmp_lat_count|cmp_lat_sum|cmp_fails|internal_flush|writeback_lat_count|writeback_lat_sum|invalidate|append_tx_lat_count|append_tx_lat_sum|retire_tx_lat_count|retire_tx_lat_sum)'
+                            target_label: librbd_pwl_key
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_librbd_pwl_(.+?)_(rd|rd_bytes|rd_latency_count|rd_latency_sum|hit_rd|rd_hit_bytes|hit_rd_latency_count|hit_rd_latency_sum|part_hit_rd|wr|wr_bytes|wr_def|wr_def_lanes|wr_def_log|wr_def_buf|wr_overlap|wr_q_barrier|log_ops|log_op_bytes_count|log_op_bytes_sum|req_arr_to_all_t_count|req_arr_to_all_t_sum|req_arr_to_dis_t_count|req_arr_to_dis_t_sum|req_all_to_dis_t_count|req_all_to_dis_t_sum|wr_latency_count|wr_latency_sum|caller_wr_latency_count|caller_wr_latency_sum|req_arr_to_all_nw_t_count|req_arr_to_all_nw_t_sum|req_arr_to_dis_nw_t_count|req_arr_to_dis_nw_t_sum|req_all_to_dis_nw_t_count|req_all_to_dis_nw_t_sum|wr_latency_nw_count|wr_latency_nw_sum|caller_wr_latency_nw_count|caller_wr_latency_nw_sum|op_alloc_t_count|op_alloc_t_sum|op_dis_to_buf_t_count|op_dis_to_buf_t_sum|op_dis_to_app_t_count|op_dis_to_app_t_sum|op_dis_to_cmp_t_count|op_dis_to_cmp_t_sum|op_buf_to_app_t_count|op_buf_to_app_t_sum|op_buf_to_bufc_t_count|op_buf_to_bufc_t_sum|op_app_to_cmp_t_count|op_app_to_cmp_t_sum|op_app_to_appc_t_count|op_app_to_appc_t_sum|discard|discard_bytes|discard_lat_count|discard_lat_sum|aio_flush|aio_flush_def|aio_flush_lat_count|aio_flush_lat_sum|ws|ws_bytes|ws_lat_count|ws_lat_sum|cmp|cmp_bytes|cmp_lat_count|cmp_lat_sum|cmp_fails|internal_flush|writeback_lat_count|writeback_lat_sum|invalidate|append_tx_lat_count|append_tx_lat_sum|retire_tx_lat_count|retire_tx_lat_sum)'
+                            target_label: __name__
+                            replacement: 'ceph_rbd_librbd_pwl_${2}'
+                      - match: 'ceph_objectcacher_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_objectcacher_(.+?)_(cache_ops_hit|cache_ops_miss|cache_bytes_hit|cache_bytes_miss|data_read|data_written|data_flushed|data_overwritten_while_flushing|write_ops_blocked|write_bytes_blocked|write_time_blocked)'
+                            target_label: objectcacher_key
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_objectcacher_(.+?)_(cache_ops_hit|cache_ops_miss|cache_bytes_hit|cache_bytes_miss|data_read|data_written|data_flushed|data_overwritten_while_flushing|write_ops_blocked|write_bytes_blocked|write_time_blocked)'
+                            target_label: __name__
+                            replacement: 'ceph_objectcacher_${2}'
+                      - match: 'ceph_finisher_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_finisher_(.+?)_(queue_len|complete_latency_count|complete_latency_sum)'
+                            target_label: finisher_key
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_finisher_(.+?)_(queue_len|complete_latency_count|complete_latency_sum)'
+                            target_label: __name__
+                            replacement: 'ceph_finisher_${2}'
+                      - match: 'ceph_throttle_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_throttle_(.+?)_(val|max|get_started|get|get_sum|get_or_fail_fail|get_or_fail_success|take|take_sum|put|put_sum|wait_count|wait_sum)'
+                            target_label: throttle_key
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_throttle_(.+?)_(val|max|get_started|get|get_sum|get_or_fail_fail|get_or_fail_success|take|take_sum|put|put_sum|wait_count|wait_sum)'
+                            target_label: __name__
+                            replacement: 'ceph_throttle_${2}'
+                      - match: '!ceph_blk_kernel_device_bluestore_* !ceph_blk_kernel_device_db_* ceph_blk_kernel_device_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_blk_kernel_device_(.+?)_(discard_op|discard_threads)'
+                            target_label: kernel_device_key
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_blk_kernel_device_(.+?)_(discard_op|discard_threads)'
+                            target_label: __name__
+                            replacement: 'ceph_kernel_device_${2}'
+                      - match: 'ceph_mclock_shard_queue_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_mclock_shard_queue_([^_]+)_(mclock_immediate_queue_len|mclock_client_queue_len|mclock_recovery_queue_len|mclock_best_effort_queue_len|mclock_all_type_queue_len)'
+                            target_label: mclock_shard
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_mclock_shard_queue_([^_]+)_(mclock_immediate_queue_len|mclock_client_queue_len|mclock_recovery_queue_len|mclock_best_effort_queue_len|mclock_all_type_queue_len)'
+                            target_label: __name__
+                            replacement: 'ceph_mclock_shard_${2}'
+                      - match: 'ceph_AsyncMessenger_Worker_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_AsyncMessenger_Worker_([0-9]+)_(msgr_recv_messages|msgr_send_messages|msgr_recv_bytes|msgr_send_bytes|msgr_active_connections|msgr_created_connections|msgr_running_total_time|msgr_running_send_time|msgr_running_recv_time|msgr_running_fast_dispatch_time|msgr_send_messages_queue_lat_count|msgr_send_messages_queue_lat_sum|msgr_handle_ack_lat_count|msgr_handle_ack_lat_sum|msgr_recv_encrypted_bytes|msgr_send_encrypted_bytes)'
+                            target_label: messenger_worker
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_AsyncMessenger_Worker_([0-9]+)_(msgr_recv_messages|msgr_send_messages|msgr_recv_bytes|msgr_send_bytes|msgr_active_connections|msgr_created_connections|msgr_running_total_time|msgr_running_send_time|msgr_running_recv_time|msgr_running_fast_dispatch_time|msgr_send_messages_queue_lat_count|msgr_send_messages_queue_lat_sum|msgr_handle_ack_lat_count|msgr_handle_ack_lat_sum|msgr_recv_encrypted_bytes|msgr_send_encrypted_bytes)'
+                            target_label: __name__
+                            replacement: 'ceph_async_messenger_worker_${2}'
+                      - match: 'ceph_AsyncMessenger_RDMAWorker_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_AsyncMessenger_RDMAWorker_([0-9]+)_(tx_no_mem|tx_parital_mem|tx_failed_post|tx_chunks|tx_bytes|rx_chunks|rx_bytes|pending_sent_conns)'
+                            target_label: rdma_worker
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_AsyncMessenger_RDMAWorker_([0-9]+)_(tx_no_mem|tx_parital_mem|tx_failed_post|tx_chunks|tx_bytes|rx_chunks|rx_bytes|pending_sent_conns)'
+                            target_label: __name__
+                            replacement: 'ceph_async_messenger_rdma_worker_${2}'
+                      - match: 'ceph_queue*_dpdk_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_queue([0-9]+)_(dpdk_receive_packets|dpdk_send_packets|dpdk_receive_bad_checksum_errors|dpdk_receive_no_memory_errors|dpdk_receive_bytes|dpdk_send_bytes|dpdk_receive_last_bunch|dpdk_send_last_bunch|dpdk_receive_fragments|dpdk_send_fragments|dpdk_receive_copy_ops|dpdk_send_copy_ops|dpdk_receive_copy_bytes|dpdk_send_copy_bytes|dpdk_receive_linearize_ops|dpdk_send_linearize_ops|dpdk_send_queue_length)'
+                            target_label: dpdk_queue
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_queue([0-9]+)_(dpdk_receive_packets|dpdk_send_packets|dpdk_receive_bad_checksum_errors|dpdk_receive_no_memory_errors|dpdk_receive_bytes|dpdk_send_bytes|dpdk_receive_last_bunch|dpdk_send_last_bunch|dpdk_receive_fragments|dpdk_send_fragments|dpdk_receive_copy_ops|dpdk_send_copy_ops|dpdk_receive_copy_bytes|dpdk_send_copy_bytes|dpdk_receive_linearize_ops|dpdk_send_linearize_ops|dpdk_send_queue_length)'
+                            target_label: __name__
+                            replacement: 'ceph_dpdk_queue_${2}'
+                      - match: 'ceph_port*_dpdk_device_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_port([0-9]+)_(dpdk_device_receive_multicast_packets|dpdk_device_receive_badcrc_errors|dpdk_device_receive_total_errors|dpdk_device_send_total_errors|dpdk_device_receive_dropped_errors|dpdk_device_receive_nombuf_errors)'
+                            target_label: dpdk_port
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_port([0-9]+)_(dpdk_device_receive_multicast_packets|dpdk_device_receive_badcrc_errors|dpdk_device_receive_total_errors|dpdk_device_send_total_errors|dpdk_device_receive_dropped_errors|dpdk_device_receive_nombuf_errors)'
+                            target_label: __name__
+                            replacement: 'ceph_dpdk_port_${2}'
+                      - match: 'ceph_service_unique_id_*'
+                        metric_relabel_configs:
+                          - source_labels: [__name__]
+                            regex: 'ceph_service_unique_id_(.+)'
+                            target_label: service_unique_id
+                            replacement: '${1}'
+                          - source_labels: [__name__]
+                            regex: 'ceph_service_unique_id_(.+)'
+                            target_label: __name__
+                            replacement: 'ceph_service_unique_id'
+                  - <<: *ceph_job
+                    name: ceph-exporter
+                    url: http://127.0.0.1:9926/metrics
 
   - <<: *module
     meta:
@@ -4571,8 +4807,21 @@ modules:
           The built-in profile follows requests through proxy admission, in-flight work and queueing, guardrails and LiteLLM
           overhead, routing and fallback, deployment selection, and the provider API response. Side branches organize response
           and provider caches, tokens and media, spend and budgets, rate limits, MCP tools, managed batches and files, callback
-          failures, Redis/PostgreSQL operations, and spend-update queues. Optional charts appear when their callbacks and
-          features export metrics.
+          failures, Redis/PostgreSQL operations, spend-update queues, and the single-process Python/process runtime. Optional
+          charts appear when their callbacks, features, or runtime mode export metrics.
+
+          Each context represents one monitored entity type. Labels identifying that entity form chart instances; bounded
+          aspects such as status, stream mode, service tier, and validated rate-limit classification become dimensions;
+          ownership and descriptive details remain filterable chart metadata. When LiteLLM configuration omits a supported
+          optional dimension label, the same context and instance remain available with an `unclassified` dimension.
+
+          Additive counters and histogram components always produce complete service or capability views. Selected additional
+          views break them down by deployment, provider/model, route, accounting entity, guardrail/hook, MCP server/tool,
+          managed batch, or callback when LiteLLM exports the required identity labels. Point-in-time gauges retain their
+          complete exported identity, including multiprocess `pid`, so distinct states, limits, budgets, queues, and last-seen
+          values are not summed together. Deployment-configured custom metadata and `tag_*` labels remain part of complete
+          gauge identity when LiteLLM emits them. Additive service views intentionally roll those deployment-controlled
+          labels up unless a dedicated entity breakdown is defined.
         method_description: |
           Netdata periodically scrapes the authenticated LiteLLM Prometheus `/metrics` endpoint and applies the built-in
           `litellm` profile.
@@ -4584,7 +4833,42 @@ modules:
             description: |
               Enable the LiteLLM
               [Prometheus callback](https://docs.litellm.ai/docs/proxy/prometheus) and configure the Netdata job with access to
-              its `/metrics` endpoint. Use LiteLLM's `prometheus_metrics_config` when a lower-cardinality label set is required.
+              its `/metrics` endpoint. LiteLLM's `prometheus_metrics_config` controls which metrics and labels the endpoint
+              exports. Service views remain complete when optional dimension labels are omitted, and optional entity views
+              appear only when their identity labels are available. Gauge identity follows every non-redundant label required
+              to distinguish the emitted state, including configured custom metadata, custom tags, and the opt-in user
+              email/alias budget labels. Arbitrary configured label names are not turned into dimensions because they are
+              deployment-defined, unbounded classifications rather than one stable bounded aspect. Size `max_time_series` and
+              `max_time_series_per_metric` for the exported surface.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: LiteLLM
+              folding:
+                enabled: false
+              description: Collect the complete profile-backed LiteLLM surface while excluding generated timestamps and deprecated aliases.
+              config: |
+                jobs:
+                  - name: litellm
+                    url: http://127.0.0.1:4000/metrics
+                    app: litellm
+                    expected_prefix: litellm_
+                    profiles:
+                      mode: exact
+                      mode_exact:
+                        entries:
+                          - name: litellm
+                    selector:
+                      deny:
+                        - '*_created'
+                        - process_start_time_seconds
+                        - litellm_requests_metric_total
+                        - litellm_llm_api_failed_requests_metric_total
+                        - litellm_check_batch_cost_last_run_timestamp
 
   - <<: *module
     meta:
@@ -4608,19 +4892,110 @@ modules:
           Monitor vLLM inference-serving workload, latency, scheduling, token throughput, cache behavior, connector activity,
           and runtime health.
 
-          The built-in profile follows requests through scheduling, prefill, decode, engine execution, and HTTP service
-          boundaries. It separates model-engine, endpoint, parser, and service-runtime identities, and organizes KV cache
-          residency and offloading, connector operations, speculative or diffusion decoding, and WebSocket activity under their
-          causal owners. Optional charts appear when the corresponding vLLM features export metrics.
+          The built-in profiles follow requests through scheduling, prefill, decode, engine execution, and HTTP service
+          boundaries. They separate model-engine, endpoint, parser, service-runtime, and Ray replica-worker identities, and
+          organize KV cache residency and offloading, connector operations, speculative or diffusion decoding, and WebSocket
+          activity under their causal owners. Optional charts appear when the corresponding vLLM features export metrics.
         method_description: |
-          Netdata periodically scrapes the vLLM Prometheus `/metrics` endpoint and applies the built-in `vllm` profile.
+          Netdata periodically scrapes either the vLLM server Prometheus `/metrics` endpoint or the Ray node metrics endpoint.
+          Auto-selection applies the built-in `vllm` profile to native `vllm:*` metrics and the separate `vllm_ray` profile to
+          `ray_vllm_*` metrics. The Ray profile preserves replica and worker identity and suppresses Ray 2.48's deprecated
+          unsuffixed counter aliases so each counter is presented once.
     setup:
       <<: *setup
       prerequisites:
         list:
           - title: Expose the vLLM metrics endpoint
             description: |
-              Run a vLLM server with a reachable Prometheus `/metrics` endpoint.
+              Run a vLLM server with a reachable Prometheus `/metrics` endpoint, or configure a Ray deployment whose node
+              metrics endpoint exposes `ray_vllm_*` families. For Ray, configure or discover each node's metrics export port;
+              Ray commonly uses port 8080 when `--metrics-export-port=8080` is set. Ray 2.48 exports an unsuffixed compatibility
+              gauge beside most canonical `_total` counters unless `RAY_EXPORT_COUNTER_AS_GAUGE=0` is set.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Native vLLM
+              folding:
+                enabled: false
+              description: Collect native vLLM server metrics with the exact profile and its duplicate/timestamp exclusions.
+              config: |
+                jobs:
+                  - name: vllm
+                    url: http://127.0.0.1:8000/metrics
+                    app: vllm
+                    expected_prefix: 'vllm:'
+                    profiles:
+                      mode: exact
+                      mode_exact:
+                        entries:
+                          - name: vllm
+                    selector:
+                      deny:
+                        - '*_created'
+                        - process_start_time_seconds
+                        - 'vllm:kv_offload_total_bytes_total'
+                        - 'vllm:kv_offload_total_time_total'
+                        - 'vllm:kv_offload_size*'
+            - name: vLLM on Ray
+              description: |
+                Collect only vLLM families from a Ray node metrics endpoint. The deny list removes Ray 2.48's 33 deprecated
+                unsuffixed compatibility gauges and vLLM's pre-canonical KV-offload duplicates; the profile repeats that
+                suppression as a fallback guard. Use a separate job when Ray system metrics also need to be monitored.
+              config: |
+                jobs:
+                  - name: vllm-ray
+                    url: http://127.0.0.1:8080
+                    app: vllm
+                    expected_prefix: ray_vllm_
+                    profiles:
+                      mode: exact
+                      mode_exact:
+                        entries:
+                          - name: vllm_ray
+                    selector:
+                      allow:
+                        - 'ray_vllm_*'
+                      deny:
+                        - ray_vllm_corrupted_requests
+                        - ray_vllm_diffusion_num_canvas_positions
+                        - ray_vllm_diffusion_num_committed_tokens
+                        - ray_vllm_diffusion_num_denoising_steps
+                        - ray_vllm_external_prefix_cache_hits
+                        - ray_vllm_external_prefix_cache_queries
+                        - ray_vllm_generation_tokens
+                        - ray_vllm_hf3fs_num_failed_load
+                        - ray_vllm_hf3fs_num_failed_save
+                        - ray_vllm_kv_offload_allocation_failure
+                        - ray_vllm_kv_offload_load_bytes
+                        - ray_vllm_kv_offload_load_time
+                        - ray_vllm_kv_offload_size*
+                        - ray_vllm_kv_offload_store_bytes
+                        - ray_vllm_kv_offload_store_time
+                        - ray_vllm_kv_offload_stores_skipped
+                        - ray_vllm_kv_offload_total_bytes
+                        - ray_vllm_kv_offload_total_bytes_total
+                        - ray_vllm_kv_offload_total_time
+                        - ray_vllm_kv_offload_total_time_total
+                        - ray_vllm_mm_cache_hits
+                        - ray_vllm_mm_cache_queries
+                        - ray_vllm_nixl_num_failed_notifications
+                        - ray_vllm_nixl_num_failed_transfers
+                        - ray_vllm_nixl_num_kv_expired_reqs
+                        - ray_vllm_num_preemptions
+                        - ray_vllm_prefix_cache_hits
+                        - ray_vllm_prefix_cache_queries
+                        - ray_vllm_prompt_tokens
+                        - ray_vllm_prompt_tokens_by_source
+                        - ray_vllm_prompt_tokens_cached
+                        - ray_vllm_request_success
+                        - ray_vllm_spec_decode_num_accepted_tokens
+                        - ray_vllm_spec_decode_num_accepted_tokens_per_pos
+                        - ray_vllm_spec_decode_num_draft_tokens
+                        - ray_vllm_spec_decode_num_drafts
 
   - <<: *module
     meta:

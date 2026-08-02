@@ -37,9 +37,11 @@ type report struct {
 }
 
 type profileReport struct {
-	Name  string `json:"name,omitempty"`
-	Match string `json:"match,omitempty"`
-	App   string `json:"app,omitempty"`
+	Name                 string   `json:"name,omitempty"`
+	Match                string   `json:"match,omitempty"`
+	App                  string   `json:"app,omitempty"`
+	AutogenSelectorAllow []string `json:"autogen_selector_allow,omitempty"`
+	AutogenSelectorDeny  []string `json:"autogen_selector_deny,omitempty"`
 }
 
 type effectiveJobReport struct {

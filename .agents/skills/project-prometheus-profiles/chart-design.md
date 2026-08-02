@@ -250,8 +250,9 @@ A label can play several roles, but each role has different UX and cardinality:
 | Role | Mechanism | Effect | Good candidates |
 |---|---|---|---|
 | Entity identity | `instances.by_labels` | creates separate chart instances and filter identity | server, database, table, device |
+| Ownership path | promoted label and, when needed for uniqueness, `instances.by_labels` | places the entity in its containing hierarchy without changing its leaf type | cluster, database, pool, namespace |
 | Comparable aspect | `name_from_label` or selector-specific static names | creates dimensions within one chart | status class, method, bounded phase |
-| Descriptive metadata | `label_promotion` | adds filter/group metadata without splitting identity | region, version-like stable attribute |
+| Descriptive detail | `label_promotion` | adds filter/group metadata without splitting identity | serial number, display name, version |
 | Routing constraint | selector label match | includes only the intended series | role, operation, state |
 | Collection transformation | relabeling | changes/drops names or labels before writing | normalization backed by a clear contract |
 
@@ -262,6 +263,13 @@ Ask what a label *means*, not merely whether it exists.
 Use the smallest stable set that uniquely identifies the entity the operator
 selects. Too few labels merge different entities. Too many labels fragment one
 entity whenever incidental metadata changes.
+
+Distinguish the semantic instance type from the complete key needed to identify
+one instance. A database label remains the owner of a table, but
+`{database, table}` may both be required in `instances.by_labels` when table
+names repeat across databases. The context still represents table instances;
+the ownership path makes each table unambiguous and preserves the identity
+lattice.
 
 `instances.by_labels: ['*']` is open-ended: any future exporter label can change
 identity and multiply charts. Use it only when the exporter contract itself says
@@ -278,6 +286,11 @@ If the values identify independently filterable entities, they normally belong
 in instances. If the values are aspects of one entity, dimensions are usually
 better. This distinction preserves both readability and filtering.
 
+For example, raw disk-throughput series may identify `{disk, operation}`. If
+`disk` is the monitored entity and `operation` is the bounded read/write aspect,
+use one chart instance per disk and one dimension per operation. The dashboard
+then counts disks, not disk-operation pairs.
+
 Distinguish a closed enum from a configuration-dependent set:
 
 - Use explicit selector/value dimensions when authoritative exporter semantics
@@ -286,6 +299,46 @@ Distinguish a closed enum from a configuration-dependent set:
   exporter version.
 - One dump showing two values does not prove a two-value enum. Hard-coding those
   values silently drops future values into autogen/unmatched behavior.
+
+#### Optional dimension labels
+
+An exporter may make a valid dimension label optional through configuration or
+version. Establish that optionality from authoritative configuration or source;
+`name_from_label` by itself is not evidence that the label can be absent. The
+label MAY still be a dimension when it remains a bounded aspect of the same
+entity, but it MUST NOT be the only route by which that metric can materialize
+in the chart.
+
+Preserve one context and instance type with two mutually exclusive routes:
+
+```yaml
+dimensions:
+  - selector: 'disk_io_bytes_total{operation=~".*[^[:space:]].*"}'
+    name_from_label: operation
+  - selector: 'disk_io_bytes_total{operation!~".*[^[:space:]].*"}'
+    name: unclassified
+```
+
+- The positive route creates the dynamic dimensions when the label is present
+  and contains at least one non-whitespace character.
+- The negative route catches missing, empty, or whitespace-only values and
+  creates one fixed fallback dimension in the same chart.
+- The fallback name MUST describe missing classification, not `total`: in a
+  mixed population it contains only the unlabeled subset.
+- The fallback name SHOULD be outside the label's authoritative value domain.
+  A dynamic/static name collision maps both populations to one dimension.
+- Do not use `.+` for the positive route. Chartengine trims and rejects
+  whitespace-only dynamic names after selector matching, so that matcher would
+  select a series that neither route can materialize.
+- Do not add a broad static selector beside the dynamic selector in the same
+  chart. Labeled series would match both and the chart would double-count them.
+
+If the optional label identifies an entity rather than an aspect, this pattern
+does not reconstruct that entity. Require the identity label on the detailed
+view and keep a coarser chart whose instance identity is available. If the
+missing label would collapse non-additive gauge states, preserve a complete
+identity or use a source-defined aggregate; a fallback dimension does not make
+invalid gauge aggregation correct.
 
 The design review must account for every observed label key, including labels
 intentionally aggregated away. Aggregation is a decision because it removes
@@ -300,11 +353,62 @@ expected cardinality. Do not mechanically promote every label or add it to
 identity; intentional aggregation is valid when the lost comparison is stated
 and correct for the operator story.
 
+### Aggregation when labels are omitted
+
+`instances.by_labels` selects the labels that form chart-instance identity. It
+does not relabel the source series or delete its other labels. When multiple
+selected series render to the same chart and dimension, chartengine currently
+sums their raw values.
+
+Use that behavior deliberately:
+
+- **Counters and histogram components:** Raw sum is the correct rollup across
+  disjoint populations of the same counted or measured quantity. Keep the chart
+  algorithm `incremental`; the Netdata Agent, not the collector or profile,
+  computes rates and handles counter resets.
+- **Point-in-time gauges:** Do not omit identity labels merely to reduce chart
+  count. Raw sum is correct only when the source semantics define the gauge as
+  additive. Otherwise preserve the complete semantic identity, or use an
+  explicitly supported reducer when the profile format provides one.
+- **No collector-side deltas:** A profile or collector MUST NOT precompute
+  counter deltas, rates, or reset adjustments to make aggregation appear safe.
+  That duplicates and conflicts with the Agent's incremental algorithm.
+- **No meaning-based censorship:** Whether a label names a user, tenant, API
+  key, endpoint, route, or another deployment-owned entity does not decide
+  whether it is retained. Source semantics, mathematical correctness, operator
+  usefulness, stability, cardinality, lifecycle, and resource cost do.
+
+For exporters with configurable label contracts, prefer a layered dashboard:
+
+1. Route additive populations to an always-materialized service or capability
+   total whose chart identity omits optional breakdown labels.
+2. Add explicit-label breakdown views for operator questions such as deployment,
+   provider/model, route, or accounting entity.
+3. Require every optional breakdown **identity** label as a nonempty matcher in
+   every dimension selector. A breakdown then disappears when its entity cannot
+   be identified, while the coarser view remains available.
+4. When an optional label is a bounded **dimension**, use complementary dynamic
+   and `unclassified` routes in the same chart. Do not create a second context
+   merely because the dimension label may be absent.
+5. Keep non-additive gauges at their complete emitted identity so optional or
+   future labels cannot silently collapse distinct states.
+
+Record every intentional aggregation in the operator model and prove it with a
+fixture containing at least two series that differ only on an omitted label. The
+expected chart must contain their raw sum. Also prove representative gauges
+remain separate when any identity label differs.
+
 ### Promoted labels
 
 Promotion is metadata, not identity. Use it for stable attributes that help the
 operator filter or explain a chart. It does not make a missing identity label
 available, and it cannot recover labels from writer-skipped `_info` metrics.
+
+Ownership and descriptive-detail labels are valid promoted metadata only when
+they are functionally stable for the chosen instance. If one purported serial
+number, database owner, or display name varies across the dimensions of one
+instance, the source evidence contradicts that classification: refine the
+identity/aspect model instead of promoting an arbitrary value.
 
 ## Compose charts around one comparison
 

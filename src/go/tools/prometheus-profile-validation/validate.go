@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -17,7 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -75,6 +76,10 @@ func validateProfile(opts validationOptions) report {
 		return r
 	}
 	r.Profile = profileReport{Name: profile.Name, Match: profile.Match, App: profile.App}
+	if selector := profile.AutogenSelector(); selector != nil {
+		r.Profile.AutogenSelectorAllow = slices.Clone(selector.Allow)
+		r.Profile.AutogenSelectorDeny = slices.Clone(selector.Deny)
+	}
 	addProfileMatchHeuristics(profile.Match, &r)
 
 	authored, err := inspectAuthoredCharts(profile, &r)
@@ -321,20 +326,38 @@ func validateProfile(opts validationOptions) report {
 	}
 
 	if runtimeCountersOK && r.Counts.SeriesAutogen != 0 {
-		r.addError(
-			"unexpected_autogen",
-			"",
-			fmt.Sprintf("%d series produced %d fallback charts", r.Counts.SeriesAutogen, r.Counts.AutogenCharts),
-			"Passing profiles must curate every series that survives the job/writer pipeline; autogen is evidence of a coverage gap.",
-		)
+		if profileExplicitlyAllowsAutogen(profile, r.Charts) {
+			r.addWarning(
+				"profile_allowed_autogen",
+				"autogen.selector.allow",
+				fmt.Sprintf("%d series produced %d explicitly allowlisted generic fallback charts", r.Counts.SeriesAutogen, r.Counts.AutogenCharts),
+				"The profile deliberately preserves this source surface through generic fallback; keep the allowlist narrow and source-backed.",
+			)
+		} else {
+			r.addError(
+				"unexpected_autogen",
+				"",
+				fmt.Sprintf("%d series produced %d fallback charts", r.Counts.SeriesAutogen, r.Counts.AutogenCharts),
+				"Passing profiles must curate every series that survives the job/writer pipeline unless a narrow profile autogen allowlist explicitly documents a generic-fallback boundary.",
+			)
+		}
 	}
 	if runtimeCountersOK && r.Counts.SeriesUnmatched != 0 {
-		r.addError(
-			"unmatched_series",
-			"",
-			fmt.Sprintf("%d writer series matched neither a curated chart nor autogen", r.Counts.SeriesUnmatched),
-			"Unmatched series are silently absent from the dashboard and therefore violate complete post-policy coverage.",
-		)
+		if profileSuppressionExplainsUnmatched(profile, merged, reader, r.Counts.SeriesAutogen, r.Counts.SeriesUnmatched) {
+			r.addWarning(
+				"profile_suppressed_series",
+				"autogen.selector",
+				fmt.Sprintf("%d writer series were suppressed by the profile's explicit fallback selector", r.Counts.SeriesUnmatched),
+				"The samples remain in the collector store but intentionally create no fallback charts; the profile must document the lost operator question and cardinality or semantic reason.",
+			)
+		} else {
+			r.addError(
+				"unmatched_series",
+				"",
+				fmt.Sprintf("%d writer series matched neither a curated chart nor autogen", r.Counts.SeriesUnmatched),
+				"Unmatched series are silently absent from the dashboard and therefore violate complete post-policy coverage.",
+			)
+		}
 	}
 	for _, item := range r.DeadCharts {
 		r.addError(
@@ -613,6 +636,118 @@ func runtimeMetricInt(engine *chartengine.Engine, suffix string) (int, error) {
 	return int(value), nil
 }
 
+func profileExplicitlyAllowsAutogen(profile promprofiles.Profile, charts []materializedChart) bool {
+	expr := profile.AutogenSelector()
+	if expr == nil || len(expr.Allow) == 0 {
+		return false
+	}
+	match, err := matcher.NewSimplePatternsMatcher(profile.Match)
+	if err != nil {
+		return false
+	}
+	found := false
+	for _, chart := range charts {
+		if !chart.Autogen {
+			continue
+		}
+		found = true
+		name, ok := autogenSourceMetric(chart.TemplateID)
+		if !ok || !match.MatchString(name) {
+			return false
+		}
+	}
+	return found
+}
+
+func autogenSourceMetric(templateID string) (string, bool) {
+	const prefix = "__autogen__:"
+	rest, ok := strings.CutPrefix(templateID, prefix)
+	if !ok {
+		return "", false
+	}
+	name, _, _ := strings.Cut(rest, "-")
+	return name, name != ""
+}
+
+func profileSuppressionExplainsUnmatched(
+	profile promprofiles.Profile,
+	merged *charttpl.Spec,
+	reader metrix.Reader,
+	currentAutogen, currentUnmatched int,
+) bool {
+	expr := profile.AutogenSelector()
+	if expr == nil || len(expr.Deny) == 0 || currentUnmatched == 0 || merged == nil || merged.Engine == nil || merged.Engine.Autogen == nil {
+		return false
+	}
+	if len(expr.Allow) > 0 {
+		allow, err := (metrixselector.Expr{Allow: slices.Clone(expr.Allow)}).Parse()
+		if err != nil {
+			return false
+		}
+		allAllowed := true
+		reader.ForEachSeries(func(name string, labels metrix.LabelView, _ metrix.SampleValue) {
+			if !allow.Matches(name, labels) {
+				allAllowed = false
+			}
+		})
+		if !allAllowed {
+			return false
+		}
+	}
+	raw, err := merged.MarshalTemplate()
+	if err != nil {
+		return false
+	}
+	relaxed, err := charttpl.DecodeYAML([]byte(raw))
+	if err != nil || relaxed.Engine == nil || relaxed.Engine.Autogen == nil {
+		return false
+	}
+
+	rules := relaxed.Engine.Autogen.Rules[:0]
+	removed := 0
+	for _, rule := range relaxed.Engine.Autogen.Rules {
+		if rule.Scope == profile.Match &&
+			slices.Equal(rule.Selector.Allow, expr.Allow) &&
+			slices.Equal(rule.Selector.Deny, expr.Deny) {
+			removed++
+			continue
+		}
+		rules = append(rules, rule)
+	}
+	if removed == 0 {
+		return false
+	}
+	relaxed.Engine.Autogen.Rules = rules
+	raw, err = relaxed.MarshalTemplate()
+	if err != nil {
+		return false
+	}
+
+	engine, err := chartengine.New()
+	if err != nil {
+		return false
+	}
+	if err := engine.LoadYAML([]byte(raw), 1); err != nil {
+		return false
+	}
+	attempt, err := engine.PreparePlan(reader)
+	if err != nil {
+		return false
+	}
+	if err := attempt.Commit(); err != nil {
+		return false
+	}
+	relaxedAutogen, err := runtimeMetricInt(engine, "series_autogen_matched_total")
+	if err != nil {
+		return false
+	}
+	relaxedUnmatched, err := runtimeMetricInt(engine, "series_unmatched_total")
+	if err != nil {
+		return false
+	}
+	return relaxedUnmatched == 0 && relaxedAutogen == currentAutogen+currentUnmatched
+}
+
 func materializeCharts(plan chartengine.Plan) []materializedChart {
 	byID := make(map[string]*materializedChart)
 	for _, action := range plan.Actions {
@@ -701,9 +836,8 @@ func inspectEmittedPlan(plan chartengine.Plan) (emittedPlanInspection, error) {
 	perChart := make(map[string]map[string]*dimensionCount)
 	currentChart := ""
 	createIndex := 0
-	scanner := bufio.NewScanner(bytes.NewReader(wire.Bytes()))
-	for scanner.Scan() {
-		line := scanner.Text()
+	for rawLine := range bytes.SplitSeq(wire.Bytes(), []byte{'\n'}) {
+		line := string(rawLine)
 		switch {
 		case strings.HasPrefix(line, "CHART "):
 			fields, ok := wireQuotedFields(line)
@@ -756,9 +890,6 @@ func inspectEmittedPlan(plan chartengine.Plan) (emittedPlanInspection, error) {
 			}
 			item.count++
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return result, fmt.Errorf("scan emitted chart protocol: %w", err)
 	}
 
 	slices.Sort(result.emptyChartIDs)

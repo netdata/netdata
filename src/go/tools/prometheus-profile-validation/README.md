@@ -69,7 +69,8 @@ For the supplied dump and job policy, a pass establishes that:
 - strict catalog/profile/template decoding succeeds;
 - the real collector completes `Init`, `Check`, and a committed `Collect`;
 - required chartengine runtime coverage counters exist and are valid;
-- every writer series is curated: zero autogen and zero unmatched series;
+- every writer series is accounted for: curated by default, or covered by an
+  explicit profile fallback allow/suppress boundary;
 - every authored chart and every authored dimension materializes;
 - every selected writer series carries every label required by its chart's
   effective explicit instance identity;
@@ -104,6 +105,22 @@ generic when selector or relabeling rules make the precise cause ambiguous.
 Raw logical series and flattened writer series are different counts for
 histograms and summaries.
 
+The strict default remains zero autogen and zero unmatched series. Two explicit
+profile policies can pass with warnings:
+
+- `profile_allowed_autogen` means every generated chart belongs to the
+  candidate profile's `match` scope and the profile has a non-empty
+  `autogen.selector.allow` boundary. Use this only for a source-backed dynamic
+  metric surface that is safe and useful as generic fallback.
+- `profile_suppressed_series` means a counterfactual planner run removed the
+  candidate profile's exact fallback rule, converted every formerly unmatched
+  series into generic fallback, and left zero unmatched series. The profile
+  must have an explicit deny list, and any allow list must accept every writer
+  series in the evidence; series rejected only because they fall outside an
+  allow boundary remain coverage errors. This proves the reported gap is an
+  intentional deny policy rather than a coincidental count; it does not prove
+  that suppressing the operator question is a good design.
+
 `authored_mapping` reports the effective profile in source order:
 
 - composed displayed family;
@@ -126,6 +143,8 @@ reason.
 
 Warnings identify designs that deserve explanation but can be correct:
 
+- explicitly allowlisted generic fallback and explicitly suppressed fallback
+  series, whose source boundary and operator trade-off require review;
 - profile `match` expressions that also accept common `go_*`, `http_*`,
   `process_*`, or `python_*` families and can therefore auto-select on an
   unrelated endpoint;

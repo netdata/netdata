@@ -1,12 +1,16 @@
 # LiteLLM profile derived from exact 1.92.0 and current upstream metric registrations.
 # Charts follow the gateway -> policy -> routing -> provider -> accounting causal path.
-# Open-ended identity is deliberate because prometheus_metrics_config changes label contracts;
-# it preserves source-distinct series and multiprocess workers instead of silently merging them.
-# Operators should reduce unwanted cardinality with LiteLLM prometheus_metrics_config.
-match: 'litellm_in_flight_requests'
+# Additive metrics always have service/domain totals and selected explicit-label breakdowns.
+# Non-timestamp gauges preserve every emitted label because their populations are not generally additive.
+# Optional identity views disappear when their keys are omitted; optional status dimensions become unclassified.
+# LiteLLM serializes an unset service tier as the literal "None"; only non-whitespace, non-sentinel values are tiers.
+# Fallback is closed to one source-backed gateway signature; unknown future names require semantic evidence.
+match: 'litellm_*'
 app: litellm
 autogen:
   selector:
+    allow:
+      - 'litellm_proxy_total_requests_metric_total'
     deny:
       - '*_created'
       - 'litellm_requests_metric_total'
@@ -18,9 +22,6 @@ template:
   groups:
     - family: Gateway
       context_namespace: gateway
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_proxy_total_requests_metric_total'
         - 'litellm_proxy_failed_requests_metric_total'
@@ -44,11 +45,23 @@ template:
           algorithm: incremental
           type: line
           priority: 2000
-          instances:
-            by_labels: ['*', '!status_code']
           dimensions:
-            - selector: 'litellm_proxy_total_requests_metric_total'
+            - selector: 'litellm_proxy_total_requests_metric_total{status_code=~".*[^[:space:]].*"}'
               name_from_label: status_code
+            - selector: 'litellm_proxy_total_requests_metric_total{status_code!~".*[^[:space:]].*"}'
+              name: unclassified
+
+        - title: Client Responses by Stream Mode
+          context: client_responses_by_stream_mode
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2005
+          dimensions:
+            - selector: 'litellm_proxy_total_requests_metric_total{stream=~".*[^[:space:]].*"}'
+              name_from_label: stream
+            - selector: 'litellm_proxy_total_requests_metric_total{stream!~".*[^[:space:]].*"}'
+              name: unclassified
 
         - title: Client Failures by Status
           context: client_failures_by_status
@@ -56,11 +69,35 @@ template:
           algorithm: incremental
           type: line
           priority: 2010
-          instances:
-            by_labels: ['*', '!exception_status']
           dimensions:
-            - selector: 'litellm_proxy_failed_requests_metric_total'
+            - selector: 'litellm_proxy_failed_requests_metric_total{exception_status=~".*[^[:space:]].*"}'
               name_from_label: exception_status
+            - selector: 'litellm_proxy_failed_requests_metric_total{exception_status!~".*[^[:space:]].*"}'
+              name: unclassified
+
+        - title: Client Failures by Rate-Limit Category
+          context: client_failures_by_rate_limit_category
+          units: failures/s
+          algorithm: incremental
+          type: line
+          priority: 2011
+          dimensions:
+            - selector: 'litellm_proxy_failed_requests_metric_total{rate_limit_category=~".*[^[:space:]].*"}'
+              name_from_label: rate_limit_category
+            - selector: 'litellm_proxy_failed_requests_metric_total{rate_limit_category!~".*[^[:space:]].*"}'
+              name: unclassified
+
+        - title: Client Failures by Rate-Limit Type
+          context: client_failures_by_rate_limit_type
+          units: failures/s
+          algorithm: incremental
+          type: line
+          priority: 2012
+          dimensions:
+            - selector: 'litellm_proxy_failed_requests_metric_total{rate_limit_type=~".*[^[:space:]].*"}'
+              name_from_label: rate_limit_type
+            - selector: 'litellm_proxy_failed_requests_metric_total{rate_limit_type!~".*[^[:space:]].*"}'
+              name: unclassified
 
         - title: In-Flight Requests
           context: in_flight_requests
@@ -78,8 +115,6 @@ template:
           algorithm: incremental
           type: heatmap
           priority: 2030
-          instances:
-            by_labels: ['*', '!le']
           dimensions:
             - selector: 'litellm_request_queue_time_seconds_bucket'
 
@@ -89,8 +124,6 @@ template:
           algorithm: incremental
           type: heatmap
           priority: 2040
-          instances:
-            by_labels: ['*', '!le']
           dimensions:
             - selector: 'litellm_request_total_latency_metric_bucket'
 
@@ -100,8 +133,6 @@ template:
           algorithm: incremental
           type: heatmap
           priority: 2050
-          instances:
-            by_labels: ['*', '!le']
           dimensions:
             - selector: 'litellm_overhead_latency_metric_bucket'
 
@@ -111,8 +142,6 @@ template:
           algorithm: incremental
           type: heatmap
           priority: 2060
-          instances:
-            by_labels: ['*', '!le']
           dimensions:
             - selector: 'litellm_overhead_with_guardrails_latency_metric_bucket'
 
@@ -127,6 +156,19 @@ template:
               name: queue
             - selector: 'litellm_request_total_latency_metric_count'
               name: end_to_end
+
+        - title: End-to-End Request-Latency Measurements by Service Tier
+          family: By Service Tier
+          context: request_total_latency_measurements_by_service_tier
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2071
+          dimensions:
+            - selector: 'litellm_request_total_latency_metric_count{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name_from_label: service_tier
+            - selector: 'litellm_request_total_latency_metric_count{service_tier!~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name: unclassified
 
         - title: Internal Overhead Measurements
           context: internal_overhead_measurements
@@ -152,6 +194,19 @@ template:
             - selector: 'litellm_request_total_latency_metric_sum'
               name: end_to_end
 
+        - title: Accumulated End-to-End Request Time by Service Tier
+          family: By Service Tier
+          context: accumulated_request_total_latency_by_service_tier
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 2091
+          dimensions:
+            - selector: 'litellm_request_total_latency_metric_sum{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name_from_label: service_tier
+            - selector: 'litellm_request_total_latency_metric_sum{service_tier!~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name: unclassified
+
         - title: Accumulated Internal Overhead
           context: accumulated_internal_overhead
           units: seconds/s
@@ -164,11 +219,176 @@ template:
             - selector: 'litellm_overhead_with_guardrails_latency_metric_sum'
               name: guardrail_overhead
 
+        - title: Client Responses by Status, Provider, and Deployment
+          family: By Provider and Deployment
+          context: client_responses_by_status_by_provider_deployment
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2110
+          instances:
+            by_labels: [api_provider, model_id]
+          dimensions:
+            - selector: 'litellm_proxy_total_requests_metric_total{api_provider=~".+",model_id=~".+",status_code=~".*[^[:space:]].*"}'
+              name_from_label: status_code
+            - selector: 'litellm_proxy_total_requests_metric_total{api_provider=~".+",model_id=~".+",status_code!~".*[^[:space:]].*"}'
+              name: unclassified
+
+        - title: Client Failures by Status, Provider, and Deployment
+          family: By Provider and Deployment
+          context: client_failures_by_status_by_provider_deployment
+          units: failures/s
+          algorithm: incremental
+          type: line
+          priority: 2120
+          instances:
+            by_labels: [api_provider, model_id]
+          dimensions:
+            - selector: 'litellm_proxy_failed_requests_metric_total{api_provider=~".+",model_id=~".+",exception_status=~".*[^[:space:]].*"}'
+              name_from_label: exception_status
+            - selector: 'litellm_proxy_failed_requests_metric_total{api_provider=~".+",model_id=~".+",exception_status!~".*[^[:space:]].*"}'
+              name: unclassified
+
+        - title: Request Queue-Time Distribution by Provider and Model
+          family: By Provider and Model
+          context: request_queue_time_distribution_by_provider_model
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2130
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_request_queue_time_seconds_bucket{api_provider=~".+",model=~".+"}'
+
+        - title: End-to-End Request-Latency Distribution by Provider and Model
+          family: By Provider and Model
+          context: request_total_latency_distribution_by_provider_model
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2140
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_request_total_latency_metric_bucket{api_provider=~".+",model=~".+"}'
+
+        - title: LiteLLM Overhead-Latency Distribution by Provider and LiteLLM Model
+          family: By Provider and LiteLLM Model
+          context: overhead_latency_distribution_by_provider_litellm_model
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2150
+          instances:
+            by_labels: [api_provider, litellm_model_name]
+          dimensions:
+            - selector: 'litellm_overhead_latency_metric_bucket{api_provider=~".+",litellm_model_name=~".+"}'
+
+        - title: Guardrail-Inclusive Overhead Distribution by Provider and LiteLLM Model
+          family: By Provider and LiteLLM Model
+          context: overhead_with_guardrails_distribution_by_provider_litellm_model
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2160
+          instances:
+            by_labels: [api_provider, litellm_model_name]
+          dimensions:
+            - selector: 'litellm_overhead_with_guardrails_latency_metric_bucket{api_provider=~".+",litellm_model_name=~".+"}'
+
+        - title: Client Request-Latency Measurements by Provider and Model
+          family: By Provider and Model
+          context: client_request_latency_measurements_by_provider_model
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2170
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_request_queue_time_seconds_count{api_provider=~".+",model=~".+"}'
+              name: queue
+            - selector: 'litellm_request_total_latency_metric_count{api_provider=~".+",model=~".+"}'
+              name: end_to_end
+
+        - title: Internal Overhead Measurements by Provider and LiteLLM Model
+          family: By Provider and LiteLLM Model
+          context: internal_overhead_measurements_by_provider_litellm_model
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2180
+          instances:
+            by_labels: [api_provider, litellm_model_name]
+          dimensions:
+            - selector: 'litellm_overhead_latency_metric_count{api_provider=~".+",litellm_model_name=~".+"}'
+              name: overhead
+            - selector: 'litellm_overhead_with_guardrails_latency_metric_count{api_provider=~".+",litellm_model_name=~".+"}'
+              name: guardrail_overhead
+
+        - title: Accumulated Client Request Time by Provider and Model
+          family: By Provider and Model
+          context: accumulated_client_request_time_by_provider_model
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 2190
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_request_queue_time_seconds_sum{api_provider=~".+",model=~".+"}'
+              name: queue
+            - selector: 'litellm_request_total_latency_metric_sum{api_provider=~".+",model=~".+"}'
+              name: end_to_end
+
+        - title: Accumulated Internal Overhead by Provider and LiteLLM Model
+          family: By Provider and LiteLLM Model
+          context: accumulated_internal_overhead_by_provider_litellm_model
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 2200
+          instances:
+            by_labels: [api_provider, litellm_model_name]
+          dimensions:
+            - selector: 'litellm_overhead_latency_metric_sum{api_provider=~".+",litellm_model_name=~".+"}'
+              name: overhead
+            - selector: 'litellm_overhead_with_guardrails_latency_metric_sum{api_provider=~".+",litellm_model_name=~".+"}'
+              name: guardrail_overhead
+
+        - title: Client Responses by Status and Route
+          family: By Route
+          context: client_responses_by_status_by_route
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2210
+          instances:
+            by_labels: [route]
+          dimensions:
+            - selector: 'litellm_proxy_total_requests_metric_total{route=~".+",status_code=~".*[^[:space:]].*"}'
+              name_from_label: status_code
+            - selector: 'litellm_proxy_total_requests_metric_total{route=~".+",status_code!~".*[^[:space:]].*"}'
+              name: unclassified
+
+        - title: Client Failures by Status and Route
+          family: By Route
+          context: client_failures_by_status_by_route
+          units: failures/s
+          algorithm: incremental
+          type: line
+          priority: 2220
+          instances:
+            by_labels: [route]
+          dimensions:
+            - selector: 'litellm_proxy_failed_requests_metric_total{route=~".+",exception_status=~".*[^[:space:]].*"}'
+              name_from_label: exception_status
+            - selector: 'litellm_proxy_failed_requests_metric_total{route=~".+",exception_status!~".*[^[:space:]].*"}'
+              name: unclassified
+
     - family: Routing and Deployments
       context_namespace: routing_and_deployments
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_deployment_total_requests_total'
         - 'litellm_deployment_success_responses_total'
@@ -190,7 +410,7 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2110
+          priority: 2230
           dimensions:
             - selector: 'litellm_deployment_total_requests_total'
               name: requests
@@ -202,19 +422,19 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2120
-          instances:
-            by_labels: ['*', '!exception_status']
+          priority: 2240
           dimensions:
-            - selector: 'litellm_deployment_failure_responses_total'
+            - selector: 'litellm_deployment_failure_responses_total{exception_status=~".*[^[:space:]].*"}'
               name_from_label: exception_status
+            - selector: 'litellm_deployment_failure_responses_total{exception_status!~".*[^[:space:]].*"}'
+              name: unclassified
 
         - title: Fallback Outcomes
           context: fallback_outcomes
           units: fallbacks/s
           algorithm: incremental
           type: line
-          priority: 2130
+          priority: 2250
           dimensions:
             - selector: 'litellm_deployment_successful_fallbacks_total'
               name: successful
@@ -226,59 +446,74 @@ template:
           units: cooldowns/s
           algorithm: incremental
           type: line
-          priority: 2140
-          instances:
-            by_labels: ['*', '!exception_status']
+          priority: 2260
           dimensions:
-            - selector: 'litellm_deployment_cooled_down_total'
+            - selector: 'litellm_deployment_cooled_down_total{exception_status=~".*[^[:space:]].*"}'
               name_from_label: exception_status
+            - selector: 'litellm_deployment_cooled_down_total{exception_status!~".*[^[:space:]].*"}'
+              name: unclassified
 
         - title: Deployment State
+          family: Deployments
           context: deployment_state
           units: state
           algorithm: absolute
           type: line
-          priority: 2150
+          priority: 2270
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_deployment_state'
               name: state
 
         - title: Deployment Request Limit
+          family: Deployments
           context: deployment_request_limit
           units: requests/min
           algorithm: absolute
           type: line
-          priority: 2160
+          priority: 2280
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_deployment_rpm_limit'
               name: limit
 
         - title: Deployment Token Limit
+          family: Deployments
           context: deployment_token_limit
           units: tokens/min
           algorithm: absolute
           type: line
-          priority: 2170
+          priority: 2290
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_deployment_tpm_limit'
               name: limit
 
         - title: Provider Remaining Requests
+          family: Provider Headroom
           context: provider_remaining_requests
           units: requests
           algorithm: absolute
           type: line
-          priority: 2180
+          priority: 2300
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_remaining_requests_metric'
               name: remaining
 
         - title: Provider Remaining Tokens
+          family: Provider Headroom
           context: provider_remaining_tokens
           units: tokens
           algorithm: absolute
           type: line
-          priority: 2190
+          priority: 2310
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_remaining_tokens_metric'
               name: remaining
@@ -288,9 +523,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2200
-          instances:
-            by_labels: ['*', '!le']
+          priority: 2320
           dimensions:
             - selector: 'litellm_deployment_latency_per_output_token_bucket'
 
@@ -299,7 +532,7 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2210
+          priority: 2330
           dimensions:
             - selector: 'litellm_deployment_latency_per_output_token_count'
               name: requests
@@ -309,16 +542,111 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2220
+          priority: 2340
           dimensions:
             - selector: 'litellm_deployment_latency_per_output_token_sum'
               name: time
 
+        - title: Request Workload by Deployment
+          family: By Deployment
+          context: deployment_request_workload_by_deployment
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2350
+          instances:
+            by_labels: [model_id]
+          dimensions:
+            - selector: 'litellm_deployment_total_requests_total{model_id=~".+"}'
+              name: requests
+            - selector: 'litellm_deployment_success_responses_total{model_id=~".+"}'
+              name: successful
+
+        - title: Failures by Deployment and Status
+          family: By Deployment
+          context: deployment_failures_by_status_by_deployment
+          units: failures/s
+          algorithm: incremental
+          type: line
+          priority: 2360
+          instances:
+            by_labels: [model_id]
+          dimensions:
+            - selector: 'litellm_deployment_failure_responses_total{model_id=~".+",exception_status=~".*[^[:space:]].*"}'
+              name_from_label: exception_status
+            - selector: 'litellm_deployment_failure_responses_total{model_id=~".+",exception_status!~".*[^[:space:]].*"}'
+              name: unclassified
+
+        - title: Cooldowns by Deployment and Status
+          family: By Deployment
+          context: deployment_cooldowns_by_status_by_deployment
+          units: cooldowns/s
+          algorithm: incremental
+          type: line
+          priority: 2370
+          instances:
+            by_labels: [model_id]
+          dimensions:
+            - selector: 'litellm_deployment_cooled_down_total{model_id=~".+",exception_status=~".*[^[:space:]].*"}'
+              name_from_label: exception_status
+            - selector: 'litellm_deployment_cooled_down_total{model_id=~".+",exception_status!~".*[^[:space:]].*"}'
+              name: unclassified
+
+        - title: Output-Token Latency Distribution by Deployment
+          family: By Deployment
+          context: deployment_output_token_latency_distribution_by_deployment
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2380
+          instances:
+            by_labels: [model_id]
+          dimensions:
+            - selector: 'litellm_deployment_latency_per_output_token_bucket{model_id=~".+"}'
+
+        - title: Output-Token Latency Measurements by Deployment
+          family: By Deployment
+          context: deployment_output_token_latency_measurements_by_deployment
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2390
+          instances:
+            by_labels: [model_id]
+          dimensions:
+            - selector: 'litellm_deployment_latency_per_output_token_count{model_id=~".+"}'
+              name: requests
+
+        - title: Accumulated Output-Token Latency by Deployment
+          family: By Deployment
+          context: accumulated_deployment_output_token_latency_by_deployment
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 2400
+          instances:
+            by_labels: [model_id]
+          dimensions:
+            - selector: 'litellm_deployment_latency_per_output_token_sum{model_id=~".+"}'
+              name: time
+
+        - title: Fallback Outcomes by Requested Model and Fallback
+          family: By Fallback Path
+          context: fallback_outcomes_by_path
+          units: fallbacks/s
+          algorithm: incremental
+          type: line
+          priority: 2410
+          instances:
+            by_labels: [requested_model, fallback_model, model_id]
+          dimensions:
+            - selector: 'litellm_deployment_successful_fallbacks_total{requested_model=~".+",fallback_model=~".+",model_id=~".+"}'
+              name: successful
+            - selector: 'litellm_deployment_failed_fallbacks_total{requested_model=~".+",fallback_model=~".+",model_id=~".+"}'
+              name: failed
+
     - family: Provider API
       context_namespace: provider_api
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_llm_api_latency_metric_bucket'
         - 'litellm_llm_api_time_to_first_token_metric_bucket'
@@ -332,9 +660,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2230
-          instances:
-            by_labels: ['*', '!le']
+          priority: 2420
           dimensions:
             - selector: 'litellm_llm_api_latency_metric_bucket'
 
@@ -343,9 +669,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2240
-          instances:
-            by_labels: ['*', '!le']
+          priority: 2430
           dimensions:
             - selector: 'litellm_llm_api_time_to_first_token_metric_bucket'
 
@@ -354,30 +678,133 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2250
+          priority: 2440
           dimensions:
             - selector: 'litellm_llm_api_latency_metric_count'
               name: api_latency
             - selector: 'litellm_llm_api_time_to_first_token_metric_count'
               name: time_to_first_token
 
+        - title: Provider API Latency Measurements by Service Tier
+          family: By Service Tier
+          context: provider_api_latency_measurements_by_service_tier
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2441
+          dimensions:
+            - selector: 'litellm_llm_api_latency_metric_count{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name_from_label: service_tier
+            - selector: 'litellm_llm_api_latency_metric_count{service_tier!~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name: unclassified
+
+        - title: Provider Time-to-First-Token Measurements by Service Tier
+          family: By Service Tier
+          context: provider_time_to_first_token_measurements_by_service_tier
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2442
+          dimensions:
+            - selector: 'litellm_llm_api_time_to_first_token_metric_count{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name_from_label: service_tier
+            - selector: 'litellm_llm_api_time_to_first_token_metric_count{service_tier!~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name: unclassified
+
         - title: Accumulated Provider Latency
           context: accumulated_provider_latency
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2260
+          priority: 2450
           dimensions:
             - selector: 'litellm_llm_api_latency_metric_sum'
               name: api_latency
             - selector: 'litellm_llm_api_time_to_first_token_metric_sum'
               name: time_to_first_token
 
+        - title: Accumulated Provider API Latency by Service Tier
+          family: By Service Tier
+          context: accumulated_provider_api_latency_by_service_tier
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 2451
+          dimensions:
+            - selector: 'litellm_llm_api_latency_metric_sum{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name_from_label: service_tier
+            - selector: 'litellm_llm_api_latency_metric_sum{service_tier!~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name: unclassified
+
+        - title: Accumulated Provider Time-to-First-Token by Service Tier
+          family: By Service Tier
+          context: accumulated_provider_time_to_first_token_by_service_tier
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 2452
+          dimensions:
+            - selector: 'litellm_llm_api_time_to_first_token_metric_sum{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name_from_label: service_tier
+            - selector: 'litellm_llm_api_time_to_first_token_metric_sum{service_tier!~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name: unclassified
+
+        - title: Provider API Latency Distribution by Provider and Model
+          family: By Provider and Model
+          context: provider_api_latency_distribution_by_provider_model
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2460
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_llm_api_latency_metric_bucket{api_provider=~".+",model=~".+"}'
+
+        - title: Time-to-First-Token Distribution by Provider and Model
+          family: By Provider and Model
+          context: provider_time_to_first_token_distribution_by_provider_model
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2470
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_llm_api_time_to_first_token_metric_bucket{api_provider=~".+",model=~".+"}'
+
+        - title: Latency Measurements by Provider and Model
+          family: By Provider and Model
+          context: provider_latency_measurements_by_provider_model
+          units: requests/s
+          algorithm: incremental
+          type: line
+          priority: 2480
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_llm_api_latency_metric_count{api_provider=~".+",model=~".+"}'
+              name: api_latency
+            - selector: 'litellm_llm_api_time_to_first_token_metric_count{api_provider=~".+",model=~".+"}'
+              name: time_to_first_token
+
+        - title: Accumulated Latency by Provider and Model
+          family: By Provider and Model
+          context: accumulated_provider_latency_by_provider_model
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 2490
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_llm_api_latency_metric_sum{api_provider=~".+",model=~".+"}'
+              name: api_latency
+            - selector: 'litellm_llm_api_time_to_first_token_metric_sum{api_provider=~".+",model=~".+"}'
+              name: time_to_first_token
+
     - family: Usage and Cost
       context_namespace: usage_and_cost
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_input_tokens_metric_total'
         - 'litellm_output_tokens_metric_total'
@@ -394,7 +821,7 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2270
+          priority: 2500
           dimensions:
             - selector: 'litellm_input_tokens_metric_total'
               name: input
@@ -408,7 +835,7 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2280
+          priority: 2510
           dimensions:
             - selector: 'litellm_input_audio_tokens_metric_total'
               name: input_audio
@@ -422,17 +849,30 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2290
+          priority: 2520
           dimensions:
             - selector: 'litellm_spend_metric_total'
               name: spend
+
+        - title: LLM Spend by Service Tier
+          family: By Service Tier
+          context: llm_spend_by_service_tier
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 2521
+          dimensions:
+            - selector: 'litellm_spend_metric_total{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name_from_label: service_tier
+            - selector: 'litellm_spend_metric_total{service_tier!~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
+              name: unclassified
 
         - title: Generated Images
           context: generated_images
           units: images/s
           algorithm: incremental
           type: line
-          priority: 2300
+          priority: 2530
           dimensions:
             - selector: 'litellm_images_generated_metric_total'
               name: images
@@ -442,16 +882,266 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2310
+          priority: 2540
           dimensions:
             - selector: 'litellm_video_duration_seconds_metric_total'
               name: duration
 
+        - title: Request Token Throughput by Provider and Model
+          family: By Provider and Model
+          context: request_token_throughput_by_provider_model
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2550
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_input_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: input
+            - selector: 'litellm_output_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: output
+            - selector: 'litellm_total_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: total
+
+        - title: Audio and Reasoning Token Throughput by Provider and Model
+          family: By Provider and Model
+          context: specialized_token_throughput_by_provider_model
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2560
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_input_audio_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: input_audio
+            - selector: 'litellm_output_audio_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: output_audio
+            - selector: 'litellm_output_reasoning_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: output_reasoning
+
+        - title: LLM Spend by Provider and Model
+          family: By Provider and Model
+          context: llm_spend_by_provider_model
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 2570
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_spend_metric_total{api_provider=~".+",model=~".+"}'
+              name: spend
+
+        - title: Generated Images by Provider and Model
+          family: By Provider and Model
+          context: generated_images_by_provider_model
+          units: images/s
+          algorithm: incremental
+          type: line
+          priority: 2580
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_images_generated_metric_total{api_provider=~".+",model=~".+"}'
+              name: images
+
+        - title: Generated Video Duration by Provider and Model
+          family: By Provider and Model
+          context: generated_video_duration_by_provider_model
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 2590
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_video_duration_seconds_metric_total{api_provider=~".+",model=~".+"}'
+              name: duration
+
+        - title: Request Token Throughput by API Key
+          family: By API Key
+          context: request_token_throughput_by_api_key
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2600
+          instances:
+            by_labels: [hashed_api_key]
+          dimensions:
+            - selector: 'litellm_input_tokens_metric_total{hashed_api_key=~".+"}'
+              name: input
+            - selector: 'litellm_output_tokens_metric_total{hashed_api_key=~".+"}'
+              name: output
+            - selector: 'litellm_total_tokens_metric_total{hashed_api_key=~".+"}'
+              name: total
+
+        - title: LLM Spend by API Key
+          family: By API Key
+          context: llm_spend_by_api_key
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 2610
+          instances:
+            by_labels: [hashed_api_key]
+          dimensions:
+            - selector: 'litellm_spend_metric_total{hashed_api_key=~".+"}'
+              name: spend
+
+        - title: Request Token Throughput by Team
+          family: By Team
+          context: request_token_throughput_by_team
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2620
+          instances:
+            by_labels: [team]
+          dimensions:
+            - selector: 'litellm_input_tokens_metric_total{team=~".+"}'
+              name: input
+            - selector: 'litellm_output_tokens_metric_total{team=~".+"}'
+              name: output
+            - selector: 'litellm_total_tokens_metric_total{team=~".+"}'
+              name: total
+
+        - title: LLM Spend by Team
+          family: By Team
+          context: llm_spend_by_team
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 2630
+          instances:
+            by_labels: [team]
+          dimensions:
+            - selector: 'litellm_spend_metric_total{team=~".+"}'
+              name: spend
+
+        - title: Request Token Throughput by User
+          family: By User
+          context: request_token_throughput_by_user
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2640
+          instances:
+            by_labels: [user]
+          dimensions:
+            - selector: 'litellm_input_tokens_metric_total{user=~".+"}'
+              name: input
+            - selector: 'litellm_output_tokens_metric_total{user=~".+"}'
+              name: output
+            - selector: 'litellm_total_tokens_metric_total{user=~".+"}'
+              name: total
+
+        - title: LLM Spend by User
+          family: By User
+          context: llm_spend_by_user
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 2650
+          instances:
+            by_labels: [user]
+          dimensions:
+            - selector: 'litellm_spend_metric_total{user=~".+"}'
+              name: spend
+
+        - title: Request Token Throughput by Organization
+          family: By Organization
+          context: request_token_throughput_by_organization
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2660
+          instances:
+            by_labels: [org_id]
+          dimensions:
+            - selector: 'litellm_input_tokens_metric_total{org_id=~".+"}'
+              name: input
+            - selector: 'litellm_output_tokens_metric_total{org_id=~".+"}'
+              name: output
+            - selector: 'litellm_total_tokens_metric_total{org_id=~".+"}'
+              name: total
+
+        - title: LLM Spend by Organization
+          family: By Organization
+          context: llm_spend_by_organization
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 2670
+          instances:
+            by_labels: [org_id]
+          dimensions:
+            - selector: 'litellm_spend_metric_total{org_id=~".+"}'
+              name: spend
+
+        - title: Request Token Throughput by End User
+          family: By End User
+          context: request_token_throughput_by_end_user
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2680
+          instances:
+            by_labels: [end_user]
+          dimensions:
+            - selector: 'litellm_input_tokens_metric_total{end_user=~".+"}'
+              name: input
+            - selector: 'litellm_output_tokens_metric_total{end_user=~".+"}'
+              name: output
+            - selector: 'litellm_total_tokens_metric_total{end_user=~".+"}'
+              name: total
+
+        - title: LLM Spend by End User
+          family: By End User
+          context: llm_spend_by_end_user
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 2690
+          instances:
+            by_labels: [end_user]
+          dimensions:
+            - selector: 'litellm_spend_metric_total{end_user=~".+"}'
+              name: spend
+
+        - title: Request Token Throughput by Requested Model
+          family: By Requested Model
+          context: request_token_throughput_by_requested_model
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2700
+          instances:
+            by_labels: [requested_model]
+          dimensions:
+            - selector: 'litellm_input_tokens_metric_total{requested_model=~".+"}'
+              name: input
+            - selector: 'litellm_output_tokens_metric_total{requested_model=~".+"}'
+              name: output
+            - selector: 'litellm_total_tokens_metric_total{requested_model=~".+"}'
+              name: total
+
+        - title: LLM Spend by Requested Model
+          family: By Requested Model
+          context: llm_spend_by_requested_model
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 2710
+          instances:
+            by_labels: [requested_model]
+          dimensions:
+            - selector: 'litellm_spend_metric_total{requested_model=~".+"}'
+              name: spend
+
     - family: Caching
       context_namespace: caching
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_cache_hits_metric_total'
         - 'litellm_cache_misses_metric_total'
@@ -466,7 +1156,7 @@ template:
           units: lookups/s
           algorithm: incremental
           type: line
-          priority: 2320
+          priority: 2720
           dimensions:
             - selector: 'litellm_cache_hits_metric_total'
               name: hits
@@ -478,7 +1168,7 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2330
+          priority: 2730
           dimensions:
             - selector: 'litellm_cached_tokens_metric_total'
               name: served
@@ -488,7 +1178,7 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2340
+          priority: 2740
           dimensions:
             - selector: 'litellm_input_cache_creation_tokens_metric_total'
               name: input_cache_created
@@ -500,18 +1190,73 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2350
+          priority: 2750
           dimensions:
             - selector: 'litellm_provider_cache_creation_input_tokens_metric_total'
               name: provider_cache_created
             - selector: 'litellm_provider_cache_read_input_tokens_metric_total'
               name: provider_cache_read
 
+        - title: Cache Outcomes by Provider and Model
+          family: By Provider and Model
+          context: cache_outcomes_by_provider_model
+          units: lookups/s
+          algorithm: incremental
+          type: line
+          priority: 2760
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_cache_hits_metric_total{api_provider=~".+",model=~".+"}'
+              name: hits
+            - selector: 'litellm_cache_misses_metric_total{api_provider=~".+",model=~".+"}'
+              name: misses
+
+        - title: LiteLLM Cached Token Throughput by Provider and Model
+          family: By Provider and Model
+          context: litellm_cached_token_throughput_by_provider_model
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2770
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_cached_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: served
+
+        - title: Request Input-Cache Token Throughput by Provider and Model
+          family: By Provider and Model
+          context: request_input_cache_token_throughput_by_provider_model
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2780
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_input_cache_creation_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: input_cache_created
+            - selector: 'litellm_input_cached_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: input_cache_read
+
+        - title: Provider Cache Token Throughput by Provider and Model
+          family: By Provider and Model
+          context: provider_cache_token_throughput_by_provider_model
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          priority: 2790
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_provider_cache_creation_input_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: provider_cache_created
+            - selector: 'litellm_provider_cache_read_input_tokens_metric_total{api_provider=~".+",model=~".+"}'
+              name: provider_cache_read
+
     - family: Governance
       context_namespace: governance
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_api_key_max_budget_metric'
         - 'litellm_remaining_api_key_budget_metric'
@@ -531,11 +1276,14 @@ template:
         - 'litellm_team_members_metric'
       charts:
         - title: API-Key Budget
+          family: API Keys
           context: api_key_budget
           units: USD
           algorithm: absolute
           type: line
-          priority: 2360
+          priority: 2800
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_api_key_max_budget_metric'
               name: api_key_max
@@ -543,11 +1291,14 @@ template:
               name: api_key_remaining
 
         - title: Organization Budget
+          family: Organizations
           context: organization_budget
           units: USD
           algorithm: absolute
           type: line
-          priority: 2370
+          priority: 2810
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_org_max_budget_metric'
               name: org_max
@@ -555,11 +1306,14 @@ template:
               name: org_remaining
 
         - title: Team Budget
+          family: Teams
           context: team_budget
           units: USD
           algorithm: absolute
           type: line
-          priority: 2380
+          priority: 2820
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_team_max_budget_metric'
               name: team_max
@@ -567,11 +1321,14 @@ template:
               name: team_remaining
 
         - title: User Budget
+          family: Users
           context: user_budget
           units: USD
           algorithm: absolute
           type: line
-          priority: 2390
+          priority: 2830
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_user_max_budget_metric'
               name: user_max
@@ -579,90 +1336,111 @@ template:
               name: user_remaining
 
         - title: Provider Remaining Budget
+          family: Providers
           context: provider_remaining_budget
           units: USD
           algorithm: absolute
           type: line
-          priority: 2400
+          priority: 2840
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_provider_remaining_budget_metric'
               name: provider_remaining
 
         - title: API-Key Budget Reset Window
+          family: API Keys
           context: api_key_budget_reset_window
           units: hours
           algorithm: absolute
           type: line
-          priority: 2410
+          priority: 2850
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_api_key_budget_remaining_hours_metric'
               name: remaining
 
         - title: Organization Budget Reset Window
+          family: Organizations
           context: organization_budget_reset_window
           units: hours
           algorithm: absolute
           type: line
-          priority: 2420
+          priority: 2860
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_org_budget_remaining_hours_metric'
               name: remaining
 
         - title: Team Budget Reset Window
+          family: Teams
           context: team_budget_reset_window
           units: hours
           algorithm: absolute
           type: line
-          priority: 2430
+          priority: 2870
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_team_budget_remaining_hours_metric'
               name: remaining
 
         - title: User Budget Reset Window
+          family: Users
           context: user_budget_reset_window
           units: hours
           algorithm: absolute
           type: line
-          priority: 2440
+          priority: 2880
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_user_budget_remaining_hours_metric'
               name: remaining
 
         - title: API-Key Model Request Headroom
+          family: API Key Models
           context: api_key_model_request_headroom
           units: requests
           algorithm: absolute
           type: line
-          priority: 2450
+          priority: 2890
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_remaining_api_key_requests_for_model'
               name: remaining
 
         - title: API-Key Model Token Headroom
+          family: API Key Models
           context: api_key_model_token_headroom
           units: tokens
           algorithm: absolute
           type: line
-          priority: 2460
+          priority: 2900
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_remaining_api_key_tokens_for_model'
               name: remaining
 
         - title: Team Membership
+          family: Teams
           context: team_membership
           units: users
           algorithm: absolute
           type: line
-          priority: 2470
+          priority: 2910
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_team_members_metric'
               name: members
 
     - family: Guardrails
       context_namespace: guardrails
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_guardrail_requests_total'
         - 'litellm_guardrail_errors_total'
@@ -675,9 +1453,7 @@ template:
           units: invocations/s
           algorithm: incremental
           type: line
-          priority: 2480
-          instances:
-            by_labels: ['*', '!status']
+          priority: 2920
           dimensions:
             - selector: 'litellm_guardrail_requests_total'
               name_from_label: status
@@ -687,9 +1463,7 @@ template:
           units: errors/s
           algorithm: incremental
           type: line
-          priority: 2490
-          instances:
-            by_labels: ['*', '!error_type']
+          priority: 2930
           dimensions:
             - selector: 'litellm_guardrail_errors_total'
               name_from_label: error_type
@@ -699,9 +1473,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2500
-          instances:
-            by_labels: ['*', '!le']
+          priority: 2940
           dimensions:
             - selector: 'litellm_guardrail_latency_seconds_bucket'
 
@@ -710,9 +1482,7 @@ template:
           units: invocations/s
           algorithm: incremental
           type: line
-          priority: 2510
-          instances:
-            by_labels: ['*', '!status']
+          priority: 2950
           dimensions:
             - selector: 'litellm_guardrail_latency_seconds_count'
               name_from_label: status
@@ -722,16 +1492,77 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2520
+          priority: 2960
           dimensions:
             - selector: 'litellm_guardrail_latency_seconds_sum'
               name: time
 
+        - title: Invocations by Guardrail, Hook, and Status
+          family: By Guardrail and Hook
+          context: guardrail_invocations_by_status_by_guardrail_hook
+          units: invocations/s
+          algorithm: incremental
+          type: line
+          priority: 2970
+          instances:
+            by_labels: [guardrail_name, hook_type]
+          dimensions:
+            - selector: 'litellm_guardrail_requests_total{guardrail_name=~".+",hook_type=~".+"}'
+              name_from_label: status
+
+        - title: Errors by Guardrail, Hook, and Type
+          family: By Guardrail and Hook
+          context: guardrail_errors_by_type_by_guardrail_hook
+          units: errors/s
+          algorithm: incremental
+          type: line
+          priority: 2980
+          instances:
+            by_labels: [guardrail_name, hook_type]
+          dimensions:
+            - selector: 'litellm_guardrail_errors_total{guardrail_name=~".+",hook_type=~".+"}'
+              name_from_label: error_type
+
+        - title: Latency Distribution by Guardrail and Hook
+          family: By Guardrail and Hook
+          context: guardrail_latency_distribution_by_guardrail_hook
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 2990
+          instances:
+            by_labels: [guardrail_name, hook_type]
+          dimensions:
+            - selector: 'litellm_guardrail_latency_seconds_bucket{guardrail_name=~".+",hook_type=~".+"}'
+
+        - title: Latency Measurements by Guardrail, Hook, and Status
+          family: By Guardrail and Hook
+          context: guardrail_latency_measurements_by_status_by_guardrail_hook
+          units: invocations/s
+          algorithm: incremental
+          type: line
+          priority: 3000
+          instances:
+            by_labels: [guardrail_name, hook_type]
+          dimensions:
+            - selector: 'litellm_guardrail_latency_seconds_count{guardrail_name=~".+",hook_type=~".+"}'
+              name_from_label: status
+
+        - title: Accumulated Latency by Guardrail and Hook
+          family: By Guardrail and Hook
+          context: accumulated_guardrail_latency_by_guardrail_hook
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 3010
+          instances:
+            by_labels: [guardrail_name, hook_type]
+          dimensions:
+            - selector: 'litellm_guardrail_latency_seconds_sum{guardrail_name=~".+",hook_type=~".+"}'
+              name: time
+
     - family: MCP Gateway
       context_namespace: mcp_gateway
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_mcp_tool_calls_total'
         - 'litellm_mcp_tool_call_spend_metric_total'
@@ -741,7 +1572,7 @@ template:
           units: calls/s
           algorithm: incremental
           type: line
-          priority: 2530
+          priority: 3020
           dimensions:
             - selector: 'litellm_mcp_tool_calls_total'
               name: calls
@@ -751,16 +1582,39 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2540
+          priority: 3030
           dimensions:
             - selector: 'litellm_mcp_tool_call_spend_metric_total'
               name: spend
 
+        - title: MCP Tool Calls by Server and Tool
+          family: By Server and Tool
+          context: mcp_tool_calls_by_server_tool
+          units: calls/s
+          algorithm: incremental
+          type: line
+          priority: 3040
+          instances:
+            by_labels: [mcp_server_name, mcp_tool_name]
+          dimensions:
+            - selector: 'litellm_mcp_tool_calls_total{mcp_server_name=~".+",mcp_tool_name=~".+"}'
+              name: calls
+
+        - title: MCP Tool-Call Spend by Server and Tool
+          family: By Server and Tool
+          context: mcp_tool_call_spend_by_server_tool
+          units: USD/s
+          algorithm: incremental
+          type: line
+          priority: 3050
+          instances:
+            by_labels: [mcp_server_name, mcp_tool_name]
+          dimensions:
+            - selector: 'litellm_mcp_tool_call_spend_metric_total{mcp_server_name=~".+",mcp_tool_name=~".+"}'
+              name: spend
+
     - family: Managed Batch and Files
       context_namespace: managed_batch_and_files
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_managed_batch_created_total'
         - 'litellm_check_batch_cost_jobs_processed_total'
@@ -778,7 +1632,7 @@ template:
           units: batches/s
           algorithm: incremental
           type: line
-          priority: 2550
+          priority: 3060
           dimensions:
             - selector: 'litellm_managed_batch_created_total'
               name: created
@@ -788,7 +1642,7 @@ template:
           units: batches/s
           algorithm: incremental
           type: line
-          priority: 2560
+          priority: 3070
           dimensions:
             - selector: 'litellm_check_batch_cost_jobs_processed_total'
               name: cost_tracked
@@ -800,19 +1654,20 @@ template:
           units: errors/s
           algorithm: incremental
           type: line
-          priority: 2570
-          instances:
-            by_labels: ['*', '!error_type']
+          priority: 3080
           dimensions:
             - selector: 'litellm_check_batch_cost_errors_total'
               name_from_label: error_type
 
         - title: Unprocessed Batches at Last Poll
+          family: Background Poller
           context: unprocessed_batches
           units: batches
           algorithm: absolute
           type: line
-          priority: 2580
+          priority: 3090
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_check_batch_cost_jobs_polled'
               name: batches
@@ -822,7 +1677,7 @@ template:
           units: files/s
           algorithm: incremental
           type: line
-          priority: 2590
+          priority: 3100
           dimensions:
             - selector: 'litellm_managed_file_created_total'
               name: created
@@ -832,19 +1687,20 @@ template:
           units: files/s
           algorithm: incremental
           type: line
-          priority: 2600
-          instances:
-            by_labels: ['*', '!result']
+          priority: 3110
           dimensions:
             - selector: 'litellm_managed_file_deleted_total'
               name_from_label: result
 
         - title: Last-Seen Managed File Size
+          family: Managed Files
           context: managed_file_size
           units: bytes
           algorithm: absolute
           type: line
-          priority: 2610
+          priority: 3120
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_managed_file_size_bytes'
               name: size
@@ -854,9 +1710,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2620
-          instances:
-            by_labels: ['*', '!le']
+          priority: 3130
           dimensions:
             - selector: 'litellm_managed_batch_duration_seconds_bucket'
 
@@ -865,16 +1719,79 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2630
+          priority: 3140
           dimensions:
             - selector: 'litellm_managed_batch_duration_seconds_sum'
               name: duration
 
+        - title: Managed Batches Created by Provider and Model
+          family: By Provider and Model
+          context: managed_batches_created_by_provider_model
+          units: batches/s
+          algorithm: incremental
+          type: line
+          priority: 3150
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_managed_batch_created_total{api_provider=~".+",model=~".+"}'
+              name: created
+
+        - title: Batch Completion and Cost Tracking by Provider and Model
+          family: By Provider and Model
+          context: managed_batch_completion_by_provider_model
+          units: batches/s
+          algorithm: incremental
+          type: line
+          priority: 3160
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_check_batch_cost_jobs_processed_total{api_provider=~".+",model=~".+"}'
+              name: cost_tracked
+            - selector: 'litellm_managed_batch_duration_seconds_count{api_provider=~".+",model=~".+"}'
+              name: completed
+
+        - title: Managed Files Created by Provider and Model
+          family: By Provider and Model
+          context: managed_files_created_by_provider_model
+          units: files/s
+          algorithm: incremental
+          type: line
+          priority: 3170
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_managed_file_created_total{api_provider=~".+",model=~".+"}'
+              name: created
+
+        - title: Managed Batch Duration Distribution by Provider and Model
+          family: By Provider and Model
+          context: managed_batch_duration_distribution_by_provider_model
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          priority: 3180
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_managed_batch_duration_seconds_bucket{api_provider=~".+",model=~".+"}'
+
+        - title: Accumulated Managed Batch Duration by Provider and Model
+          family: By Provider and Model
+          context: accumulated_managed_batch_duration_by_provider_model
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          priority: 3190
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: 'litellm_managed_batch_duration_seconds_sum{api_provider=~".+",model=~".+"}'
+              name: duration
+
     - family: Callbacks and Inventory
       context_namespace: callbacks_and_inventory
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_total_users'
         - 'litellm_active_users'
@@ -882,11 +1799,14 @@ template:
         - 'litellm_callback_logging_failures_metric_total'
       charts:
         - title: User Inventory
+          family: Inventory
           context: user_inventory
           units: users
           algorithm: absolute
           type: line
-          priority: 2640
+          priority: 3200
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_total_users'
               name: total
@@ -894,11 +1814,14 @@ template:
               name: active
 
         - title: Team Inventory
+          family: Inventory
           context: team_inventory
           units: teams
           algorithm: absolute
           type: line
-          priority: 2650
+          priority: 3210
+          instances:
+            by_labels: ['*']
           dimensions:
             - selector: 'litellm_teams_count'
               name: teams
@@ -908,16 +1831,26 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2660
+          priority: 3220
           dimensions:
             - selector: 'litellm_callback_logging_failures_metric_total'
               name: failures
 
+        - title: Callback Logging Failures by Callback
+          family: By Callback
+          context: callback_logging_failures_by_callback
+          units: failures/s
+          algorithm: incremental
+          type: line
+          priority: 3230
+          instances:
+            by_labels: [callback_name]
+          dimensions:
+            - selector: 'litellm_callback_logging_failures_metric_total{callback_name=~".+"}'
+              name: failures
+
     - family: Internal Services
       context_namespace: internal_services
-      chart_defaults:
-        instances:
-          by_labels: ['*']
       metrics:
         - 'litellm_auth_total_requests_total'
         - 'litellm_proxy_pre_call_total_requests_total'
@@ -990,9 +1923,7 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2670
-          instances:
-            by_labels: ['*', '!auth', '!proxy_pre_call', '!router', '!postgres', '!redis', '!batch_write_to_db', '!reset_budget_job', '!self', '!redis_daily_org_spend_update_queue', '!redis_daily_tag_spend_update_queue', '!redis_daily_team_spend_update_queue']
+          priority: 3240
           dimensions:
             - selector: 'litellm_auth_total_requests_total'
               name: auth
@@ -1022,9 +1953,7 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2680
-          instances:
-            by_labels: ['*', '!auth', '!proxy_pre_call', '!router', '!postgres', '!redis', '!batch_write_to_db', '!reset_budget_job', '!self', '!redis_daily_org_spend_update_queue', '!redis_daily_tag_spend_update_queue', '!redis_daily_team_spend_update_queue']
+          priority: 3250
           dimensions:
             - selector: 'litellm_auth_failed_requests_total'
               name: auth
@@ -1054,9 +1983,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2690
-          instances:
-            by_labels: ['*', '!le', '!auth']
+          priority: 3260
           dimensions:
             - selector: 'litellm_auth_latency_bucket'
 
@@ -1065,9 +1992,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2700
-          instances:
-            by_labels: ['*', '!le', '!proxy_pre_call']
+          priority: 3270
           dimensions:
             - selector: 'litellm_proxy_pre_call_latency_bucket'
 
@@ -1076,9 +2001,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2710
-          instances:
-            by_labels: ['*', '!le', '!router']
+          priority: 3280
           dimensions:
             - selector: 'litellm_router_latency_bucket'
 
@@ -1087,9 +2010,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2720
-          instances:
-            by_labels: ['*', '!le', '!postgres']
+          priority: 3290
           dimensions:
             - selector: 'litellm_postgres_latency_bucket'
 
@@ -1098,9 +2019,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2730
-          instances:
-            by_labels: ['*', '!le', '!redis']
+          priority: 3300
           dimensions:
             - selector: 'litellm_redis_latency_bucket'
 
@@ -1109,9 +2028,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2740
-          instances:
-            by_labels: ['*', '!le', '!batch_write_to_db']
+          priority: 3310
           dimensions:
             - selector: 'litellm_batch_write_to_db_latency_bucket'
 
@@ -1120,9 +2037,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2750
-          instances:
-            by_labels: ['*', '!le', '!reset_budget_job']
+          priority: 3320
           dimensions:
             - selector: 'litellm_reset_budget_job_latency_bucket'
 
@@ -1131,9 +2046,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2760
-          instances:
-            by_labels: ['*', '!le', '!self']
+          priority: 3330
           dimensions:
             - selector: 'litellm_self_latency_bucket'
 
@@ -1142,9 +2055,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2770
-          instances:
-            by_labels: ['*', '!le', '!redis_daily_org_spend_update_queue']
+          priority: 3340
           dimensions:
             - selector: 'litellm_redis_daily_org_spend_update_queue_latency_bucket'
 
@@ -1153,9 +2064,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2780
-          instances:
-            by_labels: ['*', '!le', '!redis_daily_tag_spend_update_queue']
+          priority: 3350
           dimensions:
             - selector: 'litellm_redis_daily_tag_spend_update_queue_latency_bucket'
 
@@ -1164,9 +2073,7 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2790
-          instances:
-            by_labels: ['*', '!le', '!redis_daily_team_spend_update_queue']
+          priority: 3360
           dimensions:
             - selector: 'litellm_redis_daily_team_spend_update_queue_latency_bucket'
 
@@ -1175,9 +2082,7 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2800
-          instances:
-            by_labels: ['*', '!auth', '!proxy_pre_call', '!router', '!postgres', '!redis', '!batch_write_to_db', '!reset_budget_job', '!self', '!redis_daily_org_spend_update_queue', '!redis_daily_tag_spend_update_queue', '!redis_daily_team_spend_update_queue']
+          priority: 3370
           dimensions:
             - selector: 'litellm_auth_latency_count'
               name: auth
@@ -1207,9 +2112,7 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2810
-          instances:
-            by_labels: ['*', '!auth', '!proxy_pre_call', '!router', '!postgres', '!redis', '!batch_write_to_db', '!reset_budget_job', '!self', '!redis_daily_org_spend_update_queue', '!redis_daily_tag_spend_update_queue', '!redis_daily_team_spend_update_queue']
+          priority: 3380
           dimensions:
             - selector: 'litellm_auth_latency_sum'
               name: auth
@@ -1235,13 +2138,15 @@ template:
               name: redis_daily_team_spend_update_queue
 
         - title: Spend-Update Queue Backlog
+          family: Spend Queues
           context: spend_update_queue_backlog
           units: items
           algorithm: absolute
           type: line
-          priority: 2820
+          priority: 3390
           instances:
-            by_labels: ['*', '!in_memory_daily_spend_update_queue', '!in_memory_spend_update_queue', '!redis_daily_agent_spend_update_queue', '!redis_daily_end_user_spend_update_queue', '!redis_daily_spend_update_queue', '!redis_spend_update_queue']
+            by_labels: ['*', '!in_memory_daily_spend_update_queue', '!in_memory_spend_update_queue', '!redis_daily_agent_spend_update_queue', '!redis_daily_end_user_spend_update_queue',
+              '!redis_daily_spend_update_queue', '!redis_spend_update_queue']
           dimensions:
             - selector: 'litellm_in_memory_daily_spend_update_queue_size'
               name: in_memory_daily
@@ -1257,11 +2162,12 @@ template:
               name: redis
 
         - title: Pod-Lock Manager Size
+          family: Pod Locks
           context: pod_lock_manager_size
           units: locks
           algorithm: absolute
           type: line
-          priority: 2830
+          priority: 3400
           # Unlike the constant service/queue labels above, this value identifies
           # the dynamic <cronjob>:<pod> lock and must remain in chart identity.
           instances:
@@ -1269,3 +2175,102 @@ template:
           dimensions:
             - selector: 'litellm_pod_lock_manager_size'
               name: locks
+
+    - family: Runtime
+      context_namespace: runtime
+      metrics:
+        - process_virtual_memory_bytes
+        - process_resident_memory_bytes
+        - process_cpu_seconds_total
+        - process_open_fds
+        - process_max_fds
+      charts:
+        - title: Process CPU Usage
+          context: process_cpu
+          units: cores
+          algorithm: incremental
+          type: line
+          priority: 3410
+          dimensions:
+            - selector: process_cpu_seconds_total
+              name: used
+              options:
+                float: true
+
+        - title: Process Resident Memory
+          context: process_resident_memory
+          units: bytes
+          algorithm: absolute
+          type: line
+          priority: 3420
+          dimensions:
+            - selector: process_resident_memory_bytes
+              name: resident
+
+        - title: Process Virtual Memory
+          context: process_virtual_memory
+          units: bytes
+          algorithm: absolute
+          type: line
+          priority: 3430
+          dimensions:
+            - selector: process_virtual_memory_bytes
+              name: virtual
+
+        - title: Open File Descriptors
+          context: open_file_descriptors
+          units: fds
+          algorithm: absolute
+          type: line
+          priority: 3440
+          dimensions:
+            - selector: process_open_fds
+              name: open
+
+        - title: File Descriptor Limit
+          context: file_descriptor_limit
+          units: fds
+          algorithm: absolute
+          type: line
+          priority: 3450
+          dimensions:
+            - selector: process_max_fds
+              name: limit
+
+      groups:
+        - family: Python GC
+          context_namespace: python_gc
+          metrics:
+            - python_gc_objects_collected_total
+            - python_gc_objects_uncollectable_total
+            - python_gc_collections_total
+          charts:
+            - title: Collected Objects
+              context: collected_objects
+              units: objects/s
+              algorithm: incremental
+              type: line
+              priority: 3460
+              dimensions:
+                - selector: python_gc_objects_collected_total
+                  name_from_label: generation
+
+            - title: Uncollectable Objects
+              context: uncollectable_objects
+              units: objects/s
+              algorithm: incremental
+              type: line
+              priority: 3470
+              dimensions:
+                - selector: python_gc_objects_uncollectable_total
+                  name_from_label: generation
+
+            - title: Collections
+              context: collections
+              units: collections/s
+              algorithm: incremental
+              type: line
+              priority: 3480
+              dimensions:
+                - selector: python_gc_collections_total
+                  name_from_label: generation

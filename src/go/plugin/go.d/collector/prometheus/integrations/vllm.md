@@ -24,13 +24,16 @@ Module: prometheus
 Monitor vLLM inference-serving workload, latency, scheduling, token throughput, cache behavior, connector activity,
 and runtime health.
 
-The built-in profile follows requests through scheduling, prefill, decode, engine execution, and HTTP service
-boundaries. It separates model-engine, endpoint, parser, and service-runtime identities, and organizes KV cache
-residency and offloading, connector operations, speculative or diffusion decoding, and WebSocket activity under their
-causal owners. Optional charts appear when the corresponding vLLM features export metrics.
+The built-in profiles follow requests through scheduling, prefill, decode, engine execution, and HTTP service
+boundaries. They separate model-engine, endpoint, parser, service-runtime, and Ray replica-worker identities, and
+organize KV cache residency and offloading, connector operations, speculative or diffusion decoding, and WebSocket
+activity under their causal owners. Optional charts appear when the corresponding vLLM features export metrics.
 
 
-Netdata periodically scrapes the vLLM Prometheus `/metrics` endpoint and applies the built-in `vllm` profile.
+Netdata periodically scrapes either the vLLM server Prometheus `/metrics` endpoint or the Ray node metrics endpoint.
+Auto-selection applies the built-in `vllm` profile to native `vllm:*` metrics and the separate `vllm_ray` profile to
+`ray_vllm_*` metrics. The Ray profile preserves replica and worker identity and suppresses Ray 2.48's deprecated
+unsuffixed counter aliases so each counter is presented once.
 
 
 This collector is supported on all platforms.
@@ -74,7 +77,10 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Expose the vLLM metrics endpoint
 
-Run a vLLM server with a reachable Prometheus `/metrics` endpoint.
+Run a vLLM server with a reachable Prometheus `/metrics` endpoint, or configure a Ray deployment whose node
+metrics endpoint exposes `ray_vllm_*` families. For Ray, configure or discover each node's metrics export port;
+Ray commonly uses port 8080 when `--metrics-export-port=8080` is set. Ray 2.48 exports an unsuffixed compatibility
+gauge beside most canonical `_total` counters unless `RAY_EXPORT_COUNTER_AS_GAUGE=0` is set.
 
 
 
@@ -258,135 +264,90 @@ sudo ./edit-config go.d/prometheus.conf
 
 ##### Examples
 
-###### Basic
+###### Native vLLM
 
-> **Note**: Change the port of the monitored application on which it provides metrics.
-
-A basic example configuration.
-
+Collect native vLLM server metrics with the exact profile and its duplicate/timestamp exclusions.
 
 ```yaml
 jobs:
-  - name: local
-    url: http://127.0.0.1:9090/metrics
+  - name: vllm
+    url: http://127.0.0.1:8000/metrics
+    app: vllm
+    expected_prefix: 'vllm:'
+    profiles:
+      mode: exact
+      mode_exact:
+        entries:
+          - name: vllm
+    selector:
+      deny:
+        - '*_created'
+        - process_start_time_seconds
+        - 'vllm:kv_offload_total_bytes_total'
+        - 'vllm:kv_offload_total_time_total'
+        - 'vllm:kv_offload_size*'
 
 ```
-###### Read metrics from a file
+###### vLLM on Ray
 
-An example configuration to read metrics from a file.
-
-<details open><summary>Config</summary>
-
-```yaml
-# use "file://" scheme
-jobs:
-  - name: myapp
-    url: file:///opt/metrics/myapp/metrics.txt
-
-```
-</details>
-
-###### HTTP authentication
-
-> **Note**: Change the port of the monitored application on which it provides metrics.
-
-Basic HTTP authentication.
+Collect only vLLM families from a Ray node metrics endpoint. The deny list removes Ray 2.48's 33 deprecated
+unsuffixed compatibility gauges and vLLM's pre-canonical KV-offload duplicates; the profile repeats that
+suppression as a fallback guard. Use a separate job when Ray system metrics also need to be monitored.
 
 
 <details open><summary>Config</summary>
 
 ```yaml
 jobs:
-  - name: local
-    url: http://127.0.0.1:9090/metrics
-    username: username
-    password: password
-
-```
-</details>
-
-###### HTTPS with self-signed certificate
-
-> **Note**: Change the port of the monitored application on which it provides metrics.
-
-Do not validate server certificate chain and hostname.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    url: https://127.0.0.1:9090/metrics
-    tls_skip_verify: yes
-
-```
-</details>
-
-###### Multi-instance
-
-> **Note**: When you define multiple jobs, their names must be unique.
-> **Note**: Change the port of the monitored application on which it provides metrics.
-
-Collecting metrics from local and remote instances.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    url: http://127.0.0.1:9090/metrics
-
-  - name: remote
-    url: http://192.0.2.1:9090/metrics
-
-```
-</details>
-
-###### Metric relabeling
-
-Derive a `code_class` label (2xx, 4xx, ...) on metrics named `http_*`.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    url: http://127.0.0.1:9090/metrics
-    relabeling:
-      - match: 'http_*'
-        metric_relabel_configs:
-          - source_labels: [code]
-            regex: '(\d)\d\d'
-            target_label: code_class
-            replacement: '${1}xx'
-
-```
-</details>
-
-###### Rename labels that collide with Netdata's reserved labels
-
-When these metrics are re-exported in Prometheus format, Netdata adds its own `instance`,
-`family`, `chart`, and `dimension` labels. If the scraped endpoint already uses one of those
-names, the re-export emits a duplicate label and a downstream Prometheus rejects the scrape.
-Rename the colliding labels to avoid it (the use case the former `label_prefix` option served).
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: coredns
-    url: http://127.0.0.1:9153/metrics
-    relabeling:
-      - match: '*'
-        metric_relabel_configs:
-          - regex: '(instance|family)'
-            action: labelmap
-            replacement: 'coredns_$1'
-          - regex: '(instance|family)'
-            action: labeldrop
+  - name: vllm-ray
+    url: http://127.0.0.1:8080
+    app: vllm
+    expected_prefix: ray_vllm_
+    profiles:
+      mode: exact
+      mode_exact:
+        entries:
+          - name: vllm_ray
+    selector:
+      allow:
+        - 'ray_vllm_*'
+      deny:
+        - ray_vllm_corrupted_requests
+        - ray_vllm_diffusion_num_canvas_positions
+        - ray_vllm_diffusion_num_committed_tokens
+        - ray_vllm_diffusion_num_denoising_steps
+        - ray_vllm_external_prefix_cache_hits
+        - ray_vllm_external_prefix_cache_queries
+        - ray_vllm_generation_tokens
+        - ray_vllm_hf3fs_num_failed_load
+        - ray_vllm_hf3fs_num_failed_save
+        - ray_vllm_kv_offload_allocation_failure
+        - ray_vllm_kv_offload_load_bytes
+        - ray_vllm_kv_offload_load_time
+        - ray_vllm_kv_offload_size*
+        - ray_vllm_kv_offload_store_bytes
+        - ray_vllm_kv_offload_store_time
+        - ray_vllm_kv_offload_stores_skipped
+        - ray_vllm_kv_offload_total_bytes
+        - ray_vllm_kv_offload_total_bytes_total
+        - ray_vllm_kv_offload_total_time
+        - ray_vllm_kv_offload_total_time_total
+        - ray_vllm_mm_cache_hits
+        - ray_vllm_mm_cache_queries
+        - ray_vllm_nixl_num_failed_notifications
+        - ray_vllm_nixl_num_failed_transfers
+        - ray_vllm_nixl_num_kv_expired_reqs
+        - ray_vllm_num_preemptions
+        - ray_vllm_prefix_cache_hits
+        - ray_vllm_prefix_cache_queries
+        - ray_vllm_prompt_tokens
+        - ray_vllm_prompt_tokens_by_source
+        - ray_vllm_prompt_tokens_cached
+        - ray_vllm_request_success
+        - ray_vllm_spec_decode_num_accepted_tokens
+        - ray_vllm_spec_decode_num_accepted_tokens_per_pos
+        - ray_vllm_spec_decode_num_draft_tokens
+        - ray_vllm_spec_decode_num_drafts
 
 ```
 </details>

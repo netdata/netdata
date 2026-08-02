@@ -3,12 +3,16 @@
 # profile schema cannot turn raw epochs into ages. Current CPU offloading also
 # emits deprecated aliases from the same observations as its canonical metrics;
 # the recommended policy excludes those aliases to prevent double counting.
+# Fallback is closed to one source-backed core signature; unknown future names
+# require source semantics and operator-model evidence before generic charting.
 # Information families and quantile-less summaries are skipped by the writer.
 
 match: 'vllm:*'
 app: vllm
 autogen:
   selector:
+    allow:
+      - 'vllm:num_requests_running'
     deny:
       - '*_created'
       - 'vllm:kv_offload_total_bytes_total'
@@ -596,7 +600,7 @@ template:
 
         - title: Estimated Compute per GPU
           context: estimated_compute
-          units: TFLOP/s/GPU
+          units: GFLOP/s/GPU
           algorithm: incremental
           type: line
           priority: 1470
@@ -604,7 +608,7 @@ template:
             - selector: 'vllm:estimated_flops_per_gpu_total'
               name: compute
               options:
-                divisor: 1000000000000
+                divisor: 1000000000
                 float: true
 
         - title: Estimated Memory Bandwidth per GPU

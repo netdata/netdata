@@ -7,6 +7,7 @@ whether and how it belongs in the dashboard.
 ## Contents
 
 - [The ingestion model](#the-ingestion-model)
+- [Source lifecycle owns the algorithm](#source-lifecycle-owns-the-algorithm)
 - [Gauge](#gauge)
 - [Counter](#counter)
 - [Histogram](#histogram)
@@ -30,6 +31,39 @@ Reason across four surfaces:
 A profile can only chart surface 4. A raw family missing from the writer is not
 an autogen leak, but it still matters: the validation report must make that loss
 visible so the author knows what evidence never reached the dashboard.
+
+## Source lifecycle owns the algorithm
+
+Prometheus wire type does **not** by itself determine the Netdata chart algorithm.
+Before declaring `absolute` or `incremental`, trace the producer's complete value
+lifecycle in source:
+
+1. Find registration and initialization.
+2. Find every update callsite, including assignments, additions, increments,
+   decrements, swaps, and snapshot publication.
+3. Find reset, reinitialization, and object-destruction paths.
+4. Identify what one unit counts or measures at each update.
+
+Apply these rules:
+
+- A source value that represents a current population or state MUST use
+  `absolute`, even when the exporter exposes it as a Prometheus counter. A value
+  incremented on object creation and decremented on destruction is current state.
+- A source value that represents cumulative work MUST use `incremental`, even
+  when the exporter exposes it as a Prometheus gauge or republishes it as a
+  periodic snapshot. Netdata receives the raw total and owns rate calculation
+  and reset detection.
+- A monotonically updated value MUST use the unit of the added quantity. An
+  update such as `total += bytes` is byte throughput after `incremental`; it is
+  not an event rate merely because the registration says counter.
+- HELP text, suffix inference, exporter wire type, and one observed scrape are
+  evidence inputs, not substitutes for update-site verification. When they
+  disagree with source lifecycle, follow the source and record the mismatch in
+  the semantic ledger.
+
+Do not compute deltas or resets in the collector or profile to compensate for a
+misleading wire type. Preserve the raw producer value and declare the correct
+Netdata algorithm.
 
 ## Gauge
 

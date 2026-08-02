@@ -37,6 +37,14 @@ SUBDIR=
 FORMAT=json
 OUTPUT=
 RUNNER=auto
+RUNNER_TMP=
+
+cleanup() {
+    if [ -n "$RUNNER_TMP" ] && [ -d "$RUNNER_TMP" ]; then
+        rm -rf -- "$RUNNER_TMP"
+    fi
+}
+trap cleanup EXIT
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -110,12 +118,20 @@ case "$RUNNER" in
         #   - CODACY_CODE pointing at the host path of the source
         #   - the source bind-mounted at the SAME path inside the
         #     CLI container so child containers can resolve it
+        # The CLI uses the host Docker socket to launch tool containers. Its
+        # generated analyzer config must therefore exist at the same absolute
+        # path on the host and in the CLI container; a private container /tmp
+        # makes Docker turn the missing bind source into a directory.
+        RUNNER_TMP="$(mktemp -d "${audit_dir}/runner.XXXXXX")"
+        chmod 0755 "$RUNNER_TMP"
         cli_args=(analyze --directory "$SUBDIR" --format "$FORMAT")
         [ -n "$TOOL" ] && cli_args+=(--tool "$TOOL")
         if ! docker run --rm \
                 --env CODACY_CODE="$SUBDIR" \
+                --env "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=$RUNNER_TMP" \
                 --volume /var/run/docker.sock:/var/run/docker.sock \
                 --volume "$SUBDIR":"$SUBDIR" \
+                --volume "$RUNNER_TMP":"$RUNNER_TMP" \
                 codacy/codacy-analysis-cli:latest \
                 "${cli_args[@]}" > "$OUTPUT" 2>/dev/null; then
             echo -e "${CA_YELLOW}[analyze-local] cli returned non-zero (this is normal when findings are present)${CA_NC}" >&2
@@ -133,9 +149,20 @@ if [ ! -s "$OUTPUT" ]; then
     exit 1
 fi
 
+# JSON and SARIF must never contain prepended tool-runner logs. A non-zero CLI
+# status can mean findings, so parseability is the reliable completion gate.
+case "$FORMAT" in
+    json|sarif)
+        if ! jq -e . "$OUTPUT" >/dev/null 2>&1; then
+            echo -e "${CA_RED}[ERROR]${CA_NC} malformed ${FORMAT} output at ${OUTPUT}; inspect the first tool-runner log before trusting findings" >&2
+            exit 1
+        fi
+        ;;
+esac
+
 # Quick summary if format=json.
-if [ "$FORMAT" = "json" ] && jq -e . "$OUTPUT" >/dev/null 2>&1; then
-    n="$(jq 'if type=="array" then length elif type=="object" and has("issues") then (.issues|length) else 0 end' "$OUTPUT")"
+if [ "$FORMAT" = "json" ]; then
+    n="$(jq 'if type=="array" then ([.[] | select(has("Issue"))] | length) elif type=="object" and has("issues") then (.issues|length) else 0 end' "$OUTPUT")"
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT}" >&2
 else
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${OUTPUT} (${FORMAT} format)" >&2

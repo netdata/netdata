@@ -79,6 +79,16 @@ dump as finding evidence. If GitHub check-run annotations are empty too, use
 `pr-issues.sh` with `CODACY_TOKEN`; without that token, record the evidence gap
 and re-check after the next push.
 
+The repository wrapper prevents the common Docker-socket variant of this
+failure. The outer CLI launches child analyzer containers through the host
+Docker daemon, so a config created only in the CLI container's private `/tmp`
+does not exist in the host path namespace; Docker creates a directory at the
+missing bind source and the analyzer reports `read /.codacyrc: is a directory`.
+`analyze-local.sh` gives Java a same-path host-backed temporary directory and
+rejects malformed JSON/SARIF instead of printing a false-success path. If that
+exact error recurs, verify the runner still mounts its configured Java temp
+directory at the same absolute path before changing analyzer policy.
+
 When the local CLI emits valid JSON, its top-level shape is commonly an array
 of wrappers with findings under `.Issue` (for example `.Issue.filename` and
 `.Issue.patternId.value`), not the Codacy v3 API's `.data[].commitIssue` shape.
@@ -90,6 +100,17 @@ permissions. For example, if local scratch output under `.local/` contains files
 not readable by the Docker container, Codacy logs `Could not read file` messages
 and the saved `.json` dump is plain text. Fix or move the local generated output
 before trusting local analyzer output.
+
+A restrictive workstation `umask` can also make regenerated **tracked** files
+mode `0600` and their generated output directory mode `0700`, even though Git
+still records the files' normal non-executable mode.
+`gen_docs_integrations.py` and `gen_doc_collector_page.py` can therefore leave
+generated Markdown unreadable or untraversable to Codacy's container user.
+Before rerunning the local analyzer, enumerate generated directories that lack
+world-execute permission and tracked files that lack world-read permission, then
+add only those local access bits; verify that `git status` reports no mode/content
+drift. Do not disable the analyzer or treat its resulting plain-text `.json` as
+a pass.
 
 Operational gotcha: the public Codacy v3 analysis endpoint can expose PR issue
 details even when GitHub check-run annotations are empty and no `CODACY_TOKEN`

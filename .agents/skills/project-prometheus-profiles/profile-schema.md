@@ -40,6 +40,22 @@ template:
 - `match` is REQUIRED and uses Netdata simple patterns against scraped
   Prometheus **family base names**. It is an exporter-detection signature, not
   a coverage declaration or dimension selector.
+- `match` also scopes `autogen.selector` per source family. If the profile
+  suppresses fallback for generated epochs, deprecated aliases, or other
+  uncovered exporter families, its pattern MUST cover those families as well
+  as the family used for autodetection. Exact-mode validation with a separate
+  job deny can otherwise hide generic charts that appear in a normal stock job.
+- `autogen.selector.allow` defines the only unmatched series in this profile
+  scope that may create generic fallback charts. A non-empty allowlist also
+  suppresses every unmatched series outside it. `autogen.selector.deny`
+  suppresses matching fallback after the allow check. Both forms affect chart
+  generation only; the collector store retains the samples.
+- Explicit generic fallback MAY be used only for a narrow, source-backed
+  dynamic family whose names cannot be enumerated or normalized faithfully and
+  whose generic charts remain semantically valid. Every suppressed family MUST
+  satisfy the skill's binding exclusion policy and document the lost operator
+  question. The validator reports both intentional cases as warnings and keeps
+  accidental fallback or unmatched series as errors.
 - Prefer exporter-unique family patterns in `match`. Generic runtime families
   such as `process_*`, `python_*`, and `http_*` may be charted without being
   part of detection; including them can make unrelated endpoints eligible.
@@ -164,6 +180,20 @@ effective inherited identity, selector, and missing label keys directly.
 Different raw identity values may also normalize to the same chart ID, so
 validate observed values.
 
+The semantic instance type and its complete unique key are not always the same
+list of concepts. An ownership label such as `database` does not turn a table
+context into a database-table context, but `{database, table}` may both be
+required in `by_labels` when table names repeat. Ownership and descriptive
+labels that are not required for uniqueness belong in promoted chart metadata.
+
+For an optional explicit-identity view, every dimension selector MUST require
+each identity label to be present and nonempty, for example
+`requests_total{provider=~".+",model=~".+"}`. Do not rely on later instance
+materialization to reject a label-poor series: the selector would still claim
+the series and objective validation correctly reports the unavailable identity.
+The service/capability total should select the same metric without those
+optional identity predicates.
+
 Treat nested identities as a lattice: a child entity retains its parent's
 identity labels and adds the labels required for the narrower entity. Because
 group and chart defaults replace lists rather than merging them, a child
@@ -184,9 +214,42 @@ Choose exactly one naming mode:
 - omit both only when chartengine can infer a histogram bucket (`le`), summary
   quantile (`quantile`), or supported state-like dimension.
 
-A missing `name_from_label` value makes that series unroutable. Dynamic
+A missing or empty `name_from_label` value makes that route unroutable. Dynamic
 dimension labels should describe comparable aspects, not unbounded entities;
 otherwise one chart becomes an unreadable cardinality sink.
+
+When authoritative exporter source or configuration proves that it can omit a
+valid dimension label, the chart MUST cover both label states with mutually
+exclusive selectors. Do not infer optionality merely because a chart uses
+`name_from_label`:
+
+```yaml
+dimensions:
+  - selector: 'requests_total{status=~".*[^[:space:]].*"}'
+    name_from_label: status
+  - selector: 'requests_total{status!~".*[^[:space:]].*"}'
+    name: unclassified
+```
+
+In the Netdata selector implementation, the positive matcher selects a present
+value containing at least one non-whitespace character, and the negated matcher
+also selects a missing label. The fixed fallback therefore covers missing,
+empty, and whitespace-only values in the same context and chart instance
+without overlapping the dynamic dimensions. Do not use `.+` here because
+chartengine trims and rejects whitespace-only dynamic names after selector
+matching.
+
+- The fallback MUST describe the missing classification; it MUST NOT be named
+  `total`, because it is only the unlabeled subset when labeled and unlabeled
+  series coexist.
+- The fallback name SHOULD be outside the authoritative dynamic value domain.
+- A broad static selector MUST NOT accompany the dynamic selector in the same
+  chart; the labeled series would enter both dimensions.
+- This pattern does not make a missing entity identity available. Optional
+  `instances.by_labels` still require positive selector guards and a coarser
+  stable view.
+- This pattern does not authorize invalid gauge aggregation. Preserve the
+  complete identity for non-additive states.
 
 `options` supports integer `multiplier`, `divisor`, `hidden`, and `float`.
 Conversions affect values but do not change source semantics. Use a negative

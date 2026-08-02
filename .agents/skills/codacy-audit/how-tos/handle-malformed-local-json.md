@@ -19,6 +19,23 @@ parse it.
    A known failure mode is a Dockerized tool trying to read `/.codacyrc` as a
    file and reporting `read /.codacyrc: is a directory`.
 
+   This happens when the outer Codacy CLI uses the host Docker socket but writes
+   `codacy-config*.json` only inside its private `/tmp`. The child-container bind
+   is resolved by the host daemon; because the host path does not exist, Docker
+   creates a directory there. The repository wrapper avoids this by setting
+   Java's temp directory to a host-backed directory mounted at the same absolute
+   path in the CLI container.
+
+   Verify that contract before changing analyzer configuration:
+
+   ```bash
+   grep -nE 'JAVA_TOOL_OPTIONS|RUNNER_TMP.*RUNNER_TMP' \
+     .agents/skills/codacy-audit/scripts/analyze-local.sh
+   ```
+
+   The wrapper now exits nonzero when JSON or SARIF is malformed. A printed dump
+   path without a successful exit is not a pass.
+
 4. Check GitHub check-run annotations:
 
    ```bash
