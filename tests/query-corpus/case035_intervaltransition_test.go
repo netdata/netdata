@@ -544,6 +544,25 @@ func TestCase035RateVolumeAcrossIntervalChange(t *testing.T) {
 	}
 }
 
+func TestCase035Tier0PageBoundaryKeepsEverySample(t *testing.T) {
+	const contract = "CASE-035/tier0-page-boundary-keeps-every-sample"
+	for _, item := range c035Cases {
+		item := item
+		t.Run(item.name, func(t *testing.T) {
+			trackContractComponent(t, contract, item.name)
+			state := c035Fixture(t, item.name, item.spec)
+			after, before, step := c035TransitionWindow(state.base, item.spec, tier1Gran)
+			if !c035QueryExact(t, c035QuerySpec{
+				context: state.context, host: state.host, dimension: c035RateDim,
+				tier: 0, after: after, before: before, step: step,
+				group: "sum", want: c035ExpectedVolume(state.samples, after, before, step),
+			}) {
+				t.Errorf("BROKEN %s (%s): %s", contract, item.name, manifest[contract].Proves)
+			}
+		})
+	}
+}
+
 func TestCase023AvailabilityAcrossIntervalChange(t *testing.T) {
 	const contract = "CASE-023/cadence-change-availability"
 	for _, item := range c035Cases {
