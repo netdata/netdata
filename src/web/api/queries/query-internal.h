@@ -20,6 +20,12 @@ typedef struct query_point {
 #endif
 } QUERY_POINT;
 
+typedef struct query_row_evidence {
+    uint32_t count;
+    uint32_t anomaly_count;
+    uint32_t gap_count;
+} QUERY_ROW_EVIDENCE;
+
 #ifdef NETDATA_INTERNAL_CHECKS
 #define QUERY_POINT_EMPTY (QUERY_POINT){ \
     .sp = STORAGE_POINT_UNSET, \
@@ -66,7 +72,7 @@ typedef struct query_engine_ops {
     // aggregating points over time
     size_t group_points_non_zero;
     size_t group_points_added;
-    STORAGE_POINT group_point;          // aggregates sample, anomaly, and gap evidence for each result row
+    QUERY_ROW_EVIDENCE group_point;     // aggregates sample, anomaly, and gap evidence for each result row
     STORAGE_POINT query_point;          // aggregates min, max, sum, count, anomaly count across the whole query
     RRDR_VALUE_FLAGS group_value_flags;
 
