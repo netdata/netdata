@@ -31,6 +31,8 @@ import (
 
 const (
 	c016ScanPhaseBudget = 10 * time.Second
+	// This is a sub-budget: retention must leave time for a fully reaped
+	// shutdown inside the whole-process phase budget above.
 	c016RetentionBudget = time.Second
 	c016MaxAttempts     = 5
 )

@@ -1708,6 +1708,9 @@ func l10GapTotalSlack(tier int, after, before int64) float64 {
 	if tier != 1 || (after%tier1Gran == 0 && before%tier1Gran == 0) {
 		return 0
 	}
+	// Both-cut test spans have equal edge offsets and a whole-record duration.
+	// The fixture repeats each record, so the two edge fragments complement
+	// each other and together carry at most one record of uncertainty.
 	return float64(l10GapCollected * l10GapValue)
 }
 

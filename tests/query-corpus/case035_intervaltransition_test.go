@@ -527,8 +527,11 @@ func TestCase035RateVolumeAcrossIntervalChange(t *testing.T) {
 					ok = false
 				}
 
-				// The same window on tier 0 independently proves the
-				// fixture-ledger interpretation at this row width.
+				// The dedicated page-boundary component below owns the tier1-width
+				// tier0 control. Keep the distinct tier2-width control here.
+				if target.tier != 2 {
+					continue
+				}
 				if !c035QueryExact(t, c035QuerySpec{
 					context: state.context, host: state.host, dimension: c035RateDim,
 					tier: 0, after: after, before: before, step: step,

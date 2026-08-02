@@ -310,10 +310,10 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"dense-ue1", "dense-ue10", "gapped-ue1", "partial-ue1", "hot-edge-data-independence", "near-live-partial-data"},
 	},
 	"CASE-035/transition-volume-slowing-down": {
-		Proves: "a metric slowing from update_every 1 to 10 preserves exact fixture-measured rate volume in the complete historical control row and the next row containing both cadences. Asserted at forced tiers 1 and 2 against a raw tier0 control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
+		Proves: "a metric slowing from update_every 1 to 10 preserves exact fixture-measured rate volume in the complete historical control row and the next row containing both cadences. Asserted at forced tiers 1 and 2. This contract keeps the tier2-width raw tier0 control; CASE-035/tier0-page-boundary-keeps-every-sample owns the identical tier1-width raw control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
 	},
 	"CASE-035/transition-volume-speeding-up": {
-		Proves: "the update_every 10 to 1 mirror preserves exact fixture-measured rate volume in the complete historical control row and the next row containing both cadences, at forced tiers 1 and 2 against a raw tier0 control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
+		Proves: "the update_every 10 to 1 mirror preserves exact fixture-measured rate volume in the complete historical control row and the next row containing both cadences, at forced tiers 1 and 2. This contract keeps the tier2-width raw tier0 control; CASE-035/tier0-page-boundary-keeps-every-sample owns the identical tier1-width raw control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
 	},
 	"CASE-035/tier0-page-boundary-keeps-every-sample": {
 		Proves:     "a DBENGINE tier-0 query crossing adjacent pages with different collection cadences returns every stored sample exactly once. The 10-to-1 direction pins the first ten fine-page samples so advancing by the old ten-second cadence cannot skip nine of them; the 1-to-10 mirror proves the fix does not duplicate or shift the first coarse-page sample. Exact SUM rows come from the fixture's per-sample rate-times-duration ledger, and the public timestamp grid is unchanged",

@@ -17,10 +17,10 @@ func TestC016PhaseBudgetGuards(t *testing.T) {
 		want      bool
 	}{
 		{name: "inside", monotonic: budget - time.Nanosecond, wall: budget - time.Nanosecond, want: true},
-		{name: "monotonic equal", monotonic: budget, wall: budget - time.Nanosecond},
-		{name: "wall equal", monotonic: budget - time.Nanosecond, wall: budget},
-		{name: "negative monotonic", monotonic: -time.Nanosecond, wall: time.Second},
-		{name: "negative wall", monotonic: time.Second, wall: -time.Nanosecond},
+		{name: "monotonic equal", monotonic: budget, wall: budget - time.Nanosecond, want: false},
+		{name: "wall equal", monotonic: budget - time.Nanosecond, wall: budget, want: false},
+		{name: "negative monotonic", monotonic: -time.Nanosecond, wall: time.Second, want: false},
+		{name: "negative wall", monotonic: time.Second, wall: -time.Nanosecond, want: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := c016DurationsWithinBudget(tc.monotonic, tc.wall, budget); got != tc.want {

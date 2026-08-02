@@ -227,7 +227,11 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = conn.Close() })
+	t.Cleanup(func() {
+		if conn != nil {
+			_ = conn.Close()
+		}
+	})
 
 	conn.DefineChart(stream.Chart{
 		ID: c4cContext, Title: "plan switching", Units: "units",
@@ -661,7 +665,9 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	t.Run("higher-tier-only-rate-volume", func(t *testing.T) {
 		trackContract(t, "CASE-038/higher-tier-only-rate-volume")
 
-		if err := conn.Close(); err != nil {
+		err := conn.Close()
+		conn = nil
+		if err != nil {
 			t.Fatalf("close replication connection before restart: %v", err)
 		}
 		if err := dd.Restart(); err != nil {

@@ -109,6 +109,7 @@ func TestDaemonRunRequiredFailsClosed(t *testing.T) {
 		"pure unanchored":       {run: "TestContractLedgerDeduplicatesAndKeepsFailuresSticky", want: true},
 		"allowlisted prefix":    {run: "^TestManifestDocumentAgainstDaemon$", want: true},
 		"pure C4D guard":        {run: "^TestC4DAlignedGridOracleGuardsOffByOne$", want: false},
+		"pure C023 cadence":     {run: "^TestC023ResolutionWindowRecordsUseFixtureCadence$", want: false},
 		"runtime exact":         {run: "^TestLayer0RoundTrip$", want: true},
 		"mixed alternation":     {run: "TestContractLedger|TestLayer0RoundTrip", want: true},
 		"broad regular expr":    {run: "Test.*", want: true},

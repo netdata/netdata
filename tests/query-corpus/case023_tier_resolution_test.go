@@ -135,14 +135,28 @@ func c023BucketIndex(ts, after, step int64, points int) int {
 }
 
 func c023WindowRecords(d fixture.Dimension, granularity int64) []fixture.TierPoint {
-	// The CASE-023 resolution fixture is collected at update_every=1.
-	windows := d.TierWindows(granularity, 1)
+	// The rollup's nominal source slots follow this fixture's 10-second cadence.
+	windows := d.TierWindows(granularity, c023ResolutionUE)
 	out := make([]fixture.TierPoint, 0, len(windows))
 	for _, w := range windows {
 		out = append(out, w)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].EndT < out[j].EndT })
 	return out
+}
+
+func TestC023ResolutionWindowRecordsUseFixtureCadence(t *testing.T) {
+	d := c023ResolutionDimension(c023ResolutionFixture(), "availability")
+	records := c023WindowRecords(d, c023ResolutionTier1)
+	if len(records) == 0 {
+		t.Fatal("CASE-023 resolution oracle produced no tier1 records")
+	}
+	for _, record := range records {
+		if got := record.Count + record.GapCount; got != int(tier1Gran) {
+			t.Fatalf("tier1 record ending %d models %d source slots, want %d at update_every=%d",
+				record.EndT, got, tier1Gran, c023ResolutionUE)
+		}
+	}
 }
 
 func c023Overlaps(w fixture.TierPoint, granularity, from, to int64) bool {
