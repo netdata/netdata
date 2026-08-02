@@ -204,10 +204,12 @@ func TestCase025AnomalyBitNotBlended(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// tier 1 rolls 60 samples into one stored window, so the step lands
-	// inside one window and the windows either side of it are pure 0 / 100
+	// tier 1 rolls 60 samples into one stored window. Query the first fully
+	// anomalous window so its predecessor is the final healthy window: HOLD
+	// returns 100/100/100, LINEAR returns 33/67/100, and TOTAL returns
+	// 33/33/33.
 	step := base + int64(samples/2)
-	after := step - step%60 + 60 // the first fully-anomalous stored window
+	after := step
 	before := after + 60
 
 	ok := true
