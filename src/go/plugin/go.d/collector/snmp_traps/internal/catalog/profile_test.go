@@ -573,6 +573,15 @@ func TestStockHydrationPublishesOnlyBundleDelta(t *testing.T) {
 	assert.Same(t, probe, idx.lookupLoaded(probe.OID), "publishing one bundle must not replace the complete epoch maps")
 }
 
+func TestAddTrapsRejectsNilDefinitionAtomically(t *testing.T) {
+	idx := NewEpoch()
+	valid := &TrapDef{OID: "1.3.6.1.4.1.99998.14", Name: "NIL-MIB::valid"}
+
+	err := idx.AddTraps([]*TrapDef{valid, nil})
+	require.ErrorContains(t, err, "trap definition at index 1 is nil")
+	assert.Nil(t, idx.Lookup(valid.OID))
+}
+
 func TestStockHydrationRejectsManifestRouteMismatch(t *testing.T) {
 	const actualOID = "1.3.6.1.4.1.99998.20"
 
@@ -1144,6 +1153,128 @@ func TestMetricRuleCannotReferenceChartFromAnotherProfile(t *testing.T) {
 		Output: MetricOutput{Metric: "snmp_trap_cross_chart_events", Dimension: "events", Chart: "other_chart"},
 	}}})
 	require.ErrorContains(t, err, `references unknown chart "other_chart"`)
+}
+
+func TestLoadProfileRejectsNonStringPredicateSelectors(t *testing.T) {
+	tests := map[string]struct {
+		predicate string
+		want      string
+	}{
+		"varbind": {
+			predicate: "        varbind: 42\n        field: category",
+			want:      "varbind must be a string",
+		},
+		"field": {
+			predicate: "        varbind: ifIndex\n        field: true",
+			want:      "field must be a string",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeProfileYAML(t, dir, "invalid.yaml", fmt.Sprintf(`
+metrics:
+  - name: site.invalid_selector
+    type: counter
+    where:
+      - equals: warning
+%s
+`, tc.predicate))
+
+			_, err := LoadProfileFile(filepath.Join(dir, "invalid.yaml"))
+			require.ErrorContains(t, err, tc.want)
+		})
+	}
+}
+
+func TestMetricPredicateRejectsMultipleSelectors(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "ambiguous.yaml", `
+metrics:
+  - name: site.ambiguous_selector
+    type: counter
+    where:
+      - field: category
+        varbind: ifIndex
+        equals: state_change
+`)
+	_, err := LoadProfileFile(filepath.Join(dir, "ambiguous.yaml"))
+	require.ErrorContains(t, err, "predicate requires exactly one of varbind or field")
+
+	idx := NewEpoch()
+	td := testIFMIBLinkDownTrapDef()
+	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
+	err = idx.AddMetricDefinitions([]MetricRule{{
+		Name:   "site.ambiguous_selector",
+		Type:   profileMetricTypeCounter,
+		OnTrap: td.OID,
+		Where: MetricPredicates{{
+			Field:   "category",
+			Varbind: "ifIndex",
+			Equals:  "state_change",
+		}},
+		Output: MetricOutput{Metric: "site_ambiguous_events", Dimension: "events", Chart: "site_ambiguous"},
+	}}, []MetricChart{{
+		ID:        "site_ambiguous",
+		Title:     "Ambiguous selector",
+		Context:   "snmp.trap.site.ambiguous",
+		Units:     "events/s",
+		Algorithm: "incremental",
+	}})
+	require.ErrorContains(t, err, "predicate requires exactly one of varbind or field")
+}
+
+func TestSeparateTrapStateRuleRejectsTransitionPredicates(t *testing.T) {
+	tests := map[string]string{
+		"set_when": `      set_when:
+        field: severity
+        equals: warning`,
+		"clear_when": `      clear_when:
+        field: severity
+        equals: notice`,
+	}
+
+	for name, statePredicate := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeProfileYAML(t, dir, "invalid.yaml", fmt.Sprintf(`
+traps:
+  - oid: 1.3.6.1.4.1.99998.15
+    name: STATE-MIB::problem
+    category: state_change
+    severity: warning
+  - oid: 1.3.6.1.4.1.99998.16
+    name: STATE-MIB::clear
+    category: state_change
+    severity: notice
+metrics:
+  - name: site.invalid_state
+    type: state
+    problem_trap: STATE-MIB::problem
+    clear_trap: STATE-MIB::clear
+    state:
+%s
+    output:
+      metric: site_invalid_state
+      dimension: state
+      chart: site_invalid_state
+charts:
+  - id: site_invalid_state
+    title: Invalid state
+    context: snmp.trap.site.invalid_state
+    units: state
+    algorithm: absolute
+`, statePredicate))
+
+			bundle, err := LoadProfileFile(filepath.Join(dir, "invalid.yaml"))
+			require.NoError(t, err)
+			idx := NewEpoch()
+			require.NoError(t, idx.AddTraps(bundle.Traps))
+			err = idx.AddMetricDefinitions(bundle.Metrics, bundle.Charts)
+			require.ErrorContains(t, err, "separate-OID state rule")
+		})
+	}
 }
 
 func TestDefinitionsReturnsOnlySelectedRulesAndCharts(t *testing.T) {

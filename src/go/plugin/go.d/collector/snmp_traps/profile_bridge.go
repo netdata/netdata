@@ -6,7 +6,6 @@ import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/i
 
 type VarbindDef = catalog.VarbindDef
 type TrapDef = catalog.TrapDef
-type ProfileDefinition = catalog.ProfileDefinition
 type ProfileIndex = catalog.Epoch
 
 const maxMessageLen = catalog.MaxMessageLen
@@ -17,9 +16,6 @@ func renderLabels(entry *TrapEntry, td *TrapDef) map[string]string {
 }
 func trapEntryHasUnresolvedTemplate(entry *TrapEntry) bool {
 	return catalog.EntryHasUnresolvedTemplate(entry)
-}
-func findVarbindDefForObservedOID(td *TrapDef, oid string) *VarbindDef {
-	return catalog.FindVarbindDefForObservedOID(td, oid)
 }
 func truncateUTF8(s string, maxBytes int) string { return catalog.TruncateUTF8(s, maxBytes) }
 func resolve2TierVarbind(oid string, raw VarbindValue, td *TrapDef) VarbindValue {

@@ -199,6 +199,9 @@ func validateProfileMetricRule(rule *profileMetricRule, idx *Epoch, charts map[s
 			if rule.ProblemTrap == "" || rule.ClearTrap == "" {
 				return fmt.Errorf("%s: separate-OID state rule %q requires problem_trap and clear_trap", rule.SourceFile, rule.Name)
 			}
+			if rule.State.SetWhen != nil || rule.State.ClearWhen != nil {
+				return fmt.Errorf("%s: separate-OID state rule %q cannot use state.set_when or state.clear_when", rule.SourceFile, rule.Name)
+			}
 			if _, err := resolveProfileMetricTrap(idx, rule.ProblemTrap); err != nil {
 				return fmt.Errorf("%s: state rule %q problem_trap: %w", rule.SourceFile, rule.Name, err)
 			}
@@ -341,6 +344,9 @@ func isProfileMetricSyntheticField(field string) bool {
 }
 
 func validateProfileMetricPredicate(pred profileMetricPredicate) error {
+	if err := validateMetricPredicateSelector(pred); err != nil {
+		return err
+	}
 	if pred.Not && (pred.Exists != nil || pred.Absent != nil) {
 		return fmt.Errorf("not cannot be combined with exists or absent")
 	}

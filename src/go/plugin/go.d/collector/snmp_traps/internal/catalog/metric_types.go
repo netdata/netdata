@@ -129,9 +129,17 @@ func normalizeMetricPredicateMap(m map[any]any) (MetricPredicate, error) {
 		}
 		switch key {
 		case "varbind":
-			pred.Varbind, _ = rawVal.(string)
+			value, ok := rawVal.(string)
+			if !ok {
+				return pred, fmt.Errorf("varbind must be a string")
+			}
+			pred.Varbind = value
 		case "field":
-			pred.Field, _ = rawVal.(string)
+			value, ok := rawVal.(string)
+			if !ok {
+				return pred, fmt.Errorf("field must be a string")
+			}
+			pred.Field = value
 		case "equals":
 			pred.Equals = rawVal
 		case "in":
@@ -172,10 +180,17 @@ func normalizeMetricPredicateMap(m map[any]any) (MetricPredicate, error) {
 			return pred, fmt.Errorf("unknown predicate key %q", key)
 		}
 	}
-	if pred.Varbind == "" && pred.Field == "" {
-		return pred, fmt.Errorf("predicate requires varbind or field")
+	if err := validateMetricPredicateSelector(pred); err != nil {
+		return pred, err
 	}
 	return pred, nil
+}
+
+func validateMetricPredicateSelector(pred MetricPredicate) error {
+	if (pred.Varbind == "") == (pred.Field == "") {
+		return fmt.Errorf("predicate requires exactly one of varbind or field")
+	}
+	return nil
 }
 
 // Source returns the profile file that defined the rule.

@@ -133,6 +133,8 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
       `absent`, `greater_than`, `less_than`, `range`, and `not`; never combine
       `not` with `exists` or `absent`, and never define a predicate without a
       condition operator.
+    - Every predicate MUST select exactly one string-valued source: `varbind`
+      or `field`. Use separate `where` entries for additional AND constraints.
     - `sample` rules may read only numeric varbind types documented in
       `profile-format.md`; `TimeTicks` is converted to seconds before `scale`.
       `Counter32`, `Counter64`, and `TimeTicks` are valid for sample rules,

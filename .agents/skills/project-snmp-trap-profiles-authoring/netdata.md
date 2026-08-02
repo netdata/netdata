@@ -564,8 +564,9 @@ rules are:
 - Profile metric rules are inert unless a listener job enables
   `profile_metrics`.
 - Supported rule types are `counter`, `sample`, and `state`.
-- Predicates use bounded trap fields or varbinds and support `equals`, `in`,
-  `exists`, `absent`, numeric comparisons, ranges, and `not`.
+- Predicates select exactly one string-valued trap `field` or `varbind` and
+  support `equals`, `in`, `exists`, `absent`, numeric comparisons, ranges, and
+  `not`.
 - Source identity is per device where possible: vnode host scope when
   enrichment finds an unambiguous vnode, otherwise bounded `source_id` /
   `source_kind` labels under the listener job.

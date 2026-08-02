@@ -279,6 +279,8 @@ Canonical rule fields:
 Predicate behavior:
 
 - Multiple `where` predicates are ANDed.
+- Each predicate must select exactly one string-valued source: `varbind` or `field`. Both, neither, and non-string
+  selectors are invalid; express additional constraints as separate `where` predicates.
 - Predicates may reference one of the synthetic fields `category`, `severity`, `trap_name`, or `trap_oid`.
 - Varbind predicates must reference varbinds declared on every trap the rule can process; typos fail profile validation
   instead of silently missing.

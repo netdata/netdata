@@ -99,7 +99,10 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 }
 
 func (idx *Epoch) addTraps(traps []*TrapDef) error {
-	for _, td := range traps {
+	for i, td := range traps {
+		if td == nil {
+			return fmt.Errorf("trap definition at index %d is nil", i)
+		}
 		if existing := idx.lookupLoaded(td.OID); existing != nil {
 			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.SourceFile, td.OID, existing.SourceFile)
 		}

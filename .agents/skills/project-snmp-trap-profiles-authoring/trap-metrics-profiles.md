@@ -1466,6 +1466,9 @@ Allowed predicate inputs:
 Predicate semantics:
 
 - Multiple predicates are ANDed.
+- Each predicate MUST select exactly one string-valued source: `varbind` or
+  `field`. Both, neither, and non-string selectors are invalid; use separate
+  predicates for additional AND constraints.
 - Each predicate must include at least one condition operator: `equals`, `in`,
   `exists`, `absent`, `greater_than`, `less_than`, or `range`.
 - A missing varbind in `where` makes the predicate false and the rule does not
