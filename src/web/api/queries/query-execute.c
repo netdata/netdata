@@ -84,6 +84,14 @@ static NETDATA_DOUBLE query_point_total_projection(
             &(point), (now) - (view_update_every), (now));                           \
 } while(0)
 
+#define query_merge_point_evidence(point, ops, sample_in_row) do {       \
+    bool _evidence_sample_in_row = (sample_in_row);                      \
+    if((point).tier != 0 || _evidence_sample_in_row)                     \
+        storage_point_merge_to((ops)->group_point, (point).sp);          \
+    if(!(point).added)                                                   \
+        storage_point_merge_to((ops)->query_point, (point).sp);          \
+} while(0)
+
 #define query_add_point_to_group(r, point, ops, add_flush, sample_in_row) do { \
     if(likely(netdata_double_isnumber((point).value))) {                \
         if(likely(fpclassify((point).value) != FP_ZERO))                \
@@ -96,11 +104,10 @@ static NETDATA_DOUBLE query_point_total_projection(
                                                                         \
         time_grouping_add(r, (point).value, add_flush);                  \
                                                                         \
-        if((point).tier != 0 || _sample_in_row)                          \
-            storage_point_merge_to((ops)->group_point, (point).sp);     \
-        if(!(point).added)                                              \
-            storage_point_merge_to((ops)->query_point, (point).sp);     \
+        query_merge_point_evidence(point, ops, _sample_in_row);         \
     }                                                                   \
+    else if(unlikely(storage_point_is_gap((point).sp)))                 \
+        query_merge_point_evidence(point, ops, sample_in_row);          \
                                                                         \
     (ops)->group_points_added++;                                        \
 } while(0)
@@ -317,7 +324,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 //                         new_point.id, new_point.start_time, new_point.end_time, now_start_time, now_end_time, after_wanted, before_wanted);
 //
                 // get the right value from the point we got
-                if(likely(!storage_point_is_unset(sp) && !storage_point_is_gap(sp))) {
+                if(likely(storage_point_has_value(sp))) {
 
                     if(unlikely(use_anomaly_bit_as_value))
                         new_point.value = storage_point_anomaly_rate(sp);
@@ -540,6 +547,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             // update the dimension options
             if(likely(ops->group_points_non_zero))
                 r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
+
+            if(unlikely(storage_point_is_partial(ops->group_point)))
+                ops->group_value_flags |= RRDR_VALUE_PARTIAL;
 
             // store the specific point options
             *rrdr_value_options_ptr = ops->group_value_flags;
