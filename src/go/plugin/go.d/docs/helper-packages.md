@@ -297,8 +297,8 @@ Why:
 
 Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated per-target profile files and loads them from
 stock plus user directories. By default a profile's identity is its YAML filename without the extension; collectors with
-compound encodings can supply their own filename-to-identity parser. Used by the `prometheus`, `azure_monitor`, and
-`cloudwatch` collectors.
+compound encodings can supply their own filename-to-identity parser. Used by the `prometheus`, `azure_monitor`,
+`cloudwatch`, and `snmp_traps` collectors.
 
 When:
 

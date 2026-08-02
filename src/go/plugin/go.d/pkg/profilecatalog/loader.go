@@ -28,9 +28,8 @@ import (
 )
 
 // DirSpec is one profile search directory. Stock directories are authoritative:
-// a missing stock directory and any invalid stock profile are fatal, while a
-// missing user directory is skipped and an invalid user profile is skipped with
-// a warning.
+// a missing stock directory and any invalid stock profile are fatal. Missing
+// user directories are skipped; other user errors follow Options.UserErrors.
 type DirSpec struct {
 	Path    string
 	IsStock bool
@@ -38,8 +37,8 @@ type DirSpec struct {
 
 // FileContext describes the profile file being decoded. IsStock lets a Decode
 // function treat stock and user profiles differently (for example, validate a
-// user profile eagerly so a broken one is skipped, while deferring stock
-// validation).
+// user profile eagerly under the selected user-error policy while deferring
+// stock validation).
 type FileContext struct {
 	BaseName string
 	Path     string
@@ -108,12 +107,13 @@ type stockRef struct {
 }
 
 // Load builds a Catalog from the given directories. A profile's identity is its
-// file basename. Files that are not `.yaml`/`.yml`, or whose basename starts
-// with `_`, are ignored. A user profile overrides a stock profile with the same
-// (normalized) key regardless of directory order. Duplicate user profiles are
-// skipped with a warning; duplicate stock profiles are fatal. Load never errors
-// on an empty result — the caller decides whether an empty catalog is
-// acceptable.
+// file basename. By default, files that are not `.yaml`/`.yml`, or whose
+// basename starts with `_`, are ignored; Options.ParseFileName can replace the
+// suffix policy. A user profile overrides a stock profile with the same
+// normalized key regardless of directory order. Duplicate and invalid user
+// profiles follow Options.UserErrors; duplicate and invalid stock profiles are
+// fatal. Load never errors on an empty result — the caller decides whether an
+// empty catalog is acceptable.
 func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 	if (opts.Decode == nil) == (opts.LoadFile == nil) {
 		return Catalog[P]{}, fmt.Errorf("profilecatalog: exactly one of Options.Decode or Options.LoadFile is required")

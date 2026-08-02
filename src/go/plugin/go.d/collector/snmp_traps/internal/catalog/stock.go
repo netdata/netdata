@@ -35,8 +35,11 @@ type stockProfileRoutes struct {
 }
 
 type profileHydration struct {
-	once sync.Once
-	err  error
+	parseOnce   sync.Once
+	publishOnce sync.Once
+	bundle      profileLoadBundle
+	parseErr    error
+	publishErr  error
 }
 
 func (s *stockProfileStore) empty() bool {
@@ -56,6 +59,7 @@ func buildStockProfileStore(
 	dir string,
 	extendsPaths multipath.MultiPath,
 	sources profilecatalog.Catalog[profileSource],
+	suppressedPaths map[string]bool,
 	idx *Epoch,
 ) (*stockProfileStore, error) {
 	catalogue, err := loadStockProfileCatalogue(dir)
@@ -91,12 +95,13 @@ func buildStockProfileStore(
 			return nil, fmt.Errorf("stock trap profile catalogue entry %q references missing profile %q", owner, entry.File)
 		}
 
-		// A user profile with the same extensionless identity replaces the stock
-		// profile completely, including its manifest routes.
-		if !sources.EffectiveIsStock(identity) {
+		source, _ := sources.Get(identity)
+		// A user profile with the same extensionless identity, or a top-level
+		// stock profile incorporated through an eager user extends chain, no
+		// longer owns independent lazy routes.
+		if !sources.EffectiveIsStock(identity) || suppressedPaths[canonicalProfilePath(source.path)] {
 			continue
 		}
-		source, _ := sources.Get(identity)
 		store.files[identity] = source.path
 		store.hydration[identity] = &profileHydration{}
 		routes := stockProfileRoutes{}
@@ -265,10 +270,26 @@ func (s *stockProfileStore) hydrate(idx *Epoch, name string) error {
 	if state == nil {
 		return fmt.Errorf("stock trap profile %q has no hydration state", name)
 	}
-	state.once.Do(func() {
+	state.publishOnce.Do(func() {
+		bundle, err := s.parse(name)
+		if err != nil {
+			state.publishErr = err
+			return
+		}
+		state.publishErr = idx.addBundleAtomic(bundle, name)
+	})
+	return state.publishErr
+}
+
+func (s *stockProfileStore) parse(name string) (profileLoadBundle, error) {
+	state := s.hydration[name]
+	if state == nil {
+		return profileLoadBundle{}, fmt.Errorf("stock trap profile %q has no hydration state", name)
+	}
+	state.parseOnce.Do(func() {
 		path := s.files[name]
 		if path == "" {
-			state.err = fmt.Errorf("stock trap profile %q has no file", name)
+			state.parseErr = fmt.Errorf("stock trap profile %q has no file", name)
 			return
 		}
 		loadBundle := s.loadBundle
@@ -277,18 +298,63 @@ func (s *stockProfileStore) hydrate(idx *Epoch, name string) error {
 		}
 		bundle, err := loadBundle(path, s.extendsPaths, nil)
 		if err != nil {
-			state.err = fmt.Errorf("failed to hydrate stock trap profile %q: %w", path, err)
+			state.parseErr = fmt.Errorf("failed to hydrate stock trap profile %q: %w", path, err)
 			return
 		}
 		if err := validateStockProfileRoutes(name, s.routes[name], bundle); err != nil {
-			state.err = err
+			state.parseErr = err
 			return
 		}
-		if err := idx.addBundleAtomic(bundle); err != nil {
-			state.err = err
-		}
+		state.bundle = bundle
 	})
-	return state.err
+	return state.bundle, state.parseErr
+}
+
+func (s *stockProfileStore) validationBundleForRules(current string, rules []profileMetricRule) (profileLoadBundle, error) {
+	needed := make(map[string]struct{})
+	for _, rule := range rules {
+		for _, ref := range []string{rule.OnTrap, rule.ProblemTrap, rule.ClearTrap} {
+			ref = strings.TrimSpace(ref)
+			if ref == "" {
+				continue
+			}
+			if model.IsNumericOID(ref) {
+				for _, oid := range []string{ref, model.AlternateTrapOID(ref)} {
+					if name := s.exactRoutes[oid]; name != "" && name != current {
+						needed[name] = struct{}{}
+						break
+					}
+				}
+				continue
+			}
+			mib, _, ok := strings.Cut(ref, "::")
+			if !ok || mib == "" {
+				continue
+			}
+			for _, name := range s.mibRoutes[mib] {
+				if name != current {
+					needed[name] = struct{}{}
+				}
+			}
+		}
+	}
+
+	names := make([]string, 0, len(needed))
+	for name := range needed {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	var combined profileLoadBundle
+	for _, name := range names {
+		bundle, err := s.parse(name)
+		if err != nil {
+			return profileLoadBundle{}, err
+		}
+		combined.traps = append(combined.traps, bundle.traps...)
+		combined.metrics = append(combined.metrics, bundle.metrics...)
+		combined.charts = append(combined.charts, bundle.charts...)
+	}
+	return combined, nil
 }
 
 func validateStockProfileRoutes(name string, expected stockProfileRoutes, bundle profileLoadBundle) error {

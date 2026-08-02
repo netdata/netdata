@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,54 +39,6 @@ const (
 	defaultProfileMetricExpireAfterCycles     = 60
 	defaultProfileMetricChartMaxInstances     = 2000
 )
-
-var (
-	profileMetricRuleNameRE      = regexp.MustCompile(`^[A-Za-z0-9_.:-]+::[A-Za-z0-9_.:-]+$|^[A-Za-z0-9_.:-]+$`)
-	profileMetricOutputNameRE    = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	profileMetricChartIDRE       = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	profileMetricResourceClassRE = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	profileMetricSiteClassRE     = regexp.MustCompile(`^site_[a-z0-9][a-z0-9_]*$`)
-)
-
-var stockProfileMetricResourceClasses = map[string]bool{
-	"interface":   true,
-	"peer":        true,
-	"neighbor":    true,
-	"sensor":      true,
-	"alarm":       true,
-	"pool":        true,
-	"l2_topology": true,
-	"component":   true,
-}
-
-var reservedProfileMetricPrefixes = []string{
-	"snmp_trap_events_",
-	"snmp_trap_severity_",
-	"snmp_trap_errors_",
-	"snmp_trap_dedup_",
-	"snmp_trap_pipeline_",
-	"snmp_trap_metric_",
-	"snmp_trap_profile_metrics_",
-}
-
-var builtInProfileMetricChartIDs = map[string]bool{
-	"events":                     true,
-	"severity":                   true,
-	"errors":                     true,
-	"dedup_suppressed":           true,
-	"pipeline":                   true,
-	"profile_metric_diagnostics": true,
-}
-
-var builtInProfileMetricChartContexts = map[string]bool{
-	"snmp.trap.events":                     true,
-	"snmp.trap.severity":                   true,
-	"snmp.trap.errors":                     true,
-	"snmp.trap.dedup_suppressed":           true,
-	"snmp.trap.pipeline":                   true,
-	"snmp.trap.profile_metric_diagnostics": true,
-	"profile_metric_diagnostics":           true,
-}
 
 type ProfileMetricsConfig struct {
 	Enabled bool     `yaml:"enabled,omitempty" json:"enabled"`

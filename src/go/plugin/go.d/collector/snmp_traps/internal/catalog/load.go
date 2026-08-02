@@ -17,6 +17,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
@@ -67,15 +68,23 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 		return nil, fmt.Errorf("load trap profile files: %w", err)
 	}
 
-	index := &Epoch{
-		trapsByOID:        make(map[string]*TrapDef),
-		namesByTrapName:   make(map[string]*TrapDef),
-		metricRulesByName: make(map[string]*profileMetricRule),
-		metricChartsByID:  make(map[string]*profileMetricChart),
+	index := NewEpoch()
+	suppressedPaths := make(map[string]bool)
+	for _, named := range sources.InOrder() {
+		source := named.Profile
+		if source.stock || source.bundle == nil {
+			continue
+		}
+		for _, path := range source.bundle.extendsFiles {
+			suppressedPaths[canonicalProfilePath(path)] = true
+		}
 	}
 	var userBundles []profileLoadBundle
 	for _, named := range sources.InOrder() {
 		source := named.Profile
+		if suppressedPaths[canonicalProfilePath(source.path)] {
+			continue
+		}
 		index.profiles = append(index.profiles, ProfileInfo{Name: named.Name, Path: source.path, IsStock: source.stock})
 		if source.stock {
 			continue
@@ -90,13 +99,13 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 	}
 	slices.SortFunc(index.profiles, func(a, b ProfileInfo) int { return strings.Compare(a.Name, b.Name) })
 
-	store, err := buildStockProfileStore(paths.StockDir, extendsPaths, sources, index)
+	store, err := buildStockProfileStore(paths.StockDir, extendsPaths, sources, suppressedPaths, index)
 	if err != nil {
 		return nil, err
 	}
 	index.stock = store
 	for _, bundle := range userBundles {
-		if err := index.addProfileMetrics(bundle.metrics, bundle.charts); err != nil {
+		if err := index.addBundleAtomic(profileLoadBundle{metrics: bundle.metrics, charts: bundle.charts}); err != nil {
 			return nil, err
 		}
 	}
@@ -107,37 +116,105 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 }
 
 func (idx *Epoch) addTraps(traps []*TrapDef) error {
+	for _, td := range traps {
+		if existing := idx.lookupLoaded(td.OID); existing != nil {
+			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.SourceFile, td.OID, existing.SourceFile)
+		}
+		if existing := idx.lookupTrapName(td.Name); existing != nil {
+			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.SourceFile, td.Name, existing.SourceFile)
+		}
+	}
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
 	return idx.addTrapsLocked(traps)
 }
 
-func (idx *Epoch) addBundleAtomic(bundle profileLoadBundle) error {
+func (idx *Epoch) addBundleAtomic(bundle profileLoadBundle, stockProfile ...string) error {
 	idx.publishMu.Lock()
 	defer idx.publishMu.Unlock()
 
-	idx.mu.RLock()
-	staged := &Epoch{
-		trapsByOID:        maps.Clone(idx.trapsByOID),
-		namesByTrapName:   maps.Clone(idx.namesByTrapName),
-		metricRulesByName: maps.Clone(idx.metricRulesByName),
-		metricChartsByID:  maps.Clone(idx.metricChartsByID),
+	staged := NewEpoch()
+	staged.base = idx
+	currentStockProfile := ""
+	if len(stockProfile) > 0 {
+		currentStockProfile = stockProfile[0]
 	}
-	idx.mu.RUnlock()
+	staged.validationStockProfile = currentStockProfile
+	if idx.stock != nil && len(bundle.metrics) > 0 {
+		dependencies, err := idx.stock.validationBundleForRules(currentStockProfile, bundle.metrics)
+		if err != nil {
+			return err
+		}
+		if err := staged.addValidationBundle(dependencies); err != nil {
+			return err
+		}
+	}
 
 	if err := staged.addTraps(bundle.traps); err != nil {
 		return err
 	}
-	if err := staged.addProfileMetrics(bundle.metrics, bundle.charts); err != nil {
+	if err := staged.addProfileMetrics(bundle.metrics, bundle.charts, false); err != nil {
 		return err
 	}
 
 	idx.mu.Lock()
-	idx.trapsByOID = staged.trapsByOID
-	idx.namesByTrapName = staged.namesByTrapName
-	idx.metricRulesByName = staged.metricRulesByName
-	idx.metricChartsByID = staged.metricChartsByID
+	maps.Copy(idx.trapsByOID, staged.trapsByOID)
+	maps.Copy(idx.namesByTrapName, staged.namesByTrapName)
+	maps.Copy(idx.metricRulesByName, staged.metricRulesByName)
+	maps.Copy(idx.metricRulesByOut, staged.metricRulesByOut)
+	maps.Copy(idx.metricChartsByID, staged.metricChartsByID)
 	idx.mu.Unlock()
+	return nil
+}
+
+func (idx *Epoch) addValidationBundle(bundle profileLoadBundle) error {
+	if idx.validationTrapsByOID == nil {
+		idx.validationTrapsByOID = make(map[string]*TrapDef)
+		idx.validationNamesByTrap = make(map[string]*TrapDef)
+		idx.validationRulesByName = make(map[string]*profileMetricRule)
+		idx.validationRulesByOut = make(map[string]*profileMetricRule)
+		idx.validationChartsByID = make(map[string]*profileMetricChart)
+	}
+	for _, td := range bundle.traps {
+		if existing := idx.lookupLoaded(td.OID); existing != nil {
+			if existing == td {
+				continue
+			}
+			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.SourceFile, td.OID, existing.SourceFile)
+		}
+		if existing := idx.lookupTrapName(td.Name); existing != nil {
+			if existing == td {
+				continue
+			}
+			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.SourceFile, td.Name, existing.SourceFile)
+		}
+		idx.validationTrapsByOID[td.OID] = td
+		idx.validationNamesByTrap[td.Name] = td
+	}
+	for i := range bundle.charts {
+		chart := &bundle.charts[i]
+		if existing := idx.lookupMetricChart(chart.ID); existing != nil {
+			if existing.SourceFile == chart.SourceFile {
+				continue
+			}
+			return fmt.Errorf("%s: duplicate metric chart %q (already defined in %s)", chart.SourceFile, chart.ID, existing.SourceFile)
+		}
+		idx.validationChartsByID[chart.ID] = chart
+	}
+	for i := range bundle.metrics {
+		rule := &bundle.metrics[i]
+		if existing := idx.lookupMetricRule(rule.Name); existing != nil {
+			if existing.SourceFile == rule.SourceFile {
+				continue
+			}
+			return fmt.Errorf("%s: duplicate metric rule %q (already defined in %s)", rule.SourceFile, rule.Name, existing.SourceFile)
+		}
+		if existing := idx.lookupMetricOutput(rule.Output.Metric); existing != nil && existing.Name != rule.Name {
+			return fmt.Errorf("%s: metric rule %q output.metric %q already used by rule %q in %s", rule.SourceFile, rule.Name, rule.Output.Metric, existing.Name, existing.SourceFile)
+		}
+		idx.validationRulesByName[rule.Name] = rule
+		idx.validationRulesByOut[rule.Output.Metric] = rule
+	}
 	return nil
 }
 
@@ -151,19 +228,25 @@ func (idx *Epoch) addTrapsLocked(traps []*TrapDef) error {
 	seenOIDs := make(map[string]string, len(traps))
 	seenNames := make(map[string]string, len(traps))
 	for _, td := range traps {
-		if existing, ok := idx.trapsByOID[td.OID]; ok {
+		if existing := idx.trapsByOID[td.OID]; existing != nil {
 			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.SourceFile, td.OID, existing.SourceFile)
+		}
+		if alt := model.AlternateTrapOID(td.OID); alt != td.OID {
+			if existing := idx.trapsByOID[alt]; existing != nil {
+				return fmt.Errorf("%s: duplicate trap OID %s (alternate form already defined in %s)", td.SourceFile, td.OID, existing.SourceFile)
+			}
 		}
 		if existing, ok := idx.namesByTrapName[td.Name]; ok {
 			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.SourceFile, td.Name, existing.SourceFile)
 		}
-		if existing := seenOIDs[td.OID]; existing != "" {
+		oidKey := trapOIDCollisionKey(td.OID)
+		if existing := seenOIDs[oidKey]; existing != "" {
 			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.SourceFile, td.OID, existing)
 		}
 		if existing := seenNames[td.Name]; existing != "" {
 			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.SourceFile, td.Name, existing)
 		}
-		seenOIDs[td.OID] = td.SourceFile
+		seenOIDs[oidKey] = td.SourceFile
 		seenNames[td.Name] = td.SourceFile
 	}
 	for _, td := range traps {
@@ -173,7 +256,15 @@ func (idx *Epoch) addTrapsLocked(traps []*TrapDef) error {
 	return nil
 }
 
-func (idx *Epoch) addProfileMetrics(rules []profileMetricRule, charts []profileMetricChart) error {
+func trapOIDCollisionKey(oid string) string {
+	alt := model.AlternateTrapOID(oid)
+	if alt != oid && alt < oid {
+		return alt
+	}
+	return oid
+}
+
+func (idx *Epoch) addProfileMetrics(rules []profileMetricRule, charts []profileMetricChart, includeExisting bool) error {
 	if len(rules) == 0 && len(charts) == 0 {
 		return nil
 	}
@@ -181,50 +272,65 @@ func (idx *Epoch) addProfileMetrics(rules []profileMetricRule, charts []profileM
 		return fmt.Errorf("profile index not available")
 	}
 
-	idx.mu.RLock()
-	knownCharts := make(map[string]*profileMetricChart, len(idx.metricChartsByID)+len(charts))
-	maps.Copy(knownCharts, idx.metricChartsByID)
-	knownRules := make(map[string]*profileMetricRule, len(idx.metricRulesByName)+len(rules))
-	maps.Copy(knownRules, idx.metricRulesByName)
-	idx.mu.RUnlock()
-	knownOutputMetrics := make(map[string]string, len(knownRules)+len(rules))
-	for name, rule := range knownRules {
-		if rule == nil || rule.Output.Metric == "" {
-			continue
-		}
-		knownOutputMetrics[rule.Output.Metric] = fmt.Sprintf("rule %q in %s", name, rule.SourceFile)
-	}
-
 	newCharts := make([]profileMetricChart, len(charts))
+	newChartsByID := make(map[string]*profileMetricChart, len(charts))
 	for i := range charts {
 		chart := charts[i]
 		if err := normalizeProfileMetricChart(&chart); err != nil {
 			return fmt.Errorf("%s: metric chart: %w", chart.SourceFile, err)
 		}
-		if existing := knownCharts[chart.ID]; existing != nil {
+		if existing := idx.lookupMetricChart(chart.ID); existing != nil {
+			return fmt.Errorf("%s: duplicate metric chart %q (already defined in %s)", chart.SourceFile, chart.ID, existing.SourceFile)
+		}
+		if existing := newChartsByID[chart.ID]; existing != nil {
 			return fmt.Errorf("%s: duplicate metric chart %q (already defined in %s)", chart.SourceFile, chart.ID, existing.SourceFile)
 		}
 		newCharts[i] = chart
-		knownCharts[chart.ID] = &newCharts[i]
+		newChartsByID[chart.ID] = &newCharts[i]
+	}
+	knownCharts := newChartsByID
+	if includeExisting {
+		idx.mu.RLock()
+		knownCharts = maps.Clone(idx.metricChartsByID)
+		idx.mu.RUnlock()
+		maps.Copy(knownCharts, newChartsByID)
 	}
 
 	newRules := make([]profileMetricRule, len(rules))
+	newRulesByName := make(map[string]*profileMetricRule, len(rules))
+	newRulesByOut := make(map[string]*profileMetricRule, len(rules))
 	for i := range rules {
 		rule := rules[i]
-		if existing := knownRules[rule.Name]; existing != nil {
+		if existing := idx.lookupMetricRule(rule.Name); existing != nil {
 			return fmt.Errorf("%s: duplicate metric rule %q (already defined in %s)", rule.SourceFile, rule.Name, existing.SourceFile)
+		}
+		if existing := newRulesByName[rule.Name]; existing != nil {
+			return fmt.Errorf("%s: duplicate metric rule %q (already defined in %s)", rule.SourceFile, rule.Name, existing.SourceFile)
+		}
+		if owner := idx.lazyStockMetricOwner(rule.Name); owner != "" {
+			return fmt.Errorf("%s: duplicate metric rule %q (also routed by stock profile %q)", rule.SourceFile, rule.Name, owner)
 		}
 		if err := validateProfileMetricRule(&rule, idx, knownCharts); err != nil {
 			return err
 		}
-		if existing := knownOutputMetrics[rule.Output.Metric]; existing != "" {
-			return fmt.Errorf("%s: metric rule %q output.metric %q already used by %s", rule.SourceFile, rule.Name, rule.Output.Metric, existing)
+		if existing := idx.lookupMetricOutput(rule.Output.Metric); existing != nil {
+			return fmt.Errorf("%s: metric rule %q output.metric %q already used by rule %q in %s", rule.SourceFile, rule.Name, rule.Output.Metric, existing.Name, existing.SourceFile)
+		}
+		if existing := newRulesByOut[rule.Output.Metric]; existing != nil {
+			return fmt.Errorf("%s: metric rule %q output.metric %q already used by rule %q in %s", rule.SourceFile, rule.Name, rule.Output.Metric, existing.Name, existing.SourceFile)
 		}
 		newRules[i] = rule
-		knownRules[rule.Name] = &newRules[i]
-		knownOutputMetrics[rule.Output.Metric] = fmt.Sprintf("rule %q in %s", rule.Name, rule.SourceFile)
+		newRulesByName[rule.Name] = &newRules[i]
+		newRulesByOut[rule.Output.Metric] = &newRules[i]
 	}
-	if err := validateProfileMetricChartRuleShapes(knownRules); err != nil {
+	rulesForShapeValidation := newRulesByName
+	if includeExisting {
+		idx.mu.RLock()
+		rulesForShapeValidation = maps.Clone(idx.metricRulesByName)
+		idx.mu.RUnlock()
+		maps.Copy(rulesForShapeValidation, newRulesByName)
+	}
+	if err := validateProfileMetricChartRuleShapes(rulesForShapeValidation); err != nil {
 		return err
 	}
 
@@ -232,6 +338,9 @@ func (idx *Epoch) addProfileMetrics(rules []profileMetricRule, charts []profileM
 	defer idx.mu.Unlock()
 	if idx.metricRulesByName == nil {
 		idx.metricRulesByName = make(map[string]*profileMetricRule, len(rules))
+	}
+	if idx.metricRulesByOut == nil {
+		idx.metricRulesByOut = make(map[string]*profileMetricRule, len(rules))
 	}
 	if idx.metricChartsByID == nil {
 		idx.metricChartsByID = make(map[string]*profileMetricChart, len(charts))
@@ -243,8 +352,27 @@ func (idx *Epoch) addProfileMetrics(rules []profileMetricRule, charts []profileM
 	for i := range newRules {
 		rule := newRules[i]
 		idx.metricRulesByName[rule.Name] = &newRules[i]
+		idx.metricRulesByOut[rule.Output.Metric] = &newRules[i]
 	}
 	return nil
+}
+
+func (idx *Epoch) lazyStockMetricOwner(name string) string {
+	if idx == nil {
+		return ""
+	}
+	current := idx.validationStockProfile
+	for currentEpoch := idx; currentEpoch != nil; currentEpoch = currentEpoch.base {
+		if currentEpoch.stock == nil {
+			continue
+		}
+		owner := currentEpoch.stock.metricRoutes[name]
+		if owner == current {
+			return ""
+		}
+		return owner
+	}
+	return ""
 }
 
 func validateProfileMetricChartRuleShapes(rules map[string]*profileMetricRule) error {
@@ -289,10 +417,11 @@ func validateProfileMetricChartRuleShapes(rules map[string]*profileMetricRule) e
 }
 
 type profileLoadBundle struct {
-	traps    []*TrapDef
-	varbinds map[string]VarbindDef
-	metrics  []profileMetricRule
-	charts   []profileMetricChart
+	traps        []*TrapDef
+	varbinds     map[string]VarbindDef
+	metrics      []profileMetricRule
+	charts       []profileMetricChart
+	extendsFiles []string
 }
 
 // Bundle is one fully resolved and statically validated profile file. It is a
@@ -342,6 +471,7 @@ func loadProfileBundle(filename string, extendsPaths multipath.MultiPath, stack 
 	var allTraps []*TrapDef
 	var allMetrics []profileMetricRule
 	var allCharts []profileMetricChart
+	var extendsFiles []string
 	fileVarbinds := cloneVarbindMap(def.Varbinds)
 	currentVarbinds := make(map[string]bool, len(def.Varbinds))
 	for name := range def.Varbinds {
@@ -400,6 +530,8 @@ func loadProfileBundle(filename string, extendsPaths multipath.MultiPath, stack 
 			if err != nil {
 				return profileLoadBundle{}, err
 			}
+			extendsFiles = append(extendsFiles, canonicalProfilePath(extPath))
+			extendsFiles = append(extendsFiles, base.extendsFiles...)
 			for _, bt := range base.traps {
 				baseByOID[bt.OID] = bt
 				if currentTrapOIDs[bt.OID] {
@@ -455,12 +587,23 @@ func loadProfileBundle(filename string, extendsPaths multipath.MultiPath, stack 
 		mergeProfileMetricCharts(&allCharts, allChartPos, []profileMetricChart{*chart}, nil)
 	}
 
+	slices.Sort(extendsFiles)
+	extendsFiles = slices.Compact(extendsFiles)
 	return profileLoadBundle{
-		traps:    allTraps,
-		varbinds: fileVarbinds,
-		metrics:  allMetrics,
-		charts:   allCharts,
+		traps:        allTraps,
+		varbinds:     fileVarbinds,
+		metrics:      allMetrics,
+		charts:       allCharts,
+		extendsFiles: extendsFiles,
 	}, nil
+}
+
+func canonicalProfilePath(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.Clean(path)
+	}
+	return filepath.Clean(abs)
 }
 
 func readProfileFile(filename string) ([]byte, error) {

@@ -228,6 +228,27 @@ traps:
 	}
 }
 
+func TestProfileLoadRejectsAlternateOIDDuplicatesAcrossUserProfiles(t *testing.T) {
+	userDir := t.TempDir()
+	writeProfileYAML(t, userDir, "first.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.0.10
+    name: USER-MIB::first
+    category: diagnostic
+    severity: info
+`)
+	writeProfileYAML(t, userDir, "second.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.10
+    name: USER-MIB::second
+    category: diagnostic
+    severity: info
+`)
+
+	_, err := NewManager(Paths{UserDirs: []string{userDir}, StockDir: writeTestStockCatalog(t)}).Acquire()
+	require.ErrorContains(t, err, "duplicate trap OID")
+}
+
 func TestProfileLoadIgnoresGzipProfiles(t *testing.T) {
 	userDir := t.TempDir()
 	writeGzipFile(t, userDir, "ignored.yaml.gz", `
@@ -322,6 +343,21 @@ traps:
 	require.Error(t, err)
 	assert.Nil(t, idx.lookupLoaded("1.3.6.1.4.1.99998.3"))
 	assert.Nil(t, idx.lookupLoaded("1.3.6.1.4.1.99998.4"))
+}
+
+func TestStockHydrationPublishesOnlyBundleDelta(t *testing.T) {
+	idx := NewEpoch()
+	first := &TrapDef{OID: "1.3.6.1.4.1.99998.11", Name: "DELTA-MIB::first"}
+	require.NoError(t, idx.AddTraps([]*TrapDef{first}))
+	original := idx.trapsByOID
+
+	second := &TrapDef{OID: "1.3.6.1.4.1.99998.12", Name: "DELTA-MIB::second"}
+	require.NoError(t, idx.addBundleAtomic(profileLoadBundle{traps: []*TrapDef{second}}))
+
+	probe := &TrapDef{OID: "1.3.6.1.4.1.99998.13", Name: "DELTA-MIB::probe"}
+	original[probe.OID] = probe
+	t.Cleanup(func() { delete(original, probe.OID) })
+	assert.Same(t, probe, idx.lookupLoaded(probe.OID), "publishing one bundle must not replace the complete epoch maps")
 }
 
 func TestStockHydrationRejectsManifestRouteMismatch(t *testing.T) {
@@ -429,6 +465,93 @@ traps:
 	require.NoError(t, err)
 	require.NotNil(t, td)
 	assert.Equal(t, "1.3.6.1.4.1.99998.23", td.OID)
+}
+
+func TestResolveTrapRejectsLoadedNameThatConflictsWithLazyStockCandidate(t *testing.T) {
+	stockDir := filepath.Join(t.TempDir(), "default")
+	userDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, userDir, "site.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.24
+    name: SHARED-MIB::same
+    category: diagnostic
+    severity: info
+`)
+	writeProfileYAML(t, stockDir, "vendor.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.25
+    name: SHARED-MIB::same
+    category: diagnostic
+    severity: warning
+`)
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"vendor": {
+			File:     "vendor.yaml",
+			MIBs:     []string{"SHARED-MIB"},
+			TrapOIDs: []string{"1.3.6.1.4.1.99998.25"},
+		},
+	}, false)
+
+	lease, err := NewManager(Paths{UserDirs: []string{userDir}, StockDir: stockDir}).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	_, err = lease.Epoch().ResolveTrap("SHARED-MIB::same")
+	require.ErrorContains(t, err, "duplicate trap name")
+}
+
+func TestStockMetricCanReferenceTrapInAnotherLazyStockProfile(t *testing.T) {
+	for _, prehydrate := range []bool{false, true} {
+		t.Run(fmt.Sprintf("prehydrated_%v", prehydrate), func(t *testing.T) {
+			stockDir := filepath.Join(t.TempDir(), "default")
+			require.NoError(t, os.MkdirAll(stockDir, 0o755))
+			writeProfileYAML(t, stockDir, "target.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.26
+    name: TARGET-MIB::target
+    category: diagnostic
+    severity: info
+`)
+			writeProfileYAML(t, stockDir, "metric.yaml", `
+charts:
+  - id: cross_file
+    title: Cross-file metric
+    context: snmp.trap.cross_file
+    units: events/s
+    algorithm: incremental
+metrics:
+  - name: stock.cross_file
+    type: counter
+    on_trap: TARGET-MIB::target
+    output:
+      metric: snmp_trap_cross_file_events
+      dimension: events
+      chart: cross_file
+`)
+			writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+				"metric": {
+					File:            "metric.yaml",
+					MetricRuleNames: []string{"stock.cross_file"},
+				},
+				"target": {
+					File:     "target.yaml",
+					MIBs:     []string{"TARGET-MIB"},
+					TrapOIDs: []string{"1.3.6.1.4.1.99998.26"},
+				},
+			}, false)
+
+			lease, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+			require.NoError(t, err)
+			t.Cleanup(lease.Close)
+			if prehydrate {
+				_, err = lease.Epoch().LookupWithError("1.3.6.1.4.1.99998.26")
+				require.NoError(t, err)
+			}
+			defs, err := lease.Epoch().Definitions([]string{"stock.cross_file"})
+			require.NoError(t, err)
+			assert.NotNil(t, defs.RulesByName["stock.cross_file"])
+		})
+	}
 }
 
 func TestStockHydrationCoalescesPerFileWithoutBlockingOtherFiles(t *testing.T) {
@@ -602,6 +725,115 @@ traps:
 	assert.Nil(t, idx.Lookup("1.3.6.1.4.1.99998.6"))
 	require.NotNil(t, idx.Lookup("1.3.6.1.4.1.99998.7"))
 	require.Equal(t, []ProfileInfo{{Name: "vendor", Path: filepath.Join(userDir, "vendor.yaml"), IsStock: false}}, idx.Profiles())
+}
+
+func TestUserProfileCanExtendTopLevelStockProfile(t *testing.T) {
+	stockDir := filepath.Join(t.TempDir(), "default")
+	userDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "vendor.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.27
+    name: VENDOR-MIB::base
+    category: diagnostic
+    severity: info
+`)
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"vendor": {
+			File:     "vendor.yaml",
+			MIBs:     []string{"VENDOR-MIB"},
+			TrapOIDs: []string{"1.3.6.1.4.1.99998.27"},
+		},
+	}, false)
+	writeProfileYAML(t, userDir, "site.yaml", `
+extends: [vendor.yaml]
+traps:
+  - oid: 1.3.6.1.4.1.99998.27
+    severity: warning
+`)
+
+	lease, err := NewManager(Paths{UserDirs: []string{userDir}, StockDir: stockDir}).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	td := lease.Epoch().Lookup("1.3.6.1.4.1.99998.27")
+	require.NotNil(t, td)
+	assert.Equal(t, "warning", td.Severity)
+	assert.Equal(t, []ProfileInfo{{Name: "site", Path: filepath.Join(userDir, "site.yaml"), IsStock: false}}, lease.Epoch().Profiles())
+}
+
+func TestUserMetricCollisionWithReferencedStockProfileIsRejected(t *testing.T) {
+	stockDir := filepath.Join(t.TempDir(), "default")
+	userDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "vendor.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.28
+    name: VENDOR-MIB::event
+    category: diagnostic
+    severity: info
+charts:
+  - id: stock_chart
+    title: Stock chart
+    context: snmp.trap.stock_chart
+    units: events/s
+    algorithm: incremental
+metrics:
+  - name: shared.rule
+    type: counter
+    on_trap: VENDOR-MIB::event
+    output:
+      metric: snmp_trap_stock_events
+      dimension: events
+      chart: stock_chart
+`)
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"vendor": {
+			File:            "vendor.yaml",
+			MIBs:            []string{"VENDOR-MIB"},
+			MetricRuleNames: []string{"shared.rule"},
+			TrapOIDs:        []string{"1.3.6.1.4.1.99998.28"},
+		},
+	}, false)
+	writeProfileYAML(t, userDir, "site.yaml", `
+charts:
+  - id: site_chart
+    title: Site chart
+    context: snmp.trap.site_chart
+    units: events/s
+    algorithm: incremental
+metrics:
+  - name: shared.rule
+    type: counter
+    on_trap: VENDOR-MIB::event
+    output:
+      metric: snmp_trap_site_events
+      dimension: events
+      chart: site_chart
+`)
+
+	_, err := NewManager(Paths{UserDirs: []string{userDir}, StockDir: stockDir}).Acquire()
+	require.ErrorContains(t, err, `duplicate metric rule "shared.rule"`)
+}
+
+func TestMetricRuleCannotReferenceChartFromAnotherProfile(t *testing.T) {
+	idx := NewEpoch()
+	td := testIFMIBLinkDownTrapDef()
+	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
+	require.NoError(t, idx.addBundleAtomic(profileLoadBundle{charts: []profileMetricChart{{
+		ID:        "other_chart",
+		Title:     "Other chart",
+		Context:   "snmp.trap.other_chart",
+		Units:     "events/s",
+		Algorithm: "incremental",
+	}}}))
+
+	err := idx.addBundleAtomic(profileLoadBundle{metrics: []profileMetricRule{{
+		Name:   "site.cross_chart",
+		Type:   profileMetricTypeCounter,
+		OnTrap: td.OID,
+		Output: MetricOutput{Metric: "snmp_trap_cross_chart_events", Dimension: "events", Chart: "other_chart"},
+	}}})
+	require.ErrorContains(t, err, `references unknown chart "other_chart"`)
 }
 
 func TestReadProfileFileRejectsOversizedDecompressedProfile(t *testing.T) {

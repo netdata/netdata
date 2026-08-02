@@ -211,9 +211,21 @@ type Epoch struct {
 	trapsByOID        map[string]*TrapDef
 	namesByTrapName   map[string]*TrapDef
 	metricRulesByName map[string]*profileMetricRule
+	metricRulesByOut  map[string]*profileMetricRule
 	metricChartsByID  map[string]*profileMetricChart
 	stock             *stockProfileStore
 	profiles          []ProfileInfo
+
+	// Validation overlays exist only on a staged epoch. They let one bundle
+	// validate against already-published definitions and parsed lazy
+	// dependencies without cloning or publishing either set.
+	base                   *Epoch
+	validationTrapsByOID   map[string]*TrapDef
+	validationNamesByTrap  map[string]*TrapDef
+	validationRulesByName  map[string]*profileMetricRule
+	validationRulesByOut   map[string]*profileMetricRule
+	validationChartsByID   map[string]*profileMetricChart
+	validationStockProfile string
 }
 
 // NewEpoch returns an empty epoch for callers that assemble static profile
@@ -223,6 +235,7 @@ func NewEpoch() *Epoch {
 		trapsByOID:        make(map[string]*TrapDef),
 		namesByTrapName:   make(map[string]*TrapDef),
 		metricRulesByName: make(map[string]*profileMetricRule),
+		metricRulesByOut:  make(map[string]*profileMetricRule),
 		metricChartsByID:  make(map[string]*profileMetricChart),
 	}
 }
@@ -230,10 +243,11 @@ func NewEpoch() *Epoch {
 // AddTraps validates and adds static trap definitions to an unpublished epoch.
 func (idx *Epoch) AddTraps(traps []*TrapDef) error { return idx.addTraps(traps) }
 
-// AddMetricDefinitions validates and adds static metric definitions to an
-// unpublished epoch.
+// AddMetricDefinitions validates and adds manually assembled static metric
+// definitions to an unpublished epoch. Definitions accumulated by earlier
+// calls are one logical bundle for this temporary compatibility API.
 func (idx *Epoch) AddMetricDefinitions(rules []MetricRule, charts []MetricChart) error {
-	return idx.addProfileMetrics(rules, charts)
+	return idx.addProfileMetrics(rules, charts, true)
 }
 
 // PrepareTrap compiles one manually assembled trap definition.
@@ -290,16 +304,93 @@ func (idx *Epoch) LookupWithError(oid string) (*TrapDef, error) {
 }
 
 func (idx *Epoch) lookupLoaded(oid string) *TrapDef {
-	idx.mu.RLock()
-	defer idx.mu.RUnlock()
-
-	if td := idx.trapsByOID[oid]; td != nil {
+	if td := idx.lookupExactOID(oid); td != nil {
 		return td
 	}
 	if alt := model.AlternateTrapOID(oid); alt != oid {
-		return idx.trapsByOID[alt]
+		return idx.lookupExactOID(alt)
 	}
 	return nil
+}
+
+func (idx *Epoch) lookupExactOID(oid string) *TrapDef {
+	if idx == nil {
+		return nil
+	}
+	idx.mu.RLock()
+	td := idx.trapsByOID[oid]
+	idx.mu.RUnlock()
+	if td != nil {
+		return td
+	}
+	if td = idx.validationTrapsByOID[oid]; td != nil {
+		return td
+	}
+	return idx.base.lookupExactOID(oid)
+}
+
+func (idx *Epoch) lookupTrapName(name string) *TrapDef {
+	if idx == nil {
+		return nil
+	}
+	idx.mu.RLock()
+	td := idx.namesByTrapName[name]
+	idx.mu.RUnlock()
+	if td != nil {
+		return td
+	}
+	if td = idx.validationNamesByTrap[name]; td != nil {
+		return td
+	}
+	return idx.base.lookupTrapName(name)
+}
+
+func (idx *Epoch) lookupMetricRule(name string) *profileMetricRule {
+	if idx == nil {
+		return nil
+	}
+	idx.mu.RLock()
+	rule := idx.metricRulesByName[name]
+	idx.mu.RUnlock()
+	if rule != nil {
+		return rule
+	}
+	if rule = idx.validationRulesByName[name]; rule != nil {
+		return rule
+	}
+	return idx.base.lookupMetricRule(name)
+}
+
+func (idx *Epoch) lookupMetricOutput(name string) *profileMetricRule {
+	if idx == nil {
+		return nil
+	}
+	idx.mu.RLock()
+	rule := idx.metricRulesByOut[name]
+	idx.mu.RUnlock()
+	if rule != nil {
+		return rule
+	}
+	if rule = idx.validationRulesByOut[name]; rule != nil {
+		return rule
+	}
+	return idx.base.lookupMetricOutput(name)
+}
+
+func (idx *Epoch) lookupMetricChart(id string) *profileMetricChart {
+	if idx == nil {
+		return nil
+	}
+	idx.mu.RLock()
+	chart := idx.metricChartsByID[id]
+	idx.mu.RUnlock()
+	if chart != nil {
+		return chart
+	}
+	if chart = idx.validationChartsByID[id]; chart != nil {
+		return chart
+	}
+	return idx.base.lookupMetricChart(id)
 }
 
 // MetricDefinitions is an immutable snapshot of static metric rules and charts.

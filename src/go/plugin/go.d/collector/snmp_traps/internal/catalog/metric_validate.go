@@ -269,21 +269,13 @@ func resolveProfileMetricTrap(idx *Epoch, ref string) (*TrapDef, error) {
 		}
 		return td, nil
 	}
-	idx.mu.RLock()
-	if td := idx.namesByTrapName[ref]; td != nil {
-		idx.mu.RUnlock()
-		return td, nil
-	}
-	idx.mu.RUnlock()
 	if idx.stock != nil {
 		if err := idx.stock.loadForTrapName(idx, ref); err != nil {
 			return nil, err
 		}
-		idx.mu.RLock()
-		defer idx.mu.RUnlock()
-		if td := idx.namesByTrapName[ref]; td != nil {
-			return td, nil
-		}
+	}
+	if td := idx.lookupTrapName(ref); td != nil {
+		return td, nil
 	}
 	return nil, fmt.Errorf("trap name %q not found", ref)
 }

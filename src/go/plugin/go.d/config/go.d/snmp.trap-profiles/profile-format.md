@@ -192,10 +192,10 @@ enables them with `profile_metrics`.
 Metric rules are merged through `extends:` by rule `name`; a child profile can replace or disable an inherited rule by
 using the same name. Chart definitions are merged by chart `id`.
 
-Custom profile files under `/etc/netdata/go.d/snmp.trap-profiles/` are loaded eagerly. Stock trap profiles remain lazy
-when the loaded profile set has no metric rules and no listener enables `profile_metrics`. When custom profile metric
-rules exist, or when a listener enables `profile_metrics`, stock profiles are loaded before rule selection so custom
-rules can validate references to stock trap names before the first matching trap.
+Custom profile files under `/etc/netdata/go.d/snmp.trap-profiles/` are loaded eagerly. Stock trap profiles remain lazy:
+the stock catalogue routes a received trap OID or selected metric rule to its owning profile file. When a custom metric
+rule references a stock trap, initialization parses only the stock profile candidates for that numeric OID or
+MIB-qualified trap name so the reference can be validated. Unrelated stock profile files remain unparsed.
 
 Enable profile metrics in the listener job, not in the profile file:
 
@@ -441,8 +441,8 @@ tools can emit either form for the same trap family.
 
 The plugin matches trap profile entries exact-first. If exact lookup misses, it tries one alternate trap OID by adding
 or removing a single `.0.` immediately before the final OID arc. For example, a received `1.3.6.1.4.1.14179.2.6.3.0.24`
-can match a profile `oid:` of `1.3.6.1.4.1.14179.2.6.3.24`, and the reverse is also true. If both forms are present as
-separate profile entries, the exact match wins.
+can match a profile `oid:` of `1.3.6.1.4.1.14179.2.6.3.24`, and the reverse is also true. These spellings are one logical
+trap identity: defining both forms anywhere in the effective profile set is a profile validation error.
 
 This tolerance applies only to trap OID lookup.
 
