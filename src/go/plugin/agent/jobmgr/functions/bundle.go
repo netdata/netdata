@@ -194,10 +194,7 @@ func (fb *functionBundle) invoke(
 		},
 		Target:        target,
 		OnContainment: callback.quarantineIfActive,
-		Work: func(
-			attemptCtx context.Context,
-			_ jobmgr.ProcessAttemptAdmission,
-		) error {
+		Work: func(attemptCtx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
 			defer callback.complete()
 			callCtx, cancel := context.WithCancelCause(attemptCtx)
 			stop := context.AfterFunc(ctx, func() {
@@ -231,7 +228,7 @@ func (fb *functionBundle) invoke(
 	return response.result, response.err
 }
 
-func (fc *functionCallback) quarantineIfActive() {
+func (fc *functionCallback) quarantineIfActive(error) {
 	if fc == nil || fc.bundle == nil {
 		return
 	}

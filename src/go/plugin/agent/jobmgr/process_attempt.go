@@ -155,10 +155,11 @@ type ProcessAttemptPlan struct {
 	Target   uint64
 	Work     func(context.Context, ProcessAttemptAdmission) error
 
-	// OnContainment is a synchronous pre-settlement fence. It MUST be
-	// non-blocking and MUST NOT re-enter the attempt authority.
-	// Panics are recovered and reported through ErrProcessAttemptFencePanic.
-	OnContainment func()
+	// OnContainment receives the raw cut cause under the attempt-authority lock.
+	// It MUST perform only bounded in-memory work and MUST NOT re-enter the
+	// authority or wait for a worker, I/O, or external cleanup. Panics are
+	// recovered and reported through ErrProcessAttemptFencePanic.
+	OnContainment func(error)
 }
 
 // ProcessAttemptAdmission is the only attempt control available to its worker.

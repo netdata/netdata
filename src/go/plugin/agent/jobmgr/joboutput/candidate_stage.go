@@ -60,6 +60,7 @@ type stagedJobOwner struct {
 	installing      bool
 	decided         bool
 	attached        bool
+	startRequested  bool
 	started         bool
 	retiring        bool
 	retirementCause error
@@ -283,11 +284,18 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 		return cause
 	}
 	sjo.ownership = stagedJobPromotionActive
+	attempts := sjo.attempts
+	candidateCtx := sjo.candidateCtx
+	runtimeIdentity := sjo.runtimeIdentity
+	target := sjo.target
+	sjo.mu.Unlock()
+
 	start := func() (jobmgr.ProcessAttempt, <-chan error, error) {
 		admitted := make(chan error, 1)
-		attempt, err := sjo.attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
-			Identity: sjo.runtimeIdentity,
-			Target:   sjo.target,
+		attempt, err := attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
+			Identity:      runtimeIdentity,
+			Target:        target,
+			OnContainment: sjo.containRuntimeAttempt,
 			Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
 				admitErr := admission.Admit()
 				admitted <- admitErr
@@ -307,47 +315,65 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 		// Resource apply deliberately excludes task cancellation so it cannot
 		// abandon an atomic graph transition. Until a successor exists, the
 		// candidate attempt is the process-owned stop signal for supersession.
-		err = sjo.attempts.SupersedeProcessAttempt(sjo.candidateCtx, sjo.runtimeIdentity)
+		err = attempts.SupersedeProcessAttempt(candidateCtx, runtimeIdentity)
 		if err == nil {
 			_, admitted, err = start()
 		}
 	}
 	if err != nil {
-		resources, ownership, rejected, err := sjo.failPromotionLocked(err)
-		sjo.mu.Unlock()
-		if rejected {
-			sjo.finishRejection(resources, ownership)
-		}
-		return err
+		return sjo.failPromotion(err)
 	}
 	if err := <-admitted; err != nil {
-		resources, ownership, rejected, err := sjo.failPromotionLocked(err)
-		sjo.mu.Unlock()
-		if rejected {
-			sjo.finishRejection(resources, ownership)
-		}
-		return err
+		return sjo.failPromotion(err)
+	}
+
+	sjo.mu.Lock()
+	var structuralErr error
+	if sjo.ownership != stagedJobPromotionActive {
+		structuralErr = errors.New("job output: invalid staged job promotion settlement")
 	}
 	sjo.ownership = stagedJobOwnedByRuntime
 	sjo.candidateCtx = nil
 	sjo.transferOnce.Do(func() {
 		close(sjo.transferred)
 	})
+	var retirementErr error
+	if sjo.retiring {
+		retirementErr = sjo.retirementErrorLocked("job output: staged job retired during promotion")
+	}
 	sjo.mu.Unlock()
-	return nil
+	return errors.Join(structuralErr, retirementErr)
 }
 
-func (sjo *stagedJobOwner) failPromotionLocked(
-	promotionErr error,
-) (ConstructedJob, stagedJobOwnership, bool, error) {
+func (sjo *stagedJobOwner) failPromotion(promotionErr error) error {
+	sjo.mu.Lock()
+	if sjo.ownership != stagedJobPromotionActive {
+		sjo.mu.Unlock()
+		return errors.Join(
+			promotionErr,
+			errors.New("job output: invalid failed staged job promotion settlement"),
+		)
+	}
 	sjo.ownership = stagedJobOwnedByCandidate
-	// The candidate cut may have waited behind the promotion lock. Its context
-	// records the winning cause independently of that lock.
+	if sjo.retiring {
+		cause := sjo.retirementErrorLocked("job output: staged job retired during promotion")
+		resources, ownership, rejected := sjo.rejectLocked(cause, true)
+		sjo.mu.Unlock()
+		if rejected {
+			sjo.finishRejection(resources, ownership)
+		}
+		return errors.Join(promotionErr, cause)
+	}
 	if cause := context.Cause(sjo.candidateCtx); cause != nil {
 		resources, ownership, rejected := sjo.rejectLocked(cause, true)
-		return resources, ownership, rejected, cause
+		sjo.mu.Unlock()
+		if rejected {
+			sjo.finishRejection(resources, ownership)
+		}
+		return cause
 	}
-	return ConstructedJob{}, 0, false, promotionErr
+	sjo.mu.Unlock()
+	return promotionErr
 }
 
 func (sjo *stagedJobOwner) ReserveInstallation() error {
@@ -384,6 +410,23 @@ func (sjo *stagedJobOwner) Start(ctx context.Context) error {
 	if sjo == nil || ctx == nil {
 		return errors.New("job output: invalid process-owned job start")
 	}
+	sjo.mu.Lock()
+	if sjo.retiring {
+		err := sjo.retirementErrorLocked("job output: process-owned job is retiring")
+		sjo.mu.Unlock()
+		return err
+	}
+	if sjo.ownership != stagedJobOwnedByRuntime ||
+		!sjo.attached ||
+		sjo.startRequested ||
+		sjo.started ||
+		sjo.decided ||
+		sjo.finalized {
+		sjo.mu.Unlock()
+		return errors.New("job output: invalid process-owned job start")
+	}
+	sjo.startRequested = true
+	sjo.mu.Unlock()
 	result := make(chan error, 1)
 	request := stagedJobStartRequest{
 		ctx:    ctx,
@@ -435,17 +478,32 @@ func (sjo *stagedJobOwner) Detached() {
 }
 
 func (sjo *stagedJobOwner) requestRetirement(cause error) {
+	resources := sjo.beginRetirement(cause)
+	resources.outputGate.Fence()
+}
+
+// containRuntimeAttempt publishes the authoritative cut without waiting for
+// output leases or external cleanup while the attempt authority is locked.
+func (sjo *stagedJobOwner) containRuntimeAttempt(cause error) {
+	sjo.beginRetirement(cause)
+}
+
+func (sjo *stagedJobOwner) beginRetirement(cause error) ConstructedJob {
+	if sjo == nil {
+		return ConstructedJob{}
+	}
 	sjo.mu.Lock()
 	if !sjo.retiring {
 		sjo.retirementCause = cause
 	}
 	sjo.retiring = true
 	resources := sjo.resources
-	sjo.mu.Unlock()
-	resources.outputGate.Fence()
+	resources.outputGate.RevokeAdmissions()
 	sjo.retireOnce.Do(func() {
 		close(sjo.retire)
 	})
+	sjo.mu.Unlock()
+	return resources
 }
 
 func (sjo *stagedJobOwner) retirementError(fallback string) error {
@@ -476,6 +534,7 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 	select {
 	case request = <-sjo.startRequests:
 	case <-sjo.retire:
+		sjo.cutBeforeStart(nil)
 		return sjo.finalize()
 	case <-ctx.Done():
 		sjo.cutBeforeStart(context.Cause(ctx))
@@ -483,9 +542,16 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 	}
 
 	sjo.mu.Lock()
-	if sjo.started {
+	if sjo.started || !sjo.startRequested {
 		sjo.mu.Unlock()
 		request.result <- errors.New("job output: duplicate process-owned job start")
+		return sjo.finalize()
+	}
+	if sjo.retiring {
+		err := sjo.retirementErrorLocked("job output: process-owned job retired before start")
+		sjo.mu.Unlock()
+		request.result <- err
+		sjo.cutBeforeStart(nil)
 		return sjo.finalize()
 	}
 	sjo.started = true
@@ -542,6 +608,7 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 		}
 	}
 	if !physicalExited {
+		sjo.drainRetirement()
 		stopErr := callJobLifecycle("process-owned managed runtime Stop", func() error {
 			job.Stop()
 			return nil
@@ -583,6 +650,16 @@ func (sjo *stagedJobOwner) cutBeforeStart(cause error) {
 	if !attached {
 		sjo.Detached()
 	}
+}
+
+func (sjo *stagedJobOwner) drainRetirement() {
+	if sjo == nil {
+		return
+	}
+	sjo.mu.Lock()
+	resources := sjo.resources
+	sjo.mu.Unlock()
+	resources.outputGate.Fence()
 }
 
 func (sjo *stagedJobOwner) finalize() error {

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -234,6 +235,120 @@ func TestStagedJobAcceptanceRejectsInvalidOutputGate(t *testing.T) {
 	}
 }
 
+func TestRuntimeContainmentRevokesOutputWithoutWaitingForDrain(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	writeEntered := make(chan struct{})
+	releaseWrite := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() {
+		releaseOnce.Do(func() { close(releaseWrite) })
+	}
+	defer release()
+	frames, err := lifecycle.NewFrameOwner(frameWriteFunc(func(payload []byte) (int, error) {
+		close(writeEntered)
+		<-releaseWrite
+		return len(payload), nil
+	}))
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	var rejected, final int
+	candidate := ConstructedJob{
+		Variant:          JobVariantV1,
+		CollectorCleanup: func(context.Context) error { rejected++; return nil },
+		finalCleanup:     func(context.Context) error { final++; return nil },
+		outputGate:       gate,
+	}
+	identity := lifecycle.ResourceIdentity{ID: "module_job", Generation: 1}
+	owner := newStagedJobOwner(
+		context.Background(),
+		candidate,
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       identity.ID,
+			Resource:  identity.ID,
+		},
+	)
+	require.NoError(t, owner.Promote(context.Background()))
+	require.NoError(t, owner.BindAttachment())
+	require.NoError(t, owner.AdoptAttachment(candidate))
+	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
+	_, err = owner.AcceptResources(permit)
+	require.NoError(t, err)
+
+	writeDone := make(chan error, 1)
+	go func() {
+		_, err := gate.Write([]byte("admitted\n"))
+		writeDone <- err
+	}()
+	requireTestSignal(t, writeEntered, "initial output did not acquire its write lease")
+	cutDone := make(chan int, 1)
+	go func() {
+		cutDone <- attempts.CutTarget(1)
+	}()
+	select {
+	case count := <-cutDone:
+		require.EqualValues(t, 1, count)
+	case <-time.After(time.Second):
+		release()
+		t.Fatal("containment waited for the admitted output lease to drain")
+	}
+	lateWriteDone := make(chan error, 1)
+	go func() {
+		_, err := gate.Write([]byte("late\n"))
+		lateWriteDone <- err
+	}()
+	select {
+	case err = <-lateWriteDone:
+		require.ErrorIs(t, err, errGenerationOutputFenced)
+	case <-time.After(time.Second):
+		release()
+		t.Fatal("late output waited for the admitted output lease to drain")
+	}
+
+	release()
+	require.NoError(t, <-writeDone)
+	owner.Reject()
+	requireTestSignal(t, owner.done, "contained runtime owner did not finalize after output drain")
+	require.NoError(t, permit.ReleaseExternal())
+	require.NoError(t, permit.Return())
+	require.Zero(t, rejected)
+	require.EqualValues(t, 1, final)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	attempts.BeginShutdown()
+	require.NoError(t, attempts.Shutdown(context.Background()))
+	require.EqualValues(t, containment.Census{}, attempts.Census())
+}
+
+func TestStagedJobRetirementPreservesFirstCause(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	owner := newStagedJobOwner(
+		context.Background(),
+		ConstructedJob{outputGate: gate},
+		nil,
+		1,
+		jobmgr.ProcessAttemptIdentity{},
+	)
+	structural := errors.New("runtime failed before readiness")
+	owner.beginRetirement(structural)
+	owner.containRuntimeAttempt(jobmgr.ErrProcessAttemptRetired)
+
+	err = owner.retirementError("fallback")
+	require.ErrorIs(t, err, structural)
+	require.NotErrorIs(t, err, jobmgr.ErrProcessAttemptRetired)
+	require.False(t, jobmgr.ContainsOnlyErrorLeaves(
+		err,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	))
+}
+
 func TestPreparedJobPreActivationRetirementPreservesCause(t *testing.T) {
 	tests := map[string]struct {
 		variant JobVariant
@@ -320,6 +435,147 @@ func TestPreparedJobRetirementAfterAttachmentAdoptionPreservesCause(t *testing.T
 			fixture.requireSettled(t)
 		})
 	}
+}
+
+func TestPreparedJobRejectsTargetCutBeforeWorkerObservesCancellation(t *testing.T) {
+	tests := map[string]error{
+		"retired": jobmgr.ErrProcessAttemptRetired,
+		"stopped": jobmgr.ErrProcessAttemptStopped,
+	}
+	for name, cause := range tests {
+		t.Run(name, func(t *testing.T) {
+			attempts, err := containment.NewAuthority(nil)
+			require.NoError(t, err)
+			delayed := &delayedRuntimeCancellationAuthority{
+				ProcessAttemptAuthority: attempts,
+				cutObserved:             make(chan struct{}),
+				release:                 make(chan struct{}),
+			}
+			defer delayed.releaseCancellation()
+			fixture := newPreparedAttachmentFixture(
+				t,
+				JobVariantV2,
+				delayed,
+				true,
+				jobHandlerAttacherFunc(func(
+					_ lifecycle.ResourceIdentity,
+					staged StagedHandlerLifecycle,
+				) (ProcessHandlerLifecycle, error) {
+					cutTestAuthority(t, attempts, cause)
+					requireTestSignal(t, delayed.cutObserved, "authority cut did not cancel the runtime attempt")
+					return staged.(ProcessHandlerLifecycle), nil
+				}),
+			)
+
+			generation, err := fixture.prepared.Accept(context.Background(), fixture.identity.Generation)
+			if generation != nil {
+				require.NoError(t, generation.abortProcessOwned(context.Background()))
+			}
+			delayed.releaseCancellation()
+
+			require.ErrorIs(t, err, cause)
+			require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+				err,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+			requireTestSignal(t, fixture.owner.done, "retired runtime owner did not finalize")
+			require.EqualValues(t, 1, fixture.state.rejected)
+			require.Zero(t, fixture.state.final)
+			require.EqualValues(t, 1, fixture.state.handlerFinalized)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, fixture.tasks.LongLivedCensus())
+			require.NoError(t, attempts.Shutdown(context.Background()))
+			require.EqualValues(t, containment.Census{}, attempts.Census())
+		})
+	}
+}
+
+func TestProcessOwnedJobDoesNotStartAfterContainment(t *testing.T) {
+	tests := map[string]struct {
+		variant JobVariant
+		cause   error
+	}{
+		"V1 retired": {
+			variant: JobVariantV1,
+			cause:   jobmgr.ErrProcessAttemptRetired,
+		},
+		"V1 stopped": {
+			variant: JobVariantV1,
+			cause:   jobmgr.ErrProcessAttemptStopped,
+		},
+		"V2 retired": {
+			variant: JobVariantV2,
+			cause:   jobmgr.ErrProcessAttemptRetired,
+		},
+		"V2 stopped": {
+			variant: JobVariantV2,
+			cause:   jobmgr.ErrProcessAttemptStopped,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			attempts, err := containment.NewAuthority(nil)
+			require.NoError(t, err)
+			fixture := newPreparedAttachmentFixture(t, test.variant, attempts, false, nil)
+			generation, err := fixture.prepared.Accept(context.Background(), fixture.identity.Generation)
+			require.NoError(t, err)
+			require.NotNil(t, generation)
+
+			cutTestAuthority(t, attempts, test.cause)
+			_, writeErr := fixture.gate.Write([]byte("late\n"))
+			require.ErrorIs(t, writeErr, errGenerationOutputFenced)
+			err = generation.Start(context.Background())
+
+			require.ErrorIs(t, err, test.cause)
+			require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+				err,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+			select {
+			case <-fixture.job.started:
+				t.Fatal("managed job started after containment")
+			default:
+			}
+			requireTestSignal(t, fixture.owner.done, "contained runtime owner did not finalize")
+			require.Zero(t, fixture.state.rejected)
+			require.EqualValues(t, 1, fixture.state.final)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, fixture.tasks.LongLivedCensus())
+			require.NoError(t, attempts.Shutdown(context.Background()))
+			require.EqualValues(t, containment.Census{}, attempts.Census())
+		})
+	}
+}
+
+func TestPreparedJobAdoptsPartialHandlerTransferBeforeAttachmentFailure(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attachErr := errors.New("partial handler attachment failed")
+	fixture := newPreparedAttachmentFixture(
+		t,
+		JobVariantV1,
+		attempts,
+		true,
+		jobHandlerAttacherFunc(func(
+			_ lifecycle.ResourceIdentity,
+			staged StagedHandlerLifecycle,
+		) (ProcessHandlerLifecycle, error) {
+			return staged.(ProcessHandlerLifecycle), attachErr
+		}),
+	)
+
+	generation, err := fixture.prepared.Accept(context.Background(), fixture.identity.Generation)
+
+	require.Nil(t, generation)
+	require.ErrorIs(t, err, attachErr)
+	requireTestSignal(t, fixture.owner.done, "partially attached runtime owner did not finalize")
+	require.EqualValues(t, 1, fixture.state.rejected)
+	require.Zero(t, fixture.state.final)
+	require.EqualValues(t, 1, fixture.state.handlerFinalized)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, fixture.tasks.LongLivedCensus())
+	attempts.BeginShutdown()
+	require.NoError(t, attempts.Shutdown(context.Background()))
+	require.EqualValues(t, containment.Census{}, attempts.Census())
 }
 
 func TestPreparedJobDoesNotHideProjectionFailureDuringRetirement(t *testing.T) {
@@ -609,6 +865,85 @@ func TestCandidateCancellationControlsFailedPromotion(t *testing.T) {
 	require.NoError(t, delegate.Shutdown(context.Background()))
 }
 
+func TestRuntimeContainmentSettlesPromotionOwnership(t *testing.T) {
+	tests := map[string]struct {
+		cutAfterAdmission bool
+		cause             error
+	}{
+		"retired before admission": {
+			cause: jobmgr.ErrProcessAttemptRetired,
+		},
+		"stopped before admission": {
+			cause: jobmgr.ErrProcessAttemptStopped,
+		},
+		"retired after admission": {
+			cutAfterAdmission: true,
+			cause:             jobmgr.ErrProcessAttemptRetired,
+		},
+		"stopped after admission": {
+			cutAfterAdmission: true,
+			cause:             jobmgr.ErrProcessAttemptStopped,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			delegate, err := containment.NewAuthority(nil)
+			require.NoError(t, err)
+			attempts := &promotionAdmissionGateAuthority{
+				ProcessAttemptAuthority: delegate,
+				entered:                 make(chan struct{}),
+				release:                 make(chan struct{}),
+				cutAfterAdmission:       test.cutAfterAdmission,
+			}
+			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+			require.NoError(t, err)
+			gate, err := newGenerationOutputGate(frames)
+			require.NoError(t, err)
+			var cleanups atomic.Int32
+			owner := newStagedJobOwner(
+				context.Background(),
+				ConstructedJob{
+					Variant:          JobVariantV1,
+					CollectorCleanup: func(context.Context) error { cleanups.Add(1); return nil },
+					outputGate:       gate,
+				},
+				attempts,
+				1,
+				jobmgr.ProcessAttemptIdentity{
+					Namespace: jobmgr.ProcessAttemptJobRuntime,
+					Key:       "module_job",
+					Resource:  "module_job",
+				},
+			)
+			candidateFinished := make(chan error, 1)
+			go func() {
+				candidateFinished <- owner.finishCandidate(context.Background())
+			}()
+			promoted := make(chan error, 1)
+			go func() {
+				promoted <- owner.Promote(context.Background())
+			}()
+			requireTestSignal(t, attempts.entered, "promotion did not reach the admission boundary")
+
+			cutTestAuthority(t, delegate, test.cause)
+			close(attempts.release)
+			err = <-promoted
+			owner.Reject()
+
+			require.ErrorIs(t, err, test.cause)
+			require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+				err,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+			require.NoError(t, <-candidateFinished)
+			require.NoError(t, delegate.Shutdown(context.Background()))
+			require.EqualValues(t, 1, cleanups.Load())
+			require.EqualValues(t, containment.Census{}, delegate.Census())
+		})
+	}
+}
+
 type promotionGateAuthority struct {
 	jobmgr.ProcessAttemptAuthority
 	entered chan struct{}
@@ -628,6 +963,88 @@ type busyPromotionGateAuthority struct {
 	jobmgr.ProcessAttemptAuthority
 	entered chan struct{}
 	release chan struct{}
+}
+
+type promotionAdmissionGateAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+	entered           chan struct{}
+	release           chan struct{}
+	cutAfterAdmission bool
+}
+
+func (a *promotionAdmissionGateAuthority) StartProcessAttempt(
+	ctx context.Context,
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	work := plan.Work
+	plan.Work = func(
+		ctx context.Context,
+		admission jobmgr.ProcessAttemptAdmission,
+	) error {
+		return work(ctx, promotionAdmissionGate{
+			ProcessAttemptAdmission: admission,
+			entered:                 a.entered,
+			release:                 a.release,
+			cutAfterAdmission:       a.cutAfterAdmission,
+		})
+	}
+	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+}
+
+type promotionAdmissionGate struct {
+	jobmgr.ProcessAttemptAdmission
+	entered           chan struct{}
+	release           chan struct{}
+	cutAfterAdmission bool
+}
+
+func (gate promotionAdmissionGate) Admit() error {
+	if gate.cutAfterAdmission {
+		err := gate.ProcessAttemptAdmission.Admit()
+		close(gate.entered)
+		<-gate.release
+		return err
+	}
+	close(gate.entered)
+	<-gate.release
+	return gate.ProcessAttemptAdmission.Admit()
+}
+
+type delayedRuntimeCancellationAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+	cutObserved chan struct{}
+	release     chan struct{}
+	releaseOnce sync.Once
+}
+
+func (a *delayedRuntimeCancellationAuthority) StartProcessAttempt(
+	ctx context.Context,
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	if plan.Identity.Namespace != jobmgr.ProcessAttemptJobRuntime {
+		return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+	}
+	work := plan.Work
+	plan.Work = func(
+		attemptCtx context.Context,
+		admission jobmgr.ProcessAttemptAdmission,
+	) error {
+		delayedCtx, cancel := context.WithCancelCause(context.Background())
+		go func() {
+			<-attemptCtx.Done()
+			close(a.cutObserved)
+			<-a.release
+			cancel(context.Cause(attemptCtx))
+		}()
+		return work(delayedCtx, admission)
+	}
+	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+}
+
+func (a *delayedRuntimeCancellationAuthority) releaseCancellation() {
+	a.releaseOnce.Do(func() {
+		close(a.release)
+	})
 }
 
 func (*busyPromotionGateAuthority) StartProcessAttempt(
@@ -657,6 +1074,81 @@ const (
 	retirementAfterTransfer
 	retirementAfterAdoption
 )
+
+type preparedAttachmentFixture struct {
+	prepared PreparedJob
+	identity lifecycle.ResourceIdentity
+	owner    *stagedJobOwner
+	gate     *generationOutputGate
+	job      *blockingStopManagedJob
+	state    *preActivationRetirementState
+	tasks    *lifecycle.TaskSupervisor
+}
+
+func newPreparedAttachmentFixture(
+	t *testing.T,
+	variant JobVariant,
+	attempts jobmgr.ProcessAttemptAuthority,
+	withHandler bool,
+	attacher JobHandlerAttacher,
+) *preparedAttachmentFixture {
+	t.Helper()
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	job := newBlockingStopManagedJob()
+	state := &preActivationRetirementState{}
+	candidate := ConstructedJob{
+		Variant:          variant,
+		CollectorCleanup: func(context.Context) error { state.rejected++; return nil },
+		finalCleanup:     func(context.Context) error { state.final++; return nil },
+		candidateJob:     job,
+		outputGate:       gate,
+	}
+	if withHandler {
+		candidate.StagedHandlers = &preActivationRetirementHandler{state: state}
+	}
+	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
+	owner := newStagedJobOwner(
+		context.Background(),
+		candidate,
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       identity.ID,
+			Resource:  identity.ID,
+		},
+	)
+	attachment := factoryAttachment{
+		handlerAttacher: attacher,
+		scheduler:       newTestScheduler(t),
+	}
+	staged := candidate
+	candidate.attach = func(
+		identity lifecycle.ResourceIdentity,
+		owner *stagedJobOwner,
+	) (constructedJobAttachment, error) {
+		return attachment.attach(staged, identity, owner)
+	}
+	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
+	return &preparedAttachmentFixture{
+		prepared: PreparedJob{state: &preparedJobState{
+			id:          identity.ID,
+			generation:  identity.Generation,
+			constructed: candidate,
+			permit:      permit,
+			owner:       owner,
+		}},
+		identity: identity,
+		owner:    owner,
+		gate:     gate,
+		job:      job,
+		state:    state,
+		tasks:    tasks,
+	}
+}
 
 type preActivationRetirementFixture struct {
 	prepared     PreparedJob
@@ -744,14 +1236,7 @@ func newPreActivationRetirementFixtureForWindow(
 		},
 	)
 	cut := func() {
-		switch cause {
-		case jobmgr.ErrProcessAttemptRetired:
-			require.EqualValues(t, 1, attempts.CutTarget(1))
-		case jobmgr.ErrProcessAttemptStopped:
-			attempts.BeginShutdown()
-		default:
-			require.FailNow(t, "invalid retirement test cause")
-		}
+		cutTestAuthority(t, attempts, cause)
 	}
 	var attacher JobHandlerAttacher
 	if window == retirementAfterTransfer {
@@ -923,6 +1408,18 @@ func requireTestSignal(t *testing.T, signal <-chan struct{}, message string) {
 	case <-signal:
 	case <-time.After(time.Second):
 		t.Fatal(message)
+	}
+}
+
+func cutTestAuthority(t *testing.T, attempts *containment.Authority, cause error) {
+	t.Helper()
+	switch cause {
+	case jobmgr.ErrProcessAttemptRetired:
+		require.EqualValues(t, 1, attempts.CutTarget(1))
+	case jobmgr.ErrProcessAttemptStopped:
+		attempts.BeginShutdown()
+	default:
+		require.FailNow(t, "invalid retirement test cause")
 	}
 }
 
