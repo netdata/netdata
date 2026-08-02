@@ -3,7 +3,6 @@
 package journal
 
 import (
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/journaltest"
 	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
@@ -108,7 +108,7 @@ func TestNewSDKWriterCreatesCompactUnsealedUncompressedJournal(t *testing.T) {
 }
 
 func TestSDKWriterWriteAndQueryWithJournalctl(t *testing.T) {
-	requireJournalctl(t)
+	journaltest.RequireJournalctl(t)
 
 	dir := t.TempDir()
 	w, err := newTestSDKWriter(dir, Config{RotateSize: 200 * bytesPerMB})
@@ -126,7 +126,7 @@ func TestSDKWriterWriteAndQueryWithJournalctl(t *testing.T) {
 	require.NoError(t, writeTestFields(w, fields, now, now))
 	require.NoError(t, w.sync())
 
-	out := runJournalctl(t, w.directory(), "TRAP_CATEGORY=security")
+	out := journaltest.RunJournalctl(t, w.directory(), "TRAP_CATEGORY=security")
 	assert.Contains(t, out, "sdk trap entry")
 	assert.Contains(t, out, "TRAP_CATEGORY")
 
@@ -134,7 +134,7 @@ func TestSDKWriterWriteAndQueryWithJournalctl(t *testing.T) {
 }
 
 func TestSDKWriterCWE117InjectionNotQueryableAsField(t *testing.T) {
-	requireJournalctl(t)
+	journaltest.RequireJournalctl(t)
 
 	dir := t.TempDir()
 	w, err := newTestSDKWriter(dir, Config{RotateSize: 200 * bytesPerMB})
@@ -151,7 +151,7 @@ func TestSDKWriterCWE117InjectionNotQueryableAsField(t *testing.T) {
 	journalDir := w.directory()
 	require.NoError(t, w.close())
 
-	out := runJournalctlAllowEmpty(t, journalDir, "FAKE_FIELD=spoofed")
+	out := journaltest.RunJournalctlAllowEmpty(t, journalDir, "FAKE_FIELD=spoofed")
 	assert.Empty(t, strings.TrimSpace(out))
 }
 
@@ -183,30 +183,4 @@ func TestWriterCloseReturnsWorkerFailure(t *testing.T) {
 
 	secondErr := tw.Close()
 	require.ErrorIs(t, secondErr, errNilEntry)
-}
-
-func requireJournalctl(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("journalctl"); err != nil {
-		t.Skip("journalctl not found")
-	}
-}
-
-func runJournalctl(t *testing.T, dir, match string) string {
-	t.Helper()
-	out := runJournalctlAllowEmpty(t, dir, match)
-	if strings.TrimSpace(out) == "" {
-		t.Fatalf("journalctl returned empty output for %s in %s", match, dir)
-	}
-	return out
-}
-
-func runJournalctlAllowEmpty(t *testing.T, dir, match string) string {
-	t.Helper()
-	cmd := exec.Command("journalctl", "--directory="+dir, match, "-o", "json", "--no-pager")
-	out, err := cmd.CombinedOutput()
-	if err != nil && strings.TrimSpace(string(out)) != "" {
-		t.Fatalf("journalctl failed: %v\n%s", err, string(out))
-	}
-	return string(out)
 }

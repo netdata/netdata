@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/journaltest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/stretchr/testify/assert"
@@ -101,7 +102,7 @@ func TestRetentionSweepInterval(t *testing.T) {
 }
 
 func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
-	requireJournalctl(t)
+	journaltest.RequireJournalctl(t)
 
 	sdk, err := newTestSDKWriter(t.TempDir(), Config{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
