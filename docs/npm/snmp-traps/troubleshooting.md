@@ -390,7 +390,7 @@ Check:
 - Only peers in `source.trusted_relays` may make `snmpTrapAddress.0` become the selected source.
 - `TRAP_REVERSE_DNS` is annotation only. It is not authoritative identity.
 - `TRAP_ENRICHMENT` explains selected, rejected, missing, ambiguous, or skipped enrichment decisions.
-- Source attribution metrics can show `ambiguous`, `failed`, `overflow_dropped`, and `source_transitions`.
+- Group rows by source fields to find unexpected senders, and inspect `TRAP_ENRICHMENT` for ambiguous, rejected, or changing source evidence.
 
 Keep `source.trusted_relays` narrow. A broad trusted-relay range lets senders on that path influence source attribution.
 
@@ -435,7 +435,7 @@ Choose retention based on how long operators need local forensic access. If an e
 - [Configuration](/docs/npm/snmp-traps/configuration.md) - Configure jobs, listeners, allowlists, SNMP versions, SNMPv3, outputs, retention, rate limiting, and deduplication.
 - [Journal and Querying](/docs/npm/snmp-traps/journal-and-querying.md) - Query direct-journal trap rows, decode errors, and dedup summaries.
 - [Field Reference](/docs/npm/snmp-traps/field-reference.md) - Check every emitted field and OTLP mapping.
-- [Metrics](/docs/npm/snmp-traps/metrics.md) - Interpret receiver pipeline, processing errors, dedup counters, and source metrics.
+- [Metrics](/docs/npm/snmp-traps/metrics.md) - Interpret receiver pipeline, processing errors, dedup counters, and optional profile-defined metrics.
 - [Alerts](/docs/npm/snmp-traps/alerts.md) - Understand the default health alerts and how to route or silence them.
 - [Validation and Data Quality](/docs/npm/snmp-traps/validation-and-data-quality.md) - Validate source identity, profile coverage, output backends, and data handling.
 - [Trap Profiles](/docs/npm/snmp-traps/trap-profiles.md) - Understand unknown OIDs, profile loading, template failures, overrides, and profile-derived fields.

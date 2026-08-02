@@ -289,7 +289,6 @@ func (c *Collector) Init(ctx context.Context) error {
 
 	overrides := buildOverrideMap(c.Overrides)
 	metrics := getJobMetrics(c.Name)
-	metrics.setSourceHashSaltProvider(c.sourceHashSalt)
 	listener.metrics = metrics
 	listener.onReadError = c.logListenerReadError
 	c.reportListenerReceiveBufferWarnings(listener.receiveBufferWarnings)
@@ -621,16 +620,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	if trapEntryHasUnresolvedTemplate(entry) {
 		c.incTrapError("template_unresolved")
 	}
-	metrics.recordSourceAccepted(entry)
-	if profileLookupErr != nil {
-		metrics.recordSourceError(entry, "profile_load_failed")
-	}
-	if unknownOID {
-		metrics.recordSourceError(entry, "unknown_oid")
-	}
-	if trapEntryHasUnresolvedTemplate(entry) {
-		metrics.recordSourceError(entry, "template_unresolved")
-	}
+	metrics.incPipelineAccepted()
 	var admission dedupAdmission
 	if c.deduper != nil {
 		var suppressed bool
@@ -645,7 +635,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 			c.deduper.Rollback(admission)
 		}
 		c.incTrapError(c.trapWriteFailureDim())
-		metrics.recordWriteFailure(entry, c.trapWriteFailureDim())
+		metrics.incPipelineWriteFailed()
 		packetFinished = true
 		return
 	}
@@ -659,7 +649,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	if td != nil {
 		cat = Category(td.Category)
 	}
-	metrics.recordSourceCommitted(entry)
+	metrics.incPipelineCommitted()
 	metrics.incEvent(cat)
 	metrics.incSeverity(entry.Severity)
 }

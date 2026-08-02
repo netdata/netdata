@@ -1119,14 +1119,11 @@ OTLP is protobuf-encoded — attribute values are length-prefixed and cannot esc
 
 ## 12. Receiver And Profile Metrics
 
-The collector emits three metric families:
+The collector emits two metric families:
 
 - **Receiver job totals**: continuous per-listener pipeline metrics with
   `job_name`, so receiver health remains visible even when packets cannot be
   attributed to a source device.
-- **Source-attributed receiver metrics**: bounded per-source metrics with
-  `source_id` and `source_kind`; when enrichment finds an unambiguous vnode,
-  these metrics are written under that vnode host scope.
 - **Profile-defined trap metrics**: dynamic metrics generated from profile
   `metrics:` / `charts:` rules selected by the listener job's
   `profile_metrics` configuration.
@@ -1139,34 +1136,22 @@ Built-in receiver contexts:
 - `snmp.trap.errors`: processing errors by type, grouped by job.
 - `snmp.trap.dedup_suppressed`: traps suppressed by dedup, emitted only for
   jobs with dedup enabled.
-- `snmp.trap.sources`: number of active source metric identities tracked by
-  the job.
-- `snmp.trap.source_attribution`: vnode/fallback/ambiguous/failure/overflow
-  attribution diagnostics by job.
-- `snmp.trap.source_pipeline`: accepted, committed, dedup-suppressed, and
-  write-failed trap events by source.
-- `snmp.trap.source_errors`: source-attributed processing errors when a source
-  can be identified.
-- `snmp.trap.source_last_seen`: seconds since a source last produced an
-  accepted trap.
 - `snmp.trap.profile_metric_diagnostics`: profile metric extraction,
   attribution, overflow, and source-transition diagnostics, emitted when
   `profile_metrics` selects at least one rule.
 
 Commitment and attribution rules:
 
-- `accepted` and source-attributed error counters are recorded before dedup
+- `accepted` and job-level processing error counters are recorded before dedup
   suppression.
 - `committed`, category/severity counters, and profile-defined metrics are
   recorded only after successful authoritative output commitment.
 - When both direct journal and OTLP are enabled, the direct journal path is the
   authoritative commitment path; OTLP failures are export failures.
 - When OTLP is the only backend, OTLP export failure is a terminal write failure.
-- Accepted traps are still committed when source metric attribution fails or the
-  source cap is full; diagnostics expose the skipped metric attribution.
-- Per-job totals may exceed the sum of per-source metrics because some errors
-  have no trustworthy source, source attribution may fail, or the source cap may
-  be full.
+- Built-in receiver health remains job-scoped. Source-level investigation uses
+  trap log fields and `TRAP_ENRICHMENT`; profile-defined metrics provide the
+  optional bounded device-level time-series path.
 
 Profile metric contexts are dynamic. The chart context comes from the selected
 profile chart definition and must live under the `snmp.trap.` namespace.

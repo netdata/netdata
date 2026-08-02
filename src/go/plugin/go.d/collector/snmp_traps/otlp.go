@@ -509,15 +509,10 @@ func (w *otlpTrapWriter) incNewOTLPExportFailures(batch []*TrapEntry, reportedFa
 	if len(batch) <= *reportedFailed {
 		return
 	}
-	w.incOTLPExportFailed(uint64(len(batch) - *reportedFailed))
-	if w.metrics != nil {
-		for _, entry := range batch[*reportedFailed:] {
-			if w.terminalErrors {
-				w.metrics.recordWriteFailure(entry, "otlp_export_failed")
-			} else {
-				w.metrics.recordSourceError(entry, "otlp_export_failed")
-			}
-		}
+	newFailures := uint64(len(batch) - *reportedFailed)
+	w.incOTLPExportFailed(newFailures)
+	if w.metrics != nil && w.terminalErrors {
+		w.metrics.addPipelineWriteFailed(newFailures)
 	}
 	*reportedFailed = len(batch)
 }

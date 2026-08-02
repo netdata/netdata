@@ -54,11 +54,6 @@ placements:
           - snmp.trap.pipeline
           - snmp.trap.errors
           - snmp.trap.dedup_suppressed
-          - snmp.trap.sources
-          - snmp.trap.source_attribution
-          - snmp.trap.source_pipeline
-          - snmp.trap.source_errors
-          - snmp.trap.source_last_seen
           - snmp.trap.profile_metric_diagnostics
       - type: selector
         id: profile-metrics
@@ -71,9 +66,4 @@ placements:
           - snmp.trap.errors
           - snmp.trap.dedup_suppressed
           - snmp.trap.pipeline
-          - snmp.trap.sources
-          - snmp.trap.source_attribution
-          - snmp.trap.source_pipeline
-          - snmp.trap.source_errors
-          - snmp.trap.source_last_seen
           - snmp.trap.profile_metric_diagnostics

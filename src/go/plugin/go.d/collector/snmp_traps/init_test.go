@@ -46,21 +46,10 @@ func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
 		"errors",
 		"dedup_suppressed",
 		"pipeline",
-		"source_attribution",
-		"source_pipeline",
-		"source_errors",
 	} {
 		chart, ok := charts[id]
 		require.Truef(t, ok, "missing chart %q", id)
 		assert.Equalf(t, "incremental", chart.Algorithm, "chart %q algorithm", id)
-	}
-	for _, id := range []string{
-		"sources",
-		"source_last_seen",
-	} {
-		chart, ok := charts[id]
-		require.Truef(t, ok, "missing chart %q", id)
-		assert.Equalf(t, "absolute", chart.Algorithm, "chart %q algorithm", id)
 	}
 }
 

@@ -71,7 +71,7 @@ is omitted there.
 Authoritative home: `netdata.md` §12 ("Commitment and attribution rules") and
 §19 (writer ownership / non-blocking `Write`).
 
-- `accepted` and source-attributed error counters are recorded before dedup
+- `accepted` and job-level processing error counters are recorded before dedup
   suppression.
 - `committed`, category/severity counters, and profile-defined metrics are
   recorded only after successful authoritative output commitment.
@@ -148,15 +148,3 @@ profile changes require an Agent restart or recreation of every trap job.
 Invalid operator profiles fail the next job creation; invalid lazy stock
 profiles fail their first matching lookup and increment profile-load-failure
 metrics.
-
-## 8. Source-attributed metric cap
-
-Authoritative home: `trap-metrics-profiles.md` (source identity resolver, cap
-and expiry).
-
-- Source-attributed built-in metrics are capped at 2,000 active sources per
-  job; inactive source identities expire after 60 successful collection cycles.
-
-Operator-observable effect retained in `docs/snmp-traps/metrics.md`:
-the 2,000-source cap (plan cardinality around it) and that inactive sources age
-out automatically. The "60 successful collection cycles" expiry unit is omitted.

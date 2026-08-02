@@ -2781,3 +2781,28 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted non-integer resource key varbind")
 	}
 }
+
+func TestProfileMetricValidationAllowsRetiredSourceMetricIdentifiers(t *testing.T) {
+	idx := testProfileMetricIndex(t)
+	err := idx.addProfileMetrics([]profileMetricRule{{
+		Name:   "site.source.custom",
+		Type:   profileMetricTypeCounter,
+		OnTrap: testCiscoConfigTrapOID,
+		Output: profileMetricOutput{
+			Metric:    "snmp_trap_source_custom_events",
+			Dimension: "events",
+			Chart:     "source_pipeline",
+		},
+		sourceFile: "test-profile.yaml",
+	}}, []profileMetricChart{{
+		ID:         "source_pipeline",
+		Title:      "Site source events",
+		Context:    "snmp.trap.source_pipeline",
+		Units:      "events/s",
+		Algorithm:  "incremental",
+		sourceFile: "test-profile.yaml",
+	}})
+	if err != nil {
+		t.Fatalf("addProfileMetrics rejected identifiers released with retired built-in source metrics: %v", err)
+	}
+}

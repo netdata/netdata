@@ -27,7 +27,7 @@ func newFanoutTrapWriter(primary, secondary TrapWriter, metrics *perJobMetrics) 
 func (w *fanoutTrapWriter) Write(entry *TrapEntry) error {
 	primaryErr := w.primary.Write(entry)
 	if err := w.secondary.Write(entry); err != nil {
-		w.incOTLPExportFailed(entry, 1)
+		w.incOTLPExportFailed(1)
 	}
 	return primaryErr
 }
@@ -51,11 +51,8 @@ func (w *fanoutTrapWriter) BinaryEncodedFields() uint64 {
 	return 0
 }
 
-func (w *fanoutTrapWriter) incOTLPExportFailed(entry *TrapEntry, n uint64) {
+func (w *fanoutTrapWriter) incOTLPExportFailed(n uint64) {
 	if w.metrics != nil {
 		w.metrics.addError("otlp_export_failed", n)
-		if entry != nil {
-			w.metrics.recordSourceError(entry, "otlp_export_failed")
-		}
 	}
 }

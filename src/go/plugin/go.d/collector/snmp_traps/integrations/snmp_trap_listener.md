@@ -33,7 +33,7 @@ This collector listens for incoming SNMP Trap and INFORM notifications from netw
 - **Profile-defined trap metrics**: Operators can define trap-to-metric rules in custom trap profiles, then enable selected rules per listener job with `profile_metrics`. Profile metrics are emitted per source device, using vnode host scope when enrichment finds an unambiguous vnode and bounded source labels for chart identity and fallback attribution.
 - **Direct journal storage**: Enabled by default for explicit jobs. Stores traps under the configured Netdata log directory (`${NETDATA_LOG_DIR}/traps/<job>/`; package installs usually use `/var/log/netdata`, and static installs commonly use `/opt/netdata/var/log/netdata`) and exposes the embedded `snmp:traps` Function. Direct-journal jobs appear as `__logs_sources` options.
 - **OTLP/gRPC export**: Optional backend that exports traps as OTLP LogRecords. When `otlp.enabled` is `true`, traps are exported through OTLP regardless of `journal.enabled`; if direct journal storage is also enabled, both backends receive traps.
-- **Self-metrics**: Per-job pipeline counters, trap events (by category and severity), processing errors (by type), dedup suppression (when enabled), bounded per-source receiver health, and profile-metric diagnostics.
+- **Self-metrics**: Per-job pipeline counters, trap events (by category and severity), processing errors (by type), dedup suppression (when enabled), and profile-metric diagnostics.
 
 When direct journal storage is enabled, trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_JOB`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_SOURCE_UDP_PORT`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_REVERSE_DNS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_DECODE_ERROR_KIND`, `TRAP_DECODE_ERROR`, `TRAP_PACKET_SIZE`, `TRAP_PACKET_SHA256`, `TRAP_LISTENER`, `TRAP_ENGINE_ID`, `TRAP_ENRICHMENT`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`) and decoded event varbind fields (`TRAP_VAR_*`). Non-sensitive, non-redundant event varbinds are indexed as `TRAP_VAR_*`; enum-backed varbinds also emit `_RAW` with the numeric value. `TRAP_ENRICHMENT` records the source-attribution and enrichment decisions for audit/debug, and `TRAP_JSON` stores the structured varbind payload plus `netdata_packet_sequence`, a per-job receive counter assigned once per UDP datagram. Query traps with the embedded `snmp:traps` Function through Netdata Cloud or directly via the Agent HTTP API. The Function selects all direct-journal jobs by default and can narrow to one listener with `selections.__logs_sources=["<job>"]`. OTLP-only jobs do not create local journal files and therefore do not appear as log sources.
 
@@ -551,13 +551,11 @@ Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
-Built-in receiver metrics keep per-job totals with the `job_name` label so listener health remains visible even when a packet cannot be attributed to a source device. Built-in source receiver metrics are also emitted for active, attributable sources with bounded `source_id` and `source_kind` labels; when enrichment finds an unambiguous vnode, those source metrics are written under that vnode host scope.
+Built-in receiver metrics keep per-job totals with the `job_name` label so listener health remains visible even when a packet cannot be attributed to a source device.
 
 Profile-defined trap metrics are emitted dynamically when `profile_metrics` enables rules from loaded trap profiles. Device-attributable profile metrics use vnode host scope when enrichment finds an unambiguous vnode; all profile metric series also include bounded `source_id` and `source_kind` labels so generated chart instances keep a stable identity. Resource metrics additionally include `resource_class` and `resource_id`. When vnode enrichment is unavailable, ambiguous, or conflicting, profile metrics use those labels under the listener job.
 
-Source-attributed receiver metrics are bounded to 2000 active sources per job and expire inactive sources after 60 successful collection cycles. Accepted traps are still committed to the configured backend if source metric attribution fails or the source cap is full; the attribution diagnostic counters expose those cases. Per-job pipeline totals can be greater than the sum of per-source metrics when a packet has no trustworthy source, source attribution fails, or the source cap is full.
-
-`accepted` and source-attributed error counters are recorded before dedup suppression. `committed`, event/severity counters, and profile-defined metrics are recorded only after successful authoritative output commitment. When both journal and OTLP outputs are enabled, journal is authoritative for commitment and OTLP export failures are reported as `otlp_export_failed` export/source errors. When OTLP is the only output backend, OTLP export failures are terminal write failures and also increment `pipeline.write_failed` and source-attributed `source_pipeline.write_failed` when the source is known.
+`accepted` is recorded before dedup suppression. `committed`, event/severity counters, and profile-defined metrics are recorded only after successful authoritative output commitment. When both journal and OTLP outputs are enabled, journal is authoritative for commitment and OTLP export failures increment the `otlp_export_failed` error counter. When OTLP is the only output backend, OTLP export failures are terminal write failures and also increment `pipeline.write_failed`.
 
 **Built-in contexts:**
 
@@ -566,11 +564,6 @@ Source-attributed receiver metrics are bounded to 2000 active sources per job an
 - `snmp.trap.severity`: Trap events received, split by severity. The `stacked` chart type gives a visual burst profile across the closed 8-severity taxonomy (`emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`).
 - `snmp.trap.errors`: Processing errors by type. Stacked chart for quick identification of dominant error categories.
 - `snmp.trap.dedup_suppressed`: Per-second rate of traps suppressed by dedup (only emitted when dedup is enabled on the job).
-- `snmp.trap.sources`: Number of active source metric identities tracked by the job.
-- `snmp.trap.source_attribution`: Per-job attribution diagnostics for vnode matches, fallback labels, ambiguous enrichment, attribution failures, cap overflow, and source identity transitions.
-- `snmp.trap.source_pipeline`: Source-attributed accepted, committed, dedup-suppressed, and write-failed trap events.
-- `snmp.trap.source_errors`: Source-attributed processing errors where a source can be identified.
-- `snmp.trap.source_last_seen`: Seconds since the source last produced an accepted trap.
 - `snmp.trap.profile_metric_diagnostics`: Profile-defined trap metric extraction and attribution diagnostics (only emitted when `profile_metrics` selects at least one rule).
 
 **Dynamic contexts** (profile metrics):
@@ -598,30 +591,7 @@ Metrics:
 | snmp.trap.severity | SNMP trap events received, categorized by severity | emerg, alert, crit, err, warning, notice, info, debug | events/s |
 | snmp.trap.errors | SNMP trap processing errors by type | unknown_oid, decode_failed, template_unresolved, malformed_pdu, dropped_allowlist, rate_limited, auth_failures, usm_failures, unknown_engine_id, inform_response_failed, binary_encoded, profile_load_failed, journal_write_failed, otlp_export_failed, listener_read_failed, listener_buffer_degraded | errors/s |
 | snmp.trap.dedup_suppressed | Per-second rate of traps suppressed by deduplication (only emitted when dedup is enabled) | suppressed | events/s |
-| snmp.trap.sources | Active source metric identities tracked by this listener job | active | sources |
-| snmp.trap.source_attribution | Source attribution diagnostics for built-in source receiver metrics | vnode, fallback, ambiguous, failed, overflow_dropped, source_transitions | events/s |
 | snmp.trap.profile_metric_diagnostics | Profile-defined trap metric extraction and attribution diagnostics (only emitted when profile_metrics selects at least one rule) | rule_missed, extraction_failed, attribution_failed, overflow_dropped, source_transitions | events/s |
-
-
-### Per source
-
-Per-source receiver metrics for active, attributable SNMP trap sources.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| job_name | The listener job that received the trap. |
-| source_id | Vnode ID when enrichment resolves a vnode, otherwise a bounded source identifier. Raw source values are hashed by default. |
-| source_kind | Source identity kind, such as `vnode`, `trusted_trap_address`, `udp_peer`, or `entry_source`. |
-
-Metrics:
-
-| Metric | Description | Dimensions | Unit |
-|:------|:------------|:----------|:----|
-| snmp.trap.source_pipeline | Source-attributed receiver pipeline progress | accepted, committed, dedup_suppressed, write_failed | events/s |
-| snmp.trap.source_errors | Source-attributed processing errors | unknown_oid, template_unresolved, profile_load_failed, journal_write_failed, otlp_export_failed | errors/s |
-| snmp.trap.source_last_seen | Time since this source last produced an accepted trap | seconds_ago | seconds |
 
 
 

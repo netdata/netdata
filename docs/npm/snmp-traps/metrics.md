@@ -135,31 +135,15 @@ Use this chart with the pipeline:
 - `dedup_suppressed` rising at very high rate can indicate a device-side trap storm.
 - If distinct resources are being collapsed together, review `dedup.key_varbinds` in [Configuration](/docs/npm/snmp-traps/configuration.md).
 
-## Sources and attribution
+## Source-level investigation
 
-Source metrics help answer which senders are active and which senders are affected by drops or backend failures.
+Built-in receiver metrics are job-scoped. To identify active or affected senders, filter and group trap rows by
+`TRAP_SOURCE_IP` or `TRAP_SOURCE_UDP_PEER`, then inspect `TRAP_ENRICHMENT` when the selected source differs from the UDP
+peer or attribution is unclear. See [Journal and Querying](/docs/npm/snmp-traps/journal-and-querying.md) for source filters
+and [Field Reference](/docs/npm/snmp-traps/field-reference.md) for the source and enrichment contracts.
 
-| Chart | Dimensions | How to use it |
-|---|---|---|
-| **SNMP trap active sources** | `active` | Number of source identities currently tracked for the job. |
-| **SNMP trap source attribution** | `vnode`, `fallback`, `ambiguous`, `failed`, `overflow_dropped`, `source_transitions` | Shows how the receiver assigned trap activity to source identities and whether attribution was ambiguous, failed, exceeded the source-metric cap, or changed route. |
-| **SNMP trap source pipeline** | `accepted`, `committed`, `dedup_suppressed`, `write_failed` | Per-source view of normal trap handling after attribution. |
-| **SNMP trap source-attributed errors** | `unknown_oid`, `template_unresolved`, `profile_load_failed`, `journal_write_failed`, `otlp_export_failed` | Per-source view of errors that can be attributed to a trap entry. |
-| **SNMP trap source last seen** | `seconds_ago` | Time since the receiver last saw activity for that source identity. |
-
-Per-source charts are labeled by `job_name`, `source_id`, and `source_kind`. When a trap can be tied to a Netdata vnode, the source identity uses that vnode. Otherwise the receiver falls back to the selected trap source, such as the enriched source or the UDP peer. Fallback source IDs are privacy-preserving hashes by default; use trap rows in [Usage and Output](/docs/npm/snmp-traps/usage-and-output.md) when you need readable source fields.
-
-Source-attributed receiver metrics are bounded to 2000 active sources per job, so plan source cardinality around that cap. Inactive sources age out automatically. Accepted traps can still be committed if source metric attribution fails or the source cap is full; in that case, per-job pipeline totals can be higher than the sum of per-source charts.
-
-This source-metric cap applies to the built-in source receiver charts: `snmp.trap.source_pipeline`, `snmp.trap.source_errors`, and `snmp.trap.source_last_seen`. Profile-defined metrics have separate cardinality limits; see [Profile-defined metrics](#profile-defined-metrics).
-
-Interpret source charts carefully:
-
-- A high `active` count can be normal on large networks, but sudden growth can also mean unexpected senders or relay behavior.
-- `ambiguous` means the receiver saw conflicting or rejected source evidence. Check source attribution fields in trap rows.
-- `failed` means the receiver could not create a source metric identity for an entry.
-- `overflow_dropped` means source metric tracking hit its cap. Accepted traps can still be committed, but per-source metric visibility is bounded.
-- `source_transitions` means the same raw source route changed to a different metric identity. Check relay, vnode, and source attribution configuration.
+Use profile-defined metrics when a vendor or site semantic needs a bounded device-level time series. They are opt-in and
+have separate source, resource, and instance limits.
 
 ## Profile-defined metrics
 

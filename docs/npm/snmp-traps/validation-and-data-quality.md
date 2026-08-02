@@ -45,7 +45,7 @@ Always inspect `TRAP_REPORT_TYPE` first:
 - `decode_error` means a packet reached the decode-error path but did not become a normal trap row. Inspect `TRAP_DECODE_ERROR_KIND`, `TRAP_DECODE_ERROR`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_SOURCE_UDP_PORT`, `TRAP_PACKET_SIZE`, `TRAP_PACKET_SHA256`, `TRAP_LISTENER`, `TRAP_ENGINE_ID`, and `TRAP_JSON`.
 - `deduplication_summary` means repeated matching traps were suppressed during a deduplication period. Inspect `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, and `TRAP_JSON`.
 
-Drops that happen before a row is written may be visible only in receiver metrics. Use `snmp.trap.pipeline`, `snmp.trap.errors`, `snmp.trap.dedup_suppressed`, `snmp.trap.sources`, `snmp.trap.source_last_seen`, `snmp.trap.source_attribution`, `snmp.trap.source_pipeline`, and `snmp.trap.source_errors` together with the log rows.
+Drops that happen before a row is written may be visible only in receiver metrics. Use `snmp.trap.pipeline`, `snmp.trap.errors`, and `snmp.trap.dedup_suppressed` together with the log rows and their source fields.
 
 ## Validate source identity
 
