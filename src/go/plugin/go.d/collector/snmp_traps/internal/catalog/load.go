@@ -553,8 +553,8 @@ func isProfileFileName(name string) bool {
 
 func parseProfileFileName(name string) (string, bool) {
 	for _, suffix := range []string{".yaml.zst", ".yml.zst", ".yaml", ".yml"} {
-		if strings.HasSuffix(name, suffix) {
-			return strings.TrimSuffix(name, suffix), true
+		if before, ok := strings.CutSuffix(name, suffix); ok {
+			return before, true
 		}
 	}
 	return "", false

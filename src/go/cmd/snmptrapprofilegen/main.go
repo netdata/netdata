@@ -2078,7 +2078,11 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 		}
 		counts[vendor] = len(pf.Traps)
 		combined = append(combined, recs...)
-		catalogue[vendor] = newProfileCatalogueEntry(vendor+".yaml", pf, recs, profileSHA256)
+		entry, err := newProfileCatalogueEntry(vendor+".yaml", pf, recs, profileSHA256)
+		if err != nil {
+			return nil, err
+		}
+		catalogue[vendor] = entry
 	}
 	if opts.CombinedPath != "" {
 		sortTrapRecords(combined)
@@ -2094,38 +2098,42 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 	return counts, nil
 }
 
-func newProfileCatalogueEntry(filename string, profile profileFile, records []TrapRecord, profileSHA256 string) profileCatalogueEntry {
+func newProfileCatalogueEntry(filename string, profile profileFile, records []TrapRecord, profileSHA256 string) (profileCatalogueEntry, error) {
+	metricRuleNames, err := profileMetricRuleNames(profile.Metrics)
+	if err != nil {
+		return profileCatalogueEntry{}, fmt.Errorf("build catalogue entry for %s: %w", filename, err)
+	}
 	return profileCatalogueEntry{
 		File:            filename,
 		MIBCount:        profile.MibCount,
 		MIBs:            mibsForRecords(records),
-		MetricRuleNames: profileMetricRuleNames(profile.Metrics),
+		MetricRuleNames: metricRuleNames,
 		SampleTraps:     sampleTrapNames(records, 5),
 		TrapCount:       len(profile.Traps),
 		TrapOIDs:        profileTrapOIDs(profile.Traps),
 		VarbindCount:    len(profile.Varbinds),
 		SHA256:          profileSHA256,
-	}
+	}, nil
 }
 
-func profileMetricRuleNames(rules []profileMetricRule) []string {
+func profileMetricRuleNames(rules []profileMetricRule) ([]string, error) {
 	if len(rules) == 0 {
-		return nil
+		return nil, nil
 	}
 	seen := make(map[string]struct{}, len(rules))
 	names := make([]string, 0, len(rules))
-	for _, rule := range rules {
+	for i, rule := range rules {
 		if rule.Name == "" {
-			continue
+			return nil, fmt.Errorf("metric rule at index %d has an empty name", i)
 		}
 		if _, ok := seen[rule.Name]; ok {
-			continue
+			return nil, fmt.Errorf("duplicate metric rule name %q", rule.Name)
 		}
 		seen[rule.Name] = struct{}{}
 		names = append(names, rule.Name)
 	}
 	sort.Strings(names)
-	return names
+	return names, nil
 }
 
 func filterValidTrapRecords(records []TrapRecord) []TrapRecord {

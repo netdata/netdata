@@ -349,9 +349,9 @@ defer lease.Close()
 Lifecycle:
 
 - The first `Manager.Acquire()` during job creation eagerly loads and validates all operator profiles, exactly one stock
-  manifest, every entry's decompressed-content SHA-256, and the manifest-to-filesystem inventory. This acquisition occurs
-  in `Collector.Init()`; `Collector.Check()` is a no-op. It starts one configuration epoch and returns a lease that owns
-  one reference.
+  manifest, every entry's required SHA-256 syntax, and the manifest-to-filesystem inventory. It does not read stock body
+  bytes. This acquisition occurs in `Collector.Init()`; `Collector.Check()` is a no-op. It starts one configuration epoch
+  and returns a lease that owns one reference.
 - Every subsequent job created by the same plugin registration receives a lease for that epoch. Each collector stores its
   lease and epoch explicitly; packet-path code never reads a package-global current index.
 - Every job cleanup closes its own lease. `Lease.Close()` is idempotent; the final release drops the epoch so GC can

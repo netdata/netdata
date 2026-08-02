@@ -130,9 +130,11 @@ durable artifacts.
 - Helper output is mechanical unless `--classify` is used with an
   OpenAI-compatible endpoint. Review generated category, severity, and
   descriptions before installing profiles for production use.
-- If generated YAML is malformed, active jobs keep the last valid profile
-  index and new job creation/test fails instead of silently accepting bad
-  profiles.
+- Active jobs keep their current profile epoch after files are edited. Creating
+  another job while any old job still holds a lease reuses that same epoch and
+  does not test the edits. Restart the Agent or recreate every trap job; after
+  the final old lease is released, the next job initialization reloads the
+  files and rejects malformed generated YAML instead of silently accepting it.
 - A validation run with `NAGIOS-NOTIFY-MIB` produced `nagios.yaml`
   containing four traps: `nHostEvent`, `nHostNotify`, `nSvcEvent`, and
   `nSvcNotify`.

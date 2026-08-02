@@ -692,13 +692,32 @@ func TestNewProfileCatalogueEntryIncludesMetricRuleNames(t *testing.T) {
 	profile := profileFile{Metrics: []profileMetricRule{
 		{Name: "vendor::z"},
 		{Name: "vendor::a"},
-		{Name: "vendor::z"},
-		{},
 	}}
 	want := []string{"vendor::a", "vendor::z"}
-	entry := newProfileCatalogueEntry("vendor.yaml", profile, nil, "digest")
+	entry, err := newProfileCatalogueEntry("vendor.yaml", profile, nil, "digest")
+	if err != nil {
+		t.Fatalf("newProfileCatalogueEntry() error = %v", err)
+	}
 	if !slices.Equal(entry.MetricRuleNames, want) {
 		t.Fatalf("metric_rule_names = %#v, want %#v", entry.MetricRuleNames, want)
+	}
+}
+
+func TestNewProfileCatalogueEntryRejectsInvalidMetricRuleNames(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		metrics []profileMetricRule
+		wantErr string
+	}{
+		{name: "empty", metrics: []profileMetricRule{{}}, wantErr: "empty name"},
+		{name: "duplicate", metrics: []profileMetricRule{{Name: "vendor::same"}, {Name: "vendor::same"}}, wantErr: "duplicate metric rule name"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := newProfileCatalogueEntry("vendor.yaml", profileFile{Metrics: tc.metrics}, nil, "digest")
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("newProfileCatalogueEntry() error = %v, want containing %q", err, tc.wantErr)
+			}
+		})
 	}
 }
 

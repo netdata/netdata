@@ -62,11 +62,9 @@ func TestManagerConcurrentAcquireSharesOneEpoch(t *testing.T) {
 	errs := make([]error, len(leases))
 	var wg sync.WaitGroup
 	for i := range leases {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			leases[i], errs[i] = manager.Acquire()
-		}()
+		})
 	}
 	wg.Wait()
 	for i, err := range errs {
@@ -809,11 +807,9 @@ func TestStockHydrationCoalescesPerFileWithoutBlockingOtherFiles(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = idx.LookupWithError(slowOID)
-		}()
+		})
 	}
 	select {
 	case <-started:

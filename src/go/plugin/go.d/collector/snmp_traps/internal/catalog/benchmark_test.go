@@ -35,7 +35,6 @@ func BenchmarkFirstStockProfileHydration(b *testing.B) {
 	seed.Close()
 
 	for _, route := range routes {
-		route := route
 		b.Run(route.label, func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -75,12 +74,10 @@ func BenchmarkSameStockProfileHydrationCoalescing(b *testing.B) {
 		errs := make(chan error, callers)
 		var wg sync.WaitGroup
 		for range callers {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				_, err := lease.Epoch().LookupWithError(oid)
 				errs <- err
-			}()
+			})
 		}
 		wg.Wait()
 
@@ -128,12 +125,10 @@ func benchmarkHydrateProfiles(b *testing.B, manager *Manager, oids []string, par
 		if parallel {
 			var wg sync.WaitGroup
 			for _, oid := range oids {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					_, err := lease.Epoch().LookupWithError(oid)
 					errs <- err
-				}()
+				})
 			}
 			wg.Wait()
 		} else {
