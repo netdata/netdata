@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 )
 
 func readSinglePcapUDPPacket(t *testing.T, fixture string) pcapUDPPacket {
@@ -43,7 +44,7 @@ func setSingleTestTrap(t *testing.T, trap *TrapDef) {
 	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 }
 
-func newTestV2Collector(jobName string, writer TrapWriter, prefixes []netip.Prefix, communities []string) *Collector {
+func newTestV2Collector(jobName string, writer output.Writer, prefixes []netip.Prefix, communities []string) *Collector {
 	return &Collector{
 		Config:      Config{Name: jobName},
 		trapWriter:  writer,
@@ -53,7 +54,7 @@ func newTestV2Collector(jobName string, writer TrapWriter, prefixes []netip.Pref
 	}
 }
 
-func newDefaultTestV2Collector(writer TrapWriter) *Collector {
+func newDefaultTestV2Collector(writer output.Writer) *Collector {
 	return newTestV2Collector("test", writer, nil, []string{"public"})
 }
 
@@ -97,7 +98,7 @@ func collectJobMetricsForTest(t *testing.T, jobName string) metrix.CollectorStor
 	return store
 }
 
-func newDedupTestV2Collector(t *testing.T, jobName string, writer TrapWriter) (*Collector, *perJobMetrics) {
+func newDedupTestV2Collector(t *testing.T, jobName string, writer output.Writer) (*Collector, *perJobMetrics) {
 	t.Helper()
 
 	metrics := withCleanJobMetrics(t, jobName)
@@ -147,7 +148,7 @@ func registerTestLocalEngineID(
 
 func newTestV3Collector(
 	jobName string,
-	writer TrapWriter,
+	writer output.Writer,
 	secTable *gosnmp.SnmpV3SecurityParametersTable,
 	engineIDs map[string]struct{},
 ) *Collector {

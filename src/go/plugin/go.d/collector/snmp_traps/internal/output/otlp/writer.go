@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package otlp
 
 import (
 	"context"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
 	"net"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +28,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 )
 
 const (
@@ -33,11 +36,22 @@ const (
 	defaultOTLPRequestTimeout = 5 * time.Second
 	defaultOTLPFlushInterval  = 200 * time.Millisecond
 	defaultOTLPBatchSize      = 512
-	defaultOTLPQueueCapacity  = defaultQueueCapacity
+	defaultOTLPQueueCapacity  = 10000
 	otlpServiceName           = "netdata-snmptrap"
 )
 
-type otlpRuntimeConfig struct {
+var errNilEntry = errors.New("nil trap entry")
+
+type Config struct {
+	Endpoint       string
+	Headers        map[string]string
+	RequestTimeout string
+	FlushInterval  string
+	BatchSize      int
+	QueueCapacity  int
+}
+
+type Policy struct {
 	target         string
 	insecure       bool
 	headers        metadata.MD
@@ -52,11 +66,16 @@ type otlpEndpoint struct {
 	insecure bool
 }
 
-type otlpTrapWriter struct {
+type Options struct {
+	Authoritative bool
+	Report        output.OutcomeReporter
+}
+
+type Writer struct {
 	client collogpb.LogsServiceClient
 	conn   *grpc.ClientConn
 
-	queue   chan *TrapEntry
+	queue   chan *model.TrapEntry
 	flushCh chan chan error
 	closeCh chan chan error
 	doneCh  chan struct{}
@@ -66,68 +85,68 @@ type otlpTrapWriter struct {
 	flushInterval  time.Duration
 	batchSize      int
 	jobName        string
-	metrics        *perJobMetrics
-	terminalErrors bool
+	report         output.OutcomeReporter
+	authoritative  bool
 
 	mu       sync.Mutex
+	started  bool
 	closed   bool
 	lastErr  error
 	lastErrM sync.Mutex
 }
 
-func newOTLPTrapWriter(ctx context.Context, jobName string, cfg OTLPConfig, metrics *perJobMetrics) (*otlpTrapWriter, error) {
-	if !cfg.Enabled {
-		return nil, nil
-	}
-	runtimeCfg, err := validateOTLPConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return newOTLPTrapWriterWithRuntimeConfig(ctx, jobName, runtimeCfg, metrics, true)
-}
+var _ output.Writer = (*Writer)(nil)
 
-func newOTLPTrapWriterWithRuntimeConfig(ctx context.Context, jobName string, runtimeCfg otlpRuntimeConfig, metrics *perJobMetrics, terminalErrors bool) (*otlpTrapWriter, error) {
-	conn, client, err := newOTLPClient(ctx, runtimeCfg)
+func Prepare(ctx context.Context, jobName string, policy Policy, opts Options) (*Writer, error) {
+	conn, client, err := newOTLPClient(ctx, policy)
 	if err != nil {
 		return nil, err
 	}
 
-	w := &otlpTrapWriter{
+	return &Writer{
 		client:         client,
 		conn:           conn,
-		queue:          make(chan *TrapEntry, runtimeCfg.queueCapacity),
+		queue:          make(chan *model.TrapEntry, policy.queueCapacity),
 		flushCh:        make(chan chan error),
 		closeCh:        make(chan chan error),
 		doneCh:         make(chan struct{}),
-		headers:        runtimeCfg.headers,
-		requestTimeout: runtimeCfg.requestTimeout,
-		flushInterval:  runtimeCfg.flushInterval,
-		batchSize:      runtimeCfg.batchSize,
+		headers:        policy.headers,
+		requestTimeout: policy.requestTimeout,
+		flushInterval:  policy.flushInterval,
+		batchSize:      policy.batchSize,
 		jobName:        jobName,
-		metrics:        metrics,
-		terminalErrors: terminalErrors,
-	}
-	go w.worker()
-	return w, nil
+		report:         opts.Report,
+		authoritative:  opts.Authoritative,
+	}, nil
 }
 
-func validateOTLPConfig(cfg OTLPConfig) (otlpRuntimeConfig, error) {
-	if !cfg.Enabled {
-		return otlpRuntimeConfig{}, nil
+func (w *Writer) Start() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.closed {
+		return output.ErrClosed
 	}
+	if w.started {
+		return nil
+	}
+	w.started = true
+	go w.worker()
+	return nil
+}
 
+func Normalize(cfg Config) (Policy, error) {
 	ep, err := parseOTLPEndpoint(cfg.Endpoint)
 	if err != nil {
-		return otlpRuntimeConfig{}, fmt.Errorf("otlp.endpoint: %w", err)
+		return Policy{}, fmt.Errorf("otlp.endpoint: %w", err)
 	}
 
 	requestTimeout, err := parseOTLPDuration(cfg.RequestTimeout, defaultOTLPRequestTimeout, "otlp.request_timeout")
 	if err != nil {
-		return otlpRuntimeConfig{}, err
+		return Policy{}, err
 	}
 	flushInterval, err := parseOTLPDuration(cfg.FlushInterval, defaultOTLPFlushInterval, "otlp.flush_interval")
 	if err != nil {
-		return otlpRuntimeConfig{}, err
+		return Policy{}, err
 	}
 
 	batchSize := cfg.BatchSize
@@ -135,7 +154,7 @@ func validateOTLPConfig(cfg OTLPConfig) (otlpRuntimeConfig, error) {
 		batchSize = defaultOTLPBatchSize
 	}
 	if batchSize < 0 {
-		return otlpRuntimeConfig{}, fmt.Errorf("otlp.batch_size must be positive, got %d", cfg.BatchSize)
+		return Policy{}, fmt.Errorf("otlp.batch_size must be positive, got %d", cfg.BatchSize)
 	}
 
 	queueCapacity := cfg.QueueCapacity
@@ -143,15 +162,15 @@ func validateOTLPConfig(cfg OTLPConfig) (otlpRuntimeConfig, error) {
 		queueCapacity = defaultOTLPQueueCapacity
 	}
 	if queueCapacity < 0 {
-		return otlpRuntimeConfig{}, fmt.Errorf("otlp.queue_capacity must be positive, got %d", cfg.QueueCapacity)
+		return Policy{}, fmt.Errorf("otlp.queue_capacity must be positive, got %d", cfg.QueueCapacity)
 	}
 
 	headers, err := buildOTLPMetadata(cfg.Headers)
 	if err != nil {
-		return otlpRuntimeConfig{}, err
+		return Policy{}, err
 	}
 
-	return otlpRuntimeConfig{
+	return Policy{
 		target:         ep.target,
 		insecure:       ep.insecure,
 		headers:        headers,
@@ -161,6 +180,10 @@ func validateOTLPConfig(cfg OTLPConfig) (otlpRuntimeConfig, error) {
 		queueCapacity:  queueCapacity,
 	}, nil
 }
+
+func (p Policy) Target() string { return p.target }
+
+func (p Policy) PlaintextRemote() bool { return p.insecure && !targetIsLoopback(p.target) }
 
 func parseOTLPDuration(raw string, fallback time.Duration, name string) (time.Duration, error) {
 	if strings.TrimSpace(raw) == "" {
@@ -220,7 +243,7 @@ func parseOTLPEndpoint(raw string) (otlpEndpoint, error) {
 	return otlpEndpoint{target: raw, insecure: true}, nil
 }
 
-func otlpTargetIsLoopback(target string) bool {
+func targetIsLoopback(target string) bool {
 	host, _, err := net.SplitHostPort(target)
 	if err != nil {
 		return false
@@ -274,7 +297,7 @@ func validateOTLPMetadataKey(key string) error {
 	return nil
 }
 
-func newOTLPClient(ctx context.Context, cfg otlpRuntimeConfig) (*grpc.ClientConn, collogpb.LogsServiceClient, error) {
+func newOTLPClient(ctx context.Context, cfg Policy) (*grpc.ClientConn, collogpb.LogsServiceClient, error) {
 	var creds credentials.TransportCredentials
 	if cfg.insecure {
 		creds = insecure.NewCredentials()
@@ -337,8 +360,8 @@ func otlpExport(ctx context.Context, client collogpb.LogsServiceClient, headers 
 	return nil
 }
 
-func (w *otlpTrapWriter) worker() {
-	batch := make([]*TrapEntry, 0, w.batchSize)
+func (w *Writer) worker() {
+	batch := make([]*model.TrapEntry, 0, w.batchSize)
 	reportedFailed := 0
 	var activeReplyCh chan error
 
@@ -346,7 +369,7 @@ func (w *otlpTrapWriter) worker() {
 		if v := recover(); v != nil {
 			err := fmt.Errorf("SNMP trap OTLP writer panic: %v", v)
 			w.setClosedWithError(err)
-			w.accountWorkerPanicFailures(batch, reportedFailed)
+			w.accountWorkerPanicFailures(batch, reportedFailed, err)
 			if w.conn != nil {
 				_ = w.conn.Close()
 			}
@@ -398,25 +421,32 @@ func (w *otlpTrapWriter) worker() {
 	}
 }
 
-func (w *otlpTrapWriter) Write(entry *TrapEntry) error {
+func (w *Writer) Write(entry *model.TrapEntry) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.closed {
-		return errWriterClosed
+		return output.ErrClosed
+	}
+	if !w.started {
+		return output.ErrNotStarted
 	}
 	select {
 	case w.queue <- entry:
 		return nil
 	default:
-		return errQueueFull
+		return output.ErrQueueFull
 	}
 }
 
-func (w *otlpTrapWriter) Flush() error {
+func (w *Writer) Flush() error {
 	w.mu.Lock()
 	if w.closed {
 		w.mu.Unlock()
-		return errWriterClosed
+		return output.ErrClosed
+	}
+	if !w.started {
+		w.mu.Unlock()
+		return output.ErrNotStarted
 	}
 
 	replyCh := make(chan error, 1)
@@ -425,12 +455,12 @@ func (w *otlpTrapWriter) Flush() error {
 		w.mu.Unlock()
 	case <-w.doneCh:
 		w.mu.Unlock()
-		return errWriterClosed
+		return output.ErrClosed
 	}
 	return <-replyCh
 }
 
-func (w *otlpTrapWriter) Close() error {
+func (w *Writer) Close() error {
 	w.mu.Lock()
 	if w.closed {
 		w.mu.Unlock()
@@ -439,6 +469,17 @@ func (w *otlpTrapWriter) Close() error {
 		return w.lastErr
 	}
 	w.closed = true
+	if !w.started {
+		w.mu.Unlock()
+		var err error
+		if w.conn != nil {
+			err = w.conn.Close()
+		}
+		if err != nil {
+			w.setLastErr(err)
+		}
+		return err
+	}
 
 	replyCh := make(chan error, 1)
 	select {
@@ -452,8 +493,10 @@ func (w *otlpTrapWriter) Close() error {
 	}
 	err := <-replyCh
 	<-w.doneCh
-	if closeErr := w.conn.Close(); err == nil {
-		err = closeErr
+	if w.conn != nil {
+		if closeErr := w.conn.Close(); err == nil {
+			err = closeErr
+		}
 	}
 	if err != nil {
 		w.setLastErr(err)
@@ -461,7 +504,7 @@ func (w *otlpTrapWriter) Close() error {
 	return err
 }
 
-func (w *otlpTrapWriter) drainQueue(batch *[]*TrapEntry, reportedFailed *int) error {
+func (w *Writer) drainQueue(batch *[]*model.TrapEntry, reportedFailed *int) error {
 	var firstErr error
 	for {
 		select {
@@ -485,18 +528,18 @@ func (w *otlpTrapWriter) drainQueue(batch *[]*TrapEntry, reportedFailed *int) er
 	}
 }
 
-func (w *otlpTrapWriter) exportPending(batch *[]*TrapEntry, reportedFailed *int) error {
+func (w *Writer) exportPending(batch *[]*model.TrapEntry, reportedFailed *int) error {
 	if len(*batch) == 0 {
 		return nil
 	}
 	req, err := buildOTLPExportRequest(w.jobName, *batch)
 	if err != nil {
-		w.incNewOTLPExportFailures(*batch, reportedFailed)
+		w.reportNewOTLPExportFailures(*batch, reportedFailed, output.StageExport, err)
 		w.setLastErr(err)
 		return err
 	}
 	if err := otlpExport(context.Background(), w.client, w.headers, w.requestTimeout, req); err != nil {
-		w.incNewOTLPExportFailures(*batch, reportedFailed)
+		w.reportNewOTLPExportFailures(*batch, reportedFailed, output.StageExport, err)
 		w.setLastErr(err)
 		return err
 	}
@@ -505,23 +548,26 @@ func (w *otlpTrapWriter) exportPending(batch *[]*TrapEntry, reportedFailed *int)
 	return nil
 }
 
-func (w *otlpTrapWriter) incNewOTLPExportFailures(batch []*TrapEntry, reportedFailed *int) {
+func (w *Writer) reportNewOTLPExportFailures(batch []*model.TrapEntry, reportedFailed *int, stage output.Stage, err error) {
 	if len(batch) <= *reportedFailed {
 		return
 	}
 	newFailures := uint64(len(batch) - *reportedFailed)
-	w.incOTLPExportFailed(newFailures)
-	if w.metrics != nil && w.terminalErrors {
-		w.metrics.addPipelineWriteFailed(newFailures)
-	}
+	w.report.Report(output.Outcome{
+		Backend:       output.BackendOTLP,
+		Stage:         stage,
+		FailedEntries: newFailures,
+		Err:           err,
+		Authoritative: w.authoritative,
+	})
 	*reportedFailed = len(batch)
 }
 
-func (w *otlpTrapWriter) accountWorkerPanicFailures(batch []*TrapEntry, reportedFailed int) {
+func (w *Writer) accountWorkerPanicFailures(batch []*model.TrapEntry, reportedFailed int, err error) {
 	if reportedFailed < 0 {
 		reportedFailed = 0
 	}
-	pending := make([]*TrapEntry, 0, len(batch)-min(reportedFailed, len(batch))+len(w.queue))
+	pending := make([]*model.TrapEntry, 0, len(batch)-min(reportedFailed, len(batch))+len(w.queue))
 	if reportedFailed < len(batch) {
 		pending = append(pending, batch[reportedFailed:]...)
 	}
@@ -531,19 +577,13 @@ func (w *otlpTrapWriter) accountWorkerPanicFailures(batch []*TrapEntry, reported
 			pending = append(pending, entry)
 		default:
 			reported := 0
-			w.incNewOTLPExportFailures(pending, &reported)
+			w.reportNewOTLPExportFailures(pending, &reported, output.StageWorker, err)
 			return
 		}
 	}
 }
 
-func (w *otlpTrapWriter) incOTLPExportFailed(n uint64) {
-	if w.metrics != nil {
-		w.metrics.addError("otlp_export_failed", n)
-	}
-}
-
-func (w *otlpTrapWriter) setLastErr(err error) {
+func (w *Writer) setLastErr(err error) {
 	w.lastErrM.Lock()
 	if w.lastErr == nil {
 		w.lastErr = err
@@ -551,14 +591,14 @@ func (w *otlpTrapWriter) setLastErr(err error) {
 	w.lastErrM.Unlock()
 }
 
-func (w *otlpTrapWriter) setClosedWithError(err error) {
+func (w *Writer) setClosedWithError(err error) {
 	w.setLastErr(err)
 	w.mu.Lock()
 	w.closed = true
 	w.mu.Unlock()
 }
 
-func buildOTLPExportRequest(jobName string, entries []*TrapEntry) (*collogpb.ExportLogsServiceRequest, error) {
+func buildOTLPExportRequest(jobName string, entries []*model.TrapEntry) (*collogpb.ExportLogsServiceRequest, error) {
 	records := make([]*logpb.LogRecord, 0, len(entries))
 	for _, entry := range entries {
 		record, err := trapEntryToOTLPLogRecord(entry)
@@ -583,7 +623,7 @@ func buildOTLPExportRequest(jobName string, entries []*TrapEntry) (*collogpb.Exp
 	}, nil
 }
 
-func trapEntryToOTLPLogRecord(entry *TrapEntry) (*logpb.LogRecord, error) {
+func trapEntryToOTLPLogRecord(entry *model.TrapEntry) (*logpb.LogRecord, error) {
 	if entry == nil {
 		return nil, errNilEntry
 	}
@@ -605,7 +645,7 @@ func trapEntryToOTLPLogRecord(entry *TrapEntry) (*logpb.LogRecord, error) {
 	}, nil
 }
 
-func otlpSeverity(severity Severity) (logpb.SeverityNumber, string, string) {
+func otlpSeverity(severity model.Severity) (logpb.SeverityNumber, string, string) {
 	switch severity {
 	case "emerg":
 		return logpb.SeverityNumber_SEVERITY_NUMBER_FATAL, "FATAL", "emerg"
@@ -626,11 +666,11 @@ func otlpSeverity(severity Severity) (logpb.SeverityNumber, string, string) {
 	}
 }
 
-func otlpEventName(entry *TrapEntry) string {
-	if entry.ReportType == ReportTypeDedupSummary {
+func otlpEventName(entry *model.TrapEntry) string {
+	if entry.ReportType == model.ReportTypeDedupSummary {
 		return "snmp.trap.deduplication_summary"
 	}
-	if entry.ReportType == ReportTypeDecodeError {
+	if entry.ReportType == model.ReportTypeDecodeError {
 		return "snmp.trap.decode_error"
 	}
 	cat := string(entry.Category)
@@ -640,17 +680,17 @@ func otlpEventName(entry *TrapEntry) string {
 	return "snmp.trap." + cat
 }
 
-func otlpTrapAttributes(entry *TrapEntry, severitySlug string) []*commonpb.KeyValue {
+func otlpTrapAttributes(entry *model.TrapEntry, severitySlug string) []*commonpb.KeyValue {
 	reportType := string(entry.ReportType)
 	if reportType == "" {
-		reportType = string(ReportTypeTrap)
+		reportType = string(model.ReportTypeTrap)
 	}
 
 	attrs := []*commonpb.KeyValue{
 		otlpKVString("snmp.trap.report_type", reportType),
 	}
 
-	if entry.ReportType != ReportTypeDedupSummary {
+	if entry.ReportType != model.ReportTypeDedupSummary {
 		sourceIP := entry.SourceIP
 		if sourceIP == "" {
 			sourceIP = entry.SourceUDPPeer
@@ -694,7 +734,7 @@ func otlpTrapAttributes(entry *TrapEntry, severitySlug string) []*commonpb.KeyVa
 		attrs = append(attrs, &commonpb.KeyValue{Key: "snmp.varbinds", Value: v})
 	}
 
-	for _, key := range sortedMapKeys(entry.Labels) {
+	for _, key := range output.SortedLabelKeys(nil, entry.Labels) {
 		val := entry.Labels[key]
 		attrs = append(attrs, otlpKVString("trap."+strings.ToLower(key), val))
 	}
@@ -702,7 +742,7 @@ func otlpTrapAttributes(entry *TrapEntry, severitySlug string) []*commonpb.KeyVa
 	return attrs
 }
 
-func appendDecodeErrorOTLPAttributes(attrs *[]*commonpb.KeyValue, info *DecodeErrorInfo) {
+func appendDecodeErrorOTLPAttributes(attrs *[]*commonpb.KeyValue, info *model.DecodeErrorInfo) {
 	*attrs = appendStringAttr(*attrs, "snmp.trap.decode_error.kind", info.Kind)
 	*attrs = appendStringAttr(*attrs, "snmp.trap.decode_error.message", info.Error)
 	*attrs = append(*attrs, otlpKVInt("snmp.trap.packet_size", int64(info.PacketSize)))
@@ -721,7 +761,7 @@ func appendStringAttr(attrs []*commonpb.KeyValue, key, val string) []*commonpb.K
 	return append(attrs, otlpKVString(key, val))
 }
 
-func otlpVarbindsValue(entry *TrapEntry) *commonpb.AnyValue {
+func otlpVarbindsValue(entry *model.TrapEntry) *commonpb.AnyValue {
 	if entry.DecodeError != nil {
 		info := entry.DecodeError
 		values := []*commonpb.KeyValue{
@@ -770,32 +810,27 @@ func otlpVarbindsValue(entry *TrapEntry) *commonpb.AnyValue {
 	if len(entry.Varbinds) == 0 {
 		return nil
 	}
+	// Keep occurrence state local so the compiler can keep the common small map
+	// on the stack; a stateful projector adds a heap allocation per record.
 	seenKeys := make(map[string]int)
 	values := make([]*commonpb.KeyValue, 0, len(entry.Varbinds))
 	for _, vb := range entry.Varbinds {
-		if model.IsSensitiveVarbind(vb) {
-			continue
-		}
-		key := vb.Name
-		if key == "" {
-			key = vb.OID
-		}
-		if key == "" {
+		key, ok := output.VarbindKey(vb)
+		if !ok {
 			continue
 		}
 		seenKeys[key]++
-		if seenKeys[key] > 1 {
-			key = fmt.Sprintf("%s#%d", key, seenKeys[key])
-		}
+		key = output.NumberedVarbindKey(key, seenKeys[key])
+		projected := output.ProjectVarbind(key, vb)
 		fields := []*commonpb.KeyValue{
-			otlpKVString("oid", vb.OID),
-			otlpKVString("type", string(vb.Type)),
-			otlpKV("value", otlpAnyValue(canonicalVarbindValue(vb.Value))),
+			otlpKVString("oid", projected.OID),
+			otlpKVString("type", string(projected.Type)),
+			otlpKV("value", otlpAnyValue(projected.Value)),
 		}
-		if vb.Enum != "" {
-			fields = append(fields, otlpKVString("enum", vb.Enum))
+		if projected.Enum != "" {
+			fields = append(fields, otlpKVString("enum", projected.Enum))
 		}
-		values = append(values, otlpKV(key, otlpKVListValue(fields)))
+		values = append(values, otlpKV(projected.Key, otlpKVListValue(fields)))
 	}
 	if len(values) == 0 {
 		return nil
@@ -823,26 +858,26 @@ func otlpKVListValue(values []*commonpb.KeyValue) *commonpb.AnyValue {
 	return &commonpb.AnyValue{Value: &commonpb.AnyValue_KvlistValue{KvlistValue: &commonpb.KeyValueList{Values: values}}}
 }
 
-func otlpAnyValue(val any) *commonpb.AnyValue {
-	switch v := val.(type) {
-	case nil:
+func otlpAnyValue(val output.CanonicalValue) *commonpb.AnyValue {
+	switch val.Kind {
+	case output.ValueNull:
 		return &commonpb.AnyValue{}
-	case string:
-		return otlpStringValue(v)
-	case int:
-		return &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: int64(v)}}
-	case int64:
-		return &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: v}}
-	case uint64:
-		if v <= math.MaxInt64 {
-			return &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: int64(v)}}
+	case output.ValueString:
+		return otlpStringValue(val.String)
+	case output.ValueInt64:
+		return &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: val.Int64}}
+	case output.ValueUint64:
+		if val.Uint64 <= math.MaxInt64 {
+			return &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: int64(val.Uint64)}}
 		}
-		return otlpStringValue(fmt.Sprintf("%d", v))
-	case float64:
-		return &commonpb.AnyValue{Value: &commonpb.AnyValue_DoubleValue{DoubleValue: v}}
-	case bool:
-		return &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: v}}
+		return otlpStringValue(strconv.FormatUint(val.Uint64, 10))
+	case output.ValueFloat64:
+		return &commonpb.AnyValue{Value: &commonpb.AnyValue_DoubleValue{DoubleValue: val.Float64}}
+	case output.ValueBool:
+		return &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: val.Bool}}
+	case output.ValueBytes:
+		return otlpStringValue(hex.EncodeToString(val.Bytes))
 	default:
-		return otlpStringValue(fmt.Sprintf("%v", v))
+		return &commonpb.AnyValue{}
 	}
 }

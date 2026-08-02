@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package journal
 
 import (
 	"bytes"
@@ -11,10 +11,81 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
-func TestSerializeToJournalFields(t *testing.T) {
-	entry := &TrapEntry{
+type decodedField struct {
+	Name  string
+	Value []byte
+}
+
+func serializeHotFields(entry *model.TrapEntry) ([]decodedField, error) {
+	var serializer hotSerializer
+	payloads, _, err := serializer.serialize(entry)
+	if err != nil {
+		return nil, err
+	}
+	fields := make([]decodedField, 0, len(payloads))
+	for _, payload := range payloads {
+		name, value, ok := bytes.Cut(payload, []byte{'='})
+		if ok {
+			fields = append(fields, decodedField{Name: string(name), Value: value})
+		}
+	}
+	return fields, nil
+}
+
+func TestHotSerializerExactRawPayloads(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Category:              "state_change",
+		Severity:              "warning",
+		Message:               "trap",
+		SourceIP:              "192.0.2.1",
+		SourceUDPPeer:         "192.0.2.1:162",
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
+	}
+	var serializer hotSerializer
+	payloads, binaryFields, err := serializer.serialize(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"MESSAGE=trap",
+		"PRIORITY=4",
+		"SYSLOG_IDENTIFIER=local",
+		"TRAP_JOB=local",
+		"_HOSTNAME=192.0.2.1",
+		"ND_LOG_SOURCE=snmp-trap",
+		"TRAP_REPORT_TYPE=trap",
+		"TRAP_OID=1.3.6.1.6.3.1.1.5.3",
+		"TRAP_CATEGORY=state_change",
+		"TRAP_SEVERITY=warning",
+		"TRAP_PDU_TYPE=trap",
+		"TRAP_VERSION=v2c",
+		"TRAP_SOURCE_IP=192.0.2.1",
+		"TRAP_SOURCE_UDP_PEER=192.0.2.1:162",
+		"TRAP_JSON={}",
+	}
+	if len(payloads) != len(want) {
+		t.Fatalf("payload count = %d, want %d: %q", len(payloads), len(want), payloads)
+	}
+	for i := range want {
+		if got := string(payloads[i]); got != want[i] {
+			t.Fatalf("payload %d = %q, want %q", i, got, want[i])
+		}
+	}
+	if binaryFields != 0 {
+		t.Fatalf("binary fields = %d, want 0", binaryFields)
+	}
+}
+
+func TestHotSerializer(t *testing.T) {
+	entry := &model.TrapEntry{
+		JobName:               "local",
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
@@ -27,18 +98,18 @@ func TestSerializeToJournalFields(t *testing.T) {
 		ReverseDNS:            "core-sw.ptr.example.com",
 		DeviceHostname:        "core-sw-01",
 		DeviceVendor:          "cisco",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
 		Labels:                map[string]string{"interface": "eth0", "vlan": "10"},
-		Enrichment: &TrapEnrichmentAudit{
-			Source: &TrapSourceAudit{
+		Enrichment: &model.TrapEnrichmentAudit{
+			Source: &model.TrapSourceAudit{
 				UDPPeer:            "10.0.0.1",
 				SnmpTrapAddress:    "192.0.2.1",
 				Selected:           "10.0.0.1",
 				Method:             "udp_peer",
 				RejectedCandidates: []string{"snmpTrapAddress.0:untrusted_relay_uses_udp_peer"},
 			},
-			Registry: &TrapEnrichmentLookup{
+			Registry: &model.TrapEnrichmentLookup{
 				Key:     "10.0.0.1",
 				Status:  "matched",
 				Method:  "hostname_or_ip",
@@ -50,13 +121,13 @@ func TestSerializeToJournalFields(t *testing.T) {
 				"TRAP_DEVICE_VENDOR": "cisco",
 			},
 		},
-		Varbinds: []VarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 			{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifDescr", Type: "OctetString", Value: "eth0"},
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,54 +169,54 @@ func TestSerializeToJournalFields(t *testing.T) {
 }
 
 func TestJournalSerializersAppendLargeJSONFieldsLast(t *testing.T) {
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
 		Labels:                map[string]string{"site": "lab"},
-		Enrichment: &TrapEnrichmentAudit{
-			Source: &TrapSourceAudit{Selected: "10.0.0.1", Method: "udp_peer"},
+		Enrichment: &model.TrapEnrichmentAudit{
+			Source: &model.TrapSourceAudit{Selected: "10.0.0.1", Method: "udp_peer"},
 		},
-		Varbinds: []VarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
-		t.Fatalf("serializeToJournalFields: %v", err)
+		t.Fatalf("serializeHotFields: %v", err)
 	}
 	assertFieldOrder(t, journalFieldNames(fields), "TRAP_TAG_SITE", "TRAP_VAR_IFINDEX", "TRAP_ENRICHMENT", "TRAP_JSON")
 
-	var s journalHotSerializer
+	var s hotSerializer
 	payloads, _, err := s.serialize(entry)
 	if err != nil {
-		t.Fatalf("journalHotSerializer.serialize: %v", err)
+		t.Fatalf("hotSerializer.serialize: %v", err)
 	}
 	assertFieldOrder(t, payloadFieldNames(payloads), "TRAP_TAG_SITE", "TRAP_VAR_IFINDEX", "TRAP_ENRICHMENT", "TRAP_JSON")
 }
 
-func TestSerializeToJournalFieldsNoHostname(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerNoHostname(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
-		Varbinds:              []VarbindValue{},
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
+		Varbinds:              []model.VarbindValue{},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -153,17 +224,17 @@ func TestSerializeToJournalFieldsNoHostname(t *testing.T) {
 	assertField(t, fieldMap, "_HOSTNAME", "10.0.0.1")
 }
 
-func TestSerializeToJournalFieldsDedupSummary(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerDedupSummary(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeDedupSummary,
+		ReportType:            model.ReportTypeDedupSummary,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		Message:               "DEDUPLICATED TRAPS: 5 suppressed",
 		SourceIP:              "10.0.0.1",
 		DeviceHostname:        "core-sw-01",
 		SourceVnodeID:         "source-vnode-id",
-		SummaryCounts: &DedupSummary{
+		SummaryCounts: &model.DedupSummary{
 			TotalSuppressed: 5,
 			PeriodSec:       10,
 			Fingerprints:    3,
@@ -172,7 +243,7 @@ func TestSerializeToJournalFieldsDedupSummary(t *testing.T) {
 		Severity: "info",
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,10 +265,10 @@ func TestSerializeToJournalFieldsDedupSummary(t *testing.T) {
 	}
 }
 
-func TestSerializeToJournalFieldsDecodeError(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerDecodeError(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeDecodeError,
+		ReportType:            model.ReportTypeDecodeError,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		Category:              "diagnostic",
@@ -205,9 +276,9 @@ func TestSerializeToJournalFieldsDecodeError(t *testing.T) {
 		Message:               "SNMP trap decode failed from 10.0.0.1: malformed_pdu: BER: trailing data",
 		SourceIP:              "10.0.0.1",
 		SourceUDPPeer:         "10.0.0.1",
-		SnmpVersion:           SnmpVersionV2c,
+		SnmpVersion:           model.SnmpVersionV2c,
 		PacketSequence:        7,
-		DecodeError: &DecodeErrorInfo{
+		DecodeError: &model.DecodeErrorInfo{
 			Kind:          "malformed_pdu",
 			Error:         "BER: trailing data",
 			PacketSize:    42,
@@ -218,7 +289,7 @@ func TestSerializeToJournalFieldsDecodeError(t *testing.T) {
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -256,9 +327,9 @@ func TestSerializeToJournalFieldsDecodeError(t *testing.T) {
 	}
 }
 
-func TestSerializeToJournalFieldsSeverityMapping(t *testing.T) {
+func TestHotSerializerSeverityMapping(t *testing.T) {
 	tests := map[string]struct {
-		severity Severity
+		severity model.Severity
 		priority string
 	}{
 		"emerg":   {"emerg", "0"},
@@ -283,68 +354,68 @@ func TestSerializeToJournalFieldsSeverityMapping(t *testing.T) {
 	}
 }
 
-func TestSerializeToJournalFieldsNilEntry(t *testing.T) {
-	_, err := serializeToJournalFields(nil)
+func TestHotSerializerNilEntry(t *testing.T) {
+	_, err := serializeHotFields(nil)
 	if err == nil {
 		t.Fatal("expected error for nil entry")
 	}
 }
 
-func TestSerializeToJournalFieldsMissingJobName(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerMissingJobName(t *testing.T) {
+	entry := &model.TrapEntry{
 		TrapOID:  "1.3.6.1.6.3.1.1.5.3",
 		SourceIP: "10.0.0.1",
 	}
-	_, err := serializeToJournalFields(entry)
+	_, err := serializeHotFields(entry)
 	if err == nil {
 		t.Fatal("expected error for missing job name")
 	}
 }
 
-func TestSerializeToJournalFieldsMissingSourceIP(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerMissingSourceIP(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:        "local",
 		TrapOID:        "1.3.6.1.6.3.1.1.5.3",
 		SourceIP:       "",
 		SourceUDPPeer:  "",
 		DeviceHostname: "",
 	}
-	_, err := serializeToJournalFields(entry)
+	_, err := serializeHotFields(entry)
 	if err == nil {
 		t.Fatal("expected error for missing source IP")
 	}
 }
 
-func TestSerializeToJournalFieldsNegativeTimestamp(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerNegativeTimestamp(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		SourceIP:              "10.0.0.1",
 		ReceivedRealtimeUsec:  -1,
 		ReceivedMonotonicUsec: 0,
 	}
-	_, err := serializeToJournalFields(entry)
+	_, err := serializeHotFields(entry)
 	if err == nil {
 		t.Fatal("expected error for negative timestamp")
 	}
 }
 
-func TestSerializeToJournalFieldsTRAPTagLabels(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerTRAPTagLabels(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
 		Labels:                map[string]string{"compliance": "pci", "tenant": "acme"},
-		Varbinds:              []VarbindValue{},
+		Varbinds:              []model.VarbindValue{},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -353,25 +424,25 @@ func TestSerializeToJournalFieldsTRAPTagLabels(t *testing.T) {
 	assertField(t, fieldMap, "TRAP_TAG_TENANT", "acme")
 }
 
-func TestSerializeToJournalFieldsTRAPJSONShape(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerTRAPJSONShape(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
 		PacketSequence:        42,
-		Varbinds: []VarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 			{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifDescr", Type: "OctetString", Value: "eth0"},
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -397,24 +468,24 @@ func TestSerializeToJournalFieldsTRAPJSONShape(t *testing.T) {
 	}
 }
 
-func TestSerializeToJournalFieldsTRAPJSONSequenceKeyCollision(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerTRAPJSONSequenceKeyCollision(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
 		PacketSequence:        42,
-		Varbinds: []VarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: trapJSONPacketSequenceKey, Type: "INTEGER", Value: int64(999)},
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -433,24 +504,24 @@ func TestSerializeToJournalFieldsTRAPJSONSequenceKeyCollision(t *testing.T) {
 	}
 }
 
-func TestSerializeToJournalFieldsTRAPJSONOmitsCommunityVarbind(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerTRAPJSONOmitsCommunityVarbind(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV1,
-		Varbinds: []VarbindValue{
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV1,
+		Varbinds: []model.VarbindValue{
 			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -472,18 +543,18 @@ func TestSerializeToJournalFieldsTRAPJSONOmitsCommunityVarbind(t *testing.T) {
 	}
 }
 
-func TestSerializeToJournalFieldsTrapVarbindJournalFields(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerTrapVarbindJournalFields(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV1,
-		Varbinds: []VarbindValue{
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV1,
+		Varbinds: []model.VarbindValue{
 			{OID: model.SysUpTimeOID, Name: "sysUpTime.0", Type: "TimeTicks", Value: uint64(129665677)},
 			{OID: model.SNMPTrapOID, Name: "snmpTrapOID.0", Type: "ObjectIdentifier", Value: "1.3.6.1.6.3.1.1.5.3"},
 			{OID: model.SNMPTrapAddressOID, Name: "snmpTrapAddress.0", Type: "IPAddress", Value: "0.0.0.0"},
@@ -495,7 +566,7 @@ func TestSerializeToJournalFieldsTrapVarbindJournalFields(t *testing.T) {
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -513,18 +584,18 @@ func TestSerializeToJournalFieldsTrapVarbindJournalFields(t *testing.T) {
 	assertFieldAbsent(t, fieldMap, "TRAP_VAR_SNMPTRAPCOMMUNITY_0")
 }
 
-func TestSerializeToJournalFieldsTrapVarbindJournalFieldNames(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerTrapVarbindJournalFieldNames(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
-		Varbinds: []VarbindValue{
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
+		Varbinds: []model.VarbindValue{
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 			{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifIndex", Type: "INTEGER", Value: int64(2)},
 			{OID: "1.3.6.1.4.1.999.1", Type: "OctetString", Value: "raw-oid-name"},
@@ -535,7 +606,7 @@ func TestSerializeToJournalFieldsTrapVarbindJournalFieldNames(t *testing.T) {
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -551,26 +622,26 @@ func TestSerializeToJournalFieldsTrapVarbindJournalFieldNames(t *testing.T) {
 	assertFieldAbsent(t, fieldMap, "TRAP_VAR_SNMPTRAPADDRESS_0")
 }
 
-func TestSerializeToJournalFieldsTrapVarbindJournalFieldNamesFitJournaldPolicy(t *testing.T) {
+func TestHotSerializerTrapVarbindJournalFieldNamesFitJournaldPolicy(t *testing.T) {
 	longOID := "1.3.6.1.4.1.9.9.315.1.2.1.1.1.2.3.4.5.6.7.8.9.10.11.12.13.14.15.16.17.18.19.20"
 	longName := "thisIsAnExtremelyLongVendorSpecificVarbindNameThatWouldNotFitInsideAJournaldFieldName"
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
-		Varbinds: []VarbindValue{
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
+		Varbinds: []model.VarbindValue{
 			{OID: longOID, Type: "OctetString", Value: "long-oid"},
 			{OID: "1.3.6.1.4.1.999.4", Name: longName, Type: "INTEGER", Value: int64(42), Enum: "meaning"},
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -587,11 +658,24 @@ func TestSerializeToJournalFieldsTrapVarbindJournalFieldNamesFitJournaldPolicy(t
 	assertFieldWithPrefix(t, fieldMap, "TRAP_VAR_THISISANEXTREMELYLONGVENDORSPECIFICVAR", "42")
 }
 
-func TestSerializeToJournalFieldsTRAPJSONUsesProfileNamesForTabularVarbindInstances(t *testing.T) {
-	td := testIFMIBLinkDownTrapDef()
-	entry := trapEntryFromPDU("local", testIFMIBLinkDownPDU(), td, 1000000, 1000)
+func TestHotSerializerTRAPJSONUsesProfileNamesForTabularVarbindInstances(t *testing.T) {
+	const ifOperStatusOID = "1.3.6.1.2.1.2.2.1.8"
+	entry := &model.TrapEntry{
+		JobName:               "local",
+		ReportType:            model.ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Message:               "test",
+		SourceIP:              "10.0.0.1",
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
+		Varbinds: []model.VarbindValue{{
+			OID: ifOperStatusOID + ".1", Name: "ifOperStatus", Type: "INTEGER", Value: int64(2), Enum: "down",
+		}},
+	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -602,39 +686,39 @@ func TestSerializeToJournalFieldsTRAPJSONUsesProfileNamesForTabularVarbindInstan
 		t.Fatalf("TRAP_JSON not valid: %v", err)
 	}
 
-	if _, ok := obj[testIFMIBIfOperStatusOID+".1"]; ok {
-		t.Fatalf("TRAP_JSON kept raw instance OID key %q instead of profile varbind name", testIFMIBIfOperStatusOID+".1")
+	if _, ok := obj[ifOperStatusOID+".1"]; ok {
+		t.Fatalf("TRAP_JSON kept raw instance OID key %q instead of profile varbind name", ifOperStatusOID+".1")
 	}
 	status, ok := obj["ifOperStatus"]
 	if !ok {
 		t.Fatalf("ifOperStatus key not found in TRAP_JSON: %v", obj)
 	}
-	if status["oid"] != testIFMIBIfOperStatusOID+".1" {
-		t.Fatalf("ifOperStatus oid = %v, want %s", status["oid"], testIFMIBIfOperStatusOID+".1")
+	if status["oid"] != ifOperStatusOID+".1" {
+		t.Fatalf("ifOperStatus oid = %v, want %s", status["oid"], ifOperStatusOID+".1")
 	}
 	if status["enum"] != "down" {
 		t.Fatalf("ifOperStatus enum = %v, want down", status["enum"])
 	}
 }
 
-func TestSerializeToJournalFieldsDuplicateJSONKeys(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerDuplicateJSONKeys(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
-		Varbinds: []VarbindValue{
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
+		Varbinds: []model.VarbindValue{
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(2)},
 		},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -653,22 +737,22 @@ func TestSerializeToJournalFieldsDuplicateJSONKeys(t *testing.T) {
 	}
 }
 
-func TestSerializeToJournalFieldsLabelsSorted(t *testing.T) {
-	entry := &TrapEntry{
+func TestHotSerializerLabelsSorted(t *testing.T) {
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
 		Labels:                map[string]string{"z_key": "z_val", "a_key": "a_val"},
-		Varbinds:              []VarbindValue{},
+		Varbinds:              []model.VarbindValue{},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -690,22 +774,22 @@ func TestSerializeToJournalFieldsLabelsSorted(t *testing.T) {
 
 func TestTrapTagJournalFieldNameIsCapped(t *testing.T) {
 	longKey := strings.Repeat("a", 80)
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		JobName:               "local",
-		ReportType:            ReportTypeTrap,
+		ReportType:            model.ReportTypeTrap,
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 		Message:               "test",
 		SourceIP:              "10.0.0.1",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
+		PduType:               model.PduTypeTrap,
+		SnmpVersion:           model.SnmpVersionV2c,
 		Labels:                map[string]string{longKey: "value"},
 	}
 
-	fields, err := serializeToJournalFields(entry)
+	fields, err := serializeHotFields(entry)
 	if err != nil {
-		t.Fatalf("serializeToJournalFields: %v", err)
+		t.Fatalf("serializeHotFields: %v", err)
 	}
 	fieldMap := fieldsToMap(fields)
 	var found string
@@ -724,11 +808,11 @@ func TestTrapTagJournalFieldNameIsCapped(t *testing.T) {
 	assertField(t, fieldMap, found, "value")
 }
 
-func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
-	cases := map[string]*TrapEntry{
+func TestHotSerializerCanonicalCases(t *testing.T) {
+	cases := map[string]*model.TrapEntry{
 		"Trap": {
 			JobName:               "local",
-			ReportType:            ReportTypeTrap,
+			ReportType:            model.ReportTypeTrap,
 			ReceivedRealtimeUsec:  1000000,
 			ReceivedMonotonicUsec: 1000,
 			TrapOID:               "1.3.6.1.6.3.1.1.5.3",
@@ -740,25 +824,25 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 			SourceUDPPeer:         "10.0.0.1",
 			DeviceHostname:        "core-sw-01",
 			DeviceVendor:          "cisco",
-			PduType:               PduTypeTrap,
-			SnmpVersion:           SnmpVersionV2c,
+			PduType:               model.PduTypeTrap,
+			SnmpVersion:           model.SnmpVersionV2c,
 			Labels:                map[string]string{"z_key": "z_val", "a_key": "a_val"},
-			Varbinds: []VarbindValue{
+			Varbinds: []model.VarbindValue{
 				{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 				{OID: "1.3.6.1.2.1.2.2.1.7", Name: "ifAdminStatus", Type: "INTEGER", Value: int64(1), Enum: "up"},
 				{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 				{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifIndex", Type: "OctetString", Value: "eth0"},
 			},
 		},
-		"DedupSummary": {
+		"model.DedupSummary": {
 			JobName:               "local",
-			ReportType:            ReportTypeDedupSummary,
+			ReportType:            model.ReportTypeDedupSummary,
 			ReceivedRealtimeUsec:  1000000,
 			ReceivedMonotonicUsec: 1000,
 			Severity:              "notice",
 			Message:               "summary",
-			Varbinds:              []VarbindValue{{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)}},
-			SummaryCounts: &DedupSummary{
+			Varbinds:              []model.VarbindValue{{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)}},
+			SummaryCounts: &model.DedupSummary{
 				TotalSuppressed: 12,
 				Fingerprints:    2,
 				PeriodSec:       60,
@@ -767,19 +851,19 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 		},
 		"Binary encoded": {
 			JobName:               "local",
-			ReportType:            ReportTypeTrap,
+			ReportType:            model.ReportTypeTrap,
 			ReceivedRealtimeUsec:  1000000,
 			ReceivedMonotonicUsec: 1000,
 			TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 			Severity:              "warning",
 			Message:               "line1\nline2",
 			SourceIP:              "10.0.0.1",
-			PduType:               PduTypeTrap,
-			SnmpVersion:           SnmpVersionV2c,
+			PduType:               model.PduTypeTrap,
+			SnmpVersion:           model.SnmpVersionV2c,
 		},
 		"DecodeError": {
 			JobName:               "local",
-			ReportType:            ReportTypeDecodeError,
+			ReportType:            model.ReportTypeDecodeError,
 			ReceivedRealtimeUsec:  1000000,
 			ReceivedMonotonicUsec: 1000,
 			Severity:              "warning",
@@ -787,8 +871,8 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 			Message:               "SNMP trap decode failed from 10.0.0.1: malformed_pdu: BER: trailing data",
 			SourceIP:              "10.0.0.1",
 			SourceUDPPeer:         "10.0.0.1",
-			SnmpVersion:           SnmpVersionV2c,
-			DecodeError: &DecodeErrorInfo{
+			SnmpVersion:           model.SnmpVersionV2c,
+			DecodeError: &model.DecodeErrorInfo{
 				Kind:          "malformed_pdu",
 				Error:         "BER: trailing data",
 				PacketSize:    42,
@@ -797,20 +881,20 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 				Listener:      "0.0.0.0:162",
 				EngineID:      "8000000001020304",
 			},
-			Varbinds: []VarbindValue{{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)}},
+			Varbinds: []model.VarbindValue{{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)}},
 		},
 		"JSONEscapingAndValueTypes": {
 			JobName:               "local",
-			ReportType:            ReportTypeTrap,
+			ReportType:            model.ReportTypeTrap,
 			ReceivedRealtimeUsec:  1000000,
 			ReceivedMonotonicUsec: 1000,
 			TrapOID:               "1.3.6.1.6.3.1.1.5.3",
 			Severity:              "warning",
 			Message:               "json values",
 			SourceIP:              "10.0.0.1",
-			PduType:               PduTypeTrap,
-			SnmpVersion:           SnmpVersionV2c,
-			Varbinds: []VarbindValue{
+			PduType:               model.PduTypeTrap,
+			SnmpVersion:           model.SnmpVersionV2c,
+			Varbinds: []model.VarbindValue{
 				{OID: "1.3.6.1.2.1.2.2.1.1", Name: `quote"\control`, Type: "OctetString", Value: "a<b>&\"\n\u2028\u2029" + string([]byte{0xff})},
 				{OID: "1.3.6.1.2.1.2.2.1.2", Name: "bytes", Type: "OctetString", Value: []byte{0, 15, 255}},
 				{OID: "1.3.6.1.2.1.2.2.1.3", Name: "float", Type: "OpaqueFloat", Value: float64(1.25)},
@@ -822,24 +906,49 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 
 	for name, entry := range cases {
 		t.Run(name, func(t *testing.T) {
-			fields, err := serializeToJournalFields(entry)
+			var serializer hotSerializer
+			payloads, _, err := serializer.serialize(entry)
 			if err != nil {
-				t.Fatalf("serializeToJournalFields: %v", err)
+				t.Fatalf("serialize: %v", err)
 			}
-
-			var s journalHotSerializer
-			payloads, binaryEncodedFields, err := s.serialize(entry)
-			if err != nil {
-				t.Fatalf("journalHotSerializer.serialize: %v", err)
-			}
-
-			if binaryEncodedFields != binaryEncodedFieldCount(fields) {
-				t.Fatalf("binary-encoded fields = %d, want %d", binaryEncodedFields, binaryEncodedFieldCount(fields))
-			}
-			if got, want := rawPayloadsToMap(payloads), fieldsToMap(fields); !mapsEqual(got, want) {
-				t.Fatalf("hot payload map mismatch\ngot:  %#v\nwant: %#v", got, want)
+			if len(payloads) == 0 {
+				t.Fatal("serialize returned no payloads")
 			}
 		})
+	}
+}
+
+func TestHotSerializerTRAPJSONCanonicalValueTypes(t *testing.T) {
+	entry := &model.TrapEntry{
+		JobName:    "local",
+		ReportType: model.ReportTypeTrap,
+		TrapOID:    ".0",
+		SourceIP:   "192.0.2.1",
+		Varbinds: []model.VarbindValue{
+			{Name: "string", OID: ".1", Type: "OctetString", Value: "quote\"\\line\n"},
+			{Name: "int", OID: ".2", Type: "INTEGER", Value: int64(-3)},
+			{Name: "uint", OID: ".3", Type: "Counter64", Value: uint64(7)},
+			{Name: "float", OID: ".4", Type: "OpaqueFloat", Value: float64(1.25)},
+			{Name: "bool", OID: ".5", Type: "BOOLEAN", Value: true},
+			{Name: "bytes", OID: ".6", Type: "OctetString", Value: []byte{0x00, 0x0f, 0xff}},
+			{Name: "nil", OID: ".7", Type: "Null", Value: nil},
+		},
+	}
+
+	fields, err := serializeHotFields(entry)
+	if err != nil {
+		t.Fatalf("serializeHotFields: %v", err)
+	}
+
+	want := `{"bool":{"oid":".5","type":"BOOLEAN","value":true},` +
+		`"bytes":{"oid":".6","type":"OctetString","value":"000fff"},` +
+		`"float":{"oid":".4","type":"OpaqueFloat","value":1.25},` +
+		`"int":{"oid":".2","type":"INTEGER","value":-3},` +
+		`"nil":{"oid":".7","type":"Null","value":null},` +
+		`"string":{"oid":".1","type":"OctetString","value":"quote\"\\line\n"},` +
+		`"uint":{"oid":".3","type":"Counter64","value":7}}`
+	if got := fieldsToMap(fields)["TRAP_JSON"]; got != want {
+		t.Fatalf("TRAP_JSON = %q, want %q", got, want)
 	}
 }
 
@@ -869,7 +978,7 @@ func assertFieldWithPrefix(t *testing.T, fieldMap map[string]string, prefix, exp
 	t.Fatalf("missing field with prefix %q and value %q", prefix, expected)
 }
 
-func fieldsToMap(fields []JournalField) map[string]string {
+func fieldsToMap(fields []decodedField) map[string]string {
 	m := make(map[string]string, len(fields))
 	for _, f := range fields {
 		m[f.Name] = string(f.Value)
@@ -889,7 +998,7 @@ func rawPayloadsToMap(payloads [][]byte) map[string]string {
 	return m
 }
 
-func journalFieldNames(fields []JournalField) []string {
+func journalFieldNames(fields []decodedField) []string {
 	names := make([]string, 0, len(fields))
 	for _, field := range fields {
 		names = append(names, field.Name)
@@ -930,16 +1039,4 @@ func assertFieldOrder(t *testing.T, names []string, ordered ...string) {
 	if last := ordered[len(ordered)-1]; names[len(names)-1] != last {
 		t.Fatalf("last field = %q, want %q; order: %v", names[len(names)-1], last, names)
 	}
-}
-
-func mapsEqual(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, av := range a {
-		if b[k] != av {
-			return false
-		}
-	}
-	return true
 }

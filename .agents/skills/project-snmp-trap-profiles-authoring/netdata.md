@@ -146,9 +146,14 @@ The implementation language is **Go** (user decision recorded on 2026-05-25). Th
 
 **Process model** (accepted by SOW-0035 M1 ADR-0001): The trap plugin is a **standard in-process go.d collector V2 module** at `src/go/plugin/go.d/collector/snmp_traps/`, registered as `snmp_traps`. No separate process, no CGo, no subprocess bridge.
 
-**Journal writer backend**: The trap collector uses the Go systemd journal SDK module `github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.6.4` behind the local `TrapWriter` abstraction. `NewJournalWriter()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation policy validation, and retention policy validation are proven during job creation before DynCfg apply succeeds when direct journal output is enabled.
+**Journal writer backend**: The trap collector uses the Go systemd journal SDK module
+`github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.8.0` behind `internal/output.Writer`.
+`internal/output/journal.Prepare()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal
+directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation
+policy validation, and retention policy validation are proven during job creation. `Writer.Start()` launches the queue
+worker only after every job resource has passed preflight.
 
-The configured per-job root is `${NETDATA_LOG_DIR}/traps/{job_name}/`. The plugin validates that `${NETDATA_LOG_DIR}` exists before creating the Netdata-owned child tree. The SDK appends the machine-id child directory, so the effective query directory is `${NETDATA_LOG_DIR}/traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `JournalDirectory()` for `journalctl --directory` validation.
+The configured per-job root is `${NETDATA_LOG_DIR}/traps/{job_name}/`. The plugin validates that `${NETDATA_LOG_DIR}` exists before creating the Netdata-owned child tree. The SDK appends the machine-id child directory, so the effective query directory is `${NETDATA_LOG_DIR}/traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `Directory()` for `journalctl --directory` validation.
 
 **Output backend selection**:
 
@@ -187,7 +192,7 @@ SOW-0035 M1 finalizes the exact process/writer boundary for the Go implementatio
 9. Enrich: device identity (sysName, vendor); topology position if co-located; recent polling state if available. Go in-process access is preferred; any alternate boundary must be justified by SOW-0035 M1.
 10. **(Opt-in dedup, default off — see §10)** If dedup is enabled for this job: check `(source_device, trap_OID, key_varbinds)` fingerprint. If hit, increment in-memory suppression counter and skip steps 11-12. If miss or dedup disabled, continue.
 11. Atomic increment of in-memory counters for `snmp.trap.events` (per device, per category, per severity), with `job_name` as a label.
-12. Build journal entry; one `TrapWriter.Write()` call (see §19). The journal-direct writer serializes the entry directly into SDK-managed per-job journal files (NOT via `sd_journal_send()` — journald is bypassed so the writer can set `_HOSTNAME` to the source device, see §11).
+12. Build the semantic trap entry; one `output.Writer.Write()` call (see §19). The journal-direct writer serializes the entry directly into SDK-managed per-job journal files (NOT via `sd_journal_send()` — journald is bypassed so the writer can set `_HOSTNAME` to the source device, see §11).
 13. Return.
 
 ### Cold path (per Netdata collection tick, default 1Hz)
@@ -586,7 +591,7 @@ Endpoint syntax:
 
 `headers` is an optional string map converted to gRPC metadata. Header values may be go.d secret references; the existing go.d secret resolver resolves string values before the collector receives the config. Header values are never emitted as trap attributes or logged.
 
-The OTLP writer implements the same `TrapWriter` interface as the journal writer. When direct journal is enabled, OTLP is a secondary fan-out backend: an OTLP enqueue/export failure increments `snmp.trap.errors.otlp_export_failed` and drops only the OTLP copy. When `journal.enabled` is `false`, OTLP becomes the primary/only backend and primary write failures are counted as `otlp_export_failed`. Journal write failures increment `journal_write_failed` only for jobs with direct journal enabled.
+The OTLP writer implements the same `internal/output.Writer` interface as the journal writer. When direct journal is enabled, OTLP is a secondary fan-out backend: an OTLP enqueue/export failure increments `snmp.trap.errors.otlp_export_failed` and drops only the OTLP copy. When `journal.enabled` is `false`, OTLP becomes the primary/only backend and primary write failures are counted as `otlp_export_failed`. Journal write failures increment `journal_write_failed` only for jobs with direct journal enabled.
 
 ## 8. OOB Catalog Strategy
 
@@ -1163,7 +1168,7 @@ trap-derived state gauges; see `trap-metrics-profiles.md` and
 
 Phase B resolved most of the original questions. What remains:
 
-1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, 2026-05-31 for SDK `go/v0.4.0`, 2026-06-08 for SDK `go/v0.5.1`, 2026-06-10 for SDK `go/v0.6.3` plus persistent-journal placement, and 2026-06-11 for SDK `go/v0.6.4` plus Netdata log directory placement)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.6.4`. No separate process, no CGo, no subprocess bridge. See `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`.
+1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended through 2026-08-02 for SDK `go/v0.8.0`, Netdata log directory placement, raw-payload serialization, and internal output ownership)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.8.0`. No separate process, no CGo, no subprocess bridge. See `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`.
 
 2. **Profile YAML lifecycle — ACCEPTED (superseded 2026-08-01)**: operators add or edit YAML files under
    `/etc/netdata/go.d/snmp.trap-profiles/`. Profiles are immutable while the shared profile cache has active job
@@ -1257,7 +1262,7 @@ The implementation is tracked through five sequential SOWs under `.agents/sow/pe
 
 | SOW | Scope | Acceptance |
 |---|---|---|
-| **SOW-0035** | Go implementation architecture decision (process model, journal-writer backend, TrapWriter interface contract); multi-endpoint listener (per-job DynCfg orchestration; every configured endpoint binds or job creation fails with retryable HTTP-503 surfaced in DynCfg — no automatic high-port fallback) + SNMPv1/v2c decode + source identification + replayable pcap test corpus; shared lazy profile YAML loader loaded on first runnable job creation (multipath, filename-dedup, extends-chain merge — mirroring the SNMP polling plugin) + OID index + 2-tier varbind resolution + template rendering; journal writer per-job (one journal directory per job at `${NETDATA_LOG_DIR}/traps/{job_name}/`, retention config with intentional deviation on the `max_duration` default) with creation-time directory/writer preflight and CWE-117 binary-field encoding | Operator sees decoded trap from a replayed pcap in a per-job journal directory |
+| **SOW-0035** | Go implementation architecture decision (process model, journal-writer backend, output writer interface contract); multi-endpoint listener (per-job DynCfg orchestration; every configured endpoint binds or job creation fails with retryable HTTP-503 surfaced in DynCfg — no automatic high-port fallback) + SNMPv1/v2c decode + source identification + replayable pcap test corpus; shared lazy profile YAML loader loaded on first runnable job creation (multipath, filename-dedup, extends-chain merge — mirroring the SNMP polling plugin) + OID index + 2-tier varbind resolution + template rendering; journal writer per-job (one journal directory per job at `${NETDATA_LOG_DIR}/traps/{job_name}/`, retention config with intentional deviation on the `max_duration` default) with creation-time directory/writer preflight and CWE-117 binary-field encoding | Operator sees decoded trap from a replayed pcap in a per-job journal directory |
 | **SOW-0036** | SNMPv3 USM (static engineID whitelist, per-job) + INFORM acknowledgement + `snmpEngineBoots` persistence per job; per-job allowlist + rate limiting; plugin configuration schema + DynCfg per-job orchestration refinement; plugin-self NIDL metrics (per-job dimensions, full error universe per §12, including BER limit violations from §18) | Production-grade per-job auth + rate limiting + telemetry |
 | **SOW-0037** | Cross-plugin enrichment (sysName/vendor/topology); **opt-in** deduplication (per-job, disabled by default — see §10) with periodic summary entries; profile-defined trap metrics enabled per listener job | Operational depth: enriched and optionally deduped |
 | **SOW-0038** | Throughput benchmark harness; SNMPv3 dynamic engineID discovery (opt-in); standards-compliant OTLP exporter (§11b — optional, vendor-neutral; works with Netdata's OTEL plugin and any OTLP-compliant receiver) | Scale + interop |
@@ -1281,22 +1286,23 @@ The hot path (§5) decodes untrusted UDP-delivered ASN.1 BER. Malformed or hosti
 
 These limits apply per-job (each job has its own decoder thread per §5) with the same default values listed in the table. They are not operator-configurable. The wording "global" here means the same defaults apply across every job; it does NOT mean a single shared decoder state — each job's decoder enforces the limits independently against its own UDP buffer.
 
-## 19. TrapWriter interface contract
+## 19. Output writer interface contract
 
-The `TrapWriter` interface is the contract between the trap pipeline and the storage/transport backends. It must accommodate both the journal-direct path (§11) and the opt-in OTLP path (§11b) without retrofit.
+`internal/output.Writer` is the contract between the trap pipeline and the storage/transport backends. It accommodates
+the journal-direct path (§11), the opt-in OTLP path (§11b), and the primary/secondary coordinator.
 
 **Status: Accepted (SOW-0035 M1, ADR-0001, reviewer round 5 findings folded in).** The Go interface definition and `TrapEntry` struct are recorded in `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md` §3-4. Key design decisions:
 
 - The interface is `Write(entry *TrapEntry) error`, `Flush() error`, `Close() error` — fast accept into backend-owned bounded queues, backend-internal batching
 - CWE-117 encoding is owned by the journal writer backend, not the interface
-- The journal-direct backend implements this interface by calling the Go-native `JournalWriter.WriteEntry()` method
+- The journal-direct backend has one reusable raw serializer and calls SDK `AppendRaw()` from its single worker
 - The OTLP backend (SOW-0038) implements the same interface with protobuf serialization
 - `TrapEntry` is the language-neutral semantic representation; field names are semantic (not journal/OTLP); the writer applies its backend's naming convention at serialization time
 
 ### Minimal contract (Go)
 
 ```
-TrapWriter:
+output.Writer:
   Write(entry *TrapEntry) error    # fast accept into backend-owned queue or return drop-worthy error
   Flush() error                    # drains pending writes and fsyncs/syncs backend state
   Close() error                    # closes the writer; idempotent
@@ -1306,7 +1312,10 @@ Semantics:
 
 - **Fast `Write`** (returns when the backend has accepted ownership of the immutable entry into a bounded queue, not when it is durable; `Flush()` is the durability boundary) — the journal-direct backend serializes queued entries into the per-job journal files via the Go-compatible backend selected in SOW-0035 M1 (bypassing journald so the writer controls `_HOSTNAME` and other "trusted" fields). The OTLP writer batches internally (default 200ms flush window) and `Write` returns as soon as the entry is enqueued into the batch buffer.
 - **Hot-path non-blocking behavior** — `Write` must not perform blocking disk or network I/O on the decode hot path. If the primary journal backend queue is full or the writer is in a permanent failed state, `Write` returns an error; the caller increments `journal_write_failed` and drops the primary trap persistence path while the hot path continues. When the optional OTLP secondary backend cannot accept/export a record after job creation, the fan-out writer increments `otlp_export_failed` and drops only the OTLP copy; the journal copy remains authoritative.
-- **Ownership** — on successful `Write`, the caller transfers ownership of the `TrapEntry` to the writer and must not mutate maps, slices, or strings reachable from it. Reusing a `TrapEntry`, `Labels` map, `SummaryCounts.ByTrap` map, or `Varbinds` backing array after successful `Write` is a correctness bug unless the implementation deep-copies the reused data first. On failed `Write`, ownership does not transfer, but the caller still discards the entry and uses a fresh entry for the next trap. The writer must not retain references on an error return.
+- **Ownership** — every coordinator `Write` call consumes the `TrapEntry`, regardless of the authoritative error it
+  returns, because a secondary backend may already have accepted the same entry. The caller must not mutate or reuse maps,
+  slices, strings, or backing arrays reachable from the entry after the call. An individual backend retains an entry only
+  when that backend successfully enqueues it; a backend returning an error from its own `Write` retains nothing.
 - **Default queue / flush policy** — journal-direct writer queue defaults to 10,000 entries per job; queue-full and permanent writer failure are both drop-and-continue errors. The journal-direct writer fsyncs every 1s on a ticker (time-only; the count-based 1,000-entry trigger was removed), and on `Flush()` / `Close()`.
 - **Backend-internal batching** — the interface does not expose batching. Each writer decides its own batching strategy.
 - **Error handling** — `Write` returns error only for drop-worthy conditions (for example, journal writer permanently failed, internal queue full, or OTLP receiver unreachable and retry buffer full). Transient backend failures are absorbed by the writer's internal retry/buffering policy until the bounded buffer is exhausted.

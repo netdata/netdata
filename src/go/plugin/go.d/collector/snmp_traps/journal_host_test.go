@@ -52,10 +52,6 @@ func (p *staticJournalHostProvider) MonotonicUsec() uint64 {
 	return p.nextMono.Add(1)
 }
 
-func newTestJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {
-	return newJournalWriterWithHostProvider(dir, cfg, newTestJournalHostProvider())
-}
-
 func withTestBuildinfoVarLibDir(t *testing.T, dir string) {
 	t.Helper()
 	old := buildinfo.VarLibDir

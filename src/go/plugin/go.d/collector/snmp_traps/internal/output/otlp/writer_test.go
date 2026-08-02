@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package otlp
 
 import (
 	"context"
 	"errors"
+	"math"
 	"net"
 	"os"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	collogpb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
@@ -94,23 +96,20 @@ func TestOTLPTargetIsLoopback(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, otlpTargetIsLoopback(tc.target))
+			assert.Equal(t, tc.want, targetIsLoopback(tc.target))
 		})
 	}
 }
 
-func TestValidateOTLPConfig(t *testing.T) {
+func TestNormalize(t *testing.T) {
 	tests := map[string]struct {
-		cfg     OTLPConfig
-		want    otlpRuntimeConfig
+		cfg     Config
+		want    Policy
 		wantErr bool
 	}{
-		"disabled ignores invalid endpoint": {
-			cfg: OTLPConfig{Endpoint: "not a valid endpoint"},
-		},
-		"enabled defaults": {
-			cfg: OTLPConfig{Enabled: true},
-			want: otlpRuntimeConfig{
+		"defaults": {
+			cfg: Config{},
+			want: Policy{
 				target:         "127.0.0.1:4317",
 				insecure:       true,
 				requestTimeout: defaultOTLPRequestTimeout,
@@ -120,8 +119,7 @@ func TestValidateOTLPConfig(t *testing.T) {
 			},
 		},
 		"custom values": {
-			cfg: OTLPConfig{
-				Enabled:        true,
+			cfg: Config{
 				Endpoint:       "localhost:14317",
 				RequestTimeout: "2s",
 				FlushInterval:  "250ms",
@@ -129,7 +127,7 @@ func TestValidateOTLPConfig(t *testing.T) {
 				QueueCapacity:  64,
 				Headers:        map[string]string{"Authorization": "Bearer test-token"},
 			},
-			want: otlpRuntimeConfig{
+			want: Policy{
 				target:         "localhost:14317",
 				insecure:       true,
 				requestTimeout: 2 * time.Second,
@@ -139,27 +137,23 @@ func TestValidateOTLPConfig(t *testing.T) {
 			},
 		},
 		"bad duration": {
-			cfg:     OTLPConfig{Enabled: true, RequestTimeout: "-1s"},
+			cfg:     Config{RequestTimeout: "-1s"},
 			wantErr: true,
 		},
 		"bad header": {
-			cfg:     OTLPConfig{Enabled: true, Headers: map[string]string{"grpc-timeout": "1S"}},
+			cfg:     Config{Headers: map[string]string{"grpc-timeout": "1S"}},
 			wantErr: true,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := validateOTLPConfig(tc.cfg)
+			got, err := Normalize(tc.cfg)
 			if tc.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			if !tc.cfg.Enabled {
-				assert.Empty(t, got.target)
-				return
-			}
 			assert.Equal(t, tc.want.target, got.target)
 			assert.Equal(t, tc.want.insecure, got.insecure)
 			assert.Equal(t, tc.want.requestTimeout, got.requestTimeout)
@@ -171,9 +165,9 @@ func TestValidateOTLPConfig(t *testing.T) {
 }
 
 func TestOTLPTrapEntrySerialization(t *testing.T) {
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		JobName:              "local",
-		ReportType:           ReportTypeTrap,
+		ReportType:           model.ReportTypeTrap,
 		ReceivedRealtimeUsec: 123456,
 		TrapOID:              "1.3.6.1.6.3.1.1.5.3",
 		TrapName:             "IF-MIB::linkDown",
@@ -184,13 +178,13 @@ func TestOTLPTrapEntrySerialization(t *testing.T) {
 		SourceUDPPeer:        "192.0.2.10",
 		DeviceHostname:       "switch-1",
 		DeviceVendor:         "cisco",
-		PduType:              PduTypeTrap,
-		SnmpVersion:          SnmpVersionV2c,
+		PduType:              model.PduTypeTrap,
+		SnmpVersion:          model.SnmpVersionV2c,
 		SourceVnodeID:        "vnode-1",
 		TopologyInterface:    "Gi1/0/1",
 		TopologyNeighbors:    "switch-2",
 		Labels:               map[string]string{"site": "lab"},
-		Varbinds: []VarbindValue{{
+		Varbinds: []model.VarbindValue{{
 			Name:  "ifName",
 			OID:   "1.3.6.1.2.1.31.1.1.1.1.7",
 			Type:  "OctetString",
@@ -198,7 +192,7 @@ func TestOTLPTrapEntrySerialization(t *testing.T) {
 		}},
 	}
 
-	req, err := buildOTLPExportRequest("local", []*TrapEntry{entry})
+	req, err := buildOTLPExportRequest("local", []*model.TrapEntry{entry})
 	require.NoError(t, err)
 	require.Len(t, req.ResourceLogs, 1)
 	rl := req.ResourceLogs[0]
@@ -239,25 +233,47 @@ func TestOTLPTrapEntrySerialization(t *testing.T) {
 	assert.Equal(t, "Gi1/0/1", ifName["value"].GetStringValue())
 }
 
+func TestOTLPAnyValueCanonicalTypes(t *testing.T) {
+	tests := map[string]struct {
+		value any
+		want  *commonpb.AnyValue
+	}{
+		"nil":      {want: &commonpb.AnyValue{}},
+		"string":   {value: "text", want: otlpStringValue("text")},
+		"int64":    {value: int64(-42), want: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: -42}}},
+		"uint64":   {value: uint64(42), want: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 42}}},
+		"big uint": {value: uint64(math.MaxInt64) + 1, want: otlpStringValue("9223372036854775808")},
+		"float64":  {value: 1.25, want: &commonpb.AnyValue{Value: &commonpb.AnyValue_DoubleValue{DoubleValue: 1.25}}},
+		"bool":     {value: true, want: &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}}},
+		"bytes":    {value: []byte{0x00, 0x0f, 0xff}, want: otlpStringValue("000fff")},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, otlpAnyValue(output.CanonicalizeValue(tc.value)))
+		})
+	}
+}
+
 func TestOTLPTrapEntrySerializationOmitsCommunityVarbind(t *testing.T) {
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		JobName:              "local",
-		ReportType:           ReportTypeTrap,
+		ReportType:           model.ReportTypeTrap,
 		ReceivedRealtimeUsec: 123456,
 		TrapOID:              "1.3.6.1.6.3.1.1.5.3",
 		Category:             "state_change",
 		Severity:             "warning",
 		Message:              "Interface down",
 		SourceIP:             "192.0.2.10",
-		PduType:              PduTypeTrap,
-		SnmpVersion:          SnmpVersionV1,
-		Varbinds: []VarbindValue{
+		PduType:              model.PduTypeTrap,
+		SnmpVersion:          model.SnmpVersionV1,
+		Varbinds: []model.VarbindValue{
 			{OID: model.SNMPTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 			{Name: "ifName", OID: "1.3.6.1.2.1.31.1.1.1.1.7", Type: "OctetString", Value: "Gi1/0/1"},
 		},
 	}
 
-	req, err := buildOTLPExportRequest("local", []*TrapEntry{entry})
+	req, err := buildOTLPExportRequest("local", []*model.TrapEntry{entry})
 	require.NoError(t, err)
 	require.Len(t, req.ResourceLogs, 1)
 	require.Len(t, req.ResourceLogs[0].ScopeLogs, 1)
@@ -270,13 +286,13 @@ func TestOTLPTrapEntrySerializationOmitsCommunityVarbind(t *testing.T) {
 }
 
 func TestOTLPDedupSummarySerialization(t *testing.T) {
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		JobName:              "local",
-		ReportType:           ReportTypeDedupSummary,
+		ReportType:           model.ReportTypeDedupSummary,
 		ReceivedRealtimeUsec: 1000,
 		Severity:             "info",
 		Message:              "DEDUPLICATED TRAPS",
-		SummaryCounts: &DedupSummary{
+		SummaryCounts: &model.DedupSummary{
 			TotalSuppressed: 12,
 			Fingerprints:    2,
 			PeriodSec:       5,
@@ -303,17 +319,17 @@ func TestOTLPDedupSummarySerialization(t *testing.T) {
 func TestOTLPDecodeErrorSerialization(t *testing.T) {
 	const packetHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		JobName:              "local",
-		ReportType:           ReportTypeDecodeError,
+		ReportType:           model.ReportTypeDecodeError,
 		ReceivedRealtimeUsec: 2000,
 		Category:             "diagnostic",
 		Severity:             "warning",
 		Message:              "SNMP trap decode failed from 192.0.2.10: malformed_pdu: BER: trailing data",
 		SourceIP:             "192.0.2.10",
 		SourceUDPPeer:        "192.0.2.10",
-		SnmpVersion:          SnmpVersionV2c,
-		DecodeError: &DecodeErrorInfo{
+		SnmpVersion:          model.SnmpVersionV2c,
+		DecodeError: &model.DecodeErrorInfo{
 			Kind:          "malformed_pdu",
 			Error:         "BER: trailing data",
 			PacketSize:    42,
@@ -348,26 +364,27 @@ func TestOTLPDecodeErrorSerialization(t *testing.T) {
 
 func TestOTLPTrapWriterPreflightHeadersAndFlush(t *testing.T) {
 	srv := startOTLPFixture(t, nil)
-	metrics := &perJobMetrics{}
-
-	writer, err := newOTLPTrapWriter(t.Context(), "local", OTLPConfig{
-		Enabled:        true,
+	policy, err := Normalize(Config{
 		Endpoint:       srv.endpoint,
 		Headers:        map[string]string{"authorization": "Bearer test-token"},
 		RequestTimeout: "2s",
 		FlushInterval:  "1h",
 		BatchSize:      10,
 		QueueCapacity:  10,
-	}, metrics)
+	})
 	require.NoError(t, err)
+	recorder := &outcomeRecorder{}
+	writer, err := Prepare(t.Context(), "local", policy, Options{Authoritative: true, Report: recorder.report})
+	require.NoError(t, err)
+	require.NoError(t, writer.Start())
 	defer writer.Close()
 
 	require.Len(t, srv.requests(), 1, "preflight export")
 	assert.Equal(t, []string{"Bearer test-token"}, srv.metadata()[0].Get("authorization"))
 
-	require.NoError(t, writer.Write(&TrapEntry{
+	require.NoError(t, writer.Write(&model.TrapEntry{
 		JobName:              "local",
-		ReportType:           ReportTypeTrap,
+		ReportType:           model.ReportTypeTrap,
 		ReceivedRealtimeUsec: time.Now().UnixMicro(),
 		TrapOID:              "1.3.6.1.6.3.1.1.5.3",
 		Category:             "state_change",
@@ -375,32 +392,34 @@ func TestOTLPTrapWriterPreflightHeadersAndFlush(t *testing.T) {
 		Message:              "Interface down",
 		SourceIP:             "192.0.2.10",
 		SourceUDPPeer:        "192.0.2.10",
-		SnmpVersion:          SnmpVersionV2c,
-		PduType:              PduTypeTrap,
+		SnmpVersion:          model.SnmpVersionV2c,
+		PduType:              model.PduTypeTrap,
 	}))
 	require.NoError(t, writer.Flush())
 
 	reqs := srv.requests()
 	require.Len(t, reqs, 2)
 	require.Len(t, reqs[1].ResourceLogs[0].ScopeLogs[0].LogRecords, 1)
-	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed.Load())
+	assert.Empty(t, recorder.snapshot())
 }
 
-func TestOTLPTrapWriterSecondaryAsyncExportFailureDoesNotRecordTerminalWriteFailure(t *testing.T) {
+func TestOTLPTrapWriterReportsNonAuthoritativeExportFailure(t *testing.T) {
 	srv := startOTLPFixture(t, nil)
-	metrics := &perJobMetrics{}
-	writer := newTestOTLPTrapWriter(t, srv, metrics, false)
-
-	primary := &mockTrapWriter{}
-	fanout := newFanoutTrapWriter(primary, writer, metrics)
-	entry := testFanoutTrapEntry()
+	recorder := &outcomeRecorder{}
+	writer := newTestOTLPTrapWriter(t, srv, false, recorder.report)
+	entry := testTrapEntry()
 
 	srv.setExportErr(errors.New("export failed"))
-	require.NoError(t, fanout.Write(entry))
-	require.Error(t, fanout.Flush())
+	require.NoError(t, writer.Write(entry))
+	require.Error(t, writer.Flush())
 
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
-	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
+	outcomes := recorder.snapshot()
+	require.Len(t, outcomes, 1)
+	assert.Equal(t, output.BackendOTLP, outcomes[0].Backend)
+	assert.Equal(t, output.StageExport, outcomes[0].Stage)
+	assert.Equal(t, uint64(1), outcomes[0].FailedEntries)
+	assert.False(t, outcomes[0].Authoritative)
+	assert.ErrorContains(t, outcomes[0].Err, "export failed")
 
 	srv.setExportErr(nil)
 	require.NoError(t, writer.Close())
@@ -408,16 +427,21 @@ func TestOTLPTrapWriterSecondaryAsyncExportFailureDoesNotRecordTerminalWriteFail
 
 func TestOTLPTrapWriterAuthoritativeAsyncExportFailureRecordsTerminalWriteFailure(t *testing.T) {
 	srv := startOTLPFixture(t, nil)
-	metrics := &perJobMetrics{}
-	writer := newTestOTLPTrapWriter(t, srv, metrics, true)
-	entry := testFanoutTrapEntry()
+	recorder := &outcomeRecorder{}
+	writer := newTestOTLPTrapWriter(t, srv, true, recorder.report)
+	entry := testTrapEntry()
 
 	srv.setExportErr(errors.New("export failed"))
 	require.NoError(t, writer.Write(entry))
 	require.Error(t, writer.Flush())
 
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
-	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
+	outcomes := recorder.snapshot()
+	require.Len(t, outcomes, 1)
+	assert.Equal(t, output.BackendOTLP, outcomes[0].Backend)
+	assert.Equal(t, output.StageExport, outcomes[0].Stage)
+	assert.Equal(t, uint64(1), outcomes[0].FailedEntries)
+	assert.True(t, outcomes[0].Authoritative)
+	assert.ErrorContains(t, outcomes[0].Err, "export failed")
 
 	srv.setExportErr(nil)
 	require.NoError(t, writer.Close())
@@ -425,8 +449,7 @@ func TestOTLPTrapWriterAuthoritativeAsyncExportFailureRecordsTerminalWriteFailur
 
 func TestOTLPTrapWriterDrainQueueCountsFailuresAfterFirstFailedBatch(t *testing.T) {
 	srv := startOTLPFixture(t, nil)
-	runtimeCfg, err := validateOTLPConfig(OTLPConfig{
-		Enabled:        true,
+	policy, err := Normalize(Config{
 		Endpoint:       srv.endpoint,
 		RequestTimeout: "2s",
 		FlushInterval:  "1h",
@@ -434,36 +457,35 @@ func TestOTLPTrapWriterDrainQueueCountsFailuresAfterFirstFailedBatch(t *testing.
 		QueueCapacity:  10,
 	})
 	require.NoError(t, err)
-	conn, client, err := newOTLPClient(t.Context(), runtimeCfg)
+	conn, client, err := newOTLPClient(t.Context(), policy)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 	srv.setExportErr(errors.New("export failed"))
 
-	metrics := &perJobMetrics{}
-	writer := &otlpTrapWriter{
+	recorder := &outcomeRecorder{}
+	writer := &Writer{
 		client:         client,
 		conn:           conn,
-		queue:          make(chan *TrapEntry, runtimeCfg.queueCapacity),
-		headers:        runtimeCfg.headers,
-		requestTimeout: runtimeCfg.requestTimeout,
-		batchSize:      runtimeCfg.batchSize,
+		queue:          make(chan *model.TrapEntry, policy.queueCapacity),
+		headers:        policy.headers,
+		requestTimeout: policy.requestTimeout,
+		batchSize:      policy.batchSize,
 		jobName:        "local",
-		metrics:        metrics,
-		terminalErrors: true,
+		report:         recorder.report,
+		authoritative:  true,
 	}
-	entry := testFanoutTrapEntry()
+	entry := testTrapEntry()
 	for range 5 {
 		writer.queue <- entry
 	}
 
-	batch := make([]*TrapEntry, 0, writer.batchSize)
+	batch := make([]*model.TrapEntry, 0, writer.batchSize)
 	reportedFailed := 0
 	err = writer.drainQueue(&batch, &reportedFailed)
 	require.Error(t, err)
 	_ = writer.exportPending(&batch, &reportedFailed)
 
-	assert.Equal(t, uint64(5), metrics.errors.otlpExportFailed.Load())
-	assert.Equal(t, uint64(5), metrics.pipeline.writeFailed.Load())
+	assert.Equal(t, uint64(5), recorder.failedEntries())
 
 	reqs := srv.requests()
 	totalRecords := 0
@@ -474,7 +496,7 @@ func TestOTLPTrapWriterDrainQueueCountsFailuresAfterFirstFailedBatch(t *testing.
 		require.Len(t, req.ResourceLogs, 1)
 		require.Len(t, req.ResourceLogs[0].ScopeLogs, 1)
 		records := req.ResourceLogs[0].ScopeLogs[0].LogRecords
-		assert.LessOrEqualf(t, len(records), runtimeCfg.batchSize, "request %d exceeded batch size", i)
+		assert.LessOrEqualf(t, len(records), policy.batchSize, "request %d exceeded batch size", i)
 		totalRecords += len(records)
 	}
 	assert.Equal(t, 5, totalRecords)
@@ -487,25 +509,18 @@ func TestOTLPTrapWriterPreflightFailure(t *testing.T) {
 	endpoint := "http://" + ln.Addr().String()
 	require.NoError(t, ln.Close())
 
-	_, err = newOTLPTrapWriter(t.Context(), "local", OTLPConfig{
-		Enabled:        true,
+	policy, err := Normalize(Config{
 		Endpoint:       endpoint,
 		RequestTimeout: "50ms",
-	}, nil)
+	})
+	require.NoError(t, err)
+	_, err = Prepare(t.Context(), "local", policy, Options{})
 	require.Error(t, err)
 }
 
 func TestOTLPTrapWriterFlushAfterCloseReturns(t *testing.T) {
 	srv := startOTLPFixture(t, nil)
-	writer, err := newOTLPTrapWriter(t.Context(), "local", OTLPConfig{
-		Enabled:        true,
-		Endpoint:       srv.endpoint,
-		RequestTimeout: "2s",
-		FlushInterval:  "1h",
-		BatchSize:      10,
-		QueueCapacity:  10,
-	}, nil)
-	require.NoError(t, err)
+	writer := newTestOTLPTrapWriter(t, srv, true, nil)
 	require.NoError(t, writer.Close())
 
 	done := make(chan error, 1)
@@ -515,37 +530,57 @@ func TestOTLPTrapWriterFlushAfterCloseReturns(t *testing.T) {
 
 	select {
 	case err := <-done:
-		require.ErrorIs(t, err, errWriterClosed)
+		require.ErrorIs(t, err, output.ErrClosed)
 	case <-time.After(time.Second):
 		t.Fatal("Flush blocked after Close")
 	}
 }
 
+func TestOTLPTrapWriterPreparedLifecycle(t *testing.T) {
+	srv := startOTLPFixture(t, nil)
+	policy, err := Normalize(Config{
+		Endpoint:       srv.endpoint,
+		RequestTimeout: "2s",
+		FlushInterval:  "1h",
+		BatchSize:      10,
+		QueueCapacity:  10,
+	})
+	require.NoError(t, err)
+	writer, err := Prepare(t.Context(), "local", policy, Options{})
+	require.NoError(t, err)
+
+	require.ErrorIs(t, writer.Write(testTrapEntry()), output.ErrNotStarted)
+	require.ErrorIs(t, writer.Flush(), output.ErrNotStarted)
+	require.NoError(t, writer.Close())
+	require.ErrorIs(t, writer.Start(), output.ErrClosed)
+}
+
 func TestOTLPTrapWriterWriteQueueFull(t *testing.T) {
-	writer := &otlpTrapWriter{
-		queue: make(chan *TrapEntry, 1),
+	writer := &Writer{
+		queue:   make(chan *model.TrapEntry, 1),
+		started: true,
 	}
 
-	require.NoError(t, writer.Write(&TrapEntry{JobName: "local", Message: "first"}))
-	require.ErrorIs(t, writer.Write(&TrapEntry{JobName: "local", Message: "second"}), errQueueFull)
+	require.NoError(t, writer.Write(&model.TrapEntry{JobName: "local", Message: "first"}))
+	require.ErrorIs(t, writer.Write(&model.TrapEntry{JobName: "local", Message: "second"}), output.ErrQueueFull)
 }
 
 func TestOTLPTrapWriterWorkerPanicFailsClosed(t *testing.T) {
-	metrics := &perJobMetrics{}
-	writer := &otlpTrapWriter{
-		queue:          make(chan *TrapEntry, 1),
+	recorder := &outcomeRecorder{}
+	writer := &Writer{
+		queue:          make(chan *model.TrapEntry, 1),
 		flushCh:        make(chan chan error),
 		closeCh:        make(chan chan error),
 		doneCh:         make(chan struct{}),
 		flushInterval:  time.Hour,
 		batchSize:      1,
 		requestTimeout: time.Millisecond,
-		metrics:        metrics,
-		terminalErrors: true,
+		report:         recorder.report,
+		authoritative:  true,
 	}
-	go writer.worker()
+	require.NoError(t, writer.Start())
 
-	entry := testFanoutTrapEntry()
+	entry := testTrapEntry()
 	require.NoError(t, writer.Write(entry))
 	select {
 	case <-writer.doneCh:
@@ -553,31 +588,30 @@ func TestOTLPTrapWriterWorkerPanicFailsClosed(t *testing.T) {
 		t.Fatal("OTLP worker did not exit after panic")
 	}
 
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
-	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
+	assert.Equal(t, uint64(1), recorder.failedEntries())
 
-	require.ErrorIs(t, writer.Write(&TrapEntry{JobName: "local", Message: "second"}), errWriterClosed)
+	require.ErrorIs(t, writer.Write(&model.TrapEntry{JobName: "local", Message: "second"}), output.ErrClosed)
 	err := writer.Close()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "SNMP trap OTLP writer panic")
 }
 
 func TestOTLPTrapWriterWorkerPanicUnblocksFlushAndAccountsQueuedEntries(t *testing.T) {
-	metrics := &perJobMetrics{}
-	writer := &otlpTrapWriter{
-		queue:          make(chan *TrapEntry, 10),
+	recorder := &outcomeRecorder{}
+	writer := &Writer{
+		queue:          make(chan *model.TrapEntry, 10),
 		flushCh:        make(chan chan error),
 		closeCh:        make(chan chan error),
 		doneCh:         make(chan struct{}),
 		flushInterval:  time.Hour,
 		batchSize:      10,
 		requestTimeout: time.Millisecond,
-		metrics:        metrics,
-		terminalErrors: true,
+		report:         recorder.report,
+		authoritative:  true,
 	}
-	go writer.worker()
+	require.NoError(t, writer.Start())
 
-	entry := testFanoutTrapEntry()
+	entry := testTrapEntry()
 	require.NoError(t, writer.Write(entry))
 	require.NoError(t, writer.Write(entry))
 
@@ -599,8 +633,7 @@ func TestOTLPTrapWriterWorkerPanicUnblocksFlushAndAccountsQueuedEntries(t *testi
 		t.Fatal("OTLP worker did not exit after panic")
 	}
 
-	assert.Equal(t, uint64(2), metrics.errors.otlpExportFailed.Load())
-	assert.Equal(t, uint64(2), metrics.pipeline.writeFailed.Load())
+	assert.Equal(t, uint64(2), recorder.failedEntries())
 
 }
 
@@ -610,20 +643,22 @@ func TestOTLPTrapWriterExternalReceiver(t *testing.T) {
 		t.Skip("set NETDATA_TEST_SNMP_TRAPS_OTLP_ENDPOINT to run against a real OTLP/gRPC logs receiver")
 	}
 
-	writer, err := newOTLPTrapWriter(t.Context(), "external", OTLPConfig{
-		Enabled:        true,
+	policy, err := Normalize(Config{
 		Endpoint:       endpoint,
 		RequestTimeout: "5s",
 		FlushInterval:  "1h",
 		BatchSize:      10,
 		QueueCapacity:  10,
-	}, &perJobMetrics{})
+	})
 	require.NoError(t, err)
+	writer, err := Prepare(t.Context(), "external", policy, Options{Authoritative: true})
+	require.NoError(t, err)
+	require.NoError(t, writer.Start())
 	defer writer.Close()
 
-	require.NoError(t, writer.Write(&TrapEntry{
+	require.NoError(t, writer.Write(&model.TrapEntry{
 		JobName:              "external",
-		ReportType:           ReportTypeTrap,
+		ReportType:           model.ReportTypeTrap,
 		ReceivedRealtimeUsec: time.Now().UnixMicro(),
 		TrapOID:              "1.3.6.1.6.3.1.1.5.3",
 		TrapName:             "SNMPv2-MIB::coldStart",
@@ -632,8 +667,8 @@ func TestOTLPTrapWriterExternalReceiver(t *testing.T) {
 		Message:              "External receiver interop test",
 		SourceIP:             "192.0.2.10",
 		SourceUDPPeer:        "192.0.2.10",
-		SnmpVersion:          SnmpVersionV2c,
-		PduType:              PduTypeTrap,
+		SnmpVersion:          model.SnmpVersionV2c,
+		PduType:              model.PduTypeTrap,
 	}))
 	require.NoError(t, writer.Flush())
 }
@@ -673,10 +708,9 @@ func startOTLPFixture(t *testing.T, exportErr error) *otlpFixture {
 	return f
 }
 
-func newTestOTLPTrapWriter(t *testing.T, srv *otlpFixture, metrics *perJobMetrics, terminalErrors bool) *otlpTrapWriter {
+func newTestOTLPTrapWriter(t *testing.T, srv *otlpFixture, authoritative bool, report output.OutcomeReporter) *Writer {
 	t.Helper()
-	runtimeCfg, err := validateOTLPConfig(OTLPConfig{
-		Enabled:        true,
+	policy, err := Normalize(Config{
 		Endpoint:       srv.endpoint,
 		RequestTimeout: "2s",
 		FlushInterval:  "1h",
@@ -684,9 +718,52 @@ func newTestOTLPTrapWriter(t *testing.T, srv *otlpFixture, metrics *perJobMetric
 		QueueCapacity:  10,
 	})
 	require.NoError(t, err)
-	writer, err := newOTLPTrapWriterWithRuntimeConfig(t.Context(), "local", runtimeCfg, metrics, terminalErrors)
+	writer, err := Prepare(t.Context(), "local", policy, Options{Authoritative: authoritative, Report: report})
 	require.NoError(t, err)
+	require.NoError(t, writer.Start())
 	return writer
+}
+
+type outcomeRecorder struct {
+	mu       sync.Mutex
+	outcomes []output.Outcome
+}
+
+func (r *outcomeRecorder) report(outcome output.Outcome) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.outcomes = append(r.outcomes, outcome)
+}
+
+func (r *outcomeRecorder) snapshot() []output.Outcome {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]output.Outcome(nil), r.outcomes...)
+}
+
+func (r *outcomeRecorder) failedEntries() uint64 {
+	var total uint64
+	for _, outcome := range r.snapshot() {
+		total += outcome.FailedEntries
+	}
+	return total
+}
+
+func testTrapEntry() *model.TrapEntry {
+	return &model.TrapEntry{
+		JobName:               "local",
+		ReportType:            model.ReportTypeTrap,
+		ReceivedRealtimeUsec:  time.Now().UnixMicro(),
+		ReceivedMonotonicUsec: 1,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Category:              "state_change",
+		Severity:              "warning",
+		Message:               "Interface down",
+		SourceIP:              "192.0.2.10",
+		SourceUDPPeer:         "192.0.2.10:162",
+		SnmpVersion:           model.SnmpVersionV2c,
+		PduType:               model.PduTypeTrap,
+	}
 }
 
 func (f *otlpFixture) setExportErr(err error) {

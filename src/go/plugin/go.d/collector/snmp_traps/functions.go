@@ -5,7 +5,8 @@ package snmp_traps
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/snmptrapsfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/snmptrapsfunc"
 )
 
 const (
@@ -20,5 +21,5 @@ func snmpTrapsMethods() []funcapi.FunctionConfig {
 }
 
 func snmpTrapsMethodHandler(_ collectorapi.RuntimeJob) funcapi.MethodHandler {
-	return snmptrapsfunc.NewHandler(journalBaseRoot())
+	return snmptrapsfunc.NewHandler(journal.BaseRoot())
 }

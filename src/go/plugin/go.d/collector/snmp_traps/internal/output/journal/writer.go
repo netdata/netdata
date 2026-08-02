@@ -1,40 +1,45 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package journal
 
 import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 )
 
 const (
-	defaultQueueCapacity      = 10000
+	DefaultQueueCapacity      = 10000
 	defaultFlushInterval      = 1 * time.Second
 	maxRetentionSweepInterval = 1 * time.Hour
 	minRetentionSweepInterval = 1 * time.Second
 )
 
-var (
-	errQueueFull     = errors.New("trap writer queue is full")
-	errWriterClosed  = errors.New("trap writer is closed")
-	errWriterFlushed = errors.New("trap writer has been flushed/closed")
-)
+var errWriterStopped = errors.New("trap writer has stopped")
 
-type journalTrapWriter struct {
-	journal    *JournalWriter
-	queue      chan *TrapEntry
+type Options struct {
+	QueueCapacity int
+	Report        output.OutcomeReporter
+}
+
+type Writer struct {
+	journal    *sdkWriter
+	queue      chan *model.TrapEntry
 	flushCh    chan chan error
 	doneCh     chan struct{}
-	serializer journalHotSerializer
+	serializer hotSerializer
 
-	closed    int32
 	queueMu   sync.Mutex
+	started   bool
+	closed    bool
 	failedErr error
 	failedMu  sync.Mutex
-	onFailure func(error)
+	report    output.OutcomeReporter
 
 	flushInterval time.Duration
 
@@ -42,13 +47,27 @@ type journalTrapWriter struct {
 	lastRetentionSweep     time.Time
 }
 
-func newJournalTrapWriter(j *JournalWriter, capacity int, onFailure ...func(error)) *journalTrapWriter {
-	if capacity <= 0 {
-		capacity = defaultQueueCapacity
+var (
+	_ output.Writer             = (*Writer)(nil)
+	_ output.BinaryFieldCounter = (*Writer)(nil)
+)
+
+func Prepare(dir string, cfg Config, host hostidentity.Provider, opts Options) (*Writer, error) {
+	j, err := newSDKWriter(dir, cfg, host)
+	if err != nil {
+		return nil, err
 	}
-	tw := &journalTrapWriter{
+	return newWriter(j, opts), nil
+}
+
+func newWriter(j *sdkWriter, opts Options) *Writer {
+	capacity := opts.QueueCapacity
+	if capacity <= 0 {
+		capacity = DefaultQueueCapacity
+	}
+	return &Writer{
 		journal: j,
-		queue:   make(chan *TrapEntry, capacity),
+		queue:   make(chan *model.TrapEntry, capacity),
 		// Keep unbuffered: Flush must handshake with a live worker, not queue a
 		// request that Close can strand after the worker exits.
 		flushCh:                make(chan chan error),
@@ -56,15 +75,25 @@ func newJournalTrapWriter(j *JournalWriter, capacity int, onFailure ...func(erro
 		flushInterval:          defaultFlushInterval,
 		retentionSweepInterval: journalRetentionSweepInterval(j),
 		lastRetentionSweep:     time.Now(),
+		report:                 opts.Report,
 	}
-	if len(onFailure) > 0 {
-		tw.onFailure = onFailure[0]
-	}
-	go tw.worker()
-	return tw
 }
 
-func (tw *journalTrapWriter) worker() {
+func (tw *Writer) Start() error {
+	tw.queueMu.Lock()
+	defer tw.queueMu.Unlock()
+	if tw.closed {
+		return output.ErrClosed
+	}
+	if tw.started {
+		return nil
+	}
+	tw.started = true
+	go tw.worker()
+	return nil
+}
+
+func (tw *Writer) worker() {
 	defer func() {
 		if v := recover(); v != nil {
 			tw.setFailure(fmt.Errorf("SNMP trap journal writer panic: %v", v))
@@ -139,7 +168,7 @@ func (tw *journalTrapWriter) worker() {
 	}
 }
 
-func (tw *journalTrapWriter) writeOne(entry *TrapEntry) error {
+func (tw *Writer) writeOne(entry *model.TrapEntry) error {
 	if tw.journal == nil {
 		// Test/benchmark sink mode; production Init always supplies a journal.
 		return nil
@@ -148,17 +177,17 @@ func (tw *journalTrapWriter) writeOne(entry *TrapEntry) error {
 	if err != nil {
 		return err
 	}
-	return tw.journal.WriteRawEntry(payloads, binaryEncodedFields, entry.ReceivedRealtimeUsec, entry.ReceivedMonotonicUsec)
+	return tw.journal.writeRaw(payloads, binaryEncodedFields, entry.ReceivedRealtimeUsec, entry.ReceivedMonotonicUsec)
 }
 
-func (tw *journalTrapWriter) sync() error {
+func (tw *Writer) sync() error {
 	if tw.journal == nil {
 		return nil
 	}
-	return tw.journal.Sync()
+	return tw.journal.sync()
 }
 
-func journalRetentionSweepInterval(j *JournalWriter) time.Duration {
+func journalRetentionSweepInterval(j *sdkWriter) time.Duration {
 	if j == nil {
 		return 0
 	}
@@ -180,7 +209,7 @@ func journalRetentionSweepInterval(j *JournalWriter) time.Duration {
 	return interval
 }
 
-func (tw *journalTrapWriter) maybeSweepRetention(now time.Time) error {
+func (tw *Writer) maybeSweepRetention(now time.Time) error {
 	if tw.journal == nil || tw.retentionSweepInterval <= 0 {
 		return nil
 	}
@@ -188,15 +217,15 @@ func (tw *journalTrapWriter) maybeSweepRetention(now time.Time) error {
 		return nil
 	}
 	tw.lastRetentionSweep = now
-	return tw.journal.SweepRetention()
+	return tw.journal.sweepRetention()
 }
 
-func (tw *journalTrapWriter) drainForFlush(flushPending *bool) error {
+func (tw *Writer) drainForFlush(flushPending *bool) error {
 	for {
 		select {
 		case entry, ok := <-tw.queue:
 			if !ok {
-				return errWriterClosed
+				return output.ErrClosed
 			}
 			if err := tw.writeOne(entry); err != nil {
 				return err
@@ -208,7 +237,7 @@ func (tw *journalTrapWriter) drainForFlush(flushPending *bool) error {
 	}
 }
 
-func (tw *journalTrapWriter) drainRemaining(pending bool) {
+func (tw *Writer) drainRemaining(pending bool) {
 	for entry := range tw.queue {
 		if err := tw.writeOne(entry); err != nil {
 			tw.setFailure(err)
@@ -219,13 +248,13 @@ func (tw *journalTrapWriter) drainRemaining(pending bool) {
 		}
 	}
 	if pending && tw.journal != nil {
-		if err := tw.journal.Sync(); err != nil {
+		if err := tw.journal.sync(); err != nil {
 			tw.setFailure(err)
 		}
 	}
 }
 
-func (tw *journalTrapWriter) drainAndDiscard() {
+func (tw *Writer) drainAndDiscard() {
 	// The writer has already failed. Drain entries that are immediately
 	// available without blocking because Close may not have closed the queue yet.
 	for {
@@ -240,12 +269,15 @@ func (tw *journalTrapWriter) drainAndDiscard() {
 	}
 }
 
-func (tw *journalTrapWriter) Write(entry *TrapEntry) error {
+func (tw *Writer) Write(entry *model.TrapEntry) error {
 	tw.queueMu.Lock()
 	defer tw.queueMu.Unlock()
 
-	if atomic.LoadInt32(&tw.closed) != 0 {
-		return errWriterClosed
+	if tw.closed {
+		return output.ErrClosed
+	}
+	if !tw.started {
+		return output.ErrNotStarted
 	}
 	tw.failedMu.Lock()
 	failErr := tw.failedErr
@@ -258,53 +290,77 @@ func (tw *journalTrapWriter) Write(entry *TrapEntry) error {
 	case tw.queue <- entry:
 		return nil
 	default:
-		return errQueueFull
+		return output.ErrQueueFull
 	}
 }
 
-func (tw *journalTrapWriter) BinaryEncodedFields() uint64 {
+func (tw *Writer) BinaryEncodedFields() uint64 {
 	if tw.journal == nil {
 		return 0
 	}
-	return tw.journal.BinaryEncodedFields()
+	return tw.journal.binaryFieldCount()
 }
 
-func (tw *journalTrapWriter) Flush() error {
-	if atomic.LoadInt32(&tw.closed) != 0 {
-		return errWriterClosed
+func (tw *Writer) Flush() error {
+	tw.queueMu.Lock()
+	if tw.closed {
+		tw.queueMu.Unlock()
+		return output.ErrClosed
+	}
+	if !tw.started {
+		tw.queueMu.Unlock()
+		return output.ErrNotStarted
 	}
 
 	tw.failedMu.Lock()
 	failErr := tw.failedErr
 	tw.failedMu.Unlock()
 	if failErr != nil {
+		tw.queueMu.Unlock()
 		return failErr
 	}
 
 	replyCh := make(chan error, 1)
 	select {
 	case tw.flushCh <- replyCh:
+		tw.queueMu.Unlock()
 		return <-replyCh
 	case <-tw.doneCh:
+		tw.queueMu.Unlock()
 		tw.failedMu.Lock()
 		defer tw.failedMu.Unlock()
 		if tw.failedErr != nil {
 			return tw.failedErr
 		}
-		return errWriterFlushed
+		return errWriterStopped
 	}
 }
 
-func (tw *journalTrapWriter) Close() error {
-	if !atomic.CompareAndSwapInt32(&tw.closed, 0, 1) {
+func (tw *Writer) Close() error {
+	tw.queueMu.Lock()
+	if tw.closed {
+		tw.queueMu.Unlock()
 		tw.failedMu.Lock()
 		defer tw.failedMu.Unlock()
 		return tw.failedErr
 	}
-
-	tw.queueMu.Lock()
-	close(tw.queue)
+	tw.closed = true
+	started := tw.started
+	if started {
+		close(tw.queue)
+	}
 	tw.queueMu.Unlock()
+
+	if !started {
+		if tw.journal == nil {
+			return nil
+		}
+		if err := tw.journal.close(); err != nil {
+			tw.setFailure(err)
+			return err
+		}
+		return nil
+	}
 	<-tw.doneCh
 
 	tw.failedMu.Lock()
@@ -312,7 +368,7 @@ func (tw *journalTrapWriter) Close() error {
 	tw.failedMu.Unlock()
 
 	if tw.journal != nil {
-		if err := tw.journal.Close(); err != nil {
+		if err := tw.journal.close(); err != nil {
 			tw.setFailure(err)
 			if workerErr != nil {
 				return errors.Join(workerErr, err)
@@ -324,15 +380,27 @@ func (tw *journalTrapWriter) Close() error {
 	return workerErr
 }
 
-func (tw *journalTrapWriter) setFailure(err error) {
-	var shouldLog bool
+func (tw *Writer) Directory() string {
+	if tw.journal == nil {
+		return ""
+	}
+	return tw.journal.directory()
+}
+
+func (tw *Writer) setFailure(err error) {
+	var shouldReport bool
 	tw.failedMu.Lock()
 	if tw.failedErr == nil {
 		tw.failedErr = err
-		shouldLog = true
+		shouldReport = true
 	}
 	tw.failedMu.Unlock()
-	if shouldLog && tw.onFailure != nil {
-		tw.onFailure(err)
+	if shouldReport {
+		tw.report.Report(output.Outcome{
+			Backend:       output.BackendJournal,
+			Stage:         output.StageWorker,
+			Err:           err,
+			Authoritative: true,
+		})
 	}
 }

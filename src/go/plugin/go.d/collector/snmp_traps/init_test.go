@@ -16,15 +16,42 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	collogpb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	"google.golang.org/grpc"
 )
 
 var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 )
+
+type collectorOTLPFixture struct {
+	collogpb.UnimplementedLogsServiceServer
+	endpoint string
+}
+
+func startCollectorOTLPFixture(t *testing.T) *collectorOTLPFixture {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	fixture := &collectorOTLPFixture{endpoint: "http://" + ln.Addr().String()}
+	server := grpc.NewServer()
+	collogpb.RegisterLogsServiceServer(server, fixture)
+	go func() { _ = server.Serve(ln) }()
+	t.Cleanup(func() {
+		server.Stop()
+		_ = ln.Close()
+	})
+	return fixture
+}
+
+func (f *collectorOTLPFixture) Export(context.Context, *collogpb.ExportLogsServiceRequest) (*collogpb.ExportLogsServiceResponse, error) {
+	return &collogpb.ExportLogsServiceResponse{}, nil
+}
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
 	require.NotEmpty(t, dataConfigJSON)
@@ -744,7 +771,7 @@ func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 	withTestCacheDir(t)
 	disabled := false
 	badRetention := "not-a-size"
-	srv := startOTLPFixture(t, nil)
+	srv := startCollectorOTLPFixture(t)
 
 	const jobName = "otel-only"
 	c := newTestSNMPTrapsCollector()
@@ -764,7 +791,7 @@ func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 	require.NotNil(t, c.listener)
 	assert.Empty(t, c.journalDir)
 	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
-	assert.NoDirExists(t, journalRoot(jobName))
+	assert.NoDirExists(t, journal.Root(jobName))
 	assert.Equal(t, trapWriteFailureOTLP, c.trapWriteFailureDim())
 
 	c.Cleanup(context.Background())

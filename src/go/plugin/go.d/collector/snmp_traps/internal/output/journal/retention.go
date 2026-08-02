@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package journal
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultMaxSize  = uint64(10 * 1000 * 1000 * 1000) // 10 GB
+	DefaultMaxSize  = uint64(10 * 1000 * 1000 * 1000) // 10 GB
 	minRotationSize = uint64(5 * 1024 * 1024)         // 5 MB
 	maxRotationSize = uint64(200 * 1024 * 1024)       // 200 MB
 	rotationSizeDiv = 20
@@ -21,28 +21,28 @@ const (
 	bytesPerGB      = 1024 * 1024 * 1024
 )
 
-type RetentionConfig struct {
+type Retention struct {
 	MaxSize     *uint64
 	MaxDuration *time.Duration
 	RotateSize  *uint64
 	RotateDur   *time.Duration
 }
 
-func (rc RetentionConfig) EffectiveMaxSize() uint64 {
+func (rc Retention) EffectiveMaxSize() uint64 {
 	if rc.MaxSize == nil {
-		return defaultMaxSize
+		return DefaultMaxSize
 	}
 	return *rc.MaxSize
 }
 
-func (rc RetentionConfig) EffectiveMaxDuration() time.Duration {
+func (rc Retention) EffectiveMaxDuration() time.Duration {
 	if rc.MaxDuration == nil {
 		return 0
 	}
 	return *rc.MaxDuration
 }
 
-func (rc RetentionConfig) EffectiveRotateSize() uint64 {
+func (rc Retention) EffectiveRotateSize() uint64 {
 	if rc.RotateSize != nil {
 		return *rc.RotateSize
 	}
@@ -51,14 +51,14 @@ func (rc RetentionConfig) EffectiveRotateSize() uint64 {
 	return rot
 }
 
-func (rc RetentionConfig) EffectiveRotateDur() time.Duration {
+func (rc Retention) EffectiveRotateDur() time.Duration {
 	if rc.RotateDur != nil {
 		return *rc.RotateDur
 	}
 	return 0
 }
 
-func validateRetention(rc RetentionConfig) error {
+func ValidateRetention(rc Retention) error {
 	if rc.MaxSize != nil && *rc.MaxSize == 0 {
 		return errors.New("retention.max_size must be null or positive")
 	}
@@ -83,7 +83,7 @@ func validateRetention(rc RetentionConfig) error {
 	return nil
 }
 
-func parseHumanSize(s string) (uint64, error) {
+func ParseSize(s string) (uint64, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, errors.New("empty size string")
@@ -121,7 +121,7 @@ func parseHumanSize(s string) (uint64, error) {
 	return result, nil
 }
 
-func parseHumanDuration(s string) (time.Duration, error) {
+func ParseDuration(s string) (time.Duration, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, errors.New("empty duration string")
@@ -204,56 +204,14 @@ func parseComplexDuration(s string) (time.Duration, error) {
 	return total, nil
 }
 
-func formatHumanSize(bytes uint64) string {
-	switch {
-	case bytes >= bytesPerGB && bytes%bytesPerGB == 0:
-		return fmt.Sprintf("%dGB", bytes/bytesPerGB)
-	case bytes >= bytesPerMB && bytes%bytesPerMB == 0:
-		return fmt.Sprintf("%dMB", bytes/bytesPerMB)
-	case bytes >= bytesPerKB && bytes%bytesPerKB == 0:
-		return fmt.Sprintf("%dKB", bytes/bytesPerKB)
-	default:
-		return fmt.Sprintf("%dB", bytes)
+func (rc Retention) Config() Config {
+	cfg := Config{
+		MaxSize:    rc.EffectiveMaxSize(),
+		RotateSize: rc.EffectiveRotateSize(),
+		RotateDur:  rc.EffectiveRotateDur(),
 	}
-}
-
-func humanDuration(d time.Duration) string {
-	if d == 0 {
-		return "0s"
+	if d := rc.EffectiveMaxDuration(); d > 0 {
+		cfg.MaxDuration = d
 	}
-	if d < time.Microsecond {
-		return d.String()
-	}
-	var parts []string
-	remaining := d
-
-	days := remaining / (24 * time.Hour)
-	if days > 0 {
-		parts = append(parts, fmt.Sprintf("%dd", days))
-		remaining -= days * 24 * time.Hour
-	}
-	hours := remaining / time.Hour
-	if hours > 0 {
-		parts = append(parts, fmt.Sprintf("%dh", hours))
-		remaining -= hours * time.Hour
-	}
-	minutes := remaining / time.Minute
-	if minutes > 0 {
-		parts = append(parts, fmt.Sprintf("%dm", minutes))
-		remaining -= minutes * time.Minute
-	}
-	seconds := remaining / time.Second
-	if seconds > 0 {
-		parts = append(parts, fmt.Sprintf("%ds", seconds))
-	}
-	if len(parts) == 0 {
-		ms := remaining / time.Millisecond
-		if ms > 0 {
-			parts = append(parts, fmt.Sprintf("%dms", ms))
-		}
-	}
-	if len(parts) == 0 {
-		return "0s"
-	}
-	return strings.Join(parts, "")
+	return cfg
 }

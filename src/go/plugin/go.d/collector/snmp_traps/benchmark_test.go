@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -18,6 +17,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 )
 
 // ---------------------------------------------------------------------------
@@ -65,7 +66,7 @@ type countingWriter struct {
 
 func (w *countingWriter) Write(entry *TrapEntry) error {
 	if atomic.LoadInt32(&w.closed) != 0 {
-		return errWriterClosed
+		return output.ErrClosed
 	}
 	atomic.AddInt64(&w.count, 1)
 	return nil
@@ -75,7 +76,7 @@ func (w *countingWriter) Flush() error   { return nil }
 func (w *countingWriter) Close() error   { atomic.StoreInt32(&w.closed, 1); return nil }
 func (w *countingWriter) Written() int64 { return atomic.LoadInt64(&w.count) }
 
-var _ TrapWriter = (*countingWriter)(nil)
+var _ output.Writer = (*countingWriter)(nil)
 
 // benchMakePDUs creates n synthetic PDU values with integer types.
 func benchMakePDUs(n int) []gosnmp.SnmpPDU {
@@ -477,86 +478,8 @@ func benchmarkSourceIP(i int) string {
 	return fmt.Sprintf("10.%d.%d.%d", 100+(i/65025), (i/255)%255, i%255+1)
 }
 
-// ---------------------------------------------------------------------------
-// 4. SDK-backed journal writer/drain throughput (enhanced existing benchmarks)
-// ---------------------------------------------------------------------------
-
-func BenchmarkTrapWriterWrite(b *testing.B) {
-	tw := newJournalTrapWriter(nil, 1<<20)
-	entry := benchmarkTrapEntry()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		writeTrapEntryWithBackpressure(b, tw, entry)
-	}
-	b.StopTimer()
-	b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "entries/s")
-	_ = tw.Close()
-}
-
-func BenchmarkJournalTrapWriterDrain(b *testing.B) {
-	dir := b.TempDir()
-	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
-	if err != nil {
-		b.Fatalf("NewJournalWriter: %v", err)
-	}
-	tw := newJournalTrapWriter(w, 1<<20)
-	entry := benchmarkTrapEntry()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		writeTrapEntryWithBackpressure(b, tw, entry)
-	}
-	if err := tw.Flush(); err != nil {
-		b.Fatalf("Flush: %v", err)
-	}
-	b.StopTimer()
-	b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "entries/s")
-	if err := tw.Close(); err != nil {
-		b.Fatalf("Close: %v", err)
-	}
-}
-
-func writeTrapEntryWithBackpressure(b *testing.B, tw *journalTrapWriter, entry *TrapEntry) {
-	b.Helper()
-	for {
-		err := tw.Write(entry)
-		if err == nil {
-			return
-		}
-		if err != errQueueFull {
-			b.Fatalf("Write: %v", err)
-		}
-		runtime.Gosched()
-	}
-}
-
-func BenchmarkJournalWriterWriteEntry(b *testing.B) {
-	dir := b.TempDir()
-	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
-	if err != nil {
-		b.Fatalf("NewJournalWriter: %v", err)
-	}
-	defer w.Close()
-
-	fields, err := serializeToJournalFields(benchmarkTrapEntry())
-	if err != nil {
-		b.Fatalf("serializeToJournalFields: %v", err)
-	}
-	now := time.Now().UnixMicro()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if err := w.WriteEntry(fields, now+int64(i), now+int64(i)); err != nil {
-			b.Fatalf("WriteEntry: %v", err)
-		}
-	}
-	b.StopTimer()
-	b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "entries/s")
-}
-
 // BenchmarkFullPacketToJournal measures the combined path:
-// synthetic SNMPv2c packet -> handlePacket -> journalTrapWriter queue ->
+// synthetic SNMPv2c packet -> handlePacket -> journal writer queue ->
 // SDK-backed journal append/sync. journalctl row counting runs after the timed
 // section so the throughput metric reflects ingestion and persistence only.
 func BenchmarkFullPacketToJournal(b *testing.B) {
@@ -580,11 +503,7 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 	dir := b.TempDir()
-	w, err := newTestJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
-	if err != nil {
-		b.Fatalf("NewJournalWriter: %v", err)
-	}
-	tw := newJournalTrapWriter(w, 1<<20)
+	tw := newBenchmarkJournalWriter(b, dir, 1<<20)
 	c := &Collector{
 		Config:     Config{Name: "bench-full"},
 		trapWriter: tw,
@@ -605,7 +524,7 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	}
 	b.StopTimer()
 
-	journalDir := w.JournalDirectory()
+	journalDir := tw.Directory()
 	if err := tw.Close(); err != nil {
 		b.Fatalf("Close: %v", err)
 	}
@@ -621,9 +540,27 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	}
 }
 
+func newBenchmarkJournalWriter(b *testing.B, dir string, queueCapacity int) *journal.Writer {
+	b.Helper()
+	writer, err := journal.Prepare(
+		dir,
+		journal.Config{RotateSize: 200 * 1024 * 1024},
+		newTestJournalHostProvider(),
+		journal.Options{QueueCapacity: queueCapacity},
+	)
+	if err != nil {
+		b.Fatalf("prepare journal writer: %v", err)
+	}
+	if err := writer.Start(); err != nil {
+		_ = writer.Close()
+		b.Fatalf("start journal writer: %v", err)
+	}
+	return writer
+}
+
 // BenchmarkUDPPacketToJournal measures the real local UDP receive path:
 // UDP socket -> Listener.readLoop -> Collector.handlePacket ->
-// journalTrapWriter queue -> SDK-backed journal append/sync.
+// journal writer queue -> SDK-backed journal append/sync.
 func BenchmarkUDPPacketToJournal(b *testing.B) {
 	requireJournalctlBenchmark(b)
 
@@ -669,7 +606,7 @@ func BenchmarkUDPPacketToJournalPaced(b *testing.B) {
 
 type udpPacketToJournalBenchmark struct {
 	data       []byte
-	writer     *journalTrapWriter
+	writer     *journal.Writer
 	listener   *Listener
 	conn       *net.UDPConn
 	delivered  atomic.Int64
@@ -695,11 +632,7 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	}
 	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
-	w, err := newTestJournalWriter(b.TempDir(), JournalConfig{RotateSize: 200 * bytesPerMB})
-	if err != nil {
-		b.Fatalf("NewJournalWriter: %v", err)
-	}
-	tw := newJournalTrapWriter(w, defaultQueueCapacity)
+	tw := newBenchmarkJournalWriter(b, b.TempDir(), journal.DefaultQueueCapacity)
 	b.Cleanup(func() {
 		_ = tw.Close()
 	})
@@ -735,7 +668,7 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 		writer:     tw,
 		listener:   listener,
 		conn:       conn,
-		journalDir: w.JournalDirectory(),
+		journalDir: tw.Directory(),
 	}
 	listener.start(func(pkt []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
 		c.handlePacket(pkt, peerIP, conn, peer)
@@ -915,31 +848,6 @@ func countJournalRowsBenchmark(b *testing.B, dir, match string) int64 {
 		return 0
 	}
 	return int64(bytes.Count(trimmed, []byte{'\n'}) + 1)
-}
-
-func benchmarkTrapEntry() *TrapEntry {
-	return &TrapEntry{
-		JobName:               "bench",
-		ReportType:            ReportTypeTrap,
-		ReceivedRealtimeUsec:  1000000,
-		ReceivedMonotonicUsec: 1000,
-		TrapOID:               "1.3.6.1.6.3.1.1.5.1",
-		TrapName:              "TEST-MIB::coldStart",
-		Category:              "security",
-		Severity:              "warning",
-		Message:               "benchmark trap",
-		SourceIP:              "192.0.2.10",
-		SourceUDPPeer:         "192.0.2.10",
-		PduType:               PduTypeTrap,
-		SnmpVersion:           SnmpVersionV2c,
-		Labels: map[string]string{
-			"site": "lab",
-		},
-		Varbinds: []VarbindValue{
-			{Name: "ifIndex", OID: "1.3.6.1.2.1.2.2.1.1", Type: "INTEGER", Value: int64(1)},
-			{Name: "ifDescr", OID: "1.3.6.1.2.1.31.1.1.1.1", Type: "OctetString", Value: "Ethernet1"},
-		},
-	}
 }
 
 func benchmarkDedupEntry() *TrapEntry {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package journal
 
 import (
 	"errors"
@@ -15,11 +15,12 @@ import (
 	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 )
 
 var (
 	errMissingJournalHost = errors.New("missing journal host provider")
-	errNilEntry           = errors.New("nil TrapEntry")
+	errNilEntry           = errors.New("nil trap entry")
 	errMissingJobName     = errors.New("missing job name")
 	errMissingSourceIP    = errors.New("missing source IP")
 	errNegativeTimestamp  = errors.New("negative timestamp")
@@ -31,31 +32,29 @@ const (
 	defaultNetdataLogDir = "/var/log/netdata"
 )
 
-type JournalField = sdkjournal.Field
-
-type JournalConfig struct {
+type Config struct {
 	MaxSize     uint64
 	MaxDuration time.Duration
 	RotateSize  uint64
 	RotateDur   time.Duration
 }
 
-type JournalWriter struct {
+type sdkWriter struct {
 	mu                  sync.Mutex
 	log                 *sdkjournal.Log
-	cfg                 JournalConfig
-	host                journalHostProvider
+	cfg                 Config
+	host                hostidentity.Provider
 	journalDir          string
 	activePath          string
 	binaryEncodedFields atomic.Uint64
 }
 
-func journalRoot(jobName string) string {
+func Root(jobName string) string {
 	// Caller must validate jobName first; it becomes a filesystem path segment.
-	return filepath.Join(journalBaseRoot(), jobName)
+	return filepath.Join(BaseRoot(), jobName)
 }
 
-func journalBaseRoot() string {
+func BaseRoot() string {
 	return filepath.Join(netdataLogDir(), "traps")
 }
 
@@ -69,7 +68,7 @@ func netdataLogDir() string {
 	return defaultNetdataLogDir
 }
 
-func validateNetdataLogRoot() error {
+func ValidateLogRoot() error {
 	logDir := netdataLogDir()
 	info, err := os.Stat(logDir)
 	if err != nil {
@@ -84,7 +83,7 @@ func validateNetdataLogRoot() error {
 	return nil
 }
 
-func newJournalWriterWithHostProvider(dir string, cfg JournalConfig, host journalHostProvider) (*JournalWriter, error) {
+func newSDKWriter(dir string, cfg Config, host hostidentity.Provider) (*sdkWriter, error) {
 	if host == nil {
 		return nil, errMissingJournalHost
 	}
@@ -109,7 +108,7 @@ func newJournalWriterWithHostProvider(dir string, cfg JournalConfig, host journa
 		return nil, fmt.Errorf("open journal log %s: %w", dir, err)
 	}
 
-	return &JournalWriter{
+	return &sdkWriter{
 		log:        log,
 		cfg:        cfg,
 		host:       host,
@@ -118,7 +117,7 @@ func newJournalWriterWithHostProvider(dir string, cfg JournalConfig, host journa
 	}, nil
 }
 
-func rotationPolicyFromConfig(cfg JournalConfig) sdkjournal.RotationPolicy {
+func rotationPolicyFromConfig(cfg Config) sdkjournal.RotationPolicy {
 	policy := sdkjournal.RotationPolicy{}
 	if cfg.RotateSize > 0 {
 		policy = policy.WithMaxFileSize(cfg.RotateSize)
@@ -129,7 +128,7 @@ func rotationPolicyFromConfig(cfg JournalConfig) sdkjournal.RotationPolicy {
 	return policy
 }
 
-func retentionPolicyFromConfig(cfg JournalConfig) sdkjournal.RetentionPolicy {
+func retentionPolicyFromConfig(cfg Config) sdkjournal.RetentionPolicy {
 	policy := sdkjournal.RetentionPolicy{}
 	if cfg.MaxSize > 0 {
 		policy = policy.WithMaxBytes(cfg.MaxSize)
@@ -140,40 +139,7 @@ func retentionPolicyFromConfig(cfg JournalConfig) sdkjournal.RetentionPolicy {
 	return policy
 }
 
-func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotonicUsec int64) error {
-	if realtimeUsec < 0 || monotonicUsec < 0 {
-		return errNegativeTimestamp
-	}
-
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if w.log == nil {
-		return sdkjournal.ErrWriterClosed
-	}
-	// The SDK writes length-delimited journal DATA objects. Unsafe values cannot
-	// inject fields, but we count them for the self-metrics surface.
-	count := binaryEncodedFieldCount(fields)
-	err := w.log.Append(fields, sdkjournal.EntryOptions{
-		RealtimeUsec:     uint64(realtimeUsec),
-		RealtimeUsecSet:  true,
-		MonotonicUsec:    uint64(monotonicUsec),
-		MonotonicUsecSet: true,
-		BootID:           w.host.BootID(),
-	})
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		w.binaryEncodedFields.Add(uint64(count))
-	}
-	if activePath := w.log.ActivePath(); activePath != "" {
-		w.activePath = activePath
-	}
-	return nil
-}
-
-func (w *JournalWriter) WriteRawEntry(payloads [][]byte, binaryEncodedFields int, realtimeUsec, monotonicUsec int64) error {
+func (w *sdkWriter) writeRaw(payloads [][]byte, binaryEncodedFields int, realtimeUsec, monotonicUsec int64) error {
 	if realtimeUsec < 0 || monotonicUsec < 0 {
 		return errNegativeTimestamp
 	}
@@ -203,11 +169,11 @@ func (w *JournalWriter) WriteRawEntry(payloads [][]byte, binaryEncodedFields int
 	return nil
 }
 
-func (w *JournalWriter) BinaryEncodedFields() uint64 {
+func (w *sdkWriter) binaryFieldCount() uint64 {
 	return w.binaryEncodedFields.Load()
 }
 
-func (w *JournalWriter) SweepRetention() error {
+func (w *sdkWriter) sweepRetention() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -217,7 +183,7 @@ func (w *JournalWriter) SweepRetention() error {
 	return w.log.EnforceRetention()
 }
 
-func (w *JournalWriter) Sync() error {
+func (w *sdkWriter) sync() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -227,7 +193,7 @@ func (w *JournalWriter) Sync() error {
 	return w.log.Sync()
 }
 
-func (w *JournalWriter) Close() error {
+func (w *sdkWriter) close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -239,14 +205,14 @@ func (w *JournalWriter) Close() error {
 	return err
 }
 
-func (w *JournalWriter) JournalDirectory() string {
+func (w *sdkWriter) directory() string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	return w.journalDir
 }
 
-func (w *JournalWriter) ActivePath() string {
+func (w *sdkWriter) activeFile() string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

@@ -25,16 +25,16 @@ const (
 )
 
 type Handler struct {
-	logs        sdkjournal.NetdataJournalFunction
-	journalRoot string
+	logs sdkjournal.NetdataJournalFunction
+	root string
 }
 
 var _ funcapi.RawMethodHandler = (*Handler)(nil)
 
-func NewHandler(journalRoot string) *Handler {
+func NewHandler(root string) *Handler {
 	return &Handler{
-		logs:        NewJournalFunction(),
-		journalRoot: journalRoot,
+		logs: NewJournalFunction(),
+		root: root,
 	}
 }
 
@@ -65,7 +65,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if req.Method != LogsMethodID {
 		return funcapi.NotFoundResponse(req.Method)
 	}
-	root := h.journalRoot
+	root := h.root
 	if err := validateLogsJournalRoot(root); err != nil {
 		return funcapi.UnavailableResponse(err.Error())
 	}

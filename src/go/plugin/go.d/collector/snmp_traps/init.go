@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/netip"
 	"regexp"
@@ -13,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
 )
 
 const (
@@ -53,9 +56,9 @@ type validatedConfig struct {
 	v3Enabled      bool
 	allowlist      []netip.Prefix
 	trustedRelays  []netip.Prefix
-	otlp           otlpRuntimeConfig
+	otlp           otlp.Policy
 	journalEnabled bool
-	retention      RetentionConfig
+	retention      journal.Retention
 	profileMetrics normalizedProfileMetricsConfig
 }
 
@@ -110,11 +113,20 @@ func validateConfig(c Config) (validatedConfig, error) {
 		return validated, err
 	}
 
-	otlp, err := validateOTLPConfig(c.OTLP)
-	if err != nil {
-		return validated, err
+	if c.OTLP.Enabled {
+		policy, err := otlp.Normalize(otlp.Config{
+			Endpoint:       c.OTLP.Endpoint,
+			Headers:        maps.Clone(c.OTLP.Headers),
+			RequestTimeout: c.OTLP.RequestTimeout,
+			FlushInterval:  c.OTLP.FlushInterval,
+			BatchSize:      c.OTLP.BatchSize,
+			QueueCapacity:  c.OTLP.QueueCapacity,
+		})
+		if err != nil {
+			return validated, err
+		}
+		validated.otlp = policy
 	}
-	validated.otlp = otlp
 	validated.journalEnabled = c.Journal.enabled()
 	if !validated.journalEnabled && !c.OTLP.Enabled {
 		return validated, errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled")
