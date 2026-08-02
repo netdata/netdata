@@ -712,10 +712,10 @@ Evidence:
   source evidence used for log filtering and audit.
 - `src/go/plugin/go.d/collector/snmp_traps/config.go:26` through `:28` defines
   trusted relay configuration.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:740` through `:744`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:732` through `:736`
   warns that catch-all trusted relays let every peer override source identity
   via `snmpTrapAddress.0`.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:592` through `:600`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:578` through `:587`
   handles INFORM responses and increments `inform_response_failed`.
 
 ## Explicit Non-Goals
@@ -1665,11 +1665,11 @@ design explicitly changes it:
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:637` through `:642`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:625` through `:631`
   returns early for dedup-suppressed traps.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:645` through `:650`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:633` through `:640`
   returns early for write failures.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:653` through `:662`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:644` through `:654`
   updates profile, event, and severity metrics after successful write.
 - Phase A profile metric tests verify no profile metric is emitted for write
   failures and dedup-suppressed traps. Pre-Phase-A

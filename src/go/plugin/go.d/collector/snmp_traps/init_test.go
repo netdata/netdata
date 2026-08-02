@@ -51,6 +51,15 @@ func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
 		require.Truef(t, ok, "missing chart %q", id)
 		assert.Equalf(t, "incremental", chart.Algorithm, "chart %q algorithm", id)
 	}
+	for _, id := range []string{
+		"sources",
+		"source_attribution",
+		"source_pipeline",
+		"source_errors",
+		"source_last_seen",
+	} {
+		assert.NotContains(t, charts, id)
+	}
 }
 
 func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
