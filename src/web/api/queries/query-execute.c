@@ -338,16 +338,21 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
                             case TIER_QUERY_FETCH_SUM:
                                 new_point.value = sp.sum;
-                                if(unlikely(qm->values_stored_as_rates)) {
-                                    time_t duration = sp.end_time_s - sp.start_time_s;
-                                    if(likely(duration > 0))
-                                        new_point.value *=
-                                            (NETDATA_DOUBLE)duration / (NETDATA_DOUBLE)sp.count;
-                                }
                                 if(unlikely(sp.start_time_s < now_start_time && sp.end_time_s < now_end_time))
                                     new_point.value = query_point_total_projection(
                                         &new_point, now_start_time, now_end_time);
                                 break;
+
+                            case TIER_QUERY_FETCH_RATE_SUM: {
+                                time_t duration = sp.end_time_s - sp.start_time_s;
+                                uint64_t slots = storage_point_slots(sp);
+                                new_point.value = likely(duration > 0 && slots) ?
+                                    sp.sum * (NETDATA_DOUBLE)duration / (NETDATA_DOUBLE)slots : sp.sum;
+                                if(unlikely(sp.start_time_s < now_start_time && sp.end_time_s < now_end_time))
+                                    new_point.value = query_point_total_projection(
+                                        &new_point, now_start_time, now_end_time);
+                                break;
+                            }
                         }
                     }
                 }

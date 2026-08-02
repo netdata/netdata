@@ -574,6 +574,9 @@ QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache
     if(qt->window.options & RRDR_OPTION_ANOMALY_BIT) {
         ops->point_mode = QUERY_POINT_MODE_HOLD;
     }
+    else if(ops->tier_query_fetch == TIER_QUERY_FETCH_SUM && ops->qm->values_stored_as_rates) {
+        ops->tier_query_fetch = TIER_QUERY_FETCH_RATE_SUM;
+    }
 
     ops->plan_switch_time_offset =
         ops->point_mode == QUERY_POINT_MODE_TOTAL ? ops->view_update_every : 0;
