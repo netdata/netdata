@@ -400,6 +400,8 @@ type MetricDefinitions struct {
 }
 
 // Definitions returns the selected static metric definitions and their charts.
+// A nil ruleNames slice returns the complete snapshot for the temporary manual
+// assembly bridge; runtime callers pass their explicit selection.
 func (idx *Epoch) Definitions(ruleNames []string) (MetricDefinitions, error) {
 	if idx == nil {
 		return MetricDefinitions{}, errors.New("profile index not available")
@@ -409,6 +411,23 @@ func (idx *Epoch) Definitions(ruleNames []string) (MetricDefinitions, error) {
 	}
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
+	if ruleNames != nil {
+		defs := MetricDefinitions{
+			RulesByName: make(map[string]*MetricRule, len(ruleNames)),
+			ChartsByID:  make(map[string]*MetricChart, len(ruleNames)),
+		}
+		for _, name := range ruleNames {
+			rule := idx.metricRulesByName[name]
+			if rule == nil {
+				continue
+			}
+			defs.RulesByName[name] = rule
+			if chart := idx.metricChartsByID[rule.Output.Chart]; chart != nil {
+				defs.ChartsByID[chart.ID] = chart
+			}
+		}
+		return defs, nil
+	}
 	defs := MetricDefinitions{
 		RulesByName: make(map[string]*MetricRule, len(idx.metricRulesByName)),
 		ChartsByID:  make(map[string]*MetricChart, len(idx.metricChartsByID)),

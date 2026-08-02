@@ -117,7 +117,7 @@ The plugin is a **DynCfg-managed jobs orchestrator**. Each **job is one listener
 Job lifecycle mirrors the established go.d pattern (`src/go/plugin/framework/jobruntime/job_v1.go`; orchestration in `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`):
 
 - **Add / Enable** — create job and synchronously preflight every required resource. Invalid configuration and eager
-  profile-cache errors return non-retryable coded errors (HTTP 422). A malformed lazy stock profile instead fails the
+  profile-catalog errors return non-retryable coded errors (HTTP 422). A malformed lazy stock profile instead fails the
   first matching lookup. Startup/environment failures such as endpoint bind failures (EACCES for privileged port,
   EADDRINUSE for port collision, etc.), persistent journal directory absence, journal directory create/open failure,
   writer initialization failure, SNMPv3 state persistence failure, and OTLP preflight failure are still surfaced during
@@ -347,7 +347,9 @@ The lookup contract is:
    also matches received PDU varbind OIDs under `profile_oid + "."` so table
    cells and scalar `.0` instances resolve against their profile metadata.
 
-Operators and generated profiles may therefore use the canonical OID form produced by their MIB tooling. The receiver still matches traps sent by devices that use the alternate SMI form. Exact-match precedence prevents the fallback from overriding an explicitly-authored profile entry when both forms exist.
+Operators and generated profiles may therefore use the canonical OID form produced by their MIB tooling. The receiver
+still matches traps sent by devices that use the alternate SMI form. Profile validation rejects a catalogue that defines
+both spellings because they identify the same logical trap.
 
 ### Varbind resolution — 2-tier
 

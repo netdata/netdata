@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -59,13 +60,17 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 		panic("snmp_traps Register requires a non-nil trap enrichment handle")
 	}
 	hostIdentity := newHostIdentityService()
-	profileCatalog := catalog.NewManager(defaultProfileCatalogPaths())
+	var profileCatalogOnce sync.Once
+	var profileCatalog *catalog.Manager
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
 		},
 		CreateV2: func() collectorapi.CollectorV2 {
+			profileCatalogOnce.Do(func() {
+				profileCatalog = catalog.NewManager(defaultProfileCatalogPaths())
+			})
 			return newCollector(deviceStore, topologyEnricher, hostIdentity, profileCatalog, netdataEngineStateRoot)
 		},
 		Config:         func() any { return &Config{} },

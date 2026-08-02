@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -226,6 +227,15 @@ traps:
 			assert.Equal(t, "IF-MIB::linkDown", td.Name)
 		})
 	}
+}
+
+func TestInvalidUserProfileErrorNamesTheFile(t *testing.T) {
+	userDir := t.TempDir()
+	path := filepath.Join(userDir, "broken.yaml")
+	writeProfileYAML(t, userDir, "broken.yaml", "traps: [")
+
+	_, err := NewManager(Paths{UserDirs: []string{userDir}, StockDir: writeTestStockCatalog(t)}).Acquire()
+	require.ErrorContains(t, err, path)
 }
 
 func TestProfileLoadRejectsAlternateOIDDuplicatesAcrossUserProfiles(t *testing.T) {
@@ -626,6 +636,102 @@ func TestStockHydrationCoalescesPerFileWithoutBlockingOtherFiles(t *testing.T) {
 	assert.NotNil(t, idx.lookupLoaded(fastOID))
 }
 
+func TestStockDependencyParsingDoesNotBlockUnrelatedPublication(t *testing.T) {
+	const (
+		dependencyOID = "1.3.6.1.4.1.99998.32"
+		fastOID       = "1.3.6.1.4.1.99998.33"
+	)
+	idx := NewEpoch()
+	dependencyStarted := make(chan struct{})
+	releaseDependency := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseDependency) }) }
+	defer release()
+
+	metricBundle := profileLoadBundle{
+		metrics: []profileMetricRule{{
+			Name:       "stock.dependency",
+			Type:       profileMetricTypeCounter,
+			OnTrap:     "DEPENDENCY-MIB::target",
+			Output:     profileMetricOutput{Metric: "vendor_dependency_events", Dimension: "events", Chart: "dependency_chart"},
+			SourceFile: "metric.yaml",
+		}},
+		charts: []profileMetricChart{{
+			ID: "dependency_chart", Title: "Dependency", Context: "snmp.trap.dependency", Units: "events/s", Algorithm: "incremental", SourceFile: "metric.yaml",
+		}},
+	}
+	store := &stockProfileStore{
+		files: map[string]string{
+			"metric":     "metric.yaml",
+			"dependency": "dependency.yaml",
+			"fast":       "fast.yaml",
+		},
+		routes: map[string]stockProfileRoutes{
+			"metric":     {metricRuleNames: []string{"stock.dependency"}},
+			"dependency": {trapOIDs: []string{dependencyOID}, mibs: []string{"DEPENDENCY-MIB"}},
+			"fast":       {trapOIDs: []string{fastOID}, mibs: []string{"FAST-MIB"}},
+		},
+		exactRoutes:  map[string]string{dependencyOID: "dependency", fastOID: "fast"},
+		mibRoutes:    map[string][]string{"DEPENDENCY-MIB": {"dependency"}, "FAST-MIB": {"fast"}},
+		metricRoutes: map[string]string{"stock.dependency": "metric"},
+		hydration: map[string]*profileHydration{
+			"metric":     {},
+			"dependency": {},
+			"fast":       {},
+		},
+		loadBundle: func(path string, _ multipath.MultiPath, _ []string) (profileLoadBundle, error) {
+			switch path {
+			case "metric.yaml":
+				return metricBundle, nil
+			case "dependency.yaml":
+				close(dependencyStarted)
+				<-releaseDependency
+				return profileLoadBundle{traps: []*TrapDef{{
+					OID: dependencyOID, Name: "DEPENDENCY-MIB::target", SourceFile: path,
+				}}}, nil
+			case "fast.yaml":
+				return profileLoadBundle{traps: []*TrapDef{{
+					OID: fastOID, Name: "FAST-MIB::event", SourceFile: path,
+				}}}, nil
+			default:
+				return profileLoadBundle{}, fmt.Errorf("unexpected path %q", path)
+			}
+		},
+	}
+	idx.stock = store
+
+	metricDone := make(chan error, 1)
+	go func() {
+		_, err := idx.Definitions([]string{"stock.dependency"})
+		metricDone <- err
+	}()
+	select {
+	case <-dependencyStarted:
+	case <-time.After(time.Second):
+		t.Fatal("metric dependency parsing did not start")
+	}
+
+	fastDone := make(chan error, 1)
+	go func() {
+		_, err := idx.LookupWithError(fastOID)
+		fastDone <- err
+	}()
+	blocked := false
+	select {
+	case err := <-fastDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		blocked = true
+	}
+
+	release()
+	require.NoError(t, <-metricDone)
+	if blocked {
+		require.NoError(t, <-fastDone)
+		t.Fatal("dependency parsing held the global publication lock")
+	}
+}
+
 func TestStockCatalogueIsRequiredAndUnambiguous(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -836,6 +942,34 @@ func TestMetricRuleCannotReferenceChartFromAnotherProfile(t *testing.T) {
 	require.ErrorContains(t, err, `references unknown chart "other_chart"`)
 }
 
+func TestDefinitionsReturnsOnlySelectedRulesAndCharts(t *testing.T) {
+	idx := NewEpoch()
+	td := testIFMIBLinkDownTrapDef()
+	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
+	require.NoError(t, idx.AddMetricDefinitions([]MetricRule{
+		{
+			Name:   "site.first",
+			Type:   profileMetricTypeCounter,
+			OnTrap: td.OID,
+			Output: MetricOutput{Metric: "site_first_events", Dimension: "events", Chart: "first_chart"},
+		},
+		{
+			Name:   "site.second",
+			Type:   profileMetricTypeCounter,
+			OnTrap: td.OID,
+			Output: MetricOutput{Metric: "site_second_events", Dimension: "events", Chart: "second_chart"},
+		},
+	}, []MetricChart{
+		{ID: "first_chart", Title: "First", Context: "snmp.trap.first", Units: "events/s", Algorithm: "incremental"},
+		{ID: "second_chart", Title: "Second", Context: "snmp.trap.second", Units: "events/s", Algorithm: "incremental"},
+	}))
+
+	defs, err := idx.Definitions([]string{"site.first"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"site.first"}, slices.Sorted(maps.Keys(defs.RulesByName)))
+	assert.Equal(t, []string{"first_chart"}, slices.Sorted(maps.Keys(defs.ChartsByID)))
+}
+
 func TestReadProfileFileRejectsOversizedDecompressedProfile(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAMLZstd(t, dir, "oversized.yaml.zst", strings.Repeat("x", 32))
@@ -851,8 +985,6 @@ func TestReadProfileFileRejectsOversizedDecompressedProfile(t *testing.T) {
 func TestProfileIndexLookupTrapOIDTolerance(t *testing.T) {
 	withZero := &TrapDef{OID: "1.3.6.1.2.1.33.2.0.1", Name: "UPS-MIB::upsTrapOnBattery"}
 	withoutZero := &TrapDef{OID: "1.3.6.1.4.1.14179.2.6.3.24", Name: "AIRESPACE-WIRELESS-MIB::bsnAPFunctionalityDisabled"}
-	exact := &TrapDef{OID: "1.3.6.1.4.1.14179.2.6.3.0.24", Name: "AIRESPACE-WIRELESS-MIB::exactZeroForm"}
-	alt := &TrapDef{OID: "1.3.6.1.4.1.14179.2.6.3.24", Name: "AIRESPACE-WIRELESS-MIB::alternateNoZeroForm"}
 
 	tests := map[string]struct {
 		lookup string
@@ -872,14 +1004,6 @@ func TestProfileIndexLookupTrapOIDTolerance(t *testing.T) {
 				withZero.OID: withZero,
 			},
 			want: withZero,
-		},
-		"exact_match_wins_when_both_forms_exist": {
-			lookup: "1.3.6.1.4.1.14179.2.6.3.0.24",
-			traps: map[string]*TrapDef{
-				exact.OID: exact,
-				alt.OID:   alt,
-			},
-			want: exact,
 		},
 		"too_short_oid_does_not_match_alternate": {
 			lookup: "1.3.6",

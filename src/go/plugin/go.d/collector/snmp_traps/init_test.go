@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -135,7 +136,44 @@ func TestCollectorCreatorSharesHostIdentityService(t *testing.T) {
 	second := creator.CreateV2().(*Collector)
 
 	assert.Same(t, first.hostIdentity, second.hostIdentity)
+	assert.Same(t, first.profileCatalog, second.profileCatalog)
 	assert.NotNil(t, first.engineStateRoot)
+}
+
+func TestCollectorCreatorResolvesProfilePathsOnFirstCollector(t *testing.T) {
+	originalExecutableDir := executable.Directory
+	t.Cleanup(func() { executable.Directory = originalExecutableDir })
+
+	earlyDir := filepath.Join(t.TempDir(), "before-plugin-config")
+	require.NoError(t, os.MkdirAll(earlyDir, 0o755))
+	executable.Directory = earlyDir
+	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+
+	root := t.TempDir()
+	executableDir := filepath.Join(root, "plugins.d")
+	stockDir := filepath.Join(root, "config", "go.d", "snmp.trap-profiles", "default")
+	require.NoError(t, os.MkdirAll(executableDir, 0o755))
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "minimal.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.1
+    name: SNMPv2-MIB::coldStart
+    category: state_change
+    severity: notice
+`)
+	writeProfileCatalogue(t, stockDir, map[string]any{
+		"minimal": map[string]any{
+			"file":      "minimal.yaml",
+			"mibs":      []string{"SNMPv2-MIB"},
+			"trap_oids": []string{"1.3.6.1.6.3.1.1.5.1"},
+		},
+	})
+	executable.Directory = executableDir
+
+	collector := creator.CreateV2().(*Collector)
+	lease, err := collector.profileCatalog.Acquire()
+	require.NoError(t, err)
+	lease.Close()
 }
 
 func TestCollectorNewUsesIndependentHostIdentityService(t *testing.T) {

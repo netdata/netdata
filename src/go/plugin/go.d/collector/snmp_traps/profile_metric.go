@@ -149,7 +149,6 @@ type profileMetricRuntime struct {
 	cfg        normalizedProfileMetricsConfig
 	rules      []*compiledProfileMetricRule
 	rulesByOID map[string][]*compiledProfileMetricRule
-	charts     map[string]*profileMetricChart
 
 	series          map[profileMetricSeriesKey]*profileMetricSeries
 	sources         map[string]time.Time
@@ -242,7 +241,6 @@ func newProfileMetricRuntime(cfg normalizedProfileMetricsConfig, idx *ProfileInd
 
 	rt := &profileMetricRuntime{
 		cfg:             cfg,
-		charts:          cat.chartsByID,
 		series:          make(map[profileMetricSeriesKey]*profileMetricSeries),
 		sources:         make(map[string]time.Time),
 		sourceRoutes:    make(map[string]string),

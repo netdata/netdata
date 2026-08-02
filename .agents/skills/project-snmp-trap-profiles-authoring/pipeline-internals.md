@@ -132,7 +132,7 @@ journal field-name limits" framing is omitted.
 
 ## 7. Profile loading lifecycle
 
-Authoritative home: `netdata.md` §5 ("Profile loading — leased catalog epochs,
+Authoritative home: `netdata.md` §7 ("Profile loading — leased catalog epochs,
 exact manifest routes, targeted hydration").
 
 - One catalog manager belongs to the plugin registration. Its first listener

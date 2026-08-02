@@ -381,7 +381,7 @@ All job resources are validated synchronously in the go.d framework's job `Start
 | Journal writer | `journal.Prepare(dir, cfg, host, opts)` validates directory and retention config | HTTP-503 retryable for environment failures; HTTP-422 for invalid retention config |
 
 These errors must flow through DynCfg as coded errors with the resource-specific code above. Non-retryable configuration
-and eager profile-cache errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement
+and eager profile-catalog errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement
 `DyncfgRetryable() bool` so file-configured jobs can retry after the transient condition clears. Lazy stock-profile errors
 are runtime lookup failures and do not pass through DynCfg.
 
@@ -400,13 +400,13 @@ are runtime lookup failures and do not pass through DynCfg.
 Before changing shared DynCfg behavior, M2 must run a same-failure scan (`rg 'CodedError|codedError|MarkNonDisruptiveUpdate' src/go/plugin`) and add handler/jobmgr tests proving existing plain-error retry behavior remains unchanged while coded trap creation failures surface their HTTP status.
 
 The trap plugin must still preflight all resources before it reports successful startup. `AutoDetection(ctx)` should be a
-no-op for traps unless a future SOW proves a cheap consistency check is needed; bind, eager profile-cache, journal, writer,
+no-op for traps unless a future SOW proves a cheap consistency check is needed; bind, eager profile-catalog, journal, writer,
 and retention failures must be creation-time coded errors, not retry-loop events. Lazy stock-profile errors remain first
 matching lookup failures.
 
 **Partial resource cleanup**: if endpoint 3 of 5 fails to bind after endpoints 1-2 succeeded, the previously bound endpoints are closed before returning the error. The job never enters the running state.
 
-`createCollectorJob()` failure is not followed by framework `Cleanup()` because no job object is returned. The trap job factory must therefore own rollback for every partial resource acquired during creation: release profile-cache references, close bound sockets, close or remove partially-created writer state, and leave the journal directory in a valid empty-or-reusable state before returning the coded error.
+`createCollectorJob()` failure is not followed by framework `Cleanup()` because no job object is returned. The trap job factory must therefore own rollback for every partial resource acquired during creation: release profile-catalog leases, close bound sockets, close or remove partially-created writer state, and leave the journal directory in a valid empty-or-reusable state before returning the coded error.
 
 On `Update()`, current jobmgr behavior stops the old running job before creating the replacement. If replacement creation fails, the trap job factory can only roll back partial resources from the failed new job; it cannot restore the stopped old job. This is shared framework behavior. M2 tests must capture the resulting failed status and coded response so operators see the apply-time failure clearly.
 

@@ -55,7 +55,7 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 			}
 			bundle, err := loadProfileBundle(ctx.Path, extendsPaths, nil)
 			if err != nil {
-				return profileSource{}, err
+				return profileSource{}, fmt.Errorf("invalid profile %q: %w", ctx.Path, err)
 			}
 			source.bundle = &bundle
 			return source, nil
@@ -130,21 +130,26 @@ func (idx *Epoch) addTraps(traps []*TrapDef) error {
 }
 
 func (idx *Epoch) addBundleAtomic(bundle profileLoadBundle, stockProfile ...string) error {
+	currentStockProfile := ""
+	if len(stockProfile) > 0 {
+		currentStockProfile = stockProfile[0]
+	}
+	var dependencies profileLoadBundle
+	if idx.stock != nil && len(bundle.metrics) > 0 {
+		var err error
+		dependencies, err = idx.stock.validationBundleForRules(currentStockProfile, bundle.metrics)
+		if err != nil {
+			return err
+		}
+	}
+
 	idx.publishMu.Lock()
 	defer idx.publishMu.Unlock()
 
 	staged := NewEpoch()
 	staged.base = idx
-	currentStockProfile := ""
-	if len(stockProfile) > 0 {
-		currentStockProfile = stockProfile[0]
-	}
 	staged.validationStockProfile = currentStockProfile
-	if idx.stock != nil && len(bundle.metrics) > 0 {
-		dependencies, err := idx.stock.validationBundleForRules(currentStockProfile, bundle.metrics)
-		if err != nil {
-			return err
-		}
+	if len(dependencies.traps) > 0 || len(dependencies.metrics) > 0 || len(dependencies.charts) > 0 {
 		if err := staged.addValidationBundle(dependencies); err != nil {
 			return err
 		}

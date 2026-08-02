@@ -777,7 +777,7 @@ func BenchmarkBERRejection(b *testing.B) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Profile-cache and dedup hot-path benchmarks
+// 6. Profile catalog and dedup hot-path benchmarks
 // ---------------------------------------------------------------------------
 
 func BenchmarkAcquireProfileCatalogDefaultProfiles(b *testing.B) {
