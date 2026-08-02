@@ -1144,6 +1144,7 @@ func newPreparedAttachmentFixture(
 	withHandler bool,
 	attacher JobHandlerAttacher,
 ) *preparedAttachmentFixture {
+	t.Helper()
 	return newPreparedAttachmentFixtureWithOptions(t, preparedAttachmentFixtureOptions{
 		variant:     variant,
 		attempts:    attempts,
