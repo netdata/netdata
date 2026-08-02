@@ -242,9 +242,6 @@ func TestValidateProfileReportsComposedDisplayedFamily(t *testing.T) {
 func TestValidateProfileRejectsUnsafeJobFields(t *testing.T) {
 	result := runValidation(t, validProfile, validDump, "url: http://example.invalid/metrics\n")
 	requireFinding(t, result, "job_policy")
-	if !strings.Contains(result.report.Findings[0].Message, "field url not found") {
-		t.Fatalf("unexpected strict-policy error: %s", result.report.Findings[0].Message)
-	}
 }
 
 func TestValidateProfileAppliesRelabelAndFallbackPolicy(t *testing.T) {

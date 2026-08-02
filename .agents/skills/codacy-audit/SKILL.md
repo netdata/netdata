@@ -100,9 +100,11 @@ payload shape. SARIF must declare version 2.1.0 and contain a `runs` array. If t
 exact error recurs, verify the runner still mounts its configured Java temp
 directory at the same absolute path before changing analyzer policy.
 
-For SARIF, a valid top-level envelope alone is not trustworthy. The 7.10.1 CLI
-contract also requires every run to carry its tool driver and rules, result
-records with valid rule references and physical locations, invocations, and
+For SARIF, a valid top-level envelope alone is not trustworthy. The wrapper pins
+the Docker runner to the current supported stable CLI, 7.10.1, and rejects a
+local binary that does not report that exact version. Its closed contract also
+requires every run to carry its tool driver and rules, result records with valid
+rule references and physical locations, exactly one successful invocation, and
 referenced artifacts. The wrapper validates those nested records and
 cross-references before reporting success. The CLI has one known producer quirk:
 in mixed security/non-security runs, non-security result indexes address the
@@ -118,10 +120,11 @@ directories, must successfully truncate the destination before the analyzer
 starts, and requires a non-empty readable regular file afterward. This prevents
 a failed redirection from reusing a stale report.
 
-The Docker runner follows Codacy's current CLI image. If Codacy changes the
-result ADT, the closed validation is intentionally fail-closed: verify the new
-upstream model, then update the validator and mock matrix together. Do not make
-unknown wrappers implicitly successful merely to tolerate version drift.
+The Docker image version, accepted local-binary version, closed JSON/SARIF
+validator, and mock matrix are one compatibility unit. When Codacy publishes a
+new stable CLI, verify its upstream result model and real output first, then
+update all four together. Do not use a moving image tag or make unknown wrappers
+implicitly successful merely to tolerate version drift.
 
 When the local CLI emits valid JSON, its top-level shape is an array of tagged
 result wrappers, not the Codacy v3 API's `.data[].commitIssue` shape. Issue

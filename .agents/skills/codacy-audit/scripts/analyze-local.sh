@@ -38,6 +38,8 @@ FORMAT=json
 OUTPUT=
 RUNNER=auto
 RUNNER_TMP=
+CODACY_ANALYSIS_CLI_VERSION=7.10.1
+CODACY_ANALYSIS_CLI_IMAGE="codacy/codacy-analysis-cli:${CODACY_ANALYSIS_CLI_VERSION}"
 
 cleanup() {
     if [ -n "$RUNNER_TMP" ] && [ -d "$RUNNER_TMP" ]; then
@@ -126,6 +128,21 @@ case "$RUNNER" in
         ;;
 esac
 
+# The JSON/SARIF validators below intentionally model one stable CLI release.
+# Keep the local runner on that release; the Docker path is pinned to the same
+# version so a moving image cannot silently change the report contract.
+if [ "$RUNNER" = "local" ]; then
+    expected_version="codacy-analysis-cli is on version ${CODACY_ANALYSIS_CLI_VERSION}"
+    if ! local_version_output="$(codacy-analysis-cli -v 2>&1)"; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} cannot determine local codacy-analysis-cli version" >&2
+        exit 2
+    fi
+    if ! grep -Fqx "$expected_version" <<< "$local_version_output"; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} unsupported local codacy-analysis-cli version; expected ${CODACY_ANALYSIS_CLI_VERSION}" >&2
+        exit 2
+    fi
+fi
+
 # Truncate the destination before the runner starts. If shell redirection cannot
 # initialize it, a readable stale report must not survive to the shape check.
 if ! : > "$OUTPUT"; then
@@ -169,7 +186,7 @@ case "$RUNNER" in
                 --volume /var/run/docker.sock:/var/run/docker.sock \
                 --volume "$SUBDIR":"$SUBDIR" \
                 --volume "$RUNNER_TMP":"$RUNNER_TMP" \
-                codacy/codacy-analysis-cli:latest \
+                "$CODACY_ANALYSIS_CLI_IMAGE" \
                 "${cli_args[@]}" > "$OUTPUT" 2>/dev/null; then
             echo -e "${CA_YELLOW}[analyze-local] cli returned non-zero (this is normal when findings are present)${CA_NC}" >&2
         fi

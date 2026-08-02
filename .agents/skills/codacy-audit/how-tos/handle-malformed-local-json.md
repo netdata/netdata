@@ -38,10 +38,16 @@ parse it.
    CLI's array of exactly-one-key `Issue`, `DuplicationClone`, `FileError`, or
    `FileMetrics` wrappers with their required payload fields. SARIF must use the
    2.1.0 schema and version, and every run must contain a valid tool driver and
-   rules, results with valid rule and artifact references, invocations, and
-   artifacts. The wrapper reports each JSON result class separately and fails
-   when a `FileError` makes the analysis incomplete. A printed dump path without
-   a successful exit is not a pass.
+   rules, results with valid rule and artifact references, exactly one successful
+   invocation, and artifacts. The wrapper reports each JSON result class
+   separately and fails when a `FileError` makes the analysis incomplete. A
+   printed dump path without a successful exit is not a pass.
+
+   This is a closed 7.10.1 compatibility contract, not a generic SARIF reader.
+   The Docker runner is pinned to 7.10.1, and the local runner rejects any other
+   reported CLI version before initializing the output path. Upgrade the image,
+   accepted local version, validator, and mock matrix together after checking the
+   new stable release's upstream model and real output.
 
    Codacy 7.10.1 has one known SARIF quirk: in a mixed-category run, a
    non-security result's rule index addresses the non-security subset even

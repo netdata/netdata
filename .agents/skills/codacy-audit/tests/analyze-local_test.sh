@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016 # SARIF fixtures must preserve the literal $schema key.
 
 set -Eeuo pipefail
 
@@ -11,6 +12,10 @@ mkdir -p "$tmp/bin"
 cat > "$tmp/bin/codacy-analysis-cli" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
+if [ "${1:-}" = "-v" ]; then
+    printf 'codacy-analysis-cli is on version %s\n' "${CODACY_TEST_VERSION:-7.10.1}"
+    exit 0
+fi
 cat "$CODACY_TEST_REPORT"
 EOF
 chmod 0700 "$tmp/bin/codacy-analysis-cli"
@@ -23,31 +28,43 @@ run_case() {
     local format="$3"
     local report="$4"
     local message="$5"
-    local report_path output_path output status
+    local report_path output_path stdout_path stderr_path stdout stderr status
 
     case_number=$((case_number + 1))
     report_path="$tmp/report-${case_number}.${format}"
     output_path="$tmp/output-${case_number}.${format}"
+    stdout_path="$tmp/stdout-${case_number}.txt"
+    stderr_path="$tmp/stderr-${case_number}.txt"
     printf '%s\n' "$report" > "$report_path"
 
     set +e
-    output="$({
-        PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$report_path" \
-            "$script" --runner local --format "$format" --output "$output_path"
-    } 2>&1)"
+    PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$report_path" \
+        "$script" --runner local --format "$format" --output "$output_path" \
+        > "$stdout_path" 2> "$stderr_path"
     status=$?
     set -e
+    stdout="$(cat "$stdout_path")"
+    stderr="$(cat "$stderr_path")"
 
     case "$expectation" in
         success)
             if [ "$status" -ne 0 ]; then
-                printf >&2 '[FAIL] %s: expected success, got %d\n%s\n' "$name" "$status" "$output"
+                printf >&2 '[FAIL] %s: expected success, got %d\nstdout:\n%s\nstderr:\n%s\n' \
+                    "$name" "$status" "$stdout" "$stderr"
+                return 1
+            fi
+            if [ "$stdout" != "$output_path" ]; then
+                printf >&2 '[FAIL] %s: stdout must contain exactly the dump path\nstdout:\n%s\n' "$name" "$stdout"
                 return 1
             fi
             ;;
         failure)
             if [ "$status" -eq 0 ]; then
-                printf >&2 '[FAIL] %s: expected failure\n%s\n' "$name" "$output"
+                printf >&2 '[FAIL] %s: expected failure\nstdout:\n%s\nstderr:\n%s\n' "$name" "$stdout" "$stderr"
+                return 1
+            fi
+            if [ -n "$stdout" ]; then
+                printf >&2 '[FAIL] %s: failure wrote to stdout\n%s\n' "$name" "$stdout"
                 return 1
             fi
             ;;
@@ -56,8 +73,8 @@ run_case() {
             return 1
             ;;
     esac
-    if [[ "$output" != *"$message"* ]]; then
-        printf >&2 '[FAIL] %s: missing diagnostic %q\n%s\n' "$name" "$message" "$output"
+    if [[ "$stderr" != *"$message"* ]]; then
+        printf >&2 '[FAIL] %s: missing stderr diagnostic %q\n%s\n' "$name" "$message" "$stderr"
         return 1
     fi
     printf '[PASS] %s\n' "$name"
@@ -152,6 +169,21 @@ run_case failure 'SARIF invocation reports failure' sarif '
      "results":[],"invocations":[{"executionSuccessful":false,
        "workingDirectory":{"uri":"file:///codacy"}}],"artifacts":[]
    }]}' 'invalid sarif report'
+run_case failure 'SARIF run omits invocation evidence' sarif '
+  {"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+   "version":"2.1.0","runs":[{
+     "tool":{"driver":{"name":"Tool","version":"1","informationUri":"https://www.codacy.com","rules":[]}},
+     "results":[],"artifacts":[]
+   }]}' 'invalid sarif report'
+run_case failure 'SARIF run has multiple invocations' sarif '
+  {"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+   "version":"2.1.0","runs":[{
+     "tool":{"driver":{"name":"Tool","version":"1","informationUri":"https://www.codacy.com","rules":[]}},
+     "results":[],"invocations":[
+       {"executionSuccessful":true,"workingDirectory":{"uri":"file:///codacy"}},
+       {"executionSuccessful":true,"workingDirectory":{"uri":"file:///codacy"}}
+     ],"artifacts":[]
+   }]}' 'invalid sarif report'
 run_case failure 'SARIF result has no physical location' sarif '
   {"$schema":"https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
    "version":"2.1.0","runs":[{
@@ -166,15 +198,20 @@ run_case failure 'SARIF result has no physical location' sarif '
 
 output_directory="$tmp/existing-output-directory"
 mkdir "$output_directory"
+directory_stdout_path="$tmp/directory.stdout"
+directory_stderr_path="$tmp/directory.stderr"
 set +e
-directory_output="$({
-    PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
-        "$script" --runner local --format json --output "$output_directory"
-} 2>&1)"
+PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
+    "$script" --runner local --format json --output "$output_directory" \
+    > "$directory_stdout_path" 2> "$directory_stderr_path"
 directory_status=$?
 set -e
-if [ "$directory_status" -ne 2 ] || [[ "$directory_output" != *'output path must be a regular file'* ]]; then
-    printf >&2 '[FAIL] output directory rejection: status=%d\n%s\n' "$directory_status" "$directory_output"
+directory_stdout="$(cat "$directory_stdout_path")"
+directory_stderr="$(cat "$directory_stderr_path")"
+if [ "$directory_status" -ne 2 ] || [ -n "$directory_stdout" ] || \
+        [[ "$directory_stderr" != *'output path must be a regular file'* ]]; then
+    printf >&2 '[FAIL] output directory rejection: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$directory_status" "$directory_stdout" "$directory_stderr"
     exit 1
 fi
 printf '[PASS] output directory rejection\n'
@@ -182,27 +219,60 @@ printf '[PASS] output directory rejection\n'
 stale_output="$tmp/stale-output.json"
 printf '%s\n' '[]' > "$stale_output"
 printf '%s\n' 'set -o noclobber' > "$tmp/noclobber-env"
+stale_stdout_path="$tmp/stale.stdout"
+stale_stderr_path="$tmp/stale.stderr"
 set +e
-stale_result="$({
-    BASH_ENV="$tmp/noclobber-env" PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
-        "$script" --runner local --format json --output "$stale_output"
-} 2>&1)"
+BASH_ENV="$tmp/noclobber-env" PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
+    "$script" --runner local --format json --output "$stale_output" \
+    > "$stale_stdout_path" 2> "$stale_stderr_path"
 stale_status=$?
 set -e
-if [ "$stale_status" -ne 2 ] || [[ "$stale_result" != *'cannot initialize output file'* ]]; then
-    printf >&2 '[FAIL] stale-output initialization rejection: status=%d\n%s\n' "$stale_status" "$stale_result"
+stale_stdout="$(cat "$stale_stdout_path")"
+stale_stderr="$(cat "$stale_stderr_path")"
+if [ "$stale_status" -ne 2 ] || [ -n "$stale_stdout" ] || \
+        [[ "$stale_stderr" != *'cannot initialize output file'* ]]; then
+    printf >&2 '[FAIL] stale-output initialization rejection: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$stale_status" "$stale_stdout" "$stale_stderr"
     exit 1
 fi
 printf '[PASS] stale-output initialization rejection\n'
 
+unsupported_stdout_path="$tmp/unsupported.stdout"
+unsupported_stderr_path="$tmp/unsupported.stderr"
 set +e
-unsupported_output="$({ "$script" --format yaml; } 2>&1)"
+"$script" --format yaml > "$unsupported_stdout_path" 2> "$unsupported_stderr_path"
 unsupported_status=$?
 set -e
-if [ "$unsupported_status" -ne 2 ] || [[ "$unsupported_output" != *'expected json or sarif'* ]]; then
-    printf >&2 '[FAIL] unsupported format: status=%d\n%s\n' "$unsupported_status" "$unsupported_output"
+unsupported_stdout="$(cat "$unsupported_stdout_path")"
+unsupported_stderr="$(cat "$unsupported_stderr_path")"
+if [ "$unsupported_status" -ne 2 ] || [ -n "$unsupported_stdout" ] || \
+        [[ "$unsupported_stderr" != *'expected json or sarif'* ]]; then
+    printf >&2 '[FAIL] unsupported format: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$unsupported_status" "$unsupported_stdout" "$unsupported_stderr"
     exit 1
 fi
 printf '[PASS] unsupported format\n'
 
-printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 3))"
+version_stdout_path="$tmp/version.stdout"
+version_stderr_path="$tmp/version.stderr"
+set +e
+PATH="$tmp/bin:$PATH" CODACY_TEST_VERSION=8.0.0 CODACY_TEST_REPORT="$tmp/report-1.json" \
+    "$script" --runner local --format json --output "$tmp/version-output.json" \
+    > "$version_stdout_path" 2> "$version_stderr_path"
+version_status=$?
+set -e
+version_stdout="$(cat "$version_stdout_path")"
+version_stderr="$(cat "$version_stderr_path")"
+if [ "$version_status" -ne 2 ] || [ -n "$version_stdout" ] || \
+        [[ "$version_stderr" != *'unsupported local codacy-analysis-cli version; expected 7.10.1'* ]]; then
+    printf >&2 '[FAIL] local version rejection: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$version_status" "$version_stdout" "$version_stderr"
+    exit 1
+fi
+if [ -e "$tmp/version-output.json" ]; then
+    printf >&2 '[FAIL] local version rejection initialized the output path\n'
+    exit 1
+fi
+printf '[PASS] local version rejection\n'
+
+printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 4))"
