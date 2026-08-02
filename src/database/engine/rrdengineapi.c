@@ -839,6 +839,8 @@ static ALWAYS_INLINE_HOT bool rrdeng_load_page_next(struct storage_engine_query_
 
     if (likely(handle->page)) {
         // we have a page to release
+        // The next page may have a different cadence, so search strictly after the last returned timestamp.
+        handle->now_s = pgc_page_end_time_s(handle->page) + 1;
         pgc_page_release(main_cache, handle->page);
         handle->page = NULL;
         pgdc_reset(&handle->pgdc, NULL, UINT32_MAX, handle->pgdc.slots_per_point);
