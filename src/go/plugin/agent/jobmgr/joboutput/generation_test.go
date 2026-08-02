@@ -1121,9 +1121,20 @@ type preparedAttachmentFixture struct {
 	identity lifecycle.ResourceIdentity
 	owner    *stagedJobOwner
 	gate     *generationOutputGate
+	output   *bytes.Buffer
 	job      *blockingStopManagedJob
 	state    *preActivationRetirementState
 	tasks    *lifecycle.TaskSupervisor
+}
+
+type preparedAttachmentFixtureOptions struct {
+	variant      JobVariant
+	attempts     jobmgr.ProcessAttemptAuthority
+	withHandler  bool
+	runtimeStage *stagedRuntimeService
+	newRuntime   func(*stagedJobOwner) runtimecomp.Service
+	newAttacher  func(*stagedJobOwner) JobHandlerAttacher
+	beforeAttach func(*stagedJobOwner)
 }
 
 func newPreparedAttachmentFixture(
@@ -1133,28 +1144,44 @@ func newPreparedAttachmentFixture(
 	withHandler bool,
 	attacher JobHandlerAttacher,
 ) *preparedAttachmentFixture {
+	return newPreparedAttachmentFixtureWithOptions(t, preparedAttachmentFixtureOptions{
+		variant:     variant,
+		attempts:    attempts,
+		withHandler: withHandler,
+		newAttacher: func(*stagedJobOwner) JobHandlerAttacher {
+			return attacher
+		},
+	})
+}
+
+func newPreparedAttachmentFixtureWithOptions(
+	t *testing.T,
+	options preparedAttachmentFixtureOptions,
+) *preparedAttachmentFixture {
 	t.Helper()
-	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	output := &bytes.Buffer{}
+	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
 	gate, err := newGenerationOutputGate(frames)
 	require.NoError(t, err)
 	job := newBlockingStopManagedJob()
 	state := &preActivationRetirementState{}
 	candidate := ConstructedJob{
-		Variant:          variant,
+		Variant:          options.variant,
 		CollectorCleanup: func(context.Context) error { state.rejected++; return nil },
 		finalCleanup:     func(context.Context) error { state.final++; return nil },
 		candidateJob:     job,
+		runtimeStage:     options.runtimeStage,
 		outputGate:       gate,
 	}
-	if withHandler {
+	if options.withHandler {
 		candidate.StagedHandlers = &preActivationRetirementHandler{state: state}
 	}
 	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
 	owner := newStagedJobOwner(
 		context.Background(),
 		candidate,
-		attempts,
+		options.attempts,
 		1,
 		jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptJobRuntime,
@@ -1162,7 +1189,16 @@ func newPreparedAttachmentFixture(
 			Resource:  identity.ID,
 		},
 	)
+	var attacher JobHandlerAttacher
+	if options.newAttacher != nil {
+		attacher = options.newAttacher(owner)
+	}
+	var runtimeService runtimecomp.Service
+	if options.newRuntime != nil {
+		runtimeService = options.newRuntime(owner)
+	}
 	attachment := factoryAttachment{
+		runtime:         runtimeService,
 		handlerAttacher: attacher,
 		scheduler:       newTestScheduler(t),
 	}
@@ -1171,6 +1207,9 @@ func newPreparedAttachmentFixture(
 		identity lifecycle.ResourceIdentity,
 		owner *stagedJobOwner,
 	) (constructedJobAttachment, error) {
+		if options.beforeAttach != nil {
+			options.beforeAttach(owner)
+		}
 		return attachment.attach(staged, identity, owner)
 	}
 	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
@@ -1185,6 +1224,7 @@ func newPreparedAttachmentFixture(
 		identity: identity,
 		owner:    owner,
 		gate:     gate,
+		output:   output,
 		job:      job,
 		state:    state,
 		tasks:    tasks,
@@ -1192,13 +1232,7 @@ func newPreparedAttachmentFixture(
 }
 
 type preActivationRetirementFixture struct {
-	prepared     PreparedJob
-	identity     lifecycle.ResourceIdentity
-	owner        *stagedJobOwner
-	gate         *generationOutputGate
-	output       *bytes.Buffer
-	state        *preActivationRetirementState
-	tasks        *lifecycle.TaskSupervisor
+	*preparedAttachmentFixture
 	attempts     *containment.Authority
 	wantHandler  bool
 	shutdownOnce sync.Once
@@ -1242,98 +1276,62 @@ func newPreActivationRetirementFixtureForWindow(
 	t.Helper()
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
-	output := &bytes.Buffer{}
-	frames, err := lifecycle.NewFrameOwner(output)
-	require.NoError(t, err)
-	gate, err := newGenerationOutputGate(frames)
-	require.NoError(t, err)
-	job := newBlockingStopManagedJob()
-	state := &preActivationRetirementState{}
-	handler := &preActivationRetirementHandler{state: state}
-	candidate := ConstructedJob{
-		Variant:          variant,
-		CollectorCleanup: func(context.Context) error { state.rejected++; return nil },
-		finalCleanup:     func(context.Context) error { state.final++; return nil },
-		candidateJob:     job,
-		outputGate:       gate,
-	}
+	var runtimeStage *stagedRuntimeService
 	if runtimeErr != nil || window == retirementAfterAdoption {
-		candidate.runtimeStage = newStagedRuntimeService()
-		require.NoError(t, candidate.runtimeStage.RegisterComponent(runtimecomp.ComponentConfig{Name: "test"}))
+		runtimeStage = newStagedRuntimeService()
+		require.NoError(t, runtimeStage.RegisterComponent(runtimecomp.ComponentConfig{Name: "test"}))
 	}
-	if window == retirementAfterTransfer {
-		candidate.StagedHandlers = handler
-	}
-	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
-	owner := newStagedJobOwner(
-		context.Background(),
-		candidate,
-		attempts,
-		1,
-		jobmgr.ProcessAttemptIdentity{
-			Namespace: jobmgr.ProcessAttemptJobRuntime,
-			Key:       identity.ID,
-			Resource:  identity.ID,
-		},
-	)
 	cut := func() {
 		cutTestAuthority(t, attempts, cause)
 	}
-	var attacher JobHandlerAttacher
+	var newAttacher func(*stagedJobOwner) JobHandlerAttacher
 	if window == retirementAfterTransfer {
-		attacher = jobHandlerAttacherFunc(func(
-			_ lifecycle.ResourceIdentity,
-			staged StagedHandlerLifecycle,
-		) (ProcessHandlerLifecycle, error) {
-			cut()
-			requireTestSignal(t, owner.retire, "runtime owner did not record retirement")
-			return staged.(ProcessHandlerLifecycle), nil
-		})
+		newAttacher = func(owner *stagedJobOwner) JobHandlerAttacher {
+			return jobHandlerAttacherFunc(func(
+				_ lifecycle.ResourceIdentity,
+				staged StagedHandlerLifecycle,
+			) (ProcessHandlerLifecycle, error) {
+				cut()
+				requireTestSignal(t, owner.retire, "runtime owner did not record retirement")
+				return staged.(ProcessHandlerLifecycle), nil
+			})
+		}
 	}
-	var runtimeService runtimecomp.Service
+	var newRuntime func(*stagedJobOwner) runtimecomp.Service
 	switch {
 	case runtimeErr != nil:
-		runtimeService = projectionFailureRuntimeService{err: runtimeErr}
+		newRuntime = func(*stagedJobOwner) runtimecomp.Service {
+			return projectionFailureRuntimeService{err: runtimeErr}
+		}
 	case window == retirementAfterAdoption:
-		runtimeService = projectionHookRuntimeService{register: func() error {
-			cut()
-			requireTestSignal(t, owner.retire, "runtime owner did not record retirement")
-			return nil
-		}}
+		newRuntime = func(owner *stagedJobOwner) runtimecomp.Service {
+			return projectionHookRuntimeService{register: func() error {
+				cut()
+				requireTestSignal(t, owner.retire, "runtime owner did not record retirement")
+				return nil
+			}}
+		}
 	}
-	attachment := factoryAttachment{
-		runtime:         runtimeService,
-		handlerAttacher: attacher,
-		scheduler:       newTestScheduler(t),
-	}
-	staged := candidate
-	candidate.attach = func(
-		identity lifecycle.ResourceIdentity,
-		owner *stagedJobOwner,
-	) (constructedJobAttachment, error) {
-		if window == retirementBeforeBind {
+	var beforeAttach func(*stagedJobOwner)
+	if window == retirementBeforeBind {
+		beforeAttach = func(owner *stagedJobOwner) {
 			cut()
 			requireTestSignal(t, owner.done, "retired candidate did not finalize before binding")
 		}
-		return attachment.attach(staged, identity, owner)
 	}
-	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
+	prepared := newPreparedAttachmentFixtureWithOptions(t, preparedAttachmentFixtureOptions{
+		variant:      variant,
+		attempts:     attempts,
+		withHandler:  window == retirementAfterTransfer,
+		runtimeStage: runtimeStage,
+		newRuntime:   newRuntime,
+		newAttacher:  newAttacher,
+		beforeAttach: beforeAttach,
+	})
 	fixture := &preActivationRetirementFixture{
-		prepared: PreparedJob{state: &preparedJobState{
-			id:          identity.ID,
-			generation:  identity.Generation,
-			constructed: candidate,
-			permit:      permit,
-			owner:       owner,
-		}},
-		identity:    identity,
-		owner:       owner,
-		gate:        gate,
-		output:      output,
-		state:       state,
-		tasks:       tasks,
-		attempts:    attempts,
-		wantHandler: window == retirementAfterTransfer,
+		preparedAttachmentFixture: prepared,
+		attempts:                  attempts,
+		wantHandler:               window == retirementAfterTransfer,
 	}
 	t.Cleanup(func() {
 		fixture.owner.Reject()
