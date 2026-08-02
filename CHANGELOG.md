@@ -874,6 +874,7 @@
 - Test(go.d): stabilize jobmgr secret lifecycle tests ([#23346](https://github.com/netdata/netdata/issues/23346))
 - Feat(go.d/secretstore): add AWS operational test ([#23349](https://github.com/netdata/netdata/issues/23349))
 - Docs(agents): bound review iteration ([#23350](https://github.com/netdata/netdata/issues/23350))
+- Refactor(go.d/snmp-traps): establish ownership foundations ([#23358](https://github.com/netdata/netdata/issues/23358))
 
 ## [2.10.0] - 2026-04-09
 
