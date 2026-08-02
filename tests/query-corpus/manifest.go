@@ -83,7 +83,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "samples pushed OFF the absolute ue grid: STORAGE keeps the pushed timestamps exactly (retention proves it), while every VIEW re-grids to absolute ue multiples and serves boundary-INTERPOLATED values (envelope-pinned; the exact virtual-point oracle is layer-9 work)",
 	},
 	"L2/tier1-palette": {
-		Proves: "tier1 rollup identity for the edge-data palette: aligned windows (partial first — T0 unaligned), interior gaps (partial counts + stored-empty windows), fractional anomaly rates, reset annotation LOST at tier1+ (pages store no flags), float32 sum/min/max write-rounding",
+		Proves: "tier1 rollup identity for the edge-data palette: aligned windows (partial first — T0 unaligned), interior gaps (partial numeric windows carry exactly PARTIAL; stored-empty windows carry exactly EMPTY), fractional anomaly rates, reset annotation LOST at tier1+ (pages store no flags), float32 sum/min/max write-rounding",
+	},
+	"L2/partial-wide-point": {
+		Proves: "one partial higher-tier record projected into six finer result rows marks every numeric derived row exactly PARTIAL while preserving the requested timestamp grid; PARTIAL is evidence state, not a one-time event on the source record",
 	},
 	"L2/whole-chart-absence": {
 		Proves: "never-stored tier windows (whole-chart gap) read identically to stored-empty windows: null + EMPTY annotation, with correct partial counts on the flanking windows",
@@ -275,7 +278,7 @@ var manifest = map[string]ManifestCase{
 		Proves: "time_group=incremental-sum answers how much a value changed in a bucket, so the buckets of a window telescope and add up to the first-to-last rise at every resolution. At forced tier 0 the exact one-row-per-sample grid has one opening null followed by 59 rows of +7 with zero ARP/PA, while finer and coarser controls preserve the same total; a one-sample flush must carry its real baseline rather than overwrite it with an unset last value",
 	},
 	"CASE-028/rate-with-gaps-totals-what-was-measured": {
-		Proves: "a rate metric with holes in it totals the seconds that were MEASURED, on every tier. Above tier 0 a stored record carries a sum, a count and a wall-clock width, and where seconds under it were never collected the width and the measured time differ - using the width invents volume for time nobody watched and makes the answer a property of retention. The matrix separates the candidate arithmetics: update_every 1 AND 10 (at 1 second, sum x interval is indistinguishable from sum alone), tier 1 AND tier 2 (whose own strides differ by sixty), and gapped plus no-gap controls. Every query spans whole stored records and uses bucket counts that divide the window exactly, so the oracle has no edge estimate or rounded query span",
+		Proves: "a rate metric with holes in it totals the seconds that were MEASURED, on every tier, with every row exact. Above tier 0 a stable-cadence record's count and recovered gap_count partition its nominal slots: sum x duration/(count+gap_count) integrates measured time without inventing volume. The matrix separates update_every 1/10, tiers 0/1/2, two exact zooms, and gapped/no-gap controls; every gapped numeric row is exactly PARTIAL and every dense row is clean. Windows span whole stored records, so the oracle has no edge estimate or rounded query span",
 	},
 	"CASE-028/partial-and-off-grid-rate-windows": {
 		Proves: "a window that CUTS stored records still totals what those seconds hold. The aligned matrix is what makes CASE-028's oracle exact, and it means a partial record is never asked for - but a window starting and ending inside records is the ordinary case for a dashboard. Asserted on a rate with no holes, where the part of a record inside the window is countable from the fixture rather than estimated, at update_every 1 and 10, on tier 0 and tier 1, over windows that start mid-record, end mid-record, and cover exactly 181 samples",
@@ -314,6 +317,9 @@ var manifest = map[string]ManifestCase{
 	},
 	"CASE-037/rate-volume-across-three-tier-cadence-query": {
 		Proves: "one exact one-second sum query crosses automatic tier2-to-tier1 and tier1-to-tier0 plan seams, then crosses an update_every 1-to-10 transition where the rate also changes. Every returned row and the complete total come from the fixture ledger, and db.per_tier must prove all three tiers contributed. Forced-tier mixed-cadence records remain covered separately by CASE-035",
+	},
+	"CASE-038/higher-tier-only-rate-volume": {
+		Proves: "archived dense and alternating-gap incremental metrics with no tier-0 retention or pre-restart live/cache state still return exact fixture-measured rate volume from retained tier 1. Forced-tier and automatic queries require zero tier-0 retention and reads, covering tier-1 retention and reads, the exact requested timestamp grid, and exact PA: dense rows clean, every gapped numeric row PARTIAL",
 	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves:  "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",

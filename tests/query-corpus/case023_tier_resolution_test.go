@@ -135,7 +135,8 @@ func c023BucketIndex(ts, after, step int64, points int) int {
 }
 
 func c023WindowRecords(d fixture.Dimension, granularity int64) []fixture.TierPoint {
-	windows := d.TierWindows(granularity)
+	// The CASE-023 resolution fixture is collected at update_every=1.
+	windows := d.TierWindows(granularity, 1)
 	out := make([]fixture.TierPoint, 0, len(windows))
 	for _, w := range windows {
 		out = append(out, w)

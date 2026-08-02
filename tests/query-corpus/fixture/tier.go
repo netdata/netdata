@@ -21,13 +21,15 @@ import (
 //     src/database/engine/page.c:954-967,1088-1099
 //
 // Sum/Min/Max already carry the single float32 page-write rounding. EndT is
-// the wall-clock-aligned window end and stored timestamp.
+// the wall-clock-aligned window end and stored timestamp. Count and GapCount
+// partition the window's nominal source slots for a stable cadence.
 type TierPoint struct {
 	EndT         int64
 	Sum          float64
 	Min          float64
 	Max          float64
 	Count        int
+	GapCount     int
 	AnomalyCount int
 	Empty        bool // stored, but every sample in the window was a gap (NAN/count-0 point)
 }
@@ -37,7 +39,9 @@ type TierPoint struct {
 // aligned window end. Windows the engine never stores — whole-chart gaps
 // where no sample exists at all — are absent from the map; windows whose
 // samples are all gaps are present with Empty set (the engine stores a
-// NAN/count-0 point for them).
+// NAN/count-0 point for them). updateEvery defines the nominal source-slot
+// duration; this oracle deliberately does not model a cadence change inside a
+// persisted rollup because the legacy page format cannot retain that history.
 //
 // Values are the ORIGINAL collected doubles: higher tiers aggregate the
 // pre-quantization value (rrddim-collection.c builds the tier STORAGE_POINT
@@ -50,7 +54,11 @@ type TierPoint struct {
 // fixture times would key the windows wrong. On the aligned grid,
 // window boundaries coincide with sample ends and end-assignment is
 // exact.
-func (d Dimension) TierWindows(granularity int64) map[int64]TierPoint {
+func (d Dimension) TierWindows(granularity, updateEvery int64) map[int64]TierPoint {
+	if granularity <= 0 || updateEvery <= 0 || granularity%updateEvery != 0 {
+		panic("fixture: tier granularity must be a positive multiple of update_every")
+	}
+	nominalSlots := int(granularity / updateEvery)
 	out := make(map[int64]TierPoint)
 	for _, p := range d.Points {
 		end := p.T
@@ -82,12 +90,16 @@ func (d Dimension) TierWindows(granularity int64) map[int64]TierPoint {
 
 	// accumulation happens in double; ONE float32 cast per field at page write
 	for end, tp := range out {
+		tp.GapCount = nominalSlots - tp.Count
+		if tp.GapCount < 0 {
+			panic("fixture: tier point count exceeds its nominal slot count")
+		}
 		if !tp.Empty {
 			tp.Sum = float64(float32(tp.Sum))
 			tp.Min = float64(float32(tp.Min))
 			tp.Max = float64(float32(tp.Max))
-			out[end] = tp
 		}
+		out[end] = tp
 	}
 	return out
 }

@@ -271,7 +271,7 @@ func TestAnomalyBitTierRates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	windows := ch.Dimensions[0].TierWindows(60)
+	windows := ch.Dimensions[0].TierWindows(60, int64(ch.UpdateEvery))
 
 	// same bounds discipline as layer 2: assert aligned window ends
 	// [T0+40 .. T0+520] and leave the tail out (the most recent

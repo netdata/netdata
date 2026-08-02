@@ -91,7 +91,7 @@ func TestCase023TierEstimation(t *testing.T) {
 	)
 
 	d := ch.Dimensions[0]
-	windows := d.TierWindows(tier1Gran)
+	windows := d.TierWindows(tier1Gran, int64(ch.UpdateEvery))
 
 	// the contract, stated as the model rather than as the code
 	fractionAtLeast := func(w fixture.TierPoint, threshold float64) float64 {
@@ -326,7 +326,7 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 	before := after + windows*tier1Gran
 
 	d := ch.Dimensions[0]
-	stored := d.TierWindows(tier1Gran)
+	stored := d.TierWindows(tier1Gran, int64(ch.UpdateEvery))
 
 	query := func(group, options string) []canon.Pt {
 		t.Helper()
@@ -479,7 +479,7 @@ func TestCase023TierAnomalyBit(t *testing.T) {
 	points := (lastEnd - after) / tier1Gran
 
 	d := ch.Dimensions[0]
-	stored := d.TierWindows(tier1Gran)
+	stored := d.TierWindows(tier1Gran, int64(ch.UpdateEvery))
 
 	query := func(options string) map[string][]canon.Pt {
 		t.Helper()
