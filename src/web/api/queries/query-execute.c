@@ -179,7 +179,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     }
 
     const RRDR_TIME_GROUPING add_flush = r->time_grouping.add_flush;
-    ops->group_point = STORAGE_POINT_UNSET;
+    ops->group_point = (QUERY_ROW_EVIDENCE){ 0 };
     ops->query_point = STORAGE_POINT_UNSET;
 
     RRDR_OPTIONS options = qt->window.options;
@@ -591,7 +591,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             ops->group_points_added = 0;
             ops->group_value_flags = RRDR_VALUE_NOTHING;
             ops->group_points_non_zero = 0;
-            ops->group_point = STORAGE_POINT_UNSET;
+            ops->group_point = (QUERY_ROW_EVIDENCE){ 0 };
 
             if(points_added < points_wanted)
                 now_end_time += ops->view_update_every;
