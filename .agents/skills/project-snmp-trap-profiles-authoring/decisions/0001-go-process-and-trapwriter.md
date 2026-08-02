@@ -1,6 +1,9 @@
-# ADR-0001: Go Process Model, Journal Writer Backend, and TrapWriter Contract
+# ADR-0001: Go Process Model, Journal Writer Backend, and Output Writer Contract
 
-**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`; amended on 2026-05-28 to use SDK `go/v0.3.0`; amended on 2026-05-31 to use SDK `go/v0.4.0`; amended on 2026-06-01 by SOW-0045 to route the trap writer hot path through reusable raw journal payload serialization; amended on 2026-06-10 to use SDK `go/v0.6.3`; amended on 2026-06-11 to use SDK `go/v0.6.4`, place direct journals under `${NETDATA_LOG_DIR}/traps/`, and classify startup environment failures as retryable HTTP-503 coded errors; amended on 2026-08-01 to remove profile hot reload and use one active-reference-bounded profile configuration epoch.
+**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended through 2026-08-02 to use the
+published Go journal SDK `go/v0.8.0`, route the journal hot path through one reusable raw-payload serializer, place direct
+journals under `${NETDATA_LOG_DIR}/traps/`, classify startup environment failures as retryable HTTP-503 coded errors,
+remove profile hot reload, and give output components explicit internal package and lifecycle ownership.
 **Date**: 2026-05-25
 **SOW**: SOW-0035 M1
 
@@ -10,7 +13,7 @@ The Netdata SNMP trap subsystem (design spec: `.agents/skills/project-snmp-trap-
 
 1. **Process model**: Where does the trap plugin live in the Netdata process tree?
 2. **Journal writer backend**: How do we write per-job journal files at `${NETDATA_LOG_DIR}/traps/{job_name}/` in Go, compatible with SDK-backed `snmp:traps` Function queries and optional `journalctl --directory=...` validation?
-3. **TrapWriter interface + TrapEntry shape**: What is the concrete Go contract between the trap pipeline and storage backends?
+3. **Output writer interface + TrapEntry shape**: What is the concrete Go contract between the trap pipeline and storage backends?
 
 The implementation language is **Go** (user decision, 2026-05-25). The journal writer must produce real systemd journal binary-format files so end-to-end acceptance criteria (M4: `journalctl --directory=${NETDATA_LOG_DIR}/traps/test/ TRAP_CATEGORY=security`) passes.
 
@@ -34,7 +37,7 @@ The implementation language is **Go** (user decision, 2026-05-25). The journal w
 - Registered through the standard `collectorapi.Register(...)` path in the existing `collector/init.go` import registry as `snmp_traps`, mirroring the existing `snmp_topology` naming style. A scan found no existing go.d collector registration name containing a dot, so the module name must not use `snmp.traps`.
 - Uses V2 collector interface (`collectorapi.CollectorV2`), mirroring the `ping/` collector pattern
 - Job lifecycle managed by the existing go.d framework (`src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`)
-- Journal writing via a thin adapter around `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.6.4`, keeping the local `TrapWriter` abstraction and delegating journal file format, active-file indexing, rotation, retention, and writer locking to the SDK.
+- Journal writing via a thin adapter around `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.8.0`, keeping the internal `output.Writer` abstraction and delegating journal file format, active-file indexing, rotation, retention, and writer locking to the SDK.
 - Shared profile cache: in-process Go package-level state, loaded on first runnable job creation
 
 ### Option B: Separate Go process (external plugin) via PLUGINSD
@@ -115,17 +118,15 @@ The SNMP trap plugin lives as a standard go.d collector V2 module:
 
 ```
 src/go/plugin/go.d/collector/snmp_traps/
-    collector.go         # Main struct, init() registration, Config, New(), lifecycle
-    init.go              # validateConfig(), one-shot initialization
-    collect.go           # collect() — per-cycle metric emission
-    listener.go          # Per-job UDP listener binding (M2)
-    decode.go            # BER limit pre-scan + gosnmp trap parse + RFC 3584 (M2)
-    profile.go           # Profile type + shared lazy loader (M3)
-    resolver.go          # 2-tier varbind resolution + template rendering (M3)
-    journal_writer.go    # SDK-backed journal adapter + retention mapping (M4)
-    trapentry.go         # TrapEntry type definitions
-    trapwriter.go        # TrapWriter interface definition
-    *.go_test.go         # Table-driven tests
+    collector.go                 # Framework adapter, authority selection, metrics, lifecycle wiring
+    config.go / init.go          # Public config DTOs and validation/normalization adapter
+    internal/model/              # Shared semantic trap model
+    internal/output/             # Writer contract, coordinator, typed outcomes, shared projection
+    internal/output/journal/     # Retention, SDK adapter, raw serializer, queue worker
+    internal/output/otlp/        # OTLP policy, preflight, queue/batch worker, protobuf projection
+    internal/snmptrapsfunc/      # Logs Function implementation
+    listener.go / decode.go      # Per-job UDP listener and SNMP decoding
+    profile*.go / pipeline*.go   # Profiles, enrichment, rendering, and pipeline behavior
 ```
 
 Collector consistency artifacts (`metadata.yaml`, health, README, taxonomy) remain owned by SOW-0039 unless an earlier SOW needs a minimal internal test fixture. SOW-0035 M2 ships the minimal `config_schema.json` and disabled stock config needed for DynCfg creation-time preflight and manual opt-in; SOW-0039 remains responsible for the full user-facing documentation and integration metadata bundle.
@@ -138,56 +139,19 @@ _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 
 ### 2. Journal Writer Backend
 
-The local package provides a small `JournalWriter` adapter in
-`src/go/plugin/go.d/collector/snmp_traps/journal_writer.go`. It does **not**
-implement the systemd journal binary format locally. The adapter delegates file
-format, active-file indexing, writer locks, rotation, retention, and chain
-validation/reopen behavior to `github.com/netdata/systemd-journal-sdk/go/journal`
-`go/v0.6.4`.
+`internal/output/journal` owns the journal backend. It does **not** implement the systemd journal binary format locally;
+it delegates format, active-file indexing, writer locks, rotation, retention, and chain validation/reopen behavior to
+`github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.8.0`.
 
-The public local API remains:
+The backend has an explicit two-phase lifecycle:
 
-```go
-// JournalWriter is a thin adapter over journal.Log.
-// Files are readable by journalctl --directory=<JournalDirectory()>.
-type JournalWriter struct { ... }
-
-// NewJournalWriter creates a writer for the given directory.
-// On creation, it eagerly opens the SDK log and validates the directory,
-// writer lock, active file, machine ID, boot ID, rotation policy, and
-// retention policy.
-func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error)
-
-type JournalField struct {
-    Name  string // Validated journal field name.
-    Value []byte // Raw value bytes passed to the SDK journal writer.
-}
-
-// WriteEntry writes one journal entry. It is synchronous and is called only by
-// the journal TrapWriter's single queue worker goroutine, not by the decode hot
-// path. WriteEntry is not concurrency-safe.
-func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotonicUsec int64) error
-
-// WriteRawEntry writes one journal entry from prebuilt KEY=value payloads.
-// It is an internal hot-path API used by the journal TrapWriter's single worker
-// after SOW-0045. The SDK consumes the payloads synchronously during AppendRaw.
-func (w *JournalWriter) WriteRawEntry(payloads [][]byte, sanitizedFields int, realtimeUsec, monotonicUsec int64) error
-
-// Sync flushes pending writes to disk.
-func (w *JournalWriter) Sync() error
-
-// Close finalizes the active journal file and releases resources.
-// Idempotent.
-func (w *JournalWriter) Close() error
-
-// JournalConfig controls rotation and retention.
-type JournalConfig struct {
-    MaxSize     uint64        // Total bytes cap; 0 = disabled
-    MaxDuration time.Duration // Maximum age; 0 = disabled
-    RotateSize  uint64        // Per-file rotation size; 0 = auto
-    RotateDur   time.Duration // Per-file rotation duration; 0 = disabled; user-facing default is 1h
-}
-```
+- `journal.Prepare(dir, cfg, host, opts)` eagerly opens the SDK log and proves the directory, lock, active file, host
+  identity, rotation policy, and retention policy without starting a goroutine.
+- `Writer.Start()` starts the one queue worker after every job resource has passed preflight.
+- `Writer.Write()`, `Flush()`, `Close()`, `Directory()`, and `BinaryEncodedFields()` expose only the runtime behavior needed
+  by the root collector. Closing a prepared-but-not-started writer is safe.
+- The package owns parsed `Retention` and SDK-facing `Config`; the root package retains only the human-readable config DTO
+  and maps it into these normalized types.
 
 **SDK configuration**:
 
@@ -195,8 +159,8 @@ type JournalConfig struct {
   per-job root `${NETDATA_LOG_DIR}/traps/{job_name}/`.
 - The plugin checks that `${NETDATA_LOG_DIR}` already exists before calling the
   SDK. It creates only the Netdata-owned trap child tree.
-- The SDK appends `<machine-id>/`; `JournalWriter.JournalDirectory()` returns
-  the effective query directory for `journalctl --directory`.
+- The SDK appends `<machine-id>/`; `Writer.Directory()` returns the effective query directory for
+  `journalctl --directory`.
 - `LogOpenEager` is mandatory so active journal file creation/open and writer
   lock acquisition fail during job creation.
 - `LogIdentityStrict` is mandatory. The adapter reads `/etc/machine-id` and
@@ -210,20 +174,17 @@ type JournalConfig struct {
   trap package validates this through SDK-backed `journalctl --directory`
   tests, not by maintaining local DATA/FIELD hash-table code.
 
-The journal-direct TrapWriter owns the concurrency boundary: multiple endpoint receive loops may call `TrapWriter.Write()` concurrently, but they fan into one concurrency-safe bounded queue per job. A single worker goroutine drains that queue and is the only caller of `JournalWriter.WriteRawEntry()` in the hot path.
+The journal backend owns the concurrency boundary: multiple endpoint receive loops call `Writer.Write()` concurrently and
+fan into one bounded queue per job. One worker owns one reusable serializer and is the only caller of SDK `AppendRaw()`.
+There is no allocation-returning reference serializer or field-slice write API. Tests decode and assert the actual ordered
+raw `KEY=value` payloads emitted by the production serializer.
 
-The serialization boundary is explicit:
+The serializer owns journal naming including `PRIORITY`, `SYSLOG_IDENTIFIER`, `ND_LOG_SOURCE`, `ND_NIDL_NODE`,
+`_HOSTNAME` fallback, `TRAP_TAG_<KEY_UPPERCASE>`, indexed `TRAP_VAR_*` fields, `TRAP_JSON`, sensitive-varbind omission,
+and empty optional-field omission. Structurally invalid entries fail in the worker. Shared label ordering and canonical
+varbind projection live in `internal/output` and are reused by OTLP without adding an allocation to journal enqueue.
 
-```go
-// serializeToJournalFields converts TrapEntry to journal fields per netdata.md §11.
-func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error)
-```
-
-This function remains the simple allocation-returning reference API and test contract for `TrapEntry` to journal naming, including `PRIORITY`, `SYSLOG_IDENTIFIER`, `ND_LOG_SOURCE`, `ND_NIDL_NODE`, `_HOSTNAME` fallback, `TRAP_TAG_<KEY_UPPERCASE>`, `TRAP_JSON`, and omission of empty optional enrichment fields. The hot path uses an equivalent reusable serializer owned by the single worker and passes raw `KEY=value` payloads to `WriteRawEntry()`. It returns an error for structurally invalid entries (for example nil entry or missing required fields). Unsupported `VarbindValue.Value` concrete types use the guarded fallback path in production and are rejected by tests.
-
-**Config parsing**: `JournalConfig` receives parsed byte/duration values. The config/DynCfg layer parses human-readable operator values such as `10GB` and `1h`.
-
-**Rotation**: triggered by file size reaching `RotateSize` or file age reaching `RotateDur`. `RotateSize=0` means auto-calculate from `MaxSize / 20` and clamp to 5MB-200MB; if `MaxSize=0`, use the 200MB upper clamp as the default rotation size. Oversized single entries are written to the current file and can make that file exceed `RotateSize`; the next append opens a new file. `RotateDur=0` disables time-based rotation; the user-facing default remains `1h`. On rotation, the current file is finalized (archived) and a new file is opened. If `MaxSize=0`, size-based retention is disabled but rotation still occurs; files accumulate until an age cap or external cleanup removes them.
+**Rotation**: triggered by file size reaching `RotateSize` or file age reaching `RotateDur`. `RotateSize=0` means auto-calculate from `MaxSize / 20` and clamp to 5MB-200MB; if `MaxSize=0`, use the 200MB upper clamp as the default rotation size. Oversized single entries are written to the current file and can make that file exceed `RotateSize`; the next append opens a new file. `RotateDur=0` disables time-based rotation and is the user-facing default. On rotation, the current file is finalized (archived) and a new file is opened. If `MaxSize=0`, size-based retention is disabled but rotation still occurs; files accumulate until an age cap or external cleanup removes them.
 
 **Retention**: the adapter calls `Log.EnforceRetention()` on periodic sweeps so SDK retention is honored even during low-volume periods with no rotations.
 
@@ -235,16 +196,16 @@ The journal-direct backend is Linux-only for SOW-0035 because it depends on the 
 
 The Linux-only guard is checked before resource acquisition in module/job initialization. If the trap module is built on a non-Linux platform, trap job creation returns HTTP-422 unsupported backend before profile loading, socket binding, or journal directory creation.
 
-### 3. TrapWriter Interface
+### 3. Output Writer Interface
 
 Per spec §19, proposed:
 
 ```go
-// TrapWriter is the contract between the trap pipeline and storage backends.
-// Each job has exactly one TrapWriter. The journal-direct backend writes to
+// Writer is the contract between the trap pipeline and storage backends.
+// Each job has exactly one Writer. The journal-direct backend writes to
 // ${NETDATA_LOG_DIR}/traps/{job_name}/; the OTLP backend (SOW-0038) implements
 // the same interface with protobuf serialization.
-type TrapWriter interface {
+type Writer interface {
     Write(entry *TrapEntry) error   // Fast accept into backend-owned queue or return drop-worthy error
     Flush() error                   // Durability boundary
     Close() error                   // Idempotent close
@@ -254,12 +215,15 @@ type TrapWriter interface {
 Semantics:
 
 - **Write() does not perform blocking disk or network I/O on the decode hot path.** It returns after the backend has accepted ownership of the immutable entry into a bounded internal queue. If the queue is full or the backend is in a permanent failed state, `Write()` returns an error; the caller increments `journal_write_failed` and drops the trap while the hot path continues.
-- **Entry ownership transfers to the writer on successful `Write()`.** The caller must not mutate maps, slices, or strings reachable from the entry after `Write()` returns nil. The writer must treat entries as immutable. Reusing a `TrapEntry`, `Labels` map, `SummaryCounts.ByTrap` map, or `Varbinds` backing array after a successful `Write()` is a correctness bug unless the implementation first deep-copies the reused data.
-- **Entry ownership does not transfer on failed `Write()`.** The caller still discards the entry and allocates/obtains a fresh one for the next trap; writers must not retain references on an error return.
+- **Every coordinator `Write()` invocation consumes the entry.** The caller must not mutate maps, slices, or strings
+  reachable from the entry after the call, regardless of the returned authoritative-backend error. This preserves fanout:
+  the secondary backend may have accepted the same entry even when the primary backend returns an error.
+- **An individual backend retains only successfully enqueued entries.** A backend that returns an error from its own
+  `Write()` has not retained that entry. Reusing the entry after a coordinator call remains invalid.
 - **Flush()** creates a queue barrier, waits for all entries accepted before that barrier to be written, and calls `Sync()`/`fdatasync()` on the underlying journal writer, forcing all buffered data needed for `journalctl` visibility and shutdown durability to disk.
 - **Close()** is concurrency-safe and idempotent. On first call, it drains the queue, finalizes the active journal file, best-effort sets file state to archived, syncs, and closes. Subsequent calls return nil after a successful first close, or the stored terminal error after a failed first close.
 - **Backend-internal batching** is the writer's responsibility. The interface does not expose batching.
-- **CWE-117** is owned by the journal writer backend (`JournalWriter.WriteEntry()`), not the interface.
+- **CWE-117** is owned by the journal serializer and raw SDK append path, not the interface.
 
 ### 4. TrapEntry Shape
 
@@ -292,9 +256,8 @@ type ASN1Type string
 
 // Allowed VarbindValue.Value concrete types:
 // string, int64, uint64, float64, bool, net.IP, []byte, nil.
-// The canonical serializer rejects any other concrete type in tests and
-// renders a guarded string fallback in production while incrementing a
-// decode/serialization error counter.
+// The canonical serializer renders any other concrete type through a guarded
+// string fallback; tests pin the fallback behavior.
 // TimeTicks, DateAndTime, Bits, Opaque, and vendor extensions must be normalized
 // by the decoder to one of these concrete types before serialization.
 
@@ -350,9 +313,15 @@ type TrapEntry struct {
 }
 ```
 
-`VarbindValue.Value` is not serialized with raw `encoding/json` defaults. The implementation must use a single canonical helper that preserves ordered `Varbinds`, renders `[]byte` as deterministic hex/base64 according to the decoder decision, and rejects unsupported concrete Go types in tests. Every backend, including future OTLP, must use this canonical rendering path for `VarbindValue.Value` instead of raw `encoding/json` or backend-local type switches.
+`VarbindValue.Value` is not serialized with raw `encoding/json` defaults. The implementation must use a single canonical
+helper that preserves ordered `Varbinds`, renders `[]byte` deterministically as hexadecimal, and uses a guarded string
+fallback for unsupported concrete Go types. Every backend must use this canonical rendering path for
+`VarbindValue.Value` instead of raw `encoding/json` or backend-local type switches.
 
-All maps attached to `TrapEntry` (`Labels`, `SummaryCounts.ByTrap`) must be immutable after `TrapWriter.Write()` succeeds. Dedup summary builders must deep-clone `ByTrap` before attaching it to a `TrapEntry`. If a future implementation needs `sync.Pool` reuse, it must either deep-copy maps/slices at the `Write()` boundary or prove by race tests that reused objects are not reachable by the writer.
+All maps attached to `TrapEntry` (`Labels`, `SummaryCounts.ByTrap`) must be immutable after `output.Writer.Write()` is
+called. Dedup summary builders must deep-clone `ByTrap` before attaching it to a `TrapEntry`. If a future implementation
+needs `sync.Pool` reuse, it must deep-copy maps/slices before the `Write()` boundary or prove by race tests that reused
+objects are not reachable by any backend.
 
 `DisplayHint` is reserved in the profile schema and is intentionally absent from the first TrapEntry struct. When the renderer starts using MIB DISPLAY-HINT metadata, the extractor, profile format, and TrapEntry shape must be changed together.
 
@@ -412,7 +381,7 @@ All job resources are validated synchronously in the go.d framework's job `Start
 | Eager profile cache | `AcquireProfileCache()` validates operator profiles, the stock catalogue, and any required metric catalogue | HTTP-422 |
 | Netdata log directory | `os.Stat("${NETDATA_LOG_DIR}")`; parent must already exist and be a directory | HTTP-503 retryable |
 | Journal directory | SDK creates/opens `${NETDATA_LOG_DIR}/traps/{job_name}/`; failure is all-or-nothing cleanup | HTTP-503 retryable |
-| Journal writer | `NewJournalWriter(dir, cfg)` validates directory and retention config | HTTP-503 retryable for environment failures; HTTP-422 for invalid retention config |
+| Journal writer | `journal.Prepare(dir, cfg, host, opts)` validates directory and retention config | HTTP-503 retryable for environment failures; HTTP-422 for invalid retention config |
 
 These errors must flow through DynCfg as coded errors with the resource-specific code above. Non-retryable configuration
 and eager profile-cache errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement
@@ -453,9 +422,9 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 | Active journal file is not queryable until rotation | Not acceptable for the MVP; validate SDK-backed active files with `journalctl --directory=...` before `Close()` |
 | Shared profile cache refcount leak leaves memory allocated | `ReleaseProfileCache()` is called in `Cleanup()` which the framework guarantees on shutdown; add refcount-leak and underflow detection tests |
 | Framework coded-error change breaks other collectors | Preserve existing behavior for plain errors; only `CodedError` suppresses retry and controls HTTP code; add Start and Update tests |
-| Direct journal writer cannot sustain target trap volume | M4 must include `go test -benchmem` / throughput benchmarks for `TrapWriter.Write()`, queue drain, and SDK-backed journal `WriteEntry()`; if allocation or throughput misses the tens-of-thousands/sec target, reopen batching or backend design before accepting M4 |
-| SDK dependency API drifts | Pin to `github.com/netdata/systemd-journal-sdk/go v0.6.4`; re-vendor through the module tag and review API changes before updating |
-| SDK chain handling has an upstream defect | Keep `TrapWriter` and local adapter boundaries narrow so the SDK can be updated or replaced without changing ingestion semantics |
+| Direct journal writer cannot sustain target trap volume | Run `go test -benchmem` / throughput benchmarks for queue enqueue and the SDK-backed raw serializer/drain path; if allocation or throughput misses the tens-of-thousands/sec target, reopen batching or backend design |
+| SDK dependency API drifts | Pin to `github.com/netdata/systemd-journal-sdk/go v0.8.0`; review API changes before updating |
+| SDK chain handling has an upstream defect | Keep `internal/output.Writer` and the internal journal adapter boundary narrow so the SDK can be updated or replaced without changing ingestion semantics |
 
 ## Validation Requirements
 
@@ -473,7 +442,7 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 - Single process, no IPC, no CGo, no child process management
 - Shared profile cache is trivial (Go package-level state + refcount)
 - Job lifecycle is the well-understood go.d pattern operators and maintainers already know
-- TrapWriter interface isolates the journal backend concern; backend is swappable
+- `internal/output.Writer` isolates backend concerns; backends remain swappable
 - All creation-time failures surface as coded DynCfg errors
 
 ### Negative

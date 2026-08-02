@@ -342,17 +342,6 @@ func TestTrapDeduperSummaryEntry(t *testing.T) {
 		t.Fatalf("summary message does not include trap name/count: %q", summary.Message)
 	}
 
-	fields, err := serializeToJournalFields(summary)
-	if err != nil {
-		t.Fatalf("serialize summary: %v", err)
-	}
-	fieldMap := fieldsToMap(fields)
-	if _, ok := fieldMap["_HOSTNAME"]; ok {
-		t.Fatal("dedup summary unexpectedly emitted _HOSTNAME")
-	}
-	if _, ok := fieldMap["ND_NIDL_NODE"]; ok {
-		t.Fatal("dedup summary unexpectedly emitted ND_NIDL_NODE")
-	}
 	if got := metrics.dedup.suppressed.Load(); got != 2 {
 		t.Fatalf("dedup suppressed metric = %d, want 2", got)
 	}

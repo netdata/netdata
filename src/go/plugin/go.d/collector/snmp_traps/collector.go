@@ -21,6 +21,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
 )
 
 //go:embed "config_schema.json"
@@ -110,7 +113,7 @@ type Collector struct {
 	Config `yaml:",inline" json:""`
 
 	listener           *Listener
-	trapWriter         TrapWriter
+	trapWriter         output.Writer
 	journalHost        journalHostProvider
 	journalDir         string
 	store              metrix.CollectorStore
@@ -185,20 +188,27 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.dynamicChartYAML = tmpl
 	}
 
-	var journalWriter *JournalWriter
+	var metrics *perJobMetrics
+	reportOutput := output.OutcomeReporter(func(outcome output.Outcome) {
+		c.handleOutputOutcome(metrics, outcome)
+	})
+	var journalWriter *journal.Writer
+	var otlpWriter *otlp.Writer
+	var journalHost journalHostProvider
 	if validated.journalEnabled {
-		if err := validateNetdataLogRoot(); err != nil {
+		if err := journal.ValidateLogRoot(); err != nil {
 			releaseProfiles()
 			return dyncfgStartupError(err)
 		}
-		dir := journalRoot(c.Name)
-		journalCfg := validated.retention.makeJournalConfig()
+		dir := journal.Root(c.Name)
+		journalCfg := validated.retention.Config()
 		host, err := c.hostIdentity.FreshJournal()
 		if err != nil {
 			releaseProfiles()
 			return dyncfgStartupError(err)
 		}
-		journalWriter, err = newJournalWriterWithHostProvider(dir, journalCfg, host)
+		journalHost = host
+		journalWriter, err = journal.Prepare(dir, journalCfg, host, journal.Options{Report: reportOutput})
 		if err != nil {
 			releaseProfiles()
 			return dyncfgStartupError(err)
@@ -217,6 +227,9 @@ func (c *Collector) Init(ctx context.Context) error {
 		releaseProfiles()
 		if journalWriter != nil {
 			journalWriter.Close()
+		}
+		if otlpWriter != nil {
+			otlpWriter.Close()
 		}
 		listener.close()
 	}
@@ -288,34 +301,50 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	overrides := buildOverrideMap(c.Overrides)
-	metrics := getJobMetrics(c.Name)
+	metrics = getJobMetrics(c.Name)
 	listener.metrics = metrics
 	listener.onReadError = c.logListenerReadError
 	c.reportListenerReceiveBufferWarnings(listener.receiveBufferWarnings)
-	var secondaryWriter TrapWriter
+	var secondaryWriter output.Writer
 	if c.OTLP.Enabled {
 		c.warnPlaintextOTLP(validated.otlp)
-		secondaryWriter, err = newOTLPTrapWriterWithRuntimeConfig(ctx, c.Name, validated.otlp, metrics, journalWriter == nil)
+		otlpWriter, err = otlp.Prepare(ctx, c.Name, validated.otlp, otlp.Options{
+			Authoritative: journalWriter == nil,
+			Report:        reportOutput,
+		})
 		if err != nil {
 			removeJobMetrics(c.Name)
 			cleanupCreatedState()
 			cleanupPreflight()
 			return dyncfgStartupError(err)
 		}
+		secondaryWriter = otlpWriter
 	}
-	var primaryWriter TrapWriter
+	var primaryWriter output.Writer
 	writeFailureDim := trapWriteFailureJournal
 	if journalWriter != nil {
-		primaryWriter = newJournalTrapWriter(journalWriter, defaultQueueCapacity, func(err error) {
-			c.warnf("SNMP trap journal writer stopped for job %q: %v", c.Name, err)
-		})
+		primaryWriter = journalWriter
 	}
-	trapWriter := newFanoutTrapWriter(primaryWriter, secondaryWriter, metrics)
+	trapWriter := output.NewCoordinator(primaryWriter, secondaryWriter, output.BackendOTLP, reportOutput)
 	if primaryWriter == nil {
 		writeFailureDim = trapWriteFailureOTLP
 	}
 	metrics.setDedupEnabled(c.Dedup.Enabled)
 	deduper := newTrapDeduper(c.Name, c.Dedup, trapWriter, metrics, writeFailureDim, c.monotonicUsec)
+
+	var otlpStarter, journalStarter outputStarter
+	if otlpWriter != nil {
+		otlpStarter = otlpWriter
+	}
+	if journalWriter != nil {
+		journalStarter = journalWriter
+	}
+	if err := startOutputBackends(otlpStarter, journalStarter); err != nil {
+		removeJobMetrics(c.Name)
+		cleanupCreatedState()
+		cleanupPreflight()
+		return dyncfgStartupError(err)
+	}
 
 	c.Versions = validated.versions
 	c.vnode = c.Vnode
@@ -352,8 +381,8 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.journalHost = nil
 	c.journalDir = ""
 	if journalWriter != nil {
-		c.journalHost = journalWriter.host
-		c.journalDir = journalWriter.JournalDirectory()
+		c.journalHost = journalHost
+		c.journalDir = journalWriter.Directory()
 		activeDirectJournalJobs.Add(1)
 	}
 	c.deduper = deduper
@@ -444,7 +473,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		c.reverseDNS.maybeSweep(now)
 	}
 	if c.metrics != nil {
-		if w, ok := c.trapWriter.(interface{ BinaryEncodedFields() uint64 }); ok {
+		if w, ok := c.trapWriter.(output.BinaryFieldCounter); ok {
 			c.metrics.setBinaryEncoded(w.BinaryEncodedFields())
 		}
 	}
@@ -722,11 +751,47 @@ func (c *Collector) warnf(format string, args ...any) {
 	}
 }
 
-func (c *Collector) warnPlaintextOTLP(runtimeCfg otlpRuntimeConfig) {
-	if !runtimeCfg.insecure || otlpTargetIsLoopback(runtimeCfg.target) {
+type outputStarter interface {
+	Start() error
+}
+
+func startOutputBackends(otlpBackend, journalBackend outputStarter) error {
+	if otlpBackend != nil {
+		if err := otlpBackend.Start(); err != nil {
+			return err
+		}
+	}
+	if journalBackend != nil {
+		if err := journalBackend.Start(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Collector) handleOutputOutcome(metrics *perJobMetrics, outcome output.Outcome) {
+	if outcome.Backend == output.BackendJournal && outcome.Err != nil {
+		c.warnf("SNMP trap journal writer stopped for job %q: %v", c.Name, outcome.Err)
+	}
+	if metrics == nil || outcome.FailedEntries == 0 {
 		return
 	}
-	c.warnf("SNMP trap OTLP endpoint %q uses plaintext transport; use https:// for remote collectors", runtimeCfg.target)
+	switch outcome.Backend {
+	case output.BackendJournal:
+		metrics.addError(trapWriteFailureJournal, outcome.FailedEntries)
+	case output.BackendOTLP:
+		metrics.addError(trapWriteFailureOTLP, outcome.FailedEntries)
+	}
+	if outcome.Authoritative {
+		metrics.addPipelineWriteFailed(outcome.FailedEntries)
+	}
+}
+
+func (c *Collector) warnPlaintextOTLP(policy otlp.Policy) {
+	if !policy.PlaintextRemote() {
+		return
+	}
+	c.warnf("SNMP trap OTLP endpoint %q uses plaintext transport; use https:// for remote collectors", policy.Target())
 }
 
 func (c *Collector) warnCatchAllTrustedRelays(prefixes []netip.Prefix) {

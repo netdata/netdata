@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package journal
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 )
 
-var severityToPriority = map[Severity]string{
+var severityToPriority = map[model.Severity]string{
 	"emerg":   "0",
 	"alert":   "1",
 	"crit":    "2",
@@ -35,148 +34,11 @@ const (
 	trapVarFieldHashLen       = 8
 )
 
-func severityPriority(sev Severity) string {
+func severityPriority(sev model.Severity) string {
 	if p, ok := severityToPriority[sev]; ok {
 		return p
 	}
 	return "5"
-}
-
-func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
-	if entry == nil {
-		return nil, errNilEntry
-	}
-	if entry.JobName == "" {
-		return nil, errMissingJobName
-	}
-	if entry.ReceivedRealtimeUsec < 0 || entry.ReceivedMonotonicUsec < 0 {
-		return nil, errNegativeTimestamp
-	}
-
-	isDedupSummary := entry.ReportType == ReportTypeDedupSummary
-	isDecodeError := entry.ReportType == ReportTypeDecodeError
-
-	if !isDedupSummary && !isDecodeError {
-		if entry.TrapOID == "" {
-			return nil, errMissingTrapOID
-		}
-	}
-	if !isDedupSummary {
-		if entry.SourceIP == "" && entry.SourceUDPPeer == "" && entry.DeviceHostname == "" {
-			return nil, errMissingSourceIP
-		}
-	}
-
-	hostname := entry.DeviceHostname
-	if hostname == "" {
-		if entry.SourceIP != "" {
-			hostname = entry.SourceIP
-		} else if entry.SourceUDPPeer != "" {
-			hostname = entry.SourceUDPPeer
-		}
-	}
-
-	var fields []JournalField
-
-	fields = append(fields, JournalField{Name: "MESSAGE", Value: []byte(entry.Message)})
-	fields = append(fields, JournalField{Name: "PRIORITY", Value: []byte(severityPriority(entry.Severity))})
-	fields = append(fields, JournalField{Name: "SYSLOG_IDENTIFIER", Value: []byte(entry.JobName)})
-	fields = append(fields, JournalField{Name: "TRAP_JOB", Value: []byte(entry.JobName)})
-
-	if !isDedupSummary && hostname != "" {
-		fields = append(fields, JournalField{Name: "_HOSTNAME", Value: []byte(hostname)})
-	}
-
-	fields = append(fields, JournalField{Name: "ND_LOG_SOURCE", Value: []byte("snmp-trap")})
-
-	if !isDedupSummary && entry.SourceVnodeID != "" {
-		fields = append(fields, JournalField{Name: "ND_NIDL_NODE", Value: []byte(entry.SourceVnodeID)})
-	}
-
-	reportType := string(entry.ReportType)
-	if reportType == "" {
-		reportType = "trap"
-	}
-	fields = append(fields, JournalField{Name: "TRAP_REPORT_TYPE", Value: []byte(reportType)})
-
-	if !isDedupSummary && !isDecodeError {
-		fields = append(fields, JournalField{Name: "TRAP_OID", Value: []byte(entry.TrapOID)})
-		if entry.TrapName != "" {
-			fields = append(fields, JournalField{Name: "TRAP_NAME", Value: []byte(entry.TrapName)})
-		}
-	}
-	if !isDedupSummary {
-		if entry.Category != "" {
-			fields = append(fields, JournalField{Name: "TRAP_CATEGORY", Value: []byte(entry.Category)})
-		}
-		if entry.Severity != "" {
-			fields = append(fields, JournalField{Name: "TRAP_SEVERITY", Value: []byte(entry.Severity)})
-		}
-		if entry.PduType != "" {
-			fields = append(fields, JournalField{Name: "TRAP_PDU_TYPE", Value: []byte(entry.PduType)})
-		}
-		if entry.SnmpVersion != "" {
-			fields = append(fields, JournalField{Name: "TRAP_VERSION", Value: []byte(entry.SnmpVersion)})
-		}
-		if entry.SourceIP != "" {
-			fields = append(fields, JournalField{Name: "TRAP_SOURCE_IP", Value: []byte(entry.SourceIP)})
-		}
-		if entry.SourceUDPPeer != "" {
-			fields = append(fields, JournalField{Name: "TRAP_SOURCE_UDP_PEER", Value: []byte(entry.SourceUDPPeer)})
-		}
-		if entry.ReverseDNS != "" {
-			fields = append(fields, JournalField{Name: "TRAP_REVERSE_DNS", Value: []byte(entry.ReverseDNS)})
-		}
-		if entry.DeviceVendor != "" {
-			fields = append(fields, JournalField{Name: "TRAP_DEVICE_VENDOR", Value: []byte(entry.DeviceVendor)})
-		}
-		if entry.TopologyInterface != "" {
-			fields = append(fields, JournalField{Name: "TRAP_INTERFACE", Value: []byte(entry.TopologyInterface)})
-		}
-		if entry.TopologyNeighbors != "" {
-			fields = append(fields, JournalField{Name: "TRAP_NEIGHBORS", Value: []byte(entry.TopologyNeighbors)})
-		}
-	}
-
-	if isDedupSummary && entry.SummaryCounts != nil {
-		sc := entry.SummaryCounts
-		fields = append(fields, JournalField{Name: "TRAP_SUPPRESSED_COUNT", Value: fmt.Appendf(nil, "%d", sc.TotalSuppressed)})
-		fields = append(fields, JournalField{Name: "TRAP_SUPPRESSED_FINGERPRINTS", Value: fmt.Appendf(nil, "%d", sc.Fingerprints)})
-		fields = append(fields, JournalField{Name: "TRAP_REPORT_PERIOD_SEC", Value: fmt.Appendf(nil, "%d", sc.PeriodSec)})
-	}
-	if isDecodeError && entry.DecodeError != nil {
-		appendDecodeErrorJournalFields(&fields, entry.DecodeError)
-	}
-
-	sortedLabels := sortedMapKeys(entry.Labels)
-	for _, key := range sortedLabels {
-		val := entry.Labels[key]
-		upperKey := strings.ToUpper(key)
-		if !isValidTrapTagKey(upperKey) {
-			return nil, fmt.Errorf("invalid label key for TRAP_TAG: %q", key)
-		}
-		fields = append(fields, JournalField{Name: trapTagJournalFieldNameFor(upperKey), Value: []byte(val)})
-	}
-
-	if !isDedupSummary && !isDecodeError {
-		appendTrapVarbindJournalFields(&fields, entry)
-	}
-
-	if entry.Enrichment != nil {
-		enrichmentJSON, err := buildTrapEnrichmentJSON(entry)
-		if err != nil {
-			return nil, fmt.Errorf("TRAP_ENRICHMENT: %w", err)
-		}
-		fields = append(fields, JournalField{Name: "TRAP_ENRICHMENT", Value: enrichmentJSON})
-	}
-
-	trapJSON, err := buildTrapJSON(entry)
-	if err != nil {
-		return nil, fmt.Errorf("TRAP_JSON: %w", err)
-	}
-	fields = append(fields, JournalField{Name: "TRAP_JSON", Value: trapJSON})
-
-	return fields, nil
 }
 
 func isValidTrapTagKey(upperKey string) bool {
@@ -197,22 +59,7 @@ func isValidTrapTagKey(upperKey string) bool {
 	return true
 }
 
-func appendTrapVarbindJournalFields(fields *[]JournalField, entry *TrapEntry) {
-	state := newTrapVarbindFieldState(len(entry.Varbinds))
-	for _, vb := range entry.Varbinds {
-		name, rawName := trapVarbindJournalFieldNames(vb, state)
-		if name == "" {
-			continue
-		}
-
-		*fields = append(*fields, JournalField{Name: name, Value: []byte(trapVarbindJournalValue(vb, false))})
-		if rawName != "" {
-			*fields = append(*fields, JournalField{Name: rawName, Value: []byte(trapVarbindJournalValue(vb, true))})
-		}
-	}
-}
-
-func trapVarbindJournalFieldNames(vb VarbindValue, state *trapVarbindFieldState) (string, string) {
+func trapVarbindJournalFieldNames(vb model.VarbindValue, state *trapVarbindFieldState) (string, string) {
 	if state == nil || shouldSkipTrapVarbindJournalField(vb) {
 		return "", ""
 	}
@@ -225,7 +72,7 @@ func trapVarbindJournalFieldNames(vb VarbindValue, state *trapVarbindFieldState)
 	return state.nextFieldNames(base, vb.Enum != "")
 }
 
-func shouldSkipTrapVarbindJournalField(vb VarbindValue) bool {
+func shouldSkipTrapVarbindJournalField(vb model.VarbindValue) bool {
 	if model.IsSensitiveVarbind(vb) {
 		return true
 	}
@@ -251,7 +98,7 @@ func oidMatchesScalar(oid, scalar string) bool {
 	return oid == scalar || oid == strings.TrimSuffix(scalar, ".0")
 }
 
-func trapVarbindJournalFieldBase(vb VarbindValue) string {
+func trapVarbindJournalFieldBase(vb model.VarbindValue) string {
 	source := vb.Name
 	if source == "" {
 		oid := model.NormalizeOID(vb.OID)
@@ -282,7 +129,7 @@ func trapVarbindJournalFieldBase(vb VarbindValue) string {
 	return strings.Trim(b.String(), "_")
 }
 
-func trapVarbindJournalValue(vb VarbindValue, raw bool) string {
+func trapVarbindJournalValue(vb model.VarbindValue, raw bool) string {
 	if !raw && vb.Enum != "" {
 		return vb.Enum
 	}
@@ -390,45 +237,12 @@ func prefixedHashedJournalFieldName(prefix, base string) string {
 	return prefix + base[:keepLen] + "_" + hash
 }
 
-func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
+func buildTrapJSON(entry *model.TrapEntry) ([]byte, error) {
 	if entry.DecodeError != nil {
 		return json.Marshal(decodeErrorJSON{
 			DecodeErrorInfo: entry.DecodeError,
 			PacketSequence:  entry.PacketSequence,
 		})
-	}
-
-	obj := make(map[string]jsonVarbindEntry)
-	seenKeys := make(map[string]int)
-	if entry.PacketSequence > 0 {
-		seenKeys[trapJSONPacketSequenceKey] = 1
-	}
-
-	for _, vb := range entry.Varbinds {
-		if model.IsSensitiveVarbind(vb) {
-			continue
-		}
-		key := vb.Name
-		if key == "" {
-			key = vb.OID
-		}
-		if key == "" {
-			continue
-		}
-		seenKeys[key]++
-		if seenKeys[key] > 1 {
-			key = fmt.Sprintf("%s#%d", key, seenKeys[key])
-		}
-
-		je := jsonVarbindEntry{
-			OID:  vb.OID,
-			Type: string(vb.Type),
-		}
-		je.Value = canonicalVarbindValue(vb.Value)
-		if vb.Enum != "" {
-			je.Enum = vb.Enum
-		}
-		obj[key] = je
 	}
 
 	if entry.SummaryCounts != nil {
@@ -437,9 +251,7 @@ func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 		obj2["period_sec"] = entry.SummaryCounts.PeriodSec
 		obj2["fingerprints"] = entry.SummaryCounts.Fingerprints
 		if entry.SummaryCounts.ByTrap != nil {
-			bt := make(map[string]int64, len(entry.SummaryCounts.ByTrap))
-			maps.Copy(bt, entry.SummaryCounts.ByTrap)
-			obj2["by_trap"] = bt
+			obj2["by_trap"] = entry.SummaryCounts.ByTrap
 		}
 		result, err := json.Marshal(obj2)
 		if err != nil {
@@ -448,116 +260,32 @@ func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 		return result, nil
 	}
 
-	sortedKeys := make([]string, 0, len(obj))
-	for k := range obj {
-		sortedKeys = append(sortedKeys, k)
-	}
-	sort.Strings(sortedKeys)
-
-	ordered := make([]jsonMapEntry, 0, len(obj)+1)
-	if entry.PacketSequence > 0 {
-		ordered = append(ordered, jsonMapEntry{Key: trapJSONPacketSequenceKey, Value: entry.PacketSequence})
-	}
-	for _, k := range sortedKeys {
-		ordered = append(ordered, jsonMapEntry{Key: k, Value: obj[k]})
-	}
-
-	result, err := marshalOrderedJSON(ordered)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return []byte("{}"), nil
 }
 
 type decodeErrorJSON struct {
-	*DecodeErrorInfo
+	*model.DecodeErrorInfo
 	PacketSequence uint64 `json:"netdata_packet_sequence,omitempty"`
 }
 
-func buildTrapEnrichmentJSON(entry *TrapEntry) ([]byte, error) {
+func buildTrapEnrichmentJSON(entry *model.TrapEntry) ([]byte, error) {
 	if entry == nil || entry.Enrichment == nil {
 		return nil, nil
 	}
 	return json.Marshal(entry.Enrichment)
 }
 
-type jsonVarbindEntry struct {
-	OID   string `json:"oid"`
-	Type  string `json:"type"`
-	Value any    `json:"value"`
-	Enum  string `json:"enum,omitempty"`
-}
-
-type jsonMapEntry struct {
-	Key   string
-	Value any
-}
-
-func marshalOrderedJSON(entries []jsonMapEntry) ([]byte, error) {
-	var buf strings.Builder
-	buf.WriteByte('{')
-	for i, e := range entries {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		keyBytes, err := json.Marshal(e.Key)
-		if err != nil {
-			return nil, err
-		}
-		valBytes, err := json.Marshal(e.Value)
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(keyBytes)
-		buf.WriteByte(':')
-		buf.Write(valBytes)
-	}
-	buf.WriteByte('}')
-	return []byte(buf.String()), nil
-}
-
-func canonicalVarbindValue(val any) any {
-	if val == nil {
-		return nil
-	}
-	switch v := val.(type) {
-	case string:
-		return v
-	case int64:
-		return v
-	case uint64:
-		return v
-	case float64:
-		return v
-	case bool:
-		return v
-	case []byte:
-		return fmt.Sprintf("%x", v)
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}
-
-func sortedMapKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-type journalHotSerializer struct {
+type hotSerializer struct {
 	payloads            [][]byte
 	buf                 []byte
 	labelKeys           []string
 	trapVarFieldNames   map[string]struct{}
-	jsonEntries         []rawJSONVarbindEntry
-	seenJSONKeys        map[string]int
+	jsonEntries         []output.ProjectedVarbind
+	varbindProjector    output.VarbindProjector
 	binaryEncodedFields int
 }
 
-func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error) {
+func (s *hotSerializer) serialize(entry *model.TrapEntry) ([][]byte, int, error) {
 	s.reset()
 
 	if entry == nil {
@@ -570,8 +298,8 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 		return nil, 0, errNegativeTimestamp
 	}
 
-	isDedupSummary := entry.ReportType == ReportTypeDedupSummary
-	isDecodeError := entry.ReportType == ReportTypeDecodeError
+	isDedupSummary := entry.ReportType == model.ReportTypeDedupSummary
+	isDecodeError := entry.ReportType == model.ReportTypeDecodeError
 
 	if !isDedupSummary && !isDecodeError {
 		if entry.TrapOID == "" {
@@ -689,14 +417,14 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 	return s.payloads, s.binaryEncodedFields, nil
 }
 
-func (s *journalHotSerializer) reset() {
+func (s *hotSerializer) reset() {
 	s.payloads = s.payloads[:0]
 	s.buf = s.buf[:0]
 	s.labelKeys = s.labelKeys[:0]
 	s.binaryEncodedFields = 0
 }
 
-func (s *journalHotSerializer) addStringField(name, value string) {
+func (s *hotSerializer) addStringField(name, value string) {
 	start := len(s.buf)
 	s.buf = append(s.buf, name...)
 	s.buf = append(s.buf, '=')
@@ -705,7 +433,7 @@ func (s *journalHotSerializer) addStringField(name, value string) {
 	s.addPayload(start, valueStart, name != "MESSAGE")
 }
 
-func (s *journalHotSerializer) addIntField(name string, value int64) {
+func (s *hotSerializer) addIntField(name string, value int64) {
 	start := len(s.buf)
 	s.buf = append(s.buf, name...)
 	s.buf = append(s.buf, '=')
@@ -714,7 +442,7 @@ func (s *journalHotSerializer) addIntField(name string, value int64) {
 	s.addPayload(start, valueStart, true)
 }
 
-func (s *journalHotSerializer) addDecodeErrorFields(info *DecodeErrorInfo) {
+func (s *hotSerializer) addDecodeErrorFields(info *model.DecodeErrorInfo) {
 	if info.Kind != "" {
 		s.addStringField("TRAP_DECODE_ERROR_KIND", info.Kind)
 	}
@@ -736,23 +464,19 @@ func (s *journalHotSerializer) addDecodeErrorFields(info *DecodeErrorInfo) {
 	}
 }
 
-func (s *journalHotSerializer) addPayload(start, valueStart int, countBinary bool) {
+func (s *hotSerializer) addPayload(start, valueStart int, countBinary bool) {
 	if countBinary && journalFieldNeedsBinary(s.buf[valueStart:]) {
 		s.binaryEncodedFields++
 	}
 	s.payloads = append(s.payloads, s.buf[start:])
 }
 
-func (s *journalHotSerializer) sortedLabelKeys(labels map[string]string) []string {
-	s.labelKeys = s.labelKeys[:0]
-	for key := range labels {
-		s.labelKeys = append(s.labelKeys, key)
-	}
-	sort.Strings(s.labelKeys)
+func (s *hotSerializer) sortedLabelKeys(labels map[string]string) []string {
+	s.labelKeys = output.SortedLabelKeys(s.labelKeys, labels)
 	return s.labelKeys
 }
 
-func (s *journalHotSerializer) addTrapVarbindFields(entry *TrapEntry) {
+func (s *hotSerializer) addTrapVarbindFields(entry *model.TrapEntry) {
 	state := s.trapVarbindFieldState(len(entry.Varbinds))
 	for _, vb := range entry.Varbinds {
 		name, rawName := trapVarbindJournalFieldNames(vb, state)
@@ -767,7 +491,7 @@ func (s *journalHotSerializer) addTrapVarbindFields(entry *TrapEntry) {
 	}
 }
 
-func (s *journalHotSerializer) trapVarbindFieldState(size int) *trapVarbindFieldState {
+func (s *hotSerializer) trapVarbindFieldState(size int) *trapVarbindFieldState {
 	if s.trapVarFieldNames == nil {
 		s.trapVarFieldNames = make(map[string]struct{}, size*2)
 	} else {
@@ -778,7 +502,7 @@ func (s *journalHotSerializer) trapVarbindFieldState(size int) *trapVarbindField
 	return &trapVarbindFieldState{used: s.trapVarFieldNames}
 }
 
-func (s *journalHotSerializer) addTrapJSONField(entry *TrapEntry) error {
+func (s *hotSerializer) addTrapJSONField(entry *model.TrapEntry) error {
 	start := len(s.buf)
 	s.buf = append(s.buf, "TRAP_JSON"...)
 	s.buf = append(s.buf, '=')
@@ -801,7 +525,7 @@ func (s *journalHotSerializer) addTrapJSONField(entry *TrapEntry) error {
 	return nil
 }
 
-func (s *journalHotSerializer) addTrapEnrichmentField(entry *TrapEntry) error {
+func (s *hotSerializer) addTrapEnrichmentField(entry *model.TrapEntry) error {
 	enrichmentJSON, err := buildTrapEnrichmentJSON(entry)
 	if err != nil {
 		return err
@@ -816,66 +540,23 @@ func (s *journalHotSerializer) addTrapEnrichmentField(entry *TrapEntry) error {
 	return nil
 }
 
-func appendDecodeErrorJournalFields(fields *[]JournalField, info *DecodeErrorInfo) {
-	if info.Kind != "" {
-		*fields = append(*fields, JournalField{Name: "TRAP_DECODE_ERROR_KIND", Value: []byte(info.Kind)})
-	}
-	if info.Error != "" {
-		*fields = append(*fields, JournalField{Name: "TRAP_DECODE_ERROR", Value: []byte(info.Error)})
-	}
-	*fields = append(*fields, JournalField{Name: "TRAP_PACKET_SIZE", Value: fmt.Appendf(nil, "%d", info.PacketSize)})
-	if info.PacketSHA256 != "" {
-		*fields = append(*fields, JournalField{Name: "TRAP_PACKET_SHA256", Value: []byte(info.PacketSHA256)})
-	}
-	if info.SourceUDPPort > 0 {
-		*fields = append(*fields, JournalField{Name: "TRAP_SOURCE_UDP_PORT", Value: fmt.Appendf(nil, "%d", info.SourceUDPPort)})
-	}
-	if info.Listener != "" {
-		*fields = append(*fields, JournalField{Name: "TRAP_LISTENER", Value: []byte(info.Listener)})
-	}
-	if info.EngineID != "" {
-		*fields = append(*fields, JournalField{Name: "TRAP_ENGINE_ID", Value: []byte(info.EngineID)})
-	}
-}
-
-type rawJSONVarbindEntry struct {
-	key string
-	vb  VarbindValue
-}
-
-func (s *journalHotSerializer) appendTrapJSONObject(entry *TrapEntry) error {
+func (s *hotSerializer) appendTrapJSONObject(entry *model.TrapEntry) error {
 	s.jsonEntries = s.jsonEntries[:0]
-	if s.seenJSONKeys == nil {
-		s.seenJSONKeys = make(map[string]int, len(entry.Varbinds))
-	} else {
-		for key := range s.seenJSONKeys {
-			delete(s.seenJSONKeys, key)
-		}
-	}
+	s.varbindProjector.Reset(len(entry.Varbinds))
 	if entry.PacketSequence > 0 {
-		s.seenJSONKeys[trapJSONPacketSequenceKey] = 1
+		s.varbindProjector.Reserve(trapJSONPacketSequenceKey)
 	}
 
 	for _, vb := range entry.Varbinds {
-		if model.IsSensitiveVarbind(vb) {
+		projected, ok := s.varbindProjector.Project(vb)
+		if !ok {
 			continue
 		}
-		key := vb.Name
-		if key == "" {
-			key = vb.OID
-		}
-		if key == "" {
-			continue
-		}
-		s.seenJSONKeys[key]++
-		if s.seenJSONKeys[key] > 1 {
-			key = fmt.Sprintf("%s#%d", key, s.seenJSONKeys[key])
-		}
-		s.jsonEntries = append(s.jsonEntries, rawJSONVarbindEntry{key: key, vb: vb})
+		s.jsonEntries = append(s.jsonEntries, projected)
 	}
 
-	slices.SortFunc(s.jsonEntries, func(a, b rawJSONVarbindEntry) int {
-		return strings.Compare(a.key, b.key)
+	slices.SortFunc(s.jsonEntries, func(a, b output.ProjectedVarbind) int {
+		return strings.Compare(a.Key, b.Key)
 	})
 
 	s.buf = append(s.buf, '{')
@@ -890,16 +571,16 @@ func (s *journalHotSerializer) appendTrapJSONObject(entry *TrapEntry) error {
 		if wrote || i > 0 {
 			s.buf = append(s.buf, ',')
 		}
-		s.appendJSONString(entry.key)
+		s.appendJSONString(entry.Key)
 		s.buf = append(s.buf, ':')
-		s.appendJSONVarbind(entry.vb)
+		s.appendJSONVarbind(entry)
 		wrote = true
 	}
 	s.buf = append(s.buf, '}')
 	return nil
 }
 
-func (s *journalHotSerializer) appendJSONVarbind(vb VarbindValue) {
+func (s *hotSerializer) appendJSONVarbind(vb output.ProjectedVarbind) {
 	s.buf = append(s.buf, `{"oid":`...)
 	s.appendJSONString(vb.OID)
 	s.buf = append(s.buf, `,"type":`...)
@@ -913,35 +594,33 @@ func (s *journalHotSerializer) appendJSONVarbind(vb VarbindValue) {
 	s.buf = append(s.buf, '}')
 }
 
-func (s *journalHotSerializer) appendJSONVarbindValue(value any) {
-	switch v := value.(type) {
-	case nil:
+func (s *hotSerializer) appendJSONVarbindValue(value output.CanonicalValue) {
+	switch value.Kind {
+	case output.ValueNull:
 		s.buf = append(s.buf, "null"...)
-	case string:
-		s.appendJSONString(v)
-	case int64:
-		s.buf = strconv.AppendInt(s.buf, v, 10)
-	case uint64:
-		s.buf = strconv.AppendUint(s.buf, v, 10)
-	case float64:
-		s.buf = strconv.AppendFloat(s.buf, v, 'f', -1, 64)
-	case bool:
-		s.buf = strconv.AppendBool(s.buf, v)
-	case []byte:
+	case output.ValueString:
+		s.appendJSONString(value.String)
+	case output.ValueInt64:
+		s.buf = strconv.AppendInt(s.buf, value.Int64, 10)
+	case output.ValueUint64:
+		s.buf = strconv.AppendUint(s.buf, value.Uint64, 10)
+	case output.ValueFloat64:
+		s.buf = strconv.AppendFloat(s.buf, value.Float64, 'f', -1, 64)
+	case output.ValueBool:
+		s.buf = strconv.AppendBool(s.buf, value.Bool)
+	case output.ValueBytes:
 		s.buf = append(s.buf, '"')
-		dstLen := hex.EncodedLen(len(v))
+		dstLen := hex.EncodedLen(len(value.Bytes))
 		oldLen := len(s.buf)
 		for range dstLen {
 			s.buf = append(s.buf, 0)
 		}
-		hex.Encode(s.buf[oldLen:oldLen+dstLen], v)
+		hex.Encode(s.buf[oldLen:oldLen+dstLen], value.Bytes)
 		s.buf = append(s.buf, '"')
-	default:
-		s.appendJSONString(fmt.Sprintf("%v", v))
 	}
 }
 
-func (s *journalHotSerializer) appendJSONString(value string) {
+func (s *hotSerializer) appendJSONString(value string) {
 	const hexDigits = "0123456789abcdef"
 
 	s.buf = append(s.buf, '"')

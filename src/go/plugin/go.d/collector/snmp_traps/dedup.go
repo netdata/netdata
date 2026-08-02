@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 )
 
 const (
@@ -48,7 +49,7 @@ type trapDeduper struct {
 	jobName         string
 	window          time.Duration
 	maxEntries      int
-	writer          TrapWriter
+	writer          output.Writer
 	metrics         *perJobMetrics
 	writeFailureDim string
 	monotonicNow    func() int64
@@ -83,7 +84,7 @@ func validateDedupConfig(cfg DedupConfig) error {
 	return nil
 }
 
-func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics *perJobMetrics, writeFailureDim string, monotonicNow ...func() int64) *trapDeduper {
+func newTrapDeduper(jobName string, cfg DedupConfig, writer output.Writer, metrics *perJobMetrics, writeFailureDim string, monotonicNow ...func() int64) *trapDeduper {
 	if !cfg.Enabled {
 		return nil
 	}
