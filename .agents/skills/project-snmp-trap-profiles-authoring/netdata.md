@@ -166,7 +166,11 @@ The configured per-job root is `${NETDATA_LOG_DIR}/traps/{job_name}/`. The plugi
 
 **Embedded logs Function**: `go.d.plugin` exposes one module Function named `snmp:traps`. It uses the journal SDK Netdata Function API against the shared traps root (`${NETDATA_LOG_DIR}/traps/`) and maps each direct-journal job directory to one `__logs_sources` option named after the job. The SDK selects all direct-journal sources by default; operators can narrow to one job with `selections.__logs_sources=["{job_name}"]`. OTLP-only jobs do not create direct journal directories and therefore do not appear as log sources. Until Netdata's dedicated Function deletion protocol lands, stale function advertisement is avoided by only registering the logs method when direct-journal jobs exist.
 
-**Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), trivially shared profile cache (Go package-level state + refcount), and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The SDK-backed writer preserves direct journal file control, creation-time failure detection, and `journalctl` compatibility without maintaining a package-local copy of the journal binary format.
+**Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), a plugin-scoped profile
+catalog manager with exact per-job leases, and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot
+set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The
+SDK-backed writer preserves direct journal file control, creation-time failure detection, and `journalctl` compatibility
+without maintaining a package-local copy of the journal binary format.
 
 **Reference**: `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`
 
@@ -382,8 +386,9 @@ use `with` or `first` when optional context is included.
 
 Unknown functions, unknown varbind names, malformed templates, variables,
 assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
-fail profile loading. Eager operator/metric-catalogue loads surface the error at
-job creation; lazy stock errors surface on the first matching trap.
+fail profile loading. Eager operator-profile errors surface at job creation;
+lazy stock errors surface when the first trap or enabled metric rule routes to
+that stock file.
 
 If `description` is absent, default template is:
 ```
@@ -404,27 +409,34 @@ Profiles may define optional `metrics:` and `charts:` sections, but the plugin
 evaluates those rules only for listener jobs that enable `profile_metrics`
 (§7.5). The plugin also emits its own receiver self-metrics (§12).
 
-### Profile loading — lazy shared cache, multipath, filename-dedup, field-merge on extends-chain
+### Profile loading — leased catalog epochs, exact manifest routes, targeted hydration
 
-The loader is plugin-wide shared state, not per-listener state. It initializes on first runnable trap job creation, is
-shared by all listeners, and is released when no runnable trap jobs remain. Agents with all trap jobs disabled (or no trap
-jobs configured) never pay the profile memory footprint. An eager operator-profile, stock-catalogue, or profile-metric
-catalogue validation failure is a job-creation failure and returns HTTP-422 through DynCfg before any listener is reported
-as started. A lazy stock-profile failure is reported when the first matching trap needs that file.
+`internal/catalog.Manager` is created once per plugin registration and shared by its listeners. The first runnable job
+acquires a lease and builds one catalog epoch; the final lease release drops that epoch. Agents with no runnable trap jobs
+never pay the profile memory cost. Failed initial loads leave the manager empty so a later acquisition retries from disk.
 
-Operator profiles and the stock catalogue are loaded and validated eagerly at job creation. The loader retains only a
-small OID-to-stock-file route table until a matching trap arrives. The first matching trap loads and validates the routed
-stock vendor file into the shared profile index, and later listeners reuse it. Stock profiles load eagerly during job
-creation to build the complete metric rule catalogue when an operator profile defines metric rules or the job enables
-profile metrics. Stock YAML remains uncompressed in git for review; installed packages store stock vendor files as
-`.yaml.zst`, and the runtime loader accepts raw `.yaml`/`.yml` and Zstandard-compressed `.yaml.zst`/`.yml.zst` files.
+The epoch eagerly validates every operator profile and exactly one stock manifest (`catalogue.json` or
+`catalogue.json.zst`). It also reconciles the manifest with the physical stock profile inventory. Missing, duplicate,
+gzip, or inconsistent manifests fail job creation with HTTP-422; there is no parse-all fallback.
 
-The loader mirrors the established SNMP polling pattern (`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`):
+Stock profile bodies remain lazy. The manifest supplies exact trap-OID, MIB-name, and metric-rule routes, so the runtime
+hydrates only the file needed by a matching trap, a MIB-qualified name, or an enabled rule. Hydration is coalesced per
+file, different files hydrate independently, and a failure is negatively cached only for the current epoch. A complete
+bundle is validated before its traps, metric rules, and charts are published together.
 
-1. **Multipath load** — operator overrides first, then stock: `/etc/netdata/go.d/snmp.trap-profiles/` → `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/`.
-2. **Filename dedup** — same logical filename in a higher-priority directory replaces the lower-priority one entirely. Operator override file `ciscosystems.yaml` fully replaces stock `ciscosystems.yaml` or installed `ciscosystems.yaml.zst`; operators copy + edit to customize a single vendor file.
-3. **Field-level merge via `extends:` chain** — when a profile YAML lists `extends: [_base1.yaml, _base2.yaml]`, the loader merges trap entries; later `extends` entries override earlier ones on a per-OID basis. Within a single profile entry, field-level (the override file's fields win for the fields it specifies; unspecified fields inherit from the extended base).
-4. **Directory ordering** — within a single directory, files are loaded in `filepath.WalkDir()` lexical order (Go contract). If two files in the same directory define the same OID via `extends`, the alphabetically-later file wins.
+The loader reuses `pkg/profilecatalog` for directory walking and precedence:
+
+1. **Extensionless identity** — `.yaml`, `.yml`, `.yaml.zst`, and `.yml.zst` map to the same identity, which must match
+   `^[a-z0-9][a-z0-9_-]*$`.
+2. **Operator override** — an operator `ciscosystems.yaml` fully replaces stock `ciscosystems.yaml.zst`. Duplicate or
+   invalid operator identities fail the complete load.
+3. **Field-level merge via `extends:`** — later `extends` entries override earlier entries on a per-OID basis; fields
+   omitted by the child inherit from the selected base.
+4. **Duplicate definitions** — duplicate effective trap OIDs, alternate `.0` OID forms, trap names, metric rule names,
+   metric outputs, and chart IDs are errors. Directory order never resolves such conflicts.
+
+Stock YAML remains uncompressed in git for review. Installed packages use `.yaml.zst`; gzip profile and manifest loading
+is unsupported.
 
 ### Custom MIB workflow — offline conversion, NOT runtime compilation
 
@@ -433,7 +445,9 @@ Operators who need coverage for a vendor MIB not in the shipped OOB pack:
 1. Place MIB files under `~/mibs/` (or any working directory).
 2. Run `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen generate --source-dir ~/mibs --all --out-dir ./snmp-trap-profile-gen-output` to produce profile YAMLs. The helper uses default category/severity/description values unless LLM classification is explicitly enabled for stock regeneration. It also writes review artifacts under `--out-dir`, including `conflicts.json` for duplicate trap OIDs and `source-conflicts.json` when multiple MIB files define the same module name.
 3. Drop the generated `.yaml` files from `./snmp-trap-profile-gen-output/profiles/` into `/etc/netdata/go.d/snmp.trap-profiles/`.
-4. Profile files are immutable for the lifetime of the shared cache. After editing operator profiles, restart the Agent or recreate all running `snmp_traps` jobs so the final release unloads the cache and the next job creation loads the files.
+4. Profile files are immutable for the lifetime of the shared catalog epoch. After editing operator profiles, restart
+   the Agent or recreate all running `snmp_traps` jobs so the final lease release drops the epoch and the next job
+   creation loads the files.
 
 This mirrors the SNMP polling plugin's model: stock + operator-override YAMLs only, no runtime MIB compilation. The conversion helper is shipped with Netdata in `plugins.d` and uses the bundled IANA PEN snapshot at `/usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt` unless `--refresh-pen` is passed.
 
@@ -1170,12 +1184,11 @@ Phase B resolved most of the original questions. What remains:
 
 1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended through 2026-08-02 for SDK `go/v0.8.0`, Netdata log directory placement, raw-payload serialization, and internal output ownership)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.8.0`. No separate process, no CGo, no subprocess bridge. See `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`.
 
-2. **Profile YAML lifecycle — ACCEPTED (superseded 2026-08-01)**: operators add or edit YAML files under
-   `/etc/netdata/go.d/snmp.trap-profiles/`. Profiles are immutable while the shared profile cache has active job
-   references. After editing profiles, restart the Agent or recreate all running `snmp_traps` jobs; the last release
-   unloads the cache and the next job creation eagerly reloads operator profiles and the stock catalogue. Stock vendor
-   YAML remains lazy until a matching trap needs it, unless an operator profile defines metric rules or the job enables
-   profile metrics, which requires the complete rule catalogue at job creation. The public manual reload Function and the
+2. **Profile YAML lifecycle — ACCEPTED (superseded 2026-08-02)**: operators add or edit YAML files under
+   `/etc/netdata/go.d/snmp.trap-profiles/`. Profiles are immutable while the plugin-scoped catalog epoch has active job
+   leases. After editing profiles, restart the Agent or recreate all running `snmp_traps` jobs; the final release drops
+   the epoch and the next job creation reloads operator profiles and the stock manifest. Stock vendor YAML remains lazy
+   until a matching trap OID, MIB-qualified name, or selected metric rule needs it. The public manual reload Function and
    automatic watcher were removed before stable release. Runtime MIB compilation remains out of scope.
 
 3. **MIB upload via API**: out of scope for first release. Operators convert MIBs offline using `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the resulting YAML; this is documented user workflow (see §7 and the profile-format documentation). UI-driven upload via DynCfg is a future enhancement.

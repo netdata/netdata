@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package catalog
 
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"text/template"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
+
+type TrapEntry = model.TrapEntry
+type VarbindValue = model.VarbindValue
+type ASN1Type = model.ASN1Type
 
 var validCategories = map[string]bool{
 	"state_change":  true,
@@ -70,9 +74,9 @@ type VarbindDef struct {
 	Enum        map[string]string `yaml:"enum,omitempty"`
 	Constraints string            `yaml:"constraints,omitempty"`
 
-	// rawName is the symbolic varbind name (key from the file-scoped table).
+	// RawName is the symbolic varbind name (key from the file-scoped table).
 	// Set during profile loading; not a YAML field.
-	rawName string
+	RawName string `yaml:"-"`
 }
 
 // TrapDef is a single trap entry from a profile YAML.
@@ -87,15 +91,48 @@ type TrapDef struct {
 	Labels           map[string]string `yaml:"labels,omitempty"`
 	DedupKeyVarbinds []string          `yaml:"dedup_key_varbinds,omitempty"`
 
-	// sharedVarbinds maps varbind OID → VarbindDef for runtime resolution.
+	// SharedVarbinds maps varbind OID → VarbindDef for runtime resolution.
 	// Merged from file table references + per-trap inline definitions.
-	sharedVarbinds map[string]*VarbindDef
+	SharedVarbinds map[string]*VarbindDef `yaml:"-"`
 
-	// sourceFile is the profile file this trap came from.
-	sourceFile string
+	// SourceFile is the profile file this trap came from.
+	SourceFile string `yaml:"-"`
 
 	descriptionTemplate *template.Template
 	labelTemplates      map[string]*template.Template
+}
+
+// WithOverrides returns an immutable copy with job-level category, severity,
+// and label overrides applied.
+func (t *TrapDef) WithOverrides(category, severity string, labels map[string]string) *TrapDef {
+	if t == nil {
+		return nil
+	}
+	cp := *t
+	if t.Labels != nil {
+		cp.Labels = make(map[string]string, len(t.Labels)+len(labels))
+		maps.Copy(cp.Labels, t.Labels)
+	}
+	if t.labelTemplates != nil && len(labels) > 0 {
+		cp.labelTemplates = make(map[string]*template.Template, len(t.labelTemplates))
+		maps.Copy(cp.labelTemplates, t.labelTemplates)
+	}
+	if category != "" {
+		cp.Category = category
+	}
+	if severity != "" {
+		cp.Severity = severity
+	}
+	if labels != nil {
+		if cp.Labels == nil {
+			cp.Labels = make(map[string]string, len(labels))
+		}
+		maps.Copy(cp.Labels, labels)
+		for key := range labels {
+			delete(cp.labelTemplates, key)
+		}
+	}
+	return &cp
 }
 
 // varbindResolvedNameRefs returns symbolic varbind names this trap references from the file table.
@@ -111,23 +148,34 @@ func (t *TrapDef) varbindResolvedNameRefs() map[string]bool {
 
 // varbindByOID returns the VarbindDef for a given OID from the shared varbinds map.
 func (t *TrapDef) varbindByOID(oid string) *VarbindDef {
-	if t.sharedVarbinds == nil {
+	if t.SharedVarbinds == nil {
 		return nil
 	}
-	return t.sharedVarbinds[oid]
+	return t.SharedVarbinds[oid]
 }
 
 // varbindByName returns the VarbindDef for a given symbolic name.
 func (t *TrapDef) varbindByName(name string) *VarbindDef {
-	if t.sharedVarbinds == nil {
+	if t.SharedVarbinds == nil {
 		return nil
 	}
-	for _, def := range t.sharedVarbinds {
-		if def != nil && def.rawName == name {
+	for _, def := range t.SharedVarbinds {
+		if def != nil && def.RawName == name {
 			return def
 		}
 	}
 	return nil
+}
+
+// VarbindByName returns a file-scoped or inline varbind definition by symbolic name.
+func (t *TrapDef) VarbindByName(name string) *VarbindDef {
+	if t == nil {
+		return nil
+	}
+	if vb := t.varbindByName(name); vb != nil {
+		return vb
+	}
+	return t.inlineVarbindByName(name)
 }
 
 func (t *TrapDef) inlineVarbindByName(name string) *VarbindDef {
@@ -137,7 +185,7 @@ func (t *TrapDef) inlineVarbindByName(name string) *VarbindDef {
 			continue
 		}
 		vb, err := inlineVarbindDef(imap)
-		if err == nil && vb.rawName == name {
+		if err == nil && vb.RawName == name {
 			return vb
 		}
 	}
@@ -156,25 +204,79 @@ type ProfileDefinition struct {
 	Charts    []profileMetricChart  `yaml:"charts,omitempty"`
 }
 
-// ProfileIndex is a loaded, validated OID index ready for trap lookup.
-type ProfileIndex struct {
+// Epoch is a loaded, validated OID index ready for trap lookup.
+type Epoch struct {
+	publishMu         sync.Mutex
 	mu                sync.RWMutex
 	trapsByOID        map[string]*TrapDef
 	namesByTrapName   map[string]*TrapDef
 	metricRulesByName map[string]*profileMetricRule
 	metricChartsByID  map[string]*profileMetricChart
 	stock             *stockProfileStore
+	profiles          []ProfileInfo
+}
+
+// NewEpoch returns an empty epoch for callers that assemble static profile
+// definitions before the runtime-ownership migration is complete.
+func NewEpoch() *Epoch {
+	return &Epoch{
+		trapsByOID:        make(map[string]*TrapDef),
+		namesByTrapName:   make(map[string]*TrapDef),
+		metricRulesByName: make(map[string]*profileMetricRule),
+		metricChartsByID:  make(map[string]*profileMetricChart),
+	}
+}
+
+// AddTraps validates and adds static trap definitions to an unpublished epoch.
+func (idx *Epoch) AddTraps(traps []*TrapDef) error { return idx.addTraps(traps) }
+
+// AddMetricDefinitions validates and adds static metric definitions to an
+// unpublished epoch.
+func (idx *Epoch) AddMetricDefinitions(rules []MetricRule, charts []MetricChart) error {
+	return idx.addProfileMetrics(rules, charts)
+}
+
+// PrepareTrap compiles one manually assembled trap definition.
+func PrepareTrap(td *TrapDef) error {
+	if td == nil {
+		return errors.New("trap definition is nil")
+	}
+	fileVarbinds := make(map[string]VarbindDef, len(td.SharedVarbinds))
+	for _, vb := range td.SharedVarbinds {
+		if vb != nil && vb.RawName != "" {
+			fileVarbinds[vb.RawName] = *vb
+		}
+	}
+	if td.SharedVarbinds == nil {
+		td.SharedVarbinds = buildSharedVarbinds(td, fileVarbinds)
+	}
+	return compileTrapTemplates(td, fileVarbinds)
+}
+
+// ProfileInfo describes one effective extensionless profile identity.
+type ProfileInfo struct {
+	Name    string
+	Path    string
+	IsStock bool
+}
+
+// Profiles returns the effective profile inventory sorted by identity.
+func (idx *Epoch) Profiles() []ProfileInfo {
+	if idx == nil {
+		return nil
+	}
+	return append([]ProfileInfo(nil), idx.profiles...)
 }
 
 // Lookup returns the TrapDef for a given numeric OID, or nil if not found.
-func (idx *ProfileIndex) Lookup(oid string) *TrapDef {
+func (idx *Epoch) Lookup(oid string) *TrapDef {
 	td, _ := idx.LookupWithError(oid)
 	return td
 }
 
 // LookupWithError returns the TrapDef for a given numeric OID and reports
 // stock lazy-load failures separately from genuine unknown OIDs.
-func (idx *ProfileIndex) LookupWithError(oid string) (*TrapDef, error) {
+func (idx *Epoch) LookupWithError(oid string) (*TrapDef, error) {
 	if idx == nil {
 		return nil, nil
 	}
@@ -187,7 +289,7 @@ func (idx *ProfileIndex) LookupWithError(oid string) (*TrapDef, error) {
 	return idx.lookupLoaded(oid), nil
 }
 
-func (idx *ProfileIndex) lookupLoaded(oid string) *TrapDef {
+func (idx *Epoch) lookupLoaded(oid string) *TrapDef {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
@@ -200,71 +302,41 @@ func (idx *ProfileIndex) lookupLoaded(oid string) *TrapDef {
 	return nil
 }
 
-// profileCache holds the plugin-wide shared profile state. All active jobs share
-// one profile configuration epoch; the final release unloads it so the next job
-// builds a fresh index from disk.
-type profileCache struct {
-	mu         sync.Mutex
-	current    atomic.Pointer[ProfileIndex]
-	loaded     bool
-	activeRefs int
+// MetricDefinitions is an immutable snapshot of static metric rules and charts.
+type MetricDefinitions struct {
+	RulesByName map[string]*MetricRule
+	ChartsByID  map[string]*MetricChart
 }
 
-var globalProfileCache profileCache
-
-// AcquireProfileCache lazily loads profiles on first call.
-// Returns the current profile index and any load error.
-func AcquireProfileCache() (*ProfileIndex, error) {
-	globalProfileCache.mu.Lock()
-	defer globalProfileCache.mu.Unlock()
-
-	if !globalProfileCache.loaded {
-		idx, err := loadProfileCache()
-		if err != nil {
-			return nil, err
-		}
-		globalProfileCache.current.Store(idx)
-		globalProfileCache.loaded = true
+// Definitions returns the selected static metric definitions and their charts.
+func (idx *Epoch) Definitions(ruleNames []string) (MetricDefinitions, error) {
+	if idx == nil {
+		return MetricDefinitions{}, errors.New("profile index not available")
 	}
-
-	if idx := globalProfileCache.current.Load(); idx != nil {
-		globalProfileCache.activeRefs++
-		return idx, nil
+	if err := idx.loadStockMetricRules(ruleNames); err != nil {
+		return MetricDefinitions{}, err
 	}
-	return nil, errors.New("snmp_traps profile cache is empty after load")
-}
-
-// CurrentProfileIndex returns the current profile index without locking.
-// Safe for concurrent use; may return nil if the cache was never loaded.
-func CurrentProfileIndex() *ProfileIndex {
-	return globalProfileCache.current.Load()
-}
-
-// ReleaseProfileCache drops one active job reference. When the last job stops,
-// profile memory is released so users without an active trap listener do not pay
-// the stock profile memory cost.
-func ReleaseProfileCache() {
-	globalProfileCache.mu.Lock()
-	defer globalProfileCache.mu.Unlock()
-
-	if globalProfileCache.activeRefs <= 0 {
-		return
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	defs := MetricDefinitions{
+		RulesByName: make(map[string]*MetricRule, len(idx.metricRulesByName)),
+		ChartsByID:  make(map[string]*MetricChart, len(idx.metricChartsByID)),
 	}
-	globalProfileCache.activeRefs--
-	if globalProfileCache.activeRefs == 0 {
-		globalProfileCache.current.Store(nil)
-		globalProfileCache.loaded = false
-	}
+	maps.Copy(defs.RulesByName, idx.metricRulesByName)
+	maps.Copy(defs.ChartsByID, idx.metricChartsByID)
+	return defs, nil
 }
 
-// resetProfileCacheForTest clears the shared cache for test isolation.
-func resetProfileCacheForTest() {
-	globalProfileCache.mu.Lock()
-	defer globalProfileCache.mu.Unlock()
-	globalProfileCache.current.Store(nil)
-	globalProfileCache.loaded = false
-	globalProfileCache.activeRefs = 0
+// ResolveTrap resolves a numeric OID or exact MIB-qualified trap name.
+func (idx *Epoch) ResolveTrap(ref string) (*TrapDef, error) {
+	return resolveProfileMetricTrap(idx, ref)
 }
+
+// ValidCategory reports whether category belongs to the profile taxonomy.
+func ValidCategory(category string) bool { return validCategories[category] }
+
+// ValidSeverity reports whether severity belongs to the profile taxonomy.
+func ValidSeverity(severity string) bool { return validSeverities[severity] }
 
 func validateFileVarbinds(fileVarbinds map[string]VarbindDef, src string) error {
 	for name, vb := range fileVarbinds {
@@ -283,7 +355,7 @@ func validateFileVarbinds(fileVarbinds map[string]VarbindDef, src string) error 
 
 // validateTrapDef checks required fields, closed-set enums, and varbind consistency.
 func validateTrapDef(td *TrapDef, fileVarbinds map[string]VarbindDef) error {
-	src := td.sourceFile
+	src := td.SourceFile
 	if src == "" {
 		src = "<unknown>"
 	}
@@ -401,7 +473,7 @@ func buildSharedVarbinds(td *TrapDef, fileVarbinds map[string]VarbindDef) map[st
 		}
 		if vb, exists := fileVarbinds[name]; exists {
 			copyVb := vb
-			copyVb.rawName = name
+			copyVb.RawName = name
 			shared[copyVb.OID] = &copyVb
 		}
 	}
@@ -438,7 +510,7 @@ func inlineVarbindDef(v map[any]any) (*VarbindDef, error) {
 		return nil, fmt.Errorf("missing required field 'type'")
 	}
 
-	vb := &VarbindDef{OID: oid, Type: typ, rawName: name}
+	vb := &VarbindDef{OID: oid, Type: typ, RawName: name}
 	if enumMap, ok := v["enum"].(map[any]any); ok {
 		vb.Enum = make(map[string]string, len(enumMap))
 		for k, val := range enumMap {

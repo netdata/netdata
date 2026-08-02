@@ -306,8 +306,6 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	profileDir := t.TempDir()
 	writeProfileYAML(t, profileDir, "invalid.yaml", "unknown_profile_key: true\n")
 	setTestDirs(t, profileDir)
-	resetProfileCacheForTest()
-	t.Cleanup(resetProfileCacheForTest)
 
 	c := newTestSNMPTrapsCollector()
 	c.Name = "local"
@@ -318,7 +316,7 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "profile_metrics.include")
 	assert.NotContains(t, err.Error(), "unknown_profile_key")
-	assert.Nil(t, CurrentProfileIndex())
+	assert.Nil(t, c.profileLease)
 	assert.Nil(t, c.listener)
 	assert.Nil(t, c.trapWriter)
 	assert.Nil(t, c.metrics)
@@ -619,6 +617,7 @@ func TestCollectorInit_JournalHostFailureRetriesFreshProvider(t *testing.T) {
 		ddsnmp.NewDeviceStore(),
 		snmptopology.NewTrapEnrichmentHandle(),
 		service,
+		currentTestCatalogManager,
 		func() string { return t.TempDir() },
 	)
 	c.Name = "journal-host-retry"
@@ -928,7 +927,6 @@ func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
 
 func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
 	setTestDirs(t, t.TempDir())
-	resetProfileCacheForTest()
 	withTestCacheDir(t)
 
 	c := newTestSNMPTrapsCollector()

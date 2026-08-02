@@ -42,14 +42,20 @@ directory `snmp.trap-profiles/` subdirectory (typically `/etc/netdata/go.d/snmp.
 Profiles are loaded **only when the first runnable SNMP trap job is created** — Netdata agents that do not receive traps
 never pay the memory footprint.
 
-Profile loading is shared across trap jobs: the first runnable job eagerly loads and validates operator profiles and the
-stock catalogue, builds a stock OID route table, and later jobs reuse the same cache. Stock profile definitions are loaded
-and validated when the first matching trap OID needs that stock file. Stock definitions load eagerly during job creation
-to build the complete metric rule catalogue when an operator profile defines metric rules or the job enables profile
-metrics. Failed eager validation is a creation-time job failure surfaced to DynCfg; a failed lazy stock load is reported
-by the matching trap and increments profile-load-failure metrics.
-Neither failure permanently poisons a later cache epoch. If all trap jobs are removed, the cache is released and the next
-trap job creation rebuilds the eager cache surfaces.
+Profile loading is shared across trap jobs created by one plugin registration. The first runnable job acquires a catalog
+lease, eagerly loads and validates every operator profile, and validates the stock file inventory against exactly one
+`catalogue.json` or `catalogue.json.zst`. The manifest supplies exact routes for trap OIDs, MIB-qualified trap names, and
+metric rule names; the runtime does not fall back to parsing every stock profile when the manifest is missing or invalid.
+
+Stock profile definitions are loaded and validated only when a matching trap OID, MIB-qualified name, or selected metric
+rule needs that file. Different stock files hydrate independently; concurrent requests for the same file coalesce. A
+failed eager validation is a creation-time job failure surfaced to DynCfg, while a failed lazy stock load is reported by
+the matching operation and cached only for the current catalog epoch. The final lease release drops the epoch, so the
+next runnable job rebuilds it from disk.
+
+Profile identity is the extensionless filename. For example, an operator `ciscosystems.yaml` replaces stock
+`ciscosystems.yaml.zst`. Identities must match `^[a-z0-9][a-z0-9_-]*$`; duplicate operator identities and invalid
+operator profiles fail the complete load.
 
 ## File layout
 
@@ -494,8 +500,8 @@ description: '{{with first (value "ifDescr") (value "ifName") (value "ifIndex")}
 ```
 
 Unknown functions, unknown varbind names, malformed templates, variables, assignments, `if`, `range`, arbitrary
-pipelines, and template inclusion actions fail profile loading. Eager operator/metric-catalogue loads surface the error at
-job creation; lazy stock errors surface on the first matching trap.
+pipelines, and template inclusion actions fail profile loading. Eager operator-profile errors surface at job creation;
+lazy stock errors surface when the first trap or enabled metric rule routes to that stock file.
 
 If `description:` is absent the plugin renders the default template `"{{trap_name}} on {{hostname}}."`.
 
@@ -617,6 +623,10 @@ By default the helper reads the bundled IANA PEN snapshot from
 current IANA registry before emission. The run also writes review artifacts under `--out-dir`: `traps.jsonl`,
 `extraction-report.json`, `conflicts.json` for duplicate trap OIDs, and `source-conflicts.json` when multiple MIB files
 define the same module name.
+
+The generated `catalogue.json` is a required runtime manifest. Each entry records the raw source filename plus its exact
+`mibs`, `trap_oids`, and, when present, `metric_rule_names`. Packaged installations may compress the manifest as
+`catalogue.json.zst`; gzip manifests are unsupported, and shipping both raw and Zstandard forms is an error.
 
 Edits to files under `default/` are overwritten on regeneration; operator modifications belong in the user override
 directory, not in stock files.

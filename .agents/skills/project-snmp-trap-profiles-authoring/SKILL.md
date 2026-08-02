@@ -214,7 +214,9 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
      reference list — never emit empty `{}` table entries;
    - drop internal pipeline metadata (`enrichment_source`,
      `enrichment_attempts`) from the YAML output;
-   - keep `catalogue.json` in sync (operator grep-before-install tool);
+   - keep `catalogue.json` in sync: each entry must route its stock file by
+     `trap_oids`, `mibs`, and `metric_rule_names` so the collector can hydrate
+     only the file needed for a lookup;
    - emit deterministic output (sorted varbind names, traps sorted by
      OID then name) so regenerations produce reviewable diffs.
 

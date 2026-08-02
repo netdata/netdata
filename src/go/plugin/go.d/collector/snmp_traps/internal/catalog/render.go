@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package catalog
 
 import (
 	"fmt"
@@ -10,10 +10,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
-const maxMessageLen = 512
+const MaxMessageLen = 512
 
 // renderMessage renders a trap description into a human-readable MESSAGE.
-func renderMessage(entry *TrapEntry, td *TrapDef) string {
+func RenderMessage(entry *TrapEntry, td *TrapDef) string {
 	tmpl := ""
 	if td != nil {
 		tmpl = td.Description
@@ -27,15 +27,15 @@ func renderMessage(entry *TrapEntry, td *TrapDef) string {
 	} else {
 		result = tmpl
 	}
-	if len(result) > maxMessageLen {
-		result = truncateUTF8(result, maxMessageLen-3) + "..."
+	if len(result) > MaxMessageLen {
+		result = TruncateUTF8(result, MaxMessageLen-3) + "..."
 	}
 	return result
 }
 
 // renderLabels renders label templates from the profile into the entry's Labels map.
 // Labels render as TRAP_TAG_<KEY_UPPERCASE> in later journal serialization.
-func renderLabels(entry *TrapEntry, td *TrapDef) map[string]string {
+func RenderLabels(entry *TrapEntry, td *TrapDef) map[string]string {
 	if len(td.Labels) == 0 {
 		return nil
 	}
@@ -50,7 +50,7 @@ func renderLabels(entry *TrapEntry, td *TrapDef) map[string]string {
 	return labels
 }
 
-func trapEntryHasUnresolvedTemplate(entry *TrapEntry) bool {
+func EntryHasUnresolvedTemplate(entry *TrapEntry) bool {
 	if entry == nil {
 		return false
 	}
@@ -94,8 +94,8 @@ func resolveSpecialVar(ref string, entry *TrapEntry) string {
 	}
 }
 
-func findVarbindDefForObservedOID(td *TrapDef, observedOID string) *VarbindDef {
-	if td == nil || observedOID == "" || td.sharedVarbinds == nil {
+func FindVarbindDefForObservedOID(td *TrapDef, observedOID string) *VarbindDef {
+	if td == nil || observedOID == "" || td.SharedVarbinds == nil {
 		return nil
 	}
 	if vb := td.varbindByOID(observedOID); vb != nil {
@@ -104,7 +104,7 @@ func findVarbindDefForObservedOID(td *TrapDef, observedOID string) *VarbindDef {
 
 	var best *VarbindDef
 	bestLen := -1
-	for oid, vb := range td.sharedVarbinds {
+	for oid, vb := range td.SharedVarbinds {
 		if vb == nil {
 			continue
 		}
@@ -131,7 +131,7 @@ func varbindDisplayValue(v VarbindValue, vb *VarbindDef) string {
 	return model.VarbindRawValue(v)
 }
 
-func truncateUTF8(s string, maxBytes int) string {
+func TruncateUTF8(s string, maxBytes int) string {
 	if len(s) <= maxBytes {
 		return s
 	}
@@ -149,15 +149,15 @@ func truncateUTF8(s string, maxBytes int) string {
 // resolve2TierVarbind is the 2-tier varbind resolution for assembling a TrapEntry.
 // 1. Profile inline varbinds table (OID → VarbindDef with name, type, enum)
 // 2. Raw fallback (OID-keyed, ASN.1-decoded type only)
-func resolve2TierVarbind(oid string, raw VarbindValue, td *TrapDef) VarbindValue {
+func ResolveVarbind(oid string, raw VarbindValue, td *TrapDef) VarbindValue {
 	if td != nil {
-		if vb := findVarbindDefForObservedOID(td, oid); vb != nil {
+		if vb := FindVarbindDefForObservedOID(td, oid); vb != nil {
 			return VarbindValue{
-				Name:  vb.rawName,
+				Name:  vb.RawName,
 				OID:   oid,
 				Type:  ASN1Type(vb.Type),
 				Value: raw.Value,
-				Enum:  resolveEnum(vb, raw.Value),
+				Enum:  ResolveEnum(vb, raw.Value),
 			}
 		}
 	}
@@ -171,7 +171,7 @@ func resolve2TierVarbind(oid string, raw VarbindValue, td *TrapDef) VarbindValue
 }
 
 // resolveEnum returns the enum label for a varbind value if applicable.
-func resolveEnum(vb *VarbindDef, val any) string {
+func ResolveEnum(vb *VarbindDef, val any) string {
 	if vb == nil || len(vb.Enum) == 0 {
 		return ""
 	}

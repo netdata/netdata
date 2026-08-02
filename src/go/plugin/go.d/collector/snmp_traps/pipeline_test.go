@@ -19,18 +19,25 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
+var currentTestProfileIndex *ProfileIndex
+
 func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) {
 	t.Helper()
 	for _, trap := range traps {
-		if err := compileTrapTemplates(trap, nil); err != nil {
+		if err := prepareTrapDefinition(trap); err != nil {
 			t.Fatalf("compile test trap templates: %v", err)
 		}
-		trap.sharedVarbinds = buildSharedVarbinds(trap, nil)
 	}
-	// Test-only shortcut: direct packet-path tests do not run Collector.Init(),
-	// so they seed the immutable shared index without touching refcounts.
-	globalProfileCache.current.Store(&ProfileIndex{trapsByOID: traps})
-	t.Cleanup(func() { globalProfileCache.current.Store(nil) })
+	idx := newProfileIndex()
+	trapDefs := make([]*TrapDef, 0, len(traps))
+	for _, trap := range traps {
+		trapDefs = append(trapDefs, trap)
+	}
+	if err := idx.AddTraps(trapDefs); err != nil {
+		t.Fatalf("build test profile index: %v", err)
+	}
+	currentTestProfileIndex = idx
+	t.Cleanup(func() { currentTestProfileIndex = nil })
 }
 
 func assertSeverityCounters(t *testing.T, metrics *perJobMetrics, want map[string]uint64) {

@@ -136,12 +136,14 @@ Job overrides use static label values. Profile-file labels can also use template
 
 ## Profile loading behavior
 
-- Profiles are immutable while any listener job uses the shared profile cache.
-- After changing operator or stock profiles, restart the Agent or recreate all listener jobs. The final release unloads the
-  cache, and the next job creation loads operator profiles and the stock catalogue.
-- Operator profiles and the stock catalogue are validated at job creation. Stock vendor YAML is loaded and validated on
-  the first matching trap, or eagerly to build the complete metric rule catalogue when an operator profile defines metric
-  rules or the job enables profile metrics.
+- Profiles are immutable while any listener job holds a lease on the shared catalog epoch.
+- After changing operator or stock profiles, restart the Agent or recreate all listener jobs. The final lease release
+  unloads the epoch, and the next job creation loads operator profiles and the stock manifest.
+- Operator profiles, exactly one stock manifest (`catalogue.json` or `catalogue.json.zst`), and its profile inventory are
+  validated at job creation. Gzip manifests and raw-plus-Zstandard duplicates are rejected; there is no parse-all
+  fallback.
+- Stock vendor YAML is loaded and validated only when selected by an exact trap OID, a MIB-qualified trap name, or an
+  enabled metric rule. The manifest routes each lookup without loading the complete stock pack.
 - Invalid eager profiles fail listener job creation. An invalid lazily loaded stock profile increments profile-load-failure
   metrics when a matching trap first needs that file.
 
@@ -165,10 +167,12 @@ Profiles can define optional trap-to-metric rules and chart definitions. Listene
 Profile metrics are disabled by default, and the current stock pack does not ship metric rules. To create profile-derived charts today:
 
 1. Add `metrics:` and `charts:` rules to an operator profile file under `/etc/netdata/go.d/snmp.trap-profiles/`.
-2. Restart the Agent or recreate all listener jobs so the profile cache is rebuilt.
+2. Restart the Agent or recreate all listener jobs so the catalog epoch is rebuilt.
 3. Enable `profile_metrics` in the listener job and select the loaded rule names.
 
-Rule names in `include` come from metric rule `name` fields in loaded profile YAML files. If no loaded profile defines the selected rules, listener job creation fails validation.
+Rule names in `include` come from metric rule `name` fields in profile YAML files. The stock manifest routes selected names
+to their owning files; unrelated stock files remain unloaded. If no operator or stock profile defines a selected rule,
+listener job creation fails validation.
 
 The listener-side `profile_metrics` settings are documented in [Configuration](/docs/npm/snmp-traps/configuration.md#profile-metrics). Rule and chart syntax live in [SNMP Trap Profile Format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md).
 

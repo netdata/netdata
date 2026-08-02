@@ -1,0 +1,779 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package catalog
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"maps"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+
+	"gopkg.in/yaml.v2"
+
+	"github.com/klauspost/compress/zstd"
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
+)
+
+const maxProfileExtendsDepth = 32
+
+var maxProfileFileBytes int64 = 128 * 1024 * 1024
+
+var profileIdentityRE = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+
+type profileSource struct {
+	path   string
+	stock  bool
+	bundle *profileLoadBundle
+}
+
+func loadEpoch(paths Paths) (*Epoch, error) {
+	if strings.TrimSpace(paths.StockDir) == "" {
+		return nil, errors.New("stock trap profiles directory is not configured")
+	}
+
+	allDirs := append([]string(nil), paths.UserDirs...)
+	allDirs = append(allDirs, paths.StockDir)
+	extendsPaths := multipath.New(allDirs...)
+	specs := make([]profilecatalog.DirSpec, 0, len(allDirs))
+	for _, dir := range paths.UserDirs {
+		specs = append(specs, profilecatalog.DirSpec{Path: dir})
+	}
+	specs = append(specs, profilecatalog.DirSpec{Path: paths.StockDir, IsStock: true})
+
+	sources, err := profilecatalog.Load(specs, profilecatalog.Options[profileSource]{
+		LoadFile: func(ctx profilecatalog.FileContext) (profileSource, error) {
+			source := profileSource{path: ctx.Path, stock: ctx.IsStock}
+			if ctx.IsStock {
+				return source, nil
+			}
+			bundle, err := loadProfileBundle(ctx.Path, extendsPaths, nil)
+			if err != nil {
+				return profileSource{}, err
+			}
+			source.bundle = &bundle
+			return source, nil
+		},
+		ParseFileName: parseProfileFileName,
+		ValidName:     profileIdentityRE.MatchString,
+		UserErrors:    profilecatalog.FailInvalidUser,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("load trap profile files: %w", err)
+	}
+
+	index := &Epoch{
+		trapsByOID:        make(map[string]*TrapDef),
+		namesByTrapName:   make(map[string]*TrapDef),
+		metricRulesByName: make(map[string]*profileMetricRule),
+		metricChartsByID:  make(map[string]*profileMetricChart),
+	}
+	var userBundles []profileLoadBundle
+	for _, named := range sources.InOrder() {
+		source := named.Profile
+		index.profiles = append(index.profiles, ProfileInfo{Name: named.Name, Path: source.path, IsStock: source.stock})
+		if source.stock {
+			continue
+		}
+		if source.bundle == nil {
+			return nil, fmt.Errorf("user trap profile %q was not validated", source.path)
+		}
+		if err := index.addTraps(source.bundle.traps); err != nil {
+			return nil, err
+		}
+		userBundles = append(userBundles, *source.bundle)
+	}
+	slices.SortFunc(index.profiles, func(a, b ProfileInfo) int { return strings.Compare(a.Name, b.Name) })
+
+	store, err := buildStockProfileStore(paths.StockDir, extendsPaths, sources, index)
+	if err != nil {
+		return nil, err
+	}
+	index.stock = store
+	for _, bundle := range userBundles {
+		if err := index.addProfileMetrics(bundle.metrics, bundle.charts); err != nil {
+			return nil, err
+		}
+	}
+	if len(index.trapsByOID) == 0 && store.empty() {
+		return nil, fmt.Errorf("no trap profiles found in %v", allDirs)
+	}
+	return index, nil
+}
+
+func (idx *Epoch) addTraps(traps []*TrapDef) error {
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+	return idx.addTrapsLocked(traps)
+}
+
+func (idx *Epoch) addBundleAtomic(bundle profileLoadBundle) error {
+	idx.publishMu.Lock()
+	defer idx.publishMu.Unlock()
+
+	idx.mu.RLock()
+	staged := &Epoch{
+		trapsByOID:        maps.Clone(idx.trapsByOID),
+		namesByTrapName:   maps.Clone(idx.namesByTrapName),
+		metricRulesByName: maps.Clone(idx.metricRulesByName),
+		metricChartsByID:  maps.Clone(idx.metricChartsByID),
+	}
+	idx.mu.RUnlock()
+
+	if err := staged.addTraps(bundle.traps); err != nil {
+		return err
+	}
+	if err := staged.addProfileMetrics(bundle.metrics, bundle.charts); err != nil {
+		return err
+	}
+
+	idx.mu.Lock()
+	idx.trapsByOID = staged.trapsByOID
+	idx.namesByTrapName = staged.namesByTrapName
+	idx.metricRulesByName = staged.metricRulesByName
+	idx.metricChartsByID = staged.metricChartsByID
+	idx.mu.Unlock()
+	return nil
+}
+
+func (idx *Epoch) addTrapsLocked(traps []*TrapDef) error {
+	if idx.trapsByOID == nil {
+		idx.trapsByOID = make(map[string]*TrapDef, len(traps))
+	}
+	if idx.namesByTrapName == nil {
+		idx.namesByTrapName = make(map[string]*TrapDef, len(traps))
+	}
+	seenOIDs := make(map[string]string, len(traps))
+	seenNames := make(map[string]string, len(traps))
+	for _, td := range traps {
+		if existing, ok := idx.trapsByOID[td.OID]; ok {
+			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.SourceFile, td.OID, existing.SourceFile)
+		}
+		if existing, ok := idx.namesByTrapName[td.Name]; ok {
+			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.SourceFile, td.Name, existing.SourceFile)
+		}
+		if existing := seenOIDs[td.OID]; existing != "" {
+			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.SourceFile, td.OID, existing)
+		}
+		if existing := seenNames[td.Name]; existing != "" {
+			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.SourceFile, td.Name, existing)
+		}
+		seenOIDs[td.OID] = td.SourceFile
+		seenNames[td.Name] = td.SourceFile
+	}
+	for _, td := range traps {
+		idx.trapsByOID[td.OID] = td
+		idx.namesByTrapName[td.Name] = td
+	}
+	return nil
+}
+
+func (idx *Epoch) addProfileMetrics(rules []profileMetricRule, charts []profileMetricChart) error {
+	if len(rules) == 0 && len(charts) == 0 {
+		return nil
+	}
+	if idx == nil {
+		return fmt.Errorf("profile index not available")
+	}
+
+	idx.mu.RLock()
+	knownCharts := make(map[string]*profileMetricChart, len(idx.metricChartsByID)+len(charts))
+	maps.Copy(knownCharts, idx.metricChartsByID)
+	knownRules := make(map[string]*profileMetricRule, len(idx.metricRulesByName)+len(rules))
+	maps.Copy(knownRules, idx.metricRulesByName)
+	idx.mu.RUnlock()
+	knownOutputMetrics := make(map[string]string, len(knownRules)+len(rules))
+	for name, rule := range knownRules {
+		if rule == nil || rule.Output.Metric == "" {
+			continue
+		}
+		knownOutputMetrics[rule.Output.Metric] = fmt.Sprintf("rule %q in %s", name, rule.SourceFile)
+	}
+
+	newCharts := make([]profileMetricChart, len(charts))
+	for i := range charts {
+		chart := charts[i]
+		if err := normalizeProfileMetricChart(&chart); err != nil {
+			return fmt.Errorf("%s: metric chart: %w", chart.SourceFile, err)
+		}
+		if existing := knownCharts[chart.ID]; existing != nil {
+			return fmt.Errorf("%s: duplicate metric chart %q (already defined in %s)", chart.SourceFile, chart.ID, existing.SourceFile)
+		}
+		newCharts[i] = chart
+		knownCharts[chart.ID] = &newCharts[i]
+	}
+
+	newRules := make([]profileMetricRule, len(rules))
+	for i := range rules {
+		rule := rules[i]
+		if existing := knownRules[rule.Name]; existing != nil {
+			return fmt.Errorf("%s: duplicate metric rule %q (already defined in %s)", rule.SourceFile, rule.Name, existing.SourceFile)
+		}
+		if err := validateProfileMetricRule(&rule, idx, knownCharts); err != nil {
+			return err
+		}
+		if existing := knownOutputMetrics[rule.Output.Metric]; existing != "" {
+			return fmt.Errorf("%s: metric rule %q output.metric %q already used by %s", rule.SourceFile, rule.Name, rule.Output.Metric, existing)
+		}
+		newRules[i] = rule
+		knownRules[rule.Name] = &newRules[i]
+		knownOutputMetrics[rule.Output.Metric] = fmt.Sprintf("rule %q in %s", rule.Name, rule.SourceFile)
+	}
+	if err := validateProfileMetricChartRuleShapes(knownRules); err != nil {
+		return err
+	}
+
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+	if idx.metricRulesByName == nil {
+		idx.metricRulesByName = make(map[string]*profileMetricRule, len(rules))
+	}
+	if idx.metricChartsByID == nil {
+		idx.metricChartsByID = make(map[string]*profileMetricChart, len(charts))
+	}
+	for i := range newCharts {
+		chart := newCharts[i]
+		idx.metricChartsByID[chart.ID] = &newCharts[i]
+	}
+	for i := range newRules {
+		rule := newRules[i]
+		idx.metricRulesByName[rule.Name] = &newRules[i]
+	}
+	return nil
+}
+
+func validateProfileMetricChartRuleShapes(rules map[string]*profileMetricRule) error {
+	type chartRuleShape struct {
+		ruleName      string
+		SourceFile    string
+		usesResource  bool
+		resourceClass string
+	}
+	names := make([]string, 0, len(rules))
+	for name := range rules {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	shapes := make(map[string]chartRuleShape)
+	for _, name := range names {
+		rule := rules[name]
+		if rule == nil {
+			continue
+		}
+		shape := chartRuleShape{
+			ruleName:     rule.Name,
+			SourceFile:   rule.SourceFile,
+			usesResource: rule.Identity.Resource != nil,
+		}
+		if rule.Identity.Resource != nil {
+			shape.resourceClass = rule.Identity.Resource.Class
+		}
+		existing, ok := shapes[rule.Output.Chart]
+		if !ok {
+			shapes[rule.Output.Chart] = shape
+		} else if existing.usesResource != shape.usesResource {
+			return fmt.Errorf("%s: metric rule %q chart %q mixes resource and non-resource rules (already used by rule %q in %s)",
+				rule.SourceFile, rule.Name, rule.Output.Chart, existing.ruleName, existing.SourceFile)
+		} else if shape.usesResource && existing.resourceClass != shape.resourceClass {
+			return fmt.Errorf("%s: metric rule %q chart %q mixes resource classes %q and %q (already used by rule %q in %s)",
+				rule.SourceFile, rule.Name, rule.Output.Chart, existing.resourceClass, shape.resourceClass, existing.ruleName, existing.SourceFile)
+		}
+	}
+	return nil
+}
+
+type profileLoadBundle struct {
+	traps    []*TrapDef
+	varbinds map[string]VarbindDef
+	metrics  []profileMetricRule
+	charts   []profileMetricChart
+}
+
+// Bundle is one fully resolved and statically validated profile file. It is a
+// temporary bridge for the root metric runtime until that runtime moves into
+// this package.
+type Bundle struct {
+	Traps   []*TrapDef
+	Metrics []MetricRule
+	Charts  []MetricChart
+}
+
+// LoadProfileFile resolves and validates one profile against explicit search
+// directories.
+func LoadProfileFile(filename string, searchDirs []string) (Bundle, error) {
+	bundle, err := loadProfileBundle(filename, multipath.New(searchDirs...), nil)
+	if err != nil {
+		return Bundle{}, err
+	}
+	return Bundle{Traps: bundle.traps, Metrics: bundle.metrics, Charts: bundle.charts}, nil
+}
+
+// loadProfile loads a single profile YAML and returns its validated trap definitions.
+// Returns traps, loaded file-level varbinds, and error.
+func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []string) ([]*TrapDef, map[string]VarbindDef, error) {
+	bundle, err := loadProfileBundle(filename, extendsPaths, stack)
+	if err != nil {
+		return nil, nil, err
+	}
+	return bundle.traps, bundle.varbinds, nil
+}
+
+func loadProfileBundle(filename string, extendsPaths multipath.MultiPath, stack []string) (profileLoadBundle, error) {
+	if len(stack) > maxProfileExtendsDepth {
+		return profileLoadBundle{}, fmt.Errorf("%s: profile extends depth exceeds maximum %d", filename, maxProfileExtendsDepth)
+	}
+	content, err := readProfileFile(filename)
+	if err != nil {
+		return profileLoadBundle{}, err
+	}
+
+	var def ProfileDefinition
+	if err := unmarshalProfileYAML(content, &def); err != nil {
+		return profileLoadBundle{}, err
+	}
+
+	// resolve extends chain
+	var allTraps []*TrapDef
+	var allMetrics []profileMetricRule
+	var allCharts []profileMetricChart
+	fileVarbinds := cloneVarbindMap(def.Varbinds)
+	currentVarbinds := make(map[string]bool, len(def.Varbinds))
+	for name := range def.Varbinds {
+		currentVarbinds[name] = true
+	}
+
+	currentTrapOIDs := make(map[string]bool, len(def.Traps))
+	for _, td := range def.Traps {
+		if td.OID == "" {
+			continue
+		}
+		if currentTrapOIDs[td.OID] {
+			return profileLoadBundle{}, fmt.Errorf("%s: duplicate trap OID %s in profile", filename, td.OID)
+		}
+		currentTrapOIDs[td.OID] = true
+	}
+	baseByOID := make(map[string]*TrapDef)
+	allTrapPos := make(map[string]int)
+	allMetricPos := make(map[string]int)
+	allChartPos := make(map[string]int)
+
+	currentMetricNames := make(map[string]bool, len(def.Metrics))
+	for _, metric := range def.Metrics {
+		if metric.Name == "" {
+			continue
+		}
+		if currentMetricNames[metric.Name] {
+			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric rule %s in profile", filename, metric.Name)
+		}
+		currentMetricNames[metric.Name] = true
+	}
+	currentChartIDs := make(map[string]bool, len(def.Charts))
+	for _, chart := range def.Charts {
+		if chart.ID == "" {
+			continue
+		}
+		if currentChartIDs[chart.ID] {
+			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric chart %s in profile", filename, chart.ID)
+		}
+		currentChartIDs[chart.ID] = true
+	}
+
+	if len(def.Extends) > 0 {
+		for _, extName := range def.Extends {
+			if err := validateExtendsName(extName); err != nil {
+				return profileLoadBundle{}, fmt.Errorf("%s: invalid extends entry %q: %w", filename, extName, err)
+			}
+			if stacksContains(stack, extName) {
+				return profileLoadBundle{}, fmt.Errorf("%s: circular extends detected: %q", filename, extName)
+			}
+			extPath, err := findProfileExtends(extendsPaths, extName)
+			if err != nil {
+				return profileLoadBundle{}, fmt.Errorf("%s: cannot find extension %q: %v", filename, extName, err)
+			}
+			base, err := loadProfileBundle(extPath, extendsPaths, append(stack, extName))
+			if err != nil {
+				return profileLoadBundle{}, err
+			}
+			for _, bt := range base.traps {
+				baseByOID[bt.OID] = bt
+				if currentTrapOIDs[bt.OID] {
+					continue
+				}
+				if pos, ok := allTrapPos[bt.OID]; ok {
+					allTraps[pos] = bt
+				} else {
+					allTrapPos[bt.OID] = len(allTraps)
+					allTraps = append(allTraps, bt)
+				}
+			}
+			mergeProfileMetricRules(&allMetrics, allMetricPos, base.metrics, currentMetricNames)
+			mergeProfileMetricCharts(&allCharts, allChartPos, base.charts, currentChartIDs)
+			mergeBaseVarbinds(fileVarbinds, base.varbinds, currentVarbinds)
+		}
+	}
+
+	absFile, _ := filepath.Abs(filename)
+	if err := validateFileVarbinds(fileVarbinds, absFile); err != nil {
+		return profileLoadBundle{}, err
+	}
+
+	for i := range def.Traps {
+		td := &def.Traps[i]
+		td.SourceFile = absFile
+		if base := baseByOID[td.OID]; base != nil {
+			mergeTrapDef(td, base)
+		}
+
+		if err := validateTrapDef(td, fileVarbinds); err != nil {
+			return profileLoadBundle{}, err
+		}
+
+		td.SharedVarbinds = buildSharedVarbinds(td, fileVarbinds)
+	}
+
+	for i := range def.Traps {
+		allTraps = append(allTraps, &def.Traps[i])
+	}
+
+	for i := range def.Metrics {
+		rule := &def.Metrics[i]
+		rule.SourceFile = absFile
+		if err := normalizeProfileMetricRule(rule); err != nil {
+			return profileLoadBundle{}, fmt.Errorf("%s: metric rule: %w", absFile, err)
+		}
+		allMetrics = append(allMetrics, *rule)
+	}
+	for i := range def.Charts {
+		chart := &def.Charts[i]
+		chart.SourceFile = absFile
+		mergeProfileMetricCharts(&allCharts, allChartPos, []profileMetricChart{*chart}, nil)
+	}
+
+	return profileLoadBundle{
+		traps:    allTraps,
+		varbinds: fileVarbinds,
+		metrics:  allMetrics,
+		charts:   allCharts,
+	}, nil
+}
+
+func readProfileFile(filename string) ([]byte, error) {
+	return readCompressedFile(filename)
+}
+
+func readCatalogueFile(filename string) ([]byte, error) {
+	return readCompressedFile(filename)
+}
+
+func readCompressedFile(filename string) ([]byte, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var r io.Reader = file
+	var zr *zstd.Decoder
+	if strings.HasSuffix(filename, ".zst") {
+		zr, err = zstd.NewReader(file)
+		if err != nil {
+			return nil, err
+		}
+		defer zr.Close()
+		r = zr
+	}
+
+	lr := io.LimitReader(r, maxProfileFileBytes+1)
+	data, err := io.ReadAll(lr)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxProfileFileBytes {
+		return nil, fmt.Errorf("profile file %q exceeds maximum decompressed size %d bytes", filename, maxProfileFileBytes)
+	}
+	return data, nil
+}
+
+func findProfileExtends(paths multipath.MultiPath, name string) (string, error) {
+	if !profilePathIsSupported(name) {
+		return "", fmt.Errorf("unsupported profile filename %q", name)
+	}
+	var lastErr error
+	for _, candidate := range profilePathCandidates(name) {
+		path, err := paths.Find(candidate)
+		if err == nil {
+			return path, nil
+		}
+		lastErr = err
+	}
+	return "", lastErr
+}
+
+func isProfileFileName(name string) bool {
+	_, ok := parseProfileFileName(name)
+	return ok
+}
+
+func parseProfileFileName(name string) (string, bool) {
+	for _, suffix := range []string{".yaml.zst", ".yml.zst", ".yaml", ".yml"} {
+		if strings.HasSuffix(name, suffix) {
+			return strings.TrimSuffix(name, suffix), true
+		}
+	}
+	return "", false
+}
+
+func profilePathCandidates(name string) []string {
+	if strings.HasSuffix(name, ".zst") {
+		return []string{name}
+	}
+	return []string{name, name + ".zst"}
+}
+
+func profilePathIsSupported(name string) bool {
+	_, ok := parseProfileFileName(name)
+	return ok
+}
+
+func validateExtendsName(name string) error {
+	if name == "" {
+		return fmt.Errorf("empty filename")
+	}
+	if filepath.Base(name) != name || strings.ContainsRune(name, '\\') {
+		return fmt.Errorf("must be a profile filename, not a path")
+	}
+	if name == "." || name == ".." {
+		return fmt.Errorf("must be a profile filename, not a path")
+	}
+	if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+		return fmt.Errorf("must end with .yaml or .yml")
+	}
+	return nil
+}
+
+func mergeTrapDef(target *TrapDef, base *TrapDef) {
+	if target.Name == "" {
+		target.Name = base.Name
+	}
+	if target.Category == "" {
+		target.Category = base.Category
+	}
+	if target.Severity == "" {
+		target.Severity = base.Severity
+	}
+	if target.Description == "" {
+		target.Description = base.Description
+	}
+	if target.Status == "" {
+		target.Status = base.Status
+	}
+	if target.VarbindRefs == nil {
+		target.VarbindRefs = cloneAnySlice(base.VarbindRefs)
+	}
+	if target.Labels == nil {
+		target.Labels = cloneStringMap(base.Labels)
+	} else {
+		target.Labels = mergeStringMaps(base.Labels, target.Labels)
+	}
+	if target.DedupKeyVarbinds == nil {
+		target.DedupKeyVarbinds = append([]string(nil), base.DedupKeyVarbinds...)
+	}
+}
+
+func mergeBaseVarbinds(target, base map[string]VarbindDef, protected map[string]bool) {
+	for name, vb := range base {
+		if !protected[name] {
+			target[name] = vb
+		}
+	}
+}
+
+func mergeProfileMetricRules(target *[]profileMetricRule, positions map[string]int, base []profileMetricRule, protected map[string]bool) {
+	for _, rule := range base {
+		if protected != nil && protected[rule.Name] {
+			continue
+		}
+		if pos, ok := positions[rule.Name]; ok {
+			(*target)[pos] = rule
+			continue
+		}
+		positions[rule.Name] = len(*target)
+		*target = append(*target, rule)
+	}
+}
+
+func mergeProfileMetricCharts(target *[]profileMetricChart, positions map[string]int, base []profileMetricChart, protected map[string]bool) {
+	for _, chart := range base {
+		if protected != nil && protected[chart.ID] {
+			continue
+		}
+		if pos, ok := positions[chart.ID]; ok {
+			(*target)[pos] = chart
+			continue
+		}
+		positions[chart.ID] = len(*target)
+		*target = append(*target, chart)
+	}
+}
+
+func cloneVarbindMap(src map[string]VarbindDef) map[string]VarbindDef {
+	dst := make(map[string]VarbindDef, len(src))
+	maps.Copy(dst, src)
+	return dst
+}
+
+func cloneAnySlice(src []any) []any {
+	if src == nil {
+		return nil
+	}
+	return append([]any(nil), src...)
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	maps.Copy(dst, src)
+	return dst
+}
+
+func mergeStringMaps(base, override map[string]string) map[string]string {
+	dst := cloneStringMap(base)
+	maps.Copy(dst, override)
+	return dst
+}
+
+func stacksContains(stack []string, name string) bool {
+	return slices.Contains(stack, name)
+}
+
+type yamlKeySpec struct {
+	children map[string]yamlKeySpec
+	elem     *yamlKeySpec
+	allowAny bool
+}
+
+func rejectUnknownYAMLKeys(node any, spec yamlKeySpec, path string) error {
+	if spec.allowAny || node == nil {
+		return nil
+	}
+
+	switch v := node.(type) {
+	case map[any]any:
+		if spec.children == nil {
+			return nil
+		}
+		for rawKey, rawValue := range v {
+			key, ok := rawKey.(string)
+			if !ok {
+				return fmt.Errorf("%s: config key %v is not a string", path, rawKey)
+			}
+			child, ok := spec.children[key]
+			if !ok {
+				return fmt.Errorf("%s: unknown config key %q", path, key)
+			}
+			childPath := path + "." + key
+			if err := rejectUnknownYAMLKeys(rawValue, child, childPath); err != nil {
+				return err
+			}
+		}
+	case []any:
+		if spec.elem == nil {
+			return nil
+		}
+		for i, item := range v {
+			itemPath := fmt.Sprintf("%s[%d]", path, i)
+			if err := rejectUnknownYAMLKeys(item, *spec.elem, itemPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+var (
+	profileMetricResourceYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"class":            {},
+		"key_from_varbind": {},
+		"max_per_source":   {},
+	}}
+
+	profileMetricPredicateYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"varbind": {}, "field": {}, "equals": {}, "in": {}, "exists": {}, "absent": {}, "greater_than": {},
+		"less_than": {}, "range": {}, "not": {},
+	}}
+
+	charttplDimensionLifecycleYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"max_dims":            {},
+		"expire_after_cycles": {},
+	}}
+
+	charttplLifecycleYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"max_instances":       {},
+		"expire_after_cycles": {},
+		"dimensions":          charttplDimensionLifecycleYAMLSpec,
+	}}
+
+	profileMetricRuleYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"name":               {},
+		"type":               {},
+		"enabled":            {},
+		"on_trap":            {},
+		"problem_trap":       {},
+		"clear_trap":         {},
+		"where":              {elem: &profileMetricPredicateYAMLSpec},
+		"identity":           {children: map[string]yamlKeySpec{"device": {}, "resource": profileMetricResourceYAMLSpec}},
+		"output":             {children: map[string]yamlKeySpec{"metric": {}, "dimension": {}, "chart": {}}},
+		"state":              {children: map[string]yamlKeySpec{"set_when": profileMetricPredicateYAMLSpec, "clear_when": profileMetricPredicateYAMLSpec, "problem_value": {}, "clear_value": {}, "ttl": {}}},
+		"scale":              {children: map[string]yamlKeySpec{"multiplier": {}, "divisor": {}}},
+		"missing":            {},
+		"value_from_varbind": {},
+	}}
+
+	profileMetricChartYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"id":          {},
+		"title":       {},
+		"family":      {},
+		"context":     {},
+		"units":       {},
+		"algorithm":   {},
+		"type":        {},
+		"description": {},
+		"lifecycle":   charttplLifecycleYAMLSpec,
+	}}
+
+	profileYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"vendor":     {},
+		"mib_count":  {},
+		"trap_count": {},
+		"extends":    {},
+		"varbinds":   {allowAny: true},
+		"traps":      {allowAny: true},
+		"metrics":    {elem: &profileMetricRuleYAMLSpec},
+		"charts":     {elem: &profileMetricChartYAMLSpec},
+	}}
+)
+
+func unmarshalProfileYAML(content []byte, def *ProfileDefinition) (err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			err = fmt.Errorf("panic parsing profile YAML: %v", v)
+		}
+	}()
+	var raw any
+	if err := yaml.Unmarshal(content, &raw); err != nil {
+		return err
+	}
+	if err := rejectUnknownYAMLKeys(raw, profileYAMLSpec, "profile"); err != nil {
+		return err
+	}
+	return yaml.Unmarshal(content, def)
+}

@@ -471,7 +471,7 @@
       },
       "profile_metrics": {
         "title": "Profile metrics",
-        "description": "Enable selected trap-to-metric rules defined by loaded SNMP trap profiles. Profile rules define the trap OID, filters, metric name, chart, source identity, and resource identity.",
+        "description": "Enable selected trap-to-metric rules defined by SNMP trap profiles. Rule names are resolved through the immutable profile catalog; only the required stock profile files are loaded.",
         "type": "object",
         "default": {
           "enabled": false
@@ -486,7 +486,7 @@
           },
           "include": {
             "title": "Included rules",
-            "description": "Profile metric rule names to enable. At least one rule is required when profile metrics are enabled.",
+            "description": "Profile metric rule names to resolve through the profile catalog and enable. At least one rule is required when profile metrics are enabled.",
             "type": ["array", "null"],
             "default": [],
             "items": {

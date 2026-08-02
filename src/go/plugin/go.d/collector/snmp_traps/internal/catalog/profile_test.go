@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package catalog
 
 import (
 	"bufio"
 	"compress/gzip"
-	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/klauspost/compress/zstd"
@@ -22,269 +24,139 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// =============================================================================
-// Profile cache lifecycle tests
-// =============================================================================
+var (
+	testProfileManager *Manager
+	testProfileLeases  []*Lease
+)
 
-func TestProfileCacheLazyLoad(t *testing.T) {
-	setMinimalProfileDir(t)
+func TestManagerSharesOneEpochUntilFinalRelease(t *testing.T) {
+	stockDir := writeTestStockCatalog(t)
+	manager := NewManager(Paths{StockDir: stockDir})
 
-	idx, err := AcquireProfileCache()
+	first, err := manager.Acquire()
 	require.NoError(t, err)
-	assert.NotNil(t, idx)
+	second, err := manager.Acquire()
+	require.NoError(t, err)
+	assert.Same(t, first.Epoch(), second.Epoch())
 
-	td := idx.Lookup("1.3.6.1.6.3.1.1.5.1")
-	if td != nil {
-		assert.Equal(t, "state_change", td.Category)
+	first.Close()
+	first.Close()
+	third, err := manager.Acquire()
+	require.NoError(t, err)
+	assert.Same(t, second.Epoch(), third.Epoch())
+
+	second.Close()
+	oldEpoch := third.Epoch()
+	third.Close()
+	fourth, err := manager.Acquire()
+	require.NoError(t, err)
+	t.Cleanup(fourth.Close)
+	assert.NotSame(t, oldEpoch, fourth.Epoch())
+}
+
+func TestManagerConcurrentAcquireSharesOneEpoch(t *testing.T) {
+	manager := NewManager(Paths{StockDir: writeTestStockCatalog(t)})
+	leases := make([]*Lease, 32)
+	errs := make([]error, len(leases))
+	var wg sync.WaitGroup
+	for i := range leases {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			leases[i], errs[i] = manager.Acquire()
+		}()
 	}
-
-	ReleaseProfileCache()
-	assert.Nil(t, CurrentProfileIndex(), "profile cache should unload after last release")
-
-	idx2, err := AcquireProfileCache()
-	require.NoError(t, err)
-	assert.NotNil(t, idx2)
-	assert.NotNil(t, CurrentProfileIndex())
-	ReleaseProfileCache()
-	assert.Nil(t, CurrentProfileIndex())
+	wg.Wait()
+	for i, err := range errs {
+		require.NoError(t, err)
+		assert.Same(t, leases[0].Epoch(), leases[i].Epoch())
+	}
+	for _, lease := range leases {
+		lease.Close()
+	}
 }
 
-func TestProfileCacheSharedAcrossCollectors(t *testing.T) {
-	setMinimalProfileDir(t)
+func TestManagerRetriesLoadAfterFailure(t *testing.T) {
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
+	manager := NewManager(Paths{StockDir: stockDir})
 
-	idx1, err1 := AcquireProfileCache()
-	require.NoError(t, err1)
-
-	idx2, err2 := AcquireProfileCache()
-	require.NoError(t, err2)
-
-	assert.Same(t, idx1, idx2, "second acquire should return the same index")
-
-	ReleaseProfileCache()
-	assert.NotNil(t, CurrentProfileIndex(), "cache should stay loaded while one reference remains")
-
-	idx3, err3 := AcquireProfileCache()
-	require.NoError(t, err3)
-	assert.Same(t, idx1, idx3)
-
-	ReleaseProfileCache()
-	assert.NotNil(t, CurrentProfileIndex(), "cache should stay loaded while one reference remains")
-	ReleaseProfileCache()
-	assert.Nil(t, CurrentProfileIndex(), "cache should unload after last reference")
-}
-
-func TestProfileCacheReleaseIdempotent(t *testing.T) {
-	setMinimalProfileDir(t)
-
-	_, err := AcquireProfileCache()
-	require.NoError(t, err)
-
-	ReleaseProfileCache()
-	ReleaseProfileCache()
-	ReleaseProfileCache()
-	assert.Nil(t, CurrentProfileIndex())
-}
-
-func TestProfileCacheUsesOneIndexForActiveJobEpoch(t *testing.T) {
-	dir := t.TempDir()
-	writeProfileYAML(t, dir, "test.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: warning
-`)
-	setTestDirs(t, dir)
-	resetProfileCacheForTest()
-
-	first, err := AcquireProfileCache()
-	require.NoError(t, err)
-
-	writeProfileYAML(t, dir, "test.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.4
-    name: IF-MIB::linkUp
-    category: state_change
-    severity: notice
-`)
-
-	second, err := AcquireProfileCache()
-	require.NoError(t, err)
-	assert.Same(t, first, second)
-	assert.NotNil(t, second.Lookup("1.3.6.1.6.3.1.1.5.3"))
-	assert.Nil(t, second.Lookup("1.3.6.1.6.3.1.1.5.4"))
-
-	ReleaseProfileCache()
-	assert.Same(t, first, CurrentProfileIndex())
-	ReleaseProfileCache()
-	assert.Nil(t, CurrentProfileIndex())
-
-	third, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
-	assert.NotSame(t, first, third)
-	assert.Nil(t, third.Lookup("1.3.6.1.6.3.1.1.5.3"))
-	assert.NotNil(t, third.Lookup("1.3.6.1.6.3.1.1.5.4"))
-}
-
-func TestProfileCacheRetriesInvalidDiskChangeAfterEpoch(t *testing.T) {
-	dir := t.TempDir()
-	writeProfileYAML(t, dir, "test.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: warning
-`)
-	setTestDirs(t, dir)
-	resetProfileCacheForTest()
-
-	active, err := AcquireProfileCache()
-	require.NoError(t, err)
-
-	writeProfileYAML(t, dir, "test.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.4
-    name: IF-MIB::linkUp
-    category: invalid
-    severity: notice
-`)
-	shared, err := AcquireProfileCache()
-	require.NoError(t, err)
-	assert.Same(t, active, shared)
-	ReleaseProfileCache()
-	ReleaseProfileCache()
-
-	_, err = AcquireProfileCache()
-	require.ErrorContains(t, err, "invalid category")
-	assert.Nil(t, CurrentProfileIndex())
-
-	writeProfileYAML(t, dir, "test.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.4
-    name: IF-MIB::linkUp
-    category: state_change
-    severity: notice
-`)
-	recovered, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
-	assert.NotNil(t, recovered.Lookup("1.3.6.1.6.3.1.1.5.4"))
-}
-
-func TestCollectorInitAcquiresProfileCache(t *testing.T) {
-	setMinimalProfileDir(t)
-	withTestCacheDir(t)
-
-	port := freeUDPPort(t)
-
-	c := newTestSNMPTrapsCollector()
-	c.Name = "local"
-	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
-
-	err := c.Init(context.Background())
-	require.NoError(t, err)
-	assert.NotNil(t, CurrentProfileIndex())
-
-	c.Cleanup(context.Background())
-	assert.Nil(t, CurrentProfileIndex())
-}
-
-func TestMultipleCollectorsShareSameCache(t *testing.T) {
-	setMinimalProfileDir(t)
-	withTestCacheDir(t)
-
-	port1 := freeUDPPort(t)
-	port2 := freeUDPPort(t)
-
-	c1 := newTestSNMPTrapsCollector()
-	c1.Name = "job1"
-	c1.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port1}}
-
-	c2 := newTestSNMPTrapsCollector()
-	c2.Name = "job2"
-	c2.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port2}}
-
-	err := c1.Init(context.Background())
-	require.NoError(t, err)
-
-	err = c2.Init(context.Background())
-	require.NoError(t, err)
-
-	sharedIndex := CurrentProfileIndex()
-	require.NotNil(t, sharedIndex)
-
-	c2.Cleanup(context.Background())
-	assert.Same(t, sharedIndex, CurrentProfileIndex(), "cache should still use the shared index after one collector cleans up")
-	assert.NotNil(t, CurrentProfileIndex(), "cache should still be alive after second collector cleans up")
-
-	c1.Cleanup(context.Background())
-	assert.Nil(t, CurrentProfileIndex(), "cache should unload after all collectors clean up")
-}
-
-func TestInitBindFailureReleasesProfileRef(t *testing.T) {
-	setMinimalProfileDir(t)
-	withTestCacheDir(t)
-
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
-	require.NoError(t, err)
-	defer conn.Close()
-
-	c := newTestSNMPTrapsCollector()
-	c.Name = "local"
-	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: conn.LocalAddr().(*net.UDPAddr).Port}}
-
-	err = c.Init(context.Background())
+	_, err := manager.Acquire()
 	require.Error(t, err)
-	assert.Nil(t, CurrentProfileIndex(), "profile ref should be released on bind failure")
 
-	// Verify cache can still be acquired after bind failure
-	idx, err := AcquireProfileCache()
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeStockProfileAndCatalogue(t, stockDir, "test", "1.3.6.1.4.1.99999.1")
+	lease, err := manager.Acquire()
 	require.NoError(t, err)
-	ReleaseProfileCache()
-	assert.Nil(t, CurrentProfileIndex())
-	_ = idx
+	t.Cleanup(lease.Close)
+	assert.NotNil(t, lease.Epoch())
 }
 
-// =============================================================================
-// Profile loading tests (using temp dir overrides)
-// =============================================================================
-
-func TestProfileLoadRejectsUnknownTopLevelKey(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "bad.yaml")
-	writeProfileYAML(t, dir, "bad.yaml", "unknown_profile_key: true\n")
-
-	_, err := loadProfileBundle(path, multipath.New(dir), nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), `profile: unknown config key "unknown_profile_key"`)
+func acquireTestEpoch() (*Epoch, error) {
+	if testProfileManager == nil {
+		return nil, fmt.Errorf("test profile manager is not configured")
+	}
+	lease, err := testProfileManager.Acquire()
+	if err != nil {
+		return nil, err
+	}
+	testProfileLeases = append(testProfileLeases, lease)
+	return lease.Epoch(), nil
 }
 
-func TestProfileDirPathBuilders(t *testing.T) {
-	assert.Equal(t, filepath.Join("/etc/netdata/go.d", "snmp.trap-profiles"), trapProfilesUserDir("/etc/netdata/go.d"))
-	assert.Equal(t, filepath.Join("/usr/lib/netdata/conf.d/go.d", "snmp.trap-profiles", "default"), trapProfilesStockDir("/usr/lib/netdata/conf.d/go.d"))
+func releaseTestEpoch() {
+	if len(testProfileLeases) == 0 {
+		return
+	}
+	last := len(testProfileLeases) - 1
+	lease := testProfileLeases[last]
+	testProfileLeases = testProfileLeases[:last]
+	lease.Close()
+}
+
+func resetTestEpoch() {
+	for len(testProfileLeases) > 0 {
+		releaseTestEpoch()
+	}
 }
 
 func setTestDirs(t *testing.T, dirs ...string) {
 	t.Helper()
-	testDirsOverride = dirs
+	resetTestEpoch()
+	testProfileManager = NewManager(Paths{UserDirs: append([]string(nil), dirs...), StockDir: writeTestStockCatalog(t)})
 	t.Cleanup(func() {
-		testDirsOverride = nil
+		resetTestEpoch()
+		testProfileManager = nil
 	})
 }
 
-func setMinimalProfileDir(t *testing.T) {
+func writeTestStockCatalog(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	writeProfileYAML(t, dir, "minimal.yaml", `
+	stockDir := filepath.Join(t.TempDir(), "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeStockProfileAndCatalogue(t, stockDir, "catalog_base", "1.3.6.1.4.1.99999.999")
+	return stockDir
+}
+
+func writeStockProfileAndCatalogue(t *testing.T, stockDir, name, oid string) {
+	t.Helper()
+	writeProfileYAML(t, stockDir, name+".yaml", fmt.Sprintf(`
 traps:
-  - oid: 1.3.6.1.6.3.1.1.5.1
-    name: SNMPv2-MIB::coldStart
-    category: state_change
-    severity: notice
-`)
-	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+  - oid: %s
+    name: TEST-CATALOG-MIB::%s
+    category: diagnostic
+    severity: info
+`, oid, name))
+	catalogue := stockProfileCatalogue{
+		name: {
+			File:     name + ".yaml",
+			MIBs:     []string{"TEST-CATALOG-MIB"},
+			TrapOIDs: []string{oid},
+		},
+	}
+	data, err := json.Marshal(catalogue)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(stockDir), "catalogue.json"), data, 0o644))
 }
 
 func TestProfileLoadValid(t *testing.T) {
@@ -308,18 +180,18 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
 	assert.Equal(t, "IF-MIB::linkDown", td.Name)
 	assert.Equal(t, "state_change", td.Category)
 	assert.Equal(t, "warning", td.Severity)
-	assert.NotNil(t, td.sharedVarbinds)
+	assert.NotNil(t, td.SharedVarbinds)
 }
 
 func TestProfileLoadSupportedFormats(t *testing.T) {
@@ -343,11 +215,11 @@ traps:
 `)
 
 			setTestDirs(t, dir)
-			resetProfileCacheForTest()
+			resetTestEpoch()
 
-			idx, err := AcquireProfileCache()
+			idx, err := acquireTestEpoch()
 			require.NoError(t, err)
-			defer ReleaseProfileCache()
+			defer releaseTestEpoch()
 
 			td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 			require.NotNil(t, td)
@@ -357,22 +229,19 @@ traps:
 }
 
 func TestProfileLoadIgnoresGzipProfiles(t *testing.T) {
-	for _, name := range []string{"test.yaml.gz", "test.yml.gz"} {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			writeGzipFile(t, dir, name, `
+	userDir := t.TempDir()
+	writeGzipFile(t, userDir, "ignored.yaml.gz", `
 traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: warning
+  - oid: 1.3.6.1.4.1.99998.1
+    name: IGNORED-MIB::ignored
+    category: diagnostic
+    severity: info
 `)
-
-			files, err := profileFilesInDir(dir)
-			require.NoError(t, err)
-			assert.Empty(t, files)
-		})
-	}
+	setTestDirs(t, userDir)
+	idx, err := acquireTestEpoch()
+	require.NoError(t, err)
+	t.Cleanup(releaseTestEpoch)
+	assert.Nil(t, idx.Lookup("1.3.6.1.4.1.99998.1"))
 }
 
 func TestProfileExtendsRejectsGzipFilename(t *testing.T) {
@@ -384,30 +253,355 @@ func TestProfileExtendsRejectsGzipFilename(t *testing.T) {
 	require.ErrorContains(t, err, "must end with .yaml or .yml")
 }
 
-func TestStockProfileStoreLazyLoadsRoutedZstd(t *testing.T) {
-	stockDir := t.TempDir()
-	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
+func TestStockProfileLazyHydrationAndNegativeCache(t *testing.T) {
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAMLZstd(t, stockDir, "vendor.yaml.zst", `not: [valid`)
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"vendor": {File: "vendor.yaml", MIBs: []string{"VENDOR-MIB"}, TrapOIDs: []string{"1.3.6.1.4.1.99998.2"}},
+	}, false)
+
+	manager := NewManager(Paths{StockDir: stockDir})
+	lease, err := manager.Acquire()
+	require.NoError(t, err, "stock profile bodies must remain lazy")
+	idx := lease.Epoch()
+
+	td, firstErr := idx.LookupWithError("1.3.6.1.4.1.99998.2")
+	require.Error(t, firstErr)
+	assert.Nil(t, td)
+	writeProfileYAMLZstd(t, stockDir, "vendor.yaml.zst", `
 traps:
-  - oid: 1.3.6.1.4.1.9.1.0.1
-    name: TEST-CISCO-MIB::testTrap
+  - oid: 1.3.6.1.4.1.99998.2
+    name: VENDOR-MIB::recovered
     category: diagnostic
+    severity: info
+`)
+	td, secondErr := idx.LookupWithError("1.3.6.1.4.1.99998.2")
+	assert.Nil(t, td)
+	assert.EqualError(t, secondErr, firstErr.Error(), "a failed hydration must be cached for the epoch")
+
+	lease.Close()
+	newLease, err := manager.Acquire()
+	require.NoError(t, err)
+	t.Cleanup(newLease.Close)
+	td, err = newLease.Epoch().LookupWithError("1.3.6.1.4.1.99998.2")
+	require.NoError(t, err)
+	require.NotNil(t, td)
+	assert.Equal(t, "VENDOR-MIB::recovered", td.Name)
+}
+
+func TestStockHydrationPublishesBundleAtomically(t *testing.T) {
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "vendor.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.3
+    name: VENDOR-MIB::duplicate
+    category: diagnostic
+    severity: info
+  - oid: 1.3.6.1.4.1.99998.3
+    name: VENDOR-MIB::unpublished
+    category: diagnostic
+    severity: info
+`)
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"vendor": {
+			File:     "vendor.yaml",
+			MIBs:     []string{"VENDOR-MIB"},
+			TrapOIDs: []string{"1.3.6.1.4.1.99998.3", "1.3.6.1.4.1.99998.4"},
+		},
+	}, false)
+
+	lease, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	idx := lease.Epoch()
+	_, err = idx.LookupWithError("1.3.6.1.4.1.99998.4")
+	require.Error(t, err)
+	assert.Nil(t, idx.lookupLoaded("1.3.6.1.4.1.99998.3"))
+	assert.Nil(t, idx.lookupLoaded("1.3.6.1.4.1.99998.4"))
+}
+
+func TestStockHydrationRejectsManifestRouteMismatch(t *testing.T) {
+	const actualOID = "1.3.6.1.4.1.99998.20"
+
+	for _, tc := range []struct {
+		name      string
+		catalogue stockProfileCatalogueEntry
+		hydrate   func(*Epoch) error
+	}{
+		{
+			name: "trap_oid",
+			catalogue: stockProfileCatalogueEntry{
+				File:     "vendor.yaml",
+				MIBs:     []string{"VENDOR-MIB"},
+				TrapOIDs: []string{"1.3.6.1.4.1.99998.21"},
+			},
+			hydrate: func(idx *Epoch) error {
+				_, err := idx.LookupWithError("1.3.6.1.4.1.99998.21")
+				return err
+			},
+		},
+		{
+			name: "mib",
+			catalogue: stockProfileCatalogueEntry{
+				File:     "vendor.yaml",
+				MIBs:     []string{"OTHER-MIB"},
+				TrapOIDs: []string{actualOID},
+			},
+			hydrate: func(idx *Epoch) error {
+				_, err := idx.LookupWithError(actualOID)
+				return err
+			},
+		},
+		{
+			name: "metric_rule",
+			catalogue: stockProfileCatalogueEntry{
+				File:            "vendor.yaml",
+				MIBs:            []string{"VENDOR-MIB"},
+				MetricRuleNames: []string{"vendor.missing"},
+				TrapOIDs:        []string{actualOID},
+			},
+			hydrate: func(idx *Epoch) error {
+				_, err := idx.Definitions([]string{"vendor.missing"})
+				return err
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stockDir := filepath.Join(t.TempDir(), "default")
+			require.NoError(t, os.MkdirAll(stockDir, 0o755))
+			writeProfileYAML(t, stockDir, "vendor.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.20
+    name: VENDOR-MIB::actual
+    category: diagnostic
+    severity: info
+`)
+			writeStockCatalogue(t, stockDir, stockProfileCatalogue{"vendor": tc.catalogue}, false)
+
+			lease, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+			require.NoError(t, err)
+			t.Cleanup(lease.Close)
+			err = tc.hydrate(lease.Epoch())
+			require.ErrorContains(t, err, "does not match hydrated profile")
+			assert.Nil(t, lease.Epoch().lookupLoaded(actualOID), "a route mismatch must publish none of the bundle")
+		})
+	}
+}
+
+func TestResolveTrapHydratesEveryMIBCandidateForExactName(t *testing.T) {
+	stockDir := filepath.Join(t.TempDir(), "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "first.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.22
+    name: SHARED-MIB::first
+    category: diagnostic
+    severity: info
+`)
+	writeProfileYAML(t, stockDir, "second.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.23
+    name: SHARED-MIB::second
+    category: diagnostic
+    severity: info
+`)
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"first": {
+			File:     "first.yaml",
+			MIBs:     []string{"SHARED-MIB"},
+			TrapOIDs: []string{"1.3.6.1.4.1.99998.22"},
+		},
+		"second": {
+			File:     "second.yaml",
+			MIBs:     []string{"SHARED-MIB"},
+			TrapOIDs: []string{"1.3.6.1.4.1.99998.23"},
+		},
+	}, false)
+
+	lease, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	td, err := lease.Epoch().ResolveTrap("SHARED-MIB::second")
+	require.NoError(t, err)
+	require.NotNil(t, td)
+	assert.Equal(t, "1.3.6.1.4.1.99998.23", td.OID)
+}
+
+func TestStockHydrationCoalescesPerFileWithoutBlockingOtherFiles(t *testing.T) {
+	const (
+		slowOID = "1.3.6.1.4.1.99998.30"
+		fastOID = "1.3.6.1.4.1.99998.31"
+	)
+	idx := NewEpoch()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var slowLoads atomic.Int64
+	var fastLoads atomic.Int64
+	store := &stockProfileStore{
+		files: map[string]string{"slow": "slow.yaml", "fast": "fast.yaml"},
+		routes: map[string]stockProfileRoutes{
+			"slow": {trapOIDs: []string{slowOID}, mibs: []string{"TEST-MIB"}},
+			"fast": {trapOIDs: []string{fastOID}, mibs: []string{"TEST-MIB"}},
+		},
+		exactRoutes: map[string]string{slowOID: "slow", fastOID: "fast"},
+		hydration: map[string]*profileHydration{
+			"slow": {},
+			"fast": {},
+		},
+		loadBundle: func(path string, _ multipath.MultiPath, _ []string) (profileLoadBundle, error) {
+			switch path {
+			case "slow.yaml":
+				slowLoads.Add(1)
+				close(started)
+				<-release
+				return profileLoadBundle{traps: []*TrapDef{{OID: slowOID, Name: "TEST-MIB::slow"}}}, nil
+			case "fast.yaml":
+				fastLoads.Add(1)
+				return profileLoadBundle{traps: []*TrapDef{{OID: fastOID, Name: "TEST-MIB::fast"}}}, nil
+			default:
+				return profileLoadBundle{}, fmt.Errorf("unexpected path %q", path)
+			}
+		},
+	}
+	idx.stock = store
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _ = idx.LookupWithError(slowOID)
+		}()
+	}
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("slow hydration did not start")
+	}
+
+	fastDone := make(chan error, 1)
+	go func() {
+		_, err := idx.LookupWithError(fastOID)
+		fastDone <- err
+	}()
+	select {
+	case err := <-fastDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("independent profile hydration was blocked")
+	}
+	close(release)
+	wg.Wait()
+
+	assert.EqualValues(t, 1, slowLoads.Load())
+	assert.EqualValues(t, 1, fastLoads.Load())
+	assert.NotNil(t, idx.lookupLoaded(slowOID))
+	assert.NotNil(t, idx.lookupLoaded(fastOID))
+}
+
+func TestStockCatalogueIsRequiredAndUnambiguous(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*testing.T, string)
+		want  string
+	}{
+		{name: "missing", want: "catalogue is missing"},
+		{name: "raw_and_zstd", setup: func(t *testing.T, stockDir string) {
+			writeStockCatalogue(t, stockDir, stockProfileCatalogue{}, false)
+			writeStockCatalogue(t, stockDir, stockProfileCatalogue{}, true)
+		}, want: "ambiguous"},
+		{name: "gzip", setup: func(t *testing.T, stockDir string) {
+			writeGzipFile(t, filepath.Dir(stockDir), "catalogue.json.gz", `{}`)
+		}, want: "unsupported gzip"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stockDir := filepath.Join(t.TempDir(), "default")
+			require.NoError(t, os.MkdirAll(stockDir, 0o755))
+			if tc.setup != nil {
+				tc.setup(t, stockDir)
+			}
+			_, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+			require.ErrorContains(t, err, tc.want)
+		})
+	}
+}
+
+func TestStockCatalogueReconcilesPhysicalInventory(t *testing.T) {
+	stockDir := filepath.Join(t.TempDir(), "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "orphan.yaml", "traps: []\n")
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"missing": {File: "missing.yaml", MIBs: []string{"MISSING-MIB"}, TrapOIDs: []string{"1.3.6.1.4.1.99998.5"}},
+	}, false)
+
+	_, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.ErrorContains(t, err, "references missing profile")
+
+	writeProfileYAML(t, stockDir, "missing.yaml", "traps: []\n")
+	_, err = NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.ErrorContains(t, err, `profile "orphan" is missing from the stock catalogue`)
+}
+
+func TestStockCatalogueRejectsAlternateOIDRouteDuplicates(t *testing.T) {
+	stockDir := filepath.Join(t.TempDir(), "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "first.yaml", "traps: []\n")
+	writeProfileYAML(t, stockDir, "second.yaml", "traps: []\n")
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"first":  {File: "first.yaml", MIBs: []string{"FIRST-MIB"}, TrapOIDs: []string{"1.3.6.1.4.1.99998.7.1"}},
+		"second": {File: "second.yaml", MIBs: []string{"SECOND-MIB"}, TrapOIDs: []string{"1.3.6.1.4.1.99998.7.0.1"}},
+	}, false)
+
+	_, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.ErrorContains(t, err, "routes OID")
+}
+
+func TestStockCatalogueRequiresCanonicalRawProfileFilename(t *testing.T) {
+	stockDir := filepath.Join(t.TempDir(), "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAMLZstd(t, stockDir, "vendor.yaml.zst", "traps: []\n")
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"vendor": {File: "vendor.yaml.zst"},
+	}, false)
+
+	_, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.ErrorContains(t, err, `invalid file "vendor.yaml.zst"`)
+}
+
+func TestUserProfileReplacesCompressedStockByExtensionlessIdentity(t *testing.T) {
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
+	userDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAMLZstd(t, stockDir, "vendor.yaml.zst", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.6
+    name: VENDOR-MIB::stock
+    category: diagnostic
+    severity: info
+`)
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"vendor": {File: "vendor.yaml", MIBs: []string{"VENDOR-MIB"}, TrapOIDs: []string{"1.3.6.1.4.1.99998.6"}},
+	}, false)
+	writeProfileYAML(t, userDir, "vendor.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.7
+    name: VENDOR-MIB::user
+    category: security
     severity: warning
 `)
 
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
-	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
+	lease, err := NewManager(Paths{UserDirs: []string{userDir}, StockDir: stockDir}).Acquire()
 	require.NoError(t, err)
-	idx.stock = store
-
-	assert.Empty(t, idx.trapsByOID)
-	td := idx.Lookup("1.3.6.1.4.1.9.1.0.1")
-	require.NotNil(t, td)
-	assert.Equal(t, "TEST-CISCO-MIB::testTrap", td.Name)
-	assert.True(t, store.loaded["ciscosystems.yaml"])
-	assert.Len(t, idx.trapsByOID, 1)
+	t.Cleanup(lease.Close)
+	idx := lease.Epoch()
+	assert.Nil(t, idx.Lookup("1.3.6.1.4.1.99998.6"))
+	require.NotNil(t, idx.Lookup("1.3.6.1.4.1.99998.7"))
+	require.Equal(t, []ProfileInfo{{Name: "vendor", Path: filepath.Join(userDir, "vendor.yaml"), IsStock: false}}, idx.Profiles())
 }
 
 func TestReadProfileFileRejectsOversizedDecompressedProfile(t *testing.T) {
@@ -419,308 +613,7 @@ func TestReadProfileFileRejectsOversizedDecompressedProfile(t *testing.T) {
 	t.Cleanup(func() { maxProfileFileBytes = oldLimit })
 
 	_, err := readProfileFile(filepath.Join(dir, "oversized.yaml.zst"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "exceeds maximum decompressed size")
-}
-
-func TestStockProfileStoreUsesCatalogueWithoutParsingProfiles(t *testing.T) {
-	rootDir := t.TempDir()
-	stockDir := filepath.Join(rootDir, "default")
-	require.NoError(t, os.MkdirAll(stockDir, 0o755))
-	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `not: [valid`)
-	writeProfileYAMLZstd(t, rootDir, "catalogue.json.zst", `{
-  "ciscosystems": {
-    "file": "ciscosystems.yaml",
-    "trap_count": 1,
-    "trap_oids": ["1.3.6.1.4.1.9.1.0.1"]
-  }
-}`)
-
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
-	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
-	require.NoError(t, err)
-	idx.stock = store
-
-	assert.Empty(t, idx.trapsByOID)
-	assert.Equal(t, "ciscosystems.yaml", store.route("1.3.6.1.4.1.9.1.0.1"))
-
-	td, err := idx.LookupWithError("1.3.6.1.4.1.9.1.0.1")
-	require.Error(t, err)
-	assert.Nil(t, td)
-	assert.Contains(t, err.Error(), "failed to lazy-load stock trap profile")
-	assert.NotNil(t, store.failed["ciscosystems.yaml"])
-
-	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
-traps:
-  - oid: 1.3.6.1.4.1.9.1.0.1
-    name: TEST-CISCO-MIB::testTrap
-    category: diagnostic
-    severity: warning
-`)
-	td, err = idx.LookupWithError("1.3.6.1.4.1.9.1.0.1")
-	require.Error(t, err)
-	assert.Nil(t, td)
-	assert.Empty(t, idx.trapsByOID, "negative cache should prevent reparsing until profile cache rebuild")
-}
-
-func TestStockProfileStoreTemporarilyReadsGzipCatalogue(t *testing.T) {
-	rootDir := t.TempDir()
-	stockDir := filepath.Join(rootDir, "default")
-	require.NoError(t, os.MkdirAll(stockDir, 0o755))
-	writeProfileYAML(t, stockDir, "ciscosystems.yaml", `
-traps:
-  - oid: 1.3.6.1.4.1.9.1.0.1
-    name: TEST-CISCO-MIB::testTrap
-    category: diagnostic
-    severity: warning
-`)
-	writeGzipFile(t, rootDir, "catalogue.json.gz", `{
-  "ciscosystems": {
-    "file": "ciscosystems.yaml",
-    "trap_count": 1,
-    "trap_oids": ["1.3.6.1.4.1.9.1.0.1"]
-  }
-}`)
-
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
-	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
-	require.NoError(t, err)
-	require.NotNil(t, store)
-	assert.Equal(t, "ciscosystems.yaml", store.route("1.3.6.1.4.1.9.1.0.1"))
-}
-
-func TestStockProfileStoreLazyLoadFailureDoesNotPartiallyMutateIndex(t *testing.T) {
-	stockDir := t.TempDir()
-	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
-traps:
-  - oid: 1.3.6.1.4.1.9.1.0.1
-    name: TEST-CISCO-MIB::duplicateTrap
-    category: diagnostic
-    severity: warning
-  - oid: 1.3.6.1.4.1.9.1.0.2
-    name: TEST-CISCO-MIB::uniqueTrap
-    category: diagnostic
-    severity: warning
-`)
-
-	existing := &TrapDef{
-		OID:        "1.3.6.1.4.1.9.1.0.1",
-		Name:       "TEST-CISCO-MIB::existingTrap",
-		sourceFile: "user.yaml",
-	}
-	idx := &ProfileIndex{
-		trapsByOID:      map[string]*TrapDef{existing.OID: existing},
-		namesByTrapName: map[string]*TrapDef{existing.Name: existing},
-	}
-	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	})
-	require.NoError(t, err)
-	idx.stock = store
-
-	td, err := idx.LookupWithError("1.3.6.1.4.1.9.1.0.2")
-	require.Error(t, err)
-	assert.Nil(t, td)
-	assert.Contains(t, err.Error(), "duplicate trap OID")
-	assert.Nil(t, idx.lookupLoaded("1.3.6.1.4.1.9.1.0.2"), "unique trap from failed stock file must not be inserted")
-	assert.False(t, store.loaded["ciscosystems.yaml"])
-	assert.NotNil(t, store.failed["ciscosystems.yaml"])
-}
-
-func TestStockProfileStoreRejectsCatalogueEntryWithoutTrapOIDs(t *testing.T) {
-	rootDir := t.TempDir()
-	stockDir := filepath.Join(rootDir, "default")
-	require.NoError(t, os.MkdirAll(stockDir, 0o755))
-	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
-traps:
-  - oid: 1.3.6.1.4.1.9.1.0.1
-    name: TEST-CISCO-MIB::testTrap
-    category: diagnostic
-    severity: warning
-`)
-	writeProfileYAMLZstd(t, rootDir, "catalogue.json.zst", `{
-  "ciscosystems": {
-    "file": "ciscosystems.yaml",
-    "trap_count": 1,
-    "trap_oids": []
-  }
-}`)
-
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
-	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
-	require.Error(t, err)
-	assert.Nil(t, store)
-	assert.Contains(t, err.Error(), "has no trap_oids")
-}
-
-func TestOverridesApplyToLazyLoadedStockProfiles(t *testing.T) {
-	stockDir := t.TempDir()
-	const oid = "1.3.6.1.4.1.9.1.0.1"
-	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
-traps:
-  - oid: 1.3.6.1.4.1.9.1.0.1
-    name: TEST-CISCO-MIB::testTrap
-    category: diagnostic
-    severity: warning
-    labels:
-      vendor: stock
-`)
-
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
-	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
-	require.NoError(t, err)
-	idx.stock = store
-
-	td := idx.Lookup(oid)
-	require.NotNil(t, td)
-	require.Equal(t, "diagnostic", td.Category)
-	require.Equal(t, "warning", td.Severity)
-
-	c := newTestSNMPTrapsCollector()
-	c.overrides = buildOverrideMap([]OverrideConfig{
-		{
-			OID:      oid,
-			Category: "security",
-			Severity: "crit",
-			Labels:   map[string]string{"site": "edge"},
-		},
-	})
-
-	overridden := c.applyOverrides(td)
-	require.NotSame(t, td, overridden)
-	assert.Equal(t, "security", overridden.Category)
-	assert.Equal(t, "crit", overridden.Severity)
-	assert.Equal(t, map[string]string{"vendor": "stock", "site": "edge"}, overridden.Labels)
-
-	assert.Equal(t, "diagnostic", td.Category)
-	assert.Equal(t, "warning", td.Severity)
-	assert.Equal(t, map[string]string{"vendor": "stock"}, td.Labels)
-}
-
-func TestOverrideReplacesCompiledProfileLabelWithStaticValue(t *testing.T) {
-	dir := t.TempDir()
-	const oid = "1.3.6.1.6.3.1.1.5.3"
-	writeProfileYAML(t, dir, "test.yaml", `
-varbinds:
-  ifOperStatus:
-    oid: 1.3.6.1.2.1.2.2.1.8
-    type: INTEGER
-    enum:
-      '1': up
-      '2': down
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: warning
-    labels:
-      status: '{{value "ifOperStatus"}}'
-    varbinds: [ifOperStatus]
-`)
-	setTestDirs(t, dir)
-	resetProfileCacheForTest()
-
-	idx, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
-	td := idx.Lookup(oid)
-	require.NotNil(t, td)
-	require.NotNil(t, td.labelTemplates["status"])
-
-	c := newTestSNMPTrapsCollector()
-	c.overrides = buildOverrideMap([]OverrideConfig{{
-		OID:    oid,
-		Labels: map[string]string{"status": "{{trap_name}}"},
-	}})
-	overridden := c.applyOverrides(td)
-
-	entry := &TrapEntry{
-		TrapName: "IF-MIB::linkDown",
-		Varbinds: []VarbindValue{{
-			OID:   "1.3.6.1.2.1.2.2.1.8",
-			Type:  "INTEGER",
-			Value: int64(2),
-		}},
-	}
-	assert.Equal(t, "{{trap_name}}", renderLabels(entry, overridden)["status"])
-	assert.Equal(t, "down", renderLabels(entry, td)["status"])
-}
-
-func TestStockProfileStoreLazyLoadErrorIsReported(t *testing.T) {
-	stockDir := t.TempDir()
-	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
-traps:
-  - oid: 1.3.6.1.4.1.9.1.0.1
-    name: TEST-CISCO-MIB::testTrap
-    category: diagnostic
-    severity: warning
-`)
-
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
-	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
-	require.NoError(t, err)
-	idx.stock = store
-	require.NoError(t, os.Remove(filepath.Join(stockDir, "ciscosystems.yaml.zst")))
-
-	td, err := idx.LookupWithError("1.3.6.1.4.1.9.1.0.1")
-	require.Error(t, err)
-	assert.Nil(t, td)
-	assert.Contains(t, err.Error(), "failed to lazy-load stock trap profile")
-}
-
-func TestStockProfileStoreSkipsSameBasenameUserReplacement(t *testing.T) {
-	userDir := t.TempDir()
-	stockDir := t.TempDir()
-	writeProfileYAML(t, userDir, "ciscosystems.yaml", `
-traps:
-  - oid: 1.3.6.1.4.1.9.1.0.1
-    name: TEST-CISCO-MIB::userTrap
-    category: security
-    severity: warning
-`)
-	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
-traps:
-  - oid: 1.3.6.1.4.1.9.1.0.2
-    name: TEST-CISCO-MIB::stockTrap
-    category: diagnostic
-    severity: warning
-`)
-
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
-	seen := map[string]bool{}
-	files, err := loadProfilesFromDir(userDir, multipath.New(userDir, stockDir))
-	require.NoError(t, err)
-	for _, file := range files {
-		seen[file.name] = true
-		require.NoError(t, idx.addTraps(file.traps))
-	}
-
-	store, err := buildStockProfileStore(stockDir, multipath.New(userDir, stockDir), seen, idx)
-	require.NoError(t, err)
-	idx.stock = store
-
-	assert.NotNil(t, idx.Lookup("1.3.6.1.4.1.9.1.0.1"))
-	assert.Nil(t, idx.Lookup("1.3.6.1.4.1.9.1.0.2"))
-	assert.Empty(t, store.files)
+	require.ErrorContains(t, err, "exceeds maximum decompressed size")
 }
 
 func TestProfileIndexLookupTrapOIDTolerance(t *testing.T) {
@@ -778,7 +671,7 @@ func TestProfileIndexLookupTrapOIDTolerance(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			idx := &ProfileIndex{trapsByOID: tt.traps}
+			idx := &Epoch{trapsByOID: tt.traps}
 
 			got := idx.Lookup(tt.lookup)
 			if tt.want == nil {
@@ -849,15 +742,16 @@ func TestAlternateTrapOID(t *testing.T) {
 	}
 }
 
-func TestProfileLoadEmptyDirFails(t *testing.T) {
+func TestProfileLoadEmptyUserDirKeepsStockProfiles(t *testing.T) {
 	dir := t.TempDir()
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no trap profiles found")
+	idx, err := acquireTestEpoch()
+	require.NoError(t, err)
+	t.Cleanup(releaseTestEpoch)
+	assert.Len(t, idx.Profiles(), 1)
 }
 
 func TestProfileLoadMissingName(t *testing.T) {
@@ -870,9 +764,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required field 'name'")
 }
@@ -888,9 +782,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not MIB-qualified")
 }
@@ -906,9 +800,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid category")
 }
@@ -924,9 +818,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid severity")
 }
@@ -943,9 +837,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid status")
 }
@@ -962,9 +856,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found in file-scoped varbinds table")
 }
@@ -986,9 +880,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid oid")
 }
@@ -1008,11 +902,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1033,9 +927,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required field 'type'")
 }
@@ -1052,9 +946,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dedup_key_varbind")
 }
@@ -1072,9 +966,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "label key")
 }
@@ -1097,9 +991,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate trap OID")
 }
@@ -1122,18 +1016,18 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate trap name")
 }
 
-func TestProfileLoadFilenameDedup(t *testing.T) {
-	userDir := t.TempDir()
-	stockDir := t.TempDir()
+func TestProfileLoadRejectsDuplicateUserIdentity(t *testing.T) {
+	firstDir := t.TempDir()
+	secondDir := t.TempDir()
 
-	writeProfileYAML(t, userDir, "same.yaml", `
+	writeProfileYAML(t, firstDir, "same.yaml", `
 traps:
   - oid: 1.3.6.1.6.3.1.1.5.3
     name: IF-MIB::linkDown
@@ -1141,7 +1035,7 @@ traps:
     severity: crit
 `)
 
-	writeProfileYAML(t, stockDir, "same.yaml", `
+	writeProfileYAML(t, secondDir, "same.yaml", `
 traps:
   - oid: 1.3.6.1.6.3.1.1.5.3
     name: IF-MIB::linkDown
@@ -1149,53 +1043,11 @@ traps:
     severity: warning
 `)
 
-	setTestDirs(t, userDir, stockDir)
-	resetProfileCacheForTest()
+	setTestDirs(t, firstDir, secondDir)
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
-
-	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
-	require.NotNil(t, td)
-	assert.Equal(t, "auth", td.Category)
-	assert.Equal(t, "crit", td.Severity)
-}
-
-func TestProfileLoadFilenameDedupKeepsAllTrapsFromWinningFile(t *testing.T) {
-	userDir := t.TempDir()
-	stockDir := t.TempDir()
-
-	writeProfileYAML(t, userDir, "same.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.2
-    name: IF-MIB::warmStart
-    category: state_change
-    severity: notice
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: auth
-    severity: crit
-`)
-
-	writeProfileYAML(t, stockDir, "same.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.4
-    name: IF-MIB::linkUp
-    category: state_change
-    severity: notice
-`)
-
-	setTestDirs(t, userDir, stockDir)
-	resetProfileCacheForTest()
-
-	idx, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
-
-	assert.NotNil(t, idx.Lookup("1.3.6.1.6.3.1.1.5.2"))
-	assert.NotNil(t, idx.Lookup("1.3.6.1.6.3.1.1.5.3"))
-	assert.Nil(t, idx.Lookup("1.3.6.1.6.3.1.1.5.4"))
+	_, err := acquireTestEpoch()
+	require.ErrorContains(t, err, "duplicate user profile name")
 }
 
 func TestProfileLoadExtendsMerge(t *testing.T) {
@@ -1231,11 +1083,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1266,11 +1118,11 @@ extends: [_base1.yaml, _base2.yaml]
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1304,11 +1156,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1326,9 +1178,9 @@ extends: [../../outside.yaml]
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid extends entry")
 }
@@ -1389,7 +1241,7 @@ func TestRenderMessageDefault(t *testing.T) {
 	}
 	td := &TrapDef{}
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 	assert.Equal(t, "IF-MIB::linkDown on 10.0.0.1.", msg)
 }
 
@@ -1414,11 +1266,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1432,7 +1284,7 @@ traps:
 		},
 	}
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 	assert.Contains(t, msg, "Gi0/1")
 	assert.Contains(t, msg, "42")
 	assert.Contains(t, msg, "10.0.0.1")
@@ -1442,7 +1294,7 @@ func TestRenderMessageResolvesTabularVarbindInstances(t *testing.T) {
 	td := testIFMIBLinkDownTrapDef()
 	entry := testIFMIBLinkDownEntry()
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 
 	assert.Equal(t, "Link 1 operational state changed to down on 198.51.100.10.", msg)
 }
@@ -1465,11 +1317,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1480,7 +1332,7 @@ traps:
 		Varbinds: []VarbindValue{},
 	}
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 	assert.Equal(t, "Test ", msg)
 }
 
@@ -1508,11 +1360,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1525,7 +1377,7 @@ traps:
 		},
 	}
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 	assert.Equal(t, "7 went down on 198.51.100.10.", msg)
 	assert.NotContains(t, msg, "<missing>")
 }
@@ -1548,20 +1400,20 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.4")
 	require.NotNil(t, td)
 
 	entry := &TrapEntry{TrapName: "IF-MIB::linkUp", SourceIP: "198.51.100.10"}
-	assert.Equal(t, "Interface came up on 198.51.100.10.", renderMessage(entry, td))
+	assert.Equal(t, "Interface came up on 198.51.100.10.", RenderMessage(entry, td))
 
 	entry.Varbinds = []VarbindValue{{OID: "1.3.6.1.2.1.2.2.1.2.7", Type: "OctetString", Value: "Gi0/7"}}
-	assert.Equal(t, "Interface Gi0/7 came up on 198.51.100.10.", renderMessage(entry, td))
+	assert.Equal(t, "Interface Gi0/7 came up on 198.51.100.10.", RenderMessage(entry, td))
 }
 
 func TestRenderMessageGoTemplateWithBlockWithoutElse(t *testing.T) {
@@ -1582,20 +1434,20 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.4.1.9.9.43.2.0.2")
 	require.NotNil(t, td)
 
 	entry := &TrapEntry{TrapName: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged", SourceIP: "198.51.100.10"}
-	assert.Equal(t, "Running configuration changed on 198.51.100.10.", renderMessage(entry, td))
+	assert.Equal(t, "Running configuration changed on 198.51.100.10.", RenderMessage(entry, td))
 
 	entry.Varbinds = []VarbindValue{{OID: "1.3.6.1.4.1.9.9.43.1.1.6.1.8.1", Type: "DisplayString", Value: "admin"}}
-	assert.Equal(t, "Running configuration changed by admin on 198.51.100.10.", renderMessage(entry, td))
+	assert.Equal(t, "Running configuration changed by admin on 198.51.100.10.", RenderMessage(entry, td))
 }
 
 func TestRenderGoTemplateMessageRedactsSensitiveCommunityVarbind(t *testing.T) {
@@ -1607,7 +1459,7 @@ func TestRenderGoTemplateMessageRedactsSensitiveCommunityVarbind(t *testing.T) {
 	}
 	td := testSensitiveCommunityTrapDef(t, `Community {{value "snmpTrapCommunity"}} raw {{raw "snmpTrapCommunity"}}`)
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 
 	assert.NotContains(t, msg, "private-community")
 	assert.Contains(t, msg, model.RedactedVarbindValue)
@@ -1631,9 +1483,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "if template actions are not allowed")
 }
@@ -1686,8 +1538,8 @@ traps:
 			dir := t.TempDir()
 			writeProfileYAML(t, dir, "test.yaml", profile)
 			setTestDirs(t, dir)
-			resetProfileCacheForTest()
-			_, err := AcquireProfileCache()
+			resetTestEpoch()
+			_, err := acquireTestEpoch()
 			require.Error(t, err)
 		})
 	}
@@ -1715,8 +1567,8 @@ traps:
     varbinds: [ifIndex]
     `+content+"\n")
 			setTestDirs(t, dir)
-			resetProfileCacheForTest()
-			_, err := AcquireProfileCache()
+			resetTestEpoch()
+			_, err := acquireTestEpoch()
 			require.ErrorContains(t, err, "literal braces are not allowed")
 		})
 	}
@@ -1741,8 +1593,8 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
-	_, err := AcquireProfileCache()
+	resetTestEpoch()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unbounded varbind")
 }
@@ -1750,10 +1602,10 @@ traps:
 func testSensitiveCommunityTrapDef(t *testing.T, description string) *TrapDef {
 	t.Helper()
 	oid := strings.TrimSuffix(model.SNMPTrapCommunityOID, ".0")
-	def := VarbindDef{OID: oid, Type: "OctetString", rawName: "snmpTrapCommunity"}
+	def := VarbindDef{OID: oid, Type: "OctetString", RawName: "snmpTrapCommunity"}
 	td := &TrapDef{
 		Description: description,
-		sharedVarbinds: map[string]*VarbindDef{
+		SharedVarbinds: map[string]*VarbindDef{
 			oid: &def,
 		},
 	}
@@ -1814,24 +1666,24 @@ func TestFindVarbindForProfileOIDMatchesScalarZeroInstance(t *testing.T) {
 
 func TestFindVarbindDefForObservedOIDUsesLongestColumnPrefix(t *testing.T) {
 	td := &TrapDef{
-		sharedVarbinds: map[string]*VarbindDef{
+		SharedVarbinds: map[string]*VarbindDef{
 			"1.3.6.1.4.1.999.1": {
 				OID:     "1.3.6.1.4.1.999.1",
 				Type:    "INTEGER",
-				rawName: "shortColumn",
+				RawName: "shortColumn",
 			},
 			"1.3.6.1.4.1.999.1.1": {
 				OID:     "1.3.6.1.4.1.999.1.1",
 				Type:    "INTEGER",
-				rawName: "longColumn",
+				RawName: "longColumn",
 			},
 		},
 	}
 
-	got := findVarbindDefForObservedOID(td, "1.3.6.1.4.1.999.1.1.7")
+	got := FindVarbindDefForObservedOID(td, "1.3.6.1.4.1.999.1.1.7")
 
 	require.NotNil(t, got)
-	assert.Equal(t, "longColumn", got.rawName)
+	assert.Equal(t, "longColumn", got.RawName)
 }
 
 func TestRenderMessageEmptyStringVarbindPresent(t *testing.T) {
@@ -1852,11 +1704,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1869,7 +1721,7 @@ traps:
 		},
 	}
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 	assert.Equal(t, "Alias []", msg)
 }
 
@@ -1895,11 +1747,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1912,7 +1764,7 @@ traps:
 		},
 	}
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 	assert.Contains(t, msg, "down")
 }
 
@@ -1937,11 +1789,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1954,7 +1806,7 @@ traps:
 		},
 	}
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 	assert.Contains(t, msg, "2")
 }
 
@@ -1968,16 +1820,16 @@ func TestRenderMessageTruncation(t *testing.T) {
 	}
 	td.Description = string(long)
 
-	msg := renderMessage(entry, td)
-	assert.LessOrEqual(t, len(msg), maxMessageLen)
+	msg := RenderMessage(entry, td)
+	assert.LessOrEqual(t, len(msg), MaxMessageLen)
 }
 
 func TestRenderMessageTruncationKeepsValidUTF8(t *testing.T) {
 	entry := &TrapEntry{TrapName: "X::Y", SourceIP: "1.1.1.1"}
 	td := &TrapDef{Description: strings.Repeat("é", 300)}
 
-	msg := renderMessage(entry, td)
-	assert.LessOrEqual(t, len(msg), maxMessageLen)
+	msg := RenderMessage(entry, td)
+	assert.LessOrEqual(t, len(msg), MaxMessageLen)
 	assert.True(t, utf8.ValidString(msg))
 	assert.True(t, strings.HasSuffix(msg, "..."))
 }
@@ -2005,11 +1857,11 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -2022,7 +1874,7 @@ traps:
 		},
 	}
 
-	labels := renderLabels(entry, td)
+	labels := RenderLabels(entry, td)
 	assert.Equal(t, "down", labels["oper_status"])
 	assert.Equal(t, "warning", labels["severity"])
 }
@@ -2046,9 +1898,9 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	_, err := AcquireProfileCache()
+	_, err := acquireTestEpoch()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unbounded varbind")
 }
@@ -2067,7 +1919,7 @@ func TestRenderMessageSpecialVars(t *testing.T) {
 	}
 	require.NoError(t, compileTrapTemplates(td, nil))
 
-	msg := renderMessage(entry, td)
+	msg := RenderMessage(entry, td)
 	assert.Contains(t, msg, "switch01")
 	assert.Contains(t, msg, "10.0.0.1")
 	assert.Contains(t, msg, "IF-MIB::linkDown")
@@ -2103,7 +1955,7 @@ func TestRenderMessageHostnameFallback(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			msg := renderMessage(tc.entry, td)
+			msg := RenderMessage(tc.entry, td)
 			assert.Contains(t, msg, tc.want)
 		})
 	}
@@ -2130,17 +1982,17 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
 
 	raw := VarbindValue{OID: "1.3.6.1.2.1.31.1.1.1.1", Type: "OctetString", Value: "Gi0/1"}
-	resolved := resolve2TierVarbind("1.3.6.1.2.1.31.1.1.1.1", raw, td)
+	resolved := ResolveVarbind("1.3.6.1.2.1.31.1.1.1.1", raw, td)
 	assert.Equal(t, "ifDescr", resolved.Name)
 	assert.Equal(t, ASN1Type("OctetString"), resolved.Type)
 }
@@ -2153,7 +2005,7 @@ func TestResolve2TierRawFallback(t *testing.T) {
 		Value: int64(12345),
 	}
 
-	resolved := resolve2TierVarbind("1.3.6.1.4.1.99999.1.1", raw, nil)
+	resolved := ResolveVarbind("1.3.6.1.4.1.99999.1.1", raw, nil)
 	assert.Equal(t, "customVarbind", resolved.Name)
 	assert.Equal(t, ASN1Type("Counter32"), resolved.Type)
 }
@@ -2165,7 +2017,7 @@ func TestResolve2TierRawFallbackNoName(t *testing.T) {
 		Value: int64(12345),
 	}
 
-	resolved := resolve2TierVarbind("1.3.6.1.4.1.99999.1.1", raw, nil)
+	resolved := ResolveVarbind("1.3.6.1.4.1.99999.1.1", raw, nil)
 	assert.Equal(t, "1.3.6.1.4.1.99999.1.1", resolved.OID)
 	assert.Equal(t, ASN1Type("Counter32"), resolved.Type)
 }
@@ -2190,17 +2042,17 @@ traps:
 `)
 
 	setTestDirs(t, dir)
-	resetProfileCacheForTest()
+	resetTestEpoch()
 
-	idx, err := AcquireProfileCache()
+	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
-	defer ReleaseProfileCache()
+	defer releaseTestEpoch()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
 
 	raw := VarbindValue{OID: "1.3.6.1.2.1.2.2.1.8", Type: "INTEGER", Value: int64(2)}
-	resolved := resolve2TierVarbind("1.3.6.1.2.1.2.2.1.8", raw, td)
+	resolved := ResolveVarbind("1.3.6.1.2.1.2.2.1.8", raw, td)
 	assert.Equal(t, "down", resolved.Enum)
 }
 
@@ -2208,7 +2060,7 @@ func TestResolve2TierResolvesTabularVarbindInstance(t *testing.T) {
 	td := testIFMIBLinkDownTrapDef()
 	raw := VarbindValue{OID: testIFMIBIfOperStatusOID + ".1", Type: "INTEGER", Value: int64(2)}
 
-	resolved := resolve2TierVarbind(raw.OID, raw, td)
+	resolved := ResolveVarbind(raw.OID, raw, td)
 
 	assert.Equal(t, "ifOperStatus", resolved.Name)
 	assert.Equal(t, testIFMIBIfOperStatusOID+".1", resolved.OID)
@@ -2222,13 +2074,11 @@ func TestResolve2TierResolvesTabularVarbindInstance(t *testing.T) {
 // =============================================================================
 
 func TestStockProfileIndexLoads(t *testing.T) {
-	resetProfileCacheForTest()
-
-	idx, err := AcquireProfileCache()
-	if err != nil {
-		t.Skipf("no stock profiles available: %v", err)
-	}
-	defer ReleaseProfileCache()
+	stockDir := testStockProfilesDir(t)
+	lease, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	idx := lease.Epoch()
 
 	assert.NotNil(t, idx)
 	assert.Empty(t, idx.trapsByOID, "stock profiles should be routed lazily, not retained at startup")
@@ -2248,33 +2098,35 @@ func TestStockProfileIndexLoads(t *testing.T) {
 }
 
 func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
-	stockDir := trapProfilesDirFromThisFile()
-	if stockDir == "" {
-		t.Skip("no stock profiles available")
-	}
+	stockDir := testStockProfilesDir(t)
 	cataloguePath := filepath.Join(filepath.Dir(stockDir), "catalogue.json")
 	data, err := os.ReadFile(cataloguePath)
 	require.NoError(t, err)
 
 	var catalogue map[string]struct {
-		File      string   `json:"file"`
-		TrapCount int      `json:"trap_count"`
-		TrapOIDs  []string `json:"trap_oids"`
+		File            string   `json:"file"`
+		MIBs            []string `json:"mibs"`
+		MetricRuleNames []string `json:"metric_rule_names"`
+		TrapCount       int      `json:"trap_count"`
+		TrapOIDs        []string `json:"trap_oids"`
 	}
 	require.NoError(t, json.Unmarshal(data, &catalogue))
 	require.NotEmpty(t, catalogue)
 
-	files, err := profileFilesInDir(stockDir)
+	entries, err := os.ReadDir(stockDir)
 	require.NoError(t, err)
-	require.NotEmpty(t, files)
+	require.NotEmpty(t, entries)
 
-	routesByFile := make(map[string]profileTrapRoutes, len(files))
+	routesByFile := make(map[string]profileTrapRoutes, len(entries))
 	totalFiles := 0
-	for _, path := range files {
-		name := filepath.Base(path)
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !isProfileFileName(name) || strings.HasPrefix(name, "_") {
+			continue
+		}
 		require.False(t, strings.HasSuffix(name, ".zst"), "stock profiles must stay uncompressed in the repository")
 		require.False(t, strings.HasSuffix(name, ".gz"), "stock profiles must stay uncompressed in the repository")
-		routes := profileTrapRoutesFromFile(t, path)
+		routes := profileTrapRoutesFromFile(t, filepath.Join(stockDir, name))
 		routesByFile[name] = routes
 		totalFiles += len(routes.oids)
 	}
@@ -2287,102 +2139,48 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 		require.True(t, ok, "catalogue entry %q references missing profile file %q", vendor, entry.File)
 		assert.Equal(t, entry.TrapCount, len(routes.oids), "catalogue trap_count mismatch for %s", entry.File)
 		assert.Equal(t, routes.oids, entry.TrapOIDs, "catalogue trap_oids mismatch for %s", entry.File)
+		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.File), multipath.New(stockDir), nil)
+		require.NoError(t, err, "stock profile %s", entry.File)
+		expected := stockProfileRoutes{
+			trapOIDs:        append([]string(nil), entry.TrapOIDs...),
+			mibs:            append([]string(nil), entry.MIBs...),
+			metricRuleNames: append([]string(nil), entry.MetricRuleNames...),
+		}
+		slices.Sort(expected.trapOIDs)
+		slices.Sort(expected.mibs)
+		slices.Sort(expected.metricRuleNames)
+		require.NoError(t, validateStockProfileRoutes(vendor, expected, bundle), "stock profile %s", entry.File)
 		totalCatalogue += entry.TrapCount
 	}
 	assert.Equal(t, totalFiles, totalCatalogue, "catalogue trap_count sum must match profile files")
 }
 
 func TestStockProfileDefaultFilesParse(t *testing.T) {
-	stockDir := trapProfilesDirFromThisFile()
-	if stockDir == "" {
-		t.Skip("no stock profiles available")
-	}
-
-	files, err := loadProfilesFromDir(stockDir, multipath.New(stockDir))
+	stockDir := testStockProfilesDir(t)
+	entries, err := os.ReadDir(stockDir)
 	require.NoError(t, err)
-	require.NotEmpty(t, files)
+	require.NotEmpty(t, entries)
 
 	totalTraps := 0
-	for _, file := range files {
-		require.NotEmpty(t, file.name)
-		require.NotEmpty(t, file.traps, "stock profile %s parsed without traps", file.name)
-		totalTraps += len(file.traps)
+	for _, entry := range entries {
+		if entry.IsDir() || !isProfileFileName(entry.Name()) || strings.HasPrefix(entry.Name(), "_") {
+			continue
+		}
+		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.Name()), multipath.New(stockDir), nil)
+		require.NoError(t, err, "stock profile %s", entry.Name())
+		require.NotEmpty(t, bundle.traps, "stock profile %s parsed without traps", entry.Name())
+		totalTraps += len(bundle.traps)
 	}
 	require.Positive(t, totalTraps)
 }
 
-func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
-	resetProfileCacheForTest()
-
-	idx, err := AcquireProfileCache()
-	if err != nil {
-		t.Skipf("no stock profiles available: %v", err)
-	}
-	defer ReleaseProfileCache()
-
-	tests := map[string]struct {
-		oid          string
-		wantContains []string
-		stateWord    string
-	}{
-		"linkDown": {
-			oid:          testIFMIBLinkDownOID,
-			wantContains: []string{"1", "down", "lab-switch"},
-			stateWord:    "down",
-		},
-		"linkUp": {
-			oid:          testIFMIBLinkUpOID,
-			wantContains: []string{"1", "up", "lab-switch"},
-			stateWord:    "up",
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			td := idx.Lookup(tc.oid)
-			require.NotNil(t, td)
-
-			entry := trapEntryFromPDU("local", &TrapPDU{
-				OID:      tc.oid,
-				SourceIP: "198.51.100.10",
-				PeerIP:   "198.51.100.10",
-				Version:  SnmpVersionV2c,
-				PduType:  PduTypeTrap,
-				Varbinds: []VarbindValue{
-					{OID: testIFMIBIfIndexOID + ".1", Type: "INTEGER", Value: int64(1)},
-				},
-			}, td, 1000000, 1000)
-			entry.DeviceHostname = "lab-switch"
-
-			renderTrapEntryTemplates(entry, td)
-
-			for _, want := range tc.wantContains {
-				assert.Contains(t, entry.Message, want)
-			}
-			assert.NotContains(t, entry.Message, "ifOperStatus")
-			assert.NotContains(t, entry.Message, "ifAdminStatus")
-			assert.NotContains(t, entry.Message, "changed to")
-			assert.False(t, hasUnresolvedTemplateMarker(entry.Message))
-
-			entry = trapEntryFromPDU("local", &TrapPDU{
-				OID:      tc.oid,
-				SourceIP: "198.51.100.10",
-				PeerIP:   "198.51.100.10",
-				Version:  SnmpVersionV2c,
-				PduType:  PduTypeTrap,
-			}, td, 1000000, 1000)
-			entry.DeviceHostname = "lab-switch"
-
-			renderTrapEntryTemplates(entry, td)
-
-			assert.Contains(t, entry.Message, tc.stateWord)
-			assert.Contains(t, entry.Message, "lab-switch")
-			assert.NotContains(t, entry.Message, "ifOperStatus")
-			assert.NotContains(t, entry.Message, "ifAdminStatus")
-			assert.NotContains(t, entry.Message, "changed to")
-			assert.False(t, hasUnresolvedTemplateMarker(entry.Message))
-		})
-	}
+func testStockProfilesDir(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Clean("../../../../config/go.d/snmp.trap-profiles/default")
+	info, err := os.Stat(dir)
+	require.NoError(t, err)
+	require.True(t, info.IsDir())
+	return dir
 }
 
 // =============================================================================
@@ -2405,16 +2203,16 @@ func testIFMIBLinkDownTrapDef() *TrapDef {
 		Severity:    "warning",
 		Description: `Link {{value "ifIndex"}} operational state changed to {{value "ifOperStatus"}} on {{hostname}}.`,
 		VarbindRefs: []any{"ifIndex", "ifAdminStatus", "ifOperStatus"},
-		sharedVarbinds: map[string]*VarbindDef{
+		SharedVarbinds: map[string]*VarbindDef{
 			testIFMIBIfIndexOID: {
 				OID:     testIFMIBIfIndexOID,
 				Type:    "INTEGER",
-				rawName: "ifIndex",
+				RawName: "ifIndex",
 			},
 			testIFMIBIfAdminStatusOID: {
 				OID:     testIFMIBIfAdminStatusOID,
 				Type:    "INTEGER",
-				rawName: "ifAdminStatus",
+				RawName: "ifAdminStatus",
 				Enum: map[string]string{
 					"1": "up",
 					"2": "down",
@@ -2424,7 +2222,7 @@ func testIFMIBLinkDownTrapDef() *TrapDef {
 			testIFMIBIfOperStatusOID: {
 				OID:     testIFMIBIfOperStatusOID,
 				Type:    "INTEGER",
-				rawName: "ifOperStatus",
+				RawName: "ifOperStatus",
 				Enum: map[string]string{
 					"1": "up",
 					"2": "down",
@@ -2433,9 +2231,9 @@ func testIFMIBLinkDownTrapDef() *TrapDef {
 			},
 		},
 	}
-	fileVarbinds := make(map[string]VarbindDef, len(td.sharedVarbinds))
-	for _, vb := range td.sharedVarbinds {
-		fileVarbinds[vb.rawName] = *vb
+	fileVarbinds := make(map[string]VarbindDef, len(td.SharedVarbinds))
+	for _, vb := range td.SharedVarbinds {
+		fileVarbinds[vb.RawName] = *vb
 	}
 	if err := compileTrapTemplates(td, fileVarbinds); err != nil {
 		panic(err)
@@ -2448,21 +2246,6 @@ func testIFMIBLinkDownEntry() *TrapEntry {
 		TrapOID:  testIFMIBLinkDownOID,
 		TrapName: "IF-MIB::linkDown",
 		SourceIP: "198.51.100.10",
-		Varbinds: []VarbindValue{
-			{OID: testIFMIBIfIndexOID + ".1", Type: "INTEGER", Value: int64(1)},
-			{OID: testIFMIBIfAdminStatusOID + ".1", Type: "INTEGER", Value: int64(1)},
-			{OID: testIFMIBIfOperStatusOID + ".1", Type: "INTEGER", Value: int64(2)},
-		},
-	}
-}
-
-func testIFMIBLinkDownPDU() *TrapPDU {
-	return &TrapPDU{
-		OID:      testIFMIBLinkDownOID,
-		SourceIP: "198.51.100.10",
-		PeerIP:   "198.51.100.10",
-		Version:  SnmpVersionV2c,
-		PduType:  PduTypeTrap,
 		Varbinds: []VarbindValue{
 			{OID: testIFMIBIfIndexOID + ".1", Type: "INTEGER", Value: int64(1)},
 			{OID: testIFMIBIfAdminStatusOID + ".1", Type: "INTEGER", Value: int64(1)},
@@ -2490,6 +2273,17 @@ func writeProfileYAMLZstd(t *testing.T, dir, name, content string) {
 	_, err = zw.Write([]byte(content))
 	require.NoError(t, err)
 	require.NoError(t, zw.Close())
+}
+
+func writeStockCatalogue(t *testing.T, stockDir string, catalogue stockProfileCatalogue, compressed bool) {
+	t.Helper()
+	data, err := json.Marshal(catalogue)
+	require.NoError(t, err)
+	if compressed {
+		writeProfileYAMLZstd(t, filepath.Dir(stockDir), "catalogue.json.zst", string(data))
+		return
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(stockDir), "catalogue.json"), data, 0o644))
 }
 
 func writeGzipFile(t *testing.T, dir, name, content string) {

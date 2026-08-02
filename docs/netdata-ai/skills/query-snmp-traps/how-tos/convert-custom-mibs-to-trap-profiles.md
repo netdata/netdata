@@ -71,9 +71,11 @@ Netdata SNMP trap profile YAMLs?
 
 6. Restart the Netdata Agent or recreate all active SNMP trap jobs.
 
-   Profiles are immutable while the shared cache has active job references.
-   The final job release unloads the cache; the next job creation loads and
-   validates the operator profile files.
+   Profiles are immutable while the shared catalog epoch has active job leases.
+   The final lease release unloads the epoch; the next job creation loads and
+   validates the operator profile files. The generated `catalogue.json` is a
+   review artifact for the conversion output; install the selected YAML files,
+   not that generated manifest, in the operator profile directory.
 
 7. Verify that unknown OIDs resolve:
 

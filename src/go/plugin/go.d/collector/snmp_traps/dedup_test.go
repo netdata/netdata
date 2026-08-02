@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateDedupConfig(t *testing.T) {
@@ -295,14 +296,14 @@ func TestTrapDeduperCacheCapEvictsOldestEntry(t *testing.T) {
 
 func TestTrapDeduperSummaryEntry(t *testing.T) {
 	writer := &mockTrapWriter{}
-	// Test-only shortcut: the deduper summary test does not run Collector.Init(),
-	// so it seeds the immutable shared index without touching refcounts.
-	globalProfileCache.current.Store(&ProfileIndex{trapsByOID: map[string]*TrapDef{
-		"1.3.6.1.6.3.1.1.5.3": {Name: "SNMPv2-MIB::linkDown"},
-	}})
-	t.Cleanup(func() { globalProfileCache.current.Store(nil) })
+	idx := newProfileIndex()
+	require.NoError(t, idx.AddTraps([]*TrapDef{{
+		OID:  "1.3.6.1.6.3.1.1.5.3",
+		Name: "SNMPv2-MIB::linkDown",
+	}}))
 	metrics := &perJobMetrics{}
 	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, metrics, "")
+	d.profiles = idx
 
 	entry := &TrapEntry{
 		SourceIP:       "198.51.100.10",

@@ -1627,29 +1627,24 @@ Required behavior:
 - The selected rule set must respect the fixed 500-rule limit before the job starts.
 - Lazy stock trap decode loading must not delay metric-rule validation until
   trap arrival.
-- The implementation may satisfy this by eagerly loading metric sections, by
-  shipping a generated stock metric-rule catalog, or by loading selected stock
-  profiles during `Check()`.
-- The Phase A implementation keeps operator profiles eager. Stock profiles stay
-  lazy only when the loaded profile set has no metric rules and no job enables
-  `profile_metrics`. If custom profile metric rules exist, or if a job enables
-  `profile_metrics`, stock profiles are loaded before rule selection so stock
-  metric rules and custom operator metric rules that reference stock trap names
-  validate before trap arrival.
+- The generated stock manifest records `metric_rule_names` for every profile.
+  During job creation, `profile_metrics.include` hydrates only the stock files
+  that own the requested rules.
+- Operator profiles remain eager. An operator metric rule that references a
+  stock trap by MIB-qualified name hydrates only the stock profiles routed by
+  that MIB before job creation completes.
 - The chosen implementation must preserve the existing lazy decode behavior for
   jobs that do not enable profile metrics.
-- The implementation must measure the metric catalog memory footprint when stock
-  metric rules are introduced. If the catalog is materially larger than the
-  decode catalog used today, the first implementation must load only metric
-  sections needed for validation rather than forcing full stock decode loading
-  for every non-metric job.
+- The manifest is the stock metric-rule index. The implementation must not build
+  a second complete in-memory metric catalog or parse the complete stock pack.
 
 ### Profile Lifecycle
 
-Profiles and metric rules are immutable while the shared cache has active job
-references. After editing operator profiles, restart the Agent or recreate all
-running `snmp_traps` jobs. The final release unloads the cache; the next job
-creation loads profiles and validates `profile_metrics.include` from scratch.
+Profiles and metric rules are immutable within a shared catalog epoch while
+jobs hold leases. After editing operator profiles, restart the Agent or recreate
+all running `snmp_traps` jobs. The final lease release unloads the epoch; the
+next job creation loads profiles and validates `profile_metrics.include` from
+scratch.
 
 ### Runtime Ordering
 
@@ -1973,8 +1968,8 @@ The implementation must retain tests for:
 - generated metadata/integration documentation updates;
 - health alert compatibility when chart identity or labels change;
 - profile generator preservation of curated metric rules;
-- shared cache epoch behavior when profiles change between the final release and
-  next acquisition;
+- shared catalog epoch behavior when profiles change between the final lease
+  release and next acquisition;
 - job restart behavior for `profile_metrics` configuration changes;
 - dedup/write-failure runtime ordering;
 - rejection or removal of the obsolete job-level trap `metrics:` authoring path;
