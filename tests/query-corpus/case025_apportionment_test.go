@@ -30,10 +30,8 @@ func c025ExpectedSum(
 		rowStart := base + int64(row)*rowSpan
 		rowEnd := rowStart + rowSpan
 		var value float64
+		partial := false
 		for i := 1; i <= samples; i++ {
-			if !included(i) {
-				continue
-			}
 			recordStart := base + int64((i-1)*updateEvery)
 			recordEnd := recordStart + int64(updateEvery)
 			overlapStart := rowStart
@@ -45,13 +43,21 @@ func c025ExpectedSum(
 				overlapEnd = recordEnd
 			}
 			if overlapEnd > overlapStart {
-				value += float64(i) * float64(overlapEnd-overlapStart) / float64(updateEvery)
+				if included(i) {
+					value += float64(i) * float64(overlapEnd-overlapStart) / float64(updateEvery)
+				} else {
+					partial = true
+				}
 			}
 		}
 		if value == 0 {
 			want[row] = wantEmptyWithMetadataAt(rowEnd, 0, canon.AnnotationEmpty)
 		} else {
-			want[row] = wantNumberWithMetadataAt(rowEnd, value, 0, 0)
+			pa := int64(0)
+			if partial {
+				pa = canon.AnnotationPartial
+			}
+			want[row] = wantNumberWithMetadataAt(rowEnd, value, 0, pa)
 		}
 	}
 	return want
