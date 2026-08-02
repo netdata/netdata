@@ -918,6 +918,40 @@ func TestHotSerializerCanonicalCases(t *testing.T) {
 	}
 }
 
+func TestHotSerializerTRAPJSONCanonicalValueTypes(t *testing.T) {
+	entry := &model.TrapEntry{
+		JobName:    "local",
+		ReportType: model.ReportTypeTrap,
+		TrapOID:    ".0",
+		SourceIP:   "192.0.2.1",
+		Varbinds: []model.VarbindValue{
+			{Name: "string", OID: ".1", Type: "OctetString", Value: "quote\"\\line\n"},
+			{Name: "int", OID: ".2", Type: "INTEGER", Value: int64(-3)},
+			{Name: "uint", OID: ".3", Type: "Counter64", Value: uint64(7)},
+			{Name: "float", OID: ".4", Type: "OpaqueFloat", Value: float64(1.25)},
+			{Name: "bool", OID: ".5", Type: "BOOLEAN", Value: true},
+			{Name: "bytes", OID: ".6", Type: "OctetString", Value: []byte{0x00, 0x0f, 0xff}},
+			{Name: "nil", OID: ".7", Type: "Null", Value: nil},
+		},
+	}
+
+	fields, err := serializeHotFields(entry)
+	if err != nil {
+		t.Fatalf("serializeHotFields: %v", err)
+	}
+
+	want := `{"bool":{"oid":".5","type":"BOOLEAN","value":true},` +
+		`"bytes":{"oid":".6","type":"OctetString","value":"000fff"},` +
+		`"float":{"oid":".4","type":"OpaqueFloat","value":1.25},` +
+		`"int":{"oid":".2","type":"INTEGER","value":-3},` +
+		`"nil":{"oid":".7","type":"Null","value":null},` +
+		`"string":{"oid":".1","type":"OctetString","value":"quote\"\\line\n"},` +
+		`"uint":{"oid":".3","type":"Counter64","value":7}}`
+	if got := fieldsToMap(fields)["TRAP_JSON"]; got != want {
+		t.Fatalf("TRAP_JSON = %q, want %q", got, want)
+	}
+}
+
 func assertField(t *testing.T, fieldMap map[string]string, name, expected string) {
 	t.Helper()
 	if got, ok := fieldMap[name]; !ok {

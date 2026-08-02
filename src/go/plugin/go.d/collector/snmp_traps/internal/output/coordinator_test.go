@@ -16,6 +16,8 @@ var _ Writer = (*mockWriter)(nil)
 
 type mockWriter struct {
 	mu                  sync.Mutex
+	name                string
+	calls               *[]string
 	entries             []*model.TrapEntry
 	flushes             int
 	closeAttempts       int
@@ -37,6 +39,9 @@ func (m *mockWriter) Write(entry *model.TrapEntry) error {
 func (m *mockWriter) Flush() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.calls != nil {
+		*m.calls = append(*m.calls, m.name+".flush")
+	}
 	if m.err != nil {
 		return m.err
 	}
@@ -53,6 +58,9 @@ func (m *mockWriter) BinaryEncodedFields() uint64 {
 func (m *mockWriter) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.calls != nil {
+		*m.calls = append(*m.calls, m.name+".close")
+	}
 	m.closeAttempts++
 	m.closed = true
 	return m.err
@@ -112,8 +120,9 @@ func TestCoordinatorPrimaryFailureStillAttemptsSecondaryWrite(t *testing.T) {
 func TestCoordinatorFlushAndClosePreserveOrderAndJoinErrors(t *testing.T) {
 	primaryErr := errors.New("primary failed")
 	secondaryErr := errors.New("secondary failed")
-	primary := &mockWriter{err: primaryErr}
-	secondary := &mockWriter{err: secondaryErr}
+	var calls []string
+	primary := &mockWriter{name: "primary", calls: &calls, err: primaryErr}
+	secondary := &mockWriter{name: "secondary", calls: &calls, err: secondaryErr}
 	writer := NewCoordinator(primary, secondary, BackendOTLP, nil)
 
 	flushErr := writer.Flush()
@@ -125,6 +134,12 @@ func TestCoordinatorFlushAndClosePreserveOrderAndJoinErrors(t *testing.T) {
 	require.ErrorIs(t, closeErr, secondaryErr)
 	assert.Equal(t, 1, primary.closeAttempts)
 	assert.Equal(t, 1, secondary.closeAttempts)
+	assert.Equal(t, []string{
+		"primary.flush",
+		"secondary.flush",
+		"primary.close",
+		"secondary.close",
+	}, calls)
 }
 
 func TestCoordinatorForwardsBinaryEncodedFieldsFromPrimary(t *testing.T) {

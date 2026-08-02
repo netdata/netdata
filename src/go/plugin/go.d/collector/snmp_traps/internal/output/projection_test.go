@@ -17,10 +17,26 @@ func TestSortedLabelKeysReusesDestination(t *testing.T) {
 	assert.Equal(t, cap(dst), cap(got))
 }
 
-func TestCanonicalizeValueUsesStringFallback(t *testing.T) {
-	got := CanonicalizeValue(struct{ Value string }{Value: "opaque"})
-	assert.Equal(t, ValueString, got.Kind)
-	assert.Equal(t, "{opaque}", got.String)
+func TestCanonicalizeValue(t *testing.T) {
+	tests := map[string]struct {
+		value any
+		want  CanonicalValue
+	}{
+		"nil":      {want: CanonicalValue{Kind: ValueNull}},
+		"string":   {value: "text", want: CanonicalValue{Kind: ValueString, String: "text"}},
+		"int64":    {value: int64(-42), want: CanonicalValue{Kind: ValueInt64, Int64: -42}},
+		"uint64":   {value: uint64(42), want: CanonicalValue{Kind: ValueUint64, Uint64: 42}},
+		"float64":  {value: 1.25, want: CanonicalValue{Kind: ValueFloat64, Float64: 1.25}},
+		"bool":     {value: true, want: CanonicalValue{Kind: ValueBool, Bool: true}},
+		"bytes":    {value: []byte{0x00, 0x0f, 0xff}, want: CanonicalValue{Kind: ValueBytes, Bytes: []byte{0x00, 0x0f, 0xff}}},
+		"fallback": {value: struct{ Value string }{Value: "opaque"}, want: CanonicalValue{Kind: ValueString, String: "{opaque}"}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, CanonicalizeValue(tc.value))
+		})
+	}
 }
 
 func TestVarbindProjector(t *testing.T) {

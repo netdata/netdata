@@ -5,6 +5,7 @@ package otlp
 import (
 	"context"
 	"errors"
+	"math"
 	"net"
 	"os"
 	"sync"
@@ -230,6 +231,28 @@ func TestOTLPTrapEntrySerialization(t *testing.T) {
 	assert.Equal(t, "1.3.6.1.2.1.31.1.1.1.1.7", ifName["oid"].GetStringValue())
 	assert.Equal(t, "OctetString", ifName["type"].GetStringValue())
 	assert.Equal(t, "Gi1/0/1", ifName["value"].GetStringValue())
+}
+
+func TestOTLPAnyValueCanonicalTypes(t *testing.T) {
+	tests := map[string]struct {
+		value any
+		want  *commonpb.AnyValue
+	}{
+		"nil":      {want: &commonpb.AnyValue{}},
+		"string":   {value: "text", want: otlpStringValue("text")},
+		"int64":    {value: int64(-42), want: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: -42}}},
+		"uint64":   {value: uint64(42), want: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 42}}},
+		"big uint": {value: uint64(math.MaxInt64) + 1, want: otlpStringValue("9223372036854775808")},
+		"float64":  {value: 1.25, want: &commonpb.AnyValue{Value: &commonpb.AnyValue_DoubleValue{DoubleValue: 1.25}}},
+		"bool":     {value: true, want: &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}}},
+		"bytes":    {value: []byte{0x00, 0x0f, 0xff}, want: otlpStringValue("000fff")},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, otlpAnyValue(output.CanonicalizeValue(tc.value)))
+		})
+	}
 }
 
 func TestOTLPTrapEntrySerializationOmitsCommunityVarbind(t *testing.T) {
