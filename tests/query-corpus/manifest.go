@@ -312,6 +312,10 @@ var manifest = map[string]ManifestCase{
 	"CASE-035/transition-volume-speeding-up": {
 		Proves: "the update_every 10 to 1 mirror preserves exact fixture-measured rate volume in the complete historical control row and the next row containing both cadences, at forced tiers 1 and 2 against a raw tier0 control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
 	},
+	"CASE-035/tier0-page-boundary-keeps-every-sample": {
+		Proves:     "a DBENGINE tier-0 query crossing adjacent pages with different collection cadences returns every stored sample exactly once. The 10-to-1 direction pins the first ten fine-page samples so advancing by the old ten-second cadence cannot skip nine of them; the 1-to-10 mirror proves the fix does not duplicate or shift the first coarse-page sample. Exact SUM rows come from the fixture's per-sample rate-times-duration ledger, and the public timestamp grid is unchanged",
+		Components: []string{"slows-down", "speeds-up"},
+	},
 	"CASE-036/absolute-across-plan-seam": {
 		Proves: "options=absolute applies to the point read from the incoming tier plan: a negative flat line stays exactly positive in every 1-second row across an automatic tier1-to-tier0 seam, with tier1-only and tier0-only controls and strict source-tier evidence",
 	},
