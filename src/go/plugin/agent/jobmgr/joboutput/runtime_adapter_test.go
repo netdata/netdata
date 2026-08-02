@@ -61,7 +61,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 	)
 	require.NoError(t, err)
 	attached.outputGate = gate
-	require.NoError(t, owner.Replace(attached))
+	require.NoError(t, owner.AdoptAttachment(attached))
 
 	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
 	require.NoError(t, permit.ActivateExternal())
@@ -111,7 +111,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 	require.EqualValues(t, 1, cleanups)
 }
 
-func TestProcessOwnedJobCannotAttachAfterTargetRetirementFinalizesCandidate(t *testing.T) {
+func TestProcessOwnedJobAttachmentPreservesTargetRetirementAfterCandidateFinalizes(t *testing.T) {
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -159,7 +159,12 @@ func TestProcessOwnedJobCannotAttachAfterTargetRetirementFinalizesCandidate(t *t
 		candidate.CollectorCleanup,
 		owner,
 	)
-	require.Error(t, err)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptRetired)
+	require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+		err,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	))
 }
 
 func TestStagedJobPromotionDoesNotStartAfterCallerCancellation(t *testing.T) {

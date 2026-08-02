@@ -565,8 +565,15 @@ flowchart TD
    `Stop`, Function drain, and collector cleanup remain process-owned until they return.
 5. **Promote, attach, and start** — the candidate acquires the separate `job-runtime` identity only after logical
    retirement. Candidate `Init`/`Check` may overlap the incumbent, but two installed runtimes for one job cannot.
-   - After promotion the staged runtime/vnode/Function projections attach, the permit and output gate activate, and
-     the managed loop starts.
+   - Attachment reports whether ownership transferred. The process owner adopts every transferred wrapper and partial or
+     completed Function lifecycle even when retirement already won, so rejection finalizes them exactly once. A
+     no-transfer failure is never inferred from cleanup fields and never triggers adoption.
+   - Runtime/vnode projections attach outside the staged-owner lock because they call external registries. The owner then
+     linearizes retirement against output-gate activation, permit activation, and accepted-cleanup freezing in that order.
+   - Retirement before an otherwise-valid attachment bind returns the exact process-attempt cause even when that
+     retirement already finalized the candidate. Independent duplicate, decided, or invalid transitions remain
+     fail-closed.
+   - Once output and permit acceptance wins, the managed loop starts.
    - The resource transaction owns this successor until installation acknowledgement. An apply failure aborts it when
      possible, or returns the still-live retained generation to the kernel for fail-closed ownership.
    - If the old runtime does not release within the supersession grace, the candidate is rejected and the

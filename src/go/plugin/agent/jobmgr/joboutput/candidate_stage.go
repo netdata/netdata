@@ -118,9 +118,12 @@ func newStagedJobOwner(
 	}
 }
 
-func (sjo *stagedJobOwner) Replace(resources ConstructedJob) error {
+// AdoptAttachment transfers the process-managed wrapper and any completed or
+// partial handler attachment to the process owner. Adoption remains valid while
+// retiring so rejection can finalize every transferred capability.
+func (sjo *stagedJobOwner) AdoptAttachment(resources ConstructedJob) error {
 	if sjo == nil {
-		return errors.New("job output: nil staged job resource replacement")
+		return errors.New("job output: nil staged job attachment adoption")
 	}
 	sjo.mu.Lock()
 	defer sjo.mu.Unlock()
@@ -128,14 +131,14 @@ func (sjo *stagedJobOwner) Replace(resources ConstructedJob) error {
 		!sjo.attached ||
 		sjo.decided ||
 		sjo.finalized {
-		return errors.New("job output: invalid staged job resource replacement")
+		return errors.New("job output: invalid staged job attachment adoption")
 	}
 	sjo.resources = resources
 	return nil
 }
 
-// AcceptResources linearizes permit activation with freezing the accepted
-// cleanup contract, then returns the same resource value to the generation.
+// AcceptResources linearizes retirement against output and permit activation,
+// then freezes the accepted cleanup contract.
 func (sjo *stagedJobOwner) AcceptResources(permit lifecycle.LongLivedPermit) (ConstructedJob, error) {
 	if sjo == nil {
 		return ConstructedJob{}, errors.New("job output: nil staged job acceptance")
@@ -151,10 +154,13 @@ func (sjo *stagedJobOwner) AcceptResources(permit lifecycle.LongLivedPermit) (Co
 	if sjo.retiring {
 		return ConstructedJob{}, sjo.retirementErrorLocked("job output: invalid staged job acceptance")
 	}
+	resources := sjo.resources
+	if err := resources.outputGate.Activate(); err != nil {
+		return ConstructedJob{}, err
+	}
 	if err := permit.ActivateExternal(); err != nil {
 		return ConstructedJob{}, err
 	}
-	resources := sjo.resources
 	if resources.finalCleanup != nil {
 		resources.CollectorCleanup = resources.finalCleanup
 		resources.finalCleanup = nil
@@ -169,14 +175,14 @@ func (sjo *stagedJobOwner) BindAttachment() error {
 	}
 	sjo.mu.Lock()
 	defer sjo.mu.Unlock()
-	if sjo.ownership != stagedJobOwnedByRuntime ||
-		sjo.attached ||
-		sjo.decided ||
-		sjo.finalized {
+	if sjo.ownership != stagedJobOwnedByRuntime || sjo.attached || sjo.decided {
 		return errors.New("job output: invalid staged job attachment binding")
 	}
 	if sjo.retiring {
 		return sjo.retirementErrorLocked("job output: invalid staged job attachment binding")
+	}
+	if sjo.finalized {
+		return errors.New("job output: invalid staged job attachment binding")
 	}
 	sjo.attached = true
 	return nil

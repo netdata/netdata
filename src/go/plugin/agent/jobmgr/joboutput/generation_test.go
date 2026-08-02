@@ -5,12 +5,16 @@ package joboutput
 import (
 	"bytes"
 	"context"
+	"errors"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,10 +60,15 @@ func TestPreparedJobAcceptanceTransfersFinalCleanupToProcessOwner(t *testing.T) 
 	})
 	var rejected, final int
 	identity := lifecycle.ResourceIdentity{ID: "module_job", Generation: 1}
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
 	candidate := ConstructedJob{
 		Variant:          JobVariantV1,
 		CollectorCleanup: func(context.Context) error { rejected++; return nil },
 		finalCleanup:     func(context.Context) error { final++; return nil },
+		outputGate:       gate,
 	}
 	owner := newStagedJobOwner(
 		context.Background(),
@@ -75,9 +84,9 @@ func TestPreparedJobAcceptanceTransfersFinalCleanupToProcessOwner(t *testing.T) 
 	candidate.attach = func(
 		lifecycle.ResourceIdentity,
 		*stagedJobOwner,
-	) (ConstructedJob, error) {
+	) (constructedJobAttachment, error) {
 		require.NoError(t, owner.BindAttachment())
-		return candidate, nil
+		return constructedJobAttachment{resources: candidate, transferred: true}, nil
 	}
 	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
 	prepared := PreparedJob{state: &preparedJobState{
@@ -105,7 +114,7 @@ func TestPreparedJobAcceptanceTransfersFinalCleanupToProcessOwner(t *testing.T) 
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
-func TestPreparedJobRetirementBeforeResourceAcceptanceLeavesPermitUnused(t *testing.T) {
+func TestStagedJobRetirementBeforeResourceAcceptanceLeavesPermitUnused(t *testing.T) {
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -113,10 +122,17 @@ func TestPreparedJobRetirementBeforeResourceAcceptanceLeavesPermitUnused(t *test
 		require.NoError(t, attempts.Shutdown(context.Background()))
 	})
 	identity := lifecycle.ResourceIdentity{ID: "module_job", Generation: 1}
+	var output bytes.Buffer
+	frames, err := lifecycle.NewFrameOwner(&output)
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	var cleanups int
 	candidate := ConstructedJob{
 		Variant:          JobVariantV1,
-		CollectorCleanup: func(context.Context) error { return nil },
+		CollectorCleanup: func(context.Context) error { cleanups++; return nil },
 		finalCleanup:     func(context.Context) error { return nil },
+		outputGate:       gate,
 	}
 	owner := newStagedJobOwner(
 		context.Background(),
@@ -129,30 +145,299 @@ func TestPreparedJobRetirementBeforeResourceAcceptanceLeavesPermitUnused(t *test
 			Resource:  identity.ID,
 		},
 	)
-	candidate.attach = func(
-		lifecycle.ResourceIdentity,
-		*stagedJobOwner,
-	) (ConstructedJob, error) {
-		require.NoError(t, owner.BindAttachment())
-		candidate.activateAttachment = func() error {
-			owner.Retire()
-			return nil
-		}
-		return candidate, nil
-	}
+	require.NoError(t, owner.Promote(context.Background()))
+	require.NoError(t, owner.BindAttachment())
+	require.NoError(t, owner.AdoptAttachment(candidate))
 	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
-	prepared := PreparedJob{state: &preparedJobState{
-		id:          identity.ID,
-		generation:  identity.Generation,
-		constructed: candidate,
-		permit:      permit,
-		owner:       owner,
-	}}
+	require.EqualValues(t, 1, attempts.CutTarget(1))
+	requireTestSignal(t, owner.retire, "runtime owner did not record retirement")
 
-	_, err = prepared.Accept(context.Background(), identity.Generation)
-	require.Error(t, err)
+	_, err = owner.AcceptResources(permit)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptRetired)
+	require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+		err,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	))
+	require.NoError(t, permit.AbortUnused())
+	owner.Reject()
+	requireTestSignal(t, owner.done, "retired runtime owner did not finalize")
+	_, writeErr := gate.Write([]byte("late\n"))
+	require.ErrorIs(t, writeErr, errGenerationOutputFenced)
+	require.Empty(t, output.Bytes())
+	require.EqualValues(t, 1, cleanups)
 
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
+func TestStagedJobAcceptanceRejectsInvalidOutputGate(t *testing.T) {
+	tests := map[string]struct {
+		gate func(*testing.T) *generationOutputGate
+		want string
+	}{
+		"missing": {
+			gate: func(*testing.T) *generationOutputGate { return nil },
+			want: "job output: nil generation output gate",
+		},
+		"already active": {
+			gate: func(t *testing.T) *generationOutputGate {
+				frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+				require.NoError(t, err)
+				gate, err := newGenerationOutputGate(frames)
+				require.NoError(t, err)
+				require.NoError(t, gate.Activate())
+				return gate
+			},
+			want: "job output: invalid generation output activation",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			attempts, err := containment.NewAuthority(nil)
+			require.NoError(t, err)
+			candidate := ConstructedJob{
+				Variant:          JobVariantV1,
+				CollectorCleanup: func(context.Context) error { return nil },
+				outputGate:       test.gate(t),
+			}
+			owner := newStagedJobOwner(
+				context.Background(),
+				candidate,
+				attempts,
+				1,
+				jobmgr.ProcessAttemptIdentity{
+					Namespace: jobmgr.ProcessAttemptJobRuntime,
+					Key:       "module_job",
+					Resource:  "module_job",
+				},
+			)
+			require.NoError(t, owner.Promote(context.Background()))
+			require.NoError(t, owner.BindAttachment())
+			require.NoError(t, owner.AdoptAttachment(candidate))
+			permit, tasks := issueTestJobPermit(t, "module_job", 1)
+
+			_, err = owner.AcceptResources(permit)
+
+			require.EqualError(t, err, test.want)
+			require.False(t, jobmgr.ContainsOnlyErrorLeaves(
+				err,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+			require.NoError(t, permit.AbortUnused())
+			owner.Reject()
+			requireTestSignal(t, owner.done, "rejected runtime owner did not finalize")
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+			attempts.BeginShutdown()
+			require.NoError(t, attempts.Shutdown(context.Background()))
+		})
+	}
+}
+
+func TestPreparedJobPreActivationRetirementPreservesCause(t *testing.T) {
+	tests := map[string]struct {
+		variant JobVariant
+		cause   error
+		preBind bool
+	}{
+		"V1 retired before bind": {
+			variant: JobVariantV1,
+			cause:   jobmgr.ErrProcessAttemptRetired,
+			preBind: true,
+		},
+		"V1 stopped before bind": {
+			variant: JobVariantV1,
+			cause:   jobmgr.ErrProcessAttemptStopped,
+			preBind: true,
+		},
+		"V2 retired before bind": {
+			variant: JobVariantV2,
+			cause:   jobmgr.ErrProcessAttemptRetired,
+			preBind: true,
+		},
+		"V2 stopped before bind": {
+			variant: JobVariantV2,
+			cause:   jobmgr.ErrProcessAttemptStopped,
+			preBind: true,
+		},
+		"V1 retired after transfer": {
+			variant: JobVariantV1,
+			cause:   jobmgr.ErrProcessAttemptRetired,
+		},
+		"V1 stopped after transfer": {
+			variant: JobVariantV1,
+			cause:   jobmgr.ErrProcessAttemptStopped,
+		},
+		"V2 retired after transfer": {
+			variant: JobVariantV2,
+			cause:   jobmgr.ErrProcessAttemptRetired,
+		},
+		"V2 stopped after transfer": {
+			variant: JobVariantV2,
+			cause:   jobmgr.ErrProcessAttemptStopped,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			fixture := newPreActivationRetirementFixture(t, test.variant, test.cause, test.preBind)
+
+			_, err := fixture.prepared.Accept(context.Background(), fixture.identity.Generation)
+
+			require.ErrorIs(t, err, test.cause)
+			require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+				err,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+			fixture.requireSettled(t)
+		})
+	}
+}
+
+func TestPreparedJobRetirementAfterAttachmentAdoptionPreservesCause(t *testing.T) {
+	tests := map[string]error{
+		"retired": jobmgr.ErrProcessAttemptRetired,
+		"stopped": jobmgr.ErrProcessAttemptStopped,
+	}
+	for name, cause := range tests {
+		t.Run(name, func(t *testing.T) {
+			fixture := newPreActivationRetirementFixtureForWindow(
+				t,
+				JobVariantV2,
+				cause,
+				retirementAfterAdoption,
+				nil,
+			)
+
+			_, err := fixture.prepared.Accept(context.Background(), fixture.identity.Generation)
+
+			require.ErrorIs(t, err, cause)
+			require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+				err,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+			fixture.requireSettled(t)
+		})
+	}
+}
+
+func TestPreparedJobDoesNotHideProjectionFailureDuringRetirement(t *testing.T) {
+	projectionErr := errors.New("projection failed")
+	tests := map[string]error{
+		"retired": jobmgr.ErrProcessAttemptRetired,
+		"stopped": jobmgr.ErrProcessAttemptStopped,
+	}
+	for name, cause := range tests {
+		t.Run(name, func(t *testing.T) {
+			fixture := newPreActivationRetirementFixtureWithRuntimeError(
+				t,
+				JobVariantV2,
+				cause,
+				false,
+				errors.Join(cause, projectionErr),
+			)
+			result, err := lifecycle.NewSealedResult(500, "application/json", nil)
+			require.NoError(t, err)
+			transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+				Scope: lifecycle.ResourceTransactionScope{
+					ID:        fixture.identity.ID,
+					Successor: fixture.identity,
+				},
+				Disposition: lifecycle.ResourceTransactionInstalled,
+				Successor:   fixture.prepared,
+				Result:      result,
+				Cleanup:     func() error { return nil },
+			})
+			require.NoError(t, err)
+
+			applied, err := transaction.Apply(context.Background())
+
+			require.ErrorIs(t, err, cause)
+			require.ErrorIs(t, err, projectionErr)
+			require.False(t, jobmgr.ContainsOnlyErrorLeaves(
+				err,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+			_, disposition, current := applied.Ownership()
+			require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+			require.Nil(t, current)
+			fixture.requireSettled(t)
+		})
+	}
+}
+
+func TestPreparedResourceTransactionSettlesPreActivationRetirement(t *testing.T) {
+	tests := map[string]struct {
+		variant JobVariant
+		cause   error
+		preBind bool
+	}{
+		"V1 retired before bind": {
+			variant: JobVariantV1,
+			cause:   jobmgr.ErrProcessAttemptRetired,
+			preBind: true,
+		},
+		"V2 stopped before bind": {
+			variant: JobVariantV2,
+			cause:   jobmgr.ErrProcessAttemptStopped,
+			preBind: true,
+		},
+		"V1 stopped after transfer": {
+			variant: JobVariantV1,
+			cause:   jobmgr.ErrProcessAttemptStopped,
+		},
+		"V2 retired after transfer": {
+			variant: JobVariantV2,
+			cause:   jobmgr.ErrProcessAttemptRetired,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			fixture := newPreActivationRetirementFixture(t, test.variant, test.cause, test.preBind)
+			graph, err := dyncfg.NewGraph(nil)
+			require.NoError(t, err)
+			postimage := dyncfg.GraphConfig{
+				ID:     fixture.identity.ID,
+				Module: "module",
+				Name:   "job",
+			}
+			mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
+				ID:     fixture.identity.ID,
+				Config: &postimage,
+			}})
+			require.NoError(t, err)
+			result, err := lifecycle.NewSealedResult(200, "application/json", nil)
+			require.NoError(t, err)
+			scope := lifecycle.ResourceTransactionScope{
+				ID:        fixture.identity.ID,
+				Successor: fixture.identity,
+			}
+			transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+				Scope:            scope,
+				Disposition:      lifecycle.ResourceTransactionInstalled,
+				Successor:        fixture.prepared,
+				Graph:            graph,
+				Mutation:         mutation,
+				MutationPrepared: true,
+				Result:           result,
+				Cleanup:          func() error { return nil },
+			})
+			require.NoError(t, err)
+
+			applied, err := transaction.Apply(context.Background())
+
+			require.NoError(t, err)
+			gotScope, disposition, current := applied.Ownership()
+			require.Equal(t, scope, gotScope)
+			require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+			require.Nil(t, current)
+			_, exists := graph.Lookup(fixture.identity.ID)
+			require.False(t, exists)
+			fixture.requireSettled(t)
+		})
+	}
 }
 
 func TestCandidateCancellationBeforePromotionPreservesRetirementCause(t *testing.T) {
@@ -362,6 +647,282 @@ func (a *busyPromotionGateAuthority) SupersedeProcessAttempt(
 		return ctx.Err()
 	case <-a.release:
 		return jobmgr.ErrProcessAttemptBusy
+	}
+}
+
+type preActivationRetirementWindow uint8
+
+const (
+	retirementBeforeBind preActivationRetirementWindow = iota + 1
+	retirementAfterTransfer
+	retirementAfterAdoption
+)
+
+type preActivationRetirementFixture struct {
+	prepared     PreparedJob
+	identity     lifecycle.ResourceIdentity
+	owner        *stagedJobOwner
+	gate         *generationOutputGate
+	output       *bytes.Buffer
+	state        *preActivationRetirementState
+	tasks        *lifecycle.TaskSupervisor
+	attempts     *containment.Authority
+	wantHandler  bool
+	shutdownOnce sync.Once
+	shutdownErr  error
+}
+
+func newPreActivationRetirementFixture(
+	t *testing.T,
+	variant JobVariant,
+	cause error,
+	preBind bool,
+) *preActivationRetirementFixture {
+	window := retirementAfterTransfer
+	if preBind {
+		window = retirementBeforeBind
+	}
+	return newPreActivationRetirementFixtureForWindow(t, variant, cause, window, nil)
+}
+
+func newPreActivationRetirementFixtureWithRuntimeError(
+	t *testing.T,
+	variant JobVariant,
+	cause error,
+	preBind bool,
+	runtimeErr error,
+) *preActivationRetirementFixture {
+	window := retirementAfterTransfer
+	if preBind {
+		window = retirementBeforeBind
+	}
+	return newPreActivationRetirementFixtureForWindow(t, variant, cause, window, runtimeErr)
+}
+
+func newPreActivationRetirementFixtureForWindow(
+	t *testing.T,
+	variant JobVariant,
+	cause error,
+	window preActivationRetirementWindow,
+	runtimeErr error,
+) *preActivationRetirementFixture {
+	t.Helper()
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	output := &bytes.Buffer{}
+	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	job := newBlockingStopManagedJob()
+	state := &preActivationRetirementState{}
+	handler := &preActivationRetirementHandler{state: state}
+	candidate := ConstructedJob{
+		Variant:          variant,
+		CollectorCleanup: func(context.Context) error { state.rejected++; return nil },
+		finalCleanup:     func(context.Context) error { state.final++; return nil },
+		candidateJob:     job,
+		outputGate:       gate,
+	}
+	if runtimeErr != nil || window == retirementAfterAdoption {
+		candidate.runtimeStage = newStagedRuntimeService()
+		require.NoError(t, candidate.runtimeStage.RegisterComponent(runtimecomp.ComponentConfig{Name: "test"}))
+	}
+	if window == retirementAfterTransfer {
+		candidate.StagedHandlers = handler
+	}
+	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
+	owner := newStagedJobOwner(
+		context.Background(),
+		candidate,
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       identity.ID,
+			Resource:  identity.ID,
+		},
+	)
+	cut := func() {
+		switch cause {
+		case jobmgr.ErrProcessAttemptRetired:
+			require.EqualValues(t, 1, attempts.CutTarget(1))
+		case jobmgr.ErrProcessAttemptStopped:
+			attempts.BeginShutdown()
+		default:
+			require.FailNow(t, "invalid retirement test cause")
+		}
+	}
+	var attacher JobHandlerAttacher
+	if window == retirementAfterTransfer {
+		attacher = jobHandlerAttacherFunc(func(
+			_ lifecycle.ResourceIdentity,
+			staged StagedHandlerLifecycle,
+		) (ProcessHandlerLifecycle, error) {
+			cut()
+			requireTestSignal(t, owner.retire, "runtime owner did not record retirement")
+			return staged.(ProcessHandlerLifecycle), nil
+		})
+	}
+	var runtimeService runtimecomp.Service
+	switch {
+	case runtimeErr != nil:
+		runtimeService = projectionFailureRuntimeService{err: runtimeErr}
+	case window == retirementAfterAdoption:
+		runtimeService = projectionHookRuntimeService{register: func() error {
+			cut()
+			requireTestSignal(t, owner.retire, "runtime owner did not record retirement")
+			return nil
+		}}
+	}
+	attachment := factoryAttachment{
+		runtime:         runtimeService,
+		handlerAttacher: attacher,
+		scheduler:       newTestScheduler(t),
+	}
+	staged := candidate
+	candidate.attach = func(
+		identity lifecycle.ResourceIdentity,
+		owner *stagedJobOwner,
+	) (constructedJobAttachment, error) {
+		if window == retirementBeforeBind {
+			cut()
+			requireTestSignal(t, owner.done, "retired candidate did not finalize before binding")
+		}
+		return attachment.attach(staged, identity, owner)
+	}
+	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
+	fixture := &preActivationRetirementFixture{
+		prepared: PreparedJob{state: &preparedJobState{
+			id:          identity.ID,
+			generation:  identity.Generation,
+			constructed: candidate,
+			permit:      permit,
+			owner:       owner,
+		}},
+		identity:    identity,
+		owner:       owner,
+		gate:        gate,
+		output:      output,
+		state:       state,
+		tasks:       tasks,
+		attempts:    attempts,
+		wantHandler: window == retirementAfterTransfer,
+	}
+	t.Cleanup(func() {
+		fixture.owner.Reject()
+		require.NoError(t, fixture.shutdown())
+	})
+	return fixture
+}
+
+func (fixture *preActivationRetirementFixture) requireSettled(t *testing.T) {
+	t.Helper()
+	requireTestSignal(t, fixture.owner.done, "retired runtime owner did not finalize")
+	_, writeErr := fixture.gate.Write([]byte("late\n"))
+	require.ErrorIs(t, writeErr, errGenerationOutputFenced)
+	require.Empty(t, fixture.output.Bytes())
+	require.EqualValues(t, 1, fixture.state.rejected)
+	require.Zero(t, fixture.state.final)
+	if fixture.wantHandler {
+		require.EqualValues(t, 1, fixture.state.handlerFinalized)
+	} else {
+		require.Zero(t, fixture.state.handlerFinalized)
+	}
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, fixture.tasks.LongLivedCensus())
+	require.NoError(t, fixture.shutdown())
+	require.EqualValues(t, containment.Census{}, fixture.attempts.Census())
+}
+
+func (fixture *preActivationRetirementFixture) shutdown() error {
+	fixture.shutdownOnce.Do(func() {
+		fixture.attempts.BeginShutdown()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		fixture.shutdownErr = fixture.attempts.Shutdown(ctx)
+	})
+	return fixture.shutdownErr
+}
+
+type preActivationRetirementState struct {
+	rejected         int
+	final            int
+	handlerFinalized int
+}
+
+type preActivationRetirementHandler struct {
+	state *preActivationRetirementState
+}
+
+func (*preActivationRetirementHandler) Publish() error { return nil }
+
+func (*preActivationRetirementHandler) CloseAndDrain(context.Context) error { return nil }
+
+func (*preActivationRetirementHandler) Detach(context.Context) error { return nil }
+
+func (handler *preActivationRetirementHandler) Finalize(context.Context) error {
+	handler.state.handlerFinalized++
+	return nil
+}
+
+type projectionFailureRuntimeService struct {
+	err error
+}
+
+func (service projectionFailureRuntimeService) RegisterComponent(runtimecomp.ComponentConfig) error {
+	return service.err
+}
+
+func (projectionFailureRuntimeService) UnregisterComponent(string) {}
+
+func (projectionFailureRuntimeService) QuarantineComponent(string) {}
+
+func (projectionFailureRuntimeService) FinalizeComponent(string) {}
+
+func (service projectionFailureRuntimeService) RegisterProducer(string, func() error) error {
+	return service.err
+}
+
+func (projectionFailureRuntimeService) UnregisterProducer(string) {}
+
+type projectionHookRuntimeService struct {
+	register func() error
+}
+
+func (service projectionHookRuntimeService) RegisterComponent(runtimecomp.ComponentConfig) error {
+	return service.register()
+}
+
+func (projectionHookRuntimeService) UnregisterComponent(string) {}
+
+func (projectionHookRuntimeService) QuarantineComponent(string) {}
+
+func (projectionHookRuntimeService) FinalizeComponent(string) {}
+
+func (service projectionHookRuntimeService) RegisterProducer(string, func() error) error {
+	return service.register()
+}
+
+func (projectionHookRuntimeService) UnregisterProducer(string) {}
+
+type jobHandlerAttacherFunc func(
+	lifecycle.ResourceIdentity,
+	StagedHandlerLifecycle,
+) (ProcessHandlerLifecycle, error)
+
+func (attach jobHandlerAttacherFunc) Attach(
+	identity lifecycle.ResourceIdentity,
+	staged StagedHandlerLifecycle,
+) (ProcessHandlerLifecycle, error) {
+	return attach(identity, staged)
+}
+
+func requireTestSignal(t *testing.T, signal <-chan struct{}, message string) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(time.Second):
+		t.Fatal(message)
 	}
 }
 
