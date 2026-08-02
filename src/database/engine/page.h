@@ -13,6 +13,7 @@ typedef struct pgd_cursor {
     struct pgd *pgd;
     uint32_t position;
     uint32_t slots;
+    uint32_t slots_per_point;
 
     gorilla_reader_t gr;
 } PGDC;
@@ -53,7 +54,7 @@ size_t pgd_append_point(PGD *pg,
                       SN_FLAGS flags,
                       uint32_t expected_slot);
 
-void pgdc_reset(PGDC *pgdc, PGD *pgd, uint32_t position);
+void pgdc_reset(PGDC *pgdc, PGD *pgd, uint32_t position, uint32_t slots_per_point);
 bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position, STORAGE_POINT *sp);
 
 void *dbengine_extent_alloc(size_t size);
