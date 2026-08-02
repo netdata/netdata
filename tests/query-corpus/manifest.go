@@ -176,6 +176,9 @@ var manifest = map[string]ManifestCase{
 		Proves:  "per-group view statistics (D-B SETTLED, #23097 verified numerically): non-average aggregations average over view ROWS (mean plotted value, row-extreme min/max); AVERAGE keeps the weighted (pre-division sum, contributions) pair; raw keeps (sum, count) untouched for the cloud",
 		FixedBy: "#23097",
 	},
+	"L5/gap-only-db-average-is-null": {
+		Proves: "a dimension whose selected database points are all gaps reports null min/avg/max database statistics, not a numeric zero average that falsely represents observed data",
+	},
 	"L5/anomaly-statistics": {
 		Proves: "jsonwrap-v2 per-dimension anomaly arrays: view.dimensions.sts.arp = mean of the plotted rows' anomaly rates, db.dimensions.sts.arp = anomaly rate of the fetched db points; stored NAN gap points are excluded from BOTH counts",
 	},
