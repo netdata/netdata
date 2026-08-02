@@ -1189,23 +1189,37 @@ metrics:
 }
 
 func TestMetricPredicateRejectsMultipleSelectors(t *testing.T) {
-	dir := t.TempDir()
-	writeProfileYAML(t, dir, "ambiguous.yaml", `
+	tests := map[string]string{
+		"both_non_empty": `      - field: category
+        varbind: ifIndex
+        equals: state_change`,
+		"empty_varbind": `      - field: category
+        varbind: ""
+        equals: state_change`,
+		"empty_field": `      - field: ""
+        varbind: ifIndex
+        equals: state_change`,
+	}
+
+	for name, predicate := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeProfileYAML(t, dir, "ambiguous.yaml", fmt.Sprintf(`
 metrics:
   - name: site.ambiguous_selector
     type: counter
     where:
-      - field: category
-        varbind: ifIndex
-        equals: state_change
-`)
-	_, err := LoadProfileFile(filepath.Join(dir, "ambiguous.yaml"))
-	require.ErrorContains(t, err, "predicate requires exactly one of varbind or field")
+%s
+`, predicate))
+			_, err := LoadProfileFile(filepath.Join(dir, "ambiguous.yaml"))
+			require.ErrorContains(t, err, "predicate requires exactly one of varbind or field")
+		})
+	}
 
 	idx := NewEpoch()
 	td := testIFMIBLinkDownTrapDef()
 	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
-	err = idx.AddMetricDefinitions([]MetricRule{{
+	err := idx.AddMetricDefinitions([]MetricRule{{
 		Name:   "site.ambiguous_selector",
 		Type:   profileMetricTypeCounter,
 		OnTrap: td.OID,

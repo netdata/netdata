@@ -122,6 +122,7 @@ func (p *MetricPredicate) UnmarshalYAML(unmarshal func(any) error) error {
 
 func normalizeMetricPredicateMap(m map[any]any) (MetricPredicate, error) {
 	pred := MetricPredicate{}
+	var hasVarbind, hasField bool
 	for rawKey, rawVal := range m {
 		key, ok := rawKey.(string)
 		if !ok {
@@ -129,12 +130,14 @@ func normalizeMetricPredicateMap(m map[any]any) (MetricPredicate, error) {
 		}
 		switch key {
 		case "varbind":
+			hasVarbind = true
 			value, ok := rawVal.(string)
 			if !ok {
 				return pred, fmt.Errorf("varbind must be a string")
 			}
 			pred.Varbind = value
 		case "field":
+			hasField = true
 			value, ok := rawVal.(string)
 			if !ok {
 				return pred, fmt.Errorf("field must be a string")
@@ -179,6 +182,9 @@ func normalizeMetricPredicateMap(m map[any]any) (MetricPredicate, error) {
 		default:
 			return pred, fmt.Errorf("unknown predicate key %q", key)
 		}
+	}
+	if hasVarbind == hasField {
+		return pred, fmt.Errorf("predicate requires exactly one of varbind or field")
 	}
 	if err := validateMetricPredicateSelector(pred); err != nil {
 		return pred, err
