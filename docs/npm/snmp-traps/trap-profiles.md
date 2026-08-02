@@ -140,10 +140,14 @@ Job overrides use static label values. Profile-file labels can also use template
 - After changing operator or stock profiles, restart the Agent or recreate all listener jobs. The final lease release
   unloads the epoch, and the next job creation loads operator profiles and the stock manifest.
 - Operator profiles, exactly one stock manifest (`catalogue.json` or `catalogue.json.zst`), and its profile inventory are
-  validated at job creation. Gzip manifests and raw-plus-Zstandard duplicates are rejected; there is no parse-all
-  fallback.
-- Stock vendor YAML is loaded and validated only when selected by an exact trap OID, a MIB-qualified trap name, or an
-  enabled metric rule. The manifest routes each lookup without loading the complete stock pack.
+  validated during collector initialization. `Collector.Check()` performs no additional validation. Gzip manifests and
+  raw-plus-Zstandard duplicates are rejected; there is no parse-all fallback.
+- Every stock manifest entry includes a SHA-256 of the exact decompressed YAML bytes. Lazy hydration verifies and parses
+  those same bytes, so a running catalog epoch rejects a profile body changed underneath its manifest. The digest binds
+  one installed generation together; it is not a package-authenticity signature.
+- Stock vendor YAML is loaded and validated only when selected by an exact trap OID, an enabled metric rule, or the
+  candidate-file set for a MIB-qualified trap name. Name resolution hydrates the MIB candidates and then requires one
+  exact trap-name match; it does not load the complete stock pack.
 - Invalid eager profiles fail listener job creation. An invalid lazily loaded stock profile increments profile-load-failure
   metrics when a matching trap first needs that file.
 

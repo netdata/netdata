@@ -342,6 +342,7 @@ type profileCatalogueEntry struct {
 	TrapCount       int      `json:"trap_count"`
 	TrapOIDs        []string `json:"trap_oids"`
 	VarbindCount    int      `json:"varbind_count"`
+	SHA256          string   `json:"sha256"`
 }
 
 type profileVB struct {
@@ -2071,25 +2072,17 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 		sortTrapRecords(recs)
 		pf := buildProfile(vendor, recs)
 		path := filepath.Join(opts.ProfilesOutDir, vendor+".yaml")
-		if err := writeProfileYAML(path, pf); err != nil {
+		profileSHA256, err := writeProfileYAML(path, pf)
+		if err != nil {
 			return nil, err
 		}
 		counts[vendor] = len(pf.Traps)
 		combined = append(combined, recs...)
-		catalogue[vendor] = profileCatalogueEntry{
-			File:            vendor + ".yaml",
-			MIBCount:        pf.MibCount,
-			MIBs:            mibsForRecords(recs),
-			MetricRuleNames: profileMetricRuleNames(pf.Metrics),
-			SampleTraps:     sampleTrapNames(recs, 5),
-			TrapCount:       len(pf.Traps),
-			TrapOIDs:        profileTrapOIDs(pf.Traps),
-			VarbindCount:    len(pf.Varbinds),
-		}
+		catalogue[vendor] = newProfileCatalogueEntry(vendor+".yaml", pf, recs, profileSHA256)
 	}
 	if opts.CombinedPath != "" {
 		sortTrapRecords(combined)
-		if err := writeProfileYAML(opts.CombinedPath, buildProfile("combined", combined)); err != nil {
+		if _, err := writeProfileYAML(opts.CombinedPath, buildProfile("combined", combined)); err != nil {
 			return nil, err
 		}
 	}
@@ -2099,6 +2092,20 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 		}
 	}
 	return counts, nil
+}
+
+func newProfileCatalogueEntry(filename string, profile profileFile, records []TrapRecord, profileSHA256 string) profileCatalogueEntry {
+	return profileCatalogueEntry{
+		File:            filename,
+		MIBCount:        profile.MibCount,
+		MIBs:            mibsForRecords(records),
+		MetricRuleNames: profileMetricRuleNames(profile.Metrics),
+		SampleTraps:     sampleTrapNames(records, 5),
+		TrapCount:       len(profile.Traps),
+		TrapOIDs:        profileTrapOIDs(profile.Traps),
+		VarbindCount:    len(profile.Varbinds),
+		SHA256:          profileSHA256,
+	}
 }
 
 func profileMetricRuleNames(rules []profileMetricRule) []string {
@@ -2178,9 +2185,9 @@ func buildProfile(vendor string, records []TrapRecord) profileFile {
 	return pf
 }
 
-func writeProfileYAML(path string, pf profileFile) error {
+func writeProfileYAML(path string, pf profileFile) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return "", err
 	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "# SNMP trap profile - vendor: %s\n", pf.Vendor)
@@ -2190,12 +2197,17 @@ func writeProfileYAML(path string, pf profileFile) error {
 	enc.SetIndent(2)
 	if err := enc.Encode(pf); err != nil {
 		_ = enc.Close()
-		return err
+		return "", err
 	}
 	if err := enc.Close(); err != nil {
-		return err
+		return "", err
 	}
-	return atomicWrite(path, buf.Bytes(), 0o644)
+	data := buf.Bytes()
+	if err := atomicWrite(path, data, 0o644); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func compareBaselineProfiles(dir string, records []TrapRecord) (*OverlapReport, error) {

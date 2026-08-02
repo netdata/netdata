@@ -349,8 +349,9 @@ defer lease.Close()
 Lifecycle:
 
 - The first `Manager.Acquire()` during job creation eagerly loads and validates all operator profiles, exactly one stock
-  manifest, and the manifest-to-filesystem inventory. It starts one configuration epoch and returns a lease that owns one
-  reference.
+  manifest, every entry's decompressed-content SHA-256, and the manifest-to-filesystem inventory. This acquisition occurs
+  in `Collector.Init()`; `Collector.Check()` is a no-op. It starts one configuration epoch and returns a lease that owns
+  one reference.
 - Every subsequent job created by the same plugin registration receives a lease for that epoch. Each collector stores its
   lease and epoch explicitly; packet-path code never reads a package-global current index.
 - Every job cleanup closes its own lease. `Lease.Close()` is idempotent; the final release drops the epoch so GC can
@@ -358,8 +359,11 @@ Lifecycle:
 - Profile files are not watched or reloaded while jobs hold leases. After changing a profile, restart the Agent or
   recreate all `snmp_traps` jobs so the final release drops the old epoch.
 - Agents with no trap jobs never acquire a lease, so they never pay the catalog memory cost.
-- Stock profile bodies load lazily through manifest routes: exact trap OID, MIB-qualified trap name, or enabled metric
-  rule. Enabling metrics does not parse the complete stock pack.
+- Stock profile bodies load lazily through exact trap-OID and metric-rule routes or through a deterministic candidate-file
+  set for a MIB-qualified trap name. Candidate hydration is followed by one exact name match. Enabling metrics does not
+  parse the complete stock pack.
+- Lazy hydration reads and decompresses a file once, verifies the epoch's required SHA-256, and parses the same bytes. The
+  digest binds the manifest and body within one epoch; it is not an authenticity signature.
 - Failed initial eager loads leave the manager empty and retry on the next acquisition. A failed lazy stock load is
   coalesced and negatively cached per file only for the current epoch.
 - The manager mutex covers build/acquire/refcount/release transitions. Lazy body hydration uses per-file `sync.Once`, so

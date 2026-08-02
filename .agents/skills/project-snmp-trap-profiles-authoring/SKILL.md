@@ -220,6 +220,9 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
    - keep `catalogue.json` in sync: each entry must route its stock file by
      `trap_oids`, `mibs`, and `metric_rule_names` so the collector can hydrate
      only the file needed for a lookup;
+   - emit each entry's required `sha256` as 64 lowercase hexadecimal
+     characters computed over the exact decompressed YAML bytes written to
+     disk, including comments and the final newline;
    - emit deterministic output (sorted varbind names, traps sorted by
      OID then name) so regenerations produce reviewable diffs.
 

@@ -3,6 +3,8 @@
 package catalog
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,13 +19,18 @@ import (
 )
 
 type stockProfileStore struct {
-	loadBundle   func(string) (profileLoadBundle, error)
-	files        map[string]string
+	loadBundle   func(string, [sha256.Size]byte) (profileLoadBundle, error)
+	files        map[string]stockProfileFile
 	routes       map[string]stockProfileRoutes
 	exactRoutes  map[string]string
 	mibRoutes    map[string][]string
 	metricRoutes map[string]string
 	hydration    map[string]*profileHydration
+}
+
+type stockProfileFile struct {
+	path   string
+	sha256 [sha256.Size]byte
 }
 
 type stockProfileRoutes struct {
@@ -51,6 +58,7 @@ type stockProfileCatalogueEntry struct {
 	MIBs            []string `json:"mibs"`
 	MetricRuleNames []string `json:"metric_rule_names,omitempty"`
 	TrapOIDs        []string `json:"trap_oids"`
+	SHA256          string   `json:"sha256"`
 }
 
 func buildStockProfileStore(
@@ -64,8 +72,8 @@ func buildStockProfileStore(
 	}
 
 	store := &stockProfileStore{
-		loadBundle:   loadProfileBundle,
-		files:        make(map[string]string),
+		loadBundle:   loadStockProfileBundle,
+		files:        make(map[string]stockProfileFile),
 		routes:       make(map[string]stockProfileRoutes),
 		exactRoutes:  make(map[string]string),
 		mibRoutes:    make(map[string][]string),
@@ -86,6 +94,10 @@ func buildStockProfileStore(
 			return nil, fmt.Errorf("stock trap profile catalogue entries %q and %q reference profile %q", previous, owner, identity)
 		}
 		manifestFiles[identity] = owner
+		digest, err := parseStockProfileSHA256(entry.SHA256)
+		if err != nil {
+			return nil, fmt.Errorf("stock trap profile catalogue entry %q has invalid sha256: %w", owner, err)
+		}
 		if !sources.HasStock(identity) {
 			return nil, fmt.Errorf("stock trap profile catalogue entry %q references missing profile %q", owner, entry.File)
 		}
@@ -96,7 +108,7 @@ func buildStockProfileStore(
 		if !sources.EffectiveIsStock(identity) {
 			continue
 		}
-		store.files[identity] = source.path
+		store.files[identity] = stockProfileFile{path: source.path, sha256: digest}
 		store.hydration[identity] = &profileHydration{}
 		routes := stockProfileRoutes{}
 
@@ -220,6 +232,19 @@ func parseManifestProfileFile(name string) (string, bool) {
 	return identity, ok && profileIdentityRE.MatchString(identity)
 }
 
+func parseStockProfileSHA256(value string) ([sha256.Size]byte, error) {
+	var digest [sha256.Size]byte
+	if len(value) != sha256.Size*2 || value != strings.ToLower(value) {
+		return digest, fmt.Errorf("must be %d lowercase hexadecimal characters", sha256.Size*2)
+	}
+	decoded, err := hex.DecodeString(value)
+	if err != nil {
+		return digest, fmt.Errorf("must be %d lowercase hexadecimal characters", sha256.Size*2)
+	}
+	copy(digest[:], decoded)
+	return digest, nil
+}
+
 func (idx *Epoch) loadStockForOID(oid string) error {
 	if idx == nil || idx.stock == nil {
 		return nil
@@ -281,18 +306,18 @@ func (s *stockProfileStore) parse(name string) (profileLoadBundle, error) {
 		return profileLoadBundle{}, fmt.Errorf("stock trap profile %q has no hydration state", name)
 	}
 	state.parseOnce.Do(func() {
-		path := s.files[name]
-		if path == "" {
+		file := s.files[name]
+		if file.path == "" {
 			state.parseErr = fmt.Errorf("stock trap profile %q has no file", name)
 			return
 		}
 		loadBundle := s.loadBundle
 		if loadBundle == nil {
-			loadBundle = loadProfileBundle
+			loadBundle = loadStockProfileBundle
 		}
-		bundle, err := loadBundle(path)
+		bundle, err := loadBundle(file.path, file.sha256)
 		if err != nil {
-			state.parseErr = fmt.Errorf("failed to hydrate stock trap profile %q: %w", path, err)
+			state.parseErr = fmt.Errorf("failed to hydrate stock trap profile %q: %w", file.path, err)
 			return
 		}
 		if err := validateStockProfileRoutes(name, s.routes[name], bundle); err != nil {
@@ -302,6 +327,18 @@ func (s *stockProfileStore) parse(name string) (profileLoadBundle, error) {
 		state.bundle = bundle
 	})
 	return state.bundle, state.parseErr
+}
+
+func loadStockProfileBundle(filename string, expected [sha256.Size]byte) (profileLoadBundle, error) {
+	content, err := readProfileFile(filename)
+	if err != nil {
+		return profileLoadBundle{}, err
+	}
+	actual := sha256.Sum256(content)
+	if actual != expected {
+		return profileLoadBundle{}, fmt.Errorf("content sha256 mismatch: expected %x, got %x", expected, actual)
+	}
+	return parseProfileBundle(filename, content)
 }
 
 func (s *stockProfileStore) validationBundleForRules(current string, rules []profileMetricRule) (profileLoadBundle, error) {

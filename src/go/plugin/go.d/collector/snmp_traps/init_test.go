@@ -176,6 +176,48 @@ traps:
 	lease.Close()
 }
 
+func TestCollectorNewResolvesProfilePathsAtInit(t *testing.T) {
+	originalExecutableDir := executable.Directory
+	t.Cleanup(func() { executable.Directory = originalExecutableDir })
+
+	earlyDir := filepath.Join(t.TempDir(), "before-plugin-config")
+	require.NoError(t, os.MkdirAll(earlyDir, 0o755))
+	executable.Directory = earlyDir
+	collector := New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+
+	root := t.TempDir()
+	executableDir := filepath.Join(root, "plugins.d")
+	stockDir := filepath.Join(root, "config", "go.d", "snmp.trap-profiles", "default")
+	require.NoError(t, os.MkdirAll(executableDir, 0o755))
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "minimal.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.1
+    name: SNMPv2-MIB::coldStart
+    category: state_change
+    severity: notice
+`)
+	writeProfileCatalogue(t, stockDir, map[string]any{
+		"minimal": map[string]any{
+			"file":      "minimal.yaml",
+			"mibs":      []string{"SNMPv2-MIB"},
+			"trap_oids": []string{"1.3.6.1.6.3.1.1.5.1"},
+		},
+	})
+	executable.Directory = executableDir
+
+	withTestCacheDir(t)
+	collector.Name = "standalone-late-profile-path"
+	collector.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	require.NoError(t, collector.Init(context.Background()))
+	t.Cleanup(func() { collector.Cleanup(context.Background()) })
+
+	td, err := collector.profileIndex.LookupWithError("1.3.6.1.6.3.1.1.5.1")
+	require.NoError(t, err)
+	require.NotNil(t, td)
+	assert.Equal(t, "SNMPv2-MIB::coldStart", td.Name)
+}
+
 func TestCollectorNewUsesIndependentHostIdentityService(t *testing.T) {
 	deviceStore := ddsnmp.NewDeviceStore()
 	topologyEnricher := snmptopology.NewTrapEnrichmentHandle()

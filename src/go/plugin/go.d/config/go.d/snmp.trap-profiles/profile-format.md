@@ -44,14 +44,16 @@ never pay the memory footprint.
 
 Profile loading is shared across trap jobs created by one plugin registration. The first runnable job acquires a catalog
 lease, eagerly loads and validates every operator profile, and validates the stock file inventory against exactly one
-`catalogue.json` or `catalogue.json.zst`. The manifest supplies exact routes for trap OIDs, MIB-qualified trap names, and
-metric rule names; the runtime does not fall back to parsing every stock profile when the manifest is missing or invalid.
+`catalogue.json` or `catalogue.json.zst`. This happens in `Collector.Init()`; `Collector.Check()` is a no-op. The manifest
+supplies exact routes for trap OIDs and metric rule names, plus a deterministic candidate-file set for each MIB. The
+runtime does not fall back to parsing every stock profile when the manifest is missing or invalid.
 
 Stock profile definitions are loaded and validated only when a matching trap OID, MIB-qualified name, or selected metric
-rule needs that file. Different stock files hydrate independently; concurrent requests for the same file coalesce. A
-failed eager validation is a creation-time job failure surfaced to DynCfg, while a failed lazy stock load is reported by
-the matching operation and cached only for the current catalog epoch. The final lease release drops the epoch, so the
-next runnable job rebuilds it from disk.
+rule needs that file. A MIB-qualified lookup hydrates all candidates for its MIB and then requires exactly one matching
+trap name. Different stock files hydrate independently; concurrent requests for the same file coalesce. A failed eager
+validation is a creation-time job failure surfaced to DynCfg, while a failed lazy stock load is reported by the matching
+operation and cached only for the current catalog epoch. The final lease release drops the epoch, so the next runnable
+job rebuilds it from disk.
 
 Profile identity is the extensionless filename. For example, an operator `ciscosystems.yaml` replaces stock
 `ciscosystems.yaml.zst`. Identities must match `^[a-z0-9][a-z0-9_-]*$`; duplicate operator identities and invalid
@@ -623,8 +625,15 @@ current IANA registry before emission. The run also writes review artifacts unde
 define the same module name.
 
 The generated `catalogue.json` is a required runtime manifest. Each entry records the raw source filename plus its exact
-`mibs`, `trap_oids`, and, when present, `metric_rule_names`. Packaged installations may compress the manifest as
-`catalogue.json.zst`; gzip manifests are unsupported, and shipping both raw and Zstandard forms is an error.
+`mibs`, `trap_oids`, and, when present, `metric_rule_names`. It also records a required `sha256`: exactly 64 lowercase
+hexadecimal characters computed over the exact decompressed YAML bytes, including comments and the final newline. Lazy
+hydration reads and decompresses the profile once, verifies that digest, and parses the same byte slice. This binds lazy
+content to one immutable catalog epoch; it is not a signature or package-authenticity mechanism. If a package update
+changes a profile while an old epoch is live, that epoch rejects the changed body. A new epoch accepts it only with the
+matching new manifest.
+
+Packaged installations may compress the manifest as `catalogue.json.zst`; gzip manifests are unsupported, and shipping
+both raw and Zstandard forms is an error.
 
 Edits to files under `default/` are overwritten on regeneration; operator modifications belong in the user override
 directory, not in stock files.

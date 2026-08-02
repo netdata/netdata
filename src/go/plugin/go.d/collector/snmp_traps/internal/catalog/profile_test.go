@@ -5,7 +5,9 @@ package catalog
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -154,9 +156,7 @@ traps:
 			TrapOIDs: []string{oid},
 		},
 	}
-	data, err := json.Marshal(catalogue)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(stockDir), "catalogue.json"), data, 0o644))
+	writeStockCatalogue(t, stockDir, catalogue, false)
 }
 
 func TestProfileLoadValid(t *testing.T) {
@@ -289,14 +289,202 @@ traps:
 	require.ErrorContains(t, err, `unknown config key "extends"`)
 }
 
+func TestStockProfileCatalogueRequiresValidSHA256(t *testing.T) {
+	content := []byte(`
+traps:
+  - oid: 1.3.6.1.4.1.99998.2
+    name: VENDOR-MIB::event
+    category: diagnostic
+    severity: info
+`)
+	valid := fmt.Sprintf("%x", sha256.Sum256(content))
+	tests := map[string]struct {
+		sha256  string
+		include bool
+	}{
+		"missing":   {},
+		"empty":     {include: true},
+		"short":     {sha256: "abc", include: true},
+		"non_hex":   {sha256: strings.Repeat("g", 64), include: true},
+		"uppercase": {sha256: strings.ToUpper(valid), include: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			stockDir := filepath.Join(root, "default")
+			require.NoError(t, os.MkdirAll(stockDir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(stockDir, "vendor.yaml"), content, 0o644))
+			entry := map[string]any{
+				"file":      "vendor.yaml",
+				"mibs":      []string{"VENDOR-MIB"},
+				"trap_oids": []string{"1.3.6.1.4.1.99998.2"},
+			}
+			if tc.include {
+				entry["sha256"] = tc.sha256
+			}
+			data, err := json.Marshal(map[string]any{"vendor": entry})
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(root, "catalogue.json"), data, 0o644))
+
+			_, err = NewManager(Paths{StockDir: stockDir}).Acquire()
+			require.ErrorContains(t, err, "invalid sha256")
+		})
+	}
+}
+
+func TestStockProfileCatalogueValidatesSHA256ForOperatorOverride(t *testing.T) {
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
+	userDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "vendor.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.2
+    name: VENDOR-MIB::stock
+    category: diagnostic
+    severity: info
+`)
+	writeProfileYAML(t, userDir, "vendor.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.3
+    name: VENDOR-MIB::operator
+    category: diagnostic
+    severity: warning
+`)
+	data, err := json.Marshal(map[string]any{
+		"vendor": map[string]any{
+			"file":      "vendor.yaml",
+			"sha256":    "invalid",
+			"mibs":      []string{"VENDOR-MIB"},
+			"trap_oids": []string{"1.3.6.1.4.1.99998.2"},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "catalogue.json"), data, 0o644))
+
+	_, err = NewManager(Paths{UserDirs: []string{userDir}, StockDir: stockDir}).Acquire()
+	require.ErrorContains(t, err, "invalid sha256")
+}
+
+func TestStockProfileEpochBindsLazyHydrationToManifestContent(t *testing.T) {
+	const oid = "1.3.6.1.4.1.99998.3"
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+
+	writeGeneration := func(content string) {
+		t.Helper()
+		writeProfileYAML(t, stockDir, "vendor.yaml", content)
+		data, err := json.Marshal(map[string]any{
+			"vendor": map[string]any{
+				"file":      "vendor.yaml",
+				"sha256":    fmt.Sprintf("%x", sha256.Sum256([]byte(content))),
+				"mibs":      []string{"VENDOR-MIB"},
+				"trap_oids": []string{oid},
+			},
+		})
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(root, "catalogue.json"), data, 0o644))
+	}
+
+	generationA := `
+traps:
+  - oid: 1.3.6.1.4.1.99998.3
+    name: VENDOR-MIB::event
+    category: diagnostic
+    severity: info
+`
+	generationB := `
+traps:
+  - oid: 1.3.6.1.4.1.99998.3
+    name: VENDOR-MIB::event
+    category: diagnostic
+    severity: warning
+`
+	writeGeneration(generationA)
+
+	manager := NewManager(Paths{StockDir: stockDir})
+	first, err := manager.Acquire()
+	require.NoError(t, err)
+	writeGeneration(generationB)
+	second, err := manager.Acquire()
+	require.NoError(t, err)
+	assert.Same(t, first.Epoch(), second.Epoch())
+
+	td, firstErr := first.Epoch().LookupWithError(oid)
+	assert.Nil(t, td)
+	require.ErrorContains(t, firstErr, "content sha256 mismatch")
+	td, secondErr := second.Epoch().LookupWithError(oid)
+	assert.Nil(t, td)
+	assert.EqualError(t, secondErr, firstErr.Error(), "a mismatch must be cached for the epoch")
+
+	first.Close()
+	second.Close()
+	third, err := manager.Acquire()
+	require.NoError(t, err)
+	t.Cleanup(third.Close)
+	td, err = third.Epoch().LookupWithError(oid)
+	require.NoError(t, err)
+	require.NotNil(t, td)
+	assert.Equal(t, "warning", td.Severity)
+}
+
+func TestStockProfileDigestMismatchPrecedesYAMLParsing(t *testing.T) {
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "vendor.yaml", `not: [valid`)
+	data, err := json.Marshal(map[string]any{
+		"vendor": map[string]any{
+			"file":      "vendor.yaml",
+			"sha256":    strings.Repeat("0", 64),
+			"mibs":      []string{"VENDOR-MIB"},
+			"trap_oids": []string{"1.3.6.1.4.1.99998.4"},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "catalogue.json"), data, 0o644))
+
+	lease, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	_, err = lease.Epoch().LookupWithError("1.3.6.1.4.1.99998.4")
+	require.ErrorContains(t, err, "content sha256 mismatch")
+}
+
+func TestStockProfileSHA256UsesDecompressedBytes(t *testing.T) {
+	const oid = "1.3.6.1.4.1.99998.5"
+	stockDir := filepath.Join(t.TempDir(), "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAMLZstd(t, stockDir, "vendor.yaml.zst", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.5
+    name: VENDOR-MIB::compressed
+    category: diagnostic
+    severity: info
+`)
+	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+		"vendor": {File: "vendor.yaml", MIBs: []string{"VENDOR-MIB"}, TrapOIDs: []string{oid}},
+	}, false)
+
+	lease, err := NewManager(Paths{StockDir: stockDir}).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	td, err := lease.Epoch().LookupWithError(oid)
+	require.NoError(t, err)
+	require.NotNil(t, td)
+	assert.Equal(t, "VENDOR-MIB::compressed", td.Name)
+}
+
 func TestStockProfileLazyHydrationAndNegativeCache(t *testing.T) {
 	root := t.TempDir()
 	stockDir := filepath.Join(root, "default")
 	require.NoError(t, os.MkdirAll(stockDir, 0o755))
 	writeProfileYAMLZstd(t, stockDir, "vendor.yaml.zst", `not: [valid`)
-	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
+	catalogue := stockProfileCatalogue{
 		"vendor": {File: "vendor.yaml", MIBs: []string{"VENDOR-MIB"}, TrapOIDs: []string{"1.3.6.1.4.1.99998.2"}},
-	}, false)
+	}
+	writeStockCatalogue(t, stockDir, catalogue, false)
 
 	manager := NewManager(Paths{StockDir: stockDir})
 	lease, err := manager.Acquire()
@@ -313,6 +501,11 @@ traps:
     category: diagnostic
     severity: info
 `)
+	for owner, entry := range catalogue {
+		entry.SHA256 = ""
+		catalogue[owner] = entry
+	}
+	writeStockCatalogue(t, stockDir, catalogue, false)
 	td, secondErr := idx.LookupWithError("1.3.6.1.4.1.99998.2")
 	assert.Nil(t, td)
 	assert.EqualError(t, secondErr, firstErr.Error(), "a failed hydration must be cached for the epoch")
@@ -334,19 +527,24 @@ func TestStockHydrationPublishesBundleAtomically(t *testing.T) {
 	writeProfileYAML(t, stockDir, "vendor.yaml", `
 traps:
   - oid: 1.3.6.1.4.1.99998.3
-    name: VENDOR-MIB::duplicate
-    category: diagnostic
-    severity: info
-  - oid: 1.3.6.1.4.1.99998.3
     name: VENDOR-MIB::unpublished
     category: diagnostic
     severity: info
+metrics:
+  - name: vendor.atomic
+    type: counter
+    on_trap: VENDOR-MIB::unpublished
+    output:
+      metric: vendor_atomic_events
+      dimension: events
+      chart: missing_chart
 `)
 	writeStockCatalogue(t, stockDir, stockProfileCatalogue{
 		"vendor": {
-			File:     "vendor.yaml",
-			MIBs:     []string{"VENDOR-MIB"},
-			TrapOIDs: []string{"1.3.6.1.4.1.99998.3", "1.3.6.1.4.1.99998.4"},
+			File:            "vendor.yaml",
+			MIBs:            []string{"VENDOR-MIB"},
+			TrapOIDs:        []string{"1.3.6.1.4.1.99998.3"},
+			MetricRuleNames: []string{"vendor.atomic"},
 		},
 	}, false)
 
@@ -354,10 +552,12 @@ traps:
 	require.NoError(t, err)
 	t.Cleanup(lease.Close)
 	idx := lease.Epoch()
-	_, err = idx.LookupWithError("1.3.6.1.4.1.99998.4")
+	_, err = idx.Definitions([]string{"vendor.atomic"})
 	require.Error(t, err)
+	require.ErrorContains(t, err, `references unknown chart "missing_chart"`)
 	assert.Nil(t, idx.lookupLoaded("1.3.6.1.4.1.99998.3"))
-	assert.Nil(t, idx.lookupLoaded("1.3.6.1.4.1.99998.4"))
+	assert.Nil(t, idx.lookupMetricRule("vendor.atomic"))
+	assert.Nil(t, idx.lookupMetricChart("missing_chart"))
 }
 
 func TestStockHydrationPublishesOnlyBundleDelta(t *testing.T) {
@@ -580,7 +780,7 @@ func TestStockHydrationCoalescesPerFileWithoutBlockingOtherFiles(t *testing.T) {
 	var slowLoads atomic.Int64
 	var fastLoads atomic.Int64
 	store := &stockProfileStore{
-		files: map[string]string{"slow": "slow.yaml", "fast": "fast.yaml"},
+		files: map[string]stockProfileFile{"slow": {path: "slow.yaml"}, "fast": {path: "fast.yaml"}},
 		routes: map[string]stockProfileRoutes{
 			"slow": {trapOIDs: []string{slowOID}, mibs: []string{"TEST-MIB"}},
 			"fast": {trapOIDs: []string{fastOID}, mibs: []string{"TEST-MIB"}},
@@ -590,7 +790,7 @@ func TestStockHydrationCoalescesPerFileWithoutBlockingOtherFiles(t *testing.T) {
 			"slow": {},
 			"fast": {},
 		},
-		loadBundle: func(path string) (profileLoadBundle, error) {
+		loadBundle: func(path string, _ [sha256.Size]byte) (profileLoadBundle, error) {
 			switch path {
 			case "slow.yaml":
 				slowLoads.Add(1)
@@ -666,10 +866,10 @@ func TestStockDependencyParsingDoesNotBlockUnrelatedPublication(t *testing.T) {
 		}},
 	}
 	store := &stockProfileStore{
-		files: map[string]string{
-			"metric":     "metric.yaml",
-			"dependency": "dependency.yaml",
-			"fast":       "fast.yaml",
+		files: map[string]stockProfileFile{
+			"metric":     {path: "metric.yaml"},
+			"dependency": {path: "dependency.yaml"},
+			"fast":       {path: "fast.yaml"},
 		},
 		routes: map[string]stockProfileRoutes{
 			"metric":     {metricRuleNames: []string{"stock.dependency"}},
@@ -684,7 +884,7 @@ func TestStockDependencyParsingDoesNotBlockUnrelatedPublication(t *testing.T) {
 			"dependency": {},
 			"fast":       {},
 		},
-		loadBundle: func(path string) (profileLoadBundle, error) {
+		loadBundle: func(path string, _ [sha256.Size]byte) (profileLoadBundle, error) {
 			switch path {
 			case "metric.yaml":
 				return metricBundle, nil
@@ -2291,6 +2491,7 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 		File            string   `json:"file"`
 		MIBs            []string `json:"mibs"`
 		MetricRuleNames []string `json:"metric_rule_names"`
+		SHA256          string   `json:"sha256"`
 		TrapCount       int      `json:"trap_count"`
 		TrapOIDs        []string `json:"trap_oids"`
 	}
@@ -2321,6 +2522,10 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 		require.NotEmpty(t, entry.File, "catalogue entry %q has no file", vendor)
 		routes, ok := routesByFile[entry.File]
 		require.True(t, ok, "catalogue entry %q references missing profile file %q", vendor, entry.File)
+		profileData, err := os.ReadFile(filepath.Join(stockDir, entry.File))
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256(profileData)), entry.SHA256,
+			"catalogue sha256 mismatch for %s", entry.File)
 		assert.Equal(t, entry.TrapCount, len(routes.oids), "catalogue trap_count mismatch for %s", entry.File)
 		assert.Equal(t, routes.oids, entry.TrapOIDs, "catalogue trap_oids mismatch for %s", entry.File)
 		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.File))
@@ -2461,6 +2666,23 @@ func writeProfileYAMLZstd(t *testing.T, dir, name, content string) {
 
 func writeStockCatalogue(t *testing.T, stockDir string, catalogue stockProfileCatalogue, compressed bool) {
 	t.Helper()
+	for owner, entry := range catalogue {
+		if entry.SHA256 != "" {
+			continue
+		}
+		path := filepath.Join(stockDir, entry.File)
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			path += ".zst"
+		}
+		content, err := readProfileFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			entry.SHA256 = strings.Repeat("0", sha256.Size*2)
+		} else {
+			require.NoError(t, err, "read stock profile for catalogue entry %q", owner)
+			entry.SHA256 = fmt.Sprintf("%x", sha256.Sum256(content))
+		}
+		catalogue[owner] = entry
+	}
 	data, err := json.Marshal(catalogue)
 	require.NoError(t, err)
 	if compressed {

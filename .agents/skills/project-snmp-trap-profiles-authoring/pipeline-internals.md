@@ -133,12 +133,17 @@ journal field-name limits" framing is omitted.
 ## 7. Profile loading lifecycle
 
 Authoritative home: `netdata.md` §7 ("Profile loading — leased catalog epochs,
-exact manifest routes, targeted hydration").
+manifest routes, targeted hydration").
 
 - One catalog manager belongs to the plugin registration. Its first listener
   lease creates an epoch shared by all listeners; the final lease drops it.
-- Operator profiles and the stock manifest load eagerly at job creation. Stock
-  bodies hydrate only through exact OID, MIB-name, or metric-rule routes.
+- Operator profiles and the stock manifest load eagerly in `Collector.Init()`;
+  `Collector.Check()` is a no-op. Stock bodies hydrate through exact OID and
+  metric-rule routes or through the candidate-file list for a MIB-qualified
+  name.
+- Every stock manifest entry carries a SHA-256 over the exact decompressed YAML
+  bytes. Lazy hydration verifies and parses the same bytes, binding a body to
+  the epoch that indexed it; the digest is not an authenticity signature.
 - Profiles are immutable while the shared epoch has active job leases.
   Operator and stock changes apply after an Agent restart or after every trap
   job is recreated.

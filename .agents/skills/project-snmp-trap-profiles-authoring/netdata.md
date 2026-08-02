@@ -411,7 +411,7 @@ Profiles may define optional `metrics:` and `charts:` sections, but the plugin
 evaluates those rules only for listener jobs that enable `profile_metrics`
 (§7.5). The plugin also emits its own receiver self-metrics (§12).
 
-### Profile loading — leased catalog epochs, exact manifest routes, targeted hydration
+### Profile loading — leased catalog epochs, manifest routes, targeted hydration
 
 `internal/catalog.Manager` is created once per plugin registration and shared by its listeners. The first runnable job
 acquires a lease and builds one catalog epoch; the final lease release drops that epoch. Agents with no runnable trap jobs
@@ -419,12 +419,19 @@ never pay the profile memory cost. Failed initial loads leave the manager empty 
 
 The epoch eagerly validates every operator profile and exactly one stock manifest (`catalogue.json` or
 `catalogue.json.zst`). It also reconciles the manifest with the physical stock profile inventory. Missing, duplicate,
-gzip, or inconsistent manifests fail job creation with HTTP-422; there is no parse-all fallback.
+gzip, or inconsistent manifests fail `Collector.Init()` with HTTP-422; `Collector.Check()` is a no-op and there is no
+parse-all fallback. Every manifest entry requires a lowercase SHA-256 over the exact decompressed YAML bytes, including
+comments and the final newline. Entry digests are validated even when an operator profile replaces that stock identity.
 
-Stock profile bodies remain lazy. The manifest supplies exact trap-OID, MIB-name, and metric-rule routes, so the runtime
-hydrates only the file needed by a matching trap, a MIB-qualified name, or an enabled rule. Hydration is coalesced per
-file, different files hydrate independently, and a failure is negatively cached only for the current epoch. A complete
-bundle is validated before its traps, metric rules, and charts are published together.
+Stock profile bodies remain lazy. The manifest supplies exact trap-OID and metric-rule routes plus a deterministic
+candidate-file list for each MIB. A MIB-qualified lookup hydrates every candidate for that MIB, then requires one exact
+trap-name match. Hydration reads and decompresses a profile once, verifies the epoch's digest, and parses that same byte
+slice. Requests coalesce per file, different files hydrate independently, and a failure is negatively cached only for the
+current epoch. A complete bundle is validated before its traps, metric rules, and charts are published together.
+
+The digest binds lazy content to the manifest captured by one immutable epoch; it is not a signature or package-
+authenticity mechanism. If package replacement changes a profile while an old epoch is live, that epoch rejects the new
+body. After the final lease is released, a new epoch reads the new manifest and profile together.
 
 The loader reuses `pkg/profilecatalog` for directory walking and precedence:
 

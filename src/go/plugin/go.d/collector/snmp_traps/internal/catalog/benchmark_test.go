@@ -3,6 +3,7 @@
 package catalog
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -12,7 +13,7 @@ import (
 func BenchmarkLoadedTrapLookup(b *testing.B) {
 	manager := benchmarkStockManager()
 	lease := benchmarkAcquire(b, manager)
-	oid := benchmarkStockOIDs(b, lease.Epoch(), 1)[0]
+	oid := benchmarkRepresentativeStockRoutes(b, lease.Epoch())[0].oid
 	if td, err := lease.Epoch().LookupWithError(oid); err != nil || td == nil {
 		b.Fatalf("hydrate stock profile: trap=%v err=%v", td, err)
 	}
@@ -30,24 +31,29 @@ func BenchmarkLoadedTrapLookup(b *testing.B) {
 func BenchmarkFirstStockProfileHydration(b *testing.B) {
 	manager := benchmarkStockManager()
 	seed := benchmarkAcquire(b, manager)
-	oid := benchmarkStockOIDs(b, seed.Epoch(), 1)[0]
+	routes := benchmarkRepresentativeStockRoutes(b, seed.Epoch())
 	seed.Close()
 
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		b.StopTimer()
-		lease := benchmarkAcquire(b, manager)
-		b.StartTimer()
+	for _, route := range routes {
+		route := route
+		b.Run(route.label, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				b.StopTimer()
+				lease := benchmarkAcquire(b, manager)
+				b.StartTimer()
 
-		td, err := lease.Epoch().LookupWithError(oid)
+				td, err := lease.Epoch().LookupWithError(route.oid)
 
-		b.StopTimer()
-		if err != nil || td == nil {
-			b.Fatalf("hydrate stock profile: trap=%v err=%v", td, err)
-		}
-		lease.Close()
-		b.StartTimer()
+				b.StopTimer()
+				if err != nil || td == nil {
+					b.Fatalf("hydrate stock profile: trap=%v err=%v", td, err)
+				}
+				lease.Close()
+				b.StartTimer()
+			}
+		})
 	}
 }
 
@@ -55,7 +61,7 @@ func BenchmarkSameStockProfileHydrationCoalescing(b *testing.B) {
 	const callers = 8
 	manager := benchmarkStockManager()
 	seed := benchmarkAcquire(b, manager)
-	oid := benchmarkStockOIDs(b, seed.Epoch(), 1)[0]
+	oid := benchmarkRepresentativeStockRoutes(b, seed.Epoch())[1].oid
 	seed.Close()
 
 	b.ReportAllocs()
@@ -93,8 +99,12 @@ func BenchmarkSameStockProfileHydrationCoalescing(b *testing.B) {
 func BenchmarkUnrelatedStockProfileHydration(b *testing.B) {
 	manager := benchmarkStockManager()
 	seed := benchmarkAcquire(b, manager)
-	oids := benchmarkStockOIDs(b, seed.Epoch(), 2)
+	routes := benchmarkRepresentativeStockRoutes(b, seed.Epoch())
 	seed.Close()
+	oids := make([]string, 0, len(routes))
+	for _, route := range routes {
+		oids = append(oids, route.oid)
+	}
 
 	b.Run("sequential", func(b *testing.B) {
 		b.ReportAllocs()
@@ -158,35 +168,48 @@ func benchmarkAcquire(b *testing.B, manager *Manager) *Lease {
 	return lease
 }
 
-func benchmarkStockOIDs(b *testing.B, idx *Epoch, count int) []string {
+type benchmarkStockRoute struct {
+	label   string
+	profile string
+	oid     string
+	size    int64
+}
+
+func benchmarkRepresentativeStockRoutes(b *testing.B, idx *Epoch) []benchmarkStockRoute {
 	b.Helper()
-	type route struct {
-		profile string
-		oid     string
-	}
-	routes := make([]route, 0, len(idx.stock.exactRoutes))
+	oidsByProfile := make(map[string]string, len(idx.stock.files))
 	for oid, profile := range idx.stock.exactRoutes {
-		routes = append(routes, route{profile: profile, oid: oid})
+		if current := oidsByProfile[profile]; current == "" || oid < current {
+			oidsByProfile[profile] = oid
+		}
+	}
+
+	routes := make([]benchmarkStockRoute, 0, len(oidsByProfile))
+	for profile, oid := range oidsByProfile {
+		file := idx.stock.files[profile]
+		info, err := os.Stat(file.path)
+		if err != nil {
+			b.Fatalf("stat stock profile %q: %v", file.path, err)
+		}
+		routes = append(routes, benchmarkStockRoute{profile: profile, oid: oid, size: info.Size()})
 	}
 	sort.Slice(routes, func(i, j int) bool {
-		if routes[i].profile == routes[j].profile {
-			return routes[i].oid < routes[j].oid
+		if routes[i].size == routes[j].size {
+			return routes[i].profile < routes[j].profile
 		}
-		return routes[i].profile < routes[j].profile
+		return routes[i].size < routes[j].size
 	})
-
-	oids := make([]string, 0, count)
-	previousProfile := ""
-	for _, route := range routes {
-		if route.profile == previousProfile {
-			continue
-		}
-		oids = append(oids, route.oid)
-		previousProfile = route.profile
-		if len(oids) == count {
-			return oids
-		}
+	if len(routes) < 3 {
+		b.Fatalf("stock catalog has %d routed profiles; need at least 3", len(routes))
 	}
-	b.Fatalf("stock catalog has %d distinct routed profiles; need %d", len(oids), count)
-	return nil
+
+	selected := []benchmarkStockRoute{
+		routes[(len(routes)-1)*50/100],
+		routes[(len(routes)-1)*90/100],
+		routes[len(routes)-1],
+	}
+	selected[0].label = "p50"
+	selected[1].label = "p90"
+	selected[2].label = "largest"
+	return selected
 }

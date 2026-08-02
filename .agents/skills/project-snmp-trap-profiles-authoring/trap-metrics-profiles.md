@@ -1627,9 +1627,14 @@ Required behavior:
 - The generated stock manifest records `metric_rule_names` for every profile.
   During job creation, `profile_metrics.include` hydrates only the stock files
   that own the requested rules.
+- Every stock manifest entry records a required SHA-256 over the exact
+  decompressed YAML bytes. Lazy hydration verifies and parses the same byte
+  slice so selected rules cannot combine routes from one epoch with profile
+  content from another.
 - Operator profiles remain eager. An operator metric rule that references a
-  stock trap by MIB-qualified name hydrates only the stock profiles routed by
-  that MIB before job creation completes.
+  stock trap by MIB-qualified name hydrates the deterministic candidate-file
+  set routed by that MIB, then requires one exact trap-name match before job
+  creation completes.
 - The chosen implementation must preserve the existing lazy decode behavior for
   jobs that do not enable profile metrics.
 - The manifest is the stock metric-rule index. The implementation must not build

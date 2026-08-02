@@ -91,7 +91,7 @@ func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnr
 		deviceStore,
 		topologyEnricher,
 		newHostIdentityService(),
-		catalog.NewManager(defaultProfileCatalogPaths()),
+		nil,
 		netdataEngineStateRoot,
 	)
 }
@@ -177,7 +177,11 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.profileMetrics = nil
 	c.dynamicChartYAML = ""
 
-	profileLease, err := c.profileCatalog.Acquire()
+	profileCatalog := c.profileCatalog
+	if profileCatalog == nil {
+		profileCatalog = catalog.NewManager(defaultProfileCatalogPaths())
+	}
+	profileLease, err := profileCatalog.Acquire()
 	if err != nil {
 		return dyncfgConfigError(err)
 	}
@@ -405,6 +409,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		activeDirectJournalJobs.Add(1)
 	}
 	c.deduper = deduper
+	c.profileCatalog = profileCatalog
 	c.profileLease = profileLease
 	c.profileIndex = idx
 	releaseProfileLease = false

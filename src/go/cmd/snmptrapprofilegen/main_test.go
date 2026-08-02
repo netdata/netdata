@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -653,6 +654,7 @@ func TestEmitProfilesWritesRouteMetadataToCatalogue(t *testing.T) {
 	var catalogue map[string]struct {
 		File            string   `json:"file"`
 		MetricRuleNames []string `json:"metric_rule_names"`
+		SHA256          string   `json:"sha256"`
 		TrapCount       int      `json:"trap_count"`
 		TrapOIDs        []string `json:"trap_oids"`
 	}
@@ -667,6 +669,13 @@ func TestEmitProfilesWritesRouteMetadataToCatalogue(t *testing.T) {
 	if entry.File != "standard.yaml" || entry.TrapCount != 2 {
 		t.Fatalf("standard catalogue entry = %#v, want file standard.yaml with 2 traps", entry)
 	}
+	profileData, err := os.ReadFile(filepath.Join(profilesDir, entry.File))
+	if err != nil {
+		t.Fatalf("read emitted profile: %v", err)
+	}
+	if want := fmt.Sprintf("%x", sha256.Sum256(profileData)); entry.SHA256 != want {
+		t.Fatalf("sha256 = %q, want %q", entry.SHA256, want)
+	}
 	wantOIDs := []string{"1.3.6.1.6.3.1.1.5.1", "1.3.6.1.6.3.1.1.5.3"}
 	if strings.Join(entry.TrapOIDs, ",") != strings.Join(wantOIDs, ",") {
 		t.Fatalf("trap_oids = %#v, want %#v", entry.TrapOIDs, wantOIDs)
@@ -679,16 +688,17 @@ func TestEmitProfilesWritesRouteMetadataToCatalogue(t *testing.T) {
 	}
 }
 
-func TestProfileMetricRuleNames(t *testing.T) {
-	rules := []profileMetricRule{
+func TestNewProfileCatalogueEntryIncludesMetricRuleNames(t *testing.T) {
+	profile := profileFile{Metrics: []profileMetricRule{
 		{Name: "vendor::z"},
 		{Name: "vendor::a"},
 		{Name: "vendor::z"},
 		{},
-	}
+	}}
 	want := []string{"vendor::a", "vendor::z"}
-	if got := profileMetricRuleNames(rules); !slices.Equal(got, want) {
-		t.Fatalf("profileMetricRuleNames() = %#v, want %#v", got, want)
+	entry := newProfileCatalogueEntry("vendor.yaml", profile, nil, "digest")
+	if !slices.Equal(entry.MetricRuleNames, want) {
+		t.Fatalf("metric_rule_names = %#v, want %#v", entry.MetricRuleNames, want)
 	}
 }
 
