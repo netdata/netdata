@@ -115,9 +115,9 @@ Use the smallest control that matches the job.
 | Add a name, message, varbind definitions, or metric rules for an unknown OID | Operator profile file | Overrides do not create a new trap definition. |
 | Add many OIDs from a vendor MIB | Custom MIB conversion | It generates profile YAML from the MIB source instead of hand-writing every trap. |
 | Replace stock behavior for one vendor file | Operator profile with the same filename | The operator file fully replaces the stock file of the same name. |
-| Add site-specific traps without replacing stock vendor files | Operator profile with a different filename; use `extends:` when the file should inherit an existing profile | It adds entries alongside the stock profile set without copying the whole stock vendor file. |
+| Add site-specific traps without replacing stock vendor files | Operator profile with a different filename | It adds complete entries alongside the stock profile set without replacing a vendor file. |
 
-`extends:` entries are bare `.yaml` or `.yml` filenames without path separators. Netdata resolves them across the operator and stock profile directories, operator files first. They can inherit traps, varbinds, metric rules, and chart definitions from another visible profile file, and fields in the extending file win where they overlap. Deeply nested or circular `extends:` chains are rejected at profile load time.
+Partial profile inheritance is not supported, and the `extends:` key is rejected. Use listener-job `overrides` for category, severity, or label policy changes; use a complete same-name operator profile when decode definitions must change.
 
 For simple policy overrides, configure the listener job:
 

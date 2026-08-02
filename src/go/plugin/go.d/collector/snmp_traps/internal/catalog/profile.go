@@ -197,7 +197,6 @@ type ProfileDefinition struct {
 	Vendor    string                `yaml:"vendor,omitempty"`
 	MibCount  int                   `yaml:"mib_count,omitempty"`
 	TrapCount int                   `yaml:"trap_count,omitempty"`
-	Extends   []string              `yaml:"extends,omitempty"`
 	Varbinds  map[string]VarbindDef `yaml:"varbinds,omitempty"`
 	Traps     []TrapDef             `yaml:"traps,omitempty"`
 	Metrics   []profileMetricRule   `yaml:"metrics,omitempty"`

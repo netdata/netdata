@@ -112,7 +112,10 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
    `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen`. Do not hand-edit
    them for site-specific concerns; site overrides belong under
    `/etc/netdata/go.d/snmp.trap-profiles/` and are documented in
-   `profile-format.md` § "Operator overrides".
+   `profile-format.md` § "Operator overrides". Operator composition has three
+   supported forms: a complete same-identity replacement, an independent
+   different-identity addition, or a metric-only profile that references stock
+   traps. Partial inheritance is unsupported; `extends:` is rejected.
 
 10. **Profile metrics use the validated `metrics:` / `charts:` schema.** Trap
     profiles may define optional trap-to-metric rules only through the schema in

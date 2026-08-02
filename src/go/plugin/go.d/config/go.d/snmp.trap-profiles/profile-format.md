@@ -189,8 +189,8 @@ templates can only reference varbinds that survive to disk.
 Profiles may define trap-to-metric rules next to trap decode information. These rules are inert until a listener job
 enables them with `profile_metrics`.
 
-Metric rules are merged through `extends:` by rule `name`; a child profile can replace or disable an inherited rule by
-using the same name. Chart definitions are merged by chart `id`.
+Metric rule names and chart IDs are file-local definitions. Rule names must remain unique across the effective profile
+catalogue, and a rule may reference only a chart defined in the same file.
 
 Custom profile files under `/etc/netdata/go.d/snmp.trap-profiles/` are loaded eagerly. Stock trap profiles remain lazy:
 the stock catalogue routes a received trap OID or selected metric rule to its owning profile file. When a custom metric
@@ -209,8 +209,7 @@ profile_metrics:
 - `profile_metrics.enabled` defaults to `false`; profile rules are inactive until the job enables them.
 - `profile_metrics.include` lists every rule enabled for the job. At least one rule is required when profile metrics are
   enabled. Missing or profile-disabled rule names fail job creation.
-- A child profile rule with the same `name` fully replaces the inherited rule. A child can set `enabled: false` to
-  disable an inherited rule.
+- A profile may set one of its own rules to `enabled: false`; explicitly selecting that rule then fails job creation.
 
 Identity behavior:
 
@@ -258,8 +257,8 @@ Canonical rule fields:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `name` | yes | Stable rule identity, unique after profile merge |
-| `enabled` | no | Defaults to enabled; set `false` in a child profile to disable an inherited rule |
+| `name` | yes | Stable rule identity, unique across the effective profile catalogue |
+| `enabled` | no | Defaults to enabled; set `false` to keep this file's rule unavailable for job selection |
 | `type` | yes | `counter`, `sample`, or `state` |
 | `on_trap` | yes for `counter`/`sample` | Trap name or numeric OID |
 | `problem_trap` / `clear_trap` | yes for separate-trap `state` | Trap names or numeric OIDs |
@@ -562,9 +561,7 @@ In profile terms:
 
 ## Operator overrides
 
-Operators do not copy entire stock profiles to make changes. Instead they place small override files under
-`/etc/netdata/go.d/snmp.trap-profiles/`. The plugin loader mirrors the SNMP polling plugin's multipath pattern
-(`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`):
+Operators place profile files under `/etc/netdata/go.d/snmp.trap-profiles/` and choose one of these composition modes:
 
 1. **Same filename in higher-priority directory replaces the lower-priority one entirely.** Operator `ciscosystems.yaml`
    fully replaces stock `ciscosystems.yaml` or installed `ciscosystems.yaml.zst` — copy + edit the whole file to
@@ -572,9 +569,10 @@ Operators do not copy entire stock profiles to make changes. Instead they place 
 2. **Different filename adds entries.** Operator `site-additions.yaml` (different filename) merges its `traps:` into the
    loaded set without touching stock files. Metric-only site profiles can also use a different filename and reference
    stock traps by MIB-qualified trap name in `on_trap`, `problem_trap`, or `clear_trap`.
-3. **`extends:` chain field-merge** (when an override profile lists `extends: [_base.yaml, other-base.yaml]`): entries
-   must be YAML filenames only, not paths. The loader merges trap entries by OID; fields specified in the override file
-   win over fields from the extended bases; later entries in `extends:` override earlier ones for the same field.
+
+Partial profile inheritance is not supported. The `extends:` key is rejected. Use listener-job `overrides` for
+category/severity/label policy changes on known OIDs, a complete same-name replacement for decode-definition changes, or
+a different filename for independent traps and metric rules.
 
 ### `TRAP_TAG_*` label namespace and collision-free design
 

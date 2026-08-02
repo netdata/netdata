@@ -432,9 +432,10 @@ The loader reuses `pkg/profilecatalog` for directory walking and precedence:
    `^[a-z0-9][a-z0-9_-]*$`.
 2. **Operator override** — an operator `ciscosystems.yaml` fully replaces stock `ciscosystems.yaml.zst`. Duplicate or
    invalid operator identities fail the complete load.
-3. **Field-level merge via `extends:`** — later `extends` entries override earlier entries on a per-OID basis; fields
-   omitted by the child inherit from the selected base.
-4. **Duplicate definitions** — duplicate effective trap OIDs, alternate `.0` OID forms, trap names, metric rule names,
+3. **Independent additions** — an operator file with a different identity adds complete trap/rule definitions. A
+   metric-only operator file may reference stock traps without copying their decode definitions.
+4. **No partial inheritance** — profile files are not field-merged. The `extends:` key is rejected.
+5. **Duplicate definitions** — duplicate effective trap OIDs, alternate `.0` OID forms, trap names, metric rule names,
    metric outputs, and chart IDs are errors. Directory order never resolves such conflicts.
 
 Stock YAML remains uncompressed in git for review. Installed packages use `.yaml.zst`; gzip profile and manifest loading
@@ -1214,7 +1215,8 @@ Phase B resolved most of the original questions. What remains:
 - **DynCfg lifecycle** — job-level restart on config change; plugin process does not restart.
 - **Per-job retention** — 10GB default, configurable max-size and/or max-duration, mirrored from NetFlow plugin pattern.
 - **MIB compilation** — none at runtime; operators convert offline via the shipped helper, drop YAML.
-- **Profile override merge** — multipath + filename-dedup + extends-chain field-merge, mirrored from SNMP polling plugin (`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`).
+- **Profile composition** — extensionless same-identity full replacement, independent different-identity additions, and
+  metric-only operator profiles that reference stock traps. Partial inheritance is not supported.
 - **Trap `name` field** — required, MIB-qualified.
 - **Spec example varbind layout** — file-scoped table (matches the shipped `profile-format.md` schema).
 - **Collector consistency bundle** — owned by SOW-0039 (the final SOW); SOW-0035–0038 are not independently mergeable (single PR sequence ending at SOW-0039 M6).
@@ -1277,7 +1279,7 @@ The implementation is tracked through five sequential SOWs under `.agents/sow/pe
 
 | SOW | Scope | Acceptance |
 |---|---|---|
-| **SOW-0035** | Go implementation architecture decision (process model, journal-writer backend, output writer interface contract); multi-endpoint listener (per-job DynCfg orchestration; every configured endpoint binds or job creation fails with retryable HTTP-503 surfaced in DynCfg — no automatic high-port fallback) + SNMPv1/v2c decode + source identification + replayable pcap test corpus; shared lazy profile YAML loader loaded on first runnable job creation (multipath, filename-dedup, extends-chain merge — mirroring the SNMP polling plugin) + OID index + 2-tier varbind resolution + template rendering; journal writer per-job (one journal directory per job at `${NETDATA_LOG_DIR}/traps/{job_name}/`, retention config with intentional deviation on the `max_duration` default) with creation-time directory/writer preflight and CWE-117 binary-field encoding | Operator sees decoded trap from a replayed pcap in a per-job journal directory |
+| **SOW-0035** | Go implementation architecture decision (process model, journal-writer backend, output writer interface contract); multi-endpoint listener (per-job DynCfg orchestration; every configured endpoint binds or job creation fails with retryable HTTP-503 surfaced in DynCfg — no automatic high-port fallback) + SNMPv1/v2c decode + source identification + replayable pcap test corpus; shared lazy profile YAML loader loaded on first runnable job creation (extensionless full replacement plus independent additions) + OID index + 2-tier varbind resolution + template rendering; journal writer per-job (one journal directory per job at `${NETDATA_LOG_DIR}/traps/{job_name}/`, retention config with intentional deviation on the `max_duration` default) with creation-time directory/writer preflight and CWE-117 binary-field encoding | Operator sees decoded trap from a replayed pcap in a per-job journal directory |
 | **SOW-0036** | SNMPv3 USM (static engineID whitelist, per-job) + INFORM acknowledgement + `snmpEngineBoots` persistence per job; per-job allowlist + rate limiting; plugin configuration schema + DynCfg per-job orchestration refinement; plugin-self NIDL metrics (per-job dimensions, full error universe per §12, including BER limit violations from §18) | Production-grade per-job auth + rate limiting + telemetry |
 | **SOW-0037** | Cross-plugin enrichment (sysName/vendor/topology); **opt-in** deduplication (per-job, disabled by default — see §10) with periodic summary entries; profile-defined trap metrics enabled per listener job | Operational depth: enriched and optionally deduped |
 | **SOW-0038** | Throughput benchmark harness; SNMPv3 dynamic engineID discovery (opt-in); standards-compliant OTLP exporter (§11b — optional, vendor-neutral; works with Netdata's OTEL plugin and any OTLP-compliant receiver) | Scale + interop |

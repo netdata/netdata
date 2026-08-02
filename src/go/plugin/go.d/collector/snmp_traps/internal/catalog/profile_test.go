@@ -19,7 +19,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -275,13 +274,19 @@ traps:
 	assert.Nil(t, idx.Lookup("1.3.6.1.4.1.99998.1"))
 }
 
-func TestProfileExtendsRejectsGzipFilename(t *testing.T) {
-	dir := t.TempDir()
-	writeGzipFile(t, dir, "_base.yaml.gz", "traps: []\n")
-	writeProfileYAML(t, dir, "test.yaml", "extends: [_base.yaml.gz]\n")
+func TestProfileLoadRejectsRemovedExtendsKey(t *testing.T) {
+	userDir := t.TempDir()
+	writeProfileYAML(t, userDir, "_base.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.99998.1
+    name: USER-MIB::base
+    category: diagnostic
+    severity: info
+`)
+	writeProfileYAML(t, userDir, "site.yaml", "extends: [_base.yaml]\n")
 
-	_, _, err := loadProfile(filepath.Join(dir, "test.yaml"), multipath.New(dir), nil)
-	require.ErrorContains(t, err, "must end with .yaml or .yml")
+	_, err := NewManager(Paths{UserDirs: []string{userDir}, StockDir: writeTestStockCatalog(t)}).Acquire()
+	require.ErrorContains(t, err, `unknown config key "extends"`)
 }
 
 func TestStockProfileLazyHydrationAndNegativeCache(t *testing.T) {
@@ -585,7 +590,7 @@ func TestStockHydrationCoalescesPerFileWithoutBlockingOtherFiles(t *testing.T) {
 			"slow": {},
 			"fast": {},
 		},
-		loadBundle: func(path string, _ multipath.MultiPath, _ []string) (profileLoadBundle, error) {
+		loadBundle: func(path string) (profileLoadBundle, error) {
 			switch path {
 			case "slow.yaml":
 				slowLoads.Add(1)
@@ -679,7 +684,7 @@ func TestStockDependencyParsingDoesNotBlockUnrelatedPublication(t *testing.T) {
 			"dependency": {},
 			"fast":       {},
 		},
-		loadBundle: func(path string, _ multipath.MultiPath, _ []string) (profileLoadBundle, error) {
+		loadBundle: func(path string) (profileLoadBundle, error) {
 			switch path {
 			case "metric.yaml":
 				return metricBundle, nil
@@ -833,7 +838,7 @@ traps:
 	require.Equal(t, []ProfileInfo{{Name: "vendor", Path: filepath.Join(userDir, "vendor.yaml"), IsStock: false}}, idx.Profiles())
 }
 
-func TestUserProfileCanExtendTopLevelStockProfile(t *testing.T) {
+func TestUserProfileWithDistinctIdentityAddsAlongsideStock(t *testing.T) {
 	stockDir := filepath.Join(t.TempDir(), "default")
 	userDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(stockDir, 0o755))
@@ -852,19 +857,22 @@ traps:
 		},
 	}, false)
 	writeProfileYAML(t, userDir, "site.yaml", `
-extends: [vendor.yaml]
 traps:
-  - oid: 1.3.6.1.4.1.99998.27
+  - oid: 1.3.6.1.4.1.99998.28
+    name: SITE-MIB::addition
+    category: security
     severity: warning
 `)
 
 	lease, err := NewManager(Paths{UserDirs: []string{userDir}, StockDir: stockDir}).Acquire()
 	require.NoError(t, err)
 	t.Cleanup(lease.Close)
-	td := lease.Epoch().Lookup("1.3.6.1.4.1.99998.27")
-	require.NotNil(t, td)
-	assert.Equal(t, "warning", td.Severity)
-	assert.Equal(t, []ProfileInfo{{Name: "site", Path: filepath.Join(userDir, "site.yaml"), IsStock: false}}, lease.Epoch().Profiles())
+	assert.NotNil(t, lease.Epoch().Lookup("1.3.6.1.4.1.99998.27"))
+	assert.NotNil(t, lease.Epoch().Lookup("1.3.6.1.4.1.99998.28"))
+	assert.Equal(t, []ProfileInfo{
+		{Name: "site", Path: filepath.Join(userDir, "site.yaml"), IsStock: false},
+		{Name: "vendor", Path: filepath.Join(stockDir, "vendor.yaml"), IsStock: true},
+	}, lease.Epoch().Profiles())
 }
 
 func TestUserMetricCollisionWithReferencedStockProfileIsRejected(t *testing.T) {
@@ -1404,186 +1412,6 @@ traps:
 
 	_, err := acquireTestEpoch()
 	require.ErrorContains(t, err, "duplicate user profile name")
-}
-
-func TestProfileLoadExtendsMerge(t *testing.T) {
-	dir := t.TempDir()
-
-	writeProfileYAML(t, dir, "_base.yaml", `
-varbinds:
-  ifIndex:
-    oid: 1.3.6.1.2.1.2.2.1.1
-    type: INTEGER
-  ifDescr:
-    oid: 1.3.6.1.2.1.31.1.1.1.1
-    type: OctetString
-
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: info
-    description: 'Link down: {{value "ifDescr"}}'
-    varbinds: [ifIndex, ifDescr]
-`)
-
-	writeProfileYAML(t, dir, "override.yaml", `
-extends: [_base.yaml]
-
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: security
-    severity: warning
-    varbinds: [ifIndex]
-`)
-
-	setTestDirs(t, dir)
-	resetTestEpoch()
-
-	idx, err := acquireTestEpoch()
-	require.NoError(t, err)
-	defer releaseTestEpoch()
-
-	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
-	require.NotNil(t, td)
-	assert.Equal(t, "security", td.Category)
-	assert.Equal(t, "warning", td.Severity)
-	assert.Equal(t, `Link down: {{value "ifDescr"}}`, td.Description)
-}
-
-func TestProfileLoadExtendsLaterBaseOverridesEarlier(t *testing.T) {
-	dir := t.TempDir()
-
-	writeProfileYAML(t, dir, "_base1.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: info
-`)
-	writeProfileYAML(t, dir, "_base2.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: security
-    severity: warning
-`)
-	writeProfileYAML(t, dir, "derived.yaml", `
-extends: [_base1.yaml, _base2.yaml]
-`)
-
-	setTestDirs(t, dir)
-	resetTestEpoch()
-
-	idx, err := acquireTestEpoch()
-	require.NoError(t, err)
-	defer releaseTestEpoch()
-
-	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
-	require.NotNil(t, td)
-	assert.Equal(t, "security", td.Category)
-	assert.Equal(t, "warning", td.Severity)
-}
-
-func TestProfileLoadExtendsPartialTrapOverride(t *testing.T) {
-	dir := t.TempDir()
-
-	writeProfileYAML(t, dir, "_base.yaml", `
-varbinds:
-  ifIndex:
-    oid: 1.3.6.1.2.1.2.2.1.1
-    type: INTEGER
-
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: info
-    description: "Link down"
-    varbinds: [ifIndex]
-`)
-	writeProfileYAML(t, dir, "derived.yaml", `
-extends: [_base.yaml]
-
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    severity: warning
-`)
-
-	setTestDirs(t, dir)
-	resetTestEpoch()
-
-	idx, err := acquireTestEpoch()
-	require.NoError(t, err)
-	defer releaseTestEpoch()
-
-	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
-	require.NotNil(t, td)
-	assert.Equal(t, "IF-MIB::linkDown", td.Name)
-	assert.Equal(t, "state_change", td.Category)
-	assert.Equal(t, "warning", td.Severity)
-	assert.Equal(t, "Link down", td.Description)
-	assert.NotNil(t, td.varbindByName("ifIndex"))
-}
-
-func TestProfileLoadRejectsUnsafeExtendsName(t *testing.T) {
-	dir := t.TempDir()
-	writeProfileYAML(t, dir, "bad.yaml", `
-extends: [../../outside.yaml]
-`)
-
-	setTestDirs(t, dir)
-	resetTestEpoch()
-
-	_, err := acquireTestEpoch()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid extends entry")
-}
-
-func TestProfileLoadRejectsTooDeepExtendsChain(t *testing.T) {
-	dir := t.TempDir()
-	for i := 0; i <= maxProfileExtendsDepth+1; i++ {
-		name := fmt.Sprintf("p%02d.yaml", i)
-		if i == maxProfileExtendsDepth+1 {
-			writeProfileYAML(t, dir, name, `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: warning
-`)
-			continue
-		}
-		writeProfileYAML(t, dir, name, fmt.Sprintf("extends: [p%02d.yaml]\n", i+1))
-	}
-
-	_, _, err := loadProfile(filepath.Join(dir, "p00.yaml"), multipath.New(dir), nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "profile extends depth exceeds maximum")
-}
-
-func TestProfileLoadAllowsMaximumExtendsChainDepth(t *testing.T) {
-	dir := t.TempDir()
-	for i := 0; i <= maxProfileExtendsDepth; i++ {
-		name := fmt.Sprintf("p%02d.yaml", i)
-		if i == maxProfileExtendsDepth {
-			writeProfileYAML(t, dir, name, `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: warning
-`)
-			continue
-		}
-		writeProfileYAML(t, dir, name, fmt.Sprintf("extends: [p%02d.yaml]\n", i+1))
-	}
-
-	traps, _, err := loadProfile(filepath.Join(dir, "p00.yaml"), multipath.New(dir), nil)
-	require.NoError(t, err)
-	require.Len(t, traps, 1)
-	assert.Equal(t, "IF-MIB::linkDown", traps[0].Name)
 }
 
 // =============================================================================
@@ -2495,7 +2323,7 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 		require.True(t, ok, "catalogue entry %q references missing profile file %q", vendor, entry.File)
 		assert.Equal(t, entry.TrapCount, len(routes.oids), "catalogue trap_count mismatch for %s", entry.File)
 		assert.Equal(t, routes.oids, entry.TrapOIDs, "catalogue trap_oids mismatch for %s", entry.File)
-		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.File), multipath.New(stockDir), nil)
+		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.File))
 		require.NoError(t, err, "stock profile %s", entry.File)
 		expected := stockProfileRoutes{
 			trapOIDs:        append([]string(nil), entry.TrapOIDs...),
@@ -2522,7 +2350,7 @@ func TestStockProfileDefaultFilesParse(t *testing.T) {
 		if entry.IsDir() || !isProfileFileName(entry.Name()) || strings.HasPrefix(entry.Name(), "_") {
 			continue
 		}
-		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.Name()), multipath.New(stockDir), nil)
+		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.Name()))
 		require.NoError(t, err, "stock profile %s", entry.Name())
 		require.NotEmpty(t, bundle.traps, "stock profile %s parsed without traps", entry.Name())
 		totalTraps += len(bundle.traps)

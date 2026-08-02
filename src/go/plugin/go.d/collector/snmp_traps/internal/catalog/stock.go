@@ -12,14 +12,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
 type stockProfileStore struct {
-	extendsPaths multipath.MultiPath
-	loadBundle   func(string, multipath.MultiPath, []string) (profileLoadBundle, error)
+	loadBundle   func(string) (profileLoadBundle, error)
 	files        map[string]string
 	routes       map[string]stockProfileRoutes
 	exactRoutes  map[string]string
@@ -57,9 +55,7 @@ type stockProfileCatalogueEntry struct {
 
 func buildStockProfileStore(
 	dir string,
-	extendsPaths multipath.MultiPath,
 	sources profilecatalog.Catalog[profileSource],
-	suppressedPaths map[string]bool,
 	idx *Epoch,
 ) (*stockProfileStore, error) {
 	catalogue, err := loadStockProfileCatalogue(dir)
@@ -68,7 +64,6 @@ func buildStockProfileStore(
 	}
 
 	store := &stockProfileStore{
-		extendsPaths: extendsPaths,
 		loadBundle:   loadProfileBundle,
 		files:        make(map[string]string),
 		routes:       make(map[string]stockProfileRoutes),
@@ -96,10 +91,9 @@ func buildStockProfileStore(
 		}
 
 		source, _ := sources.Get(identity)
-		// A user profile with the same extensionless identity, or a top-level
-		// stock profile incorporated through an eager user extends chain, no
-		// longer owns independent lazy routes.
-		if !sources.EffectiveIsStock(identity) || suppressedPaths[canonicalProfilePath(source.path)] {
+		// A user profile with the same extensionless identity fully replaces
+		// the stock profile and therefore owns the effective routes.
+		if !sources.EffectiveIsStock(identity) {
 			continue
 		}
 		store.files[identity] = source.path
@@ -296,7 +290,7 @@ func (s *stockProfileStore) parse(name string) (profileLoadBundle, error) {
 		if loadBundle == nil {
 			loadBundle = loadProfileBundle
 		}
-		bundle, err := loadBundle(path, s.extendsPaths, nil)
+		bundle, err := loadBundle(path)
 		if err != nil {
 			state.parseErr = fmt.Errorf("failed to hydrate stock trap profile %q: %w", path, err)
 			return

@@ -16,12 +16,9 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
-
-const maxProfileExtendsDepth = 32
 
 var maxProfileFileBytes int64 = 128 * 1024 * 1024
 
@@ -40,7 +37,6 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 
 	allDirs := append([]string(nil), paths.UserDirs...)
 	allDirs = append(allDirs, paths.StockDir)
-	extendsPaths := multipath.New(allDirs...)
 	specs := make([]profilecatalog.DirSpec, 0, len(allDirs))
 	for _, dir := range paths.UserDirs {
 		specs = append(specs, profilecatalog.DirSpec{Path: dir})
@@ -53,7 +49,7 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 			if ctx.IsStock {
 				return source, nil
 			}
-			bundle, err := loadProfileBundle(ctx.Path, extendsPaths, nil)
+			bundle, err := loadProfileBundle(ctx.Path)
 			if err != nil {
 				return profileSource{}, fmt.Errorf("invalid profile %q: %w", ctx.Path, err)
 			}
@@ -69,22 +65,9 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 	}
 
 	index := NewEpoch()
-	suppressedPaths := make(map[string]bool)
-	for _, named := range sources.InOrder() {
-		source := named.Profile
-		if source.stock || source.bundle == nil {
-			continue
-		}
-		for _, path := range source.bundle.extendsFiles {
-			suppressedPaths[canonicalProfilePath(path)] = true
-		}
-	}
 	var userBundles []profileLoadBundle
 	for _, named := range sources.InOrder() {
 		source := named.Profile
-		if suppressedPaths[canonicalProfilePath(source.path)] {
-			continue
-		}
 		index.profiles = append(index.profiles, ProfileInfo{Name: named.Name, Path: source.path, IsStock: source.stock})
 		if source.stock {
 			continue
@@ -99,7 +82,7 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 	}
 	slices.SortFunc(index.profiles, func(a, b ProfileInfo) int { return strings.Compare(a.Name, b.Name) })
 
-	store, err := buildStockProfileStore(paths.StockDir, extendsPaths, sources, suppressedPaths, index)
+	store, err := buildStockProfileStore(paths.StockDir, sources, index)
 	if err != nil {
 		return nil, err
 	}
@@ -422,11 +405,9 @@ func validateProfileMetricChartRuleShapes(rules map[string]*profileMetricRule) e
 }
 
 type profileLoadBundle struct {
-	traps        []*TrapDef
-	varbinds     map[string]VarbindDef
-	metrics      []profileMetricRule
-	charts       []profileMetricChart
-	extendsFiles []string
+	traps   []*TrapDef
+	metrics []profileMetricRule
+	charts  []profileMetricChart
 }
 
 // Bundle is one fully resolved and statically validated profile file. It is a
@@ -438,177 +419,94 @@ type Bundle struct {
 	Charts  []MetricChart
 }
 
-// LoadProfileFile resolves and validates one profile against explicit search
-// directories.
-func LoadProfileFile(filename string, searchDirs []string) (Bundle, error) {
-	bundle, err := loadProfileBundle(filename, multipath.New(searchDirs...), nil)
+// LoadProfileFile loads and validates one profile file.
+func LoadProfileFile(filename string) (Bundle, error) {
+	bundle, err := loadProfileBundle(filename)
 	if err != nil {
 		return Bundle{}, err
 	}
 	return Bundle{Traps: bundle.traps, Metrics: bundle.metrics, Charts: bundle.charts}, nil
 }
 
-// loadProfile loads a single profile YAML and returns its validated trap definitions.
-// Returns traps, loaded file-level varbinds, and error.
-func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []string) ([]*TrapDef, map[string]VarbindDef, error) {
-	bundle, err := loadProfileBundle(filename, extendsPaths, stack)
-	if err != nil {
-		return nil, nil, err
-	}
-	return bundle.traps, bundle.varbinds, nil
-}
-
-func loadProfileBundle(filename string, extendsPaths multipath.MultiPath, stack []string) (profileLoadBundle, error) {
-	if len(stack) > maxProfileExtendsDepth {
-		return profileLoadBundle{}, fmt.Errorf("%s: profile extends depth exceeds maximum %d", filename, maxProfileExtendsDepth)
-	}
+func loadProfileBundle(filename string) (profileLoadBundle, error) {
 	content, err := readProfileFile(filename)
 	if err != nil {
 		return profileLoadBundle{}, err
 	}
+	return parseProfileBundle(filename, content)
+}
 
+func parseProfileBundle(filename string, content []byte) (profileLoadBundle, error) {
 	var def ProfileDefinition
 	if err := unmarshalProfileYAML(content, &def); err != nil {
 		return profileLoadBundle{}, err
 	}
 
-	// resolve extends chain
-	var allTraps []*TrapDef
-	var allMetrics []profileMetricRule
-	var allCharts []profileMetricChart
-	var extendsFiles []string
-	fileVarbinds := cloneVarbindMap(def.Varbinds)
-	currentVarbinds := make(map[string]bool, len(def.Varbinds))
-	for name := range def.Varbinds {
-		currentVarbinds[name] = true
-	}
-
-	currentTrapOIDs := make(map[string]bool, len(def.Traps))
+	trapOIDs := make(map[string]bool, len(def.Traps))
 	for _, td := range def.Traps {
 		if td.OID == "" {
 			continue
 		}
-		if currentTrapOIDs[td.OID] {
+		if trapOIDs[td.OID] {
 			return profileLoadBundle{}, fmt.Errorf("%s: duplicate trap OID %s in profile", filename, td.OID)
 		}
-		currentTrapOIDs[td.OID] = true
+		trapOIDs[td.OID] = true
 	}
-	baseByOID := make(map[string]*TrapDef)
-	allTrapPos := make(map[string]int)
-	allMetricPos := make(map[string]int)
-	allChartPos := make(map[string]int)
 
-	currentMetricNames := make(map[string]bool, len(def.Metrics))
+	metricNames := make(map[string]bool, len(def.Metrics))
 	for _, metric := range def.Metrics {
 		if metric.Name == "" {
 			continue
 		}
-		if currentMetricNames[metric.Name] {
+		if metricNames[metric.Name] {
 			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric rule %s in profile", filename, metric.Name)
 		}
-		currentMetricNames[metric.Name] = true
+		metricNames[metric.Name] = true
 	}
-	currentChartIDs := make(map[string]bool, len(def.Charts))
+	chartIDs := make(map[string]bool, len(def.Charts))
 	for _, chart := range def.Charts {
 		if chart.ID == "" {
 			continue
 		}
-		if currentChartIDs[chart.ID] {
+		if chartIDs[chart.ID] {
 			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric chart %s in profile", filename, chart.ID)
 		}
-		currentChartIDs[chart.ID] = true
-	}
-
-	if len(def.Extends) > 0 {
-		for _, extName := range def.Extends {
-			if err := validateExtendsName(extName); err != nil {
-				return profileLoadBundle{}, fmt.Errorf("%s: invalid extends entry %q: %w", filename, extName, err)
-			}
-			if stacksContains(stack, extName) {
-				return profileLoadBundle{}, fmt.Errorf("%s: circular extends detected: %q", filename, extName)
-			}
-			extPath, err := findProfileExtends(extendsPaths, extName)
-			if err != nil {
-				return profileLoadBundle{}, fmt.Errorf("%s: cannot find extension %q: %v", filename, extName, err)
-			}
-			base, err := loadProfileBundle(extPath, extendsPaths, append(stack, extName))
-			if err != nil {
-				return profileLoadBundle{}, err
-			}
-			extendsFiles = append(extendsFiles, canonicalProfilePath(extPath))
-			extendsFiles = append(extendsFiles, base.extendsFiles...)
-			for _, bt := range base.traps {
-				baseByOID[bt.OID] = bt
-				if currentTrapOIDs[bt.OID] {
-					continue
-				}
-				if pos, ok := allTrapPos[bt.OID]; ok {
-					allTraps[pos] = bt
-				} else {
-					allTrapPos[bt.OID] = len(allTraps)
-					allTraps = append(allTraps, bt)
-				}
-			}
-			mergeProfileMetricRules(&allMetrics, allMetricPos, base.metrics, currentMetricNames)
-			mergeProfileMetricCharts(&allCharts, allChartPos, base.charts, currentChartIDs)
-			mergeBaseVarbinds(fileVarbinds, base.varbinds, currentVarbinds)
-		}
+		chartIDs[chart.ID] = true
 	}
 
 	absFile, _ := filepath.Abs(filename)
-	if err := validateFileVarbinds(fileVarbinds, absFile); err != nil {
+	if err := validateFileVarbinds(def.Varbinds, absFile); err != nil {
 		return profileLoadBundle{}, err
 	}
 
+	traps := make([]*TrapDef, 0, len(def.Traps))
 	for i := range def.Traps {
 		td := &def.Traps[i]
 		td.SourceFile = absFile
-		if base := baseByOID[td.OID]; base != nil {
-			mergeTrapDef(td, base)
-		}
-
-		if err := validateTrapDef(td, fileVarbinds); err != nil {
+		if err := validateTrapDef(td, def.Varbinds); err != nil {
 			return profileLoadBundle{}, err
 		}
-
-		td.SharedVarbinds = buildSharedVarbinds(td, fileVarbinds)
+		td.SharedVarbinds = buildSharedVarbinds(td, def.Varbinds)
+		traps = append(traps, td)
 	}
 
-	for i := range def.Traps {
-		allTraps = append(allTraps, &def.Traps[i])
-	}
-
+	metrics := make([]profileMetricRule, 0, len(def.Metrics))
 	for i := range def.Metrics {
 		rule := &def.Metrics[i]
 		rule.SourceFile = absFile
 		if err := normalizeProfileMetricRule(rule); err != nil {
 			return profileLoadBundle{}, fmt.Errorf("%s: metric rule: %w", absFile, err)
 		}
-		allMetrics = append(allMetrics, *rule)
+		metrics = append(metrics, *rule)
 	}
+	charts := make([]profileMetricChart, 0, len(def.Charts))
 	for i := range def.Charts {
 		chart := &def.Charts[i]
 		chart.SourceFile = absFile
-		mergeProfileMetricCharts(&allCharts, allChartPos, []profileMetricChart{*chart}, nil)
+		charts = append(charts, *chart)
 	}
 
-	slices.Sort(extendsFiles)
-	extendsFiles = slices.Compact(extendsFiles)
-	return profileLoadBundle{
-		traps:        allTraps,
-		varbinds:     fileVarbinds,
-		metrics:      allMetrics,
-		charts:       allCharts,
-		extendsFiles: extendsFiles,
-	}, nil
-}
-
-func canonicalProfilePath(path string) string {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return filepath.Clean(path)
-	}
-	return filepath.Clean(abs)
+	return profileLoadBundle{traps: traps, metrics: metrics, charts: charts}, nil
 }
 
 func readProfileFile(filename string) ([]byte, error) {
@@ -648,21 +546,6 @@ func readCompressedFile(filename string) ([]byte, error) {
 	return data, nil
 }
 
-func findProfileExtends(paths multipath.MultiPath, name string) (string, error) {
-	if !profilePathIsSupported(name) {
-		return "", fmt.Errorf("unsupported profile filename %q", name)
-	}
-	var lastErr error
-	for _, candidate := range profilePathCandidates(name) {
-		path, err := paths.Find(candidate)
-		if err == nil {
-			return path, nil
-		}
-		lastErr = err
-	}
-	return "", lastErr
-}
-
 func isProfileFileName(name string) bool {
 	_, ok := parseProfileFileName(name)
 	return ok
@@ -675,131 +558,6 @@ func parseProfileFileName(name string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-func profilePathCandidates(name string) []string {
-	if strings.HasSuffix(name, ".zst") {
-		return []string{name}
-	}
-	return []string{name, name + ".zst"}
-}
-
-func profilePathIsSupported(name string) bool {
-	_, ok := parseProfileFileName(name)
-	return ok
-}
-
-func validateExtendsName(name string) error {
-	if name == "" {
-		return fmt.Errorf("empty filename")
-	}
-	if filepath.Base(name) != name || strings.ContainsRune(name, '\\') {
-		return fmt.Errorf("must be a profile filename, not a path")
-	}
-	if name == "." || name == ".." {
-		return fmt.Errorf("must be a profile filename, not a path")
-	}
-	if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
-		return fmt.Errorf("must end with .yaml or .yml")
-	}
-	return nil
-}
-
-func mergeTrapDef(target *TrapDef, base *TrapDef) {
-	if target.Name == "" {
-		target.Name = base.Name
-	}
-	if target.Category == "" {
-		target.Category = base.Category
-	}
-	if target.Severity == "" {
-		target.Severity = base.Severity
-	}
-	if target.Description == "" {
-		target.Description = base.Description
-	}
-	if target.Status == "" {
-		target.Status = base.Status
-	}
-	if target.VarbindRefs == nil {
-		target.VarbindRefs = cloneAnySlice(base.VarbindRefs)
-	}
-	if target.Labels == nil {
-		target.Labels = cloneStringMap(base.Labels)
-	} else {
-		target.Labels = mergeStringMaps(base.Labels, target.Labels)
-	}
-	if target.DedupKeyVarbinds == nil {
-		target.DedupKeyVarbinds = append([]string(nil), base.DedupKeyVarbinds...)
-	}
-}
-
-func mergeBaseVarbinds(target, base map[string]VarbindDef, protected map[string]bool) {
-	for name, vb := range base {
-		if !protected[name] {
-			target[name] = vb
-		}
-	}
-}
-
-func mergeProfileMetricRules(target *[]profileMetricRule, positions map[string]int, base []profileMetricRule, protected map[string]bool) {
-	for _, rule := range base {
-		if protected != nil && protected[rule.Name] {
-			continue
-		}
-		if pos, ok := positions[rule.Name]; ok {
-			(*target)[pos] = rule
-			continue
-		}
-		positions[rule.Name] = len(*target)
-		*target = append(*target, rule)
-	}
-}
-
-func mergeProfileMetricCharts(target *[]profileMetricChart, positions map[string]int, base []profileMetricChart, protected map[string]bool) {
-	for _, chart := range base {
-		if protected != nil && protected[chart.ID] {
-			continue
-		}
-		if pos, ok := positions[chart.ID]; ok {
-			(*target)[pos] = chart
-			continue
-		}
-		positions[chart.ID] = len(*target)
-		*target = append(*target, chart)
-	}
-}
-
-func cloneVarbindMap(src map[string]VarbindDef) map[string]VarbindDef {
-	dst := make(map[string]VarbindDef, len(src))
-	maps.Copy(dst, src)
-	return dst
-}
-
-func cloneAnySlice(src []any) []any {
-	if src == nil {
-		return nil
-	}
-	return append([]any(nil), src...)
-}
-
-func cloneStringMap(src map[string]string) map[string]string {
-	if src == nil {
-		return nil
-	}
-	dst := make(map[string]string, len(src))
-	maps.Copy(dst, src)
-	return dst
-}
-
-func mergeStringMaps(base, override map[string]string) map[string]string {
-	dst := cloneStringMap(base)
-	maps.Copy(dst, override)
-	return dst
-}
-
-func stacksContains(stack []string, name string) bool {
-	return slices.Contains(stack, name)
 }
 
 type yamlKeySpec struct {
@@ -902,7 +660,6 @@ var (
 		"vendor":     {},
 		"mib_count":  {},
 		"trap_count": {},
-		"extends":    {},
 		"varbinds":   {allowAny: true},
 		"traps":      {allowAny: true},
 		"metrics":    {elem: &profileMetricRuleYAMLSpec},

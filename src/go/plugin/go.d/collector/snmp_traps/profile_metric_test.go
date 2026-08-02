@@ -1938,83 +1938,6 @@ metrics:
 	}
 }
 
-func TestLoadProfileMergesMetricRulesAndChartsFromExtends(t *testing.T) {
-	dir := t.TempDir()
-	base := `
-varbinds:
-  ifIndex:
-    oid: 1.3.6.1.2.1.2.2.1.1
-    type: INTEGER
-traps:
-  - oid: 1.3.6.1.4.1.9.9.46.2.0.1
-    name: BASE-MIB::baseTrap
-    category: security
-    severity: warning
-    varbinds:
-      - ifIndex
-charts:
-  - id: base_chart
-    title: Base chart
-    context: snmp.trap.base.chart
-    units: events/s
-    algorithm: incremental
-metrics:
-  - name: base.metric
-    type: counter
-    on_trap: BASE-MIB::baseTrap
-    output:
-      metric: snmp_trap_base_events
-      dimension: events
-      chart: base_chart
-`
-	child := `
-extends:
-  - base.yaml
-charts:
-  - id: base_chart
-    title: Base chart overridden
-    context: snmp.trap.base.chart.override
-    units: events/s
-    algorithm: incremental
-  - id: child_chart
-    title: Child chart
-    context: snmp.trap.child.chart
-    units: events/s
-    algorithm: incremental
-metrics:
-  - name: base.metric
-    type: counter
-    on_trap: BASE-MIB::baseTrap
-    output:
-      metric: snmp_trap_child_events
-      dimension: events
-      chart: child_chart
-`
-	writeProfileYAML(t, dir, "base.yaml", base)
-	writeProfileYAML(t, dir, "child.yaml", child)
-
-	bundle, err := catalog.LoadProfileFile(filepath.Join(dir, "child.yaml"), []string{dir})
-	if err != nil {
-		t.Fatalf("loadProfileBundle failed: %v", err)
-	}
-	if len(bundle.Metrics) != 1 {
-		t.Fatalf("metrics = %d, want 1 inherited rule overridden by child", len(bundle.Metrics))
-	}
-	if got := bundle.Metrics[0].Output.Metric; got != "snmp_trap_child_events" {
-		t.Fatalf("overridden metric output = %q, want snmp_trap_child_events", got)
-	}
-	if len(bundle.Charts) != 2 {
-		t.Fatalf("charts = %d, want child override of base chart plus child chart", len(bundle.Charts))
-	}
-	byID := make(map[string]profileMetricChart, len(bundle.Charts))
-	for _, chart := range bundle.Charts {
-		byID[chart.ID] = chart
-	}
-	if got := byID["base_chart"].Title; got != "Base chart overridden" {
-		t.Fatalf("base_chart title = %q, want child override", got)
-	}
-}
-
 func TestLoadProfileAcceptsCanonicalMetricSyntax(t *testing.T) {
 	dir := t.TempDir()
 	profile := `
@@ -2109,7 +2032,7 @@ charts:
 `
 	writeProfileYAML(t, dir, "profile.yaml", profile)
 
-	bundle, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml"), []string{dir})
+	bundle, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml"))
 	if err != nil {
 		t.Fatalf("loadProfileBundle failed: %v", err)
 	}
@@ -2196,7 +2119,7 @@ func TestLoadProfileRejectsRemovedProfileMetricSyntax(t *testing.T) {
 			dir := t.TempDir()
 			profile := "metrics:\n  - name: test.removed\n    type: counter\n" + removed
 			writeProfileYAML(t, dir, "profile.yaml", profile)
-			if _, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml"), []string{dir}); err == nil {
+			if _, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml")); err == nil {
 				t.Fatalf("loadProfileBundle accepted removed metric syntax %s", name)
 			}
 		})
@@ -2230,7 +2153,7 @@ charts:
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			writeProfileYAML(t, dir, "profile.yaml", profile)
-			if _, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml"), []string{dir}); err == nil {
+			if _, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml")); err == nil {
 				t.Fatalf("loadProfileBundle accepted unknown chart %s key", name)
 			}
 		})
