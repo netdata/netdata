@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -321,6 +323,9 @@ func TestGenerationOutputGateAbortsLateTransactionWithoutPoisoningFrameOwner(t *
 func TestGenerationOutputGateRevokesAdmissionsBeforeDrain(t *testing.T) {
 	writeEntered := make(chan struct{})
 	releaseWrite := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseWrite) }) }
+	t.Cleanup(release)
 	owner, err := lifecycle.NewFrameOwner(frameWriteFunc(func(payload []byte) (int, error) {
 		close(writeEntered)
 		<-releaseWrite
@@ -350,15 +355,93 @@ func TestGenerationOutputGateRevokesAdmissionsBeforeDrain(t *testing.T) {
 		close(drainDone)
 	}()
 	requireTestSignal(t, drainStarted, "output drain did not start")
+	requireGenerationGateDrainQueued(t, gate, drainDone)
 	select {
 	case <-drainDone:
 		t.Fatal("output drain completed before the admitted write released its lease")
 	default:
 	}
 
-	close(releaseWrite)
+	release()
 	require.NoError(t, <-writeDone)
 	requireTestSignal(t, drainDone, "output drain did not finish after the admitted write")
+}
+
+func TestGenerationOutputGateRevokesTransactionAdmissionsBeforeDrain(t *testing.T) {
+	writeEntered := make(chan struct{})
+	releaseWrite := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseWrite) }) }
+	t.Cleanup(release)
+	owner, err := lifecycle.NewFrameOwner(frameWriteFunc(func(payload []byte) (int, error) {
+		close(writeEntered)
+		<-releaseWrite
+		return len(payload), nil
+	}))
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(owner)
+	require.NoError(t, err)
+	require.NoError(t, gate.Activate())
+
+	var admittedEvents []string
+	admittedDone := make(chan error, 1)
+	go func() {
+		admittedDone <- gate.CommitJobOutput(
+			[]byte("admitted transaction\n"),
+			&recordingFrameState{events: &admittedEvents},
+		)
+	}()
+	requireTestSignal(t, writeEntered, "initial transaction did not acquire its write lease")
+
+	gate.RevokeAdmissions()
+	drainDone := make(chan struct{})
+	go func() {
+		gate.Fence()
+		close(drainDone)
+	}()
+	requireGenerationGateDrainQueued(t, gate, drainDone)
+
+	var lateEvents []string
+	lateDone := make(chan error, 1)
+	go func() {
+		lateDone <- gate.CommitJobOutput(
+			[]byte("late transaction\n"),
+			&recordingFrameState{events: &lateEvents},
+		)
+	}()
+	select {
+	case err = <-lateDone:
+		require.ErrorIs(t, err, errGenerationOutputFenced)
+	case <-time.After(time.Second):
+		t.Fatal("late transaction waited for the admitted transaction to drain")
+	}
+	require.Equal(t, []string{"abort"}, lateEvents)
+
+	release()
+	require.NoError(t, <-admittedDone)
+	require.Equal(t, []string{"commit"}, admittedEvents)
+	requireTestSignal(t, drainDone, "output drain did not finish after the admitted transaction")
+}
+
+func requireGenerationGateDrainQueued(
+	t *testing.T,
+	gate *generationOutputGate,
+	drainDone <-chan struct{},
+) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for gate.mu.TryRLock() {
+		gate.mu.RUnlock()
+		select {
+		case <-drainDone:
+			t.Fatal("output drain completed before its admitted lease released")
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("output drain did not queue for its write lease")
+		}
+		runtime.Gosched()
+	}
 }
 
 func TestCleanupOutputGateTerminalFenceRejectsLateOutputWithoutPoisoningFrameOwner(t *testing.T) {

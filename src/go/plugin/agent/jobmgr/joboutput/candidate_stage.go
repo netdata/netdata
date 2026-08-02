@@ -410,23 +410,9 @@ func (sjo *stagedJobOwner) Start(ctx context.Context) error {
 	if sjo == nil || ctx == nil {
 		return errors.New("job output: invalid process-owned job start")
 	}
-	sjo.mu.Lock()
-	if sjo.retiring {
-		err := sjo.retirementErrorLocked("job output: process-owned job is retiring")
-		sjo.mu.Unlock()
+	if err := sjo.reserveStart(); err != nil {
 		return err
 	}
-	if sjo.ownership != stagedJobOwnedByRuntime ||
-		!sjo.attached ||
-		sjo.startRequested ||
-		sjo.started ||
-		sjo.decided ||
-		sjo.finalized {
-		sjo.mu.Unlock()
-		return errors.New("job output: invalid process-owned job start")
-	}
-	sjo.startRequested = true
-	sjo.mu.Unlock()
 	result := make(chan error, 1)
 	request := stagedJobStartRequest{
 		ctx:    ctx,
@@ -453,6 +439,24 @@ func (sjo *stagedJobOwner) Start(ctx context.Context) error {
 		sjo.requestRetirement(cause)
 		return cause
 	}
+}
+
+func (sjo *stagedJobOwner) reserveStart() error {
+	sjo.mu.Lock()
+	defer sjo.mu.Unlock()
+	if sjo.retiring {
+		return sjo.retirementErrorLocked("job output: process-owned job is retiring")
+	}
+	if sjo.ownership != stagedJobOwnedByRuntime ||
+		!sjo.attached ||
+		sjo.startRequested ||
+		sjo.started ||
+		sjo.decided ||
+		sjo.finalized {
+		return errors.New("job output: invalid process-owned job start")
+	}
+	sjo.startRequested = true
+	return nil
 }
 
 func (sjo *stagedJobOwner) Retire() {
@@ -541,23 +545,15 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 		return sjo.finalize()
 	}
 
-	sjo.mu.Lock()
-	if sjo.started || !sjo.startRequested {
-		sjo.mu.Unlock()
-		request.result <- errors.New("job output: duplicate process-owned job start")
-		return sjo.finalize()
-	}
-	if sjo.retiring {
-		err := sjo.retirementErrorLocked("job output: process-owned job retired before start")
-		sjo.mu.Unlock()
+	resources, retiring, err := sjo.beginManagedStart()
+	if err != nil {
 		request.result <- err
-		sjo.cutBeforeStart(nil)
+		if retiring {
+			sjo.cutBeforeStart(nil)
+		}
 		return sjo.finalize()
 	}
-	sjo.started = true
-	resources := sjo.resources
 	job := resources.candidateJob
-	sjo.mu.Unlock()
 	if job == nil {
 		request.result <- errors.New("job output: missing process-owned runtime job")
 		sjo.requestRetirement(nil)
@@ -617,6 +613,19 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 		resultErr = errors.Join(resultErr, <-exited)
 	}
 	return errors.Join(resultErr, sjo.finalize())
+}
+
+func (sjo *stagedJobOwner) beginManagedStart() (ConstructedJob, bool, error) {
+	sjo.mu.Lock()
+	defer sjo.mu.Unlock()
+	if sjo.started || !sjo.startRequested {
+		return ConstructedJob{}, false, errors.New("job output: duplicate process-owned job start")
+	}
+	if sjo.retiring {
+		return ConstructedJob{}, true, sjo.retirementErrorLocked("job output: process-owned job retired before start")
+	}
+	sjo.started = true
+	return sjo.resources, false, nil
 }
 
 func (sjo *stagedJobOwner) finishCandidate(ctx context.Context) error {

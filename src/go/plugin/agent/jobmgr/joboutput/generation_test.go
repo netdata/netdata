@@ -547,6 +547,47 @@ func TestProcessOwnedJobDoesNotStartAfterContainment(t *testing.T) {
 	}
 }
 
+func TestProcessOwnedJobRejectsContainmentBetweenStartReservationAndWorkerClaim(t *testing.T) {
+	tests := map[string]error{
+		"retired": jobmgr.ErrProcessAttemptRetired,
+		"stopped": jobmgr.ErrProcessAttemptStopped,
+	}
+	for name, cause := range tests {
+		t.Run(name, func(t *testing.T) {
+			attempts, err := containment.NewAuthority(nil)
+			require.NoError(t, err)
+			fixture := newPreparedAttachmentFixture(t, JobVariantV2, attempts, false, nil)
+			generation, err := fixture.prepared.Accept(context.Background(), fixture.identity.Generation)
+			require.NoError(t, err)
+			require.NotNil(t, generation)
+			require.NoError(t, fixture.owner.reserveStart())
+
+			cutTestAuthority(t, attempts, cause)
+			_, retiring, err := fixture.owner.beginManagedStart()
+
+			require.True(t, retiring)
+			require.ErrorIs(t, err, cause)
+			require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+				err,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+			select {
+			case <-fixture.job.started:
+				t.Fatal("managed job started after containment won the reserved start")
+			default:
+			}
+			require.NoError(t, generation.abortProcessOwned(context.Background()))
+			requireTestSignal(t, fixture.owner.done, "contained runtime owner did not finalize")
+			require.Zero(t, fixture.state.rejected)
+			require.EqualValues(t, 1, fixture.state.final)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, fixture.tasks.LongLivedCensus())
+			require.NoError(t, attempts.Shutdown(context.Background()))
+			require.EqualValues(t, containment.Census{}, attempts.Census())
+		})
+	}
+}
+
 func TestPreparedJobAdoptsPartialHandlerTransferBeforeAttachmentFailure(t *testing.T) {
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
