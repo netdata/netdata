@@ -35,6 +35,21 @@ func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 	assert.NotNil(t, logs.Available)
 }
 
+func TestSNMPTrapsLogsMethodAvailabilityFollowsDirectJournalJobs(t *testing.T) {
+	startJournalJobs := activeDirectJournalJobs.Load()
+	activeDirectJournalJobs.Store(0)
+	t.Cleanup(func() { activeDirectJournalJobs.Store(startJournalJobs) })
+
+	methods := snmpTrapsMethods()
+	require.Len(t, methods, 1)
+	logs := methods[0]
+	require.NotNil(t, logs.Available)
+	assert.False(t, logs.Available())
+
+	activeDirectJournalJobs.Store(1)
+	assert.True(t, logs.Available())
+}
+
 func TestSNMPTrapsJournalFunctionUsesPublicFunctionName(t *testing.T) {
 	fn := snmptrapsfunc.NewJournalFunction()
 	assert.Equal(t, snmpTrapsFunctionName, fn.Config.FunctionName)

@@ -118,7 +118,7 @@ For the details behind these recommendations, see [Configuration](/docs/npm/snmp
 
 **First symptom:** Operators see fewer profile-metric instances than expected, while the affected traps still appear as accepted log rows. `snmp.trap.profile_metric_diagnostics` shows `overflow_dropped`, `rule_missed`, `extraction_failed`, `attribution_failed`, or `source_transitions`.
 
-**Better practice:** Keep `profile_metrics` disabled until rules are reviewed. Prefer `profile_metrics.mode: exact`, enable only bounded rules, keep `profile_metrics.identity.source_id_privacy: hash`, and set limits intentionally. See [Configuration](/docs/npm/snmp-traps/configuration.md) and [Metrics](/docs/npm/snmp-traps/metrics.md).
+**Better practice:** Keep `profile_metrics` disabled until rules are reviewed, then list only bounded rules explicitly in `profile_metrics.include`. Source identity, cardinality limits, and overflow behavior use fixed safe policies. See [Configuration](/docs/npm/snmp-traps/configuration.md) and [Metrics](/docs/npm/snmp-traps/metrics.md).
 
 ## Disabling journal while expecting local queries
 

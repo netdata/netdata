@@ -139,15 +139,15 @@ multipath, filename-dedup, field-merge on extends-chain").
   creation, shared by all listeners, released when no runnable trap jobs remain.
 - Operator profiles load eagerly at job creation; stock profiles keep only an
   OID-to-file route table until a matching trap loads the routed vendor file.
-- While a trap job runs, operator profile edits are picked up automatically;
-  invalid edits are logged and the last valid index stays active; stock updates
-  apply after an Agent restart.
+- Profiles are immutable while the shared cache has active job references.
+  Operator and stock changes apply after an Agent restart or after every trap
+  job is recreated.
 
-Operator-observable effect retained in `docs/snmp-traps/trap-profiles.md`: edits
-to operator profiles are picked up automatically while a job runs; invalid edits
-are logged and the last valid profiles stay active; stock updates apply after a
-restart; confirm with Logs + receiver metrics. The lazy-load / memory-footprint
-/ shared-cache-release / file-watcher-vs-periodic-scan mechanics are omitted.
+Operator-observable effect retained in `docs/npm/snmp-traps/trap-profiles.md`:
+profile changes require an Agent restart or recreation of every trap job.
+Invalid operator profiles fail the next job creation; invalid lazy stock
+profiles fail their first matching lookup and increment profile-load-failure
+metrics.
 
 ## 8. Source-attributed metric cap
 

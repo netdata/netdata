@@ -21,6 +21,12 @@ import (
 
 func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) {
 	t.Helper()
+	for _, trap := range traps {
+		if err := compileTrapTemplates(trap, nil); err != nil {
+			t.Fatalf("compile test trap templates: %v", err)
+		}
+		trap.sharedVarbinds = buildSharedVarbinds(trap, nil)
+	}
 	// Test-only shortcut: direct packet-path tests do not run Collector.Init(),
 	// so they seed the immutable shared index without touching refcounts.
 	globalProfileCache.current.Store(&ProfileIndex{trapsByOID: traps})
@@ -56,7 +62,7 @@ func (panicTrapWriter) Close() error           { return nil }
 
 func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "security coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "security coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
@@ -83,7 +89,7 @@ func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 
 func TestCollectorHandlePacketAssignsReceiveSequencePerPacket(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
@@ -104,7 +110,7 @@ func TestCollectorHandlePacketAssignsReceiveSequencePerPacket(t *testing.T) {
 
 func TestCollectorHandlePacketRecoversFromPanic(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "security coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "security coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	metrics := withCleanJobMetrics(t, "panic-recover")
 	c := newTestV2Collector("panic-recover", panicTrapWriter{}, nil, []string{"public"})
@@ -127,7 +133,7 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 		Vendor:   "cisco",
 	})
 
-	trap := testColdStartTrap("security", "warning", "security coldStart on {_HOSTNAME} from {TRAP_DEVICE_VENDOR}")
+	trap := testColdStartTrap("security", "warning", "security coldStart on {{hostname}} from {{vendor}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
@@ -145,7 +151,7 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 
 func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
@@ -192,7 +198,7 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 	trap := testColdStartTrap(
 		"security",
 		"warning",
-		"trap on {_HOSTNAME} vendor {TRAP_DEVICE_VENDOR}",
+		"trap on {{hostname}} vendor {{vendor}}",
 	)
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
@@ -222,7 +228,7 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	const jobName = "test-dedup-packet"
 
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c, metrics := newDedupTestV2Collector(t, jobName, writer)
@@ -313,7 +319,12 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 	t.Run("template unresolved", func(t *testing.T) {
 		const jobName = "test-dedup-template-unresolved"
 
-		trap := testColdStartTrap("security", "warning", "coldStart from {DOES_NOT_EXIST}")
+		trap := testColdStartTrap("security", "warning", `coldStart from {{with value "missing_var"}}{{.}}{{else}}<missing>{{end}}`)
+		trap.VarbindRefs = []any{map[any]any{
+			"name": "missing_var",
+			"oid":  "1.3.6.1.4.1.99999.1",
+			"type": "OctetString",
+		}}
 		trap.Name = "TEST-MIB::coldStartTemplate"
 		setSingleTestTrap(t, trap)
 		writer := &mockTrapWriter{}
@@ -342,7 +353,7 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	const jobName = "test-dedup-write-rollback"
 
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{err: errors.New("write failed")}
 	c, metrics := newDedupTestV2Collector(t, jobName, writer)
@@ -599,7 +610,7 @@ func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
 
 func TestCollectorHandlePacketAllowsAllowedCommunity(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, nil, []string{"public"})
@@ -613,7 +624,7 @@ func TestCollectorHandlePacketAllowsAllowedCommunity(t *testing.T) {
 
 func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
@@ -633,7 +644,7 @@ func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
 	withCleanJobMetrics(t, jobName)
 
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
@@ -695,7 +706,12 @@ func TestCollectMetricsEmitsSeverityCounters(t *testing.T) {
 
 func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "security coldStart from {missing_var}")
+	trap := testColdStartTrap("security", "warning", `security coldStart from {{with value "missing_var"}}{{.}}{{else}}<missing>{{end}}`)
+	trap.VarbindRefs = []any{map[any]any{
+		"name": "missing_var",
+		"oid":  "1.3.6.1.4.1.99999.1",
+		"type": "OctetString",
+	}}
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
@@ -792,7 +808,7 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 
 func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
@@ -810,7 +826,7 @@ func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
 
 func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"})
@@ -824,7 +840,7 @@ func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 }
 
 func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.T) {
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.SnmpPDU{
 		Name:  model.SNMPTrapAddressOID,
@@ -945,7 +961,7 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	const jobName = "test-rate-limit-sample"
 	withCleanJobMetrics(t, jobName)
 
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 	rl := newRateLimiter(true, 1, "sample")
@@ -1017,7 +1033,7 @@ func TestCollectorHandlePacketEmitsPipelineAndSourceMetrics(t *testing.T) {
 	const jobName = "test-pipeline-source-metrics"
 	metrics := withCleanJobMetrics(t, jobName)
 
-	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
@@ -1257,7 +1273,7 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 	metrics.incEvent("security")
 
 	idx := testProfileMetricIndex(t)
-	rt := newTestProfileMetricRuntime(t, idx, profileMetricModeAuto, nil)
+	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	rt.update(ciscoConfigTrapEntry(jobName))
 
 	store := metrix.NewCollectorStore()
@@ -1288,7 +1304,8 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 		t.Fatalf("snmp_trap_events_security = %v/%v, want 1/true", v, ok)
 	}
 
-	profileLabels := metrix.Labels{"job_name": jobName, "source_id": "192.0.2.10", "source_kind": "udp_peer"}
+	sourceID, sourceKind := fallbackTrapSourceIdentity(ciscoConfigTrapEntry(jobName), jobName, "test")
+	profileLabels := metrix.Labels{"job_name": jobName, "source_id": sourceID, "source_kind": sourceKind}
 	if v, ok := store.Read().Value("snmp_trap_cisco_config_events", profileLabels); !ok || v != 1 {
 		t.Fatalf("snmp_trap_cisco_config_events = %v/%v, want 1/true", v, ok)
 	}
@@ -1729,7 +1746,7 @@ func TestConfigValidation(t *testing.T) {
 	})
 
 	t.Run("deferred validator permits implemented profile metrics", func(t *testing.T) {
-		err := validateDeferredConfig(Config{ProfileMetrics: ProfileMetricsConfig{Enabled: true, Mode: profileMetricModeAuto}})
+		err := validateDeferredConfig(Config{ProfileMetrics: ProfileMetricsConfig{Enabled: true, Include: []string{"site.rule"}}})
 		if err != nil {
 			t.Fatalf("profile metrics should no longer be rejected as deferred: %v", err)
 		}

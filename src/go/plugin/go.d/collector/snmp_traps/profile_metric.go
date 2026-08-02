@@ -20,11 +20,6 @@ import (
 )
 
 const (
-	profileMetricModeNone     = "none"
-	profileMetricModeAuto     = "auto"
-	profileMetricModeExact    = "exact"
-	profileMetricModeCombined = "combined"
-
 	profileMetricTypeCounter = "counter"
 	profileMetricTypeSample  = "sample"
 	profileMetricTypeState   = "state"
@@ -33,20 +28,10 @@ const (
 	profileMetricIdentitySourceLabel = "source_label"
 	profileMetricIdentityListener    = "listener"
 
-	profileMetricUnresolvedSourceLabel = "source_label"
-	profileMetricDropMetricInstance    = "drop_metric_instance"
-
-	profileMetricSourceIDRaw  = "raw"
-	profileMetricSourceIDHash = "hash"
-
-	profileMetricOverflowDropAndCount = "drop_and_count"
-
 	profileMetricMissingDrop             = "drop"
 	profileMetricMissingZero             = "zero"
 	profileMetricMissingUnknownDimension = "unknown_dimension"
 	profileMetricMissingError            = "error"
-
-	profileMetricTTLBehaviorClearAndExpire = "clear_and_expire"
 
 	defaultProfileMetricMaxRules              = 500
 	defaultProfileMetricMaxSources            = 2000
@@ -117,31 +102,24 @@ var builtInProfileMetricChartContexts = map[string]bool{
 }
 
 type ProfileMetricsConfig struct {
-	Enabled  bool                        `yaml:"enabled,omitempty" json:"enabled"`
-	Mode     string                      `yaml:"mode,omitempty" json:"mode"`
-	Include  []string                    `yaml:"include,omitempty" json:"include"`
-	Identity ProfileMetricIdentityConfig `yaml:"identity,omitempty" json:"identity"`
-	Limits   ProfileMetricLimitsConfig   `yaml:"limits,omitempty" json:"limits"`
+	Enabled bool     `yaml:"enabled,omitempty" json:"enabled"`
+	Include []string `yaml:"include,omitempty" json:"include"`
 }
 
-type ProfileMetricIdentityConfig struct {
-	Device           string `yaml:"device,omitempty" json:"device"`
-	UnresolvedSource string `yaml:"unresolved_source,omitempty" json:"unresolved_source"`
-	SourceIDPrivacy  string `yaml:"source_id_privacy,omitempty" json:"source_id_privacy"`
+type profileMetricIdentityPolicy struct {
+	Device string
 }
 
-type ProfileMetricLimitsConfig struct {
-	MaxRules              int    `yaml:"max_rules,omitempty" json:"max_rules"`
-	MaxSources            int    `yaml:"max_sources,omitempty" json:"max_sources"`
-	MaxResourcesPerSource int    `yaml:"max_resources_per_source,omitempty" json:"max_resources_per_source"`
-	MaxInstancesPerJob    int    `yaml:"max_instances_per_job,omitempty" json:"max_instances_per_job"`
-	Overflow              string `yaml:"overflow,omitempty" json:"overflow"`
+type profileMetricLimitsPolicy struct {
+	MaxRules              int
+	MaxSources            int
+	MaxResourcesPerSource int
+	MaxInstancesPerJob    int
 }
 
 type profileMetricRule struct {
 	Name        string `yaml:"name"`
 	Type        string `yaml:"type"`
-	AutoSafe    bool   `yaml:"auto_safe,omitempty"`
 	Enabled     *bool  `yaml:"enabled,omitempty"`
 	OnTrap      string `yaml:"on_trap,omitempty"`
 	ProblemTrap string `yaml:"problem_trap,omitempty"`
@@ -150,19 +128,12 @@ type profileMetricRule struct {
 	Where profileMetricPredicates `yaml:"where,omitempty"`
 
 	Identity profileMetricIdentity `yaml:"identity,omitempty"`
-	Resource profileMetricResource `yaml:"resource,omitempty"`
 	Output   profileMetricOutput   `yaml:"output,omitempty"`
 	State    profileMetricState    `yaml:"state,omitempty"`
 	Scale    profileMetricScale    `yaml:"scale,omitempty"`
 
-	Missing          string                  `yaml:"missing,omitempty"`
-	ValueFromVarbind string                  `yaml:"value_from_varbind,omitempty"`
-	ChartMeta        *profileMetricChartMeta `yaml:"chart_meta,omitempty"`
-
-	Metric    string `yaml:"metric,omitempty"`
-	Dimension string `yaml:"dimension,omitempty"`
-	ChartID   string `yaml:"chart_id,omitempty"`
-	Value     string `yaml:"value,omitempty"`
+	Missing          string `yaml:"missing,omitempty"`
+	ValueFromVarbind string `yaml:"value_from_varbind,omitempty"`
 
 	sourceFile string
 }
@@ -176,9 +147,6 @@ type profileMetricResource struct {
 	Class          string `yaml:"class,omitempty"`
 	KeyFromVarbind string `yaml:"key_from_varbind,omitempty"`
 	MaxPerSource   int    `yaml:"max_per_source,omitempty"`
-
-	Key string `yaml:"key,omitempty"`
-	Max int    `yaml:"max,omitempty"`
 }
 
 type profileMetricOutput struct {
@@ -199,11 +167,6 @@ type profileMetricState struct {
 	ProblemValue *float64 `yaml:"problem_value,omitempty"`
 	ClearValue   float64  `yaml:"clear_value,omitempty"`
 	TTL          string   `yaml:"ttl,omitempty"`
-	TTLBehavior  string   `yaml:"ttl_behavior,omitempty"`
-
-	Varbind string `yaml:"varbind,omitempty"`
-	Set     any    `yaml:"set,omitempty"`
-	Clear   any    `yaml:"clear,omitempty"`
 }
 
 type profileMetricChart struct {
@@ -218,17 +181,6 @@ type profileMetricChart struct {
 	Lifecycle   *charttpl.Lifecycle `yaml:"lifecycle,omitempty"`
 
 	sourceFile string
-}
-
-type profileMetricChartMeta struct {
-	Title       string              `yaml:"title,omitempty"`
-	Family      string              `yaml:"family,omitempty"`
-	Context     string              `yaml:"context,omitempty"`
-	Units       string              `yaml:"units,omitempty"`
-	Algorithm   string              `yaml:"algorithm,omitempty"`
-	Type        string              `yaml:"type,omitempty"`
-	Description string              `yaml:"description,omitempty"`
-	Lifecycle   *charttpl.Lifecycle `yaml:"lifecycle,omitempty"`
 }
 
 type profileMetricPredicates []profileMetricPredicate
@@ -247,15 +199,11 @@ type profileMetricPredicate struct {
 }
 
 func (p *profileMetricPredicates) UnmarshalYAML(unmarshal func(any) error) error {
-	var raw any
-	if err := unmarshal(&raw); err != nil {
+	var predicates []profileMetricPredicate
+	if err := unmarshal(&predicates); err != nil {
 		return err
 	}
-	preds, err := normalizeProfileMetricPredicates(raw)
-	if err != nil {
-		return err
-	}
-	*p = preds
+	*p = predicates
 	return nil
 }
 
@@ -264,7 +212,7 @@ func (p *profileMetricPredicate) UnmarshalYAML(unmarshal func(any) error) error 
 	if err := unmarshal(&raw); err != nil {
 		return err
 	}
-	pred, err := normalizeProfileMetricPredicateMap(raw, "")
+	pred, err := normalizeProfileMetricPredicateMap(raw)
 	if err != nil {
 		return err
 	}
@@ -272,52 +220,8 @@ func (p *profileMetricPredicate) UnmarshalYAML(unmarshal func(any) error) error 
 	return nil
 }
 
-func normalizeProfileMetricPredicates(raw any) ([]profileMetricPredicate, error) {
-	switch v := raw.(type) {
-	case nil:
-		return nil, nil
-	case []any:
-		out := make([]profileMetricPredicate, 0, len(v))
-		for i, item := range v {
-			m, ok := item.(map[any]any)
-			if !ok {
-				return nil, fmt.Errorf("where[%d]: predicate must be a map", i)
-			}
-			pred, err := normalizeProfileMetricPredicateMap(m, "")
-			if err != nil {
-				return nil, fmt.Errorf("where[%d]: %w", i, err)
-			}
-			out = append(out, pred)
-		}
-		return out, nil
-	case map[any]any:
-		out := make([]profileMetricPredicate, 0, len(v))
-		for rawKey, rawVal := range v {
-			name, ok := rawKey.(string)
-			if !ok || name == "" {
-				return nil, fmt.Errorf("where: compact predicate key must be a non-empty string")
-			}
-			if opMap, ok := rawVal.(map[any]any); ok {
-				pred, err := normalizeProfileMetricPredicateMap(opMap, name)
-				if err != nil {
-					return nil, fmt.Errorf("where.%s: %w", name, err)
-				}
-				out = append(out, pred)
-			} else {
-				out = append(out, profileMetricPredicate{Varbind: name, Equals: rawVal})
-			}
-		}
-		slices.SortFunc(out, func(a, b profileMetricPredicate) int {
-			return strings.Compare(a.Varbind+a.Field, b.Varbind+b.Field)
-		})
-		return out, nil
-	default:
-		return nil, fmt.Errorf("where must be a predicate list or compact map")
-	}
-}
-
-func normalizeProfileMetricPredicateMap(m map[any]any, compactVarbind string) (profileMetricPredicate, error) {
-	pred := profileMetricPredicate{Varbind: compactVarbind}
+func normalizeProfileMetricPredicateMap(m map[any]any) (profileMetricPredicate, error) {
+	pred := profileMetricPredicate{}
 	for rawKey, rawVal := range m {
 		key, ok := rawKey.(string)
 		if !ok {
@@ -378,22 +282,12 @@ func normalizeProfileMetricPredicateMap(m map[any]any, compactVarbind string) (p
 
 type normalizedProfileMetricsConfig struct {
 	enabled  bool
-	mode     string
 	include  []string
-	identity ProfileMetricIdentityConfig
-	limits   ProfileMetricLimitsConfig
+	identity profileMetricIdentityPolicy
+	limits   profileMetricLimitsPolicy
 }
 
 func normalizeProfileMetricsConfig(cfg ProfileMetricsConfig) (normalizedProfileMetricsConfig, error) {
-	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
-	if mode == "" {
-		mode = profileMetricModeNone
-	}
-	switch mode {
-	case profileMetricModeNone, profileMetricModeAuto, profileMetricModeExact, profileMetricModeCombined:
-	default:
-		return normalizedProfileMetricsConfig{}, fmt.Errorf("profile_metrics.mode must be one of none, auto, exact, combined, got %q", cfg.Mode)
-	}
 	seen := make(map[string]bool, len(cfg.Include))
 	include := make([]string, 0, len(cfg.Include))
 	for i, name := range cfg.Include {
@@ -407,77 +301,31 @@ func normalizeProfileMetricsConfig(cfg ProfileMetricsConfig) (normalizedProfileM
 		seen[name] = true
 		include = append(include, name)
 	}
-	if cfg.Enabled && len(include) > 0 && mode != profileMetricModeExact && mode != profileMetricModeCombined {
-		return normalizedProfileMetricsConfig{}, fmt.Errorf("profile_metrics.include requires mode exact or combined")
-	}
-
-	identity := cfg.Identity
-	identity.Device = defaultString(strings.ToLower(strings.TrimSpace(identity.Device)), profileMetricIdentitySource)
-	identity.UnresolvedSource = defaultString(strings.ToLower(strings.TrimSpace(identity.UnresolvedSource)), profileMetricUnresolvedSourceLabel)
-	identity.SourceIDPrivacy = defaultString(strings.ToLower(strings.TrimSpace(identity.SourceIDPrivacy)), profileMetricSourceIDHash)
-	switch identity.Device {
-	case profileMetricIdentitySource, profileMetricIdentitySourceLabel, profileMetricIdentityListener:
-	default:
-		return normalizedProfileMetricsConfig{}, fmt.Errorf("profile_metrics.identity.device must be source, source_label, or listener, got %q", cfg.Identity.Device)
-	}
-	switch identity.UnresolvedSource {
-	case profileMetricUnresolvedSourceLabel, profileMetricDropMetricInstance:
-	default:
-		return normalizedProfileMetricsConfig{}, fmt.Errorf("profile_metrics.identity.unresolved_source must be source_label or drop_metric_instance, got %q", cfg.Identity.UnresolvedSource)
-	}
-	switch identity.SourceIDPrivacy {
-	case profileMetricSourceIDRaw, profileMetricSourceIDHash:
-	default:
-		return normalizedProfileMetricsConfig{}, fmt.Errorf("profile_metrics.identity.source_id_privacy must be raw or hash, got %q", cfg.Identity.SourceIDPrivacy)
-	}
-
-	limits := cfg.Limits
-	if limits.MaxRules == 0 {
-		limits.MaxRules = defaultProfileMetricMaxRules
-	}
-	if limits.MaxSources == 0 {
-		limits.MaxSources = defaultProfileMetricMaxSources
-	}
-	if limits.MaxResourcesPerSource == 0 {
-		limits.MaxResourcesPerSource = defaultProfileMetricMaxResourcesPerSource
-	}
-	if limits.MaxInstancesPerJob == 0 {
-		limits.MaxInstancesPerJob = defaultProfileMetricMaxInstancesPerJob
-	}
-	limits.Overflow = defaultString(strings.ToLower(strings.TrimSpace(limits.Overflow)), profileMetricOverflowDropAndCount)
-	if limits.MaxRules < 0 || limits.MaxSources < 0 || limits.MaxResourcesPerSource < 0 || limits.MaxInstancesPerJob < 0 {
-		return normalizedProfileMetricsConfig{}, fmt.Errorf("profile_metrics.limits values must be non-negative")
-	}
-	switch limits.Overflow {
-	case profileMetricOverflowDropAndCount:
-	default:
-		return normalizedProfileMetricsConfig{}, fmt.Errorf("profile_metrics.limits.overflow must be drop_and_count, got %q", cfg.Limits.Overflow)
-	}
-
-	if !cfg.Enabled || mode == profileMetricModeNone {
-		return normalizedProfileMetricsConfig{
-			enabled:  false,
-			mode:     mode,
-			include:  include,
-			identity: identity,
-			limits:   limits,
-		}, nil
+	if cfg.Enabled && len(include) == 0 {
+		return normalizedProfileMetricsConfig{}, errors.New("profile_metrics.include must contain at least one rule when enabled")
 	}
 
 	return normalizedProfileMetricsConfig{
-		enabled:  true,
-		mode:     mode,
+		enabled:  cfg.Enabled,
 		include:  include,
-		identity: identity,
-		limits:   limits,
+		identity: defaultProfileMetricIdentityPolicy(),
+		limits:   defaultProfileMetricLimitsPolicy(),
 	}, nil
 }
 
-func defaultString(value, fallback string) string {
-	if strings.TrimSpace(value) == "" {
-		return fallback
+func defaultProfileMetricIdentityPolicy() profileMetricIdentityPolicy {
+	return profileMetricIdentityPolicy{
+		Device: profileMetricIdentitySource,
 	}
-	return value
+}
+
+func defaultProfileMetricLimitsPolicy() profileMetricLimitsPolicy {
+	return profileMetricLimitsPolicy{
+		MaxRules:              defaultProfileMetricMaxRules,
+		MaxSources:            defaultProfileMetricMaxSources,
+		MaxResourcesPerSource: defaultProfileMetricMaxResourcesPerSource,
+		MaxInstancesPerJob:    defaultProfileMetricMaxInstancesPerJob,
+	}
 }
 
 type profileMetricCatalog struct {
@@ -504,34 +352,7 @@ func selectProfileMetricRules(cfg normalizedProfileMetricsConfig, cat profileMet
 	if !cfg.enabled {
 		return nil, nil
 	}
-	if len(cat.rulesByName) == 0 {
-		return nil, nil
-	}
-	includeSet := make(map[string]bool, len(cfg.include))
-	for _, name := range cfg.include {
-		includeSet[name] = true
-	}
-	var selected []*profileMetricRule
-	for name, rule := range cat.rulesByName {
-		if rule == nil || rule.disabled() {
-			continue
-		}
-		include := includeSet[name]
-		switch cfg.mode {
-		case profileMetricModeAuto:
-			if rule.AutoSafe {
-				selected = append(selected, rule)
-			}
-		case profileMetricModeExact:
-			if include {
-				selected = append(selected, rule)
-			}
-		case profileMetricModeCombined:
-			if include || rule.AutoSafe {
-				selected = append(selected, rule)
-			}
-		}
-	}
+	selected := make([]*profileMetricRule, 0, len(cfg.include))
 	for _, name := range cfg.include {
 		rule := cat.rulesByName[name]
 		if rule == nil {
@@ -540,9 +361,10 @@ func selectProfileMetricRules(cfg normalizedProfileMetricsConfig, cat profileMet
 		if rule.disabled() {
 			return nil, fmt.Errorf("profile_metrics.include rule %q is disabled by profile", name)
 		}
+		selected = append(selected, rule)
 	}
 	if len(selected) > cfg.limits.MaxRules {
-		return nil, fmt.Errorf("profile_metrics selected %d rules, above max_rules %d", len(selected), cfg.limits.MaxRules)
+		return nil, fmt.Errorf("profile_metrics selected %d rules, above fixed maximum %d", len(selected), cfg.limits.MaxRules)
 	}
 	slices.SortFunc(selected, func(a, b *profileMetricRule) int {
 		return strings.Compare(a.Name, b.Name)
@@ -1062,7 +884,7 @@ func (rt *profileMetricRuntime) seriesIdentityLocked(rule *compiledProfileMetric
 }
 
 func (rt *profileMetricRuntime) fallbackSourceIdentity(entry *TrapEntry) (string, string) {
-	return fallbackTrapSourceIdentity(entry, entry.JobName, rt.cfg.identity.SourceIDPrivacy, rt.sourceHashSalt)
+	return fallbackTrapSourceIdentity(entry, entry.JobName, rt.sourceHashSalt)
 }
 
 func (rt *profileMetricRuntime) rawFallbackSourceIdentity(entry *TrapEntry) (string, string) {
@@ -1200,13 +1022,8 @@ func (rt *profileMetricRuntime) sweepLocked(now time.Time) {
 			continue
 		}
 		if rule.rule.Type == profileMetricTypeState && rule.stateTTL > 0 && now.Sub(series.lastUpdate) >= rule.stateTTL {
-			if rule.rule.State.TTLBehavior == profileMetricTTLBehaviorClearAndExpire {
-				series.value = rule.rule.stateClearValue()
-				series.removeAfterCollect = true
-				continue
-			}
-			delete(rt.series, key)
-			removed = true
+			series.value = rule.rule.stateClearValue()
+			series.removeAfterCollect = true
 			continue
 		}
 		if rule.expireAfterCycles > 0 && rt.collectCycle-series.lastCycle > uint64(rule.expireAfterCycles) {
@@ -1528,50 +1345,8 @@ func normalizeProfileMetricRule(rule *profileMetricRule) error {
 	default:
 		return fmt.Errorf("rule %q type must be counter, sample, or state", rule.Name)
 	}
-	if rule.Value != "" {
-		if rule.ValueFromVarbind != "" {
-			return fmt.Errorf("rule %q uses both compact value and value_from_varbind", rule.Name)
-		}
-		rule.ValueFromVarbind = rule.Value
-		rule.Value = ""
-	}
-	if rule.Metric != "" {
-		if rule.Output.Metric != "" {
-			return fmt.Errorf("rule %q uses both compact metric and output.metric", rule.Name)
-		}
-		rule.Output.Metric = rule.Metric
-		rule.Metric = ""
-	}
-	if rule.Dimension != "" {
-		if rule.Output.Dimension != "" {
-			return fmt.Errorf("rule %q uses both compact dimension and output.dimension", rule.Name)
-		}
-		rule.Output.Dimension = rule.Dimension
-		rule.Dimension = ""
-	}
-	if rule.ChartID != "" {
-		if rule.Output.Chart != "" {
-			return fmt.Errorf("rule %q uses both compact chart_id and output.chart", rule.Name)
-		}
-		rule.Output.Chart = rule.ChartID
-		rule.ChartID = ""
-	}
 	if rule.Identity.Device == "" {
 		rule.Identity.Device = profileMetricIdentitySource
-	}
-	if rule.Resource.Key != "" || rule.Resource.Max != 0 || rule.Resource.Class != "" {
-		if rule.Identity.Resource != nil {
-			return fmt.Errorf("rule %q uses both compact resource and identity.resource", rule.Name)
-		}
-		res := rule.Resource
-		if res.Key != "" {
-			res.KeyFromVarbind = res.Key
-		}
-		if res.Max != 0 {
-			res.MaxPerSource = res.Max
-		}
-		rule.Identity.Resource = &res
-		rule.Resource = profileMetricResource{}
 	}
 	if rule.Output.Metric == "" {
 		rule.Output.Metric = "snmp_trap_" + slugForMetric(rule.Name)
@@ -1601,22 +1376,6 @@ func normalizeProfileMetricRule(rule *profileMetricRule) error {
 	}
 	if rule.Scale.Divisor == 0 {
 		rule.Scale.Divisor = 1
-	}
-	if rule.Type == profileMetricTypeState {
-		if rule.State.TTLBehavior == "" {
-			rule.State.TTLBehavior = profileMetricTTLBehaviorClearAndExpire
-		}
-		if rule.State.Varbind != "" {
-			if rule.State.SetWhen != nil || rule.State.ClearWhen != nil {
-				return fmt.Errorf("rule %q uses compact state.varbind with canonical set_when/clear_when", rule.Name)
-			}
-			if rule.State.Set == nil || rule.State.Clear == nil {
-				return fmt.Errorf("rule %q compact state.varbind requires state.set and state.clear", rule.Name)
-			}
-			rule.State.SetWhen = &profileMetricPredicate{Varbind: rule.State.Varbind, Equals: rule.State.Set}
-			rule.State.ClearWhen = &profileMetricPredicate{Varbind: rule.State.Varbind, Equals: rule.State.Clear}
-			rule.State.Varbind = ""
-		}
 	}
 	return nil
 }
@@ -1710,9 +1469,6 @@ func validateProfileMetricRule(rule *profileMetricRule, idx *ProfileIndex, chart
 	}
 	if rule.Scale.Multiplier < 0 {
 		return fmt.Errorf("%s: metric rule %q scale.multiplier must be zero or greater", rule.sourceFile, rule.Name)
-	}
-	if rule.State.TTLBehavior != "" && rule.State.TTLBehavior != profileMetricTTLBehaviorClearAndExpire {
-		return fmt.Errorf("%s: metric rule %q state.ttl_behavior must be %s", rule.sourceFile, rule.Name, profileMetricTTLBehaviorClearAndExpire)
 	}
 	if rule.State.TTL != "" {
 		if _, err := parseProfileMetricStateTTL(rule.State.TTL); err != nil {
@@ -2005,55 +1761,6 @@ func normalizeProfileMetricChart(chart *profileMetricChart) error {
 		chart.Lifecycle.ExpireAfterCycles = defaultProfileMetricExpireAfterCycles
 	}
 	return nil
-}
-
-func chartFromMetricRule(rule *profileMetricRule) *profileMetricChart {
-	if rule == nil || rule.ChartMeta == nil {
-		return nil
-	}
-	id := rule.Output.Chart
-	if id == "" {
-		id = slugForMetric(rule.Name)
-	}
-	units := rule.ChartMeta.Units
-	if units == "" {
-		switch rule.Type {
-		case profileMetricTypeCounter:
-			units = "events/s"
-		case profileMetricTypeState:
-			units = "state"
-		default:
-			units = "value"
-		}
-	}
-	algorithm := rule.ChartMeta.Algorithm
-	if algorithm == "" {
-		if rule.Type == profileMetricTypeCounter {
-			algorithm = "incremental"
-		} else {
-			algorithm = "absolute"
-		}
-	}
-	title := rule.ChartMeta.Title
-	if title == "" {
-		title = strings.ReplaceAll(rule.Name, "::", " ")
-	}
-	context := rule.ChartMeta.Context
-	if context == "" {
-		context = "snmp.trap." + strings.ReplaceAll(id, "_", ".")
-	}
-	return &profileMetricChart{
-		ID:          id,
-		Title:       title,
-		Family:      rule.ChartMeta.Family,
-		Context:     context,
-		Units:       units,
-		Algorithm:   algorithm,
-		Type:        rule.ChartMeta.Type,
-		Description: rule.ChartMeta.Description,
-		Lifecycle:   rule.ChartMeta.Lifecycle,
-		sourceFile:  rule.sourceFile,
-	}
 }
 
 func slugForMetric(name string) string {

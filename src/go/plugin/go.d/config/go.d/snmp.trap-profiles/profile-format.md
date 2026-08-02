@@ -37,17 +37,19 @@ The plugin reads stock profiles from the go.d stock config directory `snmp.trap-
 (typically `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/`) and operator profiles from the go.d user config
 directory `snmp.trap-profiles/` subdirectory (typically `/etc/netdata/go.d/snmp.trap-profiles/`). Stock files are plain
 `.yaml` in the source repository for reviewability; installed packages ship them as `.yaml.zst`. The loader accepts
-`.yaml`, `.yml`, `.yaml.zst`, and `.yml.zst`; draft-era `.yaml.gz` and `.yml.gz` files are also accepted as a
-compatibility fallback.
+`.yaml`, `.yml`, `.yaml.zst`, and `.yml.zst`.
 
 Profiles are loaded **only when the first runnable SNMP trap job is created** — Netdata agents that do not receive traps
 never pay the memory footprint.
 
-Profile loading is shared across trap jobs: the first runnable job eagerly loads operator profiles, validates stock
-profiles, builds a stock OID route table, and later jobs reuse the same cache. Stock profile definitions are loaded into
-memory only when the first matching trap OID needs that stock file. Failed profile validation is a creation-time job
-failure surfaced to DynCfg; it does not leave a permanently poisoned cache. If all trap jobs are removed, the cache is
-released and the next trap job creation validates profiles again.
+Profile loading is shared across trap jobs: the first runnable job eagerly loads and validates operator profiles and the
+stock catalogue, builds a stock OID route table, and later jobs reuse the same cache. Stock profile definitions are loaded
+and validated when the first matching trap OID needs that stock file. Stock definitions load eagerly during job creation
+to build the complete metric rule catalogue when an operator profile defines metric rules or the job enables profile
+metrics. Failed eager validation is a creation-time job failure surfaced to DynCfg; a failed lazy stock load is reported
+by the matching trap and increments profile-load-failure metrics.
+Neither failure permanently poisons a later cache epoch. If all trap jobs are removed, the cache is released and the next
+trap job creation rebuilds the eager cache surfaces.
 
 ## File layout
 
@@ -112,7 +114,6 @@ charts:
 metrics:
   - name: cisco.ospf.config_error
     type: counter
-    auto_safe: true
     on_trap: CISCO-OSPF-TRAP-MIB::cospfIfConfigError
     output:
       metric: snmp_trap_ospf_config_error_events
@@ -195,75 +196,45 @@ Enable profile metrics in the listener job, not in the profile file:
 ```yaml
 profile_metrics:
   enabled: true
-  mode: exact        # none | auto | exact | combined
   include:
     - cisco.config.changed
-  identity:
-    device: source   # source | source_label | listener
-    unresolved_source: source_label
-    source_id_privacy: hash
-  limits:
-    max_rules: 500
-    max_sources: 2000
-    max_resources_per_source: 512
-    max_instances_per_job: 50000
-    overflow: drop_and_count
 ```
 
-Selection modes:
-
 - `profile_metrics.enabled` defaults to `false`; profile rules are inactive until the job enables them.
-- `none`: no profile metric rules are evaluated.
-- `auto`: enable rules marked `auto_safe: true`.
-- `exact`: enable only names listed in `profile_metrics.include`.
-- `combined`: enable `auto_safe: true` rules plus names listed in `include`.
-
-`profile_metrics.include` is valid only with `mode: exact` or `mode: combined`. It is rejected with `mode: none` or
-`mode: auto`, because it would otherwise look configured while having no selection effect.
-
-Use `auto_safe: true` only for rules reviewed as bounded and safe for trap hubs. A child profile rule with the same
-`name` fully replaces the inherited rule; if an operator replacement sets `auto_safe: true`, the operator owns that
-safety decision.
+- `profile_metrics.include` lists every rule enabled for the job. At least one rule is required when profile metrics are
+  enabled. Missing or profile-disabled rule names fail job creation.
+- A child profile rule with the same `name` fully replaces the inherited rule. A child can set `enabled: false` to
+  disable an inherited rule.
 
 Identity behavior:
 
-- `identity.device: source` emits device-attributable metrics under vnode host scope when trap enrichment supplies an
-  unambiguous `SourceVnodeID`.
+- Device-attributable metrics are emitted under vnode host scope when trap enrichment supplies an unambiguous
+  `SourceVnodeID`.
 - When no vnode is known, the metric is emitted under the listener job with bounded `source_id` and `source_kind`
-  labels.
+  labels. The source ID is a stable local hash derived from the selected source value, job name, and SDK local Agent
+  identity; it is not a portable join key across Agents, listeners, or reinstalls.
 - Ambiguous or conflicting vnode enrichment falls back to source-label metrics and increments attribution diagnostics
   instead of creating or migrating vnode metrics.
 - Vnode-scoped profile metric series also include `source_id` and `source_kind`; generated chart instances use the same
   label identity in both vnode and fallback modes.
-- `identity.device: source_label` always emits under the listener job with bounded `source_id` and `source_kind` labels,
-  even when vnode enrichment is available.
-- `identity.device: listener` is only for listener-owned rules that should merge all source devices.
-- `source_id_privacy: hash` hides raw source values behind a stable local hash derived from the selected source value,
-  job name, and SDK local Agent identity. Use `raw` only when source labels are acceptable in your environment. Treat
-  hashed `source_id` values as local listener identifiers, not portable join keys across Agents, listeners, or
-  reinstalls. The local salt comes from the systemd journal SDK host identity helper. On platforms without a native
-  machine ID, the helper uses its configured Netdata state directory for synthesized stable local identity. The emitted
-  `source_id` is truncated to 16 hex characters.
 - `source_kind` is a closed label set: `vnode`, `listener`, `trusted_trap_address`, `udp_peer`, `entry_source`,
   `hostname_or_ip`, `trap_varbind`, `topology_ifindex`, `source`, or `other`.
 
 Cardinality behavior:
 
-- `limits.max_sources` caps non-listener source identities tracked by the job, including vnode and fallback sources.
-- `limits.max_resources_per_source` is the default per-source, per-resource-class resource cap.
-- `identity.resource.max_per_source` overrides the default for one rule's resource class.
+- Fixed safety limits cap each job at 500 selected rules, 2,000 source identities, 512 resources per source and resource
+  class by default, and 50,000 profile-derived chart instances.
+- `identity.resource.max_per_source` can lower the fixed default for one rule's resource class.
 - `identity.resource.key_from_varbind` must reference an integer-like bounded varbind (`INTEGER`, `Integer32`,
   `Unsigned32`, or `Gauge32`). String, MAC, username, address, and payload-like fields are rejected as resource keys to
   protect metric cardinality. `Counter32`, `Counter64`, and `TimeTicks` are valid sample values, not resource identity
   keys.
 - `identity.resource.class` must be one of the stock classes `interface`, `peer`, `neighbor`, `sensor`, `alarm`, `pool`,
   `l2_topology`, `component`, or a site-specific lowercase class beginning with `site_`, such as `site_foo_sensor`.
-- `limits.max_instances_per_job` is the final job-level safety cap.
-- `limits.overflow` currently supports `drop_and_count`: accepted traps are still committed, but over-cap metric
-  instances are skipped and diagnostics increment.
+- Over-cap metric instances are skipped and diagnostics increment; accepted traps are still committed.
 - `charts.lifecycle.expire_after_cycles` counts go.d collection cycles, so changing the listener job `update_every`
-  changes its wall-clock expiry time. State rule `state.ttl` uses wall-clock duration syntax and must be greater than
-  zero when set.
+  changes its wall-clock expiry time. State rule `state.ttl` uses a positive Go duration; expiration emits a zero once,
+  then removes the series after that successful collection.
 - Expired series are removed. If the same source/resource appears again later, the next committed trap creates a fresh
   series; counter charts may show a reset after idle expiry.
 - All rules that share one chart must have the same label shape. Do not mix resource and non-resource rules in one
@@ -284,10 +255,9 @@ Canonical rule fields:
 | `name` | yes | Stable rule identity, unique after profile merge |
 | `enabled` | no | Defaults to enabled; set `false` in a child profile to disable an inherited rule |
 | `type` | yes | `counter`, `sample`, or `state` |
-| `auto_safe` | no | Allows `profile_metrics.mode: auto` to enable the rule |
 | `on_trap` | yes for `counter`/`sample` | Trap name or numeric OID |
 | `problem_trap` / `clear_trap` | yes for separate-trap `state` | Trap names or numeric OIDs |
-| `where` | no | Predicate list or compact varbind map for filtering |
+| `where` | no | Predicate list for filtering |
 | `identity.resource` | no | Bounded resource identity, such as interface index |
 | `value_from_varbind` | yes for `sample` | Symbolic varbind name; must be numeric |
 | `scale.multiplier` / `scale.divisor` | no | Applied to `sample` values before emission |
@@ -297,9 +267,7 @@ Canonical rule fields:
 | `output.chart` | no | Chart ID; defaults from rule name |
 | `state.set_when` / `state.clear_when` | yes for same-OID `state` | Predicate objects used with `on_trap`; `set_when` takes precedence if both match |
 | `state.problem_value` / `state.clear_value` | no | State values; defaults are `1` and `0` |
-| `state.ttl` | no | Positive duration after which state is cleared/expired during `Collect()` |
-| `state.ttl_behavior` | no | Only `clear_and_expire` is supported |
-| `chart_meta` | no | Inline chart definition for compact single-chart rules |
+| `state.ttl` | no | Positive duration after which state is cleared once and then expired during `Collect()` |
 
 Predicate behavior:
 
@@ -309,8 +277,6 @@ Predicate behavior:
   instead of silently missing.
 - Each predicate must include at least one condition operator: `equals`, `in`, `exists`, `absent`, `greater_than`,
   `less_than`, or `range`.
-- Compact map-form `where` is accepted for hand-authored rules, for example
-  `where: { ccmHistoryEventTerminalType: { in: [console, terminal] } }`.
 - `equals` and `in` match enum labels when the referenced varbind has an enum.
 - Numeric predicates support `greater_than`, `less_than`, and inclusive two-value `range`; bounds must be finite numbers
   and `range` must have exactly two values ordered with `lower <= upper`.
@@ -350,8 +316,8 @@ dimensions:
 - `source_transitions`
 
 Diagnostics are listener-scoped receiver metrics. They are not emitted under per-device vnode scopes.
-`attribution_failed` includes cases where `identity.unresolved_source: drop_metric_instance` refuses fallback
-source-label emission. `overflow_dropped` is reserved for source, resource, chart, or job cardinality caps.
+`attribution_failed` counts events for which no usable source identity is available. `overflow_dropped` is reserved for
+source, resource, chart, or job cardinality caps.
 `source_transitions` counts when the same raw source maps to a different metric identity, for example from fallback
 source labels to vnode scope after enrichment starts resolving the device.
 
@@ -364,42 +330,32 @@ Runtime ordering:
 - Dedup-suppressed traps and write-failed traps do not update profile metrics.
 - Trap-derived samples and states are last-reported values. They are not continuously polled measurements.
 
-Compact aliases are accepted for common hand-authored rules:
-
-- Compact aliases are for operator-authored profiles. Stock and generated profile output should use canonical fields for
-  reviewability.
-- `metric`: alias for `output.metric`
-- `dimension`: alias for `output.dimension`
-- `chart_id`: alias for `output.chart`
-- `value`: alias for `value_from_varbind`
-- `resource.key`: alias for `identity.resource.key_from_varbind`
-- `resource.max`: alias for `identity.resource.max_per_source`
-- `state.varbind` plus `state.set` and `state.clear`: compact same-OID state rule syntax. Both `set` and `clear` are
-  required.
-
 Chart metadata defaults and validation:
 
-- `chart_meta.type` and `charts[].type` default to `line`.
+- `charts[].type` defaults to `line`.
 - Supported chart types are `line`, `area`, `stacked`, and `heatmap`.
-- `chart_meta.algorithm` and `charts[].algorithm` default to `incremental`.
+- `charts[].algorithm` defaults to `incremental`.
 - `sample` and `state` rule charts must use `algorithm: absolute`.
 - `counter` rule charts must use `algorithm: incremental`.
 
-Example compact counter rule with inline chart metadata:
+Example counter rule and chart:
 
 ```yaml
 metrics:
   - name: cisco.config.changed
     type: counter
-    auto_safe: true
     on_trap: CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged
-    metric: snmp_trap_cisco_config_events
-    chart_id: cisco_config_changes
-    chart_meta:
-      title: Cisco configuration changes
-      context: snmp.trap.cisco.config.changes
-      units: events/s
-      algorithm: incremental
+    output:
+      metric: snmp_trap_cisco_config_events
+      dimension: changes
+      chart: cisco_config_changes
+
+charts:
+  - id: cisco_config_changes
+    title: Cisco configuration changes
+    context: snmp.trap.cisco.config.changes
+    units: events/s
+    algorithm: incremental
 ```
 
 Example per-resource counter rule:
@@ -409,10 +365,11 @@ metrics:
   - name: cisco.port_security.ifindex
     type: counter
     on_trap: CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation
-    resource:
-      class: interface
-      key: ifIndex
-      max: 48
+    identity:
+      resource:
+        class: interface
+        key_from_varbind: ifIndex
+        max_per_source: 48
     output:
       metric: snmp_trap_cisco_port_security_violations
       dimension: violations
@@ -540,7 +497,8 @@ description: '{{with first (value "ifDescr") (value "ifName") (value "ifIndex")}
 ```
 
 Unknown functions, unknown varbind names, malformed templates, variables, assignments, `if`, `range`, arbitrary
-pipelines, and template inclusion actions fail at profile load so configuration errors are visible at job creation time.
+pipelines, and template inclusion actions fail profile loading. Eager operator/metric-catalogue loads surface the error at
+job creation; lazy stock errors surface on the first matching trap.
 
 If `description:` is absent the plugin renders the default template `"{{trap_name}} on {{hostname}}."`.
 
@@ -625,10 +583,10 @@ label key happens to match a plugin field name. For example, a profile with
 but in different namespaces: the operator label becomes `TRAP_TAG_INTERFACE_STATE`, the topology field becomes
 `TRAP_INTERFACE`. Both can co-exist on the same trap entry without conflict.
 
-Dynamic label references must be bounded-cardinality at profile-load time. The MVP accepts static strings, `TRAP_NAME`,
-`TRAP_DEVICE_VENDOR`, enum-backed varbinds, booleans, and small numeric ranges. It rejects unbounded values such as
-hostnames, source IPs, interface descriptions, MAC addresses, usernames, packet contents, and raw numeric OID references
-without profile metadata.
+Dynamic label references must be bounded-cardinality at profile-load time. Labels accept static strings, `{{trap_name}}`,
+`{{vendor}}`, enum-backed varbinds, booleans, and small numeric ranges. They reject unbounded values such as hostnames,
+source IPs, interface descriptions, MAC addresses, usernames, packet contents, and raw numeric OID references without
+profile metadata.
 
 ```yaml
 # /etc/netdata/go.d/snmp.trap-profiles/site-additions.yaml
@@ -640,8 +598,9 @@ traps:
       change_window: business_hours
 ```
 
-Per-OID metric extraction lives in profile `metrics:` and `charts:` sections. Listener jobs only enable/select those
-profile rules and choose identity, privacy, and cardinality limits through `profile_metrics`.
+Per-OID metric extraction lives in profile `metrics:` and `charts:` sections. Listener jobs only enable and select those
+rules through `profile_metrics`. Source identity, fallback privacy, and job-level cardinality limits use fixed safe
+policies; canonical rule-local `identity.device` and `identity.resource` fields control rule attribution and resources.
 
 ## Generated stock profiles
 

@@ -430,11 +430,7 @@ func (m *perJobMetrics) sourceForEntryLocked(entry *TrapEntry, now time.Time, co
 		return nil
 	}
 	m.initSourceMetricsLocked()
-	identity := ProfileMetricIdentityConfig{
-		Device:           profileMetricIdentitySource,
-		UnresolvedSource: profileMetricUnresolvedSourceLabel,
-		SourceIDPrivacy:  profileMetricSourceIDHash,
-	}
+	identity := defaultProfileMetricIdentityPolicy()
 	source, ok := resolveTrapMetricSourceIdentity(entry, entry.JobName, identity, m.sourceHashSalt)
 	if !ok {
 		if countDiagnostics {
@@ -539,14 +535,6 @@ func (s *perSourceMetrics) incError(dim string) {
 		s.errors.journalWriteFailed++
 	case "otlp_export_failed":
 		s.errors.otlpExportFailed++
-	}
-}
-
-func incAllJobsProfileLoadFailed() {
-	globalMetrics.mu.Lock()
-	defer globalMetrics.mu.Unlock()
-	for _, m := range globalMetrics.jobs {
-		m.errors.profileLoadFailed.Add(1)
 	}
 }
 

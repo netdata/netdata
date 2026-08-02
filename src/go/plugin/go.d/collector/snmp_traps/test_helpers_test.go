@@ -102,7 +102,7 @@ func (m *perJobMetrics) fallbackSourceIdentityForTest(entry *TrapEntry) (string,
 	m.sourceMu.Lock()
 	defer m.sourceMu.Unlock()
 	m.initSourceMetricsLocked()
-	return fallbackTrapSourceIdentity(entry, entry.JobName, profileMetricSourceIDHash, m.sourceHashSalt)
+	return fallbackTrapSourceIdentity(entry, entry.JobName, m.sourceHashSalt)
 }
 
 func privateTestIP(i int) string {

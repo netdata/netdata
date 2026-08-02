@@ -124,8 +124,8 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
 
     Required profile-metric authoring checks:
     - Rule types are only `counter`, `sample`, and `state`; use canonical
-      fields for stock/generated profiles and keep compact aliases for
-      operator-authored examples.
+      fields for every profile. Jobs enable rules explicitly by name with
+      `profile_metrics.include`.
     - `where:` predicates are ANDed and may use `equals`, `in`, `exists`,
       `absent`, `greater_than`, `less_than`, `range`, and `not`; never combine
       `not` with `exists` or `absent`, and never define a predicate without a
@@ -136,8 +136,8 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
       not resource identity keys.
     - `state` rules use either separate `problem_trap` / `clear_trap` OIDs or
       same-OID `state.set_when` / `state.clear_when` predicates. `state.ttl`
-      must be a valid Go duration string, and `state.ttl_behavior` currently
-      supports only `clear_and_expire`.
+      must be a positive Go duration string. TTL expiry clears the state once
+      and removes the series after that successful collection.
     - `identity.resource.key_from_varbind` MUST reference an integer-like
       bounded varbind (`INTEGER`, `Integer32`, `Unsigned32`, or `Gauge32`).
       Never use strings, MACs, usernames, addresses, payloads, or event IDs as
@@ -160,9 +160,6 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
       `snmp_trap_metric_`, and `snmp_trap_profile_metrics_`.
       Built-in source receiver metrics are automatic; profile rules should
       describe vendor or site semantics, not duplicate receiver pipeline health.
-    - `auto_safe: true` means the rule is safe for broad trap hubs: bounded
-      labels, bounded resource identity, no sensitive values, and no surprising
-      high cardinality. Stock rules need review evidence before enabling it.
     - Profile metrics update only after the trap is successfully committed to
       the configured journal and/or OTLP backend. Dedup-suppressed and
       write-failed traps do not update profile metrics.
@@ -277,8 +274,7 @@ classifications were done under the prior taxonomy and are now stale).
 Stock profile YAMLs stay raw in the repository so changes are reviewable in
 `git diff`. Installed/package stock vendor profiles MUST be compressed as
 `.yaml.zst`; the runtime loader supports raw `.yaml`, compressed `.yaml.zst`,
-and draft-era `.yaml.gz` compatibility. Operator/user profiles under
-`/etc/netdata/go.d/snmp.trap-profiles/` SHOULD stay uncompressed `.yaml` for
-editability. If a single vendor file grows past ~10 MB in the repository,
-revisit description verbosity rather than hiding unreviewable generated bloat
-behind compression.
+and compressed `.yml.zst`. Operator/user profiles under
+`/etc/netdata/go.d/snmp.trap-profiles/` SHOULD stay uncompressed `.yaml` for editability. If a single vendor file grows
+past ~10 MB in the repository, revisit description verbosity rather than hiding unreviewable generated bloat behind
+compression.

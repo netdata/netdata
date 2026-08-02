@@ -86,7 +86,7 @@ A **trap profile** defines per-OID mappings:
 6. Updates enabled profile-defined trap metrics only after the trap is committed to the configured backend
 7. Increments the per-job self-metrics (events by category and severity, errors by type)
 
-**Custom MIB workflow**: Operators with device-specific MIBs not covered by the OOB profiles can use the installed `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` helper to convert MIBs into trap profile YAMLs offline. The helper writes profiles under `snmp-trap-profile-gen-output/profiles/`; copy the needed YAML files to `/etc/netdata/go.d/snmp.trap-profiles/`. Active SNMP trap jobs automatically reload user-supplied profile changes and keep the last valid profile index if a changed file is invalid. Stock profile updates are picked up after trap jobs stop/start or the Netdata Agent restarts. If no trap job is active, the next job creation loads and validates the profile files. See [SNMP trap profile format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md) for the YAML schema.
+**Custom MIB workflow**: Operators with device-specific MIBs not covered by the OOB profiles can use the installed `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` helper to convert MIBs into trap profile YAMLs offline. The helper writes profiles under `snmp-trap-profile-gen-output/profiles/`; copy the needed YAML files to `/etc/netdata/go.d/snmp.trap-profiles/`. Profile files are immutable while any trap job uses the shared cache. After changing operator or stock profiles, restart the Agent or recreate all running trap jobs so the final release unloads the cache. The next job creation eagerly loads operator profiles and the stock catalogue. Stock vendor YAML is loaded and validated on the first matching trap, or eagerly to build the complete metric rule catalogue when an operator profile defines metric rules or the job enables profile metrics. See [SNMP trap profile format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md) for the YAML schema.
 
 Example conversion for a MIB module not shipped in the OOB pack:
 ```sh
@@ -290,16 +290,9 @@ Each override entry requires an `oid` (numeric OID). Optional fields: `category`
 ##### profile_metrics
 
 - `enabled`: Enable profile-defined trap metrics for committed traps (default `false`).
-- `mode`: Rule selection policy: `none`, `auto`, `exact`, or `combined` (default `none`).
-- `include`: Metric rule names to enable when `mode` is `exact` or `combined`; rejected with `mode` `none` or `auto`.
-- `identity.device`: Source identity mode: `source`, `source_label`, or `listener` (default `source`).
-- `identity.unresolved_source`: Fallback behavior when source/vnode attribution is unavailable: `source_label` or `drop_metric_instance` (default `source_label`).
-- `identity.source_id_privacy`: `hash` for stable local per-job hashes or `raw` for the selected source value (default `hash`).
-- `limits.max_rules`: Maximum enabled profile metric rules evaluated by this job (default `500`).
-- `limits.max_sources`: Maximum non-listener source identities tracked by this job, including vnode and fallback sources (default `2000`).
-- `limits.max_resources_per_source`: Default resource cap per source and resource class for rules that do not set `identity.resource.max_per_source` (default `512`).
-- `limits.max_instances_per_job`: Maximum profile-derived metric instances for this job (default `50000`).
-- `limits.overflow`: `drop_and_count`; over-cap metric instances are skipped, accepted traps are still committed, and profile metric diagnostics increment.
+- `include`: Explicit metric rule names to enable. At least one rule is required when `enabled` is `true`.
+- Device-attributable metrics use vnode host scope when enrichment finds an unambiguous vnode. Otherwise they use a bounded, hashed source label under the listener job.
+- Cardinality limits and overflow handling are fixed safety policies. Over-cap metric instances are skipped, accepted traps are still committed, and profile metric diagnostics increment.
 - Define custom rules in files under `/etc/netdata/go.d/snmp.trap-profiles/` with profile `metrics:` and `charts:` sections. See the SNMP trap profile format documentation for rule syntax and examples.
 
 
@@ -456,11 +449,9 @@ jobs:
 ```
 </details>
 
-###### With dedup and profile metrics
+###### With dedup
 
-A job with dedup enabled (window 10 seconds) and profile-defined trap metrics enabled.
-`auto` enables only loaded profile metric rules that are marked safe for automatic use.
-Use `exact` or `combined` with `include` to enable specific custom metric rules by name.
+A job with dedup enabled (window 10 seconds).
 
 
 <details open><summary>Config</summary>
@@ -476,9 +467,6 @@ jobs:
     dedup:
       enabled: true
       window_sec: 10
-    profile_metrics:
-      enabled: true
-      mode: auto
 
 ```
 </details>
@@ -498,14 +486,16 @@ metrics:
   - name: cisco.config.changed
     type: counter
     on_trap: CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged
-    metric: snmp_trap_cisco_config_events
-    dimension: changes
-    chart_id: cisco_config_changes
-    chart_meta:
-      title: Cisco configuration changes
-      context: snmp.trap.cisco.config.changes
-      units: events/s
-      algorithm: incremental
+    output:
+      metric: snmp_trap_cisco_config_events
+      dimension: changes
+      chart: cisco_config_changes
+charts:
+  - id: cisco_config_changes
+    title: Cisco configuration changes
+    context: snmp.trap.cisco.config.changes
+    units: events/s
+    algorithm: incremental
 
 # /etc/netdata/go.d/snmp_traps.conf
 jobs:
@@ -517,7 +507,6 @@ jobs:
           port: 162
     profile_metrics:
       enabled: true
-      mode: exact
       include:
         - cisco.config.changed
 
@@ -548,7 +537,7 @@ The following alerts are available:
 | [ snmp_trap_unknown_engine_id ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener is receiving v3 traps from engine IDs outside the static whitelist, or first-time dynamic engine ID registrations when dynamic discovery is enabled. |
 | [ snmp_trap_inform_response_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to send INFORM acknowledgements back to senders. |
 | [ snmp_trap_binary_encoded_fields ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener wrote structured fields with binary journal encoding. |
-| [ snmp_trap_profile_load_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to load or reload trap profiles. |
+| [ snmp_trap_profile_load_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to load trap profiles. |
 | [ snmp_trap_journal_write_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to write traps to the systemd-journal. |
 | [ snmp_trap_otlp_export_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to export traps through OTLP. |
 | [ snmp_trap_listener_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to read UDP packets from a bound socket. |
@@ -586,7 +575,7 @@ Source-attributed receiver metrics are bounded to 2000 active sources per job an
 
 **Dynamic contexts** (profile metrics):
 
-Trap profiles may define optional `metrics:` rules and `charts:`. Jobs enable those rules with `profile_metrics.mode` and `profile_metrics.include`; `include` is valid only with `exact` or `combined` mode. Profile metric contexts are generated at runtime from the profile chart definitions under the `snmp.trap.` context namespace. Profile rules can create counters, last trap-reported numeric samples, and trap-derived state gauges. They are updated only after the trap is successfully committed to the authoritative output backend.
+Trap profiles may define optional `metrics:` rules and `charts:`. Jobs enable rules explicitly with `profile_metrics.enabled` and `profile_metrics.include`. Profile metric contexts are generated at runtime from the profile chart definitions under the `snmp.trap.` context namespace. Profile rules can create counters, last trap-reported numeric samples, and trap-derived state gauges. They are updated only after the trap is successfully committed to the authoritative output backend.
 
 
 
