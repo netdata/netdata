@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -650,9 +651,10 @@ func TestEmitProfilesWritesRouteMetadataToCatalogue(t *testing.T) {
 	}
 
 	var catalogue map[string]struct {
-		File      string   `json:"file"`
-		TrapCount int      `json:"trap_count"`
-		TrapOIDs  []string `json:"trap_oids"`
+		File            string   `json:"file"`
+		MetricRuleNames []string `json:"metric_rule_names"`
+		TrapCount       int      `json:"trap_count"`
+		TrapOIDs        []string `json:"trap_oids"`
 	}
 	data, err := os.ReadFile(cataloguePath)
 	if err != nil {
@@ -668,6 +670,25 @@ func TestEmitProfilesWritesRouteMetadataToCatalogue(t *testing.T) {
 	wantOIDs := []string{"1.3.6.1.6.3.1.1.5.1", "1.3.6.1.6.3.1.1.5.3"}
 	if strings.Join(entry.TrapOIDs, ",") != strings.Join(wantOIDs, ",") {
 		t.Fatalf("trap_oids = %#v, want %#v", entry.TrapOIDs, wantOIDs)
+	}
+	if entry.MetricRuleNames != nil {
+		t.Fatalf("metric_rule_names = %#v, want omitted", entry.MetricRuleNames)
+	}
+	if bytes.Contains(data, []byte(`"metric_rule_names"`)) {
+		t.Fatalf("catalogue emitted metric_rule_names for a profile without metric rules: %s", data)
+	}
+}
+
+func TestProfileMetricRuleNames(t *testing.T) {
+	rules := []profileMetricRule{
+		{Name: "vendor::z"},
+		{Name: "vendor::a"},
+		{Name: "vendor::z"},
+		{},
+	}
+	want := []string{"vendor::a", "vendor::z"}
+	if got := profileMetricRuleNames(rules); !slices.Equal(got, want) {
+		t.Fatalf("profileMetricRuleNames() = %#v, want %#v", got, want)
 	}
 }
 

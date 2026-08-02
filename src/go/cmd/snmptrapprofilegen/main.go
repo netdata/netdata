@@ -326,6 +326,22 @@ type profileFile struct {
 	TrapCount int                  `yaml:"trap_count,omitempty"`
 	Varbinds  map[string]profileVB `yaml:"varbinds,omitempty"`
 	Traps     []profileTrap        `yaml:"traps"`
+	Metrics   []profileMetricRule  `yaml:"metrics,omitempty"`
+}
+
+type profileMetricRule struct {
+	Name string `yaml:"name"`
+}
+
+type profileCatalogueEntry struct {
+	File            string   `json:"file"`
+	MIBCount        int      `json:"mib_count"`
+	MIBs            []string `json:"mibs"`
+	MetricRuleNames []string `json:"metric_rule_names,omitempty"`
+	SampleTraps     []string `json:"sample_traps"`
+	TrapCount       int      `json:"trap_count"`
+	TrapOIDs        []string `json:"trap_oids"`
+	VarbindCount    int      `json:"varbind_count"`
 }
 
 type profileVB struct {
@@ -2047,7 +2063,7 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 		return nil, err
 	}
 	vendors := sortedKeys(byVendor)
-	catalogue := map[string]any{}
+	catalogue := map[string]profileCatalogueEntry{}
 	counts := map[string]int{}
 	var combined []TrapRecord
 	for _, vendor := range vendors {
@@ -2060,14 +2076,15 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 		}
 		counts[vendor] = len(pf.Traps)
 		combined = append(combined, recs...)
-		catalogue[vendor] = map[string]any{
-			"file":          vendor + ".yaml",
-			"trap_count":    len(pf.Traps),
-			"trap_oids":     profileTrapOIDs(pf.Traps),
-			"varbind_count": len(pf.Varbinds),
-			"mib_count":     pf.MibCount,
-			"mibs":          mibsForRecords(recs),
-			"sample_traps":  sampleTrapNames(recs, 5),
+		catalogue[vendor] = profileCatalogueEntry{
+			File:            vendor + ".yaml",
+			MIBCount:        pf.MibCount,
+			MIBs:            mibsForRecords(recs),
+			MetricRuleNames: profileMetricRuleNames(pf.Metrics),
+			SampleTraps:     sampleTrapNames(recs, 5),
+			TrapCount:       len(pf.Traps),
+			TrapOIDs:        profileTrapOIDs(pf.Traps),
+			VarbindCount:    len(pf.Varbinds),
 		}
 	}
 	if opts.CombinedPath != "" {
@@ -2082,6 +2099,26 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 		}
 	}
 	return counts, nil
+}
+
+func profileMetricRuleNames(rules []profileMetricRule) []string {
+	if len(rules) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(rules))
+	names := make([]string, 0, len(rules))
+	for _, rule := range rules {
+		if rule.Name == "" {
+			continue
+		}
+		if _, ok := seen[rule.Name]; ok {
+			continue
+		}
+		seen[rule.Name] = struct{}{}
+		names = append(names, rule.Name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func filterValidTrapRecords(records []TrapRecord) []TrapRecord {
