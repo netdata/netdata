@@ -107,8 +107,10 @@ directory at the same absolute path before changing analyzer policy.
 For SARIF, a valid top-level envelope alone is not trustworthy. The wrapper pins
 the Docker runner to the current supported stable CLI, 7.10.1, by its immutable
 Linux/amd64 manifest digest and rejects a local binary that does not report that
-exact version. Its closed contract also
-requires every run to carry its tool driver and rules, result records with valid
+exact version when `--runner local` is explicit. In automatic mode, an
+incompatible local binary falls back to the digest-pinned Docker runner when it
+is available. Its closed contract also requires every run to carry its tool
+driver and rules, result records with valid
 rule references and physical locations, exactly one successful invocation, and
 referenced artifacts. The wrapper validates those nested records and
 cross-references before reporting success. The CLI has one known producer quirk:

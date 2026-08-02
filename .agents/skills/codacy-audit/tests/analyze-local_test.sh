@@ -358,4 +358,30 @@ if [ "$docker_status" -ne 0 ] || [ "$docker_stdout" != "$docker_output" ] || \
 fi
 printf '[PASS] Docker digest and stderr contract\n'
 
-printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 5))"
+auto_output="$tmp/auto-output.json"
+auto_stdout_path="$tmp/auto.stdout"
+auto_stderr_path="$tmp/auto.stderr"
+auto_docker_args_path="$tmp/auto-docker.args"
+auto_diagnostic='synthetic auto-fallback Docker diagnostic'
+set +e
+PATH="$tmp/bin:$PATH" CODACY_TEST_VERSION=8.0.0 CODACY_TEST_REPORT="$docker_report" \
+    CODACY_TEST_STDERR="$auto_diagnostic" CODACY_TEST_DOCKER_ARGS="$auto_docker_args_path" \
+    CODACY_TEST_EXIT=0 \
+    "$script" --format json --output "$auto_output" \
+    > "$auto_stdout_path" 2> "$auto_stderr_path"
+auto_status=$?
+set -e
+auto_stdout="$(cat "$auto_stdout_path")"
+auto_stderr="$(cat "$auto_stderr_path")"
+if [ "$auto_status" -ne 0 ] || [ "$auto_stdout" != "$auto_output" ] || \
+        [[ "$auto_stderr" != *'falling back to the digest-pinned Docker runner'* ]] || \
+        [[ "$auto_stderr" != *'runner=docker'* ]] || \
+        [[ "$auto_stderr" != *"$auto_diagnostic"* ]] || \
+        [ "$(grep -Fxc -- "$docker_image" "$auto_docker_args_path")" -ne 1 ]; then
+    printf >&2 '[FAIL] automatic local-version fallback: status=%d\nstdout:\n%s\nstderr:\n%s\nargs:\n%s\n' \
+        "$auto_status" "$auto_stdout" "$auto_stderr" "$(cat "$auto_docker_args_path")"
+    exit 1
+fi
+printf '[PASS] automatic local-version fallback\n'
+
+printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 6))"

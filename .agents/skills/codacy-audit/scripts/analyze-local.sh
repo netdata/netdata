@@ -107,7 +107,9 @@ if [ ! -d "$output_parent" ]; then
 fi
 
 # Pick a runner.
+auto_selected=false
 if [ "$RUNNER" = "auto" ]; then
+    auto_selected=true
     if command -v codacy-analysis-cli >/dev/null 2>&1; then
         RUNNER=local
     elif command -v docker >/dev/null 2>&1; then
@@ -134,13 +136,20 @@ esac
 # version so a moving image cannot silently change the report contract.
 if [ "$RUNNER" = "local" ]; then
     expected_version="codacy-analysis-cli is on version ${CODACY_ANALYSIS_CLI_VERSION}"
+    local_version_error=
     if ! local_version_output="$(codacy-analysis-cli -v 2>&1)"; then
-        echo -e "${CA_RED}[ERROR]${CA_NC} cannot determine local codacy-analysis-cli version" >&2
-        exit 2
+        local_version_error="cannot determine local codacy-analysis-cli version"
+    elif ! grep -Fqx "$expected_version" <<< "$local_version_output"; then
+        local_version_error="unsupported local codacy-analysis-cli version; expected ${CODACY_ANALYSIS_CLI_VERSION}"
     fi
-    if ! grep -Fqx "$expected_version" <<< "$local_version_output"; then
-        echo -e "${CA_RED}[ERROR]${CA_NC} unsupported local codacy-analysis-cli version; expected ${CODACY_ANALYSIS_CLI_VERSION}" >&2
-        exit 2
+    if [ -n "$local_version_error" ]; then
+        if [ "$auto_selected" = true ] && command -v docker >/dev/null 2>&1; then
+            echo -e "${CA_YELLOW}[analyze-local] ${local_version_error}; falling back to the digest-pinned Docker runner${CA_NC}" >&2
+            RUNNER=docker
+        else
+            echo -e "${CA_RED}[ERROR]${CA_NC} ${local_version_error}" >&2
+            exit 2
+        fi
     fi
 fi
 

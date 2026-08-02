@@ -50,8 +50,10 @@ parse it.
 
    This is a closed 7.10.1 compatibility contract, not a generic SARIF reader.
    The Docker runner is pinned to the 7.10.1 Linux/amd64 manifest digest, and the
-   local runner rejects any other reported CLI version before initializing the
-   output path. Upgrade the image version and digest, accepted local version,
+   explicit local runner rejects any other reported CLI version before
+   initializing the output path. Automatic selection instead falls back from an
+   incompatible local binary to the digest-pinned Docker runner when Docker is
+   available. Upgrade the image version and digest, accepted local version,
    validator, and mock matrix together after checking the new stable release's
    upstream model and real output. Runner diagnostics stay on stderr; inspect
    them before trusting a malformed dump.
