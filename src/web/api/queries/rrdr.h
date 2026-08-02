@@ -12,6 +12,7 @@ extern "C" {
 
 typedef enum tier_query_fetch {
     TIER_QUERY_FETCH_SUM,
+    TIER_QUERY_FETCH_RATE_SUM,
     TIER_QUERY_FETCH_MIN,
     TIER_QUERY_FETCH_MAX,
     TIER_QUERY_FETCH_AVERAGE
