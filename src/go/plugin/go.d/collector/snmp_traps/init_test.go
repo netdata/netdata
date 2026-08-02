@@ -46,9 +46,6 @@ func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
 		"errors",
 		"dedup_suppressed",
 		"pipeline",
-		"source_attribution",
-		"source_pipeline",
-		"source_errors",
 	} {
 		chart, ok := charts[id]
 		require.Truef(t, ok, "missing chart %q", id)
@@ -56,11 +53,12 @@ func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
 	}
 	for _, id := range []string{
 		"sources",
+		"source_attribution",
+		"source_pipeline",
+		"source_errors",
 		"source_last_seen",
 	} {
-		chart, ok := charts[id]
-		require.Truef(t, ok, "missing chart %q", id)
-		assert.Equalf(t, "absolute", chart.Algorithm, "chart %q algorithm", id)
+		assert.NotContains(t, charts, id)
 	}
 }
 

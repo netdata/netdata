@@ -86,7 +86,6 @@ Useful starting points and the fixed caps that bound capacity — not capacity p
 | `dedup.window_sec` / `cache_max_entries` | 5 s / 100,000 (when enabled) | Dedup window and distinct fingerprints / job |
 | `dynamic_engine_id_max_pairs` | 4096 / job | SNMPv3 `(engineID, username)` pairs under dynamic discovery |
 | `retention.max_size` | 10 GB / job | Local journal disk before oldest rows are evicted |
-| Receiver per-source charts | 2000 sources / job (fixed) | Per-source visibility; excess counted as `overflow_dropped` |
 | Profile metric instances | 50,000 / job (fixed) | Profile-derived metric series |
 
 Profile-defined metrics stay **disabled by default** and are the main cardinality risk — a rule with an unbounded label can create uncontrolled series. Enable selected rules only; fixed runtime caps provide final guardrails. For the cardinality model see [Configuration](/docs/npm/snmp-traps/configuration.md#profile-metrics).

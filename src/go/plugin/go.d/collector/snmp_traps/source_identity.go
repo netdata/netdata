@@ -23,6 +23,28 @@ type trapMetricSourceIdentity struct {
 	routeKey    string
 }
 
+func trapEntryHasAmbiguousSourceEvidence(entry *TrapEntry) bool {
+	if entry == nil || entry.Enrichment == nil {
+		return false
+	}
+	if src := entry.Enrichment.Source; src != nil && len(src.RejectedCandidates) > 0 {
+		return true
+	}
+	return trapLookupIsAmbiguous(entry.Enrichment.Registry) || trapLookupIsAmbiguous(entry.Enrichment.Topology)
+}
+
+func trapLookupIsAmbiguous(lookup *TrapEnrichmentLookup) bool {
+	if lookup == nil {
+		return false
+	}
+	switch lookup.Status {
+	case "ambiguous", "conflict":
+		return true
+	default:
+		return lookup.Reason == "ambiguous_source" || lookup.Reason == "vnode_mismatch"
+	}
+}
+
 func resolveTrapMetricSourceIdentity(entry *TrapEntry, jobName string, identity profileMetricIdentityPolicy, sourceHashSalt string) (trapMetricSourceIdentity, bool) {
 	if entry == nil {
 		return trapMetricSourceIdentity{}, false

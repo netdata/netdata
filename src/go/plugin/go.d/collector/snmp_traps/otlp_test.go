@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,25 +96,6 @@ func TestOTLPTargetIsLoopback(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tc.want, otlpTargetIsLoopback(tc.target))
 		})
-	}
-}
-
-func collectSourceMetricsForEntry(t *testing.T, metrics *perJobMetrics, entry *TrapEntry) (metrix.CollectorStore, metrix.Labels) {
-	t.Helper()
-	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	collectSourceMetrics(store, "local", metrics)
-	require.NoError(t, managed.CycleController().CommitCycleSuccess())
-	return store, metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
-}
-
-func assertSourceMetricValue(t *testing.T, store metrix.CollectorStore, metric string, labels metrix.Labels, want float64) {
-	t.Helper()
-	if v, ok := store.Read().Value(metric, labels); !ok || v != want {
-		t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, want)
 	}
 }
 
@@ -422,10 +402,6 @@ func TestOTLPTrapWriterSecondaryAsyncExportFailureDoesNotRecordTerminalWriteFail
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
 
-	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
-	assertSourceMetricValue(t, store, "snmp_trap_source_pipeline_write_failed", labels, 0)
-	assertSourceMetricValue(t, store, "snmp_trap_source_errors_otlp_export_failed", labels, 1)
-
 	srv.setExportErr(nil)
 	require.NoError(t, writer.Close())
 }
@@ -442,14 +418,6 @@ func TestOTLPTrapWriterAuthoritativeAsyncExportFailureRecordsTerminalWriteFailur
 
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
-
-	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
-	for metric, expected := range map[string]float64{
-		"snmp_trap_source_pipeline_write_failed":     1,
-		"snmp_trap_source_errors_otlp_export_failed": 1,
-	} {
-		assertSourceMetricValue(t, store, metric, labels, expected)
-	}
 
 	srv.setExportErr(nil)
 	require.NoError(t, writer.Close())
@@ -511,23 +479,6 @@ func TestOTLPTrapWriterDrainQueueCountsFailuresAfterFirstFailedBatch(t *testing.
 	}
 	assert.Equal(t, 5, totalRecords)
 
-	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	collectSourceMetrics(store, "local", metrics)
-	require.NoError(t, managed.CycleController().CommitCycleSuccess())
-
-	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
-	for metric, expected := range map[string]float64{
-		"snmp_trap_source_pipeline_write_failed":     5,
-		"snmp_trap_source_errors_otlp_export_failed": 5,
-	} {
-		if v, ok := store.Read().Value(metric, labels); !ok || v != expected {
-			t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, expected)
-		}
-	}
 }
 
 func TestOTLPTrapWriterPreflightFailure(t *testing.T) {
@@ -605,14 +556,6 @@ func TestOTLPTrapWriterWorkerPanicFailsClosed(t *testing.T) {
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
 
-	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
-	for metric, expected := range map[string]float64{
-		"snmp_trap_source_pipeline_write_failed":     1,
-		"snmp_trap_source_errors_otlp_export_failed": 1,
-	} {
-		assertSourceMetricValue(t, store, metric, labels, expected)
-	}
-
 	require.ErrorIs(t, writer.Write(&TrapEntry{JobName: "local", Message: "second"}), errWriterClosed)
 	err := writer.Close()
 	require.Error(t, err)
@@ -659,23 +602,6 @@ func TestOTLPTrapWriterWorkerPanicUnblocksFlushAndAccountsQueuedEntries(t *testi
 	assert.Equal(t, uint64(2), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(2), metrics.pipeline.writeFailed.Load())
 
-	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	collectSourceMetrics(store, "local", metrics)
-	require.NoError(t, managed.CycleController().CommitCycleSuccess())
-
-	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
-	for metric, expected := range map[string]float64{
-		"snmp_trap_source_pipeline_write_failed":     2,
-		"snmp_trap_source_errors_otlp_export_failed": 2,
-	} {
-		if v, ok := store.Read().Value(metric, labels); !ok || v != expected {
-			t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, expected)
-		}
-	}
 }
 
 func TestOTLPTrapWriterExternalReceiver(t *testing.T) {

@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,9 +78,6 @@ func TestFanoutTrapWriterSecondaryFailureDoesNotFailPrimaryWrite(t *testing.T) {
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
 
-	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
-	assertSourceMetricValue(t, store, "snmp_trap_source_pipeline_write_failed", labels, 0)
-	assertSourceMetricValue(t, store, "snmp_trap_source_errors_otlp_export_failed", labels, 1)
 }
 
 func TestFanoutTrapWriterBothWriteFailuresRecordOneTerminalPipelineFailure(t *testing.T) {
@@ -99,32 +95,8 @@ func TestFanoutTrapWriterBothWriteFailuresRecordOneTerminalPipelineFailure(t *te
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
 
-	metrics.recordWriteFailure(entry, trapWriteFailureJournal)
+	metrics.incPipelineWriteFailed()
 	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
-
-	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	collectPipeline(store, "local", metrics)
-	collectSourceMetrics(store, "local", metrics)
-	require.NoError(t, managed.CycleController().CommitCycleSuccess())
-
-	jobLabels := metrix.Labels{"job_name": "local"}
-	if v, ok := store.Read().Value("snmp_trap_pipeline_write_failed", jobLabels); !ok || v != 1 {
-		t.Fatalf("snmp_trap_pipeline_write_failed = %v/%v, want 1/true", v, ok)
-	}
-	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
-	for metric, expected := range map[string]float64{
-		"snmp_trap_source_pipeline_write_failed":       1,
-		"snmp_trap_source_errors_journal_write_failed": 1,
-		"snmp_trap_source_errors_otlp_export_failed":   1,
-	} {
-		if v, ok := store.Read().Value(metric, labels); !ok || v != expected {
-			t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, expected)
-		}
-	}
 }
 
 func testFanoutTrapEntry() *TrapEntry {

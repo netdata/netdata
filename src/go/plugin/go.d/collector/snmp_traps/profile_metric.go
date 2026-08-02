@@ -66,8 +66,6 @@ var reservedProfileMetricPrefixes = []string{
 	"snmp_trap_errors_",
 	"snmp_trap_dedup_",
 	"snmp_trap_pipeline_",
-	"snmp_trap_source_",
-	"snmp_trap_sources_",
 	"snmp_trap_metric_",
 	"snmp_trap_profile_metrics_",
 }
@@ -78,11 +76,6 @@ var builtInProfileMetricChartIDs = map[string]bool{
 	"errors":                     true,
 	"dedup_suppressed":           true,
 	"pipeline":                   true,
-	"sources":                    true,
-	"source_attribution":         true,
-	"source_pipeline":            true,
-	"source_errors":              true,
-	"source_last_seen":           true,
 	"profile_metric_diagnostics": true,
 }
 
@@ -92,11 +85,6 @@ var builtInProfileMetricChartContexts = map[string]bool{
 	"snmp.trap.errors":                     true,
 	"snmp.trap.dedup_suppressed":           true,
 	"snmp.trap.pipeline":                   true,
-	"snmp.trap.sources":                    true,
-	"snmp.trap.source_attribution":         true,
-	"snmp.trap.source_pipeline":            true,
-	"snmp.trap.source_errors":              true,
-	"snmp.trap.source_last_seen":           true,
 	"snmp.trap.profile_metric_diagnostics": true,
 	"profile_metric_diagnostics":           true,
 }

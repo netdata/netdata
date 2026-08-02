@@ -2781,3 +2781,43 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted non-integer resource key varbind")
 	}
 }
+
+func TestProfileMetricValidationAllowsRetiredSourceMetricIdentifiers(t *testing.T) {
+	tests := []struct {
+		metric  string
+		chartID string
+		context string
+	}{
+		{metric: "snmp_trap_source_custom_events", chartID: "sources", context: "snmp.trap.sources"},
+		{metric: "snmp_trap_sources_custom_events", chartID: "source_attribution", context: "snmp.trap.source_attribution"},
+		{metric: "snmp_trap_site_source_pipeline_events", chartID: "source_pipeline", context: "snmp.trap.source_pipeline"},
+		{metric: "snmp_trap_site_source_error_events", chartID: "source_errors", context: "snmp.trap.source_errors"},
+		{metric: "snmp_trap_site_source_seen_events", chartID: "source_last_seen", context: "snmp.trap.source_last_seen"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.chartID, func(t *testing.T) {
+			idx := testProfileMetricIndex(t)
+			err := idx.addProfileMetrics([]profileMetricRule{{
+				Name:   "site.source." + tc.chartID,
+				Type:   profileMetricTypeCounter,
+				OnTrap: testCiscoConfigTrapOID,
+				Output: profileMetricOutput{
+					Metric:    tc.metric,
+					Dimension: "events",
+					Chart:     tc.chartID,
+				},
+				sourceFile: "test-profile.yaml",
+			}}, []profileMetricChart{{
+				ID:         tc.chartID,
+				Title:      "Site source events",
+				Context:    tc.context,
+				Units:      "events/s",
+				Algorithm:  "incremental",
+				sourceFile: "test-profile.yaml",
+			}})
+			if err != nil {
+				t.Fatalf("addProfileMetrics rejected identifiers released with retired built-in source metrics: %v", err)
+			}
+		})
+	}
+}

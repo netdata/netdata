@@ -325,8 +325,8 @@ Runtime ordering:
 
 - Profile metrics update only after the trap is successfully committed to the authoritative output backend. When journal
   and OTLP are both enabled, journal commitment is authoritative and OTLP failures are `otlp_export_failed`
-  export/source errors. When OTLP is the only output backend, OTLP export failures are terminal write failures and also
-  increment `pipeline.write_failed` and source-attributed `source_pipeline.write_failed` when the source is known.
+  export errors. When OTLP is the only output backend, OTLP export failures are terminal write failures and also increment
+  the job-level `pipeline.write_failed` counter.
 - Dedup-suppressed traps and write-failed traps do not update profile metrics.
 - Trap-derived samples and states are last-reported values. They are not continuously polled measurements.
 
@@ -402,14 +402,11 @@ Reserved metric name prefixes:
 - `snmp_trap_errors_`
 - `snmp_trap_dedup_`
 - `snmp_trap_pipeline_`
-- `snmp_trap_source_`
-- `snmp_trap_sources_`
 - `snmp_trap_metric_`
 - `snmp_trap_profile_metrics_`
 
-Built-in source receiver metrics are automatic. Profile authors should not recreate receiver pipeline health with
-profile rules; use profile metrics for vendor or site semantics, such as trap-derived state, counters, and bounded
-resource samples.
+Built-in receiver health is job-scoped. Profile authors should not recreate receiver pipeline health with profile rules;
+use profile metrics for vendor or site semantics, such as trap-derived state, counters, and bounded resource samples.
 
 ### Trap entries (`traps:` list)
 

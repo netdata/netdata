@@ -670,21 +670,22 @@ Evidence:
 - `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/dell-inc.yaml:21623`
   through `:21632` defines a Dell STP new-root-election trap.
 
-## Use Case 16: Receiver Pipeline Health By Source
+## Use Case 16: Source Investigation And Device Metrics
 
 Scope disposition:
 
-- This use case is accepted as an important operator requirement.
-- Full support is Phase B of the implementation scope.
-- This trap-to-metrics design preserves source identity, trap commitment, and
-  continuous diagnostics so receiver/pipeline metrics can report health per
-  source without changing the trap metric identity model.
+- Source-level investigation is an important operator requirement.
+- Built-in receiver health remains job-scoped. Operators investigate individual
+  senders through trap rows and source/enrichment fields.
+- Profile-defined metrics provide the opt-in, bounded path for vendor or site
+  semantics that need device-level time series.
 
 Operator question:
 
-- Which source device or relay path is producing unknown OIDs, decode failures,
-  auth failures, rate-limit drops, or INFORM response failures?
-- Is a trap listener healthy for all devices, or only healthy in aggregate?
+- Which source device or relay path is associated with unexpected traps or
+  enrichment decisions?
+- Is the listener pipeline healthy in aggregate while one sender's trap rows
+  show a distinct problem?
 - Did relay source attribution cause device identity ambiguity?
 
 Concrete examples:
@@ -697,26 +698,24 @@ Concrete examples:
 
 Why it matters:
 
-- Pipeline health is currently job-level. That hides per-source operational
-  problems behind listener totals.
+- Job-level pipeline metrics expose receiver health without creating an
+  always-on series for every sender.
 - Source identity is the foundation for all per-device trap metrics.
-- These metrics are system metrics, not profile-derived vendor metrics, but they
-  share the same per-device requirement.
+- Trap rows retain readable source evidence, while profile metrics create only
+  explicitly selected, bounded device-level series.
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/metrics.go:12` through `:28` defines
-  trap error counters including unknown OID, decode failure, rate-limit drops,
-  auth failures, unknown engine ID, INFORM response failure, and export/write
-  failures.
-- `src/go/plugin/go.d/collector/snmp_traps/metrics.go:241` through `:284`
-  collects events, severities, and errors with only a `job_name` label.
+- `src/go/plugin/go.d/collector/snmp_traps/metrics.go` collects receiver
+  pipeline, events, severities, errors, and dedup metrics with `job_name`.
+- `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, and `TRAP_ENRICHMENT` preserve the
+  source evidence used for log filtering and audit.
 - `src/go/plugin/go.d/collector/snmp_traps/config.go:26` through `:28` defines
   trusted relay configuration.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:740` through `:744`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:732` through `:736`
   warns that catch-all trusted relays let every peer override source identity
   via `snmpTrapAddress.0`.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:592` through `:600`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:578` through `:587`
   handles INFORM responses and increments `inform_response_failed`.
 
 ## Explicit Non-Goals
@@ -1177,15 +1176,13 @@ Recommended identity model:
     diagnostics and `TRAP_ENRICHMENT` or equivalent log evidence.
 - Authoritative output semantics:
   - When both journal and OTLP outputs are enabled, journal commitment is
-    authoritative. OTLP export failures are export errors and source-attributed
-    OTLP errors, not terminal pipeline write failures.
+    authoritative. OTLP export failures are export errors, not terminal
+    pipeline write failures.
   - When OTLP is the only output backend, OTLP export failures are terminal
     output write failures.
   - For one accepted trap, `pipeline.write_failed` increments at most once and
     only when the authoritative output commit fails. Backend-specific
-    `source_errors` may still record more than one failure for the same trap,
-    for example `journal_write_failed` and `otlp_export_failed` when both
-    outputs fail.
+    job-level error counters may still record the corresponding failure class.
 - Known source device:
   - Use existing trap enrichment to resolve `SourceVnodeID`.
   - Emit device-attributable trap metrics through V2 host scope for that vnode.
@@ -1204,7 +1201,7 @@ Recommended identity model:
   - Commit the trap and preserve source/enrichment evidence in the trap log.
   - Prefer the transport-selected source identity for bounded fallback metrics
     when it is available and not over cap.
-  - Increment an ambiguity counter.
+  - Preserve ambiguous source evidence in `TRAP_ENRICHMENT`.
   - Do not create or migrate vnode-scoped profile metrics from ambiguous vnode
     enrichment.
   - Ambiguity includes conflicting registry/topology identities for the same
@@ -1212,51 +1209,23 @@ Recommended identity model:
     `vnode_mismatch` or `ambiguous_source` reasons, rejected candidates, or an
     original-source address supplied by an untrusted relay.
 - Listener-owned diagnostics required by this spec:
-  - Keep listener/job scope when the error has no trustworthy source.
-  - Add source identity only for errors that can be attributed to a source.
-  - Emit continuously every `Collect()` cycle. Netdata receiver metrics must not
+  - Keep built-in receiver health at listener/job scope.
+  - Emit receiver metrics continuously every `Collect()` cycle. They must not
     become sparse just because no trap arrived in a cycle.
+  - Keep profile metric extraction and attribution diagnostics job-scoped when
+    profile metrics are enabled.
 
-Existing built-in static charts such as trap events, severities, processing
-errors, and dedup suppression are receiver/pipeline metrics. Phase B keeps
-listener-wide event, severity, error, and dedup totals job-scoped so receiver
-health remains visible for unattributable packets and global listener failures.
-It adds separate source-attributed receiver metrics for the signals that are
-safe and useful per source:
+Built-in static charts for pipeline progress, trap events, severities,
+processing errors, and dedup suppression remain listener/job-scoped. This keeps
+receiver health visible for unattributable packets and global listener failures
+without paying an always-on per-sender series cost.
 
-- `snmp.trap.source_pipeline`: accepted, committed, dedup-suppressed, and
-  write-failed accepted traps by source.
-- `snmp.trap.source_errors`: unknown OID, unresolved template, profile load,
-  journal write, and OTLP export errors by source when the source is known.
-- `snmp.trap.source_last_seen`: source freshness.
+Operators investigate senders by filtering and grouping trap rows on
+`TRAP_SOURCE_IP` and `TRAP_SOURCE_UDP_PEER`, then inspecting `TRAP_ENRICHMENT`
+for relay, ambiguity, and vnode evidence. Per-device vendor semantics are
+delivered by explicitly selected profile rules.
 
-Phase B deliberately does not duplicate category and severity charts per source.
-Per-source category/severity would multiply the default 2000-source cap by many
-mostly-zero time series and duplicate the role of profile-defined semantic
-metrics. Operators that need per-device vendor semantics should define profile
-metric rules for those traps.
-
-Per-device trap activity from vendor semantics is delivered by profile-defined
-device-attributable rules. Receiver health and processing behavior are delivered
-by built-in receiver/pipeline metrics.
-
-Built-in receiver/pipeline metrics added in Phase B:
-
-- `snmp.trap.pipeline`: job-level packet and write pipeline progress.
-- `snmp.trap.sources`: active source identities retained for continuous
-  source-attributed metrics.
-- `snmp.trap.source_attribution`: job-level vnode/fallback/ambiguous/failed/
-  overflow/source-transition diagnostics.
-- `snmp.trap.source_pipeline`, `snmp.trap.source_errors`, and
-  `snmp.trap.source_last_seen`: bounded source-attributed receiver health.
-
-The source-attributed built-in metrics use the same source identity resolver as
-profile-defined metrics: vnode host scope when `SourceVnodeID` is available and
-bounded `source_id` / `source_kind` labels otherwise. Their source cap is 2000
-active sources per job, with inactive source identities expiring after 60
-successful collection cycles.
-
-Fallback source identity priority:
+Fallback profile-metric source identity priority:
 
 1. Trusted `snmpTrapAddress.0` only when the UDP peer is a configured trusted
    relay.
@@ -1264,7 +1233,7 @@ Fallback source identity priority:
 3. Reverse-DNS or sysName only as display metadata, not as the stable key unless
    the operator explicitly chooses it.
 
-Required labels for fallback source metrics:
+Required labels for fallback profile metrics:
 
 - `job_name`
 - `source_id`
@@ -1274,9 +1243,9 @@ Required labels for fallback source metrics:
   `trap_varbind`, `topology_ifindex`, `source`, or `other`. Unknown future
   enrichment methods map to `other`.
 
-Fallback `source_id` uses a deterministic one-way hash of the canonical source address and
-  job name with the agent's stable local identity as salt; expose only a
-  truncated fixed-length hex value.
+- Fallback `source_id` uses a deterministic one-way hash of the canonical source
+  address and job name with the agent's stable local identity as salt; expose
+  only a truncated fixed-length hex value.
 - Hashing uses SHA-256, truncates to 16 hexadecimal
   characters, and canonicalizes addresses without transport ports.
 - Hash mode is not a security boundary. Small source-address spaces can be
@@ -1696,11 +1665,11 @@ design explicitly changes it:
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:637` through `:642`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:625` through `:631`
   returns early for dedup-suppressed traps.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:645` through `:650`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:633` through `:640`
   returns early for write failures.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:653` through `:662`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:644` through `:654`
   updates profile, event, and severity metrics after successful write.
 - Phase A profile metric tests verify no profile metric is emitted for write
   failures and dedup-suppressed traps. Pre-Phase-A
@@ -1842,15 +1811,12 @@ Reserved metric name prefixes:
 - `snmp_trap_errors_`
 - `snmp_trap_dedup_`
 - `snmp_trap_pipeline_`
-- `snmp_trap_source_`
-- `snmp_trap_sources_`
 - `snmp_trap_metric_`
 - `snmp_trap_profile_metrics_`
 
-Profile-local rules must not recreate built-in receiver pipeline/source health.
-Use profile metrics for vendor or site semantics; built-in receiver metrics
-cover pipeline progress, source attribution, source errors, and source
-freshness.
+Profile-local rules must not recreate built-in receiver pipeline health. Use
+profile metrics for vendor or site semantics; built-in receiver metrics cover
+job-level pipeline progress and processing errors.
 
 The first implementation step that accepts profile-local metrics must:
 
@@ -1915,41 +1881,32 @@ present the canonical profile syntax only.
 | Routing/HA adjacency state | Resource-scoped counters/state with explicit caps for peers/neighbors/groups. |
 | Capacity/pool/utilization thresholds | Sample plus threshold metrics and optional clear-state rules. |
 | L2 topology/neighbor counters | Counter/sample rules only; no topology mutation. |
-| Receiver pipeline health | Phase B built-in receiver metrics using the same source identity policy, trap commitment rule, and continuous extraction diagnostics as profile metrics. |
+| Receiver pipeline health | Job-scoped built-in receiver metrics preserve trap commitment ordering and remain continuous across collection cycles. |
 
 ### Receiver Pipeline Metrics
 
-The implemented receiver pipeline metrics cover receiver-owned signals such as raw receive rate,
-accepted/committed rate, drop/error stages, unknown OID/MIB gaps, SNMPv3 USM
-breakdown, INFORM outcomes, dedup/throttle suppression, source cardinality, top
-talkers, per-source last-seen/silence, and OS receive-buffer evidence where it
-can be collected safely.
+The implemented receiver pipeline metrics cover job-level receiver-owned signals
+such as raw receive rate, accepted/committed rate, drop/error stages, unknown
+OID/MIB gaps, SNMPv3 USM breakdown, INFORM outcomes, and dedup/throttle
+suppression. Source-level investigation uses trap logs.
 
 The trap-to-metrics implementation MUST preserve the common contract required by
 both phases:
 
-- source identity and vnode/fallback attribution;
+- source identity and vnode/fallback attribution for profile-defined metrics;
 - accepted trap commitment before metric attribution;
-- continuous extraction diagnostics for attribution failures, ambiguity, rule
-  misses, extraction failures, cap overflows, and source route transitions.
+- continuous extraction diagnostics for attribution failures, rule misses,
+  extraction failures, cap overflows, and source route transitions.
 
 Receiver/pipeline metrics MUST NOT silently drop accepted traps when enrichment,
 profile matching, source attribution, or metric extraction fails. Those failures
-are metrics and log evidence, not reasons to discard the trap.
+produce diagnostics and/or log evidence; they are not reasons to discard the
+trap.
 
-Receiver/pipeline metrics MUST emit continuously. Source-attributable instances
-MUST remain bounded by explicit caps and lifecycle rules; receiver-level totals
-MUST remain available for unattributable errors and global listener state.
-Job-level pipeline totals MAY be greater than the sum of per-source metrics when
-a packet has no trustworthy source, attribution fails, or the source cap is full.
-
-Implementation note:
-
-- Phase B source receiver metrics are intentionally smaller than a full
-  per-source clone of receiver charts. A benchmark at the 2000-source cap still
-  emits about 20k source series per collect cycle for pipeline/errors/last-seen,
-  so adding per-source category/severity would be an avoidable cardinality and
-  allocation cost.
+Receiver/pipeline metrics MUST emit continuously at job scope. Profile-defined
+source/resource instances MUST remain bounded by explicit caps and lifecycle
+rules; receiver-level totals MUST remain available for unattributable errors and
+global listener state.
 
 ### Required Test Coverage
 
@@ -1999,10 +1956,6 @@ The implementation must retain tests for:
   skips new metric instances;
 - receiver pipeline counters for received, decoded, accepted, committed,
   dedup-suppressed, dropped, and write-failed traps;
-- source-attributed receiver metrics for accepted, committed,
-  dedup-suppressed, write-failed, source-attributed errors, and last-seen age;
-- vnode host-scope source receiver metrics and hashed fallback source labels;
-- source receiver metric cap overflow diagnostics and source lifecycle expiry;
 - continuous emission of receiver counters, profile counters, state values, and
   fresh sample values across `Collect()` cycles with no new traps;
 - hash privacy stability across restarts and absence of raw source label leakage

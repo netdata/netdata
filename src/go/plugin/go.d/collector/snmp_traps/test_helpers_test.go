@@ -5,7 +5,6 @@ package snmp_traps
 import (
 	"net"
 	"net/netip"
-	"strconv"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -96,17 +95,6 @@ func collectJobMetricsForTest(t *testing.T, jobName string) metrix.CollectorStor
 		t.Fatalf("commit collect cycle: %v", err)
 	}
 	return store
-}
-
-func (m *perJobMetrics) fallbackSourceIdentityForTest(entry *TrapEntry) (string, string) {
-	m.sourceMu.Lock()
-	defer m.sourceMu.Unlock()
-	m.initSourceMetricsLocked()
-	return fallbackTrapSourceIdentity(entry, entry.JobName, m.sourceHashSalt)
-}
-
-func privateTestIP(i int) string {
-	return "10." + strconv.Itoa((i/65536)%256) + "." + strconv.Itoa((i/256)%256) + "." + strconv.Itoa(i%256)
 }
 
 func newDedupTestV2Collector(t *testing.T, jobName string, writer TrapWriter) (*Collector, *perJobMetrics) {

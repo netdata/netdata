@@ -16,6 +16,7 @@ import (
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
@@ -338,55 +339,6 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 	}
 }
 
-// BenchmarkPipelineSourceMetricsUpdateAndCollect exercises the built-in
-// receiver/pipeline source-metric hot path near the internal source cap.
-func BenchmarkPipelineSourceMetricsUpdateAndCollect(b *testing.B) {
-	const jobName = "bench-pipeline"
-	metrics := &perJobMetrics{}
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	if !ok {
-		b.Fatal("metrix.AsCycleManagedStore returned false")
-	}
-
-	entries := make([]*TrapEntry, 0, defaultPipelineMetricMaxSources)
-	for i := range defaultPipelineMetricMaxSources {
-		entries = append(entries, &TrapEntry{
-			JobName:  jobName,
-			SourceIP: benchmarkSourceIP(i),
-			Severity: "warning",
-		})
-	}
-	for i := range defaultPipelineMetricMaxSources - 1 {
-		metrics.recordSourceAccepted(entries[i])
-		metrics.recordSourceCommitted(entries[i])
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		entry := entries[i%len(entries)]
-		metrics.recordSourceAccepted(entry)
-		metrics.recordSourceCommitted(entry)
-		managed.CycleController().BeginCycle()
-		collectSourceMetrics(store, jobName, metrics)
-		if err := managed.CycleController().CommitCycleSuccess(); err != nil {
-			b.Fatalf("CommitCycleSuccess: %v", err)
-		}
-	}
-	b.StopTimer()
-
-	metrics.sourceMu.Lock()
-	sourceCount := len(metrics.sources)
-	overflowDropped := metrics.sourceDiagnostics.overflowDropped
-	metrics.sourceMu.Unlock()
-	b.ReportMetric(float64(sourceCount), "sources")
-	b.ReportMetric(float64(overflowDropped), "overflow_dropped")
-	if elapsed := b.Elapsed().Seconds(); elapsed > 0 {
-		b.ReportMetric(float64(b.N)/elapsed, "cycles/s")
-	}
-}
-
 func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 	b.Helper()
 	idx := &ProfileIndex{
@@ -475,10 +427,10 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 		},
 	}
 	charts := []profileMetricChart{
-		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", sourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", sourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", sourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", sourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, sourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, sourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, sourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, sourceFile: "benchmark-profile.yaml"},
 	}
 	if err := idx.addProfileMetrics(rules, charts); err != nil {
 		b.Fatalf("addProfileMetrics: %v", err)
