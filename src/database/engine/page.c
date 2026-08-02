@@ -1075,16 +1075,14 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             uint32_t n = 666666666;
             bool ok = gorilla_reader_read(&pgdc->gr, &n);
 
-            if (ok) {
+            if (ok && likely(does_storage_number_exist(n))) {
                 sp->min = sp->max = sp->sum = unpack_storage_number(n);
                 sp->flags = (SN_FLAGS)(n & SN_USER_FLAGS);
-                bool exists = does_storage_number_exist(n);
-                sp->count = exists ? 1 : 0;
-                sp->anomaly_count = exists && is_storage_number_anomalous(n) ? 1 : 0;
-                sp->gap_count = exists ? 0 : 1;
-            } else {
+                sp->count = 1;
+                sp->gap_count = 0;
+                sp->anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
+            } else
                 storage_point_empty_slots(*sp, sp->start_time_s, sp->end_time_s, pgdc->slots_per_point);
-            }
 
             return ok;
         }
@@ -1092,14 +1090,18 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             storage_number_tier1_t *array = (storage_number_tier1_t *) pgdc->pgd->raw.data;
             storage_number_tier1_t n = array[pgdc->position++];
 
-            sp->flags = n.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
-            sp->count = n.count;
-            sp->anomaly_count = n.anomaly_count;
-            sp->min = n.min_value;
-            sp->max = n.max_value;
-            sp->sum = n.sum_value;
-            sp->gap_count = 0;
-            storage_point_normalize_legacy_slots(*sp, pgdc->slots_per_point);
+            if(likely(n.count && netdata_double_isnumber(n.sum_value))) {
+                sp->flags = n.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
+                sp->count = n.count;
+                sp->anomaly_count = n.anomaly_count;
+                sp->min = n.min_value;
+                sp->max = n.max_value;
+                sp->sum = n.sum_value;
+                // V1 records omit gaps; the active grouping is the best available estimate.
+                sp->gap_count = pgdc->slots_per_point > n.count ? pgdc->slots_per_point - n.count : 0;
+            }
+            else
+                storage_point_empty_slots(*sp, sp->start_time_s, sp->end_time_s, pgdc->slots_per_point);
 
             return true;
         }
@@ -1107,12 +1109,14 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             storage_number *array = (storage_number *) pgdc->pgd->raw.data;
             storage_number n = array[pgdc->position++];
 
-            sp->min = sp->max = sp->sum = unpack_storage_number(n);
-            sp->flags = (SN_FLAGS)(n & SN_USER_FLAGS);
-            bool exists = does_storage_number_exist(n);
-            sp->count = exists ? 1 : 0;
-            sp->anomaly_count = exists && is_storage_number_anomalous(n) ? 1 : 0;
-            sp->gap_count = exists ? 0 : 1;
+            if(likely(does_storage_number_exist(n))) {
+                sp->min = sp->max = sp->sum = unpack_storage_number(n);
+                sp->flags = (SN_FLAGS)(n & SN_USER_FLAGS);
+                sp->count = 1;
+                sp->gap_count = 0;
+                sp->anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
+            } else
+                storage_point_empty_slots(*sp, sp->start_time_s, sp->end_time_s, pgdc->slots_per_point);
 
             return true;
         }

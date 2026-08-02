@@ -60,23 +60,6 @@ typedef struct storage_point {
     (netdata_double_is_zero((x).min) && netdata_double_is_zero((x).max) && \
      netdata_double_is_zero((x).sum) && (x).anomaly_count == 0))
 
-#define storage_point_normalize_legacy_slots(x, nominal_slots) do { \
-    uint32_t _storage_point_slots = (uint32_t)(nominal_slots);    \
-    if(unlikely(!_storage_point_slots))                           \
-        _storage_point_slots = 1;                                \
-    if(likely((x).count && netdata_double_isnumber((x).sum))) {  \
-        (x).gap_count = _storage_point_slots > (x).count ?       \
-            _storage_point_slots - (x).count : 0;                \
-    }                                                            \
-    else {                                                       \
-        (x).min = (x).max = (x).sum = NAN;                       \
-        (x).count = 0;                                           \
-        (x).anomaly_count = 0;                                   \
-        (x).flags = SN_FLAG_NONE;                                \
-        (x).gap_count = _storage_point_slots;                    \
-    }                                                            \
-} while(0)
-
 #define storage_point_merge_to(dst, src) do {           \
         if(storage_point_is_unset(dst))                 \
             (dst) = (src);                              \

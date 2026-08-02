@@ -68,7 +68,14 @@ static STORAGE_POINT numeric_point(
 TEST(StoragePoint, StateContractAndSize) {
 #if UINTPTR_MAX == UINT64_MAX
     EXPECT_EQ(sizeof(STORAGE_POINT), 56u);
+    EXPECT_EQ(sizeof(PGDC), 80u);
 #endif
+
+    PGDC cursor;
+    pgdc_reset(&cursor, nullptr, UINT32_MAX, 0);
+    EXPECT_EQ(cursor.slots_per_point, 1u);
+    pgdc_reset(&cursor, nullptr, UINT32_MAX, 65536);
+    EXPECT_EQ(cursor.slots_per_point, 65536u);
 
     STORAGE_POINT sp = STORAGE_POINT_UNSET;
     EXPECT_TRUE(storage_point_is_unset(sp));
@@ -153,27 +160,6 @@ TEST(StoragePoint, AddPreservesGapEvidence) {
     EXPECT_EQ(dst.gap_count, 4u);
 }
 
-TEST(StoragePoint, LegacyTierSlotNormalization) {
-    STORAGE_POINT partial = numeric_point(0, 60, 10, 10, 400, 40, 0, 0);
-    storage_point_normalize_legacy_slots(partial, 60);
-    EXPECT_EQ(partial.count, 40u);
-    EXPECT_EQ(partial.gap_count, 20u);
-    EXPECT_TRUE(storage_point_is_partial(partial));
-
-    STORAGE_POINT overfull = numeric_point(0, 60, 10, 10, 800, 80, 0, 0);
-    storage_point_normalize_legacy_slots(overfull, 60);
-    EXPECT_EQ(overfull.count, 80u);
-    EXPECT_EQ(overfull.gap_count, 0u);
-    EXPECT_TRUE(storage_point_is_complete(overfull));
-
-    STORAGE_POINT gap;
-    storage_point_empty(gap, 0, 60);
-    storage_point_normalize_legacy_slots(gap, 60);
-    EXPECT_EQ(gap.count, 0u);
-    EXPECT_EQ(gap.gap_count, 60u);
-    EXPECT_TRUE(storage_point_is_gap(gap));
-}
-
 TEST(PGD, DecodesTier0PointStatesExactly) {
     PGD *pg = pgd_create(RRDENG_PAGE_TYPE_GORILLA_32BIT, 2);
     pgd_append_point(pg, 1, 42, 42, 42, 1, 0, SN_FLAG_NOT_ANOMALOUS, 0);
@@ -201,9 +187,10 @@ TEST(PGD, DecodesTier0PointStatesExactly) {
 }
 
 TEST(PGD, ReconstructsLegacyTierGapCount) {
-    PGD *pg = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 2);
+    PGD *pg = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 3);
     pgd_append_point(pg, 60, 400, 10, 10, 40, 0, SN_FLAG_NOT_ANOMALOUS, 0);
-    pgd_append_point(pg, 120, NAN, NAN, NAN, 0, 0, SN_FLAG_NONE, 1);
+    pgd_append_point(pg, 120, 800, 10, 10, 80, 0, SN_FLAG_NOT_ANOMALOUS, 1);
+    pgd_append_point(pg, 180, NAN, NAN, NAN, 1, 0, SN_FLAG_NONE, 2);
 
     PGDC cursor;
     pgdc_reset(&cursor, pg, 0, 60);
@@ -219,9 +206,21 @@ TEST(PGD, ReconstructsLegacyTierGapCount) {
     sp.start_time_s = 60;
     sp.end_time_s = 120;
     EXPECT_TRUE(pgdc_get_next_point(&cursor, 1, &sp));
+    EXPECT_TRUE(storage_point_is_complete(sp));
+    EXPECT_EQ(sp.count, 80u);
+    EXPECT_EQ(sp.gap_count, 0u);
+
+    sp.start_time_s = 120;
+    sp.end_time_s = 180;
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 2, &sp));
     EXPECT_TRUE(storage_point_is_gap(sp));
     EXPECT_EQ(sp.count, 0u);
     EXPECT_EQ(sp.gap_count, 60u);
+
+    pgdc_reset(&cursor, pg, 2, 65536);
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 2, &sp));
+    EXPECT_TRUE(storage_point_is_gap(sp));
+    EXPECT_EQ(sp.gap_count, 65536u);
 
     pgd_free(pg);
 }
