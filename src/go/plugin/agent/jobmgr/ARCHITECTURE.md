@@ -320,9 +320,10 @@ loud and success is quiet: entering `Contained`, releasing a contained worker, q
 panic each emit a diagnostic event, while an attempt that admits or returns in time emits none. In long-lived mode,
 `jobmgr.runtime` also projects the current census as aggregate process-attempt gauges.
 
-Containment fences execute synchronously before settlement becomes visible. They stay under the authority lock to
-preserve that ordering, but cross a panic boundary: a panic is redacted as `ErrProcessAttemptFencePanic`, joined with
-the original cut cause, and cannot strand the authority mutex.
+Containment fences receive the raw cut cause and execute synchronously before settlement becomes visible. They stay under
+the authority lock to preserve that ordering, so they perform only bounded in-memory state changes: they never re-enter
+the authority or wait for a worker, I/O, or external cleanup. A panic is redacted as `ErrProcessAttemptFencePanic`, joined
+with the original cut cause, and cannot strand the authority mutex.
 
 Terminal outcomes quarantine an identity when an admitted worker fails, ownership remains retained, the worker
 panics, or the containment fence panics. Ordinary pre-admission validation failures release the identity normally.
@@ -565,8 +566,24 @@ flowchart TD
    `Stop`, Function drain, and collector cleanup remain process-owned until they return.
 5. **Promote, attach, and start** — the candidate acquires the separate `job-runtime` identity only after logical
    retirement. Candidate `Init`/`Check` may overlap the incumbent, but two installed runtimes for one job cannot.
-   - After promotion the staged runtime/vnode/Function projections attach, the permit and output gate activate, and
-     the managed loop starts.
+   - Promotion publishes its owner transition before entering the attempt authority, then releases the owner lock for
+     runtime-identity start, supersession, and admission. This removes the reverse edge against the authority's synchronous
+     containment callback. Successful admission transfers process ownership even when containment wins before promotion
+     settlement; pre-admission failure remains candidate-owned.
+   - Attachment reports whether ownership transferred. The process owner adopts every transferred wrapper and partial or
+     completed Function lifecycle even when retirement already won, so rejection finalizes them exactly once. A
+     no-transfer failure is never inferred from cleanup fields and never triggers adoption.
+   - Runtime/vnode projections attach outside the staged-owner lock because they call external registries. The owner then
+     linearizes retirement against output-gate activation, permit activation, and accepted-cleanup freezing in that order.
+   - Retirement before an otherwise-valid attachment bind returns the exact process-attempt cause even when that
+     retirement already finalized the candidate. Independent duplicate, decided, or invalid transitions remain
+     fail-closed.
+   - Runtime-attempt containment synchronously records the first retirement cause and revokes new output admission before
+     the authority cut returns. The worker later drains output leases and performs detach/cleanup outside the authority
+     lock. A later stopped/retired cut never overwrites an earlier structural failure.
+   - Start eligibility and retirement arbitrate under the process owner. The worker rechecks that decision after receiving
+     the start request, so a ready channel send cannot launch `StartManaged` after containment has won.
+   - Once output and permit acceptance wins and start remains eligible, the managed loop starts.
    - The resource transaction owns this successor until installation acknowledgement. An apply failure aborts it when
      possible, or returns the still-live retained generation to the kernel for fail-closed ownership.
    - If the old runtime does not release within the supersession grace, the candidate is rejected and the
@@ -582,10 +599,11 @@ flowchart TD
 
    Only a pure target-retired/process-stopped error tree counts as normal cancellation. Any mixed, cleanup, graph,
    panic, or ownership error stays fail-closed.
-6. **Emit** — installation activates the generation output gate. Two capabilities exist, and both serialize whole
+6. **Emit** — resource acceptance activates the generation output gate. Two capabilities exist, and both serialize whole
    frames through the process's one `FrameOwner` (`joboutput/output_gate.go`):
-   - **Ordinary collection output** is run-owned. Retirement permanently fences it before detaching projections, so a
-     retained old runtime cannot interleave late collection frames with its successor.
+   - **Ordinary collection output** is run-owned. Retirement first atomically revokes new write admission, then drains
+     write leases outside the attempt-authority lock before detaching projections. A write admitted before the cut may
+     finish; a write presented after the revocation cannot interleave with the successor.
    - **Accepted V1/V2 cleanup output** is process-owned, because physical cleanup may outlive a rotation. It emits
      terminal chart-obsoletion frames only after the managed loop and Function handlers physically quiesce.
    - The `job-runtime` identity stays occupied through cleanup, so a same-job successor cannot start before those

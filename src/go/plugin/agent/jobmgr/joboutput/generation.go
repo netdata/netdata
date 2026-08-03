@@ -105,14 +105,21 @@ type ConstructedJob struct {
 	retryAutoDetection func() bool                 // whether a failed auto-detection should be rescheduled
 	resolvedReferences bool                        // lifecycle failures may contain resolved secret values
 	stageFunctions     bool                        // job Function lifecycle still needs post-probe staging
-	activateAttachment func() error                // binds staged capabilities immediately before acceptance
-	attach             func(lifecycle.ResourceIdentity, *stagedJobOwner) (ConstructedJob, error)
+	attachProjections  func() error                // binds external runtime/vnode projections before acceptance
+	attach             func(lifecycle.ResourceIdentity, *stagedJobOwner) (constructedJobAttachment, error)
 	candidateJob       RuntimeJob
 	runtimeStage       *stagedRuntimeService
 	vnodeStage         *stagedVNodeLookup
 	outputGate         *generationOutputGate
 	storeSnapshot      secretresolver.AtomicScopeSnapshot
 	processOwner       *stagedJobOwner
+}
+
+// constructedJobAttachment reports whether process ownership transferred even
+// when later handler attachment returned an error.
+type constructedJobAttachment struct {
+	resources   ConstructedJob
+	transferred bool
 }
 
 type PreparedJob struct {
@@ -157,7 +164,7 @@ func prepareCandidateJob(
 	candidate.attach = func(
 		identity lifecycle.ResourceIdentity,
 		owner *stagedJobOwner,
-	) (ConstructedJob, error) {
+	) (constructedJobAttachment, error) {
 		return attachment.attach(staged, identity, owner)
 	}
 	return PreparedJob{
@@ -224,27 +231,28 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 		state.owner.Reject()
 		return nil, errors.Join(err, state.permit.AbortUnused())
 	}
-	attached, attachErr := state.constructed.attach(
+	attachment, attachErr := state.constructed.attach(
 		lifecycle.ResourceIdentity{
 			ID:         state.id,
 			Generation: state.generation,
 		},
 		state.owner,
 	)
-	if attachErr != nil {
-		if attached.CollectorCleanup != nil {
-			attachErr = errors.Join(attachErr, state.owner.Replace(attached))
+	if attachment.transferred {
+		state.constructed = attachment.resources
+		if err := state.owner.AdoptAttachment(attachment.resources); err != nil {
+			state.owner.Reject()
+			return nil, errors.Join(attachErr, err, state.permit.AbortUnused())
 		}
+	} else if attachErr == nil {
+		attachErr = errors.New("job output: attachment completed without ownership transfer")
+	}
+	if attachErr != nil {
 		state.owner.Reject()
 		return nil, errors.Join(attachErr, state.permit.AbortUnused())
 	}
-	state.constructed = attached
-	if err := state.owner.Replace(attached); err != nil {
-		state.owner.Reject()
-		return nil, errors.Join(err, state.permit.AbortUnused())
-	}
-	if state.constructed.activateAttachment != nil {
-		if err := callJobLifecycle("attachment activation", state.constructed.activateAttachment); err != nil {
+	if state.constructed.attachProjections != nil {
+		if err := callJobLifecycle("projection attachment", state.constructed.attachProjections); err != nil {
 			state.owner.Reject()
 			return nil, errors.Join(err, state.permit.AbortUnused())
 		}

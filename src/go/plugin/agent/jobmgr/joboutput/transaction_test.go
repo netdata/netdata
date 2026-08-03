@@ -398,10 +398,15 @@ func newRetainedTransactionSuccessor(
 	t.Helper()
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
+	frames, err := lifecycle.NewFrameOwner(io.Discard)
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
 	candidate := ConstructedJob{
 		Variant:          JobVariantV1,
 		CollectorCleanup: func(context.Context) error { return nil },
 		finalCleanup:     func(context.Context) error { return nil },
+		outputGate:       gate,
 	}
 	owner := newStagedJobOwner(
 		context.Background(),
@@ -417,9 +422,9 @@ func newRetainedTransactionSuccessor(
 	candidate.attach = func(
 		lifecycle.ResourceIdentity,
 		*stagedJobOwner,
-	) (ConstructedJob, error) {
+	) (constructedJobAttachment, error) {
 		if err := owner.BindAttachment(); err != nil {
-			return ConstructedJob{}, err
+			return constructedJobAttachment{}, err
 		}
 		attached := candidate
 		attached.Runtime = transactionTestRuntime{
@@ -427,7 +432,7 @@ func newRetainedTransactionSuccessor(
 			abortErr: abortErr,
 		}
 		attached.processOwner = owner
-		return attached, nil
+		return constructedJobAttachment{resources: attached, transferred: true}, nil
 	}
 	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
 	prepared := PreparedJob{state: &preparedJobState{
@@ -564,7 +569,6 @@ func applyTargetRetirementTransaction(
 	require.NoError(t, err)
 	gate, err := newGenerationOutputGate(frames)
 	require.NoError(t, err)
-	require.NoError(t, gate.Activate())
 
 	var cleanups int
 	candidate := ConstructedJob{
@@ -602,7 +606,7 @@ func applyTargetRetirementTransaction(
 		retired:   owner.retire,
 		detachErr: detachErr,
 	}
-	require.NoError(t, owner.Replace(attached))
+	require.NoError(t, owner.AdoptAttachment(attached))
 
 	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
 	accepted, err := owner.AcceptResources(permit)

@@ -110,7 +110,7 @@ func TestAuthorityFuseWinsLateCompletionAndRedactsDiagnostics(t *testing.T) {
 	attempt, err := authority.start(context.Background(), jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Target:   11,
-		OnContainment: func() {
+		OnContainment: func(error) {
 			fenced = true
 		},
 		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
@@ -294,7 +294,7 @@ func TestAuthorityContainsContainmentFencePanics(t *testing.T) {
 	defer releaseWork()
 	attempt, err := authority.start(context.Background(), jobmgr.ProcessAttemptPlan{
 		Identity: testIdentity(jobmgr.ProcessAttemptFunctionPoll, "module/job", "module/job"),
-		OnContainment: func() {
+		OnContainment: func(error) {
 			panic("provider-sensitive-fence-panic")
 		},
 		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
@@ -321,6 +321,34 @@ func TestAuthorityContainsContainmentFencePanics(t *testing.T) {
 	require.Equal(t, Census{Quarantined: 1}, authority.Census())
 	require.Contains(t, diagnostics.String(), jobmgr.ErrProcessAttemptFencePanic.Error())
 	require.NotContains(t, diagnostics.String(), "provider-sensitive-fence-panic")
+}
+
+func TestAuthorityContainmentFenceReceivesRawCause(t *testing.T) {
+	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
+	release := make(chan struct{})
+	fenced := make(chan error, 1)
+	attempt, err := authority.start(context.Background(), jobmgr.ProcessAttemptPlan{
+		Identity: testIdentity(jobmgr.ProcessAttemptJobRuntime, "module/job", "module/job"),
+		Target:   23,
+		OnContainment: func(cause error) {
+			fenced <- cause
+		},
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
+			<-release
+			return nil
+		},
+	})
+	require.NoError(t, err)
+
+	independent := errors.New("independent failure")
+	cause := errors.Join(jobmgr.ErrProcessAttemptRetired, independent)
+	require.True(t, attempt.Cut(cause))
+	require.Equal(t, cause, <-fenced)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptRetired)
+	require.ErrorIs(t, attempt.Await(context.Background()), independent)
+
+	close(release)
+	<-attempt.Released()
 }
 
 func TestAuthorityOrdinaryPreAdmissionErrorDoesNotQuarantine(t *testing.T) {
