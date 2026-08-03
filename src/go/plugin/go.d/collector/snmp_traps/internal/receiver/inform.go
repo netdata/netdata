@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package receiver
 
 import (
 	"errors"
@@ -50,18 +50,13 @@ func sendInformResponse(conn *net.UDPConn, peer *net.UDPAddr, pkt *gosnmp.SnmpPa
 	return err
 }
 
-func buildSnmpV3SecurityTable(users []USMUserConfig, dynamicOpt ...bool) (*gosnmp.SnmpV3SecurityParametersTable, error) {
+func buildSnmpV3SecurityTable(users []USMUser, dynamic bool) (*gosnmp.SnmpV3SecurityParametersTable, error) {
 	if len(users) == 0 {
 		return nil, nil
 	}
-	dynamic := len(dynamicOpt) > 0 && dynamicOpt[0]
-
 	tbl := gosnmp.NewSnmpV3SecurityParametersTable(trapDecodeLogger)
 
 	for _, u := range users {
-		authProto := snmpV3AuthProto(strings.ToLower(u.AuthProto))
-		privProto := snmpV3PrivProto(strings.ToLower(u.PrivProto))
-
 		var engineID []byte
 		if u.EngineID != "" {
 			var err error
@@ -75,16 +70,7 @@ func buildSnmpV3SecurityTable(users []USMUserConfig, dynamicOpt ...bool) (*gosnm
 			continue
 		}
 
-		sp := &gosnmp.UsmSecurityParameters{
-			UserName:                 u.Username,
-			AuthenticationProtocol:   authProto,
-			AuthenticationPassphrase: u.AuthKey,
-			PrivacyProtocol:          privProto,
-			PrivacyPassphrase:        u.PrivKey,
-			AuthoritativeEngineID:    string(engineID),
-		}
-
-		if err := tbl.Add(u.Username, sp); err != nil {
+		if err := tbl.Add(u.Username, newUSMSecurityParameters(u, engineID)); err != nil {
 			return nil, err
 		}
 	}
@@ -98,6 +84,17 @@ func snmpV3AuthProto(name string) gosnmp.SnmpV3AuthProtocol {
 
 func snmpV3PrivProto(name string) gosnmp.SnmpV3PrivProtocol {
 	return snmputils.ParseSNMPv3PrivProtocol(name)
+}
+
+func newUSMSecurityParameters(user USMUser, engineID []byte) *gosnmp.UsmSecurityParameters {
+	return &gosnmp.UsmSecurityParameters{
+		UserName:                 user.Username,
+		AuthenticationProtocol:   snmpV3AuthProto(strings.ToLower(user.AuthProto)),
+		AuthenticationPassphrase: user.AuthKey,
+		PrivacyProtocol:          snmpV3PrivProto(strings.ToLower(user.PrivProto)),
+		PrivacyPassphrase:        user.PrivKey,
+		AuthoritativeEngineID:    string(engineID),
+	}
 }
 
 func buildEngineIDWhitelist(ids []string) (map[string]struct{}, error) {
@@ -115,22 +112,12 @@ func buildEngineIDWhitelist(ids []string) (map[string]struct{}, error) {
 	return whitelist, nil
 }
 
-func registerUSMUsersWithLocalEngineID(tbl *gosnmp.SnmpV3SecurityParametersTable, users []USMUserConfig, localEngineID []byte) error {
+func registerUSMUsersWithLocalEngineID(tbl *gosnmp.SnmpV3SecurityParametersTable, users []USMUser, localEngineID []byte) error {
 	if tbl == nil || len(localEngineID) == 0 {
 		return nil
 	}
 	for _, u := range users {
-		authProto := snmpV3AuthProto(strings.ToLower(u.AuthProto))
-		privProto := snmpV3PrivProto(strings.ToLower(u.PrivProto))
-		sp := &gosnmp.UsmSecurityParameters{
-			UserName:                 u.Username,
-			AuthenticationProtocol:   authProto,
-			AuthenticationPassphrase: u.AuthKey,
-			PrivacyProtocol:          privProto,
-			PrivacyPassphrase:        u.PrivKey,
-			AuthoritativeEngineID:    string(localEngineID),
-		}
-		if err := tbl.Add(u.Username, sp); err != nil {
+		if err := tbl.Add(u.Username, newUSMSecurityParameters(u, localEngineID)); err != nil {
 			return err
 		}
 	}

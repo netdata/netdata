@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 )
 
 type pcapGolden struct {
@@ -60,7 +62,7 @@ func TestDecodeTrapFromPcapCorpus(t *testing.T) {
 				t.Fatalf("expected one UDP packet in %s, got %d", tc.fixture, len(packets))
 			}
 			packet := packets[0]
-			ctx, err := DecodeTrap(packet.payload, packet.peer, nil)
+			ctx, err := receiver.DecodeTrap(packet.payload, packet.peer, nil)
 			if err != nil {
 				t.Fatalf("DecodeTrap failed: %v", err)
 			}

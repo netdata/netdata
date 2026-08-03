@@ -1,0 +1,461 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package receiver
+
+import (
+	"errors"
+	"net"
+	"net/netip"
+	"strings"
+	"time"
+
+	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+)
+
+type EventType uint8
+
+const (
+	EventError EventType = iota + 1
+	EventDecoded
+	EventListenerReadFailed
+	EventListenerBufferDegraded
+	EventDynamicEngineIDRegistered
+	EventInformResponseFailed
+	EventDiscoveryReportFailed
+)
+
+type Event struct {
+	Type      EventType
+	ErrorKind string
+	Endpoint  Endpoint
+	Requested int
+	EngineID  string
+	Username  string
+	Err       error
+}
+
+type Reporter func(Event)
+
+type Datagram struct {
+	Data   []byte
+	PeerIP net.IP
+	Conn   *net.UDPConn
+	Peer   *net.UDPAddr
+}
+
+type DecodeFailure struct {
+	Data           []byte
+	PeerIP         net.IP
+	Conn           *net.UDPConn
+	Peer           *net.UDPAddr
+	Kind           string
+	Err            error
+	SniffedVersion model.SnmpVersion
+	VersionKnown   bool
+}
+
+type Result struct {
+	Context       *TrapPacketContext
+	DecodeFailure *DecodeFailure
+}
+
+type Receiver struct {
+	policy Policy
+	report Reporter
+
+	listener           *listener
+	allowlist          *Allowlist
+	rateLimiter        *rateLimiter
+	v3SecTable         *gosnmp.SnmpV3SecurityParametersTable
+	engineIDs          map[string]struct{}
+	engineBoots        *EngineBoots
+	localEngineID      *LocalEngineID
+	dynamicEngineIDReg *dynamicEngineIDRegistry
+	rollbackState      func()
+}
+
+func New(policy Policy, report Reporter) *Receiver {
+	return &Receiver{
+		policy:      policy,
+		report:      report,
+		allowlist:   NewAllowlist(policy.sourceAllowlist, policy.communities),
+		rateLimiter: newRateLimiter(policy.rateLimit.Enabled, policy.rateLimit.PerSourcePPS, policy.rateLimit.Mode),
+	}
+}
+
+func (r *Receiver) Bind() error {
+	if r.listener != nil {
+		return nil
+	}
+	l, err := newListener(r.policy.listen, r.report)
+	if err != nil {
+		return err
+	}
+	r.listener = l
+	return nil
+}
+
+type preparationError struct {
+	err    error
+	config bool
+}
+
+func (e *preparationError) Error() string { return e.err.Error() }
+func (e *preparationError) Unwrap() error { return e.err }
+
+func IsConfigPreparationError(err error) bool {
+	var target *preparationError
+	return errors.As(err, &target) && target.config
+}
+
+func configPreparationError(err error) error  { return &preparationError{err: err, config: true} }
+func startupPreparationError(err error) error { return &preparationError{err: err} }
+
+func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
+	if !r.policy.V3Enabled() {
+		return nil
+	}
+
+	paths := newEngineStatePaths(stateRoot, jobName)
+	engineBootsExisted, err := engineStatePathExistsChecked(paths.engineBoots)
+	if err != nil {
+		return startupPreparationError(err)
+	}
+	localEngineIDExisted, err := engineStatePathExistsChecked(paths.localEngineID)
+	if err != nil {
+		return startupPreparationError(err)
+	}
+	engineStateDirExisted, err := engineStatePathExistsChecked(paths.dir)
+	if err != nil {
+		return startupPreparationError(err)
+	}
+	rollback := func() {
+		cleanupCreatedEngineState(paths, !engineBootsExisted, !localEngineIDExisted, !engineStateDirExisted)
+	}
+
+	table, err := buildSnmpV3SecurityTable(r.policy.users, r.policy.dynamicEngineID)
+	if err != nil {
+		rollback()
+		return configPreparationError(err)
+	}
+	engineIDs, err := buildEngineIDWhitelist(r.policy.engineIDWhitelist)
+	if err != nil {
+		rollback()
+		return configPreparationError(err)
+	}
+	localEngineID, err := newLocalEngineID(paths, r.policy.localEngineID)
+	if err != nil {
+		rollback()
+		return startupPreparationError(err)
+	}
+	if err := registerUSMUsersWithLocalEngineID(table, r.policy.users, localEngineID.Bytes()); err != nil {
+		rollback()
+		return configPreparationError(err)
+	}
+	engineBoots, err := newEngineBoots(paths)
+	if err != nil {
+		rollback()
+		return startupPreparationError(err)
+	}
+
+	r.v3SecTable = table
+	r.engineIDs = engineIDs
+	r.localEngineID = localEngineID
+	r.engineBoots = engineBoots
+	r.rollbackState = rollback
+	if r.policy.dynamicEngineID && table != nil {
+		known := make(map[dynamicEngineIDKey]struct{})
+		for _, user := range r.policy.users {
+			if user.EngineID == "" {
+				continue
+			}
+			known[dynamicEngineIDKey{
+				engineIDHex: strings.ToLower(strings.TrimSpace(user.EngineID)),
+				username:    user.Username,
+			}] = struct{}{}
+		}
+		r.dynamicEngineIDReg = newDynamicEngineIDRegistry(table, r.policy.dynamicEngineIDMax, known, r.policy.users)
+	}
+	return nil
+}
+
+func (r *Receiver) CommitPreparedState() {
+	r.rollbackState = nil
+}
+
+func (r *Receiver) RollbackPreparedState() {
+	if r.rollbackState != nil {
+		r.rollbackState()
+		r.rollbackState = nil
+	}
+}
+
+func (r *Receiver) ReportBindWarnings() {
+	if r.listener == nil {
+		return
+	}
+	for _, warning := range r.listener.receiveBufferWarnings {
+		r.reportEvent(Event{
+			Type:      EventListenerBufferDegraded,
+			Endpoint:  warning.endpoint,
+			Requested: warning.requested,
+			Err:       warning.err,
+		})
+	}
+}
+
+func (r *Receiver) Start(handler func(Datagram)) {
+	if r.listener != nil {
+		r.listener.start(handler)
+	}
+}
+
+func (r *Receiver) Close() {
+	if r.listener != nil {
+		r.listener.close()
+		r.listener = nil
+	}
+}
+
+func (r *Receiver) Sweep(now time.Time) {
+	if r.rateLimiter != nil {
+		r.rateLimiter.maybeSweep(now)
+	}
+}
+
+func (r *Receiver) Ready() bool { return r.listener != nil }
+
+func (r *Receiver) BoundUDPAddresses() []*net.UDPAddr {
+	if r.listener == nil {
+		return nil
+	}
+	addresses := make([]*net.UDPAddr, 0, len(r.listener.endpoints))
+	for _, endpoint := range r.listener.endpoints {
+		address, ok := endpoint.conn.LocalAddr().(*net.UDPAddr)
+		if !ok {
+			continue
+		}
+		copyAddress := *address
+		copyAddress.IP = append(net.IP(nil), address.IP...)
+		addresses = append(addresses, &copyAddress)
+	}
+	return addresses
+}
+
+func (r *Receiver) Process(datagram Datagram) Result {
+	data := datagram.Data
+	decodePeerIP := datagram.PeerIP
+	rateLimitChecked := false
+
+	if source, ok := packetSourceAddr(datagram.PeerIP, datagram.Peer); ok {
+		decodePeerIP = net.IP(source.AsSlice())
+		if r.allowlist != nil && !r.allowlist.AllowedSource(source) {
+			r.reportError("dropped_allowlist")
+			return Result{}
+		}
+	} else if r.allowlist != nil {
+		r.reportError("dropped_allowlist")
+		return Result{}
+	}
+
+	sniffedVersion, versionKnown := sniffSNMPVersion(data)
+	if versionKnown && !r.versionAllowed(sniffedVersion) {
+		r.reportError("dropped_allowlist")
+		return Result{}
+	}
+
+	trustedRelay := r.trustedRelaySource(decodePeerIP)
+	packetContext, err := r.decodeTrapWithSharedTable(data, decodePeerIP, trustedRelay)
+	if err != nil {
+		kind := classifyDecodeError(err)
+		if r.v3SecTable != nil {
+			rawContext, rawErr := extractRawV3Context(data)
+			if rawErr == nil && rawContext != nil {
+				if r.policy.dynamicEngineID && !rawContext.reportable {
+					retryContext, checked, dropped := r.tryDynamicRetry(data, decodePeerIP, datagram.Peer, rawContext, trustedRelay)
+					rateLimitChecked = rateLimitChecked || checked
+					if dropped {
+						return Result{}
+					}
+					if retryContext != nil {
+						packetContext = retryContext
+						err = nil
+					}
+				} else if rawContext.discoveryProbe() && datagram.Conn != nil && datagram.Peer != nil {
+					allowed, checked := r.allowRateLimitedPacket(datagram.Peer)
+					rateLimitChecked = rateLimitChecked || checked
+					if !allowed {
+						return Result{}
+					}
+					r.sendDiscoveryReport(rawContext, datagram.Conn, datagram.Peer)
+				}
+			}
+		}
+		if err != nil {
+			if shouldExtractEngineIDOnDecodeError(kind) {
+				engineIDHex, ok, extractErr := extractSNMPv3EngineIDHex(data)
+				if extractErr == nil && ok && !engineIDHexAllowed(engineIDHex, r.engineIDs) {
+					kind = "unknown_engine_id"
+				}
+			}
+			r.reportError(kind)
+			return Result{DecodeFailure: &DecodeFailure{
+				Data:           data,
+				PeerIP:         decodePeerIP,
+				Conn:           datagram.Conn,
+				Peer:           datagram.Peer,
+				Kind:           kind,
+				Err:            err,
+				SniffedVersion: sniffedVersion,
+				VersionKnown:   versionKnown,
+			}}
+		}
+	}
+
+	r.reportEvent(Event{Type: EventDecoded})
+	pdu := packetContext.PDU
+	if !r.versionAllowed(pdu.Version) {
+		r.reportError("dropped_allowlist")
+		return Result{}
+	}
+	if pdu.Version != model.SnmpVersionV3 && !r.communityAllowed(pdu.Community) {
+		r.reportError("dropped_allowlist")
+		return Result{}
+	}
+	if !r.ensureDynamicEngineIDRegistered(packetContext) {
+		return Result{}
+	}
+	if packetContext.Packet != nil && pdu.Version == model.SnmpVersionV3 {
+		if pdu.PduType == model.PduTypeInform {
+			if !r.localEngineIDMatches(packetContext.Packet.SecurityParameters) {
+				r.reportError("unknown_engine_id")
+				return Result{}
+			}
+		} else if !isEngineIDAllowed(packetContext.Packet.SecurityParameters, r.engineIDs) {
+			r.reportError("unknown_engine_id")
+			return Result{}
+		}
+	}
+
+	if pdu.PduType == model.PduTypeInform && packetContext.Packet != nil && datagram.Conn != nil && datagram.Peer != nil {
+		var localEngineID []byte
+		if r.localEngineID != nil {
+			localEngineID = r.localEngineID.Bytes()
+		}
+		if err := sendInformResponse(datagram.Conn, datagram.Peer, packetContext.Packet, r.engineBoots, localEngineID); err != nil {
+			r.reportEvent(Event{Type: EventInformResponseFailed, Err: err})
+		}
+	}
+	if !rateLimitChecked {
+		allowed, _ := r.allowRateLimitedPacket(datagram.Peer)
+		if !allowed {
+			return Result{}
+		}
+	}
+	return Result{Context: packetContext}
+}
+
+func (r *Receiver) AdmitDecodeErrorAudit(peer *net.UDPAddr) bool {
+	if r.rateLimiter == nil || peer == nil {
+		return true
+	}
+	source, ok := udpPeerAddr(peer)
+	if !ok {
+		return true
+	}
+	allowed, mode := r.rateLimiter.Allow(source)
+	if allowed {
+		return true
+	}
+	r.reportError("rate_limited")
+	return mode != rateLimitModeDrop
+}
+
+func (r *Receiver) versionAllowed(version model.SnmpVersion) bool {
+	if len(r.policy.versions) == 0 {
+		return true
+	}
+	_, ok := r.policy.versions[version]
+	return ok
+}
+
+func (r *Receiver) communityAllowed(community string) bool {
+	return r.allowlist == nil || r.allowlist.AllowedCommunity(community)
+}
+
+func (r *Receiver) trustedRelaySource(peerIP net.IP) bool {
+	if len(r.policy.trustedRelays) == 0 || peerIP == nil {
+		return false
+	}
+	addr, ok := netip.AddrFromSlice(peerIP)
+	if !ok {
+		return false
+	}
+	addr = addr.Unmap()
+	for _, prefix := range r.policy.trustedRelays {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
+func shouldExtractEngineIDOnDecodeError(kind string) bool {
+	switch kind {
+	case "auth_failures", "usm_failures", "unknown_engine_id":
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *Receiver) localEngineIDMatches(parameters gosnmp.SnmpV3SecurityParameters) bool {
+	if r.localEngineID == nil || parameters == nil {
+		return false
+	}
+	usm, ok := parameters.(*gosnmp.UsmSecurityParameters)
+	return ok && r.localEngineID.EqualRaw(usm.AuthoritativeEngineID)
+}
+
+func (r *Receiver) reportError(kind string) {
+	r.reportEvent(Event{Type: EventError, ErrorKind: kind})
+}
+
+func (r *Receiver) dynamicPairs() int {
+	if r.dynamicEngineIDReg == nil {
+		return 0
+	}
+	return r.dynamicEngineIDReg.size()
+}
+
+func (r *Receiver) reportEvent(event Event) {
+	if r.report != nil {
+		r.report(event)
+	}
+}
+
+func udpPeerAddr(peer *net.UDPAddr) (netip.Addr, bool) {
+	if peer == nil {
+		return netip.Addr{}, false
+	}
+	addr, ok := netip.AddrFromSlice(peer.IP)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	return addr.Unmap(), true
+}
+
+func packetSourceAddr(peerIP net.IP, peer *net.UDPAddr) (netip.Addr, bool) {
+	if addr, ok := udpPeerAddr(peer); ok {
+		return addr, true
+	}
+	if peerIP == nil {
+		return netip.Addr{}, false
+	}
+	addr, err := netip.ParseAddr(peerIP.String())
+	if err != nil {
+		return netip.Addr{}, false
+	}
+	return addr.Unmap(), true
+}

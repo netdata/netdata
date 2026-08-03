@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmp_traps
+
+import (
+	"bytes"
+	"errors"
+	"strings"
+	"testing"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestCollectorReceiverReadErrorLogIsRateLimited(t *testing.T) {
+	var buf bytes.Buffer
+	c := newTestSNMPTrapsCollector()
+	c.Logger = logger.NewWithWriter(&buf)
+	metrics := &perJobMetrics{}
+	event := receiver.Event{
+		Type: receiver.EventListenerReadFailed,
+		Endpoint: receiver.Endpoint{
+			Protocol: "udp4",
+			Address:  "127.0.0.1",
+			Port:     9162,
+		},
+		Err: errors.New("boom"),
+	}
+
+	c.handleReceiverEvent(metrics, event)
+	event.Err = errors.New("again")
+	c.handleReceiverEvent(metrics, event)
+
+	out := buf.String()
+	assert.Equal(t, 1, strings.Count(out, "SNMP trap listener read failed"))
+	assert.Contains(t, out, "endpoint=udp4://127.0.0.1:9162")
+	assert.Contains(t, out, "boom")
+	assert.NotContains(t, out, "again")
+	assert.Equal(t, uint64(2), metrics.errors.listenerReadFailed.Load())
+}
+
+func TestCollectorReportsReceiverBufferDegradedEvent(t *testing.T) {
+	metrics := &perJobMetrics{}
+	c := newTestSNMPTrapsCollector()
+	var buf bytes.Buffer
+	c.Logger = logger.NewWithWriter(&buf)
+
+	c.handleReceiverEvent(metrics, receiver.Event{
+		Type: receiver.EventListenerBufferDegraded,
+		Endpoint: receiver.Endpoint{
+			Protocol: "udp4",
+			Address:  "127.0.0.1",
+			Port:     9162,
+		},
+		Requested: receiver.DefaultReceiveBuffer,
+		Err:       errors.New("boom"),
+	})
+
+	assert.Equal(t, uint64(1), metrics.errors.listenerBufferDegraded.Load())
+	out := buf.String()
+	assert.Contains(t, out, "SNMP trap listener receive buffer request degraded")
+	assert.Contains(t, out, "endpoint=udp4://127.0.0.1:9162")
+	assert.Contains(t, out, "requested=4194304 bytes")
+	assert.Contains(t, out, "boom")
+}

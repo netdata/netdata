@@ -153,3 +153,37 @@ profile changes require an Agent restart or recreation of every trap job.
 Invalid operator profiles fail the next job creation; invalid lazy stock
 profiles fail their first matching lookup and increment profile-load-failure
 metrics.
+
+## 8. Receiver boundary and synchronous handoff (authoritative)
+
+Runtime ownership is split at protocol acceptance:
+
+- `internal/receiver` owns the immutable per-job reception policy, endpoint
+  sockets, reusable receive buffers, source/version/community admission,
+  BER/SNMP decode, SNMPv3 USM and engine state, dynamic engine-ID handling,
+  INFORM responses, and per-source rate limiting.
+- The root collector owns public config DTOs and lifecycle orchestration. After
+  receiver acceptance, it owns catalog lookup, overrides,
+  attribution/enrichment, template rendering, deduplication, output commitment,
+  and metric updates.
+- Receiver outcomes use one event callback. The receiver package does not
+  depend on collector telemetry, logging, profile, or output packages.
+
+Each endpoint owns one receive goroutine and one reusable datagram buffer. The
+receive loop invokes the root packet workflow synchronously before reusing that
+buffer. There is no receiver queue, channel, or intermediate worker between the
+socket read and packet handling. Output backends retain their own bounded queues
+under the `internal/output.Writer` contract.
+
+Initialization is staged so failed jobs do not leak sockets or newly created
+SNMPv3 state:
+
+1. Validate public config and build the immutable receiver policy.
+2. Bind every endpoint; any bind failure closes earlier sockets.
+3. Prepare receiver-local SNMPv3 state when v3 is enabled.
+4. Preflight and start output backends.
+5. Commit prepared v3 state and start endpoint receive loops.
+
+Failures after v3 preparation but before receiver start roll back only state
+created by that attempt and close all bound sockets. Cleanup closes receive
+loops before output, enrichment, profile, and metric state.
