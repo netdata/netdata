@@ -4,8 +4,8 @@
 # Mirrors what Codacy CI would run on the same source. Useful BEFORE
 # `git push` to catch findings in seconds, not minutes.
 #
-# Output: a JSON dump under <repo>/.local/audits/codacy/.
-# stdout (last line): the dump path.
+# Output: a JSON or SARIF report under <repo>/.local/audits/codacy/.
+# stdout (last line): the report path.
 
 set -euo pipefail
 
@@ -14,13 +14,13 @@ usage() {
 analyze-local.sh [options]
 
 Runs the official codacy-analysis-cli (https://github.com/codacy/codacy-analysis-cli)
-on the current working tree and writes a JSON dump under
+on the current working tree and writes a JSON or SARIF report under
 <repo>/.local/audits/codacy/. The cli respects the repo's .codacy.yml
 exclude_paths.
 
 Options:
   --tool <name>          run a single tool (e.g. shellcheck, markdownlint).
-                         Omit to run all tools applicable to changed files.
+                         Omit to run all configured tools applicable to the target.
   --directory <path>     analyze a subpath (default: <repo-root>)
   --format json|sarif    output format (default: json)
   --output PATH          explicit dump path (default: auto under .local/audits/codacy/)
@@ -28,7 +28,7 @@ Options:
                          binary, fall back to docker)
   -h, --help
 
-Required tools: docker (default) OR a local codacy-analysis-cli binary.
+Required tools: jq, plus the supported local codacy-analysis-cli binary OR docker.
 EOF
 }
 
@@ -49,13 +49,48 @@ cleanup() {
 }
 trap cleanup EXIT
 
+missing_option_value() {
+    echo "Missing value for option: $1" >&2
+    usage >&2
+    exit 2
+}
+
+reserve_auto_output() {
+    local prefix="$1" candidate attempt
+
+    for ((attempt = 0; attempt < 100; attempt++)); do
+        candidate="${prefix}-$$-${RANDOM}.${FORMAT}"
+        if (set -o noclobber; : > "$candidate") 2>/dev/null; then
+            OUTPUT="$candidate"
+            return 0
+        fi
+    done
+
+    echo "[ERROR] cannot reserve a unique output file under ${audit_dir}" >&2
+    exit 2
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
-        --tool)      TOOL="$2"; shift 2 ;;
-        --directory) SUBDIR="$2"; shift 2 ;;
-        --format)    FORMAT="$2"; shift 2 ;;
-        --output)    OUTPUT="$2"; shift 2 ;;
-        --runner)    RUNNER="$2"; shift 2 ;;
+        --tool|--directory|--format|--output|--runner)
+            option="$1"
+            if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+                missing_option_value "$option"
+            fi
+            case "$2" in
+                --tool|--directory|--format|--output|--runner|-h|--help)
+                    missing_option_value "$option"
+                    ;;
+            esac
+            case "$option" in
+                --tool)      TOOL="$2" ;;
+                --directory) SUBDIR="$2" ;;
+                --format)    FORMAT="$2" ;;
+                --output)    OUTPUT="$2" ;;
+                --runner)    RUNNER="$2" ;;
+            esac
+            shift 2
+            ;;
         -h|--help)   usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -69,6 +104,11 @@ case "$FORMAT" in
         exit 2
         ;;
 esac
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "[ERROR] required tool 'jq' not found in PATH; install jq before running local Codacy analysis" >&2
+    exit 2
+fi
 
 # shellcheck source=SCRIPTDIR/_lib.sh disable=SC1091
 source "$(cd "$(dirname "$0")" && pwd)/_lib.sh"
@@ -86,24 +126,27 @@ if [ -z "$SUBDIR" ]; then
 else
     case "$SUBDIR" in
         /*) : ;;                       # absolute
-        *)  SUBDIR="$(cd "$SUBDIR" && pwd)" ;;
+        *)  SUBDIR="$(cd -- "$SUBDIR" && pwd)" ;;
     esac
 fi
 
 # Resolve output path.
+output_reserved=false
+auto_output_prefix=
 if [ -z "$OUTPUT" ]; then
     suffix=""
     [ -n "$TOOL" ] && suffix="-${TOOL}"
-    OUTPUT="${audit_dir}/local${suffix}-$(date -u +%Y%m%dT%H%M%SZ).${FORMAT}"
-fi
-if [ -e "$OUTPUT" ] && [ ! -f "$OUTPUT" ]; then
-    echo -e "${CA_RED}[ERROR]${CA_NC} output path must be a regular file: ${OUTPUT}" >&2
-    exit 2
-fi
-output_parent="$(dirname -- "$OUTPUT")"
-if [ ! -d "$output_parent" ]; then
-    echo -e "${CA_RED}[ERROR]${CA_NC} output parent directory does not exist: ${output_parent}" >&2
-    exit 2
+    auto_output_prefix="${audit_dir}/local${suffix}-$(date -u +%Y%m%dT%H%M%SZ)"
+else
+    if [ -e "$OUTPUT" ] && [ ! -f "$OUTPUT" ]; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} output path must be a regular file: ${OUTPUT}" >&2
+        exit 2
+    fi
+    output_parent="$(dirname -- "$OUTPUT")"
+    if [ ! -d "$output_parent" ]; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} output parent directory does not exist: ${output_parent}" >&2
+        exit 2
+    fi
 fi
 
 # Pick a runner.
@@ -153,11 +196,19 @@ if [ "$RUNNER" = "local" ]; then
     fi
 fi
 
-# Truncate the destination before the runner starts. If shell redirection cannot
-# initialize it, a readable stale report must not survive to the shape check.
-if ! : > "$OUTPUT"; then
-    echo -e "${CA_RED}[ERROR]${CA_NC} cannot initialize output file: ${OUTPUT}" >&2
-    exit 2
+if [ -n "$auto_output_prefix" ]; then
+    reserve_auto_output "$auto_output_prefix"
+    output_reserved=true
+fi
+
+# Explicit destinations are truncated before the runner starts. If shell
+# redirection cannot initialize one, a readable stale report must not survive
+# to the shape check. Auto destinations are reserved only after runner preflight.
+if [ "$output_reserved" != true ]; then
+    if ! : > "$OUTPUT"; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} cannot initialize output file: ${OUTPUT}" >&2
+        exit 2
+    fi
 fi
 if [ ! -f "$OUTPUT" ]; then
     echo -e "${CA_RED}[ERROR]${CA_NC} output path must be a regular file: ${OUTPUT}" >&2
@@ -172,7 +223,7 @@ case "$RUNNER" in
         # Local binary expects host paths.
         local_args=(analyze --directory "$SUBDIR" --format "$FORMAT" --fail-if-incomplete)
         [ -n "$TOOL" ] && local_args+=(--tool "$TOOL")
-        codacy-analysis-cli "${local_args[@]}" > "$OUTPUT" || runner_status=$?
+        codacy-analysis-cli "${local_args[@]}" >| "$OUTPUT" || runner_status=$?
         ;;
     docker)
         # Per https://github.com/codacy/codacy-analysis-cli the CLI
@@ -196,7 +247,7 @@ case "$RUNNER" in
                 --volume "$SUBDIR":"$SUBDIR" \
                 --volume "$RUNNER_TMP":"$RUNNER_TMP" \
                 "$CODACY_ANALYSIS_CLI_IMAGE" \
-                "${cli_args[@]}" > "$OUTPUT" || runner_status=$?
+                "${cli_args[@]}" >| "$OUTPUT" || runner_status=$?
         ;;
     *)
         echo -e "${CA_RED}[ERROR]${CA_NC} unknown --runner '${RUNNER}'" >&2
@@ -404,7 +455,7 @@ else
         and (.runs | all(.[]; valid_run))
     '
 fi
-if ! jq -e "$report_shape" "$OUTPUT" >/dev/null 2>&1; then
+if ! jq -e "$report_shape" -- "$OUTPUT" >/dev/null 2>&1; then
     echo -e "${CA_RED}[ERROR]${CA_NC} invalid ${FORMAT} report at ${OUTPUT}; inspect the tool-runner diagnostics above before trusting findings" >&2
     exit 1
 fi
@@ -417,7 +468,7 @@ if [ "$FORMAT" = "json" ]; then
             ([.[] | select(keys == ["DuplicationClone"])] | length),
             ([.[] | select(keys == ["FileError"])] | length),
             ([.[] | select(keys == ["FileMetrics"])] | length)
-        ] | @tsv' "$OUTPUT"
+        ] | @tsv' -- "$OUTPUT"
     )
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n_issues} issue(s)," \
         "${n_duplications} duplication clone(s), ${n_file_errors} file error(s)," \
@@ -432,4 +483,4 @@ else
 fi
 
 # Last line on stdout: the path. Pipe-friendly.
-echo "$OUTPUT"
+printf '%s\n' "$OUTPUT"

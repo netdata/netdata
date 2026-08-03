@@ -26,8 +26,9 @@ git checkout d7791e6838 -- .codacy.yml      # restore the pre-exclusion .codacy.
 .agents/skills/codacy-audit/scripts/analyze-local.sh --tool markdownlint
 ```
 
-Expected: a JSON dump under `<repo>/.local/audits/codacy/local-markdownlint-<ts>.json`. With the default zero issue
-threshold, the CLI returns status 102 when findings exist; the wrapper accepts that specific complete-analysis status.
+Expected: a JSON dump under
+`<repo>/.local/audits/codacy/local-markdownlint-<timestamp>-<pid>-<random>.json`. With the default zero issue threshold,
+the CLI returns status 102 when findings exist; the wrapper accepts that specific complete-analysis status.
 
 ## Step 3 -- count findings
 

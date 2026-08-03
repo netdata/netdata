@@ -3,6 +3,11 @@
 Use this when `analyze-local.sh` writes a `local-*.json` file but `jq` cannot
 parse it.
 
+The wrapper itself requires `jq` and checks for it before creating the output or
+starting the analyzer. A `required tool 'jq' not found in PATH` diagnostic is a
+local prerequisite failure, not malformed analyzer output; install `jq` and
+rerun.
+
 1. Verify the dump before reading it as findings:
 
    ```bash

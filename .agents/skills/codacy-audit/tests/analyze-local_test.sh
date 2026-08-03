@@ -6,7 +6,14 @@ set -Eeuo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 script="${repo_root}/.agents/skills/codacy-audit/scripts/analyze-local.sh"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/codacy-analyze-local-test.XXXXXX")"
-trap 'rm -rf -- "$tmp"' EXIT
+generated_outputs=()
+cleanup() {
+    if [ "${#generated_outputs[@]}" -gt 0 ]; then
+        rm -f -- "${generated_outputs[@]}"
+    fi
+    rm -rf -- "$tmp"
+}
+trap cleanup EXIT
 
 mkdir -p "$tmp/bin"
 cat > "$tmp/bin/codacy-analysis-cli" <<'EOF'
@@ -258,6 +265,48 @@ if [ "$stale_status" -ne 2 ] || [ -n "$stale_stdout" ] || \
 fi
 printf '[PASS] stale-output initialization rejection\n'
 
+dash_output_stdout_path="$tmp/dash-output.stdout"
+dash_output_stderr_path="$tmp/dash-output.stderr"
+set +e
+(
+    cd "$tmp"
+    PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
+        "$script" --runner local --format json --output '-n'
+) > "$dash_output_stdout_path" 2> "$dash_output_stderr_path"
+dash_output_status=$?
+set -e
+dash_output_stdout="$(cat "$dash_output_stdout_path")"
+dash_output_stderr="$(cat "$dash_output_stderr_path")"
+if [ "$dash_output_status" -ne 0 ] || [ "$dash_output_stdout" != '-n' ] || [ ! -f "$tmp/-n" ]; then
+    printf >&2 '[FAIL] dash-prefixed output path: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$dash_output_status" "$dash_output_stdout" "$dash_output_stderr"
+    exit 1
+fi
+printf '[PASS] dash-prefixed output path\n'
+
+dash_directory="$tmp/-target"
+dash_directory_output="$tmp/dash-directory-output.json"
+dash_directory_stdout_path="$tmp/dash-directory.stdout"
+dash_directory_stderr_path="$tmp/dash-directory.stderr"
+mkdir "$dash_directory"
+set +e
+(
+    cd "$tmp"
+    PATH="$tmp/bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
+        "$script" --runner local --directory '-target' --format json --output "$dash_directory_output"
+) > "$dash_directory_stdout_path" 2> "$dash_directory_stderr_path"
+dash_directory_status=$?
+set -e
+dash_directory_stdout="$(cat "$dash_directory_stdout_path")"
+dash_directory_stderr="$(cat "$dash_directory_stderr_path")"
+if [ "$dash_directory_status" -ne 0 ] || [ "$dash_directory_stdout" != "$dash_directory_output" ] || \
+        [ ! -f "$dash_directory_output" ]; then
+    printf >&2 '[FAIL] dash-prefixed directory path: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$dash_directory_status" "$dash_directory_stdout" "$dash_directory_stderr"
+    exit 1
+fi
+printf '[PASS] dash-prefixed directory path\n'
+
 unsupported_stdout_path="$tmp/unsupported.stdout"
 unsupported_stderr_path="$tmp/unsupported.stderr"
 set +e
@@ -273,6 +322,156 @@ if [ "$unsupported_status" -ne 2 ] || [ -n "$unsupported_stdout" ] || \
     exit 1
 fi
 printf '[PASS] unsupported format\n'
+
+help_stdout_path="$tmp/help.stdout"
+help_stderr_path="$tmp/help.stderr"
+set +e
+"$script" --help > "$help_stdout_path" 2> "$help_stderr_path"
+help_status=$?
+set -e
+help_stdout="$(cat "$help_stdout_path")"
+help_stderr="$(cat "$help_stderr_path")"
+if [ "$help_status" -ne 0 ] || [ -n "$help_stderr" ] || \
+        [[ "$help_stdout" != *'writes a JSON or SARIF report under'* ]] || \
+        [[ "$help_stdout" != *'Omit to run all configured tools applicable to the target.'* ]] || \
+        [[ "$help_stdout" != *'default: auto -- prefer local'* ]] || \
+        [[ "$help_stdout" != *'supported local codacy-analysis-cli binary OR docker'* ]] || \
+        [[ "$help_stdout" == *'docker (default)'* ]]; then
+    printf >&2 '[FAIL] help contract: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$help_status" "$help_stdout" "$help_stderr"
+    exit 1
+fi
+printf '[PASS] help contract\n'
+
+missing_value_case=0
+for option in --tool --directory --format --output --runner; do
+    missing_value_case=$((missing_value_case + 1))
+    missing_value_stdout_path="$tmp/missing-value-${missing_value_case}.stdout"
+    missing_value_stderr_path="$tmp/missing-value-${missing_value_case}.stderr"
+    set +e
+    "$script" "$option" > "$missing_value_stdout_path" 2> "$missing_value_stderr_path"
+    missing_value_status=$?
+    set -e
+    missing_value_stdout="$(cat "$missing_value_stdout_path")"
+    missing_value_stderr="$(cat "$missing_value_stderr_path")"
+    if [ "$missing_value_status" -ne 2 ] || [ -n "$missing_value_stdout" ] || \
+            [[ "$missing_value_stderr" != *"Missing value for option: $option"* ]]; then
+        printf >&2 '[FAIL] missing value for %s: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+            "$option" "$missing_value_status" "$missing_value_stdout" "$missing_value_stderr"
+        exit 1
+    fi
+done
+for option in --tool --directory --format --output --runner; do
+    missing_value_case=$((missing_value_case + 1))
+    missing_value_stdout_path="$tmp/missing-value-${missing_value_case}.stdout"
+    missing_value_stderr_path="$tmp/missing-value-${missing_value_case}.stderr"
+    set +e
+    "$script" "$option" '' > "$missing_value_stdout_path" 2> "$missing_value_stderr_path"
+    missing_value_status=$?
+    set -e
+    missing_value_stdout="$(cat "$missing_value_stdout_path")"
+    missing_value_stderr="$(cat "$missing_value_stderr_path")"
+    if [ "$missing_value_status" -ne 2 ] || [ -n "$missing_value_stdout" ] || \
+            [[ "$missing_value_stderr" != *"Missing value for option: $option"* ]]; then
+        printf >&2 '[FAIL] empty value for %s: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+            "$option" "$missing_value_status" "$missing_value_stdout" "$missing_value_stderr"
+        exit 1
+    fi
+done
+for pair in '--tool --directory' '--directory --format' '--format --output' \
+        '--output --runner' '--runner --tool' '--runner --help'; do
+    read -r option following_option <<< "$pair"
+    missing_value_case=$((missing_value_case + 1))
+    missing_value_stdout_path="$tmp/missing-value-${missing_value_case}.stdout"
+    missing_value_stderr_path="$tmp/missing-value-${missing_value_case}.stderr"
+    set +e
+    "$script" "$option" "$following_option" \
+        > "$missing_value_stdout_path" 2> "$missing_value_stderr_path"
+    missing_value_status=$?
+    set -e
+    missing_value_stdout="$(cat "$missing_value_stdout_path")"
+    missing_value_stderr="$(cat "$missing_value_stderr_path")"
+    if [ "$missing_value_status" -ne 2 ] || [ -n "$missing_value_stdout" ] || \
+            [[ "$missing_value_stderr" != *"Missing value for option: $option"* ]]; then
+        printf >&2 '[FAIL] adjacent %s after %s: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+            "$following_option" "$option" "$missing_value_status" \
+            "$missing_value_stdout" "$missing_value_stderr"
+        exit 1
+    fi
+done
+printf '[PASS] missing option values\n'
+
+collision_bin="$tmp/collision-bin"
+mkdir "$collision_bin"
+ln -s "$tmp/bin/codacy-analysis-cli" "$collision_bin/codacy-analysis-cli"
+cat > "$collision_bin/date" <<'EOF'
+#!/usr/bin/env bash
+printf '20300101T000000Z\n'
+EOF
+chmod 0700 "$collision_bin/date"
+collision_stdout_one="$tmp/collision-one.stdout"
+collision_stderr_one="$tmp/collision-one.stderr"
+collision_stdout_two="$tmp/collision-two.stdout"
+collision_stderr_two="$tmp/collision-two.stderr"
+set +e
+PATH="$collision_bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
+    "$script" --runner local --format json --tool shellcheck \
+    > "$collision_stdout_one" 2> "$collision_stderr_one" &
+collision_pid_one=$!
+PATH="$collision_bin:$PATH" CODACY_TEST_REPORT="$tmp/report-1.json" \
+    "$script" --runner local --format json --tool shellcheck \
+    > "$collision_stdout_two" 2> "$collision_stderr_two" &
+collision_pid_two=$!
+wait "$collision_pid_one"
+collision_status_one=$?
+wait "$collision_pid_two"
+collision_status_two=$?
+set -e
+collision_output_one="$(cat "$collision_stdout_one")"
+collision_output_two="$(cat "$collision_stdout_two")"
+collision_stderr_text_one="$(cat "$collision_stderr_one")"
+collision_stderr_text_two="$(cat "$collision_stderr_two")"
+collision_prefix="${repo_root}/.local/audits/codacy/local-shellcheck-20300101T000000Z-"
+for collision_output in "$collision_output_one" "$collision_output_two"; do
+    case "$collision_output" in
+        "$collision_prefix"*.json) generated_outputs+=("$collision_output") ;;
+        *)
+            printf >&2 '[FAIL] auto-output reservation returned unexpected path: %s\n' "$collision_output"
+            exit 1
+            ;;
+    esac
+done
+if [ "$collision_status_one" -ne 0 ] || [ "$collision_status_two" -ne 0 ] || \
+        [ "$collision_output_one" = "$collision_output_two" ] || \
+        [ ! -f "$collision_output_one" ] || [ ! -f "$collision_output_two" ]; then
+    printf >&2 '[FAIL] concurrent auto-output reservation: status=%d/%d paths=%s/%s\nstderr 1:\n%s\nstderr 2:\n%s\n' \
+        "$collision_status_one" "$collision_status_two" \
+        "$collision_output_one" "$collision_output_two" \
+        "$collision_stderr_text_one" "$collision_stderr_text_two"
+    exit 1
+fi
+printf '[PASS] concurrent auto-output reservation\n'
+
+missing_jq_path="$tmp/missing-jq-bin"
+missing_jq_output="$tmp/missing-jq-output.json"
+missing_jq_stdout_path="$tmp/missing-jq.stdout"
+missing_jq_stderr_path="$tmp/missing-jq.stderr"
+mkdir "$missing_jq_path"
+set +e
+PATH="$missing_jq_path" "$BASH" "$script" --runner local --format json --output "$missing_jq_output" \
+    > "$missing_jq_stdout_path" 2> "$missing_jq_stderr_path"
+missing_jq_status=$?
+set -e
+missing_jq_stdout="$(cat "$missing_jq_stdout_path")"
+missing_jq_stderr="$(cat "$missing_jq_stderr_path")"
+if [ "$missing_jq_status" -ne 2 ] || [ -n "$missing_jq_stdout" ] || \
+        [[ "$missing_jq_stderr" != *"required tool 'jq' not found in PATH"* ]] || \
+        [ -e "$missing_jq_output" ]; then
+    printf >&2 '[FAIL] missing jq preflight: status=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$missing_jq_status" "$missing_jq_stdout" "$missing_jq_stderr"
+    exit 1
+fi
+printf '[PASS] missing jq preflight\n'
 
 version_stdout_path="$tmp/version.stdout"
 version_stderr_path="$tmp/version.stderr"
@@ -295,6 +494,34 @@ if [ -e "$tmp/version-output.json" ]; then
     exit 1
 fi
 printf '[PASS] local version rejection\n'
+
+auto_version_stdout_path="$tmp/auto-version.stdout"
+auto_version_stderr_path="$tmp/auto-version.stderr"
+set +e
+PATH="$collision_bin:$PATH" CODACY_TEST_VERSION=8.0.0 CODACY_TEST_REPORT="$tmp/report-1.json" \
+    "$script" --runner local --format json --tool version-reject \
+    > "$auto_version_stdout_path" 2> "$auto_version_stderr_path"
+auto_version_status=$?
+set -e
+auto_version_stdout="$(cat "$auto_version_stdout_path")"
+auto_version_stderr="$(cat "$auto_version_stderr_path")"
+shopt -s nullglob
+auto_version_artifacts=(
+    "${repo_root}/.local/audits/codacy/local-version-reject-20300101T000000Z-"*.json
+)
+shopt -u nullglob
+if [ "${#auto_version_artifacts[@]}" -gt 0 ]; then
+    generated_outputs+=("${auto_version_artifacts[@]}")
+fi
+if [ "$auto_version_status" -ne 2 ] || [ -n "$auto_version_stdout" ] || \
+        [[ "$auto_version_stderr" != *'unsupported local codacy-analysis-cli version; expected 7.10.1'* ]] || \
+        [ "${#auto_version_artifacts[@]}" -ne 0 ]; then
+    printf >&2 '[FAIL] auto-output version rejection: status=%d artifacts=%d\nstdout:\n%s\nstderr:\n%s\n' \
+        "$auto_version_status" "${#auto_version_artifacts[@]}" \
+        "$auto_version_stdout" "$auto_version_stderr"
+    exit 1
+fi
+printf '[PASS] auto-output version rejection\n'
 
 docker_report="$tmp/docker-report.json"
 docker_output="$tmp/docker-output.json"
@@ -394,4 +621,4 @@ if [ "$auto_status" -ne 0 ] || [ "$auto_stdout" != "$auto_output" ] || \
 fi
 printf '[PASS] automatic local-version fallback\n'
 
-printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 6))"
+printf '[PASS] %d analyze-local contract cases\n' "$((case_number + 13))"

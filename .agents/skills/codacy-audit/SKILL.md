@@ -59,7 +59,7 @@ All values live in `<repo>/.env` (gitignored). See `<repo>/.agents/ENV.md` for s
 | Script | Purpose |
 |---|---|
 | `_lib.sh` | Helpers (`codacyaudit_*` prefix). Token-safe; ships `codacyaudit_selftest_no_token_leak`. |
-| `analyze-local.sh` | Run `codacy-analysis-cli` locally; auto-pick local-binary or docker; write JSON dump under `.local/audits/codacy/`. |
+| `analyze-local.sh` | Run `codacy-analysis-cli` locally; auto-pick local-binary or docker; write a JSON or SARIF report under `.local/audits/codacy/`. |
 | `pr-issues.sh` | Fetch all Codacy issues for a PR via the v3 API; cluster summary on stdout; full JSON dump on disk. |
 
 The wrapper's closed JSON/SARIF contract has a mock-runner regression suite:
@@ -68,12 +68,17 @@ The wrapper's closed JSON/SARIF contract has a mock-runner regression suite:
 bash .agents/skills/codacy-audit/tests/analyze-local_test.sh
 ```
 
+Local analysis requires `jq` plus either Docker or the pinned local
+`codacy-analysis-cli`. The wrapper preflights `jq` before it initializes an
+output file or starts the analyzer, so a missing report validator cannot waste a
+completed analysis or be misreported as malformed analyzer output.
+
 ## Workflow -- pre-push prevention
 
 ```
 $ .agents/skills/codacy-audit/scripts/analyze-local.sh
 [analyze-local] runner=docker format=json dir=<repo>
-[analyze-local] wrote 0 issue(s), 0 duplication clone(s), 0 file error(s), and 0 file-metric record(s) to <repo>/.local/audits/codacy/local-<ts>.json
+[analyze-local] wrote 0 issue(s), 0 duplication clone(s), 0 file error(s), and 0 file-metric record(s) to <repo>/.local/audits/codacy/local-<timestamp>-<pid>-<random>.json
 ```
 
 Run this before `git push`. A report with zero issues, zero duplication clones, and zero file errors is clean local
