@@ -132,7 +132,7 @@ Elements automatically align to the grid system after moving or resizing.
 
 :::warning
 
-Deleting a dashboard is permanent and cannot be undone. Netdata Cloud provides no trash bin, recycle bin, undo, or recovery mechanism for deleted dashboards — once a dashboard is deleted, it cannot be restored.
+Deleting a dashboard is permanent and cannot be undone. Netdata Cloud provides no trash bin, recycle bin, or recovery mechanism for deleted dashboards.
 
 :::
 
