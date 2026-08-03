@@ -143,7 +143,7 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
-	c.deviceLookup = deviceStore
+	c.enricher = newTestTrapEnricher(deviceStore, nil, nil)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -194,12 +194,7 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 		}
 	})
 
-	dns := newReverseDNSResolver()
-	dns.cache["198.51.100.10"] = reverseDNSCacheEntry{
-		name:      "dns-sw-01.example.com",
-		expiresAt: farFuture(),
-	}
-	t.Cleanup(dns.Close)
+	dns := newTestReverseDNS(map[string]string{"198.51.100.10": "dns-sw-01.example.com"})
 
 	trap := testColdStartTrap(
 		"security",
@@ -209,9 +204,8 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
-	c.topologyEnricher = topologyEnricher
+	c.enricher = newTestTrapEnricher(ddsnmp.NewDeviceStore(), topologyEnricher, dns)
 	c.reverseDNSEnabled = true
-	c.reverseDNS = dns
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 

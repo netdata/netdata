@@ -4,15 +4,19 @@ package snmp_traps
 
 import (
 	"net/netip"
+	"sync"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/traptest"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
 const testEngineIDHex = "80001f888077dfe44faa700258"
@@ -135,11 +139,15 @@ func newDefaultTestV2Collector(writer output.Writer) *Collector {
 }
 
 func newTestSNMPTrapsCollector() *Collector {
-	c := New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+	c := New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	if currentTestCatalogManager != nil {
 		c.profileCatalog = currentTestCatalogManager
 	}
 	return c
+}
+
+func newTestReverseDNSResolver() *reversedns.Resolver {
+	return reversedns.New(reversedns.Config{})
 }
 
 type testTrapTopologyEnricher func(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment
@@ -148,12 +156,91 @@ func (f testTrapTopologyEnricher) EnrichmentForSource(ip, trapIfIndex string) *s
 	return f(ip, trapIfIndex)
 }
 
-func newTestTrapEnrichmentCollector(topologyEnricher trapTopologyEnricher) (*Collector, *ddsnmp.DeviceStore) {
+func newTestTrapEnrichmentCollector(topologyEnricher testTrapTopologyEnricher, dns ...enrichment.ReverseDNS) (*Collector, *ddsnmp.DeviceStore) {
 	store := ddsnmp.NewDeviceStore()
-	return &Collector{
-		deviceLookup:     store,
-		topologyEnricher: topologyEnricher,
-	}, store
+	var reverseDNS enrichment.ReverseDNS
+	if len(dns) > 0 {
+		reverseDNS = dns[0]
+	}
+	return &Collector{enricher: newTestTrapEnricher(store, topologyEnricher, reverseDNS)}, store
+}
+
+func newTestTrapEnricher(store *ddsnmp.DeviceStore, topologyEnricher testTrapTopologyEnricher, dns enrichment.ReverseDNS) *enrichment.Enricher {
+	return enrichment.New(
+		netdataadapter.RegistryLookup(store),
+		testTopologyLookup(topologyEnricher),
+		dns,
+	)
+}
+
+func testTopologyLookup(topologyEnricher testTrapTopologyEnricher) enrichment.TopologyLookup {
+	if topologyEnricher == nil {
+		return nil
+	}
+	return func(sourceIP, trapIfIndex string) enrichment.TopologyResult {
+		result := topologyEnricher.EnrichmentForSource(sourceIP, trapIfIndex)
+		if result == nil {
+			return enrichment.TopologyResult{}
+		}
+		return enrichment.TopologyResult{
+			Status:          result.DeviceStatus,
+			Method:          result.DeviceMethod,
+			Matches:         result.DeviceMatches,
+			Hostname:        result.DeviceHostname,
+			Vendor:          result.DeviceVendor,
+			VnodeID:         result.SourceVnodeID,
+			InterfaceIndex:  result.InterfaceIndex,
+			InterfaceStatus: result.InterfaceStatus,
+			InterfaceName:   result.Interface,
+			NeighborStatus:  result.NeighborStatus,
+			NeighborNames:   result.Neighbors,
+		}
+	}
+}
+
+type testReverseDNS struct {
+	mu        sync.Mutex
+	results   map[netip.Addr]reversedns.Result
+	lookups   []netip.Addr
+	schedules []netip.Addr
+}
+
+func newTestReverseDNS(results map[string]string) *testReverseDNS {
+	dns := &testReverseDNS{results: make(map[netip.Addr]reversedns.Result, len(results))}
+	for raw, name := range results {
+		addr := netip.MustParseAddr(raw).Unmap()
+		state := reversedns.StateNegative
+		if name != "" {
+			state = reversedns.StatePositive
+		}
+		dns.results[addr] = reversedns.Result{State: state, Name: name}
+	}
+	return dns
+}
+
+func (d *testReverseDNS) Lookup(addr netip.Addr) reversedns.Result {
+	addr = addr.Unmap()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.lookups = append(d.lookups, addr)
+	if result, ok := d.results[addr]; ok {
+		return result
+	}
+	return reversedns.Result{State: reversedns.StateMiss}
+}
+
+func (d *testReverseDNS) Schedule(addr netip.Addr) reversedns.ScheduleState {
+	addr = addr.Unmap()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.schedules = append(d.schedules, addr)
+	return reversedns.ScheduleScheduled
+}
+
+func (d *testReverseDNS) callCounts() (lookups, schedules int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return len(d.lookups), len(d.schedules)
 }
 
 func withCleanJobMetrics(t *testing.T, jobName string) *perJobMetrics {

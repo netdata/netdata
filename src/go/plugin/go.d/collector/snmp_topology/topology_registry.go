@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"context"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -12,22 +13,28 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
 type topologyRegistry struct {
 	mu                    sync.RWMutex
 	caches                map[*topologyCache]struct{}
 	producerScopeID       string
-	reverseDNS            *topologyReverseDNSResolver
+	reverseDNS            *reversedns.Resolver
+	reverseDNSWarmer      *topologyReverseDNSWarmer
 	reverseDNSWarmCtx     context.Context
 	reverseDNSSnapshotRun atomic.Bool
 }
 
-func newTopologyRegistry() *topologyRegistry {
+func newTopologyRegistryWithResolver(reverseDNS *reversedns.Resolver) *topologyRegistry {
+	if reverseDNS == nil {
+		panic("snmp_topology registry requires a non-nil reverse DNS resolver")
+	}
 	return &topologyRegistry{
-		caches:          make(map[*topologyCache]struct{}),
-		producerScopeID: strings.TrimSpace(pluginconfig.RegistryUniqueID()),
-		reverseDNS:      newTopologyReverseDNSResolver(),
+		caches:           make(map[*topologyCache]struct{}),
+		producerScopeID:  strings.TrimSpace(pluginconfig.RegistryUniqueID()),
+		reverseDNS:       reverseDNS,
+		reverseDNSWarmer: newTopologyReverseDNSWarmer(reverseDNS),
 	}
 }
 
@@ -130,22 +137,22 @@ func (r *topologyRegistry) reverseDNSCandidateCollector() *topologyReverseDNSCan
 	if r == nil || r.reverseDNS == nil {
 		return nil
 	}
-	return r.reverseDNS.newCandidateCollector()
+	return newTopologyReverseDNSCandidateCollector(r.reverseDNS)
 }
 
-func (r *topologyRegistry) enqueueReverseDNSWarm(candidates []string) bool {
-	if r == nil || r.reverseDNS == nil || len(candidates) == 0 {
+func (r *topologyRegistry) enqueueReverseDNSWarm(candidates []netip.Addr) bool {
+	if r == nil || r.reverseDNSWarmer == nil || len(candidates) == 0 {
 		return false
 	}
 	ctx := r.reverseDNSContext()
 	if ctx == nil || ctx.Err() != nil {
 		return false
 	}
-	return r.reverseDNS.warmAsync(ctx, candidates)
+	return r.reverseDNSWarmer.warmAsync(ctx, candidates)
 }
 
 func (r *topologyRegistry) enqueueReverseDNSWarmFromDefaultSnapshot() bool {
-	if r == nil || r.reverseDNS == nil {
+	if r == nil || r.reverseDNSWarmer == nil {
 		return false
 	}
 	ctx := r.reverseDNSContext()
@@ -167,7 +174,7 @@ func (r *topologyRegistry) enqueueReverseDNSWarmFromDefaultSnapshot() bool {
 		if _, ok := r.snapshotWithOptions(options); !ok {
 			return
 		}
-		r.reverseDNS.warm(ctx, collector.collectedCandidates())
+		r.reverseDNSWarmer.warm(ctx, collector.collectedCandidates())
 	}()
 	return true
 }

@@ -4,8 +4,10 @@ package snmp_traps
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"os/exec"
 	"path/filepath"
 	"sync"
@@ -21,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
 // ---------------------------------------------------------------------------
@@ -164,20 +167,21 @@ func BenchmarkTrapEnrichmentMatchingRegistryTopology(b *testing.B) {
 			Neighbors:       []string{"access-a", "access-b"},
 		}
 	})
-	c, store := newTestTrapEnrichmentCollector(topology)
+	dns := reversedns.New(reversedns.Config{Lookup: func(context.Context, string) ([]string, error) {
+		return []string{"ptr-device.example.test."}, nil
+	}})
+	_, err := dns.Resolve(context.Background(), netip.MustParseAddr(sourceIP))
+	if err != nil {
+		b.Fatalf("prewarm reverse DNS: %v", err)
+	}
+	c, store := newTestTrapEnrichmentCollector(topology, dns)
+	c.reverseDNSEnabled = true
 	store.Register("benchmark:"+sourceIP, ddsnmp.DeviceConnectionInfo{
 		Hostname:      sourceIP,
 		VnodeHostname: "registry-device.example.test",
 		Vendor:        "registry-vendor",
 		VnodeGUID:     "vnode-benchmark",
 	})
-
-	dns := newReverseDNSResolver()
-	dns.cache[sourceIP] = reverseDNSCacheEntry{
-		name:      "ptr-device.example.test",
-		expiresAt: time.Now().Add(time.Hour),
-	}
-	b.Cleanup(dns.Close)
 
 	varbinds := []VarbindValue{{
 		Name:  "ifIndex",
@@ -190,7 +194,7 @@ func BenchmarkTrapEnrichmentMatchingRegistryTopology(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		entry := TrapEntry{SourceIP: sourceIP, Varbinds: varbinds}
-		c.enrichTrapEntry(&entry, true, dns)
+		c.enrichTrapEntry(&entry)
 		benchmarkEnrichmentStringSink = entry.ReverseDNS
 		benchmarkEnrichmentIntSink = len(entry.Enrichment.Applied)
 	}
@@ -212,6 +216,9 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 			idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 			store := ddsnmp.NewDeviceStore()
+			dns := reversedns.New(reversedns.Config{Lookup: func(context.Context, string) ([]string, error) {
+				return []string{"ptr-device.example.test."}, nil
+			}})
 			topologyByIP := make(map[string]*snmptopology.TrapTopologyEnrichment, numJobs)
 			writers := make([]*countingWriter, numJobs)
 			collectors := make([]*Collector, numJobs)
@@ -236,12 +243,9 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 					SourceVnodeID:  vnodeID,
 				}
 
-				dns := newReverseDNSResolver()
-				dns.cache[sourceIP] = reverseDNSCacheEntry{
-					name:      fmt.Sprintf("ptr-%d.example.test", i+1),
-					expiresAt: time.Now().Add(time.Hour),
+				if _, err := dns.Resolve(context.Background(), netip.MustParseAddr(sourceIP)); err != nil {
+					b.Fatalf("prewarm reverse DNS for %s: %v", sourceIP, err)
 				}
-				b.Cleanup(dns.Close)
 
 				writers[i] = &countingWriter{}
 				collectors[i] = &Collector{
@@ -249,9 +253,7 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 					trapWriter:        writers[i],
 					metrics:           &perJobMetrics{},
 					profileIndex:      idx,
-					deviceLookup:      store,
-					topologyEnricher:  testTrapTopologyEnricher(func(ip, _ string) *snmptopology.TrapTopologyEnrichment { return topologyByIP[ip] }),
-					reverseDNS:        dns,
+					enricher:          newTestTrapEnricher(store, testTrapTopologyEnricher(func(ip, _ string) *snmptopology.TrapTopologyEnrichment { return topologyByIP[ip] }), dns),
 					reverseDNSEnabled: true,
 				}
 				collectors[i].receiver = newTestReceiver(collectors[i], receiver.PolicyConfig{

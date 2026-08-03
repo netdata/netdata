@@ -17,12 +17,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profilemetrics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
 //go:embed "config_schema.json"
@@ -47,17 +50,25 @@ func directJournalLogsAvailable() bool {
 }
 
 // Register registers the SNMP traps collector with shared SNMP-family enrichment state.
-func Register(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) {
-	collectorapi.Register("snmp_traps", newCreator(deviceStore, topologyEnricher))
+func Register(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) {
+	collectorapi.Register("snmp_traps", newCreator(deviceStore, topologyEnricher, reverseDNS))
 }
 
-func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) collectorapi.Creator {
+func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) collectorapi.Creator {
 	if deviceStore == nil {
 		panic("snmp_traps Register requires a non-nil device store")
 	}
 	if topologyEnricher == nil {
 		panic("snmp_traps Register requires a non-nil trap enrichment handle")
 	}
+	if reverseDNS == nil {
+		panic("snmp_traps Register requires a non-nil reverse DNS resolver")
+	}
+	trapEnricher := enrichment.New(
+		netdataadapter.RegistryLookup(deviceStore),
+		netdataadapter.TopologyLookup(topologyEnricher),
+		reverseDNS,
+	)
 	hostIdentity := newHostIdentityService()
 	var profileCatalogOnce sync.Once
 	var profileCatalog *catalog.Manager
@@ -70,7 +81,7 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 			profileCatalogOnce.Do(func() {
 				profileCatalog = catalog.NewManager(defaultProfileCatalogPaths())
 			})
-			return newCollector(deviceStore, topologyEnricher, hostIdentity, profileCatalog, netdataEngineStateRoot)
+			return newCollector(trapEnricher, hostIdentity, profileCatalog, netdataEngineStateRoot)
 		},
 		Config:         func() any { return &Config{} },
 		AgentFunctions: snmpTrapsMethods,
@@ -79,16 +90,22 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 }
 
 // New returns an SNMP traps collector using the provided SNMP-family enrichment state.
-func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) *Collector {
+func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) *Collector {
 	if deviceStore == nil {
 		panic("snmp_traps New requires a non-nil device store")
 	}
 	if topologyEnricher == nil {
 		panic("snmp_traps New requires a non-nil trap enrichment handle")
 	}
+	if reverseDNS == nil {
+		panic("snmp_traps New requires a non-nil reverse DNS resolver")
+	}
 	return newCollector(
-		deviceStore,
-		topologyEnricher,
+		enrichment.New(
+			netdataadapter.RegistryLookup(deviceStore),
+			netdataadapter.TopologyLookup(topologyEnricher),
+			reverseDNS,
+		),
 		newHostIdentityService(),
 		nil,
 		netdataEngineStateRoot,
@@ -96,8 +113,7 @@ func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnr
 }
 
 func newCollector(
-	deviceStore *ddsnmp.DeviceStore,
-	topologyEnricher *snmptopology.TrapEnrichmentHandle,
+	trapEnricher *enrichment.Enricher,
 	hostIdentity *hostidentity.Service,
 	profileCatalog *catalog.Manager,
 	engineStateRoot func() string,
@@ -111,12 +127,11 @@ func newCollector(
 				ReceiveBuffer: receiver.DefaultReceiveBuffer,
 			},
 		},
-		store:            store,
-		deviceLookup:     deviceStore,
-		topologyEnricher: topologyEnricher,
-		hostIdentity:     hostIdentity,
-		profileCatalog:   profileCatalog,
-		engineStateRoot:  engineStateRoot,
+		store:           store,
+		enricher:        trapEnricher,
+		hostIdentity:    hostIdentity,
+		profileCatalog:  profileCatalog,
+		engineStateRoot: engineStateRoot,
 	}
 }
 
@@ -129,8 +144,7 @@ type Collector struct {
 	journalHost       journalHostProvider
 	journalDir        string
 	store             metrix.CollectorStore
-	deviceLookup      deviceLookup
-	topologyEnricher  trapTopologyEnricher
+	enricher          *enrichment.Enricher
 	hostIdentity      *hostidentity.Service
 	profileCatalog    *catalog.Manager
 	profileLease      *catalog.Lease
@@ -139,7 +153,6 @@ type Collector struct {
 	vnode             string
 	overrides         map[string]*OverrideConfig
 	metrics           *perJobMetrics
-	reverseDNS        *reverseDNSResolver
 	reverseDNSEnabled bool
 	deduper           *trapDeduper
 	packetSequence    atomic.Uint64
@@ -328,9 +341,6 @@ func (c *Collector) Init(ctx context.Context) error {
 	releaseProfileLease = false
 	c.writeFailureDim = writeFailureDim
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
-	if c.reverseDNSEnabled {
-		c.reverseDNS = newReverseDNSResolver()
-	}
 
 	if deduper != nil {
 		deduper.start()
@@ -366,11 +376,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.trapWriter = nil
 	}
 	c.journalHost = nil
-	if c.reverseDNS != nil {
-		c.reverseDNS.Close()
-		c.reverseDNS = nil
-		c.reverseDNSEnabled = false
-	}
+	c.reverseDNSEnabled = false
 	if c.profileLease != nil {
 		c.profileLease.Close()
 		c.profileLease = nil
@@ -408,9 +414,6 @@ func (c *Collector) collect(ctx context.Context) error {
 	}
 	now := time.Now()
 	c.receiver.Sweep(now)
-	if c.reverseDNS != nil {
-		c.reverseDNS.maybeSweep(now)
-	}
 	if c.metrics != nil {
 		if w, ok := c.trapWriter.(output.BinaryFieldCounter); ok {
 			c.metrics.setBinaryEncoded(w.BinaryEncodedFields())
@@ -473,7 +476,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 
 	entry := trapEntryFromPDU(c.Name, pdu, td, time.Now().UnixMicro(), c.monotonicUsec())
 	entry.PacketSequence = packetSequence
-	c.enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
+	c.enrichTrapEntry(entry)
 	renderTrapEntryTemplates(entry, td)
 	if unknownOID {
 		c.incTrapError("unknown_oid")

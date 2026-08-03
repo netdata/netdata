@@ -95,11 +95,15 @@ func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
 	deviceStore := pointerField(t, snmpCollector, "deviceStore")
 	require.NotZero(t, deviceStore)
 	assert.Equal(t, deviceStore, interfacePointerField(t, topologyCollector, "deviceSource"))
-	assert.Equal(t, deviceStore, interfacePointerField(t, trapsCollector, "deviceLookup"))
 
 	trapEnrichment := pointerField(t, topologyCollector, "trapEnrichment")
 	require.NotZero(t, trapEnrichment)
-	assert.Equal(t, trapEnrichment, interfacePointerField(t, trapsCollector, "topologyEnricher"))
+	require.NotZero(t, pointerField(t, trapsCollector, "enricher"))
+
+	topologyReverseDNS := nestedPointerField(t, topologyCollector, "topologyRegistry", "reverseDNS")
+	trapsReverseDNS := nestedInterfacePointerField(t, trapsCollector, "enricher", "reverseDNS")
+	require.NotZero(t, topologyReverseDNS)
+	assert.Equal(t, topologyReverseDNS, trapsReverseDNS)
 }
 
 func requireCreator(t *testing.T, module string) collectorapi.Creator {
@@ -128,5 +132,37 @@ func interfacePointerField(t *testing.T, obj any, name string) uintptr {
 	elem := field.Elem()
 	require.Equal(t, reflect.Pointer, elem.Kind(), "field %q concrete value", name)
 	require.False(t, elem.IsNil(), "field %q concrete value is nil", name)
+	return elem.Pointer()
+}
+
+func nestedPointerField(t *testing.T, obj any, outerName, innerName string) uintptr {
+	t.Helper()
+	outer := reflect.ValueOf(obj).Elem().FieldByName(outerName)
+	require.True(t, outer.IsValid(), "field %q not found", outerName)
+	require.Equal(t, reflect.Pointer, outer.Kind(), "field %q", outerName)
+	require.False(t, outer.IsNil(), "field %q is nil", outerName)
+
+	inner := outer.Elem().FieldByName(innerName)
+	require.True(t, inner.IsValid(), "field %q.%q not found", outerName, innerName)
+	require.Equal(t, reflect.Pointer, inner.Kind(), "field %q.%q", outerName, innerName)
+	require.False(t, inner.IsNil(), "field %q.%q is nil", outerName, innerName)
+	return inner.Pointer()
+}
+
+func nestedInterfacePointerField(t *testing.T, obj any, outerName, innerName string) uintptr {
+	t.Helper()
+	outer := reflect.ValueOf(obj).Elem().FieldByName(outerName)
+	require.True(t, outer.IsValid(), "field %q not found", outerName)
+	require.Equal(t, reflect.Pointer, outer.Kind(), "field %q", outerName)
+	require.False(t, outer.IsNil(), "field %q is nil", outerName)
+
+	inner := outer.Elem().FieldByName(innerName)
+	require.True(t, inner.IsValid(), "field %q.%q not found", outerName, innerName)
+	require.Equal(t, reflect.Interface, inner.Kind(), "field %q.%q", outerName, innerName)
+	require.False(t, inner.IsNil(), "field %q.%q is nil", outerName, innerName)
+
+	elem := inner.Elem()
+	require.Equal(t, reflect.Pointer, elem.Kind(), "field %q.%q concrete value", outerName, innerName)
+	require.False(t, elem.IsNil(), "field %q.%q concrete value is nil", outerName, innerName)
 	return elem.Pointer()
 }

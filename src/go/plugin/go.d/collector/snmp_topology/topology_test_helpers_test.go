@@ -7,6 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
@@ -18,7 +19,13 @@ func newTestSNMPTopologyCollector() *Collector {
 
 func newTestSNMPTopologyCollectorWithStore() (*Collector, *ddsnmp.DeviceStore) {
 	store := ddsnmp.NewDeviceStore()
-	return New(store, NewTrapEnrichmentHandle()), store
+	return New(store, NewTrapEnrichmentHandle(), newTestReverseDNSResolver()), store
+}
+
+func newTestReverseDNSResolver() *reversedns.Resolver { return reversedns.New(reversedns.Config{}) }
+
+func newTopologyRegistry() *topologyRegistry {
+	return newTopologyRegistryWithResolver(newTestReverseDNSResolver())
 }
 
 func registerTestDeviceState(store *ddsnmp.DeviceStore, devices ...ddsnmp.DeviceConnectionInfo) {
