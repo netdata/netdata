@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
@@ -25,6 +26,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profilemetrics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
@@ -35,12 +37,12 @@ var configSchema string
 var chartTemplateYAML string
 
 const (
-	trapWriteFailureJournal = "journal_write_failed"
-	trapWriteFailureOTLP    = "otlp_export_failed"
+	trapWriteFailureJournal = telemetry.ErrorJournalWriteFailed
+	trapWriteFailureOTLP    = telemetry.ErrorOTLPExportFailed
 
 	listenerReadErrorLogEvery     = time.Hour
 	listenerReadErrorLogKeyPrefix = "snmp_traps:listener_read_failed:"
-	listenerBufferDegradedMetric  = "listener_buffer_degraded"
+	listenerBufferDegradedMetric  = telemetry.ErrorListenerBufferDegraded
 )
 
 var activeDirectJournalJobs atomic.Int64
@@ -70,6 +72,7 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 		reverseDNS,
 	)
 	hostIdentity := newHostIdentityService()
+	telemetryRegistry := telemetry.NewRegistry()
 	var profileCatalogOnce sync.Once
 	var profileCatalog *catalog.Manager
 	return collectorapi.Creator{
@@ -81,7 +84,7 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 			profileCatalogOnce.Do(func() {
 				profileCatalog = catalog.NewManager(defaultProfileCatalogPaths())
 			})
-			return newCollector(trapEnricher, hostIdentity, profileCatalog, netdataEngineStateRoot)
+			return newCollector(trapEnricher, hostIdentity, profileCatalog, telemetryRegistry, netdataEngineStateRoot)
 		},
 		Config:         func() any { return &Config{} },
 		AgentFunctions: snmpTrapsMethods,
@@ -108,6 +111,7 @@ func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnr
 		),
 		newHostIdentityService(),
 		nil,
+		telemetry.NewRegistry(),
 		netdataEngineStateRoot,
 	)
 }
@@ -116,6 +120,7 @@ func newCollector(
 	trapEnricher *enrichment.Enricher,
 	hostIdentity *hostidentity.Service,
 	profileCatalog *catalog.Manager,
+	telemetryRegistry *telemetry.Registry,
 	engineStateRoot func() string,
 ) *Collector {
 	store := metrix.NewCollectorStore()
@@ -127,11 +132,12 @@ func newCollector(
 				ReceiveBuffer: receiver.DefaultReceiveBuffer,
 			},
 		},
-		store:           store,
-		enricher:        trapEnricher,
-		hostIdentity:    hostIdentity,
-		profileCatalog:  profileCatalog,
-		engineStateRoot: engineStateRoot,
+		store:             store,
+		enricher:          trapEnricher,
+		hostIdentity:      hostIdentity,
+		profileCatalog:    profileCatalog,
+		telemetryRegistry: telemetryRegistry,
+		engineStateRoot:   engineStateRoot,
 	}
 }
 
@@ -147,17 +153,19 @@ type Collector struct {
 	enricher          *enrichment.Enricher
 	hostIdentity      *hostidentity.Service
 	profileCatalog    *catalog.Manager
+	telemetryRegistry *telemetry.Registry
 	profileLease      *catalog.Lease
 	profileIndex      *catalog.Epoch
 	engineStateRoot   func() string
 	vnode             string
 	overrides         map[string]*OverrideConfig
-	metrics           *perJobMetrics
+	telemetry         *telemetry.Job
 	reverseDNSEnabled bool
-	deduper           *trapDeduper
+	deduper           *dedup.Deduper
+	dedupKeyVarbinds  []string
 	packetSequence    atomic.Uint64
 	profileMetrics    *profilemetrics.Runtime
-	writeFailureDim   string
+	writeFailureDim   telemetry.ErrorKind
 }
 
 func (c *Collector) Configuration() any {
@@ -209,12 +217,12 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.profileMetrics = rt
 	}
 
-	var metrics *perJobMetrics
+	var jobTelemetry *telemetry.Job
 	reportReceiver := receiver.Reporter(func(event receiver.Event) {
-		c.handleReceiverEvent(metrics, event)
+		c.handleReceiverEvent(jobTelemetry, event)
 	})
 	reportOutput := output.OutcomeReporter(func(outcome output.Outcome) {
-		c.handleOutputOutcome(metrics, outcome)
+		c.handleOutputOutcome(jobTelemetry, outcome)
 	})
 	var journalWriter *journal.Writer
 	var otlpWriter *otlp.Writer
@@ -240,7 +248,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	recv := receiver.New(validated.receiver, reportReceiver)
-	err = recv.Bind()
+	bindEvents, err := recv.Bind()
 	if err != nil {
 		releaseProfiles()
 		if journalWriter != nil {
@@ -275,8 +283,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	overrides := buildOverrideMap(c.Overrides)
-	metrics = getJobMetrics(c.Name)
-	recv.ReportBindWarnings()
+	jobTelemetry = c.attachTelemetryAndHandleInitEvents(bindEvents, validated.dedup.Enabled())
 	var secondaryWriter output.Writer
 	if c.OTLP.Enabled {
 		c.warnPlaintextOTLP(validated.otlp)
@@ -285,7 +292,7 @@ func (c *Collector) Init(ctx context.Context) error {
 			Report:        reportOutput,
 		})
 		if err != nil {
-			removeJobMetrics(c.Name)
+			jobTelemetry.Detach()
 			cleanupCreatedState()
 			cleanupPreflight()
 			return dyncfgStartupError(err)
@@ -301,11 +308,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	if primaryWriter == nil {
 		writeFailureDim = trapWriteFailureOTLP
 	}
-	metrics.setDedupEnabled(c.Dedup.Enabled)
-	deduper := newTrapDeduper(c.Name, c.Dedup, trapWriter, metrics, writeFailureDim, c.monotonicUsec)
-	if deduper != nil {
-		deduper.profiles = idx
-	}
+	jobName := c.Name
+	deduper := newJobDeduper(jobName, validated.dedup, idx, trapWriter, jobTelemetry, writeFailureDim, c.monotonicUsec)
+	dedupKeyVarbinds := validated.dedup.KeyVarbinds()
 
 	var otlpStarter, journalStarter outputStarter
 	if otlpWriter != nil {
@@ -315,7 +320,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		journalStarter = journalWriter
 	}
 	if err := startOutputBackends(otlpStarter, journalStarter); err != nil {
-		removeJobMetrics(c.Name)
+		jobTelemetry.Detach()
 		cleanupCreatedState()
 		cleanupPreflight()
 		return dyncfgStartupError(err)
@@ -324,7 +329,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.Versions = validated.versions
 	c.vnode = c.Vnode
 	c.overrides = overrides
-	c.metrics = metrics
+	c.telemetry = jobTelemetry
 	c.receiver = recv
 	c.trapWriter = trapWriter
 	c.journalHost = nil
@@ -335,6 +340,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		activeDirectJournalJobs.Add(1)
 	}
 	c.deduper = deduper
+	c.dedupKeyVarbinds = dedupKeyVarbinds
 	c.profileCatalog = profileCatalog
 	c.profileLease = profileLease
 	c.profileIndex = idx
@@ -343,7 +349,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
 
 	if deduper != nil {
-		deduper.start()
+		deduper.Start()
 	}
 
 	recv.CommitPreparedState()
@@ -371,6 +377,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.deduper.Close()
 		c.deduper = nil
 	}
+	c.dedupKeyVarbinds = nil
 	if c.trapWriter != nil {
 		c.trapWriter.Close()
 		c.trapWriter = nil
@@ -385,8 +392,10 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.journalDir != "" {
 		activeDirectJournalJobs.Add(-1)
 	}
-	removeJobMetrics(c.Name)
-	c.metrics = nil
+	if c.telemetry != nil {
+		c.telemetry.Detach()
+		c.telemetry = nil
+	}
 	c.profileMetrics = nil
 	c.journalDir = ""
 	c.writeFailureDim = ""
@@ -401,7 +410,7 @@ func (c *Collector) ChartTemplateYAML() string {
 	return chartTemplateYAML
 }
 
-func (c *Collector) trapWriteFailureDim() string {
+func (c *Collector) trapWriteFailureDim() telemetry.ErrorKind {
 	if c.writeFailureDim != "" {
 		return c.writeFailureDim
 	}
@@ -414,12 +423,12 @@ func (c *Collector) collect(ctx context.Context) error {
 	}
 	now := time.Now()
 	c.receiver.Sweep(now)
-	if c.metrics != nil {
+	if c.telemetry != nil {
 		if w, ok := c.trapWriter.(output.BinaryFieldCounter); ok {
-			c.metrics.setBinaryEncoded(w.BinaryEncodedFields())
+			c.telemetry.SetBinaryEncoded(w.BinaryEncodedFields())
 		}
+		c.telemetry.Collect(c.store)
 	}
-	collectMetrics(c.store, c.Name)
 	if c.profileMetrics != nil {
 		c.profileMetrics.Collect(c.store, c.Name)
 	}
@@ -428,21 +437,21 @@ func (c *Collector) collect(ctx context.Context) error {
 
 func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
 	packetSequence := c.packetSequence.Add(1)
-	metrics := c.trapMetrics()
-	metrics.incPipelineReceived()
+	jobTelemetry := c.telemetry
+	jobTelemetry.PipelineReceived()
 	packetFinished := false
 
 	defer func() {
 		if v := recover(); v != nil {
-			c.incTrapError("decode_failed")
+			jobTelemetry.Error(telemetry.ErrorDecodeFailed)
 			if !packetFinished {
-				metrics.incPipelineDropped()
+				jobTelemetry.PipelineDropped()
 			}
 			c.Errorf("SNMP trap packet handling panic from %s: %v", peerIP, v)
 			return
 		}
 		if !packetFinished {
-			metrics.incPipelineDropped()
+			jobTelemetry.PipelineDropped()
 		}
 	}()
 
@@ -466,7 +475,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		td, profileLookupErr = idx.LookupWithError(pdu.OID)
 		if profileLookupErr != nil {
 			c.warnf("SNMP trap profile lookup failed for OID %s: %v", pdu.OID, profileLookupErr)
-			c.incTrapError("profile_load_failed")
+			jobTelemetry.Error(telemetry.ErrorProfileLoadFailed)
 		}
 	}
 	unknownOID := td == nil && profileLookupErr == nil
@@ -479,17 +488,18 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	c.enrichTrapEntry(entry)
 	renderTrapEntryTemplates(entry, td)
 	if unknownOID {
-		c.incTrapError("unknown_oid")
+		jobTelemetry.Error(telemetry.ErrorUnknownOID)
 	}
 	if trapEntryHasUnresolvedTemplate(entry) {
-		c.incTrapError("template_unresolved")
+		jobTelemetry.Error(telemetry.ErrorTemplateUnresolved)
 	}
-	metrics.incPipelineAccepted()
-	var admission dedupAdmission
+	jobTelemetry.PipelineAccepted()
+	var admission dedup.Admission
 	if c.deduper != nil {
-		var suppressed bool
-		admission, suppressed = c.deduper.Admit(entry, td, c.Dedup.KeyVarbinds)
-		if suppressed {
+		var decision dedup.Decision
+		admission, decision = c.deduper.Admit(entry, selectDedupKeyVarbinds(td, c.dedupKeyVarbinds))
+		if decision == dedup.DecisionSuppress {
+			jobTelemetry.DedupSuppressed()
 			packetFinished = true
 			return
 		}
@@ -498,8 +508,8 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		if c.deduper != nil {
 			c.deduper.Rollback(admission)
 		}
-		c.incTrapError(c.trapWriteFailureDim())
-		metrics.incPipelineWriteFailed()
+		jobTelemetry.Error(c.trapWriteFailureDim())
+		jobTelemetry.PipelineWriteFailed(1)
 		packetFinished = true
 		return
 	}
@@ -513,15 +523,66 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	if td != nil {
 		cat = Category(td.Category)
 	}
-	metrics.incPipelineCommitted()
-	metrics.incEvent(cat)
-	metrics.incSeverity(entry.Severity)
+	jobTelemetry.PipelineCommitted()
+	jobTelemetry.Event(cat)
+	jobTelemetry.Severity(entry.Severity)
+}
+
+func selectDedupKeyVarbinds(td *TrapDef, jobKeys []string) []string {
+	if td != nil && len(td.DedupKeyVarbinds) > 0 {
+		return td.DedupKeyVarbinds
+	}
+	return jobKeys
 }
 
 func (c *Collector) warnf(format string, args ...any) {
 	if c.Logger != nil {
 		c.Warningf(format, args...)
 	}
+}
+
+func (c *Collector) attachTelemetryAndHandleInitEvents(events []receiver.Event, dedupEnabled bool) *telemetry.Job {
+	jobTelemetry := c.telemetryRegistry.Attach(c.Name, telemetry.Options{DedupEnabled: dedupEnabled})
+	for _, event := range events {
+		c.handleReceiverEvent(jobTelemetry, event)
+	}
+	return jobTelemetry
+}
+
+func newJobDeduper(
+	jobName string,
+	policy dedup.Policy,
+	idx *catalog.Epoch,
+	writer output.Writer,
+	jobTelemetry *telemetry.Job,
+	writeFailureDim telemetry.ErrorKind,
+	monotonicNow func() int64,
+) *dedup.Deduper {
+	return dedup.New(policy, dedup.Options{
+		MonotonicNow: monotonicNow,
+		ResolveName: func(oid string) string {
+			if idx != nil {
+				if td := idx.Lookup(oid); td != nil && td.Name != "" {
+					return td.Name
+				}
+			}
+			return oid
+		},
+		OnSummary: func(summary dedup.Summary) {
+			entry := &TrapEntry{
+				JobName:               jobName,
+				ReportType:            ReportTypeDedupSummary,
+				ReceivedRealtimeUsec:  summary.ReceivedRealtimeUsec,
+				ReceivedMonotonicUsec: summary.ReceivedMonotonicUsec,
+				Message:               summary.Message,
+				Severity:              "info",
+				SummaryCounts:         summary.Counts,
+			}
+			if err := writer.Write(entry); err != nil {
+				jobTelemetry.Error(writeFailureDim)
+			}
+		},
+	})
 }
 
 type outputStarter interface {
@@ -542,21 +603,21 @@ func startOutputBackends(otlpBackend, journalBackend outputStarter) error {
 	return nil
 }
 
-func (c *Collector) handleOutputOutcome(metrics *perJobMetrics, outcome output.Outcome) {
+func (c *Collector) handleOutputOutcome(jobTelemetry *telemetry.Job, outcome output.Outcome) {
 	if outcome.Backend == output.BackendJournal && outcome.Err != nil {
 		c.warnf("SNMP trap journal writer stopped for job %q: %v", c.Name, outcome.Err)
 	}
-	if metrics == nil || outcome.FailedEntries == 0 {
+	if jobTelemetry == nil || outcome.FailedEntries == 0 {
 		return
 	}
 	switch outcome.Backend {
 	case output.BackendJournal:
-		metrics.addError(trapWriteFailureJournal, outcome.FailedEntries)
+		jobTelemetry.AddError(trapWriteFailureJournal, outcome.FailedEntries)
 	case output.BackendOTLP:
-		metrics.addError(trapWriteFailureOTLP, outcome.FailedEntries)
+		jobTelemetry.AddError(trapWriteFailureOTLP, outcome.FailedEntries)
 	}
 	if outcome.Authoritative {
-		metrics.addPipelineWriteFailed(outcome.FailedEntries)
+		jobTelemetry.PipelineWriteFailed(outcome.FailedEntries)
 	}
 }
 
@@ -579,19 +640,19 @@ func trustedRelayPrefixIsCatchAll(prefix netip.Prefix) bool {
 	return prefix.Bits() == 0
 }
 
-func (c *Collector) handleReceiverEvent(metrics *perJobMetrics, event receiver.Event) {
+func (c *Collector) handleReceiverEvent(jobTelemetry *telemetry.Job, event receiver.Event) {
 	switch event.Type {
 	case receiver.EventError:
-		if metrics != nil {
-			metrics.incError(string(event.ErrorKind))
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorKind(event.ErrorKind))
 		}
 	case receiver.EventDecoded:
-		if metrics != nil {
-			metrics.incPipelineDecoded()
+		if jobTelemetry != nil {
+			jobTelemetry.PipelineDecoded()
 		}
 	case receiver.EventListenerReadFailed:
-		if metrics != nil {
-			metrics.incError("listener_read_failed")
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorListenerReadFailed)
 		}
 		if c.Logger != nil {
 			endpoint := event.Endpoint.LogName()
@@ -599,27 +660,27 @@ func (c *Collector) handleReceiverEvent(metrics *perJobMetrics, event receiver.E
 				Warningf("SNMP trap listener read failed (endpoint=%s): %v", endpoint, event.Err)
 		}
 	case receiver.EventListenerBufferDegraded:
-		if metrics != nil {
-			metrics.incError(listenerBufferDegradedMetric)
+		if jobTelemetry != nil {
+			jobTelemetry.Error(listenerBufferDegradedMetric)
 		}
 		c.warnf(
 			"SNMP trap listener receive buffer request degraded (endpoint=%s, requested=%d bytes): %v; continuing with the OS socket buffer, high trap bursts may be dropped",
 			event.Endpoint.LogName(), event.Requested, event.Err,
 		)
 	case receiver.EventDynamicEngineIDRegistered:
-		if metrics != nil {
-			metrics.incError("unknown_engine_id")
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorUnknownEngineID)
 		}
 		c.warnf("Dynamic SNMPv3 engine ID registered: engineID=%s username=%s. This sender was not in the static configuration. Every first-time dynamic (engineID, username) pair is accepted and logged once per job lifetime.",
 			event.EngineID, event.Username)
 	case receiver.EventInformResponseFailed:
-		if metrics != nil {
-			metrics.incError("inform_response_failed")
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorInformResponseFailed)
 		}
 		c.warnf("SNMP trap INFORM response failed: %v", event.Err)
 	case receiver.EventDiscoveryReportFailed:
-		if metrics != nil {
-			metrics.incError("inform_response_failed")
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorInformResponseFailed)
 		}
 		c.warnf("SNMP trap INFORM discovery Report failed: %v", event.Err)
 	}

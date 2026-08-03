@@ -162,12 +162,24 @@ Runtime ownership is split at protocol acceptance:
   sockets, reusable receive buffers, source/version/community admission,
   BER/SNMP decode, SNMPv3 USM and engine state, dynamic engine-ID handling,
   INFORM responses, and per-source rate limiting.
-- The root collector owns public config DTOs and lifecycle orchestration. After
-  receiver acceptance, it owns catalog lookup, overrides,
-  attribution/enrichment, template rendering, deduplication, output commitment,
-  and metric updates.
-- Receiver outcomes use one event callback. The receiver package does not
-  depend on collector telemetry, logging, profile, or output packages.
+- `internal/dedup` owns normalized dedup policy, fingerprint/cache state,
+  admission and rollback, summary scheduling/rendering, and synchronous final
+  callback completion. It receives model entries plus already-selected key
+  names and returns typed decisions; it does not import catalog, output, or
+  telemetry packages.
+- `internal/telemetry` owns the retained built-in per-job counters and their
+  `metrix` emission. Event paths and collection retain one explicit job handle;
+  registry lookup and locking are lifecycle-only.
+- The root collector owns public config DTOs and lifecycle/transaction
+  orchestration. After receiver acceptance, it sequences catalog lookup,
+  overrides, attribution/enrichment, template rendering, dedup admission,
+  authoritative output commitment, profile-metric updates, and built-in metric
+  updates.
+- Runtime receiver outcomes use one event callback. The receiver package does
+  not depend on collector telemetry, logging, profile, or output packages.
+- `Receiver.Bind()` returns non-fatal bind-time events as explicit values.
+  Root attaches the job telemetry handle before handling them; runtime events
+  continue through the receiver callback.
 
 Each endpoint owns one receive goroutine and one reusable datagram buffer. The
 receive loop invokes the root packet workflow synchronously before reusing that
@@ -183,15 +195,18 @@ SNMPv3 state:
 3. Construct the receiver and bind every endpoint; any bind failure closes
    earlier sockets and the prepared journal backend.
 4. Prepare receiver-local SNMPv3 state when v3 is enabled.
-5. Prepare the OTLP backend, compose the output coordinator and deduper, then
+5. Attach the per-job telemetry handle, then handle the receiver's returned
+   bind-time events so degraded default receive-buffer requests are counted.
+6. Prepare the OTLP backend, compose the output coordinator and deduper, then
    start the prepared output backends.
-6. Publish the fully constructed collector state, start deduplication when
+7. Publish the fully constructed collector state, start deduplication when
    enabled, commit prepared v3 state, and start endpoint receive loops last.
 
-Failures after v3 preparation but before receiver start roll back only state
-created by that attempt and close all bound sockets. Cleanup closes receive
-loops before output, then releases job-local profile and metric state. Borrowed
-shared enrichment dependencies remain alive.
+Failures after v3 preparation but before receiver start detach an attached
+telemetry handle, roll back only state created by that attempt, and close all
+bound sockets. Cleanup closes receive loops first, synchronously completes the
+deduper's final summary callback, closes output, releases the catalog lease, and
+detaches telemetry last. Borrowed shared enrichment dependencies remain alive.
 
 ## 9. Enrichment and reverse-DNS ownership (authoritative)
 

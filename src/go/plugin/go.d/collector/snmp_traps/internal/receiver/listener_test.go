@@ -22,7 +22,9 @@ func TestReceiverBindStartDeliverClose(t *testing.T) {
 		Versions:    []string{"v2c"},
 		Communities: []string{"public"},
 	}), nil)
-	require.NoError(t, recv.Bind())
+	bindEvents, err := recv.Bind()
+	require.NoError(t, err)
+	assert.Empty(t, bindEvents)
 	t.Cleanup(recv.Close)
 	require.Len(t, recv.listener.endpoints, 1)
 	boundAddr, ok := recv.listener.endpoints[0].conn.LocalAddr().(*net.UDPAddr)
@@ -56,7 +58,7 @@ func TestReceiverBindStartDeliverClose(t *testing.T) {
 
 func TestListenerReadLoopCountsUnexpectedReadErrors(t *testing.T) {
 	reported := make(chan Endpoint, 1)
-	l, err := newListener(ListenConfig{
+	l, _, err := newListener(ListenConfig{
 		Endpoints: []Endpoint{{
 			Protocol: "udp4",
 			Address:  "127.0.0.1",
@@ -88,7 +90,7 @@ func TestListenerReadLoopCountsUnexpectedReadErrors(t *testing.T) {
 
 func TestListenerReadLoopDoesNotReportReadErrorDuringClose(t *testing.T) {
 	var reported atomic.Bool
-	l, err := newListener(ListenConfig{
+	l, _, err := newListener(ListenConfig{
 		Endpoints: []Endpoint{{
 			Protocol: "udp4",
 			Address:  "127.0.0.1",
@@ -119,7 +121,7 @@ func TestNewListenerAppliesReceiveBuffer(t *testing.T) {
 		return nil
 	}
 
-	l, err := newListener(ListenConfig{
+	l, bindEvents, err := newListener(ListenConfig{
 		Endpoints: []Endpoint{{
 			Protocol: "udp4",
 			Address:  "127.0.0.1",
@@ -131,6 +133,7 @@ func TestNewListenerAppliesReceiveBuffer(t *testing.T) {
 	t.Cleanup(l.close)
 
 	assert.Equal(t, []int{123456}, got)
+	assert.Empty(t, bindEvents)
 }
 
 func TestNewListenerSkipsReceiveBufferWhenZero(t *testing.T) {
@@ -143,7 +146,7 @@ func TestNewListenerSkipsReceiveBufferWhenZero(t *testing.T) {
 		return nil
 	}
 
-	l, err := newListener(ListenConfig{
+	l, bindEvents, err := newListener(ListenConfig{
 		Endpoints: []Endpoint{{
 			Protocol: "udp4",
 			Address:  "127.0.0.1",
@@ -154,9 +157,10 @@ func TestNewListenerSkipsReceiveBufferWhenZero(t *testing.T) {
 	t.Cleanup(l.close)
 
 	assert.False(t, called)
+	assert.Empty(t, bindEvents)
 }
 
-func TestNewListenerAllowsDefaultReceiveBufferFailure(t *testing.T) {
+func TestReceiverBindReturnsDefaultReceiveBufferFailure(t *testing.T) {
 	oldSetUDPReadBuffer := setUDPReadBuffer
 	t.Cleanup(func() { setUDPReadBuffer = oldSetUDPReadBuffer })
 
@@ -164,21 +168,19 @@ func TestNewListenerAllowsDefaultReceiveBufferFailure(t *testing.T) {
 		return errors.New("boom")
 	}
 
-	l, err := newListener(ListenConfig{
-		Endpoints: []Endpoint{{
-			Protocol: "udp4",
-			Address:  "127.0.0.1",
-			Port:     0,
-		}},
+	recv := New(NewPolicy(PolicyConfig{Listen: ListenConfig{
+		Endpoints:     []Endpoint{{Protocol: "udp4", Address: "127.0.0.1", Port: 0}},
 		ReceiveBuffer: DefaultReceiveBuffer,
-	}, nil)
+	}}), nil)
+	bindEvents, err := recv.Bind()
 	require.NoError(t, err)
-	t.Cleanup(l.close)
-	require.Len(t, l.endpoints, 1)
-	require.Len(t, l.receiveBufferWarnings, 1)
-	assert.Equal(t, "udp4", l.receiveBufferWarnings[0].endpoint.Protocol)
-	assert.Equal(t, DefaultReceiveBuffer, l.receiveBufferWarnings[0].requested)
-	assert.ErrorContains(t, l.receiveBufferWarnings[0].err, "boom")
+	t.Cleanup(recv.Close)
+	require.Len(t, recv.listener.endpoints, 1)
+	require.Len(t, bindEvents, 1)
+	assert.Equal(t, EventListenerBufferDegraded, bindEvents[0].Type)
+	assert.Equal(t, "udp4", bindEvents[0].Endpoint.Protocol)
+	assert.Equal(t, DefaultReceiveBuffer, bindEvents[0].Requested)
+	assert.ErrorContains(t, bindEvents[0].Err, "boom")
 }
 
 func TestNewListenerFailsWhenReceiveBufferCannotBeSet(t *testing.T) {
@@ -189,7 +191,7 @@ func TestNewListenerFailsWhenReceiveBufferCannotBeSet(t *testing.T) {
 		return errors.New("boom")
 	}
 
-	l, err := newListener(ListenConfig{
+	l, bindEvents, err := newListener(ListenConfig{
 		Endpoints: []Endpoint{{
 			Protocol: "udp4",
 			Address:  "127.0.0.1",
@@ -199,6 +201,7 @@ func TestNewListenerFailsWhenReceiveBufferCannotBeSet(t *testing.T) {
 	}, nil)
 	require.Error(t, err)
 	assert.Nil(t, l)
+	assert.Empty(t, bindEvents)
 	assert.Contains(t, err.Error(), "set receive buffer")
 	assert.Contains(t, err.Error(), "boom")
 }

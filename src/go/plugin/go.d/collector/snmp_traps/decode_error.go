@@ -19,7 +19,7 @@ const maxDecodeErrorLen = 256
 func (c *Collector) writeDecodeErrorEntry(failure *receiver.DecodeFailure, packetSequence uint64) {
 	entry := newDecodeErrorEntry(c.Name, failure, packetSequence, c.monotonicUsec())
 	if err := c.trapWriter.Write(entry); err != nil {
-		c.incTrapError(c.trapWriteFailureDim())
+		c.telemetry.Error(c.trapWriteFailureDim())
 	}
 }
 

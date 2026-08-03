@@ -11,10 +11,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/traptest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
@@ -102,11 +104,14 @@ func newTestV2Collector(jobName string, writer output.Writer, prefixes []netip.P
 }
 
 func newTestV2CollectorWithPolicy(jobName string, writer output.Writer, policy receiver.PolicyConfig) *Collector {
+	registry := telemetry.NewRegistry()
 	c := &Collector{
-		Config:       Config{Name: jobName},
-		trapWriter:   writer,
-		journalHost:  newTestJournalHostProvider(),
-		profileIndex: currentTestProfileIndex,
+		Config:            Config{Name: jobName},
+		trapWriter:        writer,
+		journalHost:       newTestJournalHostProvider(),
+		profileIndex:      currentTestProfileIndex,
+		telemetryRegistry: registry,
+		telemetry:         registry.Attach(jobName, telemetry.Options{}),
 	}
 	c.receiver = newTestReceiver(c, policy)
 	return c
@@ -114,7 +119,7 @@ func newTestV2CollectorWithPolicy(jobName string, writer output.Writer, policy r
 
 func newTestReceiver(c *Collector, cfg receiver.PolicyConfig) *receiver.Receiver {
 	return receiver.New(receiver.NewPolicy(cfg), func(event receiver.Event) {
-		c.handleReceiverEvent(c.trapMetrics(), event)
+		c.handleReceiverEvent(c.telemetry, event)
 	})
 }
 
@@ -127,7 +132,7 @@ func bindTestReceiver(t *testing.T, c *Collector) *receiver.Receiver {
 			Port:     freeUDPPort(t),
 		}}},
 	})
-	if err := recv.Bind(); err != nil {
+	if _, err := recv.Bind(); err != nil {
 		t.Fatalf("bind test receiver: %v", err)
 	}
 	t.Cleanup(recv.Close)
@@ -235,14 +240,15 @@ func (d *testReverseDNS) callCounts() (lookups, schedules int) {
 	return len(d.lookups), len(d.schedules)
 }
 
-func withCleanJobMetrics(t *testing.T, jobName string) *perJobMetrics {
+func newTestJobTelemetry(t testing.TB, jobName string, dedupEnabled bool) *telemetry.Job {
 	t.Helper()
-	removeJobMetrics(jobName)
-	t.Cleanup(func() { removeJobMetrics(jobName) })
-	return getJobMetrics(jobName)
+	registry := telemetry.NewRegistry()
+	job := registry.Attach(jobName, telemetry.Options{DedupEnabled: dedupEnabled})
+	t.Cleanup(job.Detach)
+	return job
 }
 
-func collectJobMetricsForTest(t *testing.T, jobName string) metrix.CollectorStore {
+func collectJobMetricsForTest(t testing.TB, job *telemetry.Job) metrix.CollectorStore {
 	t.Helper()
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
@@ -250,23 +256,35 @@ func collectJobMetricsForTest(t *testing.T, jobName string) metrix.CollectorStor
 		t.Fatal("collector store does not expose cycle control")
 	}
 	managed.CycleController().BeginCycle()
-	collectMetrics(store, jobName)
+	job.Collect(store)
 	if err := managed.CycleController().CommitCycleSuccess(); err != nil {
 		t.Fatalf("commit collect cycle: %v", err)
 	}
 	return store
 }
 
-func newDedupTestV2Collector(t *testing.T, jobName string, writer output.Writer) (*Collector, *perJobMetrics) {
+func assertJobMetric(t testing.TB, job *telemetry.Job, jobName, metric string, want float64) {
+	t.Helper()
+	store := collectJobMetricsForTest(t, job)
+	got, ok := store.Read().Value(metric, metrix.Labels{"job_name": jobName})
+	if !ok || got != want {
+		t.Errorf("%s = %v/%v, want %v/true", metric, got, ok, want)
+	}
+}
+
+func newDedupTestV2Collector(t *testing.T, jobName string, writer output.Writer) (*Collector, *telemetry.Job) {
 	t.Helper()
 
-	metrics := withCleanJobMetrics(t, jobName)
-	metrics.setDedupEnabled(true)
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 	c.Dedup = DedupConfig{Enabled: true}
-	c.metrics = metrics
-	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, "", c.monotonicUsec)
-	return c, metrics
+	c.telemetry = c.telemetryRegistry.Attach(jobName, telemetry.Options{DedupEnabled: true})
+	policy, err := dedup.Normalize(dedup.Config{Enabled: true})
+	if err != nil {
+		t.Fatalf("normalize test dedup policy: %v", err)
+	}
+	c.dedupKeyVarbinds = policy.KeyVarbinds()
+	c.deduper = newJobDeduper(jobName, policy, c.profileIndex, writer, c.telemetry, trapWriteFailureJournal, c.monotonicUsec)
+	return c, c.telemetry
 }
 
 func testNoAuthV3User(engineID string) USMUserConfig {
@@ -286,10 +304,13 @@ func newTestV3Collector(
 	engineIDs []string,
 ) *Collector {
 	t.Helper()
+	registry := telemetry.NewRegistry()
 	c := &Collector{
-		Config:      Config{Name: jobName},
-		trapWriter:  writer,
-		journalHost: newTestJournalHostProvider(),
+		Config:            Config{Name: jobName},
+		trapWriter:        writer,
+		journalHost:       newTestJournalHostProvider(),
+		telemetryRegistry: registry,
+		telemetry:         registry.Attach(jobName, telemetry.Options{}),
 	}
 	recv := newTestReceiver(c, receiver.PolicyConfig{
 		Versions:          []string{"v3"},
