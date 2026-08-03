@@ -147,7 +147,7 @@ You will see configured Alert notification silencing rules for the space (if you
 - **Starts at**: the date and time of the first occurrence
 - **Lasts until**: the end time of the first occurrence (the gap between start and end defines how long each occurrence stays active)
 - **Repeat**: the recurrence pattern (e.g. weekly on Friday)
-- **Timezone**: your local timezone, so the window follows your wall-clock time even across DST changes
+- **Timezone**: the timezone the schedule is anchored to (typically your local one), so the window follows that zone's wall-clock time even across DST changes
 
 With a recurring rule in place, the rule activates automatically at the configured time, silences notifications for the duration, and deactivates until the next occurrence — no manual toggling needed.
 
