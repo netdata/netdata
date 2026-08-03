@@ -127,33 +127,36 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
-    time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
+    if(likely(nd_profile.storage_tiers > 1)) {
+        time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
-    bool point_has_value = netdata_double_isnumber(n);
-    STORAGE_POINT sp = {
-        .start_time_s = now_s - rd->rrdset->update_every,
-        .end_time_s = now_s,
-        .min = n,
-        .max = n,
-        .sum = n,
-        .count = point_has_value ? 1 : 0,
-        .anomaly_count = point_has_value && !(flags & SN_FLAG_NOT_ANOMALOUS) ? 1 : 0,
-        .flags = flags,
-        .gap_count = point_has_value ? 0 : 1,
-    };
+        bool point_has_value = netdata_double_isnumber(n);
+        STORAGE_POINT sp = {
+            .start_time_s = now_s - rd->rrdset->update_every,
+            .end_time_s = now_s,
+            .min = n,
+            .max = n,
+            .sum = n,
+            .count = point_has_value ? 1 : 0,
+            .anomaly_count = point_has_value && !(flags & SN_FLAG_NOT_ANOMALOUS) ? 1 : 0,
+            .flags = flags,
+            .gap_count = point_has_value ? 0 : 1,
+        };
 
-    for(size_t tier = 1; tier < nd_profile.storage_tiers;tier++) {
-        if(unlikely(!rd->tiers[tier].smh)) continue;
+        size_t tier = 1;
+        do {
+            if(unlikely(!rd->tiers[tier].smh)) continue;
 
-        struct rrddim_tier *t = &rd->tiers[tier];
+            struct rrddim_tier *t = &rd->tiers[tier];
 
-        if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
-            // we have not collected this tier before
-            // let's fill any gap that may exist
-            backfill_tier_from_smaller_tiers(rd, tier, now_s);
-        }
+            if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
+                // we have not collected this tier before
+                // let's fill any gap that may exist
+                backfill_tier_from_smaller_tiers(rd, tier, now_s);
+            }
 
-        store_metric_at_tier(rd, tier, t, sp, point_end_time_ut);
+            store_metric_at_tier(rd, tier, t, sp, point_end_time_ut);
+        } while(++tier < nd_profile.storage_tiers);
     }
     rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
 
