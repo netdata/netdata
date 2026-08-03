@@ -78,9 +78,9 @@ modules:
           name: otel.yaml
         options:
           description: |
-            Edit `otel.yaml` with `edit-config`. A user file can contain only the fields that differ from the stock configuration. Configuration resolves in this order: stock file, user file, then environment variables. Restart the Netdata Agent after changing `otel.yaml` or any `NETDATA_OTEL_CFG_*` environment variable.
+            Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files). A user file can contain only the fields that differ from the stock configuration. Configuration resolves in this order: stock file, user file, then environment variables. Restart the Netdata Agent after changing `otel.yaml` or any `NETDATA_OTEL_CFG_*` environment variable.
 
-            The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use `edit-config otel.yaml` to inspect the installed values.
+            The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
             Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the default log policies, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`. Named per-tenant policy overrides are YAML-only.
 

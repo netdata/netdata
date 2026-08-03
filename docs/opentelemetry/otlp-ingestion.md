@@ -122,7 +122,7 @@ In Netdata, open the node's Logs tab, select the `otel-logs` source, and choose 
 
 The default loopback endpoint is the safe choice for a same-host Collector. To receive remote OTLP traffic:
 
-1. Edit `otel.yaml` and bind `endpoint.path` to an address reachable by the sender.
+1. Open `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) and bind `endpoint.path` to an address reachable by the sender.
 2. Configure a server certificate and key. Add `endpoint.tls_ca_cert_path` to require client certificates.
 3. Restrict port `4317` with network access controls.
 4. Restart the Netdata Agent to apply the `otel.yaml` changes.
