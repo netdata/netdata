@@ -259,6 +259,26 @@ Netdata monitors **systemd services**.
 - Merged Disk Read/Write Operations
 - Number of Processes
 
+### Network traffic of a systemd service
+
+cgroups.plugin does not produce per-service network bandwidth, packets, or error
+charts for systemd services. The `cgroup.net_*` charts are created only for
+containers and virtual machines that expose their own network interface, which
+Netdata associates with the cgroup. An ordinary systemd service shares the host
+network namespace and has no separate interface, so it has no per-service network
+charts. This is expected behavior, not a misconfiguration or bug.
+
+To see network activity attributed to a specific systemd unit, use the
+[network-viewer.plugin Network Connections Topology](/src/collectors/network-viewer.plugin/integrations/network_connections.md#network-connections-topology)
+Function with `group_by:container`. network-viewer.plugin enumerates **live
+network connections** (sockets), not bandwidth, so it shows the connections and
+endpoints owned by a unit rather than throughput.
+
+For systemd services, `container_name` is the unit name, so a service like
+`nginx.service` appears as its own actor under `group_by:container`. See the
+linked Function reference for the full field set (`systemd_unit_name`,
+`systemd_unit_kind`).
+
 ### How to enable cgroup accounting on systemd systems that is by default disabled
 
 :::note
@@ -324,29 +344,6 @@ Which systemd services are monitored by Netdata is determined by the following p
 [plugin:cgroups]
  cgroups to match as systemd services =  !/system.slice/*.service/*.service  /system.slice/*.service
 ```
-
-### Network traffic of a systemd service
-
-cgroups.plugin does not produce per-service network bandwidth, packets, or error
-charts for systemd services. The `cgroup.net_*` charts (bandwidth, packets,
-errors, drops, and so on) are created only for containers and virtual machines
-that expose their own network interface, which Netdata associates with the
-cgroup. An ordinary systemd service that shares the host network namespace has no
-separate interface, so it has no per-service network charts — a missing chart here
-is expected behavior, not a misconfiguration or bug.
-
-To see network activity attributed to a specific systemd unit, use the
-[network-viewer.plugin Network Connections Topology](/src/collectors/network-viewer.plugin/integrations/network_connections.md#network-connections-topology)
-Function with `group_by:container`. network-viewer.plugin enumerates **live
-network connections** (sockets), not bandwidth, so it shows the connections and
-endpoints owned by a unit rather than throughput.
-
-For systemd services the topology actor's `container_name` is the service name,
-so `group_by:container` groups each unit's connections under that name. The actor
-also exposes `systemd_unit_name` (the unit name) and `systemd_unit_kind` (such as
-`service`, `scope`, or `slice`), which let you locate a single unit — for example,
-the connections of a service named `nginx.service` appear under the
-`nginx.service` container actor.
 
 ## Monitoring ephemeral containers
 
