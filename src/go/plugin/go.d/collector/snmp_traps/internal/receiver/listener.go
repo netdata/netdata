@@ -92,7 +92,7 @@ func (l *listener) start(handler func(Datagram)) {
 func (l *listener) readLoop(ep listenerEndpoint, handler func(Datagram)) {
 	defer l.wg.Done()
 
-	// Keep one extra byte so oversized datagrams are classified by DecodeTrap.
+	// Keep one extra byte so oversized datagrams are classified by decodeTrap.
 	buf := make([]byte, maxDatagramSize+1)
 	for {
 		n, peer, err := ep.conn.ReadFromUDP(buf)

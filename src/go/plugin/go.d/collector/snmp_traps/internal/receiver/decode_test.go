@@ -101,9 +101,9 @@ func TestMinimalV2cDecode(t *testing.T) {
 }
 
 func TestV2cLinkDownDecode(t *testing.T) {
-	ctx, err := DecodeTrap(buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.3"), net.ParseIP("10.1.2.3"), nil)
+	ctx, err := decodeTrap(buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.3"), net.ParseIP("10.1.2.3"), nil)
 	if err != nil {
-		t.Fatalf("DecodeTrap failed: %v", err)
+		t.Fatalf("decodeTrap failed: %v", err)
 	}
 	if ctx.PDU.OID != "1.3.6.1.6.3.1.1.5.3" {
 		t.Errorf("expected linkDown OID, got %s", ctx.PDU.OID)
@@ -114,9 +114,9 @@ func TestV2cLinkDownDecode(t *testing.T) {
 }
 
 func TestInformDecode(t *testing.T) {
-	ctx, err := DecodeTrap(buildV2cPDU(t, gosnmp.InformRequest, "public", "1.3.6.1.6.3.1.1.5.1"), net.ParseIP("10.1.2.3"), nil)
+	ctx, err := decodeTrap(buildV2cPDU(t, gosnmp.InformRequest, "public", "1.3.6.1.6.3.1.1.5.1"), net.ParseIP("10.1.2.3"), nil)
 	if err != nil {
-		t.Fatalf("DecodeTrap failed: %v", err)
+		t.Fatalf("decodeTrap failed: %v", err)
 	}
 	if ctx.PDU.PduType != model.PduTypeInform {
 		t.Errorf("expected inform PDU type, got %s", ctx.PDU.PduType)
@@ -203,9 +203,9 @@ func TestDecodeV3AuthPrivAllowsEncryptedScopedPDUOverOctetStringLimit(t *testing
 		PrivKey:   "privpassword",
 	})
 
-	ctx, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 	if err != nil {
-		t.Fatalf("DecodeTrap failed for valid authPriv packet: %v", err)
+		t.Fatalf("decodeTrap failed for valid authPriv packet: %v", err)
 	}
 	if got := len(ctx.PDU.Varbinds); got < len(extra)+2 {
 		t.Fatalf("decoded varbinds = %d, want at least %d", got, len(extra)+2)
@@ -467,7 +467,7 @@ func TestV1DecodeRejectsInvalidGenericTrap(t *testing.T) {
 	for name, genericTrap := range tests {
 		t.Run(name, func(t *testing.T) {
 			data := buildV1Trap(t, "public", "192.0.2.10", genericTrap, 0)
-			_, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), nil)
+			_, err := decodeTrap(data, net.ParseIP("10.1.2.3"), nil)
 			if err == nil {
 				t.Fatal("expected error for invalid generic trap")
 			}
@@ -480,7 +480,7 @@ func TestV1DecodeRejectsInvalidGenericTrap(t *testing.T) {
 
 func TestV1DecodeRejectsInvalidEnterpriseSpecificTrap(t *testing.T) {
 	data := buildV1Trap(t, "public", "192.0.2.10", 6, -1)
-	_, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), nil)
+	_, err := decodeTrap(data, net.ParseIP("10.1.2.3"), nil)
 	if err == nil {
 		t.Fatal("expected error for invalid enterprise-specific trap")
 	}
@@ -492,9 +492,9 @@ func TestV1DecodeRejectsInvalidEnterpriseSpecificTrap(t *testing.T) {
 func TestV1DecodeConvertsAgentAddressAndSyntheticVarbinds(t *testing.T) {
 	data := buildV1Trap(t, "public", "192.0.2.10", 6, 42)
 
-	ctx, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), nil)
+	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), nil)
 	if err != nil {
-		t.Fatalf("DecodeTrap failed: %v", err)
+		t.Fatalf("decodeTrap failed: %v", err)
 	}
 	pdu := ctx.PDU
 	if pdu.OID != "1.3.6.1.4.1.9.0.42" {
@@ -514,9 +514,9 @@ func TestV1DecodeConvertsAgentAddressAndSyntheticVarbinds(t *testing.T) {
 func TestDecodeTrapIntegration(t *testing.T) {
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1")
 
-	ctx, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), nil)
+	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), nil)
 	if err != nil {
-		t.Fatalf("DecodeTrap failed: %v", err)
+		t.Fatalf("decodeTrap failed: %v", err)
 	}
 	pdu := ctx.PDU
 	if pdu.OID != "1.3.6.1.6.3.1.1.5.1" {
@@ -533,9 +533,9 @@ func TestDecodeTrapIntegration(t *testing.T) {
 func TestDecodeTrapNilPeer(t *testing.T) {
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1")
 
-	ctx, err := DecodeTrap(data, nil, nil)
+	ctx, err := decodeTrap(data, nil, nil)
 	if err != nil {
-		t.Fatalf("DecodeTrap failed: %v", err)
+		t.Fatalf("decodeTrap failed: %v", err)
 	}
 	pdu := ctx.PDU
 	if pdu.PeerIP != "" {
@@ -558,9 +558,9 @@ func TestDecodeTrapV2cWithV3SecurityTable(t *testing.T) {
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1")
 	tbl := gosnmp.NewSnmpV3SecurityParametersTable(trapDecodeLogger)
 
-	ctx, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 	if err != nil {
-		t.Fatalf("DecodeTrap failed: %v", err)
+		t.Fatalf("decodeTrap failed: %v", err)
 	}
 	if ctx.PDU.Version != model.SnmpVersionV2c {
 		t.Fatalf("version = %s, want v2c", ctx.PDU.Version)
@@ -576,7 +576,7 @@ func TestV3DecodeNoAuth(t *testing.T) {
 		PrivacyProtocol:        gosnmp.NoPriv,
 	})
 
-	ctx, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 	if err != nil {
 		t.Fatalf("v3 decode failed: %v", err)
 	}
@@ -614,9 +614,9 @@ func TestV3DecodeAuthProtocols(t *testing.T) {
 				t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
 			}
 
-			ctx, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+			ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 			if err != nil {
-				t.Fatalf("DecodeTrap failed: %v", err)
+				t.Fatalf("decodeTrap failed: %v", err)
 			}
 			if ctx.PDU.Version != model.SnmpVersionV3 {
 				t.Fatalf("version = %s, want v3", ctx.PDU.Version)
@@ -655,9 +655,9 @@ func TestV3DecodePrivacyProtocols(t *testing.T) {
 				t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
 			}
 
-			ctx, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+			ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 			if err != nil {
-				t.Fatalf("DecodeTrap failed: %v", err)
+				t.Fatalf("decodeTrap failed: %v", err)
 			}
 			if ctx.PDU.Version != model.SnmpVersionV3 {
 				t.Fatalf("version = %s, want v3", ctx.PDU.Version)
@@ -702,7 +702,7 @@ func TestV3DecodeWrongUser(t *testing.T) {
 		PrivacyProtocol:        gosnmp.NoPriv,
 	})
 
-	_, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	_, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 	if err == nil {
 		t.Fatal("expected error for wrong user")
 	}

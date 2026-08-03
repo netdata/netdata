@@ -65,7 +65,7 @@ func normalizeRateLimitMode(mode string) string {
 	return mode
 }
 
-func (rl *rateLimiter) Allow(addr netip.Addr) (allowed bool, mode rateLimitMode) {
+func (rl *rateLimiter) allow(addr netip.Addr) (allowed bool, mode rateLimitMode) {
 	if !rl.enabled {
 		return true, rateLimitModeDrop
 	}

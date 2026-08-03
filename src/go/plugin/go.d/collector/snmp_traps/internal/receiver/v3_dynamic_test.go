@@ -257,11 +257,7 @@ func TestDynamicEngineIDNoStateForUnknownUsername(t *testing.T) {
 func TestDynamicEngineIDRateLimitDropFollowsAlreadyDecodableRegistration(t *testing.T) {
 	data := clearV3ReportableFlag(t, buildDynamicV3Trap(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
 	recv, events, peer := newDynamicTestReceiver(t, 0, RateLimitConfig{Enabled: true, PerSourcePPS: 1, Mode: "drop"})
-	srcAddr, ok := udpPeerAddr(peer)
-	if !ok {
-		t.Fatal("failed to convert UDP peer address")
-	}
-	if allowed, _ := recv.rateLimiter.Allow(srcAddr); !allowed {
+	if allowed, checked := recv.allowRateLimitedPacket(peer); !allowed || !checked {
 		t.Fatal("expected first token to be available")
 	}
 
@@ -279,14 +275,30 @@ func TestDynamicEngineIDRateLimitDropFollowsAlreadyDecodableRegistration(t *test
 	}
 }
 
+func TestDiscoveryReportWriteFailureIsReported(t *testing.T) {
+	data := buildV3DiscoveryProbe(t, 99)
+	listenerConn, peerConn := informUDPConnPair(t)
+	defer peerConn.Close()
+	peer := peerConn.LocalAddr().(*net.UDPAddr)
+	if err := listenerConn.Close(); err != nil {
+		t.Fatalf("close response socket: %v", err)
+	}
+
+	recv, events, _ := newDynamicTestReceiver(t, 0, RateLimitConfig{})
+	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
+
+	if result.Context != nil || result.DecodeFailure == nil {
+		t.Fatalf("result = %+v, want decode failure after discovery handling", result)
+	}
+	if got := events.count(EventDiscoveryReportFailed, ""); got != 1 {
+		t.Fatalf("discovery Report failure events = %d, want 1", got)
+	}
+}
+
 func TestDynamicEngineIDRateLimitSampleAllowsRetry(t *testing.T) {
 	data := clearV3ReportableFlag(t, buildDynamicV3Trap(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
 	recv, events, peer := newDynamicTestReceiver(t, 0, RateLimitConfig{Enabled: true, PerSourcePPS: 1, Mode: "sample"})
-	srcAddr, ok := udpPeerAddr(peer)
-	if !ok {
-		t.Fatal("failed to convert UDP peer address")
-	}
-	if allowed, _ := recv.rateLimiter.Allow(srcAddr); !allowed {
+	if allowed, checked := recv.allowRateLimitedPacket(peer); !allowed || !checked {
 		t.Fatal("expected first token to be available")
 	}
 
@@ -312,11 +324,7 @@ func TestDiscoveryReportRateLimitDropSkipsResponse(t *testing.T) {
 
 	recv, events, _ := newDynamicTestReceiver(t, 0, RateLimitConfig{Enabled: true, PerSourcePPS: 1, Mode: "drop"})
 	peer := peerConn.LocalAddr().(*net.UDPAddr)
-	srcAddr, ok := udpPeerAddr(peer)
-	if !ok {
-		t.Fatal("failed to convert UDP peer address")
-	}
-	if allowed, _ := recv.rateLimiter.Allow(srcAddr); !allowed {
+	if allowed, checked := recv.allowRateLimitedPacket(peer); !allowed || !checked {
 		t.Fatal("expected first token to be available")
 	}
 
@@ -355,7 +363,7 @@ func TestSendDiscoveryReportWireFormat(t *testing.T) {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}
 
-	if err := sendDiscoveryReport(listenerConn, peerConn.LocalAddr().(*net.UDPAddr), eb, lid.Bytes(), 99); err != nil {
+	if err := sendDiscoveryReport(listenerConn, peerConn.LocalAddr().(*net.UDPAddr), eb, lid.bytes(), 99); err != nil {
 		t.Fatalf("sendDiscoveryReport failed: %v", err)
 	}
 

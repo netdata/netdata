@@ -87,3 +87,57 @@ func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
+	tests := map[string]struct {
+		event     receiver.Event
+		metric    func(*perJobMetrics) uint64
+		logSubstr []string
+	}{
+		"dynamic engine ID registration": {
+			event: receiver.Event{
+				Type:     receiver.EventDynamicEngineIDRegistered,
+				EngineID: "8000000001020304",
+				Username: "test-user",
+			},
+			metric: func(m *perJobMetrics) uint64 { return m.errors.unknownEngineID.Load() },
+			logSubstr: []string{
+				"Dynamic SNMPv3 engine ID registered",
+				"engineID=8000000001020304",
+				"username=test-user",
+			},
+		},
+		"INFORM response failure": {
+			event: receiver.Event{
+				Type: receiver.EventInformResponseFailed,
+				Err:  errors.New("response failed"),
+			},
+			metric:    func(m *perJobMetrics) uint64 { return m.errors.informResponseFail.Load() },
+			logSubstr: []string{"SNMP trap INFORM response failed", "response failed"},
+		},
+		"discovery Report failure": {
+			event: receiver.Event{
+				Type: receiver.EventDiscoveryReportFailed,
+				Err:  errors.New("report failed"),
+			},
+			metric:    func(m *perJobMetrics) uint64 { return m.errors.informResponseFail.Load() },
+			logSubstr: []string{"SNMP trap INFORM discovery Report failed", "report failed"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			metrics := &perJobMetrics{}
+			var buf bytes.Buffer
+			c := newTestSNMPTrapsCollector()
+			c.Logger = logger.NewWithWriter(&buf)
+
+			c.handleReceiverEvent(metrics, tc.event)
+
+			assert.Equal(t, uint64(1), tc.metric(metrics))
+			for _, substr := range tc.logSubstr {
+				assert.Contains(t, buf.String(), substr)
+			}
+		})
+	}
+}

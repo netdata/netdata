@@ -49,15 +49,15 @@ type TrapPacketContext struct {
 	PDU    *model.TrapPDU
 }
 
-type DecodeOptions struct {
-	TrustedRelay bool
+type decodeOptions struct {
+	trustedRelay bool
 }
 
-func DecodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable) (*TrapPacketContext, error) {
-	return decodeTrapWithOptions(data, udpPeer, secTable, DecodeOptions{})
+func decodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable) (*TrapPacketContext, error) {
+	return decodeTrapWithOptions(data, udpPeer, secTable, decodeOptions{})
 }
 
-func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable, opts DecodeOptions) (*TrapPacketContext, error) {
+func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable, opts decodeOptions) (*TrapPacketContext, error) {
 	pkt, err := decodePacket(data, secTable)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3S
 		peerIP = udpPeer.String()
 	}
 
-	source := selectTrapSource(varbinds, udpPeer, opts.TrustedRelay)
+	source := selectTrapSource(varbinds, udpPeer, opts.trustedRelay)
 
 	tpdu := &model.TrapPDU{
 		OID:         trapOID,

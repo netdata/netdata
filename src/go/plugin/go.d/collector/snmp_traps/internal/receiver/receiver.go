@@ -77,12 +77,12 @@ type Receiver struct {
 	report Reporter
 
 	listener           *listener
-	allowlist          *Allowlist
+	allowlist          *allowlist
 	rateLimiter        *rateLimiter
 	v3SecTable         *gosnmp.SnmpV3SecurityParametersTable
 	engineIDs          map[string]struct{}
-	engineBoots        *EngineBoots
-	localEngineID      *LocalEngineID
+	engineBoots        *engineBoots
+	localEngineID      *localEngineID
 	dynamicEngineIDReg *dynamicEngineIDRegistry
 	rollbackState      func()
 }
@@ -91,7 +91,7 @@ func New(policy Policy, report Reporter) *Receiver {
 	return &Receiver{
 		policy:      policy,
 		report:      report,
-		allowlist:   NewAllowlist(policy.sourceAllowlist, policy.communities),
+		allowlist:   newAllowlist(policy.sourceAllowlist, policy.communities),
 		rateLimiter: newRateLimiter(policy.rateLimit.Enabled, policy.rateLimit.PerSourcePPS, policy.rateLimit.Mode),
 	}
 }
@@ -161,7 +161,7 @@ func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
 		rollback()
 		return startupPreparationError(err)
 	}
-	if err := registerUSMUsersWithLocalEngineID(table, r.policy.users, localEngineID.Bytes()); err != nil {
+	if err := registerUSMUsersWithLocalEngineID(table, r.policy.users, localEngineID.bytes()); err != nil {
 		rollback()
 		return configPreparationError(err)
 	}
@@ -245,7 +245,7 @@ func (r *Receiver) Process(datagram Datagram) Result {
 
 	if source, ok := packetSourceAddr(datagram.PeerIP, datagram.Peer); ok {
 		decodePeerIP = net.IP(source.AsSlice())
-		if r.allowlist != nil && !r.allowlist.AllowedSource(source) {
+		if r.allowlist != nil && !r.allowlist.allowedSource(source) {
 			r.reportError(ErrorDroppedPolicy)
 			return Result{}
 		}
@@ -336,7 +336,7 @@ func (r *Receiver) Process(datagram Datagram) Result {
 	if pdu.PduType == model.PduTypeInform && packetContext.Packet != nil && datagram.Conn != nil && datagram.Peer != nil {
 		var localEngineID []byte
 		if r.localEngineID != nil {
-			localEngineID = r.localEngineID.Bytes()
+			localEngineID = r.localEngineID.bytes()
 		}
 		if err := sendInformResponse(datagram.Conn, datagram.Peer, packetContext.Packet, r.engineBoots, localEngineID); err != nil {
 			r.reportEvent(Event{Type: EventInformResponseFailed, Err: err})
@@ -359,7 +359,7 @@ func (r *Receiver) AdmitDecodeErrorAudit(peer *net.UDPAddr) bool {
 	if !ok {
 		return true
 	}
-	allowed, mode := r.rateLimiter.Allow(source)
+	allowed, mode := r.rateLimiter.allow(source)
 	if allowed {
 		return true
 	}
@@ -376,7 +376,7 @@ func (r *Receiver) versionAllowed(version model.SnmpVersion) bool {
 }
 
 func (r *Receiver) communityAllowed(community string) bool {
-	return r.allowlist == nil || r.allowlist.AllowedCommunity(community)
+	return r.allowlist == nil || r.allowlist.allowedCommunity(community)
 }
 
 func (r *Receiver) trustedRelaySource(peerIP net.IP) bool {
@@ -410,7 +410,7 @@ func (r *Receiver) localEngineIDMatches(parameters gosnmp.SnmpV3SecurityParamete
 		return false
 	}
 	usm, ok := parameters.(*gosnmp.UsmSecurityParameters)
-	return ok && r.localEngineID.EqualRaw(usm.AuthoritativeEngineID)
+	return ok && r.localEngineID.equalRaw(usm.AuthoritativeEngineID)
 }
 
 func (r *Receiver) reportError(kind ErrorKind) {

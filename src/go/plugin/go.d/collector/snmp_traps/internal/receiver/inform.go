@@ -11,7 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
-func sendInformResponse(conn *net.UDPConn, peer *net.UDPAddr, pkt *gosnmp.SnmpPacket, engineBoots *EngineBoots, localEngineID []byte) error {
+func sendInformResponse(conn *net.UDPConn, peer *net.UDPAddr, pkt *gosnmp.SnmpPacket, engineBoots *engineBoots, localEngineID []byte) error {
 	if pkt == nil || conn == nil || peer == nil {
 		return nil
 	}
@@ -32,7 +32,7 @@ func sendInformResponse(conn *net.UDPConn, peer *net.UDPAddr, pkt *gosnmp.SnmpPa
 			if usp, ok := respPkt.SecurityParameters.(*gosnmp.UsmSecurityParameters); ok {
 				// RFC 3414 section 1.5.1 makes the receiver authoritative for
 				// confirmed-class messages such as INFORM requests.
-				v, engineTime := engineBoots.Snapshot()
+				v, engineTime := engineBoots.snapshot()
 				if v > 0 && v <= maxSnmpEngineBoots {
 					usp.AuthoritativeEngineBoots = uint32(v)
 					usp.AuthoritativeEngineTime = engineTime
@@ -148,7 +148,7 @@ func isEngineIDAllowed(sp gosnmp.SnmpV3SecurityParameters, whitelist map[string]
 	return ok
 }
 
-func sendDiscoveryReport(conn *net.UDPConn, peer *net.UDPAddr, engineBoots *EngineBoots, localEngineID []byte, msgID uint32) error {
+func sendDiscoveryReport(conn *net.UDPConn, peer *net.UDPAddr, engineBoots *engineBoots, localEngineID []byte, msgID uint32) error {
 	if conn == nil || peer == nil {
 		return nil
 	}
@@ -158,7 +158,7 @@ func sendDiscoveryReport(conn *net.UDPConn, peer *net.UDPAddr, engineBoots *Engi
 
 	boots, engineTime := int64(0), uint32(0)
 	if engineBoots != nil {
-		boots, engineTime = engineBoots.Snapshot()
+		boots, engineTime = engineBoots.snapshot()
 	}
 
 	reportPkt := gosnmp.SnmpPacket{

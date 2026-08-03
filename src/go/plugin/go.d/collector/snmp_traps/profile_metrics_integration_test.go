@@ -56,7 +56,7 @@ metrics:
 	c := newDefaultTestV2Collector(failedWriter)
 	c.profileIndex = lease.Epoch()
 	c.profileMetrics = rt
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	store := metrix.NewCollectorStore()
 	collectProfileMetricsForTest(t, rt, store, "test")
@@ -66,7 +66,7 @@ metrics:
 
 	successWriter := &mockTrapWriter{}
 	c.trapWriter = successWriter
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	require.Len(t, successWriter.entries, 1)
 
 	collectProfileMetricsForTest(t, rt, store, "test")
@@ -82,8 +82,8 @@ metrics:
 	dedupCollector.deduper.start()
 	t.Cleanup(dedupCollector.deduper.Close)
 
-	dedupCollector.handlePacket(packet.payload, packet.peer, nil, nil)
-	dedupCollector.handlePacket(packet.payload, packet.peer, nil, nil)
+	dedupCollector.handlePacket(packet.Payload, packet.Peer, nil, nil)
+	dedupCollector.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	require.Len(t, dedupWriter.entries, 1)
 
 	collectProfileMetricsForTest(t, rt, store, "test")

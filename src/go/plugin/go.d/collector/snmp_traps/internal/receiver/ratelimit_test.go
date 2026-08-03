@@ -13,12 +13,12 @@ func TestRateLimiterAllow(t *testing.T) {
 	addr := netip.MustParseAddr("10.1.2.3")
 
 	for range 100 {
-		if allowed, _ := rl.Allow(addr); !allowed {
+		if allowed, _ := rl.allow(addr); !allowed {
 			t.Fatal("token bucket exhausted too early")
 		}
 	}
 
-	allowed, mode := rl.Allow(addr)
+	allowed, mode := rl.allow(addr)
 	if allowed {
 		t.Fatal("expected rate limiter to drop after bucket exhausted")
 	}
@@ -51,10 +51,10 @@ func TestRateLimiterEvictsOldestTrackedSourceAtCapacity(t *testing.T) {
 	second := netip.MustParseAddr("10.0.0.2")
 	third := netip.MustParseAddr("10.0.0.3")
 
-	if allowed, _ := rl.Allow(first); !allowed {
+	if allowed, _ := rl.allow(first); !allowed {
 		t.Fatal("expected first source to be allowed")
 	}
-	if allowed, _ := rl.Allow(second); !allowed {
+	if allowed, _ := rl.allow(second); !allowed {
 		t.Fatal("expected second source to be allowed")
 	}
 
@@ -64,7 +64,7 @@ func TestRateLimiterEvictsOldestTrackedSourceAtCapacity(t *testing.T) {
 	rl.buckets[second].lastFill = now
 	rl.mu.Unlock()
 
-	allowed, mode := rl.Allow(third)
+	allowed, mode := rl.allow(third)
 	if !allowed {
 		t.Fatal("expected new source above cap to evict the oldest tracked source")
 	}

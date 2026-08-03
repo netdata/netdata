@@ -9,7 +9,7 @@ import (
 )
 
 func TestAllowlistCIDR(t *testing.T) {
-	al := NewAllowlist([]netip.Prefix{
+	al := newAllowlist([]netip.Prefix{
 		netip.MustParsePrefix("10.0.0.0/8"),
 		netip.MustParsePrefix("192.168.1.0/24"),
 	}, nil)
@@ -27,8 +27,8 @@ func TestAllowlistCIDR(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			addr := netip.MustParseAddr(tc.addr)
-			if got := al.AllowedSource(addr); got != tc.want {
-				t.Errorf("AllowedSource(%s) = %v, want %v", tc.addr, got, tc.want)
+			if got := al.allowedSource(addr); got != tc.want {
+				t.Errorf("allowedSource(%s) = %v, want %v", tc.addr, got, tc.want)
 			}
 		})
 	}
@@ -39,12 +39,12 @@ func TestAllowlistDefaultIncludesIPv6(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NormalizeSourceAllowlist failed: %v", err)
 	}
-	al := NewAllowlist(prefixes, nil)
+	al := newAllowlist(prefixes, nil)
 
-	if !al.AllowedSource(netip.MustParseAddr("2001:db8::1")) {
+	if !al.allowedSource(netip.MustParseAddr("2001:db8::1")) {
 		t.Fatal("default allowlist should accept IPv6")
 	}
-	if !al.AllowedSource(netip.MustParseAddr("192.0.2.1")) {
+	if !al.allowedSource(netip.MustParseAddr("192.0.2.1")) {
 		t.Fatal("default allowlist should accept IPv4")
 	}
 }
@@ -60,7 +60,7 @@ func TestPacketSourceAddrFallsBackToPeerIP(t *testing.T) {
 }
 
 func TestAllowlistCommunity(t *testing.T) {
-	al := NewAllowlist(nil, []string{"allowed-a", "allowed-b"})
+	al := newAllowlist(nil, []string{"allowed-a", "allowed-b"})
 
 	tests := map[string]struct {
 		value string
@@ -73,8 +73,8 @@ func TestAllowlistCommunity(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := al.AllowedCommunity(tc.value); got != tc.want {
-				t.Errorf("AllowedCommunity(%s) = %v, want %v", tc.value, got, tc.want)
+			if got := al.allowedCommunity(tc.value); got != tc.want {
+				t.Errorf("allowedCommunity(%s) = %v, want %v", tc.value, got, tc.want)
 			}
 		})
 	}

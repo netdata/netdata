@@ -38,7 +38,7 @@ func BenchmarkDecodeTrap(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _ = DecodeTrap(data, peer, nil)
+				_, _ = decodeTrap(data, peer, nil)
 			}
 			b.StopTimer()
 			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "traps/s")

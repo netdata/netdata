@@ -98,7 +98,7 @@ func (r *dynamicEngineIDRegistry) accept(engineIDHex string, username string) (s
 }
 
 func (r *Receiver) decodeTrapWithSharedTable(data []byte, peerIP net.IP, trustedRelay bool) (*TrapPacketContext, error) {
-	opts := DecodeOptions{TrustedRelay: trustedRelay}
+	opts := decodeOptions{trustedRelay: trustedRelay}
 	if r.dynamicEngineIDReg == nil {
 		return decodeTrapWithOptions(data, peerIP, r.v3SecTable, opts)
 	}
@@ -119,7 +119,7 @@ func (r *Receiver) tryDynamicRetry(data []byte, peerIP net.IP, peer *net.UDPAddr
 	if tempTable == nil {
 		return nil, checked, false
 	}
-	retryCtx, err := decodeTrapWithOptions(data, peerIP, tempTable, DecodeOptions{TrustedRelay: trustedRelay})
+	retryCtx, err := decodeTrapWithOptions(data, peerIP, tempTable, decodeOptions{trustedRelay: trustedRelay})
 	if err != nil {
 		return nil, checked, false
 	}
@@ -167,7 +167,7 @@ func (r *Receiver) allowRateLimitedPacket(peer *net.UDPAddr) (bool, bool) {
 	if !ok {
 		return true, false
 	}
-	allowed, mode := r.rateLimiter.Allow(srcAddr)
+	allowed, mode := r.rateLimiter.allow(srcAddr)
 	if allowed {
 		return true, true
 	}
@@ -200,7 +200,7 @@ func (r *Receiver) buildDynamicTempTable(engineIDHex, username string) *gosnmp.S
 func (r *Receiver) sendDiscoveryReport(rawCtx *rawV3Context, conn *net.UDPConn, peer *net.UDPAddr) {
 	var localEID []byte
 	if r.localEngineID != nil {
-		localEID = r.localEngineID.Bytes()
+		localEID = r.localEngineID.bytes()
 	}
 	if err := sendDiscoveryReport(conn, peer, r.engineBoots, localEID, rawCtx.msgID); err != nil {
 		r.reportEvent(Event{Type: EventDiscoveryReportFailed, Err: err})

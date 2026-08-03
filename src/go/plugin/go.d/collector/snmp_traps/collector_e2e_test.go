@@ -33,7 +33,7 @@ func TestCollectorReplayPcapThroughListenerToJournal(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 
-	_, err = conn.Write(packets[0].payload)
+	_, err = conn.Write(packets[0].Payload)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {

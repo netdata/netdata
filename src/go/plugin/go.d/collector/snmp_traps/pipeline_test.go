@@ -73,7 +73,7 @@ func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -100,8 +100,8 @@ func TestCollectorHandlePacketAssignsReceiveSequencePerPacket(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 2 {
 		t.Fatalf("written entries = %d, want 2", len(writer.entries))
@@ -122,7 +122,7 @@ func TestCollectorHandlePacketRecoversFromPanic(t *testing.T) {
 	c := newTestV2Collector("panic-recover", panicTrapWriter{}, nil, []string{"public"})
 	c.metrics = metrics
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if got := metrics.errors.decodeFailed.Load(); got != 1 {
 		t.Fatalf("decode_failed = %d, want 1", got)
@@ -145,7 +145,7 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 	c := newDefaultTestV2Collector(writer)
 	c.deviceLookup = deviceStore
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -163,7 +163,7 @@ func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) 
 	c := newDefaultTestV2Collector(writer)
 	c.vnode = "listener-vnode-id"
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -213,7 +213,7 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 	c.reverseDNSEnabled = true
 	c.reverseDNS = dns
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -241,8 +241,8 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	c.deduper.start()
 	defer c.deduper.Close()
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -293,8 +293,8 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		writer := &mockTrapWriter{}
 		c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
-		c.handlePacket(packet.payload, packet.peer, nil, nil)
-		c.handlePacket(packet.payload, packet.peer, nil, nil)
+		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -325,8 +325,8 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		writer := &mockTrapWriter{}
 		c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
-		c.handlePacket(packet.payload, packet.peer, nil, nil)
-		c.handlePacket(packet.payload, packet.peer, nil, nil)
+		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -353,7 +353,7 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	writer := &mockTrapWriter{err: errors.New("write failed")}
 	c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	if got := metrics.errors.journalWriteFailed.Load(); got != 1 {
 		t.Fatalf("journal write failures = %d, want 1", got)
 	}
@@ -367,7 +367,7 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	}
 
 	writer.err = nil
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries after rollback = %d, want 1", len(writer.entries))
@@ -387,7 +387,7 @@ func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
 	c := newTestV2CollectorWithPolicy("test", writer, receiver.PolicyConfig{Versions: []string{"v3"}})
 
 	removeJobMetrics("test")
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected 0 entries for disallowed version, got %d", len(writer.entries))
@@ -578,7 +578,7 @@ func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, nil, []string{"secret"})
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected 0 entries for disallowed community, got %d", len(writer.entries))
@@ -592,7 +592,7 @@ func TestCollectorHandlePacketAllowsAllowedCommunity(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, nil, []string{"public"})
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -607,7 +607,7 @@ func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	c := newDefaultTestV2Collector(writer)
 
 	withCleanJobMetrics(t, "test")
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	m := getJobMetrics("test")
 	ev := m.events.stateChange.Load()
@@ -626,7 +626,7 @@ func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	m := getJobMetrics(jobName)
 	assertSeverityCounters(t, m, map[string]uint64{"warning": 1})
@@ -694,7 +694,7 @@ func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 	c := newDefaultTestV2Collector(writer)
 
 	withCleanJobMetrics(t, "test")
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	m := getJobMetrics("test")
 	if v := m.errors.templateUnresolved.Load(); v != 1 {
@@ -708,7 +708,7 @@ func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
 	c := newTestV2Collector("test", writer, nil, []string{"secret"})
 
 	withCleanJobMetrics(t, "test")
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	m := getJobMetrics("test")
 	dr := m.errors.droppedAllowlist.Load()
@@ -782,7 +782,7 @@ func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
 	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
 	peer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
 
-	c.handlePacket(packet.payload, peer.IP, nil, peer)
+	c.handlePacket(packet.Payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("expected IPv4-mapped peer to match IPv4 CIDR, got %d entries", len(writer.entries))
@@ -800,7 +800,7 @@ func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"})
 	peer := &net.UDPAddr{IP: net.ParseIP("2001:db8::1"), Port: 9162}
 
-	c.handlePacket(packet.payload, peer.IP, nil, peer)
+	c.handlePacket(packet.Payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("expected native IPv6 peer to match IPv6 CIDR, got %d entries", len(writer.entries))
@@ -955,12 +955,12 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 		},
 	})
 	if result := c.receiver.Process(receiver.Datagram{
-		Data: packet.payload, PeerIP: peer.IP, Peer: peer,
+		Data: packet.Payload, PeerIP: peer.IP, Peer: peer,
 	}); result.Context == nil {
 		t.Fatalf("first packet result = %+v, want accepted packet to consume the initial token", result)
 	}
 
-	c.handlePacket(packet.payload, peer.IP, nil, peer)
+	c.handlePacket(packet.Payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("sample-mode rate-limited trap should be written, got %d entries", len(writer.entries))
@@ -1022,7 +1022,7 @@ func TestCollectorHandlePacketEmitsPipelineMetrics(t *testing.T) {
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 	c.metrics = metrics
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))

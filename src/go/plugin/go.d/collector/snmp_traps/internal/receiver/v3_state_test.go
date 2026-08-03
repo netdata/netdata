@@ -22,7 +22,7 @@ func TestEngineBootsPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newEngineBoots failed: %v", err)
 	}
-	if got := eb.Value(); got != 1 {
+	if got := eb.bootsValue(); got != 1 {
 		t.Fatalf("first boot value = %d, want 1", got)
 	}
 
@@ -30,7 +30,7 @@ func TestEngineBootsPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second newEngineBoots failed: %v", err)
 	}
-	if got := eb.Value(); got != 2 {
+	if got := eb.bootsValue(); got != 2 {
 		t.Fatalf("second boot value = %d, want 2", got)
 	}
 }
@@ -70,11 +70,11 @@ func TestEngineBootsRejectsInvalidState(t *testing.T) {
 }
 
 func TestEngineBootsEngineTimeCapsAtUint32(t *testing.T) {
-	eb := &EngineBoots{
+	eb := &engineBoots{
 		startedAt: time.Now().Add(-time.Duration(uint64(maxSnmpEngineTime)+1) * time.Second),
 	}
 
-	if got := eb.EngineTime(); got != maxSnmpEngineTime {
+	if got := eb.engineTime(); got != maxSnmpEngineTime {
 		t.Fatalf("engine time = %d, want %d", got, maxSnmpEngineTime)
 	}
 }
@@ -164,16 +164,16 @@ func TestLocalEngineIDConfiguredAcceptedAndPersisted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLocalEngineID with configured value failed: %v", err)
 	}
-	if lid.Hex() != testLocalEngineIDHex {
-		t.Fatalf("local engine ID hex = %q, want %q", lid.Hex(), testLocalEngineIDHex)
+	if lid.hexString() != testLocalEngineIDHex {
+		t.Fatalf("local engine ID hex = %q, want %q", lid.hexString(), testLocalEngineIDHex)
 	}
 
 	lid2, err := newLocalEngineID(paths, "")
 	if err != nil {
 		t.Fatalf("NewLocalEngineID reload failed: %v", err)
 	}
-	if lid2.Hex() != testLocalEngineIDHex {
-		t.Fatalf("reloaded local engine ID hex = %q, want %q", lid2.Hex(), testLocalEngineIDHex)
+	if lid2.hexString() != testLocalEngineIDHex {
+		t.Fatalf("reloaded local engine ID hex = %q, want %q", lid2.hexString(), testLocalEngineIDHex)
 	}
 }
 
@@ -184,7 +184,7 @@ func TestLocalEngineIDOmittedGeneratesPersistsAndReloads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLocalEngineID generation failed: %v", err)
 	}
-	generated := lid.Hex()
+	generated := lid.hexString()
 	raw, err := hex.DecodeString(generated)
 	if err != nil {
 		t.Fatalf("generated hex is invalid: %v", err)
@@ -200,8 +200,8 @@ func TestLocalEngineIDOmittedGeneratesPersistsAndReloads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLocalEngineID reload failed: %v", err)
 	}
-	if lid2.Hex() != generated {
-		t.Fatalf("reloaded local engine ID hex = %q, want %q", lid2.Hex(), generated)
+	if lid2.hexString() != generated {
+		t.Fatalf("reloaded local engine ID hex = %q, want %q", lid2.hexString(), generated)
 	}
 }
 
@@ -391,7 +391,7 @@ func TestV3InformResponseContainsLocalEngineID(t *testing.T) {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}
 
-	if err := sendInformResponse(listenerConn, peerConn.LocalAddr().(*net.UDPAddr), pkt, eb, lid.Bytes()); err != nil {
+	if err := sendInformResponse(listenerConn, peerConn.LocalAddr().(*net.UDPAddr), pkt, eb, lid.bytes()); err != nil {
 		t.Fatalf("sendInformResponse failed: %v", err)
 	}
 
@@ -433,7 +433,7 @@ func TestSendInformResponseV3AuthPriv(t *testing.T) {
 		PrivKey:   "privpassword",
 	}
 	secTable := newTestV3SecurityTable(t, user)
-	if err := registerUSMUsersWithLocalEngineID(secTable, []USMUser{user}, lid.Bytes()); err != nil {
+	if err := registerUSMUsersWithLocalEngineID(secTable, []USMUser{user}, lid.bytes()); err != nil {
 		t.Fatalf("register local engine ID: %v", err)
 	}
 
@@ -446,20 +446,20 @@ func TestSendInformResponseV3AuthPriv(t *testing.T) {
 		privKey:     "privpassword",
 		trapOID:     "1.3.6.1.6.3.1.1.5.1",
 	})
-	reqCtx, err := DecodeTrap(reqData, net.ParseIP("10.1.2.3"), secTable)
+	reqCtx, err := decodeTrap(reqData, net.ParseIP("10.1.2.3"), secTable)
 	if err != nil {
-		t.Fatalf("DecodeTrap failed: %v", err)
+		t.Fatalf("decodeTrap failed: %v", err)
 	}
 
 	eb, err := newEngineBoots(paths)
 	if err != nil {
 		t.Fatalf("NewEngineBoots failed: %v", err)
 	}
-	if err := sendInformResponse(listenerConn, peerConn.LocalAddr().(*net.UDPAddr), reqCtx.Packet, eb, lid.Bytes()); err != nil {
+	if err := sendInformResponse(listenerConn, peerConn.LocalAddr().(*net.UDPAddr), reqCtx.Packet, eb, lid.bytes()); err != nil {
 		t.Fatalf("sendInformResponse failed: %v", err)
 	}
 
-	localEngineID := lid.Bytes()
+	localEngineID := lid.bytes()
 	decoderSP := &gosnmp.UsmSecurityParameters{
 		UserName:                 "testuser",
 		AuthenticationProtocol:   gosnmp.SHA256,

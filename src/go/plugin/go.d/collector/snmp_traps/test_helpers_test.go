@@ -55,7 +55,13 @@ func buildV3SecuredTrap(t testing.TB, spec v3SecuredTrapSpec) []byte {
 	return traptest.BuildV3SecuredTrap(t, spec.traptest())
 }
 
-func readSinglePcapUDPPacket(t *testing.T, fixture string) pcapUDPPacket {
+func readPcapUDPPackets(t testing.TB, fixture string) []traptest.UDPPacket {
+	t.Helper()
+
+	return traptest.ReadPcapUDPPackets(t, fixture)
+}
+
+func readSinglePcapUDPPacket(t *testing.T, fixture string) traptest.UDPPacket {
 	t.Helper()
 
 	packets := readPcapUDPPackets(t, fixture)
@@ -65,7 +71,7 @@ func readSinglePcapUDPPacket(t *testing.T, fixture string) pcapUDPPacket {
 	return packets[0]
 }
 
-func readColdStartUDPPacket(t *testing.T) pcapUDPPacket {
+func readColdStartUDPPacket(t *testing.T) traptest.UDPPacket {
 	t.Helper()
 	return readSinglePcapUDPPacket(t, "testdata/v2c_coldstart.pcap.hex")
 }
