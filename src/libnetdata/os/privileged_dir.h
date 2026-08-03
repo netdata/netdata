@@ -36,7 +36,9 @@ typedef enum {
 // directory, which silently defeats both O_NOFOLLOW and lstat()'s S_ISLNK.
 // Returns false when there is no entry left to name - a NULL/empty path, one
 // whose final component is "." or ".." (those reach a directory *through* the
-// component before them), or one that does not fit in dst.
+// component before them), or one that does not fit in dst. On failure errno is
+// ENAMETOOLONG when the result does not fit in dst, EINVAL for every other
+// reason.
 bool os_dir_path_trim(const char *path, char *dst, size_t dst_size);
 
 // Classify the directory that contains path's final component. Intermediate
