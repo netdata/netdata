@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/attribution"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profilemetrics"
 	"github.com/stretchr/testify/require"
 )
@@ -174,18 +175,18 @@ traps:
 	return catalog.Paths{UserDirs: []string{userDir}, StockDir: stockDir}
 }
 
-func rootTestCiscoConfigTrapEntry(jobName string) *TrapEntry {
-	return &TrapEntry{
+func rootTestCiscoConfigTrapEntry(jobName string) *model.TrapEntry {
+	return &model.TrapEntry{
 		JobName:       jobName,
 		TrapOID:       "1.3.6.1.4.1.9.9.43.2.0.1",
 		TrapName:      "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+		Enrichment: &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{
 			Selected: "192.0.2.10",
 			Method:   "udp_peer",
 		}},
-		Varbinds: []VarbindValue{{
+		Varbinds: []model.VarbindValue{{
 			OID:   "1.3.6.1.4.1.9.9.43.1.1.1.2",
 			Type:  "INTEGER",
 			Value: 2,
@@ -193,7 +194,7 @@ func rootTestCiscoConfigTrapEntry(jobName string) *TrapEntry {
 	}
 }
 
-func rootTestProfileMetricSourceLabels(entry *TrapEntry, sourceHashSalt string) metrix.Labels {
+func rootTestProfileMetricSourceLabels(entry *model.TrapEntry, sourceHashSalt string) metrix.Labels {
 	source, ok := attribution.Resolve(entry, entry.JobName, attribution.DeviceSource, sourceHashSalt)
 	if !ok {
 		panic("test trap entry has no source identity")

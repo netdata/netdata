@@ -25,7 +25,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
@@ -33,28 +33,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
-type TrapEntry = model.TrapEntry
-type TrapDef = catalog.TrapDef
-type VarbindValue = model.VarbindValue
-type TrapSourceAudit = model.TrapSourceAudit
-type TrapEnrichmentAudit = model.TrapEnrichmentAudit
-type Category = model.Category
-type Severity = model.Severity
-
 const (
-	ReportTypeDedupSummary = model.ReportTypeDedupSummary
-	ReportTypeDecodeError  = model.ReportTypeDecodeError
-	testEngineIDHex        = "80001f888077dfe44faa700258"
+	testEngineIDHex = "80001f888077dfe44faa700258"
 )
-
-type USMUserConfig struct {
-	Username  string
-	EngineID  string
-	AuthProto string
-	AuthKey   string
-	PrivProto string
-	PrivKey   string
-}
 
 type v3SecuredTrapSpec struct {
 	user        string
@@ -103,8 +84,8 @@ func readColdStartUDPPacket(t *testing.T) traptest.UDPPacket {
 	return packets[0]
 }
 
-func testColdStartTrap(category, severity, description string) *TrapDef {
-	return &TrapDef{
+func testColdStartTrap(category, severity, description string) *catalog.TrapDef {
+	return &catalog.TrapDef{
 		OID:         "1.3.6.1.6.3.1.1.5.1",
 		Name:        "TEST-MIB::coldStartSecurity",
 		Category:    category,
@@ -113,15 +94,15 @@ func testColdStartTrap(category, severity, description string) *TrapDef {
 	}
 }
 
-func setSingleTestTrap(t *testing.T, trap *TrapDef) *catalog.Epoch {
-	return setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+func setSingleTestTrap(t *testing.T, trap *catalog.TrapDef) *catalog.Epoch {
+	return setTestProfileIndex(t, map[string]*catalog.TrapDef{trap.OID: trap})
 }
 
-func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) *catalog.Epoch {
+func setTestProfileIndex(t *testing.T, traps map[string]*catalog.TrapDef) *catalog.Epoch {
 	t.Helper()
 	paths := rootTestProfileCatalogPaths(t)
 	if len(traps) > 0 {
-		defs := make([]*TrapDef, 0, len(traps))
+		defs := make([]*catalog.TrapDef, 0, len(traps))
 		for _, trap := range traps {
 			defs = append(defs, trap)
 		}
@@ -149,20 +130,55 @@ func newTestV2CollectorWithPolicy(jobName string, writer output.Writer, cfg rece
 	if len(indexes) > 0 {
 		profileIndex = indexes[0]
 	}
-	j := &Job{
-		policy:       NewPolicy(PolicyConfig{JobName: jobName, Receiver: receiver.NewPolicy(cfg)}),
-		writer:       writer,
-		journalHost:  newTestJournalHostProvider(),
-		profileIndex: profileIndex,
-		telemetry:    registry.Attach(jobName, telemetry.Options{}),
-		deps: Dependencies{
-			Enricher:  newTestTrapEnricher(ddsnmp.NewDeviceStore(), nil, nil),
-			Telemetry: registry,
-		},
-	}
+	j := newTestJob(
+		NewPolicy(PolicyConfig{JobName: jobName, Receiver: receiver.NewPolicy(cfg)}),
+		registry,
+		newTestTrapEnricher(ddsnmp.NewDeviceStore(), nil, nil),
+	)
+	j.writer = writer
+	j.journalHost = newTestJournalHostProvider()
+	j.profileIndex = profileIndex
+	j.telemetry = registry.Attach(jobName, telemetry.Options{})
 	j.receiver = newTestReceiver(j, cfg)
 	return j
 }
+
+func newTestJob(policy Policy, registry *telemetry.Registry, trapEnricher *enrichment.Enricher) *Job {
+	if registry == nil {
+		registry = telemetry.NewRegistry()
+	}
+	if trapEnricher == nil {
+		trapEnricher = enrichment.New(nil, nil, nil)
+	}
+	provider := newTestJournalHostProvider()
+	return New(policy, Dependencies{
+		Catalog:         catalog.NewManager(catalog.Paths{}),
+		HostIdentity:    staticHostIdentity{provider: provider},
+		Enricher:        trapEnricher,
+		Telemetry:       registry,
+		JournalActivity: testJournalActivity{},
+	})
+}
+
+type staticHostIdentity struct {
+	provider hostidentity.Provider
+}
+
+func (s staticHostIdentity) FreshJournal() (hostidentity.Provider, error) {
+	return s.provider, nil
+}
+
+func (s staticHostIdentity) CachedFallback() (hostidentity.Provider, error) {
+	return s.provider, nil
+}
+
+type testJournalActivity struct{}
+
+func (testJournalActivity) Acquire() JournalActivityLease { return testJournalActivityLease{} }
+
+type testJournalActivityLease struct{}
+
+func (testJournalActivityLease) Close() {}
 
 func newTestReceiver(j *Job, cfg receiver.PolicyConfig) *receiver.Receiver {
 	return receiver.New(receiver.NewPolicy(cfg), func(event receiver.Event) {
@@ -240,24 +256,13 @@ func newDedupTestV2Collector(t *testing.T, jobName string, writer output.Writer,
 	return j, j.telemetry
 }
 
-func testNoAuthV3User(engineID string) USMUserConfig {
-	return USMUserConfig{Username: "testuser", EngineID: engineID, AuthProto: "none", PrivProto: "none"}
+func testNoAuthV3User(engineID string) receiver.USMUser {
+	return receiver.USMUser{Username: "testuser", EngineID: engineID, AuthProto: "none", PrivProto: "none"}
 }
 
-func toReceiverUSMUsers(users []USMUserConfig) []receiver.USMUser {
-	out := make([]receiver.USMUser, len(users))
-	for i, user := range users {
-		out[i] = receiver.USMUser{
-			Username: user.Username, EngineID: user.EngineID, AuthProto: user.AuthProto,
-			AuthKey: user.AuthKey, PrivProto: user.PrivProto, PrivKey: user.PrivKey,
-		}
-	}
-	return out
-}
-
-func newTestV3Collector(t *testing.T, jobName string, writer output.Writer, users []USMUserConfig, engineIDs []string) *Job {
+func newTestV3Collector(t *testing.T, jobName string, writer output.Writer, users []receiver.USMUser, engineIDs []string) *Job {
 	t.Helper()
-	cfg := receiver.PolicyConfig{Versions: []string{"v3"}, USMUsers: toReceiverUSMUsers(users), EngineIDWhitelist: engineIDs}
+	cfg := receiver.PolicyConfig{Versions: []string{"v3"}, USMUsers: users, EngineIDWhitelist: engineIDs}
 	j := newTestV2CollectorWithPolicy(jobName, writer, cfg)
 	if err := j.receiver.PrepareV3(t.TempDir(), jobName); err != nil {
 		t.Fatalf("prepare test v3 receiver: %v", err)
@@ -282,23 +287,13 @@ func newTestTrapEnricher(store *ddsnmp.DeviceStore, topologyEnricher testTrapTop
 	return enrichment.New(netdataadapter.RegistryLookup(store), topology, dns)
 }
 
-func newTestTrapEnrichmentCollector(topologyEnricher testTrapTopologyEnricher, dns ...enrichment.ReverseDNS) (*Job, *ddsnmp.DeviceStore) {
+func newTestEnricherWithStore(topologyEnricher testTrapTopologyEnricher, dns ...enrichment.ReverseDNS) (*enrichment.Enricher, *ddsnmp.DeviceStore) {
 	store := ddsnmp.NewDeviceStore()
 	var reverseDNS enrichment.ReverseDNS
 	if len(dns) > 0 {
 		reverseDNS = dns[0]
 	}
-	job := &Job{
-		policy: NewPolicy(PolicyConfig{}),
-		deps: Dependencies{
-			Enricher: newTestTrapEnricher(store, topologyEnricher, reverseDNS),
-		},
-	}
-	return job, store
-}
-
-func (j *Job) enrichTrapEntry(entry *model.TrapEntry) {
-	j.deps.Enricher.Enrich(entry, j.policy.reverseDNSEnabled)
+	return newTestTrapEnricher(store, topologyEnricher, reverseDNS), store
 }
 
 type testReverseDNS struct {

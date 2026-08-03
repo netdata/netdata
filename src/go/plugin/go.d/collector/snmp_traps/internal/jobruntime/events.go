@@ -15,6 +15,14 @@ const (
 	listenerReadErrorLogKeyPrefix = "snmp_traps:listener_read_failed:"
 )
 
+func (j *Job) attachTelemetry(bindEvents []receiver.Event) *telemetry.Job {
+	jobTelemetry := j.deps.Telemetry.Attach(j.policy.jobName, telemetry.Options{DedupEnabled: j.policy.dedup.Enabled()})
+	for _, event := range bindEvents {
+		j.handleReceiverEvent(jobTelemetry, event)
+	}
+	return jobTelemetry
+}
+
 func (j *Job) handleOutputOutcome(jobTelemetry *telemetry.Job, outcome output.Outcome) {
 	if outcome.Backend == output.BackendJournal && outcome.Err != nil {
 		j.deps.Log.warningf("SNMP trap journal writer stopped for job %q: %v", j.policy.jobName, outcome.Err)

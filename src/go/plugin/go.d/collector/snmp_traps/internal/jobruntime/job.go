@@ -31,7 +31,6 @@ type Job struct {
 	receiver         *receiver.Receiver
 	writer           output.Writer
 	journalHost      hostidentity.Provider
-	journalDir       string
 	profileLease     *catalog.Lease
 	profileIndex     *catalog.Epoch
 	telemetry        *telemetry.Job
@@ -109,7 +108,7 @@ func (j *Job) Start(ctx context.Context, onCommit func()) error {
 		j.handleOutputOutcome(jobTelemetry, outcome)
 	})
 
-	prepared, err := j.prepareOutputs(ctx, reportOutput)
+	prepared, err := j.prepareOutputs(reportOutput)
 	if err != nil {
 		releaseProfileLease()
 		return err
@@ -142,10 +141,7 @@ func (j *Job) Start(ctx context.Context, onCommit func()) error {
 		}
 	}
 
-	jobTelemetry = j.deps.Telemetry.Attach(j.policy.jobName, telemetry.Options{DedupEnabled: j.policy.dedup.Enabled()})
-	for _, event := range bindEvents {
-		j.handleReceiverEvent(jobTelemetry, event)
-	}
+	jobTelemetry = j.attachTelemetry(bindEvents)
 
 	if j.policy.otlpEnabled {
 		j.warnPlaintextOTLP()
@@ -172,7 +168,6 @@ func (j *Job) Start(ctx context.Context, onCommit func()) error {
 	j.receiver = recv
 	j.writer = writer
 	j.journalHost = prepared.journalHost
-	j.journalDir = prepared.journalDir()
 	j.profileLease = profileLease
 	j.profileIndex = idx
 	j.telemetry = jobTelemetry
@@ -253,7 +248,6 @@ func (j *Job) Cleanup() {
 			j.telemetry = nil
 		}
 		j.profileMetrics = nil
-		j.journalDir = ""
 		j.writeFailureDim = ""
 	})
 }
@@ -268,9 +262,6 @@ func (j *Job) sourceHashSalt() string {
 func (j *Job) monotonicUsecWith(provider hostidentity.Provider) int64 {
 	if provider != nil {
 		return int64(provider.MonotonicUsec())
-	}
-	if j.deps.HostIdentity == nil {
-		return 0
 	}
 	provider, err := j.deps.HostIdentity.CachedFallback()
 	if err != nil {

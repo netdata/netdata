@@ -15,25 +15,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
-type TrapEntry = model.TrapEntry
-type VarbindValue = model.VarbindValue
-
-type testEnrichmentCollector struct {
-	enricher          *enrichment.Enricher
-	reverseDNSEnabled bool
-}
-
-func (c *testEnrichmentCollector) enrichTrapEntry(entry *TrapEntry) {
-	c.enricher.Enrich(entry, c.reverseDNSEnabled)
-}
-
 type testTrapTopologyEnricher func(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment
 
 func (f testTrapTopologyEnricher) EnrichmentForSource(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment {
 	return f(ip, trapIfIndex)
 }
 
-func newTestTrapEnrichmentCollector(topologyEnricher testTrapTopologyEnricher, dns ...enrichment.ReverseDNS) (*testEnrichmentCollector, *ddsnmp.DeviceStore) {
+func newTestEnricher(topologyEnricher testTrapTopologyEnricher, dns ...enrichment.ReverseDNS) (*enrichment.Enricher, *ddsnmp.DeviceStore) {
 	store := ddsnmp.NewDeviceStore()
 	var reverseDNS enrichment.ReverseDNS
 	if len(dns) > 0 {
@@ -45,9 +33,7 @@ func newTestTrapEnrichmentCollector(topologyEnricher testTrapTopologyEnricher, d
 			return netdataadapter.ProjectTopologyResult(topologyEnricher.EnrichmentForSource(sourceIP, trapIfIndex))
 		}
 	}
-	return &testEnrichmentCollector{
-		enricher: enrichment.New(netdataadapter.RegistryLookup(store), topology, reverseDNS),
-	}, store
+	return enrichment.New(netdataadapter.RegistryLookup(store), topology, reverseDNS), store
 }
 
 type adapterReverseDNS struct {
@@ -112,7 +98,7 @@ const (
 )
 
 func TestEnrichTrapEntryHostnamePriority(t *testing.T) {
-	c, store := newTestTrapEnrichmentCollector(nil)
+	enricher, store := newTestEnricher(nil)
 	regKey := "key:10.1.2.3:162"
 	store.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname:      "10.1.2.3",
@@ -142,10 +128,10 @@ func TestEnrichTrapEntryHostnamePriority(t *testing.T) {
 
 	for tcName, tc := range tests {
 		t.Run(tcName, func(t *testing.T) {
-			entry := &TrapEntry{
+			entry := &model.TrapEntry{
 				SourceIP: tc.sourceIP,
 			}
-			c.enrichTrapEntry(entry)
+			enricher.Enrich(entry, false)
 
 			if entry.DeviceHostname != tc.wantHostname {
 				t.Errorf("DeviceHostname = %q, want %q", entry.DeviceHostname, tc.wantHostname)
@@ -220,18 +206,17 @@ func TestEnrichTrapEntryRegistryHostnameWinsOverTopologyAndReverseDNS(t *testing
 	for tcName, tc := range tests {
 		t.Run(tcName, func(t *testing.T) {
 			dns := newTestReverseDNS(map[string]string{tc.info.Hostname: "reverse.example.com"})
-			c, store := newTestTrapEnrichmentCollector(topologyEnricher, dns)
-			c.reverseDNSEnabled = true
+			enricher, store := newTestEnricher(topologyEnricher, dns)
 			regKey := "key:" + tc.info.Hostname + ":162"
 			store.Register(regKey, tc.info)
 
-			entry := &TrapEntry{
+			entry := &model.TrapEntry{
 				SourceIP: tc.info.Hostname,
-				Varbinds: []VarbindValue{
+				Varbinds: []model.VarbindValue{
 					{Name: "ifIndex", OID: testIfIndexOIDPrefix + ".1", Type: "InterfaceIndex", Value: int64(1)},
 				},
 			}
-			c.enrichTrapEntry(entry)
+			enricher.Enrich(entry, true)
 
 			if entry.DeviceHostname != tc.wantHost {
 				t.Errorf("DeviceHostname = %q, want %q", entry.DeviceHostname, tc.wantHost)
@@ -253,7 +238,7 @@ func TestEnrichTrapEntryRegistryHostnameWinsOverTopologyAndReverseDNS(t *testing
 }
 
 func TestEnrichTrapEntrySysNameOverVnodeUnknown(t *testing.T) {
-	c, store := newTestTrapEnrichmentCollector(nil)
+	enricher, store := newTestEnricher(nil)
 	regKey := "key:10.1.2.4:162"
 	store.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname:      "10.1.2.4",
@@ -261,8 +246,8 @@ func TestEnrichTrapEntrySysNameOverVnodeUnknown(t *testing.T) {
 		VnodeHostname: "unknown",
 	})
 
-	entry := &TrapEntry{SourceIP: "10.1.2.4"}
-	c.enrichTrapEntry(entry)
+	entry := &model.TrapEntry{SourceIP: "10.1.2.4"}
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "real-switch" {
 		t.Errorf("DeviceHostname = %q, want real-switch (unknown vnode hostname treated as unresolved)", entry.DeviceHostname)
@@ -270,15 +255,15 @@ func TestEnrichTrapEntrySysNameOverVnodeUnknown(t *testing.T) {
 }
 
 func TestEnrichTrapEntryEmptySysNameSkipped(t *testing.T) {
-	c, store := newTestTrapEnrichmentCollector(nil)
+	enricher, store := newTestEnricher(nil)
 	regKey := "key:10.1.2.5:162"
 	store.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.1.2.5",
 		SysName:  "",
 	})
 
-	entry := &TrapEntry{SourceIP: "10.1.2.5"}
-	c.enrichTrapEntry(entry)
+	entry := &model.TrapEntry{SourceIP: "10.1.2.5"}
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "" {
 		t.Errorf("DeviceHostname = %q, want empty (empty sysName treated as unresolved)", entry.DeviceHostname)
@@ -286,9 +271,9 @@ func TestEnrichTrapEntryEmptySysNameSkipped(t *testing.T) {
 }
 
 func TestEnrichTrapEntryNoDeviceStoreMatch(t *testing.T) {
-	c, _ := newTestTrapEnrichmentCollector(nil)
-	entry := &TrapEntry{SourceIP: "172.16.0.99"}
-	c.enrichTrapEntry(entry)
+	enricher, _ := newTestEnricher(nil)
+	entry := &model.TrapEntry{SourceIP: "172.16.0.99"}
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "" {
 		t.Errorf("DeviceHostname = %q, want empty for unknown device", entry.DeviceHostname)
@@ -302,7 +287,7 @@ func TestEnrichTrapEntryNoDeviceStoreMatch(t *testing.T) {
 }
 
 func TestEnrichTrapEntryAmbiguousDeviceStoreMatchDoesNotEnrich(t *testing.T) {
-	c, store := newTestTrapEnrichmentCollector(nil)
+	enricher, store := newTestEnricher(nil)
 	store.Register("job-a:10.9.9.1:162", ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.9.9.1",
 		SysName:  "switch-a",
@@ -314,8 +299,8 @@ func TestEnrichTrapEntryAmbiguousDeviceStoreMatchDoesNotEnrich(t *testing.T) {
 		Vendor:   "vendor-b",
 	})
 
-	entry := &TrapEntry{SourceIP: "10.9.9.1"}
-	c.enrichTrapEntry(entry)
+	entry := &model.TrapEntry{SourceIP: "10.9.9.1"}
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "" {
 		t.Errorf("DeviceHostname = %q, want empty for ambiguous registry source", entry.DeviceHostname)
@@ -348,20 +333,20 @@ func TestEnrichTrapEntryDoesNotUseTopologyOnVnodeConflict(t *testing.T) {
 		}
 	})
 
-	c, store := newTestTrapEnrichmentCollector(topologyEnricher)
+	enricher, store := newTestEnricher(topologyEnricher)
 	store.Register("job-a:10.9.9.2:162", ddsnmp.DeviceConnectionInfo{
 		Hostname:  "10.9.9.2",
 		SysName:   "registry-switch",
 		VnodeGUID: "registry-vnode-id",
 	})
 
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		SourceIP: "10.9.9.2",
-		Varbinds: []VarbindValue{
+		Varbinds: []model.VarbindValue{
 			{Name: "ifIndex", OID: testIfIndexOIDPrefix + ".1", Type: "InterfaceIndex", Value: int64(1)},
 		},
 	}
-	c.enrichTrapEntry(entry)
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "registry-switch" {
 		t.Errorf("DeviceHostname = %q, want registry-switch", entry.DeviceHostname)
@@ -384,16 +369,16 @@ func TestEnrichTrapEntryUsesTrapVarbindInterfaceWithoutTopology(t *testing.T) {
 	topologyEnricher := testTrapTopologyEnricher(func(_, _ string) *snmptopology.TrapTopologyEnrichment {
 		return nil
 	})
-	c, _ := newTestTrapEnrichmentCollector(topologyEnricher)
+	enricher, _ := newTestEnricher(topologyEnricher)
 
-	entry := &TrapEntry{
+	entry := &model.TrapEntry{
 		SourceIP: "10.9.9.3",
-		Varbinds: []VarbindValue{
+		Varbinds: []model.VarbindValue{
 			{Name: "ifIndex", OID: testIfIndexOIDPrefix + ".29", Type: "InterfaceIndex", Value: int64(29)},
 			{Name: "ifName", OID: testIfNameOIDPrefix + ".29", Type: "OctetString", Value: "uplink-29"},
 		},
 	}
-	c.enrichTrapEntry(entry)
+	enricher.Enrich(entry, false)
 
 	if entry.TopologyInterface != "uplink-29" {
 		t.Errorf("TopologyInterface = %q, want uplink-29", entry.TopologyInterface)
@@ -413,9 +398,9 @@ func TestEnrichTrapEntryUsesTrapVarbindInterfaceWithoutTopology(t *testing.T) {
 }
 
 func TestEnrichTrapEntrySourceUDPPeerFallback(t *testing.T) {
-	c, _ := newTestTrapEnrichmentCollector(nil)
-	entry := &TrapEntry{SourceUDPPeer: "192.168.1.1"}
-	c.enrichTrapEntry(entry)
+	enricher, _ := newTestEnricher(nil)
+	entry := &model.TrapEntry{SourceUDPPeer: "192.168.1.1"}
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "" {
 		t.Errorf("DeviceHostname = %q, want empty (no device match)", entry.DeviceHostname)
@@ -423,14 +408,14 @@ func TestEnrichTrapEntrySourceUDPPeerFallback(t *testing.T) {
 }
 
 func TestEnrichTrapEntryNilEntry(t *testing.T) {
-	c, _ := newTestTrapEnrichmentCollector(nil)
-	c.enrichTrapEntry(nil)
+	enricher, _ := newTestEnricher(nil)
+	enricher.Enrich(nil, false)
 }
 
 func TestEnrichTrapEntryNoSource(t *testing.T) {
-	c, _ := newTestTrapEnrichmentCollector(nil)
-	entry := &TrapEntry{}
-	c.enrichTrapEntry(entry)
+	enricher, _ := newTestEnricher(nil)
+	entry := &model.TrapEntry{}
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "" {
 		t.Errorf("DeviceHostname = %q, want empty", entry.DeviceHostname)
@@ -439,14 +424,14 @@ func TestEnrichTrapEntryNoSource(t *testing.T) {
 
 func TestEnrichTrapEntryReverseDNSDefaultOff(t *testing.T) {
 	dns := newTestReverseDNS(map[string]string{"10.5.5.1": "core-sw.mydc.example.com"})
-	c, store := newTestTrapEnrichmentCollector(nil, dns)
+	enricher, store := newTestEnricher(nil, dns)
 	regKey := "key:10.5.5.1:162"
 	store.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.5.5.1",
 	})
 
-	entry := &TrapEntry{SourceIP: "10.5.5.1"}
-	c.enrichTrapEntry(entry)
+	entry := &model.TrapEntry{SourceIP: "10.5.5.1"}
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "" {
 		t.Errorf("DeviceHostname = %q, want empty (reverse DNS disabled, no vnode/sysName)", entry.DeviceHostname)
@@ -458,11 +443,10 @@ func TestEnrichTrapEntryReverseDNSDefaultOff(t *testing.T) {
 
 func TestEnrichTrapEntryReverseDNSEnabledNoSNMPState(t *testing.T) {
 	dns := newTestReverseDNS(map[string]string{"10.6.6.1": "peer.mydc.example.com"})
-	c, _ := newTestTrapEnrichmentCollector(nil, dns)
-	c.reverseDNSEnabled = true
+	enricher, _ := newTestEnricher(nil, dns)
 
-	entry := &TrapEntry{SourceIP: "10.6.6.1"}
-	c.enrichTrapEntry(entry)
+	entry := &model.TrapEntry{SourceIP: "10.6.6.1"}
+	enricher.Enrich(entry, true)
 
 	if entry.DeviceHostname != "" {
 		t.Errorf("DeviceHostname = %q, want empty because reverse DNS is not authoritative identity", entry.DeviceHostname)
@@ -480,14 +464,14 @@ func TestEnrichTrapEntryReverseDNSEnabledNoSNMPState(t *testing.T) {
 
 func TestEnrichTrapEntryReverseDNSDisabledNoCacheUse(t *testing.T) {
 	dns := newTestReverseDNS(map[string]string{"10.7.7.1": "cached.example.com"})
-	c, store := newTestTrapEnrichmentCollector(nil, dns)
+	enricher, store := newTestEnricher(nil, dns)
 	regKey := "key:10.7.7.1:162"
 	store.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.7.7.1",
 	})
 
-	entry := &TrapEntry{SourceIP: "10.7.7.1"}
-	c.enrichTrapEntry(entry)
+	entry := &model.TrapEntry{SourceIP: "10.7.7.1"}
+	enricher.Enrich(entry, false)
 
 	if entry.DeviceHostname != "" {
 		t.Errorf("DeviceHostname = %q, want empty (reverse DNS disabled, no SNMP state)", entry.DeviceHostname)
@@ -499,16 +483,15 @@ func TestEnrichTrapEntryReverseDNSDisabledNoCacheUse(t *testing.T) {
 
 func TestEnrichTrapEntryReverseDNSDoesNotReplaceKnownHostname(t *testing.T) {
 	dns := newTestReverseDNS(map[string]string{"10.7.7.2": "reverse-known.example.com"})
-	c, store := newTestTrapEnrichmentCollector(nil, dns)
-	c.reverseDNSEnabled = true
+	enricher, store := newTestEnricher(nil, dns)
 	regKey := "key:10.7.7.2:162"
 	store.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.7.7.2",
 		SysName:  "known-switch",
 	})
 
-	entry := &TrapEntry{SourceIP: "10.7.7.2"}
-	c.enrichTrapEntry(entry)
+	entry := &model.TrapEntry{SourceIP: "10.7.7.2"}
+	enricher.Enrich(entry, true)
 
 	if entry.DeviceHostname != "known-switch" {
 		t.Errorf("DeviceHostname = %q, want known-switch", entry.DeviceHostname)
@@ -520,10 +503,9 @@ func TestEnrichTrapEntryReverseDNSDoesNotReplaceKnownHostname(t *testing.T) {
 
 func TestEnrichTrapEntryReverseDNSEnabledSchedulesCacheMiss(t *testing.T) {
 	dns := newTestReverseDNS(nil)
-	c, _ := newTestTrapEnrichmentCollector(nil, dns)
-	c.reverseDNSEnabled = true
-	entry := &TrapEntry{SourceIP: "203.0.113.10"}
-	c.enrichTrapEntry(entry)
+	enricher, _ := newTestEnricher(nil, dns)
+	entry := &model.TrapEntry{SourceIP: "203.0.113.10"}
+	enricher.Enrich(entry, true)
 
 	if entry.Enrichment == nil || entry.Enrichment.ReverseDNS == nil {
 		t.Fatal("missing reverse DNS audit")
@@ -569,7 +551,7 @@ func TestEnrichTrapEntryVendorAndVnodeEnrichment(t *testing.T) {
 
 	for tcName, tc := range tests {
 		t.Run(tcName, func(t *testing.T) {
-			c, store := newTestTrapEnrichmentCollector(nil)
+			enricher, store := newTestEnricher(nil)
 			regKey := "key:" + tc.hostname + ":162"
 			store.Register(regKey, ddsnmp.DeviceConnectionInfo{
 				Hostname:  tc.hostname,
@@ -578,8 +560,8 @@ func TestEnrichTrapEntryVendorAndVnodeEnrichment(t *testing.T) {
 				VnodeGUID: tc.vnodeGUID,
 			})
 
-			entry := &TrapEntry{SourceIP: tc.hostname}
-			c.enrichTrapEntry(entry)
+			entry := &model.TrapEntry{SourceIP: tc.hostname}
+			enricher.Enrich(entry, false)
 
 			if entry.DeviceVendor != tc.wantVendor {
 				t.Errorf("DeviceVendor = %q, want %q", entry.DeviceVendor, tc.wantVendor)

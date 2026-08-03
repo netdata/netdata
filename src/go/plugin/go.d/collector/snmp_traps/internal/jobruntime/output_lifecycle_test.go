@@ -21,12 +21,12 @@ type recordingOutputStarter struct {
 
 type cleanupOrderWriter struct {
 	order   []string
-	entries []*TrapEntry
+	entries []*model.TrapEntry
 }
 
-func (w *cleanupOrderWriter) Write(entry *TrapEntry) error {
+func (w *cleanupOrderWriter) Write(entry *model.TrapEntry) error {
 	w.entries = append(w.entries, entry)
-	if entry.ReportType == ReportTypeDedupSummary {
+	if entry.ReportType == model.ReportTypeDedupSummary {
 		w.order = append(w.order, "summary")
 	}
 	return nil
@@ -67,10 +67,6 @@ func TestStartOutputBackendsStopsAfterFailure(t *testing.T) {
 func TestPreparedOutputsStartIgnoresTypedNilBackend(t *testing.T) {
 	prepared := &preparedOutputs{}
 	require.NoError(t, prepared.start())
-}
-
-func TestMonotonicUsecWithoutHostIdentityReturnsZero(t *testing.T) {
-	assert.Zero(t, (&Job{}).monotonicUsecWith(nil))
 }
 
 func TestHandleOutputOutcomePreservesBackendAuthorityMetrics(t *testing.T) {
@@ -116,8 +112,8 @@ func TestCollectorCleanupWritesFinalDedupSummaryBeforeClosingOutput(t *testing.T
 	require.Len(t, writer.entries, 1)
 	summary := writer.entries[0]
 	assert.Equal(t, jobName, summary.JobName)
-	assert.Equal(t, ReportTypeDedupSummary, summary.ReportType)
-	assert.Equal(t, Severity("info"), summary.Severity)
+	assert.Equal(t, model.ReportTypeDedupSummary, summary.ReportType)
+	assert.Equal(t, model.Severity("info"), summary.Severity)
 	assert.Positive(t, summary.ReceivedRealtimeUsec)
 	assert.Zero(t, summary.ReceivedMonotonicUsec)
 	require.NotNil(t, summary.SummaryCounts)

@@ -46,8 +46,7 @@ func TestCollectorAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
 	c := newTestEventJob(logger.NewWithWriter(&buf))
 	c.policy.jobName = "buffer-degraded"
 
-	metrics := c.deps.Telemetry.Attach("buffer-degraded", telemetry.Options{})
-	c.handleReceiverEvent(metrics, receiver.Event{
+	metrics := c.attachTelemetry([]receiver.Event{{
 		Type: receiver.EventListenerBufferDegraded,
 		Endpoint: receiver.Endpoint{
 			Protocol: "udp4",
@@ -56,7 +55,7 @@ func TestCollectorAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
 		},
 		Requested: receiver.DefaultReceiveBuffer,
 		Err:       errors.New("boom"),
-	})
+	}})
 	t.Cleanup(metrics.Detach)
 
 	assertJobMetric(t, metrics, "buffer-degraded", "snmp_trap_errors_listener_buffer_degraded", 1)
@@ -145,12 +144,7 @@ func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
 
 func newTestEventJob(log *logger.Logger) *Job {
 	registry := telemetry.NewRegistry()
-	job := &Job{
-		policy: NewPolicy(PolicyConfig{JobName: "test"}),
-		deps: Dependencies{
-			Telemetry: registry,
-		},
-	}
+	job := newTestJob(NewPolicy(PolicyConfig{JobName: "test"}), registry, nil)
 	if log != nil {
 		job.deps.Log = Logger{
 			Warningf: log.Warningf,

@@ -13,14 +13,13 @@ import (
 )
 
 type preparedOutputs struct {
-	job         *Job
 	journal     *journal.Writer
 	otlp        *otlp.Writer
 	journalHost hostidentity.Provider
 }
 
-func (j *Job) prepareOutputs(_ context.Context, report output.OutcomeReporter) (*preparedOutputs, error) {
-	prepared := &preparedOutputs{job: j}
+func (j *Job) prepareOutputs(report output.OutcomeReporter) (*preparedOutputs, error) {
+	prepared := &preparedOutputs{}
 	if !j.policy.journalEnabled {
 		return prepared, nil
 	}
@@ -111,11 +110,4 @@ func (p *preparedOutputs) close() {
 	if p.otlp != nil {
 		_ = p.otlp.Close()
 	}
-}
-
-func (p *preparedOutputs) journalDir() string {
-	if p.journal == nil {
-		return ""
-	}
-	return p.journal.Directory()
 }

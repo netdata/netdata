@@ -475,9 +475,6 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	assert.Contains(t, err.Error(), "profile_metrics.include")
 	assert.NotContains(t, err.Error(), "unknown_profile_key")
 	assert.Nil(t, c.job)
-	assert.Nil(t, c.job)
-	assert.Nil(t, c.job)
-	assert.Nil(t, c.job)
 }
 
 func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {

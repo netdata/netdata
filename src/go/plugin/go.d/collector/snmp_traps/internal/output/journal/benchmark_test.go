@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 )
 
-func BenchmarkTrapWriterWrite(b *testing.B) {
+func BenchmarkTrapWriterSerializeAndWrite(b *testing.B) {
 	writer := newWriter(discardJournalSink{}, Config{}, 1<<20, nil)
 	if err := writer.Start(); err != nil {
 		b.Fatal(err)

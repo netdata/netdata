@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
@@ -33,9 +34,9 @@ func assertSeverityCounters(t *testing.T, job *telemetry.Job, jobName string, wa
 
 type panicTrapWriter struct{}
 
-func (panicTrapWriter) Write(*TrapEntry) error { panic("trap writer panic") }
-func (panicTrapWriter) Flush() error           { return nil }
-func (panicTrapWriter) Close() error           { return nil }
+func (panicTrapWriter) Write(*model.TrapEntry) error { panic("trap writer panic") }
+func (panicTrapWriter) Flush() error                 { return nil }
+func (panicTrapWriter) Close() error                 { return nil }
 
 func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
@@ -121,7 +122,7 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 	}
 }
 
-func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) {
+func TestJobHandleDatagramLeavesSourceVnodeEmptyWithoutEnrichmentMatch(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	index := setSingleTestTrap(t, trap)
@@ -242,8 +243,8 @@ func TestSelectDedupKeyVarbindsPrefersProfileKeys(t *testing.T) {
 	}
 
 	assert(selectDedupKeyVarbinds(nil, jobKeys), jobKeys)
-	assert(selectDedupKeyVarbinds(&TrapDef{}, jobKeys), jobKeys)
-	assert(selectDedupKeyVarbinds(&TrapDef{DedupKeyVarbinds: []string{"profileKey"}}, jobKeys), []string{"profileKey"})
+	assert(selectDedupKeyVarbinds(&catalog.TrapDef{}, jobKeys), jobKeys)
+	assert(selectDedupKeyVarbinds(&catalog.TrapDef{DedupKeyVarbinds: []string{"profileKey"}}, jobKeys), []string{"profileKey"})
 }
 
 func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
@@ -252,7 +253,7 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 	t.Run("unknown OID", func(t *testing.T) {
 		const jobName = "test-dedup-unknown-oid"
 
-		index := setTestProfileIndex(t, map[string]*TrapDef{})
+		index := setTestProfileIndex(t, map[string]*catalog.TrapDef{})
 		writer := &mockTrapWriter{}
 		c, metrics := newDedupTestV2Collector(t, jobName, writer, index)
 
@@ -377,7 +378,7 @@ func TestCollectorHandlePacketWritesDecodeErrorEntry(t *testing.T) {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
 	}
 	entry := writer.entries[0]
-	if entry.ReportType != ReportTypeDecodeError {
+	if entry.ReportType != model.ReportTypeDecodeError {
 		t.Fatalf("ReportType = %q, want decode_error", entry.ReportType)
 	}
 	if entry.DecodeError == nil {
@@ -455,14 +456,11 @@ func TestCollectorHandlePacketDynamicDecodeFailureReusesRateLimitAdmission(t *te
 	const jobName = "test-dynamic-decode-error-rate-limit"
 	writer := &mockTrapWriter{}
 	registry := telemetry.NewRegistry()
-	c := &Job{
-		policy:      NewPolicy(PolicyConfig{JobName: jobName}),
-		writer:      writer,
-		journalHost: newTestJournalHostProvider(),
-		telemetry:   registry.Attach(jobName, telemetry.Options{}),
-		deps:        Dependencies{Telemetry: registry},
-	}
-	user := USMUserConfig{
+	c := newTestJob(NewPolicy(PolicyConfig{JobName: jobName}), registry, nil)
+	c.writer = writer
+	c.journalHost = newTestJournalHostProvider()
+	c.telemetry = registry.Attach(jobName, telemetry.Options{})
+	user := receiver.USMUser{
 		Username:  "testuser",
 		AuthProto: "sha256",
 		AuthKey:   "authpassword",
@@ -471,7 +469,7 @@ func TestCollectorHandlePacketDynamicDecodeFailureReusesRateLimitAdmission(t *te
 	}
 	c.receiver = newTestReceiver(c, receiver.PolicyConfig{
 		Versions:        []string{"v3"},
-		USMUsers:        toReceiverUSMUsers([]USMUserConfig{user}),
+		USMUsers:        []receiver.USMUser{user},
 		DynamicEngineID: true,
 		RateLimit: receiver.RateLimitConfig{
 			Enabled:      true,
@@ -615,7 +613,7 @@ func TestCollectorHandlePacketRejectsUnknownV3EngineID(t *testing.T) {
 	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 
 	writer := &mockTrapWriter{}
-	c := newTestV3Collector(t, jobName, writer, []USMUserConfig{testNoAuthV3User(testEngineIDHex)}, []string{"80001f888077dfe44faa700259"})
+	c := newTestV3Collector(t, jobName, writer, []receiver.USMUser{testNoAuthV3User(testEngineIDHex)}, []string{"80001f888077dfe44faa700259"})
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -637,7 +635,7 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 		privKey:     "privpassword",
 		trapOID:     "1.3.6.1.6.3.1.1.5.1",
 	})
-	user := USMUserConfig{
+	user := receiver.USMUser{
 		Username:  "testuser",
 		EngineID:  otherEngineID,
 		AuthProto: "sha256",
@@ -647,7 +645,7 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 	}
 
 	writer := &mockTrapWriter{}
-	c := newTestV3Collector(t, jobName, writer, []USMUserConfig{user}, []string{otherEngineID})
+	c := newTestV3Collector(t, jobName, writer, []receiver.USMUser{user}, []string{otherEngineID})
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 

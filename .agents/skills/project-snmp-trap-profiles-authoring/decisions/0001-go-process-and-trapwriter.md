@@ -161,7 +161,7 @@ The backend has an explicit two-phase lifecycle:
   identity, rotation policy, and retention policy without starting a goroutine.
 - `Writer.Start()` starts the one queue worker after every job resource has passed preflight.
 - `Writer.Write()`, `Flush()`, `Close()`, `Directory()`, and `BinaryEncodedFields()` expose only the runtime behavior needed
-  by the root collector. Closing a prepared-but-not-started writer is safe.
+  by the job runtime and output-owner tests. Closing a prepared-but-not-started writer is safe.
 - The package owns parsed `Retention` and SDK-facing `Config`; the root package retains only the human-readable config DTO
   and maps it into these normalized types.
 

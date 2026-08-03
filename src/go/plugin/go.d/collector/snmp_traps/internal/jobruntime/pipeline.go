@@ -63,9 +63,7 @@ func (j *Job) handleDatagram(datagram receiver.Datagram) {
 
 	entry := entryFromPDU(j.policy.jobName, pdu, td, time.Now().UnixMicro(), j.monotonicUsecWith(j.journalHost))
 	entry.PacketSequence = packetSequence
-	if j.deps.Enricher != nil {
-		j.deps.Enricher.Enrich(entry, j.policy.reverseDNSEnabled)
-	}
+	j.deps.Enricher.Enrich(entry, j.policy.reverseDNSEnabled)
 	renderEntryTemplates(entry, td)
 	if unknownOID {
 		jobTelemetry.Error(telemetry.ErrorUnknownOID)
