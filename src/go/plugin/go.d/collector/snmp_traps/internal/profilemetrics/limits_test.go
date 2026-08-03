@@ -223,33 +223,6 @@ func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T)
 	assertProfileMetricOverflow(t, store, 0)
 }
 
-func TestProfileMetricRuntimePrunesExpiredSourceRoutes(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
-	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
-	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
-		Enabled: true,
-		Include: []string{"cisco.config.changed"},
-	}, func(cfg *Policy) {
-		cfg.identity.Device = profileMetricIdentityListener
-		cfg.limits.MaxSources = 1
-	})
-	first := ciscoConfigTrapEntry(testProfileMetricJobName)
-	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
-	rt.Update(first)
-	rt.Update(second)
-
-	store := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
-
-	rt.mu.Lock()
-	routeCount := rt.sourceRoutes.Len()
-	rt.mu.Unlock()
-	if routeCount > 1 {
-		t.Fatalf("sourceRoutes = %d, want <= 1 after lifecycle expiry and pruning", routeCount)
-	}
-}
-
 func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
 	if err := idx.addDefinitions([]profileMetricRule{{

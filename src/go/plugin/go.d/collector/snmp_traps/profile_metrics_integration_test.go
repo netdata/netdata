@@ -74,6 +74,22 @@ metrics:
 	if value, ok := store.Read().Value("snmp_trap_cold_start_events", labels); !ok || value != 1 {
 		t.Fatalf("snmp_trap_cold_start_events = %v/%v, want 1/true", value, ok)
 	}
+
+	dedupWriter := &mockTrapWriter{}
+	dedupCollector, _ := newDedupTestV2Collector(t, "test", dedupWriter)
+	dedupCollector.profileIndex = lease.Epoch()
+	dedupCollector.profileMetrics = rt
+	dedupCollector.deduper.start()
+	t.Cleanup(dedupCollector.deduper.Close)
+
+	dedupCollector.handlePacket(packet.payload, packet.peer, nil, nil)
+	dedupCollector.handlePacket(packet.payload, packet.peer, nil, nil)
+	require.Len(t, dedupWriter.entries, 1)
+
+	collectProfileMetricsForTest(t, rt, store, "test")
+	if value, ok := store.Read().Value("snmp_trap_cold_start_events", labels); !ok || value != 2 {
+		t.Fatalf("snmp_trap_cold_start_events after duplicate = %v/%v, want 2/true", value, ok)
+	}
 }
 
 func collectProfileMetricsForTest(t *testing.T, rt *profilemetrics.Runtime, store metrix.CollectorStore, jobName string) {
