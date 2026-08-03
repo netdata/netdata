@@ -444,6 +444,7 @@ type c035FixtureState struct {
 }
 
 var c035Fixtures = map[string]c035FixtureState{}
+var c035BufferedFixtures = map[string]c035FixtureState{}
 
 func c035Fixture(t *testing.T, name string, tc c035Case) c035FixtureState {
 	t.Helper()
@@ -490,12 +491,94 @@ func c035Fixture(t *testing.T, name string, tc c035Case) c035FixtureState {
 	return state
 }
 
+func c035BufferedFixture(t *testing.T, name string, tc c035Case) c035FixtureState {
+	t.Helper()
+	if state, ok := c035BufferedFixtures[name]; ok {
+		return state
+	}
+
+	base := int64(fixture.T0) - int64(fixture.T0)%36000
+	context := "fixture.c035_buffered_" + name
+	host := "c035-buffered-" + name
+
+	// The final old-cadence sample starts on a tier2 boundary. It saves the
+	// completed tier1 and tier2 points, then collection changes cadence before
+	// another old-cadence sample can trigger their modulo-based early flush.
+	firstSamples := 4*tier2Gran + 1
+	ch1, samples1 := c035Phase(context, base, base, firstSamples, tc.firstEvery, false, tc)
+	conn := connect(t, host, guid(tc.machineGUID+10), stream.CapsLive)
+	ch1.Define(conn)
+	ch1.PushLive(conn)
+	if err := conn.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := td.WaitRetention(host, context, ch1.FirstT(), ch1.LastT(), 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	boundary := base + 4*int64(tc.firstEvery)*tier2Gran
+	transition := boundary + int64(tc.firstEvery)
+	remainingOldWindow := int64(tc.firstEvery)*tier2Gran - int64(tc.firstEvery)
+	secondSamples := int((remainingOldWindow+int64(tc.thenEvery)-1)/int64(tc.thenEvery)) + 2
+	ch2, samples2 := c035Phase(context, base, transition, secondSamples, tc.thenEvery, true, tc)
+	ch2.Define(conn)
+	ch2.PushLive(conn)
+	if err := conn.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := td.WaitRetention(host, context, ch1.FirstT(), ch2.LastT(), 60*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	state := c035FixtureState{
+		base: base, context: context, host: host,
+		samples: append(samples1, samples2...),
+	}
+	c035BufferedFixtures[name] = state
+	return state
+}
+
 func c035TransitionWindow(base int64, tc c035Case, grouping int64) (after, before, step int64) {
 	step = int64(tc.firstEvery) * grouping
 	start := base + c035TransitionOffset(tc)/step*step
 	before = start + step
 	after = before - 2*step
 	return after, before, step
+}
+
+func TestCase035CompletedRollupKeepsOriginalCadence(t *testing.T) {
+	const contract = "CASE-035/completed-rollup-keeps-original-cadence"
+	for _, item := range c035Cases {
+		item := item
+		t.Run(item.name, func(t *testing.T) {
+			state := c035BufferedFixture(t, item.name, item.spec)
+			boundary := state.base + 4*int64(item.spec.firstEvery)*tier2Gran
+			for _, target := range []struct {
+				tier     int
+				grouping int64
+			}{
+				{tier: 1, grouping: tier1Gran},
+				{tier: 2, grouping: tier2Gran},
+			} {
+				target := target
+				t.Run("tier"+strconv.Itoa(target.tier), func(t *testing.T) {
+					trackContractComponent(t, contract,
+						item.name+"-tier"+strconv.Itoa(target.tier))
+
+					step := int64(item.spec.firstEvery) * target.grouping
+					after, before := boundary-2*step, boundary
+					if !c035QueryExact(t, c035QuerySpec{
+						context: state.context, host: state.host, dimension: c035RateDim,
+						tier: target.tier, after: after, before: before, step: step,
+						group: "sum", want: c035ExpectedVolume(state.samples, after, before, step),
+					}) {
+						t.Errorf("BROKEN %s (%s-tier%d): %s",
+							contract, item.name, target.tier, manifest[contract].Proves)
+					}
+				})
+			}
+		})
+	}
 }
 
 func TestCase035RateVolumeAcrossIntervalChange(t *testing.T) {
