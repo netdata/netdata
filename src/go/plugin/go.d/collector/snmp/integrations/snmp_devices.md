@@ -134,7 +134,7 @@ The [go.d/sd/snmp.conf](https://github.com/netdata/netdata/blob/master/src/go/pl
 
 Because all discovered devices share this one template, editing it lets you mass-customize every auto-discovered device at once. Any valid job-level option added to the template — such as `update_every`, `manual_profiles`, `create_vnode`, or `options.timeout` — applies to every discovered device.
 
-The template exposes these variables for each discovered device:
+The default template uses these variables for each discovered device:
 
 | Variable | Description |
 |---|---|
@@ -149,7 +149,7 @@ The template exposes these variables for each discovered device:
 | `.Credential.PrivacyProtocol` | SNMPv3 privacy protocol (version 3) |
 | `.Credential.PrivacyPassphrase` | SNMPv3 privacy passphrase (version 3) |
 
-The shipped `go.d/sd/snmp.conf` is the authoritative example of the full template. See the [Setup](#setup) section for the complete set of job-level configuration options.
+The shipped `go.d/sd/snmp.conf` is the authoritative example of the full template. The discovery engine also makes additional fields available to a custom template — for example `.SysInfo.Location`, `.SysInfo.Contact`, and `.Credential.ContextName` — so you are not limited to the variables the default template uses. See the [Setup](#setup) section for the complete set of job-level configuration options.
 
 
 #### Limits
