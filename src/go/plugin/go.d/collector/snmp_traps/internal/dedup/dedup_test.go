@@ -3,8 +3,6 @@
 package dedup
 
 import (
-	"math"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -52,12 +50,12 @@ func TestNormalizeClonesJobKeyVarbinds(t *testing.T) {
 	assert.Equal(t, []string{"ifIndex"}, policy.KeyVarbinds())
 }
 
-func TestNormalizeRejectsUnrepresentableWindow(t *testing.T) {
-	if strconv.IntSize < 64 {
-		t.Skip("int cannot represent a time.Duration-overflowing whole-second window")
-	}
-	seconds := int64(math.MaxInt64)/int64(time.Second) + 1
-	_, err := Normalize(Config{Enabled: true, WindowSec: int(seconds)})
+func TestNormalizeWindowBounds(t *testing.T) {
+	policy, err := Normalize(Config{Enabled: true, WindowSec: MaxWindowSec})
+	require.NoError(t, err)
+	assert.Equal(t, time.Duration(MaxWindowSec)*time.Second, policy.window)
+
+	_, err = Normalize(Config{Enabled: true, WindowSec: MaxWindowSec + 1})
 	require.ErrorContains(t, err, "window_sec")
 }
 

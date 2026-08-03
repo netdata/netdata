@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
@@ -17,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
@@ -26,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	collogpb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -331,6 +334,30 @@ func TestConfigSchemaDynCfgListFieldsHaveSafeDefaults(t *testing.T) {
 		}
 		assertSchemaArrayProperty(t, schema, tc.name, tc.path, []any{"array", "null"}, wantDefault)
 	}
+}
+
+func TestDedupWindowWireTypeIsArchitectureIndependent(t *testing.T) {
+	assert.Equal(t, reflect.Int64, reflect.TypeOf(DedupConfig{}.WindowSec).Kind())
+
+	for name, decode := range map[string]func([]byte, any) error{
+		"json": json.Unmarshal,
+		"yaml": yaml.Unmarshal,
+	} {
+		t.Run(name, func(t *testing.T) {
+			var cfg Config
+			payload := []byte(`{"dedup":{"window_sec":9223372036}}`)
+			if name == "yaml" {
+				payload = []byte("dedup:\n  window_sec: 9223372036\n")
+			}
+			require.NoError(t, decode(payload, &cfg))
+			assert.Equal(t, dedup.MaxWindowSec, cfg.Dedup.WindowSec)
+		})
+	}
+
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+	window := schemaProperty(t, schema, "jsonSchema", "properties", "dedup", "properties", "window_sec")
+	assert.Equal(t, float64(dedup.MaxWindowSec), window["maximum"])
 }
 
 func TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults(t *testing.T) {

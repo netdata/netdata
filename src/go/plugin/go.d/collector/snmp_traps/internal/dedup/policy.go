@@ -13,12 +13,13 @@ import (
 const (
 	defaultWindow     = 5 * time.Second
 	defaultMaxEntries = 100000
-	maxWindowSec      = int64(math.MaxInt64) / int64(time.Second)
+	// MaxWindowSec is the largest whole-second window representable by time.Duration.
+	MaxWindowSec = int64(math.MaxInt64) / int64(time.Second)
 )
 
 type Config struct {
 	Enabled         bool
-	WindowSec       int
+	WindowSec       int64
 	CacheMaxEntries int
 	KeyVarbinds     []string
 }
@@ -38,8 +39,8 @@ func Normalize(cfg Config) (Policy, error) {
 	if cfg.WindowSec < 0 {
 		return Policy{}, fmt.Errorf("dedup.window_sec must be non-negative, got %d", cfg.WindowSec)
 	}
-	if int64(cfg.WindowSec) > maxWindowSec {
-		return Policy{}, fmt.Errorf("dedup.window_sec must not exceed %d, got %d", maxWindowSec, cfg.WindowSec)
+	if cfg.WindowSec > MaxWindowSec {
+		return Policy{}, fmt.Errorf("dedup.window_sec must not exceed %d, got %d", MaxWindowSec, cfg.WindowSec)
 	}
 	if cfg.CacheMaxEntries < 0 {
 		return Policy{}, fmt.Errorf("dedup.cache_max_entries must be non-negative, got %d", cfg.CacheMaxEntries)

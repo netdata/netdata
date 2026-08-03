@@ -33,7 +33,7 @@ type RateLimitConfig struct {
 
 type DedupConfig struct {
 	Enabled         bool     `yaml:"enabled" json:"enabled"`
-	WindowSec       int      `yaml:"window_sec" json:"window_sec"`
+	WindowSec       int64    `yaml:"window_sec" json:"window_sec"`
 	CacheMaxEntries int      `yaml:"cache_max_entries" json:"cache_max_entries"`
 	KeyVarbinds     []string `yaml:"key_varbinds,omitempty" json:"key_varbinds"`
 }
