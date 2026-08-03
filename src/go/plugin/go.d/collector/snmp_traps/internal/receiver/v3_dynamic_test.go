@@ -255,11 +255,26 @@ func TestExtractRawV3ContextRejectsMalformedEnvelope(t *testing.T) {
 	if len(fields) != 4 {
 		t.Fatalf("outer field count = %d, want 4", len(fields))
 	}
+	scopedFields := v3PlaintextScopedPDUFields(t, data)
+	if len(scopedFields) != 3 {
+		t.Fatalf("scoped PDU field count = %d, want 3", len(scopedFields))
+	}
+	invalidContextEngineID := append([]byte(nil), scopedFields[0]...)
+	invalidContextEngineID[0] = tagInteger
+	invalidContextName := append([]byte(nil), scopedFields[1]...)
+	invalidContextName[0] = tagInteger
 
 	invalidMsgData := replaceV3MsgDataTag(t, data, tagInteger)
 	tests := map[string][]byte{
 		"missing msgData":                   berTLV(tagSequence, testBERFields(fields[:3]...)),
 		"invalid msgData tag":               invalidMsgData,
+		"empty plaintext scoped PDU":        replaceV3MsgData(t, data, testBERSequence()),
+		"missing context name and data":     replaceV3MsgData(t, data, testBERSequence(scopedFields[0])),
+		"missing scoped PDU data":           replaceV3MsgData(t, data, testBERSequence(scopedFields[:2]...)),
+		"invalid context engine ID tag":     replaceV3MsgData(t, data, testBERSequence(invalidContextEngineID, scopedFields[1], scopedFields[2])),
+		"invalid context name tag":          replaceV3MsgData(t, data, testBERSequence(scopedFields[0], invalidContextName, scopedFields[2])),
+		"malformed scoped PDU data":         replaceV3MsgData(t, data, testBERSequence(scopedFields[0], scopedFields[1], []byte{tagTrapV2, 1})),
+		"trailing scoped PDU field":         replaceV3MsgData(t, data, testBERSequence(append(scopedFields, testBERElement(tagOctetStr, nil))...)),
 		"trailing outer field":              berTLV(tagSequence, testBERFields(append(fields, testBERElement(tagInteger, []byte{0}))...)),
 		"trailing bytes after message":      append(append([]byte(nil), data...), 0),
 		"encrypted msgData without privacy": replaceV3MsgDataTag(t, data, tagOctetStr),
@@ -360,6 +375,7 @@ func TestMalformedDiscoveryRequestDoesNotSendReport(t *testing.T) {
 	tests := map[string][]byte{
 		"invalid header":                    corruptV3HeaderFieldTag(t, probe, 1, tagOctetStr),
 		"missing msgData":                   berTLV(tagSequence, testBERFields(fields[:3]...)),
+		"empty plaintext scoped PDU":        replaceV3MsgData(t, probe, testBERSequence()),
 		"encrypted msgData without privacy": replaceV3MsgDataTag(t, probe, tagOctetStr),
 		"plaintext msgData with privacy":    setV3Flags(t, probe, gosnmp.AuthPriv|gosnmp.Reportable),
 	}
@@ -818,8 +834,41 @@ func replaceV3MsgDataTag(t *testing.T, data []byte, replacement byte) []byte {
 	}
 	msgData := append([]byte(nil), fields[3]...)
 	msgData[0] = replacement
-	fields[3] = msgData
+	return replaceV3MsgData(t, data, msgData)
+}
+
+func replaceV3MsgData(t *testing.T, data, msgData []byte) []byte {
+	t.Helper()
+	fields := v3OuterFields(t, data)
+	if len(fields) != 4 {
+		t.Fatalf("outer field count = %d, want 4", len(fields))
+	}
+	fields[3] = append([]byte(nil), msgData...)
 	return berTLV(tagSequence, testBERFields(fields...))
+}
+
+func v3PlaintextScopedPDUFields(t *testing.T, data []byte) [][]byte {
+	t.Helper()
+	outerFields := v3OuterFields(t, data)
+	if len(outerFields) != 4 {
+		t.Fatalf("outer field count = %d, want 4", len(outerFields))
+	}
+	msgData := outerFields[3]
+	tag, valueStart, valueEnd, next, err := readBERElement(msgData, 0)
+	if err != nil || tag != tagSequence || next != len(msgData) {
+		t.Fatalf("parse plaintext scoped PDU: tag=%#x next=%d/%d err=%v", tag, next, len(msgData), err)
+	}
+
+	var fields [][]byte
+	for pos := valueStart; pos < valueEnd; {
+		_, _, _, next, err := readBERElement(msgData[:valueEnd], pos)
+		if err != nil {
+			t.Fatalf("parse scoped PDU field %d: %v", len(fields), err)
+		}
+		fields = append(fields, append([]byte(nil), msgData[pos:next]...))
+		pos = next
+	}
+	return fields
 }
 
 func testBERElement(tag byte, value []byte) []byte {

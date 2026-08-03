@@ -104,12 +104,17 @@ func parseRawV3Envelope(data []byte) (*rawV3Envelope, error) {
 		return nil, fmt.Errorf("SNMPv3 security parameters are not an octet string")
 	}
 
-	tag, _, _, next, err = readBERElement(data[:valueEnd], next)
+	tag, msgDataStart, msgDataEnd, next, err := readBERElement(data[:valueEnd], next)
 	if err != nil {
 		return nil, err
 	}
 	if tag != tagSequence && tag != tagOctetStr {
 		return nil, fmt.Errorf("SNMPv3 msgData is neither plaintext nor encrypted")
+	}
+	if tag == tagSequence {
+		if err := validateRawScopedPDU(data[msgDataStart:msgDataEnd]); err != nil {
+			return nil, err
+		}
 	}
 	if next != valueEnd || outerNext != len(data) {
 		return nil, fmt.Errorf("SNMPv3 message contains trailing fields")
@@ -120,6 +125,33 @@ func parseRawV3Envelope(data []byte) (*rawV3Envelope, error) {
 		securityParameters: data[securityStart:securityEnd],
 		msgDataEncrypted:   tag == tagOctetStr,
 	}, nil
+}
+
+func validateRawScopedPDU(data []byte) error {
+	tag, _, _, next, err := readBERElement(data, 0)
+	if err != nil {
+		return fmt.Errorf("SNMPv3 scoped PDU contextEngineID: %w", err)
+	}
+	if tag != tagOctetStr {
+		return fmt.Errorf("SNMPv3 scoped PDU contextEngineID is not an octet string")
+	}
+
+	tag, _, _, next, err = readBERElement(data, next)
+	if err != nil {
+		return fmt.Errorf("SNMPv3 scoped PDU contextName: %w", err)
+	}
+	if tag != tagOctetStr {
+		return fmt.Errorf("SNMPv3 scoped PDU contextName is not an octet string")
+	}
+
+	_, _, _, next, err = readBERElement(data, next)
+	if err != nil {
+		return fmt.Errorf("SNMPv3 scoped PDU data: %w", err)
+	}
+	if next != len(data) {
+		return fmt.Errorf("SNMPv3 scoped PDU contains trailing fields")
+	}
+	return nil
 }
 
 func parseRawV3Header(data []byte) (rawV3Header, error) {
