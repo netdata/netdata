@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 )
 
 // ---------------------------------------------------------------------------
@@ -79,49 +80,8 @@ func (w *countingWriter) Written() int64 { return atomic.LoadInt64(&w.count) }
 
 var _ output.Writer = (*countingWriter)(nil)
 
-// benchMakePDUs creates n synthetic PDU values with integer types.
-func benchMakePDUs(n int) []gosnmp.SnmpPDU {
-	out := make([]gosnmp.SnmpPDU, n)
-	for i := range out {
-		out[i] = gosnmp.SnmpPDU{
-			Name:  fmt.Sprintf("1.3.6.1.2.1.2.2.1.%d", i+1),
-			Type:  gosnmp.Integer,
-			Value: int(i),
-		}
-	}
-	return out
-}
-
 // ---------------------------------------------------------------------------
-// 1. Decode-only throughput benchmarks (varying varbind count)
-// ---------------------------------------------------------------------------
-
-func BenchmarkDecodeTrap(b *testing.B) {
-	cases := map[string]int{
-		"Varbinds=2":   0,  // baseline: 2 total varbinds (sysUpTime + trapOID)
-		"Varbinds=5":   3,  // 3 extra (5 total)
-		"Varbinds=10":  8,  // 8 extra (10 total)
-		"Varbinds=20":  18, // 18 extra (20 total)
-		"Varbinds=50":  48, // 48 extra (50 total)
-		"Varbinds=256": 254,
-	}
-	for name, n := range cases {
-		b.Run(name, func(b *testing.B) {
-			data := buildBenchV2cTrap(b, "public", "1.3.6.1.6.3.1.1.5.1", benchMakePDUs(n)...)
-			peer := net.ParseIP("10.1.2.3")
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				_, _ = DecodeTrap(data, peer, nil)
-			}
-			b.StopTimer()
-			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "traps/s")
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// 2. End-to-end packet path through Collector.handlePacket
+// End-to-end packet path through Collector.handlePacket
 // ---------------------------------------------------------------------------
 
 func BenchmarkPacketTrap(b *testing.B) {
@@ -149,11 +109,10 @@ func BenchmarkPacketTrap(b *testing.B) {
 	c := &Collector{
 		Config:       Config{Name: jobName},
 		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
 		metrics:      &perJobMetrics{},
 		profileIndex: idx,
 	}
+	c.receiver = newTestReceiver(c, receiver.PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"public"}})
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -204,11 +163,10 @@ func BenchmarkMultiJob(b *testing.B) {
 				collectors[i] = &Collector{
 					Config:       Config{Name: jn},
 					trapWriter:   writers[i],
-					versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-					allowlist:    NewAllowlist(nil, []string{"public"}),
 					metrics:      &perJobMetrics{},
 					profileIndex: idx,
 				}
+				collectors[i].receiver = newTestReceiver(collectors[i], receiver.PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"public"}})
 			}
 
 			b.ReportAllocs()
@@ -291,11 +249,10 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	c := &Collector{
 		Config:       Config{Name: "bench-full"},
 		trapWriter:   tw,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
 		metrics:      &perJobMetrics{},
 		profileIndex: idx,
 	}
+	c.receiver = newTestReceiver(c, receiver.PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"public"}})
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -344,7 +301,7 @@ func newBenchmarkJournalWriter(b *testing.B, dir string, queueCapacity int) *jou
 }
 
 // BenchmarkUDPPacketToJournal measures the real local UDP receive path:
-// UDP socket -> Listener.readLoop -> Collector.handlePacket ->
+// UDP socket -> receiver read loop -> Collector.handlePacket ->
 // journal writer queue -> SDK-backed journal append/sync.
 func BenchmarkUDPPacketToJournal(b *testing.B) {
 	requireJournalctlBenchmark(b)
@@ -392,7 +349,7 @@ func BenchmarkUDPPacketToJournalPaced(b *testing.B) {
 type udpPacketToJournalBenchmark struct {
 	data       []byte
 	writer     *journal.Writer
-	listener   *Listener
+	receiver   *receiver.Receiver
 	conn       *net.UDPConn
 	delivered  atomic.Int64
 	journalDir string
@@ -425,25 +382,23 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	c := &Collector{
 		Config:       Config{Name: "bench-udp"},
 		trapWriter:   tw,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
 		metrics:      &perJobMetrics{},
 		profileIndex: idx,
 	}
-
-	listener, err := newListener("bench-udp", ListenConfig{
-		Endpoints: []EndpointConfig{{Protocol: "udp4", Address: "127.0.0.1", Port: 0}},
+	port := freeUDPPort(b)
+	recv := newTestReceiver(c, receiver.PolicyConfig{
+		Listen:      receiver.ListenConfig{Endpoints: []receiver.Endpoint{{Protocol: "udp", Address: "127.0.0.1", Port: port}}},
+		Versions:    []string{"v2c"},
+		Communities: []string{"public"},
 	})
+	c.receiver = recv
+	err := recv.Bind()
 	if err != nil {
-		b.Fatalf("newListener: %v", err)
+		b.Fatalf("bind receiver: %v", err)
 	}
-	b.Cleanup(listener.close)
+	b.Cleanup(recv.Close)
 
-	udpAddr, ok := listener.endpoints[0].conn.LocalAddr().(*net.UDPAddr)
-	if !ok {
-		b.Fatalf("unexpected listener address: %T", listener.endpoints[0].conn.LocalAddr())
-	}
-	conn, err := net.DialUDP("udp4", nil, udpAddr)
+	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	if err != nil {
 		b.Fatalf("DialUDP: %v", err)
 	}
@@ -452,12 +407,12 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	h := &udpPacketToJournalBenchmark{
 		data:       data,
 		writer:     tw,
-		listener:   listener,
+		receiver:   recv,
 		conn:       conn,
 		journalDir: tw.Directory(),
 	}
-	listener.start(func(pkt []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
-		c.handlePacket(pkt, peerIP, conn, peer)
+	recv.Start(func(datagram receiver.Datagram) {
+		c.handlePacket(datagram.Data, datagram.PeerIP, datagram.Conn, datagram.Peer)
 		h.delivered.Add(1)
 	})
 
@@ -475,7 +430,7 @@ func (h *udpPacketToJournalBenchmark) finish(b *testing.B, sent int64) {
 	b.Helper()
 
 	deliveredCount := waitForBenchmarkDeliveries(b, &h.delivered, sent, 250*time.Millisecond)
-	h.listener.close()
+	h.receiver.Close()
 	if err := h.writer.Flush(); err != nil {
 		b.Fatalf("Flush: %v", err)
 	}
@@ -515,51 +470,7 @@ func waitForBenchmarkDeliveries(b *testing.B, delivered *atomic.Int64, want int6
 }
 
 // ---------------------------------------------------------------------------
-// 5. Malformed BER / limit rejection benchmark
-// ---------------------------------------------------------------------------
-
-func BenchmarkBERRejection(b *testing.B) {
-	cases := map[string]struct {
-		data []byte
-	}{
-		"Oversized": {
-			data: make([]byte, maxDatagramSize+1),
-		},
-		"DepthOverLimit": {
-			data: nestedSequence(maxNestingDepth + 1),
-		},
-		"OIDTooLong": {
-			data: berTLV(tagSequence, berTLV(tagOID, make([]byte, maxOIDEncodedLen+1))),
-		},
-		"OctetStringTooLong": {
-			data: berTLV(tagSequence, berTLV(tagOctetStr, make([]byte, maxOctetStringLen+1))),
-		},
-		"TrailingData": {
-			data: append(buildBenchV2cTrap(b, "public", "1.3.6.1.6.3.1.1.5.1"), 0x00),
-		},
-		"IndefiniteLength": {
-			data: []byte{tagSequence, 0x80, 0x00, 0x00},
-		},
-		"Truncated": {
-			data: []byte{0x30, 0x01, 0x02},
-		},
-	}
-
-	for name, tc := range cases {
-		b.Run(name, func(b *testing.B) {
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				_, _ = decodePacket(tc.data, nil)
-			}
-			b.StopTimer()
-			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "rejected/s")
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// 6. Profile catalog and dedup hot-path benchmarks
+// Profile catalog and dedup hot-path benchmarks
 // ---------------------------------------------------------------------------
 
 func BenchmarkAcquireProfileCatalogDefaultProfiles(b *testing.B) {

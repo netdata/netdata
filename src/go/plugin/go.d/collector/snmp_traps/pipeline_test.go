@@ -7,16 +7,15 @@ import (
 	"errors"
 	"net"
 	"net/netip"
-	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 )
 
 var currentTestProfileIndex *ProfileIndex
@@ -74,7 +73,7 @@ func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -101,8 +100,8 @@ func TestCollectorHandlePacketAssignsReceiveSequencePerPacket(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 2 {
 		t.Fatalf("written entries = %d, want 2", len(writer.entries))
@@ -123,7 +122,7 @@ func TestCollectorHandlePacketRecoversFromPanic(t *testing.T) {
 	c := newTestV2Collector("panic-recover", panicTrapWriter{}, nil, []string{"public"})
 	c.metrics = metrics
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if got := metrics.errors.decodeFailed.Load(); got != 1 {
 		t.Fatalf("decode_failed = %d, want 1", got)
@@ -146,7 +145,7 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 	c := newDefaultTestV2Collector(writer)
 	c.deviceLookup = deviceStore
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -164,7 +163,7 @@ func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) 
 	c := newDefaultTestV2Collector(writer)
 	c.vnode = "listener-vnode-id"
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -214,7 +213,7 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 	c.reverseDNSEnabled = true
 	c.reverseDNS = dns
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -242,8 +241,8 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	c.deduper.start()
 	defer c.deduper.Close()
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -294,8 +293,8 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		writer := &mockTrapWriter{}
 		c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
-		c.handlePacket(packet.payload, packet.peer, nil, nil)
-		c.handlePacket(packet.payload, packet.peer, nil, nil)
+		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -326,8 +325,8 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		writer := &mockTrapWriter{}
 		c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
-		c.handlePacket(packet.payload, packet.peer, nil, nil)
-		c.handlePacket(packet.payload, packet.peer, nil, nil)
+		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -354,7 +353,7 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	writer := &mockTrapWriter{err: errors.New("write failed")}
 	c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	if got := metrics.errors.journalWriteFailed.Load(); got != 1 {
 		t.Fatalf("journal write failures = %d, want 1", got)
 	}
@@ -368,7 +367,7 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	}
 
 	writer.err = nil
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries after rollback = %d, want 1", len(writer.entries))
@@ -385,15 +384,10 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		Config:     Config{Name: "test"},
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:  NewAllowlist(nil, nil),
-	}
+	c := newTestV2CollectorWithPolicy("test", writer, receiver.PolicyConfig{Versions: []string{"v3"}})
 
 	removeJobMetrics("test")
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected 0 entries for disallowed version, got %d", len(writer.entries))
@@ -423,12 +417,7 @@ func TestCollectorHandlePacketDropsDisallowedV3BeforeDecode(t *testing.T) {
 
 	data := buildV3Trap(t, "testuser", "1.3.6.1.6.3.1.1.5.1")
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		Config:     Config{Name: jobName},
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, nil),
-	}
+	c := newTestV2CollectorWithPolicy(jobName, writer, receiver.PolicyConfig{Versions: []string{"v2c"}})
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -453,7 +442,7 @@ func TestCollectorHandlePacketWritesDecodeErrorEntry(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 
-	data := make([]byte, maxDatagramSize+1)
+	data := make([]byte, 64*1024)
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 	c.handlePacket(data, peer.IP, nil, peer)
 
@@ -470,8 +459,8 @@ func TestCollectorHandlePacketWritesDecodeErrorEntry(t *testing.T) {
 	if entry.DecodeError.Kind != "malformed_pdu" {
 		t.Fatalf("DecodeError.Kind = %q, want malformed_pdu", entry.DecodeError.Kind)
 	}
-	if entry.DecodeError.PacketSize != maxDatagramSize+1 {
-		t.Fatalf("DecodeError.PacketSize = %d, want %d", entry.DecodeError.PacketSize, maxDatagramSize+1)
+	if entry.DecodeError.PacketSize != len(data) {
+		t.Fatalf("DecodeError.PacketSize = %d, want %d", entry.DecodeError.PacketSize, len(data))
 	}
 	if entry.PacketSequence != 1 {
 		t.Fatalf("PacketSequence = %d, want 1", entry.PacketSequence)
@@ -521,9 +510,17 @@ func TestCollectorHandlePacketDecodeErrorHonorsRateLimitDrop(t *testing.T) {
 	metrics := withCleanJobMetrics(t, jobName)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-	c.rateLimiter = newRateLimiter(true, 1, "drop")
+	c.receiver = newTestReceiver(c, receiver.PolicyConfig{
+		Versions:    []string{"v2c"},
+		Communities: []string{"public"},
+		RateLimit: receiver.RateLimitConfig{
+			Enabled:      true,
+			PerSourcePPS: 1,
+			Mode:         "drop",
+		},
+	})
 
-	data := make([]byte, maxDatagramSize+1)
+	data := make([]byte, 64*1024)
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 	c.handlePacket(data, peer.IP, nil, peer)
 	c.handlePacket(data, peer.IP, nil, peer)
@@ -539,12 +536,63 @@ func TestCollectorHandlePacketDecodeErrorHonorsRateLimitDrop(t *testing.T) {
 	}
 }
 
+func TestCollectorHandlePacketDynamicDecodeFailureReusesRateLimitAdmission(t *testing.T) {
+	const jobName = "test-dynamic-decode-error-rate-limit"
+	metrics := withCleanJobMetrics(t, jobName)
+	writer := &mockTrapWriter{}
+	c := &Collector{
+		Config:      Config{Name: jobName},
+		trapWriter:  writer,
+		journalHost: newTestJournalHostProvider(),
+	}
+	user := USMUserConfig{
+		Username:  "testuser",
+		AuthProto: "sha256",
+		AuthKey:   "authpassword",
+		PrivProto: "aes",
+		PrivKey:   "privpassword",
+	}
+	c.receiver = newTestReceiver(c, receiver.PolicyConfig{
+		Versions:        []string{"v3"},
+		USMUsers:        toReceiverUSMUsers([]USMUserConfig{user}),
+		DynamicEngineID: true,
+		RateLimit: receiver.RateLimitConfig{
+			Enabled:      true,
+			PerSourcePPS: 1,
+			Mode:         "drop",
+		},
+	})
+	if err := c.receiver.PrepareV3(t.TempDir(), jobName); err != nil {
+		t.Fatalf("prepare test v3 receiver: %v", err)
+	}
+	t.Cleanup(c.receiver.RollbackPreparedState)
+
+	data := buildV3SecuredTrapWithFlags(t, v3SecuredTrapSpec{
+		user:        "testuser",
+		engineIDHex: testEngineIDHex,
+		authProto:   "sha256",
+		privProto:   "aes",
+		authKey:     "wrongpassword",
+		privKey:     "privpassword",
+		trapOID:     "1.3.6.1.6.3.1.1.5.1",
+	}, gosnmp.AuthPriv)
+	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c.handlePacket(data, peer.IP, nil, peer)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries = %d, want first admitted decode error", len(writer.entries))
+	}
+	if got := metrics.errors.rateLimited.Load(); got != 0 {
+		t.Fatalf("rate_limited = %d, want 0", got)
+	}
+}
+
 func TestCollectorHandlePacketDecodeErrorNormalizesIPv4MappedSource(t *testing.T) {
 	const jobName = "test-decode-error-ipv4-mapped"
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
 
-	data := make([]byte, maxDatagramSize+1)
+	data := make([]byte, 64*1024)
 	peer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
 	c.handlePacket(data, peer.IP, nil, peer)
 
@@ -581,7 +629,7 @@ func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, nil, []string{"secret"})
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected 0 entries for disallowed community, got %d", len(writer.entries))
@@ -595,7 +643,7 @@ func TestCollectorHandlePacketAllowsAllowedCommunity(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, nil, []string{"public"})
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -610,7 +658,7 @@ func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	c := newDefaultTestV2Collector(writer)
 
 	withCleanJobMetrics(t, "test")
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	m := getJobMetrics("test")
 	ev := m.events.stateChange.Load()
@@ -629,7 +677,7 @@ func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	m := getJobMetrics(jobName)
 	assertSeverityCounters(t, m, map[string]uint64{"warning": 1})
@@ -697,7 +745,7 @@ func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 	c := newDefaultTestV2Collector(writer)
 
 	withCleanJobMetrics(t, "test")
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	m := getJobMetrics("test")
 	if v := m.errors.templateUnresolved.Load(); v != 1 {
@@ -711,7 +759,7 @@ func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
 	c := newTestV2Collector("test", writer, nil, []string{"secret"})
 
 	withCleanJobMetrics(t, "test")
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	m := getJobMetrics("test")
 	dr := m.errors.droppedAllowlist.Load()
@@ -725,14 +773,9 @@ func TestCollectorHandlePacketRejectsUnknownV3EngineID(t *testing.T) {
 	withCleanJobMetrics(t, jobName)
 
 	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-	secTable := newTestV3SecurityTable(t, testNoAuthV3User(testEngineIDHex))
-	engineIDs, err := buildEngineIDWhitelist([]string{"80001f888077dfe44faa700259"})
-	if err != nil {
-		t.Fatalf("buildEngineIDWhitelist failed: %v", err)
-	}
 
 	writer := &mockTrapWriter{}
-	c := newTestV3Collector(jobName, writer, secTable, engineIDs)
+	c := newTestV3Collector(t, jobName, writer, []USMUserConfig{testNoAuthV3User(testEngineIDHex)}, []string{"80001f888077dfe44faa700259"})
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -759,21 +802,17 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 		privKey:     "privpassword",
 		trapOID:     "1.3.6.1.6.3.1.1.5.1",
 	})
-	secTable := newTestV3SecurityTable(t, USMUserConfig{
+	user := USMUserConfig{
 		Username:  "testuser",
 		EngineID:  otherEngineID,
 		AuthProto: "sha256",
 		AuthKey:   "authpassword",
 		PrivProto: "aes",
 		PrivKey:   "privpassword",
-	})
-	engineIDs, err := buildEngineIDWhitelist([]string{otherEngineID})
-	if err != nil {
-		t.Fatalf("buildEngineIDWhitelist failed: %v", err)
 	}
 
 	writer := &mockTrapWriter{}
-	c := newTestV3Collector(jobName, writer, secTable, engineIDs)
+	c := newTestV3Collector(t, jobName, writer, []USMUserConfig{user}, []string{otherEngineID})
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -794,7 +833,7 @@ func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
 	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
 	peer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
 
-	c.handlePacket(packet.payload, peer.IP, nil, peer)
+	c.handlePacket(packet.Payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("expected IPv4-mapped peer to match IPv4 CIDR, got %d entries", len(writer.entries))
@@ -812,7 +851,7 @@ func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"})
 	peer := &net.UDPAddr{IP: net.ParseIP("2001:db8::1"), Port: 9162}
 
-	c.handlePacket(packet.payload, peer.IP, nil, peer)
+	c.handlePacket(packet.Payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("expected native IPv6 peer to match IPv6 CIDR, got %d entries", len(writer.entries))
@@ -852,8 +891,11 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 
 	t.Run("trusted_peer_uses_snmpTrapAddress", func(t *testing.T) {
 		writer := &mockTrapWriter{}
-		c := newTestV2Collector("test-trusted-relay", writer, nil, []string{"public"})
-		c.trustedRelays = []netip.Prefix{netip.MustParsePrefix("10.1.2.0/24")}
+		c := newTestV2CollectorWithPolicy("test-trusted-relay", writer, receiver.PolicyConfig{
+			Versions:      []string{"v2c"},
+			Communities:   []string{"public"},
+			TrustedRelays: []netip.Prefix{netip.MustParsePrefix("10.1.2.0/24")},
+		})
 
 		c.handlePacket(data, peer.IP, nil, peer)
 
@@ -877,8 +919,11 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 
 	t.Run("ipv4_mapped_trusted_peer_matches_ipv4_cidr", func(t *testing.T) {
 		writer := &mockTrapWriter{}
-		c := newTestV2Collector("test-trusted-relay-mapped", writer, nil, []string{"public"})
-		c.trustedRelays = []netip.Prefix{netip.MustParsePrefix("10.1.2.0/24")}
+		c := newTestV2CollectorWithPolicy("test-trusted-relay-mapped", writer, receiver.PolicyConfig{
+			Versions:      []string{"v2c"},
+			Communities:   []string{"public"},
+			TrustedRelays: []netip.Prefix{netip.MustParsePrefix("10.1.2.0/24")},
+		})
 		mappedPeer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
 
 		c.handlePacket(data, mappedPeer.IP, nil, mappedPeer)
@@ -903,8 +948,11 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 
 	t.Run("missing_peer_never_trusts_snmpTrapAddress", func(t *testing.T) {
 		writer := &mockTrapWriter{}
-		c := newTestV2Collector("test-trusted-relay-missing-peer", writer, nil, []string{"public"})
-		c.trustedRelays = []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}
+		c := newTestV2CollectorWithPolicy("test-trusted-relay-missing-peer", writer, receiver.PolicyConfig{
+			Versions:      []string{"v2c"},
+			Communities:   []string{"public"},
+			TrustedRelays: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")},
+		})
 
 		c.handlePacket(data, nil, nil, nil)
 
@@ -915,8 +963,11 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 
 	t.Run("catch_all_trusted_peer_uses_snmpTrapAddress", func(t *testing.T) {
 		writer := &mockTrapWriter{}
-		c := newTestV2Collector("test-trusted-relay-catch-all", writer, nil, []string{"public"})
-		c.trustedRelays = []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}
+		c := newTestV2CollectorWithPolicy("test-trusted-relay-catch-all", writer, receiver.PolicyConfig{
+			Versions:      []string{"v2c"},
+			Communities:   []string{"public"},
+			TrustedRelays: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")},
+		})
 
 		c.handlePacket(data, peer.IP, nil, peer)
 
@@ -944,20 +995,23 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
-	rl := newRateLimiter(true, 1, "sample")
-	srcAddr, ok := udpPeerAddr(peer)
-	if !ok {
-		t.Fatal("failed to convert UDP peer address")
-	}
-	if allowed, _ := rl.Allow(srcAddr); !allowed {
-		t.Fatal("expected first token to be available")
-	}
-
 	writer := &mockTrapWriter{}
-	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-	c.rateLimiter = rl
+	c := newTestV2CollectorWithPolicy(jobName, writer, receiver.PolicyConfig{
+		Versions:    []string{"v2c"},
+		Communities: []string{"public"},
+		RateLimit: receiver.RateLimitConfig{
+			Enabled:      true,
+			PerSourcePPS: 1,
+			Mode:         "sample",
+		},
+	})
+	if result := c.receiver.Process(receiver.Datagram{
+		Data: packet.Payload, PeerIP: peer.IP, Peer: peer,
+	}); result.PDU == nil {
+		t.Fatalf("first packet result = %+v, want accepted packet to consume the initial token", result)
+	}
 
-	c.handlePacket(packet.payload, peer.IP, nil, peer)
+	c.handlePacket(packet.Payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("sample-mode rate-limited trap should be written, got %d entries", len(writer.entries))
@@ -1019,7 +1073,7 @@ func TestCollectorHandlePacketEmitsPipelineMetrics(t *testing.T) {
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 	c.metrics = metrics
 
-	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -1057,12 +1111,12 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 
 	c := &Collector{
 		Config:         Config{Name: jobName},
-		listener:       &Listener{},
 		trapWriter:     &mockTrapWriter{},
 		metrics:        metrics,
 		profileMetrics: rt,
 		store:          store,
 	}
+	c.receiver = bindTestReceiver(t, c)
 
 	managed.CycleController().BeginCycle()
 	if err := c.collect(context.Background()); err != nil {
@@ -1095,11 +1149,11 @@ func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
 
 	c := &Collector{
 		Config:     Config{Name: jobName},
-		listener:   &Listener{},
 		trapWriter: &mockTrapWriter{binaryEncodedFields: 2},
 		metrics:    getJobMetrics(jobName),
 		store:      store,
 	}
+	c.receiver = bindTestReceiver(t, c)
 
 	managed.CycleController().BeginCycle()
 	if err := c.collect(context.Background()); err != nil {
@@ -1113,414 +1167,4 @@ func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
 	if v, ok := store.Read().Value("snmp_trap_errors_binary_encoded", labels); !ok || v != 2 {
 		t.Fatalf("errors binary_encoded value = %v/%v, want 2/true", v, ok)
 	}
-}
-
-func TestSnmpEngineBootsPersistence(t *testing.T) {
-	jobName := "test-job"
-	paths := newEngineStatePaths(t.TempDir(), jobName)
-
-	eb, err := newEngineBoots(paths)
-	if err != nil {
-		t.Fatalf("NewEngineBoots failed: %v", err)
-	}
-	if v := eb.Value(); v != 1 {
-		t.Errorf("expected first boot value 1, got %d", v)
-	}
-
-	eb, err = newEngineBoots(paths)
-	if err != nil {
-		t.Fatalf("second NewEngineBoots failed: %v", err)
-	}
-	if v := eb.Value(); v != 2 {
-		t.Errorf("expected second boot value 2, got %d", v)
-	}
-}
-
-func TestSnmpEngineBootsCorruptFileFailsCreation(t *testing.T) {
-	jobName := "test-job"
-	paths := newEngineStatePaths(t.TempDir(), jobName)
-	if err := os.MkdirAll(paths.dir, 0750); err != nil {
-		t.Fatalf("mkdir engine boots dir: %v", err)
-	}
-	if err := os.WriteFile(paths.engineBoots, []byte("not-a-number\n"), 0640); err != nil {
-		t.Fatalf("write engine boots file: %v", err)
-	}
-
-	if _, err := newEngineBoots(paths); err == nil {
-		t.Fatal("expected corrupt engine-boots state to fail job creation")
-	}
-}
-
-func TestSnmpEngineBootsRejectsMaxValue(t *testing.T) {
-	jobName := "test-job"
-	paths := newEngineStatePaths(t.TempDir(), jobName)
-	if err := os.MkdirAll(paths.dir, 0750); err != nil {
-		t.Fatalf("mkdir engine boots dir: %v", err)
-	}
-	if err := os.WriteFile(paths.engineBoots, []byte("2147483647\n"), 0640); err != nil {
-		t.Fatalf("write engine boots file: %v", err)
-	}
-
-	if _, err := newEngineBoots(paths); err == nil {
-		t.Fatal("expected error for max engine boots value")
-	}
-}
-
-func TestSnmpEngineBootsReadErrorFails(t *testing.T) {
-	jobName := "test-job"
-	paths := newEngineStatePaths(t.TempDir(), jobName)
-	if err := os.MkdirAll(paths.engineBoots, 0750); err != nil {
-		t.Fatalf("mkdir engine boots file path: %v", err)
-	}
-
-	if _, err := newEngineBoots(paths); err == nil {
-		t.Fatal("expected read error when engine boots path is a directory")
-	}
-}
-
-func TestSnmpEngineBootsEngineTimeCapsAtUint32(t *testing.T) {
-	eb := &EngineBoots{
-		startedAt: time.Now().Add(-time.Duration(uint64(maxSnmpEngineTime)+1) * time.Second),
-	}
-
-	if got := eb.EngineTime(); got != maxSnmpEngineTime {
-		t.Fatalf("engine time = %d, want %d", got, maxSnmpEngineTime)
-	}
-}
-
-func TestAllowlistCIDR(t *testing.T) {
-	al := NewAllowlist([]netip.Prefix{
-		netip.MustParsePrefix("10.0.0.0/8"),
-		netip.MustParsePrefix("192.168.1.0/24"),
-	}, nil)
-
-	tests := map[string]struct {
-		addr string
-		want bool
-	}{
-		"inside 10.x":    {addr: "10.1.2.3", want: true},
-		"inside 192.168": {addr: "192.168.1.42", want: true},
-		"outside":        {addr: "172.16.0.1", want: false},
-		"loopback":       {addr: "127.0.0.1", want: false},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			addr := netip.MustParseAddr(tc.addr)
-			if got := al.AllowedSource(addr); got != tc.want {
-				t.Errorf("AllowedSource(%s) = %v, want %v", tc.addr, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestAllowlistDefaultIncludesIPv6(t *testing.T) {
-	prefixes, err := validateAllowlist(AllowlistConfig{})
-	if err != nil {
-		t.Fatalf("validateAllowlist failed: %v", err)
-	}
-	al := NewAllowlist(prefixes, nil)
-
-	if !al.AllowedSource(netip.MustParseAddr("2001:db8::1")) {
-		t.Fatal("default allowlist should accept IPv6")
-	}
-	if !al.AllowedSource(netip.MustParseAddr("192.0.2.1")) {
-		t.Fatal("default allowlist should accept IPv4")
-	}
-}
-
-func TestPacketSourceAddrFallsBackToPeerIP(t *testing.T) {
-	addr, ok := packetSourceAddr(net.ParseIP("::ffff:10.1.2.3"), nil)
-	if !ok {
-		t.Fatal("expected source address from peerIP")
-	}
-	if got := addr.String(); got != "10.1.2.3" {
-		t.Fatalf("source addr = %q, want 10.1.2.3", got)
-	}
-}
-
-func TestAllowlistCommunity(t *testing.T) {
-	al := NewAllowlist(nil, []string{"allowed-a", "allowed-b"})
-
-	tests := map[string]struct {
-		value string
-		want  bool
-	}{
-		"allowed-a": {value: "allowed-a", want: true},
-		"allowed-b": {value: "allowed-b", want: true},
-		"denied":    {value: "denied", want: false},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := al.AllowedCommunity(tc.value); got != tc.want {
-				t.Errorf("AllowedCommunity(%s) = %v, want %v", tc.value, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestRateLimiterAllow(t *testing.T) {
-	rl := newRateLimiter(true, 100, "drop")
-	addr := netip.MustParseAddr("10.1.2.3")
-
-	for i := range 100 {
-		if allowed, _ := rl.Allow(addr); !allowed && i < 100 {
-			t.Fatalf("token bucket exhausted too early at iteration %d", i)
-		}
-	}
-
-	allowed, mode := rl.Allow(addr)
-	if allowed {
-		t.Fatal("expected rate limiter to drop after bucket exhausted")
-	}
-	if mode != rateLimitModeDrop {
-		t.Fatal("expected drop mode")
-	}
-}
-
-func TestRateLimiterDefaults(t *testing.T) {
-	if err := validateRateLimit(RateLimitConfig{Enabled: true}); err != nil {
-		t.Fatalf("validateRateLimit should accept defaulted enabled config: %v", err)
-	}
-	rl := newRateLimiter(true, 0, "")
-	if !rl.enabled {
-		t.Fatal("expected enabled rate limiter")
-	}
-	if rl.burst != defaultRateLimitPerSourcePPS {
-		t.Fatalf("burst = %d, want %d", rl.burst, defaultRateLimitPerSourcePPS)
-	}
-	if rl.mode != rateLimitModeDrop {
-		t.Fatalf("mode = %v, want drop", rl.mode)
-	}
-}
-
-func TestRateLimiterEvictsOldestTrackedSourceAtCapacity(t *testing.T) {
-	rl := newRateLimiter(true, 100, "drop")
-	rl.maxSources = 2
-
-	first := netip.MustParseAddr("10.0.0.1")
-	second := netip.MustParseAddr("10.0.0.2")
-	third := netip.MustParseAddr("10.0.0.3")
-
-	if allowed, _ := rl.Allow(first); !allowed {
-		t.Fatal("expected first source to be allowed")
-	}
-	if allowed, _ := rl.Allow(second); !allowed {
-		t.Fatal("expected second source to be allowed")
-	}
-
-	now := time.Now()
-	rl.mu.Lock()
-	rl.buckets[first].lastFill = now.Add(-time.Minute)
-	rl.buckets[second].lastFill = now
-	rl.mu.Unlock()
-
-	allowed, mode := rl.Allow(third)
-	if !allowed {
-		t.Fatal("expected new source above cap to evict the oldest tracked source")
-	}
-	if mode != rateLimitModeDrop {
-		t.Fatalf("mode = %v, want drop", mode)
-	}
-	if got := len(rl.buckets); got != 2 {
-		t.Fatalf("tracked sources = %d, want 2", got)
-	}
-	if _, ok := rl.buckets[first]; ok {
-		t.Fatal("expected oldest tracked source to be evicted")
-	}
-	if _, ok := rl.buckets[second]; !ok {
-		t.Fatal("expected second tracked source to remain")
-	}
-	if _, ok := rl.buckets[third]; !ok {
-		t.Fatal("expected new tracked source to be admitted")
-	}
-}
-
-func TestConfigValidation(t *testing.T) {
-	t.Run("valid v3 versions", func(t *testing.T) {
-		_, err := validateVersions([]string{"v1", "v2c", "v3"})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("valid USM users", func(t *testing.T) {
-		err := validateUSMUsers([]USMUserConfig{
-			{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "sha256", AuthKey: "authsecret", PrivProto: "aes", PrivKey: "privsecret"},
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("short auth key", func(t *testing.T) {
-		err := validateUSMUsers([]USMUserConfig{
-			{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "sha", AuthKey: "short"},
-		})
-		if err == nil {
-			t.Fatal("expected error for short auth key")
-		}
-	})
-
-	t.Run("short priv key", func(t *testing.T) {
-		err := validateUSMUsers([]USMUserConfig{
-			{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "sha", AuthKey: "authpass", PrivProto: "aes", PrivKey: "short"},
-		})
-		if err == nil {
-			t.Fatal("expected error for short priv key")
-		}
-	})
-
-	t.Run("invalid auth proto", func(t *testing.T) {
-		err := validateUSMUsers([]USMUserConfig{
-			{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "whirlpool"},
-		})
-		if err == nil {
-			t.Fatal("expected error for invalid auth proto")
-		}
-	})
-
-	t.Run("invalid priv proto", func(t *testing.T) {
-		err := validateUSMUsers([]USMUserConfig{
-			{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "sha", AuthKey: "authsecret", PrivProto: "3des"},
-		})
-		if err == nil {
-			t.Fatal("expected error for invalid priv proto")
-		}
-	})
-
-	t.Run("priv without auth", func(t *testing.T) {
-		err := validateUSMUsers([]USMUserConfig{
-			{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "none", PrivProto: "aes", PrivKey: "privsecret"},
-		})
-		if err == nil {
-			t.Fatal("expected error for priv without auth")
-		}
-	})
-
-	t.Run("invalid engine ID hex", func(t *testing.T) {
-		err := validateEngineIDWhitelist([]string{"nothex"})
-		if err == nil {
-			t.Fatal("expected error for invalid engine ID hex")
-		}
-	})
-
-	t.Run("duplicate engine ID whitelist", func(t *testing.T) {
-		err := validateEngineIDWhitelist([]string{testEngineIDHex, strings.ToUpper(testEngineIDHex)})
-		if err == nil {
-			t.Fatal("expected error for duplicate engine ID")
-		}
-	})
-
-	t.Run("invalid CIDR", func(t *testing.T) {
-		_, err := validateAllowlist(AllowlistConfig{SourceCIDRs: []string{"not-a-cidr"}})
-		if err == nil {
-			t.Fatal("expected error for invalid CIDR")
-		}
-	})
-
-	t.Run("valid trusted relays", func(t *testing.T) {
-		prefixes, err := validateTrustedRelays(SourceConfig{TrustedRelays: []string{"10.0.0.0/8", "2001:db8::/32"}})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(prefixes) != 2 {
-			t.Fatalf("prefixes = %d, want 2", len(prefixes))
-		}
-	})
-
-	t.Run("catch-all trusted relays", func(t *testing.T) {
-		prefixes, err := validateTrustedRelays(SourceConfig{TrustedRelays: []string{"0.0.0.0/0", "::/0", "10.0.0.0/8"}})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !trustedRelayPrefixIsCatchAll(prefixes[0]) {
-			t.Fatalf("%s should be catch-all", prefixes[0])
-		}
-		if !trustedRelayPrefixIsCatchAll(prefixes[1]) {
-			t.Fatalf("%s should be catch-all", prefixes[1])
-		}
-		if trustedRelayPrefixIsCatchAll(prefixes[2]) {
-			t.Fatalf("%s should not be catch-all", prefixes[2])
-		}
-	})
-
-	t.Run("invalid trusted relay CIDR", func(t *testing.T) {
-		_, err := validateTrustedRelays(SourceConfig{TrustedRelays: []string{"not-a-cidr"}})
-		if err == nil {
-			t.Fatal("expected error for invalid trusted relay CIDR")
-		}
-	})
-
-	t.Run("invalid rate limit mode", func(t *testing.T) {
-		err := validateRateLimit(RateLimitConfig{Enabled: true, PerSourcePPS: 100, Mode: "invalid"})
-		if err == nil {
-			t.Fatal("expected error for invalid rate limit mode")
-		}
-	})
-
-	t.Run("invalid label key", func(t *testing.T) {
-		err := validateConfigLabelKey("INVALID")
-		if err == nil {
-			t.Fatal("expected error for uppercase label key")
-		}
-	})
-
-	t.Run("prefixed label keys", func(t *testing.T) {
-		for _, key := range []string{"trap_zone", "message_type", "priority_level"} {
-			if err := validateConfigLabelKey(key); err != nil {
-				t.Fatalf("expected %q to be valid: %v", key, err)
-			}
-		}
-	})
-
-	t.Run("implemented dynamic engine discovery", func(t *testing.T) {
-		err := validateDeferredConfig(Config{DynamicEngineID: true})
-		if err != nil {
-			t.Fatalf("dynamic engine ID discovery should no longer be rejected as deferred: %v", err)
-		}
-	})
-
-	t.Run("dynamic engine discovery rejects static whitelist", func(t *testing.T) {
-		err := validateDeferredConfig(Config{DynamicEngineID: true, EngineIDWhitelist: []string{testEngineIDHex}})
-		if err == nil {
-			t.Fatal("expected error for dynamic engine ID discovery with engine_id_whitelist")
-		}
-	})
-
-	t.Run("dynamic engine discovery rejects negative max pairs", func(t *testing.T) {
-		err := validateDeferredConfig(Config{DynamicEngineIDMax: -1})
-		if err == nil {
-			t.Fatal("expected error for negative dynamic_engine_id_max_pairs")
-		}
-	})
-
-	t.Run("static USM user requires engine ID", func(t *testing.T) {
-		err := validateUSMUsers([]USMUserConfig{{Username: "testuser"}})
-		if err == nil {
-			t.Fatal("expected error for static USM user without engine_id")
-		}
-	})
-
-	t.Run("dynamic USM user may omit engine ID", func(t *testing.T) {
-		err := validateUSMUsers([]USMUserConfig{{Username: "testuser"}}, true)
-		if err != nil {
-			t.Fatalf("dynamic USM user should allow omitted engine_id: %v", err)
-		}
-	})
-
-	t.Run("implemented dedup", func(t *testing.T) {
-		err := validateDeferredConfig(Config{Dedup: DedupConfig{Enabled: true}})
-		if err != nil {
-			t.Fatalf("dedup should no longer be rejected as deferred: %v", err)
-		}
-	})
-
-	t.Run("deferred validator permits implemented profile metrics", func(t *testing.T) {
-		err := validateDeferredConfig(Config{ProfileMetrics: ProfileMetricsConfig{Enabled: true, Include: []string{"site.rule"}}})
-		if err != nil {
-			t.Fatalf("profile metrics should no longer be rejected as deferred: %v", err)
-		}
-	})
 }

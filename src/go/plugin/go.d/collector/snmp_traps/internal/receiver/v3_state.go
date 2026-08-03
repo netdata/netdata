@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package receiver
 
 import (
 	"crypto/rand"
@@ -71,7 +71,7 @@ func cleanupCreatedEngineState(paths engineStatePaths, removeEngineBoots, remove
 	}
 }
 
-type EngineBoots struct {
+type engineBoots struct {
 	mu        sync.Mutex
 	path      string
 	value     int64
@@ -79,19 +79,19 @@ type EngineBoots struct {
 	valid     bool
 }
 
-func newEngineBoots(paths engineStatePaths) (*EngineBoots, error) {
+func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
 	if err := os.MkdirAll(paths.dir, 0750); err != nil {
 		return nil, fmt.Errorf("engine-boots: create directory %s: %w", paths.dir, err)
 	}
 
-	eb := &EngineBoots{path: paths.engineBoots, startedAt: time.Now()}
+	eb := &engineBoots{path: paths.engineBoots, startedAt: time.Now()}
 	if err := eb.init(); err != nil {
 		return nil, err
 	}
 	return eb, nil
 }
 
-func (eb *EngineBoots) init() error {
+func (eb *engineBoots) init() error {
 	data, err := os.ReadFile(eb.path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -119,29 +119,29 @@ func (eb *EngineBoots) init() error {
 	return eb.persist()
 }
 
-func (eb *EngineBoots) persist() error {
+func (eb *engineBoots) persist() error {
 	return persistEngineStateFile("engine-boots", eb.path, fmt.Appendf(nil, "%d\n", eb.value))
 }
 
-func (eb *EngineBoots) Value() int64 {
+func (eb *engineBoots) bootsValue() int64 {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
 	return eb.value
 }
 
-func (eb *EngineBoots) EngineTime() uint32 {
+func (eb *engineBoots) engineTime() uint32 {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
 	return eb.engineTimeLocked()
 }
 
-func (eb *EngineBoots) Snapshot() (int64, uint32) {
+func (eb *engineBoots) snapshot() (int64, uint32) {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
 	return eb.value, eb.engineTimeLocked()
 }
 
-func (eb *EngineBoots) engineTimeLocked() uint32 {
+func (eb *engineBoots) engineTimeLocked() uint32 {
 	if eb.startedAt.IsZero() {
 		return 0
 	}
@@ -155,26 +155,26 @@ func (eb *EngineBoots) engineTimeLocked() uint32 {
 	return uint32(elapsed / time.Second)
 }
 
-type LocalEngineID struct {
+type localEngineID struct {
 	mu    sync.Mutex
 	path  string
 	value []byte
 	valid bool
 }
 
-func newLocalEngineID(paths engineStatePaths, configuredHex string) (*LocalEngineID, error) {
+func newLocalEngineID(paths engineStatePaths, configuredHex string) (*localEngineID, error) {
 	if err := os.MkdirAll(paths.dir, 0750); err != nil {
 		return nil, fmt.Errorf("local-engine-id: create directory %s: %w", paths.dir, err)
 	}
 
-	lid := &LocalEngineID{path: paths.localEngineID}
+	lid := &localEngineID{path: paths.localEngineID}
 	if err := lid.init(configuredHex); err != nil {
 		return nil, err
 	}
 	return lid, nil
 }
 
-func (lid *LocalEngineID) init(configuredHex string) error {
+func (lid *localEngineID) init(configuredHex string) error {
 	configuredHex = strings.TrimSpace(configuredHex)
 	if configuredHex != "" {
 		raw, err := parseEngineIDHex(configuredHex)
@@ -204,7 +204,7 @@ func (lid *LocalEngineID) init(configuredHex string) error {
 	return nil
 }
 
-func (lid *LocalEngineID) generate() error {
+func (lid *localEngineID) generate() error {
 	raw := make([]byte, 12)
 	if _, err := rand.Read(raw); err != nil {
 		return fmt.Errorf("local-engine-id: generate random bytes: %w", err)
@@ -227,7 +227,7 @@ func isAllByte(b []byte, value byte) bool {
 	return len(b) > 0
 }
 
-func (lid *LocalEngineID) persist() error {
+func (lid *localEngineID) persist() error {
 	hexStr := hex.EncodeToString(lid.value)
 	return persistEngineStateFile("local-engine-id", lid.path, []byte(hexStr+"\n"))
 }
@@ -275,7 +275,7 @@ func persistEngineStateFile(label, path string, data []byte) error {
 	return nil
 }
 
-func (lid *LocalEngineID) Hex() string {
+func (lid *localEngineID) hexString() string {
 	lid.mu.Lock()
 	defer lid.mu.Unlock()
 	if !lid.valid {
@@ -284,7 +284,7 @@ func (lid *LocalEngineID) Hex() string {
 	return hex.EncodeToString(lid.value)
 }
 
-func (lid *LocalEngineID) Bytes() []byte {
+func (lid *localEngineID) bytes() []byte {
 	lid.mu.Lock()
 	defer lid.mu.Unlock()
 	if !lid.valid {
@@ -295,7 +295,7 @@ func (lid *LocalEngineID) Bytes() []byte {
 	return out
 }
 
-func (lid *LocalEngineID) EqualRaw(raw string) bool {
+func (lid *localEngineID) equalRaw(raw string) bool {
 	// GoSNMP stores authoritative engine IDs as strings containing raw bytes.
 	// Compare byte-by-byte without converting either side through hex.
 	lid.mu.Lock()

@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 )
 
 type staticJournalHostProvider struct {
@@ -154,7 +155,10 @@ func TestDecodeErrorRealtimeSurvivesCachedHostIdentityFailure(t *testing.T) {
 	c := &Collector{hostIdentity: service}
 
 	before := time.Now().UnixMicro()
-	entry := newDecodeErrorEntry("test", decodeErrorRecord{kind: "decode_failed", err: errors.New("bad packet")}, c.monotonicUsec())
+	entry := newDecodeErrorEntry("test", &receiver.DecodeFailure{
+		Kind: "decode_failed",
+		Err:  errors.New("bad packet"),
+	}, 0, c.monotonicUsec())
 	after := time.Now().UnixMicro()
 
 	if entry.ReceivedMonotonicUsec != 0 {

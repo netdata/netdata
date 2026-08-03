@@ -3,7 +3,6 @@
 package snmp_traps
 
 import (
-	"net"
 	"net/netip"
 	"testing"
 
@@ -12,19 +11,65 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/traptest"
 )
 
-func readSinglePcapUDPPacket(t *testing.T, fixture string) pcapUDPPacket {
+const testEngineIDHex = "80001f888077dfe44faa700258"
+
+type v3SecuredTrapSpec struct {
+	user        string
+	engineIDHex string
+	authProto   string
+	privProto   string
+	authKey     string
+	privKey     string
+	trapOID     string
+	extra       []gosnmp.SnmpPDU
+}
+
+func (s v3SecuredTrapSpec) traptest() traptest.V3Spec {
+	return traptest.V3Spec{
+		User: s.user, EngineIDHex: s.engineIDHex, AuthProto: s.authProto, PrivProto: s.privProto,
+		AuthKey: s.authKey, PrivKey: s.privKey, TrapOID: s.trapOID, Extra: s.extra,
+	}
+}
+
+func buildV2cTrap(t testing.TB, community, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+	return traptest.BuildV2cTrap(t, community, trapOID, extra...)
+}
+
+func buildV2cPDU(t testing.TB, pduType gosnmp.PDUType, community, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+	return traptest.BuildV2cPDU(t, pduType, community, trapOID, extra...)
+}
+
+func buildV3TrapWithEngineID(t testing.TB, user, engineIDHex, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+	return traptest.BuildV3TrapWithEngineID(t, user, engineIDHex, trapOID, extra...)
+}
+
+func buildV3Trap(t testing.TB, user, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+	return traptest.BuildV3Trap(t, user, trapOID, extra...)
+}
+
+func buildV3SecuredTrap(t testing.TB, spec v3SecuredTrapSpec) []byte {
+	return traptest.BuildV3SecuredTrap(t, spec.traptest())
+}
+
+func buildV3SecuredTrapWithFlags(t testing.TB, spec v3SecuredTrapSpec, flags gosnmp.SnmpV3MsgFlags) []byte {
+	return traptest.BuildV3SecuredTrapWithFlags(t, spec.traptest(), flags)
+}
+
+func readSinglePcapUDPPacket(t *testing.T, fixture string) traptest.UDPPacket {
 	t.Helper()
 
-	packets := readPcapUDPPackets(t, fixture)
+	packets := traptest.ReadPcapUDPPackets(t, fixture)
 	if len(packets) != 1 {
 		t.Fatalf("expected one packet in %s, got %d", fixture, len(packets))
 	}
 	return packets[0]
 }
 
-func readColdStartUDPPacket(t *testing.T) pcapUDPPacket {
+func readColdStartUDPPacket(t *testing.T) traptest.UDPPacket {
 	t.Helper()
 	return readSinglePcapUDPPacket(t, "testdata/v2c_coldstart.pcap.hex")
 }
@@ -45,14 +90,44 @@ func setSingleTestTrap(t *testing.T, trap *TrapDef) {
 }
 
 func newTestV2Collector(jobName string, writer output.Writer, prefixes []netip.Prefix, communities []string) *Collector {
-	return &Collector{
+	return newTestV2CollectorWithPolicy(jobName, writer, receiver.PolicyConfig{
+		Versions:        []string{"v2c"},
+		Communities:     communities,
+		SourceAllowlist: prefixes,
+	})
+}
+
+func newTestV2CollectorWithPolicy(jobName string, writer output.Writer, policy receiver.PolicyConfig) *Collector {
+	c := &Collector{
 		Config:       Config{Name: jobName},
 		trapWriter:   writer,
 		journalHost:  newTestJournalHostProvider(),
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(prefixes, communities),
 		profileIndex: currentTestProfileIndex,
 	}
+	c.receiver = newTestReceiver(c, policy)
+	return c
+}
+
+func newTestReceiver(c *Collector, cfg receiver.PolicyConfig) *receiver.Receiver {
+	return receiver.New(receiver.NewPolicy(cfg), func(event receiver.Event) {
+		c.handleReceiverEvent(c.trapMetrics(), event)
+	})
+}
+
+func bindTestReceiver(t *testing.T, c *Collector) *receiver.Receiver {
+	t.Helper()
+	recv := newTestReceiver(c, receiver.PolicyConfig{
+		Listen: receiver.ListenConfig{Endpoints: []receiver.Endpoint{{
+			Protocol: "udp",
+			Address:  "127.0.0.1",
+			Port:     freeUDPPort(t),
+		}}},
+	})
+	if err := recv.Bind(); err != nil {
+		t.Fatalf("bind test receiver: %v", err)
+	}
+	t.Cleanup(recv.Close)
+	return recv
 }
 
 func newDefaultTestV2Collector(writer output.Writer) *Collector {
@@ -115,10 +190,6 @@ func newDedupTestV2Collector(t *testing.T, jobName string, writer output.Writer)
 	return c, metrics
 }
 
-func defaultDynamicUser() USMUserConfig {
-	return USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-}
-
 func testNoAuthV3User(engineID string) USMUserConfig {
 	return USMUserConfig{
 		Username:  "testuser",
@@ -128,77 +199,28 @@ func testNoAuthV3User(engineID string) USMUserConfig {
 	}
 }
 
-func newTestV3SecurityTable(t *testing.T, users ...USMUserConfig) *gosnmp.SnmpV3SecurityParametersTable {
-	t.Helper()
-
-	secTable, err := buildSnmpV3SecurityTable(users)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	return secTable
-}
-
-func registerTestLocalEngineID(
-	t *testing.T,
-	secTable *gosnmp.SnmpV3SecurityParametersTable,
-	lid *LocalEngineID,
-	users ...USMUserConfig,
-) {
-	t.Helper()
-
-	if err := registerUSMUsersWithLocalEngineID(secTable, users, lid.Bytes()); err != nil {
-		t.Fatalf("registerUSMUsersWithLocalEngineID failed: %v", err)
-	}
-}
-
 func newTestV3Collector(
+	t *testing.T,
 	jobName string,
 	writer output.Writer,
-	secTable *gosnmp.SnmpV3SecurityParametersTable,
-	engineIDs map[string]struct{},
+	users []USMUserConfig,
+	engineIDs []string,
 ) *Collector {
-	return &Collector{
+	t.Helper()
+	c := &Collector{
 		Config:      Config{Name: jobName},
 		trapWriter:  writer,
 		journalHost: newTestJournalHostProvider(),
-		versions:    map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:   NewAllowlist(nil, nil),
-		v3SecTable:  secTable,
-		engineIDs:   engineIDs,
 	}
-}
-
-func newDynamicEngineIDTestCollector(
-	t *testing.T,
-	jobName string,
-	data []byte,
-	configure func(*Collector),
-) (*Collector, *mockTrapWriter, *net.UDPAddr) {
-	t.Helper()
-
-	removeJobMetrics(jobName)
-	t.Cleanup(func() { removeJobMetrics(jobName) })
-
-	user := defaultDynamicUser()
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{user}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
+	recv := newTestReceiver(c, receiver.PolicyConfig{
+		Versions:          []string{"v3"},
+		USMUsers:          toReceiverUSMUsers(users),
+		EngineIDWhitelist: engineIDs,
+	})
+	if err := recv.PrepareV3(t.TempDir(), jobName); err != nil {
+		t.Fatalf("prepare test v3 receiver: %v", err)
 	}
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		Config:             Config{Name: jobName, USMUsers: []USMUserConfig{user}},
-		trapWriter:         writer,
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-	}
-	if configure != nil {
-		configure(c)
-	}
-	c.dynamicEngineIDReg = newDynamicEngineIDRegistry(secTable, c.dynamicEngineIDMax, nil, []USMUserConfig{user})
-
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
-	return c, writer, peer
+	t.Cleanup(recv.RollbackPreparedState)
+	c.receiver = recv
+	return c
 }

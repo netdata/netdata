@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package receiver
 
 import (
 	"fmt"
@@ -12,10 +12,8 @@ import (
 )
 
 const (
-	maxDatagramSize              = 8192
-	defaultListenerReceiveBuffer = 4 * 1024 * 1024
-	maxListenerReceiveBuffer     = 256 * 1024 * 1024
-	listenerReadErrorBackoff     = 100 * time.Millisecond
+	maxDatagramSize          = 8192
+	listenerReadErrorBackoff = 100 * time.Millisecond
 )
 
 var setUDPReadBuffer = func(conn *net.UDPConn, bytes int) error {
@@ -24,30 +22,26 @@ var setUDPReadBuffer = func(conn *net.UDPConn, bytes int) error {
 
 type listenerEndpoint struct {
 	conn *net.UDPConn
-	cfg  EndpointConfig
+	cfg  Endpoint
 }
 
 type listenerReceiveBufferWarning struct {
-	endpoint  EndpointConfig
+	endpoint  Endpoint
 	requested int
 	err       error
 }
 
-type Listener struct {
-	jobName               string
+type listener struct {
 	endpoints             []listenerEndpoint
 	receiveBufferWarnings []listenerReceiveBufferWarning
-	metrics               *perJobMetrics
-	onReadError           func(EndpointConfig, error)
+	report                Reporter
 	mu                    sync.Mutex
 	closed                bool
 	wg                    sync.WaitGroup
 }
 
-func newListener(jobName string, cfg ListenConfig) (*Listener, error) {
-	l := &Listener{
-		jobName: jobName,
-	}
+func newListener(cfg ListenConfig, report Reporter) (*listener, error) {
+	l := &listener{report: report}
 
 	var bound []*net.UDPConn
 
@@ -67,7 +61,7 @@ func newListener(jobName string, cfg ListenConfig) (*Listener, error) {
 		}
 		if cfg.ReceiveBuffer > 0 {
 			if err := setUDPReadBuffer(conn, cfg.ReceiveBuffer); err != nil {
-				if cfg.ReceiveBuffer != defaultListenerReceiveBuffer {
+				if cfg.ReceiveBuffer != DefaultReceiveBuffer {
 					conn.Close()
 					closeConns(bound)
 					return nil, fmt.Errorf("endpoint %d: set receive buffer for %s to %d bytes: %w", i, addr, cfg.ReceiveBuffer, err)
@@ -87,7 +81,7 @@ func newListener(jobName string, cfg ListenConfig) (*Listener, error) {
 	return l, nil
 }
 
-func (l *Listener) start(handler func([]byte, net.IP, *net.UDPConn, *net.UDPAddr)) {
+func (l *listener) start(handler func(Datagram)) {
 	for i := range l.endpoints {
 		ep := l.endpoints[i]
 		l.wg.Add(1)
@@ -95,10 +89,10 @@ func (l *Listener) start(handler func([]byte, net.IP, *net.UDPConn, *net.UDPAddr
 	}
 }
 
-func (l *Listener) readLoop(ep listenerEndpoint, handler func([]byte, net.IP, *net.UDPConn, *net.UDPAddr)) {
+func (l *listener) readLoop(ep listenerEndpoint, handler func(Datagram)) {
 	defer l.wg.Done()
 
-	// Keep one extra byte so oversized datagrams are classified by DecodeTrap.
+	// Keep one extra byte so oversized datagrams are classified by decodeTrap.
 	buf := make([]byte, maxDatagramSize+1)
 	for {
 		n, peer, err := ep.conn.ReadFromUDP(buf)
@@ -106,12 +100,7 @@ func (l *Listener) readLoop(ep listenerEndpoint, handler func([]byte, net.IP, *n
 			if l.isClosed() {
 				return
 			}
-			if l.metrics != nil {
-				l.metrics.incError("listener_read_failed")
-			}
-			if l.onReadError != nil {
-				l.onReadError(ep.cfg, err)
-			}
+			l.reportEvent(Event{Type: EventListenerReadFailed, Endpoint: ep.cfg, Err: err})
 			time.Sleep(listenerReadErrorBackoff)
 			continue
 		}
@@ -119,17 +108,17 @@ func (l *Listener) readLoop(ep listenerEndpoint, handler func([]byte, net.IP, *n
 		if peer != nil {
 			peerIP = peer.IP
 		}
-		handler(buf[:n], peerIP, ep.conn, peer)
+		handler(Datagram{Data: buf[:n], PeerIP: peerIP, Conn: ep.conn, Peer: peer})
 	}
 }
 
-func (l *Listener) isClosed() bool {
+func (l *listener) isClosed() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.closed
 }
 
-func (l *Listener) close() {
+func (l *listener) close() {
 	l.mu.Lock()
 	if l.closed {
 		l.mu.Unlock()
@@ -149,7 +138,8 @@ func closeConns(conns []*net.UDPConn) {
 	}
 }
 
-func listenerEndpointLogName(ep EndpointConfig) string {
-	protocol := strings.ToLower(ep.Protocol)
-	return protocol + "://" + net.JoinHostPort(ep.Address, strconv.Itoa(ep.Port))
+func (l *listener) reportEvent(event Event) {
+	if l.report != nil {
+		l.report(event)
+	}
 }

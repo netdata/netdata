@@ -10,65 +10,38 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 )
 
 const maxDecodeErrorLen = 256
 
-type decodeErrorRecord struct {
-	data           []byte
-	peerIP         net.IP
-	conn           *net.UDPConn
-	peer           *net.UDPAddr
-	packetSequence uint64
-	kind           string
-	err            error
-	sniffedVersion SnmpVersion
-	versionKnown   bool
-}
-
-func (c *Collector) writeDecodeErrorEntry(rec decodeErrorRecord) {
-	if c.trapWriter == nil {
-		return
-	}
-
-	if c.rateLimiter != nil && rec.peer != nil {
-		srcAddr, ok := udpPeerAddr(rec.peer)
-		if ok {
-			allowed, mode := c.rateLimiter.Allow(srcAddr)
-			if !allowed {
-				c.incTrapError("rate_limited")
-				if mode == rateLimitModeDrop {
-					return
-				}
-			}
-		}
-	}
-
-	entry := newDecodeErrorEntry(c.Name, rec, c.monotonicUsec())
+func (c *Collector) writeDecodeErrorEntry(failure *receiver.DecodeFailure, packetSequence uint64) {
+	entry := newDecodeErrorEntry(c.Name, failure, packetSequence, c.monotonicUsec())
 	if err := c.trapWriter.Write(entry); err != nil {
 		c.incTrapError(c.trapWriteFailureDim())
 	}
 }
 
-func newDecodeErrorEntry(jobName string, rec decodeErrorRecord, monotonicUsec int64) *TrapEntry {
+func newDecodeErrorEntry(jobName string, failure *receiver.DecodeFailure, packetSequence uint64, monotonicUsec int64) *TrapEntry {
 	now := time.Now().UnixMicro()
-	sourceIP, sourcePeer, sourcePort := decodeErrorSource(rec.peerIP, rec.peer)
-	listener := decodeErrorListener(rec.conn)
-	errText := sanitizeDecodeError(rec.err)
-	packetHash := sha256.Sum256(rec.data)
+	sourceIP, sourcePeer, sourcePort := decodeErrorSource(failure.PeerIP, failure.Peer)
+	listener := decodeErrorListener(failure.Conn)
+	errText := sanitizeDecodeError(failure.Err)
+	packetHash := sha256.Sum256(failure.Data)
 
 	info := &DecodeErrorInfo{
-		Kind:          rec.kind,
+		Kind:          string(failure.Kind),
 		Error:         errText,
-		PacketSize:    len(rec.data),
+		PacketSize:    len(failure.Data),
 		PacketSHA256:  hex.EncodeToString(packetHash[:]),
 		SourceUDPPort: sourcePort,
 		Listener:      listener,
 	}
-	if rec.versionKnown {
-		info.SnmpVersion = string(rec.sniffedVersion)
+	if failure.VersionKnown {
+		info.SnmpVersion = string(failure.SniffedVersion)
 	}
-	if engineID, ok := decodeErrorEngineID(rec.data); ok {
+	if engineID, ok := receiver.ExtractEngineID(failure.Data); ok {
 		info.EngineID = engineID
 	}
 
@@ -76,7 +49,7 @@ func newDecodeErrorEntry(jobName string, rec decodeErrorRecord, monotonicUsec in
 	if messageSource == "" {
 		messageSource = sourceIP
 	}
-	message := fmt.Sprintf("SNMP trap decode failed from %s: %s: %s", messageSource, rec.kind, errText)
+	message := fmt.Sprintf("SNMP trap decode failed from %s: %s: %s", messageSource, failure.Kind, errText)
 	if len(message) > maxMessageLen {
 		message = truncateUTF8(message, maxMessageLen-3) + "..."
 	}
@@ -86,13 +59,13 @@ func newDecodeErrorEntry(jobName string, rec decodeErrorRecord, monotonicUsec in
 		ReportType:            ReportTypeDecodeError,
 		ReceivedRealtimeUsec:  now,
 		ReceivedMonotonicUsec: monotonicUsec,
-		Category:              decodeErrorCategory(rec.kind),
+		Category:              decodeErrorCategory(failure.Kind),
 		Severity:              "warning",
 		Message:               message,
 		SourceIP:              sourceIP,
 		SourceUDPPeer:         sourcePeer,
-		SnmpVersion:           rec.sniffedVersion,
-		PacketSequence:        rec.packetSequence,
+		SnmpVersion:           failure.SniffedVersion,
+		PacketSequence:        packetSequence,
 		DecodeError:           info,
 	}
 }
@@ -120,17 +93,9 @@ func decodeErrorListener(conn *net.UDPConn) string {
 	return conn.LocalAddr().String()
 }
 
-func decodeErrorEngineID(data []byte) (string, bool) {
-	engineID, ok, err := extractSNMPv3EngineIDHex(data)
-	if err != nil || !ok || engineID == "" {
-		return "", false
-	}
-	return engineID, true
-}
-
-func decodeErrorCategory(kind string) Category {
+func decodeErrorCategory(kind receiver.ErrorKind) Category {
 	switch kind {
-	case "auth_failures", "usm_failures", "unknown_engine_id":
+	case receiver.ErrorAuthFailure, receiver.ErrorUSMFailure, receiver.ErrorUnknownEngine:
 		return "auth"
 	default:
 		return "diagnostic"

@@ -127,9 +127,9 @@ src/go/plugin/go.d/collector/snmp_traps/
     internal/output/             # Writer contract, coordinator, typed outcomes, shared projection
     internal/output/journal/     # Retention, SDK adapter, raw serializer, queue worker
     internal/output/otlp/        # OTLP policy, preflight, queue/batch worker, protobuf projection
+    internal/receiver/           # UDP receive loops, SNMP decode/admission, v3 state, INFORM responses
     internal/snmptrapsfunc/      # Logs Function implementation
-    listener.go / decode.go      # Per-job UDP listener and SNMP decoding
-    profile*.go / pipeline*.go   # Profiles, enrichment, rendering, and pipeline behavior
+    pipeline.go / enrich.go      # Post-acceptance enrichment, rendering, and pipeline behavior
 ```
 
 Collector consistency artifacts (`metadata.yaml`, health, README, taxonomy) remain owned by SOW-0039 unless an earlier SOW needs a minimal internal test fixture. SOW-0035 M2 ships the minimal `config_schema.json` and disabled stock config needed for DynCfg creation-time preflight and manual opt-in; SOW-0039 remains responsible for the full user-facing documentation and integration metadata bundle.

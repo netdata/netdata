@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package receiver
 
 import (
 	"net"
@@ -48,7 +48,7 @@ func TestSendInformResponseV2c(t *testing.T) {
 	}
 }
 
-func TestCollectorHandlePacketRespondsBeforeRateLimitDrop(t *testing.T) {
+func TestReceiverRespondsBeforeRateLimitDrop(t *testing.T) {
 	reqData := buildV2cPDU(t, gosnmp.InformRequest, "public", "1.3.6.1.6.3.1.1.5.1")
 
 	listenerConn, peerConn := informUDPConnPair(t)
@@ -56,45 +56,36 @@ func TestCollectorHandlePacketRespondsBeforeRateLimitDrop(t *testing.T) {
 	defer peerConn.Close()
 
 	peer := peerConn.LocalAddr().(*net.UDPAddr)
-	rl := newRateLimiter(true, 1, "drop")
-	srcAddr, ok := udpPeerAddr(peer)
-	if !ok {
-		t.Fatal("failed to convert UDP peer address")
-	}
-	if allowed, _ := rl.Allow(srcAddr); !allowed {
-		t.Fatal("expected first token to be available")
-	}
-
-	const jobName = "test-inform-rate-limit"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
-
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		Config:      Config{Name: jobName},
-		trapWriter:  writer,
-		versions:    map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:   NewAllowlist(nil, []string{"public"}),
-		rateLimiter: rl,
+	var events []Event
+	recv := New(NewPolicy(PolicyConfig{
+		Versions:    []string{"v2c"},
+		Communities: []string{"public"},
+		RateLimit:   RateLimitConfig{Enabled: true, PerSourcePPS: 1, Mode: "drop"},
+	}), func(event Event) { events = append(events, event) })
+	prime := recv.Process(Datagram{
+		Data:   buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1"),
+		PeerIP: peer.IP,
+		Peer:   peer,
+	})
+	if prime.PDU == nil {
+		t.Fatalf("priming trap result = %+v, want accepted trap", prime)
 	}
 
-	c.handlePacket(reqData, peer.IP, listenerConn, peer)
+	result := recv.Process(Datagram{Data: reqData, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
 
 	respPkt := readInformResponse(t, peerConn)
 	if respPkt.PDUType != gosnmp.GetResponse {
 		t.Fatalf("response PDU type = %s, want GetResponse", respPkt.PDUType)
 	}
-	if len(writer.entries) != 0 {
-		t.Fatalf("rate-limited INFORM should not be journaled, got %d entries", len(writer.entries))
+	if result.PDU != nil || result.DecodeFailure != nil {
+		t.Fatalf("rate-limited INFORM result = %+v, want drop", result)
 	}
-
-	m := getJobMetrics(jobName)
-	if v := m.errors.rateLimited.Load(); v != 1 {
-		t.Fatalf("rate_limited = %d, want 1", v)
+	if countEvents(events, EventError, "rate_limited") != 1 {
+		t.Fatalf("events = %+v, want one rate_limited error", events)
 	}
 }
 
-func TestCollectorHandlePacketIncrementsInformResponseFailed(t *testing.T) {
+func TestReceiverReportsInformResponseFailed(t *testing.T) {
 	reqData := buildV2cPDU(t, gosnmp.InformRequest, "public", "1.3.6.1.6.3.1.1.5.1")
 
 	listenerConn, peerConn := informUDPConnPair(t)
@@ -104,24 +95,27 @@ func TestCollectorHandlePacketIncrementsInformResponseFailed(t *testing.T) {
 		t.Fatalf("close listener socket: %v", err)
 	}
 
-	const jobName = "test-inform-response-failed"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
-
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		Config:     Config{Name: jobName},
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
+	var events []Event
+	recv := New(NewPolicy(PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"public"}}), func(event Event) {
+		events = append(events, event)
+	})
+	result := recv.Process(Datagram{Data: reqData, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
+	if result.PDU == nil {
+		t.Fatalf("result = %+v, want accepted INFORM", result)
 	}
-
-	c.handlePacket(reqData, peer.IP, listenerConn, peer)
-
-	m := getJobMetrics(jobName)
-	if v := m.errors.informResponseFail.Load(); v != 1 {
-		t.Fatalf("inform_response_failed = %d, want 1", v)
+	if countEvents(events, EventInformResponseFailed, "") != 1 {
+		t.Fatalf("events = %+v, want one INFORM response failure", events)
 	}
+}
+
+func countEvents(events []Event, eventType EventType, errorKind ErrorKind) int {
+	count := 0
+	for _, event := range events {
+		if event.Type == eventType && (errorKind == "" || event.ErrorKind == errorKind) {
+			count++
+		}
+	}
+	return count
 }
 
 func informUDPConnPair(t *testing.T) (*net.UDPConn, *net.UDPConn) {

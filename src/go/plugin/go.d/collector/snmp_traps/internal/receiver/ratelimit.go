@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package receiver
 
 import (
 	"net/netip"
@@ -14,10 +14,6 @@ type rateLimitMode int
 const (
 	rateLimitModeDrop   rateLimitMode = 0
 	rateLimitModeSample rateLimitMode = 1
-
-	defaultRateLimitPerSourcePPS = 1000
-	defaultRateLimitMode         = "drop"
-	defaultRateLimitMaxSources   = 10000
 )
 
 type rateLimiter struct {
@@ -45,13 +41,13 @@ func newRateLimiter(enabled bool, perSourcePPS int, mode string) *rateLimiter {
 		return rl
 	}
 	if perSourcePPS <= 0 {
-		perSourcePPS = defaultRateLimitPerSourcePPS
+		perSourcePPS = defaultRateLimitPPS
 	}
 	mode = normalizeRateLimitMode(mode)
 	rl.enabled = true
 	rl.rate = float64(perSourcePPS)
 	rl.burst = perSourcePPS
-	rl.maxSources = defaultRateLimitMaxSources
+	rl.maxSources = defaultRateLimitSources
 	switch mode {
 	case "sample":
 		rl.mode = rateLimitModeSample
@@ -69,7 +65,7 @@ func normalizeRateLimitMode(mode string) string {
 	return mode
 }
 
-func (rl *rateLimiter) Allow(addr netip.Addr) (allowed bool, mode rateLimitMode) {
+func (rl *rateLimiter) allow(addr netip.Addr) (allowed bool, mode rateLimitMode) {
 	if !rl.enabled {
 		return true, rateLimitModeDrop
 	}

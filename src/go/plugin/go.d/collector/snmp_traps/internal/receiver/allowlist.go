@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package receiver
 
 import (
 	"net/netip"
 )
 
-type Allowlist struct {
+type allowlist struct {
 	nets  []netip.Prefix
 	comms map[string]struct{}
 	empty bool
 }
 
-func NewAllowlist(nets []netip.Prefix, communities []string) *Allowlist {
-	al := &Allowlist{nets: nets}
+func newAllowlist(nets []netip.Prefix, communities []string) *allowlist {
+	al := &allowlist{nets: nets}
 	if len(communities) == 0 {
 		al.empty = true
 	} else {
@@ -25,7 +25,7 @@ func NewAllowlist(nets []netip.Prefix, communities []string) *Allowlist {
 	return al
 }
 
-func (al *Allowlist) AllowedSource(addr netip.Addr) bool {
+func (al *allowlist) allowedSource(addr netip.Addr) bool {
 	if len(al.nets) == 0 {
 		return true
 	}
@@ -37,7 +37,7 @@ func (al *Allowlist) AllowedSource(addr netip.Addr) bool {
 	return false
 }
 
-func (al *Allowlist) AllowedCommunity(community string) bool {
+func (al *allowlist) allowedCommunity(community string) bool {
 	if al.empty {
 		return true
 	}

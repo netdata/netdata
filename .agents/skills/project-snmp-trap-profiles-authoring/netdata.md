@@ -176,12 +176,27 @@ without maintaining a package-local copy of the journal binary format.
 
 ### Concurrency model
 
-- **Hot path** (per-packet decode + enrich + counter increment): one receive loop per endpoint with reusable buffers; no per-packet heap allocation target; shared per-listener decoder/resolver/writer pipeline. One job = one listener = one or more endpoints = one writer. Multiple endpoint receive loops in the same job fan into one concurrency-safe bounded writer queue; one worker drains that queue and writes journal entries sequentially.
+- **Hot path** (per-packet decode + enrich + counter increment): one receive loop per endpoint with reusable buffers; no
+  per-packet heap allocation target; one per-job receiver/application/output pipeline. One job = one listener = one or
+  more endpoints = one writer. Each endpoint invokes the packet workflow synchronously; successful entries then fan into
+  the concurrency-safe bounded writer queue, which one worker drains sequentially.
 - **Journal write**: per-job writer thread, one journal file family per job (under `${NETDATA_LOG_DIR}/traps/{job_name}/`). SOW-0045 measured about 62K-73K persisted traps/sec for the full synthetic packet-to-journal path on the workstation, but this is local benchmark evidence, not a portable hardware guarantee. To exceed one writer's ceiling for a single high-volume listener, operators add more jobs for scaling/isolation. Multi-writer partitioning **within a single listener** is out of scope for SOW-0035–SOW-0038; if it becomes necessary it joins a future SOW.
 
 ### Process model
 
 SOW-0035 M1 finalizes the exact process/writer boundary for the Go implementation. The default target is standard go.d job orchestration unless M1 evidence justifies another boundary for the journal writer path. **Job lifecycle is independent** of plugin lifecycle — DynCfg add/update/enable/disable/remove operates per-job without restarting the plugin process. Plugin process restart cycles all jobs.
+
+### Runtime ownership
+
+- `internal/receiver` owns the immutable per-job reception policy, endpoint sockets and receive loops,
+  source/version/community admission, BER/SNMP decode, SNMPv3 USM and engine state, dynamic engine-ID handling, INFORM
+  responses, and per-source rate limiting.
+- The root collector owns public config DTOs and job orchestration. After receiver acceptance, it owns catalog lookup,
+  overrides, attribution/enrichment, template rendering, deduplication, output commitment, and metric updates.
+- The endpoint receive loop calls the root packet workflow synchronously. There is no receiver-owned queue or goroutine
+  between socket read and packet handling; each endpoint keeps one goroutine and one reusable datagram buffer.
+- Receiver health and policy outcomes cross the boundary through one event callback. `internal/receiver` does not import
+  collector telemetry, logging, profile, or output packages.
 
 ### Hot path (executes per trap, per job)
 
@@ -585,8 +600,8 @@ Implementation ownership:
 - `internal/profilemetrics` owns per-job selection/compilation, generated chart
   templates, predicates and value extraction, mutable series/cardinality state,
   diagnostics, and `metrix` collection.
-- The root collector owns the public config DTO and orchestration only: it
-  constructs the runtime during `Init()`, updates it after a successful
+- For profile metrics, the root collector owns the public config DTO and
+  orchestration: it constructs the runtime during `Init()`, updates it after a successful
   authoritative write, collects it during `Collect()`, and releases it during
   cleanup.
 
