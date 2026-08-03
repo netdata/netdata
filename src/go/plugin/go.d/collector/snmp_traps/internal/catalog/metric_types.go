@@ -8,6 +8,24 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
+const (
+	MetricTypeCounter = "counter"
+	MetricTypeSample  = "sample"
+	MetricTypeState   = "state"
+
+	MetricIdentitySource      = "source"
+	MetricIdentitySourceLabel = "source_label"
+	MetricIdentityListener    = "listener"
+
+	MetricMissingDrop             = "drop"
+	MetricMissingZero             = "zero"
+	MetricMissingUnknownDimension = "unknown_dimension"
+	MetricMissingError            = "error"
+
+	DefaultMetricExpireAfterCycles = 60
+	DefaultMetricChartMaxInstances = 2000
+)
+
 // MetricRule is one static profile metric definition.
 type MetricRule struct {
 	Name        string `yaml:"name"`

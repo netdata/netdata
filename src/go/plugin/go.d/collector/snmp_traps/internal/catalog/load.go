@@ -413,9 +413,7 @@ type profileLoadBundle struct {
 	charts  []profileMetricChart
 }
 
-// Bundle is one fully resolved and statically validated profile file. It is a
-// temporary bridge for the root metric runtime until that runtime moves into
-// this package.
+// Bundle is one fully resolved and statically validated profile file.
 type Bundle struct {
 	Traps   []*TrapDef
 	Metrics []MetricRule

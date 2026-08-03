@@ -1045,9 +1045,9 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 	metrics := withCleanJobMetrics(t, jobName)
 	metrics.incEvent("security")
 
-	idx := testProfileMetricIndex(t)
-	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
-	rt.update(ciscoConfigTrapEntry(jobName))
+	rt := newRootTestProfileMetricRuntime(t)
+	entry := rootTestCiscoConfigTrapEntry(jobName)
+	rt.Update(entry)
 
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
@@ -1077,8 +1077,7 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 		t.Fatalf("snmp_trap_events_security = %v/%v, want 1/true", v, ok)
 	}
 
-	sourceID, sourceKind := fallbackTrapSourceIdentity(ciscoConfigTrapEntry(jobName), jobName, "test")
-	profileLabels := metrix.Labels{"job_name": jobName, "source_id": sourceID, "source_kind": sourceKind}
+	profileLabels := rootTestProfileMetricSourceLabels(entry, "test")
 	if v, ok := store.Read().Value("snmp_trap_cisco_config_events", profileLabels); !ok || v != 1 {
 		t.Fatalf("snmp_trap_cisco_config_events = %v/%v, want 1/true", v, ok)
 	}

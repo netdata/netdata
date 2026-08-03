@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profilemetrics"
 )
 
 const (
@@ -60,7 +61,7 @@ type validatedConfig struct {
 	otlp           otlp.Policy
 	journalEnabled bool
 	retention      journal.Retention
-	profileMetrics normalizedProfileMetricsConfig
+	profileMetrics profilemetrics.Policy
 }
 
 func (c Config) Validate() error {
@@ -156,7 +157,7 @@ func validateConfig(c Config) (validatedConfig, error) {
 		validated.retention = retention
 	}
 
-	profileMetrics, err := normalizeProfileMetricsConfig(c.ProfileMetrics)
+	profileMetrics, err := profilemetrics.Normalize(c.ProfileMetrics.Enabled, c.ProfileMetrics.Include)
 	if err != nil {
 		return validated, err
 	}

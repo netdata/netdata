@@ -15,24 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
-const (
-	profileMetricTypeCounter = "counter"
-	profileMetricTypeSample  = "sample"
-	profileMetricTypeState   = "state"
-
-	profileMetricIdentitySource      = "source"
-	profileMetricIdentitySourceLabel = "source_label"
-	profileMetricIdentityListener    = "listener"
-
-	profileMetricMissingDrop             = "drop"
-	profileMetricMissingZero             = "zero"
-	profileMetricMissingUnknownDimension = "unknown_dimension"
-	profileMetricMissingError            = "error"
-
-	defaultProfileMetricExpireAfterCycles = 60
-	defaultProfileMetricChartMaxInstances = 2000
-)
-
 var (
 	profileMetricRuleNameRE      = regexp.MustCompile(`^[A-Za-z0-9_.:-]+::[A-Za-z0-9_.:-]+$|^[A-Za-z0-9_.:-]+$`)
 	profileMetricOutputNameRE    = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
@@ -93,26 +75,26 @@ func normalizeProfileMetricRule(rule *profileMetricRule) error {
 	}
 	rule.Type = strings.ToLower(strings.TrimSpace(rule.Type))
 	switch rule.Type {
-	case profileMetricTypeCounter, profileMetricTypeSample, profileMetricTypeState:
+	case MetricTypeCounter, MetricTypeSample, MetricTypeState:
 	default:
 		return fmt.Errorf("rule %q type must be counter, sample, or state", rule.Name)
 	}
 	if rule.Identity.Device == "" {
-		rule.Identity.Device = profileMetricIdentitySource
+		rule.Identity.Device = MetricIdentitySource
 	}
 	if rule.Output.Metric == "" {
 		rule.Output.Metric = "snmp_trap_" + slugForMetric(rule.Name)
-		if !strings.HasSuffix(rule.Output.Metric, "_events") && rule.Type == profileMetricTypeCounter {
+		if !strings.HasSuffix(rule.Output.Metric, "_events") && rule.Type == MetricTypeCounter {
 			rule.Output.Metric += "_events"
 		}
 	}
 	if rule.Output.Dimension == "" {
 		switch rule.Type {
-		case profileMetricTypeCounter:
+		case MetricTypeCounter:
 			rule.Output.Dimension = "events"
-		case profileMetricTypeSample:
+		case MetricTypeSample:
 			rule.Output.Dimension = "value"
-		case profileMetricTypeState:
+		case MetricTypeState:
 			rule.Output.Dimension = "state"
 		}
 	}
@@ -120,7 +102,7 @@ func normalizeProfileMetricRule(rule *profileMetricRule) error {
 		rule.Output.Chart = slugForMetric(rule.Name)
 	}
 	if rule.Missing == "" {
-		rule.Missing = profileMetricMissingDrop
+		rule.Missing = MetricMissingDrop
 	}
 	rule.Missing = strings.ToLower(strings.TrimSpace(rule.Missing))
 	if rule.Scale.Multiplier == 0 {
@@ -154,19 +136,19 @@ func validateProfileMetricRule(rule *profileMetricRule, idx *Epoch, charts map[s
 		return fmt.Errorf("%s: metric rule %q references unknown chart %q", rule.SourceFile, rule.Name, rule.Output.Chart)
 	}
 	switch rule.Missing {
-	case profileMetricMissingDrop, profileMetricMissingZero, profileMetricMissingUnknownDimension, profileMetricMissingError:
+	case MetricMissingDrop, MetricMissingZero, MetricMissingUnknownDimension, MetricMissingError:
 	default:
 		return fmt.Errorf("%s: metric rule %q missing must be drop, zero, unknown_dimension, or error", rule.SourceFile, rule.Name)
 	}
 	switch rule.Type {
-	case profileMetricTypeCounter:
+	case MetricTypeCounter:
 		if rule.OnTrap == "" || rule.ProblemTrap != "" || rule.ClearTrap != "" || rule.ValueFromVarbind != "" {
 			return fmt.Errorf("%s: counter rule %q requires only on_trap", rule.SourceFile, rule.Name)
 		}
 		if _, err := resolveProfileMetricTrap(idx, rule.OnTrap); err != nil {
 			return fmt.Errorf("%s: counter rule %q on_trap: %w", rule.SourceFile, rule.Name, err)
 		}
-	case profileMetricTypeSample:
+	case MetricTypeSample:
 		if rule.OnTrap == "" || rule.ValueFromVarbind == "" {
 			return fmt.Errorf("%s: sample rule %q requires on_trap and value_from_varbind", rule.SourceFile, rule.Name)
 		}
@@ -181,13 +163,13 @@ func validateProfileMetricRule(rule *profileMetricRule, idx *Epoch, charts map[s
 		if !isProfileMetricNumericVarbind(vb) {
 			return fmt.Errorf("%s: sample rule %q value_from_varbind %q is non-numeric type %q", rule.SourceFile, rule.Name, rule.ValueFromVarbind, vb.Type)
 		}
-		if rule.Missing == profileMetricMissingUnknownDimension {
+		if rule.Missing == MetricMissingUnknownDimension {
 			return fmt.Errorf("%s: sample rule %q missing unknown_dimension requires identity.resource", rule.SourceFile, rule.Name)
 		}
 		if charts[rule.Output.Chart].Algorithm != "absolute" {
 			return fmt.Errorf("%s: sample rule %q chart %q must use absolute algorithm", rule.SourceFile, rule.Name, rule.Output.Chart)
 		}
-	case profileMetricTypeState:
+	case MetricTypeState:
 		if rule.OnTrap != "" {
 			if rule.State.SetWhen == nil || rule.State.ClearWhen == nil || rule.ProblemTrap != "" || rule.ClearTrap != "" {
 				return fmt.Errorf("%s: same-OID state rule %q requires on_trap with state set_when and clear_when only", rule.SourceFile, rule.Name)
@@ -213,10 +195,10 @@ func validateProfileMetricRule(rule *profileMetricRule, idx *Epoch, charts map[s
 			return fmt.Errorf("%s: state rule %q chart %q must use absolute algorithm", rule.SourceFile, rule.Name, rule.Output.Chart)
 		}
 	}
-	if rule.Type != profileMetricTypeSample && rule.Missing == profileMetricMissingZero {
+	if rule.Type != MetricTypeSample && rule.Missing == MetricMissingZero {
 		return fmt.Errorf("%s: metric rule %q missing zero is supported only for sample rules", rule.SourceFile, rule.Name)
 	}
-	if rule.Missing == profileMetricMissingUnknownDimension && rule.Identity.Resource == nil {
+	if rule.Missing == MetricMissingUnknownDimension && rule.Identity.Resource == nil {
 		return fmt.Errorf("%s: metric rule %q missing unknown_dimension requires identity.resource", rule.SourceFile, rule.Name)
 	}
 	if rule.Scale.Divisor <= 0 {
@@ -421,9 +403,9 @@ func validateProfileMetricResourceVarbind(rule *profileMetricRule, idx *Epoch) e
 func profileMetricRuleTrapDefs(rule *profileMetricRule, idx *Epoch) ([]*TrapDef, error) {
 	var refs []string
 	switch rule.Type {
-	case profileMetricTypeCounter, profileMetricTypeSample:
+	case MetricTypeCounter, MetricTypeSample:
 		refs = append(refs, rule.OnTrap)
-	case profileMetricTypeState:
+	case MetricTypeState:
 		if rule.OnTrap != "" {
 			refs = append(refs, rule.OnTrap)
 		} else {
@@ -455,7 +437,7 @@ func isProfileMetricResourceKeyVarbind(vb *VarbindDef) bool {
 
 func validateProfileMetricIdentity(rule *profileMetricRule) error {
 	switch rule.Identity.Device {
-	case "", profileMetricIdentitySource, profileMetricIdentitySourceLabel, profileMetricIdentityListener:
+	case "", MetricIdentitySource, MetricIdentitySourceLabel, MetricIdentityListener:
 	default:
 		return fmt.Errorf("identity.device must be source, source_label, or listener")
 	}
@@ -533,15 +515,15 @@ func normalizeProfileMetricChart(chart *profileMetricChart) error {
 	}
 	if chart.Lifecycle == nil {
 		chart.Lifecycle = &charttpl.Lifecycle{
-			MaxInstances:      defaultProfileMetricChartMaxInstances,
-			ExpireAfterCycles: defaultProfileMetricExpireAfterCycles,
+			MaxInstances:      DefaultMetricChartMaxInstances,
+			ExpireAfterCycles: DefaultMetricExpireAfterCycles,
 		}
 	}
 	if chart.Lifecycle.MaxInstances <= 0 {
-		chart.Lifecycle.MaxInstances = defaultProfileMetricChartMaxInstances
+		chart.Lifecycle.MaxInstances = DefaultMetricChartMaxInstances
 	}
 	if chart.Lifecycle.ExpireAfterCycles <= 0 {
-		chart.Lifecycle.ExpireAfterCycles = defaultProfileMetricExpireAfterCycles
+		chart.Lifecycle.ExpireAfterCycles = DefaultMetricExpireAfterCycles
 	}
 	return nil
 }

@@ -91,21 +91,9 @@ func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
 }
 
 func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
-		Enabled: true,
-		Include: []string{"cisco.config.changed"},
-	})
-	require.NoError(t, err)
-
-	rt, tmpl, err := newProfileMetricRuntime(cfg, idx, "test")
-	require.NoError(t, err)
-	require.NotNil(t, rt)
-	require.NotEmpty(t, tmpl)
-
+	rt := newRootTestProfileMetricRuntime(t)
 	c := newTestSNMPTrapsCollector()
 	c.profileMetrics = rt
-	c.dynamicChartYAML = tmpl
 
 	collecttest.AssertChartTemplateSchema(t, c.ChartTemplateYAML())
 	charts := chartTemplatesByIDFromYAML(t, c.ChartTemplateYAML())

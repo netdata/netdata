@@ -1561,8 +1561,9 @@ Compilation path:
 - Developer-only debug dumps of the compiled spec are allowed only outside
   public request paths and must never become the source served by
   `ChartTemplateYAML()`.
-- Compilation happens when the trap profile metric catalog is built or refreshed,
-  not on every collection cycle.
+- Static definitions are validated and retained by the shared catalog epoch. Each
+  listener job compiles its explicitly selected rules and generated chart template
+  once during `Init()`, not on every collection cycle.
 - `profile_metrics.include` validation uses the compiled metric rule catalog.
 
 Chart conflict rules:
@@ -1603,8 +1604,8 @@ Lifecycle:
 - State tables must be synchronized; race-free state updates are a required
   implementation property.
 - Multi-endpoint listener jobs can deliver trap metric updates concurrently.
-  `profileMetricRuntime.mu` serializes state and series mutations within the
-  job.
+  The mutex owned by `internal/profilemetrics.Runtime` serializes state and
+  series mutations within the job.
 - State tables are in-memory only. After Agent restart, trap-derived state is
   unknown until new traps arrive; the implementation must not claim a persisted
   clear state unless a clear trap was observed after restart.
@@ -1665,11 +1666,11 @@ design explicitly changes it:
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:625` through `:631`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:680` through `:686`
   returns early for dedup-suppressed traps.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:633` through `:640`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:688` through `:696`
   returns early for write failures.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:644` through `:654`
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:699` through `:709`
   updates profile, event, and severity metrics after successful write.
 - Phase A profile metric tests verify no profile metric is emitted for write
   failures and dedup-suppressed traps. Pre-Phase-A
