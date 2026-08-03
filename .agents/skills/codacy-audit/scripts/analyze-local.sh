@@ -191,7 +191,7 @@ case "$RUNNER" in
         [ -n "$TOOL" ] && cli_args+=(--tool "$TOOL")
         docker run --rm \
                 --env CODACY_CODE="$SUBDIR" \
-                --env "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=$RUNNER_TMP" \
+                --env "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=\"$RUNNER_TMP\"" \
                 --volume /var/run/docker.sock:/var/run/docker.sock \
                 --volume "$SUBDIR":"$SUBDIR" \
                 --volume "$RUNNER_TMP":"$RUNNER_TMP" \

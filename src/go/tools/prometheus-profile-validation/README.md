@@ -118,11 +118,20 @@ selector, missing label keys, and affected count—not observed label values.
 Changing the entity boundary or overriding identity can be correct; inventing a
 label that the series does not carry is not.
 
-`pipeline_excluded` reports raw logical source series that are wholly or partly
-absent after job policy and writer processing. Categories are deliberately
-generic when selector or relabeling rules make the precise cause ambiguous.
-Raw logical series and flattened writer series are different counts for
-histograms and summaries.
+`pipeline_excluded` records raw source families that are wholly or partly absent
+after job policy and writer processing. Each record carries the raw and
+materialized logical-series counts; `counts.pipeline_excluded` is the number of
+family records, not the sum of lost logical identities. Relabel-renamed families
+are reconciled by logical identity against their final writer names, so
+successful normalization is not reported as loss. Categories are deliberately
+generic when selector or relabeling rules make the precise cause ambiguous. Raw
+logical series and flattened writer series are different counts for histograms
+and summaries.
+
+`pipeline_renamed` reports successful raw-to-final family-name lineage separately,
+including the raw logical-series count and how many renamed identities reached
+the writer. A family can appear in both sections when only part of its source
+identity set survives normalization.
 
 The strict current-source requirement is zero autogen and zero unmatched
 series. One explicit profile policy can pass with a warning:

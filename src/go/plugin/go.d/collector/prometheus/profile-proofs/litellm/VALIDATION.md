@@ -18,8 +18,8 @@
 - Input: **201 raw families / 322 logical series**.
 - Writer/profile: **710 writer series**, **159 authored charts**, **231 runtime chart instances**, and
   **975 dimensions**.
-- Pipeline exclusions: **83**; exact ledger dispositions are 82 job-excluded routes and
-  1 writer-ineligible information route.
+- Pipeline exclusions: **83 raw families / 117 logical identities**; exact ledger dispositions are 82 job-excluded routes
+  and 1 writer-ineligible information route.
 - Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
 - `SOURCE-INVENTORY.tsv` has 356 rows and maps all 273 exact authored selector routes; unresolved
   families/selectors **0**.

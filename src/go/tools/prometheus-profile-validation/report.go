@@ -22,6 +22,7 @@ type report struct {
 	Counts              countReport                          `json:"counts"`
 	RawFamilies         []rawFamilyReport                    `json:"raw_families,omitempty"`
 	PipelineExcluded    []pipelineExcludedReport             `json:"pipeline_excluded,omitempty"`
+	PipelineRenamed     []pipelineRenamedReport              `json:"pipeline_renamed,omitempty"`
 	AuthoredMapping     []authoredChartMappingReport         `json:"authored_mapping,omitempty"`
 	Charts              []materializedChart                  `json:"charts,omitempty"`
 	DeadCharts          []deadChartReport                    `json:"dead_charts,omitempty"`
@@ -70,6 +71,7 @@ type countReport struct {
 	ChartDimensions  int `json:"chart_dimensions"`
 	AuthoredCharts   int `json:"authored_charts"`
 	PipelineExcluded int `json:"pipeline_excluded"`
+	PipelineRenamed  int `json:"pipeline_renamed"`
 }
 
 type rawFamilyReport struct {
@@ -89,6 +91,13 @@ type pipelineExcludedReport struct {
 	Category           string `json:"category"`
 	RawLogicalSeries   int    `json:"raw_logical_series"`
 	WriterSourceSeries int    `json:"writer_source_series"`
+}
+
+type pipelineRenamedReport struct {
+	RawName                   string   `json:"raw_name"`
+	FinalNames                []string `json:"final_names"`
+	RawLogicalSeries          int      `json:"raw_logical_series"`
+	MaterializedLogicalSeries int      `json:"materialized_logical_series"`
 }
 
 type authoredChartMappingReport struct {
@@ -256,6 +265,12 @@ func writeTextReport(w io.Writer, r report) error {
 		len(r.DimensionLosses),
 		len(r.Collisions)+len(r.InstanceLosses)+len(r.ChartWireCollisions)+len(r.ContextCollisions)+len(r.DimensionCollisions),
 	)
+	fmt.Fprintf(
+		&b,
+		"Pipeline: excluded_families=%d, renamed_families=%d\n",
+		r.Counts.PipelineExcluded,
+		r.Counts.PipelineRenamed,
+	)
 
 	if len(r.PipelineExcluded) > 0 {
 		fmt.Fprintln(&b, "\nRaw families wholly or partly absent after the real job/writer pipeline:")
@@ -272,6 +287,19 @@ func writeTextReport(w io.Writer, r report) error {
 				shape,
 				item.RawLogicalSeries,
 				item.WriterSourceSeries,
+			)
+		}
+	}
+	if len(r.PipelineRenamed) > 0 {
+		fmt.Fprintln(&b, "\nRaw families successfully normalized by job relabeling:")
+		for _, item := range r.PipelineRenamed {
+			fmt.Fprintf(
+				&b,
+				"  - %s -> %s; logical_series raw=%d normalized_and_materialized=%d\n",
+				item.RawName,
+				strings.Join(item.FinalNames, ","),
+				item.RawLogicalSeries,
+				item.MaterializedLogicalSeries,
 			)
 		}
 	}
@@ -446,6 +474,7 @@ func writeTextReport(w io.Writer, r report) error {
 func sortReport(r *report) {
 	sort.Slice(r.RawFamilies, func(i, j int) bool { return r.RawFamilies[i].Name < r.RawFamilies[j].Name })
 	sort.Slice(r.PipelineExcluded, func(i, j int) bool { return r.PipelineExcluded[i].Name < r.PipelineExcluded[j].Name })
+	sort.Slice(r.PipelineRenamed, func(i, j int) bool { return r.PipelineRenamed[i].RawName < r.PipelineRenamed[j].RawName })
 	sort.Slice(r.Charts, func(i, j int) bool { return r.Charts[i].IDFingerprint < r.Charts[j].IDFingerprint })
 	sort.Slice(r.DeadCharts, func(i, j int) bool { return r.DeadCharts[i].Path < r.DeadCharts[j].Path })
 	sort.Slice(r.DeadDimensions, func(i, j int) bool { return r.DeadDimensions[i].Path < r.DeadDimensions[j].Path })

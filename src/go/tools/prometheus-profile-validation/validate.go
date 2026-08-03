@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"maps"
 	"math"
 	"net/http"
 	"os"
@@ -145,8 +146,9 @@ func validateProfile(opts validationOptions) report {
 	reader := coll.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	materializedFamilies := inventoryWriterSeries(reader)
 	r.Counts.WriterSeries = materializedFamilies.series
-	r.PipelineExcluded = explainExcludedRawFamilies(r.RawFamilies, materializedFamilies, r.Job)
+	r.PipelineExcluded, r.PipelineRenamed = reconcileRawFamilies(r.RawFamilies, materializedFamilies, r.Job, relabelAudits.provenance)
 	r.Counts.PipelineExcluded = len(r.PipelineExcluded)
+	r.Counts.PipelineRenamed = len(r.PipelineRenamed)
 
 	templateYAML := coll.ChartTemplateYAML()
 	if strings.TrimSpace(templateYAML) == "" {
@@ -497,29 +499,25 @@ func inventoryRawFamilies(families prompkg.MetricFamilies) ([]rawFamilyReport, i
 }
 
 type writerInventory struct {
-	sourceSeries map[string]map[string]struct{}
+	sourceSeries map[writerSeriesKey]struct{}
 	series       int
 }
 
 func inventoryWriterSeries(reader metrix.Reader) writerInventory {
 	out := writerInventory{
-		sourceSeries: make(map[string]map[string]struct{}),
+		sourceSeries: make(map[writerSeriesKey]struct{}),
 	}
 	reader.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, _ metrix.SampleValue) {
 		out.series++
 		family := sourceFamilyName(name, meta)
-		identities := out.sourceSeries[family]
-		if identities == nil {
-			identities = make(map[string]struct{})
-			out.sourceSeries[family] = identities
-		}
-		identities[sourceIdentityKey(labels, meta)] = struct{}{}
+		out.sourceSeries[writerSeriesKey{family: family, identity: sourceIdentityKey(labels, meta)}] = struct{}{}
 	})
 	return out
 }
 
-func (i writerInventory) sourceSeriesCount(name string) int {
-	return len(i.sourceSeries[name])
+func (i writerInventory) contains(key writerSeriesKey) bool {
+	_, ok := i.sourceSeries[key]
+	return ok
 }
 
 func sourceIdentityKey(labels metrix.LabelView, meta metrix.SeriesMeta) string {
@@ -570,11 +568,47 @@ func sourceFamilyName(name string, meta metrix.SeriesMeta) string {
 	return name
 }
 
-func explainExcludedRawFamilies(raw []rawFamilyReport, writer writerInventory, job effectiveJobReport) []pipelineExcludedReport {
-	var out []pipelineExcludedReport
+func reconcileRawFamilies(
+	raw []rawFamilyReport,
+	writer writerInventory,
+	job effectiveJobReport,
+	provenance pipelineProvenance,
+) ([]pipelineExcludedReport, []pipelineRenamedReport) {
+	var excluded []pipelineExcludedReport
+	var renamed []pipelineRenamedReport
 	ambiguousJobPolicy := len(job.SelectorAllow) > 0 || len(job.SelectorDeny) > 0 || job.RelabelBlocks > 0
 	for _, family := range raw {
-		writerSeries := writer.sourceSeriesCount(family.Name)
+		writerSeries := 0
+		renamedSeries := 0
+		finalNames := make(map[string]struct{})
+		for _, destinations := range provenance[family.Name] {
+			materialized := false
+			materializedRename := false
+			for destination := range destinations {
+				if !writer.contains(destination) {
+					continue
+				}
+				materialized = true
+				if destination.family != family.Name {
+					materializedRename = true
+					finalNames[destination.family] = struct{}{}
+				}
+			}
+			if materialized {
+				writerSeries++
+			}
+			if materializedRename {
+				renamedSeries++
+			}
+		}
+		if len(finalNames) > 0 {
+			renamed = append(renamed, pipelineRenamedReport{
+				RawName:                   family.Name,
+				FinalNames:                slices.Sorted(maps.Keys(finalNames)),
+				RawLogicalSeries:          family.Series,
+				MaterializedLogicalSeries: renamedSeries,
+			})
+		}
 		if writerSeries >= family.Series {
 			continue
 		}
@@ -599,7 +633,7 @@ func explainExcludedRawFamilies(raw []rawFamilyReport, writer writerInventory, j
 				category = "untyped_requires_matching_fallback_type"
 			}
 		}
-		out = append(out, pipelineExcludedReport{
+		excluded = append(excluded, pipelineExcludedReport{
 			Name:               family.Name,
 			Type:               family.Type,
 			Shape:              family.Shape,
@@ -608,7 +642,7 @@ func explainExcludedRawFamilies(raw []rawFamilyReport, writer writerInventory, j
 			WriterSourceSeries: writerSeries,
 		})
 	}
-	return out
+	return excluded, renamed
 }
 
 func runtimeMetricInt(engine *chartengine.Engine, suffix string) (int, error) {

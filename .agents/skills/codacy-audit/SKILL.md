@@ -103,6 +103,9 @@ path. JSON must be the CLI's result array, where each item is exactly one suppor
 payload shape. SARIF must declare version 2.1.0 and contain a `runs` array. If that
 exact error recurs, verify the runner still mounts its configured Java temp
 directory at the same absolute path before changing analyzer policy.
+`JAVA_TOOL_OPTIONS` must retain literal quotes around that path because Java
+reparses the environment value; shell-quoting the Docker argument alone does not
+protect checkout paths containing spaces.
 
 For SARIF, a valid top-level envelope alone is not trustworthy. The wrapper pins
 the Docker runner to the current supported stable CLI, 7.10.1, by its immutable

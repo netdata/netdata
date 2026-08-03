@@ -1254,6 +1254,70 @@ relabeling:
 	if result.exitCode != 0 {
 		t.Fatalf("bounded source-evidenced metric-name rewrites remain valid\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
 	}
+	if len(result.report.PipelineExcluded) != 0 {
+		t.Fatalf("successfully renamed source families were reported as excluded: %#v", result.report.PipelineExcluded)
+	}
+	if got, want := result.report.Counts.PipelineRenamed, 2; got != want {
+		t.Fatalf("renamed source families=%d, want %d: %#v", got, want, result.report.PipelineRenamed)
+	}
+	for _, want := range []pipelineRenamedReport{
+		{
+			RawName:                   "app_worker_alpha_temperature",
+			FinalNames:                []string{"app_temperature"},
+			RawLogicalSeries:          1,
+			MaterializedLogicalSeries: 1,
+		},
+		{
+			RawName:                   "app_worker_beta_requests_total",
+			FinalNames:                []string{"app_requests_total"},
+			RawLogicalSeries:          1,
+			MaterializedLogicalSeries: 1,
+		},
+	} {
+		if !slices.ContainsFunc(result.report.PipelineRenamed, func(got pipelineRenamedReport) bool {
+			return got.RawName == want.RawName &&
+				slices.Equal(got.FinalNames, want.FinalNames) &&
+				got.RawLogicalSeries == want.RawLogicalSeries &&
+				got.MaterializedLogicalSeries == want.MaterializedLogicalSeries
+		}) {
+			t.Fatalf("missing rename lineage %#v: %#v", want, result.report.PipelineRenamed)
+		}
+	}
+}
+
+func TestValidateProfileReportsTypedFamilyRenameAsMaterialized(t *testing.T) {
+	profile := strings.ReplaceAll(validProfile, "app_latency_seconds", "app_normalized_latency_seconds")
+	job := `
+relabeling:
+  - match: app_latency_seconds_bucket app_latency_seconds_sum app_latency_seconds_count
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_latency_seconds(_bucket|_sum|_count)
+        target_label: __name__
+        replacement: app_normalized_latency_seconds${1}
+        action: replace
+`
+	result := runValidation(t, profile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("typed-family rename should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+	if len(result.report.PipelineExcluded) != 0 {
+		t.Fatalf("successfully renamed typed family was reported as excluded: %#v", result.report.PipelineExcluded)
+	}
+	want := pipelineRenamedReport{
+		RawName:                   "app_latency_seconds",
+		FinalNames:                []string{"app_normalized_latency_seconds"},
+		RawLogicalSeries:          1,
+		MaterializedLogicalSeries: 1,
+	}
+	if !slices.ContainsFunc(result.report.PipelineRenamed, func(got pipelineRenamedReport) bool {
+		return got.RawName == want.RawName &&
+			slices.Equal(got.FinalNames, want.FinalNames) &&
+			got.RawLogicalSeries == want.RawLogicalSeries &&
+			got.MaterializedLogicalSeries == want.MaterializedLogicalSeries
+	}) {
+		t.Fatalf("missing typed-family rename lineage %#v: %#v", want, result.report.PipelineRenamed)
+	}
 }
 
 func TestValidateProfileRejectsObservedFiniteWildcardRewriteIdentityCollapse(t *testing.T) {
@@ -3433,6 +3497,44 @@ func TestValidateProfileReportsPartialWriterMaterialization(t *testing.T) {
 	}
 }
 
+func TestValidateProfileReportsPartialRelabeledWriterMaterialization(t *testing.T) {
+	dump := "# TYPE app_raw_value gauge\napp_raw_value{instance=\"finite\"} 1\napp_raw_value{instance=\"nan\"} NaN\n"
+	job := `
+relabeling:
+  - match: app_raw_value
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_raw_value
+        target_label: __name__
+        replacement: app_value
+        action: replace
+`
+	result := runValidation(t, singleInstanceValueGaugeProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("one rejected renamed source series should remain transparent\nreport:\n%s", result.stdout)
+	}
+	if len(result.report.PipelineExcluded) != 1 {
+		t.Fatalf("missing partial renamed-family exclusion: %#v", result.report.PipelineExcluded)
+	}
+	excluded := result.report.PipelineExcluded[0]
+	if excluded.Name != "app_raw_value" ||
+		excluded.Category != "partially_not_materialized_after_job_policy_or_writer" ||
+		excluded.RawLogicalSeries != 2 ||
+		excluded.WriterSourceSeries != 1 {
+		t.Fatalf("unexpected partial renamed-family exclusion: %#v", excluded)
+	}
+	if len(result.report.PipelineRenamed) != 1 {
+		t.Fatalf("missing partial rename lineage: %#v", result.report.PipelineRenamed)
+	}
+	renamed := result.report.PipelineRenamed[0]
+	if renamed.RawName != "app_raw_value" ||
+		!slices.Equal(renamed.FinalNames, []string{"app_value"}) ||
+		renamed.RawLogicalSeries != 2 ||
+		renamed.MaterializedLogicalSeries != 1 {
+		t.Fatalf("unexpected partial rename lineage: %#v", renamed)
+	}
+}
+
 func TestRuntimeMetricIntRejectsMissingEvidence(t *testing.T) {
 	engine, err := chartengine.New(chartengine.WithRuntimeStore(nil))
 	if err != nil {
@@ -3475,6 +3577,40 @@ func TestWriteTextReportIncludesAuthoredMapping(t *testing.T) {
 		`selector="service_requests_total"`,
 		"algorithm=\"<inferred>\"",
 		"identity=[instance]",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("text report missing %q:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestWriteTextReportSeparatesPipelineLossFromRenames(t *testing.T) {
+	r := newReport()
+	r.Counts.PipelineExcluded = 1
+	r.Counts.PipelineRenamed = 1
+	r.PipelineExcluded = []pipelineExcludedReport{{
+		Name:               "app_dropped",
+		Type:               "gauge",
+		Category:           "not_materialized_after_job_policy_or_writer",
+		RawLogicalSeries:   1,
+		WriterSourceSeries: 0,
+	}}
+	r.PipelineRenamed = []pipelineRenamedReport{{
+		RawName:                   "app_worker_alpha_temperature",
+		FinalNames:                []string{"app_temperature"},
+		RawLogicalSeries:          1,
+		MaterializedLogicalSeries: 1,
+	}}
+
+	var out bytes.Buffer
+	if err := writeTextReport(&out, r); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Pipeline: excluded_families=1, renamed_families=1",
+		"app_dropped: not_materialized_after_job_policy_or_writer",
+		"app_worker_alpha_temperature -> app_temperature",
+		"normalized_and_materialized=1",
 	} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("text report missing %q:\n%s", want, out.String())

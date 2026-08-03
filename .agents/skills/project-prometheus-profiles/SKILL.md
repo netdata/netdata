@@ -751,7 +751,9 @@ A `PASS` proves, for that evidence:
 - unambiguously non-volume charts do not use filled presentation.
 
 The report lists raw families absent after selector/relabel/writer processing
-under `pipeline_excluded`; they are not misreported as chart coverage.
+under `pipeline_excluded`; they are not misreported as chart coverage. Successful
+metric-name normalization is reconciled by logical identity and reported under
+`pipeline_renamed`, never as source loss.
 The `authored_mapping` section lists the actual source-ordered
 selector-to-displayed-family mapping, including effective inherited instance
 identity, units, algorithm intent, naming mechanisms, and priority. It is the

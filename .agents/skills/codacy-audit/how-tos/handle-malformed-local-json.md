@@ -26,6 +26,16 @@ parse it.
    Java's temp directory to a host-backed directory mounted at the same absolute
    path in the CLI container.
 
+   The environment value must contain literal quotes around the temp path:
+
+   ```text
+   JAVA_TOOL_OPTIONS=-Djava.io.tmpdir="/host/path with spaces/.local/..."
+   ```
+
+   Docker argument quoting keeps the value together only until it enters the
+   container. Java parses `JAVA_TOOL_OPTIONS` again, so omitting the literal
+   quotes breaks checkouts whose absolute path contains spaces.
+
    Verify that contract before changing analyzer configuration:
 
    ```bash

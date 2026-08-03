@@ -231,11 +231,33 @@ type relabelInvalidNameDropAudit struct {
 	rawSeries         int
 }
 
+type writerSeriesKey struct {
+	family   string
+	identity string
+}
+
+type pipelineProvenance map[string]map[string]map[writerSeriesKey]struct{}
+
+func (p pipelineProvenance) sourceDestinations(family, identity string) map[writerSeriesKey]struct{} {
+	identities := p[family]
+	if identities == nil {
+		identities = make(map[string]map[writerSeriesKey]struct{})
+		p[family] = identities
+	}
+	destinations := identities[identity]
+	if destinations == nil {
+		destinations = make(map[writerSeriesKey]struct{})
+		identities[identity] = destinations
+	}
+	return destinations
+}
+
 type relabelPolicyAudits struct {
 	discards         map[relabelDiscardRuleKey]*relabelDiscardAudit
 	nameRewrites     map[relabelDiscardRuleKey]*relabelNameRewriteAudit
 	identityCollapse relabelIdentityCollapseAudit
 	invalidNameDrops relabelInvalidNameDropAudit
+	provenance       pipelineProvenance
 }
 
 // addRelabelPolicyReview replays the validated job rules over the captured
@@ -247,10 +269,6 @@ func addRelabelPolicyReview(
 	batch prompkg.SampleBatch,
 	r *report,
 ) relabelPolicyAudits {
-	if len(blocks) == 0 {
-		return relabelPolicyAudits{}
-	}
-
 	effectiveSelector, err := expr.Parse()
 	if err != nil {
 		return relabelPolicyAudits{} // Collector.Init reports the authoritative selector error.
@@ -266,6 +284,7 @@ func addRelabelPolicyReview(
 	audits := relabelPolicyAudits{
 		discards:     make(map[relabelDiscardRuleKey]*relabelDiscardAudit),
 		nameRewrites: make(map[relabelDiscardRuleKey]*relabelNameRewriteAudit),
+		provenance:   make(pipelineProvenance),
 		invalidNameDrops: relabelInvalidNameDropAudit{
 			blocks:            make(map[int]struct{}),
 			families:          make(map[string]struct{}),
@@ -329,6 +348,9 @@ func addRelabelPolicyReview(
 	fallbackCounter := fallbackTypeMatcher(fallback.Counter)
 
 	for _, raw := range batch.Samples {
+		rawFamily := sampleSourceFamilyName(raw)
+		rawIdentity := sampleWriterIdentityKey(raw)
+		destinations := audits.provenance.sourceDestinations(rawFamily, rawIdentity)
 		if effectiveSelector != nil && !effectiveSelector.Matches(sampleLabelsWithName(raw)) {
 			continue
 		}
@@ -386,6 +408,7 @@ func addRelabelPolicyReview(
 		if !sampleDropped && sampleCanReachWriter(sample, fallbackGauge, fallbackCounter) {
 			family := sampleSourceFamilyName(sample)
 			key := logicalSampleIdentityKey(family, sample)
+			destinations[writerSeriesKey{family: family, identity: sampleWriterIdentityKey(sample)}] = struct{}{}
 			identity := finalIdentities[key]
 			if identity == nil {
 				identity = &relabeledIdentity{
@@ -445,6 +468,30 @@ func addRelabelPolicyReview(
 		)
 	}
 	return audits
+}
+
+func sampleWriterIdentityKey(sample prompkg.Sample) string {
+	excluded := ""
+	switch sample.Kind {
+	case prompkg.SampleKindHistogramBucket:
+		excluded = "le"
+	case prompkg.SampleKindSummaryQuantile:
+		excluded = "quantile"
+	}
+
+	labels := make([]promlabels.Label, 0, len(sample.Labels))
+	for _, label := range sample.Labels {
+		if label.Name != excluded {
+			labels = append(labels, label)
+		}
+	}
+	slices.SortFunc(labels, func(a, b promlabels.Label) int { return strings.Compare(a.Name, b.Name) })
+
+	var b strings.Builder
+	for _, label := range labels {
+		fmt.Fprintf(&b, "%d:%s=%d:%s;", len(label.Name), label.Name, len(label.Value), label.Value)
+	}
+	return b.String()
 }
 
 func fallbackTypeMatcher(patterns []string) matcher.Matcher {

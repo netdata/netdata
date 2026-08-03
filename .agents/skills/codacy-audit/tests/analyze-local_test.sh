@@ -318,7 +318,17 @@ if [ "${#docker_args[@]}" -lt 6 ]; then
     printf >&2 '[FAIL] Docker runner emitted only %d arguments\n' "${#docker_args[@]}"
     exit 1
 fi
-runner_tmp="${docker_args[5]#JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=}"
+runner_tmp_option="${docker_args[5]#JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=}"
+case "$runner_tmp_option" in
+    \"*\")
+        runner_tmp="${runner_tmp_option#\"}"
+        runner_tmp="${runner_tmp%\"}"
+        ;;
+    *)
+        printf >&2 '[FAIL] Docker runner temp path is not quoted for Java: %q\n' "$runner_tmp_option"
+        exit 1
+        ;;
+esac
 case "$runner_tmp" in
     "$repo_root"/.local/audits/codacy/runner.*) ;;
     *)
@@ -333,7 +343,7 @@ printf '%s\n' \
     --env \
     "CODACY_CODE=$repo_root" \
     --env \
-    "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=$runner_tmp" \
+    "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=\"$runner_tmp\"" \
     --volume \
     /var/run/docker.sock:/var/run/docker.sock \
     --volume \

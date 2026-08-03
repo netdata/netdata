@@ -4,6 +4,6 @@ f0555b266e4142abdc7e857dbf5fc73c398633fecf78e22335dac2dbbe6ccd92	223877	src/go/p
 14390a34fdb9dd90acda024cf9af1eb42b37c4f8f3b516fc8d693f4050fdbad3	11778	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/OPERATOR-MODEL.md
 b9269da300af9167aff80f74ae766db4b1c8a6ddaeb5af2b569ceb7c3629bb80	452116	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/SOURCE-INVENTORY.tsv
 534bba3e2d68d4a646c86dc80046580cd30894bad8a9ef78fc20f413612bcbca	4140	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml
-963360ff83d322db4c5c5e884e4564c22a214cf24dbf37c9cd68f0c3ea6716bf	3873	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION.md
+72732c1f4b3cd477a694990c1673a85b505c55f07722cb4c47d8da35218a5f39	3911	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION.md
 3a4fda116991c78d46c9ef5b2daacd7d8adfc16ce7cf04d84bced9de010d3274	201177	src/go/plugin/go.d/collector/prometheus/testdata/litellm_all_metrics.prom
 779f0e5ad557efce527d72c3c0d85a7ae2d4f64bf87139881f595237336a1169	92502	src/go/plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml

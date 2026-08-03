@@ -4,6 +4,6 @@ f0555b266e4142abdc7e857dbf5fc73c398633fecf78e22335dac2dbbe6ccd92	223877	src/go/p
 db185ab065f5871bc199296a5178ff760ae47e8423c99e79cb3f1bab81e6a791	5734	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/OPERATOR-MODEL.md
 73e84e0627e3a550a800ae1c81b1613abf0add3008564a15034b4c8edc4795c2	224535	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/SOURCE-INVENTORY.tsv
 08a6ae722e14114339b6c44e077d1ec74301d9d520db3cf604e67c619ce8d6a4	1573	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml
-c3bb48e17dfcf6bf9cfd6ae8305a1cde3383e86aa563d458a2ab3b934ff0f53f	2915	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION.md
+601d53797a8dca575b02760f001132c303488650126ca6c81b8d5304c1b03e7f	2952	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION.md
 b99fd5261867725618f2e9f1eff3b47ca3a5d5a4528b57324f25390b016b7c7c	180349	src/go/plugin/go.d/collector/prometheus/testdata/vllm_ray_all_metrics.prom
 d6d1b53ed44ec48d81640c9d16f05b3afe40bbf69b56ddcf06008acd169db9ff	49109	src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml

@@ -15,7 +15,8 @@
 - Input: **183 raw families / 262 logical series**.
 - Writer/profile: **778 writer series**, **124 authored charts**, **142 runtime chart instances**, and
   **778 dimensions**.
-- Loss boundary: **90 pipeline-excluded logical identities**, all reconciled to binding job/writer dispositions.
+- Loss boundary: **90 pipeline-excluded raw families / 130 logical identities**, all reconciled to binding job/writer
+  dispositions.
 - Generic fallback, unmatched series, dead charts/dimensions, lifecycle loss, and ID/context/dimension collisions: **0**.
 - Exact semantic ledger: 253 rows; 163 chart routes, 85 job exclusions, and
   5 writer-ineligible routes; unresolved families/selectors **0**.
