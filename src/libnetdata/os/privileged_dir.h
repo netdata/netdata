@@ -44,12 +44,18 @@ bool os_dir_path_trim(const char *path, char *dst, size_t dst_size);
 // Classify the directory that contains path's final component. Intermediate
 // symlinks are resolved normally (/var/run -> /run); only the final component
 // is treated as untrusted.
+// Advisory only: the answer describes the parent as it was at this instant, and
+// a caller that then acts on a path re-resolves it. Use os_open_dir_privileged()
+// when the verdict has to hold for the access it authorizes.
 OS_DIR_PARENT_TRUST os_dir_parent_trust(const char *path);
 
 // Open path as a directory descriptor, for a process that is about to act on it
 // with root privileges. A symlink at the final component is followed only when
 // the directory containing it is exclusively ours; everywhere else O_NOFOLLOW
-// refuses it. Returns the descriptor (the caller closes it) or -1.
+// refuses it. The parent is opened once and both judged and used through that
+// descriptor, so the directory the decision was made about is the directory the
+// final component is looked up in. Returns the descriptor (the caller closes it)
+// or -1.
 int os_open_dir_privileged(const char *path);
 
 #endif //NETDATA_PRIVILEGED_DIR_H

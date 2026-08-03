@@ -1322,12 +1322,116 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     freez(server);
 }
 
-static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
-    if(spawn_server_is_running(server->path)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Server is already listening on path '%s'", server->path);
+// Grant the socket its final mode without ever letting the operation land on
+// anything but the socket we just bound. This runs as root for the temporary
+// spawn server, long before become_user(), inside a directory the netdata
+// account can write into: /run/netdata is 0775 netdata:netdata on a stock
+// systemd install and carries no sticky bit, so any entry in it - including a
+// root-owned socket - can be unlinked and replaced by that account.
+// AT_SYMLINK_NOFOLLOW is what refuses a replacement: it fails rather than
+// following a link, both where the kernel implements it (macOS, FreeBSD) and
+// through the /proc-based emulation in glibc and musl. Measured on both: it
+// succeeds on the socket we bound, and returns EOPNOTSUPP once the name has
+// become a symlink.
+// There is deliberately no fallback for a failure. The only alternatives are to
+// chmod whatever the name now refers to, or to stat it and then chmod it - which
+// is the same race again, with more code to hide it in. A failure here means the
+// entry is not the socket we created, so the server would be listening on a name
+// no client can reach: refuse instead.
+static bool spawn_server_chmod_socket(SPAWN_SERVER *server, int dir_fd, const char *sock_filename) {
+    if(fchmodat(dir_fd, sock_filename, 0770, AT_SYMLINK_NOFOLLOW) == 0)
+        return true;
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN SERVER: refusing to set the mode of '%s' (%s) - it is no longer the socket we bound",
+           server->path, strerror(errno));
+    return false;
+}
+
+#if defined(OS_LINUX)
+// Whether bind() can be made to resolve through a descriptor at all: the
+// directory reached via /proc/self/fd/<fd> must be the very inode the descriptor
+// refers to. What this decides is not the bind, but what a *failed* bind means -
+// with the route available, a failure is a real failure and must never be retried
+// on the pathname, because a swapped run directory is one of the things that can
+// produce it. Only an unavailable route (no procfs, a chroot, a hardened sandbox)
+// may send us to the pathname. Measured: this still matches while the directory is
+// renamed away, so an attack cannot make the route look unavailable.
+static bool spawn_server_dir_fd_route_usable(int dir_fd, char *dst, size_t dst_size) {
+    int len = snprintf(dst, dst_size, "/proc/self/fd/%d", dir_fd);
+    if(len <= 0 || (size_t)len >= dst_size)
+        return false;
+
+    struct stat via_proc, via_fd;
+    if(stat(dst, &via_proc) == -1 || fstat(dir_fd, &via_fd) == -1)
+        return false;
+
+    return via_proc.st_dev == via_fd.st_dev && via_proc.st_ino == via_fd.st_ino;
+}
+#endif
+
+// There is no bindat(), so bind() resolves the run directory a second time and
+// could land in a replacement. But the run directory can only be replaced under us
+// when the directory holding it is writable by somebody else - the sticky /tmp
+// fallback, whose leaf we deliberately accept when it belongs to the uid we drop
+// to. With an exclusive parent, which is every packaged install (/run/netdata,
+// parent /run is root-only), nobody but root can rename it and binding the
+// pathname is already safe.
+// So the descriptor route below is used where it is needed and skipped where it
+// buys nothing. That matters for more than tidiness: when it *is* needed and
+// unavailable there is no safe pathname to retry on, and refusing is the only
+// honest answer - keeping that refusal confined to the sticky-parent case is what
+// stops an environment without a usable /proc from taking netdata down.
+static bool spawn_server_bind_socket(SPAWN_SERVER *server, int dir_fd, const char *sock_filename, bool parent_is_exclusive) {
+    if(!parent_is_exclusive) {
+        // Somebody other than root can rename this run directory, so its pathname
+        // is not a safe thing to hand to bind(): it may resolve into a replacement
+        // by the time the kernel walks it.
+#if defined(OS_LINUX)
+        char dir_fd_path[FILENAME_MAX + 1];
+        if(spawn_server_dir_fd_route_usable(dir_fd, dir_fd_path, sizeof(dir_fd_path))) {
+            char bind_path[FILENAME_MAX + 1];
+            int len = snprintf(bind_path, sizeof(bind_path), "%s/%s", dir_fd_path, sock_filename);
+
+            struct sockaddr_un dir_fd_addr = {
+                .sun_family = AF_UNIX,
+            };
+
+            if(len > 0 && (size_t)len < sizeof(bind_path) &&
+               spawn_server_set_unix_socket_path(&dir_fd_addr, bind_path, false, NULL)) {
+
+                if(bind(server->sock, (struct sockaddr *)&dir_fd_addr, sizeof(dir_fd_addr)) == 0)
+                    return true;
+
+                // No retry on the pathname: the route was available, so this is a
+                // real failure - and a swapped run directory is one of the things
+                // that can produce it, which the pathname would resolve straight
+                // into.
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "SPAWN SERVER: Failed to bind() '%s' through the run directory descriptor (%s)",
+                       server->path, strerror(errno));
+                return false;
+            }
+        }
+#else
+        (void)dir_fd;
+        (void)sock_filename;
+#endif
+
+        // Nothing here can be made safe: there is no descriptor route on this
+        // platform (or none usable), and the pathname is exactly what an attacker
+        // controls. Say so plainly and point at the fix, rather than binding it
+        // anyway with a warning nobody reads.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: refusing to create '%s': its run directory is inside a directory "
+               "others can write to, and this system cannot bind through a directory descriptor. "
+               "Set NETDATA_RUN_DIR to a directory whose parent only root can write to.",
+               server->path);
         return false;
     }
 
+    // The parent is exclusively ours, so nobody but root can rename or replace the
+    // run directory and the pathname still names the directory we validated.
     struct sockaddr_un server_addr = {
         .sun_family = AF_UNIX,
     };
@@ -1336,31 +1440,65 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
                                           "SPAWN SERVER: Cannot listen on path"))
         return false;
 
-    if ((server->sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    // bind() cannot be redirected onto an existing name: any entry already there,
+    // a planted symlink included, makes it fail rather than write through it.
+    if(bind(server->sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         int error = errno;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to create socket(): %s (%d)", strerror(error), error);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind() '%s': %s (%d)",
+               server->path, strerror(error), error);
         return false;
     }
 
-    unlink(server->path);
+    return true;
+}
+
+static bool spawn_server_create_listening_socket(SPAWN_SERVER *server, const char *runtime_directory, const char *sock_filename) {
+    if(spawn_server_is_running(server->path)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Server is already listening on path '%s'", server->path);
+        return false;
+    }
+
+    // Every name operation below goes through this descriptor, so they all act on
+    // the directory os_run_dir() validated instead of on a path re-resolved from
+    // / each time - under the /tmp fallback the run directory is owned by the uid
+    // we drop to, which can rename it away while we are still root.
+    int dir_fd = os_open_dir_privileged(runtime_directory);
+    if(dir_fd == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot open run directory '%s' to create the '%s' socket",
+               runtime_directory, server->name);
+        return false;
+    }
+
+    if ((server->sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        int error = errno;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to create socket(): %s (%d)", strerror(error), error);
+        close(dir_fd);
+        return false;
+    }
+
+    unlinkat(dir_fd, sock_filename, 0);
     errno = 0;
 
-    if (bind(server->sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        int error = errno;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind(): %s (%d)", strerror(error), error);
+    // Decides whether bind() may use the pathname: with an exclusive parent only
+    // root can replace the run directory, so it cannot change meaning under us.
+    bool parent_is_exclusive = (os_dir_parent_trust(runtime_directory) == OS_DIR_PARENT_EXCLUSIVE);
+
+    if (!spawn_server_bind_socket(server, dir_fd, sock_filename, parent_is_exclusive)) {
+        close(dir_fd);
         return false;
     }
 
     if (listen(server->sock, SOMAXCONN) == -1) {
         int error = errno;
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to listen(): %s (%d)", strerror(error), error);
+        close(dir_fd);
         return false;
     }
 
-    if(chmod(server->path, 0770) != 0)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to chmod '%s' to 0770", server->path);
-
-    return true;
+    bool ok = spawn_server_chmod_socket(server, dir_fd, sock_filename);
+    close(dir_fd);
+    return ok;
 }
 
 static void replace_stdio_with_dev_null() {
@@ -1414,17 +1552,32 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         goto cleanup;
     }
 
-    char path[1024];
-    int path_length;
-    const size_t max_path_length = spawn_server_max_unix_socket_path_length();
+    // Built separately from the full path: the socket is created, unlinked and
+    // chmod()ed relative to a descriptor for the run directory, which needs the
+    // file name on its own.
+    char sock_filename[256];
+    int name_length;
     if(name && *name) {
         server->name = strdupz(name);
-        path_length = snprintf(path, sizeof(path), "%s/netdata-spawn-%s.sock", runtime_directory, name);
+        name_length = snprintf(sock_filename, sizeof(sock_filename), "netdata-spawn-%s.sock", name);
     }
     else {
         server->name = strdupz("unnamed");
-        path_length = snprintf(path, sizeof(path), "%s/netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
+        name_length = snprintf(sock_filename, sizeof(sock_filename), "netdata-spawn-%d-%zu.sock", getpid(), server->id);
     }
+
+    if(name_length < 0 || (size_t)name_length >= sizeof(sock_filename)) {
+        errno = ENAMETOOLONG;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: socket file name for '%s' does not fit in %zu bytes",
+               server->name, sizeof(sock_filename));
+        goto cleanup;
+    }
+
+    char path[1024];
+    int path_length;
+    const size_t max_path_length = spawn_server_max_unix_socket_path_length();
+    path_length = snprintf(path, sizeof(path), "%s/%s", runtime_directory, sock_filename);
 
     if(path_length < 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -1451,7 +1604,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
 
     server->path = strdupz(path);
 
-    if (!spawn_server_create_listening_socket(server))
+    if (!spawn_server_create_listening_socket(server, runtime_directory, sock_filename))
         goto cleanup;
 
     if (pipe(server->pipe) == -1) {
