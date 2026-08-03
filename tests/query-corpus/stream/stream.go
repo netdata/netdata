@@ -376,6 +376,9 @@ func (c *Conn) ServeReplication(charts map[string]struct{ FirstT, LastT int64 },
 			return served, fmt.Errorf("stream: parent requested replication of unknown chart %q", chart)
 		}
 
+		// Scope the response even when this replication window has no rows.
+		c.Linef("RBEGIN %s", qw(chart))
+
 		if after != 0 && before != 0 {
 			for _, row := range handler(chart, after, before) {
 				c.Linef("RBEGIN %s %d %d %d", qw(chart), row.T-1, row.T, childNow)
