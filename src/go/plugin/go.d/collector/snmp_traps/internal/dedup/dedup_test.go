@@ -3,6 +3,8 @@
 package dedup
 
 import (
+	"math"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -48,6 +50,27 @@ func TestNormalizeClonesJobKeyVarbinds(t *testing.T) {
 	returned := policy.KeyVarbinds()
 	returned[0] = "also-mutated"
 	assert.Equal(t, []string{"ifIndex"}, policy.KeyVarbinds())
+}
+
+func TestNormalizeRejectsUnrepresentableWindow(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("int cannot represent a time.Duration-overflowing whole-second window")
+	}
+	seconds := int64(math.MaxInt64)/int64(time.Second) + 1
+	_, err := Normalize(Config{Enabled: true, WindowSec: int(seconds)})
+	require.ErrorContains(t, err, "window_sec")
+}
+
+func TestNormalizeTrimsJobKeyVarbinds(t *testing.T) {
+	policy, err := Normalize(Config{Enabled: true, KeyVarbinds: []string{" ifIndex "}})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"ifIndex"}, policy.KeyVarbinds())
+
+	d := New(policy, Options{})
+	_, decision := d.Admit(testEntry("198.51.100.10", "1"), policy.KeyVarbinds())
+	assert.Equal(t, DecisionAdmit, decision)
+	_, decision = d.Admit(testEntry("198.51.100.10", "2"), policy.KeyVarbinds())
+	assert.Equal(t, DecisionAdmit, decision)
 }
 
 func TestDefaultFingerprintUsesSourceAndTrap(t *testing.T) {
@@ -266,6 +289,76 @@ func TestCloseWaitsForFinalSummaryCallback(t *testing.T) {
 	case <-d.doneCh:
 	default:
 		t.Fatal("Close returned before the timer goroutine stopped")
+	}
+}
+
+func TestConcurrentCloseBeforeStartWaitsForFinalSummaryCallback(t *testing.T) {
+	callbackStarted := make(chan struct{})
+	releaseCallback := make(chan struct{})
+	d := newTestDeduper(t, Config{Enabled: true}, Options{OnSummary: func(Summary) {
+		close(callbackStarted)
+		<-releaseCallback
+	}})
+	entry := &model.TrapEntry{SourceIP: "198.51.100.10", TrapOID: testTrapOID}
+	d.Admit(entry, nil)
+	d.Admit(entry, nil)
+
+	firstClosed := make(chan struct{})
+	go func() {
+		d.Close()
+		close(firstClosed)
+	}()
+	<-callbackStarted
+
+	secondClosed := make(chan struct{})
+	go func() {
+		d.Close()
+		close(secondClosed)
+	}()
+	secondReturnedEarly := false
+	select {
+	case <-secondClosed:
+		secondReturnedEarly = true
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(releaseCallback)
+	select {
+	case <-firstClosed:
+	case <-time.After(time.Second):
+		t.Fatal("first Close did not return after final callback completed")
+	}
+	select {
+	case <-secondClosed:
+	case <-time.After(time.Second):
+		t.Fatal("second Close did not return after final callback completed")
+	}
+	if secondReturnedEarly {
+		t.Fatal("concurrent Close returned before the final callback completed")
+	}
+	select {
+	case <-d.doneCh:
+	default:
+		t.Fatal("Close returned before finalization was signaled complete")
+	}
+}
+
+func TestCloseBeforeStartSignalsCompletionWhenFinalCallbackPanics(t *testing.T) {
+	d := newTestDeduper(t, Config{Enabled: true}, Options{OnSummary: func(Summary) {
+		panic("summary callback panic")
+	}})
+	entry := &model.TrapEntry{SourceIP: "198.51.100.10", TrapOID: testTrapOID}
+	d.Admit(entry, nil)
+	d.Admit(entry, nil)
+
+	func() {
+		defer func() { assert.Equal(t, "summary callback panic", recover()) }()
+		d.Close()
+	}()
+	select {
+	case <-d.doneCh:
+	default:
+		t.Fatal("panicking final callback did not signal finalization complete")
 	}
 }
 

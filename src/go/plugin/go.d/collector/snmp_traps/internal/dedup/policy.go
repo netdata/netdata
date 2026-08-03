@@ -4,6 +4,7 @@ package dedup
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 const (
 	defaultWindow     = 5 * time.Second
 	defaultMaxEntries = 100000
+	maxWindowSec      = int64(math.MaxInt64) / int64(time.Second)
 )
 
 type Config struct {
@@ -36,13 +38,19 @@ func Normalize(cfg Config) (Policy, error) {
 	if cfg.WindowSec < 0 {
 		return Policy{}, fmt.Errorf("dedup.window_sec must be non-negative, got %d", cfg.WindowSec)
 	}
+	if int64(cfg.WindowSec) > maxWindowSec {
+		return Policy{}, fmt.Errorf("dedup.window_sec must not exceed %d, got %d", maxWindowSec, cfg.WindowSec)
+	}
 	if cfg.CacheMaxEntries < 0 {
 		return Policy{}, fmt.Errorf("dedup.cache_max_entries must be non-negative, got %d", cfg.CacheMaxEntries)
 	}
+	keyVarbinds := make([]string, len(cfg.KeyVarbinds))
 	for i, key := range cfg.KeyVarbinds {
-		if strings.TrimSpace(key) == "" {
+		key = strings.TrimSpace(key)
+		if key == "" {
 			return Policy{}, fmt.Errorf("dedup.key_varbinds[%d] must not be empty", i)
 		}
+		keyVarbinds[i] = key
 	}
 
 	policy.window = time.Duration(cfg.WindowSec) * time.Second
@@ -53,7 +61,7 @@ func Normalize(cfg Config) (Policy, error) {
 	if policy.maxEntries <= 0 {
 		policy.maxEntries = defaultMaxEntries
 	}
-	policy.keyVarbinds = slices.Clone(cfg.KeyVarbinds)
+	policy.keyVarbinds = keyVarbinds
 	return policy, nil
 }
 

@@ -5,6 +5,7 @@ package dedup
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
@@ -22,12 +23,16 @@ func BenchmarkFingerprint(b *testing.B) {
 func BenchmarkAdmitDuplicate(b *testing.B) {
 	entry := benchmarkEntry()
 	keys := []string{"ifIndex", "ifDescr"}
-	d := newTestDeduper(b, Config{Enabled: true}, Options{})
+	d := newTestDeduper(b, Config{Enabled: true}, frozenClockOptions())
 	d.Admit(entry, keys)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
 		d.Admit(entry, keys)
+	}
+	b.StopTimer()
+	if got := d.period.total; got != int64(b.N) {
+		b.Fatalf("suppressed %d entries, want %d", got, b.N)
 	}
 }
 
@@ -40,18 +45,22 @@ func BenchmarkAdmitUniqueAtCapacity(b *testing.B) {
 			TrapOID:       testTrapOID,
 		}
 	}
-	d := newTestDeduper(b, Config{Enabled: true, CacheMaxEntries: capacity}, Options{})
+	d := newTestDeduper(b, Config{Enabled: true, CacheMaxEntries: capacity}, frozenClockOptions())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := range b.N {
 		d.Admit(&entries[i%len(entries)], nil)
+	}
+	b.StopTimer()
+	if got := d.period.total; got != 0 {
+		b.Fatalf("suppressed %d entries in unique-admission workload", got)
 	}
 }
 
 func BenchmarkAdmitDuplicateParallel(b *testing.B) {
 	entry := benchmarkEntry()
 	keys := []string{"ifIndex", "ifDescr"}
-	d := newTestDeduper(b, Config{Enabled: true}, Options{})
+	d := newTestDeduper(b, Config{Enabled: true}, frozenClockOptions())
 	d.Admit(entry, keys)
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -60,6 +69,10 @@ func BenchmarkAdmitDuplicateParallel(b *testing.B) {
 			d.Admit(entry, keys)
 		}
 	})
+	b.StopTimer()
+	if got := d.period.total; got != int64(b.N) {
+		b.Fatalf("suppressed %d entries, want %d", got, b.N)
+	}
 }
 
 func BenchmarkRenderSummary(b *testing.B) {
@@ -91,4 +104,9 @@ func benchmarkEntry() *model.TrapEntry {
 			{Name: "ifOperStatus", OID: "1.3.6.1.2.1.2.2.1.8.7", Type: "INTEGER", Value: int64(2)},
 		},
 	}
+}
+
+func frozenClockOptions() Options {
+	now := time.Unix(1, 0)
+	return Options{Now: func() time.Time { return now }}
 }

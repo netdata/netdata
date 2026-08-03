@@ -155,16 +155,14 @@ func (d *Deduper) Close() {
 	}
 	d.lifecycleMu.Lock()
 	if d.closed {
-		started := d.started
 		d.lifecycleMu.Unlock()
-		if started {
-			<-d.doneCh
-		}
+		<-d.doneCh
 		return
 	}
 	d.closed = true
 	if !d.started {
 		d.lifecycleMu.Unlock()
+		defer close(d.doneCh)
 		d.emitSummary(d.now())
 		return
 	}

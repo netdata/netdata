@@ -472,9 +472,9 @@ func validateTrapDef(td *TrapDef, fileVarbinds map[string]VarbindDef) error {
 		return fmt.Errorf("%s: trap entry %s: invalid status %q (must be current, deprecated, mandatory, obsolete, or optional)", src, td.OID, td.Status)
 	}
 
-	for _, name := range td.DedupKeyVarbinds {
-		if name == "" {
-			continue
+	for i, name := range td.DedupKeyVarbinds {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("%s: trap entry %s: dedup_key_varbinds[%d] must not be empty", src, td.OID, i)
 		}
 		if _, ok := fileVarbinds[name]; !ok {
 			return fmt.Errorf("%s: trap entry %s: dedup_key_varbind %q not found in file-scoped varbinds table", src, td.OID, name)
