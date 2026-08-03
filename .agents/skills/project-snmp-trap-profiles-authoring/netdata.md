@@ -575,6 +575,21 @@ rules are:
   extraction failures and cardinality overflow increment diagnostics instead
   of dropping the trap.
 
+Implementation ownership:
+
+- `internal/catalog` owns YAML decoding, static rule/chart validation, immutable
+  catalog epochs, lazy stock hydration, and selected-definition lookup.
+- `internal/attribution` owns vnode/fallback/listener source resolution,
+  privacy-preserving source hashes, ambiguity handling, and bounded route
+  transition tracking.
+- `internal/profilemetrics` owns per-job selection/compilation, generated chart
+  templates, predicates and value extraction, mutable series/cardinality state,
+  diagnostics, and `metrix` collection.
+- The root collector owns the public config DTO and orchestration only: it
+  constructs the runtime during `Init()`, updates it after a successful
+  authoritative write, collects it during `Collect()`, and releases it during
+  cleanup.
+
 ### Per-OID overrides and labels
 
 Operators can apply per-OID overrides on top of profile baseline. The `overrides:` block in the job config (see example above) supports per-OID category/severity changes and per-OID label additions; `oid_prefix:` matches a whole subtree.

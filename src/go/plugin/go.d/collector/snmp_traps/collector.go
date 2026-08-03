@@ -24,6 +24,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profilemetrics"
 )
 
 //go:embed "config_schema.json"
@@ -155,8 +156,7 @@ type Collector struct {
 	reverseDNSEnabled  bool
 	deduper            *trapDeduper
 	packetSequence     atomic.Uint64
-	profileMetrics     *profileMetricRuntime
-	dynamicChartYAML   string
+	profileMetrics     *profilemetrics.Runtime
 	writeFailureDim    string
 }
 
@@ -175,7 +175,6 @@ func (c *Collector) Init(ctx context.Context) error {
 		return nil
 	}
 	c.profileMetrics = nil
-	c.dynamicChartYAML = ""
 
 	profileCatalog := c.profileCatalog
 	if profileCatalog == nil {
@@ -198,14 +197,16 @@ func (c *Collector) Init(ctx context.Context) error {
 		releaseProfiles()
 		return dyncfgConfigError(errors.New("profile index not available"))
 	}
-	if validated.profileMetrics.enabled {
-		rt, tmpl, err := newProfileMetricRuntime(validated.profileMetrics, idx, c.sourceHashSalt())
+	if validated.profileMetrics.Enabled() {
+		rt, err := profilemetrics.New(validated.profileMetrics, idx, profilemetrics.Options{
+			BaseChartTemplateYAML: chartTemplateYAML,
+			SourceHashSalt:        c.sourceHashSalt(),
+		})
 		if err != nil {
 			releaseProfiles()
 			return dyncfgConfigError(err)
 		}
 		c.profileMetrics = rt
-		c.dynamicChartYAML = tmpl
 	}
 
 	var metrics *perJobMetrics
@@ -466,7 +467,6 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	removeJobMetrics(c.Name)
 	c.metrics = nil
 	c.profileMetrics = nil
-	c.dynamicChartYAML = ""
 	c.journalDir = ""
 	c.writeFailureDim = ""
 }
@@ -474,8 +474,8 @@ func (c *Collector) Cleanup(ctx context.Context) {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string {
-	if c.dynamicChartYAML != "" {
-		return c.dynamicChartYAML
+	if c.profileMetrics != nil {
+		return c.profileMetrics.ChartTemplateYAML()
 	}
 	return chartTemplateYAML
 }
@@ -505,7 +505,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	}
 	collectMetrics(c.store, c.Name)
 	if c.profileMetrics != nil {
-		c.profileMetrics.collect(c.store, c.Name)
+		c.profileMetrics.Collect(c.store, c.Name)
 	}
 	return nil
 }
@@ -697,7 +697,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	packetFinished = true
 
 	if c.profileMetrics != nil {
-		c.profileMetrics.update(entry)
+		c.profileMetrics.Update(entry)
 	}
 
 	cat := Category("unknown")

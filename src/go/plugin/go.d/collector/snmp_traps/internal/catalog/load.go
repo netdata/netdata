@@ -413,24 +413,6 @@ type profileLoadBundle struct {
 	charts  []profileMetricChart
 }
 
-// Bundle is one fully resolved and statically validated profile file. It is a
-// temporary bridge for the root metric runtime until that runtime moves into
-// this package.
-type Bundle struct {
-	Traps   []*TrapDef
-	Metrics []MetricRule
-	Charts  []MetricChart
-}
-
-// LoadProfileFile loads and validates one profile file.
-func LoadProfileFile(filename string) (Bundle, error) {
-	bundle, err := loadProfileBundle(filename)
-	if err != nil {
-		return Bundle{}, err
-	}
-	return Bundle{Traps: bundle.traps, Metrics: bundle.metrics, Charts: bundle.charts}, nil
-}
-
 func loadProfileBundle(filename string) (profileLoadBundle, error) {
 	content, err := readProfileFile(filename)
 	if err != nil {

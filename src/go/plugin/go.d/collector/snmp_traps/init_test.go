@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -91,21 +92,9 @@ func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
 }
 
 func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
-		Enabled: true,
-		Include: []string{"cisco.config.changed"},
-	})
-	require.NoError(t, err)
-
-	rt, tmpl, err := newProfileMetricRuntime(cfg, idx, "test")
-	require.NoError(t, err)
-	require.NotNil(t, rt)
-	require.NotEmpty(t, tmpl)
-
+	rt := newRootTestProfileMetricRuntime(t)
 	c := newTestSNMPTrapsCollector()
 	c.profileMetrics = rt
-	c.dynamicChartYAML = tmpl
 
 	collecttest.AssertChartTemplateSchema(t, c.ChartTemplateYAML())
 	charts := chartTemplatesByIDFromYAML(t, c.ChartTemplateYAML())
@@ -123,6 +112,31 @@ func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
 	}
 	assert.Contains(t, contexts, "snmp.trap.profile_metric_diagnostics")
 	assert.Contains(t, contexts, "snmp.trap.cisco.config.changes")
+}
+
+func TestCollectorInitBuildsEnabledProfileMetricRuntime(t *testing.T) {
+	withTestCacheDir(t)
+	paths := rootTestProfileCatalogPaths(t)
+	writeRootTestProfileMetricProfile(t, paths.UserDirs[0])
+
+	c := newTestSNMPTrapsCollector()
+	c.profileCatalog = catalog.NewManager(paths)
+	c.Name = "profile-metrics-init"
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.ProfileMetrics = ProfileMetricsConfig{
+		Enabled: true,
+		Include: []string{"cisco.config.changed"},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	t.Cleanup(func() { c.Cleanup(context.Background()) })
+	require.NotNil(t, c.profileMetrics)
+
+	template := c.ChartTemplateYAML()
+	collecttest.AssertChartTemplateSchema(t, template)
+	charts := chartTemplatesByIDFromYAML(t, template)
+	assert.Contains(t, charts, "profile_metric_diagnostics")
+	assert.Contains(t, charts, "cisco_config_changes")
 }
 
 func TestCollectorCreatorDefaults(t *testing.T) {

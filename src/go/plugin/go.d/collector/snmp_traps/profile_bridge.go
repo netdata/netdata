@@ -21,10 +21,9 @@ func truncateUTF8(s string, maxBytes int) string { return catalog.TruncateUTF8(s
 func resolve2TierVarbind(oid string, raw VarbindValue, td *TrapDef) VarbindValue {
 	return catalog.ResolveVarbind(oid, raw, td)
 }
-func resolveEnum(vb *VarbindDef, value any) string { return catalog.ResolveEnum(vb, value) }
 
-// Temporary root-package bridges retained until profile runtime ownership moves
-// into internal/catalog in the next refactor stage.
+// Root packet rendering and dedup retain these catalog bridges until their
+// approved PR9/PR10 ownership moves.
 func newProfileIndex() *ProfileIndex { return catalog.NewEpoch() }
 func prepareTrapDefinition(td *TrapDef) error {
 	return catalog.PrepareTrap(td)

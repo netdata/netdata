@@ -67,6 +67,11 @@ type ReverseDNSConfig struct {
 	Enabled bool `yaml:"enabled" json:"enabled"`
 }
 
+type ProfileMetricsConfig struct {
+	Enabled bool     `yaml:"enabled,omitempty" json:"enabled"`
+	Include []string `yaml:"include,omitempty" json:"include"`
+}
+
 type Config struct {
 	Name               string               `yaml:"name,omitempty" json:"name"`
 	Vnode              string               `yaml:"vnode,omitempty" json:"vnode"`
