@@ -60,7 +60,19 @@ typedef struct storage_point {
     (netdata_double_is_zero((x).min) && netdata_double_is_zero((x).max) && \
      netdata_double_is_zero((x).sum) && (x).anomaly_count == 0))
 
-#define storage_point_merge_to(dst, src) do {           \
+#define storage_point_merge_values(dst, src) do {       \
+        if((src).min < (dst).min)                       \
+            (dst).min = (src).min;                      \
+        if((src).max > (dst).max)                       \
+            (dst).max = (src).max;                      \
+} while(0)
+
+#define storage_point_add_values(dst, src) do {         \
+        (dst).min += (src).min;                         \
+        (dst).max += (src).max;                         \
+} while(0)
+
+#define storage_point_accumulate_to(dst, src, values) do { \
         if(storage_point_is_unset(dst))                 \
             (dst) = (src);                              \
                                                         \
@@ -74,10 +86,7 @@ typedef struct storage_point {
                                                         \
             if(storage_point_has_value(src)) {          \
                 if(storage_point_has_value(dst)) {      \
-                    if((src).min < (dst).min)           \
-                        (dst).min = (src).min;          \
-                    if((src).max > (dst).max)           \
-                        (dst).max = (src).max;          \
+                    values(dst, src);                   \
                     (dst).sum += (src).sum;             \
                     (dst).count += (src).count;         \
                     (dst).anomaly_count +=              \
@@ -98,41 +107,11 @@ typedef struct storage_point {
         }                                               \
 } while(0)
 
-#define storage_point_add_to(dst, src) do {             \
-        if(storage_point_is_unset(dst))                 \
-            (dst) = (src);                              \
-                                                        \
-        else if(!storage_point_is_unset(src)) {         \
-                                                        \
-            if((src).start_time_s < (dst).start_time_s) \
-                (dst).start_time_s = (src).start_time_s;\
-                                                        \
-            if((src).end_time_s > (dst).end_time_s)     \
-                (dst).end_time_s = (src).end_time_s;    \
-                                                        \
-            if(storage_point_has_value(src)) {          \
-                if(storage_point_has_value(dst)) {      \
-                    (dst).min += (src).min;             \
-                    (dst).max += (src).max;             \
-                    (dst).sum += (src).sum;             \
-                    (dst).count += (src).count;         \
-                    (dst).anomaly_count +=              \
-                        (src).anomaly_count;             \
-                }                                       \
-                else {                                  \
-                    (dst).min = (src).min;              \
-                    (dst).max = (src).max;              \
-                    (dst).sum = (src).sum;              \
-                    (dst).count = (src).count;          \
-                    (dst).anomaly_count =               \
-                        (src).anomaly_count;             \
-                }                                       \
-                (dst).flags |=                          \
-                    (src).flags & SN_FLAG_RESET;         \
-            }                                           \
-            (dst).gap_count += (src).gap_count;         \
-        }                                               \
-} while(0)
+#define storage_point_merge_to(dst, src) \
+    storage_point_accumulate_to(dst, src, storage_point_merge_values)
+
+#define storage_point_add_to(dst, src) \
+    storage_point_accumulate_to(dst, src, storage_point_add_values)
 
 #define storage_point_make_positive(sp) do {            \
         if(storage_point_has_value(sp)) {               \
