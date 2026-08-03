@@ -280,6 +280,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     db_points_read_since_plan_switch = 1;
                 }
 
+                NETDATA_DOUBLE prepared_sum = sp.sum;
+
                 // ONE POINT READ-AHEAD
                 if(unlikely(query_plan_should_switch_plan(ops, sp.end_time_s) &&
                     query_planer_next_plan(ops, now_end_time, new_point.sp.end_time_s))) {
@@ -309,6 +311,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         // the point from the previous plan is useless
                         sp = sp2;
                         sp_tier = sp2_tier;
+                        prepared_sum = sp2.sum;
                     }
                     else {
                         // let the query run from the previous plan
@@ -321,7 +324,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                             time_t duration = sp.end_time_s - sp.start_time_s;
                             time_t retained = sp2.start_time_s - sp.start_time_s;
                             if(!qm->values_stored_as_rates && duration > 0)
-                                sp.sum *= (NETDATA_DOUBLE)retained / (NETDATA_DOUBLE)duration;
+                                prepared_sum *= (NETDATA_DOUBLE)retained / (NETDATA_DOUBLE)duration;
                             sp.end_time_s = sp2.start_time_s;
                         }
                     }
@@ -357,7 +360,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                                 break;
 
                             case TIER_QUERY_FETCH_SUM:
-                                new_point.value = sp.sum;
+                                new_point.value = prepared_sum;
                                 if(unlikely(sp.start_time_s < now_start_time && sp.end_time_s < now_end_time))
                                     new_point.value = query_point_total_projection(
                                         &new_point, now_start_time, now_end_time);
@@ -367,7 +370,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                                 time_t duration = sp.end_time_s - sp.start_time_s;
                                 uint64_t slots = storage_point_slots(sp);
                                 new_point.value = likely(duration > 0 && slots) ?
-                                    sp.sum * (NETDATA_DOUBLE)duration / (NETDATA_DOUBLE)slots : sp.sum;
+                                    prepared_sum * (NETDATA_DOUBLE)duration / (NETDATA_DOUBLE)slots : prepared_sum;
                                 if(unlikely(sp.start_time_s < now_start_time && sp.end_time_s < now_end_time))
                                     new_point.value = query_point_total_projection(
                                         &new_point, now_start_time, now_end_time);
