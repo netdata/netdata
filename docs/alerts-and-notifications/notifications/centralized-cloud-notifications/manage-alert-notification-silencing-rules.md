@@ -200,7 +200,7 @@ Silencing only suppresses notifications. The alert still evaluates and remains v
 2. Set name: "Weekly MySQL Long-Running Query - Friday Night"
 3. **Node Criteria**:
     - Rooms: All Rooms (or the specific room containing the node)
-    - Nodes: [specific node name, e.g. va-stats4dbs-1]
+    - Nodes: [specific node name, e.g. child1]]
     - Host Labels: *
 4. **Alert Criteria**:
     - Alert Name: [exact alert name as it appears in the notification]
