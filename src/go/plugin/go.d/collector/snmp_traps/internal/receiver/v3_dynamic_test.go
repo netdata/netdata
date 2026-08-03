@@ -24,7 +24,7 @@ func (r *receiverEventRecorder) report(event Event) {
 	r.events = append(r.events, event)
 }
 
-func (r *receiverEventRecorder) count(eventType EventType, errorKind string) int {
+func (r *receiverEventRecorder) count(eventType EventType, errorKind ErrorKind) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return countEvents(r.events, eventType, errorKind)

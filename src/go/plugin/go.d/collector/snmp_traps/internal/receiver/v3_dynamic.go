@@ -141,7 +141,7 @@ func (r *Receiver) ensureDynamicEngineIDRegistered(pktCtx *TrapPacketContext) bo
 	}
 	usp, ok := pktCtx.Packet.SecurityParameters.(*gosnmp.UsmSecurityParameters)
 	if !ok || usp.UserName == "" || usp.AuthoritativeEngineID == "" {
-		r.reportError("unknown_engine_id")
+		r.reportError(ErrorUnknownEngine)
 		return false
 	}
 	return r.registerDynamicEngineID(hex.EncodeToString([]byte(usp.AuthoritativeEngineID)), usp.UserName)
@@ -150,7 +150,7 @@ func (r *Receiver) ensureDynamicEngineIDRegistered(pktCtx *TrapPacketContext) bo
 func (r *Receiver) registerDynamicEngineID(engineIDHex, username string) bool {
 	engineIDHex, accepted, isNew := r.dynamicEngineIDReg.accept(engineIDHex, username)
 	if !accepted {
-		r.reportError("unknown_engine_id")
+		r.reportError(ErrorUnknownEngine)
 		return false
 	}
 	if isNew {
@@ -171,7 +171,7 @@ func (r *Receiver) allowRateLimitedPacket(peer *net.UDPAddr) (bool, bool) {
 	if allowed {
 		return true, true
 	}
-	r.reportError("rate_limited")
+	r.reportError(ErrorRateLimited)
 	return mode != rateLimitModeDrop, true
 }
 

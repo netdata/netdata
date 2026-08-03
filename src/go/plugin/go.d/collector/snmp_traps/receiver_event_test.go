@@ -64,3 +64,26 @@ func TestCollectorReportsReceiverBufferDegradedEvent(t *testing.T) {
 	assert.Contains(t, out, "requested=4194304 bytes")
 	assert.Contains(t, out, "boom")
 }
+
+func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
+	tests := map[receiver.ErrorKind]func(*perJobMetrics) uint64{
+		receiver.ErrorMalformedPDU:  func(m *perJobMetrics) uint64 { return m.errors.malformedPDU.Load() },
+		receiver.ErrorAuthFailure:   func(m *perJobMetrics) uint64 { return m.errors.authFailures.Load() },
+		receiver.ErrorUSMFailure:    func(m *perJobMetrics) uint64 { return m.errors.usmFailures.Load() },
+		receiver.ErrorUnknownEngine: func(m *perJobMetrics) uint64 { return m.errors.unknownEngineID.Load() },
+		receiver.ErrorDecodeFailed:  func(m *perJobMetrics) uint64 { return m.errors.decodeFailed.Load() },
+		receiver.ErrorDroppedPolicy: func(m *perJobMetrics) uint64 { return m.errors.droppedAllowlist.Load() },
+		receiver.ErrorRateLimited:   func(m *perJobMetrics) uint64 { return m.errors.rateLimited.Load() },
+	}
+
+	for kind, value := range tests {
+		t.Run(string(kind), func(t *testing.T) {
+			metrics := &perJobMetrics{}
+			newTestSNMPTrapsCollector().handleReceiverEvent(metrics, receiver.Event{
+				Type:      receiver.EventError,
+				ErrorKind: kind,
+			})
+			assert.Equal(t, uint64(1), value(metrics))
+		})
+	}
+}

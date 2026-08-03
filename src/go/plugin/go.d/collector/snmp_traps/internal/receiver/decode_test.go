@@ -145,6 +145,21 @@ func TestSniffSNMPVersionRejectsHugeBERLength(t *testing.T) {
 	}
 }
 
+func TestSniffSNMPVersionMalformedDoesNotAllocate(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"indefinite length": {tagSequence, 0x80, 0x00, 0x00},
+		"truncated":         {tagSequence, 0x01, tagInteger},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := testing.AllocsPerRun(1000, func() {
+				_, _ = sniffSNMPVersion(data)
+			}); got != 0 {
+				t.Fatalf("sniffSNMPVersion allocations = %.0f, want 0", got)
+			}
+		})
+	}
+}
+
 func TestDecodeRejectsOctetStringOverLimit(t *testing.T) {
 	longValue := make([]byte, maxOctetStringLen+1)
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.SnmpPDU{
@@ -700,7 +715,7 @@ func TestV3DecodeWrongUser(t *testing.T) {
 func TestClassifyDecodeError(t *testing.T) {
 	tests := map[string]struct {
 		errMsg string
-		want   string
+		want   ErrorKind
 	}{
 		"auth_failure":       {errMsg: "authentication failure", want: "auth_failures"},
 		"decrypt_failure":    {errMsg: "decrypt error", want: "auth_failures"},

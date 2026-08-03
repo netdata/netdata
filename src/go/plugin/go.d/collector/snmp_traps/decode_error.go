@@ -31,7 +31,7 @@ func newDecodeErrorEntry(jobName string, failure *receiver.DecodeFailure, packet
 	packetHash := sha256.Sum256(failure.Data)
 
 	info := &DecodeErrorInfo{
-		Kind:          failure.Kind,
+		Kind:          string(failure.Kind),
 		Error:         errText,
 		PacketSize:    len(failure.Data),
 		PacketSHA256:  hex.EncodeToString(packetHash[:]),
@@ -93,9 +93,9 @@ func decodeErrorListener(conn *net.UDPConn) string {
 	return conn.LocalAddr().String()
 }
 
-func decodeErrorCategory(kind string) Category {
+func decodeErrorCategory(kind receiver.ErrorKind) Category {
 	switch kind {
-	case "auth_failures", "usm_failures", "unknown_engine_id":
+	case receiver.ErrorAuthFailure, receiver.ErrorUSMFailure, receiver.ErrorUnknownEngine:
 		return "auth"
 	default:
 		return "diagnostic"

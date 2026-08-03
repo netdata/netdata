@@ -580,7 +580,7 @@ func (c *Collector) handleReceiverEvent(metrics *perJobMetrics, event receiver.E
 	switch event.Type {
 	case receiver.EventError:
 		if metrics != nil {
-			metrics.incError(event.ErrorKind)
+			metrics.incError(string(event.ErrorKind))
 		}
 	case receiver.EventDecoded:
 		if metrics != nil {

@@ -385,8 +385,9 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 		metrics:      &perJobMetrics{},
 		profileIndex: idx,
 	}
+	port := freeUDPPort(b)
 	recv := newTestReceiver(c, receiver.PolicyConfig{
-		Listen:      receiver.ListenConfig{Endpoints: []receiver.Endpoint{{Protocol: "udp4", Address: "127.0.0.1", Port: 0}}},
+		Listen:      receiver.ListenConfig{Endpoints: []receiver.Endpoint{{Protocol: "udp", Address: "127.0.0.1", Port: port}}},
 		Versions:    []string{"v2c"},
 		Communities: []string{"public"},
 	})
@@ -397,11 +398,7 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	}
 	b.Cleanup(recv.Close)
 
-	addresses := recv.BoundUDPAddresses()
-	if len(addresses) != 1 {
-		b.Fatalf("bound addresses = %d, want 1", len(addresses))
-	}
-	conn, err := net.DialUDP("udp4", nil, addresses[0])
+	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	if err != nil {
 		b.Fatalf("DialUDP: %v", err)
 	}

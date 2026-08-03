@@ -56,22 +56,20 @@ func TestReceiverRespondsBeforeRateLimitDrop(t *testing.T) {
 	defer peerConn.Close()
 
 	peer := peerConn.LocalAddr().(*net.UDPAddr)
-	rl := newRateLimiter(true, 1, "drop")
-	srcAddr, ok := udpPeerAddr(peer)
-	if !ok {
-		t.Fatal("failed to convert UDP peer address")
-	}
-	if allowed, _ := rl.Allow(srcAddr); !allowed {
-		t.Fatal("expected first token to be available")
-	}
-
 	var events []Event
 	recv := New(NewPolicy(PolicyConfig{
 		Versions:    []string{"v2c"},
 		Communities: []string{"public"},
 		RateLimit:   RateLimitConfig{Enabled: true, PerSourcePPS: 1, Mode: "drop"},
 	}), func(event Event) { events = append(events, event) })
-	recv.rateLimiter = rl
+	prime := recv.Process(Datagram{
+		Data:   buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1"),
+		PeerIP: peer.IP,
+		Peer:   peer,
+	})
+	if prime.Context == nil {
+		t.Fatalf("priming trap result = %+v, want accepted trap", prime)
+	}
 
 	result := recv.Process(Datagram{Data: reqData, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
 
@@ -110,7 +108,7 @@ func TestReceiverReportsInformResponseFailed(t *testing.T) {
 	}
 }
 
-func countEvents(events []Event, eventType EventType, errorKind string) int {
+func countEvents(events []Event, eventType EventType, errorKind ErrorKind) int {
 	count := 0
 	for _, event := range events {
 		if event.Type == eventType && (errorKind == "" || event.ErrorKind == errorKind) {

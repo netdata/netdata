@@ -25,9 +25,21 @@ const (
 	EventDiscoveryReportFailed
 )
 
+type ErrorKind string
+
+const (
+	ErrorMalformedPDU  ErrorKind = "malformed_pdu"
+	ErrorAuthFailure   ErrorKind = "auth_failures"
+	ErrorUSMFailure    ErrorKind = "usm_failures"
+	ErrorUnknownEngine ErrorKind = "unknown_engine_id"
+	ErrorDecodeFailed  ErrorKind = "decode_failed"
+	ErrorDroppedPolicy ErrorKind = "dropped_allowlist"
+	ErrorRateLimited   ErrorKind = "rate_limited"
+)
+
 type Event struct {
 	Type      EventType
-	ErrorKind string
+	ErrorKind ErrorKind
 	Endpoint  Endpoint
 	Requested int
 	EngineID  string
@@ -49,7 +61,7 @@ type DecodeFailure struct {
 	PeerIP         net.IP
 	Conn           *net.UDPConn
 	Peer           *net.UDPAddr
-	Kind           string
+	Kind           ErrorKind
 	Err            error
 	SniffedVersion model.SnmpVersion
 	VersionKnown   bool
@@ -226,23 +238,6 @@ func (r *Receiver) Sweep(now time.Time) {
 
 func (r *Receiver) Ready() bool { return r.listener != nil }
 
-func (r *Receiver) BoundUDPAddresses() []*net.UDPAddr {
-	if r.listener == nil {
-		return nil
-	}
-	addresses := make([]*net.UDPAddr, 0, len(r.listener.endpoints))
-	for _, endpoint := range r.listener.endpoints {
-		address, ok := endpoint.conn.LocalAddr().(*net.UDPAddr)
-		if !ok {
-			continue
-		}
-		copyAddress := *address
-		copyAddress.IP = append(net.IP(nil), address.IP...)
-		addresses = append(addresses, &copyAddress)
-	}
-	return addresses
-}
-
 func (r *Receiver) Process(datagram Datagram) Result {
 	data := datagram.Data
 	decodePeerIP := datagram.PeerIP
@@ -251,17 +246,17 @@ func (r *Receiver) Process(datagram Datagram) Result {
 	if source, ok := packetSourceAddr(datagram.PeerIP, datagram.Peer); ok {
 		decodePeerIP = net.IP(source.AsSlice())
 		if r.allowlist != nil && !r.allowlist.AllowedSource(source) {
-			r.reportError("dropped_allowlist")
+			r.reportError(ErrorDroppedPolicy)
 			return Result{}
 		}
 	} else if r.allowlist != nil {
-		r.reportError("dropped_allowlist")
+		r.reportError(ErrorDroppedPolicy)
 		return Result{}
 	}
 
 	sniffedVersion, versionKnown := sniffSNMPVersion(data)
 	if versionKnown && !r.versionAllowed(sniffedVersion) {
-		r.reportError("dropped_allowlist")
+		r.reportError(ErrorDroppedPolicy)
 		return Result{}
 	}
 
@@ -296,7 +291,7 @@ func (r *Receiver) Process(datagram Datagram) Result {
 			if shouldExtractEngineIDOnDecodeError(kind) {
 				engineIDHex, ok, extractErr := extractSNMPv3EngineIDHex(data)
 				if extractErr == nil && ok && !engineIDHexAllowed(engineIDHex, r.engineIDs) {
-					kind = "unknown_engine_id"
+					kind = ErrorUnknownEngine
 				}
 			}
 			r.reportError(kind)
@@ -316,11 +311,11 @@ func (r *Receiver) Process(datagram Datagram) Result {
 	r.reportEvent(Event{Type: EventDecoded})
 	pdu := packetContext.PDU
 	if !r.versionAllowed(pdu.Version) {
-		r.reportError("dropped_allowlist")
+		r.reportError(ErrorDroppedPolicy)
 		return Result{}
 	}
 	if pdu.Version != model.SnmpVersionV3 && !r.communityAllowed(pdu.Community) {
-		r.reportError("dropped_allowlist")
+		r.reportError(ErrorDroppedPolicy)
 		return Result{}
 	}
 	if !r.ensureDynamicEngineIDRegistered(packetContext) {
@@ -329,11 +324,11 @@ func (r *Receiver) Process(datagram Datagram) Result {
 	if packetContext.Packet != nil && pdu.Version == model.SnmpVersionV3 {
 		if pdu.PduType == model.PduTypeInform {
 			if !r.localEngineIDMatches(packetContext.Packet.SecurityParameters) {
-				r.reportError("unknown_engine_id")
+				r.reportError(ErrorUnknownEngine)
 				return Result{}
 			}
 		} else if !isEngineIDAllowed(packetContext.Packet.SecurityParameters, r.engineIDs) {
-			r.reportError("unknown_engine_id")
+			r.reportError(ErrorUnknownEngine)
 			return Result{}
 		}
 	}
@@ -368,7 +363,7 @@ func (r *Receiver) AdmitDecodeErrorAudit(peer *net.UDPAddr) bool {
 	if allowed {
 		return true
 	}
-	r.reportError("rate_limited")
+	r.reportError(ErrorRateLimited)
 	return mode != rateLimitModeDrop
 }
 
@@ -401,9 +396,9 @@ func (r *Receiver) trustedRelaySource(peerIP net.IP) bool {
 	return false
 }
 
-func shouldExtractEngineIDOnDecodeError(kind string) bool {
+func shouldExtractEngineIDOnDecodeError(kind ErrorKind) bool {
 	switch kind {
-	case "auth_failures", "usm_failures", "unknown_engine_id":
+	case ErrorAuthFailure, ErrorUSMFailure, ErrorUnknownEngine:
 		return true
 	default:
 		return false
@@ -418,7 +413,7 @@ func (r *Receiver) localEngineIDMatches(parameters gosnmp.SnmpV3SecurityParamete
 	return ok && r.localEngineID.EqualRaw(usm.AuthoritativeEngineID)
 }
 
-func (r *Receiver) reportError(kind string) {
+func (r *Receiver) reportError(kind ErrorKind) {
 	r.reportEvent(Event{Type: EventError, ErrorKind: kind})
 }
 

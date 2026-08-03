@@ -37,7 +37,11 @@ const (
 )
 
 var (
-	trapDecodeLogger = gosnmp.NewLogger(log.New(io.Discard, "", 0))
+	trapDecodeLogger      = gosnmp.NewLogger(log.New(io.Discard, "", 0))
+	errBERTruncatedTLV    = errors.New("BER: truncated tag/length")
+	errBERMissingLength   = errors.New("BER: missing length byte")
+	errBERIndefinite      = errors.New("BER: indefinite length is unsupported")
+	errBERTruncatedLength = errors.New("BER: truncated length")
 )
 
 type TrapPacketContext struct {
@@ -104,7 +108,7 @@ func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3S
 	}, nil
 }
 
-func classifyDecodeError(err error) string {
+func classifyDecodeError(err error) ErrorKind {
 	if err == nil {
 		return ""
 	}
@@ -115,48 +119,47 @@ func classifyDecodeError(err error) string {
 	s := err.Error()
 	switch {
 	case strings.Contains(s, "BER:"):
-		return "malformed_pdu"
+		return ErrorMalformedPDU
 	case strings.Contains(s, "datagram too large"):
-		return "malformed_pdu"
+		return ErrorMalformedPDU
 	case strings.Contains(s, "too many varbinds"):
-		return "malformed_pdu"
+		return ErrorMalformedPDU
 	case strings.Contains(s, "OctetString too long"):
-		return "malformed_pdu"
+		return ErrorMalformedPDU
 	case strings.Contains(s, "missing snmpTrapOID.0"):
-		return "malformed_pdu"
+		return ErrorMalformedPDU
 	case strings.Contains(s, "invalid SNMPv1"):
-		return "malformed_pdu"
+		return ErrorMalformedPDU
 	case strings.Contains(s, "authentication"):
-		return "auth_failures"
+		return ErrorAuthFailure
 	case strings.Contains(s, "decrypt"):
-		return "auth_failures"
+		return ErrorAuthFailure
 	case strings.Contains(s, "USM"):
-		return "usm_failures"
+		return ErrorUSMFailure
 	case strings.Contains(s, "no security parameters"):
-		return "usm_failures"
+		return ErrorUSMFailure
 	case strings.Contains(s, "no credentials"):
-		return "usm_failures"
+		return ErrorUSMFailure
 	case strings.Contains(s, "unknown engine"):
-		return "unknown_engine_id"
+		return ErrorUnknownEngine
 	case strings.Contains(s, "engine ID"):
-		return "unknown_engine_id"
+		return ErrorUnknownEngine
 	default:
-		return "decode_failed"
+		return ErrorDecodeFailed
 	}
 }
 
 func sniffSNMPVersion(data []byte) (model.SnmpVersion, bool) {
-	tag, valueStart, valueEnd, _, err := readBERElement(data, 0)
+	tag, content, _, err := readTLV(data)
 	if err != nil || tag != tagSequence {
 		return "", false
 	}
-
-	tag, intStart, intEnd, _, err := readBERElement(data[:valueEnd], valueStart)
+	tag, versionData, _, err := readTLV(content)
 	if err != nil || tag != tagInteger {
 		return "", false
 	}
 
-	version, ok := parseBERVersion(data[intStart:intEnd])
+	version, ok := parseBERVersion(versionData)
 	if !ok {
 		return "", false
 	}
@@ -573,7 +576,7 @@ func walkBER(data []byte, depth int, opts validateBEROptions) (int, error) {
 
 func readTLV(data []byte) (tag byte, content []byte, consumed int, err error) {
 	if len(data) < 2 {
-		return 0, nil, 0, errors.New("BER: truncated tag/length")
+		return 0, nil, 0, errBERTruncatedTLV
 	}
 	tag = data[0]
 	length, lengthBytes, err := decodeBERLength(data[1:])
@@ -590,7 +593,7 @@ func readTLV(data []byte) (tag byte, content []byte, consumed int, err error) {
 
 func decodeBERLength(data []byte) (length int, consumed int, err error) {
 	if len(data) == 0 {
-		return 0, 0, errors.New("BER: missing length byte")
+		return 0, 0, errBERMissingLength
 	}
 	b := data[0]
 	if b&0x80 == 0 {
@@ -599,13 +602,13 @@ func decodeBERLength(data []byte) (length int, consumed int, err error) {
 
 	n := int(b & 0x7f)
 	if n == 0 {
-		return 0, 0, errors.New("BER: indefinite length is unsupported")
+		return 0, 0, errBERIndefinite
 	}
 	if n > maxBERLengthOctets {
 		return 0, 0, fmt.Errorf("BER: length uses %d octets, max %d", n, maxBERLengthOctets)
 	}
 	if len(data) < 1+n {
-		return 0, 0, errors.New("BER: truncated length")
+		return 0, 0, errBERTruncatedLength
 	}
 
 	var length64 uint64

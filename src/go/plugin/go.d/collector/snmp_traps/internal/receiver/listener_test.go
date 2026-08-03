@@ -9,9 +9,49 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestReceiverBindStartDeliverClose(t *testing.T) {
+	port := availableUDPPort(t)
+	listen := ListenConfig{Endpoints: []Endpoint{{Protocol: "udp", Address: "127.0.0.1", Port: port}}}
+	require.NoError(t, ValidateListen(listen))
+
+	recv := New(NewPolicy(PolicyConfig{
+		Listen:      listen,
+		Versions:    []string{"v2c"},
+		Communities: []string{"public"},
+	}), nil)
+	require.NoError(t, recv.Bind())
+	t.Cleanup(recv.Close)
+
+	results := make(chan Result, 1)
+	recv.Start(func(datagram Datagram) {
+		results <- recv.Process(datagram)
+	})
+
+	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	_, err = conn.Write(buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1"))
+	require.NoError(t, err)
+
+	select {
+	case result := <-results:
+		require.NotNil(t, result.Context)
+		require.NotNil(t, result.Context.PDU)
+		assert.Equal(t, model.PduTypeTrap, result.Context.PDU.PduType)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for receiver delivery")
+	}
+
+	recv.Close()
+	rebound, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	require.NoError(t, err, "receiver did not release bound endpoint")
+	require.NoError(t, rebound.Close())
+}
 
 func TestListenerReadLoopCountsUnexpectedReadErrors(t *testing.T) {
 	reported := make(chan Endpoint, 1)
@@ -160,4 +200,13 @@ func TestNewListenerFailsWhenReceiveBufferCannotBeSet(t *testing.T) {
 	assert.Nil(t, l)
 	assert.Contains(t, err.Error(), "set receive buffer")
 	assert.Contains(t, err.Error(), "boom")
+}
+
+func availableUDPPort(t testing.TB) int {
+	t.Helper()
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	port := conn.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, conn.Close())
+	return port
 }
