@@ -465,6 +465,32 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
           description: Ingesting storing and visualizing OpenTelemetry metrics
           path: OpenTelemetry
+        items:
+          - meta:
+              label: Send OpenTelemetry data to Netdata
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/send-data-to-netdata.md
+              description: Export metrics and logs from an OpenTelemetry Collector to a Netdata Agent
+              keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector]
+          - meta:
+              label: Collector metric recipes
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/collector-metric-recipes.md
+              description: Collect Prometheus, Redis, NGINX, PostgreSQL, and host metrics through OpenTelemetry Collector receivers
+              keywords: [opentelemetry, otel, prometheus, redis, nginx, postgresql, hostmetrics, receivers]
+          - meta:
+              label: Collector log recipes
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/collector-log-recipes.md
+              description: Collect systemd journal, application file, and syslog records through OpenTelemetry Collector receivers
+              keywords: [opentelemetry, otel, journald, filelog, syslog, logs, receivers]
+          - meta:
+              label: Collector transformations
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/collector-transformations.md
+              description: Parse, enrich, normalize, and filter OpenTelemetry logs before exporting them to Netdata
+              keywords: [opentelemetry, otel, ottl, transform, filter, json, logs]
+          - meta:
+              label: Create metrics from OpenTelemetry logs
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-to-metrics.md
+              description: Count matching OpenTelemetry log records and chart their rate in Netdata
+              keywords: [opentelemetry, otel, logs, metrics, count, filter, ottl]
       - meta:
           label: Secrets Management
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SECRETS.md
