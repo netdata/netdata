@@ -97,16 +97,16 @@ func New(policy Policy, report Reporter) *Receiver {
 	}
 }
 
-func (r *Receiver) Bind() error {
+func (r *Receiver) Bind() ([]Event, error) {
 	if r.listener != nil {
-		return nil
+		return nil, nil
 	}
-	l, err := newListener(r.policy.listen, r.report)
+	l, events, err := newListener(r.policy.listen, r.report)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	r.listener = l
-	return nil
+	return events, nil
 }
 
 type preparationError struct {
@@ -201,20 +201,6 @@ func (r *Receiver) RollbackPreparedState() {
 	if r.rollbackState != nil {
 		r.rollbackState()
 		r.rollbackState = nil
-	}
-}
-
-func (r *Receiver) ReportBindWarnings() {
-	if r.listener == nil {
-		return
-	}
-	for _, warning := range r.listener.receiveBufferWarnings {
-		r.reportEvent(Event{
-			Type:      EventListenerBufferDegraded,
-			Endpoint:  warning.endpoint,
-			Requested: warning.requested,
-			Err:       warning.err,
-		})
 	}
 }
 

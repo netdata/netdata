@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
@@ -17,14 +18,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	collogpb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -145,7 +149,7 @@ func TestCollectorCreatorDefaults(t *testing.T) {
 	assert.False(t, creator.Defaults.Disabled)
 }
 
-func TestCollectorCreatorSharesHostIdentityService(t *testing.T) {
+func TestCollectorCreatorSharesPluginDependencies(t *testing.T) {
 	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	first := creator.CreateV2().(*Collector)
 	second := creator.CreateV2().(*Collector)
@@ -153,6 +157,7 @@ func TestCollectorCreatorSharesHostIdentityService(t *testing.T) {
 	assert.Same(t, first.hostIdentity, second.hostIdentity)
 	assert.Same(t, first.profileCatalog, second.profileCatalog)
 	assert.Same(t, first.enricher, second.enricher)
+	assert.Same(t, first.telemetryRegistry, second.telemetryRegistry)
 	assert.NotNil(t, first.engineStateRoot)
 }
 
@@ -331,6 +336,30 @@ func TestConfigSchemaDynCfgListFieldsHaveSafeDefaults(t *testing.T) {
 	}
 }
 
+func TestDedupWindowWireTypeIsArchitectureIndependent(t *testing.T) {
+	assert.Equal(t, reflect.Int64, reflect.TypeFor[int64]().Kind())
+
+	for name, decode := range map[string]func([]byte, any) error{
+		"json": json.Unmarshal,
+		"yaml": yaml.Unmarshal,
+	} {
+		t.Run(name, func(t *testing.T) {
+			var cfg Config
+			payload := []byte(`{"dedup":{"window_sec":9223372036}}`)
+			if name == "yaml" {
+				payload = []byte("dedup:\n  window_sec: 9223372036\n")
+			}
+			require.NoError(t, decode(payload, &cfg))
+			assert.Equal(t, dedup.MaxWindowSec, cfg.Dedup.WindowSec)
+		})
+	}
+
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+	window := schemaProperty(t, schema, "jsonSchema", "properties", "dedup", "properties", "window_sec")
+	assert.Equal(t, float64(dedup.MaxWindowSec), window["maximum"])
+}
+
 func TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults(t *testing.T) {
 	var schema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
@@ -429,7 +458,7 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	assert.Nil(t, c.profileLease)
 	assert.Nil(t, c.receiver)
 	assert.Nil(t, c.trapWriter)
-	assert.Nil(t, c.metrics)
+	assert.Nil(t, c.telemetry)
 }
 
 func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {
@@ -662,6 +691,7 @@ func TestCollectorInit_JournalHostFailureRetriesFreshProvider(t *testing.T) {
 		newTestTrapEnricher(ddsnmp.NewDeviceStore(), nil, newTestReverseDNSResolver()),
 		service,
 		currentTestCatalogManager,
+		telemetry.NewRegistry(),
 		func() string { return t.TempDir() },
 	)
 	c.Name = "journal-host-retry"

@@ -14,20 +14,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
 )
 
-var currentTestProfileIndex *ProfileIndex
+var currentTestProfileIndex *catalog.Epoch
 
 func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) {
 	t.Helper()
 	for _, trap := range traps {
-		if err := prepareTrapDefinition(trap); err != nil {
+		if err := catalog.PrepareTrap(trap); err != nil {
 			t.Fatalf("compile test trap templates: %v", err)
 		}
 	}
-	idx := newProfileIndex()
+	idx := catalog.NewEpoch()
 	trapDefs := make([]*TrapDef, 0, len(traps))
 	for _, trap := range traps {
 		trapDefs = append(trapDefs, trap)
@@ -39,23 +41,15 @@ func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) {
 	t.Cleanup(func() { currentTestProfileIndex = nil })
 }
 
-func assertSeverityCounters(t *testing.T, metrics *perJobMetrics, want map[string]uint64) {
+func assertSeverityCounters(t *testing.T, job *telemetry.Job, jobName string, want map[string]uint64) {
 	t.Helper()
-
-	got := map[string]uint64{
-		"emerg":   metrics.severities.emerg.Load(),
-		"alert":   metrics.severities.alert.Load(),
-		"crit":    metrics.severities.crit.Load(),
-		"err":     metrics.severities.err.Load(),
-		"warning": metrics.severities.warning.Load(),
-		"notice":  metrics.severities.notice.Load(),
-		"info":    metrics.severities.info.Load(),
-		"debug":   metrics.severities.debug.Load(),
-	}
-
-	for name, value := range got {
-		if value != want[name] {
-			t.Errorf("%s severity = %d, want %d", name, value, want[name])
+	store := collectJobMetricsForTest(t, job)
+	labels := metrix.Labels{"job_name": jobName}
+	for _, name := range []string{"emerg", "alert", "crit", "err", "warning", "notice", "info", "debug"} {
+		metric := "snmp_trap_severity_" + name
+		value, ok := store.Read().Value(metric, labels)
+		if !ok || value != float64(want[name]) {
+			t.Errorf("%s = %v/%v, want %d/true", metric, value, ok, want[name])
 		}
 	}
 }
@@ -118,15 +112,10 @@ func TestCollectorHandlePacketRecoversFromPanic(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "security coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
-	metrics := withCleanJobMetrics(t, "panic-recover")
 	c := newTestV2Collector("panic-recover", panicTrapWriter{}, nil, []string{"public"})
-	c.metrics = metrics
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
-
-	if got := metrics.errors.decodeFailed.Load(); got != 1 {
-		t.Fatalf("decode_failed = %d, want 1", got)
-	}
+	assertJobMetric(t, c.telemetry, "panic-recover", "snmp_trap_errors_decode_failed", 1)
 }
 
 func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
@@ -232,7 +221,7 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c, metrics := newDedupTestV2Collector(t, jobName, writer)
-	c.deduper.start()
+	c.deduper.Start()
 	defer c.deduper.Close()
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
@@ -247,24 +236,14 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	if got := c.packetSequence.Load(); got != 2 {
 		t.Fatalf("collector packetSequence = %d, want 2", got)
 	}
-	if got := metrics.dedup.suppressed.Load(); got != 1 {
-		t.Fatalf("dedup suppressed = %d, want 1", got)
-	}
-	if got := metrics.events.security.Load(); got != 1 {
-		t.Fatalf("security events = %d, want 1", got)
-	}
-	assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
-	if got := metrics.errors.unknownOID.Load(); got != 0 {
-		t.Fatalf("unknown OID errors = %d, want 0", got)
-	}
-	if got := metrics.errors.templateUnresolved.Load(); got != 0 {
-		t.Fatalf("template unresolved errors = %d, want 0", got)
-	}
-	if got := metrics.errors.journalWriteFailed.Load(); got != 0 {
-		t.Fatalf("journal write failures = %d, want 0", got)
-	}
+	assertJobMetric(t, metrics, jobName, "snmp_trap_dedup_suppressed", 1)
+	assertJobMetric(t, metrics, jobName, "snmp_trap_events_security", 1)
+	assertSeverityCounters(t, metrics, jobName, map[string]uint64{"warning": 1})
+	assertJobMetric(t, metrics, jobName, "snmp_trap_errors_unknown_oid", 0)
+	assertJobMetric(t, metrics, jobName, "snmp_trap_errors_template_unresolved", 0)
+	assertJobMetric(t, metrics, jobName, "snmp_trap_errors_journal_write_failed", 0)
 
-	store := collectJobMetricsForTest(t, jobName)
+	store := collectJobMetricsForTest(t, metrics)
 	jobLabels := metrix.Labels{"job_name": jobName}
 	for name, expected := range map[string]float64{
 		"snmp_trap_pipeline_accepted":         2,
@@ -275,6 +254,20 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
 		}
 	}
+}
+
+func TestSelectDedupKeyVarbindsPrefersProfileKeys(t *testing.T) {
+	jobKeys := []string{"jobKey"}
+	assert := func(got, want []string) {
+		t.Helper()
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Fatalf("selected keys = %v, want %v", got, want)
+		}
+	}
+
+	assert(selectDedupKeyVarbinds(nil, jobKeys), jobKeys)
+	assert(selectDedupKeyVarbinds(&TrapDef{}, jobKeys), jobKeys)
+	assert(selectDedupKeyVarbinds(&TrapDef{DedupKeyVarbinds: []string{"profileKey"}}, jobKeys), []string{"profileKey"})
 }
 
 func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
@@ -293,16 +286,10 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
 		}
-		if got := metrics.dedup.suppressed.Load(); got != 1 {
-			t.Fatalf("dedup suppressed = %d, want 1", got)
-		}
-		if got := metrics.errors.unknownOID.Load(); got != 2 {
-			t.Fatalf("unknown OID errors = %d, want 2", got)
-		}
-		if got := metrics.events.unknown.Load(); got != 1 {
-			t.Fatalf("unknown events = %d, want 1", got)
-		}
-		assertSeverityCounters(t, metrics, map[string]uint64{"notice": 1})
+		assertJobMetric(t, metrics, jobName, "snmp_trap_dedup_suppressed", 1)
+		assertJobMetric(t, metrics, jobName, "snmp_trap_errors_unknown_oid", 2)
+		assertJobMetric(t, metrics, jobName, "snmp_trap_events_unknown", 1)
+		assertSeverityCounters(t, metrics, jobName, map[string]uint64{"notice": 1})
 	})
 
 	t.Run("template unresolved", func(t *testing.T) {
@@ -325,16 +312,10 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
 		}
-		if got := metrics.dedup.suppressed.Load(); got != 1 {
-			t.Fatalf("dedup suppressed = %d, want 1", got)
-		}
-		if got := metrics.errors.templateUnresolved.Load(); got != 2 {
-			t.Fatalf("template unresolved errors = %d, want 2", got)
-		}
-		if got := metrics.events.security.Load(); got != 1 {
-			t.Fatalf("security events = %d, want 1", got)
-		}
-		assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
+		assertJobMetric(t, metrics, jobName, "snmp_trap_dedup_suppressed", 1)
+		assertJobMetric(t, metrics, jobName, "snmp_trap_errors_template_unresolved", 2)
+		assertJobMetric(t, metrics, jobName, "snmp_trap_events_security", 1)
+		assertSeverityCounters(t, metrics, jobName, map[string]uint64{"warning": 1})
 	})
 }
 
@@ -348,17 +329,13 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
-	if got := metrics.errors.journalWriteFailed.Load(); got != 1 {
-		t.Fatalf("journal write failures = %d, want 1", got)
-	}
-	store := collectJobMetricsForTest(t, jobName)
+	assertJobMetric(t, metrics, jobName, "snmp_trap_errors_journal_write_failed", 1)
+	store := collectJobMetricsForTest(t, metrics)
 	jobLabels := metrix.Labels{"job_name": jobName}
 	if v, ok := store.Read().Value("snmp_trap_pipeline_write_failed", jobLabels); !ok || v != 1 {
 		t.Fatalf("snmp_trap_pipeline_write_failed = %v/%v, want 1/true", v, ok)
 	}
-	if got := metrics.dedup.suppressed.Load(); got != 0 {
-		t.Fatalf("dedup suppressed after failed first write = %d, want 0", got)
-	}
+	assertJobMetric(t, metrics, jobName, "snmp_trap_dedup_suppressed", 0)
 
 	writer.err = nil
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
@@ -366,13 +343,9 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries after rollback = %d, want 1", len(writer.entries))
 	}
-	if got := metrics.dedup.suppressed.Load(); got != 0 {
-		t.Fatalf("dedup suppressed after rollback retry = %d, want 0", got)
-	}
-	if got := metrics.events.security.Load(); got != 1 {
-		t.Fatalf("security events = %d, want 1", got)
-	}
-	assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
+	assertJobMetric(t, metrics, jobName, "snmp_trap_dedup_suppressed", 0)
+	assertJobMetric(t, metrics, jobName, "snmp_trap_events_security", 1)
+	assertSeverityCounters(t, metrics, jobName, map[string]uint64{"warning": 1})
 }
 
 func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
@@ -380,17 +353,13 @@ func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2CollectorWithPolicy("test", writer, receiver.PolicyConfig{Versions: []string{"v3"}})
 
-	removeJobMetrics("test")
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected 0 entries for disallowed version, got %d", len(writer.entries))
 	}
-	m := getJobMetrics("test")
-	if dr := m.errors.droppedAllowlist.Load(); dr != 1 {
-		t.Errorf("expected 1 dropped_allowlist, got %d", dr)
-	}
-	store := collectJobMetricsForTest(t, "test")
+	assertJobMetric(t, c.telemetry, "test", "snmp_trap_errors_dropped_allowlist", 1)
+	store := collectJobMetricsForTest(t, c.telemetry)
 	labels := metrix.Labels{"job_name": "test"}
 	for name, expected := range map[string]float64{
 		"snmp_trap_pipeline_received": 1,
@@ -401,14 +370,10 @@ func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
 			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
 		}
 	}
-	removeJobMetrics("test")
 }
 
 func TestCollectorHandlePacketDropsDisallowedV3BeforeDecode(t *testing.T) {
 	const jobName = "test-disallowed-v3"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
-
 	data := buildV3Trap(t, "testuser", "1.3.6.1.6.3.1.1.5.1")
 	writer := &mockTrapWriter{}
 	c := newTestV2CollectorWithPolicy(jobName, writer, receiver.PolicyConfig{Versions: []string{"v2c"}})
@@ -418,21 +383,13 @@ func TestCollectorHandlePacketDropsDisallowedV3BeforeDecode(t *testing.T) {
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected 0 entries for disallowed v3 packet, got %d", len(writer.entries))
 	}
-	m := getJobMetrics(jobName)
-	if v := m.errors.droppedAllowlist.Load(); v != 1 {
-		t.Fatalf("dropped_allowlist = %d, want 1", v)
-	}
-	if v := m.errors.authFailures.Load(); v != 0 {
-		t.Fatalf("auth_failures = %d, want 0", v)
-	}
-	if v := m.errors.decodeFailed.Load(); v != 0 {
-		t.Fatalf("decode_failed = %d, want 0", v)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_dropped_allowlist", 1)
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_auth_failures", 0)
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_decode_failed", 0)
 }
 
 func TestCollectorHandlePacketWritesDecodeErrorEntry(t *testing.T) {
 	const jobName = "test-decode-error-entry"
-	metrics := withCleanJobMetrics(t, jobName)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 
@@ -474,14 +431,11 @@ func TestCollectorHandlePacketWritesDecodeErrorEntry(t *testing.T) {
 	if !strings.Contains(entry.Message, "malformed_pdu") {
 		t.Fatalf("Message = %q, want malformed_pdu", entry.Message)
 	}
-	if got := metrics.errors.malformedPDU.Load(); got != 1 {
-		t.Fatalf("malformed_pdu = %d, want 1", got)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_malformed_pdu", 1)
 }
 
 func TestCollectorHandlePacketDecodeErrorHonorsAllowlist(t *testing.T) {
 	const jobName = "test-decode-error-allowlist"
-	metrics := withCleanJobMetrics(t, jobName)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
 
@@ -491,17 +445,12 @@ func TestCollectorHandlePacketDecodeErrorHonorsAllowlist(t *testing.T) {
 	if len(writer.entries) != 0 {
 		t.Fatalf("written entries = %d, want 0", len(writer.entries))
 	}
-	if got := metrics.errors.droppedAllowlist.Load(); got != 1 {
-		t.Fatalf("dropped_allowlist = %d, want 1", got)
-	}
-	if got := metrics.errors.decodeFailed.Load(); got != 0 {
-		t.Fatalf("decode_failed = %d, want 0", got)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_dropped_allowlist", 1)
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_decode_failed", 0)
 }
 
 func TestCollectorHandlePacketDecodeErrorHonorsRateLimitDrop(t *testing.T) {
 	const jobName = "test-decode-error-rate-limit"
-	metrics := withCleanJobMetrics(t, jobName)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 	c.receiver = newTestReceiver(c, receiver.PolicyConfig{
@@ -522,22 +471,20 @@ func TestCollectorHandlePacketDecodeErrorHonorsRateLimitDrop(t *testing.T) {
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
 	}
-	if got := metrics.errors.malformedPDU.Load(); got != 2 {
-		t.Fatalf("malformed_pdu = %d, want 2", got)
-	}
-	if got := metrics.errors.rateLimited.Load(); got != 1 {
-		t.Fatalf("rate_limited = %d, want 1", got)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_malformed_pdu", 2)
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_rate_limited", 1)
 }
 
 func TestCollectorHandlePacketDynamicDecodeFailureReusesRateLimitAdmission(t *testing.T) {
 	const jobName = "test-dynamic-decode-error-rate-limit"
-	metrics := withCleanJobMetrics(t, jobName)
 	writer := &mockTrapWriter{}
+	registry := telemetry.NewRegistry()
 	c := &Collector{
-		Config:      Config{Name: jobName},
-		trapWriter:  writer,
-		journalHost: newTestJournalHostProvider(),
+		Config:            Config{Name: jobName},
+		trapWriter:        writer,
+		journalHost:       newTestJournalHostProvider(),
+		telemetryRegistry: registry,
+		telemetry:         registry.Attach(jobName, telemetry.Options{}),
 	}
 	user := USMUserConfig{
 		Username:  "testuser",
@@ -576,9 +523,7 @@ func TestCollectorHandlePacketDynamicDecodeFailureReusesRateLimitAdmission(t *te
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want first admitted decode error", len(writer.entries))
 	}
-	if got := metrics.errors.rateLimited.Load(); got != 0 {
-		t.Fatalf("rate_limited = %d, want 0", got)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_rate_limited", 0)
 }
 
 func TestCollectorHandlePacketDecodeErrorNormalizesIPv4MappedSource(t *testing.T) {
@@ -606,16 +551,12 @@ func TestCollectorHandlePacketDropsWhenAllowlistCannotDetermineSource(t *testing
 	const jobName = "test-allowlist-missing-source"
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
-	metrics := withCleanJobMetrics(t, jobName)
-
 	c.handlePacket([]byte{0x30, 0x00}, nil, nil, nil)
 
 	if len(writer.entries) != 0 {
 		t.Fatalf("written entries = %d, want 0", len(writer.entries))
 	}
-	if got := metrics.errors.droppedAllowlist.Load(); got != 1 {
-		t.Fatalf("dropped_allowlist = %d, want 1", got)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_dropped_allowlist", 1)
 }
 
 func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
@@ -651,20 +592,12 @@ func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
 
-	withCleanJobMetrics(t, "test")
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
-
-	m := getJobMetrics("test")
-	ev := m.events.stateChange.Load()
-	if ev != 1 {
-		t.Errorf("expected 1 state_change event, got %d", ev)
-	}
+	assertJobMetric(t, c.telemetry, "test", "snmp_trap_events_state_change", 1)
 }
 
 func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
 	const jobName = "test-severity-event"
-	withCleanJobMetrics(t, jobName)
-
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("state_change", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
@@ -673,57 +606,7 @@ func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
-	m := getJobMetrics(jobName)
-	assertSeverityCounters(t, m, map[string]uint64{"warning": 1})
-}
-
-func TestPerJobMetricsIncSeverityFallsBackToNotice(t *testing.T) {
-	m := &perJobMetrics{}
-	m.incSeverity("")
-	m.incSeverity("not_a_severity")
-
-	if v := m.severities.notice.Load(); v != 2 {
-		t.Fatalf("notice severity = %d, want 2", v)
-	}
-	assertSeverityCounters(t, m, map[string]uint64{"notice": 2})
-}
-
-func TestCollectMetricsEmitsSeverityCounters(t *testing.T) {
-	const jobName = "test-severity-metrics"
-	withCleanJobMetrics(t, jobName)
-
-	getJobMetrics(jobName).incSeverity("crit")
-	getJobMetrics(jobName).incSeverity("warning")
-	getJobMetrics(jobName).incSeverity("info")
-
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	if !ok {
-		t.Fatal("collector store does not expose cycle control")
-	}
-
-	managed.CycleController().BeginCycle()
-	collectMetrics(store, jobName)
-	if err := managed.CycleController().CommitCycleSuccess(); err != nil {
-		t.Fatalf("commit collect cycle: %v", err)
-	}
-
-	labels := metrix.Labels{"job_name": jobName}
-	want := map[string]float64{
-		"snmp_trap_severity_emerg":   0,
-		"snmp_trap_severity_alert":   0,
-		"snmp_trap_severity_crit":    1,
-		"snmp_trap_severity_err":     0,
-		"snmp_trap_severity_warning": 1,
-		"snmp_trap_severity_notice":  0,
-		"snmp_trap_severity_info":    1,
-		"snmp_trap_severity_debug":   0,
-	}
-	for name, expected := range want {
-		if v, ok := store.Read().Value(name, labels); !ok || v != expected {
-			t.Fatalf("%s value = %v/%v, want %v/true", name, v, ok, expected)
-		}
-	}
+	assertSeverityCounters(t, c.telemetry, jobName, map[string]uint64{"warning": 1})
 }
 
 func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
@@ -738,13 +621,8 @@ func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
 
-	withCleanJobMetrics(t, "test")
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
-
-	m := getJobMetrics("test")
-	if v := m.errors.templateUnresolved.Load(); v != 1 {
-		t.Errorf("expected 1 template_unresolved, got %d", v)
-	}
+	assertJobMetric(t, c.telemetry, "test", "snmp_trap_errors_template_unresolved", 1)
 }
 
 func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
@@ -752,20 +630,12 @@ func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, nil, []string{"secret"})
 
-	withCleanJobMetrics(t, "test")
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
-
-	m := getJobMetrics("test")
-	dr := m.errors.droppedAllowlist.Load()
-	if dr != 1 {
-		t.Errorf("expected 1 dropped_allowlist, got %d", dr)
-	}
+	assertJobMetric(t, c.telemetry, "test", "snmp_trap_errors_dropped_allowlist", 1)
 }
 
 func TestCollectorHandlePacketRejectsUnknownV3EngineID(t *testing.T) {
 	const jobName = "test-v3-engine"
-	withCleanJobMetrics(t, jobName)
-
 	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 
 	writer := &mockTrapWriter{}
@@ -776,16 +646,11 @@ func TestCollectorHandlePacketRejectsUnknownV3EngineID(t *testing.T) {
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected unknown engine ID to drop trap, got %d entries", len(writer.entries))
 	}
-	m := getJobMetrics(jobName)
-	if v := m.errors.unknownEngineID.Load(); v != 1 {
-		t.Fatalf("unknown_engine_id = %d, want 1", v)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_unknown_engine_id", 1)
 }
 
 func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.T) {
 	const jobName = "test-v3-auth-failure-engine"
-	withCleanJobMetrics(t, jobName)
-
 	otherEngineID := "80001f888077dfe44faa700259"
 	data := buildV3SecuredTrap(t, v3SecuredTrapSpec{
 		user:        "testuser",
@@ -810,13 +675,8 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
-	m := getJobMetrics(jobName)
-	if v := m.errors.unknownEngineID.Load(); v != 1 {
-		t.Fatalf("unknown_engine_id = %d, want 1", v)
-	}
-	if v := m.errors.authFailures.Load(); v != 0 {
-		t.Fatalf("auth_failures = %d, want 0", v)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_unknown_engine_id", 1)
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_auth_failures", 0)
 }
 
 func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
@@ -984,7 +844,6 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	const jobName = "test-rate-limit-sample"
-	withCleanJobMetrics(t, jobName)
 
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
@@ -1010,62 +869,17 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	if len(writer.entries) != 1 {
 		t.Fatalf("sample-mode rate-limited trap should be written, got %d entries", len(writer.entries))
 	}
-	m := getJobMetrics(jobName)
-	if v := m.errors.rateLimited.Load(); v != 1 {
-		t.Fatalf("rate_limited = %d, want 1", v)
-	}
-}
-
-func TestCollectMetricsEmitsCounters(t *testing.T) {
-	const jobName = "test-metrics"
-	withCleanJobMetrics(t, jobName)
-
-	incTrapEvents(jobName, "security")
-	incTrapError(jobName, "decode_failed")
-	getJobMetrics(jobName).addError("otlp_export_failed", 3)
-	getJobMetrics(jobName).addError("listener_read_failed", 2)
-	getJobMetrics(jobName).addError("listener_buffer_degraded", 1)
-
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	if !ok {
-		t.Fatal("collector store does not expose cycle control")
-	}
-
-	managed.CycleController().BeginCycle()
-	collectMetrics(store, jobName)
-	if err := managed.CycleController().CommitCycleSuccess(); err != nil {
-		t.Fatalf("commit collect cycle: %v", err)
-	}
-
-	labels := metrix.Labels{"job_name": jobName}
-	if v, ok := store.Read().Value("snmp_trap_events_security", labels); !ok || v != 1 {
-		t.Fatalf("events security value = %v/%v, want 1/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_errors_decode_failed", labels); !ok || v != 1 {
-		t.Fatalf("errors decode_failed value = %v/%v, want 1/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_errors_otlp_export_failed", labels); !ok || v != 3 {
-		t.Fatalf("errors otlp_export_failed value = %v/%v, want 3/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_errors_listener_read_failed", labels); !ok || v != 2 {
-		t.Fatalf("errors listener_read_failed value = %v/%v, want 2/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_errors_listener_buffer_degraded", labels); !ok || v != 1 {
-		t.Fatalf("errors listener_buffer_degraded value = %v/%v, want 1/true", v, ok)
-	}
+	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_rate_limited", 1)
 }
 
 func TestCollectorHandlePacketEmitsPipelineMetrics(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	const jobName = "test-pipeline-metrics"
-	metrics := withCleanJobMetrics(t, jobName)
 
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-	c.metrics = metrics
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -1073,7 +887,7 @@ func TestCollectorHandlePacketEmitsPipelineMetrics(t *testing.T) {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
 	}
 
-	store := collectJobMetricsForTest(t, jobName)
+	store := collectJobMetricsForTest(t, c.telemetry)
 	jobLabels := metrix.Labels{"job_name": jobName}
 	for name, expected := range map[string]float64{
 		"snmp_trap_pipeline_received":  1,
@@ -1090,8 +904,8 @@ func TestCollectorHandlePacketEmitsPipelineMetrics(t *testing.T) {
 
 func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 	const jobName = "test-built-in-and-profile-metrics"
-	metrics := withCleanJobMetrics(t, jobName)
-	metrics.incEvent("security")
+	metrics := newTestJobTelemetry(t, jobName, false)
+	metrics.Event(model.Category("security"))
 
 	rt := newRootTestProfileMetricRuntime(t)
 	entry := rootTestCiscoConfigTrapEntry(jobName)
@@ -1106,7 +920,7 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 	c := &Collector{
 		Config:         Config{Name: jobName},
 		trapWriter:     &mockTrapWriter{},
-		metrics:        metrics,
+		telemetry:      metrics,
 		profileMetrics: rt,
 		store:          store,
 	}
@@ -1133,7 +947,7 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 
 func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
 	const jobName = "test-binary-encoded"
-	withCleanJobMetrics(t, jobName)
+	metrics := newTestJobTelemetry(t, jobName, false)
 
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
@@ -1144,7 +958,7 @@ func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
 	c := &Collector{
 		Config:     Config{Name: jobName},
 		trapWriter: &mockTrapWriter{binaryEncodedFields: 2},
-		metrics:    getJobMetrics(jobName),
+		telemetry:  metrics,
 		store:      store,
 	}
 	c.receiver = bindTestReceiver(t, c)

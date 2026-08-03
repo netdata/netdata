@@ -1658,6 +1658,25 @@ traps:
 	assert.Contains(t, err.Error(), "dedup_key_varbind")
 }
 
+func TestProfileLoadEmptyDedupKey(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "bad.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+    dedup_key_varbinds: [""]
+`)
+
+	setTestDirs(t, dir)
+	resetTestEpoch()
+
+	_, err := acquireTestEpoch()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dedup_key_varbind")
+}
+
 func TestProfileLoadInvalidLabelKey(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAML(t, dir, "bad.yaml", `

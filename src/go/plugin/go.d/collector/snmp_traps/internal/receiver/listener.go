@@ -25,23 +25,17 @@ type listenerEndpoint struct {
 	cfg  Endpoint
 }
 
-type listenerReceiveBufferWarning struct {
-	endpoint  Endpoint
-	requested int
-	err       error
-}
-
 type listener struct {
-	endpoints             []listenerEndpoint
-	receiveBufferWarnings []listenerReceiveBufferWarning
-	report                Reporter
-	mu                    sync.Mutex
-	closed                bool
-	wg                    sync.WaitGroup
+	endpoints []listenerEndpoint
+	report    Reporter
+	mu        sync.Mutex
+	closed    bool
+	wg        sync.WaitGroup
 }
 
-func newListener(cfg ListenConfig, report Reporter) (*listener, error) {
+func newListener(cfg ListenConfig, report Reporter) (*listener, []Event, error) {
 	l := &listener{report: report}
+	var bindEvents []Event
 
 	var bound []*net.UDPConn
 
@@ -51,25 +45,26 @@ func newListener(cfg ListenConfig, report Reporter) (*listener, error) {
 		udpAddr, err := net.ResolveUDPAddr(protocol, addr)
 		if err != nil {
 			closeConns(bound)
-			return nil, fmt.Errorf("endpoint %d: resolve %s: %w", i, addr, err)
+			return nil, nil, fmt.Errorf("endpoint %d: resolve %s: %w", i, addr, err)
 		}
 
 		conn, err := net.ListenUDP(protocol, udpAddr)
 		if err != nil {
 			closeConns(bound)
-			return nil, fmt.Errorf("endpoint %d: bind %s: %w", i, addr, err)
+			return nil, nil, fmt.Errorf("endpoint %d: bind %s: %w", i, addr, err)
 		}
 		if cfg.ReceiveBuffer > 0 {
 			if err := setUDPReadBuffer(conn, cfg.ReceiveBuffer); err != nil {
 				if cfg.ReceiveBuffer != DefaultReceiveBuffer {
 					conn.Close()
 					closeConns(bound)
-					return nil, fmt.Errorf("endpoint %d: set receive buffer for %s to %d bytes: %w", i, addr, cfg.ReceiveBuffer, err)
+					return nil, nil, fmt.Errorf("endpoint %d: set receive buffer for %s to %d bytes: %w", i, addr, cfg.ReceiveBuffer, err)
 				}
-				l.receiveBufferWarnings = append(l.receiveBufferWarnings, listenerReceiveBufferWarning{
-					endpoint:  ep,
-					requested: cfg.ReceiveBuffer,
-					err:       err,
+				bindEvents = append(bindEvents, Event{
+					Type:      EventListenerBufferDegraded,
+					Endpoint:  ep,
+					Requested: cfg.ReceiveBuffer,
+					Err:       err,
 				})
 			}
 		}
@@ -78,7 +73,7 @@ func newListener(cfg ListenConfig, report Reporter) (*listener, error) {
 		l.endpoints = append(l.endpoints, listenerEndpoint{conn: conn, cfg: ep})
 	}
 
-	return l, nil
+	return l, bindEvents, nil
 }
 
 func (l *listener) start(handler func(Datagram)) {

@@ -79,7 +79,7 @@ metrics:
 	dedupCollector, _ := newDedupTestV2Collector(t, "test", dedupWriter)
 	dedupCollector.profileIndex = lease.Epoch()
 	dedupCollector.profileMetrics = rt
-	dedupCollector.deduper.start()
+	dedupCollector.deduper.Start()
 	t.Cleanup(dedupCollector.deduper.Close)
 
 	dedupCollector.handlePacket(packet.Payload, packet.Peer, nil, nil)

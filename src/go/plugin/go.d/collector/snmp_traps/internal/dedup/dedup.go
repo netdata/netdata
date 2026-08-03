@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package dedup
 
 import (
 	"container/list"
@@ -12,128 +12,124 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 )
 
 const (
-	defaultDedupWindow          = 5 * time.Second
-	defaultDedupCacheMaxEntries = 100000
-	dedupVarbindMissing         = "missing"
-	dedupVarbindPresent         = "present"
+	varbindMissing = "missing"
+	varbindPresent = "present"
 )
 
-type dedupKey [sha256.Size]byte
+type key [sha256.Size]byte
 
-type dedupAdmission struct {
-	key dedupKey
+type Decision uint8
+
+const (
+	DecisionAdmit Decision = iota
+	DecisionSuppress
+)
+
+type Admission struct {
+	key key
 	ok  bool
 }
 
-type dedupCacheEntry struct {
-	key       dedupKey
+type Summary struct {
+	ReceivedRealtimeUsec  int64
+	ReceivedMonotonicUsec int64
+	Message               string
+	Counts                *model.DedupSummary
+}
+
+type NameResolver func(oid string) string
+type SummaryCallback func(Summary)
+
+type Options struct {
+	MonotonicNow func() int64
+	ResolveName  NameResolver
+	OnSummary    SummaryCallback
+	Now          func() time.Time
+}
+
+type cacheEntry struct {
+	key       key
 	trapOID   string
 	expiresAt time.Time
 }
 
-type dedupPeriodState struct {
+type periodState struct {
 	total        int64
 	byTrap       map[string]int64
-	fingerprints map[dedupKey]struct{}
+	fingerprints map[key]struct{}
 }
 
-type trapDeduper struct {
-	jobName         string
-	window          time.Duration
-	maxEntries      int
-	writer          output.Writer
-	metrics         *perJobMetrics
-	writeFailureDim string
-	monotonicNow    func() int64
-	profiles        *ProfileIndex
+type Deduper struct {
+	window       time.Duration
+	maxEntries   int
+	monotonicNow func() int64
+	resolveName  NameResolver
+	onSummary    SummaryCallback
+	now          func() time.Time
 
 	mu      sync.Mutex
-	entries map[dedupKey]*list.Element
+	entries map[key]*list.Element
 	order   *list.List
-	period  dedupPeriodState
+	period  periodState
 
-	closeOnce sync.Once
-	startOnce sync.Once
-	started   atomic.Bool
-	closeCh   chan struct{}
-	doneCh    chan struct{}
+	lifecycleMu sync.Mutex
+	started     bool
+	closed      bool
+	closeCh     chan struct{}
+	doneCh      chan struct{}
 }
 
-func validateDedupConfig(cfg DedupConfig) error {
-	if !cfg.Enabled {
+func New(policy Policy, opts Options) *Deduper {
+	if !policy.enabled {
 		return nil
 	}
-	if cfg.WindowSec < 0 {
-		return fmt.Errorf("dedup.window_sec must be non-negative, got %d", cfg.WindowSec)
+	if opts.MonotonicNow == nil {
+		opts.MonotonicNow = func() int64 { return 0 }
 	}
-	if cfg.CacheMaxEntries < 0 {
-		return fmt.Errorf("dedup.cache_max_entries must be non-negative, got %d", cfg.CacheMaxEntries)
+	if opts.ResolveName == nil {
+		opts.ResolveName = func(oid string) string { return oid }
 	}
-	for i, key := range cfg.KeyVarbinds {
-		if strings.TrimSpace(key) == "" {
-			return fmt.Errorf("dedup.key_varbinds[%d] must not be empty", i)
-		}
+	if opts.Now == nil {
+		opts.Now = time.Now
 	}
-	return nil
-}
-
-func newTrapDeduper(jobName string, cfg DedupConfig, writer output.Writer, metrics *perJobMetrics, writeFailureDim string, monotonicNow ...func() int64) *trapDeduper {
-	if !cfg.Enabled {
-		return nil
-	}
-	if writeFailureDim == "" {
-		writeFailureDim = trapWriteFailureJournal
-	}
-	monotonicFn := func() int64 { return 0 }
-	if len(monotonicNow) > 0 && monotonicNow[0] != nil {
-		monotonicFn = monotonicNow[0]
-	}
-	window := time.Duration(cfg.WindowSec) * time.Second
-	if window <= 0 {
-		window = defaultDedupWindow
-	}
-	maxEntries := cfg.CacheMaxEntries
-	if maxEntries <= 0 {
-		maxEntries = defaultDedupCacheMaxEntries
-	}
-	return &trapDeduper{
-		jobName:         jobName,
-		window:          window,
-		maxEntries:      maxEntries,
-		writer:          writer,
-		metrics:         metrics,
-		writeFailureDim: writeFailureDim,
-		monotonicNow:    monotonicFn,
-		entries:         make(map[dedupKey]*list.Element),
-		order:           list.New(),
-		period: dedupPeriodState{
+	return &Deduper{
+		window:       policy.window,
+		maxEntries:   policy.maxEntries,
+		monotonicNow: opts.MonotonicNow,
+		resolveName:  opts.ResolveName,
+		onSummary:    opts.OnSummary,
+		now:          opts.Now,
+		entries:      make(map[key]*list.Element),
+		order:        list.New(),
+		period: periodState{
 			byTrap:       make(map[string]int64),
-			fingerprints: make(map[dedupKey]struct{}),
+			fingerprints: make(map[key]struct{}),
 		},
 		closeCh: make(chan struct{}),
 		doneCh:  make(chan struct{}),
 	}
 }
 
-func (d *trapDeduper) start() {
+func (d *Deduper) Start() {
 	if d == nil {
 		return
 	}
-	d.startOnce.Do(func() {
-		d.started.Store(true)
-		go d.run()
-	})
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+	if d.started || d.closed {
+		return
+	}
+	d.started = true
+	go d.run()
 }
 
-func (d *trapDeduper) run() {
+func (d *Deduper) run() {
 	ticker := time.NewTicker(d.window)
 	defer func() {
 		ticker.Stop()
@@ -145,56 +141,67 @@ func (d *trapDeduper) run() {
 		case now := <-ticker.C:
 			d.emitSummary(now)
 		case <-d.closeCh:
-			d.emitSummary(time.Now())
+			d.emitSummary(d.now())
 			return
 		}
 	}
 }
 
-func (d *trapDeduper) Close() {
+// Close synchronously completes the final summary callback. The caller may
+// close output dependencies as soon as Close returns.
+func (d *Deduper) Close() {
 	if d == nil {
 		return
 	}
-	if !d.started.Load() {
+	d.lifecycleMu.Lock()
+	if d.closed {
+		d.lifecycleMu.Unlock()
+		<-d.doneCh
 		return
 	}
-	d.closeOnce.Do(func() {
-		close(d.closeCh)
-		<-d.doneCh
-	})
+	d.closed = true
+	if !d.started {
+		d.lifecycleMu.Unlock()
+		defer close(d.doneCh)
+		d.emitSummary(d.now())
+		return
+	}
+	close(d.closeCh)
+	d.lifecycleMu.Unlock()
+	<-d.doneCh
 }
 
-func (d *trapDeduper) Admit(entry *TrapEntry, td *TrapDef, jobKeys []string) (dedupAdmission, bool) {
+func (d *Deduper) Admit(entry *model.TrapEntry, keyVarbinds []string) (Admission, Decision) {
 	if d == nil || entry == nil {
-		return dedupAdmission{}, false
+		return Admission{}, DecisionAdmit
 	}
-	now := time.Now()
-	key := dedupFingerprint(entry, td, jobKeys)
+	now := d.now()
+	fingerprint := fingerprint(entry, keyVarbinds)
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	d.evictExpiredLocked(now)
-	if elem, ok := d.entries[key]; ok {
-		cacheEntry := elem.Value.(*dedupCacheEntry)
+	if elem, ok := d.entries[fingerprint]; ok {
+		cacheEntry := elem.Value.(*cacheEntry)
 		if now.Before(cacheEntry.expiresAt) {
-			d.recordSuppressedLocked(key, cacheEntry.trapOID)
-			return dedupAdmission{}, true
+			d.recordSuppressedLocked(fingerprint, cacheEntry.trapOID)
+			return Admission{}, DecisionSuppress
 		}
 		d.removeElementLocked(elem)
 	}
 
-	cacheEntry := &dedupCacheEntry{
-		key:       key,
+	entryState := &cacheEntry{
+		key:       fingerprint,
 		trapOID:   entry.TrapOID,
 		expiresAt: now.Add(d.window),
 	}
-	d.entries[key] = d.order.PushBack(cacheEntry)
+	d.entries[fingerprint] = d.order.PushBack(entryState)
 	d.trimLocked()
-	return dedupAdmission{key: key, ok: true}, false
+	return Admission{key: fingerprint, ok: true}, DecisionAdmit
 }
 
-func (d *trapDeduper) Rollback(admission dedupAdmission) {
+func (d *Deduper) Rollback(admission Admission) {
 	if d == nil || !admission.ok {
 		return
 	}
@@ -205,24 +212,20 @@ func (d *trapDeduper) Rollback(admission dedupAdmission) {
 	}
 }
 
-func (d *trapDeduper) recordSuppressedLocked(key dedupKey, trapOID string) {
+func (d *Deduper) recordSuppressedLocked(fingerprint key, trapOID string) {
 	if trapOID == "" {
 		trapOID = "unknown"
 	}
 	d.period.total++
 	d.period.byTrap[trapOID]++
-	d.period.fingerprints[key] = struct{}{}
-	if d.metrics != nil {
-		d.metrics.incDedupSuppressed()
-		d.metrics.incPipelineDedupSuppressed()
-	}
+	d.period.fingerprints[fingerprint] = struct{}{}
 }
 
-func (d *trapDeduper) evictExpiredLocked(now time.Time) {
+func (d *Deduper) evictExpiredLocked(now time.Time) {
 	for elem := d.order.Front(); elem != nil; {
 		next := elem.Next()
-		cacheEntry := elem.Value.(*dedupCacheEntry)
-		if now.Before(cacheEntry.expiresAt) {
+		entry := elem.Value.(*cacheEntry)
+		if now.Before(entry.expiresAt) {
 			return
 		}
 		d.removeElementLocked(elem)
@@ -230,7 +233,7 @@ func (d *trapDeduper) evictExpiredLocked(now time.Time) {
 	}
 }
 
-func (d *trapDeduper) trimLocked() {
+func (d *Deduper) trimLocked() {
 	for d.maxEntries > 0 && len(d.entries) > d.maxEntries {
 		elem := d.order.Front()
 		if elem == nil {
@@ -240,35 +243,29 @@ func (d *trapDeduper) trimLocked() {
 	}
 }
 
-func (d *trapDeduper) removeElementLocked(elem *list.Element) {
-	cacheEntry := elem.Value.(*dedupCacheEntry)
-	delete(d.entries, cacheEntry.key)
+func (d *Deduper) removeElementLocked(elem *list.Element) {
+	entry := elem.Value.(*cacheEntry)
+	delete(d.entries, entry.key)
 	d.order.Remove(elem)
 }
 
-func (d *trapDeduper) emitSummary(now time.Time) {
-	if d == nil || d.writer == nil {
+func (d *Deduper) emitSummary(now time.Time) {
+	if d == nil || d.onSummary == nil {
 		return
 	}
-	summary := d.snapshotSummary()
-	if summary == nil || summary.TotalSuppressed == 0 {
+	counts := d.snapshotSummary()
+	if counts == nil || counts.TotalSuppressed == 0 {
 		return
 	}
-	entry := &TrapEntry{
-		JobName:               d.jobName,
-		ReportType:            ReportTypeDedupSummary,
+	d.onSummary(Summary{
 		ReceivedRealtimeUsec:  now.UnixMicro(),
 		ReceivedMonotonicUsec: d.monotonicNow(),
-		Message:               d.renderSummaryMessage(summary),
-		Severity:              "info",
-		SummaryCounts:         summary,
-	}
-	if err := d.writer.Write(entry); err != nil && d.metrics != nil {
-		d.metrics.incError(d.writeFailureDim)
-	}
+		Message:               d.renderSummaryMessage(counts),
+		Counts:                counts,
+	})
 }
 
-func (d *trapDeduper) snapshotSummary() *DedupSummary {
+func (d *Deduper) snapshotSummary() *model.DedupSummary {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -277,7 +274,7 @@ func (d *trapDeduper) snapshotSummary() *DedupSummary {
 	}
 	byTrap := make(map[string]int64, len(d.period.byTrap))
 	maps.Copy(byTrap, d.period.byTrap)
-	summary := &DedupSummary{
+	summary := &model.DedupSummary{
 		TotalSuppressed: d.period.total,
 		PeriodSec:       int64(d.window / time.Second),
 		Fingerprints:    int64(len(d.period.fingerprints)),
@@ -285,38 +282,28 @@ func (d *trapDeduper) snapshotSummary() *DedupSummary {
 	}
 	d.period.total = 0
 	d.period.byTrap = make(map[string]int64)
-	d.period.fingerprints = make(map[dedupKey]struct{})
+	d.period.fingerprints = make(map[key]struct{})
 	return summary
 }
 
-func (d *trapDeduper) renderSummaryMessage(summary *DedupSummary) string {
+func (d *Deduper) renderSummaryMessage(summary *model.DedupSummary) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "DEDUPLICATED TRAPS: %d events have been deduplicated in the last %ds:", summary.TotalSuppressed, summary.PeriodSec)
-
-	for _, item := range sortedDedupSummaryItems(summary.ByTrap) {
-		fmt.Fprintf(&b, "\n- %s %d", d.trapSummaryName(item.oid), item.count)
+	for _, item := range sortedSummaryItems(summary.ByTrap) {
+		fmt.Fprintf(&b, "\n- %s %d", d.resolveName(item.oid), item.count)
 	}
 	return b.String()
 }
 
-func (d *trapDeduper) trapSummaryName(oid string) string {
-	if idx := d.profiles; idx != nil {
-		if td := idx.Lookup(oid); td != nil && td.Name != "" {
-			return td.Name
-		}
-	}
-	return oid
-}
-
-type dedupSummaryItem struct {
+type summaryItem struct {
 	oid   string
 	count int64
 }
 
-func sortedDedupSummaryItems(byTrap map[string]int64) []dedupSummaryItem {
-	items := make([]dedupSummaryItem, 0, len(byTrap))
+func sortedSummaryItems(byTrap map[string]int64) []summaryItem {
+	items := make([]summaryItem, 0, len(byTrap))
 	for oid, count := range byTrap {
-		items = append(items, dedupSummaryItem{oid: oid, count: count})
+		items = append(items, summaryItem{oid: oid, count: count})
 	}
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].count != items[j].count {
@@ -327,23 +314,23 @@ func sortedDedupSummaryItems(byTrap map[string]int64) []dedupSummaryItem {
 	return items
 }
 
-func dedupFingerprint(entry *TrapEntry, td *TrapDef, jobKeys []string) dedupKey {
+func fingerprint(entry *model.TrapEntry, keyVarbinds []string) key {
 	var stack [512]byte
 	buf := stack[:0]
 	buf = appendFingerprintPart(buf, "source")
-	buf = appendDedupSourceDevice(buf, entry)
+	buf = appendSourceDevice(buf, entry)
 	buf = appendFingerprintPart(buf, "trap_oid")
 	buf = appendFingerprintPart(buf, entry.TrapOID)
 
-	for _, name := range dedupKeyVarbinds(td, jobKeys) {
+	for _, name := range keyVarbinds {
 		buf = appendFingerprintPart(buf, "varbind")
 		buf = appendFingerprintPart(buf, name)
-		vb, ok := dedupVarbind(entry, name)
+		vb, ok := findVarbind(entry, name)
 		if !ok {
-			buf = appendFingerprintPart(buf, dedupVarbindMissing)
+			buf = appendFingerprintPart(buf, varbindMissing)
 			continue
 		}
-		buf = appendFingerprintPart(buf, dedupVarbindPresent)
+		buf = appendFingerprintPart(buf, varbindPresent)
 		buf = appendFingerprintPart(buf, vb.OID)
 		buf = appendFingerprintPart(buf, string(vb.Type))
 		if model.IsSensitiveVarbind(vb) {
@@ -356,7 +343,7 @@ func dedupFingerprint(entry *TrapEntry, td *TrapDef, jobKeys []string) dedupKey 
 	return sha256.Sum256(buf)
 }
 
-func appendDedupSourceDevice(buf []byte, entry *TrapEntry) []byte {
+func appendSourceDevice(buf []byte, entry *model.TrapEntry) []byte {
 	if entry == nil {
 		return appendFingerprintPart(buf, "")
 	}
@@ -375,16 +362,9 @@ func appendDedupSourceDevice(buf []byte, entry *TrapEntry) []byte {
 	return appendFingerprintPart(buf, "")
 }
 
-func dedupKeyVarbinds(td *TrapDef, jobKeys []string) []string {
-	if td != nil && len(td.DedupKeyVarbinds) > 0 {
-		return td.DedupKeyVarbinds
-	}
-	return jobKeys
-}
-
-func dedupVarbind(entry *TrapEntry, name string) (VarbindValue, bool) {
+func findVarbind(entry *model.TrapEntry, name string) (model.VarbindValue, bool) {
 	if entry == nil {
-		return VarbindValue{}, false
+		return model.VarbindValue{}, false
 	}
 	if value, ok := model.FindVarbindByName(entry.Varbinds, name); ok {
 		return value, true
@@ -392,7 +372,7 @@ func dedupVarbind(entry *TrapEntry, name string) (VarbindValue, bool) {
 	if model.IsNumericOID(name) {
 		return model.FindVarbindForProfileOID(entry.Varbinds, name)
 	}
-	return VarbindValue{}, false
+	return model.VarbindValue{}, false
 }
 
 func appendFingerprintValue(buf []byte, val any) []byte {

@@ -706,17 +706,17 @@ Why it matters:
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/metrics.go` collects receiver
-  pipeline, events, severities, errors, and dedup metrics with `job_name`.
+- `src/go/plugin/go.d/collector/snmp_traps/internal/telemetry/job.go` collects
+  receiver pipeline, events, severities, errors, and dedup metrics with
+  `job_name` through an explicit per-job handle.
 - `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, and `TRAP_ENRICHMENT` preserve the
   source evidence used for log filtering and audit.
 - `src/go/plugin/go.d/collector/snmp_traps/config.go:26` through `:28` defines
   trusted relay configuration.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:732` through `:736`
-  warns that catch-all trusted relays let every peer override source identity
-  via `snmpTrapAddress.0`.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:578` through `:587`
-  handles INFORM responses and increments `inform_response_failed`.
+- `Collector.warnCatchAllTrustedRelays` warns that catch-all trusted relays let
+  every peer override source identity via `snmpTrapAddress.0`.
+- `Collector.handleReceiverEvent` handles INFORM response failures and records
+  `inform_response_failed` through the retained telemetry handle.
 
 ## Explicit Non-Goals
 
@@ -1785,7 +1785,7 @@ Profile validation must reject:
   approved bounded enum or boolean representation;
 - `value_from_varbind` targeting known sensitive varbinds;
 - `output.metric` values that collide with built-in metrics emitted by
-  `metrics.go`;
+  `internal/telemetry/job.go`;
 - `output.dimension` values that do not match the chart dimension name selecting
   the rule's `output.metric`.
 

@@ -10,6 +10,7 @@ import (
 	"regexp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
@@ -38,6 +39,7 @@ type validatedConfig struct {
 	otlp           otlp.Policy
 	journalEnabled bool
 	retention      journal.Retention
+	dedup          dedup.Policy
 	profileMetrics profilemetrics.Policy
 }
 
@@ -86,9 +88,16 @@ func validateConfig(c Config) (validatedConfig, error) {
 	if err := receiver.ValidateRateLimit(toReceiverRateLimitConfig(c.RateLimit)); err != nil {
 		return validated, err
 	}
-	if err := validateDedupConfig(c.Dedup); err != nil {
+	dedupPolicy, err := dedup.Normalize(dedup.Config{
+		Enabled:         c.Dedup.Enabled,
+		WindowSec:       c.Dedup.WindowSec,
+		CacheMaxEntries: c.Dedup.CacheMaxEntries,
+		KeyVarbinds:     c.Dedup.KeyVarbinds,
+	})
+	if err != nil {
 		return validated, err
 	}
+	validated.dedup = dedupPolicy
 
 	if c.OTLP.Enabled {
 		policy, err := otlp.Normalize(otlp.Config{

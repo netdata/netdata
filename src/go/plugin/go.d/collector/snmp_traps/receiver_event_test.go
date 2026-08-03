@@ -17,7 +17,7 @@ func TestCollectorReceiverReadErrorLogIsRateLimited(t *testing.T) {
 	var buf bytes.Buffer
 	c := newTestSNMPTrapsCollector()
 	c.Logger = logger.NewWithWriter(&buf)
-	metrics := &perJobMetrics{}
+	metrics := newTestJobTelemetry(t, "read-errors", false)
 	event := receiver.Event{
 		Type: receiver.EventListenerReadFailed,
 		Endpoint: receiver.Endpoint{
@@ -37,16 +37,16 @@ func TestCollectorReceiverReadErrorLogIsRateLimited(t *testing.T) {
 	assert.Contains(t, out, "endpoint=udp4://127.0.0.1:9162")
 	assert.Contains(t, out, "boom")
 	assert.NotContains(t, out, "again")
-	assert.Equal(t, uint64(2), metrics.errors.listenerReadFailed.Load())
+	assertJobMetric(t, metrics, "read-errors", "snmp_trap_errors_listener_read_failed", 2)
 }
 
-func TestCollectorReportsReceiverBufferDegradedEvent(t *testing.T) {
-	metrics := &perJobMetrics{}
+func TestCollectorAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
 	c := newTestSNMPTrapsCollector()
+	c.Name = "buffer-degraded"
 	var buf bytes.Buffer
 	c.Logger = logger.NewWithWriter(&buf)
 
-	c.handleReceiverEvent(metrics, receiver.Event{
+	metrics := c.attachTelemetryAndHandleInitEvents([]receiver.Event{{
 		Type: receiver.EventListenerBufferDegraded,
 		Endpoint: receiver.Endpoint{
 			Protocol: "udp4",
@@ -55,9 +55,10 @@ func TestCollectorReportsReceiverBufferDegradedEvent(t *testing.T) {
 		},
 		Requested: receiver.DefaultReceiveBuffer,
 		Err:       errors.New("boom"),
-	})
+	}}, false)
+	t.Cleanup(metrics.Detach)
 
-	assert.Equal(t, uint64(1), metrics.errors.listenerBufferDegraded.Load())
+	assertJobMetric(t, metrics, "buffer-degraded", "snmp_trap_errors_listener_buffer_degraded", 1)
 	out := buf.String()
 	assert.Contains(t, out, "SNMP trap listener receive buffer request degraded")
 	assert.Contains(t, out, "endpoint=udp4://127.0.0.1:9162")
@@ -66,24 +67,24 @@ func TestCollectorReportsReceiverBufferDegradedEvent(t *testing.T) {
 }
 
 func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
-	tests := map[receiver.ErrorKind]func(*perJobMetrics) uint64{
-		receiver.ErrorMalformedPDU:  func(m *perJobMetrics) uint64 { return m.errors.malformedPDU.Load() },
-		receiver.ErrorAuthFailure:   func(m *perJobMetrics) uint64 { return m.errors.authFailures.Load() },
-		receiver.ErrorUSMFailure:    func(m *perJobMetrics) uint64 { return m.errors.usmFailures.Load() },
-		receiver.ErrorUnknownEngine: func(m *perJobMetrics) uint64 { return m.errors.unknownEngineID.Load() },
-		receiver.ErrorDecodeFailed:  func(m *perJobMetrics) uint64 { return m.errors.decodeFailed.Load() },
-		receiver.ErrorDroppedPolicy: func(m *perJobMetrics) uint64 { return m.errors.droppedAllowlist.Load() },
-		receiver.ErrorRateLimited:   func(m *perJobMetrics) uint64 { return m.errors.rateLimited.Load() },
+	tests := map[receiver.ErrorKind]string{
+		receiver.ErrorMalformedPDU:  "snmp_trap_errors_malformed_pdu",
+		receiver.ErrorAuthFailure:   "snmp_trap_errors_auth_failures",
+		receiver.ErrorUSMFailure:    "snmp_trap_errors_usm_failures",
+		receiver.ErrorUnknownEngine: "snmp_trap_errors_unknown_engine_id",
+		receiver.ErrorDecodeFailed:  "snmp_trap_errors_decode_failed",
+		receiver.ErrorDroppedPolicy: "snmp_trap_errors_dropped_allowlist",
+		receiver.ErrorRateLimited:   "snmp_trap_errors_rate_limited",
 	}
 
-	for kind, value := range tests {
+	for kind, metric := range tests {
 		t.Run(string(kind), func(t *testing.T) {
-			metrics := &perJobMetrics{}
+			metrics := newTestJobTelemetry(t, string(kind), false)
 			newTestSNMPTrapsCollector().handleReceiverEvent(metrics, receiver.Event{
 				Type:      receiver.EventError,
 				ErrorKind: kind,
 			})
-			assert.Equal(t, uint64(1), value(metrics))
+			assertJobMetric(t, metrics, string(kind), metric, 1)
 		})
 	}
 }
@@ -91,7 +92,7 @@ func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
 func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
 	tests := map[string]struct {
 		event     receiver.Event
-		metric    func(*perJobMetrics) uint64
+		metric    string
 		logSubstr []string
 	}{
 		"dynamic engine ID registration": {
@@ -100,7 +101,7 @@ func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
 				EngineID: "8000000001020304",
 				Username: "test-user",
 			},
-			metric: func(m *perJobMetrics) uint64 { return m.errors.unknownEngineID.Load() },
+			metric: "snmp_trap_errors_unknown_engine_id",
 			logSubstr: []string{
 				"Dynamic SNMPv3 engine ID registered",
 				"engineID=8000000001020304",
@@ -112,7 +113,7 @@ func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
 				Type: receiver.EventInformResponseFailed,
 				Err:  errors.New("response failed"),
 			},
-			metric:    func(m *perJobMetrics) uint64 { return m.errors.informResponseFail.Load() },
+			metric:    "snmp_trap_errors_inform_response_failed",
 			logSubstr: []string{"SNMP trap INFORM response failed", "response failed"},
 		},
 		"discovery Report failure": {
@@ -120,21 +121,21 @@ func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
 				Type: receiver.EventDiscoveryReportFailed,
 				Err:  errors.New("report failed"),
 			},
-			metric:    func(m *perJobMetrics) uint64 { return m.errors.informResponseFail.Load() },
+			metric:    "snmp_trap_errors_inform_response_failed",
 			logSubstr: []string{"SNMP trap INFORM discovery Report failed", "report failed"},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			metrics := &perJobMetrics{}
+			metrics := newTestJobTelemetry(t, name, false)
 			var buf bytes.Buffer
 			c := newTestSNMPTrapsCollector()
 			c.Logger = logger.NewWithWriter(&buf)
 
 			c.handleReceiverEvent(metrics, tc.event)
 
-			assert.Equal(t, uint64(1), tc.metric(metrics))
+			assertJobMetric(t, metrics, name, tc.metric, 1)
 			for _, substr := range tc.logSubstr {
 				assert.Contains(t, buf.String(), substr)
 			}

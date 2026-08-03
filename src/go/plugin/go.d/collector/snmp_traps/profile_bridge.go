@@ -4,9 +4,9 @@ package snmp_traps
 
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 
-type VarbindDef = catalog.VarbindDef
+// Root packet rendering retains these catalog bridges until its approved PR10
+// ownership move.
 type TrapDef = catalog.TrapDef
-type ProfileIndex = catalog.Epoch
 
 const maxMessageLen = catalog.MaxMessageLen
 
@@ -20,11 +20,4 @@ func trapEntryHasUnresolvedTemplate(entry *TrapEntry) bool {
 func truncateUTF8(s string, maxBytes int) string { return catalog.TruncateUTF8(s, maxBytes) }
 func resolve2TierVarbind(oid string, raw VarbindValue, td *TrapDef) VarbindValue {
 	return catalog.ResolveVarbind(oid, raw, td)
-}
-
-// Root packet rendering and dedup retain these catalog bridges until their
-// approved PR9/PR10 ownership moves.
-func newProfileIndex() *ProfileIndex { return catalog.NewEpoch() }
-func prepareTrapDefinition(td *TrapDef) error {
-	return catalog.PrepareTrap(td)
 }
