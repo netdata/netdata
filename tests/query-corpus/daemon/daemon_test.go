@@ -4,6 +4,7 @@ package daemon
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -16,6 +17,46 @@ func TestNetdataConfigDisablesUnlistedPlugins(t *testing.T) {
 	const disabled = "\n    enable running new plugins = no\n"
 	if !strings.Contains(netdataConfTemplate, disabled) {
 		t.Fatal("generated [plugins] configuration allows unlisted installed collectors")
+	}
+}
+
+func TestStorageOptionsAreStrictAndRenderExactly(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		o    Options
+	}{
+		{name: "default"},
+		{name: "gorilla-dbengine", o: Options{DBEnginePageType: "gorilla", StreamMemoryMode: "dbengine"}},
+		{name: "raw-ram", o: Options{DBEnginePageType: "raw", StreamMemoryMode: "ram"}},
+		{name: "raw-alloc", o: Options{DBEnginePageType: "raw", StreamMemoryMode: "alloc"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validateOptions(tc.o); err != nil {
+				t.Fatalf("valid options rejected: %v", err)
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name string
+		o    Options
+	}{
+		{name: "unknown page type", o: Options{DBEnginePageType: "array"}},
+		{name: "unknown memory mode", o: Options{StreamMemoryMode: "heap"}},
+		{name: "case variant", o: Options{DBEnginePageType: "Raw"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validateOptions(tc.o); err == nil {
+				t.Fatal("invalid storage option accepted")
+			}
+		})
+	}
+
+	if got := streamMemoryMode(Options{}); got != "dbengine" {
+		t.Fatalf("default stream memory mode = %q, want dbengine", got)
+	}
+	if got := fmt.Sprintf(streamConfTemplate, "key", "alloc"); !strings.Contains(got, "[key]") || !strings.Contains(got, "default memory mode = alloc") {
+		t.Fatalf("stream configuration did not render selected memory mode:\n%s", got)
 	}
 }
 

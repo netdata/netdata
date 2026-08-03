@@ -72,6 +72,10 @@ var manifest = map[string]ManifestCase{
 		Proves:  "the three gap-only dimension states per the #23095 working-as-intended ruling: live phantom retention, gone after restart, back on next iteration",
 		FixedBy: "ruling #23095",
 	},
+	"L1/storage-backend-gap-state": {
+		Proves:     "every tier-0 storage backend normalizes the same numeric-gap-numeric stream identically: exact request-derived timestamp grids, EMPTY only on gaps, PARTIAL on mixed SUM rows, database statistics that exclude gaps, and the same answers from DBENGINE Gorilla and raw pages both hot and after restart plus RAM and ALLOC child storage",
+		Components: []string{"dbengine-gorilla-hot", "dbengine-gorilla-restart", "dbengine-raw-hot", "dbengine-raw-restart", "ram", "alloc"},
+	},
 	"L1/incremental-rates": {
 		Proves:     "the db stores PER-SECOND rates regardless of update_every: a v1 child's raw counters through the parent's rrdset_done yield K*(mul/div)/UE per second (incremental at ue 1/2/5 incl. mul/div scaling; absolute control unscaled)",
 		Components: []string{"rates-ue1-2-5", "rate-ue10"},
@@ -102,6 +106,13 @@ var manifest = map[string]ManifestCase{
 	},
 	"L2/update-every-sweep": {
 		Proves: "ue {10,30,60,600,3600} over the backdated v2 protocol: tier0 identity, tier1 windows on the scaled grid (gran = ue x 60, absolute alignment, partial counts, stored-empty family, fractional anomaly rates), time-group buckets in BOTH grid modes (default: bucket ends snap to absolute multiples of group x ue with `after` rounded UP; unaligned: grid anchored at `after`); paced v1 rate contract extended to ue=10",
+	},
+	"L2/historical-tier-grouping": {
+		Proves:     "a persisted higher-tier point keeps its original complete or PARTIAL state after the configured tier grouping changes: a dense count-4 rollup remains clean after grouping 4 to 8, and a gapped count-4-of-8 rollup remains PARTIAL after grouping 8 to 4; legacy V1 pages cannot satisfy this because they do not store the historical slot invariant",
+		Components: []string{"complete-4-to-8", "partial-8-to-4"},
+	},
+	"L2/v1-rollup-count-65536": {
+		Proves: "a complete higher-tier rollup containing 65,536 source samples remains numeric after persistence and restart: forced tier 1 projects it onto an exact 256-by-256-second request grid with value 256 in every clean row and min/avg/max exactly 1; legacy V1 pages cannot satisfy this because the stored uint16 count wraps to zero",
 	},
 	"CASE-017/tier-boundary-absorption": {
 		Proves:  "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",

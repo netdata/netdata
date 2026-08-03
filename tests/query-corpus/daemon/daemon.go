@@ -35,10 +35,12 @@ var errProcessNotReaped = errors.New("daemon: failed startup process is not reap
 
 // Options configures the daemon under test.
 type Options struct {
-	Binary       string // path to the stock netdata binary
-	RunDir       string // scratch directory for etc/cache/lib/log
-	Port         int    // 0 picks a free port
-	StorageTiers int    // defaults to 3
+	Binary           string // path to the stock netdata binary
+	RunDir           string // scratch directory for etc/cache/lib/log
+	Port             int    // 0 picks a free port
+	StorageTiers     int    // defaults to 3
+	DBEnginePageType string // empty keeps the stock Gorilla default; also accepts gorilla or raw
+	StreamMemoryMode string // empty defaults to dbengine; also accepts ram or alloc
 	// TierRetentionMB caps a tier's dbengine disk quota (index = tier), so
 	// its oldest datafiles rotate out while the tiers above keep more
 	// history — the plan-switching scenario. Retention TIME knobs are
@@ -138,13 +140,36 @@ const netdataConfTemplate = `[global]
 const streamConfTemplate = `[stream]
     enabled = no
 
-[%s]
+[%[1]s]
     enabled = yes
     type = api
-    default memory mode = dbengine
+    default memory mode = %[2]s
     health enabled by default = no
     replication period = 3650d
 `
+
+func validateOptions(o Options) error {
+	switch o.DBEnginePageType {
+	case "", "gorilla", "raw":
+	default:
+		return fmt.Errorf("daemon: invalid dbengine page type %q", o.DBEnginePageType)
+	}
+
+	switch o.StreamMemoryMode {
+	case "", "dbengine", "ram", "alloc":
+	default:
+		return fmt.Errorf("daemon: invalid stream memory mode %q", o.StreamMemoryMode)
+	}
+
+	return nil
+}
+
+func streamMemoryMode(o Options) string {
+	if o.StreamMemoryMode == "" {
+		return "dbengine"
+	}
+	return o.StreamMemoryMode
+}
 
 // freePort asks the kernel for an unused localhost TCP port.
 func freePort() (int, error) {
@@ -177,6 +202,9 @@ func Start(o Options) (*Daemon, error) {
 	if o.StorageTiers <= 0 {
 		o.StorageTiers = 3
 	}
+	if err := validateOptions(o); err != nil {
+		return nil, err
+	}
 
 	for _, sub := range []string{"etc", "cache", "lib", "log"} {
 		if err := os.MkdirAll(filepath.Join(o.RunDir, sub), 0o755); err != nil {
@@ -188,7 +216,7 @@ func Start(o Options) (*Daemon, error) {
 	if err != nil {
 		return nil, err
 	}
-	streamConf := fmt.Sprintf(streamConfTemplate, streamKey)
+	streamConf := fmt.Sprintf(streamConfTemplate, streamKey, streamMemoryMode(o))
 	if err := os.WriteFile(filepath.Join(o.RunDir, "etc", "stream.conf"), []byte(streamConf), 0o644); err != nil {
 		return nil, fmt.Errorf("daemon: write stream.conf: %w", err)
 	}
@@ -257,6 +285,9 @@ func startAttempt(o Options, hostname, streamKey string) (*Daemon, error) {
 		if tier > 0 && every > 0 {
 			extraDB += fmt.Sprintf("    dbengine tier %d update every iterations = %d\n", tier, every)
 		}
+	}
+	if o.DBEnginePageType != "" {
+		extraDB += fmt.Sprintf("    dbengine page type = %s\n", o.DBEnginePageType)
 	}
 	conf := fmt.Sprintf(netdataConfTemplate, o.RunDir, hostname, o.Port, o.StorageTiers, step, extraDB)
 	confPath := filepath.Join(o.RunDir, "etc", "netdata.conf")
