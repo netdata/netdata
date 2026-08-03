@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 int pgd_test(int argc, char *argv[]);
+int pgd_storage_point_unittest(void);
 
 #ifdef __cplusplus
 }

@@ -2,6 +2,7 @@
 
 #include "database/rrd.h"
 #include "database/rrddim-collection.h"
+#include "page_test.h"
 
 #ifdef ENABLE_DBENGINE
 
@@ -476,6 +477,7 @@ int test_dbengine(void) {
     if(!host)
         fatal("Failed to initialize host");
 
+    errors += (size_t)pgd_storage_point_unittest();
     errors += test_dbengine_burst_retention(host);
 
     RRDSET *st[CHARTS] = { 0 };

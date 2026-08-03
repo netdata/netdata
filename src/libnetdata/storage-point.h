@@ -48,7 +48,7 @@ typedef struct storage_point {
         _storage_point_slots : 1;                              \
 } while(0)
 
-#define STORAGE_POINT_UNSET (STORAGE_POINT){ .min = NAN, .max = NAN, .sum = NAN, .count = 0, .anomaly_count = 0, .flags = SN_FLAG_NONE, .gap_count = 0, .start_time_s = 0, .end_time_s = 0 }
+#define STORAGE_POINT_UNSET (STORAGE_POINT){ .min = NAN, .max = NAN, .sum = NAN, .start_time_s = 0, .end_time_s = 0, .count = 0, .anomaly_count = 0, .flags = SN_FLAG_NONE, .gap_count = 0 }
 
 #define storage_point_has_value(x) ((x).count != 0)
 #define storage_point_is_unset(x) (!(x).count && !(x).gap_count)
