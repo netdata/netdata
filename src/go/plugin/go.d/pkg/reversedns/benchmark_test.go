@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"runtime"
 	"testing"
 )
 
@@ -112,9 +113,11 @@ func BenchmarkLookupCachedParallel(b *testing.B) {
 
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
+		var result Result
 		for pb.Next() {
-			benchmarkResultSink = r.Lookup(addr)
+			result = r.Lookup(addr)
 		}
+		runtime.KeepAlive(result)
 	})
 }
 
