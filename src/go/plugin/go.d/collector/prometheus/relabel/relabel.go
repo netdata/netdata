@@ -653,13 +653,12 @@ func (p *Processor) rangeLabels(fn func(labels.Label)) {
 	// labels (labelmap) does not re-process labels it creates in the same rule. The
 	// scratch buffer is reused across calls.
 	//
-	// __name__ is deliberately excluded: labelmap/labeldrop/labelkeep operate on label
-	// names, and the metric name is never a sensible subject for them — labelmap would
-	// derive a junk label from the name, and labeldrop/labelkeep would strip the name
-	// and invalidate the metric. This diverges from Prometheus, which exposes __name__
-	// to these actions; here a metric is renamed only by a replace rule that targets
-	// __name__. (p.builder never holds __name__ — the name lives in p.currentName — so
-	// not re-adding it here is all it takes.)
+	// __name__ is deliberately excluded as an input: labelmap/labeldrop/labelkeep
+	// operate on application-label names, while the metric name lives separately in
+	// p.currentName. This diverges from Prometheus, which exposes __name__ to these
+	// actions. A labelmap replacement may still produce the destination __name__ and
+	// copy a matching application label's value into p.currentName; labeldrop and
+	// labelkeep cannot remove it because it is not ranged here.
 	p.rangeBuf = p.rangeBuf[:0]
 	p.builder.Range(func(l labels.Label) {
 		p.rangeBuf = append(p.rangeBuf, l)

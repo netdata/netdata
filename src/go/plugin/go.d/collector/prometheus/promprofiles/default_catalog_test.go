@@ -5,12 +5,14 @@ package promprofiles
 import (
 	"bufio"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
@@ -72,19 +74,7 @@ func TestDefaultCatalog_AllStockProfilesHydrate(t *testing.T) {
 // also suppresses vLLM's deprecated pre-canonical KV-offload families so every
 // operation is represented exactly once.
 func TestDefaultCatalog_VLLMRayDeniesEveryCompatibilityGauge(t *testing.T) {
-	file, err := os.Open("../testdata/vllm_ray_all_metrics.prom")
-	require.NoError(t, err)
-	defer func() { require.NoError(t, file.Close()) }()
-
-	types := make(map[string]string)
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) == 4 && fields[0] == "#" && fields[1] == "TYPE" {
-			types[fields[2]] = fields[3]
-		}
-	}
-	require.NoError(t, scanner.Err())
+	types := readPrometheusTypes(t, "../testdata/vllm_ray_all_metrics.prom")
 
 	var aliases []string
 	for name, typ := range types {
@@ -96,7 +86,7 @@ func TestDefaultCatalog_VLLMRayDeniesEveryCompatibilityGauge(t *testing.T) {
 	require.Len(t, aliases, 33)
 
 	denials := append(aliases,
-		"ray_vllm_kv_offload_size*",
+		"ray_vllm_kv_offload_size",
 		"ray_vllm_kv_offload_total_bytes_total",
 		"ray_vllm_kv_offload_total_time_total",
 	)
@@ -111,23 +101,97 @@ func TestDefaultCatalog_VLLMRayDeniesEveryCompatibilityGauge(t *testing.T) {
 	require.Equal(t, denials, selector.Deny)
 }
 
-func TestDefaultCatalog_HolisticProfilesHaveClosedFallbackAllowlists(t *testing.T) {
-	want := map[string][]string{
-		"ceph":     {"ceph_health_status", "ceph_daemon_socket_up", "ceph_nvmeof_gateway_info"},
-		"litellm":  {"litellm_proxy_total_requests_metric_total"},
-		"vllm":     {"vllm:num_requests_running"},
-		"vllm_ray": {"ray_vllm_num_requests_running"},
+func TestDefaultCatalog_GeneratedEpochDenialsMatchSourceUnion(t *testing.T) {
+	tests := map[string]struct {
+		fixture string
+		prefix  string
+	}{
+		"litellm": {fixture: "../testdata/litellm_all_metrics.prom", prefix: "litellm_"},
+		"vllm":    {fixture: "../testdata/vllm_all_metrics.prom", prefix: "vllm:"},
 	}
 
 	catalog, err := LoadFromDefaultDirs()
 	require.NoError(t, err)
-	for name, expected := range want {
-		profile, ok := catalog.Get(name)
-		require.Truef(t, ok, "stock profile %q must exist", name)
+	for profileName, test := range tests {
+		t.Run(profileName, func(t *testing.T) {
+			var sourceCreated []string
+			for name := range readPrometheusTypes(t, test.fixture) {
+				if strings.HasPrefix(name, test.prefix) && strings.HasSuffix(name, "_created") {
+					sourceCreated = append(sourceCreated, name)
+				}
+			}
+			slices.Sort(sourceCreated)
+
+			profile, ok := catalog.Get(profileName)
+			require.True(t, ok)
+			selector := profile.AutogenSelector()
+			require.NotNil(t, selector)
+			var deniedCreated []string
+			for _, name := range selector.Deny {
+				if strings.HasSuffix(name, "_created") {
+					deniedCreated = append(deniedCreated, name)
+				}
+			}
+			slices.Sort(deniedCreated)
+			require.Equal(t, sourceCreated, deniedCreated,
+				"stock profile generated-epoch denials must exactly track the committed source union")
+		})
+	}
+}
+
+func readPrometheusTypes(t *testing.T, path string) map[string]string {
+	t.Helper()
+
+	file, err := os.Open(path)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, file.Close()) }()
+
+	types := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) == 4 && fields[0] == "#" && fields[1] == "TYPE" {
+			types[fields[2]] = fields[3]
+		}
+	}
+	require.NoError(t, scanner.Err())
+	return types
+}
+
+func TestDefaultCatalog_AllStockProfilesPreserveUnknownFutureFamilies(t *testing.T) {
+	want := map[string]string{
+		"ceph":     "ceph_netdata_future_metric",
+		"haproxy":  "haproxy_netdata_future_metric",
+		"litellm":  "litellm_netdata_future_metric",
+		"vllm":     "vllm:netdata_future_metric",
+		"vllm_ray": "ray_vllm_netdata_future_metric",
+	}
+	exactMetricName := regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
+
+	catalog, err := LoadFromDefaultDirs()
+	require.NoError(t, err)
+	for _, profile := range catalog.OrderedProfiles() {
+		name := profile.Name
+		futureMetric, ok := want[name]
+		require.Truef(t, ok, "stock profile %q needs a forward-compatibility canary", name)
+		scope, err := matcher.NewSimplePatternsMatcher(profile.Match)
+		require.NoErrorf(t, err, "stock profile %q match must parse", name)
+		require.Truef(t, scope.MatchString(futureMetric),
+			"stock profile %q canary %q must be inside its match scope", name, futureMetric)
 		selector := profile.AutogenSelector()
-		require.NotNilf(t, selector, "stock profile %q must define fallback policy", name)
-		require.Equalf(t, expected, selector.Allow,
-			"stock profile %q must suppress unknown unmatched families", name)
+		if selector == nil {
+			continue
+		}
+		require.Emptyf(t, selector.Allow, "stock profile %q must not close fallback with an allowlist", name)
+		for _, item := range selector.Deny {
+			metricName, _, _ := strings.Cut(item, "{")
+			require.Regexpf(t, exactMetricName, strings.TrimSpace(metricName),
+				"stock profile %q fallback deny %q must name one exact family", name, item)
+		}
+		compiled, err := selector.Parse()
+		require.NoErrorf(t, err, "stock profile %q fallback selector must parse", name)
+		require.Truef(t, compiled.Matches(futureMetric, nil),
+			"stock profile %q must preserve unknown matching family %q", name, futureMetric)
 	}
 }
 

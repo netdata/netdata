@@ -15,7 +15,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 const validDump = `
@@ -173,6 +175,9 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 	}
 	if result.report.Verdict != verdictPass {
 		t.Fatalf("expected PASS report, got %#v", result.report.Findings)
+	}
+	if result.report.Profile.FutureMetricCanary != "app_netdata_future_metric_0" {
+		t.Fatalf("future metric canary: got %q", result.report.Profile.FutureMetricCanary)
 	}
 	if result.report.Counts.RawFamilies != 4 {
 		t.Fatalf("raw family count: got %d, want 4", result.report.Counts.RawFamilies)
@@ -336,155 +341,18 @@ func TestValidateProfileFindsCoverageGap(t *testing.T) {
 	}
 }
 
-func TestValidateProfileAcceptsExplicitGenericFallbackBoundary(t *testing.T) {
+func TestValidateProfileRejectsClosedFallbackWithoutObservedCoverageGap(t *testing.T) {
 	profile := strings.Replace(
 		validProfile,
 		"app: app\n",
-		"app: app\nautogen:\n  selector:\n    allow: [app_extra]\n",
+		"app: app\nautogen:\n  selector:\n    allow: [app_temperature]\n",
 		1,
 	)
-	dump := validDump + "\n# TYPE app_extra gauge\napp_extra{instance=\"node-a\"} 1\n"
-	result := runValidation(t, profile, dump, "")
-	if result.exitCode != 0 {
-		t.Fatalf("explicitly allowlisted generic fallback should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
-	}
-	if !hasFinding(result.report, "profile_allowed_autogen", "warning") {
-		t.Fatalf("missing profile_allowed_autogen warning in %#v", result.report.Findings)
-	}
-}
-
-func TestValidateProfileAttributesTypedComponentsToTheirSourceFamily(t *testing.T) {
-	tests := map[string]struct {
-		family    string
-		metric    string
-		dimension string
-		dump      string
-	}{
-		"histogram": {
-			family:    "app_latency_seconds",
-			metric:    "app_latency_seconds_bucket",
-			dimension: "le",
-			dump: "# TYPE app_latency_seconds histogram\n" +
-				"app_latency_seconds_bucket{le=\"1\"} 2\n" +
-				"app_latency_seconds_bucket{le=\"+Inf\"} 3\n" +
-				"app_latency_seconds_sum 1.5\n" +
-				"app_latency_seconds_count 3\n",
-		},
-		"summary": {
-			family:    "app_size_bytes",
-			metric:    "app_size_bytes",
-			dimension: "quantile",
-			dump: "# TYPE app_size_bytes summary\n" +
-				"app_size_bytes{quantile=\"0.5\"} 100\n" +
-				"app_size_bytes_sum 500\n" +
-				"app_size_bytes_count 3\n",
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			profile := fmt.Sprintf(`
-match: %s
-app: app
-autogen:
-  selector:
-    allow: [%s]
-template:
-  family: Example
-  context_namespace: app
-  metrics: [%s]
-  charts:
-    - title: Distribution
-      context: distribution
-      units: observations/s
-      algorithm: incremental
-      priority: 100
-      dimensions:
-        - selector: %s
-          name_from_label: %s
-`, tc.family, tc.family, tc.metric, tc.metric, tc.dimension)
-
-			result := runValidation(t, profile, tc.dump, "")
-			if result.exitCode != 0 {
-				t.Fatalf("typed component fallback should be attributed to %q\nreport:\n%s", tc.family, result.stdout)
-			}
-			if result.report.Counts.AutogenCharts != 2 || result.report.Counts.SeriesAutogen != 2 {
-				t.Fatalf("expected count and sum fallback charts: %#v", result.report.Counts)
-			}
-			if !hasFinding(result.report, "profile_allowed_autogen", "warning") ||
-				hasFinding(result.report, "unexpected_autogen", "error") {
-				t.Fatalf("typed fallback was not accepted under its structured source family: %#v", result.report.Findings)
-			}
-		})
-	}
-}
-
-func TestValidateProfileDoesNotAttributeScalarSuffixToAnotherFamily(t *testing.T) {
-	profile := `
-match: app_value
-app: app
-autogen:
-  selector:
-    allow: [app_value_count]
-template:
-  family: Example
-  context_namespace: app
-  metrics: [app_value]
-  charts:
-    - title: Value
-      context: value
-      units: values
-      priority: 100
-      dimensions:
-        - selector: app_value
-          name: value
-`
-	dump := "# TYPE app_value gauge\napp_value 1\n# TYPE app_value_count gauge\napp_value_count 2\n"
-
-	result := runValidation(t, profile, dump, "")
-	requireFinding(t, result, "unexpected_autogen")
-}
-
-func TestValidateProfileFailsClosedOnConflictingSourceFamilyAttribution(t *testing.T) {
-	profile := `
-match: foo*
-app: app
-autogen:
-  selector:
-    allow: [foo]
-template:
-  family: Example
-  context_namespace: app
-  metrics: [foo_bucket, foo_count]
-  charts:
-    - title: Distribution
-      context: distribution
-      units: observations/s
-      algorithm: incremental
-      priority: 100
-      dimensions:
-        - selector: foo_bucket
-          name_from_label: le
-    - title: Scalar Count
-      context: scalar_count
-      units: values
-      priority: 110
-      dimensions:
-        - selector: 'foo_count{kind="scalar"}'
-          name: value
-`
-	dump := "# TYPE foo histogram\n" +
-		"foo_bucket{le=\"1\"} 1\n" +
-		"foo_bucket{le=\"+Inf\"} 1\n" +
-		"foo_sum 0.5\n" +
-		"foo_count 1\n" +
-		"# TYPE foo_count gauge\n" +
-		"foo_count{kind=\"scalar\"} 7\n"
-
-	result := runValidation(t, profile, dump, "")
-	requireFinding(t, result, "unexpected_autogen")
-	if result.report.Counts.AutogenCharts != 2 || result.report.Counts.SeriesAutogen != 2 {
-		t.Fatalf("expected histogram count and sum fallback charts: %#v", result.report.Counts)
+	result := runValidation(t, profile, validDump, "")
+	requireFinding(t, result, "closed_profile_fallback")
+	requireFinding(t, result, "future_metric_blocked_by_profile")
+	if hasFinding(result.report, "unexpected_autogen", "error") {
+		t.Fatalf("the current-source fixture has no coverage gap: %#v", result.report.Findings)
 	}
 }
 
@@ -505,55 +373,1609 @@ func TestValidateProfileAcceptsExplicitFallbackSuppression(t *testing.T) {
 	}
 }
 
-func TestValidateProfileRejectsImplicitAllowBoundarySuppression(t *testing.T) {
+func TestValidateProfileRejectsExactFallbackSuppressionWithoutFixtureEvidence(t *testing.T) {
 	profile := strings.Replace(
 		validProfile,
 		"app: app\n",
-		"app: app\nautogen:\n  selector:\n    allow: [app_temperature]\n",
+		"app: app\nautogen:\n  selector:\n    deny: [app_absent]\n",
 		1,
 	)
-	dump := validDump + "\n# TYPE app_extra gauge\napp_extra{instance=\"node-a\"} 1\n"
-	result := runValidation(t, profile, dump, "")
-	if result.exitCode != 1 {
-		t.Fatalf("allow-boundary suppression should remain a coverage error\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
-	}
-	if !hasFinding(result.report, "unmatched_series", "error") {
-		t.Fatalf("missing unmatched_series error in %#v", result.report.Findings)
+	result := runValidation(t, profile, validDump, "")
+	requireFinding(t, result, "unproven_profile_fallback_deny")
+}
+
+func TestValidateProfileRejectsLabelConstrainedFallbackDeny(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"app: app\n",
+		"app: app\nautogen:\n  selector:\n    deny: ['app_temperature{environment=\"future\"}']\n",
+		1,
+	)
+	result := runValidation(t, profile, validDump, "")
+	requireFinding(t, result, "open_ended_profile_fallback_deny")
+}
+
+func TestValidateProfileRejectsOpenEndedFallbackDenyWithoutObservedCoverageGap(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"app: app\n",
+		"app: app\nautogen:\n  selector:\n    deny: ['app_*']\n",
+		1,
+	)
+	result := runValidation(t, profile, validDump, "")
+	requireFinding(t, result, "open_ended_profile_fallback_deny")
+}
+
+func TestValidateProfileRejectsJobSelectorClosedToFutureFamily(t *testing.T) {
+	result := runValidation(t, validProfile, validDump, "selector:\n  allow: [app_temperature, app_requests_total, app_latency_seconds, app_size_bytes]\n")
+	requireFinding(t, result, "future_metric_blocked_by_job_selector")
+}
+
+func TestValidateProfileRejectsJobSelectorThatOnlyAdmitsPredictableCanary(t *testing.T) {
+	job := "selector:\n  allow: [app_temperature, app_requests_total, app_latency_seconds, app_size_bytes, 'app_netdata_future_metric_*']\n"
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "future_metric_blocked_by_job_selector")
+}
+
+func TestValidateProfileRejectsJobSelectorThatAdmitsEveryPublicCanary(t *testing.T) {
+	job := `
+selector:
+  allow:
+    - app_temperature
+    - app_requests_total
+    - app_latency_seconds
+    - app_size_bytes
+    - 'app_netdata_future_metric_*'
+    - 'app_upstream_added_metric_*'
+    - 'app_exporter_new_signal_*'
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "closed_job_selector_allow")
+	if hasFinding(result.report, "future_metric_blocked_by_job_selector", "error") {
+		t.Fatalf("all finite canaries passed; structural namespace coverage must catch the closed allowlist: %#v", result.report.Findings)
 	}
 }
 
-func TestValidateProfileAcceptsExplicitDenyWithinCompleteAllowBoundary(t *testing.T) {
-	profile := strings.Replace(
-		validProfile,
-		"app: app\n",
-		"app: app\nautogen:\n  selector:\n    allow: ['app_*']\n    deny: [app_internal]\n",
-		1,
-	)
-	dump := validDump + "\n# TYPE app_internal gauge\napp_internal{instance=\"node-a\"} 1\n"
-	result := runValidation(t, profile, dump, "")
+func TestValidateProfileAcceptsJobSelectorOpenToFutureFamily(t *testing.T) {
+	result := runValidation(t, validProfile, validDump, "selector:\n  allow: ['app_*']\n")
 	if result.exitCode != 0 {
-		t.Fatalf("explicit deny inside a complete allow boundary should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
-	}
-	if !hasFinding(result.report, "profile_suppressed_series", "warning") {
-		t.Fatalf("missing profile_suppressed_series warning in %#v", result.report.Findings)
+		t.Fatalf("namespace-wide job selector should admit future family\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
 	}
 }
 
-func TestValidateProfileAcceptsLabelSelectedGenericFallback(t *testing.T) {
+func TestUncoveredWildcardProfileTerms(t *testing.T) {
+	tests := map[string]struct {
+		profile string
+		allows  []string
+		want    []string
+	}{
+		"no allowlist is open": {
+			profile: `app_*`,
+		},
+		"matching term": {
+			profile: `app_*`,
+			allows:  []string{`app_*`},
+		},
+		"universal term": {
+			profile: `app_* service_*`,
+			allows:  []string{`*`},
+		},
+		"one allow expression can carry every positive term": {
+			profile: `app_* service_*`,
+			allows:  []string{`app_* service_*`},
+		},
+		"exact profile expression preserves its exclusions": {
+			profile: `!app_debug_* app_*`,
+			allows:  []string{`!app_debug_* app_*`},
+		},
+		"positive superset preserves an excluded profile namespace": {
+			profile: `!app_debug_* app_*`,
+			allows:  []string{`app_*`},
+		},
+		"label constraint is not namespace coverage": {
+			profile: `app_*`,
+			allows:  []string{`app_*{environment="production"}`},
+			want:    []string{`app_*`},
+		},
+		"negative allow term closes a subnamespace": {
+			profile: `app_*`,
+			allows:  []string{`!app_private_* app_*`},
+			want:    []string{`app_*`},
+		},
+		"finite public canaries are not structural coverage": {
+			profile: `app_*`,
+			allows: []string{
+				`app_netdata_future_metric_*`,
+				`app_upstream_added_metric_*`,
+				`app_exporter_new_signal_*`,
+			},
+			want: []string{`app_*`},
+		},
+		"exact profile has no future namespace": {
+			profile: `app_temperature`,
+			allows:  []string{`app_temperature`},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := uncoveredWildcardProfileTerms(tc.profile, tc.allows); !slices.Equal(got, tc.want) {
+				t.Fatalf("uncovered terms: got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateProfileRejectsOpenEndedJobSelectorDenyWithoutObservedCoverageGap(t *testing.T) {
+	result := runValidation(t, validProfile, validDump, "selector:\n  deny: ['app_*_created']\n")
+	requireFinding(t, result, "open_ended_job_selector_deny")
+}
+
+func TestValidateProfileRejectsExactJobSelectorDenyWithoutFixtureEvidence(t *testing.T) {
+	result := runValidation(t, validProfile, validDump, "selector:\n  deny: [app_absent]\n")
+	requireFinding(t, result, "unproven_job_selector_deny")
+}
+
+func TestValidateProfileRejectsLabelConstrainedJobSelectorDeny(t *testing.T) {
+	result := runValidation(t, validProfile, validDump, "selector:\n  deny: ['app_temperature{environment=\"future\"}']\n")
+	requireFinding(t, result, "open_ended_job_selector_deny")
+}
+
+func TestValidateProfileRejectsRelabelDropOfFutureFamilyWithoutObservedCoverageGap(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_netdata_future_metric_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_netdata_future_metric_.*
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "future_metric_blocked_by_job_relabel")
+}
+
+func TestValidateProfileRejectsRelabelDropOfFutureSubnamespace(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_internal_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_internal_.*
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "future_metric_blocked_by_job_relabel")
+}
+
+func TestValidateProfileRejectsFutureAffectingRelabelBlockWithoutCanary(t *testing.T) {
+	job := `
+relabeling:
+  - match: '!app_netdata_future_metric_* !app_upstream_added_metric_* !app_exporter_new_signal_* app_*'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_.+
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "future_relabel_canary_unavailable")
+	if hasFinding(result.report, "future_metric_blocked_by_job_relabel", "error") {
+		t.Fatalf("the block excludes every public canary; the unavailable-probe check must catch it: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsUnprobedLabelOnlyRelabelBlock(t *testing.T) {
+	job := `
+relabeling:
+  - match: '!app_netdata_future_metric_* !app_upstream_added_metric_* !app_exporter_new_signal_* app_*'
+    metric_relabel_configs:
+      - regex: internal_.+
+        action: labeldrop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("label-only relabeling cannot hide a future metric family\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileAcceptsUnprobedFutureAffectingDisjointRelabelBlock(t *testing.T) {
+	job := `
+relabeling:
+  - match: '!other_netdata_future_metric_* !other_upstream_added_metric_* !other_exporter_new_signal_* other_*'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: other_.+
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("a provably disjoint relabel namespace cannot hide an app family\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileAcceptsRelabelScopeExcludedByProfile(t *testing.T) {
+	profile := strings.Replace(validProfile, "match: app_*", "match: '!app_debug_* app_*'", 1)
+	job := `
+relabeling:
+  - match: app_debug_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_debug_.+
+        action: drop
+`
+	result := runValidation(t, profile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("profile exclusions make the relabel scope provably disjoint\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileAcceptsRelabelScopeExcludedByOrderedCharacterClassNegative(t *testing.T) {
+	profile := strings.Replace(validProfile, "match: app_*", "match: '!app_[ab]* app_*'", 1)
+	job := `
+relabeling:
+  - match: app_a*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_a.+
+        action: drop
+`
+	result := runValidation(t, profile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("ordered negative character-class scope makes the relabel block disjoint\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileAcceptsDisjointCharacterClassRelabelScope(t *testing.T) {
+	profile := strings.ReplaceAll(validProfile, "app_", "app_a")
+	dump := strings.ReplaceAll(validDump, "app_", "app_a")
+	job := `
+relabeling:
+  - match: app_[b]*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_b.+
+        action: drop
+`
+	result := runValidation(t, profile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("character classes prove the two wildcard scopes disjoint\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestSimpleGlobPatternsIntersectOnMetricName(t *testing.T) {
+	tests := map[string]struct {
+		left  string
+		right string
+		want  bool
+	}{
+		"disjoint character class": {left: "app_a*", right: "app_[b]*"},
+		"overlapping character class": {
+			left: "app_[ab]*", right: "app_b*", want: true,
+		},
+		"negated character class": {
+			left: "app_?", right: "app_[^a]", want: true,
+		},
+		"stars can match empty": {
+			left: "app_*", right: "app_", want: true,
+		},
+		"invalid metric initial character": {left: "1*", right: "1*"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok := simpleGlobPatternsIntersectOnMetricName(tc.left, tc.right)
+			if !ok {
+				t.Fatal("valid simple globs were not parsed")
+			}
+			if got != tc.want {
+				t.Fatalf("intersection: got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSimplePatternScopesMayOverlapHonorsOrderedNegatives(t *testing.T) {
+	tests := map[string]struct {
+		left  string
+		right string
+		want  bool
+	}{
+		"character class intersection excluded": {
+			left: `!app_[ab]* app_*`, right: `app_a*`, want: false,
+		},
+		"union of earlier negatives excludes intersection": {
+			left: `!app_a* !app_b* app_*`, right: `app_[ab]*`, want: false,
+		},
+		"one character class branch remains": {
+			left: `!app_a* app_*`, right: `app_[ab]*`, want: true,
+		},
+		"earlier positive wins over later negative": {
+			left: `app_a* !app_a* app_*`, right: `app_a*`, want: true,
+		},
+		"earlier negative wins over later positive": {
+			left: `!app_a* app_a*`, right: `app_a*`, want: false,
+		},
+		"negatives from both operands exclude intersection": {
+			left: `!app_a* app_*`, right: `!app_b* app_[ab]*`, want: false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := simplePatternScopesMayOverlap(tc.left, tc.right); got != tc.want {
+				t.Fatalf("scope overlap: got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateProfileRejectsRelabelTermWithoutCanaryCoverage(t *testing.T) {
+	job := `
+relabeling:
+  - match: '!app_hidden_netdata_future_metric_* !app_hidden_upstream_added_metric_* !app_hidden_exporter_new_signal_* app_safe_* app_hidden_*'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_hidden_.+
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "future_relabel_canary_unavailable")
+}
+
+func TestValidateProfileRejectsLabelDependentDiscardUnderWildcardRelabelScope(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [kind]
+        regex: .+
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "unbounded_relabel_discard")
+	if hasFinding(result.report, "future_metric_blocked_by_job_relabel", "error") {
+		t.Fatalf("empty-label canaries do not exercise this policy; the structural check must catch it: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsSourceProvenLabelDependentDiscardUnderExactRelabelScope(t *testing.T) {
+	dump := validDump + `
+# TYPE app_private gauge
+app_private{kind="private"} 1
+`
+	job := `
+relabeling:
+  - match: app_private
+    metric_relabel_configs:
+      - source_labels: [kind]
+        regex: private
+        action: drop
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("an exact known metric block with exercised source evidence bounds label-dependent discard\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileRejectsExactRelabelScopeWithoutFixtureEvidence(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_absent
+    metric_relabel_configs:
+      - regex: internal_.+
+        action: labeldrop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "unproven_exact_relabel_scope")
+}
+
+func TestValidateProfileRejectsExactRelabelDiscardWithoutMatchingFixtureEvidence(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_temperature
+    metric_relabel_configs:
+      - source_labels: [kind]
+        regex: private
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "unproven_exact_relabel_discard")
+}
+
+func TestValidateProfileRejectsLabelDerivedMetricNameRewriteUnderWildcardScope(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [kind]
+        regex: private
+        target_label: __name__
+        replacement: ''
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "unbounded_metric_name_rewrite")
+	if hasFinding(result.report, "future_metric_blocked_by_job_relabel", "error") {
+		t.Fatalf("empty-label canaries do not take the conditional invalid-name path: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsLabelDerivedMetricNameRewriteUnderExactScope(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_temperature
+    metric_relabel_configs:
+      - source_labels: [kind]
+        regex: (.+)
+        target_label: __name__
+        replacement: app_temperature_${1}
+`
+	result := runValidation(t, validProfile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("an exact known metric block bounds label-derived name rewriting\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileRejectsLabelMapMetricNameRewriteUnderWildcardScope(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: metric_name
+        replacement: __name__
+        action: labelmap
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "unbounded_metric_name_rewrite")
+}
+
+func TestValidateProfileAcceptsLabelMapMetricNameRewriteUnderExactScope(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_temperature
+    metric_relabel_configs:
+      - regex: metric_name
+        replacement: __name__
+        action: labelmap
+`
+	result := runValidation(t, validProfile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("an exact original metric block bounds labelmap name rewriting\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestRelabelRuleMayWriteMetricName(t *testing.T) {
+	tests := map[string]struct {
+		action      relabel.Action
+		regex       string
+		target      string
+		replacement string
+		want        bool
+	}{
+		"static labelmap destination": {
+			action: relabel.LabelMap, regex: "metric_name", replacement: "__name__", want: true,
+		},
+		"finite safe labelmap captures": {
+			action: relabel.LabelMap, regex: "(instance|family)", replacement: "$1",
+		},
+		"finite reachable labelmap captures": {
+			action: relabel.LabelMap, regex: "(name|instance)", replacement: "__${1}__", want: true,
+		},
+		"identity labelmap excludes metric name input": {
+			action: relabel.LabelMap, regex: "(.*)", replacement: "$1",
+		},
+		"incompatible replace target prefix": {
+			action: relabel.Replace, regex: "node-(a)", target: "app_$1",
+		},
+		"finite safe replace target": {
+			action: relabel.Replace, regex: "(instance|family)", target: "__${1}__",
+		},
+		"finite reachable replace target": {
+			action: relabel.Replace, regex: "(name|instance)", target: "__${1}__", want: true,
+		},
+		"literal safe label": {
+			action: relabel.Replace, regex: "(.*)", target: "instance",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rule := relabel.Config{
+				Regex:       relabel.MustNewRegexp(tc.regex),
+				TargetLabel: tc.target,
+				Replacement: tc.replacement,
+				Action:      tc.action,
+			}
+			if got := relabelRuleMayWriteMetricName(rule, tc.action); got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRelabelLabelMapMayOverwriteProtectedLabel(t *testing.T) {
+	tests := map[string]struct {
+		regex       string
+		replacement string
+		want        bool
+	}{
+		"finite disjoint destination": {
+			regex: "(instance)", replacement: "copy_${1}",
+		},
+		"dynamic disjoint prefix": {
+			regex: "(.+)", replacement: "copy_${1}",
+		},
+		"dynamic disjoint suffix": {
+			regex: "(.+)", replacement: "${1}_copy",
+		},
+		"finite self-map": {
+			regex: "(worker)", replacement: "${1}",
+		},
+		"infinite identity map": {
+			regex: "(.*)", replacement: "${1}",
+		},
+		"static overwrite from another label": {
+			regex: "(instance)", replacement: "worker", want: true,
+		},
+		"finite branch can overwrite": {
+			regex: "(worker|instance)", replacement: "worker", want: true,
+		},
+		"unresolved dynamic destination": {
+			regex: "(.+)", replacement: "${1}er", want: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rule := relabel.Config{
+				Regex:       relabel.MustNewRegexp(tc.regex),
+				Replacement: tc.replacement,
+				Action:      relabel.LabelMap,
+			}
+			if got := relabelTemplateMayExpandToLabelName(
+				rule, relabel.LabelMap, rule.Replacement, "worker",
+			); got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateProfileAcceptsSafeFiniteMetricNameTemplates(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - regex: (instance|family)
+        replacement: $1
+        action: labelmap
+      - source_labels: [__name__]
+        regex: node-(a)
+        target_label: app_$1
+        replacement: normalized
+        action: replace
+`
+	result := runValidation(t, validProfile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("finite regex outputs cannot create __name__\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileRejectsFutureMetricRoutedToAuthoredMetric(t *testing.T) {
+	job := `
+relabeling:
+  - match: '!app_temperature !app_requests_total !app_latency_seconds_* !app_size_bytes* app_*'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_.+
+        target_label: __name__
+        replacement: app_temperature
+        action: replace
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "future_metric_routed_to_authored_metric")
+}
+
+func TestValidateProfileRejectsFutureMetricIdentityCollapse(t *testing.T) {
+	job := `
+relabeling:
+  - match: '!app_temperature !app_requests_total !app_latency_seconds_* !app_size_bytes* app_*'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_.+
+        target_label: __name__
+        replacement: app_generic
+        action: replace
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "future_metric_identity_collapse")
+}
+
+func TestValidateProfileChecksFallbackAfterRelabeling(t *testing.T) {
 	profile := strings.Replace(
 		validProfile,
 		"app: app\n",
-		"app: app\nautogen:\n  selector:\n    allow: ['app_extra{kind=\"accepted\"}']\n",
+		"app: app\nautogen:\n  selector:\n    deny: [app_suppressed]\n",
 		1,
 	)
-	dump := validDump + "\n# TYPE app_extra gauge\napp_extra{instance=\"node-a\",kind=\"accepted\"} 1\n"
-	result := runValidation(t, profile, dump, "")
+	job := `
+relabeling:
+  - match: '!app_temperature !app_requests_total !app_latency_seconds_* !app_size_bytes* app_*'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_.+
+        target_label: __name__
+        replacement: app_suppressed
+        action: replace
+`
+	result := runValidation(t, profile, validDump, job)
+	requireFinding(t, result, "future_metric_blocked_by_profile")
+}
+
+func TestValidateProfileRejectsDiscardAfterExactLabelMapMetricNameRewrite(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_temperature
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: metric_name
+        replacement: __name__
+        action: labelmap
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_never_exported_.+
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "tainted_relabel_name_discard")
+}
+
+func TestValidateProfileRejectsExactScopeExceptionAfterEarlierMetricRename(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_future_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_future_.+
+        target_label: __name__
+        replacement: app_temperature
+  - match: app_temperature
+    metric_relabel_configs:
+      - source_labels: [kind]
+        regex: private
+        target_label: __name__
+        replacement: ''
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "unbounded_metric_name_rewrite")
+}
+
+func TestValidateProfileAcceptsDisjointExactRelabelPaths(t *testing.T) {
+	dump := validDump + `
+# TYPE app_never gauge
+app_never 1
+# TYPE app_other gauge
+app_other{kind="private"} 1
+`
+	job := `
+relabeling:
+  - match: app_never
+    metric_relabel_configs:
+      - source_labels: [kind]
+        regex: private
+        target_label: __name__
+        replacement: app_normalized
+      - source_labels: [__name__]
+        regex: app_never
+        action: drop
+  - match: app_other
+    metric_relabel_configs:
+      - source_labels: [kind]
+        regex: private
+        action: drop
+`
+	result := runValidation(t, validProfile, dump, job)
 	if result.exitCode != 0 {
-		t.Fatalf("label-selected generic fallback should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+		t.Fatalf("disjoint exact blocks retain their original bounded scopes\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
 	}
-	if !hasFinding(result.report, "profile_allowed_autogen", "warning") {
-		t.Fatalf("missing profile_allowed_autogen warning in %#v", result.report.Findings)
+}
+
+func TestValidateProfileRejectsDiscardAfterSameBlockLabelDerivedMetricRename(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [tenant]
+        regex: (.+)
+        target_label: __name__
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: private-.+
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "tainted_relabel_name_discard")
+	if hasFinding(result.report, "future_metric_blocked_by_job_relabel", "error") {
+		t.Fatalf("empty-label canaries do not take the label-derived rename path: %#v", result.report.Findings)
 	}
+}
+
+func TestValidateProfileRejectsDiscardAfterCrossBlockLabelDerivedMetricRename(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [tenant]
+        regex: (.+)
+        target_label: __name__
+        replacement: ${1}
+  - match: private-*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: private-.+
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "tainted_relabel_name_discard")
+	if hasFinding(result.report, "future_metric_blocked_by_job_relabel", "error") {
+		t.Fatalf("empty-label canaries do not take the cross-block rename path: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileRejectsDiscardAfterChainedTaintedMetricRename(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_alpha
+    metric_relabel_configs:
+      - source_labels: [tenant]
+        regex: (.+)
+        target_label: __name__
+        replacement: bridge_${1}
+      - source_labels: [__name__]
+        regex: bridge_(.+)
+        target_label: __name__
+        replacement: final_${1}
+  - match: final_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: final_.+
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "tainted_relabel_name_discard")
+}
+
+func TestValidateProfileAcceptsDiscardAfterBoundedMetricNameDerivedRename(t *testing.T) {
+	dump := validDump + `
+# TYPE app_deprecated gauge
+app_deprecated 1
+`
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: (app_deprecated)
+        target_label: __name__
+        replacement: ${1}
+      - source_labels: [__name__]
+        regex: app_deprecated
+        action: drop
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("name-only rewrite preserves discard provenance\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileRejectsOpenEndedMetricNameRewriteDespiteObservedMatch(t *testing.T) {
+	dump := validDump + `
+# TYPE app_secret_signal gauge
+app_secret_signal{instance="node-b"} 1
+`
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_secret_.+
+        target_label: __name__
+        replacement: app_temperature
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "open_ended_relabel_name_rewrite")
+}
+
+func TestValidateProfileRejectsBoundedMetricNameRewriteWithoutFixtureEvidence(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature|requests_total)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature|requests_total)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "unproven_relabel_name_rewrite")
+}
+
+func TestValidateProfileRequiresEveryBoundedMetricNameRewriteBranchInFixture(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature|requests_total)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature|requests_total)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unproven_relabel_name_rewrite")
+}
+
+func TestValidateProfileAcceptsBoundedMetricNameRewriteWithCompleteFixtureEvidence(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+# TYPE app_worker_beta_requests_total counter
+app_worker_beta_requests_total{instance="node-b"} 11
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature|requests_total)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature|requests_total)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("bounded source-evidenced metric-name rewrites remain valid\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileRejectsObservedFiniteWildcardRewriteIdentityCollapse(t *testing.T) {
+	dump := validDump + `
+# TYPE app_alias_a gauge
+app_alias_a{instance="node-b"} 43
+# TYPE app_alias_b gauge
+app_alias_b{instance="node-b"} 44
+`
+	job := `
+relabeling:
+  - match: app_alias_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_alias_(a|b)
+        target_label: __name__
+        replacement: app_temperature
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "observed_relabel_identity_collapse")
+}
+
+func TestValidateProfileRejectsObservedExactScopeRewriteIdentityCollapse(t *testing.T) {
+	dump := validDump + `
+# TYPE app_alias_a gauge
+app_alias_a{instance="node-b"} 43
+# TYPE app_alias_b gauge
+app_alias_b{instance="node-b"} 44
+`
+	job := `
+relabeling:
+  - match: app_alias_a app_alias_b
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_alias_(a|b)
+        target_label: __name__
+        replacement: app_temperature
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "observed_relabel_identity_collapse")
+}
+
+func TestValidateProfileRejectsObservedRelabelLabelIdentityCollapse(t *testing.T) {
+	dump := validDump + `
+app_temperature{instance="node-b",worker="a"} 43
+app_temperature{instance="node-b",worker="b"} 44
+`
+	job := `
+relabeling:
+  - match: app_temperature
+    metric_relabel_configs:
+      - regex: worker
+        action: labeldrop
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "observed_relabel_identity_collapse")
+}
+
+func TestValidateProfileIgnoresWriterRejectedScalarInRelabelIdentityCollapse(t *testing.T) {
+	dump := validDump + `
+app_temperature{instance="node-b",worker="a"} NaN
+app_temperature{instance="node-b",worker="b"} 44
+`
+	job := `
+relabeling:
+  - match: app_temperature
+    metric_relabel_configs:
+      - regex: worker
+        action: labeldrop
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("a writer-rejected scalar cannot participate in a writer identity collision\nreport:\n%s", result.stdout)
+	}
+	if hasFinding(result.report, "observed_relabel_identity_collapse", "error") {
+		t.Fatalf("writer-rejected NaN was treated as a materialized identity: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileRejectsImplicitInvalidMetricNameDiscard(t *testing.T) {
+	dump := validDump + `
+app_temperature{instance="node-b",canonical_name="app_temperature"} 44
+`
+	job := `
+relabeling:
+  - match: app_temperature
+    metric_relabel_configs:
+      - source_labels: [canonical_name]
+        regex: (.*)
+        target_label: __name__
+        replacement: ${1}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "invalid_relabel_metric_name_discard")
+}
+
+func TestValidateProfilePreservesReplacementSuffixInMutationReachability(t *testing.T) {
+	dump := strings.ReplaceAll(validDump, "app_temperature", "app_source")
+	dump = strings.Replace(
+		dump,
+		`app_source{instance="node-a"}`,
+		`app_source{instance="node-a",target_prefix="app"}`,
+		1,
+	) + `
+# TYPE app_bad gauge
+app_bad{instance="node-b"} 1
+`
+	job := `
+relabeling:
+  - match: app_source
+    metric_relabel_configs:
+      - source_labels: [target_prefix]
+        regex: (.+)
+        target_label: __name__
+        replacement: ${1}_temperature
+        action: replace
+  - match: app_bad
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_bad
+        action: drop
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("literal replacement suffix proves the earlier rewrite cannot reach app_bad\nreport:\n%s", result.stdout)
+	}
+	if hasFinding(result.report, "tainted_relabel_name_discard", "error") {
+		t.Fatalf("disjoint replacement suffix was discarded from reachability: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsUnreachableDynamicIdentityLabelWrite(t *testing.T) {
+	dump := validDump + `
+# TYPE app_sensor_alpha_temperature gauge
+app_sensor_alpha_temperature{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_sensor_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_sensor_(.+)_(temperature)
+        target_label: sensor
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_sensor_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_other
+        target_label: sensor
+        replacement: overwritten
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("a name-disjoint later rule cannot overwrite the extracted identity\nreport:\n%s", result.stdout)
+	}
+	if hasFinding(result.report, "unpreserved_relabel_name_identity", "error") {
+		t.Fatalf("name-disjoint label write was treated as reachable: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileRejectsBoundedRewriteToNonAuthoredMetrics(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+# TYPE app_worker_beta_requests_total counter
+app_worker_beta_requests_total{instance="node-b"} 11
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature|requests_total)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature|requests_total)
+        target_label: __name__
+        replacement: renamed_${2}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "open_ended_relabel_name_rewrite")
+}
+
+func TestValidateProfileRejectsBoundedRewriteOutputDerivedFromDynamicIdentity(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_app_temperature_old gauge
+app_worker_app_temperature_old{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_old
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_old
+        target_label: __name__
+        replacement: ${1}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "open_ended_relabel_name_rewrite")
+}
+
+func TestFiniteRegexpReplacementOutputs(t *testing.T) {
+	tests := map[string]struct {
+		expr        string
+		replacement string
+		want        []string
+		finite      bool
+	}{
+		"finite suffix capture": {
+			expr:        `app_worker_(.+)_(temperature|requests_total)`,
+			replacement: `app_${2}`,
+			want:        []string{"app_requests_total", "app_temperature"},
+			finite:      true,
+		},
+		"nested finite capture": {
+			expr:        `app_worker_(.+(temperature|requests_total))`,
+			replacement: `app_${2}`,
+			finite:      false,
+		},
+		"dynamic capture": {
+			expr:        `app_worker_(.+)_old`,
+			replacement: `${1}`,
+			finite:      false,
+		},
+		"constant": {
+			expr:        `app_temperature_(.+)`,
+			replacement: `app_temperature`,
+			want:        []string{"app_temperature"},
+			finite:      true,
+		},
+		"capture absent on one branch": {
+			expr:        `app_(foo|(bar))_(.+)`,
+			replacement: `app_${2}`,
+			want:        []string{"app_", "app_bar"},
+			finite:      true,
+		},
+		"ambiguous named capture": {
+			expr:        `app_(?P<kind>temperature)|app_(?P<kind>requests_total)`,
+			replacement: `app_${kind}`,
+			finite:      false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, finite := finiteRegexpReplacementOutputs(tc.expr, tc.replacement, 256)
+			if finite != tc.finite || !slices.Equal(got, tc.want) {
+				t.Fatalf("outputs=%q finite=%v, want outputs=%q finite=%v", got, finite, tc.want, tc.finite)
+			}
+		})
+	}
+}
+
+func TestValidateProfileRejectsDynamicRewriteWithoutIdentityExtraction(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+# TYPE app_worker_beta_temperature gauge
+app_worker_beta_temperature{instance="node-b"} 44
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unpreserved_relabel_name_identity")
+}
+
+func TestValidateProfileAcceptsDynamicRewriteWithIdentityExtraction(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+# TYPE app_worker_beta_temperature gauge
+app_worker_beta_temperature{instance="node-b"} 44
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+`
+	baseline := runValidation(t, validProfile, validDump, "")
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("identity-preserving dynamic rewrite should pass\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+	if got, want := result.report.Counts.WriterSeries, baseline.report.Counts.WriterSeries+2; got != want {
+		t.Fatalf("writer series=%d, want %d after preserving two dynamic identities", got, want)
+	}
+}
+
+func TestValidateProfileRejectsIncompleteNestedDynamicIdentityExtraction(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_barX_temperature gauge
+app_worker_barX_temperature{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(foo|baz|bar(.+))_(temperature)
+        target_label: worker
+        replacement: ${2}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(foo|baz|bar(.+))_(temperature)
+        target_label: __name__
+        replacement: app_${3}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unpreserved_relabel_name_identity")
+}
+
+func TestValidateProfileAcceptsCompleteNestedDynamicIdentityExtraction(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_barX_temperature gauge
+app_worker_barX_temperature{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(foo|baz|bar(.+))_(temperature)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(foo|baz|bar(.+))_(temperature)
+        target_label: __name__
+        replacement: app_${3}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("the capture enclosing the complete dynamic grammar region should preserve identity\nstderr:\n%s\nreport:\n%s",
+			result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileAcceptsDynamicRewriteWithDisjointLabelMap(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+      - regex: (instance)
+        replacement: copy_${1}
+        action: labelmap
+`
+	baseline := runValidation(t, validProfile, validDump, "")
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("a labelmap with destinations disjoint from the extracted identity label should pass\nstderr:\n%s\nreport:\n%s",
+			result.stderr, result.stdout)
+	}
+	if got, want := result.report.Counts.WriterSeries, baseline.report.Counts.WriterSeries+1; got != want {
+		t.Fatalf("writer series=%d, want %d after preserving the dynamic identity", got, want)
+	}
+}
+
+func TestValidateProfileRejectsDynamicRewriteWithOverwritingLabelMap(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+      - regex: (instance)
+        replacement: worker
+        action: labelmap
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unpreserved_relabel_name_identity")
+}
+
+func TestValidateProfileRejectsDynamicRewriteAfterIdentityLabelRemoval(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - regex: worker
+        action: labeldrop
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unpreserved_relabel_name_identity")
+}
+
+func TestValidateProfileRejectsDynamicRewriteBeforeIdentityLabelRemoval(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+# TYPE app_worker_beta_temperature gauge
+app_worker_beta_temperature{instance="node-b"} 44
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+      - regex: worker
+        action: labeldrop
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unpreserved_relabel_name_identity")
+}
+
+func TestValidateProfileRejectsDynamicIdentityRemovalInLaterBlock(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_temperature gauge
+app_worker_alpha_temperature{instance="node-b"} 43
+# TYPE app_worker_beta_temperature gauge
+app_worker_beta_temperature{instance="node-b"} 44
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+  - match: app_temperature
+    metric_relabel_configs:
+      - regex: worker
+        action: labeldrop
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unpreserved_relabel_name_identity")
+}
+
+func TestValidateProfileRejectsDynamicRewriteThatErasesFiniteBranch(t *testing.T) {
+	dump := validDump + `
+# TYPE app_a_x_temperature gauge
+app_a_x_temperature{instance="node-b"} 43
+# TYPE app_b_x_temperature gauge
+app_b_x_temperature{instance="node-b"} 44
+`
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_(a|b)_(.+)_(temperature)
+        target_label: worker
+        replacement: ${2}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_(a|b)_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${3}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unpreserved_relabel_name_identity")
+}
+
+func TestValidateProfileRejectsDynamicRewriteThatOverwritesSourceLabel(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_x_temperature gauge
+app_worker_x_temperature{instance="node-b",worker="original-a"} 43
+app_worker_x_temperature{instance="node-b",worker="original-b"} 44
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unpreserved_relabel_name_identity")
+}
+
+func TestValidateProfileAcceptsSourceProvenCanonicalDynamicTailRewrite(t *testing.T) {
+	dump := validDump + `
+# TYPE app_temperature_sensor_a gauge
+app_temperature_sensor_a{instance="node-b"} 43
+`
+	job := `
+relabeling:
+  - match: app_temperature_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_temperature_(.+)
+        target_label: sensor
+        replacement: ${1}
+        action: replace
+      - source_labels: [__name__]
+        regex: app_temperature_(.+)
+        target_label: __name__
+        replacement: app_temperature
+        action: replace
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("a source-evidenced canonical dynamic tail may normalize to its fixed metric prefix\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileRejectsOpenEndedMetricNameDiscardDespiteObservedMatch(t *testing.T) {
+	dump := validDump + `
+# TYPE app_signal gauge
+app_signal 1
+`
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_s.+
+        action: drop
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "open_ended_relabel_name_discard")
+}
+
+func TestValidateProfileRejectsBoundedMetricNameDiscardWithoutFixtureEvidence(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_.+_(deprecated|legacy)
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "unproven_relabel_name_discard")
+}
+
+func TestValidateProfileRequiresEveryBoundedMetricNameDiscardBranchInFixture(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_deprecated gauge
+app_worker_alpha_deprecated 1
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_.+_(deprecated|legacy)
+        action: drop
+`
+	result := runValidation(t, validProfile, dump, job)
+	requireFinding(t, result, "unproven_relabel_name_discard")
+}
+
+func TestValidateProfileAcceptsBoundedMetricNameDiscardWithCompleteFixtureEvidence(t *testing.T) {
+	dump := validDump + `
+# TYPE app_worker_alpha_deprecated gauge
+app_worker_alpha_deprecated 1
+# TYPE app_worker_beta_legacy gauge
+app_worker_beta_legacy 1
+`
+	job := `
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_.+_(deprecated|legacy)
+        action: drop
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("bounded source-evidenced alias drops remain valid\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
+}
+
+func TestValidateProfileRejectsWildcardMetricNameDropEqual(t *testing.T) {
+	job := `
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        target_label: __name__
+        action: dropequal
+`
+	result := runValidation(t, validProfile, validDump, job)
+	requireFinding(t, result, "open_ended_relabel_name_discard")
+}
+
+func TestValidateProfileRejectsClosedRelabelFilterWithoutWildcardScope(t *testing.T) {
+	profile := strings.Replace(validProfile, "match: app_*", "match: app_temperature", 1)
+	job := `
+relabeling:
+  - match: app_temperature
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_temperature
+        action: keep
+`
+	result := runValidation(t, profile, validDump, job)
+	requireFinding(t, result, "closed_relabel_filter")
+}
+
+func TestSyntheticFutureMetricSupportsCompleteSimplePatternGlobSyntax(t *testing.T) {
+	canaries, wildcard := syntheticFutureMetrics(`!app_a* app_[bc]?*`)
+	if !wildcard || len(canaries) != len(futureMetricStems) {
+		t.Fatalf("expected varied future canaries, got canaries=%v wildcard=%v", canaries, wildcard)
+	}
+	scope, err := matcher.NewSimplePatternsMatcher(`!app_a* app_[bc]?*`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, canary := range canaries {
+		if !prometheusMetricNamePattern.MatchString(canary) {
+			t.Fatalf("canary %q is not a valid Prometheus metric name", canary)
+		}
+		if !scope.MatchString(canary) {
+			t.Fatalf("canary %q does not match its source scope", canary)
+		}
+	}
+
+	if canaries, wildcard := syntheticFutureMetrics(`app_\*`); len(canaries) != 0 || wildcard {
+		t.Fatalf("escaped glob metacharacter must not create a canary: canaries=%v wildcard=%v", canaries, wildcard)
+	}
+
+	canaries, wildcard = syntheticFutureMetrics(`app_* service_*`)
+	if !wildcard || len(canaries) != 2*len(futureMetricStems) {
+		t.Fatalf("every positive wildcard namespace needs a canary: canaries=%v wildcard=%v", canaries, wildcard)
+	}
+}
+
+func TestValidateProfileRejectsWildcardScopeWithoutValidFutureCanary(t *testing.T) {
+	profile := strings.Replace(validProfile, "match: app_*", "match: '[0-9]*'", 1)
+	result := runValidation(t, profile, validDump, "")
+	requireFinding(t, result, "future_metric_canary_unavailable")
 }
 
 func TestValidateProfileFindsDeadChart(t *testing.T) {
@@ -1036,14 +2458,21 @@ relabeling:
         action: keepequal
 `
 	result := runValidation(t, validProfile, dump, job)
-	if result.exitCode != 0 {
-		t.Fatalf("discard review must preserve author judgment\nreport:\n%s", result.stdout)
+	if result.exitCode != 1 {
+		t.Fatalf("inverse keep filters must fail contributor validation\nreport:\n%s", result.stdout)
 	}
+	var closedFilters int
 	var findings []finding
 	for _, item := range result.report.Findings {
+		if item.Code == "closed_relabel_filter" {
+			closedFilters++
+		}
 		if item.Code == "job_relabel_discard_review" {
 			findings = append(findings, item)
 		}
+	}
+	if closedFilters != 2 {
+		t.Fatalf("closed relabel filters: got %d, want 2: %#v", closedFilters, result.report.Findings)
 	}
 	if len(findings) != 4 {
 		t.Fatalf("discard findings: got %d, want 4: %#v", len(findings), findings)
@@ -1084,15 +2513,13 @@ relabeling:
 	}
 }
 
-func TestValidateProfileDoesNotPromptForWriterSkippedInfoDeny(t *testing.T) {
+func TestValidateProfileRejectsOpenEndedWriterSkippedInfoDeny(t *testing.T) {
 	dump := validDump + `
 # TYPE app_build_info gauge
 app_build_info{version="test"} 1
 `
 	result := runValidation(t, validProfile, dump, "selector:\n  deny: ['*_info']\n")
-	if result.exitCode != 0 {
-		t.Fatalf("expected PASS\nreport:\n%s", result.stdout)
-	}
+	requireFinding(t, result, "open_ended_job_selector_deny")
 	if hasFinding(result.report, "job_deny_review", "warning") {
 		t.Fatalf("writer-skipped info family should not be presented as lost chart surface: %#v", result.report.Findings)
 	}

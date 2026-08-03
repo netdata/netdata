@@ -3,14 +3,12 @@
 # and ray-project/ray @ 03491225d59a1ffde99c3628969ccf456be13efd (ray-2.48.0).
 # Ray prefixes vLLM instruments, adds replica/worker identity, and emits 33 deprecated
 # unsuffixed counter gauges by default; those aliases are denied to prevent duplicates.
-# Fallback is closed to one source-backed core signature; unknown future names
-# require source semantics and operator-model evidence before generic charting.
+# Known compatibility aliases are excluded exactly; unknown future ray_vllm families
+# remain eligible for generic fallback.
 match: ray_vllm_*
 app: vllm
 autogen:
   selector:
-    allow:
-      - ray_vllm_num_requests_running
     deny:
       - ray_vllm_corrupted_requests
       - ray_vllm_diffusion_num_canvas_positions
@@ -24,7 +22,7 @@ autogen:
       - ray_vllm_kv_offload_allocation_failure
       - ray_vllm_kv_offload_load_bytes
       - ray_vllm_kv_offload_load_time
-      - ray_vllm_kv_offload_size*
+      - ray_vllm_kv_offload_size
       - ray_vllm_kv_offload_store_bytes
       - ray_vllm_kv_offload_store_time
       - ray_vllm_kv_offload_stores_skipped

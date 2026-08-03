@@ -40,6 +40,7 @@ type profileReport struct {
 	Name                 string   `json:"name,omitempty"`
 	Match                string   `json:"match,omitempty"`
 	App                  string   `json:"app,omitempty"`
+	FutureMetricCanary   string   `json:"future_metric_canary,omitempty"`
 	AutogenSelectorAllow []string `json:"autogen_selector_allow,omitempty"`
 	AutogenSelectorDeny  []string `json:"autogen_selector_deny,omitempty"`
 }
@@ -184,6 +185,7 @@ func newReport() report {
 		Verdict: verdictPass,
 		EvidenceLimits: []string{
 			"Validation proves behavior for the supplied dump and structured job policy, not metrics or label values absent from that evidence.",
+			"The synthetic future-family canary proves that policy admits a new matching name; it does not establish that future metric's type, labels, semantics, or cardinality.",
 			"Observed planner and public-wire chart/context/dimension collisions are checked; possible collisions from unseen future values cannot be proven from one dump.",
 			"A lifecycle cap that accommodates this dump may still omit entities or dimensions in a larger configuration.",
 			"Exact candidate validation does not prove that profile.match uniquely auto-selects this exporter against unrelated endpoints.",
@@ -224,6 +226,9 @@ func writeTextReport(w io.Writer, r report) error {
 	fmt.Fprintf(&b, "VERDICT: %s\n", r.Verdict)
 	if r.Profile.Name != "" {
 		fmt.Fprintf(&b, "Profile: %s (match=%q, app=%q)\n", r.Profile.Name, r.Profile.Match, r.Profile.App)
+	}
+	if r.Profile.FutureMetricCanary != "" {
+		fmt.Fprintf(&b, "Future metric canary: %s (synthetic forward-compatibility probe)\n", r.Profile.FutureMetricCanary)
 	}
 	fmt.Fprintf(
 		&b,

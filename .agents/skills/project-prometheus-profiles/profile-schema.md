@@ -40,22 +40,88 @@ template:
 - `match` is REQUIRED and uses Netdata simple patterns against scraped
   Prometheus **family base names**. It is an exporter-detection signature, not
   a coverage declaration or dimension selector.
-- `match` also scopes `autogen.selector` per source family. If the profile
-  suppresses fallback for generated epochs, deprecated aliases, or other
-  uncovered exporter families, its pattern MUST cover those families as well
-  as the family used for autodetection. Exact-mode validation with a separate
-  job deny can otherwise hide generic charts that appear in a normal stock job.
-- `autogen.selector.allow` defines the only unmatched series in this profile
-  scope that may create generic fallback charts. A non-empty allowlist also
-  suppresses every unmatched series outside it. `autogen.selector.deny`
-  suppresses matching fallback after the allow check. Both forms affect chart
-  generation only; the collector store retains the samples.
-- Explicit generic fallback MAY be used only for a narrow, source-backed
-  dynamic family whose names cannot be enumerated or normalized faithfully and
-  whose generic charts remain semantically valid. Every suppressed family MUST
-  satisfy the skill's binding exclusion policy and document the lost operator
-  question. The validator reports both intentional cases as warnings and keeps
-  accidental fallback or unmatched series as errors.
+- `match` also scopes `autogen.selector` per source family. A contributed stock
+  profile MUST remain open to every unknown future family in that scope.
+- The runtime format supports `autogen.selector.allow`, but contributed profiles
+  MUST NOT use it: an allowlist suppresses every unknown family outside the
+  list. This syntax remains available only for deployment-owned user policy.
+- `autogen.selector.deny` MAY suppress fallback only for exact family base names
+  present in the source-complete inventory and justified by one binding
+  exclusion case. Wildcard, label-only, open-ended, and fixture-absent exact
+  profile denies are forbidden. A selector containing `{...}` is
+  label-constrained policy, not an exact metric name. The collector store
+  retains the samples; only generic charts disappear.
+- Current source-complete evidence MUST still produce zero generic fallback and
+  zero unmatched series. The validator tests future compatibility separately
+  with a synthetic family derived from wildcard `match` scope, so an unknown
+  future family remains generic without masking current profile incompleteness.
+- Recommended-job selector denies MUST name exact exposition metric names
+  present in the source-complete sample inventory.
+  Dynamic source-proven alias grammars belong in bounded relabel `drop` rules;
+  inverse `keep`/`keepequal` filters are forbidden for stock profile jobs. A
+  non-empty job allow list MUST copy every positive wildcard
+  term from `profile.match` into an unconstrained expression, copy the complete
+  match expression, or use `*`; finite canaries and label constraints are not
+  structural namespace coverage. Label-dependent sample discard MUST use an
+  exact source-fixture metric block, and every exact-scope discard rule MUST
+  actually drop a fixture sample at its ordered pipeline position. Wildcard
+  blocks may discard only from `__name__`,
+  with either a finite exact-name regex or one non-empty internal entity key
+  between finite exporter prefixes and finite terminal metric suffixes. Every
+  finite exact name or prefix/suffix branch MUST drop source-complete fixture
+  evidence; open-ended terminal regexes and wildcard `dropequal` are forbidden.
+  Before discard, that name MUST remain derived exclusively from the original
+  metric name across all earlier relabel rules and blocks. A wildcard block also
+  MUST NOT rewrite `__name__` from application labels because the mutation can
+  itself rename or invalidate unknown future families. The exact-scope
+  exception cannot infer name-only provenance from `labelmap.source_labels`:
+  Netdata's relabel runtime ignores that field and maps application-label
+  names. The exception applies only before any earlier metric-name write; a
+  rewrite can route a future family into an apparently exact later block.
+  Dynamic targets are evaluated with their regex and replacement together: a
+  finite output language that cannot produce `__name__` is label-only, not a
+  metric-name rewrite. Every positive wildcard term in a block that can discard
+  or rename a metric MUST yield an in-scope synthetic probe that the ordered
+  pipeline actually processes; one harmless term cannot cover another term
+  whose exclusions hide every probe. After the pipeline, each primary future
+  probe MUST still reach generic fallback, MUST NOT collide with an authored
+  dimension metric name, and MUST retain a distinct final metric name. Name
+  provenance follows reachable ordered paths, including negative terms; a
+  provably disjoint exact mutation does not taint a later exact block. Scope
+  proof includes the complete glob language, including character classes. A
+  subsequent name-only rewrite inherits any application-label provenance in
+  its incoming `__name__`; it cannot clear taint.
+- A wildcard name-derived `replace` MUST use the same finite exact-name or
+  internal-dynamic-key-plus-terminal-suffix grammar and fixture evidence as a
+  wildcard name drop. An internal-key rewrite MUST NOT reference the dynamic
+  capture in its output; its finite output branches MUST all be authored
+  canonical metric names. Before either dynamic rewrite form, an earlier
+  `replace` in the same block MUST copy unchanged from `__name__` the capture
+  that encloses the entire dynamic entity region into a reserved static
+  non-`__name__` label; a nested capture covering only one alternative is
+  incomplete. The target MUST be
+  absent from source-fixture block inputs and preserved through every reachable
+  later rule/block. A later label write sourced only from `__name__` is harmless
+  when its regex is disjoint from all possible current names. Canonical outputs
+  MUST keep every finite prefix/suffix branch distinct. One rewrite-only form is
+  also allowed for a
+  source-owned dynamic identity tail:
+  `<canonical_name>_<non-empty-identity>` may rewrite
+  exactly to `<canonical_name>`, and the source-complete fixture MUST reach that
+  branch. An unrelated terminal catch remains open-ended and forbidden.
+- Across exact and wildcard blocks, the complete recommended relabel pipeline
+  MUST preserve every observed writer-admissible logical identity after normal
+  histogram/summary assembly. Distinct source identities MUST NOT converge on
+  the same final metric name and labels; label removal and name normalization
+  do not aggregate the values they collapse. Writer-rejected samples such as
+  non-finite scalars do not participate in this identity proof.
+- Every source-fixture sample reached by a metric-name rewrite MUST retain a
+  valid non-empty name. Empty/invalid replacement output is an implicit discard,
+  not a rewrite; intentional exclusions belong in explicit bounded,
+  source-evidenced `drop` rules.
+- Ordered name-rewrite reachability MUST preserve literal replacement prefixes
+  and suffixes around captures; collapsing every capture-bearing replacement to
+  a prefix-only wildcard creates false reachability into disjoint later blocks.
 - Prefer exporter-unique family patterns in `match`. Generic runtime families
   such as `process_*`, `python_*`, and `http_*` may be charted without being
   part of detection; including them can make unrelated endpoints eligible.

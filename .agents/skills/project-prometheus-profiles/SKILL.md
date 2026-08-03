@@ -91,12 +91,12 @@ of these proofs fails:
   cause them, except for a deliberately small service-impact overview.
 - **Unit proof:** every dimension on one axis has the same rendered algebra and
   the same counted or measured object.
-- **Evidence proof:** every writer-capable family is curated or excluded only
-  under one of the binding cases, with the lost operator question stated.
-- **Runtime proof:** the exact profile, dump, and job policy pass the objective
-  validator. The default is zero fallback and zero unmatched series; a narrow,
-  explicit profile fallback allow/suppress boundary is valid only under the
-  evidence and exclusion rules below and remains visible as a warning.
+- **Evidence proof:** every current writer-capable family is curated or excluded
+  only under one of the binding cases, with the lost operator question stated.
+- **Runtime proof:** the exact profile, source-complete dump, and job policy pass
+  the objective validator with zero fallback and zero unmatched current series.
+  A separately synthesized future-family canary MUST remain eligible for generic
+  fallback through both the profile and job policy.
 
 Why: each proof catches a different failure class. Runtime coverage cannot prove
 that a `Latency` branch teaches causality; a good family tree cannot make
@@ -166,15 +166,19 @@ configuration and moment:
 - Do not invent metric names, label keys, or types from application concepts.
 
 If authoritative evidence cannot establish an in-scope shape, record the
-surface as unresolved and preserve generic fallback where safe. Do not fabricate
-it, silently narrow the support scope, or claim holistic completion.
+surface as unresolved and leave unknown future families eligible for generic
+fallback. Do not fabricate it, silently narrow the support scope, or claim
+holistic completion. A known current family reaching fallback still fails the
+source-complete gate; future compatibility is not an excuse for incomplete
+current-source research.
 
-Generic fallback is not a substitute for research. A profile-level
-`autogen.selector.allow` MAY preserve a source-backed dynamic family only when
-the source names cannot be enumerated or normalized faithfully and each generic
-chart still represents a valid operator signal. Keep the allowlist as narrow as
-the source contract. Record the owner, identity encoded in the name/labels,
-cardinality boundary, and why an authored selector cannot represent it.
+Generic fallback is a forward-compatibility guard, not a substitute for
+research. A contributed profile MUST NOT use `autogen.selector.allow`: every
+allowlist is also an implicit deny of all unknown families outside the list.
+Source-backed dynamic current families MUST be normalized, curated from
+representative synthetic instances, or excluded under one binding case. The
+runtime format retains `allow` for deployment-owned user configurations, but it
+is not valid stock-profile authoring policy.
 
 If `TYPE` is missing, do not guess silently. The collector can recover only
 selected untyped scalar families through `fallback_type`; it cannot reconstruct
@@ -399,9 +403,44 @@ of:
 
 Choose the least surprising mechanism:
 
-- Use `selector` for efficient name/label allow/deny filtering.
-- Use relabeling when series or labels must be transformed, normalized, kept,
-  or dropped by ordered Prometheus-compatible rules.
+- Use `selector` for efficient name/label filtering. A contributed job MAY use
+  `allow` only when it structurally covers the profile's complete future
+  namespace: copy every positive wildcard term from `profile.match` unchanged
+  into an unconstrained allow expression, copy the complete match expression,
+  or use `*`. Finite synthetic names and label-constrained allow expressions do
+  not prove namespace coverage.
+- Use relabeling when series or labels must be transformed, normalized, or
+  dropped by ordered Prometheus-compatible rules. Contributed jobs MUST NOT use
+  sample-filtering `keep` or `keepequal`; express known exclusions with bounded
+  `drop` or `dropequal` rules under exact known metric scopes. Label-dependent
+  sample discard MUST be scoped by an exact known metric block. A wildcard
+  block MAY discard only with `drop` from `__name__`, and its regex MUST either
+  enumerate finite exact metric names or express one non-empty internal entity
+  key between finite exporter prefixes and finite terminal metric suffixes.
+  Every exact name or prefix/suffix branch MUST drop source-complete fixture
+  evidence. Wildcard `dropequal` is forbidden because it cannot use a regex to
+  bound the discarded name grammar. Across preceding rules and blocks, the
+  name MUST remain derived only from the original `__name__`; a label-derived
+  rename cannot become a sample-discard input.
+  A wildcard block also MUST NOT write `__name__` from application labels: the
+  rewrite itself can rename an unknown family out of scope or invalidate and
+  drop it. Label-derived name rewriting requires an exact known metric block
+  reached before any prior metric-name mutation; otherwise a future family may
+  have been routed into that apparently exact scope. A name-derived wildcard
+  rewrite MUST use the bounded/evidenced input grammar required below. A
+  rewrite with an internal dynamic entity key MUST NOT reference that key in
+  the output; every finite output branch MUST select an authored canonical
+  metric. Before either dynamic rewrite form, an earlier rule in the same block
+  MUST copy unchanged the capture that encloses the entire dynamic entity
+  region into a reserved stable non-`__name__` label. A nested capture that
+  covers only one alternative is incomplete. The target MUST be absent from source-fixture block inputs and MUST
+  survive every reachable later rule/block. Canonical outputs MUST preserve
+  every finite prefix/suffix branch distinction; otherwise distinct source
+  entities can collapse. A source-proven
+  `<canonical_name>_<non-empty-identity>` family MAY normalize to
+  `<canonical_name>` only when the replacement is exactly that canonical name;
+  this rewrite-only form supports exporter-owned dynamic identity tails without
+  admitting an unrelated catch-all rewrite.
 - Use `fallback_type` only for untyped scalar families whose semantics are
   known.
 - Do not “cover” a metric by declaring it under `metrics:`. Coverage exists
@@ -470,18 +509,116 @@ When the endpoint policy matters, write a structured validation job file. Do
 not validate with a different selector/relabel/fallback policy from the one
 being recommended or installed.
 
-Profile fallback suppression is an exclusion too. A non-empty
-`autogen.selector.allow` rejects every unmatched series outside its allowlist,
-and `autogen.selector.deny` can reject an allowed series. Either path MUST
-satisfy one binding exclusion case above and document the lost operator
-question. The samples remain in the collector store; only their generic charts
-are suppressed. For objective completion, enumerate intentional exclusions in
-`deny`; do not rely on absence from `allow`. The validator keeps an
-allow-boundary rejection as an unmatched-series error, because it cannot
-distinguish the intended boundary from a newly omitted family. It accepts
-explicit denies only when the allow side admits all writer evidence and a
-counterfactual planner run proves that removing the exact profile rule turns
-every unmatched series into fallback.
+Profile fallback suppression is an exclusion too. Apply these binding rules:
+
+- `autogen.selector.allow` MUST NOT appear in a contributed profile. It closes
+  fallback for every unknown family outside the allowlist.
+- Every `autogen.selector.deny` entry MUST name one exact family present in the
+  source-complete family inventory; wildcard, label-only, open-ended, and
+  fixture-absent exact denies are forbidden. A selector containing `{...}` is
+  label-constrained policy, not an exact family name, even when its metric-name
+  portion has no wildcard.
+- For histogram and summary suppression, use the exact source family base name
+  in the profile deny. Job selectors operate on exposition sample names instead,
+  so their bounded exclusions must enumerate the exact `_bucket`, `_count`, and
+  `_sum` series that are actually emitted.
+- A job selector deny MUST name exact exposition metric names present in the
+  source-complete sample inventory. A dynamic alias grammar MUST use a bounded,
+  source-proven relabel `drop` rule instead.
+  A non-empty job allow list MUST structurally cover every
+  positive wildcard term in `profile.match`; finite synthetic canaries are only
+  supplemental probes. The full job policy MUST also admit the validator's
+  applicable relabel-subnamespace synthetic future families.
+- Every positive wildcard term in a relabel block that can discard a sample or
+  rewrite its metric name MUST expose a deterministic synthetic family inside
+  the profile scope and the ordered block path MUST actually process it. Match
+  exclusions MUST NOT hide every probe for one term while another harmless term
+  supplies coverage; an untestable future-affecting term is a closed boundary,
+  not evidence of compatibility.
+- A wildcard relabel block MUST NOT discard samples from application labels.
+  Its `drop` decision MUST derive exclusively from `__name__` and MUST be
+  structurally bounded as either a finite exact-name set or one non-empty
+  internal dynamic entity key between finite exporter prefixes and finite
+  terminal metric suffixes. Every finite exact name or prefix/suffix branch
+  MUST drop at least one sample in the source-complete fixture. A regex with an
+  open-ended terminal region such as `app_s.+` is forbidden even if the public
+  canaries do not match it. `dropequal` is forbidden under wildcard scope.
+  Label-dependent discard is bounded only under a block whose positive match
+  terms are exact metric names present in the source-complete exposition. Every
+  exact-scope discard rule MUST actually drop at least one fixture sample at its
+  ordered pipeline position; an exact spelling without exercised evidence is
+  not a known exclusion.
+- Before any sample-discard rule, the current `__name__` MUST remain derived
+  exclusively from the original metric name. A preceding `replace`, `hashmod`,
+  `lowercase`, or `uppercase` that may write `__name__` from application labels
+  taints that provenance across later rules and relabel blocks; contributor
+  validation rejects subsequent discard.
+- A wildcard relabel block MUST NOT write `__name__` from application labels at
+  all. This includes an omitted-action default `replace`, a dynamic replacement
+  target that may expand to `__name__`, `hashmod`, `lowercase`, `uppercase`, and
+  `labelmap` whose replacement can produce `__name__`. Such a rule can itself
+  invalidate and drop a future sample even without an explicit discard action.
+  Netdata's relabel runtime ignores configured `labelmap.source_labels`, so
+  listing only `__name__` there does not establish metric-name-only provenance.
+  The exact-scope exception applies only while `__name__` is still the original
+  metric name; any earlier name write removes that proof even when the earlier
+  write was itself name-derived. Determine whether a dynamic target can produce
+  `__name__` from its regex and replacement together; a finite output language
+  that cannot produce `__name__` is label-only and MUST NOT be rejected as a
+  metric-name write.
+- A wildcard `replace` from `__name__` to `__name__` MUST have a bounded,
+  source-evidenced input grammar. It may enumerate finite exact names, use one
+  non-empty internal entity key between finite exporter prefixes and finite
+  terminal suffixes, or normalize a source-proven canonical dynamic tail. The
+  last form is valid only for `<canonical_name>_<non-empty-identity>` rewritten
+  exactly to `<canonical_name>`. Every finite name, prefix/suffix branch, or
+  canonical-prefix branch MUST reach the rewrite in the source-complete fixture.
+  Before either dynamic form rewrites the name, the same block MUST copy
+  unchanged from `__name__` the capture that encloses the entire dynamic entity
+  region into a reserved static non-`__name__` label. A nested capture that
+  covers only one alternative is incomplete. The target MUST be absent from source-fixture inputs at
+  block entry and preserved through every reachable remaining rule and block.
+  A later label write sourced only from `__name__` is unreachable when its
+  regex is disjoint from every possible current canonical name and therefore
+  does not invalidate preservation.
+  Canonical outputs MUST preserve every finite prefix/suffix branch distinction.
+  Together these rules keep distinct source entities distinct after their
+  family names converge.
+  A conditional terminal catch such as `app_secret_.+ -> app_temperature` is
+  forbidden even when finite canaries do not enter it.
+- The complete recommended relabel pipeline MUST be injective over observed
+  writer-admissible logical identities. After normal histogram/summary component
+  assembly, two distinct source identities MUST NOT have the same final metric
+  name and labels. This applies to exact and wildcard blocks and to label
+  rewrites/removals as well as metric-name rewrites; relabeling does not
+  aggregate values when identities collapse. Samples the real writer rejects,
+  such as non-finite scalar values, do not create a writer identity and MUST NOT
+  create a false collision.
+- Every metric-name rewrite MUST produce a valid non-empty name for every
+  source-fixture sample it reaches. A rewrite MUST NOT use missing/empty label
+  values or invalid replacement output as an implicit discard mechanism; use an
+  explicit bounded, source-evidenced `drop` rule for an intentional exclusion.
+- After the recommended relabel pipeline, every primary future-family probe
+  MUST still route to generic fallback. It MUST NOT collide with a metric name
+  selected by an authored dimension or share its final metric name with another
+  primary probe, even when the rename derives only from the original
+  `__name__`. Many-to-one generic names can mix unrelated families or types.
+- Name-provenance checks MUST follow reachable ordered relabel paths. An exact
+  mutation taints a later exact block only when its possible output can enter
+  that block; capture-bearing replacements preserve both literal prefixes and
+  suffixes when proving that reachability, and a provably disjoint exact path
+  remains bounded. Ordered negative terms and the complete glob language,
+  including character classes, in profile and block scopes are part of that
+  reachability proof. A name-only rewrite
+  inherits application-label provenance when its input `__name__` was already
+  label-derived; it MUST NOT clear taint merely because its immediate source is
+  `__name__`.
+- The samples remain in the collector store when only profile fallback is
+  suppressed; only their generic charts disappear.
+
+The validator rejects closed boundaries independently of the source fixture. It
+accepts an exact profile deny only when a counterfactual planner run proves that
+removing that exact rule turns every unmatched current series into fallback.
 
 ## Encode the design
 
@@ -507,9 +644,10 @@ reviewable; decreasing priorities contradict the journey expressed by the
 file.
 
 Coverage and chart composition are separate decisions. A complete profile MUST
-account for every writer-surviving flattened bucket, count, sum, quantile,
-counter, and gauge series through authored routing, an explicitly justified
-generic-fallback boundary, or one binding exclusion case. It MUST NOT
+account for every current writer-surviving flattened bucket, count, sum,
+quantile, counter, and gauge series through authored routing or one binding
+exclusion case. Generic fallback is reserved for unknown future families and
+MUST NOT make a source-complete fixture pass. A profile MUST NOT
 mechanically create one chart for every metric or three charts for every
 histogram:
 
@@ -531,12 +669,11 @@ histogram:
   ratio that the exporter did not supply.
 
 The operator question decides the chart boundary; the validator's routing
-result decides whether every written series was accounted for. Zero autogen and
-zero unmatched remain the normal result. Explicit fallback warnings require a
-source-backed explanation; they are not permission to replace useful curation
-with generic charts or silent suppression. Conflating coverage with chart
-composition produces repetitive metric-type dashboards instead of useful
-comparisons.
+result decides whether every written current series was accounted for. Zero
+autogen and zero unmatched are mandatory for the source-complete fixture. The
+separate future-family canary proves that a later exporter addition still gets a
+generic chart. Conflating coverage with chart composition produces repetitive
+metric-type dashboards instead of useful comparisons.
 
 Keep contexts and IDs stable. Changing them creates new chart identities and
 can strand historical metadata. Different source charts that render the same
@@ -580,9 +717,21 @@ A `PASS` proves, for that evidence:
 - strict catalog/profile/template decoding succeeds;
 - the real collector completes `Init`, `Check`, and a committed `Collect`;
 - the real writer and flattening behavior are exercised;
-- every written series is accounted for, normally with zero autogen and zero
-  unmatched; any nonzero result is proved to be the candidate profile's narrow,
-  explicit fallback allow/suppress policy and is reported as a warning;
+- every current writer series is accounted for with zero autogen and zero
+  unmatched;
+- a deterministic synthetic future family derived from wildcard `match` scope
+  is admitted by the structured job selector/relabel policy and remains generic
+  after relabeling rather than colliding with an authored metric;
+- any non-empty job allow list structurally covers each positive wildcard
+  profile namespace, and wildcard relabel discard has a bounded, fully
+  fixture-evidenced metric-name grammar with original-name-only provenance;
+  wildcard metric-name rewrites are likewise original-name-derived, bounded,
+  and fixture-evidenced; every applicable future-affecting wildcard block has a
+  deterministic in-scope probe for each positive wildcard term and the ordered
+  pipeline actually applies that block to the probe;
+- the profile has no fallback allowlist or open-ended fallback deny, and the job
+  has no sample-filtering `keep`/`keepequal` relabel action; every exact
+  profile/job/relabel exclusion has source-complete evidence;
 - every authored chart and dimension materializes;
 - every selected writer series carries the labels required by the chart's
   effective explicit instance identity;
@@ -614,14 +763,14 @@ denominator is mechanically valid but is not a complete dashboard unless every
 exclusion satisfies the policy above.
 
 Warnings are prompts for model review, not policy decisions. They include
-explicitly allowed generic fallback, explicitly suppressed fallback series,
-generic auto-selection signatures, observed labels with no authored role,
+exact explicitly suppressed fallback series, generic auto-selection signatures,
+observed labels with no authored role,
 the job-policy exclusion summary, observed per-rule allow/deny impact, unused
 metric declarations, authored/runtime heatmap divergence, ambiguous or
 physical-rate filled charts, repeated sibling family paths, mixed leaf identity,
-parent identity loss, sibling identity mismatch, sample-discarding relabel
-actions, and incremental counter/distribution charts whose units omit rate
-semantics. Each can be intentional, but its UX or diagnostic trade-off must be
+parent identity loss, sibling identity mismatch, bounded `drop`/`dropequal`
+relabel actions, and incremental counter/distribution charts whose units omit
+rate semantics. Each can be intentional, but its UX or diagnostic trade-off must be
 explained. Do not mechanically add identity, promotion, dimensions, or unit
 suffixes merely to silence a warning; explain intentional aggregation,
 entity-level boundaries, and truthful unit algebra when they are correct.
@@ -725,6 +874,25 @@ Deliver:
 - the stock integration metadata/generated-doc disposition when applicable;
 - explicit unresolved evidence limitations; known source-defined optional
   surfaces in scope must not be deferred merely for lack of a local feature.
+
+For a stock profile in this repository, commit the durable proof under
+`src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/`:
+
+- `OPERATOR-MODEL.md` contains the operator model and selector-level
+  reconciliation;
+- `SOURCE-INVENTORY.tsv` contains the exact source-family/selector ledger;
+- `EVIDENCE.md` records versions, source and documentation revisions, feature
+  gates, evidence boundaries, fixture provenance, and exact reproduction steps;
+- `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the
+  objective validator and agrees with the recommended metadata example;
+- `SHA256SUMS.tsv` hashes the final profile, fixture, metadata job-policy source,
+  validation job, operator model, and source inventory; and
+- `VALIDATION.md` is the authoritative human-readable PASS summary.
+
+Do not substitute transient local report JSON, an uncommitted scratch document,
+or a private observed scrape for this reviewable stock proof. Raw reports MAY
+remain local when the committed inputs, hashes, commands, counts, and semantic
+ledger reproduce the same conclusion.
 
 Do not install or reload production configuration merely because authoring
 passed. Installation is a separate operational change:

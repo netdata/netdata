@@ -1,0 +1,9 @@
+sha256	bytes	path
+f0555b266e4142abdc7e857dbf5fc73c398633fecf78e22335dac2dbbe6ccd92	223877	src/go/plugin/go.d/collector/prometheus/metadata.yaml
+5afb85c72fdf22b33da7711cc6390c6f4773ba52dddca55f1b2b427c8b8fabe7	3225	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/EVIDENCE.md
+bce0ebef37ff502025697b63494ee0954e1e50dd9063210c75b00e42d213f82a	11772	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/OPERATOR-MODEL.md
+b9269da300af9167aff80f74ae766db4b1c8a6ddaeb5af2b569ceb7c3629bb80	452116	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/SOURCE-INVENTORY.tsv
+534bba3e2d68d4a646c86dc80046580cd30894bad8a9ef78fc20f413612bcbca	4140	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml
+bdf2d82a7aee8dcbe17dab3273641bb2c4d81517c82b6689a7e1729b21639b77	3827	src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION.md
+3a4fda116991c78d46c9ef5b2daacd7d8adfc16ce7cf04d84bced9de010d3274	201177	src/go/plugin/go.d/collector/prometheus/testdata/litellm_all_metrics.prom
+779f0e5ad557efce527d72c3c0d85a7ae2d4f64bf87139881f595237336a1169	92502	src/go/plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml

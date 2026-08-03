@@ -54,6 +54,21 @@ func TestProcessor_Apply(t *testing.T) {
 			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
 			keep: true,
 		},
+		"labelmap can rewrite __name__ from an application label": {
+			cfgs: []Config{{
+				SourceLabels: []string{commonmodel.MetricNameLabel},
+				Regex:        MustNewRegexp("metric_name"),
+				Replacement:  commonmodel.MetricNameLabel,
+				Action:       LabelMap,
+			}},
+			in: sample("original_metric", map[string]string{
+				"metric_name": "renamed_metric",
+			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			want: sample("renamed_metric", map[string]string{
+				"metric_name": "renamed_metric",
+			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			keep: true,
+		},
 		"explicit empty separator joins without the default ';'": {
 			cfgs: []Config{{
 				SourceLabels: []string{"a", "b"},

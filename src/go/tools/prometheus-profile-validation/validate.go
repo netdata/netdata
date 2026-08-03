@@ -16,9 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -120,7 +118,8 @@ func validateProfile(opts validationOptions) report {
 	}
 	defer coll.Cleanup(context.Background())
 	addJobDenyReview(policy.Selector, rawSamples, r.RawFamilies, &r)
-	addRelabelDiscardReview(policy.Selector, policy.Relabeling, rawSamples, &r)
+	relabelAudits := addRelabelPolicyReview(policy.Selector, policy.Relabeling, policy.FallbackType, rawSamples, &r)
+	addForwardCompatibilityChecks(profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r)
 	if err := coll.Check(ctx); err != nil {
 		r.addError("collector_check", opts.dumpPath, err.Error(), "The candidate must match the post-policy scrape and pass the collector startup gates.")
 		return r
@@ -326,21 +325,12 @@ func validateProfile(opts validationOptions) report {
 	}
 
 	if runtimeCountersOK && r.Counts.SeriesAutogen != 0 {
-		if profileExplicitlyAllowsAutogen(profile, r.Charts, materializedFamilies) {
-			r.addWarning(
-				"profile_allowed_autogen",
-				"autogen.selector.allow",
-				fmt.Sprintf("%d series produced %d explicitly allowlisted generic fallback charts", r.Counts.SeriesAutogen, r.Counts.AutogenCharts),
-				"The profile deliberately preserves this source surface through generic fallback; keep the allowlist narrow and source-backed.",
-			)
-		} else {
-			r.addError(
-				"unexpected_autogen",
-				"",
-				fmt.Sprintf("%d series produced %d fallback charts", r.Counts.SeriesAutogen, r.Counts.AutogenCharts),
-				"Passing profiles must curate every series that survives the job/writer pipeline unless a narrow profile autogen allowlist explicitly documents a generic-fallback boundary.",
-			)
-		}
+		r.addError(
+			"unexpected_autogen",
+			"",
+			fmt.Sprintf("%d series produced %d fallback charts", r.Counts.SeriesAutogen, r.Counts.AutogenCharts),
+			"The source-complete fixture must curate every series that survives the job/writer pipeline. Generic fallback preserves unknown future metrics; it does not excuse a current-source coverage gap.",
+		)
 	}
 	if runtimeCountersOK && r.Counts.SeriesUnmatched != 0 {
 		if profileSuppressionExplainsUnmatched(profile, merged, reader, r.Counts.SeriesAutogen, r.Counts.SeriesUnmatched) {
@@ -507,26 +497,17 @@ func inventoryRawFamilies(families prompkg.MetricFamilies) ([]rawFamilyReport, i
 }
 
 type writerInventory struct {
-	sourceSeries             map[string]map[string]struct{}
-	sourceFamilyBySeriesName map[string]string
-	series                   int
+	sourceSeries map[string]map[string]struct{}
+	series       int
 }
 
 func inventoryWriterSeries(reader metrix.Reader) writerInventory {
 	out := writerInventory{
-		sourceSeries:             make(map[string]map[string]struct{}),
-		sourceFamilyBySeriesName: make(map[string]string),
+		sourceSeries: make(map[string]map[string]struct{}),
 	}
 	reader.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, _ metrix.SampleValue) {
 		out.series++
 		family := sourceFamilyName(name, meta)
-		if previous, ok := out.sourceFamilyBySeriesName[name]; ok && previous != family {
-			// An empty mapped family marks inconsistent metadata and keeps validation
-			// fail-closed without guessing from a flattened suffix.
-			out.sourceFamilyBySeriesName[name] = ""
-		} else if !ok {
-			out.sourceFamilyBySeriesName[name] = family
-		}
 		identities := out.sourceSeries[family]
 		if identities == nil {
 			identities = make(map[string]struct{})
@@ -649,48 +630,6 @@ func runtimeMetricInt(engine *chartengine.Engine, suffix string) (int, error) {
 	return int(value), nil
 }
 
-func profileExplicitlyAllowsAutogen(profile promprofiles.Profile, charts []materializedChart, writer writerInventory) bool {
-	expr := profile.AutogenSelector()
-	if expr == nil || len(expr.Allow) == 0 {
-		return false
-	}
-	match, err := matcher.NewSimplePatternsMatcher(profile.Match)
-	if err != nil {
-		return false
-	}
-	found := false
-	for _, chart := range charts {
-		if !chart.Autogen {
-			continue
-		}
-		found = true
-		name, ok := autogenSourceMetric(chart.TemplateID)
-		if !ok {
-			return false
-		}
-		if family, found := writer.sourceFamilyBySeriesName[name]; found {
-			if family == "" {
-				return false
-			}
-			name = family
-		}
-		if !match.MatchString(name) {
-			return false
-		}
-	}
-	return found
-}
-
-func autogenSourceMetric(templateID string) (string, bool) {
-	const prefix = "__autogen__:"
-	rest, ok := strings.CutPrefix(templateID, prefix)
-	if !ok {
-		return "", false
-	}
-	name, _, _ := strings.Cut(rest, "-")
-	return name, name != ""
-}
-
 func profileSuppressionExplainsUnmatched(
 	profile promprofiles.Profile,
 	merged *charttpl.Spec,
@@ -700,21 +639,6 @@ func profileSuppressionExplainsUnmatched(
 	expr := profile.AutogenSelector()
 	if expr == nil || len(expr.Deny) == 0 || currentUnmatched == 0 || merged == nil || merged.Engine == nil || merged.Engine.Autogen == nil {
 		return false
-	}
-	if len(expr.Allow) > 0 {
-		allow, err := (metrixselector.Expr{Allow: slices.Clone(expr.Allow)}).Parse()
-		if err != nil {
-			return false
-		}
-		allAllowed := true
-		reader.ForEachSeries(func(name string, labels metrix.LabelView, _ metrix.SampleValue) {
-			if !allow.Matches(name, labels) {
-				allAllowed = false
-			}
-		})
-		if !allAllowed {
-			return false
-		}
 	}
 	raw, err := merged.MarshalTemplate()
 	if err != nil {

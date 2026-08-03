@@ -6,16 +6,10 @@
 # pool/daemon/image/user/bucket/gateway/device axis instead of silently merging entities.
 # Priority-0 counters are curated because the official exporter can expose them with prio-limit=0.
 # Job relabeling normalizes every unambiguous dynamic group grammar in the declared releases.
-# Fallback is limited to known producer signatures; unknown future names require source-backed
-# identity, unit, and operator-model evidence before they can be charted safely.
+# The declared source union is fully curated; unknown future ceph families remain eligible for
+# generic fallback until their semantics can be added to the operator model.
 match: 'ceph_*'
 app: ceph
-autogen:
-  selector:
-    allow:
-      - ceph_health_status
-      - ceph_daemon_socket_up
-      - ceph_nvmeof_gateway_info
 template:
   family: Ceph
   context_namespace: ceph

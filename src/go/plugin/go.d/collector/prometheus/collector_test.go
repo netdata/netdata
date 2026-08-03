@@ -951,7 +951,7 @@ ceph_health_status 0
 	)
 }
 
-func configureCephProfileJobFromMetadata(t *testing.T, collr *Collector, jobName string) {
+func configureProfileJobFromMetadata(t *testing.T, collr *Collector, integrationID, profileName, jobName string) {
 	t.Helper()
 
 	var metadata struct {
@@ -974,36 +974,35 @@ func configureCephProfileJobFromMetadata(t *testing.T, collr *Collector, jobName
 	require.NoError(t, err)
 	require.NoError(t, yaml.Unmarshal(content, &metadata))
 
-	const integrationID = "collector-go.d.plugin-prometheus-ceph"
-	var rawConfig string
-	for _, module := range metadata.Modules {
-		if module.Meta.ID == integrationID {
-			require.NotEmpty(t, module.Setup.Configuration.Examples.List)
-			rawConfig = module.Setup.Configuration.Examples.List[0].Config
-			break
-		}
-	}
-	require.NotEmptyf(t, rawConfig, "metadata integration %q has no configuration example", integrationID)
-
-	var example struct {
-		Jobs []yaml.Node `yaml:"jobs"`
-	}
-	require.NoError(t, yaml.Unmarshal([]byte(rawConfig), &example))
-	require.Len(t, example.Jobs, 2)
-
 	var config *Config
-	for idx := range example.Jobs {
-		candidate := New().Config
-		require.NoError(t, example.Jobs[idx].Decode(&candidate))
-		if candidate.Name == jobName {
-			config = &candidate
-			break
+	for _, module := range metadata.Modules {
+		if module.Meta.ID != integrationID {
+			continue
 		}
+		require.NotEmpty(t, module.Setup.Configuration.Examples.List)
+		for _, item := range module.Setup.Configuration.Examples.List {
+			var example struct {
+				Jobs []yaml.Node `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(item.Config), &example))
+			for idx := range example.Jobs {
+				candidate := New().Config
+				require.NoError(t, example.Jobs[idx].Decode(&candidate))
+				if candidate.Name == jobName {
+					config = &candidate
+					break
+				}
+			}
+			if config != nil {
+				break
+			}
+		}
+		break
 	}
-	require.NotNilf(t, config, "metadata example has no job %q", jobName)
+	require.NotNilf(t, config, "metadata integration %q has no job %q", integrationID, jobName)
 	require.Equal(t, ProfilesConfig{
 		Mode:      "exact",
-		ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "ceph"}}},
+		ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: profileName}}},
 	}, config.Profiles)
 
 	config.URL = collr.URL
@@ -1023,14 +1022,7 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 
 	collr := New()
 	collr.URL = srv.URL
-	collr.Selector = selector.Expr{Deny: []string{
-		"*_created",
-		"process_start_time_seconds",
-		"vllm:kv_offload_total_bytes_total",
-		"vllm:kv_offload_total_time_total",
-		"vllm:kv_offload_size*",
-	}}
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm", "vllm")
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 
@@ -1062,6 +1054,13 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 	defer attempt.Abort()
 	plan := attempt.Plan()
 	require.NoError(t, attempt.Commit())
+	runtimeReader := eng.RuntimeStore().Read(metrix.ReadRaw())
+	for _, metric := range []string{"series_autogen_matched_total", "series_unmatched_total"} {
+		name := "netdata.go.plugin.framework.chartengine." + metric
+		value, ok := runtimeReader.Value(name, nil)
+		require.Truef(t, ok, "chartengine runtime metric %q is missing", name)
+		assert.Zerof(t, value, "source-complete stock fixture must leave %s at zero", metric)
+	}
 
 	seenChartIDs := make(map[string]string)
 	identityCounts := map[string]int{
@@ -1206,6 +1205,13 @@ func testCollectorStockProfileAllMetrics(
 	defer attempt.Abort()
 	plan := attempt.Plan()
 	require.NoError(t, attempt.Commit())
+	runtimeReader := eng.RuntimeStore().Read(metrix.ReadRaw())
+	for _, metric := range []string{"series_autogen_matched_total", "series_unmatched_total"} {
+		name := "netdata.go.plugin.framework.chartengine." + metric
+		value, ok := runtimeReader.Value(name, nil)
+		require.Truef(t, ok, "chartengine runtime metric %q is missing", name)
+		assert.Zerof(t, value, "source-complete stock fixture must leave %s at zero", metric)
+	}
 
 	seenChartIDs := make(map[string]string)
 	for _, action := range plan.Actions {
@@ -1233,51 +1239,11 @@ func testCollectorStockProfileAllMetrics(
 // removes Ray's deprecated unsuffixed counter aliases and pre-canonical
 // KV-offload duplicates so canonical counters are represented exactly once.
 func TestCollector_VLLMRayProfileAllMetrics(t *testing.T) {
-	denials := []string{
-		"ray_vllm_corrupted_requests",
-		"ray_vllm_diffusion_num_canvas_positions",
-		"ray_vllm_diffusion_num_committed_tokens",
-		"ray_vllm_diffusion_num_denoising_steps",
-		"ray_vllm_external_prefix_cache_hits",
-		"ray_vllm_external_prefix_cache_queries",
-		"ray_vllm_generation_tokens",
-		"ray_vllm_hf3fs_num_failed_load",
-		"ray_vllm_hf3fs_num_failed_save",
-		"ray_vllm_kv_offload_allocation_failure",
-		"ray_vllm_kv_offload_load_bytes",
-		"ray_vllm_kv_offload_load_time",
-		"ray_vllm_kv_offload_size*",
-		"ray_vllm_kv_offload_store_bytes",
-		"ray_vllm_kv_offload_store_time",
-		"ray_vllm_kv_offload_stores_skipped",
-		"ray_vllm_kv_offload_total_bytes",
-		"ray_vllm_kv_offload_total_bytes_total",
-		"ray_vllm_kv_offload_total_time",
-		"ray_vllm_kv_offload_total_time_total",
-		"ray_vllm_mm_cache_hits",
-		"ray_vllm_mm_cache_queries",
-		"ray_vllm_nixl_num_failed_notifications",
-		"ray_vllm_nixl_num_failed_transfers",
-		"ray_vllm_nixl_num_kv_expired_reqs",
-		"ray_vllm_num_preemptions",
-		"ray_vllm_prefix_cache_hits",
-		"ray_vllm_prefix_cache_queries",
-		"ray_vllm_prompt_tokens",
-		"ray_vllm_prompt_tokens_by_source",
-		"ray_vllm_prompt_tokens_cached",
-		"ray_vllm_request_success",
-		"ray_vllm_spec_decode_num_accepted_tokens",
-		"ray_vllm_spec_decode_num_accepted_tokens_per_pos",
-		"ray_vllm_spec_decode_num_draft_tokens",
-		"ray_vllm_spec_decode_num_drafts",
-	}
 	testCollectorStockProfileAllMetrics(
 		t,
 		"vllm_ray_all_metrics.prom",
 		func(collr *Collector) {
-			collr.Selector = selector.Expr{Allow: []string{"ray_vllm_*"}, Deny: denials}
-			collr.MaxTS = 200000
-			collr.MaxTSPerMetric = 50000
+			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm_ray", "vllm-ray")
 		},
 		"prometheus.vllm.",
 		map[string][]string{
@@ -1293,15 +1259,11 @@ func TestCollector_VLLMRayProfileAllMetrics(t *testing.T) {
 			"prometheus.vllm.mooncake_connector.volume.failed_keys":     {"ok", "error"},
 		},
 		func(reader metrix.Reader) {
-			denied := make(map[string]bool, len(denials))
-			for _, name := range denials {
-				denied[name] = true
-			}
 			var sawCanonicalCounter bool
 			reader.ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
-				assert.Falsef(t, denied[name], "Ray duplicate family %q survived the job selector", name)
-				assert.Falsef(t, strings.HasPrefix(name, "ray_vllm_kv_offload_size"),
-					"deprecated Ray KV-offload histogram %q survived the job selector", name)
+				assert.NotEqual(t, "ray_vllm_request_success", name, "Ray compatibility gauge survived the job selector")
+				assert.Falsef(t, strings.HasPrefix(name, "ray_vllm_kv_offload_size_"),
+					"deprecated Ray KV-offload histogram component %q survived the job selector", name)
 				if name == "ray_vllm_request_success_total" {
 					sawCanonicalCounter = true
 				}
@@ -1355,15 +1317,7 @@ func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
 		t,
 		"litellm_all_metrics.prom",
 		func(collr *Collector) {
-			collr.Selector = selector.Expr{Deny: []string{
-				"*_created",
-				"process_start_time_seconds",
-				"litellm_requests_metric_total",
-				"litellm_llm_api_failed_requests_metric_total",
-				"litellm_check_batch_cost_last_run_timestamp",
-			}}
-			collr.MaxTS = 20000
-			collr.MaxTSPerMetric = 2000
+			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-litellm", "litellm", "litellm")
 		},
 		"prometheus.litellm.",
 		map[string][]string{
@@ -1601,7 +1555,7 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 		t,
 		"ceph_all_metrics.prom",
 		func(collr *Collector) {
-			configureCephProfileJobFromMetadata(t, collr, "ceph-mgr")
+			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr")
 		},
 		"prometheus.ceph.",
 		map[string][]string{
@@ -1939,7 +1893,7 @@ func TestCollector_CephProfileProducerVariants(t *testing.T) {
 				t,
 				test.fixture,
 				func(collr *Collector) {
-					configureCephProfileJobFromMetadata(t, collr, test.jobName)
+					configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", test.jobName)
 				},
 				"prometheus.ceph.",
 				map[string][]string{test.context: test.dims},

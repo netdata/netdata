@@ -203,6 +203,7 @@ type relabelDiscardAudit struct {
 	action            promrelabel.Action
 	blockMatch        string
 	families          map[string]struct{}
+	metricNames       map[string]struct{}
 	logicalIdentities map[string]struct{}
 	rawSeries         int
 }
@@ -212,71 +213,169 @@ type relabelDiscardRuleKey struct {
 	rule  int
 }
 
-// addRelabelDiscardReview replays the validated job rules over the captured
-// samples so every sample-discarding rule has an explicit evidence boundary.
-func addRelabelDiscardReview(
+type relabelNameRewriteAudit struct {
+	metricNames          map[string]struct{}
+	blockInputLabelNames map[string]struct{}
+}
+
+type relabelIdentityCollapseAudit struct {
+	finalFamilies    []string
+	finalIdentities  int
+	sourceIdentities int
+}
+
+type relabelInvalidNameDropAudit struct {
+	blocks            map[int]struct{}
+	families          map[string]struct{}
+	logicalIdentities map[string]struct{}
+	rawSeries         int
+}
+
+type relabelPolicyAudits struct {
+	discards         map[relabelDiscardRuleKey]*relabelDiscardAudit
+	nameRewrites     map[relabelDiscardRuleKey]*relabelNameRewriteAudit
+	identityCollapse relabelIdentityCollapseAudit
+	invalidNameDrops relabelInvalidNameDropAudit
+}
+
+// addRelabelPolicyReview replays the validated job rules over the captured
+// samples so every discard and bounded name rewrite has an evidence boundary.
+func addRelabelPolicyReview(
 	expr promselector.Expr,
 	blocks []promcollector.RelabelBlock,
+	fallback fallbackTypePolicy,
 	batch prompkg.SampleBatch,
 	r *report,
-) {
+) relabelPolicyAudits {
 	if len(blocks) == 0 {
-		return
+		return relabelPolicyAudits{}
 	}
 
 	effectiveSelector, err := expr.Parse()
 	if err != nil {
-		return // Collector.Init reports the authoritative selector error.
+		return relabelPolicyAudits{} // Collector.Init reports the authoritative selector error.
 	}
 
 	type compiledBlock struct {
-		match matcher.Matcher
-		proc  *promrelabel.Processor
+		match            matcher.Matcher
+		proc             *promrelabel.Processor
+		ruleInput        map[int]*promrelabel.Processor
+		nameRewriteRules map[int]promrelabel.Config
 	}
 	compiled := make([]compiledBlock, 0, len(blocks))
-	audits := make(map[relabelDiscardRuleKey]*relabelDiscardAudit)
+	audits := relabelPolicyAudits{
+		discards:     make(map[relabelDiscardRuleKey]*relabelDiscardAudit),
+		nameRewrites: make(map[relabelDiscardRuleKey]*relabelNameRewriteAudit),
+		invalidNameDrops: relabelInvalidNameDropAudit{
+			blocks:            make(map[int]struct{}),
+			families:          make(map[string]struct{}),
+			logicalIdentities: make(map[string]struct{}),
+		},
+	}
 	for blockIndex, block := range blocks {
 		m, err := matcher.NewSimplePatternsMatcher(block.Match)
 		if err != nil {
-			return // Collector.Init reports the authoritative block error.
+			return relabelPolicyAudits{} // Collector.Init reports the authoritative block error.
 		}
 		proc, err := promrelabel.New(block.MetricRelabelConfigs)
 		if err != nil {
-			return // Collector.Init reports the authoritative rule error.
+			return relabelPolicyAudits{} // Collector.Init reports the authoritative rule error.
 		}
-		compiled = append(compiled, compiledBlock{match: m, proc: proc})
+		item := compiledBlock{
+			match:            m,
+			proc:             proc,
+			ruleInput:        make(map[int]*promrelabel.Processor),
+			nameRewriteRules: make(map[int]promrelabel.Config),
+		}
+		compiled = append(compiled, item)
 		for ruleIndex, config := range block.MetricRelabelConfigs {
 			action, ok := sampleDiscardingRelabelAction(config.Action)
-			if !ok {
-				continue
+			if ok {
+				audits.discards[relabelDiscardRuleKey{block: blockIndex, rule: ruleIndex}] = &relabelDiscardAudit{
+					action:            action,
+					blockMatch:        block.Match,
+					families:          make(map[string]struct{}),
+					metricNames:       make(map[string]struct{}),
+					logicalIdentities: make(map[string]struct{}),
+				}
 			}
-			audits[relabelDiscardRuleKey{block: blockIndex, rule: ruleIndex}] = &relabelDiscardAudit{
-				action:            action,
-				blockMatch:        block.Match,
-				families:          make(map[string]struct{}),
-				logicalIdentities: make(map[string]struct{}),
+			isNameRewrite := normalizedRelabelAction(config.Action) == promrelabel.Replace &&
+				len(config.SourceLabels) == 1 && config.SourceLabels[0] == promlabels.MetricName &&
+				config.TargetLabel == promlabels.MetricName
+			if isNameRewrite {
+				key := relabelDiscardRuleKey{block: blockIndex, rule: ruleIndex}
+				audits.nameRewrites[key] = &relabelNameRewriteAudit{
+					metricNames:          make(map[string]struct{}),
+					blockInputLabelNames: make(map[string]struct{}),
+				}
+				compiled[blockIndex].nameRewriteRules[ruleIndex] = config
+			}
+			if ruleIndex > 0 && (ok || isNameRewrite) {
+				prefix, err := promrelabel.New(block.MetricRelabelConfigs[:ruleIndex])
+				if err != nil {
+					return relabelPolicyAudits{} // Collector.Init reports the authoritative rule error.
+				}
+				compiled[blockIndex].ruleInput[ruleIndex] = prefix
 			}
 		}
 	}
-	if len(audits) == 0 {
-		return
+
+	type relabeledIdentity struct {
+		family           string
+		sourceIdentities map[string]struct{}
 	}
+	finalIdentities := make(map[string]*relabeledIdentity)
+	fallbackGauge := fallbackTypeMatcher(fallback.Gauge)
+	fallbackCounter := fallbackTypeMatcher(fallback.Counter)
 
 	for _, raw := range batch.Samples {
 		if effectiveSelector != nil && !effectiveSelector.Matches(sampleLabelsWithName(raw)) {
 			continue
 		}
 		sample := raw
+		sampleDropped := false
 		for blockIndex, block := range compiled {
 			if !block.match.MatchString(sample.Name) {
 				continue
 			}
+			for ruleIndex, config := range block.nameRewriteRules {
+				input := sample
+				if prefix := block.ruleInput[ruleIndex]; prefix != nil {
+					processed, prefixDrop := prefix.Apply(sample)
+					if prefixDrop.Dropped() {
+						continue
+					}
+					input = processed
+				}
+				if config.Regex.MatchString(input.Name) {
+					audit := audits.nameRewrites[relabelDiscardRuleKey{block: blockIndex, rule: ruleIndex}]
+					audit.metricNames[input.Name] = struct{}{}
+					for _, label := range sample.Labels {
+						audit.blockInputLabelNames[label.Name] = struct{}{}
+					}
+				}
+			}
 			out, drop := block.proc.Apply(sample)
 			if drop.Dropped() {
+				sampleDropped = true
+				if drop.Reason == promrelabel.DropReasonInvalidMetricName {
+					family := sampleSourceFamilyName(raw)
+					audits.invalidNameDrops.blocks[blockIndex] = struct{}{}
+					audits.invalidNameDrops.families[family] = struct{}{}
+					audits.invalidNameDrops.logicalIdentities[logicalSampleIdentityKey(family, raw)] = struct{}{}
+					audits.invalidNameDrops.rawSeries++
+				}
 				key := relabelDiscardRuleKey{block: blockIndex, rule: drop.RuleIndex}
-				if audit := audits[key]; audit != nil {
+				if audit := audits.discards[key]; audit != nil {
+					input := sample
+					if prefix := block.ruleInput[drop.RuleIndex]; prefix != nil {
+						if processed, prefixDrop := prefix.Apply(sample); !prefixDrop.Dropped() {
+							input = processed
+						}
+					}
 					family := sampleSourceFamilyName(raw)
 					audit.families[family] = struct{}{}
+					audit.metricNames[input.Name] = struct{}{}
 					audit.logicalIdentities[logicalSampleIdentityKey(family, raw)] = struct{}{}
 					audit.rawSeries++
 				}
@@ -284,16 +383,44 @@ func addRelabelDiscardReview(
 			}
 			sample = out
 		}
+		if !sampleDropped && sampleCanReachWriter(sample, fallbackGauge, fallbackCounter) {
+			family := sampleSourceFamilyName(sample)
+			key := logicalSampleIdentityKey(family, sample)
+			identity := finalIdentities[key]
+			if identity == nil {
+				identity = &relabeledIdentity{
+					family:           family,
+					sourceIdentities: make(map[string]struct{}),
+				}
+				finalIdentities[key] = identity
+			}
+			identity.sourceIdentities[logicalSampleIdentityKey(sampleSourceFamilyName(raw), raw)] = struct{}{}
+		}
 	}
 
-	keys := slices.SortedFunc(maps.Keys(audits), func(a, b relabelDiscardRuleKey) int {
+	collapsedSources := make(map[string]struct{})
+	collapsedFamilies := make(map[string]struct{})
+	for _, identity := range finalIdentities {
+		if len(identity.sourceIdentities) < 2 {
+			continue
+		}
+		audits.identityCollapse.finalIdentities++
+		collapsedFamilies[identity.family] = struct{}{}
+		for source := range identity.sourceIdentities {
+			collapsedSources[source] = struct{}{}
+		}
+	}
+	audits.identityCollapse.finalFamilies = slices.Sorted(maps.Keys(collapsedFamilies))
+	audits.identityCollapse.sourceIdentities = len(collapsedSources)
+
+	keys := slices.SortedFunc(maps.Keys(audits.discards), func(a, b relabelDiscardRuleKey) int {
 		if a.block != b.block {
 			return a.block - b.block
 		}
 		return a.rule - b.rule
 	})
 	for _, key := range keys {
-		audit := audits[key]
+		audit := audits.discards[key]
 		path := fmt.Sprintf("relabeling[%d].metric_relabel_configs[%d]", key.block, key.rule)
 		message := fmt.Sprintf(
 			"sample-discarding relabel action %q in block match %q dropped no samples in the supplied dump",
@@ -317,10 +444,54 @@ func addRelabelDiscardReview(
 			"Drop, keep, dropequal, and keepequal change the evidence denominator before profile coverage is measured. Confirm authoritative semantics and state which operator question is lost; zero observed drops do not prove the rule is harmless for unseen values.",
 		)
 	}
+	return audits
+}
+
+func fallbackTypeMatcher(patterns []string) matcher.Matcher {
+	m := matcher.FALSE()
+	for _, pattern := range patterns {
+		item, err := matcher.NewGlobMatcher(pattern)
+		if err != nil {
+			return matcher.FALSE() // Collector.Init reports the authoritative pattern error.
+		}
+		m = matcher.Or(m, item)
+	}
+	return m
+}
+
+func sampleCanReachWriter(sample prompkg.Sample, fallbackGauge, fallbackCounter matcher.Matcher) bool {
+	family := sampleSourceFamilyName(sample)
+	if strings.HasSuffix(family, "_info") {
+		return false
+	}
+	if sample.Kind == prompkg.SampleKindScalar && (math.IsNaN(sample.Value) || math.IsInf(sample.Value, 0)) {
+		return false
+	}
+	switch sample.FamilyType {
+	case commonmodel.MetricTypeGauge,
+		commonmodel.MetricTypeCounter,
+		commonmodel.MetricTypeHistogram,
+		commonmodel.MetricTypeSummary:
+		return true
+	case commonmodel.MetricTypeUnknown:
+		return strings.HasSuffix(family, "_total") ||
+			(fallbackGauge != nil && fallbackGauge.MatchString(family)) ||
+			(fallbackCounter != nil && fallbackCounter.MatchString(family))
+	default:
+		return false
+	}
+}
+
+func normalizedRelabelAction(action promrelabel.Action) promrelabel.Action {
+	action = promrelabel.Action(strings.ToLower(strings.TrimSpace(string(action))))
+	if action == "" {
+		return promrelabel.Replace
+	}
+	return action
 }
 
 func sampleDiscardingRelabelAction(action promrelabel.Action) (promrelabel.Action, bool) {
-	action = promrelabel.Action(strings.ToLower(strings.TrimSpace(string(action))))
+	action = normalizedRelabelAction(action)
 	switch action {
 	case promrelabel.Drop, promrelabel.DropEqual, promrelabel.Keep, promrelabel.KeepEqual:
 		return action, true

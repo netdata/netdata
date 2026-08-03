@@ -319,14 +319,61 @@ Example:
 match: 'example_*'
 autogen:
   selector:
-    allow:
-      - 'example_*{environment="production"}'
     deny:
       - example_http_request_duration_seconds
-      - 'example_debug_*'
 template:
   # ...
 ```
+
+> **Stock contribution policy:** the runtime syntax above remains available to
+> user-owned profiles, including `allow` and wildcard selectors. Profiles
+> contributed to Netdata MUST NOT use `autogen.selector.allow` or open-ended
+> `deny` entries: unknown future families matching `match` must remain eligible
+> for generic fallback. Contributed denies name exact family base names present
+> in the source-complete fixture only. A selector containing `{...}` is
+> label-constrained policy, not an exact family name. The objective profile
+> validator enforces this policy separately from its strict zero-fallback check
+> over current source-complete evidence.
+
+Recommended jobs shipped with stock profiles follow the same forward-open
+rule. Under a wildcard relabel block, a sample-discarding rule may use only a
+`__name__` `drop` that enumerates finite exact names or one non-empty internal
+entity key between finite exporter prefixes and finite terminal metric
+suffixes. Every finite exact name or prefix/suffix branch must be exercised by
+the source-complete fixture. Open-ended terminal regexes, wildcard
+`dropequal`, inverse `keep`/`keepequal`, and application-label-dependent
+discard are not accepted stock-authoring patterns; runtime support remains
+available for user-owned jobs.
+
+Exact recommended-job denies and exact relabel-block metric names must also be
+present in the source-complete fixture. Every exact-scope discard rule must drop
+at least one fixture sample at its real ordered pipeline position. A wildcard
+name-derived rewrite follows the bounded drop grammar and fixture-evidence rule;
+an internal-key rewrite cannot reference its dynamic capture, and every finite
+output must be an authored canonical metric. Before either dynamic form, the
+same block must copy unchanged from `__name__` the capture that encloses the
+entire dynamic entity region into a reserved static non-`__name__` label; a
+nested capture covering only one alternative is incomplete. That target must be
+absent from source-fixture block inputs and preserved through every reachable
+later rule or block. A later label write sourced only from `__name__` is
+harmless when its regex is disjoint from every possible current name. Canonical
+outputs must preserve every finite prefix/suffix branch distinction.
+Capture-bearing replacement reachability also preserves literal prefixes and
+suffixes around the captures. The rewrite may additionally normalize a
+source-proven `<canonical_name>_<non-empty-identity>` family exactly to
+`<canonical_name>`.
+This rewrite-only canonical form does not permit unrelated terminal catches.
+Across exact and wildcard blocks, the complete recommended relabel pipeline
+must also preserve every observed writer-admissible logical identity after
+normal histogram/summary assembly. Distinct source identities may not converge
+on the same final metric name and labels: metric relabeling does not aggregate
+values when a name rewrite or label removal collapses identities.
+Writer-rejected samples such as non-finite scalars do not participate in this
+collision proof.
+Every source-fixture sample reached by a metric-name rewrite must also retain a
+valid non-empty name. Use an explicit bounded, source-evidenced `drop` rule for
+an intentional exclusion instead of relying on invalid replacement output to
+discard the sample.
 
 ### `app`
 
