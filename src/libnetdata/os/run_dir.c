@@ -77,6 +77,23 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
     // there is nothing for it to protect.
     return true;
 #else
+    // The leaf's own mode matters as much as its parent's: everything netdata
+    // puts here (the spawn server sockets, netdata.pipe) is created and used
+    // while still root, so a directory every local user can write into lets any
+    // of them pre-plant or swap those names. This is what refuses
+    // NETDATA_RUN_DIR=/tmp, which the parent check alone accepts (/tmp's parent
+    // is root-owned and exclusive).
+    // Group-write is deliberately still accepted: the shipped systemd unit
+    // creates /run/netdata with RuntimeDirectoryMode=0775 and re-applies it on
+    // every start, so refusing S_IWGRP would leave the default install with no
+    // run directory at all.
+    if (st.st_mode & S_IWOTH) {
+        netdata_log_error(
+            "Refusing run directory '%s': mode %04o lets any local user write into it",
+            dir, (unsigned int)(st.st_mode & 07777));
+        return false;
+    }
+
     switch (os_dir_parent_trust(dir)) {
         case OS_DIR_PARENT_EXCLUSIVE:
             // Nobody else can create an entry here, so whoever owns the
@@ -89,11 +106,16 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
         case OS_DIR_PARENT_STICKY:
             // The /tmp fallback. Anyone can create entries here, but sticky
             // means only the owner of an entry can rename or delete it, so
-            // requiring the directory to be ours also closes the window between
-            // this check and the privileged use that follows it (the temporary
-            // spawn server binds its socket here long before become_user()).
+            // requiring the directory to be ours keeps every third account out.
             // "Ours" has to include the uid we will drop to, because the first
-            // run creates this directory as root and then chowns it.
+            // run creates this directory as root and then chowns it - and that
+            // is also the limit of what this predicate can promise: a process
+            // already running as that uid owns the entry, so it can still swap
+            // the directory between here and the privileged use that follows
+            // (the temporary spawn server binds its socket here long before
+            // become_user()). What protects that use is performing it through a
+            // descriptor - os_open_dir_privileged() and fchown() - not this
+            // check.
             if (run_dir_owner_is_ours(st.st_uid))
                 return true;
 
