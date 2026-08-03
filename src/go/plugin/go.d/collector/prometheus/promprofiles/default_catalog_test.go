@@ -16,6 +16,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
+var exactPrometheusMetricNamePattern = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
+
+func isExactPrometheusMetricName(value string) bool {
+	return exactPrometheusMetricNamePattern.MatchString(strings.TrimSpace(value))
+}
+
 // Catalog caching (load-once, retry-after-failure, disabled-under-test) is now
 // provided and tested by pkg/profilecatalog (Cached); it is not re-tested here.
 
@@ -166,8 +172,6 @@ func TestDefaultCatalog_AllStockProfilesPreserveUnknownFutureFamilies(t *testing
 		"vllm":     "vllm:netdata_future_metric",
 		"vllm_ray": "ray_vllm_netdata_future_metric",
 	}
-	exactMetricName := regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
-
 	catalog, err := LoadFromDefaultDirs()
 	require.NoError(t, err)
 	for _, profile := range catalog.OrderedProfiles() {
@@ -184,14 +188,33 @@ func TestDefaultCatalog_AllStockProfilesPreserveUnknownFutureFamilies(t *testing
 		}
 		require.Emptyf(t, selector.Allow, "stock profile %q must not close fallback with an allowlist", name)
 		for _, item := range selector.Deny {
-			metricName, _, _ := strings.Cut(item, "{")
-			require.Regexpf(t, exactMetricName, strings.TrimSpace(metricName),
+			require.Truef(t, isExactPrometheusMetricName(item),
 				"stock profile %q fallback deny %q must name one exact family", name, item)
 		}
 		compiled, err := selector.Parse()
 		require.NoErrorf(t, err, "stock profile %q fallback selector must parse", name)
 		require.Truef(t, compiled.Matches(futureMetric, nil),
 			"stock profile %q must preserve unknown matching family %q", name, futureMetric)
+	}
+}
+
+func TestDefaultCatalog_ExactFallbackDenySyntax(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "plain metric", value: "app_requests_total", want: true},
+		{name: "colon metric", value: "vllm:requests_total", want: true},
+		{name: "wildcard", value: "app_*", want: false},
+		{name: "label constrained", value: `app_requests_total{tenant="a"}`, want: false},
+		{name: "label only", value: `{tenant="a"}`, want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.want, isExactPrometheusMetricName(test.value))
+		})
 	}
 }
 

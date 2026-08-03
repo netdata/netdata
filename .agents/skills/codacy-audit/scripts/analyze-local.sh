@@ -50,7 +50,9 @@ cleanup() {
 trap cleanup EXIT
 
 missing_option_value() {
-    echo "Missing value for option: $1" >&2
+    local option="$1"
+
+    echo "Missing value for option: $option" >&2
     usage >&2
     exit 2
 }
@@ -81,6 +83,7 @@ while [ $# -gt 0 ]; do
                 --tool|--directory|--format|--output|--runner|-h|--help)
                     missing_option_value "$option"
                     ;;
+                *) : ;;
             esac
             case "$option" in
                 --tool)      TOOL="$2" ;;
@@ -88,6 +91,10 @@ while [ $# -gt 0 ]; do
                 --format)    FORMAT="$2" ;;
                 --output)    OUTPUT="$2" ;;
                 --runner)    RUNNER="$2" ;;
+                *)
+                    echo "Internal parser error: unhandled option: $option" >&2
+                    exit 2
+                    ;;
             esac
             shift 2
             ;;
