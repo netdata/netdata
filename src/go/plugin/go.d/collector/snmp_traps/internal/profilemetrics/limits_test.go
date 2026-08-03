@@ -12,7 +12,7 @@ import (
 )
 
 func TestProfileMetricRuntimeConcurrentUpdates(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -34,7 +34,7 @@ func TestProfileMetricRuntimeConcurrentUpdates(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeConcurrentUpdateAndCollect(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -70,7 +70,7 @@ func TestProfileMetricRuntimeConcurrentUpdateAndCollect(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSourceCapSkipsOnlyMetricInstance(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 1})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -86,7 +86,7 @@ func TestProfileMetricRuntimeSourceCapSkipsOnlyMetricInstance(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeMaxInstancesSkipsOnlyNewMetricInstance(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 1})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -102,7 +102,7 @@ func TestProfileMetricRuntimeMaxInstancesSkipsOnlyNewMetricInstance(t *testing.T
 }
 
 func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 60}
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 10})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
@@ -119,7 +119,7 @@ func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testi
 }
 
 func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 1}
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 10})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
@@ -137,8 +137,8 @@ func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *te
 }
 
 func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddMetricDefinitions(
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addDefinitions(
 		[]profileMetricRule{
 			{
 				Name:   "z.tie_a_chart",
@@ -184,10 +184,10 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 	); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
-	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, ProfileMetricsConfig{
+	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"a.tie_z_chart", "z.tie_a_chart"},
-	}, func(cfg *normalizedProfileMetricsConfig) {
+	}, func(cfg *Policy) {
 		cfg.limits.MaxInstancesPerJob = 1
 	})
 
@@ -206,7 +206,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 }
 
 func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 1})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
@@ -224,12 +224,12 @@ func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T)
 }
 
 func TestProfileMetricRuntimePrunesExpiredSourceRoutes(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
-	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, ProfileMetricsConfig{
+	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
-	}, func(cfg *normalizedProfileMetricsConfig) {
+	}, func(cfg *Policy) {
 		cfg.identity.Device = profileMetricIdentityListener
 		cfg.limits.MaxSources = 1
 	})
@@ -251,8 +251,8 @@ func TestProfileMetricRuntimePrunesExpiredSourceRoutes(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:       "cisco.port_security.ifindex_cap",
 		Type:       profileMetricTypeCounter,
 		OnTrap:     testPortSecurityTrapOID,
@@ -277,9 +277,9 @@ func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	profileMetricChartFromIndex(t, idx, "port_security_violations").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
-	if err := idx.AddMetricDefinitions([]profileMetricRule{{
+	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:       "cisco.port_security.ifindex_lifecycle_cap",
 		Type:       profileMetricTypeCounter,
 		OnTrap:     testPortSecurityTrapOID,
@@ -305,8 +305,8 @@ func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.
 }
 
 func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:       "cisco.port_security.ifindex_job_cap",
 		Type:       profileMetricTypeCounter,
 		OnTrap:     testPortSecurityTrapOID,
@@ -316,10 +316,10 @@ func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
-	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, ProfileMetricsConfig{
+	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.port_security.ifindex_job_cap"},
-	}, func(cfg *normalizedProfileMetricsConfig) {
+	}, func(cfg *Policy) {
 		cfg.limits.MaxResourcesPerSource = 1
 	})
 	first := portSecurityTrapEntry(7)
@@ -336,8 +336,8 @@ func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.ifindex_unknown",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -353,13 +353,13 @@ func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.port_security.ifindex_unknown"})
-	entry := &TrapEntry{
+	entry := &testTrapEntry{
 		JobName:       "profile-job",
 		TrapOID:       testPortSecurityTrapOID,
 		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment:    &TrapEnrichmentAudit{Source: &TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
+		Enrichment:    &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
 	}
 
 	rt.Update(entry)

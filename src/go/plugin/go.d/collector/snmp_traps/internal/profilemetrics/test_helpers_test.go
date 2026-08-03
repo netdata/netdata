@@ -18,23 +18,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type ProfileMetricsConfig struct {
+type testRuntimeConfig struct {
 	Enabled bool
 	Include []string
 }
 
-type ProfileIndex struct {
+type testCatalog struct {
 	epoch  *catalog.Epoch
 	rules  map[string]*catalog.MetricRule
 	charts map[string]*catalog.MetricChart
 }
-type TrapEnrichmentAudit = model.TrapEnrichmentAudit
-type TrapEnrichmentLookup = model.TrapEnrichmentLookup
-type TrapSourceAudit = model.TrapSourceAudit
-type Category = model.Category
-type Severity = model.Severity
-type profileMetricRuntime = Runtime
-type normalizedProfileMetricsConfig = Policy
+type testTrapEntry = model.TrapEntry
+type testTrapDef = catalog.TrapDef
+type testVarbindDef = catalog.VarbindDef
+type testVarbindValue = model.VarbindValue
+type testTrapEnrichmentAudit = model.TrapEnrichmentAudit
+type testTrapEnrichmentLookup = model.TrapEnrichmentLookup
+type testTrapSourceAudit = model.TrapSourceAudit
+type testCategory = model.Category
+type testSeverity = model.Severity
 type profileMetricIdentity = catalog.MetricIdentity
 type profileMetricResource = catalog.MetricResource
 type profileMetricOutput = catalog.MetricOutput
@@ -56,17 +58,17 @@ const (
 	profileMetricMissingError            = catalog.MetricMissingError
 )
 
-func newProfileIndex() *ProfileIndex {
-	return &ProfileIndex{
+func newTestCatalog() *testCatalog {
+	return &testCatalog{
 		epoch:  catalog.NewEpoch(),
 		rules:  make(map[string]*catalog.MetricRule),
 		charts: make(map[string]*catalog.MetricChart),
 	}
 }
 
-func (idx *ProfileIndex) AddTraps(traps []*TrapDef) error { return idx.epoch.AddTraps(traps) }
+func (idx *testCatalog) addTraps(traps []*testTrapDef) error { return idx.epoch.AddTraps(traps) }
 
-func (idx *ProfileIndex) AddMetricDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) error {
+func (idx *testCatalog) addDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) error {
 	for i := range rules {
 		rule := rules[i]
 		idx.rules[rule.Name] = &rule
@@ -81,7 +83,7 @@ func (idx *ProfileIndex) AddMetricDefinitions(rules []catalog.MetricRule, charts
 	return nil
 }
 
-func (idx *ProfileIndex) Definitions(names []string) (catalog.MetricDefinitions, error) {
+func (idx *testCatalog) Definitions(names []string) (catalog.MetricDefinitions, error) {
 	defs := catalog.MetricDefinitions{
 		RulesByName: make(map[string]*catalog.MetricRule),
 		ChartsByID:  make(map[string]*catalog.MetricChart),
@@ -108,13 +110,15 @@ func (idx *ProfileIndex) Definitions(names []string) (catalog.MetricDefinitions,
 	return defs, nil
 }
 
-func (idx *ProfileIndex) ResolveTrap(ref string) (*TrapDef, error) { return idx.epoch.ResolveTrap(ref) }
+func (idx *testCatalog) ResolveTrap(ref string) (*testTrapDef, error) {
+	return idx.epoch.ResolveTrap(ref)
+}
 
-func normalizeProfileMetricsConfig(cfg ProfileMetricsConfig) (Policy, error) {
+func normalizeTestRuntimeConfig(cfg testRuntimeConfig) (Policy, error) {
 	return Normalize(cfg.Enabled, cfg.Include)
 }
 
-func newProfileMetricRuntime(cfg Policy, idx Catalog, sourceHashSalt string) (*Runtime, string, error) {
+func newTestRuntime(cfg Policy, idx Catalog, sourceHashSalt string) (*Runtime, string, error) {
 	rt, err := New(cfg, idx, Options{
 		BaseChartTemplateYAML: testBaseChartTemplate(),
 		SourceHashSalt:        sourceHashSalt,
@@ -133,7 +137,7 @@ func testBaseChartTemplate() string {
 	return string(raw)
 }
 
-func fallbackTrapSourceIdentity(entry *TrapEntry, jobName, sourceHashSalt string) (string, string) {
+func fallbackTrapSourceIdentity(entry *testTrapEntry, jobName, sourceHashSalt string) (string, string) {
 	source, ok := attribution.Resolve(entry, jobName, attribution.DeviceSource, sourceHashSalt)
 	if !ok {
 		return "", ""
@@ -163,10 +167,10 @@ func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.Cyc
 	return ms
 }
 
-func testProfileMetricIndex(t *testing.T) *ProfileIndex {
+func newPopulatedTestCatalog(t *testing.T) *testCatalog {
 	t.Helper()
-	idx := newProfileIndex()
-	traps := []*TrapDef{
+	idx := newTestCatalog()
+	traps := []*testTrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
 			Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
@@ -177,7 +181,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 				testCiscoTerminalTypeVarbind,
 				"sysUpTime.0",
 			},
-			SharedVarbinds: map[string]*VarbindDef{
+			SharedVarbinds: map[string]*testVarbindDef{
 				testCiscoCommandSourceOID: {
 					OID:         testCiscoCommandSourceOID,
 					Type:        "INTEGER",
@@ -210,7 +214,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 			VarbindRefs: []any{
 				"ifIndex",
 			},
-			SharedVarbinds: map[string]*VarbindDef{
+			SharedVarbinds: map[string]*testVarbindDef{
 				testIfIndexOID: {
 					OID:         testIfIndexOID,
 					Type:        "INTEGER",
@@ -220,7 +224,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 			},
 		},
 	}
-	if err := idx.AddTraps(traps); err != nil {
+	if err := idx.addTraps(traps); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
 	charts := []profileMetricChart{
@@ -289,46 +293,46 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 			SourceFile: "test-profile.yaml",
 		},
 	}
-	if err := idx.AddMetricDefinitions(rules, charts); err != nil {
+	if err := idx.addDefinitions(rules, charts); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	return idx
 }
 
-func newTestProfileMetricRuntime(t *testing.T, idx Catalog, include []string) *profileMetricRuntime {
+func newTestProfileMetricRuntime(t *testing.T, idx Catalog, include []string) *Runtime {
 	t.Helper()
-	return newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
+	return newTestProfileMetricRuntimeWithConfig(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: include,
 	})
 }
 
-func newTestProfileMetricRuntimeWithConfig(t *testing.T, idx Catalog, cfg ProfileMetricsConfig) *profileMetricRuntime {
+func newTestProfileMetricRuntimeWithConfig(t *testing.T, idx Catalog, cfg testRuntimeConfig) *Runtime {
 	t.Helper()
 	return newTestProfileMetricRuntimeWithPolicy(t, idx, cfg, nil)
 }
 
-func newTestProfileMetricRuntimeWithPolicy(t *testing.T, idx Catalog, cfg ProfileMetricsConfig, configure func(*normalizedProfileMetricsConfig)) *profileMetricRuntime {
+func newTestProfileMetricRuntimeWithPolicy(t *testing.T, idx Catalog, cfg testRuntimeConfig, configure func(*Policy)) *Runtime {
 	t.Helper()
-	normalized, err := normalizeProfileMetricsConfig(cfg)
+	normalized, err := normalizeTestRuntimeConfig(cfg)
 	if err != nil {
-		t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
+		t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 	}
 	if configure != nil {
 		configure(&normalized)
 	}
-	rt, tmpl, err := newProfileMetricRuntime(normalized, idx, "test")
+	rt, tmpl, err := newTestRuntime(normalized, idx, "test")
 	if err != nil {
-		t.Fatalf("newProfileMetricRuntime failed: %v", err)
+		t.Fatalf("newTestRuntime failed: %v", err)
 	}
 	if rt == nil {
-		t.Fatalf("newProfileMetricRuntime returned nil runtime")
+		t.Fatalf("newTestRuntime returned nil runtime")
 	}
 	collecttest.AssertChartTemplateSchema(t, tmpl)
 	return rt
 }
 
-func collectProfileMetricsOnce(t *testing.T, rt *profileMetricRuntime, store metrix.CollectorStore, jobName string) {
+func collectProfileMetricsOnce(t *testing.T, rt *Runtime, store metrix.CollectorStore, jobName string) {
 	t.Helper()
 	managed := needCycleManagedStore(t, store)
 	managed.CycleController().BeginCycle()
@@ -338,18 +342,18 @@ func collectProfileMetricsOnce(t *testing.T, rt *profileMetricRuntime, store met
 	}
 }
 
-func ciscoConfigTrapEntry(jobName string) *TrapEntry {
-	return &TrapEntry{
+func ciscoConfigTrapEntry(jobName string) *testTrapEntry {
+	return &testTrapEntry{
 		JobName:       jobName,
 		TrapOID:       testCiscoConfigTrapOID,
 		TrapName:      "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
 			Selected: "192.0.2.10",
 			Method:   "udp_peer",
 		}},
-		Varbinds: []VarbindValue{
+		Varbinds: []testVarbindValue{
 			{OID: testCiscoCommandSourceOID, Type: "INTEGER", Value: 2},
 			{OID: testCiscoTerminalTypeOID, Type: "INTEGER", Value: 2},
 			{OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
@@ -357,13 +361,13 @@ func ciscoConfigTrapEntry(jobName string) *TrapEntry {
 	}
 }
 
-func ciscoConfigTrapEntryFromSource(jobName, source string) *TrapEntry {
+func ciscoConfigTrapEntryFromSource(jobName, source string) *testTrapEntry {
 	entry := ciscoConfigTrapEntry(jobName)
 	setTrapEntrySource(entry, source)
 	return entry
 }
 
-func setTrapEntrySource(entry *TrapEntry, source string) {
+func setTrapEntrySource(entry *testTrapEntry, source string) {
 	entry.SourceIP = source
 	entry.SourceUDPPeer = source
 	entry.Enrichment.Source.Selected = source
@@ -386,7 +390,7 @@ func portSecurityResourceLabels(resourceID string) metrix.Labels {
 	return labels
 }
 
-func collectProfileMetricStore(t *testing.T, rt *profileMetricRuntime) metrix.CollectorStore {
+func collectProfileMetricStore(t *testing.T, rt *Runtime) metrix.CollectorStore {
 	t.Helper()
 	store := metrix.NewCollectorStore()
 	collectProfileMetricsOnce(t, rt, store, testProfileMetricJobName)
@@ -412,12 +416,12 @@ func assertProfileMetricOverflow(t *testing.T, store metrix.CollectorStore, want
 	assertProfileMetricValue(t, store, "snmp_trap_profile_metrics_overflow_dropped", profileMetricJobLabels(), want)
 }
 
-func sourceRuntimeWithLimits(t *testing.T, idx Catalog, limits profileMetricLimitsPolicy) *profileMetricRuntime {
+func sourceRuntimeWithLimits(t *testing.T, idx Catalog, limits profileMetricLimitsPolicy) *Runtime {
 	t.Helper()
-	return newTestProfileMetricRuntimeWithPolicy(t, idx, ProfileMetricsConfig{
+	return newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
-	}, func(cfg *normalizedProfileMetricsConfig) {
+	}, func(cfg *Policy) {
 		if limits.MaxRules != 0 {
 			cfg.limits.MaxRules = limits.MaxRules
 		}
@@ -445,21 +449,19 @@ func profileMetricChartForTest(id, title, context, units, algorithm string) prof
 	}
 }
 
-func addProfileMetricRuleWithChart(t *testing.T, idx *ProfileIndex, rule profileMetricRule, chart profileMetricChart) {
+func addProfileMetricRuleWithChart(t *testing.T, idx *testCatalog, rule profileMetricRule, chart profileMetricChart) {
 	t.Helper()
-	if err := idx.AddMetricDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}); err != nil {
+	if err := idx.addDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 }
 
-func profileMetricCatalogForTest(t *testing.T, idx Catalog) profileMetricCatalog {
+func profileMetricCatalogForTest(t *testing.T, idx *testCatalog) profileMetricCatalog {
 	t.Helper()
-	defs, err := idx.Definitions(nil)
-	require.NoError(t, err)
-	return profileMetricCatalog{rulesByName: defs.RulesByName, chartsByID: defs.ChartsByID}
+	return profileMetricCatalog{rulesByName: idx.rules, chartsByID: idx.charts}
 }
 
-func profileMetricChartFromIndex(t *testing.T, idx Catalog, id string) *profileMetricChart {
+func profileMetricChartFromIndex(t *testing.T, idx *testCatalog, id string) *profileMetricChart {
 	t.Helper()
 	chart := profileMetricCatalogForTest(t, idx).chartsByID[id]
 	require.NotNil(t, chart)
@@ -470,15 +472,15 @@ func profileMetricOutputForTest(metric, dimension, chart string) profileMetricOu
 	return profileMetricOutput{Metric: metric, Dimension: dimension, Chart: chart}
 }
 
-func portSecurityTrapEntry(resource any) *TrapEntry {
-	return &TrapEntry{
+func portSecurityTrapEntry(resource any) *testTrapEntry {
+	return &testTrapEntry{
 		JobName:       testProfileMetricJobName,
 		TrapOID:       testPortSecurityTrapOID,
 		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment:    &TrapEnrichmentAudit{Source: &TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
-		Varbinds:      []VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: resource}},
+		Enrichment:    &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
+		Varbinds:      []testVarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: resource}},
 	}
 }
 

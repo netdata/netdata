@@ -10,7 +10,7 @@ import (
 )
 
 func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	addProfileMetricRuleWithChart(
 		t,
 		idx,
@@ -49,7 +49,7 @@ func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	addProfileMetricRuleWithChart(
 		t,
 		idx,
@@ -74,7 +74,7 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 	)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.console_custom_state"})
 	entry := ciscoConfigTrapEntry("profile-job")
-	entry.Category = Category("config_change")
+	entry.Category = testCategory("config_change")
 	store := metrix.NewCollectorStore()
 	labels := profileMetricSourceLabels("192.0.2.10")
 
@@ -105,8 +105,8 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddTraps([]*TrapDef{
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addTraps([]*testTrapDef{
 		{OID: testLinkDownTrapOID, Name: "SNMPv2-MIB::linkDown", Category: "state_change", Severity: "warning", SourceFile: "test-profile.yaml"},
 		{OID: testLinkUpTrapOID, Name: "SNMPv2-MIB::linkUp", Category: "state_change", Severity: "notice", SourceFile: "test-profile.yaml"},
 	}); err != nil {
@@ -163,7 +163,7 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 }
 
 func TestProfileMetricRuntimeStateTTLClearsAndExpires(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	addProfileMetricRuleWithChart(
 		t,
 		idx,

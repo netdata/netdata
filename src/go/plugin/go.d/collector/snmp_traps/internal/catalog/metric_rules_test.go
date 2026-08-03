@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type ProfileIndex = Epoch
-
 const (
 	profileMetricTypeCounter = MetricTypeCounter
 	profileMetricTypeSample  = MetricTypeSample
@@ -25,9 +23,9 @@ type profileMetricCatalog struct {
 	chartsByID  map[string]*MetricChart
 }
 
-func newProfileIndex() *ProfileIndex { return NewEpoch() }
+func newTestMetricEpoch() *Epoch { return NewEpoch() }
 
-func (idx *Epoch) AddMetricDefinitions(rules []MetricRule, charts []MetricChart) error {
+func (idx *Epoch) addTestMetricDefinitions(rules []MetricRule, charts []MetricChart) error {
 	return idx.addProfileMetrics(rules, charts, true)
 }
 
@@ -41,9 +39,9 @@ const (
 	testPortSecurityTrapOID       = "1.3.6.1.4.1.9.9.46.2.0.1"
 )
 
-func testProfileMetricIndex(t *testing.T) *ProfileIndex {
+func newPopulatedTestMetricEpoch(t *testing.T) *Epoch {
 	t.Helper()
-	idx := newProfileIndex()
+	idx := newTestMetricEpoch()
 	traps := []*TrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
@@ -167,18 +165,18 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 			SourceFile: "test-profile.yaml",
 		},
 	}
-	if err := idx.AddMetricDefinitions(rules, charts); err != nil {
+	if err := idx.addTestMetricDefinitions(rules, charts); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	return idx
 }
 
-func profileMetricCatalogForTest(t *testing.T, idx *ProfileIndex) profileMetricCatalog {
+func profileMetricCatalogForTest(t *testing.T, idx *Epoch) profileMetricCatalog {
 	t.Helper()
 	return profileMetricCatalog{rulesByName: idx.metricRulesByName, chartsByID: idx.metricChartsByID}
 }
 
-func profileMetricChartFromIndex(t *testing.T, idx *ProfileIndex, id string) *profileMetricChart {
+func profileMetricChartFromIndex(t *testing.T, idx *Epoch, id string) *profileMetricChart {
 	t.Helper()
 	chart := profileMetricCatalogForTest(t, idx).chartsByID[id]
 	require.NotNil(t, chart)
@@ -283,11 +281,11 @@ charts:
 	if err != nil {
 		t.Fatalf("loadProfileBundle failed: %v", err)
 	}
-	idx := newProfileIndex()
+	idx := newTestMetricEpoch()
 	if err := idx.AddTraps(bundle.traps); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
-	if err := idx.AddMetricDefinitions(bundle.metrics, bundle.charts); err != nil {
+	if err := idx.addTestMetricDefinitions(bundle.metrics, bundle.charts); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	cat := profileMetricCatalogForTest(t, idx)
@@ -408,8 +406,8 @@ charts:
 }
 
 func TestProfileMetricValidationResourceClassPolicy(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestMetricEpoch(t)
+	err := idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.custom_resource_class",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -432,8 +430,8 @@ func TestProfileMetricValidationResourceClassPolicy(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted non-stock resource class without site_ prefix")
 	}
 
-	idx = testProfileMetricIndex(t)
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	idx = newPopulatedTestMetricEpoch(t)
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.site_resource_class",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -501,8 +499,8 @@ func TestProfileMetricValidationRejectsNonNumericPredicateBounds(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			idx := testProfileMetricIndex(t)
-			err := idx.AddMetricDefinitions([]profileMetricRule{{
+			idx := newPopulatedTestMetricEpoch(t)
+			err := idx.addTestMetricDefinitions([]profileMetricRule{{
 				Name:   "cisco.config.bad_" + name,
 				Type:   profileMetricTypeCounter,
 				OnTrap: testCiscoConfigTrapOID,
@@ -522,8 +520,8 @@ func TestProfileMetricValidationRejectsNonNumericPredicateBounds(t *testing.T) {
 }
 
 func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestMetricEpoch(t)
+	err := idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.bad_missing",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -540,7 +538,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted sample missing=unknown_dimension without resource identity")
 	}
 
-	err = idx.AddMetricDefinitions(nil, []profileMetricChart{{
+	err = idx.addTestMetricDefinitions(nil, []profileMetricChart{{
 		ID:         "profile_metric_diagnostics",
 		Title:      "Reserved diagnostics",
 		Context:    "snmp.trap.site.diagnostics",
@@ -552,7 +550,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted reserved diagnostics chart id")
 	}
 
-	err = idx.AddMetricDefinitions(nil, []profileMetricChart{{
+	err = idx.addTestMetricDefinitions(nil, []profileMetricChart{{
 		ID:         "site_events",
 		Title:      "Reserved events context",
 		Context:    "snmp.trap.events",
@@ -564,7 +562,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted reserved built-in chart context")
 	}
 
-	err = idx.AddMetricDefinitions(nil, []profileMetricChart{{
+	err = idx.addTestMetricDefinitions(nil, []profileMetricChart{{
 		ID:         "site_profile_metric_diagnostics",
 		Title:      "Reserved profile metric diagnostics context",
 		Context:    "snmp.trap.profile_metric_diagnostics",
@@ -576,7 +574,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted reserved profile metric diagnostics chart context")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_diagnostic_prefix",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -591,7 +589,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted reserved profile metric diagnostics prefix")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_not_absent",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -611,7 +609,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted not with absent predicate")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_range",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -630,7 +628,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted one-sided range predicate")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_empty_predicate",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -648,7 +646,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted predicate without condition")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_where_varbind",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -667,7 +665,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted where predicate with unknown varbind")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_where_field",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -686,7 +684,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted where predicate with unknown synthetic field")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_state_set_varbind",
 		Type:   profileMetricTypeState,
 		OnTrap: testCiscoConfigTrapOID,
@@ -705,7 +703,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted state.set_when predicate with unknown varbind")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_ttl",
 		Type:   profileMetricTypeState,
 		OnTrap: testCiscoConfigTrapOID,
@@ -730,8 +728,8 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		"zero_ttl":     "0s",
 	} {
 		t.Run(name, func(t *testing.T) {
-			idx := testProfileMetricIndex(t)
-			err := idx.AddMetricDefinitions([]profileMetricRule{{
+			idx := newPopulatedTestMetricEpoch(t)
+			err := idx.addTestMetricDefinitions([]profileMetricRule{{
 				Name:   "cisco.config." + name,
 				Type:   profileMetricTypeState,
 				OnTrap: testCiscoConfigTrapOID,
@@ -753,7 +751,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		})
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.bad_multiplier",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -770,7 +768,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted negative scale multiplier")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_chart_algorithm",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -792,7 +790,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted framework-unsupported chart algorithm")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_chart_type",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -815,7 +813,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted framework-unsupported chart type")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.duplicate_output_metric",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -830,7 +828,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted duplicate output.metric")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.bad_negative_resource_cap",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -846,7 +844,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted negative resource max_per_source")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.config.resource_on_non_resource_chart",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -862,7 +860,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		t.Fatalf("addProfileMetrics accepted mixed resource and non-resource rules on one chart")
 	}
 
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.bad_resource_class",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -886,7 +884,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		Type:    "DisplayString",
 		RawName: "ccmHistoryEventUser",
 	}
-	err = idx.AddMetricDefinitions([]profileMetricRule{{
+	err = idx.addTestMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.config.bad_string_resource",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testCiscoConfigTrapOID,
@@ -924,8 +922,8 @@ func TestProfileMetricValidationAllowsRetiredSourceMetricIdentifiers(t *testing.
 	}
 	for _, tc := range tests {
 		t.Run(tc.chartID, func(t *testing.T) {
-			idx := testProfileMetricIndex(t)
-			err := idx.AddMetricDefinitions([]profileMetricRule{{
+			idx := newPopulatedTestMetricEpoch(t)
+			err := idx.addTestMetricDefinitions([]profileMetricRule{{
 				Name:   "site.source." + tc.chartID,
 				Type:   profileMetricTypeCounter,
 				OnTrap: testCiscoConfigTrapOID,

@@ -10,7 +10,7 @@ import (
 )
 
 func TestProfileMetricRuntimeIncludedCounterBySource(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -27,7 +27,7 @@ func TestProfileMetricRuntimeIncludedCounterBySource(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -43,8 +43,8 @@ func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.console_terminal_type",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -83,7 +83,7 @@ func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	profileMetricChartFromIndex(t, idx, "cisco_terminal_type").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 3}
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")
@@ -104,8 +104,8 @@ func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *test
 }
 
 func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.terminal_type_scaled",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -143,8 +143,8 @@ func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.sysuptime_seconds",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -183,8 +183,8 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	if err := idx.AddMetricDefinitions([]profileMetricRule{
+	idx := newPopulatedTestCatalog(t)
+	if err := idx.addDefinitions([]profileMetricRule{
 		{
 			Name:             "cisco.config.terminal_type_missing_drop",
 			Type:             profileMetricTypeSample,

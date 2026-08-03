@@ -43,12 +43,12 @@ type profileMetricDiagnostics struct {
 
 type compiledProfileMetricRule struct {
 	rule              *profileMetricRule
-	trapOIDs          map[string]*TrapDef
-	problemOIDs       map[string]*TrapDef
-	clearOIDs         map[string]*TrapDef
+	trapOIDs          map[string]*catalog.TrapDef
+	problemOIDs       map[string]*catalog.TrapDef
+	clearOIDs         map[string]*catalog.TrapDef
 	chart             *profileMetricChart
-	valueVarbind      *VarbindDef
-	resourceVarbind   *VarbindDef
+	valueVarbind      *catalog.VarbindDef
+	resourceVarbind   *catalog.VarbindDef
 	stateTTL          time.Duration
 	expireAfterCycles int
 }
@@ -89,7 +89,7 @@ type profileMetricSeriesSnapshot struct {
 	value  float64
 }
 
-func (rt *Runtime) Update(entry *TrapEntry) {
+func (rt *Runtime) Update(entry *model.TrapEntry) {
 	if rt == nil || entry == nil {
 		return
 	}
@@ -105,7 +105,7 @@ func (rt *Runtime) Update(entry *TrapEntry) {
 	}
 }
 
-func (rt *Runtime) updateRuleLocked(rule *compiledProfileMetricRule, entry *TrapEntry, now time.Time) {
+func (rt *Runtime) updateRuleLocked(rule *compiledProfileMetricRule, entry *model.TrapEntry, now time.Time) {
 	td := rule.trapDefForOID(entry.TrapOID)
 	if td == nil {
 		rt.diagnostics.ruleMissed++
@@ -156,7 +156,7 @@ func (rt *Runtime) updateRuleLocked(rule *compiledProfileMetricRule, entry *Trap
 	}
 }
 
-func (r *compiledProfileMetricRule) trapDefForOID(oid string) *TrapDef {
+func (r *compiledProfileMetricRule) trapDefForOID(oid string) *catalog.TrapDef {
 	if td := r.trapOIDs[oid]; td != nil {
 		return td
 	}
@@ -166,7 +166,7 @@ func (r *compiledProfileMetricRule) trapDefForOID(oid string) *TrapDef {
 	return r.clearOIDs[oid]
 }
 
-func (r *compiledProfileMetricRule) sameOIDStateValue(entry *TrapEntry, td *TrapDef) (float64, bool) {
+func (r *compiledProfileMetricRule) sameOIDStateValue(entry *model.TrapEntry, td *catalog.TrapDef) (float64, bool) {
 	if r.rule.State.SetWhen != nil && profileMetricPredicateMatches(*r.rule.State.SetWhen, entry, td) {
 		return r.rule.StateProblemValue(), true
 	}
@@ -176,7 +176,7 @@ func (r *compiledProfileMetricRule) sameOIDStateValue(entry *TrapEntry, td *Trap
 	return 0, false
 }
 
-func (rt *Runtime) addCounterLocked(rule *compiledProfileMetricRule, entry *TrapEntry, td *TrapDef, now time.Time) {
+func (rt *Runtime) addCounterLocked(rule *compiledProfileMetricRule, entry *model.TrapEntry, td *catalog.TrapDef, now time.Time) {
 	series := rt.getOrCreateSeriesLocked(rule, entry, td, now)
 	if series == nil {
 		return
@@ -186,7 +186,7 @@ func (rt *Runtime) addCounterLocked(rule *compiledProfileMetricRule, entry *Trap
 	series.lastCycle = rt.collectCycle
 }
 
-func (rt *Runtime) setSeriesValueLocked(rule *compiledProfileMetricRule, entry *TrapEntry, td *TrapDef, value float64, now time.Time) {
+func (rt *Runtime) setSeriesValueLocked(rule *compiledProfileMetricRule, entry *model.TrapEntry, td *catalog.TrapDef, value float64, now time.Time) {
 	series := rt.getOrCreateSeriesLocked(rule, entry, td, now)
 	if series == nil {
 		return
@@ -197,7 +197,7 @@ func (rt *Runtime) setSeriesValueLocked(rule *compiledProfileMetricRule, entry *
 	series.removeAfterCollect = false
 }
 
-func (rt *Runtime) getOrCreateSeriesLocked(rule *compiledProfileMetricRule, entry *TrapEntry, td *TrapDef, now time.Time) *profileMetricSeries {
+func (rt *Runtime) getOrCreateSeriesLocked(rule *compiledProfileMetricRule, entry *model.TrapEntry, td *catalog.TrapDef, now time.Time) *profileMetricSeries {
 	key, scope, labels, ok := rt.seriesIdentityLocked(rule, entry, td, now)
 	if !ok {
 		return nil
@@ -254,7 +254,7 @@ func (rt *Runtime) ensureChartInstanceTrackedLocked(rule *compiledProfileMetricR
 	return true
 }
 
-func (rt *Runtime) seriesIdentityLocked(rule *compiledProfileMetricRule, entry *TrapEntry, td *TrapDef, now time.Time) (profileMetricSeriesKey, metrix.HostScope, []metrix.Label, bool) {
+func (rt *Runtime) seriesIdentityLocked(rule *compiledProfileMetricRule, entry *model.TrapEntry, td *catalog.TrapDef, now time.Time) (profileMetricSeriesKey, metrix.HostScope, []metrix.Label, bool) {
 	identity := rt.cfg.identity
 	if rule.rule.Identity.Device != "" && rule.rule.Identity.Device != catalog.MetricIdentitySource {
 		identity.Device = attribution.DeviceMode(rule.rule.Identity.Device)
@@ -315,7 +315,7 @@ func (rt *Runtime) ensureSourceTrackedLocked(sourceID string, now time.Time) boo
 	return true
 }
 
-func (rt *Runtime) resourceIdentity(rule *compiledProfileMetricRule, entry *TrapEntry, _ *TrapDef) (string, bool) {
+func (rt *Runtime) resourceIdentity(rule *compiledProfileMetricRule, entry *model.TrapEntry, _ *catalog.TrapDef) (string, bool) {
 	if rule.resourceVarbind == nil {
 		rt.diagnostics.extractionFailed++
 		return "", false

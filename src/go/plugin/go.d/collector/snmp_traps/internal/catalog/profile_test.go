@@ -1219,7 +1219,7 @@ metrics:
 	idx := NewEpoch()
 	td := testIFMIBLinkDownTrapDef()
 	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
-	err := idx.AddMetricDefinitions([]MetricRule{{
+	err := idx.addTestMetricDefinitions([]MetricRule{{
 		Name:   "site.ambiguous_selector",
 		Type:   profileMetricTypeCounter,
 		OnTrap: td.OID,
@@ -1285,7 +1285,7 @@ charts:
 			require.NoError(t, err)
 			idx := NewEpoch()
 			require.NoError(t, idx.AddTraps(bundle.traps))
-			err = idx.AddMetricDefinitions(bundle.metrics, bundle.charts)
+			err = idx.addTestMetricDefinitions(bundle.metrics, bundle.charts)
 			require.ErrorContains(t, err, "separate-OID state rule")
 		})
 	}
@@ -1295,7 +1295,7 @@ func TestDefinitionsReturnsOnlySelectedRulesAndCharts(t *testing.T) {
 	idx := NewEpoch()
 	td := testIFMIBLinkDownTrapDef()
 	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
-	require.NoError(t, idx.AddMetricDefinitions([]MetricRule{
+	require.NoError(t, idx.addTestMetricDefinitions([]MetricRule{
 		{
 			Name:   "site.first",
 			Type:   profileMetricTypeCounter,

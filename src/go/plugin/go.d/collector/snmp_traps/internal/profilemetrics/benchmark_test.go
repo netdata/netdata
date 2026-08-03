@@ -16,7 +16,7 @@ import (
 // resource cap checks, state updates, metric collection, and TTL sweep.
 func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 	idx := benchmarkProfileMetricIndex(b)
-	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
+	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
 		Include: []string{
 			"bench.config.changed",
@@ -26,7 +26,7 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 		},
 	})
 	if err != nil {
-		b.Fatalf("normalizeProfileMetricsConfig: %v", err)
+		b.Fatalf("normalizeTestRuntimeConfig: %v", err)
 	}
 	cfg.limits = profileMetricLimitsPolicy{
 		MaxRules:              4,
@@ -34,9 +34,9 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 		MaxResourcesPerSource: 32,
 		MaxInstancesPerJob:    4096,
 	}
-	rt, _, err := newProfileMetricRuntime(cfg, idx, "benchmark")
+	rt, _, err := newTestRuntime(cfg, idx, "benchmark")
 	if err != nil {
-		b.Fatalf("newProfileMetricRuntime: %v", err)
+		b.Fatalf("newTestRuntime: %v", err)
 	}
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
@@ -55,7 +55,7 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 		rt.Update(benchmarkProfileMetricPortTrapEntry("bench-profile", "10.254.0.1", i+1))
 	}
 
-	entries := make([]*TrapEntry, 0, nearMaxSources+nearMaxResources)
+	entries := make([]*testTrapEntry, 0, nearMaxSources+nearMaxResources)
 	for i := range nearMaxSources {
 		terminalType := 2
 		if i%2 == 1 {
@@ -92,16 +92,16 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 	}
 }
 
-func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
+func benchmarkProfileMetricIndex(b testing.TB) *testCatalog {
 	b.Helper()
-	idx := newProfileIndex()
-	traps := []*TrapDef{
+	idx := newTestCatalog()
+	traps := []*testTrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
 			Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 			Category: "config_change",
 			Severity: "notice",
-			SharedVarbinds: map[string]*VarbindDef{
+			SharedVarbinds: map[string]*testVarbindDef{
 				testCiscoTerminalTypeOID: {
 					OID:     testCiscoTerminalTypeOID,
 					Type:    "INTEGER",
@@ -125,7 +125,7 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 			Name:     "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 			Category: "security",
 			Severity: "warning",
-			SharedVarbinds: map[string]*VarbindDef{
+			SharedVarbinds: map[string]*testVarbindDef{
 				testIfIndexOID: {
 					OID:         testIfIndexOID,
 					Type:        "INTEGER",
@@ -135,7 +135,7 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 			},
 		},
 	}
-	if err := idx.AddTraps(traps); err != nil {
+	if err := idx.addTraps(traps); err != nil {
 		b.Fatalf("addTraps: %v", err)
 	}
 
@@ -182,42 +182,42 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
 		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
 	}
-	if err := idx.AddMetricDefinitions(rules, charts); err != nil {
+	if err := idx.addDefinitions(rules, charts); err != nil {
 		b.Fatalf("addProfileMetrics: %v", err)
 	}
 	return idx
 }
 
-func benchmarkProfileMetricConfigTrapEntry(jobName, sourceIP string, terminalType int) *TrapEntry {
-	return &TrapEntry{
+func benchmarkProfileMetricConfigTrapEntry(jobName, sourceIP string, terminalType int) *testTrapEntry {
+	return &testTrapEntry{
 		JobName:       jobName,
 		TrapOID:       testCiscoConfigTrapOID,
 		TrapName:      "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 		SourceIP:      sourceIP,
 		SourceUDPPeer: sourceIP,
-		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
 			Selected: sourceIP,
 			Method:   "udp_peer",
 		}},
-		Varbinds: []VarbindValue{
+		Varbinds: []testVarbindValue{
 			{OID: testCiscoTerminalTypeOID, Type: "INTEGER", Value: terminalType},
 			{OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
 		},
 	}
 }
 
-func benchmarkProfileMetricPortTrapEntry(jobName, sourceIP string, ifIndex int) *TrapEntry {
-	return &TrapEntry{
+func benchmarkProfileMetricPortTrapEntry(jobName, sourceIP string, ifIndex int) *testTrapEntry {
+	return &testTrapEntry{
 		JobName:       jobName,
 		TrapOID:       testPortSecurityTrapOID,
 		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 		SourceIP:      sourceIP,
 		SourceUDPPeer: sourceIP,
-		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
 			Selected: sourceIP,
 			Method:   "udp_peer",
 		}},
-		Varbinds: []VarbindValue{
+		Varbinds: []testVarbindValue{
 			{OID: testIfIndexOID, Type: "INTEGER", Value: ifIndex},
 		},
 	}

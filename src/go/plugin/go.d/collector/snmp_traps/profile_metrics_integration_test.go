@@ -94,7 +94,24 @@ func collectProfileMetricsForTest(t *testing.T, rt *profilemetrics.Runtime, stor
 func newRootTestProfileMetricRuntime(t *testing.T) *profilemetrics.Runtime {
 	t.Helper()
 	paths := rootTestProfileCatalogPaths(t)
-	writeProfileYAML(t, paths.UserDirs[0], "profile.yaml", `
+	writeRootTestProfileMetricProfile(t, paths.UserDirs[0])
+	lease, err := catalog.NewManager(paths).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	policy, err := profilemetrics.Normalize(true, []string{"cisco.config.changed"})
+	require.NoError(t, err)
+	rt, err := profilemetrics.New(policy, lease.Epoch(), profilemetrics.Options{
+		BaseChartTemplateYAML: chartTemplateYAML,
+		SourceHashSalt:        "test",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rt)
+	return rt
+}
+
+func writeRootTestProfileMetricProfile(t *testing.T, dir string) {
+	t.Helper()
+	writeProfileYAML(t, dir, "profile.yaml", `
 varbinds:
   ccmHistoryEventTerminalType:
     oid: 1.3.6.1.4.1.9.9.43.1.1.1.2
@@ -121,18 +138,6 @@ metrics:
       dimension: events
       chart: cisco_config_changes
 `)
-	lease, err := catalog.NewManager(paths).Acquire()
-	require.NoError(t, err)
-	t.Cleanup(lease.Close)
-	policy, err := profilemetrics.Normalize(true, []string{"cisco.config.changed"})
-	require.NoError(t, err)
-	rt, err := profilemetrics.New(policy, lease.Epoch(), profilemetrics.Options{
-		BaseChartTemplateYAML: chartTemplateYAML,
-		SourceHashSalt:        "test",
-	})
-	require.NoError(t, err)
-	require.NotNil(t, rt)
-	return rt
 }
 
 func rootTestProfileCatalogPaths(t *testing.T) catalog.Paths {

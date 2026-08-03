@@ -10,7 +10,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/attribution"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 const (
@@ -34,10 +33,6 @@ type profileMetricLimitsPolicy struct {
 type profileMetricRule = catalog.MetricRule
 type profileMetricChart = catalog.MetricChart
 type profileMetricPredicate = catalog.MetricPredicate
-type TrapEntry = model.TrapEntry
-type TrapDef = catalog.TrapDef
-type VarbindDef = catalog.VarbindDef
-type VarbindValue = model.VarbindValue
 
 // Policy is the normalized, immutable per-job profile-metric policy.
 type Policy struct {

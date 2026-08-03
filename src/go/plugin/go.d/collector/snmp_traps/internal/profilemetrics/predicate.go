@@ -14,7 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
-func profileMetricPredicatesMatch(preds []profileMetricPredicate, entry *TrapEntry, td *TrapDef) bool {
+func profileMetricPredicatesMatch(preds []profileMetricPredicate, entry *model.TrapEntry, td *catalog.TrapDef) bool {
 	for _, pred := range preds {
 		if !profileMetricPredicateMatches(pred, entry, td) {
 			return false
@@ -23,7 +23,7 @@ func profileMetricPredicatesMatch(preds []profileMetricPredicate, entry *TrapEnt
 	return true
 }
 
-func profileMetricPredicateMatches(pred profileMetricPredicate, entry *TrapEntry, td *TrapDef) bool {
+func profileMetricPredicateMatches(pred profileMetricPredicate, entry *model.TrapEntry, td *catalog.TrapDef) bool {
 	present, value, vb := profileMetricPredicateValue(pred, entry, td)
 	result := profileMetricPredicateResult(pred, present, value, vb)
 	if pred.Not && present {
@@ -32,19 +32,19 @@ func profileMetricPredicateMatches(pred profileMetricPredicate, entry *TrapEntry
 	return result
 }
 
-func profileMetricPredicateValue(pred profileMetricPredicate, entry *TrapEntry, td *TrapDef) (bool, VarbindValue, *VarbindDef) {
+func profileMetricPredicateValue(pred profileMetricPredicate, entry *model.TrapEntry, td *catalog.TrapDef) (bool, model.VarbindValue, *catalog.VarbindDef) {
 	if pred.Field != "" {
 		return profileMetricSyntheticFieldValue(pred.Field, entry)
 	}
 	vb := trapMetricVarbindByName(td, pred.Varbind)
 	if vb == nil {
-		return false, VarbindValue{}, nil
+		return false, model.VarbindValue{}, nil
 	}
 	v, ok := model.FindVarbindForProfileOID(entry.Varbinds, vb.OID)
 	return ok, v, vb
 }
 
-func profileMetricSyntheticFieldValue(field string, entry *TrapEntry) (bool, VarbindValue, *VarbindDef) {
+func profileMetricSyntheticFieldValue(field string, entry *model.TrapEntry) (bool, model.VarbindValue, *catalog.VarbindDef) {
 	var value string
 	switch field {
 	case "category":
@@ -56,15 +56,15 @@ func profileMetricSyntheticFieldValue(field string, entry *TrapEntry) (bool, Var
 	case "trap_oid":
 		value = entry.TrapOID
 	default:
-		return false, VarbindValue{}, nil
+		return false, model.VarbindValue{}, nil
 	}
 	if value == "" {
-		return false, VarbindValue{}, nil
+		return false, model.VarbindValue{}, nil
 	}
-	return true, VarbindValue{Value: value}, nil
+	return true, model.VarbindValue{Value: value}, nil
 }
 
-func profileMetricPredicateResult(pred profileMetricPredicate, present bool, value VarbindValue, vb *VarbindDef) bool {
+func profileMetricPredicateResult(pred profileMetricPredicate, present bool, value model.VarbindValue, vb *catalog.VarbindDef) bool {
 	if pred.Absent != nil {
 		return *pred.Absent == !present
 	}
@@ -111,7 +111,7 @@ func profileMetricPredicateResult(pred profileMetricPredicate, present bool, val
 	return false
 }
 
-func profileMetricValueEquals(value VarbindValue, vb *VarbindDef, want any) bool {
+func profileMetricValueEquals(value model.VarbindValue, vb *catalog.VarbindDef, want any) bool {
 	actual := model.VarbindRawValue(value)
 	if vb != nil && len(vb.Enum) > 0 {
 		if label := catalog.ResolveEnum(vb, value.Value); label != "" && label == fmt.Sprintf("%v", want) {
@@ -182,7 +182,7 @@ const (
 	profileMetricValueInvalid
 )
 
-func profileMetricNumericVarbindValue(entry *TrapEntry, vb *VarbindDef) (float64, profileMetricValueStatus) {
+func profileMetricNumericVarbindValue(entry *model.TrapEntry, vb *catalog.VarbindDef) (float64, profileMetricValueStatus) {
 	if vb == nil {
 		return 0, profileMetricValueInvalid
 	}

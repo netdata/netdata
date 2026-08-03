@@ -102,9 +102,9 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 	}
 	compiled := &compiledProfileMetricRule{
 		rule:        rule,
-		trapOIDs:    make(map[string]*TrapDef),
-		problemOIDs: make(map[string]*TrapDef),
-		clearOIDs:   make(map[string]*TrapDef),
+		trapOIDs:    make(map[string]*catalog.TrapDef),
+		problemOIDs: make(map[string]*catalog.TrapDef),
+		clearOIDs:   make(map[string]*catalog.TrapDef),
 	}
 	chart := cat.chartsByID[rule.Output.Chart]
 	if chart == nil {
@@ -116,7 +116,7 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 		compiled.expireAfterCycles = chart.Lifecycle.ExpireAfterCycles
 	}
 
-	addTrap := func(dst map[string]*TrapDef, ref, field string) error {
+	addTrap := func(dst map[string]*catalog.TrapDef, ref, field string) error {
 		td, err := resolveProfileMetricTrap(idx, ref)
 		if err != nil {
 			return fmt.Errorf("%s: profile metric rule %q %s: %w", rule.Source(), rule.Name, field, err)
@@ -171,11 +171,11 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 	return compiled, nil
 }
 
-func resolveProfileMetricTrap(idx Catalog, ref string) (*TrapDef, error) {
+func resolveProfileMetricTrap(idx Catalog, ref string) (*catalog.TrapDef, error) {
 	return idx.ResolveTrap(ref)
 }
 
-func metricOIDAliasesFromTrap(td *TrapDef) []string {
+func metricOIDAliasesFromTrap(td *catalog.TrapDef) []string {
 	if td == nil || td.OID == "" {
 		return nil
 	}
@@ -186,14 +186,14 @@ func metricOIDAliasesFromTrap(td *TrapDef) []string {
 	return aliases
 }
 
-func firstTrapDef(m map[string]*TrapDef) *TrapDef {
+func firstTrapDef(m map[string]*catalog.TrapDef) *catalog.TrapDef {
 	for _, td := range m {
 		return td
 	}
 	return nil
 }
 
-func firstAnyTrapDef(mapsIn ...map[string]*TrapDef) *TrapDef {
+func firstAnyTrapDef(mapsIn ...map[string]*catalog.TrapDef) *catalog.TrapDef {
 	for _, m := range mapsIn {
 		if td := firstTrapDef(m); td != nil {
 			return td
@@ -202,6 +202,6 @@ func firstAnyTrapDef(mapsIn ...map[string]*TrapDef) *TrapDef {
 	return nil
 }
 
-func trapMetricVarbindByName(td *TrapDef, name string) *VarbindDef {
+func trapMetricVarbindByName(td *catalog.TrapDef, name string) *catalog.VarbindDef {
 	return td.VarbindByName(name)
 }

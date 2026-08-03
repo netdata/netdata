@@ -11,8 +11,8 @@ import (
 )
 
 func TestProfileMetricSelection(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	require.NoError(t, idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	require.NoError(t, idx.addDefinitions([]profileMetricRule{{
 		Name:       "disabled.rule",
 		Type:       profileMetricTypeCounter,
 		Enabled:    new(false),
@@ -23,32 +23,32 @@ func TestProfileMetricSelection(t *testing.T) {
 	cat := profileMetricCatalogForTest(t, idx)
 
 	tests := map[string]struct {
-		cfg   ProfileMetricsConfig
+		cfg   testRuntimeConfig
 		want  []string
 		error bool
 	}{
 		"disabled": {
-			cfg: ProfileMetricsConfig{},
+			cfg: testRuntimeConfig{},
 		},
 		"explicit include": {
-			cfg:  ProfileMetricsConfig{Enabled: true, Include: []string{"cisco.config.terminal_type", "cisco.config.changed"}},
+			cfg:  testRuntimeConfig{Enabled: true, Include: []string{"cisco.config.terminal_type", "cisco.config.changed"}},
 			want: []string{"cisco.config.changed", "cisco.config.terminal_type"},
 		},
 		"missing include": {
-			cfg:   ProfileMetricsConfig{Enabled: true, Include: []string{"missing.rule"}},
+			cfg:   testRuntimeConfig{Enabled: true, Include: []string{"missing.rule"}},
 			error: true,
 		},
 		"disabled include": {
-			cfg:   ProfileMetricsConfig{Enabled: true, Include: []string{"disabled.rule"}},
+			cfg:   testRuntimeConfig{Enabled: true, Include: []string{"disabled.rule"}},
 			error: true,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg, err := normalizeProfileMetricsConfig(tc.cfg)
+			cfg, err := normalizeTestRuntimeConfig(tc.cfg)
 			if err != nil {
-				t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
+				t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 			}
 			rules, err := selectProfileMetricRules(cfg, cat)
 			if tc.error {
@@ -72,14 +72,14 @@ func TestProfileMetricSelection(t *testing.T) {
 }
 
 func TestProfileMetricSelectionRejectsMoreThanMaxRules(t *testing.T) {
-	idx := testProfileMetricIndex(t)
+	idx := newPopulatedTestCatalog(t)
 	cat := profileMetricCatalogForTest(t, idx)
-	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
+	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed", "cisco.config.terminal_type"},
 	})
 	if err != nil {
-		t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
+		t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 	}
 
 	cfg.limits.MaxRules = 1
@@ -89,22 +89,22 @@ func TestProfileMetricSelectionRejectsMoreThanMaxRules(t *testing.T) {
 }
 
 func TestNewProfileMetricRuntimeRejectsNilProfileIndex(t *testing.T) {
-	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
+	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
 	})
 	if err != nil {
-		t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
+		t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 	}
 
-	if _, _, err := newProfileMetricRuntime(cfg, nil, "test"); err == nil || !strings.Contains(err.Error(), "profile index not available") {
-		t.Fatalf("newProfileMetricRuntime nil index error = %v, want profile index not available", err)
+	if _, _, err := newTestRuntime(cfg, nil, "test"); err == nil || !strings.Contains(err.Error(), "profile index not available") {
+		t.Fatalf("newTestRuntime nil index error = %v, want profile index not available", err)
 	}
 }
 
 func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
-	idx := testProfileMetricIndex(t)
-	err := idx.AddMetricDefinitions([]profileMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	err := idx.addDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.duplicate_dimension",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -118,17 +118,17 @@ func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("addProfileMetrics rejected alternate same-dimension rule before selection: %v", err)
 	}
-	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
+	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed", "cisco.config.duplicate_dimension"},
 	})
 	if err != nil {
-		t.Fatalf("normalizeProfileMetricsConfig failed: %v", err)
+		t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 	}
-	_, _, err = newProfileMetricRuntime(cfg, idx, "test")
+	_, _, err = newTestRuntime(cfg, idx, "test")
 	if err == nil ||
 		!strings.Contains(err.Error(), "reuses output.dimension") ||
 		!strings.Contains(err.Error(), "cisco.config.changed") {
-		t.Fatalf("newProfileMetricRuntime duplicate dimension error = %v, want rule-specific duplicate dimension error", err)
+		t.Fatalf("newTestRuntime duplicate dimension error = %v, want rule-specific duplicate dimension error", err)
 	}
 }

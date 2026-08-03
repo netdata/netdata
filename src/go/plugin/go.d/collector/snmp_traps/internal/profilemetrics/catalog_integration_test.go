@@ -61,7 +61,7 @@ metrics:
 	require.NoError(t, err)
 	assert.Empty(t, defs.RulesByName)
 
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
+	rt := newTestProfileMetricRuntimeWithConfig(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"stock.cold_start"},
 	})
@@ -111,17 +111,17 @@ metrics:
 	require.NoError(t, err)
 	t.Cleanup(lease.Close)
 	idx := lease.Epoch()
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
+	rt := newTestProfileMetricRuntimeWithConfig(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"site.cold_start"},
 	})
-	entry := &TrapEntry{
+	entry := &testTrapEntry{
 		JobName:       "profile-job",
 		TrapOID:       "1.3.6.1.6.3.1.1.5.1",
 		TrapName:      "SNMPv2-MIB::coldStart",
 		SourceIP:      "192.0.2.30",
 		SourceUDPPeer: "192.0.2.30",
-		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
 			Selected: "192.0.2.30",
 			Method:   "udp_peer",
 		}},
