@@ -15,17 +15,17 @@ import (
 type testReverseDNS struct {
 	result        reversedns.Result
 	scheduleState reversedns.ScheduleState
-	lookups       int
-	schedules     int
+	lookups       []netip.Addr
+	schedules     []netip.Addr
 }
 
-func (d *testReverseDNS) Lookup(netip.Addr) reversedns.Result {
-	d.lookups++
+func (d *testReverseDNS) Lookup(addr netip.Addr) reversedns.Result {
+	d.lookups = append(d.lookups, addr)
 	return d.result
 }
 
-func (d *testReverseDNS) Schedule(netip.Addr) reversedns.ScheduleState {
-	d.schedules++
+func (d *testReverseDNS) Schedule(addr netip.Addr) reversedns.ScheduleState {
+	d.schedules = append(d.schedules, addr)
 	return d.scheduleState
 }
 
@@ -39,8 +39,8 @@ func TestEnrichReverseDNSCachedPositive(t *testing.T) {
 	require.NotNil(t, entry.Enrichment)
 	require.NotNil(t, entry.Enrichment.ReverseDNS)
 	assert.Equal(t, "matched", entry.Enrichment.ReverseDNS.Status)
-	assert.Equal(t, 1, dns.lookups)
-	assert.Zero(t, dns.schedules)
+	assert.Equal(t, []netip.Addr{netip.MustParseAddr("192.0.2.10")}, dns.lookups)
+	assert.Empty(t, dns.schedules)
 }
 
 func TestEnrichReverseDNSMissRemainsPendingWhenScheduleSeesPositive(t *testing.T) {
@@ -56,8 +56,9 @@ func TestEnrichReverseDNSMissRemainsPendingWhenScheduleSeesPositive(t *testing.T
 	require.NotNil(t, entry.Enrichment)
 	require.NotNil(t, entry.Enrichment.ReverseDNS)
 	assert.Equal(t, "pending", entry.Enrichment.ReverseDNS.Status)
-	assert.Equal(t, 1, dns.lookups)
-	assert.Equal(t, 1, dns.schedules)
+	wantAddr := []netip.Addr{netip.MustParseAddr("192.0.2.10")}
+	assert.Equal(t, wantAddr, dns.lookups)
+	assert.Equal(t, wantAddr, dns.schedules)
 }
 
 func TestEnrichReverseDNSDisabledDoesNotUseResolver(t *testing.T) {
@@ -67,8 +68,8 @@ func TestEnrichReverseDNSDisabledDoesNotUseResolver(t *testing.T) {
 	New(nil, nil, dns).Enrich(entry, false)
 
 	assert.Empty(t, entry.ReverseDNS)
-	assert.Zero(t, dns.lookups)
-	assert.Zero(t, dns.schedules)
+	assert.Empty(t, dns.lookups)
+	assert.Empty(t, dns.schedules)
 	require.NotNil(t, entry.Enrichment)
 	assert.Nil(t, entry.Enrichment.ReverseDNS)
 }

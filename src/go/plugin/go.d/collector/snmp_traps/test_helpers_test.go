@@ -215,6 +215,17 @@ func (d *testReverseDNS) Schedule(addr netip.Addr) reversedns.ScheduleState {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.schedules = append(d.schedules, addr)
+	if !addr.IsValid() {
+		return reversedns.ScheduleInvalid
+	}
+	if result, ok := d.results[addr]; ok {
+		if result.State == reversedns.StatePositive {
+			return reversedns.SchedulePositive
+		}
+		if result.State == reversedns.StateNegative {
+			return reversedns.ScheduleNegative
+		}
+	}
 	return reversedns.ScheduleScheduled
 }
 

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -104,6 +105,8 @@ func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
 	trapsReverseDNS := nestedInterfacePointerField(t, trapsCollector, "enricher", "reverseDNS")
 	require.NotZero(t, topologyReverseDNS)
 	assert.Equal(t, topologyReverseDNS, trapsReverseDNS)
+	negativeTTL := durationField(t, topologyCollector, "topologyRegistry", "reverseDNS", "negativeTTL")
+	assert.Equal(t, 5*time.Minute, negativeTTL)
 }
 
 func requireCreator(t *testing.T, module string) collectorapi.Creator {
@@ -115,8 +118,7 @@ func requireCreator(t *testing.T, module string) collectorapi.Creator {
 
 func pointerField(t *testing.T, obj any, name string) uintptr {
 	t.Helper()
-	field := reflect.ValueOf(obj).Elem().FieldByName(name)
-	require.True(t, field.IsValid(), "field %q not found", name)
+	field := fieldPath(t, obj, name)
 	require.Equal(t, reflect.Pointer, field.Kind(), "field %q", name)
 	require.False(t, field.IsNil(), "field %q is nil", name)
 	return field.Pointer()
@@ -124,8 +126,7 @@ func pointerField(t *testing.T, obj any, name string) uintptr {
 
 func interfacePointerField(t *testing.T, obj any, name string) uintptr {
 	t.Helper()
-	field := reflect.ValueOf(obj).Elem().FieldByName(name)
-	require.True(t, field.IsValid(), "field %q not found", name)
+	field := fieldPath(t, obj, name)
 	require.Equal(t, reflect.Interface, field.Kind(), "field %q", name)
 	require.False(t, field.IsNil(), "field %q is nil", name)
 
@@ -137,13 +138,7 @@ func interfacePointerField(t *testing.T, obj any, name string) uintptr {
 
 func nestedPointerField(t *testing.T, obj any, outerName, innerName string) uintptr {
 	t.Helper()
-	outer := reflect.ValueOf(obj).Elem().FieldByName(outerName)
-	require.True(t, outer.IsValid(), "field %q not found", outerName)
-	require.Equal(t, reflect.Pointer, outer.Kind(), "field %q", outerName)
-	require.False(t, outer.IsNil(), "field %q is nil", outerName)
-
-	inner := outer.Elem().FieldByName(innerName)
-	require.True(t, inner.IsValid(), "field %q.%q not found", outerName, innerName)
+	inner := fieldPath(t, obj, outerName, innerName)
 	require.Equal(t, reflect.Pointer, inner.Kind(), "field %q.%q", outerName, innerName)
 	require.False(t, inner.IsNil(), "field %q.%q is nil", outerName, innerName)
 	return inner.Pointer()
@@ -151,13 +146,7 @@ func nestedPointerField(t *testing.T, obj any, outerName, innerName string) uint
 
 func nestedInterfacePointerField(t *testing.T, obj any, outerName, innerName string) uintptr {
 	t.Helper()
-	outer := reflect.ValueOf(obj).Elem().FieldByName(outerName)
-	require.True(t, outer.IsValid(), "field %q not found", outerName)
-	require.Equal(t, reflect.Pointer, outer.Kind(), "field %q", outerName)
-	require.False(t, outer.IsNil(), "field %q is nil", outerName)
-
-	inner := outer.Elem().FieldByName(innerName)
-	require.True(t, inner.IsValid(), "field %q.%q not found", outerName, innerName)
+	inner := fieldPath(t, obj, outerName, innerName)
 	require.Equal(t, reflect.Interface, inner.Kind(), "field %q.%q", outerName, innerName)
 	require.False(t, inner.IsNil(), "field %q.%q is nil", outerName, innerName)
 
@@ -165,4 +154,26 @@ func nestedInterfacePointerField(t *testing.T, obj any, outerName, innerName str
 	require.Equal(t, reflect.Pointer, elem.Kind(), "field %q.%q concrete value", outerName, innerName)
 	require.False(t, elem.IsNil(), "field %q.%q concrete value is nil", outerName, innerName)
 	return elem.Pointer()
+}
+
+func durationField(t *testing.T, obj any, names ...string) time.Duration {
+	t.Helper()
+	field := fieldPath(t, obj, names...)
+	require.Equal(t, reflect.Int64, field.Kind(), "field %q", strings.Join(names, "."))
+	return time.Duration(field.Int())
+}
+
+func fieldPath(t *testing.T, obj any, names ...string) reflect.Value {
+	t.Helper()
+	value := reflect.ValueOf(obj)
+	for _, name := range names {
+		for value.Kind() == reflect.Pointer || value.Kind() == reflect.Interface {
+			require.False(t, value.IsNil(), "field path %q contains nil", strings.Join(names, "."))
+			value = value.Elem()
+		}
+		require.Equal(t, reflect.Struct, value.Kind(), "field path %q", strings.Join(names, "."))
+		value = value.FieldByName(name)
+		require.True(t, value.IsValid(), "field path %q not found", strings.Join(names, "."))
+	}
+	return value
 }
