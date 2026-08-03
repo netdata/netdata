@@ -1073,11 +1073,11 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
 {
      unsigned int max = host->health_log.max;
 
-     sqlite3_stmt *stmt_query;
+     sqlite3_stmt *stmt_query = NULL;
 
      int rc;
-
      BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
+
      buffer_sprintf(command, SQL_SELECT_HEALTH_LOG);
 
      if (chart)
@@ -1085,13 +1085,12 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
 
      buffer_strcat(command, " ORDER BY hld.unique_id DESC LIMIT @limit");
 
-     rc = PREPARE_STATEMENT(db_meta, buffer_tostring(command), &stmt_query);
-     buffer_free(command);
-
-     if (unlikely(rc != SQLITE_OK)) {
+     if (unlikely(!PREPARE_STATEMENT(db_meta, buffer_tostring(command), &stmt_query))) {
+        buffer_free(command);
         error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
         return;
      }
+     buffer_free(command);
 
      int param = 0;
      rc = sqlite3_bind_blob(stmt_query, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC);
