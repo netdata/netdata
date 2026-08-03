@@ -136,7 +136,7 @@ func (e *Enricher) Enrich(entry *model.TrapEntry, useReverseDNS bool) {
 	}
 
 	if topologyTrusted {
-		if entry.DeviceHostname == "" && !isUnresolvedSysName(topology.Hostname) {
+		if entry.DeviceHostname == "" && !IsUnresolvedSysName(topology.Hostname) {
 			entry.DeviceHostname = topology.Hostname
 			addTrapEnrichmentApplied(audit, "_HOSTNAME", topology.Hostname)
 			audit.Topology.Fields = append(audit.Topology.Fields, "_HOSTNAME")
@@ -256,7 +256,8 @@ func addTrapEnrichmentApplied(audit *model.TrapEnrichmentAudit, field, value str
 	audit.Applied[field] = value
 }
 
-func isUnresolvedSysName(name string) bool {
+// IsUnresolvedSysName reports whether an SNMP sysName is unusable as a hostname.
+func IsUnresolvedSysName(name string) bool {
 	s := strings.TrimSpace(name)
 	return s == "" || strings.EqualFold(s, "unknown")
 }

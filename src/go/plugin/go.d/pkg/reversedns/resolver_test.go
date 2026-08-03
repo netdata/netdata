@@ -580,6 +580,23 @@ func TestSLRUTransitionsAndNegativeRetention(t *testing.T) {
 	requireCacheInvariants(t, r)
 }
 
+func TestOneEntryCacheKeepsPositiveInProbationary(t *testing.T) {
+	r := New(Config{Now: newTestClock().Now, MaxEntries: 1})
+	first := testAddr(1)
+	second := testAddr(2)
+
+	insertTestResult(r, first, Result{State: StatePositive, Name: "first.example.test"})
+	require.Equal(t, StatePositive, r.Lookup(first).State)
+	require.Zero(t, r.protectedLimit)
+	require.Zero(t, r.protected.len)
+	require.Equal(t, 1, r.probationary.len)
+
+	insertTestResult(r, second, Result{State: StateNegative})
+	require.Equal(t, Result{State: StateMiss}, r.Lookup(first))
+	require.Equal(t, Result{State: StateNegative}, r.Lookup(second))
+	requireCacheInvariants(t, r)
+}
+
 func TestSLRUProtectsReusedPositivesFromOneShotScan(t *testing.T) {
 	r := New(Config{Now: newTestClock().Now, MaxEntries: 100})
 	protected := make([]netip.Addr, 80)
@@ -631,6 +648,32 @@ func TestExpiredProtectedEntriesAreReclaimedBeforeLiveEviction(t *testing.T) {
 	require.NotNil(t, r.cache[live])
 	require.Zero(t, r.protected.len)
 	require.Equal(t, 1, r.probationary.len)
+	requireCacheInvariants(t, r)
+}
+
+func TestBackwardClockObservationPreservesExpiryOrdering(t *testing.T) {
+	clock := newTestClock()
+	r := New(Config{Now: clock.Now, PositiveTTL: time.Hour})
+	first := testAddr(1)
+	second := testAddr(2)
+	third := testAddr(3)
+
+	insertTestResult(r, first, Result{State: StatePositive, Name: "first.example.test"})
+	clock.Add(10 * time.Minute)
+	insertTestResult(r, second, Result{State: StatePositive, Name: "second.example.test"})
+	clock.Add(-5 * time.Minute)
+	insertTestResult(r, third, Result{State: StatePositive, Name: "third.example.test"})
+
+	r.mu.Lock()
+	secondExpiry := r.cache[second].expiresAt
+	thirdExpiry := r.cache[third].expiresAt
+	r.mu.Unlock()
+	require.Equal(t, secondExpiry, thirdExpiry)
+	requireCacheInvariants(t, r)
+
+	clock.Add(66 * time.Minute)
+	require.Equal(t, Result{State: StateMiss}, r.Lookup(third))
+	require.Empty(t, r.cache)
 	requireCacheInvariants(t, r)
 }
 

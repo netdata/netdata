@@ -166,36 +166,17 @@ func newTestTrapEnrichmentCollector(topologyEnricher testTrapTopologyEnricher, d
 }
 
 func newTestTrapEnricher(store *ddsnmp.DeviceStore, topologyEnricher testTrapTopologyEnricher, dns enrichment.ReverseDNS) *enrichment.Enricher {
+	var topology enrichment.TopologyLookup
+	if topologyEnricher != nil {
+		topology = func(sourceIP, trapIfIndex string) enrichment.TopologyResult {
+			return netdataadapter.ProjectTopologyResult(topologyEnricher.EnrichmentForSource(sourceIP, trapIfIndex))
+		}
+	}
 	return enrichment.New(
 		netdataadapter.RegistryLookup(store),
-		testTopologyLookup(topologyEnricher),
+		topology,
 		dns,
 	)
-}
-
-func testTopologyLookup(topologyEnricher testTrapTopologyEnricher) enrichment.TopologyLookup {
-	if topologyEnricher == nil {
-		return nil
-	}
-	return func(sourceIP, trapIfIndex string) enrichment.TopologyResult {
-		result := topologyEnricher.EnrichmentForSource(sourceIP, trapIfIndex)
-		if result == nil {
-			return enrichment.TopologyResult{}
-		}
-		return enrichment.TopologyResult{
-			Status:          result.DeviceStatus,
-			Method:          result.DeviceMethod,
-			Matches:         result.DeviceMatches,
-			Hostname:        result.DeviceHostname,
-			Vendor:          result.DeviceVendor,
-			VnodeID:         result.SourceVnodeID,
-			InterfaceIndex:  result.InterfaceIndex,
-			InterfaceStatus: result.InterfaceStatus,
-			InterfaceName:   result.Interface,
-			NeighborStatus:  result.NeighborStatus,
-			NeighborNames:   result.Neighbors,
-		}
-	}
 }
 
 type testReverseDNS struct {

@@ -72,3 +72,21 @@ func TestEnrichReverseDNSDisabledDoesNotUseResolver(t *testing.T) {
 	require.NotNil(t, entry.Enrichment)
 	assert.Nil(t, entry.Enrichment.ReverseDNS)
 }
+
+func TestIsUnresolvedSysName(t *testing.T) {
+	tests := map[string]struct {
+		name string
+		want bool
+	}{
+		"empty":      {want: true},
+		"whitespace": {name: " \t", want: true},
+		"unknown":    {name: " UNKNOWN ", want: true},
+		"resolved":   {name: "switch.example.test"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsUnresolvedSysName(tc.name))
+		})
+	}
+}

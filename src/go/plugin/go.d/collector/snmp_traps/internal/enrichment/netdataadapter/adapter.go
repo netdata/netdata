@@ -3,8 +3,6 @@
 package netdataadapter
 
 import (
-	"strings"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
@@ -22,9 +20,9 @@ func RegistryLookup(store *ddsnmp.DeviceStore) enrichment.RegistryLookup {
 		}
 
 		device := devices[0]
-		if !isUnresolvedSysName(device.VnodeHostname) {
+		if !enrichment.IsUnresolvedSysName(device.VnodeHostname) {
 			result.Hostname = device.VnodeHostname
-		} else if !isUnresolvedSysName(device.SysName) {
+		} else if !enrichment.IsUnresolvedSysName(device.SysName) {
 			result.Hostname = device.SysName
 		}
 		result.Vendor = device.Vendor
@@ -38,11 +36,12 @@ func TopologyLookup(handle *snmptopology.TrapEnrichmentHandle) enrichment.Topolo
 		return nil
 	}
 	return func(sourceIP, trapIfIndex string) enrichment.TopologyResult {
-		return topologyResult(handle.EnrichmentForSource(sourceIP, trapIfIndex))
+		return ProjectTopologyResult(handle.EnrichmentForSource(sourceIP, trapIfIndex))
 	}
 }
 
-func topologyResult(result *snmptopology.TrapTopologyEnrichment) enrichment.TopologyResult {
+// ProjectTopologyResult isolates the topology DTO from trap enrichment policy.
+func ProjectTopologyResult(result *snmptopology.TrapTopologyEnrichment) enrichment.TopologyResult {
 	if result == nil {
 		return enrichment.TopologyResult{}
 	}
@@ -59,9 +58,4 @@ func topologyResult(result *snmptopology.TrapTopologyEnrichment) enrichment.Topo
 		NeighborStatus:  result.NeighborStatus,
 		NeighborNames:   result.Neighbors,
 	}
-}
-
-func isUnresolvedSysName(name string) bool {
-	s := strings.TrimSpace(name)
-	return s == "" || strings.EqualFold(s, "unknown")
 }

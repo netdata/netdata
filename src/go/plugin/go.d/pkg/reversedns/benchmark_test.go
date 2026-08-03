@@ -18,19 +18,12 @@ var (
 	benchmarkScheduleSink ScheduleState
 )
 
+const benchmarkCacheTTL = time.Duration(1<<63 - 1)
+
 func BenchmarkLookupCached(b *testing.B) {
 	for _, state := range []State{StatePositive, StateNegative} {
 		b.Run(fmt.Sprintf("state=%d", state), func(b *testing.B) {
-			r := New(Config{})
-			addr := netip.MustParseAddr("192.0.2.10")
-			result := Result{State: state}
-			if state == StatePositive {
-				result.Name = "cached.example.test"
-			}
-			insertTestResult(r, addr, result)
-			if state == StatePositive {
-				r.Lookup(addr)
-			}
+			r, addr := newCachedBenchmarkResolver(state)
 
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -44,16 +37,7 @@ func BenchmarkLookupCached(b *testing.B) {
 func BenchmarkScheduleNoWork(b *testing.B) {
 	for _, state := range []State{StatePositive, StateNegative} {
 		b.Run(fmt.Sprintf("cached-state=%d", state), func(b *testing.B) {
-			r := New(Config{})
-			addr := netip.MustParseAddr("192.0.2.10")
-			result := Result{State: state}
-			if state == StatePositive {
-				result.Name = "cached.example.test"
-			}
-			insertTestResult(r, addr, result)
-			if state == StatePositive {
-				r.Lookup(addr)
-			}
+			r, addr := newCachedBenchmarkResolver(state)
 
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -91,9 +75,12 @@ func BenchmarkScheduleNoWork(b *testing.B) {
 			active := netip.MustParseAddr("192.0.2.10")
 			requireScheduledBenchmark(b, r, active)
 			<-started
+			r.mu.Lock()
+			lookupDone := r.calls[active].done
+			r.mu.Unlock()
 			b.Cleanup(func() {
 				close(release)
-				waitForNoCallsBenchmark(r)
+				<-lookupDone
 			})
 			addr := active
 			if name == "saturated" {
@@ -182,15 +169,24 @@ func requireScheduledBenchmark(b *testing.B, r *Resolver, addr netip.Addr) {
 	}
 }
 
-func waitForNoCallsBenchmark(r *Resolver) {
-	for {
-		r.mu.Lock()
-		done := len(r.calls) == 0
-		r.mu.Unlock()
-		if done {
-			return
-		}
+func newCachedBenchmarkResolver(state State) (*Resolver, netip.Addr) {
+	r := New(Config{
+		PositiveTTL: benchmarkCacheTTL,
+		NegativeTTL: benchmarkCacheTTL,
+		Lookup: func(context.Context, string) ([]string, error) {
+			panic("cached reverse DNS benchmark performed a lookup")
+		},
+	})
+	addr := netip.MustParseAddr("192.0.2.10")
+	result := Result{State: state}
+	if state == StatePositive {
+		result.Name = "cached.example.test"
 	}
+	insertTestResult(r, addr, result)
+	if state == StatePositive {
+		r.Lookup(addr)
+	}
+	return r, addr
 }
 
 func benchmarkAddr(sequence uint64) netip.Addr {

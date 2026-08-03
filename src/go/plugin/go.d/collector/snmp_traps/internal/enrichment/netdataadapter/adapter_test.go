@@ -59,7 +59,7 @@ func TestRegistryLookupTreatsUnknownVnodeHostnameAsUnresolved(t *testing.T) {
 }
 
 func TestTopologyResultProjectsAllFields(t *testing.T) {
-	got := topologyResult(&snmptopology.TrapTopologyEnrichment{
+	got := ProjectTopologyResult(&snmptopology.TrapTopologyEnrichment{
 		DeviceStatus:    "matched",
 		DeviceMethod:    "management_ip",
 		DeviceMatches:   1,
@@ -89,5 +89,5 @@ func TestTopologyResultProjectsAllFields(t *testing.T) {
 func TestNilDependenciesProduceNilLookups(t *testing.T) {
 	assert.Nil(t, RegistryLookup(nil))
 	assert.Nil(t, TopologyLookup(nil))
-	assert.Empty(t, topologyResult(nil))
+	assert.Empty(t, ProjectTopologyResult(nil))
 }
