@@ -76,6 +76,7 @@ func BenchmarkScheduleNoWork(b *testing.B) {
 			release := make(chan struct{})
 			started := make(chan struct{})
 			r := New(Config{
+				LookupTimeout: time.Hour,
 				MaxConcurrent: 1,
 				Lookup: func(ctx context.Context, _ string) ([]string, error) {
 					close(started)
