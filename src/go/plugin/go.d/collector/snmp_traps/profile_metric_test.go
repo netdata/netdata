@@ -5,6 +5,7 @@ package snmp_traps
 import (
 	"encoding/hex"
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -14,10 +15,12 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -44,10 +47,7 @@ func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.Cyc
 
 func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 	t.Helper()
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
+	idx := newProfileIndex()
 	traps := []*TrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
@@ -59,17 +59,17 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 				testCiscoTerminalTypeVarbind,
 				"sysUpTime.0",
 			},
-			sharedVarbinds: map[string]*VarbindDef{
+			SharedVarbinds: map[string]*VarbindDef{
 				testCiscoCommandSourceOID: {
 					OID:         testCiscoCommandSourceOID,
 					Type:        "INTEGER",
-					rawName:     testCiscoCommandSourceVarbind,
+					RawName:     testCiscoCommandSourceVarbind,
 					Constraints: "(1..4)",
 				},
 				testCiscoTerminalTypeOID: {
 					OID:     testCiscoTerminalTypeOID,
 					Type:    "INTEGER",
-					rawName: testCiscoTerminalTypeVarbind,
+					RawName: testCiscoTerminalTypeVarbind,
 					Enum: map[string]string{
 						"1": "none",
 						"2": "console",
@@ -80,7 +80,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 				model.SysUpTimeOID: {
 					OID:     model.SysUpTimeOID,
 					Type:    "TimeTicks",
-					rawName: "sysUpTime.0",
+					RawName: "sysUpTime.0",
 				},
 			},
 		},
@@ -92,17 +92,17 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 			VarbindRefs: []any{
 				"ifIndex",
 			},
-			sharedVarbinds: map[string]*VarbindDef{
+			SharedVarbinds: map[string]*VarbindDef{
 				testIfIndexOID: {
 					OID:         testIfIndexOID,
 					Type:        "INTEGER",
-					rawName:     "ifIndex",
+					RawName:     "ifIndex",
 					Constraints: "(1..48)",
 				},
 			},
 		},
 	}
-	if err := idx.addTraps(traps); err != nil {
+	if err := idx.AddTraps(traps); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
 	charts := []profileMetricChart{
@@ -113,7 +113,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 			Units:      "events/s",
 			Algorithm:  "incremental",
 			Type:       "line",
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		{
 			ID:         "cisco_terminal_type",
@@ -122,7 +122,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 			Units:      "type",
 			Algorithm:  "absolute",
 			Type:       "line",
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		{
 			ID:         "port_security_violations",
@@ -131,7 +131,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 			Units:      "events/s",
 			Algorithm:  "incremental",
 			Type:       "line",
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 	}
 	rules := []profileMetricRule{
@@ -144,7 +144,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 				Dimension: "events",
 				Chart:     "cisco_config_changes",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:             "cisco.config.terminal_type",
@@ -156,7 +156,7 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 				Dimension: "terminal_type",
 				Chart:     "cisco_terminal_type",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:     "cisco.port_security.ifindex",
@@ -168,10 +168,10 @@ func testProfileMetricIndex(t *testing.T) *ProfileIndex {
 				Dimension: "violations",
 				Chart:     "port_security_violations",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 	}
-	if err := idx.addProfileMetrics(rules, charts); err != nil {
+	if err := idx.AddMetricDefinitions(rules, charts); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	return idx
@@ -323,15 +323,29 @@ func profileMetricChartForTest(id, title, context, units, algorithm string) prof
 		Units:      units,
 		Algorithm:  algorithm,
 		Type:       "line",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}
 }
 
 func addProfileMetricRuleWithChart(t *testing.T, idx *ProfileIndex, rule profileMetricRule, chart profileMetricChart) {
 	t.Helper()
-	if err := idx.addProfileMetrics([]profileMetricRule{rule}, []profileMetricChart{chart}); err != nil {
+	if err := idx.AddMetricDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
+}
+
+func profileMetricCatalogForTest(t *testing.T, idx *ProfileIndex) profileMetricCatalog {
+	t.Helper()
+	defs, err := idx.Definitions(nil)
+	require.NoError(t, err)
+	return profileMetricCatalog{rulesByName: defs.RulesByName, chartsByID: defs.ChartsByID}
+}
+
+func profileMetricChartFromIndex(t *testing.T, idx *ProfileIndex, id string) *profileMetricChart {
+	t.Helper()
+	chart := profileMetricCatalogForTest(t, idx).chartsByID[id]
+	require.NotNil(t, chart)
+	return chart
 }
 
 func profileMetricOutputForTest(metric, dimension, chart string) profileMetricOutput {
@@ -352,14 +366,15 @@ func portSecurityTrapEntry(resource any) *TrapEntry {
 
 func TestProfileMetricSelection(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	idx.metricRulesByName["disabled.rule"] = &profileMetricRule{
-		Name:    "disabled.rule",
-		Type:    profileMetricTypeCounter,
-		Enabled: new(false),
-		OnTrap:  testCiscoConfigTrapOID,
-		Output:  profileMetricOutput{Metric: "snmp_trap_disabled_events", Dimension: "events", Chart: "cisco_config_changes"},
-	}
-	cat := idx.profileMetricCatalog()
+	require.NoError(t, idx.AddMetricDefinitions([]profileMetricRule{{
+		Name:       "disabled.rule",
+		Type:       profileMetricTypeCounter,
+		Enabled:    new(false),
+		OnTrap:     testCiscoConfigTrapOID,
+		Output:     profileMetricOutput{Metric: "snmp_trap_disabled_events", Dimension: "events", Chart: "cisco_config_changes"},
+		SourceFile: "test-profile.yaml",
+	}}, nil))
+	cat := profileMetricCatalogForTest(t, idx)
 
 	tests := map[string]struct {
 		cfg   ProfileMetricsConfig
@@ -412,7 +427,7 @@ func TestProfileMetricSelection(t *testing.T) {
 
 func TestProfileMetricSelectionRejectsMoreThanMaxRules(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	cat := idx.profileMetricCatalog()
+	cat := profileMetricCatalogForTest(t, idx)
 	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed", "cisco.config.terminal_type"},
@@ -443,7 +458,7 @@ func TestNewProfileMetricRuntimeRejectsNilProfileIndex(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.console",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -456,7 +471,7 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 			Dimension: "console_events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -476,7 +491,7 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.synthetic_fields",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -491,7 +506,7 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 			Dimension: "synthetic_field_events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -547,7 +562,7 @@ func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
 
 func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.console_terminal_type",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -561,7 +576,7 @@ func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 			Dimension: "terminal_type",
 			Chart:     "cisco_terminal_type",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -587,7 +602,7 @@ func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 
 func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	idx.metricChartsByID["cisco_terminal_type"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 3}
+	profileMetricChartFromIndex(t, idx, "cisco_terminal_type").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 3}
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	store := metrix.NewCollectorStore()
@@ -608,7 +623,7 @@ func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *test
 
 func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.terminal_type_scaled",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -620,7 +635,7 @@ func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 			Dimension: "terminal_type_scaled",
 			Chart:     "cisco_terminal_type",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -647,7 +662,7 @@ func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 
 func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.sysuptime_seconds",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -658,7 +673,7 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 			Dimension: "seconds",
 			Chart:     "cisco_sysuptime_seconds",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, []profileMetricChart{{
 		ID:         "cisco_sysuptime_seconds",
 		Title:      "Cisco sysUpTime seconds",
@@ -666,7 +681,7 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 		Units:      "seconds",
 		Algorithm:  "absolute",
 		Type:       "line",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -687,7 +702,7 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 
 func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{
 		{
 			Name:             "cisco.config.terminal_type_missing_drop",
 			Type:             profileMetricTypeSample,
@@ -699,7 +714,7 @@ func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
 				Dimension: "missing_drop",
 				Chart:     "cisco_terminal_type",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:             "cisco.config.terminal_type_missing_error",
@@ -712,7 +727,7 @@ func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
 				Dimension: "missing_error",
 				Chart:     "cisco_terminal_type",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 	}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
@@ -747,7 +762,7 @@ func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{
 		{
 			Name:   "cisco.config.rich_predicates",
 			Type:   profileMetricTypeCounter,
@@ -765,7 +780,7 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 				Dimension: "events",
 				Chart:     "cisco_config_changes",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:   "cisco.config.absent_predicate",
@@ -780,7 +795,7 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 				Dimension: "absent_events",
 				Chart:     "cisco_config_changes",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 	}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
@@ -814,7 +829,7 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{
 		{
 			Name:   "cisco.config.exists_false",
 			Type:   profileMetricTypeCounter,
@@ -828,7 +843,7 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "exists_false_events",
 				Chart:     "cisco_config_changes",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:   "cisco.config.numeric_in",
@@ -843,7 +858,7 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "numeric_in_events",
 				Chart:     "cisco_config_changes",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:   "cisco.config.synthetic_not",
@@ -859,7 +874,7 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "synthetic_not_events",
 				Chart:     "cisco_config_changes",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 	}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
@@ -900,7 +915,7 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 
 func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.finite_range",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -913,7 +928,7 @@ func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
 			Dimension: "finite_range_events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -951,7 +966,7 @@ func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
 				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
 			},
 			Output:     profileMetricOutputForTest("snmp_trap_cisco_console_session_state", "active", "cisco_console_state"),
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		profileMetricChartForTest("cisco_console_state", "Cisco console configuration state", "snmp.trap.cisco.console.state", "state", "absolute"),
 	)
@@ -996,7 +1011,7 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 				ClearValue:   2,
 			},
 			Output:     profileMetricOutputForTest("snmp_trap_cisco_console_custom_state", "active", "cisco_console_custom_state"),
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		profileMetricChartForTest("cisco_console_custom_state", "Cisco console custom state", "snmp.trap.cisco.console.custom.state", "state", "absolute"),
 	)
@@ -1034,9 +1049,9 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 
 func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addTraps([]*TrapDef{
-		{OID: testLinkDownTrapOID, Name: "SNMPv2-MIB::linkDown", Category: "state_change", Severity: "warning", sourceFile: "test-profile.yaml"},
-		{OID: testLinkUpTrapOID, Name: "SNMPv2-MIB::linkUp", Category: "state_change", Severity: "notice", sourceFile: "test-profile.yaml"},
+	if err := idx.AddTraps([]*TrapDef{
+		{OID: testLinkDownTrapOID, Name: "SNMPv2-MIB::linkDown", Category: "state_change", Severity: "warning", SourceFile: "test-profile.yaml"},
+		{OID: testLinkUpTrapOID, Name: "SNMPv2-MIB::linkUp", Category: "state_change", Severity: "notice", SourceFile: "test-profile.yaml"},
 	}); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
@@ -1053,7 +1068,7 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 				ClearValue:   1,
 			},
 			Output:     profileMetricOutputForTest("snmp_trap_if_link_state", "up", "if_link_state"),
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		profileMetricChartForTest("if_link_state", "Interface link state", "snmp.trap.if.link.state", "state", "absolute"),
 	)
@@ -1105,7 +1120,7 @@ func TestProfileMetricRuntimeStateTTLClearsAndExpires(t *testing.T) {
 				TTL:       "1ms",
 			},
 			Output:     profileMetricOutputForTest("snmp_trap_cisco_console_ttl_state", "active", "cisco_console_ttl_state"),
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		},
 		profileMetricChartForTest("cisco_console_ttl_state", "Cisco console TTL state", "snmp.trap.cisco.console.ttl.state", "state", "absolute"),
 	)
@@ -1471,7 +1486,7 @@ func TestProfileMetricRuntimeMaxInstancesSkipsOnlyNewMetricInstance(t *testing.T
 
 func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	idx.metricChartsByID["cisco_config_changes"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 60}
+	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 60}
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 10})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -1488,7 +1503,7 @@ func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testi
 
 func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	idx.metricChartsByID["cisco_config_changes"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 1}
+	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 1}
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 10})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -1506,7 +1521,7 @@ func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *te
 
 func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics(
+	if err := idx.AddMetricDefinitions(
 		[]profileMetricRule{
 			{
 				Name:   "z.tie_a_chart",
@@ -1517,7 +1532,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 					Dimension: "events",
 					Chart:     "a_tie_chart",
 				},
-				sourceFile: "test-profile.yaml",
+				SourceFile: "test-profile.yaml",
 			},
 			{
 				Name:   "a.tie_z_chart",
@@ -1528,7 +1543,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 					Dimension: "events",
 					Chart:     "z_tie_chart",
 				},
-				sourceFile: "test-profile.yaml",
+				SourceFile: "test-profile.yaml",
 			},
 		},
 		[]profileMetricChart{
@@ -1538,7 +1553,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 				Context:    "snmp.trap.tie.a",
 				Units:      "events/s",
 				Algorithm:  "incremental",
-				sourceFile: "test-profile.yaml",
+				SourceFile: "test-profile.yaml",
 			},
 			{
 				ID:         "z_tie_chart",
@@ -1546,7 +1561,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 				Context:    "snmp.trap.tie.z",
 				Units:      "events/s",
 				Algorithm:  "incremental",
-				sourceFile: "test-profile.yaml",
+				SourceFile: "test-profile.yaml",
 			},
 		},
 	); err != nil {
@@ -1575,7 +1590,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 
 func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	idx.metricChartsByID["cisco_config_changes"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
+	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 1})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -1593,7 +1608,7 @@ func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T)
 
 func TestProfileMetricRuntimePrunesExpiredSourceRoutes(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	idx.metricChartsByID["cisco_config_changes"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
+	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
 	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, ProfileMetricsConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
@@ -1620,13 +1635,13 @@ func TestProfileMetricRuntimePrunesExpiredSourceRoutes(t *testing.T) {
 
 func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:       "cisco.port_security.ifindex_cap",
 		Type:       profileMetricTypeCounter,
 		OnTrap:     testPortSecurityTrapOID,
 		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
 		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_capped_violations", "violations", "port_security_violations"),
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -1646,14 +1661,14 @@ func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 
 func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	idx.metricChartsByID["port_security_violations"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	profileMetricChartFromIndex(t, idx, "port_security_violations").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:       "cisco.port_security.ifindex_lifecycle_cap",
 		Type:       profileMetricTypeCounter,
 		OnTrap:     testPortSecurityTrapOID,
 		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
 		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_lifecycle_capped_violations", "violations", "port_security_violations"),
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -1674,13 +1689,13 @@ func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.
 
 func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:       "cisco.port_security.ifindex_job_cap",
 		Type:       profileMetricTypeCounter,
 		OnTrap:     testPortSecurityTrapOID,
 		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex"}},
 		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_job_capped_violations", "violations", "port_security_violations"),
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -1705,7 +1720,7 @@ func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 
 func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics([]profileMetricRule{{
+	if err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.ifindex_unknown",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -1716,7 +1731,7 @@ func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
 			Dimension: "violations",
 			Chart:     "port_security_violations",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -1743,12 +1758,12 @@ func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
 
 func TestProfileMetricsUpdateAfterCommittedTrapOnly(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	idx := &ProfileIndex{trapsByOID: make(map[string]*TrapDef), namesByTrapName: make(map[string]*TrapDef)}
+	idx := newProfileIndex()
 	coldStart := testColdStartTrap("state_change", "warning", "coldStart")
-	if err := idx.addTraps([]*TrapDef{coldStart}); err != nil {
+	if err := idx.AddTraps([]*TrapDef{coldStart}); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
-	if err := idx.addProfileMetrics(
+	if err := idx.AddMetricDefinitions(
 		[]profileMetricRule{{
 			Name:   "snmp.cold_start",
 			Type:   profileMetricTypeCounter,
@@ -1758,7 +1773,7 @@ func TestProfileMetricsUpdateAfterCommittedTrapOnly(t *testing.T) {
 				Dimension: "events",
 				Chart:     "cold_start",
 			},
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		}},
 		[]profileMetricChart{{
 			ID:         "cold_start",
@@ -1766,17 +1781,16 @@ func TestProfileMetricsUpdateAfterCommittedTrapOnly(t *testing.T) {
 			Context:    "snmp.trap.cold.start",
 			Units:      "events/s",
 			Algorithm:  "incremental",
-			sourceFile: "test-profile.yaml",
+			SourceFile: "test-profile.yaml",
 		}},
 	); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	rt := newTestProfileMetricRuntime(t, idx, []string{"snmp.cold_start"})
-	globalProfileCache.current.Store(idx)
-	t.Cleanup(func() { globalProfileCache.current.Store(nil) })
 
 	failedWriter := &mockTrapWriter{err: errors.New("write failed")}
 	c := newDefaultTestV2Collector(failedWriter)
+	c.profileIndex = idx
 	c.profileMetrics = rt
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
@@ -1801,8 +1815,10 @@ func TestProfileMetricsUpdateAfterCommittedTrapOnly(t *testing.T) {
 	}
 }
 
-func TestProfileMetricRuntimeLoadsMetricBearingStockProfiles(t *testing.T) {
-	stockDir := t.TempDir()
+func TestProfileMetricRuntimeHydratesOnlySelectedStockRule(t *testing.T) {
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
 	writeProfileYAML(t, stockDir, "stock.yaml", `
 traps:
   - oid: 1.3.6.1.6.3.1.1.5.1
@@ -1824,39 +1840,44 @@ metrics:
       dimension: events
       chart: stock_cold_start
 `)
-	idx := &ProfileIndex{
-		trapsByOID:        make(map[string]*TrapDef),
-		namesByTrapName:   make(map[string]*TrapDef),
-		metricRulesByName: make(map[string]*profileMetricRule),
-		metricChartsByID:  make(map[string]*profileMetricChart),
-	}
-	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
-	if err != nil {
-		t.Fatalf("buildStockProfileStore failed: %v", err)
-	}
-	idx.stock = store
-	if len(idx.metricRulesByName) != 0 {
-		t.Fatalf("stock metric rule was loaded before profile_metrics runtime creation")
-	}
+	writeProfileYAML(t, stockDir, "unselected.yaml", `not: [valid`)
+	writeProfileCatalogue(t, stockDir, map[string]any{
+		"stock": map[string]any{
+			"file":              "stock.yaml",
+			"mibs":              []string{"SNMPv2-MIB"},
+			"metric_rule_names": []string{"stock.cold_start"},
+			"trap_oids":         []string{"1.3.6.1.6.3.1.1.5.1"},
+		},
+		"unselected": map[string]any{
+			"file":      "unselected.yaml",
+			"mibs":      []string{"UNSELECTED-MIB"},
+			"trap_oids": []string{"1.3.6.1.4.1.99997.1"},
+		},
+	})
+
+	lease, err := catalog.NewManager(catalog.Paths{StockDir: stockDir}).Acquire()
+	require.NoError(t, err, "stock profile bodies must remain lazy at acquisition")
+	t.Cleanup(lease.Close)
+	idx := lease.Epoch()
+	defs, err := idx.Definitions(nil)
+	require.NoError(t, err)
+	assert.Empty(t, defs.RulesByName)
 
 	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
 		Enabled: true,
 		Include: []string{"stock.cold_start"},
 	})
-	if len(rt.rules) != 1 {
-		t.Fatalf("runtime rules = %d, want 1 stock metric rule", len(rt.rules))
-	}
-	if !idx.stock.metricsLoaded {
-		t.Fatalf("stock metric scan was not marked loaded")
-	}
-	if idx.metricRulesByName["stock.cold_start"] == nil {
-		t.Fatalf("stock metric rule was not added to profile catalog")
-	}
+	require.Len(t, rt.rules, 1)
+	defs, err = idx.Definitions([]string{"stock.cold_start"})
+	require.NoError(t, err)
+	assert.NotNil(t, defs.RulesByName["stock.cold_start"])
 }
 
 func TestProfileMetricUserRuleCanReferenceStockTrapName(t *testing.T) {
+	root := t.TempDir()
+	stockDir := filepath.Join(root, "default")
 	userDir := t.TempDir()
-	stockDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
 	writeProfileYAML(t, stockDir, "stock.yaml", `
 traps:
   - oid: 1.3.6.1.6.3.1.1.5.1
@@ -1864,6 +1885,13 @@ traps:
     category: state_change
     severity: warning
 `)
+	writeProfileCatalogue(t, stockDir, map[string]any{
+		"stock": map[string]any{
+			"file":      "stock.yaml",
+			"mibs":      []string{"SNMPv2-MIB"},
+			"trap_oids": []string{"1.3.6.1.6.3.1.1.5.1"},
+		},
+	})
 	writeProfileYAML(t, userDir, "site.yaml", `
 charts:
   - id: site_cold_start
@@ -1881,30 +1909,10 @@ metrics:
       chart: site_cold_start
 `)
 
-	paths := profileLoadPaths{
-		eagerDirs: []string{userDir},
-		stockDir:  stockDir,
-		all:       multipath.New(userDir, stockDir),
-	}
-	idx, seen, accepted, err := loadUserProfileTraps(paths)
-	if err != nil {
-		t.Fatalf("loadUserProfileTraps failed: %v", err)
-	}
-	store, err := buildStockProfileStore(stockDir, paths.all, seen, idx)
-	if err != nil {
-		t.Fatalf("buildStockProfileStore failed: %v", err)
-	}
-	idx.stock = store
-	if source := idx.loadedTrapNameSource("SNMPv2-MIB::coldStart"); source != "" {
-		t.Fatalf("stock trap name was loaded before profile metric validation: %q", source)
-	}
-	if err := idx.loadStockProfileMetrics(); err != nil {
-		t.Fatalf("loadStockProfileMetrics failed: %v", err)
-	}
-	if err := addLoadedProfileMetrics(idx, accepted); err != nil {
-		t.Fatalf("addLoadedProfileMetrics failed: %v", err)
-	}
-
+	lease, err := catalog.NewManager(catalog.Paths{UserDirs: []string{userDir}, StockDir: stockDir}).Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	idx := lease.Epoch()
 	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
 		Enabled: true,
 		Include: []string{"site.cold_start"},
@@ -1922,89 +1930,11 @@ metrics:
 	}
 
 	rt.update(entry)
-
-	metricStore := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, metricStore, "profile-job")
+	store := metrix.NewCollectorStore()
+	collectProfileMetricsOnce(t, rt, store, "profile-job")
 	labels := profileMetricSourceLabels("192.0.2.30")
-	if v, ok := metricStore.Read().Value("snmp_trap_site_cold_start_events", labels); !ok || v != 1 {
+	if v, ok := store.Read().Value("snmp_trap_site_cold_start_events", labels); !ok || v != 1 {
 		t.Fatalf("snmp_trap_site_cold_start_events = %v/%v, want 1/true", v, ok)
-	}
-}
-
-func TestLoadProfileMergesMetricRulesAndChartsFromExtends(t *testing.T) {
-	dir := t.TempDir()
-	base := `
-varbinds:
-  ifIndex:
-    oid: 1.3.6.1.2.1.2.2.1.1
-    type: INTEGER
-traps:
-  - oid: 1.3.6.1.4.1.9.9.46.2.0.1
-    name: BASE-MIB::baseTrap
-    category: security
-    severity: warning
-    varbinds:
-      - ifIndex
-charts:
-  - id: base_chart
-    title: Base chart
-    context: snmp.trap.base.chart
-    units: events/s
-    algorithm: incremental
-metrics:
-  - name: base.metric
-    type: counter
-    on_trap: BASE-MIB::baseTrap
-    output:
-      metric: snmp_trap_base_events
-      dimension: events
-      chart: base_chart
-`
-	child := `
-extends:
-  - base.yaml
-charts:
-  - id: base_chart
-    title: Base chart overridden
-    context: snmp.trap.base.chart.override
-    units: events/s
-    algorithm: incremental
-  - id: child_chart
-    title: Child chart
-    context: snmp.trap.child.chart
-    units: events/s
-    algorithm: incremental
-metrics:
-  - name: base.metric
-    type: counter
-    on_trap: BASE-MIB::baseTrap
-    output:
-      metric: snmp_trap_child_events
-      dimension: events
-      chart: child_chart
-`
-	writeProfileYAML(t, dir, "base.yaml", base)
-	writeProfileYAML(t, dir, "child.yaml", child)
-
-	bundle, err := loadProfileBundle(filepath.Join(dir, "child.yaml"), multipath.New(dir), nil)
-	if err != nil {
-		t.Fatalf("loadProfileBundle failed: %v", err)
-	}
-	if len(bundle.metrics) != 1 {
-		t.Fatalf("metrics = %d, want 1 inherited rule overridden by child", len(bundle.metrics))
-	}
-	if got := bundle.metrics[0].Output.Metric; got != "snmp_trap_child_events" {
-		t.Fatalf("overridden metric output = %q, want snmp_trap_child_events", got)
-	}
-	if len(bundle.charts) != 2 {
-		t.Fatalf("charts = %d, want child override of base chart plus child chart", len(bundle.charts))
-	}
-	byID := make(map[string]profileMetricChart, len(bundle.charts))
-	for _, chart := range bundle.charts {
-		byID[chart.ID] = chart
-	}
-	if got := byID["base_chart"].Title; got != "Base chart overridden" {
-		t.Fatalf("base_chart title = %q, want child override", got)
 	}
 }
 
@@ -2102,36 +2032,37 @@ charts:
 `
 	writeProfileYAML(t, dir, "profile.yaml", profile)
 
-	bundle, err := loadProfileBundle(filepath.Join(dir, "profile.yaml"), multipath.New(dir), nil)
+	bundle, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml"))
 	if err != nil {
 		t.Fatalf("loadProfileBundle failed: %v", err)
 	}
-	idx := &ProfileIndex{trapsByOID: make(map[string]*TrapDef), namesByTrapName: make(map[string]*TrapDef)}
-	if err := idx.addTraps(bundle.traps); err != nil {
+	idx := newProfileIndex()
+	if err := idx.AddTraps(bundle.Traps); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
-	if err := idx.addProfileMetrics(bundle.metrics, bundle.charts); err != nil {
+	if err := idx.AddMetricDefinitions(bundle.Metrics, bundle.Charts); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
-	if idx.metricRulesByName["cisco.config.changed"].Output.Dimension != "events" {
-		t.Fatalf("canonical counter dimension = %q, want events", idx.metricRulesByName["cisco.config.changed"].Output.Dimension)
+	cat := profileMetricCatalogForTest(t, idx)
+	if cat.rulesByName["cisco.config.changed"].Output.Dimension != "events" {
+		t.Fatalf("canonical counter dimension = %q, want events", cat.rulesByName["cisco.config.changed"].Output.Dimension)
 	}
-	if got := idx.metricRulesByName["cisco.config.changed"].Where; len(got) != 1 || got[0].Varbind != "ccmHistoryEventTerminalType" || got[0].Equals != "console" {
+	if got := cat.rulesByName["cisco.config.changed"].Where; len(got) != 1 || got[0].Varbind != "ccmHistoryEventTerminalType" || got[0].Equals != "console" {
 		t.Fatalf("canonical where list = %#v, want ccmHistoryEventTerminalType equals console", got)
 	}
-	if got := idx.metricRulesByName["cisco.config.changed.by_terminal"].Where; len(got) != 1 || got[0].Varbind != "ccmHistoryEventTerminalType" || !reflect.DeepEqual(got[0].In, []any{"console", "virtual"}) {
+	if got := cat.rulesByName["cisco.config.changed.by_terminal"].Where; len(got) != 1 || got[0].Varbind != "ccmHistoryEventTerminalType" || !reflect.DeepEqual(got[0].In, []any{"console", "virtual"}) {
 		t.Fatalf("canonical where in list = %#v, want ccmHistoryEventTerminalType in console,virtual", got)
 	}
-	if idx.metricRulesByName["cisco.port_security.ifindex"].Identity.Resource == nil {
+	if cat.rulesByName["cisco.port_security.ifindex"].Identity.Resource == nil {
 		t.Fatalf("canonical identity.resource syntax did not populate identity.resource")
 	}
-	if idx.metricChartsByID["cisco_config_changes"] == nil {
+	if profileMetricChartFromIndex(t, idx, "cisco_config_changes") == nil {
 		t.Fatalf("canonical chart did not create cisco_config_changes chart")
 	}
-	if got := idx.metricChartsByID["cisco_config_changes"].Type; got != "line" {
+	if got := profileMetricChartFromIndex(t, idx, "cisco_config_changes").Type; got != "line" {
 		t.Fatalf("canonical chart default type = %q, want line", got)
 	}
-	if got := idx.metricChartsByID["port_security_violations"].Type; got != "line" {
+	if got := profileMetricChartFromIndex(t, idx, "port_security_violations").Type; got != "line" {
 		t.Fatalf("canonical chart default type = %q, want line", got)
 	}
 }
@@ -2188,7 +2119,7 @@ func TestLoadProfileRejectsRemovedProfileMetricSyntax(t *testing.T) {
 			dir := t.TempDir()
 			profile := "metrics:\n  - name: test.removed\n    type: counter\n" + removed
 			writeProfileYAML(t, dir, "profile.yaml", profile)
-			if _, err := loadProfileBundle(filepath.Join(dir, "profile.yaml"), multipath.New(dir), nil); err == nil {
+			if _, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml")); err == nil {
 				t.Fatalf("loadProfileBundle accepted removed metric syntax %s", name)
 			}
 		})
@@ -2222,7 +2153,7 @@ charts:
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			writeProfileYAML(t, dir, "profile.yaml", profile)
-			if _, err := loadProfileBundle(filepath.Join(dir, "profile.yaml"), multipath.New(dir), nil); err == nil {
+			if _, err := catalog.LoadProfileFile(filepath.Join(dir, "profile.yaml")); err == nil {
 				t.Fatalf("loadProfileBundle accepted unknown chart %s key", name)
 			}
 		})
@@ -2238,7 +2169,7 @@ func TestProfileMetricDiagnosticChartUsesTemplateLocalContext(t *testing.T) {
 
 func TestProfileMetricValidationResourceClassPolicy(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	err := idx.addProfileMetrics([]profileMetricRule{{
+	err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.custom_resource_class",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -2248,21 +2179,21 @@ func TestProfileMetricValidationResourceClassPolicy(t *testing.T) {
 			Dimension: "violations",
 			Chart:     "custom_resource_class",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, []profileMetricChart{{
 		ID:         "custom_resource_class",
 		Title:      "Custom resource class",
 		Context:    "snmp.trap.cisco.custom.resource.class",
 		Units:      "events/s",
 		Algorithm:  "incremental",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}})
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted non-stock resource class without site_ prefix")
 	}
 
 	idx = testProfileMetricIndex(t)
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.site_resource_class",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -2272,14 +2203,14 @@ func TestProfileMetricValidationResourceClassPolicy(t *testing.T) {
 			Dimension: "violations",
 			Chart:     "site_resource_class",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, []profileMetricChart{{
 		ID:         "site_resource_class",
 		Title:      "Site resource class",
 		Context:    "snmp.trap.cisco.site.resource.class",
 		Units:      "events/s",
 		Algorithm:  "incremental",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}})
 	if err != nil {
 		t.Fatalf("addProfileMetrics rejected site-prefixed resource class: %v", err)
@@ -2331,7 +2262,7 @@ func TestProfileMetricValidationRejectsNonNumericPredicateBounds(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			idx := testProfileMetricIndex(t)
-			err := idx.addProfileMetrics([]profileMetricRule{{
+			err := idx.AddMetricDefinitions([]profileMetricRule{{
 				Name:   "cisco.config.bad_" + name,
 				Type:   profileMetricTypeCounter,
 				OnTrap: testCiscoConfigTrapOID,
@@ -2341,7 +2272,7 @@ func TestProfileMetricValidationRejectsNonNumericPredicateBounds(t *testing.T) {
 					Dimension: "bad_" + name,
 					Chart:     "cisco_config_changes",
 				},
-				sourceFile: "test-profile.yaml",
+				SourceFile: "test-profile.yaml",
 			}}, nil)
 			if err == nil || !strings.Contains(err.Error(), tc.wantError) {
 				t.Fatalf("addProfileMetrics error = %v, want %q", err, tc.wantError)
@@ -2352,7 +2283,7 @@ func TestProfileMetricValidationRejectsNonNumericPredicateBounds(t *testing.T) {
 
 func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	err := idx.addProfileMetrics([]profileMetricRule{{
+	err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.duplicate_dimension",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2361,7 +2292,7 @@ func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "site-profile.yaml",
+		SourceFile: "site-profile.yaml",
 	}}, nil)
 	if err != nil {
 		t.Fatalf("addProfileMetrics rejected alternate same-dimension rule before selection: %v", err)
@@ -2396,7 +2327,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 	}
 
 	idx := testProfileMetricIndex(t)
-	err := idx.addProfileMetrics([]profileMetricRule{{
+	err := idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.bad_missing",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -2407,49 +2338,49 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "value",
 			Chart:     "cisco_terminal_type",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted sample missing=unknown_dimension without resource identity")
 	}
 
-	err = idx.addProfileMetrics(nil, []profileMetricChart{{
+	err = idx.AddMetricDefinitions(nil, []profileMetricChart{{
 		ID:         "profile_metric_diagnostics",
 		Title:      "Reserved diagnostics",
 		Context:    "snmp.trap.site.diagnostics",
 		Units:      "events/s",
 		Algorithm:  "incremental",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}})
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted reserved diagnostics chart id")
 	}
 
-	err = idx.addProfileMetrics(nil, []profileMetricChart{{
+	err = idx.AddMetricDefinitions(nil, []profileMetricChart{{
 		ID:         "site_events",
 		Title:      "Reserved events context",
 		Context:    "snmp.trap.events",
 		Units:      "events/s",
 		Algorithm:  "incremental",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}})
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted reserved built-in chart context")
 	}
 
-	err = idx.addProfileMetrics(nil, []profileMetricChart{{
+	err = idx.AddMetricDefinitions(nil, []profileMetricChart{{
 		ID:         "site_profile_metric_diagnostics",
 		Title:      "Reserved profile metric diagnostics context",
 		Context:    "snmp.trap.profile_metric_diagnostics",
 		Units:      "events/s",
 		Algorithm:  "incremental",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}})
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted reserved profile metric diagnostics chart context")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_diagnostic_prefix",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2458,13 +2389,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted reserved profile metric diagnostics prefix")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_not_absent",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2478,13 +2409,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted not with absent predicate")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_range",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2497,13 +2428,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted one-sided range predicate")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_empty_predicate",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2515,13 +2446,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted predicate without condition")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_where_varbind",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2534,13 +2465,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted where predicate with unknown varbind")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_where_field",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2553,13 +2484,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted where predicate with unknown synthetic field")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_state_set_varbind",
 		Type:   profileMetricTypeState,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2572,13 +2503,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "state",
 			Chart:     "cisco_terminal_type",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted state.set_when predicate with unknown varbind")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_ttl",
 		Type:   profileMetricTypeState,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2592,7 +2523,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "state",
 			Chart:     "cisco_terminal_type",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted invalid state.ttl")
@@ -2604,7 +2535,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			idx := testProfileMetricIndex(t)
-			err := idx.addProfileMetrics([]profileMetricRule{{
+			err := idx.AddMetricDefinitions([]profileMetricRule{{
 				Name:   "cisco.config." + name,
 				Type:   profileMetricTypeState,
 				OnTrap: testCiscoConfigTrapOID,
@@ -2618,7 +2549,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 					Dimension: "state",
 					Chart:     "cisco_terminal_type",
 				},
-				sourceFile: "test-profile.yaml",
+				SourceFile: "test-profile.yaml",
 			}}, nil)
 			if err == nil || !strings.Contains(err.Error(), "must be greater than zero") {
 				t.Fatalf("addProfileMetrics error = %v, want positive state.ttl validation error", err)
@@ -2626,7 +2557,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		})
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.bad_multiplier",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -2637,13 +2568,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "value",
 			Chart:     "cisco_terminal_type",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted negative scale multiplier")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_chart_algorithm",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2652,20 +2583,20 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "bad_chart_algorithm",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, []profileMetricChart{{
 		ID:         "bad_chart_algorithm",
 		Title:      "Bad chart algorithm",
 		Context:    "snmp.trap.cisco.bad.chart.algorithm",
 		Units:      "events/s",
 		Algorithm:  "percentage-of-incremental-row",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}})
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted framework-unsupported chart algorithm")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.bad_chart_type",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2674,7 +2605,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "bad_chart_type",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, []profileMetricChart{{
 		ID:         "bad_chart_type",
 		Title:      "Bad chart type",
@@ -2682,13 +2613,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		Units:      "events/s",
 		Algorithm:  "incremental",
 		Type:       "pie",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}})
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted framework-unsupported chart type")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.duplicate_output_metric",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -2697,13 +2628,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "duplicate",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted duplicate output.metric")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.bad_negative_resource_cap",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -2713,13 +2644,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "violations",
 			Chart:     "port_security_violations",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted negative resource max_per_source")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.config.resource_on_non_resource_chart",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -2729,13 +2660,13 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted mixed resource and non-resource rules on one chart")
 	}
 
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.port_security.bad_resource_class",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -2745,20 +2676,21 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "port_security_violations",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, nil)
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted mixed resource classes on one chart")
 	}
 
 	const testCiscoUsernameOID = "1.3.6.1.4.1.9.9.43.1.1.1.99"
-	configTrap := idx.namesByTrapName["CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged"]
-	configTrap.sharedVarbinds[testCiscoUsernameOID] = &VarbindDef{
+	configTrap, err := idx.ResolveTrap("CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged")
+	require.NoError(t, err)
+	configTrap.SharedVarbinds[testCiscoUsernameOID] = &VarbindDef{
 		OID:     testCiscoUsernameOID,
 		Type:    "DisplayString",
-		rawName: "ccmHistoryEventUser",
+		RawName: "ccmHistoryEventUser",
 	}
-	err = idx.addProfileMetrics([]profileMetricRule{{
+	err = idx.AddMetricDefinitions([]profileMetricRule{{
 		Name:     "cisco.config.bad_string_resource",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testCiscoConfigTrapOID,
@@ -2768,14 +2700,14 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 			Dimension: "events",
 			Chart:     "bad_string_resource",
 		},
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}}, []profileMetricChart{{
 		ID:         "bad_string_resource",
 		Title:      "Bad string resource",
 		Context:    "snmp.trap.cisco.bad.string.resource",
 		Units:      "events/s",
 		Algorithm:  "incremental",
-		sourceFile: "test-profile.yaml",
+		SourceFile: "test-profile.yaml",
 	}})
 	if err == nil {
 		t.Fatalf("addProfileMetrics accepted non-integer resource key varbind")
@@ -2797,7 +2729,7 @@ func TestProfileMetricValidationAllowsRetiredSourceMetricIdentifiers(t *testing.
 	for _, tc := range tests {
 		t.Run(tc.chartID, func(t *testing.T) {
 			idx := testProfileMetricIndex(t)
-			err := idx.addProfileMetrics([]profileMetricRule{{
+			err := idx.AddMetricDefinitions([]profileMetricRule{{
 				Name:   "site.source." + tc.chartID,
 				Type:   profileMetricTypeCounter,
 				OnTrap: testCiscoConfigTrapOID,
@@ -2806,14 +2738,14 @@ func TestProfileMetricValidationAllowsRetiredSourceMetricIdentifiers(t *testing.
 					Dimension: "events",
 					Chart:     tc.chartID,
 				},
-				sourceFile: "test-profile.yaml",
+				SourceFile: "test-profile.yaml",
 			}}, []profileMetricChart{{
 				ID:         tc.chartID,
 				Title:      "Site source events",
 				Context:    tc.context,
 				Units:      "events/s",
 				Algorithm:  "incremental",
-				sourceFile: "test-profile.yaml",
+				SourceFile: "test-profile.yaml",
 			}})
 			if err != nil {
 				t.Fatalf("addProfileMetrics rejected identifiers released with retired built-in source metrics: %v", err)

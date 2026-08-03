@@ -94,7 +94,7 @@ replaced job-level operator metrics with profile-defined metrics:
   emit several independent metrics through the job-level contract.
 - Existing static metric instances were scoped by listener job, not by source
   device.
-- Trap profile YAML had `extends`, `varbinds`, and `traps`, but no profile-local
+- Trap profile YAML had `varbinds` and `traps`, but no profile-local
   metric section.
 
 Evidence:
@@ -470,8 +470,8 @@ Evidence:
 - `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md:132`
   through `:137` documents converting custom MIBs offline and dropping YAML
   files under `/etc/netdata/go.d/snmp.trap-profiles/`.
-- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md:346`
-  through `:365` documents operator override files and `extends:`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md`
+  documents complete same-identity replacement and independent operator files.
 - `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/milestone-systems-a-s.yaml:17`
   shows a shipped profile containing a user-defined event trap example.
 
@@ -859,7 +859,7 @@ Safe defaults:
 Profile-defined metrics are disabled by default and use explicit opt-in only.
 There is no automatic rule selection: `profile_metrics.include` names every
 rule selected by the job. A profile rule may set `enabled: false`; that always
-wins after profile merge and makes explicit selection fail validation.
+makes explicit selection fail validation.
 
 `profile_metrics.include` entries select metric rule names, not trap names and
 not profile filenames.
@@ -867,10 +867,10 @@ not profile filenames.
 ### Profile Format Extension
 
 Trap profiles have a first-class optional `metrics:` section. The section
-is file-local, mergeable through `extends:`, and validated together with
+is file-local and validated together with
 `varbinds:`, `traps:`, and the optional profile-local `charts:` section.
 
-The profile format has one canonical YAML surface. It is the validation, merge,
+The profile format has one canonical YAML surface. It is the validation,
 runtime, generated-stock, source-control review, and operator authoring contract.
 Unknown fields and removed aliases are rejected at profile load.
 
@@ -925,7 +925,7 @@ writing the canonical field explicitly.
 
 Canonical metric rule fields:
 
-- `name`: stable metric-rule identity, unique after profile merge. Stock rules
+- `name`: stable metric-rule identity, unique across the effective profile catalogue. Stock rules
   should use a MIB-qualified stable name; operator rules should use a
   site-specific prefix to avoid collisions.
 - `type`: one of the supported extraction types.
@@ -943,13 +943,13 @@ Type-specific selector fields:
   `clear_trap` are required, and `on_trap` is invalid.
 - `state` with same-OID set/clear semantics: `on_trap` is required together
   with `state.set_when` and `state.clear_when`.
-- All trap selectors resolve after the full `extends:` chain is merged, against
-  the resolved profile's `traps:` section. Symbolic names and numeric OIDs must
-  resolve before `Check()` returns.
+- Trap selectors resolve against traps in the same profile or a lazily routed
+  stock profile. Symbolic names and numeric OIDs must resolve during job
+  `Init()` before listener startup.
 
 Canonical chart fields:
 
-- `id`: stable chart ID within the merged profile.
+- `id`: stable chart ID within the profile file.
 - `context`: chart context, using the `snmp.trap.*` namespace.
 - `title`, `family`, `units`, and `algorithm`.
 - `lifecycle` for every chart that can create per-source or per-resource
@@ -975,13 +975,11 @@ Rule and chart names:
   `snmp.trap.`.
 - Profile-local chart IDs and contexts must not collide with built-in static
   chart IDs/contexts for events, severity, errors, or dedup-suppressed metrics.
-- `output.chart` must reference a chart `id` present in the fully merged profile.
-- Forward references to charts defined later in the same profile or inherited
-  from an `extends:` base are allowed.
-- `output.chart` validation happens after full profile resolution and before
-  job `Check()` returns. Errors must name the profile file and metric rule.
-- `output.chart` references are limited to the same resolved `extends:` chain.
-  Cross-chain chart references are validation errors.
+- `output.chart` must reference a chart `id` defined in the same profile file.
+- Forward references to charts defined later in that file are allowed.
+- `output.chart` validation happens during profile validation or job `Init()`.
+  Errors must name the profile file and metric rule. Cross-file chart references
+  are validation errors.
 
 Optional rule fields:
 
@@ -989,7 +987,7 @@ Optional rule fields:
 - `missing`: explicit behavior for missing varbinds.
 - `scale`: numeric multiplier/divisor for sampled values, for example
   `scale: { multiplier: 1, divisor: 100 }`.
-- `enabled`: disable or re-enable a merged stock rule from an operator profile.
+- `enabled`: make this file's rule available or unavailable for job selection.
 - `description`: author-facing note explaining why the rule exists.
 
 The profile `charts:` section is a profile-local chart-template description. The
@@ -1468,6 +1466,9 @@ Allowed predicate inputs:
 Predicate semantics:
 
 - Multiple predicates are ANDed.
+- Each predicate MUST select exactly one string-valued source: `varbind` or
+  `field`. Both, neither, and non-string selectors are invalid; use separate
+  predicates for additional AND constraints.
 - Each predicate must include at least one condition operator: `equals`, `in`,
   `exists`, `absent`, `greater_than`, `less_than`, or `range`.
 - A missing varbind in `where` makes the predicate false and the rule does not
@@ -1566,9 +1567,8 @@ Compilation path:
 
 Chart conflict rules:
 
-- `charts:` merge by `id` within the resolved profile.
-- A child chart with the same `id` in an `extends:` chain replaces the base
-  chart in full.
+- Chart IDs must be unique within a profile file and across the effective
+  profile catalogue; filesystem order never resolves a collision.
 - Across the final loaded profile set, two charts may share a `context` only if
   `title`, `family`, `units`, `algorithm`, chart type, and dimension names are
   compatible.
@@ -1621,35 +1621,35 @@ arrives.
 
 Required behavior:
 
-- Job `Check()` must validate every `profile_metrics.include` entry against a
-  metric rule catalog.
+- Job `Init()` must validate every `profile_metrics.include` entry against a
+  metric rule catalog before listener startup.
 - The metric rule catalog must include operator and stock profile rules.
 - The selected rule set must respect the fixed 500-rule limit before the job starts.
 - Lazy stock trap decode loading must not delay metric-rule validation until
   trap arrival.
-- The implementation may satisfy this by eagerly loading metric sections, by
-  shipping a generated stock metric-rule catalog, or by loading selected stock
-  profiles during `Check()`.
-- The Phase A implementation keeps operator profiles eager. Stock profiles stay
-  lazy only when the loaded profile set has no metric rules and no job enables
-  `profile_metrics`. If custom profile metric rules exist, or if a job enables
-  `profile_metrics`, stock profiles are loaded before rule selection so stock
-  metric rules and custom operator metric rules that reference stock trap names
-  validate before trap arrival.
+- The generated stock manifest records `metric_rule_names` for every profile.
+  During job creation, `profile_metrics.include` hydrates only the stock files
+  that own the requested rules.
+- Every stock manifest entry records a required SHA-256 over the exact
+  decompressed YAML bytes. Lazy hydration verifies and parses the same byte
+  slice so selected rules cannot combine routes from one epoch with profile
+  content from another.
+- Operator profiles remain eager. An operator metric rule that references a
+  stock trap by MIB-qualified name hydrates the deterministic candidate-file
+  set routed by that MIB, then requires one exact trap-name match before job
+  creation completes.
 - The chosen implementation must preserve the existing lazy decode behavior for
   jobs that do not enable profile metrics.
-- The implementation must measure the metric catalog memory footprint when stock
-  metric rules are introduced. If the catalog is materially larger than the
-  decode catalog used today, the first implementation must load only metric
-  sections needed for validation rather than forcing full stock decode loading
-  for every non-metric job.
+- The manifest is the stock metric-rule index. The implementation must not build
+  a second complete in-memory metric catalog or parse the complete stock pack.
 
 ### Profile Lifecycle
 
-Profiles and metric rules are immutable while the shared cache has active job
-references. After editing operator profiles, restart the Agent or recreate all
-running `snmp_traps` jobs. The final release unloads the cache; the next job
-creation loads profiles and validates `profile_metrics.include` from scratch.
+Profiles and metric rules are immutable within a shared catalog epoch while
+jobs hold leases. After editing operator profiles, restart the Agent or recreate
+all running `snmp_traps` jobs. The final lease release unloads the epoch; the
+next job creation loads profiles and validates `profile_metrics.include` from
+scratch.
 
 ### Runtime Ordering
 
@@ -1677,36 +1677,20 @@ Evidence:
   through `:831` and `:962` through `:985` covered the removed job-level
   operator metric runtime.
 
-### Merge And Override Semantics
+### Composition And Override Semantics
 
-Trap profile merge behavior should extend the existing `extends:` model:
-
-- `varbinds:` continue to merge by symbolic name.
-- `traps:` continue to merge by trap OID.
-- `metrics:` merge by stable `name` within the resolved profile.
-- Metric rule names must be globally unique after profile resolution unless a
-  later rule is replacing an earlier rule through the same `extends:` chain.
-- Cross-profile metric name collisions outside an `extends:` replacement chain
-  are validation errors. Filesystem load order must never decide which metric
-  rule wins.
-- Later profiles in the `extends:` chain replace earlier metric rules with the
-  same `name` in full. There is no field-level merge for metric rules.
-- `enabled: false` in an extending profile disables a merged metric rule without
-  disabling trap decode.
-- `charts:` merge by `id` within the resolved profile, with full replacement in
-  an `extends:` chain.
+- `varbinds:`, `traps:`, `metrics:`, and `charts:` are defined and validated as
+  one profile-file bundle; profile files are not field-merged.
+- Metric rule names, chart IDs, trap OIDs/names, and metric outputs must be
+  unique across the effective profile catalogue. Filesystem order never decides
+  which definition wins.
 - Multiple metric rules may reference the same trap OID.
-- Operator profiles can add metrics that reference stock traps without copying
-  the full stock profile.
-- Abstract `_*.yaml` profiles can hold reusable metric rule blocks.
-
-Same-filename replacement remains available for full vendor-profile replacement:
-an operator file with the same filename as a stock profile replaces the stock
-file in full. Normal customization should use either a small metric-only site
-profile that references stock traps by MIB-qualified trap name, or `extends:`
-when the operator needs to merge/override trap decode metadata too. Same-filename
-replacement discards all stock decode and metric content unless the operator file
-redefines it.
+- An operator profile with the same extensionless filename identity as a stock
+  profile replaces that stock file in full, including decode and metric content.
+- An operator profile with a different identity adds complete definitions.
+- A metric-only operator profile may reference stock traps without copying the
+  stock profile. `enabled: false` makes only that file's rule unavailable.
+- Partial profile inheritance is unsupported and the `extends:` key is rejected.
 
 Operator profiles that need to add metrics for traps from several stock files
 can use one metric-only site profile that references those stock traps by
@@ -1822,7 +1806,7 @@ The first implementation step that accepts profile-local metrics must:
 
 - add a `Metrics` field and a `Charts` field to the profile data model;
 - reject or strictly validate unknown metric/chart YAML fields;
-- extend `extends:` merge logic for metric rules and chart definitions;
+- keep metric rules and chart definitions file-local;
 - resolve symbolic trap names to canonical OIDs at load time;
 - validate every metric rule against the resolved trap's varbind set;
 - expose metric validation errors at profile load or job creation time.
@@ -1837,7 +1821,8 @@ Loader requirements:
 - Full top-level strictness should use an audited allowlist of documented
   profile keys so existing stock profiles are not broken accidentally.
 - Validation errors must include the profile filename, the offending key or
-  rule name, and whether the error came from parsing, merge, or job `Check()`.
+  rule name, and whether the error came from parsing, static validation, or job
+  `Init()`.
 
 ### Documentation And Skill Updates
 
@@ -1919,15 +1904,16 @@ The implementation must retain tests for:
 - derived metric name, dimension, chart ID, and context collision rejection;
 - unknown top-level key rejection or targeted rejection for `metrics:` and
   `charts:` before runtime support is complete;
-- `extends:` metric merge, override, disable, and duplicate-name detection;
+- rejection of the removed `extends:` key and duplicate-name detection across
+  independent profiles;
 - chart merge, chart context conflict, duplicate dimension, and `charttpl.Spec`
   validation;
 - built-in static chart ID/context collision rejection;
-- metric rule `output.chart` references to inherited and local chart IDs;
-- rejection of cross-chain chart references;
+- metric rule `output.chart` references to same-file chart IDs;
+- rejection of cross-file chart references;
 - metric rule catalog construction for lazy stock profiles and `include`
-  validation at `Check()`;
-- fixed selected-rule limit after profile merge;
+  validation during job `Init()`;
+- fixed selected-rule limit after catalogue selection;
 - multiple metrics referencing the same trap OID;
 - symbolic trap name and numeric OID resolution order;
 - missing-varbind behavior;
@@ -1973,8 +1959,8 @@ The implementation must retain tests for:
 - generated metadata/integration documentation updates;
 - health alert compatibility when chart identity or labels change;
 - profile generator preservation of curated metric rules;
-- shared cache epoch behavior when profiles change between the final release and
-  next acquisition;
+- shared catalog epoch behavior when profiles change between the final lease
+  release and next acquisition;
 - job restart behavior for `profile_metrics` configuration changes;
 - dedup/write-failure runtime ordering;
 - rejection or removal of the obsolete job-level trap `metrics:` authoring path;

@@ -112,7 +112,10 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
    `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen`. Do not hand-edit
    them for site-specific concerns; site overrides belong under
    `/etc/netdata/go.d/snmp.trap-profiles/` and are documented in
-   `profile-format.md` § "Operator overrides".
+   `profile-format.md` § "Operator overrides". Operator composition has three
+   supported forms: a complete same-identity replacement, an independent
+   different-identity addition, or a metric-only profile that references stock
+   traps. Partial inheritance is unsupported; `extends:` is rejected.
 
 10. **Profile metrics use the validated `metrics:` / `charts:` schema.** Trap
     profiles may define optional trap-to-metric rules only through the schema in
@@ -130,6 +133,8 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
       `absent`, `greater_than`, `less_than`, `range`, and `not`; never combine
       `not` with `exists` or `absent`, and never define a predicate without a
       condition operator.
+    - Every predicate MUST select exactly one string-valued source: `varbind`
+      or `field`. Use separate `where` entries for additional AND constraints.
     - `sample` rules may read only numeric varbind types documented in
       `profile-format.md`; `TimeTicks` is converted to seconds before `scale`.
       `Counter32`, `Counter64`, and `TimeTicks` are valid for sample rules,
@@ -214,7 +219,12 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
      reference list — never emit empty `{}` table entries;
    - drop internal pipeline metadata (`enrichment_source`,
      `enrichment_attempts`) from the YAML output;
-   - keep `catalogue.json` in sync (operator grep-before-install tool);
+   - keep `catalogue.json` in sync: each entry must route its stock file by
+     `trap_oids`, `mibs`, and `metric_rule_names` so the collector can hydrate
+     only the file needed for a lookup;
+   - emit each entry's required `sha256` as 64 lowercase hexadecimal
+     characters computed over the exact decompressed YAML bytes written to
+     disk, including comments and the final newline;
    - emit deterministic output (sorted varbind names, traps sorted by
      OID then name) so regenerations produce reviewable diffs.
 

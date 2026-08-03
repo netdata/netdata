@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
@@ -418,10 +419,10 @@ func validateOverrides(overrides []OverrideConfig) error {
 		if !model.IsNumericOID(o.OID) {
 			return fmt.Errorf("overrides[%d]: invalid oid %q", i, o.OID)
 		}
-		if o.Category != "" && !validCategories[o.Category] {
+		if o.Category != "" && !catalog.ValidCategory(o.Category) {
 			return fmt.Errorf("overrides[%d]: invalid category %q", i, o.Category)
 		}
-		if o.Severity != "" && !validSeverities[o.Severity] {
+		if o.Severity != "" && !catalog.ValidSeverity(o.Severity) {
 			return fmt.Errorf("overrides[%d]: invalid severity %q", i, o.Severity)
 		}
 		for key := range o.Labels {

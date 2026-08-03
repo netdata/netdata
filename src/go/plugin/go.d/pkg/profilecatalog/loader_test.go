@@ -90,6 +90,10 @@ func TestLoad(t *testing.T) {
 			dirs:        []dirFiles{{isStock: true, files: map[string]string{"app.yml": "one"}}},
 			wantInOrder: []string{"app"},
 		},
+		"accepts uppercase YAML extension": {
+			dirs:        []dirFiles{{isStock: true, files: map[string]string{"app.YAML": "one"}}},
+			wantInOrder: []string{"app"},
+		},
 		"recurses into subdirectories": {
 			dirs:        []dirFiles{{isStock: true, files: map[string]string{"nested/app.yaml": "one"}}},
 			wantInOrder: []string{"app"},
@@ -216,9 +220,152 @@ func TestLoad(t *testing.T) {
 	}
 }
 
-func TestLoad_requiresDecode(t *testing.T) {
+func TestLoad_requiresExactlyOneLoader(t *testing.T) {
+	loadFile := func(FileContext) (tProfile, error) { return tProfile{}, nil }
+
 	_, err := Load[tProfile](nil, Options[tProfile]{})
-	assert.Error(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one")
+
+	_, err = Load(nil, Options[tProfile]{Decode: decodeTest, LoadFile: loadFile})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exactly one")
+}
+
+func TestLoad_loadFileAndCompoundFileName(t *testing.T) {
+	specs := buildSpecs(t, []dirFiles{{isStock: true, files: map[string]string{
+		"app.yaml.zst": "compressed",
+		"notes.txt":    "ignored",
+	}}})
+	var parsed []string
+	var loaded []FileContext
+
+	cat, err := Load(specs, Options[tProfile]{
+		LoadFile: func(ctx FileContext) (tProfile, error) {
+			loaded = append(loaded, ctx)
+			return tProfile{Name: ctx.BaseName, Content: filepath.Base(ctx.Path)}, nil
+		},
+		ParseFileName: func(name string) (string, bool) {
+			parsed = append(parsed, name)
+			const suffix = ".yaml.zst"
+			if !strings.HasSuffix(name, suffix) {
+				return "", false
+			}
+			return strings.TrimSuffix(name, suffix), true
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"app.yaml.zst", "notes.txt"}, parsed)
+	require.Len(t, loaded, 1)
+	assert.Equal(t, "app", loaded[0].BaseName)
+	assert.True(t, loaded[0].IsStock)
+	assert.Equal(t, "app.yaml.zst", filepath.Base(loaded[0].Path))
+	got, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, "app.yaml.zst", got.Content)
+}
+
+func TestLoad_compoundIdentityPrecedenceAndDuplicates(t *testing.T) {
+	parse := func(name string) (string, bool) {
+		for _, suffix := range []string{".yaml.zst", ".yml.zst", ".yaml", ".yml"} {
+			if before, ok := strings.CutSuffix(name, suffix); ok {
+				return before, true
+			}
+		}
+		return "", false
+	}
+	loadFile := func(ctx FileContext) (tProfile, error) {
+		return tProfile{Name: ctx.BaseName, Content: filepath.Base(ctx.Path)}, nil
+	}
+
+	t.Run("raw user overrides compressed stock", func(t *testing.T) {
+		specs := buildSpecs(t, []dirFiles{
+			{isStock: true, files: map[string]string{"app.yaml.zst": "stock"}},
+			{isStock: false, files: map[string]string{"app.yaml": "user"}},
+		})
+		cat, err := Load(specs, Options[tProfile]{LoadFile: loadFile, ParseFileName: parse, UserErrors: FailInvalidUser})
+		require.NoError(t, err)
+		got, ok := cat.Get("app")
+		require.True(t, ok)
+		assert.Equal(t, "app.yaml", got.Content)
+		assert.False(t, cat.EffectiveIsStock("app"))
+	})
+
+	t.Run("stock cross-encoding duplicate is fatal", func(t *testing.T) {
+		specs := buildSpecs(t, []dirFiles{{isStock: true, files: map[string]string{
+			"app.yaml":     "raw",
+			"app.yaml.zst": "compressed",
+		}}})
+		_, err := Load(specs, Options[tProfile]{LoadFile: loadFile, ParseFileName: parse})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate stock profile")
+	})
+
+	t.Run("strict user cross-encoding duplicate is fatal", func(t *testing.T) {
+		specs := buildSpecs(t, []dirFiles{{isStock: false, files: map[string]string{
+			"app.yaml":     "raw",
+			"app.yaml.zst": "compressed",
+		}}})
+		_, err := Load(specs, Options[tProfile]{LoadFile: loadFile, ParseFileName: parse, UserErrors: FailInvalidUser})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate user profile")
+	})
+}
+
+func TestLoad_userErrorPolicy(t *testing.T) {
+	loadFile := func(ctx FileContext) (tProfile, error) {
+		if !ctx.IsStock && ctx.BaseName == "app" {
+			return tProfile{}, errors.New("invalid user override")
+		}
+		return tProfile{Name: ctx.BaseName, Content: "stock"}, nil
+	}
+
+	for _, userFirst := range []bool{false, true} {
+		name := "stock first"
+		if userFirst {
+			name = "user first"
+		}
+		t.Run(name, func(t *testing.T) {
+			stock := dirFiles{isStock: true, files: map[string]string{"app.yaml": "stock"}}
+			user := dirFiles{isStock: false, files: map[string]string{"app.yaml": "bad"}}
+			dirs := []dirFiles{stock, user}
+			if userFirst {
+				dirs = []dirFiles{user, stock}
+			}
+			specs := buildSpecs(t, dirs)
+
+			cat, err := Load(specs, Options[tProfile]{LoadFile: loadFile})
+			require.NoError(t, err)
+			got, ok := cat.Get("app")
+			require.True(t, ok)
+			assert.Equal(t, "stock", got.Content)
+
+			_, err = Load(specs, Options[tProfile]{LoadFile: loadFile, UserErrors: FailInvalidUser})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid user override")
+		})
+	}
+
+	t.Run("strict missing user directory remains optional", func(t *testing.T) {
+		missing := filepath.Join(t.TempDir(), "missing")
+		cat, err := Load([]DirSpec{{Path: missing}}, Options[tProfile]{LoadFile: loadFile, UserErrors: FailInvalidUser})
+		require.NoError(t, err)
+		assert.True(t, cat.Empty())
+	})
+
+	t.Run("strict non-directory user path fails", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "profiles")
+		require.NoError(t, os.WriteFile(path, []byte("not a directory"), 0o644))
+		_, err := Load([]DirSpec{{Path: path}}, Options[tProfile]{LoadFile: loadFile, UserErrors: FailInvalidUser})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not a directory")
+	})
+
+	t.Run("unknown policy fails before walking", func(t *testing.T) {
+		_, err := Load[tProfile](nil, Options[tProfile]{LoadFile: loadFile, UserErrors: UserErrorPolicy(99)})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid user error policy")
+	})
 }
 
 func TestLoad_discoveryOrderPreserved(t *testing.T) {

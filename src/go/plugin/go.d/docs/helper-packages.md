@@ -295,27 +295,31 @@ Why:
 
 ## Profile Catalog Helpers
 
-Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated per-target "profiles" as YAML files (a
-profile's identity is its file basename) and loads them from stock plus user directories. Used by the `prometheus`,
-`azure_monitor`, and `cloudwatch` collectors.
+Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated per-target profile files and loads them from
+stock plus user directories. By default a profile's identity is its YAML filename without the extension; collectors with
+compound encodings can supply their own filename-to-identity parser. Used by the `prometheus`, `azure_monitor`,
+`cloudwatch`, and `snmp_traps` collectors.
 
 When:
 
 - the collector reads profiles from `config/go.d/<name>.profiles/` (stock) and the user config dirs;
-- it needs stock/user override precedence (user overrides stock by basename), the stock-fatal / user-skip error policy,
-  and a process-wide cached catalog.
+- it needs stock/user override precedence (user overrides stock by logical identity), stock-fatal errors, and either
+  skip-invalid-user or fail-invalid-user behavior;
+- it may need the optional process-wide cache, or may own a shorter catalog lifecycle itself.
 
 Why:
 
 - one shared `Load[P]` + `Catalog[P]` + `Cached[T]` replaces per-collector copies of the directory walk, override
   precedence, and singleton caching;
 - it is generic over the collector's profile type `P` and oblivious to matching (matching stays in the collector);
-- decode depth is the collector's choice via `Options.Decode`: parse everything eagerly, or parse a lightweight header
-  now and hydrate the heavy part later (as `prometheus` does for its chart templates).
+- loading depth is the collector's choice: `Options.Decode` receives file bytes, while `Options.LoadFile` lets the caller
+  own compression, size limits, or path-based lazy state;
+- `Options.ParseFileName` can derive one logical identity from compound suffixes while preserving the default YAML
+  behavior for existing callers.
 
 Do NOT put matching logic in this package; it is a catalog + loader, not a matcher. Keep the profile schema, its
 decode/validate, the `defaultDirSpecs` directory resolution (location-specific), and specialized queries in the
-collector's own `*profiles` package, wrapping `profilecatalog.Catalog[P]` by struct embedding.
+collector's own profile package. A collector may wrap `profilecatalog.Catalog[P]` when it needs specialized queries.
 
 ## Legacy V1 Helpers
 

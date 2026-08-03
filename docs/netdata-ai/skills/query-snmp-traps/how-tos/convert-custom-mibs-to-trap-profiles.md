@@ -71,9 +71,11 @@ Netdata SNMP trap profile YAMLs?
 
 6. Restart the Netdata Agent or recreate all active SNMP trap jobs.
 
-   Profiles are immutable while the shared cache has active job references.
-   The final job release unloads the cache; the next job creation loads and
-   validates the operator profile files.
+   Profiles are immutable while the shared catalog epoch has active job leases.
+   The final lease release unloads the epoch; the next job creation loads and
+   validates the operator profile files. The generated `catalogue.json` is a
+   review artifact for the conversion output; install the selected YAML files,
+   not that generated manifest, in the operator profile directory.
 
 7. Verify that unknown OIDs resolve:
 
@@ -128,9 +130,11 @@ durable artifacts.
 - Helper output is mechanical unless `--classify` is used with an
   OpenAI-compatible endpoint. Review generated category, severity, and
   descriptions before installing profiles for production use.
-- If generated YAML is malformed, active jobs keep the last valid profile
-  index and new job creation/test fails instead of silently accepting bad
-  profiles.
+- Active jobs keep their current profile epoch after files are edited. Creating
+  another job while any old job still holds a lease reuses that same epoch and
+  does not test the edits. Restart the Agent or recreate every trap job; after
+  the final old lease is released, the next job initialization reloads the
+  files and rejects malformed generated YAML instead of silently accepting it.
 - A validation run with `NAGIOS-NOTIFY-MIB` produced `nagios.yaml`
   containing four traps: `nHostEvent`, `nHostNotify`, `nSvcEvent`, and
   `nSvcNotify`.

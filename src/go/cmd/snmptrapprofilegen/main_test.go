@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -650,9 +652,11 @@ func TestEmitProfilesWritesRouteMetadataToCatalogue(t *testing.T) {
 	}
 
 	var catalogue map[string]struct {
-		File      string   `json:"file"`
-		TrapCount int      `json:"trap_count"`
-		TrapOIDs  []string `json:"trap_oids"`
+		File            string   `json:"file"`
+		MetricRuleNames []string `json:"metric_rule_names"`
+		SHA256          string   `json:"sha256"`
+		TrapCount       int      `json:"trap_count"`
+		TrapOIDs        []string `json:"trap_oids"`
 	}
 	data, err := os.ReadFile(cataloguePath)
 	if err != nil {
@@ -665,9 +669,55 @@ func TestEmitProfilesWritesRouteMetadataToCatalogue(t *testing.T) {
 	if entry.File != "standard.yaml" || entry.TrapCount != 2 {
 		t.Fatalf("standard catalogue entry = %#v, want file standard.yaml with 2 traps", entry)
 	}
+	profileData, err := os.ReadFile(filepath.Join(profilesDir, entry.File))
+	if err != nil {
+		t.Fatalf("read emitted profile: %v", err)
+	}
+	if want := fmt.Sprintf("%x", sha256.Sum256(profileData)); entry.SHA256 != want {
+		t.Fatalf("sha256 = %q, want %q", entry.SHA256, want)
+	}
 	wantOIDs := []string{"1.3.6.1.6.3.1.1.5.1", "1.3.6.1.6.3.1.1.5.3"}
 	if strings.Join(entry.TrapOIDs, ",") != strings.Join(wantOIDs, ",") {
 		t.Fatalf("trap_oids = %#v, want %#v", entry.TrapOIDs, wantOIDs)
+	}
+	if entry.MetricRuleNames != nil {
+		t.Fatalf("metric_rule_names = %#v, want omitted", entry.MetricRuleNames)
+	}
+	if bytes.Contains(data, []byte(`"metric_rule_names"`)) {
+		t.Fatalf("catalogue emitted metric_rule_names for a profile without metric rules: %s", data)
+	}
+}
+
+func TestNewProfileCatalogueEntryIncludesMetricRuleNames(t *testing.T) {
+	profile := profileFile{Metrics: []profileMetricRule{
+		{Name: "vendor::z"},
+		{Name: "vendor::a"},
+	}}
+	want := []string{"vendor::a", "vendor::z"}
+	entry, err := newProfileCatalogueEntry("vendor.yaml", profile, nil, "digest")
+	if err != nil {
+		t.Fatalf("newProfileCatalogueEntry() error = %v", err)
+	}
+	if !slices.Equal(entry.MetricRuleNames, want) {
+		t.Fatalf("metric_rule_names = %#v, want %#v", entry.MetricRuleNames, want)
+	}
+}
+
+func TestNewProfileCatalogueEntryRejectsInvalidMetricRuleNames(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		metrics []profileMetricRule
+		wantErr string
+	}{
+		{name: "empty", metrics: []profileMetricRule{{}}, wantErr: "empty name"},
+		{name: "duplicate", metrics: []profileMetricRule{{Name: "vendor::same"}, {Name: "vendor::same"}}, wantErr: "duplicate metric rule name"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := newProfileCatalogueEntry("vendor.yaml", profileFile{Metrics: tc.metrics}, nil, "digest")
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("newProfileCatalogueEntry() error = %v, want containing %q", err, tc.wantErr)
+			}
+		})
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,8 +15,8 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
@@ -41,20 +42,22 @@ func buildBenchV2cTrap(b testing.TB, community, trapOID string, extra ...gosnmp.
 	return data
 }
 
-// setBenchProfileIndex seeds the global profile index for benchmarks.
-func setBenchProfileIndex(b *testing.B, traps map[string]*TrapDef) {
+func setBenchProfileIndex(b *testing.B, traps map[string]*TrapDef) *ProfileIndex {
 	b.Helper()
 	for _, trap := range traps {
-		if err := compileTrapTemplates(trap, nil); err != nil {
+		if err := prepareTrapDefinition(trap); err != nil {
 			b.Fatalf("compile benchmark trap templates: %v", err)
 		}
-		trap.sharedVarbinds = buildSharedVarbinds(trap, nil)
 	}
-	// Benchmark-only shortcut: swap the atomic current index without touching
-	// the lazy-load/refcount state used by production job creation.
-	prev := globalProfileCache.current.Load()
-	globalProfileCache.current.Store(&ProfileIndex{trapsByOID: traps})
-	b.Cleanup(func() { globalProfileCache.current.Store(prev) })
+	idx := newProfileIndex()
+	trapDefs := make([]*TrapDef, 0, len(traps))
+	for _, trap := range traps {
+		trapDefs = append(trapDefs, trap)
+	}
+	if err := idx.AddTraps(trapDefs); err != nil {
+		b.Fatalf("build benchmark profile index: %v", err)
+	}
+	return idx
 }
 
 // countingWriter is an in-memory sink that counts trap entries without
@@ -140,17 +143,18 @@ func BenchmarkPacketTrap(b *testing.B) {
 		Severity:    "warning",
 		Description: "coldStart from {{source_ip}}",
 	}
-	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
+	idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 	const jobName = "bench-pkt"
 
 	writer := &countingWriter{}
 	c := &Collector{
-		Config:     Config{Name: jobName},
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-		metrics:    &perJobMetrics{},
+		Config:       Config{Name: jobName},
+		trapWriter:   writer,
+		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:    NewAllowlist(nil, []string{"public"}),
+		metrics:      &perJobMetrics{},
+		profileIndex: idx,
 	}
 
 	b.ReportAllocs()
@@ -190,7 +194,7 @@ func BenchmarkMultiJob(b *testing.B) {
 				Severity:    "warning",
 				Description: "coldStart from {{source_ip}}",
 			}
-			setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
+			idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 			writers := make([]*countingWriter, numJobs)
 			collectors := make([]*Collector, numJobs)
@@ -200,11 +204,12 @@ func BenchmarkMultiJob(b *testing.B) {
 				peers[i] = net.ParseIP(fmt.Sprintf("10.1.2.%d", i+1))
 				writers[i] = &countingWriter{}
 				collectors[i] = &Collector{
-					Config:     Config{Name: jn},
-					trapWriter: writers[i],
-					versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-					allowlist:  NewAllowlist(nil, []string{"public"}),
-					metrics:    &perJobMetrics{},
+					Config:       Config{Name: jn},
+					trapWriter:   writers[i],
+					versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+					allowlist:    NewAllowlist(nil, []string{"public"}),
+					metrics:      &perJobMetrics{},
+					profileIndex: idx,
 				}
 			}
 
@@ -342,21 +347,18 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 
 func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 	b.Helper()
-	idx := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
+	idx := newProfileIndex()
 	traps := []*TrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
 			Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 			Category: "config_change",
 			Severity: "notice",
-			sharedVarbinds: map[string]*VarbindDef{
+			SharedVarbinds: map[string]*VarbindDef{
 				testCiscoTerminalTypeOID: {
 					OID:     testCiscoTerminalTypeOID,
 					Type:    "INTEGER",
-					rawName: testCiscoTerminalTypeVarbind,
+					RawName: testCiscoTerminalTypeVarbind,
 					Enum: map[string]string{
 						"1": "none",
 						"2": "console",
@@ -367,7 +369,7 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 				model.SysUpTimeOID: {
 					OID:     model.SysUpTimeOID,
 					Type:    "TimeTicks",
-					rawName: "sysUpTime.0",
+					RawName: "sysUpTime.0",
 				},
 			},
 		},
@@ -376,17 +378,17 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 			Name:     "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 			Category: "security",
 			Severity: "warning",
-			sharedVarbinds: map[string]*VarbindDef{
+			SharedVarbinds: map[string]*VarbindDef{
 				testIfIndexOID: {
 					OID:         testIfIndexOID,
 					Type:        "INTEGER",
-					rawName:     "ifIndex",
+					RawName:     "ifIndex",
 					Constraints: "(1..48)",
 				},
 			},
 		},
 	}
-	if err := idx.addTraps(traps); err != nil {
+	if err := idx.AddTraps(traps); err != nil {
 		b.Fatalf("addTraps: %v", err)
 	}
 
@@ -396,7 +398,7 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 			Type:       profileMetricTypeCounter,
 			OnTrap:     testCiscoConfigTrapOID,
 			Output:     profileMetricOutput{Metric: "snmp_trap_bench_config_events", Dimension: "events", Chart: "bench_config_changes"},
-			sourceFile: "benchmark-profile.yaml",
+			SourceFile: "benchmark-profile.yaml",
 		},
 		{
 			Name:             "bench.config.terminal_type",
@@ -404,7 +406,7 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 			OnTrap:           testCiscoConfigTrapOID,
 			ValueFromVarbind: testCiscoTerminalTypeVarbind,
 			Output:           profileMetricOutput{Metric: "snmp_trap_bench_terminal_type", Dimension: "terminal_type", Chart: "bench_terminal_type"},
-			sourceFile:       "benchmark-profile.yaml",
+			SourceFile:       "benchmark-profile.yaml",
 		},
 		{
 			Name:   "bench.config.console_state",
@@ -416,7 +418,7 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 				TTL:       "1ns",
 			},
 			Output:     profileMetricOutput{Metric: "snmp_trap_bench_console_state", Dimension: "active", Chart: "bench_console_state"},
-			sourceFile: "benchmark-profile.yaml",
+			SourceFile: "benchmark-profile.yaml",
 		},
 		{
 			Name:       "bench.port_security.ifindex",
@@ -424,16 +426,16 @@ func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
 			OnTrap:     testPortSecurityTrapOID,
 			Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 32}},
 			Output:     profileMetricOutput{Metric: "snmp_trap_bench_port_security_violations", Dimension: "violations", Chart: "bench_port_security"},
-			sourceFile: "benchmark-profile.yaml",
+			SourceFile: "benchmark-profile.yaml",
 		},
 	}
 	charts := []profileMetricChart{
-		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, sourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, sourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, sourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, sourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
 	}
-	if err := idx.addProfileMetrics(rules, charts); err != nil {
+	if err := idx.AddMetricDefinitions(rules, charts); err != nil {
 		b.Fatalf("addProfileMetrics: %v", err)
 	}
 	return idx
@@ -500,16 +502,17 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 		Severity:    "warning",
 		Description: "coldStart from {{source_ip}}",
 	}
-	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
+	idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 	dir := b.TempDir()
 	tw := newBenchmarkJournalWriter(b, dir, 1<<20)
 	c := &Collector{
-		Config:     Config{Name: "bench-full"},
-		trapWriter: tw,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-		metrics:    &perJobMetrics{},
+		Config:       Config{Name: "bench-full"},
+		trapWriter:   tw,
+		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:    NewAllowlist(nil, []string{"public"}),
+		metrics:      &perJobMetrics{},
+		profileIndex: idx,
 	}
 
 	b.ReportAllocs()
@@ -630,7 +633,7 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 		Severity:    "warning",
 		Description: "coldStart from {{source_ip}}",
 	}
-	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
+	idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 	tw := newBenchmarkJournalWriter(b, b.TempDir(), journal.DefaultQueueCapacity)
 	b.Cleanup(func() {
@@ -638,11 +641,12 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	})
 
 	c := &Collector{
-		Config:     Config{Name: "bench-udp"},
-		trapWriter: tw,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-		metrics:    &perJobMetrics{},
+		Config:       Config{Name: "bench-udp"},
+		trapWriter:   tw,
+		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:    NewAllowlist(nil, []string{"public"}),
+		metrics:      &perJobMetrics{},
+		profileIndex: idx,
 	}
 
 	listener, err := newListener("bench-udp", ListenConfig{
@@ -773,29 +777,22 @@ func BenchmarkBERRejection(b *testing.B) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Profile-cache and dedup hot-path benchmarks
+// 6. Profile catalog and dedup hot-path benchmarks
 // ---------------------------------------------------------------------------
 
-func BenchmarkBuildStockProfileStoreDefaultProfiles(b *testing.B) {
-	dir := trapProfilesDirFromThisFile()
-	if dir == "" {
-		b.Skip("default trap profile directory not found")
-	}
-	paths := multipath.New(dir)
+func BenchmarkAcquireProfileCatalogDefaultProfiles(b *testing.B) {
+	dir := filepath.Clean("../../config/go.d/snmp.trap-profiles/default")
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		idx := &ProfileIndex{
-			trapsByOID:      make(map[string]*TrapDef),
-			namesByTrapName: make(map[string]*TrapDef),
-		}
-		store, err := buildStockProfileStore(dir, paths, nil, idx)
+		lease, err := catalog.NewManager(catalog.Paths{StockDir: dir}).Acquire()
 		if err != nil {
-			b.Fatalf("buildStockProfileStore: %v", err)
+			b.Fatalf("acquire profile catalog: %v", err)
 		}
-		if store.empty() {
-			b.Fatal("expected non-empty stock profile store")
+		if len(lease.Epoch().Profiles()) == 0 {
+			b.Fatal("expected non-empty profile catalog")
 		}
+		lease.Close()
 	}
 }
 

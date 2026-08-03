@@ -6,13 +6,12 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"maps"
 	"net"
 	"net/netip"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
-	"text/template"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -20,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
@@ -60,13 +60,18 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 		panic("snmp_traps Register requires a non-nil trap enrichment handle")
 	}
 	hostIdentity := newHostIdentityService()
+	var profileCatalogOnce sync.Once
+	var profileCatalog *catalog.Manager
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
 		},
 		CreateV2: func() collectorapi.CollectorV2 {
-			return newCollector(deviceStore, topologyEnricher, hostIdentity, netdataEngineStateRoot)
+			profileCatalogOnce.Do(func() {
+				profileCatalog = catalog.NewManager(defaultProfileCatalogPaths())
+			})
+			return newCollector(deviceStore, topologyEnricher, hostIdentity, profileCatalog, netdataEngineStateRoot)
 		},
 		Config:         func() any { return &Config{} },
 		AgentFunctions: snmpTrapsMethods,
@@ -82,13 +87,20 @@ func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnr
 	if topologyEnricher == nil {
 		panic("snmp_traps New requires a non-nil trap enrichment handle")
 	}
-	return newCollector(deviceStore, topologyEnricher, newHostIdentityService(), netdataEngineStateRoot)
+	return newCollector(
+		deviceStore,
+		topologyEnricher,
+		newHostIdentityService(),
+		nil,
+		netdataEngineStateRoot,
+	)
 }
 
 func newCollector(
 	deviceStore *ddsnmp.DeviceStore,
 	topologyEnricher *snmptopology.TrapEnrichmentHandle,
 	hostIdentity *hostidentity.Service,
+	profileCatalog *catalog.Manager,
 	engineStateRoot func() string,
 ) *Collector {
 	store := metrix.NewCollectorStore()
@@ -104,6 +116,7 @@ func newCollector(
 		deviceLookup:     deviceStore,
 		topologyEnricher: topologyEnricher,
 		hostIdentity:     hostIdentity,
+		profileCatalog:   profileCatalog,
 		engineStateRoot:  engineStateRoot,
 	}
 }
@@ -120,6 +133,9 @@ type Collector struct {
 	deviceLookup       deviceLookup
 	topologyEnricher   trapTopologyEnricher
 	hostIdentity       *hostidentity.Service
+	profileCatalog     *catalog.Manager
+	profileLease       *catalog.Lease
+	profileIndex       *catalog.Epoch
 	engineStateRoot    func() string
 	vnode              string
 	versions           map[SnmpVersion]struct{}
@@ -139,7 +155,6 @@ type Collector struct {
 	reverseDNSEnabled  bool
 	deduper            *trapDeduper
 	packetSequence     atomic.Uint64
-	profileCacheHeld   bool
 	profileMetrics     *profileMetricRuntime
 	dynamicChartYAML   string
 	writeFailureDim    string
@@ -162,18 +177,23 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.profileMetrics = nil
 	c.dynamicChartYAML = ""
 
-	if _, err := AcquireProfileCache(); err != nil {
+	profileCatalog := c.profileCatalog
+	if profileCatalog == nil {
+		profileCatalog = catalog.NewManager(defaultProfileCatalogPaths())
+	}
+	profileLease, err := profileCatalog.Acquire()
+	if err != nil {
 		return dyncfgConfigError(err)
 	}
-	releaseProfileCache := true
+	releaseProfileLease := true
 	releaseProfiles := func() {
-		if releaseProfileCache {
-			ReleaseProfileCache()
-			releaseProfileCache = false
+		if releaseProfileLease {
+			profileLease.Close()
+			releaseProfileLease = false
 		}
 	}
 
-	idx := CurrentProfileIndex()
+	idx := profileLease.Epoch()
 	if idx == nil {
 		releaseProfiles()
 		return dyncfgConfigError(errors.New("profile index not available"))
@@ -331,6 +351,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	metrics.setDedupEnabled(c.Dedup.Enabled)
 	deduper := newTrapDeduper(c.Name, c.Dedup, trapWriter, metrics, writeFailureDim, c.monotonicUsec)
+	if deduper != nil {
+		deduper.profiles = idx
+	}
 
 	var otlpStarter, journalStarter outputStarter
 	if otlpWriter != nil {
@@ -386,8 +409,10 @@ func (c *Collector) Init(ctx context.Context) error {
 		activeDirectJournalJobs.Add(1)
 	}
 	c.deduper = deduper
-	c.profileCacheHeld = true
-	releaseProfileCache = false
+	c.profileCatalog = profileCatalog
+	c.profileLease = profileLease
+	c.profileIndex = idx
+	releaseProfileLease = false
 	c.writeFailureDim = writeFailureDim
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
 	if c.reverseDNSEnabled {
@@ -430,9 +455,10 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.reverseDNS = nil
 		c.reverseDNSEnabled = false
 	}
-	if c.profileCacheHeld {
-		ReleaseProfileCache()
-		c.profileCacheHeld = false
+	if c.profileLease != nil {
+		c.profileLease.Close()
+		c.profileLease = nil
+		c.profileIndex = nil
 	}
 	if c.journalDir != "" {
 		activeDirectJournalJobs.Add(-1)
@@ -624,7 +650,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		}
 	}
 
-	idx := CurrentProfileIndex()
+	idx := c.profileIndex
 	var td *TrapDef
 	var profileLookupErr error
 	if idx != nil {
@@ -843,31 +869,7 @@ func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
 	if !ok {
 		return td
 	}
-	cp := *td
-	if td.Labels != nil {
-		cp.Labels = make(map[string]string, len(td.Labels)+len(ov.Labels))
-		maps.Copy(cp.Labels, td.Labels)
-	}
-	if td.labelTemplates != nil && len(ov.Labels) > 0 {
-		cp.labelTemplates = make(map[string]*template.Template, len(td.labelTemplates))
-		maps.Copy(cp.labelTemplates, td.labelTemplates)
-	}
-	if ov.Category != "" {
-		cp.Category = ov.Category
-	}
-	if ov.Severity != "" {
-		cp.Severity = ov.Severity
-	}
-	if ov.Labels != nil {
-		if cp.Labels == nil {
-			cp.Labels = make(map[string]string, len(ov.Labels))
-		}
-		maps.Copy(cp.Labels, ov.Labels)
-		for key := range ov.Labels {
-			delete(cp.labelTemplates, key)
-		}
-	}
-	return &cp
+	return td.WithOverrides(ov.Category, ov.Severity, ov.Labels)
 }
 
 func buildOverrideMap(overrides []OverrideConfig) map[string]*OverrideConfig {

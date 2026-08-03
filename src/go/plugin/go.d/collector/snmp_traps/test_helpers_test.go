@@ -46,11 +46,12 @@ func setSingleTestTrap(t *testing.T, trap *TrapDef) {
 
 func newTestV2Collector(jobName string, writer output.Writer, prefixes []netip.Prefix, communities []string) *Collector {
 	return &Collector{
-		Config:      Config{Name: jobName},
-		trapWriter:  writer,
-		journalHost: newTestJournalHostProvider(),
-		versions:    map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:   NewAllowlist(prefixes, communities),
+		Config:       Config{Name: jobName},
+		trapWriter:   writer,
+		journalHost:  newTestJournalHostProvider(),
+		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:    NewAllowlist(prefixes, communities),
+		profileIndex: currentTestProfileIndex,
 	}
 }
 
@@ -59,7 +60,11 @@ func newDefaultTestV2Collector(writer output.Writer) *Collector {
 }
 
 func newTestSNMPTrapsCollector() *Collector {
-	return New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+	c := New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+	if currentTestCatalogManager != nil {
+		c.profileCatalog = currentTestCatalogManager
+	}
+	return c
 }
 
 type testTrapTopologyEnricher func(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment

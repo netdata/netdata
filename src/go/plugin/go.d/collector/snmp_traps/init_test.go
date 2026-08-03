@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -135,7 +136,86 @@ func TestCollectorCreatorSharesHostIdentityService(t *testing.T) {
 	second := creator.CreateV2().(*Collector)
 
 	assert.Same(t, first.hostIdentity, second.hostIdentity)
+	assert.Same(t, first.profileCatalog, second.profileCatalog)
 	assert.NotNil(t, first.engineStateRoot)
+}
+
+func TestCollectorCreatorResolvesProfilePathsOnFirstCollector(t *testing.T) {
+	originalExecutableDir := executable.Directory
+	t.Cleanup(func() { executable.Directory = originalExecutableDir })
+
+	earlyDir := filepath.Join(t.TempDir(), "before-plugin-config")
+	require.NoError(t, os.MkdirAll(earlyDir, 0o755))
+	executable.Directory = earlyDir
+	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+
+	root := t.TempDir()
+	executableDir := filepath.Join(root, "plugins.d")
+	stockDir := filepath.Join(root, "config", "go.d", "snmp.trap-profiles", "default")
+	require.NoError(t, os.MkdirAll(executableDir, 0o755))
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "minimal.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.1
+    name: SNMPv2-MIB::coldStart
+    category: state_change
+    severity: notice
+`)
+	writeProfileCatalogue(t, stockDir, map[string]any{
+		"minimal": map[string]any{
+			"file":      "minimal.yaml",
+			"mibs":      []string{"SNMPv2-MIB"},
+			"trap_oids": []string{"1.3.6.1.6.3.1.1.5.1"},
+		},
+	})
+	executable.Directory = executableDir
+
+	collector := creator.CreateV2().(*Collector)
+	lease, err := collector.profileCatalog.Acquire()
+	require.NoError(t, err)
+	lease.Close()
+}
+
+func TestCollectorNewResolvesProfilePathsAtInit(t *testing.T) {
+	originalExecutableDir := executable.Directory
+	t.Cleanup(func() { executable.Directory = originalExecutableDir })
+
+	earlyDir := filepath.Join(t.TempDir(), "before-plugin-config")
+	require.NoError(t, os.MkdirAll(earlyDir, 0o755))
+	executable.Directory = earlyDir
+	collector := New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+
+	root := t.TempDir()
+	executableDir := filepath.Join(root, "plugins.d")
+	stockDir := filepath.Join(root, "config", "go.d", "snmp.trap-profiles", "default")
+	require.NoError(t, os.MkdirAll(executableDir, 0o755))
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAML(t, stockDir, "minimal.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.1
+    name: SNMPv2-MIB::coldStart
+    category: state_change
+    severity: notice
+`)
+	writeProfileCatalogue(t, stockDir, map[string]any{
+		"minimal": map[string]any{
+			"file":      "minimal.yaml",
+			"mibs":      []string{"SNMPv2-MIB"},
+			"trap_oids": []string{"1.3.6.1.6.3.1.1.5.1"},
+		},
+	})
+	executable.Directory = executableDir
+
+	withTestCacheDir(t)
+	collector.Name = "standalone-late-profile-path"
+	collector.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	require.NoError(t, collector.Init(context.Background()))
+	t.Cleanup(func() { collector.Cleanup(context.Background()) })
+
+	td, err := collector.profileIndex.LookupWithError("1.3.6.1.6.3.1.1.5.1")
+	require.NoError(t, err)
+	require.NotNil(t, td)
+	assert.Equal(t, "SNMPv2-MIB::coldStart", td.Name)
 }
 
 func TestCollectorNewUsesIndependentHostIdentityService(t *testing.T) {
@@ -306,8 +386,6 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	profileDir := t.TempDir()
 	writeProfileYAML(t, profileDir, "invalid.yaml", "unknown_profile_key: true\n")
 	setTestDirs(t, profileDir)
-	resetProfileCacheForTest()
-	t.Cleanup(resetProfileCacheForTest)
 
 	c := newTestSNMPTrapsCollector()
 	c.Name = "local"
@@ -318,7 +396,7 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "profile_metrics.include")
 	assert.NotContains(t, err.Error(), "unknown_profile_key")
-	assert.Nil(t, CurrentProfileIndex())
+	assert.Nil(t, c.profileLease)
 	assert.Nil(t, c.listener)
 	assert.Nil(t, c.trapWriter)
 	assert.Nil(t, c.metrics)
@@ -619,6 +697,7 @@ func TestCollectorInit_JournalHostFailureRetriesFreshProvider(t *testing.T) {
 		ddsnmp.NewDeviceStore(),
 		snmptopology.NewTrapEnrichmentHandle(),
 		service,
+		currentTestCatalogManager,
 		func() string { return t.TempDir() },
 	)
 	c.Name = "journal-host-retry"
@@ -928,7 +1007,6 @@ func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
 
 func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
 	setTestDirs(t, t.TempDir())
-	resetProfileCacheForTest()
 	withTestCacheDir(t)
 
 	c := newTestSNMPTrapsCollector()

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package catalog
 
 import (
 	"bytes"
@@ -56,7 +56,7 @@ func compileTrapTemplates(td *TrapDef, fileVarbinds map[string]VarbindDef) error
 func invalidProfileTemplateText(td *TrapDef, name, labelKey, tmpl string) error {
 	ctx := templateValidationContext{src: "<unknown>", templateName: name, labelKey: labelKey}
 	if td != nil {
-		ctx.src = td.sourceFile
+		ctx.src = td.SourceFile
 		ctx.trapOID = td.OID
 	}
 	return ctx.errf("literal braces are not allowed in static text %q; use restricted Go-template syntax", tmpl)
@@ -66,7 +66,7 @@ func compileProfileTemplate(name, tmpl string, td *TrapDef, fileVarbinds map[str
 	src := "<unknown>"
 	oid := ""
 	if td != nil {
-		src = td.sourceFile
+		src = td.SourceFile
 		oid = td.OID
 	}
 

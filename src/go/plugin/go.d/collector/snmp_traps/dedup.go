@@ -53,6 +53,7 @@ type trapDeduper struct {
 	metrics         *perJobMetrics
 	writeFailureDim string
 	monotonicNow    func() int64
+	profiles        *ProfileIndex
 
 	mu      sync.Mutex
 	entries map[dedupKey]*list.Element
@@ -299,7 +300,7 @@ func (d *trapDeduper) renderSummaryMessage(summary *DedupSummary) string {
 }
 
 func (d *trapDeduper) trapSummaryName(oid string) string {
-	if idx := CurrentProfileIndex(); idx != nil {
+	if idx := d.profiles; idx != nil {
 		if td := idx.Lookup(oid); td != nil && td.Name != "" {
 			return td.Name
 		}

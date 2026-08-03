@@ -21,11 +21,14 @@ The implementation language is **Go** (user decision, 2026-05-25). The journal w
 
 1. **Fit for purpose** — the architecture must blend with existing Netdata patterns. The go.d framework already owns job orchestration (DynCfg Add/Enable/Update/Disable/Remove), coded-error surfacing in the dashboard, and the V2 collector lifecycle.
 2. **Minimize blast radius** — new process boundaries, CGo dependencies, or IPC bridges add failure modes, build complexity, and operational surface that must be continuously tested.
-3. **Creation-time failure detection** — all job resources (bind, eager profile-cache surfaces, journal directory, writer
+3. **Creation-time failure detection** — all job resources (bind, eager profile-catalog surfaces, journal directory, writer
    init, retention) must be validated before DynCfg reports the job as started. Lazy stock vendor YAML is not a job
    resource; a malformed lazy file fails the first matching lookup. This is a user-facing correctness contract per spec
    §5.
-4. **Share nothing, share once** — the trap profile cache loads on first runnable job creation, is shared across all listeners, and is released when no runnable jobs remain. In-process sharing is trivial; cross-process sharing adds synchronization, IPC, and lifecycle coordination.
+4. **Share nothing, share once** — the trap profile catalog creates one immutable configuration epoch on first runnable
+   job creation, shares that epoch across all listeners created by the same plugin registration, and releases it when no
+   runnable jobs remain. In-process sharing is trivial; cross-process sharing adds synchronization, IPC, and lifecycle
+   coordination.
 5. **journalctl compatibility** — the M4 acceptance criterion requires `journalctl --directory=...` to work. This means real systemd journal binary-format files (not plain text, not SQLite). The `journalctl` tool reads the binary format documented at https://systemd.io/JOURNAL_FILE_FORMAT/.
 6. **Simplicity** — avoid over-engineering. Prefer standard go.d module code unless evidence justifies another boundary.
 
@@ -38,14 +41,14 @@ The implementation language is **Go** (user decision, 2026-05-25). The journal w
 - Uses V2 collector interface (`collectorapi.CollectorV2`), mirroring the `ping/` collector pattern
 - Job lifecycle managed by the existing go.d framework (`src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`)
 - Journal writing via a thin adapter around `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.8.0`, keeping the internal `output.Writer` abstraction and delegating journal file format, active-file indexing, rotation, retention, and writer locking to the SDK.
-- Shared profile cache: in-process Go package-level state, loaded on first runnable job creation
+- Shared profile catalog: an in-process manager owned by the plugin registration, loaded on first runnable job creation
 
 ### Option B: Separate Go process (external plugin) via PLUGINSD
 
 - Trap plugin runs as a standalone Go binary using the PLUGINSD protocol (`src/plugins.d/README.md`)
 - Communicates metrics via stdout `BEGIN/SET/END` lines
 - Journal writing must happen in-process in the separate binary or via a second bridge
-- Profile cache lives in the separate process; cross-process sharing with any future Go go.d enrichment code requires netipc
+- Profile catalog lives in the separate process; cross-process sharing with any future Go go.d enrichment code requires netipc
 
 ### Option C: Go in-process + CGo bridge to Rust journal-log-writer
 
@@ -330,44 +333,42 @@ Constants for the closed sets:
 - **Category**: `state_change`, `config_change`, `security`, `auth`, `license`, `mobility`, `diagnostic`, `unknown`
 - **Severity**: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`
 
-### 5. Shared Profile Cache Lifecycle
+### 5. Shared Profile Catalog Lifecycle
 
-The profile cache is **plugin-wide in-process state**, not per-job:
+`internal/catalog.Manager` is **plugin-registration-owned in-process state**, not package-global state and not per-job
+state. The plugin factory constructs one manager with explicit operator and stock paths; every collector created by that
+factory acquires its own exact-once `Lease`:
 
 ```go
-// In profile.go — plugin-wide state protected by sync.Mutex. Packet-path reads
-// use the atomic pointer without taking this mutex.
-type profileCache struct {
-    mu         sync.Mutex
-    current    atomic.Pointer[ProfileIndex]
-    loaded     bool
-    activeRefs int
-}
-
-// AcquireProfileCache loads profiles on first call, increments refcount.
-func AcquireProfileCache() (*ProfileIndex, error) { ... }
-
-// ReleaseProfileCache decrements refcount; drops the index when refs == 0.
-func ReleaseProfileCache() { ... }
+manager := catalog.NewManager(catalog.Paths{UserDirs: userDirs, StockDir: stockDir})
+lease, err := manager.Acquire()
+epoch := lease.Epoch()
+defer lease.Close()
 ```
 
 Lifecycle:
-- The first `AcquireProfileCache()` call during job creation eagerly loads operator profiles and the stock catalogue,
-  starts one profile configuration epoch, and increments its active reference count. Stock vendor files load lazily on
-  first matching use unless an operator profile defines metric rules or the job enables profile metrics, which requires
-  the complete rule catalogue during job creation.
-- Every subsequent job creation increments the same reference count and receives the same `*ProfileIndex`.
-- Every job removal calls `ReleaseProfileCache()`. The last release clears the index so GC can reclaim it.
-- Profile files are not watched or reloaded while jobs hold references. After changing a profile, restart the Agent or
-  recreate all `snmp_traps` jobs; the next first acquire rebuilds the eager cache surfaces from disk.
-- Agents with no trap jobs never call `AcquireProfileCache()`, so they never pay the profile memory cost
-- Failed initial eager loads do not poison future attempts. The implementation must not use `sync.Once`; it must retry on
-  the next acquisition. A failed lazy stock load is cached only for the current epoch and retried after the final release
-  and next acquisition.
-- The mutex covers the full acquire-check-load-increment and release-decrement-clear sequence. No goroutine may observe a
-  partially initialized cache. A failed load leaves the cache unloaded.
-- Extra releases are ignored; they never underflow the reference count or disturb an active epoch.
-- Tests need a package-private reset helper (for example `resetProfileCacheForTest`) so package-level state does not leak between test cases.
+
+- The first `Manager.Acquire()` during job creation eagerly loads and validates all operator profiles, exactly one stock
+  manifest, every entry's required SHA-256 syntax, and the manifest-to-filesystem inventory. It does not read stock body
+  bytes. This acquisition occurs in `Collector.Init()`; `Collector.Check()` is a no-op. It starts one configuration epoch
+  and returns a lease that owns one reference.
+- Every subsequent job created by the same plugin registration receives a lease for that epoch. Each collector stores its
+  lease and epoch explicitly; packet-path code never reads a package-global current index.
+- Every job cleanup closes its own lease. `Lease.Close()` is idempotent; the final release drops the epoch so GC can
+  reclaim it and the next acquisition observes the current on-disk configuration.
+- Profile files are not watched or reloaded while jobs hold leases. After changing a profile, restart the Agent or
+  recreate all `snmp_traps` jobs so the final release drops the old epoch.
+- Agents with no trap jobs never acquire a lease, so they never pay the catalog memory cost.
+- Stock profile bodies load lazily through exact trap-OID and metric-rule routes or through a deterministic candidate-file
+  set for a MIB-qualified trap name. Candidate hydration is followed by one exact name match. Enabling metrics does not
+  parse the complete stock pack.
+- Lazy hydration reads and decompresses a file once, verifies the epoch's required SHA-256, and parses the same bytes. The
+  digest binds the manifest and body within one epoch; it is not an authenticity signature.
+- Failed initial eager loads leave the manager empty and retry on the next acquisition. A failed lazy stock load is
+  coalesced and negatively cached per file only for the current epoch.
+- The manager mutex covers build/acquire/refcount/release transitions. Lazy body hydration uses per-file `sync.Once`, so
+  same-file requests coalesce while unrelated files load independently. A full body bundle is validated before traps,
+  metric rules, and charts are published atomically.
 
 ### 6. Creation-time Failure Detection
 
@@ -378,13 +379,13 @@ All job resources are validated synchronously in the go.d framework's job `Start
 | Job name | `^[a-zA-Z0-9][a-zA-Z0-9_-]*$`, max 64 chars, no path separators/dots | HTTP-422 |
 | Endpoint list | At least one endpoint, protocol supported (udp), address/port parseable | HTTP-422 |
 | Endpoint bind | `net.ListenUDP()` on every configured endpoint; all-or-nothing cleanup on partial failure | HTTP-503 retryable |
-| Eager profile cache | `AcquireProfileCache()` validates operator profiles, the stock catalogue, and any required metric catalogue | HTTP-422 |
+| Eager profile catalog | `Manager.Acquire()` validates operator profiles, one stock manifest, and its complete inventory | HTTP-422 |
 | Netdata log directory | `os.Stat("${NETDATA_LOG_DIR}")`; parent must already exist and be a directory | HTTP-503 retryable |
 | Journal directory | SDK creates/opens `${NETDATA_LOG_DIR}/traps/{job_name}/`; failure is all-or-nothing cleanup | HTTP-503 retryable |
 | Journal writer | `journal.Prepare(dir, cfg, host, opts)` validates directory and retention config | HTTP-503 retryable for environment failures; HTTP-422 for invalid retention config |
 
 These errors must flow through DynCfg as coded errors with the resource-specific code above. Non-retryable configuration
-and eager profile-cache errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement
+and eager profile-catalog errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement
 `DyncfgRetryable() bool` so file-configured jobs can retry after the transient condition clears. Lazy stock-profile errors
 are runtime lookup failures and do not pass through DynCfg.
 
@@ -403,13 +404,13 @@ are runtime lookup failures and do not pass through DynCfg.
 Before changing shared DynCfg behavior, M2 must run a same-failure scan (`rg 'CodedError|codedError|MarkNonDisruptiveUpdate' src/go/plugin`) and add handler/jobmgr tests proving existing plain-error retry behavior remains unchanged while coded trap creation failures surface their HTTP status.
 
 The trap plugin must still preflight all resources before it reports successful startup. `AutoDetection(ctx)` should be a
-no-op for traps unless a future SOW proves a cheap consistency check is needed; bind, eager profile-cache, journal, writer,
+no-op for traps unless a future SOW proves a cheap consistency check is needed; bind, eager profile-catalog, journal, writer,
 and retention failures must be creation-time coded errors, not retry-loop events. Lazy stock-profile errors remain first
 matching lookup failures.
 
 **Partial resource cleanup**: if endpoint 3 of 5 fails to bind after endpoints 1-2 succeeded, the previously bound endpoints are closed before returning the error. The job never enters the running state.
 
-`createCollectorJob()` failure is not followed by framework `Cleanup()` because no job object is returned. The trap job factory must therefore own rollback for every partial resource acquired during creation: release profile-cache references, close bound sockets, close or remove partially-created writer state, and leave the journal directory in a valid empty-or-reusable state before returning the coded error.
+`createCollectorJob()` failure is not followed by framework `Cleanup()` because no job object is returned. The trap job factory must therefore own rollback for every partial resource acquired during creation: release profile-catalog leases, close bound sockets, close or remove partially-created writer state, and leave the journal directory in a valid empty-or-reusable state before returning the coded error.
 
 On `Update()`, current jobmgr behavior stops the old running job before creating the replacement. If replacement creation fails, the trap job factory can only roll back partial resources from the failed new job; it cannot restore the stopped old job. This is shared framework behavior. M2 tests must capture the resulting failed status and coded response so operators see the apply-time failure clearly.
 
@@ -420,7 +421,7 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 | Go journal writer has format bugs undetected by `journalctl` | M4 end-to-end test replays a pcap through the full pipeline and queries with `journalctl --directory=...`; write tests against the journal file format spec |
 | SDK-backed adapter fails creation-time preflight | Use `LogOpenEager` + `LogIdentityStrict` and wrap errors as coded DynCfg job-creation failures |
 | Active journal file is not queryable until rotation | Not acceptable for the MVP; validate SDK-backed active files with `journalctl --directory=...` before `Close()` |
-| Shared profile cache refcount leak leaves memory allocated | `ReleaseProfileCache()` is called in `Cleanup()` which the framework guarantees on shutdown; add refcount-leak and underflow detection tests |
+| Shared profile catalog lease leak leaves an epoch allocated | Every collector stores and closes its exact lease in `Cleanup()` and on partial initialization failure; test idempotent close, final release, retry, and concurrent acquisition |
 | Framework coded-error change breaks other collectors | Preserve existing behavior for plain errors; only `CodedError` suppresses retry and controls HTTP code; add Start and Update tests |
 | Direct journal writer cannot sustain target trap volume | Run `go test -benchmem` / throughput benchmarks for queue enqueue and the SDK-backed raw serializer/drain path; if allocation or throughput misses the tens-of-thousands/sec target, reopen batching or backend design |
 | SDK dependency API drifts | Pin to `github.com/netdata/systemd-journal-sdk/go v0.8.0`; review API changes before updating |
@@ -440,7 +441,7 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 ### Positive
 
 - Single process, no IPC, no CGo, no child process management
-- Shared profile cache is trivial (Go package-level state + refcount)
+- Shared profile catalog has explicit ownership (plugin-scoped manager + per-collector exact lease)
 - Job lifecycle is the well-understood go.d pattern operators and maintainers already know
 - `internal/output.Writer` isolates backend concerns; backends remain swappable
 - All creation-time failures surface as coded DynCfg errors

@@ -5,9 +5,7 @@ package snmp_traps
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"math"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,6 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
@@ -41,54 +40,6 @@ const (
 	defaultProfileMetricChartMaxInstances     = 2000
 )
 
-var (
-	profileMetricRuleNameRE      = regexp.MustCompile(`^[A-Za-z0-9_.:-]+::[A-Za-z0-9_.:-]+$|^[A-Za-z0-9_.:-]+$`)
-	profileMetricOutputNameRE    = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	profileMetricChartIDRE       = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	profileMetricResourceClassRE = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	profileMetricSiteClassRE     = regexp.MustCompile(`^site_[a-z0-9][a-z0-9_]*$`)
-)
-
-var stockProfileMetricResourceClasses = map[string]bool{
-	"interface":   true,
-	"peer":        true,
-	"neighbor":    true,
-	"sensor":      true,
-	"alarm":       true,
-	"pool":        true,
-	"l2_topology": true,
-	"component":   true,
-}
-
-var reservedProfileMetricPrefixes = []string{
-	"snmp_trap_events_",
-	"snmp_trap_severity_",
-	"snmp_trap_errors_",
-	"snmp_trap_dedup_",
-	"snmp_trap_pipeline_",
-	"snmp_trap_metric_",
-	"snmp_trap_profile_metrics_",
-}
-
-var builtInProfileMetricChartIDs = map[string]bool{
-	"events":                     true,
-	"severity":                   true,
-	"errors":                     true,
-	"dedup_suppressed":           true,
-	"pipeline":                   true,
-	"profile_metric_diagnostics": true,
-}
-
-var builtInProfileMetricChartContexts = map[string]bool{
-	"snmp.trap.events":                     true,
-	"snmp.trap.severity":                   true,
-	"snmp.trap.errors":                     true,
-	"snmp.trap.dedup_suppressed":           true,
-	"snmp.trap.pipeline":                   true,
-	"snmp.trap.profile_metric_diagnostics": true,
-	"profile_metric_diagnostics":           true,
-}
-
 type ProfileMetricsConfig struct {
 	Enabled bool     `yaml:"enabled,omitempty" json:"enabled"`
 	Include []string `yaml:"include,omitempty" json:"include"`
@@ -105,168 +56,15 @@ type profileMetricLimitsPolicy struct {
 	MaxInstancesPerJob    int
 }
 
-type profileMetricRule struct {
-	Name        string `yaml:"name"`
-	Type        string `yaml:"type"`
-	Enabled     *bool  `yaml:"enabled,omitempty"`
-	OnTrap      string `yaml:"on_trap,omitempty"`
-	ProblemTrap string `yaml:"problem_trap,omitempty"`
-	ClearTrap   string `yaml:"clear_trap,omitempty"`
-
-	Where profileMetricPredicates `yaml:"where,omitempty"`
-
-	Identity profileMetricIdentity `yaml:"identity,omitempty"`
-	Output   profileMetricOutput   `yaml:"output,omitempty"`
-	State    profileMetricState    `yaml:"state,omitempty"`
-	Scale    profileMetricScale    `yaml:"scale,omitempty"`
-
-	Missing          string `yaml:"missing,omitempty"`
-	ValueFromVarbind string `yaml:"value_from_varbind,omitempty"`
-
-	sourceFile string
-}
-
-type profileMetricIdentity struct {
-	Device   string                 `yaml:"device,omitempty"`
-	Resource *profileMetricResource `yaml:"resource,omitempty"`
-}
-
-type profileMetricResource struct {
-	Class          string `yaml:"class,omitempty"`
-	KeyFromVarbind string `yaml:"key_from_varbind,omitempty"`
-	MaxPerSource   int    `yaml:"max_per_source,omitempty"`
-}
-
-type profileMetricOutput struct {
-	Metric    string `yaml:"metric,omitempty"`
-	Dimension string `yaml:"dimension,omitempty"`
-	Chart     string `yaml:"chart,omitempty"`
-}
-
-type profileMetricScale struct {
-	Multiplier int `yaml:"multiplier,omitempty"`
-	Divisor    int `yaml:"divisor,omitempty"`
-}
-
-type profileMetricState struct {
-	SetWhen   *profileMetricPredicate `yaml:"set_when,omitempty"`
-	ClearWhen *profileMetricPredicate `yaml:"clear_when,omitempty"`
-
-	ProblemValue *float64 `yaml:"problem_value,omitempty"`
-	ClearValue   float64  `yaml:"clear_value,omitempty"`
-	TTL          string   `yaml:"ttl,omitempty"`
-}
-
-type profileMetricChart struct {
-	ID          string              `yaml:"id"`
-	Title       string              `yaml:"title"`
-	Family      string              `yaml:"family,omitempty"`
-	Context     string              `yaml:"context"`
-	Units       string              `yaml:"units"`
-	Algorithm   string              `yaml:"algorithm,omitempty"`
-	Type        string              `yaml:"type,omitempty"`
-	Description string              `yaml:"description,omitempty"`
-	Lifecycle   *charttpl.Lifecycle `yaml:"lifecycle,omitempty"`
-
-	sourceFile string
-}
-
-type profileMetricPredicates []profileMetricPredicate
-
-type profileMetricPredicate struct {
-	Varbind     string `yaml:"varbind,omitempty"`
-	Field       string `yaml:"field,omitempty"`
-	Equals      any    `yaml:"equals,omitempty"`
-	In          []any  `yaml:"in,omitempty"`
-	Exists      *bool  `yaml:"exists,omitempty"`
-	Absent      *bool  `yaml:"absent,omitempty"`
-	GreaterThan any    `yaml:"greater_than,omitempty"`
-	LessThan    any    `yaml:"less_than,omitempty"`
-	Range       []any  `yaml:"range,omitempty"`
-	Not         bool   `yaml:"not,omitempty"`
-}
-
-func (p *profileMetricPredicates) UnmarshalYAML(unmarshal func(any) error) error {
-	var predicates []profileMetricPredicate
-	if err := unmarshal(&predicates); err != nil {
-		return err
-	}
-	*p = predicates
-	return nil
-}
-
-func (p *profileMetricPredicate) UnmarshalYAML(unmarshal func(any) error) error {
-	var raw map[any]any
-	if err := unmarshal(&raw); err != nil {
-		return err
-	}
-	pred, err := normalizeProfileMetricPredicateMap(raw)
-	if err != nil {
-		return err
-	}
-	*p = pred
-	return nil
-}
-
-func normalizeProfileMetricPredicateMap(m map[any]any) (profileMetricPredicate, error) {
-	pred := profileMetricPredicate{}
-	for rawKey, rawVal := range m {
-		key, ok := rawKey.(string)
-		if !ok {
-			return pred, fmt.Errorf("predicate key %v is not a string", rawKey)
-		}
-		switch key {
-		case "varbind":
-			s, _ := rawVal.(string)
-			pred.Varbind = s
-		case "field":
-			s, _ := rawVal.(string)
-			pred.Field = s
-		case "equals":
-			pred.Equals = rawVal
-		case "in":
-			values, ok := rawVal.([]any)
-			if !ok {
-				return pred, fmt.Errorf("in must be a list")
-			}
-			pred.In = append([]any(nil), values...)
-		case "exists":
-			b, ok := rawVal.(bool)
-			if !ok {
-				return pred, fmt.Errorf("exists must be boolean")
-			}
-			pred.Exists = &b
-		case "absent":
-			b, ok := rawVal.(bool)
-			if !ok {
-				return pred, fmt.Errorf("absent must be boolean")
-			}
-			pred.Absent = &b
-		case "greater_than":
-			pred.GreaterThan = rawVal
-		case "less_than":
-			pred.LessThan = rawVal
-		case "range":
-			values, ok := rawVal.([]any)
-			if !ok || len(values) != 2 {
-				return pred, fmt.Errorf("range must be a two-element list")
-			}
-			pred.Range = append([]any(nil), values...)
-		case "not":
-			b, ok := rawVal.(bool)
-			if !ok {
-				return pred, fmt.Errorf("not must be boolean")
-			}
-			pred.Not = b
-		default:
-			return pred, fmt.Errorf("unknown predicate key %q", key)
-		}
-	}
-	if pred.Varbind == "" && pred.Field == "" {
-		return pred, fmt.Errorf("predicate requires varbind or field")
-	}
-	return pred, nil
-}
+type profileMetricRule = catalog.MetricRule
+type profileMetricIdentity = catalog.MetricIdentity
+type profileMetricResource = catalog.MetricResource
+type profileMetricOutput = catalog.MetricOutput
+type profileMetricScale = catalog.MetricScale
+type profileMetricState = catalog.MetricState
+type profileMetricChart = catalog.MetricChart
+type profileMetricPredicates = catalog.MetricPredicates
+type profileMetricPredicate = catalog.MetricPredicate
 
 type normalizedProfileMetricsConfig struct {
 	enabled  bool
@@ -321,21 +119,6 @@ type profileMetricCatalog struct {
 	chartsByID  map[string]*profileMetricChart
 }
 
-func (idx *ProfileIndex) profileMetricCatalog() profileMetricCatalog {
-	if idx == nil {
-		return profileMetricCatalog{}
-	}
-	idx.mu.RLock()
-	defer idx.mu.RUnlock()
-	cat := profileMetricCatalog{
-		rulesByName: make(map[string]*profileMetricRule, len(idx.metricRulesByName)),
-		chartsByID:  make(map[string]*profileMetricChart, len(idx.metricChartsByID)),
-	}
-	maps.Copy(cat.rulesByName, idx.metricRulesByName)
-	maps.Copy(cat.chartsByID, idx.metricChartsByID)
-	return cat
-}
-
 func selectProfileMetricRules(cfg normalizedProfileMetricsConfig, cat profileMetricCatalog) ([]*profileMetricRule, error) {
 	if !cfg.enabled {
 		return nil, nil
@@ -346,7 +129,7 @@ func selectProfileMetricRules(cfg normalizedProfileMetricsConfig, cat profileMet
 		if rule == nil {
 			return nil, fmt.Errorf("profile_metrics.include rule %q not found", name)
 		}
-		if rule.disabled() {
+		if rule.Disabled() {
 			return nil, fmt.Errorf("profile_metrics.include rule %q is disabled by profile", name)
 		}
 		selected = append(selected, rule)
@@ -360,17 +143,12 @@ func selectProfileMetricRules(cfg normalizedProfileMetricsConfig, cat profileMet
 	return selected, nil
 }
 
-func (r *profileMetricRule) disabled() bool {
-	return r != nil && r.Enabled != nil && !*r.Enabled
-}
-
 type profileMetricRuntime struct {
 	mu sync.Mutex
 
 	cfg        normalizedProfileMetricsConfig
 	rules      []*compiledProfileMetricRule
 	rulesByOID map[string][]*compiledProfileMetricRule
-	charts     map[string]*profileMetricChart
 
 	series          map[profileMetricSeriesKey]*profileMetricSeries
 	sources         map[string]time.Time
@@ -448,10 +226,11 @@ func newProfileMetricRuntime(cfg normalizedProfileMetricsConfig, idx *ProfileInd
 	if idx == nil {
 		return nil, "", errors.New("profile index not available")
 	}
-	if err := idx.loadStockProfileMetrics(); err != nil {
+	defs, err := idx.Definitions(cfg.include)
+	if err != nil {
 		return nil, "", err
 	}
-	cat := idx.profileMetricCatalog()
+	cat := profileMetricCatalog{rulesByName: defs.RulesByName, chartsByID: defs.ChartsByID}
 	selected, err := selectProfileMetricRules(cfg, cat)
 	if err != nil {
 		return nil, "", err
@@ -462,7 +241,6 @@ func newProfileMetricRuntime(cfg normalizedProfileMetricsConfig, idx *ProfileInd
 
 	rt := &profileMetricRuntime{
 		cfg:             cfg,
-		charts:          cat.chartsByID,
 		series:          make(map[profileMetricSeriesKey]*profileMetricSeries),
 		sources:         make(map[string]time.Time),
 		sourceRoutes:    make(map[string]string),
@@ -517,7 +295,7 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 	}
 	chart := cat.chartsByID[rule.Output.Chart]
 	if chart == nil {
-		return nil, fmt.Errorf("%s: profile metric rule %q references unknown chart %q", rule.sourceFile, rule.Name, rule.Output.Chart)
+		return nil, fmt.Errorf("%s: profile metric rule %q references unknown chart %q", rule.Source(), rule.Name, rule.Output.Chart)
 	}
 	compiled.chart = chart
 	compiled.expireAfterCycles = defaultProfileMetricExpireAfterCycles
@@ -528,7 +306,7 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 	addTrap := func(dst map[string]*TrapDef, ref, field string) error {
 		td, err := resolveProfileMetricTrap(idx, ref)
 		if err != nil {
-			return fmt.Errorf("%s: profile metric rule %q %s: %w", rule.sourceFile, rule.Name, field, err)
+			return fmt.Errorf("%s: profile metric rule %q %s: %w", rule.Source(), rule.Name, field, err)
 		}
 		for _, oid := range metricOIDAliasesFromTrap(td) {
 			dst[oid] = td
@@ -556,7 +334,7 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 		if rule.State.TTL != "" {
 			ttl, err := parseProfileMetricStateTTL(rule.State.TTL)
 			if err != nil {
-				return nil, fmt.Errorf("%s: profile metric rule %q state.ttl: %w", rule.sourceFile, rule.Name, err)
+				return nil, fmt.Errorf("%s: profile metric rule %q state.ttl: %w", rule.Source(), rule.Name, err)
 			}
 			compiled.stateTTL = ttl
 		}
@@ -565,7 +343,7 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 		td := firstTrapDef(compiled.trapOIDs)
 		vb := trapMetricVarbindByName(td, rule.ValueFromVarbind)
 		if vb == nil {
-			return nil, fmt.Errorf("%s: profile metric rule %q value_from_varbind %q not found", rule.sourceFile, rule.Name, rule.ValueFromVarbind)
+			return nil, fmt.Errorf("%s: profile metric rule %q value_from_varbind %q not found", rule.Source(), rule.Name, rule.ValueFromVarbind)
 		}
 		compiled.valueVarbind = vb
 	}
@@ -573,7 +351,7 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 		td := firstAnyTrapDef(compiled.trapOIDs, compiled.problemOIDs, compiled.clearOIDs)
 		vb := trapMetricVarbindByName(td, rule.Identity.Resource.KeyFromVarbind)
 		if vb == nil {
-			return nil, fmt.Errorf("%s: profile metric rule %q resource key_from_varbind %q not found", rule.sourceFile, rule.Name, rule.Identity.Resource.KeyFromVarbind)
+			return nil, fmt.Errorf("%s: profile metric rule %q resource key_from_varbind %q not found", rule.Source(), rule.Name, rule.Identity.Resource.KeyFromVarbind)
 		}
 		compiled.resourceVarbind = vb
 	}
@@ -581,26 +359,7 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 }
 
 func resolveProfileMetricTrap(idx *ProfileIndex, ref string) (*TrapDef, error) {
-	ref = strings.TrimSpace(ref)
-	if ref == "" {
-		return nil, errors.New("trap reference is empty")
-	}
-	if model.IsNumericOID(ref) {
-		td, err := idx.LookupWithError(ref)
-		if err != nil {
-			return nil, err
-		}
-		if td == nil {
-			return nil, fmt.Errorf("trap oid %q not found", ref)
-		}
-		return td, nil
-	}
-	idx.mu.RLock()
-	defer idx.mu.RUnlock()
-	if td := idx.namesByTrapName[ref]; td != nil {
-		return td, nil
-	}
-	return nil, fmt.Errorf("trap name %q not found", ref)
+	return idx.ResolveTrap(ref)
 }
 
 func metricOIDAliasesFromTrap(td *TrapDef) []string {
@@ -631,13 +390,7 @@ func firstAnyTrapDef(mapsIn ...map[string]*TrapDef) *TrapDef {
 }
 
 func trapMetricVarbindByName(td *TrapDef, name string) *VarbindDef {
-	if td == nil || name == "" {
-		return nil
-	}
-	if vb := td.varbindByName(name); vb != nil {
-		return vb
-	}
-	return td.inlineVarbindByName(name)
+	return td.VarbindByName(name)
 }
 
 func (rt *profileMetricRuntime) update(entry *TrapEntry) {
@@ -692,15 +445,15 @@ func (rt *profileMetricRuntime) updateRuleLocked(rule *compiledProfileMetricRule
 			rt.diagnostics.extractionFailed++
 			return
 		}
-		val = rule.rule.Scale.apply(val)
+		val = rule.rule.Scale.Apply(val)
 		rt.setSeriesValueLocked(rule, entry, td, val, now)
 	case profileMetricTypeState:
 		if _, ok := rule.problemOIDs[entry.TrapOID]; ok {
-			rt.setSeriesValueLocked(rule, entry, td, rule.rule.stateProblemValue(), now)
+			rt.setSeriesValueLocked(rule, entry, td, rule.rule.StateProblemValue(), now)
 			return
 		}
 		if _, ok := rule.clearOIDs[entry.TrapOID]; ok {
-			rt.setSeriesValueLocked(rule, entry, td, rule.rule.stateClearValue(), now)
+			rt.setSeriesValueLocked(rule, entry, td, rule.rule.StateClearValue(), now)
 			return
 		}
 		rt.diagnostics.ruleMissed++
@@ -719,35 +472,12 @@ func (r *compiledProfileMetricRule) trapDefForOID(oid string) *TrapDef {
 
 func (r *compiledProfileMetricRule) sameOIDStateValue(entry *TrapEntry, td *TrapDef) (float64, bool) {
 	if r.rule.State.SetWhen != nil && profileMetricPredicateMatches(*r.rule.State.SetWhen, entry, td) {
-		return r.rule.stateProblemValue(), true
+		return r.rule.StateProblemValue(), true
 	}
 	if r.rule.State.ClearWhen != nil && profileMetricPredicateMatches(*r.rule.State.ClearWhen, entry, td) {
-		return r.rule.stateClearValue(), true
+		return r.rule.StateClearValue(), true
 	}
 	return 0, false
-}
-
-func (r *profileMetricRule) stateProblemValue() float64 {
-	if r.State.ProblemValue != nil {
-		return *r.State.ProblemValue
-	}
-	return 1
-}
-
-func (r *profileMetricRule) stateClearValue() float64 {
-	return r.State.ClearValue
-}
-
-func (s profileMetricScale) apply(v float64) float64 {
-	mul := s.Multiplier
-	if mul == 0 {
-		mul = 1
-	}
-	div := s.Divisor
-	if div == 0 {
-		div = 1
-	}
-	return v * float64(mul) / float64(div)
 }
 
 func (rt *profileMetricRuntime) addCounterLocked(rule *compiledProfileMetricRule, entry *TrapEntry, td *TrapDef, now time.Time) {
@@ -1010,7 +740,7 @@ func (rt *profileMetricRuntime) sweepLocked(now time.Time) {
 			continue
 		}
 		if rule.rule.Type == profileMetricTypeState && rule.stateTTL > 0 && now.Sub(series.lastUpdate) >= rule.stateTTL {
-			series.value = rule.rule.stateClearValue()
+			series.value = rule.rule.StateClearValue()
 			series.removeAfterCollect = true
 			continue
 		}
@@ -1317,440 +1047,6 @@ func profileMetricNumericVarbindValue(entry *TrapEntry, vb *VarbindDef) (float64
 	return value, profileMetricValueOK
 }
 
-func normalizeProfileMetricRule(rule *profileMetricRule) error {
-	if rule == nil {
-		return errors.New("nil metric rule")
-	}
-	if rule.Name == "" {
-		return errors.New("name is required")
-	}
-	if !profileMetricRuleNameRE.MatchString(rule.Name) {
-		return fmt.Errorf("name %q contains invalid characters", rule.Name)
-	}
-	rule.Type = strings.ToLower(strings.TrimSpace(rule.Type))
-	switch rule.Type {
-	case profileMetricTypeCounter, profileMetricTypeSample, profileMetricTypeState:
-	default:
-		return fmt.Errorf("rule %q type must be counter, sample, or state", rule.Name)
-	}
-	if rule.Identity.Device == "" {
-		rule.Identity.Device = profileMetricIdentitySource
-	}
-	if rule.Output.Metric == "" {
-		rule.Output.Metric = "snmp_trap_" + slugForMetric(rule.Name)
-		if !strings.HasSuffix(rule.Output.Metric, "_events") && rule.Type == profileMetricTypeCounter {
-			rule.Output.Metric += "_events"
-		}
-	}
-	if rule.Output.Dimension == "" {
-		switch rule.Type {
-		case profileMetricTypeCounter:
-			rule.Output.Dimension = "events"
-		case profileMetricTypeSample:
-			rule.Output.Dimension = "value"
-		case profileMetricTypeState:
-			rule.Output.Dimension = "state"
-		}
-	}
-	if rule.Output.Chart == "" {
-		rule.Output.Chart = slugForMetric(rule.Name)
-	}
-	if rule.Missing == "" {
-		rule.Missing = profileMetricMissingDrop
-	}
-	rule.Missing = strings.ToLower(strings.TrimSpace(rule.Missing))
-	if rule.Scale.Multiplier == 0 {
-		rule.Scale.Multiplier = 1
-	}
-	if rule.Scale.Divisor == 0 {
-		rule.Scale.Divisor = 1
-	}
-	return nil
-}
-
-func validateProfileMetricRule(rule *profileMetricRule, idx *ProfileIndex, charts map[string]*profileMetricChart) error {
-	if err := normalizeProfileMetricRule(rule); err != nil {
-		return fmt.Errorf("%s: metric rule: %w", rule.sourceFile, err)
-	}
-	if !profileMetricOutputNameRE.MatchString(rule.Output.Metric) {
-		return fmt.Errorf("%s: metric rule %q output.metric %q must match ^[a-z][a-z0-9_]*$", rule.sourceFile, rule.Name, rule.Output.Metric)
-	}
-	for _, prefix := range reservedProfileMetricPrefixes {
-		if strings.HasPrefix(rule.Output.Metric, prefix) {
-			return fmt.Errorf("%s: metric rule %q output.metric %q uses reserved prefix %q", rule.sourceFile, rule.Name, rule.Output.Metric, prefix)
-		}
-	}
-	if !profileMetricOutputNameRE.MatchString(rule.Output.Dimension) {
-		return fmt.Errorf("%s: metric rule %q output.dimension %q must match ^[a-z][a-z0-9_]*$", rule.sourceFile, rule.Name, rule.Output.Dimension)
-	}
-	if !profileMetricChartIDRE.MatchString(rule.Output.Chart) {
-		return fmt.Errorf("%s: metric rule %q output.chart %q must match ^[a-z][a-z0-9_]*$", rule.sourceFile, rule.Name, rule.Output.Chart)
-	}
-	if charts[rule.Output.Chart] == nil {
-		return fmt.Errorf("%s: metric rule %q references unknown chart %q", rule.sourceFile, rule.Name, rule.Output.Chart)
-	}
-	switch rule.Missing {
-	case profileMetricMissingDrop, profileMetricMissingZero, profileMetricMissingUnknownDimension, profileMetricMissingError:
-	default:
-		return fmt.Errorf("%s: metric rule %q missing must be drop, zero, unknown_dimension, or error", rule.sourceFile, rule.Name)
-	}
-	switch rule.Type {
-	case profileMetricTypeCounter:
-		if rule.OnTrap == "" || rule.ProblemTrap != "" || rule.ClearTrap != "" || rule.ValueFromVarbind != "" {
-			return fmt.Errorf("%s: counter rule %q requires only on_trap", rule.sourceFile, rule.Name)
-		}
-		if _, err := resolveProfileMetricTrap(idx, rule.OnTrap); err != nil {
-			return fmt.Errorf("%s: counter rule %q on_trap: %w", rule.sourceFile, rule.Name, err)
-		}
-	case profileMetricTypeSample:
-		if rule.OnTrap == "" || rule.ValueFromVarbind == "" {
-			return fmt.Errorf("%s: sample rule %q requires on_trap and value_from_varbind", rule.sourceFile, rule.Name)
-		}
-		td, err := resolveProfileMetricTrap(idx, rule.OnTrap)
-		if err != nil {
-			return fmt.Errorf("%s: sample rule %q on_trap: %w", rule.sourceFile, rule.Name, err)
-		}
-		vb := trapMetricVarbindByName(td, rule.ValueFromVarbind)
-		if vb == nil {
-			return fmt.Errorf("%s: sample rule %q value_from_varbind %q not found", rule.sourceFile, rule.Name, rule.ValueFromVarbind)
-		}
-		if !isProfileMetricNumericVarbind(vb) {
-			return fmt.Errorf("%s: sample rule %q value_from_varbind %q is non-numeric type %q", rule.sourceFile, rule.Name, rule.ValueFromVarbind, vb.Type)
-		}
-		if rule.Missing == profileMetricMissingUnknownDimension {
-			return fmt.Errorf("%s: sample rule %q missing unknown_dimension requires identity.resource", rule.sourceFile, rule.Name)
-		}
-		if charts[rule.Output.Chart].Algorithm != "absolute" {
-			return fmt.Errorf("%s: sample rule %q chart %q must use absolute algorithm", rule.sourceFile, rule.Name, rule.Output.Chart)
-		}
-	case profileMetricTypeState:
-		if rule.OnTrap != "" {
-			if rule.State.SetWhen == nil || rule.State.ClearWhen == nil || rule.ProblemTrap != "" || rule.ClearTrap != "" {
-				return fmt.Errorf("%s: same-OID state rule %q requires on_trap with state set_when and clear_when only", rule.sourceFile, rule.Name)
-			}
-			if _, err := resolveProfileMetricTrap(idx, rule.OnTrap); err != nil {
-				return fmt.Errorf("%s: state rule %q on_trap: %w", rule.sourceFile, rule.Name, err)
-			}
-		} else {
-			if rule.ProblemTrap == "" || rule.ClearTrap == "" {
-				return fmt.Errorf("%s: separate-OID state rule %q requires problem_trap and clear_trap", rule.sourceFile, rule.Name)
-			}
-			if _, err := resolveProfileMetricTrap(idx, rule.ProblemTrap); err != nil {
-				return fmt.Errorf("%s: state rule %q problem_trap: %w", rule.sourceFile, rule.Name, err)
-			}
-			if _, err := resolveProfileMetricTrap(idx, rule.ClearTrap); err != nil {
-				return fmt.Errorf("%s: state rule %q clear_trap: %w", rule.sourceFile, rule.Name, err)
-			}
-		}
-		if charts[rule.Output.Chart].Algorithm != "absolute" {
-			return fmt.Errorf("%s: state rule %q chart %q must use absolute algorithm", rule.sourceFile, rule.Name, rule.Output.Chart)
-		}
-	}
-	if rule.Type != profileMetricTypeSample && rule.Missing == profileMetricMissingZero {
-		return fmt.Errorf("%s: metric rule %q missing zero is supported only for sample rules", rule.sourceFile, rule.Name)
-	}
-	if rule.Missing == profileMetricMissingUnknownDimension && rule.Identity.Resource == nil {
-		return fmt.Errorf("%s: metric rule %q missing unknown_dimension requires identity.resource", rule.sourceFile, rule.Name)
-	}
-	if rule.Scale.Divisor <= 0 {
-		return fmt.Errorf("%s: metric rule %q scale.divisor must be greater than zero", rule.sourceFile, rule.Name)
-	}
-	if rule.Scale.Multiplier < 0 {
-		return fmt.Errorf("%s: metric rule %q scale.multiplier must be zero or greater", rule.sourceFile, rule.Name)
-	}
-	if rule.State.TTL != "" {
-		if _, err := parseProfileMetricStateTTL(rule.State.TTL); err != nil {
-			return fmt.Errorf("%s: metric rule %q state.ttl %q is invalid: %w", rule.sourceFile, rule.Name, rule.State.TTL, err)
-		}
-	}
-	for _, pred := range rule.Where {
-		if err := validateProfileMetricPredicate(pred); err != nil {
-			return fmt.Errorf("%s: metric rule %q where: %w", rule.sourceFile, rule.Name, err)
-		}
-	}
-	if rule.State.SetWhen != nil {
-		if err := validateProfileMetricPredicate(*rule.State.SetWhen); err != nil {
-			return fmt.Errorf("%s: metric rule %q state.set_when: %w", rule.sourceFile, rule.Name, err)
-		}
-	}
-	if rule.State.ClearWhen != nil {
-		if err := validateProfileMetricPredicate(*rule.State.ClearWhen); err != nil {
-			return fmt.Errorf("%s: metric rule %q state.clear_when: %w", rule.sourceFile, rule.Name, err)
-		}
-	}
-	if err := validateProfileMetricPredicateReferences(rule, idx); err != nil {
-		return fmt.Errorf("%s: metric rule %q: %w", rule.sourceFile, rule.Name, err)
-	}
-	if err := validateProfileMetricIdentity(rule); err != nil {
-		return fmt.Errorf("%s: metric rule %q: %w", rule.sourceFile, rule.Name, err)
-	}
-	if err := validateProfileMetricResourceVarbind(rule, idx); err != nil {
-		return fmt.Errorf("%s: metric rule %q: %w", rule.sourceFile, rule.Name, err)
-	}
-	return nil
-}
-
-func validateProfileMetricPredicateReferences(rule *profileMetricRule, idx *ProfileIndex) error {
-	traps, err := profileMetricRuleTrapDefs(rule, idx)
-	if err != nil {
-		return err
-	}
-	for i, pred := range rule.Where {
-		if err := validateProfileMetricPredicateReference(pred, traps); err != nil {
-			return fmt.Errorf("where[%d]: %w", i, err)
-		}
-	}
-	if rule.State.SetWhen != nil {
-		if err := validateProfileMetricPredicateReference(*rule.State.SetWhen, traps); err != nil {
-			return fmt.Errorf("state.set_when: %w", err)
-		}
-	}
-	if rule.State.ClearWhen != nil {
-		if err := validateProfileMetricPredicateReference(*rule.State.ClearWhen, traps); err != nil {
-			return fmt.Errorf("state.clear_when: %w", err)
-		}
-	}
-	return nil
-}
-
-func validateProfileMetricPredicateReference(pred profileMetricPredicate, traps []*TrapDef) error {
-	if pred.Field != "" {
-		if isProfileMetricSyntheticField(pred.Field) {
-			return nil
-		}
-		return fmt.Errorf("field %q is not supported", pred.Field)
-	}
-	if pred.Varbind == "" {
-		return fmt.Errorf("varbind or field is required")
-	}
-	for _, td := range traps {
-		if trapMetricVarbindByName(td, pred.Varbind) == nil {
-			return fmt.Errorf("varbind %q not found on trap %q", pred.Varbind, td.Name)
-		}
-	}
-	return nil
-}
-
-func isProfileMetricSyntheticField(field string) bool {
-	switch field {
-	case "category", "severity", "trap_name", "trap_oid":
-		return true
-	default:
-		return false
-	}
-}
-
-func validateProfileMetricPredicate(pred profileMetricPredicate) error {
-	if pred.Not && (pred.Exists != nil || pred.Absent != nil) {
-		return fmt.Errorf("not cannot be combined with exists or absent")
-	}
-	if pred.Range != nil && len(pred.Range) != 2 {
-		return fmt.Errorf("range requires exactly two values")
-	}
-	if pred.GreaterThan != nil {
-		if err := validateProfileMetricPredicateNumber("greater_than", pred.GreaterThan); err != nil {
-			return err
-		}
-	}
-	if pred.LessThan != nil {
-		if err := validateProfileMetricPredicateNumber("less_than", pred.LessThan); err != nil {
-			return err
-		}
-	}
-	if len(pred.Range) == 2 {
-		var bounds [2]float64
-		for i, value := range pred.Range {
-			if err := validateProfileMetricPredicateNumber(fmt.Sprintf("range[%d]", i), value); err != nil {
-				return err
-			}
-			bounds[i], _ = profileMetricFloatValue(value)
-		}
-		if bounds[0] > bounds[1] {
-			return fmt.Errorf("range[0] must be less than or equal to range[1]")
-		}
-	} else {
-		for i, value := range pred.Range {
-			if err := validateProfileMetricPredicateNumber(fmt.Sprintf("range[%d]", i), value); err != nil {
-				return err
-			}
-		}
-	}
-	if pred.Equals == nil &&
-		len(pred.In) == 0 &&
-		pred.Exists == nil &&
-		pred.Absent == nil &&
-		pred.GreaterThan == nil &&
-		pred.LessThan == nil &&
-		len(pred.Range) == 0 {
-		return fmt.Errorf("predicate requires at least one condition")
-	}
-	return nil
-}
-
-func validateProfileMetricPredicateNumber(field string, value any) error {
-	if _, ok := profileMetricFloatValue(value); !ok {
-		return fmt.Errorf("%s must be a finite number", field)
-	}
-	return nil
-}
-
-func validateProfileMetricResourceVarbind(rule *profileMetricRule, idx *ProfileIndex) error {
-	if rule.Identity.Resource == nil {
-		return nil
-	}
-	traps, err := profileMetricRuleTrapDefs(rule, idx)
-	if err != nil {
-		return err
-	}
-	key := rule.Identity.Resource.KeyFromVarbind
-	var resourceOID string
-	for _, td := range traps {
-		vb := trapMetricVarbindByName(td, key)
-		if vb == nil {
-			return fmt.Errorf("identity.resource.key_from_varbind %q not found on trap %q", key, td.Name)
-		}
-		if !isProfileMetricResourceKeyVarbind(vb) {
-			return fmt.Errorf("identity.resource.key_from_varbind %q has unsupported type %q on trap %q; use an integer-like bounded resource key", key, vb.Type, td.Name)
-		}
-		if resourceOID == "" {
-			resourceOID = vb.OID
-			continue
-		}
-		if vb.OID != resourceOID {
-			return fmt.Errorf("identity.resource.key_from_varbind %q resolves to different OIDs across state traps", key)
-		}
-	}
-	return nil
-}
-
-func profileMetricRuleTrapDefs(rule *profileMetricRule, idx *ProfileIndex) ([]*TrapDef, error) {
-	var refs []string
-	switch rule.Type {
-	case profileMetricTypeCounter, profileMetricTypeSample:
-		refs = append(refs, rule.OnTrap)
-	case profileMetricTypeState:
-		if rule.OnTrap != "" {
-			refs = append(refs, rule.OnTrap)
-		} else {
-			refs = append(refs, rule.ProblemTrap, rule.ClearTrap)
-		}
-	}
-	traps := make([]*TrapDef, 0, len(refs))
-	for _, ref := range refs {
-		td, err := resolveProfileMetricTrap(idx, ref)
-		if err != nil {
-			return nil, err
-		}
-		traps = append(traps, td)
-	}
-	return traps, nil
-}
-
-func isProfileMetricResourceKeyVarbind(vb *VarbindDef) bool {
-	if vb == nil {
-		return false
-	}
-	switch strings.ToLower(strings.TrimSpace(vb.Type)) {
-	case "integer", "integer32", "unsigned32", "gauge32":
-		return true
-	default:
-		return false
-	}
-}
-
-func validateProfileMetricIdentity(rule *profileMetricRule) error {
-	switch rule.Identity.Device {
-	case "", profileMetricIdentitySource, profileMetricIdentitySourceLabel, profileMetricIdentityListener:
-	default:
-		return fmt.Errorf("identity.device must be source, source_label, or listener")
-	}
-	if rule.Identity.Resource == nil {
-		return nil
-	}
-	res := rule.Identity.Resource
-	if res.Class == "" || !profileMetricResourceClassRE.MatchString(res.Class) {
-		return fmt.Errorf("identity.resource.class %q must match ^[a-z][a-z0-9_]*$", res.Class)
-	}
-	if !stockProfileMetricResourceClasses[res.Class] && !profileMetricSiteClassRE.MatchString(res.Class) {
-		return fmt.Errorf("identity.resource.class %q must be a stock class or match ^site_[a-z0-9][a-z0-9_]*$", res.Class)
-	}
-	if res.KeyFromVarbind == "" {
-		return fmt.Errorf("identity.resource.key_from_varbind is required")
-	}
-	if res.MaxPerSource < 0 {
-		return fmt.Errorf("identity.resource.max_per_source must be zero or greater")
-	}
-	return nil
-}
-
-func isProfileMetricNumericVarbind(vb *VarbindDef) bool {
-	if vb == nil {
-		return false
-	}
-	switch strings.ToLower(strings.TrimSpace(vb.Type)) {
-	case "integer", "integer32", "unsigned32", "gauge32", "counter32", "counter64", "timeticks":
-		return true
-	default:
-		return false
-	}
-}
-
-func normalizeProfileMetricChart(chart *profileMetricChart) error {
-	if chart == nil {
-		return errors.New("nil chart")
-	}
-	if chart.ID == "" || !profileMetricChartIDRE.MatchString(chart.ID) {
-		return fmt.Errorf("chart id %q must match ^[a-z][a-z0-9_]*$", chart.ID)
-	}
-	if builtInProfileMetricChartIDs[chart.ID] {
-		return fmt.Errorf("chart id %q collides with built-in SNMP trap chart", chart.ID)
-	}
-	if chart.Title == "" {
-		return fmt.Errorf("chart %q title is required", chart.ID)
-	}
-	if chart.Context == "" {
-		chart.Context = "snmp.trap." + chart.ID
-	}
-	if !strings.HasPrefix(chart.Context, "snmp.trap.") {
-		return fmt.Errorf("chart %q context %q must start with snmp.trap.", chart.ID, chart.Context)
-	}
-	if builtInProfileMetricChartContexts[chart.Context] {
-		return fmt.Errorf("chart %q context %q collides with built-in SNMP trap chart", chart.ID, chart.Context)
-	}
-	if chart.Units == "" {
-		return fmt.Errorf("chart %q units is required", chart.ID)
-	}
-	if chart.Algorithm == "" {
-		chart.Algorithm = "incremental"
-	}
-	switch chart.Algorithm {
-	case "incremental", "absolute":
-	default:
-		return fmt.Errorf("chart %q algorithm %q is unsupported", chart.ID, chart.Algorithm)
-	}
-	if chart.Type == "" {
-		chart.Type = "line"
-	}
-	switch chart.Type {
-	case "line", "area", "stacked", "heatmap":
-	default:
-		return fmt.Errorf("chart %q type %q is unsupported", chart.ID, chart.Type)
-	}
-	if chart.Lifecycle == nil {
-		chart.Lifecycle = &charttpl.Lifecycle{
-			MaxInstances:      defaultProfileMetricChartMaxInstances,
-			ExpireAfterCycles: defaultProfileMetricExpireAfterCycles,
-		}
-	}
-	if chart.Lifecycle.MaxInstances <= 0 {
-		chart.Lifecycle.MaxInstances = defaultProfileMetricChartMaxInstances
-	}
-	if chart.Lifecycle.ExpireAfterCycles <= 0 {
-		chart.Lifecycle.ExpireAfterCycles = defaultProfileMetricExpireAfterCycles
-	}
-	return nil
-}
-
 func slugForMetric(name string) string {
 	name = strings.ToLower(name)
 	var b strings.Builder
@@ -1836,7 +1132,7 @@ func validateSelectedProfileMetricChartDimensions(ruleByChart map[string][]*comp
 			dimension := rule.rule.Output.Dimension
 			if existing := seen[dimension]; existing != nil {
 				return fmt.Errorf("%s: metric rule %q chart %q reuses output.dimension %q selected by rule %q in %s",
-					rule.rule.sourceFile, rule.rule.Name, chartID, dimension, existing.rule.Name, existing.rule.sourceFile)
+					rule.rule.Source(), rule.rule.Name, chartID, dimension, existing.rule.Name, existing.rule.Source())
 			}
 			seen[dimension] = rule
 		}

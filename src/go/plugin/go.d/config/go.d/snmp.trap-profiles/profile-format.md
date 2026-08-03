@@ -42,14 +42,22 @@ directory `snmp.trap-profiles/` subdirectory (typically `/etc/netdata/go.d/snmp.
 Profiles are loaded **only when the first runnable SNMP trap job is created** — Netdata agents that do not receive traps
 never pay the memory footprint.
 
-Profile loading is shared across trap jobs: the first runnable job eagerly loads and validates operator profiles and the
-stock catalogue, builds a stock OID route table, and later jobs reuse the same cache. Stock profile definitions are loaded
-and validated when the first matching trap OID needs that stock file. Stock definitions load eagerly during job creation
-to build the complete metric rule catalogue when an operator profile defines metric rules or the job enables profile
-metrics. Failed eager validation is a creation-time job failure surfaced to DynCfg; a failed lazy stock load is reported
-by the matching trap and increments profile-load-failure metrics.
-Neither failure permanently poisons a later cache epoch. If all trap jobs are removed, the cache is released and the next
-trap job creation rebuilds the eager cache surfaces.
+Profile loading is shared across trap jobs created by one plugin registration. The first runnable job acquires a catalog
+lease, eagerly loads and validates every operator profile, and validates the stock file inventory against exactly one
+`catalogue.json` or `catalogue.json.zst`. This happens in `Collector.Init()`; `Collector.Check()` is a no-op. The manifest
+supplies exact routes for trap OIDs and metric rule names, plus a deterministic candidate-file set for each MIB. The
+runtime does not fall back to parsing every stock profile when the manifest is missing or invalid.
+
+Stock profile definitions are loaded and validated only when a matching trap OID, MIB-qualified name, or selected metric
+rule needs that file. A MIB-qualified lookup hydrates all candidates for its MIB and then requires exactly one matching
+trap name. Different stock files hydrate independently; concurrent requests for the same file coalesce. A failed eager
+validation is a creation-time job failure surfaced to DynCfg, while a failed lazy stock load is reported by the matching
+operation and cached only for the current catalog epoch. The final lease release drops the epoch, so the next runnable
+job rebuilds it from disk.
+
+Profile identity is the extensionless filename. For example, an operator `ciscosystems.yaml` replaces stock
+`ciscosystems.yaml.zst`. Identities must match `^[a-z0-9][a-z0-9_-]*$`; duplicate operator identities and invalid
+operator profiles fail the complete load.
 
 ## File layout
 
@@ -183,13 +191,13 @@ templates can only reference varbinds that survive to disk.
 Profiles may define trap-to-metric rules next to trap decode information. These rules are inert until a listener job
 enables them with `profile_metrics`.
 
-Metric rules are merged through `extends:` by rule `name`; a child profile can replace or disable an inherited rule by
-using the same name. Chart definitions are merged by chart `id`.
+Metric rule names and chart IDs are file-local definitions. Rule names must remain unique across the effective profile
+catalogue, and a rule may reference only a chart defined in the same file.
 
-Custom profile files under `/etc/netdata/go.d/snmp.trap-profiles/` are loaded eagerly. Stock trap profiles remain lazy
-when the loaded profile set has no metric rules and no listener enables `profile_metrics`. When custom profile metric
-rules exist, or when a listener enables `profile_metrics`, stock profiles are loaded before rule selection so custom
-rules can validate references to stock trap names before the first matching trap.
+Custom profile files under `/etc/netdata/go.d/snmp.trap-profiles/` are loaded eagerly. Stock trap profiles remain lazy:
+the stock catalogue routes a received trap OID or selected metric rule to its owning profile file. When a custom metric
+rule references a stock trap, initialization parses only the stock profile candidates for that numeric OID or
+MIB-qualified trap name so the reference can be validated. Unrelated stock profile files remain unparsed.
 
 Enable profile metrics in the listener job, not in the profile file:
 
@@ -203,8 +211,7 @@ profile_metrics:
 - `profile_metrics.enabled` defaults to `false`; profile rules are inactive until the job enables them.
 - `profile_metrics.include` lists every rule enabled for the job. At least one rule is required when profile metrics are
   enabled. Missing or profile-disabled rule names fail job creation.
-- A child profile rule with the same `name` fully replaces the inherited rule. A child can set `enabled: false` to
-  disable an inherited rule.
+- A profile may set one of its own rules to `enabled: false`; explicitly selecting that rule then fails job creation.
 
 Identity behavior:
 
@@ -252,8 +259,8 @@ Canonical rule fields:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `name` | yes | Stable rule identity, unique after profile merge |
-| `enabled` | no | Defaults to enabled; set `false` in a child profile to disable an inherited rule |
+| `name` | yes | Stable rule identity, unique across the effective profile catalogue |
+| `enabled` | no | Defaults to enabled; set `false` to keep this file's rule unavailable for job selection |
 | `type` | yes | `counter`, `sample`, or `state` |
 | `on_trap` | yes for `counter`/`sample` | Trap name or numeric OID |
 | `problem_trap` / `clear_trap` | yes for separate-trap `state` | Trap names or numeric OIDs |
@@ -272,6 +279,8 @@ Canonical rule fields:
 Predicate behavior:
 
 - Multiple `where` predicates are ANDed.
+- Each predicate must select exactly one string-valued source: `varbind` or `field`. Both, neither, and non-string
+  selectors are invalid; express additional constraints as separate `where` predicates.
 - Predicates may reference one of the synthetic fields `category`, `severity`, `trap_name`, or `trap_oid`.
 - Varbind predicates must reference varbinds declared on every trap the rule can process; typos fail profile validation
   instead of silently missing.
@@ -435,8 +444,8 @@ tools can emit either form for the same trap family.
 
 The plugin matches trap profile entries exact-first. If exact lookup misses, it tries one alternate trap OID by adding
 or removing a single `.0.` immediately before the final OID arc. For example, a received `1.3.6.1.4.1.14179.2.6.3.0.24`
-can match a profile `oid:` of `1.3.6.1.4.1.14179.2.6.3.24`, and the reverse is also true. If both forms are present as
-separate profile entries, the exact match wins.
+can match a profile `oid:` of `1.3.6.1.4.1.14179.2.6.3.24`, and the reverse is also true. These spellings are one logical
+trap identity: defining both forms anywhere in the effective profile set is a profile validation error.
 
 This tolerance applies only to trap OID lookup.
 
@@ -494,8 +503,8 @@ description: '{{with first (value "ifDescr") (value "ifName") (value "ifIndex")}
 ```
 
 Unknown functions, unknown varbind names, malformed templates, variables, assignments, `if`, `range`, arbitrary
-pipelines, and template inclusion actions fail profile loading. Eager operator/metric-catalogue loads surface the error at
-job creation; lazy stock errors surface on the first matching trap.
+pipelines, and template inclusion actions fail profile loading. Eager operator-profile errors surface at job creation;
+lazy stock errors surface when the first trap or enabled metric rule routes to that stock file.
 
 If `description:` is absent the plugin renders the default template `"{{trap_name}} on {{hostname}}."`.
 
@@ -556,9 +565,7 @@ In profile terms:
 
 ## Operator overrides
 
-Operators do not copy entire stock profiles to make changes. Instead they place small override files under
-`/etc/netdata/go.d/snmp.trap-profiles/`. The plugin loader mirrors the SNMP polling plugin's multipath pattern
-(`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`):
+Operators place profile files under `/etc/netdata/go.d/snmp.trap-profiles/` and choose one of these composition modes:
 
 1. **Same filename in higher-priority directory replaces the lower-priority one entirely.** Operator `ciscosystems.yaml`
    fully replaces stock `ciscosystems.yaml` or installed `ciscosystems.yaml.zst` — copy + edit the whole file to
@@ -566,9 +573,10 @@ Operators do not copy entire stock profiles to make changes. Instead they place 
 2. **Different filename adds entries.** Operator `site-additions.yaml` (different filename) merges its `traps:` into the
    loaded set without touching stock files. Metric-only site profiles can also use a different filename and reference
    stock traps by MIB-qualified trap name in `on_trap`, `problem_trap`, or `clear_trap`.
-3. **`extends:` chain field-merge** (when an override profile lists `extends: [_base.yaml, other-base.yaml]`): entries
-   must be YAML filenames only, not paths. The loader merges trap entries by OID; fields specified in the override file
-   win over fields from the extended bases; later entries in `extends:` override earlier ones for the same field.
+
+Partial profile inheritance is not supported. The `extends:` key is rejected. Use listener-job `overrides` for
+category/severity/label policy changes on known OIDs, a complete same-name replacement for decode-definition changes, or
+a different filename for independent traps and metric rules.
 
 ### `TRAP_TAG_*` label namespace and collision-free design
 
@@ -617,6 +625,17 @@ By default the helper reads the bundled IANA PEN snapshot from
 current IANA registry before emission. The run also writes review artifacts under `--out-dir`: `traps.jsonl`,
 `extraction-report.json`, `conflicts.json` for duplicate trap OIDs, and `source-conflicts.json` when multiple MIB files
 define the same module name.
+
+The generated `catalogue.json` is a required runtime manifest. Each entry records the raw source filename plus its exact
+`mibs`, `trap_oids`, and, when present, `metric_rule_names`. It also records a required `sha256`: exactly 64 lowercase
+hexadecimal characters computed over the exact decompressed YAML bytes, including comments and the final newline. Lazy
+hydration reads and decompresses the profile once, verifies that digest, and parses the same byte slice. This binds lazy
+content to one immutable catalog epoch; it is not a signature or package-authenticity mechanism. If a package update
+changes a profile while an old epoch is live, that epoch rejects the changed body. A new epoch accepts it only with the
+matching new manifest.
+
+Packaged installations may compress the manifest as `catalogue.json.zst`; gzip manifests are unsupported, and shipping
+both raw and Zstandard forms is an error.
 
 Edits to files under `default/` are overwritten on regeneration; operator modifications belong in the user override
 directory, not in stock files.
