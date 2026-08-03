@@ -870,7 +870,9 @@ _HOSTNAME=<the source device hostname from enrichment, or source IP when enrichm
 3. **SNMP/topology sysName** — the source device `sysName` from the topology cache when the trap source IP matches topology-managed IP state and the direct SNMP registry lookup missed, for example when the SNMP collector target was configured by DNS name but traps arrive from an IP.
 4. **Source IP** — the string form of the validated trap source IP. `_HOSTNAME` is always emitted; the source IP is the mandatory fallback when no enrichment identity exists.
 
-Reverse DNS is an optional annotation only. When `reverse_dns.enabled: true`, cached PTR results are emitted as `TRAP_REVERSE_DNS`; they do not set `_HOSTNAME`, vnode identity, vendor, interface, or neighbors.
+Reverse DNS is an optional annotation only. One process-owned bounded resolver is shared with SNMP topology; listener
+jobs borrow it and keep only their own enablement bit. When `reverse_dns.enabled: true`, cached PTR results are emitted
+as `TRAP_REVERSE_DNS`; they do not set `_HOSTNAME`, vnode identity, vendor, interface, or neighbors.
 
 The serializer sets `_HOSTNAME` to `DeviceHostname` when the enrichment layer provides a non-empty deterministic value; otherwise it falls back to `SourceIP`. No synchronous DNS lookup is performed in the writer or on the hot path. Operators querying `journalctl _HOSTNAME=core-sw-01` see every log line about that device — including traps the device emitted, polled-metric alerts on it, and topology updates — in one cohesive view.
 

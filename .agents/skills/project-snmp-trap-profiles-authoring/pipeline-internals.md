@@ -190,4 +190,26 @@ SNMPv3 state:
 
 Failures after v3 preparation but before receiver start roll back only state
 created by that attempt and close all bound sockets. Cleanup closes receive
-loops before output, enrichment, profile, and metric state.
+loops before output, then releases job-local profile and metric state. Borrowed
+shared enrichment dependencies remain alive.
+
+## 9. Enrichment and reverse-DNS ownership (authoritative)
+
+The SNMP-family composition root creates shared enrichment dependencies once:
+
+- `ddsnmp.DeviceStore` carries SNMP polling identity.
+- `snmp_topology.TrapEnrichmentHandle` carries topology device/interface/neighbor context.
+- `pkg/reversedns.Resolver` is the one process-owned PTR cache and lookup scheduler used by topology and traps.
+
+Each trap creator builds one immutable `internal/enrichment.Enricher` from Netdata-specific value adapters under
+`internal/enrichment/netdataadapter`. All listener jobs created by that creator share the enricher, while each job keeps
+its own `reverse_dns.enabled` bit. Job initialization and cleanup MUST NOT create, close, sweep, or clear the borrowed
+resolver.
+
+The packet path performs only cache-only `Lookup` plus best-effort non-blocking `Schedule`. A cold row is written with
+reverse-DNS audit status `pending`; it is not backfilled when the PTR lookup later completes. Topology keeps live DNS I/O
+in its bounded background warmer and uses only cache hits while rendering Function responses.
+
+The generic resolver owns address canonicalization, deterministic PTR selection, positive/negative TTLs, per-address
+coalescing, bounded admission, and scan-resistant retention. Collector adapters retain source eligibility, display-name
+precedence, public audit-state mapping, and all registry/topology DTO projection.

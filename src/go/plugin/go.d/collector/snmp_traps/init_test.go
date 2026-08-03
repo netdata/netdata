@@ -141,17 +141,18 @@ func TestCollectorInitBuildsEnabledProfileMetricRuntime(t *testing.T) {
 }
 
 func TestCollectorCreatorDefaults(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	assert.False(t, creator.Defaults.Disabled)
 }
 
 func TestCollectorCreatorSharesHostIdentityService(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	first := creator.CreateV2().(*Collector)
 	second := creator.CreateV2().(*Collector)
 
 	assert.Same(t, first.hostIdentity, second.hostIdentity)
 	assert.Same(t, first.profileCatalog, second.profileCatalog)
+	assert.Same(t, first.enricher, second.enricher)
 	assert.NotNil(t, first.engineStateRoot)
 }
 
@@ -162,7 +163,7 @@ func TestCollectorCreatorResolvesProfilePathsOnFirstCollector(t *testing.T) {
 	earlyDir := filepath.Join(t.TempDir(), "before-plugin-config")
 	require.NoError(t, os.MkdirAll(earlyDir, 0o755))
 	executable.Directory = earlyDir
-	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 
 	root := t.TempDir()
 	executableDir := filepath.Join(root, "plugins.d")
@@ -198,7 +199,7 @@ func TestCollectorNewResolvesProfilePathsAtInit(t *testing.T) {
 	earlyDir := filepath.Join(t.TempDir(), "before-plugin-config")
 	require.NoError(t, os.MkdirAll(earlyDir, 0o755))
 	executable.Directory = earlyDir
-	collector := New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
+	collector := New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 
 	root := t.TempDir()
 	executableDir := filepath.Join(root, "plugins.d")
@@ -236,27 +237,34 @@ traps:
 func TestCollectorNewUsesIndependentHostIdentityService(t *testing.T) {
 	deviceStore := ddsnmp.NewDeviceStore()
 	topologyEnricher := snmptopology.NewTrapEnrichmentHandle()
-	first := New(deviceStore, topologyEnricher)
-	second := New(deviceStore, topologyEnricher)
+	reverseDNS := newTestReverseDNSResolver()
+	first := New(deviceStore, topologyEnricher, reverseDNS)
+	second := New(deviceStore, topologyEnricher, reverseDNS)
 
 	assert.NotSame(t, first.hostIdentity, second.hostIdentity)
 }
 
 func TestCollectorCreatorRequiresSharedDependencies(t *testing.T) {
 	require.PanicsWithValue(t, "snmp_traps Register requires a non-nil device store", func() {
-		_ = newCreator(nil, snmptopology.NewTrapEnrichmentHandle())
+		_ = newCreator(nil, snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	})
 	require.PanicsWithValue(t, "snmp_traps Register requires a non-nil trap enrichment handle", func() {
-		_ = newCreator(ddsnmp.NewDeviceStore(), nil)
+		_ = newCreator(ddsnmp.NewDeviceStore(), nil, newTestReverseDNSResolver())
+	})
+	require.PanicsWithValue(t, "snmp_traps Register requires a non-nil reverse DNS resolver", func() {
+		_ = newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), nil)
 	})
 }
 
 func TestCollectorNewRequiresSharedDependencies(t *testing.T) {
 	require.PanicsWithValue(t, "snmp_traps New requires a non-nil device store", func() {
-		_ = New(nil, snmptopology.NewTrapEnrichmentHandle())
+		_ = New(nil, snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	})
 	require.PanicsWithValue(t, "snmp_traps New requires a non-nil trap enrichment handle", func() {
-		_ = New(ddsnmp.NewDeviceStore(), nil)
+		_ = New(ddsnmp.NewDeviceStore(), nil, newTestReverseDNSResolver())
+	})
+	require.PanicsWithValue(t, "snmp_traps New requires a non-nil reverse DNS resolver", func() {
+		_ = New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), nil)
 	})
 }
 
@@ -651,8 +659,7 @@ func TestCollectorInit_JournalHostFailureRetriesFreshProvider(t *testing.T) {
 		},
 	)
 	c := newCollector(
-		ddsnmp.NewDeviceStore(),
-		snmptopology.NewTrapEnrichmentHandle(),
+		newTestTrapEnricher(ddsnmp.NewDeviceStore(), nil, newTestReverseDNSResolver()),
 		service,
 		currentTestCatalogManager,
 		func() string { return t.TempDir() },

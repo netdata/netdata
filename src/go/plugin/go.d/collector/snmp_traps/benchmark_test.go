@@ -4,8 +4,10 @@ package snmp_traps
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"os/exec"
 	"path/filepath"
 	"sync"
@@ -14,11 +16,14 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
 // ---------------------------------------------------------------------------
@@ -131,6 +136,156 @@ func BenchmarkPacketTrap(b *testing.B) {
 	reportDrops(b, int64(b.N), written)
 	b.ReportMetric(float64(written)/b.Elapsed().Seconds(), "entries/s")
 	b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "packets/s")
+}
+
+var (
+	benchmarkEnrichmentStringSink string
+	benchmarkEnrichmentIntSink    int
+)
+
+// BenchmarkTrapEnrichmentMatchingRegistryTopology measures the affected
+// per-packet enrichment path with registry, topology, and cached PTR hits.
+func BenchmarkTrapEnrichmentMatchingRegistryTopology(b *testing.B) {
+	const sourceIP = "192.0.2.10"
+
+	topology := testTrapTopologyEnricher(func(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment {
+		if ip != sourceIP || trapIfIndex != "7" {
+			b.Fatalf("unexpected topology lookup: ip=%q ifIndex=%q", ip, trapIfIndex)
+		}
+		return &snmptopology.TrapTopologyEnrichment{
+			SourceIP:        sourceIP,
+			DeviceStatus:    "matched",
+			DeviceMethod:    "management_ip",
+			DeviceMatches:   1,
+			DeviceHostname:  "topology-device.example.test",
+			DeviceVendor:    "topology-vendor",
+			SourceVnodeID:   "vnode-benchmark",
+			InterfaceIndex:  "7",
+			InterfaceStatus: "matched",
+			Interface:       "Gi0/7",
+			NeighborStatus:  "matched",
+			Neighbors:       []string{"access-a", "access-b"},
+		}
+	})
+	dns := reversedns.New(reversedns.Config{Lookup: func(context.Context, string) ([]string, error) {
+		return []string{"ptr-device.example.test."}, nil
+	}})
+	_, err := dns.Resolve(context.Background(), netip.MustParseAddr(sourceIP))
+	if err != nil {
+		b.Fatalf("prewarm reverse DNS: %v", err)
+	}
+	c, store := newTestTrapEnrichmentCollector(topology, dns)
+	c.reverseDNSEnabled = true
+	store.Register("benchmark:"+sourceIP, ddsnmp.DeviceConnectionInfo{
+		Hostname:      sourceIP,
+		VnodeHostname: "registry-device.example.test",
+		Vendor:        "registry-vendor",
+		VnodeGUID:     "vnode-benchmark",
+	})
+
+	varbinds := []VarbindValue{{
+		Name:  "ifIndex",
+		OID:   "1.3.6.1.2.1.2.2.1.1.7",
+		Type:  "INTEGER",
+		Value: int64(7),
+	}}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		entry := TrapEntry{SourceIP: sourceIP, Varbinds: varbinds}
+		c.enrichTrapEntry(&entry)
+		benchmarkEnrichmentStringSink = entry.ReverseDNS
+		benchmarkEnrichmentIntSink = len(entry.Enrichment.Applied)
+	}
+}
+
+// BenchmarkPacketTrapEnrichedJobs measures concurrent packet handling across
+// multiple jobs with registry, topology, and cached PTR enrichment enabled.
+func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
+	for _, numJobs := range []int{1, 4, 10} {
+		b.Run(fmt.Sprintf("jobs=%d", numJobs), func(b *testing.B) {
+			data := buildBenchV2cTrap(b, "public", "1.3.6.1.6.3.1.1.5.1")
+			trap := &TrapDef{
+				OID:         "1.3.6.1.6.3.1.1.5.1",
+				Name:        "TEST-MIB::coldStart",
+				Category:    "security",
+				Severity:    "warning",
+				Description: "coldStart from {{source_ip}}",
+			}
+			idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
+
+			store := ddsnmp.NewDeviceStore()
+			dns := reversedns.New(reversedns.Config{Lookup: func(context.Context, string) ([]string, error) {
+				return []string{"ptr-device.example.test."}, nil
+			}})
+			topologyByIP := make(map[string]*snmptopology.TrapTopologyEnrichment, numJobs)
+			writers := make([]*countingWriter, numJobs)
+			collectors := make([]*Collector, numJobs)
+			peers := make([]net.IP, numJobs)
+			for i := range numJobs {
+				sourceIP := fmt.Sprintf("192.0.2.%d", i+1)
+				vnodeID := fmt.Sprintf("vnode-benchmark-%d", i+1)
+				peers[i] = net.ParseIP(sourceIP)
+				store.Register("benchmark:"+sourceIP, ddsnmp.DeviceConnectionInfo{
+					Hostname:  sourceIP,
+					SysName:   fmt.Sprintf("device-%d.example.test", i+1),
+					Vendor:    "benchmark-vendor",
+					VnodeGUID: vnodeID,
+				})
+				topologyByIP[sourceIP] = &snmptopology.TrapTopologyEnrichment{
+					SourceIP:       sourceIP,
+					DeviceStatus:   "matched",
+					DeviceMethod:   "management_ip",
+					DeviceMatches:  1,
+					DeviceHostname: fmt.Sprintf("device-%d.example.test", i+1),
+					DeviceVendor:   "benchmark-vendor",
+					SourceVnodeID:  vnodeID,
+				}
+
+				if _, err := dns.Resolve(context.Background(), netip.MustParseAddr(sourceIP)); err != nil {
+					b.Fatalf("prewarm reverse DNS for %s: %v", sourceIP, err)
+				}
+
+				writers[i] = &countingWriter{}
+				collectors[i] = &Collector{
+					Config:            Config{Name: fmt.Sprintf("bench-enriched-%d", i+1)},
+					trapWriter:        writers[i],
+					metrics:           &perJobMetrics{},
+					profileIndex:      idx,
+					enricher:          newTestTrapEnricher(store, testTrapTopologyEnricher(func(ip, _ string) *snmptopology.TrapTopologyEnrichment { return topologyByIP[ip] }), dns),
+					reverseDNSEnabled: true,
+				}
+				collectors[i].receiver = newTestReceiver(collectors[i], receiver.PolicyConfig{
+					Versions:    []string{"v2c"},
+					Communities: []string{"public"},
+				})
+			}
+
+			var nextJob atomic.Uint64
+			b.ReportAllocs()
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				job := int(nextJob.Add(1)-1) % numJobs
+				collector := collectors[job]
+				peer := peers[job]
+				for pb.Next() {
+					pkt := make([]byte, len(data))
+					copy(pkt, data)
+					collector.handlePacket(pkt, peer, nil, nil)
+				}
+			})
+			b.StopTimer()
+
+			var written int64
+			for _, writer := range writers {
+				written += writer.Written()
+			}
+			reportDrops(b, int64(b.N), written)
+			b.ReportMetric(float64(written)/b.Elapsed().Seconds(), "entries/s")
+			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "packets/s")
+		})
+	}
 }
 
 // ---------------------------------------------------------------------------
