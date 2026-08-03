@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
@@ -89,12 +90,8 @@ func (idx *testCatalog) Definitions(names []string) (catalog.MetricDefinitions, 
 		ChartsByID:  make(map[string]*catalog.MetricChart),
 	}
 	if names == nil {
-		for name, rule := range idx.rules {
-			defs.RulesByName[name] = rule
-		}
-		for id, chart := range idx.charts {
-			defs.ChartsByID[id] = chart
-		}
+		maps.Copy(defs.RulesByName, idx.rules)
+		maps.Copy(defs.ChartsByID, idx.charts)
 		return defs, nil
 	}
 	for _, name := range names {
