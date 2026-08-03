@@ -47,6 +47,22 @@ static void check_trim_errno(const char *what, const char *path, char *dst, size
     }
 }
 
+// os_open_dir_privileged() decides whether to follow a symlink at the final
+// component from the trust class of the directory holding it.
+static void check_open(const char *what, const char *path, bool expected) {
+    int fd = os_open_dir_privileged(path);
+    bool got = (fd != -1);
+    if (fd != -1) close(fd);
+
+    if (got == expected)
+        fprintf(stderr, "  ok       %-52s (%s)\n", what, got ? "opened" : "refused");
+    else {
+        fprintf(stderr, "  FAILED   %-52s got %s, expected %s\n",
+                what, got ? "opened" : "refused", expected ? "opened" : "refused");
+        failures++;
+    }
+}
+
 // Build "<root_dir>/<name>" into buf.
 static const char *under(char *buf, size_t size, const char *name) {
     snprintfz(buf, size, "%s/%s", root_dir, name);
@@ -140,6 +156,168 @@ int main(void) {
     snprintfz(p, sizeof(p), "%s/ours", open_parent);
     make_parent(p, 0755);
     check("world-writable parent without the sticky bit", p, false);
+
+    // The leaf's own mode. Its parent being exclusive says nobody else can
+    // replace the directory - it says nothing about who can create entries
+    // inside it, which is where the sockets go.
+    snprintfz(p, sizeof(p), "%s/other_writable", exclusive);
+    make_parent(p, 0777);
+    check("directory writable by everyone", p, false);
+
+    snprintfz(p, sizeof(p), "%s/other_writable_sticky", exclusive);
+    make_parent(p, 01777);
+    check("directory writable by everyone, even sticky", p, false);
+
+    // Must stay accepted: the shipped systemd unit creates /run/netdata with
+    // RuntimeDirectoryMode=0775 and re-applies it on every start, so refusing
+    // group-write would leave the default install without a run directory.
+    snprintfz(p, sizeof(p), "%s/group_writable", exclusive);
+    make_parent(p, 0775);
+    check("directory writable by its group (systemd 0775 shape)", p, true);
+
+    fprintf(stderr, "privileged open, symlink at the final component:\n");
+    {
+        // Exclusive parent: only we could have placed the link, so it is
+        // followed - this is what keeps /var/cache/netdata -> another
+        // filesystem working.
+        snprintfz(p, sizeof(p), "%s/real", exclusive);
+        snprintfz(q, sizeof(q), "%s/link_ok", exclusive);
+        if (symlink(p, q) == -1) fatal("test setup: symlink '%s'", q);
+        check_open("symlink in an exclusive parent (followed)", q, true);
+
+        // Same link, but reached through a parent anyone can write into: now
+        // somebody else could have planted it, so O_NOFOLLOW refuses it.
+        snprintfz(p, sizeof(p), "%s/link_bad", open_parent);
+        snprintfz(q, sizeof(q), "%s/real", exclusive);
+        if (symlink(q, p) == -1) fatal("test setup: symlink '%s'", p);
+        check_open("symlink in a world-writable parent (refused)", p, false);
+
+        // A real directory opens either way.
+        snprintfz(p, sizeof(p), "%s/real", exclusive);
+        check_open("a real directory", p, true);
+    }
+
+    // The spawn server sets its socket's mode with
+    // fchmodat(dir_fd, name, 0770, AT_SYMLINK_NOFOLLOW) while it may still be
+    // root, in a directory the netdata account can write into. That is safe only
+    // because AT_SYMLINK_NOFOLLOW refuses a symlink instead of following it, so
+    // assert the platform really behaves that way rather than trusting it.
+    fprintf(stderr, "the fchmodat() guarantee the spawn server relies on:\n");
+    {
+        snprintfz(p, sizeof(p), "%s/chmod_victim", exclusive);
+        int vfd = open(p, O_WRONLY | O_CREAT | O_EXCL, 0600);
+        if (vfd == -1) fatal("test setup: create '%s'", p);
+        close(vfd);
+
+        snprintfz(q, sizeof(q), "%s/chmod_link", exclusive);
+        if (symlink(p, q) == -1) fatal("test setup: symlink '%s'", q);
+
+        int dfd = open(exclusive, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (dfd == -1) fatal("test setup: open '%s'", exclusive);
+
+        errno = 0;
+        bool refused = (fchmodat(dfd, "chmod_link", 0770, AT_SYMLINK_NOFOLLOW) == -1);
+        int refused_errno = errno;
+
+        struct st_check { struct stat st; } v;
+        if (lstat(p, &v.st) == -1) fatal("test: lstat '%s'", p);
+        bool victim_untouched = ((v.st.st_mode & 07777) == 0600);
+
+        if (refused && victim_untouched)
+            fprintf(stderr, "  ok       %-52s (%s)\n",
+                    "symlink refused, its target left alone", strerror(refused_errno));
+        else if (!refused && victim_untouched)
+            // no platform is known to do this; it would mean the link itself was
+            // chmoded, which is harmless here but worth noticing
+            fprintf(stderr, "  ok       %-52s (link itself)\n", "symlink not followed");
+        else {
+            fprintf(stderr, "  FAILED   %-52s target became %04o - the spawn server "
+                            "socket chmod can be redirected on this platform\n",
+                    "symlink refused, its target left alone", (unsigned)(v.st.st_mode & 07777));
+            failures++;
+        }
+
+        close(dfd);
+    }
+
+#if defined(OS_LINUX)
+    // The spawn server binds its socket through "/proc/self/fd/<dir_fd>/<name>"
+    // so that bind() resolves the run directory it already validated instead of
+    // walking the path again. Prove that: rename the directory away and leave a
+    // symlink to somewhere else in its place, then bind - the socket must appear
+    // in the directory the descriptor refers to, not in the replacement.
+    fprintf(stderr, "the bind() guarantee the spawn server relies on:\n");
+    {
+        char rundir[FILENAME_MAX + 1], attacker[FILENAME_MAX + 1], moved[FILENAME_MAX + 1];
+        make_parent(under(rundir, sizeof(rundir), "bind_run"), 0755);
+        make_parent(under(attacker, sizeof(attacker), "bind_attacker"), 0755);
+        under(moved, sizeof(moved), "bind_run_moved");
+
+        int dfd = open(rundir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (dfd == -1) fatal("test setup: open '%s'", rundir);
+
+        // Same question the spawn server asks before it decides what a failed
+        // bind means: is the descriptor route available here at all? Only an
+        // unavailable route may skip - a route that is available and then fails
+        // is the defect this case exists to catch, never a skip.
+        char probe[FILENAME_MAX + 1];
+        snprintfz(probe, sizeof(probe), "/proc/self/fd/%d", dfd);
+        struct stat via_proc, via_fd;
+        bool route_usable = (stat(probe, &via_proc) == 0 && fstat(dfd, &via_fd) == 0 &&
+                             via_proc.st_dev == via_fd.st_dev && via_proc.st_ino == via_fd.st_ino);
+
+        // the swap, exactly as a run-dir owner could perform it
+        if (rename(rundir, moved) == -1) fatal("test setup: rename '%s'", rundir);
+        if (symlink(attacker, rundir) == -1) fatal("test setup: symlink '%s'", rundir);
+
+        struct sockaddr_un addr = { .sun_family = AF_UNIX };
+        snprintfz(addr.sun_path, sizeof(addr.sun_path) - 1, "/proc/self/fd/%d/s.sock", dfd);
+
+        int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (sock == -1) fatal("test setup: socket()");
+
+        errno = 0;
+        bool bound = (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == 0);
+        int bind_errno = errno;
+
+        char in_attacker[FILENAME_MAX + 1], in_real[FILENAME_MAX + 1];
+        snprintfz(in_attacker, sizeof(in_attacker), "%s/s.sock", attacker);
+        snprintfz(in_real, sizeof(in_real), "%s/s.sock", moved);
+
+        struct stat st;
+        bool landed_in_attacker = (lstat(in_attacker, &st) == 0);
+        bool landed_in_real = (lstat(in_real, &st) == 0);
+
+        if (!route_usable) {
+            // No usable /proc (chroot, hardened sandbox, some containers). The
+            // spawn server warns and binds the pathname there; that residual is
+            // tracked, not asserted here.
+            fprintf(stderr, "  SKIPPED  %-52s (no usable /proc/self/fd)\n",
+                    "run dir swapped after open, before bind");
+            skipped++;
+        }
+        else if (bound && landed_in_real && !landed_in_attacker)
+            fprintf(stderr, "  ok       %-52s (followed the descriptor)\n",
+                    "run dir swapped after open, before bind");
+        else {
+            // Either the bind failed although the route was available - in which
+            // case the spawn server must refuse rather than retry on the pathname
+            // - or it followed the swap.
+            fprintf(stderr, "  FAILED   %-52s bound=%s(%s) real=%s attacker=%s\n",
+                    "run dir swapped after open, before bind",
+                    bound ? "yes" : "no", bound ? "-" : strerror(bind_errno),
+                    landed_in_real ? "yes" : "no",
+                    landed_in_attacker ? "YES - bind followed the swap" : "no");
+            failures++;
+        }
+
+        close(sock);
+        close(dfd);
+        unlink(in_real);
+        unlink(in_attacker);
+        unlink(rundir);
+    }
+#endif
 
     fprintf(stderr, "trim failures, as reported to the caller:\n");
     {
