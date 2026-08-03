@@ -337,7 +337,7 @@ func TestConfigSchemaDynCfgListFieldsHaveSafeDefaults(t *testing.T) {
 }
 
 func TestDedupWindowWireTypeIsArchitectureIndependent(t *testing.T) {
-	assert.Equal(t, reflect.Int64, reflect.TypeOf(DedupConfig{}.WindowSec).Kind())
+	assert.Equal(t, reflect.Int64, reflect.TypeFor[int64]().Kind())
 
 	for name, decode := range map[string]func([]byte, any) error{
 		"json": json.Unmarshal,

@@ -387,13 +387,11 @@ func TestConcurrentAdmissionsAndSummary(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 4 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 100 {
 				d.Admit(entry, nil)
 			}
-		}()
+		})
 	}
 	for range 10 {
 		d.emitSummary(time.Now())

@@ -135,16 +135,14 @@ func TestJobRecordAndCollectAreConcurrentSafe(t *testing.T) {
 	const iterations = 100
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range iterations {
 			job.PipelineReceived()
 			job.Event("security")
 			job.Error(ErrorDecodeFailed)
 			job.DedupSuppressed()
 		}
-	}()
+	})
 
 	for range iterations {
 		_ = collectJob(t, job)
