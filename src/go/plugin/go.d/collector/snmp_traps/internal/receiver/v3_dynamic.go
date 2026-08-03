@@ -97,7 +97,7 @@ func (r *dynamicEngineIDRegistry) accept(engineIDHex string, username string) (s
 	return engineIDHex, true, true
 }
 
-func (r *Receiver) decodeTrapWithSharedTable(data []byte, peerIP net.IP, trustedRelay bool) (*TrapPacketContext, error) {
+func (r *Receiver) decodeTrapWithSharedTable(data []byte, peerIP net.IP, trustedRelay bool) (*packetContext, error) {
 	opts := decodeOptions{trustedRelay: trustedRelay}
 	if r.dynamicEngineIDReg == nil {
 		return decodeTrapWithOptions(data, peerIP, r.v3SecTable, opts)
@@ -107,7 +107,7 @@ func (r *Receiver) decodeTrapWithSharedTable(data []byte, peerIP net.IP, trusted
 	return decodeTrapWithOptions(data, peerIP, r.v3SecTable, opts)
 }
 
-func (r *Receiver) tryDynamicRetry(data []byte, peerIP net.IP, peer *net.UDPAddr, rawCtx *rawV3Context, trustedRelay bool) (*TrapPacketContext, bool, bool) {
+func (r *Receiver) tryDynamicRetry(data []byte, peerIP net.IP, peer *net.UDPAddr, rawCtx *rawV3Context, trustedRelay bool) (*packetContext, bool, bool) {
 	if r.dynamicEngineIDReg == nil || rawCtx.username == "" {
 		return nil, false, false
 	}
@@ -132,7 +132,7 @@ func (r *Receiver) tryDynamicRetry(data []byte, peerIP net.IP, peer *net.UDPAddr
 	return retryCtx, checked, false
 }
 
-func (r *Receiver) ensureDynamicEngineIDRegistered(pktCtx *TrapPacketContext) bool {
+func (r *Receiver) ensureDynamicEngineIDRegistered(pktCtx *packetContext) bool {
 	if !r.policy.dynamicEngineID || r.dynamicEngineIDReg == nil || pktCtx == nil || pktCtx.Packet == nil || pktCtx.PDU == nil {
 		return true
 	}

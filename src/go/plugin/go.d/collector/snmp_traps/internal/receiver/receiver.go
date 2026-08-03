@@ -68,7 +68,7 @@ type DecodeFailure struct {
 }
 
 type Result struct {
-	Context       *TrapPacketContext
+	PDU           *model.TrapPDU
 	DecodeFailure *DecodeFailure
 }
 
@@ -348,7 +348,7 @@ func (r *Receiver) Process(datagram Datagram) Result {
 			return Result{}
 		}
 	}
-	return Result{Context: packetContext}
+	return Result{PDU: packetContext.PDU}
 }
 
 func (r *Receiver) AdmitDecodeErrorAudit(peer *net.UDPAddr) bool {

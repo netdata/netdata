@@ -450,11 +450,11 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		}
 		return
 	}
-	if result.Context == nil {
+	if result.PDU == nil {
 		return
 	}
 
-	pdu := result.Context.PDU
+	pdu := result.PDU
 
 	idx := c.profileIndex
 	var td *TrapDef

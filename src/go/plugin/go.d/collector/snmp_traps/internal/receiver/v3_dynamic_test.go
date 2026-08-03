@@ -165,7 +165,7 @@ func TestDynamicEngineIDTrapRegistration(t *testing.T) {
 	data := clearV3ReportableFlag(t, buildDynamicV3Trap(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
 	recv, events, peer := newDynamicTestReceiver(t, 0, RateLimitConfig{})
 	for range 2 {
-		if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.Context == nil {
+		if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.PDU == nil {
 			t.Fatalf("result = %+v, want accepted trap", result)
 		}
 	}
@@ -182,10 +182,10 @@ func TestDynamicEngineIDCapRejectsNewPairs(t *testing.T) {
 	secondEngineID := "80001f888077dfe44faa700259"
 	second := clearV3ReportableFlag(t, buildDynamicV3Trap(t, "testuser", secondEngineID, "1.3.6.1.6.3.1.1.5.1"))
 	recv, events, peer := newDynamicTestReceiver(t, 1, RateLimitConfig{})
-	if result := recv.Process(Datagram{Data: first, PeerIP: peer.IP, Peer: peer}); result.Context == nil {
+	if result := recv.Process(Datagram{Data: first, PeerIP: peer.IP, Peer: peer}); result.PDU == nil {
 		t.Fatalf("first result = %+v, want accepted trap", result)
 	}
-	if result := recv.Process(Datagram{Data: second, PeerIP: peer.IP, Peer: peer}); result.Context != nil || result.DecodeFailure != nil {
+	if result := recv.Process(Datagram{Data: second, PeerIP: peer.IP, Peer: peer}); result.PDU != nil || result.DecodeFailure != nil {
 		t.Fatalf("second result = %+v, want policy drop", result)
 	}
 	if got := events.count(EventDynamicEngineIDRegistered, "") + events.count(EventError, "unknown_engine_id"); got != 2 {
@@ -214,7 +214,7 @@ func TestDynamicEngineIDConcurrentDuplicateRegistration(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 16 {
 		wg.Go(func() {
-			if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.Context != nil {
+			if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.PDU != nil {
 				accepted.Add(1)
 			}
 		})
@@ -235,7 +235,7 @@ func TestDynamicEngineIDConcurrentDuplicateRegistration(t *testing.T) {
 func TestDynamicEngineIDDoesNotRegisterInform(t *testing.T) {
 	data := clearV3ReportableFlag(t, buildDynamicV3Inform(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
 	recv, _, peer := newDynamicTestReceiver(t, 0, RateLimitConfig{})
-	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.Context != nil || result.DecodeFailure != nil {
+	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.PDU != nil || result.DecodeFailure != nil {
 		t.Fatalf("result = %+v, want policy drop", result)
 	}
 	if got := recv.dynamicPairs(); got != 0 {
@@ -261,7 +261,7 @@ func TestDynamicEngineIDRateLimitDropFollowsAlreadyDecodableRegistration(t *test
 		t.Fatal("expected first token to be available")
 	}
 
-	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.Context != nil || result.DecodeFailure != nil {
+	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.PDU != nil || result.DecodeFailure != nil {
 		t.Fatalf("result = %+v, want rate-limit drop", result)
 	}
 	if got := events.count(EventError, "rate_limited"); got != 1 {
@@ -287,7 +287,7 @@ func TestDiscoveryReportWriteFailureIsReported(t *testing.T) {
 	recv, events, _ := newDynamicTestReceiver(t, 0, RateLimitConfig{})
 	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
 
-	if result.Context != nil || result.DecodeFailure == nil {
+	if result.PDU != nil || result.DecodeFailure == nil {
 		t.Fatalf("result = %+v, want decode failure after discovery handling", result)
 	}
 	if got := events.count(EventDiscoveryReportFailed, ""); got != 1 {
@@ -302,7 +302,7 @@ func TestDynamicEngineIDRateLimitSampleAllowsRetry(t *testing.T) {
 		t.Fatal("expected first token to be available")
 	}
 
-	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.Context == nil {
+	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.PDU == nil {
 		t.Fatalf("result = %+v, want sampled acceptance", result)
 	}
 	if got := events.count(EventError, "rate_limited"); got != 1 {
@@ -328,7 +328,7 @@ func TestDiscoveryReportRateLimitDropSkipsResponse(t *testing.T) {
 		t.Fatal("expected first token to be available")
 	}
 
-	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Conn: listenerConn, Peer: peer}); result.Context != nil || result.DecodeFailure != nil {
+	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Conn: listenerConn, Peer: peer}); result.PDU != nil || result.DecodeFailure != nil {
 		t.Fatalf("result = %+v, want rate-limit drop", result)
 	}
 	if got := events.count(EventError, "rate_limited"); got != 1 {

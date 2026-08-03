@@ -301,7 +301,7 @@ func TestV3InformAcceptedWithLocalEngineID(t *testing.T) {
 	data := buildV3InformWithEngineID(t, "testuser", testLocalEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 	recv, events := newStaticV3TestReceiver(t, []string{testEngineIDHex})
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
-	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.Context == nil {
+	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.PDU == nil {
 		t.Fatalf("result = %+v, want accepted INFORM", result)
 	}
 	if got := events.count(EventError, "unknown_engine_id"); got != 0 {
@@ -313,7 +313,7 @@ func TestV3InformRejectedWithNonLocalEngineID(t *testing.T) {
 	data := buildV3InformWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 	recv, events := newStaticV3TestReceiver(t, []string{testEngineIDHex})
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
-	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.Context != nil || result.DecodeFailure != nil {
+	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.PDU != nil || result.DecodeFailure != nil {
 		t.Fatalf("result = %+v, want policy drop", result)
 	}
 	if got := events.count(EventError, "unknown_engine_id"); got != 1 {
@@ -325,7 +325,7 @@ func TestV3TrapStillRequiresSenderEngineWhitelist(t *testing.T) {
 	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 	recv, events := newStaticV3TestReceiver(t, []string{"80001f888077dfe44faa700259"})
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
-	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.Context != nil || result.DecodeFailure != nil {
+	if result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer}); result.PDU != nil || result.DecodeFailure != nil {
 		t.Fatalf("result = %+v, want policy drop", result)
 	}
 	if got := events.count(EventError, "unknown_engine_id"); got != 1 {

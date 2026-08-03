@@ -55,16 +55,10 @@ func buildV3SecuredTrap(t testing.TB, spec v3SecuredTrapSpec) []byte {
 	return traptest.BuildV3SecuredTrap(t, spec.traptest())
 }
 
-func readPcapUDPPackets(t testing.TB, fixture string) []traptest.UDPPacket {
-	t.Helper()
-
-	return traptest.ReadPcapUDPPackets(t, fixture)
-}
-
 func readSinglePcapUDPPacket(t *testing.T, fixture string) traptest.UDPPacket {
 	t.Helper()
 
-	packets := readPcapUDPPackets(t, fixture)
+	packets := traptest.ReadPcapUDPPackets(t, fixture)
 	if len(packets) != 1 {
 		t.Fatalf("expected one packet in %s, got %d", fixture, len(packets))
 	}

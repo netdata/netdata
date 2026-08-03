@@ -40,9 +40,8 @@ func TestReceiverBindStartDeliverClose(t *testing.T) {
 
 	select {
 	case result := <-results:
-		require.NotNil(t, result.Context)
-		require.NotNil(t, result.Context.PDU)
-		assert.Equal(t, model.PduTypeTrap, result.Context.PDU.PduType)
+		require.NotNil(t, result.PDU)
+		assert.Equal(t, model.PduTypeTrap, result.PDU.PduType)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for receiver delivery")
 	}

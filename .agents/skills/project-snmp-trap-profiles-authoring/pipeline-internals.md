@@ -179,10 +179,14 @@ Initialization is staged so failed jobs do not leak sockets or newly created
 SNMPv3 state:
 
 1. Validate public config and build the immutable receiver policy.
-2. Bind every endpoint; any bind failure closes earlier sockets.
-3. Prepare receiver-local SNMPv3 state when v3 is enabled.
-4. Preflight and start output backends.
-5. Commit prepared v3 state and start endpoint receive loops.
+2. Prepare the journal backend when enabled; no receiver socket is bound yet.
+3. Construct the receiver and bind every endpoint; any bind failure closes
+   earlier sockets and the prepared journal backend.
+4. Prepare receiver-local SNMPv3 state when v3 is enabled.
+5. Prepare the OTLP backend, compose the output coordinator and deduper, then
+   start the prepared output backends.
+6. Publish the fully constructed collector state, start deduplication when
+   enabled, commit prepared v3 state, and start endpoint receive loops last.
 
 Failures after v3 preparation but before receiver start roll back only state
 created by that attempt and close all bound sockets. Cleanup closes receive

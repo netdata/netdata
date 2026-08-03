@@ -67,7 +67,7 @@ func TestReceiverRespondsBeforeRateLimitDrop(t *testing.T) {
 		PeerIP: peer.IP,
 		Peer:   peer,
 	})
-	if prime.Context == nil {
+	if prime.PDU == nil {
 		t.Fatalf("priming trap result = %+v, want accepted trap", prime)
 	}
 
@@ -77,7 +77,7 @@ func TestReceiverRespondsBeforeRateLimitDrop(t *testing.T) {
 	if respPkt.PDUType != gosnmp.GetResponse {
 		t.Fatalf("response PDU type = %s, want GetResponse", respPkt.PDUType)
 	}
-	if result.Context != nil || result.DecodeFailure != nil {
+	if result.PDU != nil || result.DecodeFailure != nil {
 		t.Fatalf("rate-limited INFORM result = %+v, want drop", result)
 	}
 	if countEvents(events, EventError, "rate_limited") != 1 {
@@ -100,7 +100,7 @@ func TestReceiverReportsInformResponseFailed(t *testing.T) {
 		events = append(events, event)
 	})
 	result := recv.Process(Datagram{Data: reqData, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
-	if result.Context == nil {
+	if result.PDU == nil {
 		t.Fatalf("result = %+v, want accepted INFORM", result)
 	}
 	if countEvents(events, EventInformResponseFailed, "") != 1 {

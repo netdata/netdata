@@ -44,7 +44,7 @@ var (
 	errBERTruncatedLength = errors.New("BER: truncated length")
 )
 
-type TrapPacketContext struct {
+type packetContext struct {
 	Packet *gosnmp.SnmpPacket
 	PDU    *model.TrapPDU
 }
@@ -53,11 +53,11 @@ type decodeOptions struct {
 	trustedRelay bool
 }
 
-func decodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable) (*TrapPacketContext, error) {
+func decodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable) (*packetContext, error) {
 	return decodeTrapWithOptions(data, udpPeer, secTable, decodeOptions{})
 }
 
-func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable, opts decodeOptions) (*TrapPacketContext, error) {
+func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable, opts decodeOptions) (*packetContext, error) {
 	pkt, err := decodePacket(data, secTable)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3S
 		SourceAudit: source.audit,
 	}
 
-	return &TrapPacketContext{
+	return &packetContext{
 		Packet: pkt,
 		PDU:    tpdu,
 	}, nil

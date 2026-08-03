@@ -956,7 +956,7 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	})
 	if result := c.receiver.Process(receiver.Datagram{
 		Data: packet.Payload, PeerIP: peer.IP, Peer: peer,
-	}); result.Context == nil {
+	}); result.PDU == nil {
 		t.Fatalf("first packet result = %+v, want accepted packet to consume the initial token", result)
 	}
 
