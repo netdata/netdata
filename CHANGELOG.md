@@ -875,6 +875,9 @@
 - Feat(go.d/secretstore): add AWS operational test ([#23349](https://github.com/netdata/netdata/issues/23349))
 - Docs(agents): bound review iteration ([#23350](https://github.com/netdata/netdata/issues/23350))
 - Refactor(go.d/snmp-traps): establish ownership foundations ([#23358](https://github.com/netdata/netdata/issues/23358))
+- Refactor(go.d/snmp-traps): reduce profile surface ([#23359](https://github.com/netdata/netdata/issues/23359))
+- Refactor(go.d/snmp-traps): remove built-in source metrics ([#23360](https://github.com/netdata/netdata/issues/23360))
+- Refactor(snmp-traps): internalize output backends ([#23361](https://github.com/netdata/netdata/issues/23361))
 
 ## [2.10.0] - 2026-04-09
 
