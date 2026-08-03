@@ -284,7 +284,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
                 // ONE POINT READ-AHEAD
                 if(unlikely(query_plan_should_switch_plan(ops, sp.end_time_s) &&
-                    query_planer_next_plan(ops, now_end_time, new_point.sp.end_time_s))) {
+                    query_planer_next_plan(
+                        ops, now_end_time - ops->plan_switch_time_offset, new_point.sp.end_time_s))) {
 
                     // The end time of the current point, crosses our plans (tiers)
                     // so, we switched plan (tier)
