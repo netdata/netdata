@@ -279,15 +279,15 @@ charts:
 `
 	writeProfileYAML(t, dir, "profile.yaml", profile)
 
-	bundle, err := LoadProfileFile(filepath.Join(dir, "profile.yaml"))
+	bundle, err := loadProfileBundle(filepath.Join(dir, "profile.yaml"))
 	if err != nil {
 		t.Fatalf("loadProfileBundle failed: %v", err)
 	}
 	idx := newProfileIndex()
-	if err := idx.AddTraps(bundle.Traps); err != nil {
+	if err := idx.AddTraps(bundle.traps); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
-	if err := idx.AddMetricDefinitions(bundle.Metrics, bundle.Charts); err != nil {
+	if err := idx.AddMetricDefinitions(bundle.metrics, bundle.charts); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	cat := profileMetricCatalogForTest(t, idx)
@@ -366,7 +366,7 @@ func TestLoadProfileRejectsRemovedProfileMetricSyntax(t *testing.T) {
 			dir := t.TempDir()
 			profile := "metrics:\n  - name: test.removed\n    type: counter\n" + removed
 			writeProfileYAML(t, dir, "profile.yaml", profile)
-			if _, err := LoadProfileFile(filepath.Join(dir, "profile.yaml")); err == nil {
+			if _, err := loadProfileBundle(filepath.Join(dir, "profile.yaml")); err == nil {
 				t.Fatalf("loadProfileBundle accepted removed metric syntax %s", name)
 			}
 		})
@@ -400,7 +400,7 @@ charts:
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			writeProfileYAML(t, dir, "profile.yaml", profile)
-			if _, err := LoadProfileFile(filepath.Join(dir, "profile.yaml")); err == nil {
+			if _, err := loadProfileBundle(filepath.Join(dir, "profile.yaml")); err == nil {
 				t.Fatalf("loadProfileBundle accepted unknown chart %s key", name)
 			}
 		})

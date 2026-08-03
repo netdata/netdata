@@ -1182,7 +1182,7 @@ metrics:
 %s
 `, tc.predicate))
 
-			_, err := LoadProfileFile(filepath.Join(dir, "invalid.yaml"))
+			_, err := loadProfileBundle(filepath.Join(dir, "invalid.yaml"))
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
@@ -1211,7 +1211,7 @@ metrics:
     where:
 %s
 `, predicate))
-			_, err := LoadProfileFile(filepath.Join(dir, "ambiguous.yaml"))
+			_, err := loadProfileBundle(filepath.Join(dir, "ambiguous.yaml"))
 			require.ErrorContains(t, err, "predicate requires exactly one of varbind or field")
 		})
 	}
@@ -1281,11 +1281,11 @@ charts:
     algorithm: absolute
 `, statePredicate))
 
-			bundle, err := LoadProfileFile(filepath.Join(dir, "invalid.yaml"))
+			bundle, err := loadProfileBundle(filepath.Join(dir, "invalid.yaml"))
 			require.NoError(t, err)
 			idx := NewEpoch()
-			require.NoError(t, idx.AddTraps(bundle.Traps))
-			err = idx.AddMetricDefinitions(bundle.Metrics, bundle.Charts)
+			require.NoError(t, idx.AddTraps(bundle.traps))
+			err = idx.AddMetricDefinitions(bundle.metrics, bundle.charts)
 			require.ErrorContains(t, err, "separate-OID state rule")
 		})
 	}
