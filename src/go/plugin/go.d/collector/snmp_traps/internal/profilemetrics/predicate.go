@@ -4,11 +4,8 @@ package profilemetrics
 
 import (
 	"fmt"
-	"math"
 	"slices"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
@@ -83,25 +80,25 @@ func profileMetricPredicateResult(pred profileMetricPredicate, present bool, val
 		})
 	}
 	if pred.GreaterThan != nil || pred.LessThan != nil || len(pred.Range) > 0 {
-		actual, ok := profileMetricFloatValue(value.Value)
+		actual, ok := catalog.ParseMetricFloat(value.Value)
 		if !ok {
 			return false
 		}
 		if pred.GreaterThan != nil {
-			want, ok := profileMetricFloatValue(pred.GreaterThan)
+			want, ok := catalog.ParseMetricFloat(pred.GreaterThan)
 			if !ok || actual <= want {
 				return false
 			}
 		}
 		if pred.LessThan != nil {
-			want, ok := profileMetricFloatValue(pred.LessThan)
+			want, ok := catalog.ParseMetricFloat(pred.LessThan)
 			if !ok || actual >= want {
 				return false
 			}
 		}
 		if len(pred.Range) > 0 {
-			low, okLow := profileMetricFloatValue(pred.Range[0])
-			high, okHigh := profileMetricFloatValue(pred.Range[1])
+			low, okLow := catalog.ParseMetricFloat(pred.Range[0])
+			high, okHigh := catalog.ParseMetricFloat(pred.Range[1])
 			if !okLow || !okHigh || actual < low || actual > high {
 				return false
 			}
@@ -121,59 +118,6 @@ func profileMetricValueEquals(value model.VarbindValue, vb *catalog.VarbindDef, 
 	return actual == fmt.Sprintf("%v", want)
 }
 
-func profileMetricFloatValue(value any) (float64, bool) {
-	f, ok := profileMetricRawFloatValue(value)
-	if !ok || math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0, false
-	}
-	return f, true
-}
-
-func profileMetricRawFloatValue(value any) (float64, bool) {
-	switch v := value.(type) {
-	case int:
-		return float64(v), true
-	case int8:
-		return float64(v), true
-	case int16:
-		return float64(v), true
-	case int32:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case uint:
-		return float64(v), true
-	case uint8:
-		return float64(v), true
-	case uint16:
-		return float64(v), true
-	case uint32:
-		return float64(v), true
-	case uint64:
-		return float64(v), true
-	case float32:
-		return float64(v), true
-	case float64:
-		return v, true
-	case string:
-		f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
-		return f, err == nil
-	default:
-		return 0, false
-	}
-}
-
-func parseProfileMetricStateTTL(value string) (time.Duration, error) {
-	ttl, err := time.ParseDuration(value)
-	if err != nil {
-		return 0, err
-	}
-	if ttl <= 0 {
-		return 0, fmt.Errorf("must be greater than zero")
-	}
-	return ttl, nil
-}
-
 type profileMetricValueStatus int
 
 const (
@@ -190,7 +134,7 @@ func profileMetricNumericVarbindValue(entry *model.TrapEntry, vb *catalog.Varbin
 	if !ok {
 		return 0, profileMetricValueMissing
 	}
-	value, ok := profileMetricFloatValue(v.Value)
+	value, ok := catalog.ParseMetricFloat(v.Value)
 	if !ok {
 		return 0, profileMetricValueInvalid
 	}

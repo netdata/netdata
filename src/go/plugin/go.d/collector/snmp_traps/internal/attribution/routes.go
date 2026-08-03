@@ -3,8 +3,6 @@
 package attribution
 
 import (
-	"slices"
-	"strings"
 	"time"
 )
 
@@ -12,15 +10,18 @@ import (
 // Its caller owns synchronization.
 type RouteTracker struct {
 	limit  int
-	routes map[string]string
-	seen   map[string]time.Time
+	routes map[string]trackedRoute
+}
+
+type trackedRoute struct {
+	effective string
+	seen      time.Time
 }
 
 func NewRouteTracker(limit int) *RouteTracker {
 	return &RouteTracker{
 		limit:  limit,
-		routes: make(map[string]string),
-		seen:   make(map[string]time.Time),
+		routes: make(map[string]trackedRoute),
 	}
 }
 
@@ -29,9 +30,9 @@ func (t *RouteTracker) Observe(rawRouteKey, routeKey string, now time.Time) bool
 	if t == nil || rawRouteKey == "" || routeKey == "" {
 		return false
 	}
-	transitioned := t.routes[rawRouteKey] != "" && t.routes[rawRouteKey] != routeKey
-	t.routes[rawRouteKey] = routeKey
-	t.seen[rawRouteKey] = now
+	previous := t.routes[rawRouteKey]
+	transitioned := previous.effective != "" && previous.effective != routeKey
+	t.routes[rawRouteKey] = trackedRoute{effective: routeKey, seen: now}
 	t.Prune()
 	return transitioned
 }
@@ -48,29 +49,16 @@ func (t *RouteTracker) Prune() {
 	if len(t.routes) <= limit {
 		return
 	}
-	type routeAge struct {
-		key  string
-		seen time.Time
+	oldestKey := ""
+	oldestSeen := time.Time{}
+	for key, route := range t.routes {
+		if oldestKey == "" || route.seen.Before(oldestSeen) || route.seen.Equal(oldestSeen) && key < oldestKey {
+			oldestKey = key
+			oldestSeen = route.seen
+		}
 	}
-	ages := make([]routeAge, 0, len(t.routes))
-	for rawRouteKey := range t.routes {
-		ages = append(ages, routeAge{key: rawRouteKey, seen: t.seen[rawRouteKey]})
-	}
-	slices.SortFunc(ages, func(a, b routeAge) int {
-		if a.seen.Equal(b.seen) {
-			return strings.Compare(a.key, b.key)
-		}
-		if a.seen.Before(b.seen) {
-			return -1
-		}
-		return 1
-	})
-	for _, age := range ages {
-		if len(t.routes) <= limit {
-			break
-		}
-		delete(t.routes, age.key)
-		delete(t.seen, age.key)
+	if oldestKey != "" {
+		delete(t.routes, oldestKey)
 	}
 }
 

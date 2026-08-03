@@ -174,7 +174,7 @@ func TestProfileMetricRuntimeStateTTLClearsAndExpires(t *testing.T) {
 			State: profileMetricState{
 				SetWhen:   &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "console"},
 				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
-				TTL:       "1ms",
+				TTL:       "100ms",
 			},
 			Output:     profileMetricOutputForTest("snmp_trap_cisco_console_ttl_state", "active", "cisco_console_ttl_state"),
 			SourceFile: "test-profile.yaml",
@@ -192,10 +192,16 @@ func TestProfileMetricRuntimeStateTTLClearsAndExpires(t *testing.T) {
 		t.Fatalf("snmp_trap_cisco_console_ttl_state after set = %v/%v, want 1/true", v, ok)
 	}
 
-	time.Sleep(5 * time.Millisecond)
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
-	if v, ok := store.Read().Value("snmp_trap_cisco_console_ttl_state", labels); !ok || v != 0 {
-		t.Fatalf("snmp_trap_cisco_console_ttl_state after TTL clear = %v/%v, want 0/true", v, ok)
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		collectProfileMetricsOnce(t, rt, store, "profile-job")
+		if v, ok := store.Read().Value("snmp_trap_cisco_console_ttl_state", labels); ok && v == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("snmp_trap_cisco_console_ttl_state did not clear before deadline")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 	collectProfileMetricsOnce(t, rt, store, "profile-job")
 	if _, ok := store.Read().Value("snmp_trap_cisco_console_ttl_state", labels); ok {

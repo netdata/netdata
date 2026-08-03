@@ -3,6 +3,7 @@
 package attribution
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -46,5 +47,24 @@ func TestRouteTrackerUsesStableTieBreak(t *testing.T) {
 
 	if _, ok := tracker.routes["raw:b"]; !ok {
 		t.Fatalf("lexicographically newest route should remain: %#v", tracker.routes)
+	}
+}
+
+func BenchmarkRouteTrackerObserveAtCapacity(b *testing.B) {
+	const limit = 2000
+	keys := make([]string, limit+1)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("raw:%04d", i)
+	}
+
+	tracker := NewRouteTracker(limit)
+	for i := range limit {
+		tracker.Observe(keys[i], "effective", time.Unix(int64(i), 0))
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := range b.N {
+		tracker.Observe(keys[(i+limit)%len(keys)], "effective", time.Unix(int64(i+limit), 0))
 	}
 }

@@ -5,11 +5,8 @@ package catalog
 import (
 	"errors"
 	"fmt"
-	"math"
 	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
@@ -208,7 +205,7 @@ func validateProfileMetricRule(rule *profileMetricRule, idx *Epoch, charts map[s
 		return fmt.Errorf("%s: metric rule %q scale.multiplier must be zero or greater", rule.SourceFile, rule.Name)
 	}
 	if rule.State.TTL != "" {
-		if _, err := parseProfileMetricStateTTL(rule.State.TTL); err != nil {
+		if _, err := ParseMetricStateTTL(rule.State.TTL); err != nil {
 			return fmt.Errorf("%s: metric rule %q state.ttl %q is invalid: %w", rule.SourceFile, rule.Name, rule.State.TTL, err)
 		}
 	}
@@ -351,7 +348,7 @@ func validateProfileMetricPredicate(pred profileMetricPredicate) error {
 			if err := validateProfileMetricPredicateNumber(fmt.Sprintf("range[%d]", i), value); err != nil {
 				return err
 			}
-			bounds[i], _ = profileMetricFloatValue(value)
+			bounds[i], _ = ParseMetricFloat(value)
 		}
 		if bounds[0] > bounds[1] {
 			return fmt.Errorf("range[0] must be less than or equal to range[1]")
@@ -365,7 +362,7 @@ func validateProfileMetricPredicate(pred profileMetricPredicate) error {
 }
 
 func validateProfileMetricPredicateNumber(field string, value any) error {
-	if _, ok := profileMetricFloatValue(value); !ok {
+	if _, ok := ParseMetricFloat(value); !ok {
 		return fmt.Errorf("%s must be a finite number", field)
 	}
 	return nil
@@ -544,57 +541,4 @@ func slugForMetric(name string) string {
 		}
 	}
 	return strings.Trim(b.String(), "_")
-}
-
-func parseProfileMetricStateTTL(value string) (time.Duration, error) {
-	ttl, err := time.ParseDuration(value)
-	if err != nil {
-		return 0, err
-	}
-	if ttl <= 0 {
-		return 0, fmt.Errorf("must be greater than zero")
-	}
-	return ttl, nil
-}
-
-func profileMetricFloatValue(value any) (float64, bool) {
-	f, ok := profileMetricRawFloatValue(value)
-	if !ok || math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0, false
-	}
-	return f, true
-}
-
-func profileMetricRawFloatValue(value any) (float64, bool) {
-	switch v := value.(type) {
-	case int:
-		return float64(v), true
-	case int8:
-		return float64(v), true
-	case int16:
-		return float64(v), true
-	case int32:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case uint:
-		return float64(v), true
-	case uint8:
-		return float64(v), true
-	case uint16:
-		return float64(v), true
-	case uint32:
-		return float64(v), true
-	case uint64:
-		return float64(v), true
-	case float32:
-		return float64(v), true
-	case float64:
-		return v, true
-	case string:
-		f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
-		return f, err == nil
-	default:
-		return 0, false
-	}
 }

@@ -45,6 +45,23 @@ func TestResolveFallsBackForAmbiguousVnode(t *testing.T) {
 	}
 }
 
+func TestResolveFallsBackForRejectedSourceCandidate(t *testing.T) {
+	entry := testEntry()
+	entry.SourceVnodeID = "vnode-1"
+	entry.Enrichment.Source.RejectedCandidates = []string{"snmpTrapAddress.0:untrusted_relay_uses_udp_peer"}
+
+	got, ok := Resolve(entry, "profile-job", DeviceSource, "salt")
+	if !ok {
+		t.Fatal("Resolve returned false")
+	}
+	if got.Key.SourceKind != "udp_peer" || got.Key.SourceID == "192.0.2.10" {
+		t.Fatalf("key = %#v, want hashed udp_peer identity", got.Key)
+	}
+	if got.Scope.ScopeKey != "" {
+		t.Fatalf("scope = %#v, want default host", got.Scope)
+	}
+}
+
 func TestResolveSourceLabelIgnoresVnode(t *testing.T) {
 	entry := testEntry()
 	entry.SourceVnodeID = "vnode-1"

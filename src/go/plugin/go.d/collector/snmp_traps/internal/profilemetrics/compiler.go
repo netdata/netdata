@@ -145,7 +145,7 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 			}
 		}
 		if rule.State.TTL != "" {
-			ttl, err := parseProfileMetricStateTTL(rule.State.TTL)
+			ttl, err := catalog.ParseMetricStateTTL(rule.State.TTL)
 			if err != nil {
 				return nil, fmt.Errorf("%s: profile metric rule %q state.ttl: %w", rule.Source(), rule.Name, err)
 			}

@@ -69,14 +69,8 @@ metrics:
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 	require.Len(t, successWriter.entries, 1)
 
-	source, ok := attribution.Resolve(successWriter.entries[0], "test", attribution.DeviceSource, "test")
-	require.True(t, ok)
 	collectProfileMetricsForTest(t, rt, store, "test")
-	labels := metrix.Labels{
-		"job_name":    "test",
-		"source_id":   source.Key.SourceID,
-		"source_kind": source.Key.SourceKind,
-	}
+	labels := rootTestProfileMetricSourceLabels(successWriter.entries[0], "test")
 	if value, ok := store.Read().Value("snmp_trap_cold_start_events", labels); !ok || value != 1 {
 		t.Fatalf("snmp_trap_cold_start_events = %v/%v, want 1/true", value, ok)
 	}
