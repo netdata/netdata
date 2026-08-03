@@ -225,7 +225,7 @@ func TestParseRawV3HeaderRejectsMalformedRequiredFields(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if _, _, err := parseRawV3Header(tc.header); err == nil {
+			if _, err := parseRawV3Header(tc.header); err == nil {
 				t.Fatal("expected malformed v3 header to be rejected")
 			}
 		})
@@ -240,12 +240,12 @@ func TestParseRawV3HeaderIgnoresReservedFlagBits(t *testing.T) {
 		testBERElement(tagInteger, []byte{byte(gosnmp.UserSecurityModel)}),
 	)
 
-	msgID, reportable, err := parseRawV3Header(header)
+	parsed, err := parseRawV3Header(header)
 	if err != nil {
 		t.Fatalf("parseRawV3Header failed: %v", err)
 	}
-	if msgID != 99 || !reportable {
-		t.Fatalf("header = msgID %d/reportable %v, want 99/true", msgID, reportable)
+	if parsed.msgID != 99 || !parsed.reportable {
+		t.Fatalf("header = msgID %d/reportable %v, want 99/true", parsed.msgID, parsed.reportable)
 	}
 }
 
@@ -256,13 +256,14 @@ func TestExtractRawV3ContextRejectsMalformedEnvelope(t *testing.T) {
 		t.Fatalf("outer field count = %d, want 4", len(fields))
 	}
 
-	invalidMsgData := append([]byte(nil), fields[3]...)
-	invalidMsgData[0] = tagInteger
+	invalidMsgData := replaceV3MsgDataTag(t, data, tagInteger)
 	tests := map[string][]byte{
-		"missing msgData":              berTLV(tagSequence, testBERFields(fields[:3]...)),
-		"invalid msgData tag":          berTLV(tagSequence, testBERFields(fields[0], fields[1], fields[2], invalidMsgData)),
-		"trailing outer field":         berTLV(tagSequence, testBERFields(append(fields, testBERElement(tagInteger, []byte{0}))...)),
-		"trailing bytes after message": append(append([]byte(nil), data...), 0),
+		"missing msgData":                   berTLV(tagSequence, testBERFields(fields[:3]...)),
+		"invalid msgData tag":               invalidMsgData,
+		"trailing outer field":              berTLV(tagSequence, testBERFields(append(fields, testBERElement(tagInteger, []byte{0}))...)),
+		"trailing bytes after message":      append(append([]byte(nil), data...), 0),
+		"encrypted msgData without privacy": replaceV3MsgDataTag(t, data, tagOctetStr),
+		"plaintext msgData with privacy":    setV3Flags(t, data, gosnmp.AuthPriv|gosnmp.Reportable),
 	}
 
 	for name, data := range tests {
@@ -357,8 +358,10 @@ func TestMalformedDiscoveryRequestDoesNotSendReport(t *testing.T) {
 	probe := buildV3DiscoveryProbe(t, 99)
 	fields := v3OuterFields(t, probe)
 	tests := map[string][]byte{
-		"invalid header":  corruptV3HeaderFieldTag(t, probe, 1, tagOctetStr),
-		"missing msgData": berTLV(tagSequence, testBERFields(fields[:3]...)),
+		"invalid header":                    corruptV3HeaderFieldTag(t, probe, 1, tagOctetStr),
+		"missing msgData":                   berTLV(tagSequence, testBERFields(fields[:3]...)),
+		"encrypted msgData without privacy": replaceV3MsgDataTag(t, probe, tagOctetStr),
+		"plaintext msgData with privacy":    setV3Flags(t, probe, gosnmp.AuthPriv|gosnmp.Reportable),
 	}
 
 	for name, data := range tests {
@@ -703,6 +706,14 @@ func buildV3DiscoveryProbe(t *testing.T, msgID uint32) []byte {
 }
 
 func clearV3ReportableFlag(t *testing.T, data []byte) []byte {
+	return mutateV3Flags(t, data, func(flags byte) byte { return flags &^ byte(gosnmp.Reportable) })
+}
+
+func setV3Flags(t *testing.T, data []byte, flags gosnmp.SnmpV3MsgFlags) []byte {
+	return mutateV3Flags(t, data, func(byte) byte { return byte(flags) })
+}
+
+func mutateV3Flags(t *testing.T, data []byte, mutate func(byte) byte) []byte {
 	t.Helper()
 
 	out := append([]byte(nil), data...)
@@ -746,7 +757,7 @@ func clearV3ReportableFlag(t *testing.T, data []byte) []byte {
 		t.Fatalf("msgFlags tag/length = 0x%x/%d, want octet string length 1", tag, flagsEnd-flagsStart)
 	}
 
-	out[flagsStart] &^= 0x04
+	out[flagsStart] = mutate(out[flagsStart])
 	return out
 }
 
@@ -797,6 +808,18 @@ func v3OuterFields(t *testing.T, data []byte) [][]byte {
 		pos = next
 	}
 	return fields
+}
+
+func replaceV3MsgDataTag(t *testing.T, data []byte, replacement byte) []byte {
+	t.Helper()
+	fields := v3OuterFields(t, data)
+	if len(fields) != 4 {
+		t.Fatalf("outer field count = %d, want 4", len(fields))
+	}
+	msgData := append([]byte(nil), fields[3]...)
+	msgData[0] = replacement
+	fields[3] = msgData
+	return berTLV(tagSequence, testBERFields(fields...))
 }
 
 func testBERElement(tag byte, value []byte) []byte {

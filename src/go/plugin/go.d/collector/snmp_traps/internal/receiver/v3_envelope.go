@@ -26,6 +26,13 @@ type rawV3Context struct {
 type rawV3Envelope struct {
 	headerData         []byte
 	securityParameters []byte
+	msgDataEncrypted   bool
+}
+
+type rawV3Header struct {
+	msgID      uint32
+	reportable bool
+	privacy    bool
 }
 
 // extractRawV3Context peeks at raw SNMPv3 data and returns the authoritative
@@ -36,9 +43,12 @@ func extractRawV3Context(data []byte) (*rawV3Context, error) {
 	if err != nil || envelope == nil {
 		return nil, err
 	}
-	msgID, reportable, err := parseRawV3Header(envelope.headerData)
+	header, err := parseRawV3Header(envelope.headerData)
 	if err != nil {
 		return nil, err
+	}
+	if envelope.msgDataEncrypted != header.privacy {
+		return nil, fmt.Errorf("SNMPv3 msgData does not match privacy flag")
 	}
 	engineID, username, err := parseRawUSMContext(envelope.securityParameters, true)
 	if err != nil {
@@ -48,8 +58,8 @@ func extractRawV3Context(data []byte) (*rawV3Context, error) {
 	return &rawV3Context{
 		engineID:   engineID,
 		username:   username,
-		reportable: reportable,
-		msgID:      msgID,
+		reportable: header.reportable,
+		msgID:      header.msgID,
 	}, nil
 }
 
@@ -108,65 +118,69 @@ func parseRawV3Envelope(data []byte) (*rawV3Envelope, error) {
 	return &rawV3Envelope{
 		headerData:         data[headerStart:headerEnd],
 		securityParameters: data[securityStart:securityEnd],
+		msgDataEncrypted:   tag == tagOctetStr,
 	}, nil
 }
 
-func parseRawV3Header(data []byte) (msgID uint32, reportable bool, err error) {
+func parseRawV3Header(data []byte) (rawV3Header, error) {
 	tag, valueStart, valueEnd, next, err := readBERElement(data, 0)
 	if err != nil {
-		return 0, false, err
+		return rawV3Header{}, err
 	}
 	if tag != tagInteger {
-		return 0, false, fmt.Errorf("SNMPv3 msgID is not an integer")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 msgID is not an integer")
 	}
 	msgID, ok := parseBERUint32(data[valueStart:valueEnd])
 	if !ok || msgID > maxSNMPv3Integer {
-		return 0, false, fmt.Errorf("SNMPv3 msgID is invalid")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 msgID is invalid")
 	}
 
 	tag, valueStart, valueEnd, next, err = readBERElement(data, next)
 	if err != nil {
-		return 0, false, err
+		return rawV3Header{}, err
 	}
 	if tag != tagInteger {
-		return 0, false, fmt.Errorf("SNMPv3 msgMaxSize is not an integer")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 msgMaxSize is not an integer")
 	}
 	msgMaxSize, ok := parseBERUint32(data[valueStart:valueEnd])
 	if !ok || msgMaxSize < minV3MsgMaxSize || msgMaxSize > maxSNMPv3Integer {
-		return 0, false, fmt.Errorf("SNMPv3 msgMaxSize is invalid")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 msgMaxSize is invalid")
 	}
 
 	tag, valueStart, valueEnd, next, err = readBERElement(data, next)
 	if err != nil {
-		return 0, false, err
+		return rawV3Header{}, err
 	}
 	if tag != tagOctetStr {
-		return 0, false, fmt.Errorf("SNMPv3 msgFlags is not an octet string")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 msgFlags is not an octet string")
 	}
 	if valueEnd-valueStart != 1 {
-		return 0, false, fmt.Errorf("SNMPv3 msgFlags must contain exactly one byte")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 msgFlags must contain exactly one byte")
 	}
 	flags := data[valueStart]
 	if flags&0x03 == 0x02 {
-		return 0, false, fmt.Errorf("SNMPv3 msgFlags is invalid")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 msgFlags is invalid")
 	}
-	reportable = flags&0x04 != 0
 
 	tag, valueStart, valueEnd, next, err = readBERElement(data, next)
 	if err != nil {
-		return 0, false, err
+		return rawV3Header{}, err
 	}
 	if tag != tagInteger {
-		return 0, false, fmt.Errorf("SNMPv3 securityModel is not an integer")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 securityModel is not an integer")
 	}
 	securityModel, ok := parseBERUint32(data[valueStart:valueEnd])
 	if !ok || securityModel != usmSecurityModel {
-		return 0, false, fmt.Errorf("SNMPv3 securityModel is not USM")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 securityModel is not USM")
 	}
 	if next != len(data) {
-		return 0, false, fmt.Errorf("SNMPv3 header data contains trailing fields")
+		return rawV3Header{}, fmt.Errorf("SNMPv3 header data contains trailing fields")
 	}
-	return msgID, reportable, nil
+	return rawV3Header{
+		msgID:      msgID,
+		reportable: flags&0x04 != 0,
+		privacy:    flags&0x02 != 0,
+	}, nil
 }
 
 func parseRawUSMContext(data []byte, includeUsername bool) (engineID, username string, err error) {
