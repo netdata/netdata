@@ -1,8 +1,8 @@
-# Collect metrics with OpenTelemetry Collector receivers
+# Collect Metrics with OpenTelemetry Collector
 
 Use these recipes when an OpenTelemetry Collector is already part of your observability pipeline or must fan metrics out to multiple backends. If Netdata is the only consumer, prefer the linked native Netdata collector: it requires fewer moving parts and provides purpose-built charts and alerts.
 
-Before you begin, complete [Send OpenTelemetry data to Netdata](/docs/opentelemetry/send-data-to-netdata.md). The examples on this page use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
+Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). The examples on this page use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
 
 ## Shared exporter
 
@@ -24,7 +24,7 @@ The `service.pipelines.metrics` blocks are alternatives. To run several receiver
 
 The `host_metrics` receiver collects CPU, memory, disk, filesystem, network, load, paging, and process metrics from the Collector host. Netdata ships mappings that group common host metrics into multi-dimension charts.
 
-Use the smaller [host metrics smoke test](/docs/opentelemetry/send-data-to-netdata.md#smoke-test-metrics-with-host_metrics) to verify the OTLP path. For a broader existing OpenTelemetry host pipeline, add the shared exporter and this receiver and pipeline:
+Use the smaller [host metrics smoke test](/docs/opentelemetry/otlp-ingestion.md#smoke-test-host-metrics) to verify the OTLP path. For a broader existing OpenTelemetry host pipeline, add the shared exporter and this receiver and pipeline:
 
 ```yaml
 receivers:

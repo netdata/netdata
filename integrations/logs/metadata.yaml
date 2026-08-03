@@ -128,7 +128,7 @@
 
       It receives OTLP-formatted log data and indexes it for fast querying. The logs are explored from the "Logs" tab of the Netdata UI, using the same powerful exploration interface used for systemd journal logs.
 
-      Follow [Send OpenTelemetry data to Netdata](/docs/opentelemetry/send-data-to-netdata.md) for a maintained Collector configuration and end-to-end verification steps.
+      Follow [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md) for a maintained Collector configuration and end-to-end verification steps.
     visualization:
       description: |
         You can start exploring OpenTelemetry logs on the "Logs" tab of the Netdata UI.

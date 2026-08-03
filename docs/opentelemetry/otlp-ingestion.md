@@ -1,4 +1,4 @@
-# Send OpenTelemetry data to Netdata
+# Ingest OpenTelemetry Metrics and Logs
 
 Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry data or an OpenTelemetry Collector is already part of your observability pipeline. For host and application metrics that Netdata can collect directly, the native collector is usually simpler and exposes purpose-built charts and alerts.
 
@@ -31,7 +31,7 @@ flowchart LR
 
 The maintained examples are validated with OpenTelemetry Collector Contrib `0.157.0`. If you run an older release, check that release's component identifiers before copying the configuration.
 
-For production pipelines beyond these smoke tests, continue with the maintained [metric receiver recipes](/docs/opentelemetry/collector-metric-recipes.md), [log receiver recipes](/docs/opentelemetry/collector-log-recipes.md), and [transformation recipes](/docs/opentelemetry/collector-transformations.md). Each page links its pinned examples to the complete upstream Collector documentation.
+For production pipelines beyond these smoke tests, continue with [Metrics Collection](/docs/opentelemetry/metrics-collection.md), [Logs Collection](/docs/opentelemetry/logs-collection.md), and [Transformations](/docs/opentelemetry/transformations.md). Each page links its pinned examples to the complete upstream Collector documentation.
 
 The plugin starts automatically and listens on the IPv4 loopback endpoint `127.0.0.1:4317`. The examples below put the Collector and Agent on the same host and intentionally disable TLS only for that loopback connection.
 
@@ -49,7 +49,7 @@ exporters:
 
 Use the `otlp_grpc` exporter and port `4317`. Netdata does not accept the `otlp_http` exporter or OTLP/HTTP port `4318`. Use `127.0.0.1` rather than `localhost` if the latter resolves to IPv6.
 
-## Smoke-test metrics with `host_metrics`
+## Smoke-test Host Metrics
 
 If you already use native Netdata host collectors, this pipeline duplicates some host metrics. Use it as a smoke test or when hostmetrics is already part of a shared OpenTelemetry pipeline.
 

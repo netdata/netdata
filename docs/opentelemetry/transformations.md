@@ -1,8 +1,8 @@
-# Transform and filter OpenTelemetry data before Netdata
+# Transform and Filter OpenTelemetry Logs
 
 Use Collector processors when several receivers need the same normalization, enrichment, or filtering before they export to Netdata. Prefer a receiver's built-in parser for source-specific work; use the `transform` processor for reusable OTTL changes and the `filter` processor to drop records.
 
-Before you begin, complete [Send OpenTelemetry data to Netdata](/docs/opentelemetry/send-data-to-netdata.md). These examples use the `transform` and `filter` processors from OpenTelemetry Collector Contrib `0.157.0`.
+Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). These examples use the `transform` and `filter` processors from OpenTelemetry Collector Contrib `0.157.0`.
 
 ## Parse a JSON log body
 
@@ -18,7 +18,7 @@ processors:
 
 For a body such as `{"level":"error","msg":"connection refused","duration_ms":312}`, the processor adds `level`, `msg`, and `duration_ms` attributes while retaining the original body. The `insert` strategy preserves an existing attribute when the parsed object has the same key. With `error_mode: ignore`, an invalid JSON record continues through the pipeline and the Collector logs the transformation error.
 
-Use a receiver-level `json_parser` instead when every line from one file has the same format and you also need to parse its timestamp or severity during ingestion. See [Collect logs with OpenTelemetry Collector receivers](/docs/opentelemetry/collector-log-recipes.md#parse-json-lines).
+Use a receiver-level `json_parser` instead when every line from one file has the same format and you also need to parse its timestamp or severity during ingestion. See [Collect Logs with OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md#parse-json-lines).
 
 ## Normalize severity and enrich resources
 
@@ -99,7 +99,7 @@ service:
       exporters: [otlp_grpc/netdata]
 ```
 
-For production file collection, add persistent offsets as described in the [file log recipe](/docs/opentelemetry/collector-log-recipes.md#application-log-files).
+For production file collection, add persistent offsets as described in [Logs Collection](/docs/opentelemetry/logs-collection.md#application-log-files).
 
 ## Create metrics from matching logs
 

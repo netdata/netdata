@@ -12,7 +12,7 @@ endmeta-->
 
 Network devices send syslog; an OpenTelemetry Collector receives it, normalizes it, and forwards it to Netdata over OTLP. This page walks through a working configuration.
 
-For applications, host metrics, and general file logs, use [Send OpenTelemetry data to Netdata](/docs/opentelemetry/send-data-to-netdata.md). This page remains the canonical workflow for network-device syslog.
+For applications, host metrics, and general file logs, use [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). This page remains the canonical workflow for network-device syslog.
 
 ## What you need
 

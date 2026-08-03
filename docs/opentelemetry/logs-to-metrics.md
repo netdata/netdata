@@ -1,4 +1,4 @@
-# Create metrics from OpenTelemetry logs
+# Create Metrics from OpenTelemetry Logs
 
 An OpenTelemetry Collector can count matching log records and export the result to Netdata as a metric while it continues forwarding the original logs. This example drops health-check noise and charts warning and error records per second.
 
@@ -6,7 +6,7 @@ Use this for operational trend monitoring, not durable audit counts. The count c
 
 > The count connector and filter processor have alpha stability in OpenTelemetry Collector Contrib `0.157.0`, the version used to validate this example. Review their upstream stability before upgrading the Collector.
 
-Before you begin, complete the prerequisites and local exporter setup in [Send OpenTelemetry data to Netdata](/docs/opentelemetry/send-data-to-netdata.md), including the Netdata Cloud sign-in required to verify `otel-logs`.
+Before you begin, complete the prerequisites and local exporter setup in [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md), including the Netdata Cloud sign-in required to verify `otel-logs`.
 
 The count connector bridges the logs and metrics pipelines:
 
@@ -111,4 +111,4 @@ If the chart is absent:
 2. Inspect the Collector for connector, OTTL, and export errors, then inspect the Agent journal for OTLP ingestion errors.
 3. Temporarily add a `debug` exporter with `verbosity: detailed` to the logs pipeline and verify that the body matches the connector condition. Remove the exporter after diagnosis because detailed log output can expose sensitive record content.
 
-To alert on the derived chart, use the standard [Netdata alert configuration reference](/src/health/REFERENCE.md). For the shared endpoint, security, and basic metrics/logs workflows, see [Send OpenTelemetry data to Netdata](/docs/opentelemetry/send-data-to-netdata.md).
+To alert on the derived chart, use the standard [Netdata alert configuration reference](/src/health/REFERENCE.md). For the shared endpoint, security, and basic metrics/logs workflows, see [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md).

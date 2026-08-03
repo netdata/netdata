@@ -31,7 +31,7 @@ modules:
 
           The plugin accepts gauges, sums, explicit-bucket histograms, and summaries. It does not currently ingest exponential histograms. Monotonic cumulative and delta sums are rate-normalized; non-monotonic cumulative sums behave as gauges.
 
-          For a maintained Collector configuration and end-to-end verification steps, see [Send OpenTelemetry data to Netdata](/docs/opentelemetry/send-data-to-netdata.md). The separate [OpenTelemetry Logs integration](/integrations/logs/integrations/opentelemetry_logs.md) explains how received logs appear in Netdata.
+          For a maintained Collector configuration and end-to-end verification steps, see [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). The separate [OpenTelemetry Logs integration](/integrations/logs/integrations/opentelemetry_logs.md) explains how received logs appear in Netdata.
         method_description: |
           The plugin starts automatically and listens on a configurable OTLP/gRPC endpoint. OTLP/HTTP is not supported, so senders must use the gRPC exporter and port `4317`, not the HTTP exporter and port `4318`.
 
