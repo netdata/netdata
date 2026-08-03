@@ -445,7 +445,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 
 	result := c.receiver.Process(receiver.Datagram{Data: data, PeerIP: peerIP, Conn: conn, Peer: peer})
 	if failure := result.DecodeFailure; failure != nil {
-		if c.trapWriter != nil && c.receiver.AdmitDecodeErrorAudit(failure.Peer) {
+		if c.trapWriter != nil && c.receiver.AdmitDecodeErrorAudit(failure) {
 			c.writeDecodeErrorEntry(failure, packetSequence)
 		}
 		return

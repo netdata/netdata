@@ -15,9 +15,7 @@ import (
 )
 
 func TestReceiverBindStartDeliverClose(t *testing.T) {
-	port := availableUDPPort(t)
-	listen := ListenConfig{Endpoints: []Endpoint{{Protocol: "udp", Address: "127.0.0.1", Port: port}}}
-	require.NoError(t, ValidateListen(listen))
+	listen := ListenConfig{Endpoints: []Endpoint{{Protocol: "udp", Address: "127.0.0.1", Port: 0}}}
 
 	recv := New(NewPolicy(PolicyConfig{
 		Listen:      listen,
@@ -26,6 +24,10 @@ func TestReceiverBindStartDeliverClose(t *testing.T) {
 	}), nil)
 	require.NoError(t, recv.Bind())
 	t.Cleanup(recv.Close)
+	require.Len(t, recv.listener.endpoints, 1)
+	boundAddr, ok := recv.listener.endpoints[0].conn.LocalAddr().(*net.UDPAddr)
+	require.True(t, ok)
+	port := boundAddr.Port
 
 	results := make(chan Result, 1)
 	recv.Start(func(datagram Datagram) {
@@ -199,13 +201,4 @@ func TestNewListenerFailsWhenReceiveBufferCannotBeSet(t *testing.T) {
 	assert.Nil(t, l)
 	assert.Contains(t, err.Error(), "set receive buffer")
 	assert.Contains(t, err.Error(), "boom")
-}
-
-func availableUDPPort(t testing.TB) int {
-	t.Helper()
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
-	require.NoError(t, err)
-	port := conn.LocalAddr().(*net.UDPAddr).Port
-	require.NoError(t, conn.Close())
-	return port
 }

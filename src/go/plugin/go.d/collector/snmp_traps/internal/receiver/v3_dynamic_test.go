@@ -108,20 +108,7 @@ func TestExtractRawV3ContextTrap(t *testing.T) {
 }
 
 func TestExtractRawV3ContextReportableDiscoveryProbe(t *testing.T) {
-	pkt := &gosnmp.SnmpPacket{
-		Version:            gosnmp.Version3,
-		MsgFlags:           gosnmp.Reportable,
-		SecurityModel:      gosnmp.UserSecurityModel,
-		SecurityParameters: &gosnmp.UsmSecurityParameters{},
-		PDUType:            gosnmp.GetRequest,
-		MsgID:              99,
-		RequestID:          42,
-		MsgMaxSize:         maxDatagramSize,
-	}
-	data, err := pkt.MarshalMsg()
-	if err != nil {
-		t.Fatalf("MarshalMsg failed: %v", err)
-	}
+	data := buildV3DiscoveryProbe(t, 99)
 
 	ctx, err := extractRawV3Context(data)
 	if err != nil {
@@ -141,6 +128,204 @@ func TestExtractRawV3ContextReportableDiscoveryProbe(t *testing.T) {
 	}
 	if ctx.msgID != 99 {
 		t.Fatalf("msgID = %d, want 99", ctx.msgID)
+	}
+}
+
+func TestParseRawV3HeaderRejectsMalformedRequiredFields(t *testing.T) {
+	validMsgID := testBERElement(tagInteger, []byte{99})
+	validMaxSize := testBERElement(tagInteger, []byte{0x01, 0x00, 0x00})
+	validFlags := testBERElement(tagOctetStr, []byte{byte(gosnmp.Reportable)})
+	validSecurityModel := testBERElement(tagInteger, []byte{byte(gosnmp.UserSecurityModel)})
+
+	tests := map[string]struct {
+		header []byte
+	}{
+		"invalid msgID encoding": {
+			header: testBERFields(
+				testBERElement(tagInteger, []byte{0x01, 0x00, 0x00, 0x00, 0x00}),
+				validMaxSize,
+				validFlags,
+				validSecurityModel,
+			),
+		},
+		"msgID exceeds protocol range": {
+			header: testBERFields(
+				testBERElement(tagInteger, []byte{0x00, 0x80, 0x00, 0x00, 0x00}),
+				validMaxSize,
+				validFlags,
+				validSecurityModel,
+			),
+		},
+		"msgMaxSize has wrong tag": {
+			header: testBERFields(
+				validMsgID,
+				testBERElement(tagOctetStr, []byte{0x01, 0x00, 0x00}),
+				validFlags,
+				validSecurityModel,
+			),
+		},
+		"invalid msgMaxSize encoding": {
+			header: testBERFields(
+				validMsgID,
+				testBERElement(tagInteger, []byte{0x01, 0x00, 0x00, 0x00, 0x00}),
+				validFlags,
+				validSecurityModel,
+			),
+		},
+		"msgMaxSize is below protocol minimum": {
+			header: testBERFields(
+				validMsgID,
+				testBERElement(tagInteger, []byte{0x01, 0xe3}),
+				validFlags,
+				validSecurityModel,
+			),
+		},
+		"msgFlags has wrong length": {
+			header: testBERFields(
+				validMsgID,
+				validMaxSize,
+				testBERElement(tagOctetStr, []byte{byte(gosnmp.Reportable), 0}),
+				validSecurityModel,
+			),
+		},
+		"msgFlags uses reserved privacy-only level": {
+			header: testBERFields(
+				validMsgID,
+				validMaxSize,
+				testBERElement(tagOctetStr, []byte{0x02}),
+				validSecurityModel,
+			),
+		},
+		"invalid securityModel encoding": {
+			header: testBERFields(
+				validMsgID,
+				validMaxSize,
+				validFlags,
+				testBERElement(tagInteger, nil),
+			),
+		},
+		"securityModel is not USM": {
+			header: testBERFields(
+				validMsgID,
+				validMaxSize,
+				validFlags,
+				testBERElement(tagInteger, []byte{4}),
+			),
+		},
+		"trailing header field": {
+			header: testBERFields(
+				validMsgID,
+				validMaxSize,
+				validFlags,
+				validSecurityModel,
+				testBERElement(tagInteger, []byte{0}),
+			),
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, _, err := parseRawV3Header(tc.header); err == nil {
+				t.Fatal("expected malformed v3 header to be rejected")
+			}
+		})
+	}
+}
+
+func TestParseRawUSMContextRejectsMalformedRequiredFields(t *testing.T) {
+	engineID, err := hex.DecodeString(testEngineIDHex)
+	if err != nil {
+		t.Fatalf("decode test engine ID: %v", err)
+	}
+	validEngineID := testBERElement(tagOctetStr, engineID)
+	validBoots := testBERElement(tagInteger, []byte{1})
+	validTime := testBERElement(tagInteger, []byte{1})
+	validUsername := testBERElement(tagOctetStr, []byte("testuser"))
+	validAuth := testBERElement(tagOctetStr, nil)
+	validPriv := testBERElement(tagOctetStr, nil)
+
+	tests := map[string][]byte{
+		"engine boots has wrong tag": testBERSequence(
+			validEngineID,
+			testBERElement(tagOctetStr, []byte{1}),
+			validTime,
+			validUsername,
+			validAuth,
+			validPriv,
+		),
+		"engine time has invalid encoding": testBERSequence(
+			validEngineID,
+			validBoots,
+			testBERElement(tagInteger, nil),
+			validUsername,
+			validAuth,
+			validPriv,
+		),
+		"missing authentication and privacy parameters": testBERSequence(
+			validEngineID,
+			validBoots,
+			validTime,
+			validUsername,
+		),
+		"authentication parameters have wrong tag": testBERSequence(
+			validEngineID,
+			validBoots,
+			validTime,
+			validUsername,
+			testBERElement(tagInteger, []byte{0}),
+			validPriv,
+		),
+		"privacy parameters have wrong tag": testBERSequence(
+			validEngineID,
+			validBoots,
+			validTime,
+			validUsername,
+			validAuth,
+			testBERElement(tagInteger, []byte{0}),
+		),
+		"trailing USM field": testBERSequence(
+			validEngineID,
+			validBoots,
+			validTime,
+			validUsername,
+			validAuth,
+			validPriv,
+			testBERElement(tagOctetStr, nil),
+		),
+	}
+
+	for name, data := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, _, err := parseRawUSMContext(data, true); err == nil {
+				t.Fatal("expected malformed USM context to be rejected")
+			}
+		})
+	}
+}
+
+func TestMalformedDiscoveryHeaderDoesNotSendReport(t *testing.T) {
+	data := corruptV3HeaderFieldTag(t, buildV3DiscoveryProbe(t, 99), 1, tagOctetStr)
+	listenerConn, peerConn := informUDPConnPair(t)
+	defer listenerConn.Close()
+	defer peerConn.Close()
+
+	recv, _, _ := newDynamicTestReceiver(t, 0, RateLimitConfig{})
+	peer := peerConn.LocalAddr().(*net.UDPAddr)
+	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
+	if result.DecodeFailure == nil {
+		t.Fatalf("result = %+v, want decode failure", result)
+	}
+
+	if err := peerConn.SetReadDeadline(time.Now().Add(50 * time.Millisecond)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
+	buf := make([]byte, maxDatagramSize)
+	_, _, err := peerConn.ReadFromUDP(buf)
+	if err == nil {
+		t.Fatal("malformed discovery request received a Report")
+	}
+	if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
+		t.Fatalf("read response error = %v, want timeout", err)
 	}
 }
 
@@ -275,6 +460,48 @@ func TestDynamicEngineIDRateLimitDropFollowsAlreadyDecodableRegistration(t *test
 	}
 }
 
+func TestDynamicDecodeFailureReusesRateLimitAdmission(t *testing.T) {
+	spec := dynamicV3Spec("testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	spec.authKey = "wrongpassword"
+	data := buildV3SecuredTrapWithFlags(t, spec, gosnmp.AuthPriv)
+	recv, events, peer := newDynamicTestReceiver(t, 0, RateLimitConfig{Enabled: true, PerSourcePPS: 1, Mode: "drop"})
+
+	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer})
+	if result.DecodeFailure == nil {
+		t.Fatalf("result = %+v, want decode failure", result)
+	}
+	if !recv.AdmitDecodeErrorAudit(result.DecodeFailure) {
+		t.Fatal("first admitted dynamic decode failure should be auditable")
+	}
+	if got := events.count(EventError, "rate_limited"); got != 0 {
+		t.Fatalf("rate_limited events = %d, want 0", got)
+	}
+}
+
+func TestDynamicDecodeFailureSampleAdmissionIsNotRepeated(t *testing.T) {
+	spec := dynamicV3Spec("testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	spec.authKey = "wrongpassword"
+	data := buildV3SecuredTrapWithFlags(t, spec, gosnmp.AuthPriv)
+	recv, events, peer := newDynamicTestReceiver(t, 0, RateLimitConfig{Enabled: true, PerSourcePPS: 1, Mode: "sample"})
+	if allowed, checked := recv.allowRateLimitedPacket(peer); !allowed || !checked {
+		t.Fatal("expected first token to be available")
+	}
+
+	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer})
+	if result.DecodeFailure == nil {
+		t.Fatalf("result = %+v, want decode failure", result)
+	}
+	if got := events.count(EventError, "rate_limited"); got != 1 {
+		t.Fatalf("rate_limited events before audit = %d, want 1", got)
+	}
+	if !recv.AdmitDecodeErrorAudit(result.DecodeFailure) {
+		t.Fatal("sampled dynamic decode failure should be auditable")
+	}
+	if got := events.count(EventError, "rate_limited"); got != 1 {
+		t.Fatalf("rate_limited events after audit = %d, want 1", got)
+	}
+}
+
 func TestDiscoveryReportWriteFailureIsReported(t *testing.T) {
 	data := buildV3DiscoveryProbe(t, 99)
 	listenerConn, peerConn := informUDPConnPair(t)
@@ -284,7 +511,7 @@ func TestDiscoveryReportWriteFailureIsReported(t *testing.T) {
 		t.Fatalf("close response socket: %v", err)
 	}
 
-	recv, events, _ := newDynamicTestReceiver(t, 0, RateLimitConfig{})
+	recv, events, _ := newDynamicTestReceiver(t, 0, RateLimitConfig{Enabled: true, PerSourcePPS: 1, Mode: "drop"})
 	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
 
 	if result.PDU != nil || result.DecodeFailure == nil {
@@ -292,6 +519,12 @@ func TestDiscoveryReportWriteFailureIsReported(t *testing.T) {
 	}
 	if got := events.count(EventDiscoveryReportFailed, ""); got != 1 {
 		t.Fatalf("discovery Report failure events = %d, want 1", got)
+	}
+	if !recv.AdmitDecodeErrorAudit(result.DecodeFailure) {
+		t.Fatal("first admitted discovery failure should be auditable")
+	}
+	if got := events.count(EventError, "rate_limited"); got != 0 {
+		t.Fatalf("rate_limited events = %d, want 0", got)
 	}
 }
 
@@ -458,6 +691,10 @@ func clearV3ReportableFlag(t *testing.T, data []byte) []byte {
 }
 
 func corruptV3MessageIDTag(t *testing.T, data []byte) []byte {
+	return corruptV3HeaderFieldTag(t, data, 0, tagOctetStr)
+}
+
+func corruptV3HeaderFieldTag(t *testing.T, data []byte, field int, replacement byte) []byte {
 	t.Helper()
 	out := append([]byte(nil), data...)
 	tag, valueStart, valueEnd, _, err := readBERElement(out, 0)
@@ -468,10 +705,33 @@ func corruptV3MessageIDTag(t *testing.T, data []byte) []byte {
 	if err != nil {
 		t.Fatalf("parse version: %v", err)
 	}
-	tag, headerStart, _, _, err := readBERElement(out[:valueEnd], next)
+	tag, headerStart, headerEnd, _, err := readBERElement(out[:valueEnd], next)
 	if err != nil || tag != tagSequence {
 		t.Fatalf("parse v3 header: tag=%#x err=%v", tag, err)
 	}
-	out[headerStart] = tagOctetStr
+	pos := headerStart
+	for range field {
+		_, _, _, pos, err = readBERElement(out[:headerEnd], pos)
+		if err != nil {
+			t.Fatalf("parse v3 header field: %v", err)
+		}
+	}
+	out[pos] = replacement
 	return out
+}
+
+func testBERElement(tag byte, value []byte) []byte {
+	return append([]byte{tag, byte(len(value))}, value...)
+}
+
+func testBERFields(fields ...[]byte) []byte {
+	var data []byte
+	for _, field := range fields {
+		data = append(data, field...)
+	}
+	return data
+}
+
+func testBERSequence(fields ...[]byte) []byte {
+	return testBERElement(tagSequence, testBERFields(fields...))
 }

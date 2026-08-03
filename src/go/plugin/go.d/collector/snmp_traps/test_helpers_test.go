@@ -55,6 +55,10 @@ func buildV3SecuredTrap(t testing.TB, spec v3SecuredTrapSpec) []byte {
 	return traptest.BuildV3SecuredTrap(t, spec.traptest())
 }
 
+func buildV3SecuredTrapWithFlags(t testing.TB, spec v3SecuredTrapSpec, flags gosnmp.SnmpV3MsgFlags) []byte {
+	return traptest.BuildV3SecuredTrapWithFlags(t, spec.traptest(), flags)
+}
+
 func readSinglePcapUDPPacket(t *testing.T, fixture string) traptest.UDPPacket {
 	t.Helper()
 

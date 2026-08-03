@@ -3,6 +3,7 @@
 package receiver
 
 import (
+	"net/netip"
 	"strings"
 	"testing"
 )
@@ -140,4 +141,29 @@ func TestPolicyValidation(t *testing.T) {
 			t.Fatal("expected validation error")
 		}
 	})
+}
+
+func TestNormalizeCIDRListCanonicalizesIPv4MappedPrefixes(t *testing.T) {
+	tests := map[string]func([]string) ([]netip.Prefix, error){
+		"source allowlist": NormalizeSourceAllowlist,
+		"trusted relays":   NormalizeTrustedRelays,
+	}
+
+	for name, normalize := range tests {
+		t.Run(name, func(t *testing.T) {
+			prefixes, err := normalize([]string{"::ffff:192.0.2.123/120", "2001:db8::1234/32"})
+			if err != nil {
+				t.Fatalf("normalize CIDRs: %v", err)
+			}
+			if got := prefixes[0].String(); got != "192.0.2.0/24" {
+				t.Fatalf("mapped prefix = %q, want 192.0.2.0/24", got)
+			}
+			if !prefixes[0].Contains(netip.MustParseAddr("192.0.2.42")) {
+				t.Fatal("canonical mapped prefix does not contain equivalent IPv4 peer")
+			}
+			if got := prefixes[1].String(); got != "2001:db8::/32" {
+				t.Fatalf("native IPv6 prefix = %q, want 2001:db8::/32", got)
+			}
+		})
+	}
 }

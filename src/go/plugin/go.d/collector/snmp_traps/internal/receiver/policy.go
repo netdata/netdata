@@ -113,8 +113,8 @@ func NewPolicy(cfg PolicyConfig) Policy {
 		localEngineID:      cfg.LocalEngineID,
 		dynamicEngineID:    cfg.DynamicEngineID,
 		dynamicEngineIDMax: dynamicMax,
-		sourceAllowlist:    slices.Clone(cfg.SourceAllowlist),
-		trustedRelays:      slices.Clone(cfg.TrustedRelays),
+		sourceAllowlist:    cloneCanonicalPrefixes(cfg.SourceAllowlist),
+		trustedRelays:      cloneCanonicalPrefixes(cfg.TrustedRelays),
 		rateLimit:          cfg.RateLimit,
 	}
 }
@@ -127,6 +127,17 @@ func (p Policy) V3Enabled() bool {
 func cloneListenConfig(cfg ListenConfig) ListenConfig {
 	cfg.Endpoints = slices.Clone(cfg.Endpoints)
 	return cfg
+}
+
+func cloneCanonicalPrefixes(prefixes []netip.Prefix) []netip.Prefix {
+	if prefixes == nil {
+		return nil
+	}
+	cloned := make([]netip.Prefix, len(prefixes))
+	for i, prefix := range prefixes {
+		cloned[i] = canonicalPrefix(prefix)
+	}
+	return cloned
 }
 
 func ValidateListen(cfg ListenConfig) error {
@@ -293,9 +304,16 @@ func parseCIDRList(field string, cidrs []string) ([]netip.Prefix, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s[%d]: invalid CIDR %q: %v", field, i, cidr, err)
 		}
-		prefixes = append(prefixes, prefix)
+		prefixes = append(prefixes, canonicalPrefix(prefix))
 	}
 	return prefixes, nil
+}
+
+func canonicalPrefix(prefix netip.Prefix) netip.Prefix {
+	if prefix.Addr().Is4In6() && prefix.Bits() >= 96 {
+		return netip.PrefixFrom(prefix.Addr().Unmap(), prefix.Bits()-96).Masked()
+	}
+	return prefix.Masked()
 }
 
 func ValidateRateLimit(cfg RateLimitConfig) error {

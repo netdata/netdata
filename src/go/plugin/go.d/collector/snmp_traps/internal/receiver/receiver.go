@@ -65,6 +65,7 @@ type DecodeFailure struct {
 	Err            error
 	SniffedVersion model.SnmpVersion
 	VersionKnown   bool
+	auditAdmitted  bool
 }
 
 type Result struct {
@@ -304,6 +305,7 @@ func (r *Receiver) Process(datagram Datagram) Result {
 				Err:            err,
 				SniffedVersion: sniffedVersion,
 				VersionKnown:   versionKnown,
+				auditAdmitted:  rateLimitChecked,
 			}}
 		}
 	}
@@ -351,11 +353,17 @@ func (r *Receiver) Process(datagram Datagram) Result {
 	return Result{PDU: packetContext.PDU}
 }
 
-func (r *Receiver) AdmitDecodeErrorAudit(peer *net.UDPAddr) bool {
-	if r.rateLimiter == nil || peer == nil {
+func (r *Receiver) AdmitDecodeErrorAudit(failure *DecodeFailure) bool {
+	if failure == nil {
+		return false
+	}
+	if failure.auditAdmitted {
 		return true
 	}
-	source, ok := udpPeerAddr(peer)
+	if r.rateLimiter == nil || failure.Peer == nil {
+		return true
+	}
+	source, ok := udpPeerAddr(failure.Peer)
 	if !ok {
 		return true
 	}

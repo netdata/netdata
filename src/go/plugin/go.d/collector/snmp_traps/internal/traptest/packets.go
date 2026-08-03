@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"io"
 	"log"
-	"strings"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -146,13 +145,13 @@ func newV3PacketParts(t testing.TB, spec V3Spec) (*gosnmp.GoSNMP, []gosnmp.SnmpP
 	if err != nil {
 		t.Fatalf("invalid test engine ID: %v", err)
 	}
-	authProto := strings.ToLower(spec.AuthProto)
-	privProto := strings.ToLower(spec.PrivProto)
+	authProto := snmputils.ParseSNMPv3AuthProtocol(spec.AuthProto)
+	privProto := snmputils.ParseSNMPv3PrivProtocol(spec.PrivProto)
 	security := &gosnmp.UsmSecurityParameters{
 		UserName:                 spec.User,
-		AuthenticationProtocol:   snmputils.ParseSNMPv3AuthProtocol(authProto),
+		AuthenticationProtocol:   authProto,
 		AuthenticationPassphrase: spec.AuthKey,
-		PrivacyProtocol:          snmputils.ParseSNMPv3PrivProtocol(privProto),
+		PrivacyProtocol:          privProto,
 		PrivacyPassphrase:        spec.PrivKey,
 		AuthoritativeEngineID:    string(engineID),
 		AuthoritativeEngineBoots: 1,
@@ -176,15 +175,13 @@ func newV3PacketParts(t testing.TB, spec V3Spec) (*gosnmp.GoSNMP, []gosnmp.SnmpP
 	return client, pdus, engineID
 }
 
-func securityLevel(authProto, privProto string) gosnmp.SnmpV3MsgFlags {
+func securityLevel(authProto gosnmp.SnmpV3AuthProtocol, privProto gosnmp.SnmpV3PrivProtocol) gosnmp.SnmpV3MsgFlags {
 	switch {
-	case authProto == "none" && privProto == "none":
+	case authProto == gosnmp.NoAuth:
 		return gosnmp.NoAuthNoPriv
-	case authProto != "none" && privProto == "none":
+	case privProto == gosnmp.NoPriv:
 		return gosnmp.AuthNoPriv
-	case authProto != "none" && privProto != "none":
-		return gosnmp.AuthPriv
 	default:
-		return gosnmp.NoAuthNoPriv
+		return gosnmp.AuthPriv
 	}
 }

@@ -536,6 +536,57 @@ func TestCollectorHandlePacketDecodeErrorHonorsRateLimitDrop(t *testing.T) {
 	}
 }
 
+func TestCollectorHandlePacketDynamicDecodeFailureReusesRateLimitAdmission(t *testing.T) {
+	const jobName = "test-dynamic-decode-error-rate-limit"
+	metrics := withCleanJobMetrics(t, jobName)
+	writer := &mockTrapWriter{}
+	c := &Collector{
+		Config:      Config{Name: jobName},
+		trapWriter:  writer,
+		journalHost: newTestJournalHostProvider(),
+	}
+	user := USMUserConfig{
+		Username:  "testuser",
+		AuthProto: "sha256",
+		AuthKey:   "authpassword",
+		PrivProto: "aes",
+		PrivKey:   "privpassword",
+	}
+	c.receiver = newTestReceiver(c, receiver.PolicyConfig{
+		Versions:        []string{"v3"},
+		USMUsers:        toReceiverUSMUsers([]USMUserConfig{user}),
+		DynamicEngineID: true,
+		RateLimit: receiver.RateLimitConfig{
+			Enabled:      true,
+			PerSourcePPS: 1,
+			Mode:         "drop",
+		},
+	})
+	if err := c.receiver.PrepareV3(t.TempDir(), jobName); err != nil {
+		t.Fatalf("prepare test v3 receiver: %v", err)
+	}
+	t.Cleanup(c.receiver.RollbackPreparedState)
+
+	data := buildV3SecuredTrapWithFlags(t, v3SecuredTrapSpec{
+		user:        "testuser",
+		engineIDHex: testEngineIDHex,
+		authProto:   "sha256",
+		privProto:   "aes",
+		authKey:     "wrongpassword",
+		privKey:     "privpassword",
+		trapOID:     "1.3.6.1.6.3.1.1.5.1",
+	}, gosnmp.AuthPriv)
+	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c.handlePacket(data, peer.IP, nil, peer)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries = %d, want first admitted decode error", len(writer.entries))
+	}
+	if got := metrics.errors.rateLimited.Load(); got != 0 {
+		t.Fatalf("rate_limited = %d, want 0", got)
+	}
+}
+
 func TestCollectorHandlePacketDecodeErrorNormalizesIPv4MappedSource(t *testing.T) {
 	const jobName = "test-decode-error-ipv4-mapped"
 	writer := &mockTrapWriter{}

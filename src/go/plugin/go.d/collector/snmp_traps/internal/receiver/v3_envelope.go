@@ -7,6 +7,12 @@ import (
 	"fmt"
 )
 
+const (
+	maxSNMPv3Integer = uint32(1<<31 - 1)
+	minV3MsgMaxSize  = uint32(484)
+	usmSecurityModel = uint32(3)
+)
+
 // rawV3Context holds fields extracted from raw SNMPv3 data before full
 // decode: the authoritative engine ID (hex), the USM security name
 // (username), and whether the message is reportable.
@@ -102,11 +108,21 @@ func parseRawV3Header(data []byte) (msgID uint32, reportable bool, err error) {
 	if tag != tagInteger {
 		return 0, false, fmt.Errorf("SNMPv3 msgID is not an integer")
 	}
-	msgID, _ = parseBERUint32(data[valueStart:valueEnd])
+	msgID, ok := parseBERUint32(data[valueStart:valueEnd])
+	if !ok || msgID > maxSNMPv3Integer {
+		return 0, false, fmt.Errorf("SNMPv3 msgID is invalid")
+	}
 
-	_, _, _, next, err = readBERElement(data, next)
+	tag, valueStart, valueEnd, next, err = readBERElement(data, next)
 	if err != nil {
 		return 0, false, err
+	}
+	if tag != tagInteger {
+		return 0, false, fmt.Errorf("SNMPv3 msgMaxSize is not an integer")
+	}
+	msgMaxSize, ok := parseBERUint32(data[valueStart:valueEnd])
+	if !ok || msgMaxSize < minV3MsgMaxSize || msgMaxSize > maxSNMPv3Integer {
+		return 0, false, fmt.Errorf("SNMPv3 msgMaxSize is invalid")
 	}
 
 	tag, valueStart, valueEnd, next, err = readBERElement(data, next)
@@ -116,30 +132,43 @@ func parseRawV3Header(data []byte) (msgID uint32, reportable bool, err error) {
 	if tag != tagOctetStr {
 		return 0, false, fmt.Errorf("SNMPv3 msgFlags is not an octet string")
 	}
-	if valueEnd-valueStart == 1 {
-		reportable = data[valueStart]&0x04 != 0
+	if valueEnd-valueStart != 1 {
+		return 0, false, fmt.Errorf("SNMPv3 msgFlags must contain exactly one byte")
 	}
+	flags := data[valueStart]
+	if flags&^byte(0x07) != 0 || flags&0x03 == 0x02 {
+		return 0, false, fmt.Errorf("SNMPv3 msgFlags is invalid")
+	}
+	reportable = flags&0x04 != 0
 
-	tag, _, _, _, err = readBERElement(data, next)
+	tag, valueStart, valueEnd, next, err = readBERElement(data, next)
 	if err != nil {
 		return 0, false, err
 	}
 	if tag != tagInteger {
 		return 0, false, fmt.Errorf("SNMPv3 securityModel is not an integer")
 	}
+	securityModel, ok := parseBERUint32(data[valueStart:valueEnd])
+	if !ok || securityModel != usmSecurityModel {
+		return 0, false, fmt.Errorf("SNMPv3 securityModel is not USM")
+	}
+	if next != len(data) {
+		return 0, false, fmt.Errorf("SNMPv3 header data contains trailing fields")
+	}
 	return msgID, reportable, nil
 }
 
 func parseRawUSMContext(data []byte, includeUsername bool) (engineID, username string, err error) {
-	tag, valueStart, valueEnd, _, err := readBERElement(data, 0)
+	tag, valueStart, valueEnd, outerNext, err := readBERElement(data, 0)
 	if err != nil {
 		return "", "", err
 	}
 	if tag != tagSequence {
 		return "", "", fmt.Errorf("SNMPv3 USM parameters are not a sequence")
 	}
+	sequenceEnd := valueEnd
 
-	tag, engineStart, engineEnd, next, err := readBERElement(data[:valueEnd], valueStart)
+	tag, engineStart, engineEnd, next, err := readBERElement(data[:sequenceEnd], valueStart)
 	if err != nil {
 		return "", "", err
 	}
@@ -151,26 +180,63 @@ func parseRawUSMContext(data []byte, includeUsername bool) (engineID, username s
 		return engineID, "", nil
 	}
 
-	_, _, _, next, err = readBERElement(data[:valueEnd], next)
+	tag, valueStart, valueEnd, next, err = readBERElement(data[:sequenceEnd], next)
 	if err != nil {
 		return "", "", err
 	}
-	_, _, _, next, err = readBERElement(data[:valueEnd], next)
+	if tag != tagInteger {
+		return "", "", fmt.Errorf("SNMPv3 authoritative engine boots is not an integer")
+	}
+	if value, ok := parseBERUint32(data[valueStart:valueEnd]); !ok || value > maxSNMPv3Integer {
+		return "", "", fmt.Errorf("SNMPv3 authoritative engine boots is invalid")
+	}
+
+	tag, valueStart, valueEnd, next, err = readBERElement(data[:sequenceEnd], next)
 	if err != nil {
 		return "", "", err
 	}
-	tag, valueStart, valueEnd, _, err = readBERElement(data[:valueEnd], next)
+	if tag != tagInteger {
+		return "", "", fmt.Errorf("SNMPv3 authoritative engine time is not an integer")
+	}
+	if value, ok := parseBERUint32(data[valueStart:valueEnd]); !ok || value > maxSNMPv3Integer {
+		return "", "", fmt.Errorf("SNMPv3 authoritative engine time is invalid")
+	}
+
+	tag, valueStart, valueEnd, next, err = readBERElement(data[:sequenceEnd], next)
 	if err != nil {
 		return "", "", err
 	}
 	if tag != tagOctetStr {
 		return "", "", fmt.Errorf("SNMPv3 userName is not an octet string")
 	}
-	return engineID, string(data[valueStart:valueEnd]), nil
+	username = string(data[valueStart:valueEnd])
+
+	tag, _, _, next, err = readBERElement(data[:sequenceEnd], next)
+	if err != nil {
+		return "", "", err
+	}
+	if tag != tagOctetStr {
+		return "", "", fmt.Errorf("SNMPv3 authentication parameters are not an octet string")
+	}
+
+	tag, _, _, next, err = readBERElement(data[:sequenceEnd], next)
+	if err != nil {
+		return "", "", err
+	}
+	if tag != tagOctetStr {
+		return "", "", fmt.Errorf("SNMPv3 privacy parameters are not an octet string")
+	}
+	if next != sequenceEnd || outerNext != len(data) {
+		return "", "", fmt.Errorf("SNMPv3 USM parameters contain trailing fields")
+	}
+	return engineID, username, nil
 }
 
 func parseBERUint32(data []byte) (uint32, bool) {
 	if len(data) == 0 || len(data) > 5 {
+		return 0, false
+	}
+	if data[0]&0x80 != 0 || len(data) == 5 && data[0] != 0 {
 		return 0, false
 	}
 	var v uint64
