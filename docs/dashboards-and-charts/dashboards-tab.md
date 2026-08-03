@@ -132,13 +132,13 @@ Elements automatically align to the grid system after moving or resizing.
 
 :::warning
 
-Deleting a dashboard is permanent and cannot be undone. Netdata Cloud provides no trash bin, recycle bin, or recovery mechanism for deleted dashboards.
+Deleting a dashboard is permanent and cannot be undone.
 
 :::
 
 :::note
 
-Can't find a dashboard you didn't delete? Dashboards belong to a specific [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#create-your-first-room), and each Room keeps its own separate dashboards. A dashboard that appears to be missing is often in another Room — check the **Dashboards** tab in each Room to locate it.
+Can't find a dashboard? Dashboards belong to a specific [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#create-your-first-room), and each Room keeps its own separate dashboards. A dashboard that appears to be missing is often in another Room — check the **Dashboards** tab in each Room to locate it.
 
 :::
 
