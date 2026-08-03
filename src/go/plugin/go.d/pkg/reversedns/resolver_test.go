@@ -367,6 +367,45 @@ func TestCancelOneActiveWaiterDoesNotCancelSharedLookup(t *testing.T) {
 	require.Equal(t, Result{State: StatePositive, Name: "shared.example.test"}, got.result)
 }
 
+func TestCancelFinalActiveWaiterKeepsLookupAndCachesResult(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	lookupCanceled := make(chan struct{}, 1)
+	r := New(Config{
+		LookupTimeout: time.Second,
+		Lookup: func(ctx context.Context, _ string) ([]string, error) {
+			close(started)
+			select {
+			case <-release:
+				return []string{"orphaned.example.test"}, nil
+			case <-ctx.Done():
+				lookupCanceled <- struct{}{}
+				return nil, ctx.Err()
+			}
+		},
+	})
+
+	addr := netip.MustParseAddr("192.0.2.10")
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { _, err := r.Resolve(ctx, addr); done <- err }()
+	<-started
+	waitForCallState(t, r, addr, callActive, 1)
+
+	cancel()
+	require.ErrorIs(t, <-done, context.Canceled)
+	waitForCallState(t, r, addr, callActive, 0)
+	select {
+	case <-lookupCanceled:
+		t.Fatal("final caller cancellation reached active lookup context")
+	default:
+	}
+
+	close(release)
+	waitForNoCalls(t, r)
+	require.Equal(t, Result{State: StatePositive, Name: "orphaned.example.test"}, r.Lookup(addr))
+}
+
 func TestCompletedResultWinsLaterCallerCancellation(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})
