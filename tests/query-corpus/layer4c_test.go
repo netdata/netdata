@@ -84,6 +84,24 @@ const (
 	// tier0 page, leaving an automatic seam across a DBENGINE page hole.
 	c4cSplitDim   = "split"
 	c4cSplitValue = 1000
+
+	// A sparse seam dimension isolates executor read-ahead exhaustion. The
+	// stored gaps force deterministic tier1 flushes without inventing data in
+	// the long retention hole.
+	c4cSoleDim     = "sole"
+	c4cSparseValue = 1000
+
+	// A separate sparse chart stops collection entirely before its resumed
+	// rate burst. Unlike an omitted dimension on a still-running chart, this
+	// creates a real DBENGINE page hole at both tier 0 and tier 1, with no
+	// immediately preceding gap row; the 100,000-second jump exceeds either
+	// page's remaining capacity.
+	c4cEqualContext   = "fixture.l4c_equal"
+	c4cEqualRateDim   = "rate"
+	c4cEqualRateValue = 1000
+	c4cEqualStart     = int64(fixture.T0 + 100000)
+	c4cEqualLast      = c4cEqualStart + 121
+	c4cEqualRows      = 181
 )
 
 // c4cValue is the deterministic sample generator: 23 mixed low bits keep
@@ -148,6 +166,39 @@ func c4cSplitCollected(ts int64) bool {
 	offset := ts - fixture.T0
 	return (offset >= 41 && offset <= 200) ||
 		(offset >= 2021 && offset <= 2081)
+}
+
+func c4cSolePoint(ts int64) (bool, string) {
+	offset := ts - fixture.T0
+	switch {
+	case offset >= 41 && offset <= 100, offset == 2021:
+		return true, stream.FlagNotAnomalous
+	case offset >= 101 && offset <= 161:
+		return true, stream.FlagEmpty
+	default:
+		return false, ""
+	}
+}
+
+func c4cEqualRateRows(after, before int64) []stream.ReplayRow {
+	rows := make([]stream.ReplayRow, 0, c4cEqualRows)
+	for ts := after + 1; ts <= before; ts++ {
+		offset := ts - fixture.T0
+		var flags string
+		switch {
+		case offset >= 41 && offset <= 100,
+			ts >= c4cEqualStart+1 && ts <= c4cEqualStart+60:
+			flags = stream.FlagNotAnomalous
+		case ts >= c4cEqualStart+61 && ts <= c4cEqualLast:
+			flags = stream.FlagEmpty
+		default:
+			continue
+		}
+		rows = append(rows, stream.ReplayRow{T: ts, Dims: []stream.ReplayValue{{
+			ID: c4cEqualRateDim, Collected: strconv.Itoa(c4cEqualRateValue), Flags: flags,
+		}}})
+	}
+	return rows
 }
 
 // perTierRetention extracts db.per_tier by its explicit tier ID. Missing,
@@ -233,6 +284,36 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		}
 	})
 
+	firstT := int64(fixture.T0)
+	lastT := int64(fixture.T0 + c4cRows)
+
+	// Replicate the sparse chart first. Its early page can then rotate while
+	// the resumed page remains the metric's live final page during the large
+	// main-chart replay below.
+	conn.DefineChart(stream.Chart{
+		ID: c4cEqualContext, Title: "equal-start rate seam", Units: "units/s",
+		Family: "fixture", Context: c4cEqualContext, UpdateEvery: 1,
+	})
+	conn.Dimension(c4cEqualRateDim, "incremental", 1, 1)
+	conn.ChartDefinitionEnd(firstT, c4cEqualLast, c4cEqualLast)
+	servedEqual, err := conn.ServeReplication(
+		map[string]struct{ FirstT, LastT int64 }{
+			c4cEqualContext: {FirstT: firstT, LastT: c4cEqualLast},
+		},
+		c4cEqualLast,
+		func(_ string, after, before int64) []stream.ReplayRow {
+			return c4cEqualRateRows(after, before)
+		},
+		10*time.Minute,
+	)
+	if err != nil {
+		t.Fatalf("equal-start replication dialogue: %v (served %v)", err, servedEqual)
+	}
+	if servedEqual[c4cEqualContext] != c4cEqualRows {
+		t.Fatalf("equal-start replication served %d rows, want %d",
+			servedEqual[c4cEqualContext], c4cEqualRows)
+	}
+
 	conn.DefineChart(stream.Chart{
 		ID: c4cContext, Title: "plan switching", Units: "units",
 		Family: "fixture", Context: c4cContext, UpdateEvery: 1,
@@ -247,8 +328,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	conn.Dimension(c4cNegativeDim, "", 1, 1)
 	conn.Dimension(c4cDisjointDim, "", 1, 1)
 	conn.Dimension(c4cSplitDim, "", 1, 1)
-	firstT := int64(fixture.T0)
-	lastT := int64(fixture.T0 + c4cRows)
+	conn.Dimension(c4cSoleDim, "", 1, 1)
 	conn.ChartDefinitionEnd(firstT, lastT, lastT)
 
 	served, err := conn.ServeReplication(
@@ -258,7 +338,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 			rows := make([]stream.ReplayRow, 0, before-after)
 			for ts := after + 1; ts <= before; ts++ {
 				row := stream.ReplayRow{
-					T: ts, Dims: make([]stream.ReplayValue, c4cDims+5, c4cDims+7),
+					T: ts, Dims: make([]stream.ReplayValue, c4cDims+5, c4cDims+8),
 				}
 				for d := 0; d < c4cDims; d++ {
 					row.Dims[d] = stream.ReplayValue{
@@ -305,6 +385,13 @@ func TestLayer4PlanSwitching(t *testing.T) {
 						ID:        c4cSplitDim,
 						Collected: strconv.Itoa(c4cSplitValue),
 						Flags:     stream.FlagNotAnomalous,
+					})
+				}
+				if present, flags := c4cSolePoint(ts); present {
+					row.Dims = append(row.Dims, stream.ReplayValue{
+						ID:        c4cSoleDim,
+						Collected: strconv.Itoa(c4cSparseValue),
+						Flags:     flags,
 					})
 				}
 				rows = append(rows, row)
@@ -1741,6 +1828,119 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 		}
 	}
 
+	if !c4cSumConsumesSoleBufferedPoint(t, dd, lastT) {
+		ok = false
+	}
+	if !c4cRateSumOwnsEqualStartFinePoint(t, dd) {
+		ok = false
+	}
+
+	return ok
+}
+
+func c4cSumConsumesSoleBufferedPoint(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
+	t.Helper()
+
+	tiers := c4DimensionRetention(t, dd, c4cContext, "l4c-child", c4cSoleDim, lastT, 2)
+	wantTier0 := daemon.Retention{FirstEntry: fixture.T0 + 2021, LastEntry: fixture.T0 + 2021}
+	wantTier1 := daemon.Retention{FirstEntry: fixture.T0 + 100, LastEntry: fixture.T0 + 160}
+	if tiers[0] != wantTier0 || tiers[1] != wantTier1 {
+		t.Fatalf("sole-point seam cannot prove exhausted incoming read-ahead: got %+v, want tier0=%+v tier1=%+v",
+			tiers[:2], wantTier0, wantTier1)
+	}
+
+	after, before := int64(fixture.T0+41), int64(fixture.T0+2021)
+	params := daemon.DataParams(c4cContext, after, before, 1)
+	params.Set("time_group", "sum")
+	params.Set("scope_dimensions", c4cSoleDim)
+	params.Set("options", "jsonwrap|unaligned")
+	doc, err := dd.DataV3("l4c-child", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok := queryTimestampGridExact(t, doc,
+		queryExpectedVirtualGrid(t, after, before, 1, false))
+	if !assertTierPresence(t, doc, []bool{true, true, false}) {
+		ok = false
+	}
+	if points, valid := strictTierPoints(t, doc); !valid ||
+		points[0] != 1 || points[1] != 2 || points[2] != 0 {
+		t.Logf("sole-point seam tier reads = %v, want tier0=1 tier1=2 tier2=0", points)
+		ok = false
+	}
+	if !assertOnlyColumn(t, cols, c4cSoleDim) ||
+		!assertExactColumn(t, cols, c4cSoleDim, []expectedColumnPoint{
+			wantNumberWithPAAt(before, 61*c4cSparseValue, canon.AnnotationPartial),
+		}, 0) {
+		ok = false
+	}
+	if !ok {
+		t.Log("sole-point seam dropped the final buffered fine-tier point or changed its fixed grid/evidence")
+	}
+	return ok
+}
+
+func c4cRateSumOwnsEqualStartFinePoint(t *testing.T, dd *daemon.Daemon) bool {
+	t.Helper()
+
+	tiers := c4DimensionRetention(
+		t, dd, c4cEqualContext, "l4c-child", c4cEqualRateDim, c4cEqualLast, 2)
+	wantTier0 := daemon.Retention{FirstEntry: c4cEqualStart + 1, LastEntry: c4cEqualLast}
+	wantTier1 := daemon.Retention{FirstEntry: fixture.T0 + 100, LastEntry: c4cEqualStart + 60}
+	if tiers[0] != wantTier0 || tiers[1] != wantTier1 {
+		t.Fatalf("equal-start rate seam cannot prove a real page hole and coarse/fine ownership: "+
+			"got %+v, want tier0=%+v tier1=%+v", tiers[:2], wantTier0, wantTier1)
+	}
+
+	after, before := c4cEqualStart-20, c4cEqualStart+60
+	params := daemon.DataParams(c4cEqualContext, after, before, 3)
+	params.Set("time_group", "sum")
+	params.Set("scope_dimensions", c4cEqualRateDim)
+	params.Set("options", "jsonwrap|unaligned|raw")
+	doc, err := dd.DataV3("l4c-child", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok := queryTimestampGridExact(t, doc,
+		queryExpectedVirtualGrid(t, after, before, 3, false))
+	if !assertTierPresence(t, doc, []bool{true, true, false}) {
+		ok = false
+	}
+	if points, valid := strictTierPoints(t, doc); !valid || points[0] != 60 || points[1] == 0 {
+		t.Logf("equal-start rate seam tier reads = %v, want tier0=60 and tier1>0", points)
+		ok = false
+	}
+	if !assertOnlyColumn(t, cols, c4cEqualRateDim) ||
+		!assertExactColumn(t, cols, c4cEqualRateDim, []expectedColumnPoint{
+			wantNumberAt(c4cEqualStart+6, 6*c4cEqualRateValue),
+			wantNumberAt(c4cEqualStart+33, 27*c4cEqualRateValue),
+			wantNumberAt(c4cEqualStart+60, 27*c4cEqualRateValue),
+		}, 0) {
+		ok = false
+	}
+	stats, valid := strictDimensionStats(
+		t, doc, "db", []string{c4cEqualRateDim}, []string{"min", "max", "sum", "cnt"})
+	if !valid || stats[c4cEqualRateDim]["min"] != c4cEqualRateValue ||
+		stats[c4cEqualRateDim]["max"] != c4cEqualRateValue ||
+		stats[c4cEqualRateDim]["sum"] != 60*c4cEqualRateValue ||
+		stats[c4cEqualRateDim]["cnt"] != 60 {
+		t.Logf("equal-start rate seam raw statistics = %v, want min=max=1000 sum=60000 cnt=60",
+			stats[c4cEqualRateDim])
+		ok = false
+	}
+	if !ok {
+		t.Log("equal-start rate seam duplicated or lost coarse/fine volume, source evidence, or the fixed grid")
+	}
 	return ok
 }
 
