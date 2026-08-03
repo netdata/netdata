@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"io"
 	"log"
+	"strings"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -145,8 +146,8 @@ func newV3PacketParts(t testing.TB, spec V3Spec) (*gosnmp.GoSNMP, []gosnmp.SnmpP
 	if err != nil {
 		t.Fatalf("invalid test engine ID: %v", err)
 	}
-	authProto := snmputils.ParseSNMPv3AuthProtocol(spec.AuthProto)
-	privProto := snmputils.ParseSNMPv3PrivProtocol(spec.PrivProto)
+	authProto := snmputils.ParseSNMPv3AuthProtocol(strings.ToLower(spec.AuthProto))
+	privProto := snmputils.ParseSNMPv3PrivProtocol(strings.ToLower(spec.PrivProto))
 	security := &gosnmp.UsmSecurityParameters{
 		UserName:                 spec.User,
 		AuthenticationProtocol:   authProto,

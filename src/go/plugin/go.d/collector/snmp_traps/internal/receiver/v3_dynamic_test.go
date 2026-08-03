@@ -232,6 +232,48 @@ func TestParseRawV3HeaderRejectsMalformedRequiredFields(t *testing.T) {
 	}
 }
 
+func TestParseRawV3HeaderIgnoresReservedFlagBits(t *testing.T) {
+	header := testBERFields(
+		testBERElement(tagInteger, []byte{99}),
+		testBERElement(tagInteger, []byte{0x01, 0x00, 0x00}),
+		testBERElement(tagOctetStr, []byte{byte(gosnmp.Reportable) | 0x80}),
+		testBERElement(tagInteger, []byte{byte(gosnmp.UserSecurityModel)}),
+	)
+
+	msgID, reportable, err := parseRawV3Header(header)
+	if err != nil {
+		t.Fatalf("parseRawV3Header failed: %v", err)
+	}
+	if msgID != 99 || !reportable {
+		t.Fatalf("header = msgID %d/reportable %v, want 99/true", msgID, reportable)
+	}
+}
+
+func TestExtractRawV3ContextRejectsMalformedEnvelope(t *testing.T) {
+	data := buildV3DiscoveryProbe(t, 99)
+	fields := v3OuterFields(t, data)
+	if len(fields) != 4 {
+		t.Fatalf("outer field count = %d, want 4", len(fields))
+	}
+
+	invalidMsgData := append([]byte(nil), fields[3]...)
+	invalidMsgData[0] = tagInteger
+	tests := map[string][]byte{
+		"missing msgData":              berTLV(tagSequence, testBERFields(fields[:3]...)),
+		"invalid msgData tag":          berTLV(tagSequence, testBERFields(fields[0], fields[1], fields[2], invalidMsgData)),
+		"trailing outer field":         berTLV(tagSequence, testBERFields(append(fields, testBERElement(tagInteger, []byte{0}))...)),
+		"trailing bytes after message": append(append([]byte(nil), data...), 0),
+	}
+
+	for name, data := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := extractRawV3Context(data); err == nil {
+				t.Fatal("expected malformed v3 envelope to be rejected")
+			}
+		})
+	}
+}
+
 func TestParseRawUSMContextRejectsMalformedRequiredFields(t *testing.T) {
 	engineID, err := hex.DecodeString(testEngineIDHex)
 	if err != nil {
@@ -258,6 +300,14 @@ func TestParseRawUSMContextRejectsMalformedRequiredFields(t *testing.T) {
 			validBoots,
 			testBERElement(tagInteger, nil),
 			validUsername,
+			validAuth,
+			validPriv,
+		),
+		"username exceeds protocol maximum": testBERSequence(
+			validEngineID,
+			validBoots,
+			validTime,
+			testBERElement(tagOctetStr, make([]byte, 33)),
 			validAuth,
 			validPriv,
 		),
@@ -303,29 +353,39 @@ func TestParseRawUSMContextRejectsMalformedRequiredFields(t *testing.T) {
 	}
 }
 
-func TestMalformedDiscoveryHeaderDoesNotSendReport(t *testing.T) {
-	data := corruptV3HeaderFieldTag(t, buildV3DiscoveryProbe(t, 99), 1, tagOctetStr)
-	listenerConn, peerConn := informUDPConnPair(t)
-	defer listenerConn.Close()
-	defer peerConn.Close()
-
-	recv, _, _ := newDynamicTestReceiver(t, 0, RateLimitConfig{})
-	peer := peerConn.LocalAddr().(*net.UDPAddr)
-	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
-	if result.DecodeFailure == nil {
-		t.Fatalf("result = %+v, want decode failure", result)
+func TestMalformedDiscoveryRequestDoesNotSendReport(t *testing.T) {
+	probe := buildV3DiscoveryProbe(t, 99)
+	fields := v3OuterFields(t, probe)
+	tests := map[string][]byte{
+		"invalid header":  corruptV3HeaderFieldTag(t, probe, 1, tagOctetStr),
+		"missing msgData": berTLV(tagSequence, testBERFields(fields[:3]...)),
 	}
 
-	if err := peerConn.SetReadDeadline(time.Now().Add(50 * time.Millisecond)); err != nil {
-		t.Fatalf("set read deadline: %v", err)
-	}
-	buf := make([]byte, maxDatagramSize)
-	_, _, err := peerConn.ReadFromUDP(buf)
-	if err == nil {
-		t.Fatal("malformed discovery request received a Report")
-	}
-	if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
-		t.Fatalf("read response error = %v, want timeout", err)
+	for name, data := range tests {
+		t.Run(name, func(t *testing.T) {
+			listenerConn, peerConn := informUDPConnPair(t)
+			defer listenerConn.Close()
+			defer peerConn.Close()
+
+			recv, _, _ := newDynamicTestReceiver(t, 0, RateLimitConfig{})
+			peer := peerConn.LocalAddr().(*net.UDPAddr)
+			result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Conn: listenerConn, Peer: peer})
+			if result.DecodeFailure == nil {
+				t.Fatalf("result = %+v, want decode failure", result)
+			}
+
+			if err := peerConn.SetReadDeadline(time.Now().Add(50 * time.Millisecond)); err != nil {
+				t.Fatalf("set read deadline: %v", err)
+			}
+			buf := make([]byte, maxDatagramSize)
+			_, _, err := peerConn.ReadFromUDP(buf)
+			if err == nil {
+				t.Fatal("malformed discovery request received a Report")
+			}
+			if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
+				t.Fatalf("read response error = %v, want timeout", err)
+			}
+		})
 	}
 }
 
@@ -718,6 +778,25 @@ func corruptV3HeaderFieldTag(t *testing.T, data []byte, field int, replacement b
 	}
 	out[pos] = replacement
 	return out
+}
+
+func v3OuterFields(t *testing.T, data []byte) [][]byte {
+	t.Helper()
+	tag, valueStart, valueEnd, next, err := readBERElement(data, 0)
+	if err != nil || tag != tagSequence || next != len(data) {
+		t.Fatalf("parse outer sequence: tag=%#x next=%d/%d err=%v", tag, next, len(data), err)
+	}
+
+	var fields [][]byte
+	for pos := valueStart; pos < valueEnd; {
+		_, _, _, next, err := readBERElement(data[:valueEnd], pos)
+		if err != nil {
+			t.Fatalf("parse outer field %d: %v", len(fields), err)
+		}
+		fields = append(fields, append([]byte(nil), data[pos:next]...))
+		pos = next
+	}
+	return fields
 }
 
 func testBERElement(tag byte, value []byte) []byte {

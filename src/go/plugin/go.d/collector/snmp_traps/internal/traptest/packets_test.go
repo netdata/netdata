@@ -42,6 +42,13 @@ func TestV3PacketFlagsFollowParsedProtocols(t *testing.T) {
 			privKey:   "privpass",
 			want:      gosnmp.AuthPriv,
 		},
+		"uppercase auth-priv aliases": {
+			authProto: "SHA256",
+			privProto: "AES",
+			authKey:   "authpass",
+			privKey:   "privpass",
+			want:      gosnmp.AuthPriv,
+		},
 	}
 
 	for name, tc := range tests {

@@ -58,7 +58,7 @@ func parseRawV3Envelope(data []byte) (*rawV3Envelope, error) {
 		return nil, fmt.Errorf("too short for SNMPv3")
 	}
 
-	tag, valueStart, valueEnd, _, err := readBERElement(data, 0)
+	tag, valueStart, valueEnd, outerNext, err := readBERElement(data, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -86,12 +86,23 @@ func parseRawV3Envelope(data []byte) (*rawV3Envelope, error) {
 		return nil, fmt.Errorf("SNMPv3 header data is not a sequence")
 	}
 
-	tag, securityStart, securityEnd, _, err := readBERElement(data[:valueEnd], next)
+	tag, securityStart, securityEnd, next, err := readBERElement(data[:valueEnd], next)
 	if err != nil {
 		return nil, err
 	}
 	if tag != tagOctetStr {
 		return nil, fmt.Errorf("SNMPv3 security parameters are not an octet string")
+	}
+
+	tag, _, _, next, err = readBERElement(data[:valueEnd], next)
+	if err != nil {
+		return nil, err
+	}
+	if tag != tagSequence && tag != tagOctetStr {
+		return nil, fmt.Errorf("SNMPv3 msgData is neither plaintext nor encrypted")
+	}
+	if next != valueEnd || outerNext != len(data) {
+		return nil, fmt.Errorf("SNMPv3 message contains trailing fields")
 	}
 
 	return &rawV3Envelope{
@@ -136,7 +147,7 @@ func parseRawV3Header(data []byte) (msgID uint32, reportable bool, err error) {
 		return 0, false, fmt.Errorf("SNMPv3 msgFlags must contain exactly one byte")
 	}
 	flags := data[valueStart]
-	if flags&^byte(0x07) != 0 || flags&0x03 == 0x02 {
+	if flags&0x03 == 0x02 {
 		return 0, false, fmt.Errorf("SNMPv3 msgFlags is invalid")
 	}
 	reportable = flags&0x04 != 0
@@ -208,6 +219,9 @@ func parseRawUSMContext(data []byte, includeUsername bool) (engineID, username s
 	}
 	if tag != tagOctetStr {
 		return "", "", fmt.Errorf("SNMPv3 userName is not an octet string")
+	}
+	if valueEnd-valueStart > 32 {
+		return "", "", fmt.Errorf("SNMPv3 userName exceeds 32 bytes")
 	}
 	username = string(data[valueStart:valueEnd])
 
