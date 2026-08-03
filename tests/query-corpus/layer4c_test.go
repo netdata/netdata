@@ -1453,8 +1453,62 @@ func c4cSumFocusedSeams(t *testing.T, dd *daemon.Daemon, boundary int64) bool {
 			t.Logf("%s seam query did not combine the coarse prefix and fine suffix exactly", seam.label)
 			ok = false
 		}
+		if !c4cConstantDBStatisticsCoherent(t, doc, false) {
+			t.Logf("%s seam query corrupted its database point statistics", seam.label)
+			ok = false
+		}
+
+		params.Set("options", "jsonwrap|unaligned|raw")
+		rawDoc, err := dd.DataV3("l4c-child", params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !c4cConstantDBStatisticsCoherent(t, rawDoc, true) {
+			t.Logf("%s seam query corrupted its raw database point statistics", seam.label)
+			ok = false
+		}
 	}
 
+	return ok
+}
+
+func c4cConstantDBStatisticsCoherent(t *testing.T, doc map[string]any, raw bool) bool {
+	t.Helper()
+
+	fields := []string{"min", "avg", "max"}
+	if raw {
+		fields = []string{"min", "max", "sum", "cnt"}
+	}
+	stats, valid := strictDimensionStats(t, doc, "db", []string{c4cConstDim}, fields)
+	flat, found := stats[c4cConstDim]
+	if !found {
+		t.Logf("db dimension statistics do not contain %q", c4cConstDim)
+		return false
+	}
+
+	ok := valid
+	for _, field := range []string{"min", "max"} {
+		if flat[field] != c4cConstValue {
+			t.Logf("db.dimensions.sts.%s = %v, want exactly %d for a constant source",
+				field, flat[field], c4cConstValue)
+			ok = false
+		}
+	}
+	if raw {
+		count := flat["cnt"]
+		if count <= 0 || math.Trunc(count) != count {
+			t.Logf("db.dimensions.sts.cnt = %v, want a positive integer", count)
+			ok = false
+		} else if want := float64(c4cConstValue) * count; flat["sum"] != want {
+			t.Logf("db.dimensions.sts sum/count = %v/%v, want sum exactly %v for a constant source",
+				flat["sum"], count, want)
+			ok = false
+		}
+	} else if flat["avg"] != c4cConstValue {
+		t.Logf("db.dimensions.sts.avg = %v, want exactly %d for a constant source",
+			flat["avg"], c4cConstValue)
+		ok = false
+	}
 	return ok
 }
 
@@ -1629,9 +1683,10 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 		wantNumberAt(splitAfter+17*120, 61*c4cSplitValue)
 
 	for _, split := range []struct {
-		label           string
-		rowSpan, points int64
-		want            []expectedColumnPoint
+		label                   string
+		rowSpan, points         int64
+		queryAfterOffsetSeconds int64
+		want                    []expectedColumnPoint
 	}{
 		{
 			label:   "wide rows",
@@ -1644,15 +1699,25 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 			},
 		},
 		{
+			label:                   "one wide row",
+			rowSpan:                 2100,
+			points:                  1,
+			queryAfterOffsetSeconds: 1,
+			want: []expectedColumnPoint{
+				wantNumberAt(splitAfter+2100, 161*c4cSplitValue),
+			},
+		},
+		{
 			label:   "expired coarse record",
 			rowSpan: 120,
 			points:  17,
 			want:    expiredCoarseWant,
 		},
 	} {
+		splitQueryAfter := splitAfter + split.queryAfterOffsetSeconds
 		splitBefore := splitAfter + split.points*split.rowSpan
 		splitParams := daemon.DataParams(
-			c4cContext, splitAfter, splitBefore, split.points)
+			c4cContext, splitQueryAfter, splitBefore, split.points)
 		splitParams.Set("time_group", "sum")
 		splitParams.Set("scope_dimensions", c4cSplitDim)
 		splitParams.Set("options", "jsonwrap|unaligned")
@@ -1665,10 +1730,12 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 			t.Fatal(err)
 		}
 
-		if !assertExactView(t, splitDoc, splitAfter, splitBefore, split.rowSpan) ||
-			!assertTierPresence(t, splitDoc, []bool{true, true, false}) ||
-			!assertOnlyColumn(t, splitCols, c4cSplitDim) ||
-			!assertExactColumn(t, splitCols, c4cSplitDim, split.want, 0) {
+		gridOK := queryTimestampGridExact(t, splitDoc,
+			queryExpectedVirtualGrid(t, splitQueryAfter, splitBefore, split.points, false))
+		tiersOK := assertTierPresence(t, splitDoc, []bool{true, true, false})
+		columnOK := assertOnlyColumn(t, splitCols, c4cSplitDim)
+		valuesOK := assertExactColumn(t, splitCols, c4cSplitDim, split.want, 0)
+		if !gridOK || !tiersOK || !columnOK || !valuesOK {
 			t.Logf("split storage-gap tail %s violated exact coarse/fine ownership", split.label)
 			ok = false
 		}
