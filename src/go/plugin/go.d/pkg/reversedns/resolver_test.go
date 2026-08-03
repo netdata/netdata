@@ -687,7 +687,7 @@ func TestRandomizedCacheOperationsPreserveInvariants(t *testing.T) {
 	})
 	rng := rand.New(rand.NewSource(42))
 
-	for i := 0; i < 2_000; i++ {
+	for range 2_000 {
 		addr := testAddr(rng.Intn(200))
 		switch rng.Intn(4) {
 		case 0:
