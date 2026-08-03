@@ -1,6 +1,6 @@
-# LiteLLM operator model
+<!-- markdownlint-disable MD013 MD043 MD060 -->
 
-<!-- markdownlint-disable MD013 MD060 -->
+# LiteLLM operator model
 
 ## Evidence boundary
 

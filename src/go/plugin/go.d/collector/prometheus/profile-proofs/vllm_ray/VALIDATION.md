@@ -1,6 +1,6 @@
-# vLLM Ray Prometheus profile validation
+<!-- markdownlint-disable MD013 MD043 -->
 
-<!-- markdownlint-disable MD013 -->
+# vLLM Ray Prometheus profile validation
 
 ## Bounded source scope
 
@@ -42,7 +42,7 @@ source-complete synthetic PASS proves the contract; live Ray evidence can be add
 
 - Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml`.
 - Fixture: `src/go/plugin/go.d/collector/prometheus/testdata/vllm_ray_all_metrics.prom`.
-- Job input: `profile-proofs/vllm_ray/VALIDATION-JOB.yaml`.
+- Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml`.
 - Semantic proof: `OPERATOR-MODEL.md` and `SOURCE-INVENTORY.tsv`.
 - Evidence manifest: `EVIDENCE.md`.
 - Integrity manifest: `SHA256SUMS.tsv`.

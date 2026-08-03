@@ -1,6 +1,6 @@
-# Ceph profile evidence manifest
+<!-- markdownlint-disable MD013 MD043 -->
 
-<!-- markdownlint-disable MD013 -->
+# Ceph profile evidence manifest
 
 ## Supported source boundary
 
@@ -25,11 +25,12 @@
 
 ## Evidence classes and fixture provenance
 
-- `testdata/ceph_all_metrics.prom` is the sanitized structural union of the three Ceph releases, official producers, daemon
-  roles, modules, and optional transports. Values and identities are synthetic.
-- The seven `testdata/ceph_*_all_metrics.prom` producer fixtures separately preserve the Reef/Squid/Tentacle MGR and
-  ceph-exporter contracts plus NVMe-oF. Their expected strict failures are only dead charts/dimensions belonging to other
-  release/producer branches; each has zero generic fallback and zero unmatched series.
+- `src/go/plugin/go.d/collector/prometheus/testdata/ceph_all_metrics.prom` is the sanitized structural union of the three Ceph
+  releases, official producers, daemon roles, modules, and optional transports. Values and identities are synthetic.
+- The seven `src/go/plugin/go.d/collector/prometheus/testdata/ceph_*_all_metrics.prom` producer fixtures separately preserve
+  the Reef/Squid/Tentacle MGR and ceph-exporter contracts plus NVMe-oF. Expected strict failures are only dead
+  charts/dimensions from release/producer branches absent from that fixture; each has zero generic fallback and zero
+  unmatched series.
 - Dynamic raw family-name grammars are proven from pinned source. Relabeling retains their dynamic key as identity before
   mapping only finite source-known suffix branches onto stable canonical names.
 - The native Ceph Dashboard REST collector is a different source and does not narrow or suppress official exporter coverage.

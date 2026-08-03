@@ -24,8 +24,8 @@ Options:
   --directory <path>     analyze a subpath (default: <repo-root>)
   --format json|sarif    output format (default: json)
   --output PATH          explicit dump path (default: auto under .local/audits/codacy/)
-  --runner docker|local  installer to use (default: auto -- prefer local
-                         binary, fall back to docker, fall back to npm)
+  --runner docker|local  runner to use (default: auto -- prefer local
+                         binary, fall back to docker)
   -h, --help
 
 Required tools: docker (default) OR a local codacy-analysis-cli binary.

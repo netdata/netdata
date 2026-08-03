@@ -1,6 +1,6 @@
-# LiteLLM profile evidence manifest
+<!-- markdownlint-disable MD013 MD043 -->
 
-<!-- markdownlint-disable MD013 -->
+# LiteLLM profile evidence manifest
 
 ## Supported source boundary
 
@@ -27,8 +27,8 @@
 
 - A local authenticated scrape established LiteLLM 1.92.0 transport and the enabled subset. It remains private and does not
   define the supported surface.
-- `testdata/litellm_all_metrics.prom` is a sanitized structural union of observed and source-only callback, label-filtered,
-  single-process, and multiprocess shapes. Placeholder identities are synthetic.
+- `src/go/plugin/go.d/collector/prometheus/testdata/litellm_all_metrics.prom` is a sanitized structural union of observed and
+  source-only callback, label-filtered, single-process, and multiprocess shapes. Placeholder identities are synthetic.
 - Source registration, HELP, type, bucket, and service files used by the fixture are byte-identical across the structural and
   current comparison revisions; update callsites supply the label and optionality evidence.
 - `SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner, identity, population, unit algebra,

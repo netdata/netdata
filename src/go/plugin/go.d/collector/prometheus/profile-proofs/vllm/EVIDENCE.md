@@ -1,6 +1,6 @@
-# vLLM profile evidence manifest
+<!-- markdownlint-disable MD013 MD043 -->
 
-<!-- markdownlint-disable MD013 -->
+# vLLM profile evidence manifest
 
 ## Supported source boundary
 
@@ -26,8 +26,8 @@
 
 - A read-only local scrape established the native endpoint transport and enabled subset. It remains private because it carries
   deployment labels and values; it does not define the supported surface.
-- `testdata/vllm_all_metrics.prom` is a sanitized synthetic union built from the pinned registrations, update callsites, and
-  the observed label shapes. Placeholder values and identities are non-production.
+- `src/go/plugin/go.d/collector/prometheus/testdata/vllm_all_metrics.prom` is a sanitized synthetic union built from the
+  pinned registrations, update callsites, and observed label shapes. Placeholder values and identities are non-production.
 - Source-only families prove schema and routing, not live enablement, cadence, value distribution, or cardinality.
 - `SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner, identity, population, unit algebra,
   availability gate, disposition, and authored destination.

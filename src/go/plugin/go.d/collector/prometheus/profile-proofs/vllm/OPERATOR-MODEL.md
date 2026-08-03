@@ -1,6 +1,6 @@
-# vLLM Prometheus Operator Model
+<!-- markdownlint-disable MD013 MD043 MD060 -->
 
-<!-- markdownlint-disable MD013 MD060 -->
+# vLLM Prometheus Operator Model
 
 ## Evidence boundary
 

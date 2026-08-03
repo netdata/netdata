@@ -1,6 +1,6 @@
-# Stock Prometheus profile proofs
+<!-- markdownlint-disable MD013 MD043 -->
 
-<!-- markdownlint-disable MD013 -->
+# Stock Prometheus profile proofs
 
 This directory contains the durable authoring proof for stock Prometheus profiles whose source surface cannot be established
 from one live endpoint. Each profile directory records the operator model, the source-to-profile reconciliation, the evidence
@@ -16,8 +16,8 @@ boundary, the exact committed-input hashes, and the authoritative validation res
   evidence, fixture provenance, and reproducible validation commands.
 - `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the objective validator and mirrors the
   recommended metadata example without endpoint or authentication settings.
-- `SHA256SUMS.tsv` fingerprints the final profile, sanitized fixture inputs, metadata job-policy source, operator model, and
-  source inventory. It intentionally does not hash itself or transient validator reports.
+- `SHA256SUMS.tsv` fingerprints the final profile, sanitized fixture inputs, metadata job-policy source, validation job,
+  operator model, and source inventory. It intentionally does not hash itself or transient validator reports.
 - `VALIDATION.md` states the authoritative PASS result, counts, loss boundary, and evidence limitations.
 
 ## Evidence boundary

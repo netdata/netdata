@@ -1,6 +1,6 @@
-# vLLM Ray profile evidence manifest
+<!-- markdownlint-disable MD013 MD043 -->
 
-<!-- markdownlint-disable MD013 -->
+# vLLM Ray profile evidence manifest
 
 ## Supported source boundary
 
@@ -21,8 +21,8 @@
 
 ## Evidence classes and fixture provenance
 
-- `testdata/vllm_ray_all_metrics.prom` is a sanitized source-derived structural union. No live Ray deployment was used or is
-  claimed.
+- `src/go/plugin/go.d/collector/prometheus/testdata/vllm_ray_all_metrics.prom` is a sanitized source-derived structural
+  union. No live Ray deployment was used or is claimed.
 - The fixture preserves Ray replica/worker identity and includes mutually optional vLLM features plus the source-proven alias
   behavior with placeholder values.
 - `SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner, identity, population, unit algebra,

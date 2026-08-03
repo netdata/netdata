@@ -184,6 +184,16 @@ and template-controlled spacing that conflict with the repository's markdownlint
 rules. Validate `metadata.yaml`, generator source, generated-doc reproducibility,
 and Learn ingestion instead; never hand-edit generated pages to clear Codacy.
 
+Operational gotcha: Codacy Cloud can enable markdownlint `MD043` with an empty
+required heading sequence. It reports one finding per new Markdown file as
+`Expected: [None]; Actual: # ...`, even though a structured document correctly
+needs headings. Do not delete the headings. Follow the repository's existing
+suppression pattern by placing `<!-- markdownlint-disable ... MD043 -->` or
+`<!-- markdownlint-disable-file ... MD043 -->` before the first heading; a
+directive after the heading is too late to suppress that finding. If the document
+participates in an integrity manifest, refresh its hash and byte count after
+moving the directive. See `how-tos/resolve-md043-none-heading-findings.md`.
+
 To restrict to a single tool (matches what Codacy reported on a CI run):
 
 ```

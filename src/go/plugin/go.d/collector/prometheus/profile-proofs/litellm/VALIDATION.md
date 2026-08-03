@@ -1,6 +1,6 @@
-# LiteLLM Prometheus profile validation
+<!-- markdownlint-disable MD013 MD043 -->
 
-<!-- markdownlint-disable MD013 -->
+# LiteLLM Prometheus profile validation
 
 ## Bounded source scope
 
@@ -56,7 +56,7 @@ rollout check, not part of this source-completeness claim.
 
 - Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml`.
 - Fixture: `src/go/plugin/go.d/collector/prometheus/testdata/litellm_all_metrics.prom`.
-- Job input: `profile-proofs/litellm/VALIDATION-JOB.yaml`.
+- Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml`.
 - Semantic proof: `OPERATOR-MODEL.md` and `SOURCE-INVENTORY.tsv`.
 - Evidence manifest: `EVIDENCE.md`.
 - Integrity manifest: `SHA256SUMS.tsv`.

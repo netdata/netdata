@@ -1,6 +1,6 @@
-# vLLM Prometheus profile validation
+<!-- markdownlint-disable MD013 MD043 -->
 
-<!-- markdownlint-disable MD013 -->
+# vLLM Prometheus profile validation
 
 ## Bounded source scope
 
@@ -37,7 +37,7 @@ collector failure. Live deployment validation is an operational rollout check, n
 
 - Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm.yaml`.
 - Fixture: `src/go/plugin/go.d/collector/prometheus/testdata/vllm_all_metrics.prom`.
-- Job input: `profile-proofs/vllm/VALIDATION-JOB.yaml`.
+- Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION-JOB.yaml`.
 - Semantic proof: `OPERATOR-MODEL.md` and `SOURCE-INVENTORY.tsv`.
 - Evidence manifest: `EVIDENCE.md`.
 - Integrity manifest: `SHA256SUMS.tsv`.

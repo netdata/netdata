@@ -56,10 +56,9 @@ func TestProcessor_Apply(t *testing.T) {
 		},
 		"labelmap can rewrite __name__ from an application label": {
 			cfgs: []Config{{
-				SourceLabels: []string{commonmodel.MetricNameLabel},
-				Regex:        MustNewRegexp("metric_name"),
-				Replacement:  commonmodel.MetricNameLabel,
-				Action:       LabelMap,
+				Regex:       MustNewRegexp("metric_name"),
+				Replacement: commonmodel.MetricNameLabel,
+				Action:      LabelMap,
 			}},
 			in: sample("original_metric", map[string]string{
 				"metric_name": "renamed_metric",

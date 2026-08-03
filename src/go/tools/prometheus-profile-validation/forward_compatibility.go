@@ -446,7 +446,7 @@ func uncoveredWildcardProfileTerms(profileMatch string, allows []string) []strin
 	}
 
 	var required []string
-	for _, term := range strings.Fields(profileMatch) {
+	for term := range strings.FieldsSeq(profileMatch) {
 		if strings.HasPrefix(term, "!") || !hasUnescapedGlobMeta(term) {
 			continue
 		}
@@ -509,7 +509,7 @@ func unconstrainedMetricPattern(selector string) (string, bool) {
 func exactRelabelBlockMetricScope(matchExpr string) ([]string, bool) {
 	hasPositive := false
 	var names []string
-	for _, term := range strings.Fields(matchExpr) {
+	for term := range strings.FieldsSeq(matchExpr) {
 		if strings.HasPrefix(term, "!") {
 			continue
 		}
@@ -698,12 +698,7 @@ func regexpCanMatchEmpty(re *syntax.Regexp) bool {
 		}
 		return true
 	case syntax.OpAlternate:
-		for _, sub := range re.Sub {
-			if regexpCanMatchEmpty(sub) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(re.Sub, regexpCanMatchEmpty)
 	case syntax.OpRepeat:
 		return re.Min == 0 || len(re.Sub) == 0 || regexpCanMatchEmpty(re.Sub[0])
 	default:
@@ -973,11 +968,8 @@ func laterRelabelBlocksPreserveLabel(
 			if err != nil {
 				return false
 			}
-			for _, name := range possibleNames {
-				if match.MatchString(name) {
-					reachable = true
-					break
-				}
+			if slices.ContainsFunc(possibleNames, match.MatchString) {
+				reachable = true
 			}
 		}
 		if !reachable {
@@ -1040,12 +1032,7 @@ func relabelRuleMayApplyToMetricNames(rule relabel.Config, action relabel.Action
 		len(rule.SourceLabels) != 1 || rule.SourceLabels[0] != labels.MetricName {
 		return true
 	}
-	for _, name := range possibleNames {
-		if rule.Regex.MatchString(name) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(possibleNames, rule.Regex.MatchString)
 }
 
 func finiteMetricNamesAfterRelabelRule(
@@ -1386,10 +1373,8 @@ func enumerateFiniteRegexp(re *syntax.Regexp, limit int) ([]string, bool) {
 		if !finite {
 			return nil, false
 		}
-		for _, value := range part {
-			if value == "" {
-				return part, true
-			}
+		if slices.Contains(part, "") {
+			return part, true
 		}
 		if len(part) == limit {
 			return nil, false
@@ -1482,9 +1467,9 @@ type simplePatternPositiveBranch struct {
 func orderedSimplePatternPositiveBranches(expr string) []simplePatternPositiveBranch {
 	var branches []simplePatternPositiveBranch
 	var negatives []string
-	for _, term := range strings.Fields(expr) {
-		if strings.HasPrefix(term, "!") {
-			negatives = append(negatives, strings.TrimPrefix(term, "!"))
+	for term := range strings.FieldsSeq(expr) {
+		if after, ok := strings.CutPrefix(term, "!"); ok {
+			negatives = append(negatives, after)
 			continue
 		}
 		branches = append(branches, simplePatternPositiveBranch{
@@ -1983,9 +1968,9 @@ func syntheticFutureMetricTerms(matchExpr string) ([]futureMetricTermCanaries, b
 	hasWildcard := false
 	var terms []futureMetricTermCanaries
 	var earlierNegatives []string
-	for _, term := range strings.Fields(matchExpr) {
-		if strings.HasPrefix(term, "!") {
-			earlierNegatives = append(earlierNegatives, strings.TrimPrefix(term, "!"))
+	for term := range strings.FieldsSeq(matchExpr) {
+		if after, ok := strings.CutPrefix(term, "!"); ok {
+			earlierNegatives = append(earlierNegatives, after)
 			continue
 		}
 		if !hasUnescapedGlobMeta(term) {
@@ -1997,7 +1982,7 @@ func syntheticFutureMetricTerms(matchExpr string) ([]futureMetricTermCanaries, b
 			earlierNegatives: append([]string(nil), earlierNegatives...),
 		}
 		seen := make(map[string]struct{})
-		for attempt := 0; attempt < len(metricNameCandidateAlphabet)*4; attempt++ {
+		for attempt := range len(metricNameCandidateAlphabet) * 4 {
 			candidate, ok := syntheticMetricFromGlob(term, attempt)
 			if ok && prometheusMetricNamePattern.MatchString(candidate) && scope.MatchString(candidate) {
 				if _, ok := seen[candidate]; !ok {
@@ -2099,7 +2084,7 @@ func syntheticGlobClassValue(class string, offset int) (byte, bool) {
 		return 0, false
 	}
 	var candidates []byte
-	for i := 0; i < len(metricNameCandidateAlphabet); i++ {
+	for i := range len(metricNameCandidateAlphabet) {
 		candidate := metricNameCandidateAlphabet[i]
 		if classMatcher.MatchString(string(candidate)) {
 			candidates = append(candidates, candidate)

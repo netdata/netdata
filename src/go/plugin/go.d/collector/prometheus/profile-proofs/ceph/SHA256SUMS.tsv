@@ -1,10 +1,10 @@
 sha256	bytes	path
 f0555b266e4142abdc7e857dbf5fc73c398633fecf78e22335dac2dbbe6ccd92	223877	src/go/plugin/go.d/collector/prometheus/metadata.yaml
-d3fa691af73768eb9df96cb42fc9f5132d5c1386055110d7167ed54ac573f51c	3571	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/EVIDENCE.md
-01e7a49d57f2a7114876d04121720129e44cde733e96070e543812de38fc5a31	14621	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/OPERATOR-MODEL.md
+f6fb2785f3be985b1cd6ee6ada0bcd7d40497af4c391520506a650059398eeb5	3664	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/EVIDENCE.md
+bd75ac3a8119be4a92f1288f98575a6af8c1a4f66f048598d81eb10bb79ebf65	14627	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/OPERATOR-MODEL.md
 f03d56c6ae9370edcd27ebae533840f632fdd33da22aaa0ae4609e2e0719d265	2549169	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/SOURCE-INVENTORY.tsv
 8dab747182a63aed126a1dd28aa27479a33761dd4bcd04b7c032d2b389d580b7	14838	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml
-650f15bf1a26735eb5854d8cc483b6e92e222b4e564ebffd93f3b98292901f1f	6010	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION.md
+c32768bef2441b80ead349b297c1b15a9b305b37e0a822e42e1ec624fb73850f	6056	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION.md
 9961bc27e3b68153699b83b55bc600b28ee419613dff777a4753459341014fda	426109	src/go/plugin/go.d/collector/prometheus/testdata/ceph_all_metrics.prom
 bfd7c2954f80f266a15c11b136bffd5fd80748054e43ffaebce7edfc8bda3295	6536	src/go/plugin/go.d/collector/prometheus/testdata/ceph_nvmeof_all_metrics.prom
 df8a88bd328bbef03acae996895e12e3a38c09f2292de1a45a4da9dd83cbec8a	385104	src/go/plugin/go.d/collector/prometheus/testdata/ceph_reef_exporter_prio0_all_metrics.prom

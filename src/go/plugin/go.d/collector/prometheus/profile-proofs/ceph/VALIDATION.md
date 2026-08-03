@@ -1,6 +1,6 @@
-# Ceph Prometheus profile validation
+<!-- markdownlint-disable MD013 MD043 MD060 -->
 
-<!-- markdownlint-disable MD013 MD060 -->
+# Ceph Prometheus profile validation
 
 ## Bounded source scope
 
@@ -77,7 +77,7 @@ the source-completeness proof, and no Ceph daemon, exporter, or Ceph configurati
 
 - Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml`.
 - Union and producer fixtures: `src/go/plugin/go.d/collector/prometheus/testdata/ceph*_all_metrics.prom`.
-- Job input: `profile-proofs/ceph/VALIDATION-JOB.yaml`.
+- Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml`.
 - Semantic proof: `OPERATOR-MODEL.md` and `SOURCE-INVENTORY.tsv`.
 - Evidence manifest: `EVIDENCE.md`.
 - Integrity manifest: `SHA256SUMS.tsv`.

@@ -1,9 +1,9 @@
 sha256	bytes	path
 f0555b266e4142abdc7e857dbf5fc73c398633fecf78e22335dac2dbbe6ccd92	223877	src/go/plugin/go.d/collector/prometheus/metadata.yaml
-2b11e46fa8fae9b57ef5c09b27ca91f73d525aa297476172df94c879025a07b2	3110	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/EVIDENCE.md
-c582c9c00077dca0be330f3947ffd5325df001e21eb8ed8e930480e9793c8116	42090	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/OPERATOR-MODEL.md
+a26898933847a721de96875b2526ab387ef4a662b3282a1eef9bd663436aaa7f	3152	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/EVIDENCE.md
+36c8d4dbedf558dab7a45fcec20dc58e09c5e013c072e5d311d0b0730d76e32a	42096	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/OPERATOR-MODEL.md
 6225e193fa03bc7c5de204cc2aca41e2b73df8e7d16f2574f6454a5bdb5019b7	246877	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/SOURCE-INVENTORY.tsv
 1c0f0eee4d11f2a990347f164bfe3a5e1d5e1628621eb546e4f7ab11013b00b2	3945	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION-JOB.yaml
-971c471f2978af3bc366fc18ef34e4a533b1ec01b96de30ee9f35cabe71cf4aa	2770	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION.md
+705f052f26b2aaf45bf7471d2b6027588b0e51ab7ef5457543a46d1bf7152eeb	2816	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION.md
 3b614f56c64d12f8097fa7e8627d5d2f3177ad9a306af3f67231e3b1cfc5d92a	117939	src/go/plugin/go.d/collector/prometheus/testdata/vllm_all_metrics.prom
 5a97a19b3e2b504268069e4f23adca8a8aa6c2c97a114f5e2b273f6748b0149a	57651	src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm.yaml
