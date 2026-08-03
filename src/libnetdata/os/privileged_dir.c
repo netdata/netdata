@@ -8,8 +8,10 @@
 #endif
 
 bool os_dir_path_trim(const char *path, char *dst, size_t dst_size) {
-    if(!path || !*path || !dst || !dst_size)
+    if(!path || !*path || !dst || !dst_size) {
+        errno = EINVAL;
         return false;
+    }
 
     size_t len = strlen(path);
 
@@ -41,11 +43,15 @@ bool os_dir_path_trim(const char *path, char *dst, size_t dst_size) {
 
     size_t component = len - cut;
     if((component == 1 && path[cut] == '.') ||
-       (component == 2 && path[cut] == '.' && path[cut + 1] == '.'))
+       (component == 2 && path[cut] == '.' && path[cut + 1] == '.')) {
+        errno = EINVAL;
         return false;
+    }
 
-    if(len >= dst_size)
+    if(len >= dst_size) {
+        errno = ENAMETOOLONG;
         return false;
+    }
 
     memcpy(dst, path, len);
     dst[len] = '\0';
@@ -104,10 +110,9 @@ int os_open_dir_privileged(const char *path) {
     // A configured path may carry a trailing slash, which would make O_NOFOLLOW
     // below a no-op. Decide and open on the trimmed path, never on the original.
     char dir[FILENAME_MAX + 1];
-    if(!os_dir_path_trim(path, dir, sizeof(dir))) {
-        errno = ENAMETOOLONG;
+    if(!os_dir_path_trim(path, dir, sizeof(dir)))
+        // errno is already EINVAL (nothing left to name) or ENAMETOOLONG
         return -1;
-    }
 
     int flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC;
 

@@ -27,6 +27,26 @@ static void check(const char *what, const char *dir, bool expected) {
     }
 }
 
+// os_open_dir_privileged() reports its trimming failures through errno, and the
+// caller logs it: a path with nothing left to name must not be reported as if it
+// were too long.
+static void check_trim_errno(const char *what, const char *path, char *dst, size_t dst_size, int expected) {
+    errno = 0;
+    if (os_dir_path_trim(path, dst, dst_size)) {
+        fprintf(stderr, "  FAILED   %-52s trimmed, expected failure\n", what);
+        failures++;
+        return;
+    }
+
+    if (errno == expected)
+        fprintf(stderr, "  ok       %-52s (%s)\n", what, strerror(errno));
+    else {
+        fprintf(stderr, "  FAILED   %-52s errno %s, expected %s\n",
+                what, strerror(errno), strerror(expected));
+        failures++;
+    }
+}
+
 // Build "<root_dir>/<name>" into buf.
 static const char *under(char *buf, size_t size, const char *name) {
     snprintfz(buf, size, "%s/%s", root_dir, name);
@@ -120,6 +140,17 @@ int main(void) {
     snprintfz(p, sizeof(p), "%s/ours", open_parent);
     make_parent(p, 0755);
     check("world-writable parent without the sticky bit", p, false);
+
+    fprintf(stderr, "trim failures, as reported to the caller:\n");
+    {
+        char small[8];
+        check_trim_errno("NULL path", NULL, small, sizeof(small), EINVAL);
+        check_trim_errno("empty path", "", small, sizeof(small), EINVAL);
+        // "/x/." normalises to "/x"; these are the shapes with no entry left
+        check_trim_errno("the cwd itself, '.'", ".", p, sizeof(p), EINVAL);
+        check_trim_errno("path ending in '..'", "/var/lib/netdata/..", p, sizeof(p), EINVAL);
+        check_trim_errno("path longer than the buffer", "/var/lib/netdata", small, sizeof(small), ENAMETOOLONG);
+    }
 
     fprintf(stderr, "cases that need root:\n");
     if (geteuid() != 0) {
