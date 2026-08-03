@@ -4,7 +4,11 @@ An OpenTelemetry Collector can count matching log records and export the result 
 
 Use this for operational trend monitoring, not durable audit counts. The count connector emits monotonic delta sums, which Netdata rate-normalizes over the chart interval. Collector restarts and pipeline delivery failures can affect the result.
 
-> The count connector and filter processor have alpha stability in OpenTelemetry Collector Contrib `0.157.0`, the version used to validate this example. Review their upstream stability before upgrading the Collector.
+:::caution
+
+The count connector and filter processor have alpha stability in OpenTelemetry Collector Contrib `0.157.0`, the version used to validate this example. Review their upstream stability before upgrading the Collector.
+
+:::
 
 Before you begin, complete the prerequisites and local exporter setup in [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md), including the Netdata Cloud sign-in required to verify `otel-logs`.
 
