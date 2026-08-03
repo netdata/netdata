@@ -174,7 +174,7 @@ func TestWriterCloseReturnsWorkerFailure(t *testing.T) {
 	w, err := newTestSDKWriter(dir, Config{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 
-	tw := newWriter(w, Options{QueueCapacity: 10})
+	tw := newWriter(w, w.cfg, 10, nil)
 	require.NoError(t, tw.Start())
 	require.NoError(t, tw.Write(nil))
 

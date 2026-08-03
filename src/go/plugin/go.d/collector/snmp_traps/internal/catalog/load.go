@@ -20,7 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
-var maxProfileFileBytes int64 = 128 * 1024 * 1024
+const maxProfileFileBytes int64 = 128 * 1024 * 1024
 
 var profileIdentityRE = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
@@ -64,7 +64,7 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 		return nil, fmt.Errorf("load trap profile files: %w", err)
 	}
 
-	index := NewEpoch()
+	index := newEpoch()
 	var userBundles []profileLoadBundle
 	for _, named := range sources.InOrder() {
 		source := named.Profile
@@ -132,7 +132,7 @@ func (idx *Epoch) addBundleAtomic(bundle profileLoadBundle, stockProfile ...stri
 	idx.publishMu.Lock()
 	defer idx.publishMu.Unlock()
 
-	staged := NewEpoch()
+	staged := newEpoch()
 	staged.base = idx
 	staged.validationStockProfile = currentStockProfile
 	if len(dependencies.traps) > 0 || len(dependencies.metrics) > 0 || len(dependencies.charts) > 0 {
@@ -495,14 +495,18 @@ func parseProfileBundle(filename string, content []byte) (profileLoadBundle, err
 }
 
 func readProfileFile(filename string) ([]byte, error) {
-	return readCompressedFile(filename)
+	return readProfileFileLimited(filename, maxProfileFileBytes)
+}
+
+func readProfileFileLimited(filename string, maxBytes int64) ([]byte, error) {
+	return readCompressedFile(filename, maxBytes)
 }
 
 func readCatalogueFile(filename string) ([]byte, error) {
-	return readCompressedFile(filename)
+	return readCompressedFile(filename, maxProfileFileBytes)
 }
 
-func readCompressedFile(filename string) ([]byte, error) {
+func readCompressedFile(filename string, maxBytes int64) ([]byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -520,13 +524,13 @@ func readCompressedFile(filename string) ([]byte, error) {
 		r = zr
 	}
 
-	lr := io.LimitReader(r, maxProfileFileBytes+1)
+	lr := io.LimitReader(r, maxBytes+1)
 	data, err := io.ReadAll(lr)
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(data)) > maxProfileFileBytes {
-		return nil, fmt.Errorf("profile file %q exceeds maximum decompressed size %d bytes", filename, maxProfileFileBytes)
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("profile file %q exceeds maximum decompressed size %d bytes", filename, maxBytes)
 	}
 	return data, nil
 }

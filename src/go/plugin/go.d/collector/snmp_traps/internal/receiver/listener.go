@@ -16,10 +16,6 @@ const (
 	listenerReadErrorBackoff = 100 * time.Millisecond
 )
 
-var setUDPReadBuffer = func(conn *net.UDPConn, bytes int) error {
-	return conn.SetReadBuffer(bytes)
-}
-
 type listenerEndpoint struct {
 	conn *net.UDPConn
 	cfg  Endpoint
@@ -34,6 +30,12 @@ type listener struct {
 }
 
 func newListener(cfg ListenConfig, report Reporter) (*listener, []Event, error) {
+	return newListenerWithReadBuffer(cfg, report, func(conn *net.UDPConn, bytes int) error {
+		return conn.SetReadBuffer(bytes)
+	})
+}
+
+func newListenerWithReadBuffer(cfg ListenConfig, report Reporter, setReadBuffer func(*net.UDPConn, int) error) (*listener, []Event, error) {
 	l := &listener{report: report}
 	var bindEvents []Event
 
@@ -54,7 +56,7 @@ func newListener(cfg ListenConfig, report Reporter) (*listener, []Event, error) 
 			return nil, nil, fmt.Errorf("endpoint %d: bind %s: %w", i, addr, err)
 		}
 		if cfg.ReceiveBuffer > 0 {
-			if err := setUDPReadBuffer(conn, cfg.ReceiveBuffer); err != nil {
+			if err := setReadBuffer(conn, cfg.ReceiveBuffer); err != nil {
 				if cfg.ReceiveBuffer != DefaultReceiveBuffer {
 					conn.Close()
 					closeConns(bound)

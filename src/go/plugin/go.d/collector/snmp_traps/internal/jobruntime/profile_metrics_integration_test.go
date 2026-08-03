@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package jobruntime
 
 import (
 	"errors"
@@ -45,7 +45,7 @@ metrics:
 	policy, err := profilemetrics.Normalize(true, []string{"snmp.cold_start"})
 	require.NoError(t, err)
 	rt, err := profilemetrics.New(policy, lease.Epoch(), profilemetrics.Options{
-		BaseChartTemplateYAML: chartTemplateYAML,
+		BaseChartTemplateYAML: testBaseChartTemplate(),
 		SourceHashSalt:        "test",
 	})
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ metrics:
 	}
 
 	successWriter := &mockTrapWriter{}
-	c.trapWriter = successWriter
+	c.writer = successWriter
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	require.Len(t, successWriter.entries, 1)
 
@@ -111,7 +111,7 @@ func newRootTestProfileMetricRuntime(t *testing.T) *profilemetrics.Runtime {
 	policy, err := profilemetrics.Normalize(true, []string{"cisco.config.changed"})
 	require.NoError(t, err)
 	rt, err := profilemetrics.New(policy, lease.Epoch(), profilemetrics.Options{
-		BaseChartTemplateYAML: chartTemplateYAML,
+		BaseChartTemplateYAML: testBaseChartTemplate(),
 		SourceHashSalt:        "test",
 	})
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ metrics:
 `)
 }
 
-func rootTestProfileCatalogPaths(t *testing.T) catalog.Paths {
+func rootTestProfileCatalogPaths(t testing.TB) catalog.Paths {
 	t.Helper()
 	root := t.TempDir()
 	userDir := filepath.Join(root, "user")

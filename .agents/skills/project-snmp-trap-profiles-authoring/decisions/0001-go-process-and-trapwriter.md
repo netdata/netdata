@@ -140,6 +140,15 @@ Registration in `src/go/plugin/go.d/collector/init.go`:
 _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 ```
 
+#### Final ownership outcome
+
+The initial layout above was an implementation starting point. The completed ownership split keeps the selected
+in-process model and writer contract, but moves all per-job lifecycle and packet orchestration into
+`internal/jobruntime`. The root `collector.go` is now the framework adapter; `config.go` / `init.go` own public DTOs and
+normalization; `register.go` / `services.go` compose plugin-scoped services; and `internal/jobruntime` owns acquired
+resources, rollback, cleanup, synchronous packet handling, and metric collection. The former root `pipeline.go`,
+`decode_error.go`, `enrich.go`, and compatibility bridge files were removed rather than retained as forwarding layers.
+
 ### 2. Journal Writer Backend
 
 `internal/output/journal` owns the journal backend. It does **not** implement the systemd journal binary format locally;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package jobruntime
 
 import (
 	"bytes"
@@ -49,20 +49,18 @@ func buildBenchV2cTrap(b testing.TB, community, trapOID string, extra ...gosnmp.
 
 func setBenchProfileIndex(b *testing.B, traps map[string]*TrapDef) *catalog.Epoch {
 	b.Helper()
+	paths := rootTestProfileCatalogPaths(b)
+	defs := make([]*TrapDef, 0, len(traps))
 	for _, trap := range traps {
-		if err := catalog.PrepareTrap(trap); err != nil {
-			b.Fatalf("compile benchmark trap templates: %v", err)
-		}
+		defs = append(defs, trap)
 	}
-	idx := catalog.NewEpoch()
-	trapDefs := make([]*TrapDef, 0, len(traps))
-	for _, trap := range traps {
-		trapDefs = append(trapDefs, trap)
-	}
-	if err := idx.AddTraps(trapDefs); err != nil {
+	writeProfileYAML(b, paths.UserDirs[0], "benchmark.yaml", map[string]any{"traps": defs})
+	lease, err := catalog.NewManager(paths).Acquire()
+	if err != nil {
 		b.Fatalf("build benchmark profile index: %v", err)
 	}
-	return idx
+	b.Cleanup(lease.Close)
+	return lease.Epoch()
 }
 
 // countingWriter is an in-memory sink that counts trap entries without
@@ -90,8 +88,17 @@ func newBenchmarkTelemetry(jobName string) *telemetry.Job {
 	return telemetry.NewRegistry().Attach(jobName, telemetry.Options{})
 }
 
+func newBenchmarkJob(jobName string, writer output.Writer, idx *catalog.Epoch) *Job {
+	return &Job{
+		policy:       NewPolicy(PolicyConfig{JobName: jobName}),
+		writer:       writer,
+		telemetry:    newBenchmarkTelemetry(jobName),
+		profileIndex: idx,
+	}
+}
+
 // ---------------------------------------------------------------------------
-// End-to-end packet path through Collector.handlePacket
+// End-to-end packet path through Job.handlePacket
 // ---------------------------------------------------------------------------
 
 func BenchmarkPacketTrap(b *testing.B) {
@@ -116,12 +123,7 @@ func BenchmarkPacketTrap(b *testing.B) {
 	const jobName = "bench-pkt"
 
 	writer := &countingWriter{}
-	c := &Collector{
-		Config:       Config{Name: jobName},
-		trapWriter:   writer,
-		telemetry:    newBenchmarkTelemetry(jobName),
-		profileIndex: idx,
-	}
+	c := newBenchmarkJob(jobName, writer, idx)
 	c.receiver = newTestReceiver(c, receiver.PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"public"}})
 
 	b.ReportAllocs()
@@ -180,7 +182,7 @@ func BenchmarkTrapEnrichmentMatchingRegistryTopology(b *testing.B) {
 		b.Fatalf("prewarm reverse DNS: %v", err)
 	}
 	c, store := newTestTrapEnrichmentCollector(topology, dns)
-	c.reverseDNSEnabled = true
+	c.policy.reverseDNSEnabled = true
 	store.Register("benchmark:"+sourceIP, ddsnmp.DeviceConnectionInfo{
 		Hostname:      sourceIP,
 		VnodeHostname: "registry-device.example.test",
@@ -226,7 +228,7 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 			}})
 			topologyByIP := make(map[string]*snmptopology.TrapTopologyEnrichment, numJobs)
 			writers := make([]*countingWriter, numJobs)
-			collectors := make([]*Collector, numJobs)
+			collectors := make([]*Job, numJobs)
 			peers := make([]net.IP, numJobs)
 			for i := range numJobs {
 				sourceIP := fmt.Sprintf("192.0.2.%d", i+1)
@@ -253,14 +255,10 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 				}
 
 				writers[i] = &countingWriter{}
-				collectors[i] = &Collector{
-					Config:            Config{Name: fmt.Sprintf("bench-enriched-%d", i+1)},
-					trapWriter:        writers[i],
-					telemetry:         newBenchmarkTelemetry(fmt.Sprintf("bench-enriched-%d", i+1)),
-					profileIndex:      idx,
-					enricher:          newTestTrapEnricher(store, testTrapTopologyEnricher(func(ip, _ string) *snmptopology.TrapTopologyEnrichment { return topologyByIP[ip] }), dns),
-					reverseDNSEnabled: true,
-				}
+				jobName := fmt.Sprintf("bench-enriched-%d", i+1)
+				collectors[i] = newBenchmarkJob(jobName, writers[i], idx)
+				collectors[i].policy.reverseDNSEnabled = true
+				collectors[i].deps.Enricher = newTestTrapEnricher(store, testTrapTopologyEnricher(func(ip, _ string) *snmptopology.TrapTopologyEnrichment { return topologyByIP[ip] }), dns)
 				collectors[i].receiver = newTestReceiver(collectors[i], receiver.PolicyConfig{
 					Versions:    []string{"v2c"},
 					Communities: []string{"public"},
@@ -314,18 +312,13 @@ func BenchmarkMultiJob(b *testing.B) {
 			idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 			writers := make([]*countingWriter, numJobs)
-			collectors := make([]*Collector, numJobs)
+			collectors := make([]*Job, numJobs)
 			peers := make([]net.IP, numJobs)
 			for i := range numJobs {
 				jn := fmt.Sprintf("bm-multi-%d", i)
 				peers[i] = net.ParseIP(fmt.Sprintf("10.1.2.%d", i+1))
 				writers[i] = &countingWriter{}
-				collectors[i] = &Collector{
-					Config:       Config{Name: jn},
-					trapWriter:   writers[i],
-					telemetry:    newBenchmarkTelemetry(jn),
-					profileIndex: idx,
-				}
+				collectors[i] = newBenchmarkJob(jn, writers[i], idx)
 				collectors[i].receiver = newTestReceiver(collectors[i], receiver.PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"public"}})
 			}
 
@@ -405,13 +398,8 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
 	dir := b.TempDir()
-	tw := newBenchmarkJournalWriter(b, dir, 1<<20)
-	c := &Collector{
-		Config:       Config{Name: "bench-full"},
-		trapWriter:   tw,
-		telemetry:    newBenchmarkTelemetry("bench-full"),
-		profileIndex: idx,
-	}
+	tw := newBenchmarkJournalWriter(b, dir)
+	c := newBenchmarkJob("bench-full", tw, idx)
 	c.receiver = newTestReceiver(c, receiver.PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"public"}})
 
 	b.ReportAllocs()
@@ -442,13 +430,13 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	}
 }
 
-func newBenchmarkJournalWriter(b *testing.B, dir string, queueCapacity int) *journal.Writer {
+func newBenchmarkJournalWriter(b *testing.B, dir string) *journal.Writer {
 	b.Helper()
 	writer, err := journal.Prepare(
 		dir,
 		journal.Config{RotateSize: 200 * 1024 * 1024},
 		newTestJournalHostProvider(),
-		journal.Options{QueueCapacity: queueCapacity},
+		journal.Options{},
 	)
 	if err != nil {
 		b.Fatalf("prepare journal writer: %v", err)
@@ -461,7 +449,7 @@ func newBenchmarkJournalWriter(b *testing.B, dir string, queueCapacity int) *jou
 }
 
 // BenchmarkUDPPacketToJournal measures the real local UDP receive path:
-// UDP socket -> receiver read loop -> Collector.handlePacket ->
+// UDP socket -> receiver read loop -> Job.handlePacket ->
 // journal writer queue -> SDK-backed journal append/sync.
 func BenchmarkUDPPacketToJournal(b *testing.B) {
 	requireJournalctlBenchmark(b)
@@ -534,17 +522,12 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	}
 	idx := setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
 
-	tw := newBenchmarkJournalWriter(b, b.TempDir(), journal.DefaultQueueCapacity)
+	tw := newBenchmarkJournalWriter(b, b.TempDir())
 	b.Cleanup(func() {
 		_ = tw.Close()
 	})
 
-	c := &Collector{
-		Config:       Config{Name: "bench-udp"},
-		trapWriter:   tw,
-		telemetry:    newBenchmarkTelemetry("bench-udp"),
-		profileIndex: idx,
-	}
+	c := newBenchmarkJob("bench-udp", tw, idx)
 	port := freeUDPPort(b)
 	recv := newTestReceiver(c, receiver.PolicyConfig{
 		Listen:      receiver.ListenConfig{Endpoints: []receiver.Endpoint{{Protocol: "udp", Address: "127.0.0.1", Port: port}}},
@@ -634,7 +617,7 @@ func waitForBenchmarkDeliveries(b *testing.B, delivered *atomic.Int64, want int6
 // ---------------------------------------------------------------------------
 
 func BenchmarkAcquireProfileCatalogDefaultProfiles(b *testing.B) {
-	dir := filepath.Clean("../../config/go.d/snmp.trap-profiles/default")
+	dir := filepath.Clean("../../../../config/go.d/snmp.trap-profiles/default")
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

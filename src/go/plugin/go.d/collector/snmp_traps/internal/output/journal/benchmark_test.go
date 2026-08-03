@@ -11,7 +11,7 @@ import (
 )
 
 func BenchmarkTrapWriterWrite(b *testing.B) {
-	writer := newWriter(nil, Options{QueueCapacity: 1 << 20})
+	writer := newWriter(discardJournalSink{}, Config{}, 1<<20, nil)
 	if err := writer.Start(); err != nil {
 		b.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func BenchmarkJournalTrapWriterDrain(b *testing.B) {
 	if err != nil {
 		b.Fatalf("open SDK journal: %v", err)
 	}
-	writer := newWriter(sdk, Options{QueueCapacity: 1 << 20})
+	writer := newWriter(sdk, sdk.cfg, 1<<20, nil)
 	if err := writer.Start(); err != nil {
 		b.Fatal(err)
 	}

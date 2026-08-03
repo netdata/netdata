@@ -25,9 +25,10 @@ type testRuntimeConfig struct {
 }
 
 type testCatalog struct {
-	epoch  *catalog.Epoch
-	rules  map[string]*catalog.MetricRule
-	charts map[string]*catalog.MetricChart
+	trapsByOID  map[string]*catalog.TrapDef
+	trapsByName map[string]*catalog.TrapDef
+	rules       map[string]*catalog.MetricRule
+	charts      map[string]*catalog.MetricChart
 }
 type testTrapEntry = model.TrapEntry
 type testTrapDef = catalog.TrapDef
@@ -61,13 +62,23 @@ const (
 
 func newTestCatalog() *testCatalog {
 	return &testCatalog{
-		epoch:  catalog.NewEpoch(),
-		rules:  make(map[string]*catalog.MetricRule),
-		charts: make(map[string]*catalog.MetricChart),
+		trapsByOID:  make(map[string]*catalog.TrapDef),
+		trapsByName: make(map[string]*catalog.TrapDef),
+		rules:       make(map[string]*catalog.MetricRule),
+		charts:      make(map[string]*catalog.MetricChart),
 	}
 }
 
-func (idx *testCatalog) addTraps(traps []*testTrapDef) error { return idx.epoch.AddTraps(traps) }
+func (idx *testCatalog) addTraps(traps []*testTrapDef) error {
+	for _, trap := range traps {
+		if trap == nil {
+			return fmt.Errorf("nil trap definition")
+		}
+		idx.trapsByOID[trap.OID] = trap
+		idx.trapsByName[trap.Name] = trap
+	}
+	return nil
+}
 
 func (idx *testCatalog) addDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) error {
 	for i := range rules {
@@ -108,7 +119,18 @@ func (idx *testCatalog) Definitions(names []string) (catalog.MetricDefinitions, 
 }
 
 func (idx *testCatalog) ResolveTrap(ref string) (*testTrapDef, error) {
-	return idx.epoch.ResolveTrap(ref)
+	if trap := idx.trapsByOID[ref]; trap != nil {
+		return trap, nil
+	}
+	if alt := model.AlternateTrapOID(ref); alt != ref {
+		if trap := idx.trapsByOID[alt]; trap != nil {
+			return trap, nil
+		}
+	}
+	if trap := idx.trapsByName[ref]; trap != nil {
+		return trap, nil
+	}
+	return nil, fmt.Errorf("trap %q not found", ref)
 }
 
 func normalizeTestRuntimeConfig(cfg testRuntimeConfig) (Policy, error) {

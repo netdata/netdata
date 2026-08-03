@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
@@ -41,6 +42,7 @@ type validatedConfig struct {
 	retention      journal.Retention
 	dedup          dedup.Policy
 	profileMetrics profilemetrics.Policy
+	runtime        jobruntime.Policy
 }
 
 func (c Config) Validate() error {
@@ -153,6 +155,28 @@ func validateConfig(c Config) (validatedConfig, error) {
 		SourceAllowlist:    allowlist,
 		TrustedRelays:      trustedRelays,
 		RateLimit:          toReceiverRateLimitConfig(c.RateLimit),
+	})
+	overrides := make([]jobruntime.Override, len(c.Overrides))
+	for i, override := range c.Overrides {
+		overrides[i] = jobruntime.Override{
+			OID:      override.OID,
+			Category: override.Category,
+			Severity: override.Severity,
+			Labels:   override.Labels,
+		}
+	}
+	validated.runtime = jobruntime.NewPolicy(jobruntime.PolicyConfig{
+		JobName:               c.Name,
+		Receiver:              validated.receiver,
+		JournalEnabled:        validated.journalEnabled,
+		Journal:               validated.retention.Config(),
+		OTLPEnabled:           c.OTLP.Enabled,
+		OTLP:                  validated.otlp,
+		Dedup:                 validated.dedup,
+		ProfileMetrics:        validated.profileMetrics,
+		ReverseDNSEnabled:     c.ReverseDNS.Enabled,
+		Overrides:             overrides,
+		BaseChartTemplateYAML: chartTemplateYAML,
 	})
 
 	return validated, nil

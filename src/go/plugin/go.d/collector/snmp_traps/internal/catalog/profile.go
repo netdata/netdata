@@ -227,8 +227,7 @@ type Epoch struct {
 	validationStockProfile string
 }
 
-// NewEpoch returns an empty epoch for callers that assemble static trap definitions.
-func NewEpoch() *Epoch {
+func newEpoch() *Epoch {
 	return &Epoch{
 		trapsByOID:        make(map[string]*TrapDef),
 		namesByTrapName:   make(map[string]*TrapDef),
@@ -236,26 +235,6 @@ func NewEpoch() *Epoch {
 		metricRulesByOut:  make(map[string]*profileMetricRule),
 		metricChartsByID:  make(map[string]*profileMetricChart),
 	}
-}
-
-// AddTraps validates and adds static trap definitions to an unpublished epoch.
-func (idx *Epoch) AddTraps(traps []*TrapDef) error { return idx.addTraps(traps) }
-
-// PrepareTrap compiles one manually assembled trap definition.
-func PrepareTrap(td *TrapDef) error {
-	if td == nil {
-		return errors.New("trap definition is nil")
-	}
-	fileVarbinds := make(map[string]VarbindDef, len(td.SharedVarbinds))
-	for _, vb := range td.SharedVarbinds {
-		if vb != nil && vb.RawName != "" {
-			fileVarbinds[vb.RawName] = *vb
-		}
-	}
-	if td.SharedVarbinds == nil {
-		td.SharedVarbinds = buildSharedVarbinds(td, fileVarbinds)
-	}
-	return compileTrapTemplates(td, fileVarbinds)
 }
 
 // ProfileInfo describes one effective extensionless profile identity.

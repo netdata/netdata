@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package jobruntime
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -65,8 +64,17 @@ func TestStartOutputBackendsStopsAfterFailure(t *testing.T) {
 	assert.Equal(t, []string{"otlp"}, order)
 }
 
+func TestPreparedOutputsStartIgnoresTypedNilBackend(t *testing.T) {
+	prepared := &preparedOutputs{}
+	require.NoError(t, prepared.start())
+}
+
+func TestMonotonicUsecWithoutHostIdentityReturnsZero(t *testing.T) {
+	assert.Zero(t, (&Job{}).monotonicUsecWith(nil))
+}
+
 func TestHandleOutputOutcomePreservesBackendAuthorityMetrics(t *testing.T) {
-	collector := &Collector{Config: Config{Name: "local"}}
+	collector := &Job{policy: NewPolicy(PolicyConfig{JobName: "local"})}
 	metrics := newTestJobTelemetry(t, "local", false)
 
 	collector.handleOutputOutcome(metrics, output.Outcome{
@@ -88,7 +96,7 @@ func TestCollectorCleanupWritesFinalDedupSummaryBeforeClosingOutput(t *testing.T
 	require.NoError(t, err)
 	metrics := newTestJobTelemetry(t, jobName, true)
 	writer := &cleanupOrderWriter{}
-	d := newJobDeduper(jobName, policy, nil, writer, metrics, trapWriteFailureJournal, nil)
+	d := newDeduper(jobName, policy, nil, writer, metrics, writeFailureJournal, nil)
 	d.Start()
 	entry := &model.TrapEntry{SourceIP: "198.51.100.10", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
 	_, decision := d.Admit(entry, nil)
@@ -96,13 +104,13 @@ func TestCollectorCleanupWritesFinalDedupSummaryBeforeClosingOutput(t *testing.T
 	_, decision = d.Admit(entry, nil)
 	require.Equal(t, dedup.DecisionSuppress, decision)
 
-	c := &Collector{
-		Config:     Config{Name: jobName},
-		trapWriter: writer,
-		telemetry:  metrics,
-		deduper:    d,
+	c := &Job{
+		policy:    NewPolicy(PolicyConfig{JobName: jobName}),
+		writer:    writer,
+		telemetry: metrics,
+		deduper:   d,
 	}
-	c.Cleanup(context.Background())
+	c.Cleanup()
 
 	assert.Equal(t, []string{"summary", "close"}, writer.order)
 	require.Len(t, writer.entries, 1)
@@ -124,14 +132,14 @@ func TestFinalDedupSummaryWriteFailureOnlyRecordsBackendError(t *testing.T) {
 	require.NoError(t, err)
 	metrics := newTestJobTelemetry(t, jobName, true)
 	writer := &mockTrapWriter{err: errors.New("write failed")}
-	d := newJobDeduper(jobName, policy, nil, writer, metrics, trapWriteFailureJournal, nil)
+	d := newDeduper(jobName, policy, nil, writer, metrics, writeFailureJournal, nil)
 	d.Start()
 	entry := &model.TrapEntry{SourceIP: "198.51.100.10", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
 	d.Admit(entry, nil)
 	d.Admit(entry, nil)
 
-	c := &Collector{Config: Config{Name: jobName}, trapWriter: writer, telemetry: metrics, deduper: d}
-	c.Cleanup(context.Background())
+	c := &Job{policy: NewPolicy(PolicyConfig{JobName: jobName}), writer: writer, telemetry: metrics, deduper: d}
+	c.Cleanup()
 
 	assertJobMetric(t, metrics, jobName, "snmp_trap_errors_journal_write_failed", 1)
 	assertJobMetric(t, metrics, jobName, "snmp_trap_pipeline_write_failed", 0)

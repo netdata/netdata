@@ -1,18 +1,110 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package enrichment_test
 
 import (
-	"context"
 	"net/netip"
-	"sync/atomic"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
+
+type TrapEntry = model.TrapEntry
+type VarbindValue = model.VarbindValue
+
+type testEnrichmentCollector struct {
+	enricher          *enrichment.Enricher
+	reverseDNSEnabled bool
+}
+
+func (c *testEnrichmentCollector) enrichTrapEntry(entry *TrapEntry) {
+	c.enricher.Enrich(entry, c.reverseDNSEnabled)
+}
+
+type testTrapTopologyEnricher func(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment
+
+func (f testTrapTopologyEnricher) EnrichmentForSource(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment {
+	return f(ip, trapIfIndex)
+}
+
+func newTestTrapEnrichmentCollector(topologyEnricher testTrapTopologyEnricher, dns ...enrichment.ReverseDNS) (*testEnrichmentCollector, *ddsnmp.DeviceStore) {
+	store := ddsnmp.NewDeviceStore()
+	var reverseDNS enrichment.ReverseDNS
+	if len(dns) > 0 {
+		reverseDNS = dns[0]
+	}
+	var topology enrichment.TopologyLookup
+	if topologyEnricher != nil {
+		topology = func(sourceIP, trapIfIndex string) enrichment.TopologyResult {
+			return netdataadapter.ProjectTopologyResult(topologyEnricher.EnrichmentForSource(sourceIP, trapIfIndex))
+		}
+	}
+	return &testEnrichmentCollector{
+		enricher: enrichment.New(netdataadapter.RegistryLookup(store), topology, reverseDNS),
+	}, store
+}
+
+type adapterReverseDNS struct {
+	mu        sync.Mutex
+	results   map[netip.Addr]reversedns.Result
+	lookups   []netip.Addr
+	schedules []netip.Addr
+}
+
+func newTestReverseDNS(results map[string]string) *adapterReverseDNS {
+	dns := &adapterReverseDNS{results: make(map[netip.Addr]reversedns.Result, len(results))}
+	for raw, name := range results {
+		addr := netip.MustParseAddr(raw).Unmap()
+		state := reversedns.StateNegative
+		if name != "" {
+			state = reversedns.StatePositive
+		}
+		dns.results[addr] = reversedns.Result{State: state, Name: name}
+	}
+	return dns
+}
+
+func (d *adapterReverseDNS) Lookup(addr netip.Addr) reversedns.Result {
+	addr = addr.Unmap()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.lookups = append(d.lookups, addr)
+	if result, ok := d.results[addr]; ok {
+		return result
+	}
+	return reversedns.Result{State: reversedns.StateMiss}
+}
+
+func (d *adapterReverseDNS) Schedule(addr netip.Addr) reversedns.ScheduleState {
+	addr = addr.Unmap()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.schedules = append(d.schedules, addr)
+	if !addr.IsValid() {
+		return reversedns.ScheduleInvalid
+	}
+	if result, ok := d.results[addr]; ok {
+		if result.State == reversedns.StatePositive {
+			return reversedns.SchedulePositive
+		}
+		if result.State == reversedns.StateNegative {
+			return reversedns.ScheduleNegative
+		}
+	}
+	return reversedns.ScheduleScheduled
+}
+
+func (d *adapterReverseDNS) callCounts() (lookups, schedules int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return len(d.lookups), len(d.schedules)
+}
 
 const (
 	testIfIndexOIDPrefix = "1.3.6.1.2.1.2.2.1.1"
@@ -442,46 +534,6 @@ func TestEnrichTrapEntryReverseDNSEnabledSchedulesCacheMiss(t *testing.T) {
 	if lookups, schedules := dns.callCounts(); lookups != 1 || schedules != 1 {
 		t.Fatalf("reverse DNS calls = (%d lookups, %d schedules), want (1, 1)", lookups, schedules)
 	}
-}
-
-func TestCollectorsShareBorrowedReverseDNSCacheAcrossCleanup(t *testing.T) {
-	var lookups atomic.Int64
-	shared := reversedns.New(reversedns.Config{Lookup: func(context.Context, string) ([]string, error) {
-		lookups.Add(1)
-		return []string{"shared.example.test."}, nil
-	}})
-	store := ddsnmp.NewDeviceStore()
-	topology := snmptopology.NewTrapEnrichmentHandle()
-	first := New(store, topology, shared)
-	second := New(store, topology, shared)
-	first.reverseDNSEnabled = true
-	second.reverseDNSEnabled = true
-
-	firstEntry := &TrapEntry{SourceIP: "192.0.2.10"}
-	first.enrichTrapEntry(firstEntry)
-	requireReverseDNSState(t, shared, netip.MustParseAddr("192.0.2.10"), reversedns.StatePositive)
-	first.Cleanup(context.Background())
-
-	secondEntry := &TrapEntry{SourceIP: "192.0.2.10"}
-	second.enrichTrapEntry(secondEntry)
-	if got := secondEntry.ReverseDNS; got != "shared.example.test" {
-		t.Fatalf("ReverseDNS = %q, want shared.example.test", got)
-	}
-	if got := lookups.Load(); got != 1 {
-		t.Fatalf("PTR lookups = %d, want one shared lookup", got)
-	}
-}
-
-func requireReverseDNSState(t *testing.T, resolver *reversedns.Resolver, addr netip.Addr, want reversedns.State) {
-	t.Helper()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		if result := resolver.Lookup(addr); result.State == want {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatalf("reverse DNS state = %v, want %v", resolver.Lookup(addr).State, want)
 }
 
 func TestEnrichTrapEntryVendorAndVnodeEnrichment(t *testing.T) {

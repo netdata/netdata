@@ -23,7 +23,7 @@ type profileMetricCatalog struct {
 	chartsByID  map[string]*MetricChart
 }
 
-func newTestMetricEpoch() *Epoch { return NewEpoch() }
+func newTestMetricEpoch() *Epoch { return newEpoch() }
 
 func (idx *Epoch) addTestMetricDefinitions(rules []MetricRule, charts []MetricChart) error {
 	return idx.addProfileMetrics(rules, charts, true)
@@ -96,7 +96,7 @@ func newPopulatedTestMetricEpoch(t *testing.T) *Epoch {
 			},
 		},
 	}
-	if err := idx.AddTraps(traps); err != nil {
+	if err := idx.addTraps(traps); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
 	charts := []profileMetricChart{
@@ -282,7 +282,7 @@ charts:
 		t.Fatalf("loadProfileBundle failed: %v", err)
 	}
 	idx := newTestMetricEpoch()
-	if err := idx.AddTraps(bundle.traps); err != nil {
+	if err := idx.addTraps(bundle.traps); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
 	if err := idx.addTestMetricDefinitions(bundle.metrics, bundle.charts); err != nil {

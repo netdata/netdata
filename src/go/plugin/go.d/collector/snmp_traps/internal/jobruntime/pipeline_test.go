@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package jobruntime
 
 import (
-	"context"
 	"errors"
 	"net"
 	"net/netip"
@@ -14,32 +13,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
 )
-
-var currentTestProfileIndex *catalog.Epoch
-
-func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) {
-	t.Helper()
-	for _, trap := range traps {
-		if err := catalog.PrepareTrap(trap); err != nil {
-			t.Fatalf("compile test trap templates: %v", err)
-		}
-	}
-	idx := catalog.NewEpoch()
-	trapDefs := make([]*TrapDef, 0, len(traps))
-	for _, trap := range traps {
-		trapDefs = append(trapDefs, trap)
-	}
-	if err := idx.AddTraps(trapDefs); err != nil {
-		t.Fatalf("build test profile index: %v", err)
-	}
-	currentTestProfileIndex = idx
-	t.Cleanup(func() { currentTestProfileIndex = nil })
-}
 
 func assertSeverityCounters(t *testing.T, job *telemetry.Job, jobName string, want map[string]uint64) {
 	t.Helper()
@@ -63,9 +40,9 @@ func (panicTrapWriter) Close() error           { return nil }
 func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "security coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newDefaultTestV2Collector(writer)
+	c := newDefaultTestV2Collector(writer, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -90,9 +67,9 @@ func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 func TestCollectorHandlePacketAssignsReceiveSequencePerPacket(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newDefaultTestV2Collector(writer)
+	c := newDefaultTestV2Collector(writer, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
@@ -111,8 +88,8 @@ func TestCollectorHandlePacketAssignsReceiveSequencePerPacket(t *testing.T) {
 func TestCollectorHandlePacketRecoversFromPanic(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "security coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
-	c := newTestV2Collector("panic-recover", panicTrapWriter{}, nil, []string{"public"})
+	index := setSingleTestTrap(t, trap)
+	c := newTestV2Collector("panic-recover", panicTrapWriter{}, nil, []string{"public"}, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	assertJobMetric(t, c.telemetry, "panic-recover", "snmp_trap_errors_decode_failed", 1)
@@ -129,10 +106,10 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 	})
 
 	trap := testColdStartTrap("security", "warning", "security coldStart on {{hostname}} from {{vendor}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newDefaultTestV2Collector(writer)
-	c.enricher = newTestTrapEnricher(deviceStore, nil, nil)
+	c := newDefaultTestV2Collector(writer, index)
+	c.deps.Enricher = newTestTrapEnricher(deviceStore, nil, nil)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -147,10 +124,9 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newDefaultTestV2Collector(writer)
-	c.vnode = "listener-vnode-id"
+	c := newDefaultTestV2Collector(writer, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -190,11 +166,11 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 		"warning",
 		"trap on {{hostname}} vendor {{vendor}}",
 	)
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newDefaultTestV2Collector(writer)
-	c.enricher = newTestTrapEnricher(ddsnmp.NewDeviceStore(), topologyEnricher, dns)
-	c.reverseDNSEnabled = true
+	c := newDefaultTestV2Collector(writer, index)
+	c.deps.Enricher = newTestTrapEnricher(ddsnmp.NewDeviceStore(), topologyEnricher, dns)
+	c.policy.reverseDNSEnabled = true
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -218,9 +194,9 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c, metrics := newDedupTestV2Collector(t, jobName, writer)
+	c, metrics := newDedupTestV2Collector(t, jobName, writer, index)
 	c.deduper.Start()
 	defer c.deduper.Close()
 
@@ -276,9 +252,9 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 	t.Run("unknown OID", func(t *testing.T) {
 		const jobName = "test-dedup-unknown-oid"
 
-		setTestProfileIndex(t, map[string]*TrapDef{})
+		index := setTestProfileIndex(t, map[string]*TrapDef{})
 		writer := &mockTrapWriter{}
-		c, metrics := newDedupTestV2Collector(t, jobName, writer)
+		c, metrics := newDedupTestV2Collector(t, jobName, writer, index)
 
 		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
@@ -302,9 +278,9 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 			"type": "OctetString",
 		}}
 		trap.Name = "TEST-MIB::coldStartTemplate"
-		setSingleTestTrap(t, trap)
+		index := setSingleTestTrap(t, trap)
 		writer := &mockTrapWriter{}
-		c, metrics := newDedupTestV2Collector(t, jobName, writer)
+		c, metrics := newDedupTestV2Collector(t, jobName, writer, index)
 
 		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 		c.handlePacket(packet.Payload, packet.Peer, nil, nil)
@@ -324,9 +300,9 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{err: errors.New("write failed")}
-	c, metrics := newDedupTestV2Collector(t, jobName, writer)
+	c, metrics := newDedupTestV2Collector(t, jobName, writer, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	assertJobMetric(t, metrics, jobName, "snmp_trap_errors_journal_write_failed", 1)
@@ -479,12 +455,12 @@ func TestCollectorHandlePacketDynamicDecodeFailureReusesRateLimitAdmission(t *te
 	const jobName = "test-dynamic-decode-error-rate-limit"
 	writer := &mockTrapWriter{}
 	registry := telemetry.NewRegistry()
-	c := &Collector{
-		Config:            Config{Name: jobName},
-		trapWriter:        writer,
-		journalHost:       newTestJournalHostProvider(),
-		telemetryRegistry: registry,
-		telemetry:         registry.Attach(jobName, telemetry.Options{}),
+	c := &Job{
+		policy:      NewPolicy(PolicyConfig{JobName: jobName}),
+		writer:      writer,
+		journalHost: newTestJournalHostProvider(),
+		telemetry:   registry.Attach(jobName, telemetry.Options{}),
+		deps:        Dependencies{Telemetry: registry},
 	}
 	user := USMUserConfig{
 		Username:  "testuser",
@@ -574,9 +550,9 @@ func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
 func TestCollectorHandlePacketAllowsAllowedCommunity(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("state_change", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newTestV2Collector("test", writer, nil, []string{"public"})
+	c := newTestV2Collector("test", writer, nil, []string{"public"}, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -588,9 +564,9 @@ func TestCollectorHandlePacketAllowsAllowedCommunity(t *testing.T) {
 func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("state_change", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newDefaultTestV2Collector(writer)
+	c := newDefaultTestV2Collector(writer, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	assertJobMetric(t, c.telemetry, "test", "snmp_trap_events_state_change", 1)
@@ -600,9 +576,9 @@ func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
 	const jobName = "test-severity-event"
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("state_change", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"}, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -617,9 +593,9 @@ func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 		"oid":  "1.3.6.1.4.1.99999.1",
 		"type": "OctetString",
 	}}
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newDefaultTestV2Collector(writer)
+	c := newDefaultTestV2Collector(writer, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 	assertJobMetric(t, c.telemetry, "test", "snmp_trap_errors_template_unresolved", 1)
@@ -682,9 +658,9 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
+	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"}, index)
 	peer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
 
 	c.handlePacket(packet.Payload, peer.IP, nil, peer)
@@ -700,9 +676,9 @@ func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
 func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"})
+	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"}, index)
 	peer := &net.UDPAddr{IP: net.ParseIP("2001:db8::1"), Port: 9162}
 
 	c.handlePacket(packet.Payload, peer.IP, nil, peer)
@@ -714,7 +690,7 @@ func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 
 func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.T) {
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.SnmpPDU{
 		Name:  model.SNMPTrapAddressOID,
 		Type:  gosnmp.IPAddress,
@@ -724,7 +700,7 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 
 	t.Run("untrusted_peer_uses_udp_peer", func(t *testing.T) {
 		writer := &mockTrapWriter{}
-		c := newTestV2Collector("test-untrusted-relay", writer, nil, []string{"public"})
+		c := newTestV2Collector("test-untrusted-relay", writer, nil, []string{"public"}, index)
 
 		c.handlePacket(data, peer.IP, nil, peer)
 
@@ -749,7 +725,7 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 			Versions:      []string{"v2c"},
 			Communities:   []string{"public"},
 			TrustedRelays: []netip.Prefix{netip.MustParsePrefix("10.1.2.0/24")},
-		})
+		}, index)
 
 		c.handlePacket(data, peer.IP, nil, peer)
 
@@ -777,7 +753,7 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 			Versions:      []string{"v2c"},
 			Communities:   []string{"public"},
 			TrustedRelays: []netip.Prefix{netip.MustParsePrefix("10.1.2.0/24")},
-		})
+		}, index)
 		mappedPeer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
 
 		c.handlePacket(data, mappedPeer.IP, nil, mappedPeer)
@@ -806,7 +782,7 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 			Versions:      []string{"v2c"},
 			Communities:   []string{"public"},
 			TrustedRelays: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")},
-		})
+		}, index)
 
 		c.handlePacket(data, nil, nil, nil)
 
@@ -821,7 +797,7 @@ func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.
 			Versions:      []string{"v2c"},
 			Communities:   []string{"public"},
 			TrustedRelays: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")},
-		})
+		}, index)
 
 		c.handlePacket(data, peer.IP, nil, peer)
 
@@ -846,7 +822,7 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	const jobName = "test-rate-limit-sample"
 
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 	writer := &mockTrapWriter{}
 	c := newTestV2CollectorWithPolicy(jobName, writer, receiver.PolicyConfig{
@@ -857,7 +833,7 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 			PerSourcePPS: 1,
 			Mode:         "sample",
 		},
-	})
+	}, index)
 	if result := c.receiver.Process(receiver.Datagram{
 		Data: packet.Payload, PeerIP: peer.IP, Peer: peer,
 	}); result.PDU == nil {
@@ -877,9 +853,9 @@ func TestCollectorHandlePacketEmitsPipelineMetrics(t *testing.T) {
 	const jobName = "test-pipeline-metrics"
 
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
-	setSingleTestTrap(t, trap)
+	index := setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"}, index)
 
 	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
 
@@ -917,17 +893,16 @@ func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
 		t.Fatal("collector store does not expose cycle control")
 	}
 
-	c := &Collector{
-		Config:         Config{Name: jobName},
-		trapWriter:     &mockTrapWriter{},
+	c := &Job{
+		policy:         NewPolicy(PolicyConfig{JobName: jobName}),
+		writer:         &mockTrapWriter{},
 		telemetry:      metrics,
 		profileMetrics: rt,
-		store:          store,
 	}
 	c.receiver = bindTestReceiver(t, c)
 
 	managed.CycleController().BeginCycle()
-	if err := c.collect(context.Background()); err != nil {
+	if err := c.Collect(store); err != nil {
 		t.Fatalf("collect failed: %v", err)
 	}
 	if err := managed.CycleController().CommitCycleSuccess(); err != nil {
@@ -955,16 +930,15 @@ func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
 		t.Fatal("collector store does not expose cycle control")
 	}
 
-	c := &Collector{
-		Config:     Config{Name: jobName},
-		trapWriter: &mockTrapWriter{binaryEncodedFields: 2},
-		telemetry:  metrics,
-		store:      store,
+	c := &Job{
+		policy:    NewPolicy(PolicyConfig{JobName: jobName}),
+		writer:    &mockTrapWriter{binaryEncodedFields: 2},
+		telemetry: metrics,
 	}
 	c.receiver = bindTestReceiver(t, c)
 
 	managed.CycleController().BeginCycle()
-	if err := c.collect(context.Background()); err != nil {
+	if err := c.Collect(store); err != nil {
 		t.Fatalf("collect failed: %v", err)
 	}
 	if err := managed.CycleController().CommitCycleSuccess(); err != nil {

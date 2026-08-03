@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package jobruntime
 
 import (
 	"crypto/sha256"
@@ -11,26 +11,28 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 )
 
 const maxDecodeErrorLen = 256
 
-func (c *Collector) writeDecodeErrorEntry(failure *receiver.DecodeFailure, packetSequence uint64) {
-	entry := newDecodeErrorEntry(c.Name, failure, packetSequence, c.monotonicUsec())
-	if err := c.trapWriter.Write(entry); err != nil {
-		c.telemetry.Error(c.trapWriteFailureDim())
+func (j *Job) writeDecodeErrorEntry(failure *receiver.DecodeFailure, packetSequence uint64) {
+	entry := newDecodeErrorEntry(j.policy.jobName, failure, packetSequence, j.monotonicUsecWith(j.journalHost))
+	if err := j.writer.Write(entry); err != nil {
+		j.telemetry.Error(j.trapWriteFailureDim())
 	}
 }
 
-func newDecodeErrorEntry(jobName string, failure *receiver.DecodeFailure, packetSequence uint64, monotonicUsec int64) *TrapEntry {
+func newDecodeErrorEntry(jobName string, failure *receiver.DecodeFailure, packetSequence uint64, monotonicUsec int64) *model.TrapEntry {
 	now := time.Now().UnixMicro()
 	sourceIP, sourcePeer, sourcePort := decodeErrorSource(failure.PeerIP, failure.Peer)
 	listener := decodeErrorListener(failure.Conn)
 	errText := sanitizeDecodeError(failure.Err)
 	packetHash := sha256.Sum256(failure.Data)
 
-	info := &DecodeErrorInfo{
+	info := &model.DecodeErrorInfo{
 		Kind:          string(failure.Kind),
 		Error:         errText,
 		PacketSize:    len(failure.Data),
@@ -50,13 +52,13 @@ func newDecodeErrorEntry(jobName string, failure *receiver.DecodeFailure, packet
 		messageSource = sourceIP
 	}
 	message := fmt.Sprintf("SNMP trap decode failed from %s: %s: %s", messageSource, failure.Kind, errText)
-	if len(message) > maxMessageLen {
-		message = truncateUTF8(message, maxMessageLen-3) + "..."
+	if len(message) > catalog.MaxMessageLen {
+		message = catalog.TruncateUTF8(message, catalog.MaxMessageLen-3) + "..."
 	}
 
-	return &TrapEntry{
+	return &model.TrapEntry{
 		JobName:               jobName,
-		ReportType:            ReportTypeDecodeError,
+		ReportType:            model.ReportTypeDecodeError,
 		ReceivedRealtimeUsec:  now,
 		ReceivedMonotonicUsec: monotonicUsec,
 		Category:              decodeErrorCategory(failure.Kind),
@@ -93,7 +95,7 @@ func decodeErrorListener(conn *net.UDPConn) string {
 	return conn.LocalAddr().String()
 }
 
-func decodeErrorCategory(kind receiver.ErrorKind) Category {
+func decodeErrorCategory(kind receiver.ErrorKind) model.Category {
 	switch kind {
 	case receiver.ErrorAuthFailure, receiver.ErrorUSMFailure, receiver.ErrorUnknownEngine:
 		return "auth"
@@ -122,7 +124,7 @@ func sanitizeDecodeError(err error) string {
 		s = "unknown decode error"
 	}
 	if len(s) > maxDecodeErrorLen {
-		return truncateUTF8(s, maxDecodeErrorLen-3) + "..."
+		return catalog.TruncateUTF8(s, maxDecodeErrorLen-3) + "..."
 	}
 	return s
 }
