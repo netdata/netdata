@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package jobruntime
 
 import (
 	"bytes"
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCollectorReceiverReadErrorLogIsRateLimited(t *testing.T) {
+func TestJobReceiverReadErrorLogIsRateLimited(t *testing.T) {
 	var buf bytes.Buffer
-	c := newTestSNMPTrapsCollector()
-	c.Logger = logger.NewWithWriter(&buf)
+	c := newTestEventJob(logger.NewWithWriter(&buf))
 	metrics := newTestJobTelemetry(t, "read-errors", false)
 	event := receiver.Event{
 		Type: receiver.EventListenerReadFailed,
@@ -40,13 +41,12 @@ func TestCollectorReceiverReadErrorLogIsRateLimited(t *testing.T) {
 	assertJobMetric(t, metrics, "read-errors", "snmp_trap_errors_listener_read_failed", 2)
 }
 
-func TestCollectorAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
-	c := newTestSNMPTrapsCollector()
-	c.Name = "buffer-degraded"
+func TestJobAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
 	var buf bytes.Buffer
-	c.Logger = logger.NewWithWriter(&buf)
+	c := newTestEventJob(logger.NewWithWriter(&buf))
+	c.policy.jobName = "buffer-degraded"
 
-	metrics := c.attachTelemetryAndHandleInitEvents([]receiver.Event{{
+	metrics := c.attachTelemetry([]receiver.Event{{
 		Type: receiver.EventListenerBufferDegraded,
 		Endpoint: receiver.Endpoint{
 			Protocol: "udp4",
@@ -55,7 +55,7 @@ func TestCollectorAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
 		},
 		Requested: receiver.DefaultReceiveBuffer,
 		Err:       errors.New("boom"),
-	}}, false)
+	}})
 	t.Cleanup(metrics.Detach)
 
 	assertJobMetric(t, metrics, "buffer-degraded", "snmp_trap_errors_listener_buffer_degraded", 1)
@@ -66,7 +66,7 @@ func TestCollectorAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
 	assert.Contains(t, out, "boom")
 }
 
-func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
+func TestJobMapsReceiverErrorKinds(t *testing.T) {
 	tests := map[receiver.ErrorKind]string{
 		receiver.ErrorMalformedPDU:  "snmp_trap_errors_malformed_pdu",
 		receiver.ErrorAuthFailure:   "snmp_trap_errors_auth_failures",
@@ -80,7 +80,7 @@ func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
 	for kind, metric := range tests {
 		t.Run(string(kind), func(t *testing.T) {
 			metrics := newTestJobTelemetry(t, string(kind), false)
-			newTestSNMPTrapsCollector().handleReceiverEvent(metrics, receiver.Event{
+			newTestEventJob(nil).handleReceiverEvent(metrics, receiver.Event{
 				Type:      receiver.EventError,
 				ErrorKind: kind,
 			})
@@ -89,7 +89,7 @@ func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
 	}
 }
 
-func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
+func TestJobMapsReceiverOperationalEvents(t *testing.T) {
 	tests := map[string]struct {
 		event     receiver.Event
 		metric    string
@@ -130,8 +130,7 @@ func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			metrics := newTestJobTelemetry(t, name, false)
 			var buf bytes.Buffer
-			c := newTestSNMPTrapsCollector()
-			c.Logger = logger.NewWithWriter(&buf)
+			c := newTestEventJob(logger.NewWithWriter(&buf))
 
 			c.handleReceiverEvent(metrics, tc.event)
 
@@ -141,4 +140,19 @@ func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTestEventJob(log *logger.Logger) *Job {
+	registry := telemetry.NewRegistry()
+	job := newTestJob(NewPolicy(PolicyConfig{JobName: "test"}), registry, nil)
+	if log != nil {
+		job.deps.Log = Logger{
+			Warningf: log.Warningf,
+			Errorf:   log.Errorf,
+			WarnLimited: func(key string, every time.Duration, format string, args ...any) {
+				log.Limit(key, 1, every).Warningf(format, args...)
+			},
+		}
+	}
+	return job
 }

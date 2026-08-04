@@ -153,7 +153,10 @@ directory creation/open, active file creation, writer lock acquisition, machine 
 policy validation, and retention policy validation are proven during job creation. `Writer.Start()` launches the queue
 worker only after every job resource has passed preflight.
 
-The configured per-job root is `${NETDATA_LOG_DIR}/traps/{job_name}/`. The plugin validates that `${NETDATA_LOG_DIR}` exists before creating the Netdata-owned child tree. The SDK appends the machine-id child directory, so the effective query directory is `${NETDATA_LOG_DIR}/traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `Directory()` for `journalctl --directory` validation.
+The configured per-job root is `${NETDATA_LOG_DIR}/traps/{job_name}/`. The plugin validates that `${NETDATA_LOG_DIR}`
+exists before creating the Netdata-owned child tree. The SDK appends the machine-id child directory, so the effective
+storage directory is `${NETDATA_LOG_DIR}/traps/{job_name}/{machine_id}/`. Use the configured per-job root for recursive
+`journalctl --directory` validation.
 
 **Output backend selection**:
 
@@ -196,15 +199,19 @@ SOW-0035 M1 finalizes the exact process/writer boundary for the Go implementatio
   telemetry, or catalog lookup.
 - `internal/telemetry` owns retained built-in per-job counters and `metrix` emission through explicit registry/job
   handles. Event and collection paths use the retained handle directly; registry locking is lifecycle-only.
-- The root collector owns public config DTOs and job/transaction orchestration. After receiver acceptance, it sequences
-  catalog lookup, overrides, attribution/enrichment, template rendering, dedup admission, output commitment,
-  profile-metric updates, and built-in metric updates.
-- The endpoint receive loop calls the root packet workflow synchronously. There is no receiver-owned queue or goroutine
-  between socket read and packet handling; each endpoint keeps one goroutine and one reusable datagram buffer.
+- `internal/jobruntime` owns one job's acquired resources, initialization/rollback/cleanup order, synchronous packet
+  transaction, and metric collection. After receiver acceptance, it sequences catalog lookup, overrides,
+  attribution/enrichment, template rendering, dedup admission, output commitment, profile-metric updates, and built-in
+  metric updates.
+- The root collector owns public config DTOs and normalization, framework methods/assets, and composition of shared
+  plugin services into an immutable `jobruntime.Policy` plus explicit dependencies. It does not own live receiver,
+  writer, dedup, profile-metric, or telemetry state.
+- The endpoint receive loop calls the `jobruntime.Job` packet workflow synchronously. There is no receiver-owned queue or
+  goroutine between socket read and packet handling; each endpoint keeps one goroutine and one reusable datagram buffer.
 - Runtime receiver health and policy outcomes cross the boundary through one event callback. `internal/receiver` does
   not import collector telemetry, logging, profile, or output packages.
-- Non-fatal bind-time outcomes are returned as explicit events. Root attaches the per-job telemetry handle before
-  handling them; runtime outcomes continue through the receiver callback.
+- Non-fatal bind-time outcomes are returned as explicit events. `jobruntime.Job` attaches the per-job telemetry handle
+  before handling them; runtime outcomes continue through the receiver callback.
 
 ### Hot path (executes per trap, per job)
 
@@ -615,10 +622,9 @@ Implementation ownership:
 - `internal/profilemetrics` owns per-job selection/compilation, generated chart
   templates, predicates and value extraction, mutable series/cardinality state,
   diagnostics, and `metrix` collection.
-- For profile metrics, the root collector owns the public config DTO and
-  orchestration: it constructs the runtime during `Init()`, updates it after a successful
-  authoritative write, collects it during `Collect()`, and releases it during
-  cleanup.
+- For profile metrics, the root collector owns the public config DTO and normalization. `internal/jobruntime` constructs
+  the runtime during `Init()`, updates it after a successful authoritative write, collects it during `Collect()`, and
+  releases it during cleanup.
 
 ### Per-OID overrides and labels
 

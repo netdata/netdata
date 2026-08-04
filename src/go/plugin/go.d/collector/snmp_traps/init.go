@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
@@ -33,14 +34,9 @@ var (
 )
 
 type validatedConfig struct {
-	versions       []string
-	trustedRelays  []netip.Prefix
-	receiver       receiver.Policy
-	otlp           otlp.Policy
-	journalEnabled bool
-	retention      journal.Retention
-	dedup          dedup.Policy
-	profileMetrics profilemetrics.Policy
+	versions      []string
+	trustedRelays []netip.Prefix
+	runtime       jobruntime.Policy
 }
 
 func (c Config) Validate() error {
@@ -97,8 +93,8 @@ func validateConfig(c Config) (validatedConfig, error) {
 	if err != nil {
 		return validated, err
 	}
-	validated.dedup = dedupPolicy
 
+	var otlpPolicy otlp.Policy
 	if c.OTLP.Enabled {
 		policy, err := otlp.Normalize(otlp.Config{
 			Endpoint:       c.OTLP.Endpoint,
@@ -111,10 +107,10 @@ func validateConfig(c Config) (validatedConfig, error) {
 		if err != nil {
 			return validated, err
 		}
-		validated.otlp = policy
+		otlpPolicy = policy
 	}
-	validated.journalEnabled = c.Journal.enabled()
-	if !validated.journalEnabled && !c.OTLP.Enabled {
+	journalEnabled := c.Journal.enabled()
+	if !journalEnabled && !c.OTLP.Enabled {
 		return validated, errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled")
 	}
 
@@ -128,20 +124,19 @@ func validateConfig(c Config) (validatedConfig, error) {
 		return validated, err
 	}
 
-	if validated.journalEnabled {
-		retention, err := parseRetentionConfig(c.Retention)
+	var retention journal.Retention
+	if journalEnabled {
+		retention, err = parseRetentionConfig(c.Retention)
 		if err != nil {
 			return validated, err
 		}
-		validated.retention = retention
 	}
 
 	profileMetrics, err := profilemetrics.Normalize(c.ProfileMetrics.Enabled, c.ProfileMetrics.Include)
 	if err != nil {
 		return validated, err
 	}
-	validated.profileMetrics = profileMetrics
-	validated.receiver = receiver.NewPolicy(receiver.PolicyConfig{
+	receiverPolicy := receiver.NewPolicy(receiver.PolicyConfig{
 		Listen:             listen,
 		Versions:           versions,
 		Communities:        c.Communities,
@@ -153,6 +148,28 @@ func validateConfig(c Config) (validatedConfig, error) {
 		SourceAllowlist:    allowlist,
 		TrustedRelays:      trustedRelays,
 		RateLimit:          toReceiverRateLimitConfig(c.RateLimit),
+	})
+	overrides := make([]jobruntime.Override, len(c.Overrides))
+	for i, override := range c.Overrides {
+		overrides[i] = jobruntime.Override{
+			OID:      override.OID,
+			Category: override.Category,
+			Severity: override.Severity,
+			Labels:   override.Labels,
+		}
+	}
+	validated.runtime = jobruntime.NewPolicy(jobruntime.PolicyConfig{
+		JobName:               c.Name,
+		Receiver:              receiverPolicy,
+		JournalEnabled:        journalEnabled,
+		Journal:               retention.Config(),
+		OTLPEnabled:           c.OTLP.Enabled,
+		OTLP:                  otlpPolicy,
+		Dedup:                 dedupPolicy,
+		ProfileMetrics:        profileMetrics,
+		ReverseDNSEnabled:     c.ReverseDNS.Enabled,
+		Overrides:             overrides,
+		BaseChartTemplateYAML: chartTemplateYAML,
 	})
 
 	return validated, nil

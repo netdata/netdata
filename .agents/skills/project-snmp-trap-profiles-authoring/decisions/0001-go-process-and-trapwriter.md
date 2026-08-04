@@ -140,6 +140,15 @@ Registration in `src/go/plugin/go.d/collector/init.go`:
 _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 ```
 
+#### Final ownership outcome
+
+The initial layout above was an implementation starting point. The completed ownership split keeps the selected
+in-process model and writer contract, but moves all per-job lifecycle and packet orchestration into
+`internal/jobruntime`. The root `collector.go` is now the framework adapter; `config.go` / `init.go` own public DTOs and
+normalization; `register.go` / `services.go` compose plugin-scoped services; and `internal/jobruntime` owns acquired
+resources, rollback, cleanup, synchronous packet handling, and metric collection. The former root `pipeline.go`,
+`decode_error.go`, `enrich.go`, and compatibility bridge files were removed rather than retained as forwarding layers.
+
 ### 2. Journal Writer Backend
 
 `internal/output/journal` owns the journal backend. It does **not** implement the systemd journal binary format locally;
@@ -151,8 +160,8 @@ The backend has an explicit two-phase lifecycle:
 - `journal.Prepare(dir, cfg, host, opts)` eagerly opens the SDK log and proves the directory, lock, active file, host
   identity, rotation policy, and retention policy without starting a goroutine.
 - `Writer.Start()` starts the one queue worker after every job resource has passed preflight.
-- `Writer.Write()`, `Flush()`, `Close()`, `Directory()`, and `BinaryEncodedFields()` expose only the runtime behavior needed
-  by the root collector. Closing a prepared-but-not-started writer is safe.
+- `Writer.Write()`, `Flush()`, `Close()`, and `BinaryEncodedFields()` expose only the runtime behavior needed
+  by the job runtime and output-owner tests. Closing a prepared-but-not-started writer is safe.
 - The package owns parsed `Retention` and SDK-facing `Config`; the root package retains only the human-readable config DTO
   and maps it into these normalized types.
 
@@ -162,8 +171,7 @@ The backend has an explicit two-phase lifecycle:
   per-job root `${NETDATA_LOG_DIR}/traps/{job_name}/`.
 - The plugin checks that `${NETDATA_LOG_DIR}` already exists before calling the
   SDK. It creates only the Netdata-owned trap child tree.
-- The SDK appends `<machine-id>/`; `Writer.Directory()` returns the effective query directory for
-  `journalctl --directory`.
+- The SDK appends `<machine-id>/`; `journalctl --directory` can query the configured per-job root recursively.
 - `LogOpenEager` is mandatory so active journal file creation/open and writer
   lock acquisition fail during job creation.
 - `LogIdentityStrict` is mandatory. The adapter reads `/etc/machine-id` and

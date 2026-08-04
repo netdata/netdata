@@ -20,7 +20,7 @@ func (testProvider) MonotonicUsec() uint64      { return 1 }
 func TestServiceIsLazy(t *testing.T) {
 	var configCalls atomic.Int64
 	var loadCalls atomic.Int64
-	_ = NewWithLoader(
+	_ = newWithLoader(
 		func() LoadConfig {
 			configCalls.Add(1)
 			return LoadConfig{}
@@ -37,7 +37,7 @@ func TestServiceIsLazy(t *testing.T) {
 
 func TestFreshJournalLoadsEveryAttempt(t *testing.T) {
 	var calls atomic.Int64
-	service := NewWithLoader(
+	service := newWithLoader(
 		func() LoadConfig { return LoadConfig{StateDir: "/state"} },
 		func(LoadConfig) (Provider, error) {
 			if calls.Add(1) == 1 {
@@ -61,7 +61,7 @@ func TestFreshJournalLoadsEveryAttempt(t *testing.T) {
 func TestCachedFallbackCachesSuccessUnderConcurrency(t *testing.T) {
 	var calls atomic.Int64
 	provider := testProvider{}
-	service := NewWithLoader(
+	service := newWithLoader(
 		func() LoadConfig { return LoadConfig{} },
 		func(LoadConfig) (Provider, error) {
 			calls.Add(1)
@@ -87,7 +87,7 @@ func TestCachedFallbackCachesSuccessUnderConcurrency(t *testing.T) {
 func TestCachedFallbackCachesErrorButDoesNotPoisonFresh(t *testing.T) {
 	wantErr := errors.New("cached failure")
 	var calls atomic.Int64
-	service := NewWithLoader(
+	service := newWithLoader(
 		func() LoadConfig { return LoadConfig{} },
 		func(LoadConfig) (Provider, error) {
 			if calls.Add(1) == 1 {
@@ -113,7 +113,7 @@ func TestCachedFallbackCachesErrorButDoesNotPoisonFresh(t *testing.T) {
 func TestFreshFailureDoesNotPoisonCachedFallback(t *testing.T) {
 	wantErr := errors.New("fresh failure")
 	var calls atomic.Int64
-	service := NewWithLoader(
+	service := newWithLoader(
 		func() LoadConfig { return LoadConfig{} },
 		func(LoadConfig) (Provider, error) {
 			if calls.Add(1) == 1 {

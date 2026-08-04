@@ -20,7 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
-var maxProfileFileBytes int64 = 128 * 1024 * 1024
+const maxProfileFileBytes int64 = 128 * 1024 * 1024
 
 var profileIdentityRE = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
@@ -64,11 +64,10 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 		return nil, fmt.Errorf("load trap profile files: %w", err)
 	}
 
-	index := NewEpoch()
+	index := newEpoch()
 	var userBundles []profileLoadBundle
 	for _, named := range sources.InOrder() {
 		source := named.Profile
-		index.profiles = append(index.profiles, ProfileInfo{Name: named.Name, Path: source.path, IsStock: source.stock})
 		if source.stock {
 			continue
 		}
@@ -80,7 +79,6 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 		}
 		userBundles = append(userBundles, *source.bundle)
 	}
-	slices.SortFunc(index.profiles, func(a, b ProfileInfo) int { return strings.Compare(a.Name, b.Name) })
 
 	store, err := buildStockProfileStore(paths.StockDir, sources, index)
 	if err != nil {
@@ -132,7 +130,7 @@ func (idx *Epoch) addBundleAtomic(bundle profileLoadBundle, stockProfile ...stri
 	idx.publishMu.Lock()
 	defer idx.publishMu.Unlock()
 
-	staged := NewEpoch()
+	staged := newEpoch()
 	staged.base = idx
 	staged.validationStockProfile = currentStockProfile
 	if len(dependencies.traps) > 0 || len(dependencies.metrics) > 0 || len(dependencies.charts) > 0 {
@@ -426,37 +424,8 @@ func parseProfileBundle(filename string, content []byte) (profileLoadBundle, err
 	if err := unmarshalProfileYAML(content, &def); err != nil {
 		return profileLoadBundle{}, err
 	}
-
-	trapOIDs := make(map[string]bool, len(def.Traps))
-	for _, td := range def.Traps {
-		if td.OID == "" {
-			continue
-		}
-		if trapOIDs[td.OID] {
-			return profileLoadBundle{}, fmt.Errorf("%s: duplicate trap OID %s in profile", filename, td.OID)
-		}
-		trapOIDs[td.OID] = true
-	}
-
-	metricNames := make(map[string]bool, len(def.Metrics))
-	for _, metric := range def.Metrics {
-		if metric.Name == "" {
-			continue
-		}
-		if metricNames[metric.Name] {
-			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric rule %s in profile", filename, metric.Name)
-		}
-		metricNames[metric.Name] = true
-	}
-	chartIDs := make(map[string]bool, len(def.Charts))
-	for _, chart := range def.Charts {
-		if chart.ID == "" {
-			continue
-		}
-		if chartIDs[chart.ID] {
-			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric chart %s in profile", filename, chart.ID)
-		}
-		chartIDs[chart.ID] = true
+	if err := validateProfileDefinitionUniqueness(filename, &def); err != nil {
+		return profileLoadBundle{}, err
 	}
 
 	absFile, _ := filepath.Abs(filename)
@@ -494,15 +463,54 @@ func parseProfileBundle(filename string, content []byte) (profileLoadBundle, err
 	return profileLoadBundle{traps: traps, metrics: metrics, charts: charts}, nil
 }
 
+func validateProfileDefinitionUniqueness(filename string, def *ProfileDefinition) error {
+	trapOIDs := make(map[string]bool, len(def.Traps))
+	for _, td := range def.Traps {
+		if td.OID == "" {
+			continue
+		}
+		if trapOIDs[td.OID] {
+			return fmt.Errorf("%s: duplicate trap OID %s in profile", filename, td.OID)
+		}
+		trapOIDs[td.OID] = true
+	}
+
+	metricNames := make(map[string]bool, len(def.Metrics))
+	for _, metric := range def.Metrics {
+		if metric.Name == "" {
+			continue
+		}
+		if metricNames[metric.Name] {
+			return fmt.Errorf("%s: duplicate metric rule %s in profile", filename, metric.Name)
+		}
+		metricNames[metric.Name] = true
+	}
+	chartIDs := make(map[string]bool, len(def.Charts))
+	for _, chart := range def.Charts {
+		if chart.ID == "" {
+			continue
+		}
+		if chartIDs[chart.ID] {
+			return fmt.Errorf("%s: duplicate metric chart %s in profile", filename, chart.ID)
+		}
+		chartIDs[chart.ID] = true
+	}
+	return nil
+}
+
 func readProfileFile(filename string) ([]byte, error) {
-	return readCompressedFile(filename)
+	return readProfileFileLimited(filename, maxProfileFileBytes)
+}
+
+func readProfileFileLimited(filename string, maxBytes int64) ([]byte, error) {
+	return readCompressedFile(filename, maxBytes)
 }
 
 func readCatalogueFile(filename string) ([]byte, error) {
-	return readCompressedFile(filename)
+	return readCompressedFile(filename, maxProfileFileBytes)
 }
 
-func readCompressedFile(filename string) ([]byte, error) {
+func readCompressedFile(filename string, maxBytes int64) ([]byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -520,13 +528,13 @@ func readCompressedFile(filename string) ([]byte, error) {
 		r = zr
 	}
 
-	lr := io.LimitReader(r, maxProfileFileBytes+1)
+	lr := io.LimitReader(r, maxBytes+1)
 	data, err := io.ReadAll(lr)
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(data)) > maxProfileFileBytes {
-		return nil, fmt.Errorf("profile file %q exceeds maximum decompressed size %d bytes", filename, maxProfileFileBytes)
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("profile file %q exceeds maximum decompressed size %d bytes", filename, maxBytes)
 	}
 	return data, nil
 }

@@ -72,12 +72,14 @@ func TestNewSDKWriterEagerOpenCreatesSDKJournalDirectory(t *testing.T) {
 	require.NoError(t, err)
 	defer w.close()
 
-	assert.NotEmpty(t, w.directory())
-	assert.NotEqual(t, filepath.Clean(dir), filepath.Clean(w.directory()))
-	assert.DirExists(t, w.directory())
-	assert.NotEmpty(t, w.activeFile())
-	assert.FileExists(t, w.activeFile())
-	assert.True(t, strings.HasPrefix(filepath.Base(w.activeFile()), "snmp-traps@"), "active journal path = %s", w.activeFile())
+	journalDir := w.log.JournalDirectory()
+	activePath := w.log.ActivePath()
+	assert.NotEmpty(t, journalDir)
+	assert.NotEqual(t, filepath.Clean(dir), filepath.Clean(journalDir))
+	assert.DirExists(t, journalDir)
+	assert.NotEmpty(t, activePath)
+	assert.FileExists(t, activePath)
+	assert.True(t, strings.HasPrefix(filepath.Base(activePath), "snmp-traps@"), "active journal path = %s", activePath)
 }
 
 func TestNewSDKWriterCreatesCompactUnsealedUncompressedJournal(t *testing.T) {
@@ -91,7 +93,7 @@ func TestNewSDKWriterCreatesCompactUnsealedUncompressedJournal(t *testing.T) {
 	}
 	now := time.Now().UnixMicro()
 	require.NoError(t, writeTestFields(w, fields, now, now))
-	activePath := w.activeFile()
+	activePath := w.log.ActivePath()
 	require.NoError(t, w.close())
 
 	r, err := sdkjournal.OpenFileWithOptions(activePath, sdkjournal.ReaderOptions{})
@@ -126,7 +128,7 @@ func TestSDKWriterWriteAndQueryWithJournalctl(t *testing.T) {
 	require.NoError(t, writeTestFields(w, fields, now, now))
 	require.NoError(t, w.sync())
 
-	out := journaltest.RunJournalctl(t, w.directory(), "TRAP_CATEGORY=security")
+	out := journaltest.RunJournalctl(t, dir, "TRAP_CATEGORY=security")
 	assert.Contains(t, out, "sdk trap entry")
 	assert.Contains(t, out, "TRAP_CATEGORY")
 
@@ -148,10 +150,9 @@ func TestSDKWriterCWE117InjectionNotQueryableAsField(t *testing.T) {
 	}
 	now := time.Now().UnixMicro()
 	require.NoError(t, writeTestFields(w, fields, now, now))
-	journalDir := w.directory()
 	require.NoError(t, w.close())
 
-	out := journaltest.RunJournalctlAllowEmpty(t, journalDir, "FAKE_FIELD=spoofed")
+	out := journaltest.RunJournalctlAllowEmpty(t, dir, "FAKE_FIELD=spoofed")
 	assert.Empty(t, strings.TrimSpace(out))
 }
 
@@ -171,10 +172,11 @@ func TestSDKWriterCountsBinaryEncodedFields(t *testing.T) {
 
 func TestWriterCloseReturnsWorkerFailure(t *testing.T) {
 	dir := t.TempDir()
-	w, err := newTestSDKWriter(dir, Config{RotateSize: 200 * bytesPerMB})
+	cfg := Config{RotateSize: 200 * bytesPerMB}
+	w, err := newTestSDKWriter(dir, cfg)
 	require.NoError(t, err)
 
-	tw := newWriter(w, Options{QueueCapacity: 10})
+	tw := newWriter(w, cfg, 10, nil)
 	require.NoError(t, tw.Start())
 	require.NoError(t, tw.Write(nil))
 

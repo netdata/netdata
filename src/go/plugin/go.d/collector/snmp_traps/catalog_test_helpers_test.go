@@ -14,20 +14,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var currentTestCatalogManager *catalog.Manager
-
-func setTestDirs(t *testing.T, dirs ...string) {
-	t.Helper()
+func testCatalogManager(dirs ...string) *catalog.Manager {
 	paths := catalog.Paths{}
 	if len(dirs) > 0 {
 		paths.UserDirs = append([]string(nil), dirs[:len(dirs)-1]...)
 		paths.StockDir = dirs[len(dirs)-1]
 	}
-	currentTestCatalogManager = catalog.NewManager(paths)
-	t.Cleanup(func() { currentTestCatalogManager = nil })
+	return catalog.NewManager(paths)
 }
 
-func setMinimalProfileDir(t *testing.T) {
+func setTestDirs(t *testing.T, dirs ...string) *catalog.Manager {
+	t.Helper()
+	return testCatalogManager(dirs...)
+}
+
+func setMinimalProfileDir(t *testing.T) *catalog.Manager {
 	t.Helper()
 	root := t.TempDir()
 	stockDir := filepath.Join(root, "default")
@@ -48,16 +49,15 @@ traps:
 		},
 	}
 	writeProfileCatalogue(t, stockDir, manifest)
-	currentTestCatalogManager = catalog.NewManager(catalog.Paths{StockDir: stockDir})
-	t.Cleanup(func() { currentTestCatalogManager = nil })
+	return catalog.NewManager(catalog.Paths{StockDir: stockDir})
 }
 
-func writeProfileYAML(t *testing.T, dir, name, content string) {
+func writeProfileYAML(t testing.TB, dir, name, content string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644))
 }
 
-func writeProfileCatalogue(t *testing.T, stockDir string, manifest any) {
+func writeProfileCatalogue(t testing.TB, stockDir string, manifest any) {
 	t.Helper()
 	data, err := json.Marshal(manifest)
 	require.NoError(t, err)

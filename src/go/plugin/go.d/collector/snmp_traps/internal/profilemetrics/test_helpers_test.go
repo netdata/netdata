@@ -3,8 +3,6 @@
 package profilemetrics
 
 import (
-	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
@@ -12,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/attribution"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-	"github.com/stretchr/testify/require"
 )
 
 type testRuntimeConfig struct {
@@ -24,91 +22,244 @@ type testRuntimeConfig struct {
 	Include []string
 }
 
-type testCatalog struct {
-	epoch  *catalog.Epoch
-	rules  map[string]*catalog.MetricRule
-	charts map[string]*catalog.MetricChart
-}
-type testTrapEntry = model.TrapEntry
-type testTrapDef = catalog.TrapDef
-type testVarbindDef = catalog.VarbindDef
-type testVarbindValue = model.VarbindValue
-type testTrapEnrichmentAudit = model.TrapEnrichmentAudit
-type testTrapEnrichmentLookup = model.TrapEnrichmentLookup
-type testTrapSourceAudit = model.TrapSourceAudit
-type testCategory = model.Category
-type testSeverity = model.Severity
-type profileMetricIdentity = catalog.MetricIdentity
-type profileMetricResource = catalog.MetricResource
-type profileMetricOutput = catalog.MetricOutput
-type profileMetricScale = catalog.MetricScale
-type profileMetricState = catalog.MetricState
-type profileMetricPredicates = catalog.MetricPredicates
-
-const (
-	profileMetricTypeCounter = catalog.MetricTypeCounter
-	profileMetricTypeSample  = catalog.MetricTypeSample
-	profileMetricTypeState   = catalog.MetricTypeState
-
-	profileMetricIdentitySourceLabel = catalog.MetricIdentitySourceLabel
-	profileMetricIdentityListener    = catalog.MetricIdentityListener
-
-	profileMetricMissingDrop             = catalog.MetricMissingDrop
-	profileMetricMissingZero             = catalog.MetricMissingZero
-	profileMetricMissingUnknownDimension = catalog.MetricMissingUnknownDimension
-	profileMetricMissingError            = catalog.MetricMissingError
-)
-
-func newTestCatalog() *testCatalog {
-	return &testCatalog{
-		epoch:  catalog.NewEpoch(),
-		rules:  make(map[string]*catalog.MetricRule),
-		charts: make(map[string]*catalog.MetricChart),
-	}
+// staticTestCatalog is an immutable, exact-reference implementation of the
+// catalog contract consumed by profilemetrics. Catalog parsing, validation,
+// normalization, and lazy stock resolution are intentionally absent.
+type staticTestCatalog struct {
+	rulesByName map[string]*catalog.MetricRule
+	chartsByID  map[string]*catalog.MetricChart
+	trapsByRef  map[string]*catalog.TrapDef
 }
 
-func (idx *testCatalog) addTraps(traps []*testTrapDef) error { return idx.epoch.AddTraps(traps) }
-
-func (idx *testCatalog) addDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) error {
-	for i := range rules {
-		rule := rules[i]
-		idx.rules[rule.Name] = &rule
+func newStaticTestCatalog(traps []*catalog.TrapDef, rules []catalog.MetricRule, charts []catalog.MetricChart) *staticTestCatalog {
+	idx := &staticTestCatalog{
+		rulesByName: make(map[string]*catalog.MetricRule, len(rules)),
+		chartsByID:  make(map[string]*catalog.MetricChart, len(charts)),
+		trapsByRef:  make(map[string]*catalog.TrapDef, len(traps)*2),
 	}
-	for i := range charts {
-		chart := charts[i]
-		if chart.Type == "" {
-			chart.Type = "line"
-		}
-		idx.charts[chart.ID] = &chart
-	}
-	return nil
+	return idx.withTraps(traps...).withDefinitions(rules, charts)
 }
 
-func (idx *testCatalog) Definitions(names []string) (catalog.MetricDefinitions, error) {
+func (idx *staticTestCatalog) Definitions(names []string) (catalog.MetricDefinitions, error) {
+	if idx == nil {
+		return catalog.MetricDefinitions{}, fmt.Errorf("profile index not available")
+	}
 	defs := catalog.MetricDefinitions{
-		RulesByName: make(map[string]*catalog.MetricRule),
-		ChartsByID:  make(map[string]*catalog.MetricChart),
-	}
-	if names == nil {
-		maps.Copy(defs.RulesByName, idx.rules)
-		maps.Copy(defs.ChartsByID, idx.charts)
-		return defs, nil
+		RulesByName: make(map[string]*catalog.MetricRule, len(names)),
+		ChartsByID:  make(map[string]*catalog.MetricChart, len(names)),
 	}
 	for _, name := range names {
-		rule := idx.rules[name]
+		rule := idx.rulesByName[name]
 		if rule == nil {
 			continue
 		}
 		defs.RulesByName[name] = rule
-		if chart := idx.charts[rule.Output.Chart]; chart != nil {
+		if chart := idx.chartsByID[rule.Output.Chart]; chart != nil {
 			defs.ChartsByID[chart.ID] = chart
 		}
 	}
 	return defs, nil
 }
 
-func (idx *testCatalog) ResolveTrap(ref string) (*testTrapDef, error) {
-	return idx.epoch.ResolveTrap(ref)
+func (idx *staticTestCatalog) ResolveTrap(ref string) (*catalog.TrapDef, error) {
+	if idx == nil {
+		return nil, fmt.Errorf("profile index not available")
+	}
+	trap := idx.trapsByRef[ref]
+	if trap == nil {
+		return nil, fmt.Errorf("trap %q not found", ref)
+	}
+	return trap, nil
+}
+
+func (idx *staticTestCatalog) withDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) *staticTestCatalog {
+	next := idx.clone()
+	for i := range rules {
+		rule := cloneTestMetricRule(&rules[i])
+		next.rulesByName[rule.Name] = rule
+	}
+	for i := range charts {
+		chart := cloneTestMetricChart(&charts[i])
+		next.chartsByID[chart.ID] = chart
+	}
+	return next
+}
+
+func (idx *staticTestCatalog) withTraps(traps ...*catalog.TrapDef) *staticTestCatalog {
+	next := idx.clone()
+	for _, trap := range traps {
+		if trap == nil {
+			continue
+		}
+		trap = cloneTestTrapDef(trap)
+		next.trapsByRef[trap.OID] = trap
+		next.trapsByRef[trap.Name] = trap
+	}
+	return next
+}
+
+func (idx *staticTestCatalog) withChartLifecycle(id string, lifecycle charttpl.Lifecycle) *staticTestCatalog {
+	next := idx.clone()
+	chart := cloneTestMetricChart(next.chartsByID[id])
+	if chart == nil {
+		panic(fmt.Sprintf("profile metric chart %q not found", id))
+	}
+	chart.Lifecycle = cloneTestChartLifecycle(&lifecycle)
+	next.chartsByID[id] = chart
+	return next
+}
+
+func (idx *staticTestCatalog) clone() *staticTestCatalog {
+	if idx == nil {
+		return &staticTestCatalog{
+			rulesByName: make(map[string]*catalog.MetricRule),
+			chartsByID:  make(map[string]*catalog.MetricChart),
+			trapsByRef:  make(map[string]*catalog.TrapDef),
+		}
+	}
+	next := &staticTestCatalog{
+		rulesByName: make(map[string]*catalog.MetricRule, len(idx.rulesByName)),
+		chartsByID:  make(map[string]*catalog.MetricChart, len(idx.chartsByID)),
+		trapsByRef:  make(map[string]*catalog.TrapDef, len(idx.trapsByRef)),
+	}
+	maps.Copy(next.rulesByName, idx.rulesByName)
+	maps.Copy(next.chartsByID, idx.chartsByID)
+	maps.Copy(next.trapsByRef, idx.trapsByRef)
+	return next
+}
+
+func cloneTestMetricRule(src *catalog.MetricRule) *catalog.MetricRule {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	if src.Enabled != nil {
+		enabled := *src.Enabled
+		dst.Enabled = &enabled
+	}
+	if src.Identity.Resource != nil {
+		resource := *src.Identity.Resource
+		dst.Identity.Resource = &resource
+	}
+	if src.Where != nil {
+		dst.Where = make(catalog.MetricPredicates, len(src.Where))
+		for i := range src.Where {
+			dst.Where[i] = cloneTestMetricPredicate(src.Where[i])
+		}
+	}
+	if src.State.SetWhen != nil {
+		pred := cloneTestMetricPredicate(*src.State.SetWhen)
+		dst.State.SetWhen = &pred
+	}
+	if src.State.ClearWhen != nil {
+		pred := cloneTestMetricPredicate(*src.State.ClearWhen)
+		dst.State.ClearWhen = &pred
+	}
+	if src.State.ProblemValue != nil {
+		value := *src.State.ProblemValue
+		dst.State.ProblemValue = &value
+	}
+	return &dst
+}
+
+func cloneTestMetricPredicate(src catalog.MetricPredicate) catalog.MetricPredicate {
+	dst := src
+	dst.Equals = cloneTestCatalogValue(src.Equals)
+	dst.In = cloneTestCatalogValues(src.In)
+	dst.GreaterThan = cloneTestCatalogValue(src.GreaterThan)
+	dst.LessThan = cloneTestCatalogValue(src.LessThan)
+	dst.Range = cloneTestCatalogValues(src.Range)
+	if src.Exists != nil {
+		exists := *src.Exists
+		dst.Exists = &exists
+	}
+	if src.Absent != nil {
+		absent := *src.Absent
+		dst.Absent = &absent
+	}
+	return dst
+}
+
+func cloneTestCatalogValues(src []any) []any {
+	if src == nil {
+		return nil
+	}
+	dst := make([]any, len(src))
+	for i := range src {
+		dst[i] = cloneTestCatalogValue(src[i])
+	}
+	return dst
+}
+
+func cloneTestCatalogValue(src any) any {
+	switch value := src.(type) {
+	case []any:
+		return cloneTestCatalogValues(value)
+	case map[any]any:
+		dst := make(map[any]any, len(value))
+		for key, item := range value {
+			dst[cloneTestCatalogValue(key)] = cloneTestCatalogValue(item)
+		}
+		return dst
+	case map[string]any:
+		dst := make(map[string]any, len(value))
+		for key, item := range value {
+			dst[key] = cloneTestCatalogValue(item)
+		}
+		return dst
+	default:
+		return src
+	}
+}
+
+func cloneTestMetricChart(src *catalog.MetricChart) *catalog.MetricChart {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	dst.Lifecycle = cloneTestChartLifecycle(src.Lifecycle)
+	return &dst
+}
+
+func cloneTestChartLifecycle(src *charttpl.Lifecycle) *charttpl.Lifecycle {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	if src.Dimensions != nil {
+		dimensions := *src.Dimensions
+		dst.Dimensions = &dimensions
+	}
+	return &dst
+}
+
+func cloneTestTrapDef(src *catalog.TrapDef) *catalog.TrapDef {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	dst.VarbindRefs = cloneTestCatalogValues(src.VarbindRefs)
+	dst.DedupKeyVarbinds = append([]string(nil), src.DedupKeyVarbinds...)
+	if src.Labels != nil {
+		dst.Labels = make(map[string]string, len(src.Labels))
+		maps.Copy(dst.Labels, src.Labels)
+	}
+	if src.SharedVarbinds != nil {
+		dst.SharedVarbinds = make(map[string]*catalog.VarbindDef, len(src.SharedVarbinds))
+		for oid, def := range src.SharedVarbinds {
+			if def == nil {
+				dst.SharedVarbinds[oid] = nil
+				continue
+			}
+			cp := *def
+			if def.Enum != nil {
+				cp.Enum = make(map[string]string, len(def.Enum))
+				maps.Copy(cp.Enum, def.Enum)
+			}
+			dst.SharedVarbinds[oid] = &cp
+		}
+	}
+	return &dst
 }
 
 func normalizeTestRuntimeConfig(cfg testRuntimeConfig) (Policy, error) {
@@ -134,7 +285,7 @@ func testBaseChartTemplate() string {
 	return string(raw)
 }
 
-func fallbackTrapSourceIdentity(entry *testTrapEntry, jobName, sourceHashSalt string) (string, string) {
+func fallbackTrapSourceIdentity(entry *model.TrapEntry, jobName, sourceHashSalt string) (string, string) {
 	source, ok := attribution.Resolve(entry, jobName, attribution.DeviceSource, sourceHashSalt)
 	if !ok {
 		return "", ""
@@ -164,10 +315,33 @@ func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.Cyc
 	return ms
 }
 
-func newPopulatedTestCatalog(t *testing.T) *testCatalog {
+func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 	t.Helper()
-	idx := newTestCatalog()
-	traps := []*testTrapDef{
+	commandSource := &catalog.VarbindDef{
+		OID:         testCiscoCommandSourceOID,
+		Type:        "INTEGER",
+		Constraints: "(1..4)",
+		RawName:     testCiscoCommandSourceVarbind,
+	}
+	terminalType := &catalog.VarbindDef{
+		OID:  testCiscoTerminalTypeOID,
+		Type: "INTEGER",
+		Enum: map[string]string{
+			"1": "none",
+			"2": "console",
+			"3": "virtual",
+			"4": "aux",
+		},
+		RawName: testCiscoTerminalTypeVarbind,
+	}
+	sysUpTime := &catalog.VarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks", RawName: "sysUpTime.0"}
+	ifIndex := &catalog.VarbindDef{
+		OID:         testIfIndexOID,
+		Type:        "INTEGER",
+		Constraints: "(1..48)",
+		RawName:     "ifIndex",
+	}
+	traps := []*catalog.TrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
 			Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
@@ -178,29 +352,10 @@ func newPopulatedTestCatalog(t *testing.T) *testCatalog {
 				testCiscoTerminalTypeVarbind,
 				"sysUpTime.0",
 			},
-			SharedVarbinds: map[string]*testVarbindDef{
-				testCiscoCommandSourceOID: {
-					OID:         testCiscoCommandSourceOID,
-					Type:        "INTEGER",
-					RawName:     testCiscoCommandSourceVarbind,
-					Constraints: "(1..4)",
-				},
-				testCiscoTerminalTypeOID: {
-					OID:     testCiscoTerminalTypeOID,
-					Type:    "INTEGER",
-					RawName: testCiscoTerminalTypeVarbind,
-					Enum: map[string]string{
-						"1": "none",
-						"2": "console",
-						"3": "virtual",
-						"4": "aux",
-					},
-				},
-				model.SysUpTimeOID: {
-					OID:     model.SysUpTimeOID,
-					Type:    "TimeTicks",
-					RawName: "sysUpTime.0",
-				},
+			SharedVarbinds: map[string]*catalog.VarbindDef{
+				testCiscoCommandSourceOID: commandSource,
+				testCiscoTerminalTypeOID:  terminalType,
+				model.SysUpTimeOID:        sysUpTime,
 			},
 		},
 		{
@@ -211,89 +366,98 @@ func newPopulatedTestCatalog(t *testing.T) *testCatalog {
 			VarbindRefs: []any{
 				"ifIndex",
 			},
-			SharedVarbinds: map[string]*testVarbindDef{
-				testIfIndexOID: {
-					OID:         testIfIndexOID,
-					Type:        "INTEGER",
-					RawName:     "ifIndex",
-					Constraints: "(1..48)",
-				},
+			SharedVarbinds: map[string]*catalog.VarbindDef{testIfIndexOID: ifIndex},
+		},
+		{OID: testLinkDownTrapOID, Name: "IF-MIB::linkDown", Category: "state_change", Severity: "warning"},
+	}
+	charts := []catalog.MetricChart{
+		{
+			ID:        "cisco_config_changes",
+			Title:     "Cisco config changes",
+			Context:   "snmp.trap.cisco.config.changes",
+			Units:     "events/s",
+			Algorithm: "incremental",
+			Type:      "line",
+			Lifecycle: &charttpl.Lifecycle{
+				MaxInstances:      catalog.DefaultMetricChartMaxInstances,
+				ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+			},
+		},
+		{
+			ID:        "cisco_terminal_type",
+			Title:     "Cisco terminal type",
+			Context:   "snmp.trap.cisco.terminal.type",
+			Units:     "type",
+			Algorithm: "absolute",
+			Type:      "line",
+			Lifecycle: &charttpl.Lifecycle{
+				MaxInstances:      catalog.DefaultMetricChartMaxInstances,
+				ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+			},
+		},
+		{
+			ID:        "port_security_violations",
+			Title:     "Port security violations",
+			Context:   "snmp.trap.cisco.port.security.violations",
+			Units:     "events/s",
+			Algorithm: "incremental",
+			Type:      "line",
+			Lifecycle: &charttpl.Lifecycle{
+				MaxInstances:      catalog.DefaultMetricChartMaxInstances,
+				ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
 			},
 		},
 	}
-	if err := idx.addTraps(traps); err != nil {
-		t.Fatalf("addTraps failed: %v", err)
-	}
-	charts := []profileMetricChart{
-		{
-			ID:         "cisco_config_changes",
-			Title:      "Cisco config changes",
-			Context:    "snmp.trap.cisco.config.changes",
-			Units:      "events/s",
-			Algorithm:  "incremental",
-			Type:       "line",
-			SourceFile: "test-profile.yaml",
-		},
-		{
-			ID:         "cisco_terminal_type",
-			Title:      "Cisco terminal type",
-			Context:    "snmp.trap.cisco.terminal.type",
-			Units:      "type",
-			Algorithm:  "absolute",
-			Type:       "line",
-			SourceFile: "test-profile.yaml",
-		},
-		{
-			ID:         "port_security_violations",
-			Title:      "Port security violations",
-			Context:    "snmp.trap.cisco.port.security.violations",
-			Units:      "events/s",
-			Algorithm:  "incremental",
-			Type:       "line",
-			SourceFile: "test-profile.yaml",
-		},
-	}
-	rules := []profileMetricRule{
+	rules := []catalog.MetricRule{
 		{
 			Name:   "cisco.config.changed",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
-			Output: profileMetricOutput{
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
+			},
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_config_events",
 				Dimension: "events",
 				Chart:     "cisco_config_changes",
 			},
-			SourceFile: "test-profile.yaml",
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:             "cisco.config.terminal_type",
-			Type:             profileMetricTypeSample,
+			Type:             catalog.MetricTypeSample,
 			OnTrap:           testCiscoConfigTrapOID,
 			ValueFromVarbind: testCiscoTerminalTypeVarbind,
-			Output: profileMetricOutput{
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
+			},
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_terminal_type",
 				Dimension: "terminal_type",
 				Chart:     "cisco_terminal_type",
 			},
-			SourceFile: "test-profile.yaml",
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
-			Name:     "cisco.port_security.ifindex",
-			Type:     profileMetricTypeCounter,
-			OnTrap:   testPortSecurityTrapOID,
-			Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 48}},
-			Output: profileMetricOutput{
+			Name:   "cisco.port_security.ifindex",
+			Type:   catalog.MetricTypeCounter,
+			OnTrap: testPortSecurityTrapOID,
+			Identity: catalog.MetricIdentity{
+				Device:   catalog.MetricIdentitySource,
+				Resource: &catalog.MetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 48},
+			},
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_port_security_violations",
 				Dimension: "violations",
 				Chart:     "port_security_violations",
 			},
-			SourceFile: "test-profile.yaml",
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 	}
-	if err := idx.addDefinitions(rules, charts); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
-	return idx
+	return newStaticTestCatalog(traps, rules, charts)
 }
 
 func newTestProfileMetricRuntime(t *testing.T, idx Catalog, include []string) *Runtime {
@@ -309,7 +473,27 @@ func newTestProfileMetricRuntimeWithConfig(t *testing.T, idx Catalog, cfg testRu
 	return newTestProfileMetricRuntimeWithPolicy(t, idx, cfg, nil)
 }
 
-func newTestProfileMetricRuntimeWithPolicy(t *testing.T, idx Catalog, cfg testRuntimeConfig, configure func(*Policy)) *Runtime {
+func newTestProfileMetricRuntimeWithPolicy(
+	t *testing.T,
+	idx Catalog,
+	cfg testRuntimeConfig,
+	configure func(*Policy),
+) *Runtime {
+	t.Helper()
+	return newTestProfileMetricRuntimeFromCatalog(t, idx, cfg, configure)
+}
+
+func newTestProfileMetricRuntimeFromCatalogWithConfig(t *testing.T, idx Catalog, cfg testRuntimeConfig) *Runtime {
+	t.Helper()
+	return newTestProfileMetricRuntimeFromCatalog(t, idx, cfg, nil)
+}
+
+func newTestProfileMetricRuntimeFromCatalog(
+	t *testing.T,
+	idx Catalog,
+	cfg testRuntimeConfig,
+	configure func(*Policy),
+) *Runtime {
 	t.Helper()
 	normalized, err := normalizeTestRuntimeConfig(cfg)
 	if err != nil {
@@ -339,18 +523,18 @@ func collectProfileMetricsOnce(t *testing.T, rt *Runtime, store metrix.Collector
 	}
 }
 
-func ciscoConfigTrapEntry(jobName string) *testTrapEntry {
-	return &testTrapEntry{
+func ciscoConfigTrapEntry(jobName string) *model.TrapEntry {
+	return &model.TrapEntry{
 		JobName:       jobName,
 		TrapOID:       testCiscoConfigTrapOID,
 		TrapName:      "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
+		Enrichment: &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{
 			Selected: "192.0.2.10",
 			Method:   "udp_peer",
 		}},
-		Varbinds: []testVarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: testCiscoCommandSourceOID, Type: "INTEGER", Value: 2},
 			{OID: testCiscoTerminalTypeOID, Type: "INTEGER", Value: 2},
 			{OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
@@ -358,13 +542,13 @@ func ciscoConfigTrapEntry(jobName string) *testTrapEntry {
 	}
 }
 
-func ciscoConfigTrapEntryFromSource(jobName, source string) *testTrapEntry {
+func ciscoConfigTrapEntryFromSource(jobName, source string) *model.TrapEntry {
 	entry := ciscoConfigTrapEntry(jobName)
 	setTrapEntrySource(entry, source)
 	return entry
 }
 
-func setTrapEntrySource(entry *testTrapEntry, source string) {
+func setTrapEntrySource(entry *model.TrapEntry, source string) {
 	entry.SourceIP = source
 	entry.SourceUDPPeer = source
 	entry.Enrichment.Source.Selected = source
@@ -434,71 +618,41 @@ func sourceRuntimeWithLimits(t *testing.T, idx Catalog, limits profileMetricLimi
 	})
 }
 
-func profileMetricChartForTest(id, title, context, units, algorithm string) profileMetricChart {
-	return profileMetricChart{
-		ID:         id,
-		Title:      title,
-		Context:    context,
-		Units:      units,
-		Algorithm:  algorithm,
-		Type:       "line",
-		SourceFile: "test-profile.yaml",
+func profileMetricChartForTest(id, title, context, units, algorithm string) catalog.MetricChart {
+	return catalog.MetricChart{
+		ID:        id,
+		Title:     title,
+		Context:   context,
+		Units:     units,
+		Algorithm: algorithm,
+		Type:      "line",
+		Lifecycle: &charttpl.Lifecycle{
+			MaxInstances:      catalog.DefaultMetricChartMaxInstances,
+			ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+		},
 	}
 }
 
-func addProfileMetricRuleWithChart(t *testing.T, idx *testCatalog, rule profileMetricRule, chart profileMetricChart) {
-	t.Helper()
-	if err := idx.addDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+func addProfileMetricRuleWithChart(idx *staticTestCatalog, rule catalog.MetricRule, chart catalog.MetricChart) *staticTestCatalog {
+	return idx.withDefinitions([]catalog.MetricRule{rule}, []catalog.MetricChart{chart})
 }
 
-func profileMetricCatalogForTest(t *testing.T, idx *testCatalog) profileMetricCatalog {
-	t.Helper()
-	return profileMetricCatalog{rulesByName: idx.rules, chartsByID: idx.charts}
+func profileMetricCatalogForTest(idx *staticTestCatalog) profileMetricCatalog {
+	return profileMetricCatalog{rulesByName: idx.rulesByName, chartsByID: idx.chartsByID}
 }
 
-func profileMetricChartFromIndex(t *testing.T, idx *testCatalog, id string) *profileMetricChart {
-	t.Helper()
-	chart := profileMetricCatalogForTest(t, idx).chartsByID[id]
-	require.NotNil(t, chart)
-	return chart
+func profileMetricOutputForTest(metric, dimension, chart string) catalog.MetricOutput {
+	return catalog.MetricOutput{Metric: metric, Dimension: dimension, Chart: chart}
 }
 
-func profileMetricOutputForTest(metric, dimension, chart string) profileMetricOutput {
-	return profileMetricOutput{Metric: metric, Dimension: dimension, Chart: chart}
-}
-
-func portSecurityTrapEntry(resource any) *testTrapEntry {
-	return &testTrapEntry{
+func portSecurityTrapEntry(resource any) *model.TrapEntry {
+	return &model.TrapEntry{
 		JobName:       testProfileMetricJobName,
 		TrapOID:       testPortSecurityTrapOID,
 		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment:    &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
-		Varbinds:      []testVarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: resource}},
+		Enrichment:    &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
+		Varbinds:      []model.VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: resource}},
 	}
-}
-
-func writeProfileYAML(t *testing.T, dir, name, content string) {
-	t.Helper()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644))
-}
-
-func writeProfileCatalogue(t *testing.T, stockDir string, manifest any) {
-	t.Helper()
-	data, err := json.Marshal(manifest)
-	require.NoError(t, err)
-	var entries map[string]map[string]any
-	require.NoError(t, json.Unmarshal(data, &entries))
-	for owner, entry := range entries {
-		file, _ := entry["file"].(string)
-		profileData, err := os.ReadFile(filepath.Join(stockDir, file))
-		require.NoError(t, err, "read stock profile for catalogue entry %q", owner)
-		entry["sha256"] = fmt.Sprintf("%x", sha256.Sum256(profileData))
-	}
-	data, err = json.Marshal(entries)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(stockDir), "catalogue.json"), data, 0o644))
 }

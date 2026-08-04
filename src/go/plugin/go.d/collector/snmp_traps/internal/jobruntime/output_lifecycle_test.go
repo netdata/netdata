@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package jobruntime
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -22,12 +21,12 @@ type recordingOutputStarter struct {
 
 type cleanupOrderWriter struct {
 	order   []string
-	entries []*TrapEntry
+	entries []*model.TrapEntry
 }
 
-func (w *cleanupOrderWriter) Write(entry *TrapEntry) error {
+func (w *cleanupOrderWriter) Write(entry *model.TrapEntry) error {
 	w.entries = append(w.entries, entry)
-	if entry.ReportType == ReportTypeDedupSummary {
+	if entry.ReportType == model.ReportTypeDedupSummary {
 		w.order = append(w.order, "summary")
 	}
 	return nil
@@ -65,30 +64,35 @@ func TestStartOutputBackendsStopsAfterFailure(t *testing.T) {
 	assert.Equal(t, []string{"otlp"}, order)
 }
 
+func TestPreparedOutputsStartIgnoresTypedNilBackend(t *testing.T) {
+	prepared := &preparedOutputs{}
+	require.NoError(t, prepared.start())
+}
+
 func TestHandleOutputOutcomePreservesBackendAuthorityMetrics(t *testing.T) {
-	collector := &Collector{Config: Config{Name: "local"}}
+	job := &Job{policy: NewPolicy(PolicyConfig{JobName: "local"})}
 	metrics := newTestJobTelemetry(t, "local", false)
 
-	collector.handleOutputOutcome(metrics, output.Outcome{
+	job.handleOutputOutcome(metrics, output.Outcome{
 		Backend: output.BackendOTLP, Stage: output.StageEnqueue, FailedEntries: 2,
 	})
 	assertJobMetric(t, metrics, "local", "snmp_trap_errors_otlp_export_failed", 2)
 	assertJobMetric(t, metrics, "local", "snmp_trap_pipeline_write_failed", 0)
 
-	collector.handleOutputOutcome(metrics, output.Outcome{
+	job.handleOutputOutcome(metrics, output.Outcome{
 		Backend: output.BackendOTLP, Stage: output.StageExport, FailedEntries: 3, Authoritative: true,
 	})
 	assertJobMetric(t, metrics, "local", "snmp_trap_errors_otlp_export_failed", 5)
 	assertJobMetric(t, metrics, "local", "snmp_trap_pipeline_write_failed", 3)
 }
 
-func TestCollectorCleanupWritesFinalDedupSummaryBeforeClosingOutput(t *testing.T) {
+func TestJobCleanupWritesFinalDedupSummaryBeforeClosingOutput(t *testing.T) {
 	const jobName = "cleanup-order"
 	policy, err := dedup.Normalize(dedup.Config{Enabled: true, WindowSec: 3600})
 	require.NoError(t, err)
 	metrics := newTestJobTelemetry(t, jobName, true)
 	writer := &cleanupOrderWriter{}
-	d := newJobDeduper(jobName, policy, nil, writer, metrics, trapWriteFailureJournal, nil)
+	d := newDeduper(jobName, policy, nil, writer, metrics, writeFailureJournal, nil)
 	d.Start()
 	entry := &model.TrapEntry{SourceIP: "198.51.100.10", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
 	_, decision := d.Admit(entry, nil)
@@ -96,20 +100,20 @@ func TestCollectorCleanupWritesFinalDedupSummaryBeforeClosingOutput(t *testing.T
 	_, decision = d.Admit(entry, nil)
 	require.Equal(t, dedup.DecisionSuppress, decision)
 
-	c := &Collector{
-		Config:     Config{Name: jobName},
-		trapWriter: writer,
-		telemetry:  metrics,
-		deduper:    d,
+	c := &Job{
+		policy:    NewPolicy(PolicyConfig{JobName: jobName}),
+		writer:    writer,
+		telemetry: metrics,
+		deduper:   d,
 	}
-	c.Cleanup(context.Background())
+	c.Cleanup()
 
 	assert.Equal(t, []string{"summary", "close"}, writer.order)
 	require.Len(t, writer.entries, 1)
 	summary := writer.entries[0]
 	assert.Equal(t, jobName, summary.JobName)
-	assert.Equal(t, ReportTypeDedupSummary, summary.ReportType)
-	assert.Equal(t, Severity("info"), summary.Severity)
+	assert.Equal(t, model.ReportTypeDedupSummary, summary.ReportType)
+	assert.Equal(t, model.Severity("info"), summary.Severity)
 	assert.Positive(t, summary.ReceivedRealtimeUsec)
 	assert.Zero(t, summary.ReceivedMonotonicUsec)
 	require.NotNil(t, summary.SummaryCounts)
@@ -124,14 +128,14 @@ func TestFinalDedupSummaryWriteFailureOnlyRecordsBackendError(t *testing.T) {
 	require.NoError(t, err)
 	metrics := newTestJobTelemetry(t, jobName, true)
 	writer := &mockTrapWriter{err: errors.New("write failed")}
-	d := newJobDeduper(jobName, policy, nil, writer, metrics, trapWriteFailureJournal, nil)
+	d := newDeduper(jobName, policy, nil, writer, metrics, writeFailureJournal, nil)
 	d.Start()
 	entry := &model.TrapEntry{SourceIP: "198.51.100.10", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
 	d.Admit(entry, nil)
 	d.Admit(entry, nil)
 
-	c := &Collector{Config: Config{Name: jobName}, trapWriter: writer, telemetry: metrics, deduper: d}
-	c.Cleanup(context.Background())
+	c := &Job{policy: NewPolicy(PolicyConfig{JobName: jobName}), writer: writer, telemetry: metrics, deduper: d}
+	c.Cleanup()
 
 	assertJobMetric(t, metrics, jobName, "snmp_trap_errors_journal_write_failed", 1)
 	assertJobMetric(t, metrics, jobName, "snmp_trap_pipeline_write_failed", 0)
