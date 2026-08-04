@@ -56,6 +56,12 @@ static inline bool is_dir_accessible(const char *dir, bool rw) {
 // controls. Unlike the parent check above it uses lstat(),
 // so intermediate symlinks (/var/run -> /run) still resolve, but a symlink at
 // the final component is refused.
+//
+// rw distinguishes the two callers, because they are exposed to different things.
+// With rw the agent is about to create, chown and bind here while still root, so
+// the full rule applies. Without rw the caller only reads or connects to what is
+// already there - netdatacli looking for netdata.pipe, a plugin looking for a
+// socket - and one requirement is dropped for it: see the sticky case below.
 bool os_run_dir_is_safe(const char *candidate, bool rw) {
     // Trimmed here, not just in the callers: with a trailing slash the kernel
     // resolves the final component as a directory, so lstat() would report a
@@ -66,13 +72,29 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
 
     struct stat st;
     if (lstat(dir, &st) == -1)
+        // nothing is there (yet) - silent, the caller tries the next candidate or
+        // creates it
         return false;
 
-    // S_ISLNK is implied by !S_ISDIR, but spell it out: this is the check that
-    // stops a pre-created /tmp/netdata -> /etc from becoming our run dir.
-    if (S_ISLNK(st.st_mode) || !S_ISDIR(st.st_mode))
+    // The check that stops a pre-created /tmp/netdata -> /etc from becoming our run
+    // dir. Kept separate from the !S_ISDIR case below, which it implies, so each
+    // refusal can say which one it was: a refusal here relocates the agent to the
+    // next candidate (typically /tmp/netdata), and an operator who symlinked the run
+    // directory on purpose would otherwise have nothing to go on.
+    if (S_ISLNK(st.st_mode)) {
+        netdata_log_error(
+            "Refusing run directory '%s': it is a symbolic link. Point NETDATA_RUN_DIR at the "
+            "directory itself, or bind-mount it there.", dir);
         return false;
+    }
 
+    if (!S_ISDIR(st.st_mode)) {
+        netdata_log_error("Refusing run directory '%s': not a directory", dir);
+        return false;
+    }
+
+    // silent: "we cannot use this one" is a normal outcome while probing the
+    // built-in candidates, not a misconfiguration
     if (access(dir, rw ? W_OK : R_OK) == -1)
         return false;
 
@@ -123,7 +145,15 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
             // become_user()). What protects that use is performing it through a
             // descriptor - os_open_dir_privileged() and fchown() - not this
             // check.
-            if (run_dir_owner_is_ours(st.st_uid))
+            //
+            // A read-only caller is exempt: it creates nothing and chowns nothing,
+            // and it cannot answer the question anyway - netdatacli run by root
+            // does not know which uid the agent runs as, so requiring the
+            // directory to be "ours" only made it unable to find an agent that
+            // uses this fallback. Everything else above still applies to it, so it
+            // cannot be pointed elsewhere by a planted symlink, and the socket's
+            // own mode is what decides whether it may actually talk to the agent.
+            if (!rw || run_dir_owner_is_ours(st.st_uid))
                 return true;
 
             netdata_log_error(
