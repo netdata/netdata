@@ -226,7 +226,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
         else if(has_receiver)
             s->ingest.type = RRDHOST_INGEST_TYPE_CHILD;
-        else if(rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST))
+        else if(flags & RRDHOST_FLAG_VIRTUAL_HOST)
             s->ingest.type = RRDHOST_INGEST_TYPE_VIRTUAL;
         else
             s->ingest.type = RRDHOST_INGEST_TYPE_ARCHIVED;

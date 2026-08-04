@@ -220,6 +220,10 @@ static inline bool pluginsd_update_host_ephemerality(RRDHOST *host) {
 // when this returns false. Setting the flag first is what keeps a receiver from attaching behind
 // our back: rrdhost_set_receiver() re-checks it under the receiver lock we take below, so a
 // connection that passed the accept-time check is refused once we have claimed the host.
+//
+// On failure the caller MUST clear the flag again, unless the host is already registered in
+// parser->user.vnodes.JudyL - the stale detection and the plugin teardown clear it only for hosts
+// in that index, so an unregistered host would keep the gate closed with nobody collecting.
 static bool pluginsd_host_claim_as_local_vnode(RRDHOST *host, const char *keyword) {
     // stream_receiver_signal_to_stop_and_wait() also returns true when no receiver is attached,
     // so we check first: that is the only way to tell "nothing to do" (the common case, silent)
@@ -292,10 +296,13 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     rrdhost_flag_set(host, RRDHOST_FLAG_VIRTUAL_HOST);
 
     // the flag above closes the door to new receivers; this evicts one that is already inside.
-    // on failure the flag is left set, so no new receiver can attach until this plugin is torn
-    // down; the teardown clears it for every vnode it tracks, which is correct - by then we are
-    // no longer collecting, so a peer streaming this host to us is welcome.
+    // on failure we clear it again: this host is not in parser->user.vnodes.JudyL yet (JudyLIns is
+    // at the end of this function), so neither the stale detection nor the plugin teardown - both
+    // iterate that index - would ever clear it. We are not collecting into this host, so leaving
+    // the gate closed would reject the receiver we just failed to evict, plus every later
+    // reconnect of a legitimate child with this machine guid, while nothing writes to it at all.
     if(!pluginsd_host_claim_as_local_vnode(host, PLUGINSD_KEYWORD_HOST_DEFINE_END)) {
+        rrdhost_flag_clear(host, RRDHOST_FLAG_VIRTUAL_HOST);
         pluginsd_host_define_cleanup(parser);
         parser->user.retry = true;
         return PARSER_RC_ERROR;
@@ -374,10 +381,11 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                     uint32_t seen_seconds_ago = (now > last_seen) ? (uint32_t)(now - last_seen) : 0;
 
                     if (seen_seconds_ago >= stale_after_seconds) {
-                        // one atomic clear, so a concurrent flags snapshot cannot observe the impossible
-                        // "not virtual but still collector-online" pair - rrdhost_status_ingest() reads both
-                        // bits from a single snapshot and would report the wrong ingest type. This is about
-                        // consistent status reporting; writer exclusivity is enforced by the receiver lock.
+                        // one atomic clear: both bits describe the same transition (we stopped collecting
+                        // this vnode), so a reader that snapshots host->flags once cannot observe one
+                        // without the other - rrdhost_status_ingest() derives ingest.type from such a
+                        // snapshot. This is about consistent status reporting only; writer exclusivity is
+                        // enforced by the receiver lock, not by these bits.
                         rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST | RRDHOST_FLAG_COLLECTOR_ONLINE);
                         nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE, last seen %u seconds ago", rrdhost_hostname(virtual_host), seen_seconds_ago);
                         schedule_node_state_update(virtual_host, 1000);
