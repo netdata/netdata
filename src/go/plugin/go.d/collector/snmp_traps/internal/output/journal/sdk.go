@@ -42,7 +42,6 @@ type Config struct {
 type sdkWriter struct {
 	mu                  sync.Mutex
 	log                 *sdkjournal.Log
-	cfg                 Config
 	host                hostidentity.Provider
 	binaryEncodedFields atomic.Uint64
 }
@@ -108,7 +107,6 @@ func newSDKWriter(dir string, cfg Config, host hostidentity.Provider) (*sdkWrite
 
 	return &sdkWriter{
 		log:  log,
-		cfg:  cfg,
 		host: host,
 	}, nil
 }

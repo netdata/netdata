@@ -172,10 +172,11 @@ func TestSDKWriterCountsBinaryEncodedFields(t *testing.T) {
 
 func TestWriterCloseReturnsWorkerFailure(t *testing.T) {
 	dir := t.TempDir()
-	w, err := newTestSDKWriter(dir, Config{RotateSize: 200 * bytesPerMB})
+	cfg := Config{RotateSize: 200 * bytesPerMB}
+	w, err := newTestSDKWriter(dir, cfg)
 	require.NoError(t, err)
 
-	tw := newWriter(w, w.cfg, 10, nil)
+	tw := newWriter(w, cfg, 10, nil)
 	require.NoError(t, tw.Start())
 	require.NoError(t, tw.Write(nil))
 

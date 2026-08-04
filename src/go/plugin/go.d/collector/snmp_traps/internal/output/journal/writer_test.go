@@ -113,9 +113,10 @@ func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 	journaltest.RequireJournalctl(t)
 
 	dir := t.TempDir()
-	sdk, err := newTestSDKWriter(dir, Config{RotateSize: 200 * bytesPerMB})
+	cfg := Config{RotateSize: 200 * bytesPerMB}
+	sdk, err := newTestSDKWriter(dir, cfg)
 	require.NoError(t, err)
-	writer := newWriter(sdk, sdk.cfg, 1<<10, nil)
+	writer := newWriter(sdk, cfg, 1<<10, nil)
 	writer.flushInterval = 100 * time.Millisecond
 	require.NoError(t, writer.Start())
 

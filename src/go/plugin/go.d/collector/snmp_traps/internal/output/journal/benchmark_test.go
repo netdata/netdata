@@ -32,11 +32,12 @@ func BenchmarkTrapWriterSerializeAndWrite(b *testing.B) {
 }
 
 func BenchmarkJournalTrapWriterDrain(b *testing.B) {
-	sdk, err := newTestSDKWriter(b.TempDir(), Config{RotateSize: 200 * bytesPerMB})
+	cfg := Config{RotateSize: 200 * bytesPerMB}
+	sdk, err := newTestSDKWriter(b.TempDir(), cfg)
 	if err != nil {
 		b.Fatalf("open SDK journal: %v", err)
 	}
-	writer := newWriter(sdk, sdk.cfg, 1<<20, nil)
+	writer := newWriter(sdk, cfg, 1<<20, nil)
 	if err := writer.Start(); err != nil {
 		b.Fatal(err)
 	}
