@@ -16,6 +16,9 @@ import (
 )
 
 func TestCollectorsShareBorrowedReverseDNSCacheAcrossCleanup(t *testing.T) {
+	manager := setMinimalProfileDir(t)
+	withTestCacheDir(t)
+
 	var lookups atomic.Int64
 	shared := reversedns.New(reversedns.Config{Lookup: func(context.Context, string) ([]string, error) {
 		lookups.Add(1)
@@ -25,10 +28,20 @@ func TestCollectorsShareBorrowedReverseDNSCacheAcrossCleanup(t *testing.T) {
 	topology := snmptopology.NewTrapEnrichmentHandle()
 	first := New(store, topology, shared)
 	second := New(store, topology, shared)
+	first.services.catalog = manager
+	first.Name = "first"
+	first.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	if err := first.Init(context.Background()); err != nil {
+		t.Fatalf("initialize first collector: %v", err)
+	}
+	t.Cleanup(func() { first.Cleanup(context.Background()) })
 
 	firstEntry := &model.TrapEntry{SourceIP: "192.0.2.10"}
 	first.services.enricher.Enrich(firstEntry, true)
 	requireReverseDNSState(t, shared, netip.MustParseAddr("192.0.2.10"), reversedns.StatePositive)
+	if first.job == nil {
+		t.Fatal("first collector did not reach a running Job before cleanup")
+	}
 	first.Cleanup(context.Background())
 
 	secondEntry := &model.TrapEntry{SourceIP: "192.0.2.10"}
