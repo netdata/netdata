@@ -34,6 +34,7 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			state := &factoryTestState{}
+			var module *factoryTestV2
 			v1Creates := 0
 			v2Creates := 0
 			resolver, err := secretresolver.NewAtomicResolver(nil)
@@ -48,10 +49,11 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 							},
 							CreateV2: func() collectorapi.CollectorV2 {
 								v2Creates++
-								return &factoryTestV2{
+								module = &factoryTestV2{
 									state:    state,
 									checkErr: test.checkErr,
 								}
+								return module
 							},
 						},
 					},
@@ -74,6 +76,7 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 				require.FailNowf(t, "test failed", "unknown operation %q", test.operation)
 			}
 			require.EqualValues(t, test.wantErr, err != nil)
+			require.Equal(t, config.Name(), module.Name)
 			require.False(
 				t,
 				v1Creates != 0 || v2Creates != test.wantCreates || state.collectorCleanup != test.wantCreates,

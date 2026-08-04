@@ -32,6 +32,7 @@ already owns the behavior.
 | Command execution | `src/go/plugin/go.d/pkg/ndexec` |
 | Log-file readers/parsers | `src/go/plugin/go.d/pkg/logs` |
 | IP range parsing | `src/go/plugin/go.d/pkg/iprange` |
+| Shared reverse-DNS lookup/cache | `src/go/plugin/go.d/pkg/reversedns` |
 | SQL query/scan helpers | `src/go/plugin/go.d/pkg/sqlquery` |
 | Cloud auth config/credentials | `src/go/plugin/go.d/pkg/cloudauth` |
 | Profile-catalog loading (YAML profiles, stock/user dirs) | `src/go/plugin/go.d/pkg/profilecatalog` |
@@ -295,27 +296,52 @@ Why:
 
 ## Profile Catalog Helpers
 
-Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated per-target "profiles" as YAML files (a
-profile's identity is its file basename) and loads them from stock plus user directories. Used by the `prometheus`,
-`azure_monitor`, and `cloudwatch` collectors.
+Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated per-target profile files and loads them from
+stock plus user directories. By default a profile's identity is its YAML filename without the extension; collectors with
+compound encodings can supply their own filename-to-identity parser. Used by the `prometheus`, `azure_monitor`,
+`cloudwatch`, and `snmp_traps` collectors.
 
 When:
 
 - the collector reads profiles from `config/go.d/<name>.profiles/` (stock) and the user config dirs;
-- it needs stock/user override precedence (user overrides stock by basename), the stock-fatal / user-skip error policy,
-  and a process-wide cached catalog.
+- it needs stock/user override precedence (user overrides stock by logical identity), stock-fatal errors, and either
+  skip-invalid-user or fail-invalid-user behavior;
+- it may need the optional process-wide cache, or may own a shorter catalog lifecycle itself.
 
 Why:
 
 - one shared `Load[P]` + `Catalog[P]` + `Cached[T]` replaces per-collector copies of the directory walk, override
   precedence, and singleton caching;
 - it is generic over the collector's profile type `P` and oblivious to matching (matching stays in the collector);
-- decode depth is the collector's choice via `Options.Decode`: parse everything eagerly, or parse a lightweight header
-  now and hydrate the heavy part later (as `prometheus` does for its chart templates).
+- loading depth is the collector's choice: `Options.Decode` receives file bytes, while `Options.LoadFile` lets the caller
+  own compression, size limits, or path-based lazy state;
+- `Options.ParseFileName` can derive one logical identity from compound suffixes while preserving the default YAML
+  behavior for existing callers.
 
 Do NOT put matching logic in this package; it is a catalog + loader, not a matcher. Keep the profile schema, its
 decode/validate, the `defaultDirSpecs` directory resolution (location-specific), and specialized queries in the
-collector's own `*profiles` package, wrapping `profilecatalog.Catalog[P]` by struct embedding.
+collector's own profile package. A collector may wrap `profilecatalog.Catalog[P]` when it needs specialized queries.
+
+## Reverse DNS
+
+Use `src/go/plugin/go.d/pkg/reversedns` when multiple collectors or jobs need PTR data from one bounded process-owned
+cache.
+
+Choose the API by caller behavior:
+
+- `Lookup` is cache-only and performs no DNS I/O.
+- `Schedule` is best-effort and non-blocking; use it from per-item hot paths.
+- `Resolve` waits for a cached or coalesced lookup; use it from background warmers and other blocking paths.
+
+The resolver canonicalizes mapped IPv4 addresses, normalizes PTR names deterministically, caches positive and negative
+results with separate TTLs, coalesces work by address, and bounds both active lookups and retained entries. Blocking
+`Resolve` work receives admission priority over new `Schedule` work. Its segmented retention policy protects repeatedly
+used positive entries from one-pass source scans.
+
+Create the resolver at the composition root and inject the same pointer into its consumers. Collectors borrow it: they
+MUST NOT close, sweep, or replace it during per-job lifecycle. Keep collector-specific address eligibility, candidate
+selection, display precedence, and audit mapping in collector-owned adapters rather than adding those policies to the
+generic package.
 
 ## Legacy V1 Helpers
 

@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -61,7 +63,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 	)
 	require.NoError(t, err)
 	attached.outputGate = gate
-	require.NoError(t, owner.Replace(attached))
+	require.NoError(t, owner.AdoptAttachment(attached))
 
 	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
 	require.NoError(t, permit.ActivateExternal())
@@ -111,7 +113,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 	require.EqualValues(t, 1, cleanups)
 }
 
-func TestProcessOwnedJobCannotAttachAfterTargetRetirementFinalizesCandidate(t *testing.T) {
+func TestProcessOwnedJobAttachmentPreservesTargetRetirementAfterCandidateFinalizes(t *testing.T) {
 	attempts, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -159,7 +161,12 @@ func TestProcessOwnedJobCannotAttachAfterTargetRetirementFinalizesCandidate(t *t
 		candidate.CollectorCleanup,
 		owner,
 	)
-	require.Error(t, err)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptRetired)
+	require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+		err,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	))
 }
 
 func TestStagedJobPromotionDoesNotStartAfterCallerCancellation(t *testing.T) {
@@ -313,6 +320,130 @@ func TestGenerationOutputGateAbortsLateTransactionWithoutPoisoningFrameOwner(t *
 	require.Empty(t, output.Bytes())
 }
 
+func TestGenerationOutputGateRevokesAdmissionsBeforeDrain(t *testing.T) {
+	writeEntered := make(chan struct{})
+	releaseWrite := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseWrite) }) }
+	t.Cleanup(release)
+	owner, err := lifecycle.NewFrameOwner(frameWriteFunc(func(payload []byte) (int, error) {
+		close(writeEntered)
+		<-releaseWrite
+		return len(payload), nil
+	}))
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(owner)
+	require.NoError(t, err)
+	require.NoError(t, gate.Activate())
+
+	writeDone := make(chan error, 1)
+	go func() {
+		_, err := gate.Write([]byte("admitted\n"))
+		writeDone <- err
+	}()
+	requireTestSignal(t, writeEntered, "initial output did not acquire its write lease")
+
+	gate.RevokeAdmissions()
+	_, err = gate.Write([]byte("late\n"))
+	require.ErrorIs(t, err, errGenerationOutputFenced)
+
+	drainStarted := make(chan struct{})
+	drainDone := make(chan struct{})
+	go func() {
+		close(drainStarted)
+		gate.Fence()
+		close(drainDone)
+	}()
+	requireTestSignal(t, drainStarted, "output drain did not start")
+	requireGenerationGateDrainQueued(t, gate, drainDone)
+	select {
+	case <-drainDone:
+		t.Fatal("output drain completed before the admitted write released its lease")
+	default:
+	}
+
+	release()
+	require.NoError(t, <-writeDone)
+	requireTestSignal(t, drainDone, "output drain did not finish after the admitted write")
+}
+
+func TestGenerationOutputGateRevokesTransactionAdmissionsBeforeDrain(t *testing.T) {
+	writeEntered := make(chan struct{})
+	releaseWrite := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseWrite) }) }
+	t.Cleanup(release)
+	owner, err := lifecycle.NewFrameOwner(frameWriteFunc(func(payload []byte) (int, error) {
+		close(writeEntered)
+		<-releaseWrite
+		return len(payload), nil
+	}))
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(owner)
+	require.NoError(t, err)
+	require.NoError(t, gate.Activate())
+
+	var admittedEvents []string
+	admittedDone := make(chan error, 1)
+	go func() {
+		admittedDone <- gate.CommitJobOutput(
+			[]byte("admitted transaction\n"),
+			&recordingFrameState{events: &admittedEvents},
+		)
+	}()
+	requireTestSignal(t, writeEntered, "initial transaction did not acquire its write lease")
+
+	gate.RevokeAdmissions()
+	drainDone := make(chan struct{})
+	go func() {
+		gate.Fence()
+		close(drainDone)
+	}()
+	requireGenerationGateDrainQueued(t, gate, drainDone)
+
+	var lateEvents []string
+	lateDone := make(chan error, 1)
+	go func() {
+		lateDone <- gate.CommitJobOutput(
+			[]byte("late transaction\n"),
+			&recordingFrameState{events: &lateEvents},
+		)
+	}()
+	select {
+	case err = <-lateDone:
+		require.ErrorIs(t, err, errGenerationOutputFenced)
+	case <-time.After(time.Second):
+		t.Fatal("late transaction waited for the admitted transaction to drain")
+	}
+	require.Equal(t, []string{"abort"}, lateEvents)
+
+	release()
+	require.NoError(t, <-admittedDone)
+	require.Equal(t, []string{"commit"}, admittedEvents)
+	requireTestSignal(t, drainDone, "output drain did not finish after the admitted transaction")
+}
+
+func requireGenerationGateDrainQueued(
+	t *testing.T,
+	gate *generationOutputGate,
+	drainDone <-chan struct{},
+) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for gate.mu.TryRLock() {
+		gate.mu.RUnlock()
+		select {
+		case <-drainDone:
+			t.Fatal("output drain completed before its admitted lease released")
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("output drain did not queue for its write lease")
+		}
+		runtime.Gosched()
+	}
+}
+
 func TestCleanupOutputGateTerminalFenceRejectsLateOutputWithoutPoisoningFrameOwner(t *testing.T) {
 	var output bytes.Buffer
 	owner, err := lifecycle.NewFrameOwner(&output)
@@ -332,6 +463,24 @@ func TestCleanupOutputGateTerminalFenceRejectsLateOutputWithoutPoisoningFrameOwn
 	gate.PoisonOutput(err)
 	require.False(t, owner.Census().Poisoned)
 	require.Equal(t, payload, output.Bytes())
+}
+
+func BenchmarkGenerationOutputGateWrite(b *testing.B) {
+	owner, err := lifecycle.NewFrameOwner(io.Discard)
+	require.NoError(b, err)
+	gate, err := newGenerationOutputGate(owner)
+	require.NoError(b, err)
+	require.NoError(b, gate.Activate())
+	payload := []byte("BEGIN x\nEND\n\n")
+
+	b.ReportAllocs()
+	b.SetBytes(int64(len(payload)))
+	b.ResetTimer()
+	for range b.N {
+		if _, err := gate.Write(payload); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 type recordingFrameState struct {

@@ -5,6 +5,7 @@ package joboutput
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -32,38 +33,43 @@ const (
 type generationOutputGate struct {
 	mu     sync.RWMutex
 	writer FrameWriter
-	state  generationOutputState
+	state  atomic.Uint32
 }
 
 func newGenerationOutputGate(owner *lifecycle.FrameOwner) (*generationOutputGate, error) {
 	if owner == nil {
 		return nil, errors.New("job output: nil generation output owner")
 	}
-	return &generationOutputGate{
-		writer: FrameWriter{Owner: owner},
-		state:  generationOutputInactive,
-	}, nil
+	gate := &generationOutputGate{writer: FrameWriter{Owner: owner}}
+	gate.state.Store(uint32(generationOutputInactive))
+	return gate, nil
 }
 
 func (gog *generationOutputGate) Activate() error {
 	if gog == nil {
 		return errors.New("job output: nil generation output gate")
 	}
-	gog.mu.Lock()
-	defer gog.mu.Unlock()
-	if gog.state != generationOutputInactive {
+	if !gog.state.CompareAndSwap(uint32(generationOutputInactive), uint32(generationOutputActive)) {
 		return errors.New("job output: invalid generation output activation")
 	}
-	gog.state = generationOutputActive
 	return nil
+}
+
+// RevokeAdmissions synchronously rejects future writes without waiting for a
+// write already holding a lease. Fence performs the corresponding drain.
+func (gog *generationOutputGate) RevokeAdmissions() {
+	if gog == nil {
+		return
+	}
+	gog.state.Store(uint32(generationOutputFenced))
 }
 
 func (gog *generationOutputGate) Fence() {
 	if gog == nil {
 		return
 	}
+	gog.RevokeAdmissions()
 	gog.mu.Lock()
-	gog.state = generationOutputFenced
 	gog.mu.Unlock()
 }
 
@@ -71,9 +77,15 @@ func (gog *generationOutputGate) Write(payload []byte) (int, error) {
 	if gog == nil {
 		return 0, errGenerationOutputInactive
 	}
+	switch generationOutputState(gog.state.Load()) {
+	case generationOutputFenced:
+		return 0, errGenerationOutputFenced
+	case generationOutputInactive:
+		return 0, errGenerationOutputInactive
+	}
 	gog.mu.RLock()
 	defer gog.mu.RUnlock()
-	switch gog.state {
+	switch generationOutputState(gog.state.Load()) {
 	case generationOutputActive:
 		return gog.writer.Write(payload)
 	case generationOutputFenced:
@@ -93,9 +105,15 @@ func (gog *generationOutputGate) CommitJobOutput(
 	if gog == nil {
 		return errors.Join(errGenerationOutputInactive, transaction.Abort())
 	}
+	switch generationOutputState(gog.state.Load()) {
+	case generationOutputFenced:
+		return errors.Join(errGenerationOutputFenced, transaction.Abort())
+	case generationOutputInactive:
+		return errors.Join(errGenerationOutputInactive, transaction.Abort())
+	}
 	gog.mu.RLock()
 	defer gog.mu.RUnlock()
-	switch gog.state {
+	switch generationOutputState(gog.state.Load()) {
 	case generationOutputActive:
 		return gog.writer.CommitJobOutput(payload, transaction)
 	case generationOutputFenced:

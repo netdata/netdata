@@ -18,7 +18,7 @@ func TestCollectorReplayPcapThroughListenerToJournal(t *testing.T) {
 
 	port := freeUDPPort(t)
 	c := newTestSNMPTrapsCollector()
-	c.SetJobName("e2e")
+	c.Name = "e2e"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 	c.Versions = []string{"v2c"}
 	c.Communities = []string{"public"}
@@ -26,14 +26,13 @@ func TestCollectorReplayPcapThroughListenerToJournal(t *testing.T) {
 	require.NoError(t, c.Init(t.Context()))
 	t.Cleanup(func() { c.Cleanup(t.Context()) })
 
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	require.Len(t, packets, 1)
+	packet := readSinglePcapUDPPacket(t, "testdata/v2c_coldstart.pcap.hex")
 
 	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 
-	_, err = conn.Write(packets[0].payload)
+	_, err = conn.Write(packet.Payload)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {

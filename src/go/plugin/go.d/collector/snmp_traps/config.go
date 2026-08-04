@@ -2,8 +2,6 @@
 
 package snmp_traps
 
-import "fmt"
-
 type EndpointConfig struct {
 	Protocol string `yaml:"protocol" json:"protocol"`
 	Address  string `yaml:"address" json:"address"`
@@ -35,7 +33,7 @@ type RateLimitConfig struct {
 
 type DedupConfig struct {
 	Enabled         bool     `yaml:"enabled" json:"enabled"`
-	WindowSec       int      `yaml:"window_sec" json:"window_sec"`
+	WindowSec       int64    `yaml:"window_sec" json:"window_sec"`
 	CacheMaxEntries int      `yaml:"cache_max_entries" json:"cache_max_entries"`
 	KeyVarbinds     []string `yaml:"key_varbinds,omitempty" json:"key_varbinds"`
 }
@@ -69,7 +67,13 @@ type ReverseDNSConfig struct {
 	Enabled bool `yaml:"enabled" json:"enabled"`
 }
 
+type ProfileMetricsConfig struct {
+	Enabled bool     `yaml:"enabled,omitempty" json:"enabled"`
+	Include []string `yaml:"include,omitempty" json:"include"`
+}
+
 type Config struct {
+	Name               string               `yaml:"name,omitempty" json:"name"`
 	Vnode              string               `yaml:"vnode,omitempty" json:"vnode"`
 	ReverseDNS         ReverseDNSConfig     `yaml:"reverse_dns,omitempty" json:"reverse_dns"`
 	UpdateEvery        int                  `yaml:"update_every,omitempty" json:"update_every"`
@@ -95,152 +99,4 @@ type Config struct {
 type ListenConfig struct {
 	Endpoints     []EndpointConfig `yaml:"endpoints" json:"endpoints"`
 	ReceiveBuffer int              `yaml:"receive_buffer,omitempty" json:"receive_buffer"`
-}
-
-type yamlKeySpec struct {
-	children map[string]yamlKeySpec
-	elem     *yamlKeySpec
-	allowAny bool
-}
-
-var (
-	endpointYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
-		"protocol": {},
-		"address":  {},
-		"port":     {},
-	}}
-
-	usmUserYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
-		"username":   {},
-		"engine_id":  {},
-		"auth_proto": {},
-		"auth_key":   {},
-		"priv_proto": {},
-		"priv_key":   {},
-	}}
-
-	overrideYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
-		"oid":      {},
-		"category": {},
-		"severity": {},
-		"labels":   {allowAny: true},
-	}}
-
-	profileMetricIdentityConfigYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
-		"device":            {},
-		"unresolved_source": {},
-		"source_id_privacy": {},
-	}}
-
-	profileMetricLimitsConfigYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
-		"max_rules":                {},
-		"max_sources":              {},
-		"max_resources_per_source": {},
-		"max_instances_per_job":    {},
-		"overflow":                 {},
-	}}
-
-	profileMetricsConfigYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
-		"enabled":  {},
-		"mode":     {},
-		"include":  {},
-		"identity": profileMetricIdentityConfigYAMLSpec,
-		"limits":   profileMetricLimitsConfigYAMLSpec,
-	}}
-
-	configYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
-		"__provider__":                {},
-		"__source__":                  {},
-		"__source_type__":             {},
-		"autodetection_retry":         {},
-		"function_only":               {},
-		"labels":                      {allowAny: true},
-		"module":                      {},
-		"name":                        {},
-		"priority":                    {},
-		"vnode":                       {},
-		"reverse_dns":                 {children: map[string]yamlKeySpec{"enabled": {}}},
-		"update_every":                {},
-		"listen":                      {children: map[string]yamlKeySpec{"endpoints": {elem: &endpointYAMLSpec}, "receive_buffer": {}}},
-		"versions":                    {},
-		"communities":                 {},
-		"usm_users":                   {elem: &usmUserYAMLSpec},
-		"engine_id_whitelist":         {},
-		"local_engine_id":             {},
-		"dynamic_engine_id_discovery": {},
-		"dynamic_engine_id_max_pairs": {},
-		"allowlist":                   {children: map[string]yamlKeySpec{"source_cidrs": {}}},
-		"source":                      {children: map[string]yamlKeySpec{"trusted_relays": {}}},
-		"rate_limit":                  {children: map[string]yamlKeySpec{"enabled": {}, "per_source_pps": {}, "mode": {}}},
-		"dedup":                       {children: map[string]yamlKeySpec{"enabled": {}, "window_sec": {}, "cache_max_entries": {}, "key_varbinds": {}}},
-		"journal":                     {children: map[string]yamlKeySpec{"enabled": {}}},
-		"otlp":                        {children: map[string]yamlKeySpec{"enabled": {}, "endpoint": {}, "headers": {allowAny: true}, "request_timeout": {}, "flush_interval": {}, "batch_size": {}, "queue_capacity": {}}},
-		"retention":                   {children: map[string]yamlKeySpec{"max_size": {}, "max_duration": {}, "rotation_size": {}, "rotation_duration": {}}},
-		"overrides":                   {elem: &overrideYAMLSpec},
-		"profile_metrics":             profileMetricsConfigYAMLSpec,
-	}}
-)
-
-func (c *Config) UnmarshalYAML(unmarshal func(any) error) error {
-	var raw any
-	if err := unmarshal(&raw); err != nil {
-		return err
-	}
-	if err := rejectUnknownYAMLKeys(raw, configYAMLSpec, ""); err != nil {
-		return err
-	}
-
-	type plain Config
-	return unmarshal((*plain)(c))
-}
-
-func rejectUnknownYAMLKeys(node any, spec yamlKeySpec, path string) error {
-	if spec.allowAny || node == nil {
-		return nil
-	}
-
-	switch v := node.(type) {
-	case map[any]any:
-		if spec.children == nil {
-			return nil
-		}
-		for rawKey, rawValue := range v {
-			key, ok := rawKey.(string)
-			if !ok {
-				if path == "" {
-					return fmt.Errorf("config key %v is not a string", rawKey)
-				}
-				return fmt.Errorf("%s: config key %v is not a string", path, rawKey)
-			}
-			child, ok := spec.children[key]
-			if !ok {
-				if path == "" {
-					if key == "metrics" {
-						return fmt.Errorf("job-level metrics is not supported; define trap metric rules in profiles and enable them with profile_metrics")
-					}
-					return fmt.Errorf("unknown config key %q", key)
-				}
-				return fmt.Errorf("%s: unknown config key %q", path, key)
-			}
-			childPath := key
-			if path != "" {
-				childPath = path + "." + key
-			}
-			if err := rejectUnknownYAMLKeys(rawValue, child, childPath); err != nil {
-				return err
-			}
-		}
-	case []any:
-		if spec.elem == nil {
-			return nil
-		}
-		for i, item := range v {
-			itemPath := fmt.Sprintf("%s[%d]", path, i)
-			if err := rejectUnknownYAMLKeys(item, *spec.elem, itemPath); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }

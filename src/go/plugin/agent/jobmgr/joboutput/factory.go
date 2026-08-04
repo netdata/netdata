@@ -59,10 +59,6 @@ type JobHandlerAttacher interface {
 	Attach(lifecycle.ResourceIdentity, StagedHandlerLifecycle) (ProcessHandlerLifecycle, error)
 }
 
-type jobNamedModule interface {
-	SetJobName(string)
-}
-
 type FactoryConfig struct {
 	Epoch           uint64                                        // target run generation
 	PluginName      string                                        // owning plugin name stamped into job config
@@ -113,12 +109,12 @@ func (fa factoryAttachment) attach(
 	candidate ConstructedJob,
 	identity lifecycle.ResourceIdentity,
 	owner *stagedJobOwner,
-) (ConstructedJob, error) {
+) (constructedJobAttachment, error) {
 	if !identity.Valid() ||
 		candidate.candidateJob == nil ||
 		owner == nil ||
 		fa.scheduler == nil {
-		return candidate, errors.New("job output: invalid candidate attachment")
+		return constructedJobAttachment{}, errors.New("job output: invalid candidate attachment")
 	}
 	attached, err := newProcessManagedJob(
 		candidate.Variant,
@@ -129,7 +125,7 @@ func (fa factoryAttachment) attach(
 		owner,
 	)
 	if err != nil {
-		return candidate, err
+		return constructedJobAttachment{}, err
 	}
 	attached.Observer = fa.observer
 	attached.resolvedReferences = candidate.resolvedReferences
@@ -138,10 +134,8 @@ func (fa factoryAttachment) attach(
 	attached.vnodeStage = candidate.vnodeStage
 	attached.outputGate = candidate.outputGate
 	attached.StagedHandlers = candidate.StagedHandlers
-	if candidate.runtimeStage != nil ||
-		candidate.vnodeStage != nil ||
-		candidate.outputGate != nil {
-		attached.activateAttachment = func() error {
+	if candidate.runtimeStage != nil || candidate.vnodeStage != nil {
+		attached.attachProjections = func() error {
 			var runtimeErr error
 			if candidate.runtimeStage != nil {
 				runtimeErr = candidate.runtimeStage.attach(fa.runtime)
@@ -154,11 +148,12 @@ func (fa factoryAttachment) attach(
 					return err
 				}
 			}
-			if candidate.outputGate != nil {
-				return candidate.outputGate.Activate()
-			}
 			return nil
 		}
+	}
+	result := constructedJobAttachment{
+		resources:   attached,
+		transferred: true,
 	}
 	if candidate.StagedHandlers != nil {
 		handlers, attachErr := callAttachHandlers(
@@ -171,13 +166,16 @@ func (fa factoryAttachment) attach(
 			attached.StagedHandlers = nil
 		}
 		if attachErr != nil {
-			return attached, attachErr
+			result.resources = attached
+			return result, attachErr
 		}
 		if handlers == nil {
-			return attached, errors.New("job output: nil attached handler lifecycle")
+			result.resources = attached
+			return result, errors.New("job output: nil attached handler lifecycle")
 		}
 	}
-	return attached, nil
+	result.resources = attached
+	return result, nil
 }
 
 func NewFactory(config FactoryConfig) (*Factory, error) {
@@ -481,7 +479,6 @@ func (f *Factory) buildV1(
 	if module == nil {
 		return nil, nil, false, fmt.Errorf("job output: module %q returned a nil V1 collector", config.Module())
 	}
-	setModuleJobName(module, config.Name())
 	redactLifecycle, storeSnapshot, err =
 		f.config.ConfigModules.applyResolvedWithSnapshot(ctx, config, module)
 	if err != nil {
@@ -560,7 +557,6 @@ func (f *Factory) buildV2(
 	if module == nil {
 		return nil, nil, nil, false, fmt.Errorf("job output: module %q returned a nil V2 collector", config.Module())
 	}
-	setModuleJobName(module, config.Name())
 	redactLifecycle, storeSnapshot, err =
 		f.config.ConfigModules.applyResolvedWithSnapshot(ctx, config, module)
 	if err != nil {
@@ -667,10 +663,4 @@ func factoryLabels(config confgroup.Config) map[string]string {
 
 func creatorDeclaresFunctions(creator collectorapi.Creator) bool {
 	return creator.SharedFunctions != nil || creator.AgentFunctions != nil || creator.InstanceFunctions != nil
-}
-
-func setModuleJobName(module any, name string) {
-	if named, ok := module.(jobNamedModule); ok {
-		named.SetJobName(name)
-	}
 }

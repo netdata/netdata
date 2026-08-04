@@ -88,7 +88,7 @@ type attempt struct {
 	state    attemptState
 	admitted bool
 	result   error
-	fence    func()
+	fence    func(error)
 	fenceErr error
 	settled  chan struct{}
 	released chan struct{}
@@ -192,7 +192,7 @@ func callWork(
 	return work(ctx, admission)
 }
 
-func callContainmentFence(fence func()) (err error) {
+func callContainmentFence(fence func(error), cause error) (err error) {
 	if fence == nil {
 		return nil
 	}
@@ -201,7 +201,7 @@ func callContainmentFence(fence func()) (err error) {
 			err = jobmgr.ErrProcessAttemptFencePanic
 		}
 	}()
-	fence()
+	fence(cause)
 	return nil
 }
 
@@ -269,7 +269,7 @@ func (a *Authority) cut(attempt *attempt, cause error, probingOnly bool) bool {
 	a.census.Contained++
 	attempt.timer.Stop()
 	attempt.cancel(cause)
-	fenceErr := callContainmentFence(attempt.fence)
+	fenceErr := callContainmentFence(attempt.fence, cause)
 	if fenceErr != nil {
 		attempt.fenceErr = fenceErr
 		attempt.result = errors.Join(cause, fenceErr)

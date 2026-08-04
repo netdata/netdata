@@ -6,19 +6,28 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"maps"
 	"net"
 	"net/netip"
-	"slices"
-	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profilemetrics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
 //go:embed "config_schema.json"
@@ -28,12 +37,12 @@ var configSchema string
 var chartTemplateYAML string
 
 const (
-	trapWriteFailureJournal = "journal_write_failed"
-	trapWriteFailureOTLP    = "otlp_export_failed"
+	trapWriteFailureJournal = telemetry.ErrorJournalWriteFailed
+	trapWriteFailureOTLP    = telemetry.ErrorOTLPExportFailed
 
 	listenerReadErrorLogEvery     = time.Hour
 	listenerReadErrorLogKeyPrefix = "snmp_traps:listener_read_failed:"
-	listenerBufferDegradedMetric  = "listener_buffer_degraded"
+	listenerBufferDegradedMetric  = telemetry.ErrorListenerBufferDegraded
 )
 
 var activeDirectJournalJobs atomic.Int64
@@ -43,23 +52,40 @@ func directJournalLogsAvailable() bool {
 }
 
 // Register registers the SNMP traps collector with shared SNMP-family enrichment state.
-func Register(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) {
-	collectorapi.Register("snmp_traps", newCreator(deviceStore, topologyEnricher))
+func Register(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) {
+	collectorapi.Register("snmp_traps", newCreator(deviceStore, topologyEnricher, reverseDNS))
 }
 
-func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) collectorapi.Creator {
+func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) collectorapi.Creator {
 	if deviceStore == nil {
 		panic("snmp_traps Register requires a non-nil device store")
 	}
 	if topologyEnricher == nil {
 		panic("snmp_traps Register requires a non-nil trap enrichment handle")
 	}
+	if reverseDNS == nil {
+		panic("snmp_traps Register requires a non-nil reverse DNS resolver")
+	}
+	trapEnricher := enrichment.New(
+		netdataadapter.RegistryLookup(deviceStore),
+		netdataadapter.TopologyLookup(topologyEnricher),
+		reverseDNS,
+	)
+	hostIdentity := newHostIdentityService()
+	telemetryRegistry := telemetry.NewRegistry()
+	var profileCatalogOnce sync.Once
+	var profileCatalog *catalog.Manager
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
 		},
-		CreateV2:       func() collectorapi.CollectorV2 { return New(deviceStore, topologyEnricher) },
+		CreateV2: func() collectorapi.CollectorV2 {
+			profileCatalogOnce.Do(func() {
+				profileCatalog = catalog.NewManager(defaultProfileCatalogPaths())
+			})
+			return newCollector(trapEnricher, hostIdentity, profileCatalog, telemetryRegistry, netdataEngineStateRoot)
+		},
 		Config:         func() any { return &Config{} },
 		AgentFunctions: snmpTrapsMethods,
 		MethodHandler:  snmpTrapsMethodHandler,
@@ -67,25 +93,51 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.
 }
 
 // New returns an SNMP traps collector using the provided SNMP-family enrichment state.
-func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle) *Collector {
+func New(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) *Collector {
 	if deviceStore == nil {
 		panic("snmp_traps New requires a non-nil device store")
 	}
 	if topologyEnricher == nil {
 		panic("snmp_traps New requires a non-nil trap enrichment handle")
 	}
+	if reverseDNS == nil {
+		panic("snmp_traps New requires a non-nil reverse DNS resolver")
+	}
+	return newCollector(
+		enrichment.New(
+			netdataadapter.RegistryLookup(deviceStore),
+			netdataadapter.TopologyLookup(topologyEnricher),
+			reverseDNS,
+		),
+		newHostIdentityService(),
+		nil,
+		telemetry.NewRegistry(),
+		netdataEngineStateRoot,
+	)
+}
+
+func newCollector(
+	trapEnricher *enrichment.Enricher,
+	hostIdentity *hostidentity.Service,
+	profileCatalog *catalog.Manager,
+	telemetryRegistry *telemetry.Registry,
+	engineStateRoot func() string,
+) *Collector {
 	store := metrix.NewCollectorStore()
 
 	return &Collector{
 		Config: Config{
 			Versions: []string{"v1", "v2c"},
 			Listen: ListenConfig{
-				ReceiveBuffer: defaultListenerReceiveBuffer,
+				ReceiveBuffer: receiver.DefaultReceiveBuffer,
 			},
 		},
-		store:            store,
-		deviceLookup:     deviceStore,
-		topologyEnricher: topologyEnricher,
+		store:             store,
+		enricher:          trapEnricher,
+		hostIdentity:      hostIdentity,
+		profileCatalog:    profileCatalog,
+		telemetryRegistry: telemetryRegistry,
+		engineStateRoot:   engineStateRoot,
 	}
 }
 
@@ -93,176 +145,110 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	listener           *Listener
-	trapWriter         TrapWriter
-	journalHost        journalHostProvider
-	journalDir         string
-	store              metrix.CollectorStore
-	deviceLookup       deviceLookup
-	topologyEnricher   trapTopologyEnricher
-	jobName            string
-	vnode              string
-	versions           map[SnmpVersion]struct{}
-	allowlist          *Allowlist
-	trustedRelays      []netip.Prefix
-	rateLimiter        *rateLimiter
-	engineBoots        *EngineBoots
-	localEngineID      *LocalEngineID
-	v3SecTable         *gosnmp.SnmpV3SecurityParametersTable
-	engineIDs          map[string]struct{}
-	dynamicEngineID    bool
-	dynamicEngineIDMax int
-	dynamicEngineIDReg *dynamicEngineIDRegistry
-	overrides          map[string]*OverrideConfig
-	metrics            *perJobMetrics
-	reverseDNS         *reverseDNSResolver
-	reverseDNSEnabled  bool
-	deduper            *trapDeduper
-	packetSequence     atomic.Uint64
-	profileCacheHeld   bool
-	profileMetrics     *profileMetricRuntime
-	dynamicChartYAML   string
-	writeFailureDim    string
+	receiver          *receiver.Receiver
+	trapWriter        output.Writer
+	journalHost       journalHostProvider
+	journalDir        string
+	store             metrix.CollectorStore
+	enricher          *enrichment.Enricher
+	hostIdentity      *hostidentity.Service
+	profileCatalog    *catalog.Manager
+	telemetryRegistry *telemetry.Registry
+	profileLease      *catalog.Lease
+	profileIndex      *catalog.Epoch
+	engineStateRoot   func() string
+	vnode             string
+	overrides         map[string]*OverrideConfig
+	telemetry         *telemetry.Job
+	reverseDNSEnabled bool
+	deduper           *dedup.Deduper
+	dedupKeyVarbinds  []string
+	packetSequence    atomic.Uint64
+	profileMetrics    *profilemetrics.Runtime
+	writeFailureDim   telemetry.ErrorKind
 }
 
 func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) SetJobName(name string) {
-	c.jobName = name
-}
-
 func (c *Collector) Init(ctx context.Context) error {
-	if err := validateJobName(c.jobName); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	if err := validateListenConfig(c.Listen); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	versions, err := validateVersions(c.Versions)
+	validated, err := validateConfig(c.Config)
 	if err != nil {
 		return dyncfgConfigError(err)
 	}
-	v3Enabled := versionListContains(versions, "v3")
+	c.warnCatchAllTrustedRelays(validated.trustedRelays)
 
-	if err := validateUSMUsers(c.USMUsers, c.DynamicEngineID); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	if err := validateEngineIDWhitelist(c.EngineIDWhitelist); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	if err := validateLocalEngineID(c.LocalEngineID); err != nil {
-		return dyncfgConfigError(err)
-	}
-
-	allowlistPrefixes, err := validateAllowlist(c.Allowlist)
-	if err != nil {
-		return dyncfgConfigError(err)
-	}
-	trustedRelays, err := validateTrustedRelays(c.Source)
-	if err != nil {
-		return dyncfgConfigError(err)
-	}
-	c.warnCatchAllTrustedRelays(trustedRelays)
-
-	if err := validateRateLimit(c.RateLimit); err != nil {
-		return dyncfgConfigError(err)
-	}
-	if err := validateDedupConfig(c.Dedup); err != nil {
-		return dyncfgConfigError(err)
-	}
-	otlpRuntime, err := validateOTLPConfig(c.OTLP)
-	if err != nil {
-		return dyncfgConfigError(err)
-	}
-	journalEnabled := c.Journal.enabled()
-	if !journalEnabled && !c.OTLP.Enabled {
-		return dyncfgConfigError(errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled"))
-	}
-
-	if err := validateOverrides(c.Overrides); err != nil {
-		return dyncfgConfigError(err)
-	}
-	if err := validateDeferredConfig(c.Config); err != nil {
-		return dyncfgConfigError(err)
-	}
-	if v3Enabled {
-		if len(c.USMUsers) == 0 {
-			return dyncfgConfigError(errors.New("SNMPv3 requires at least one usm_users entry"))
-		}
-		if !c.DynamicEngineID && len(c.EngineIDWhitelist) == 0 {
-			return dyncfgConfigError(errors.New("SNMPv3 requires engine_id_whitelist when dynamic_engine_id_discovery is disabled"))
-		}
-	}
-
-	var retCfg RetentionConfig
-	if journalEnabled {
-		ret, err := parseRetentionConfig(c.Retention)
-		if err != nil {
-			return dyncfgConfigError(err)
-		}
-		retCfg = ret
-	}
-
-	if c.listener != nil {
+	if c.receiver != nil {
 		return nil
 	}
 	c.profileMetrics = nil
-	c.dynamicChartYAML = ""
 
-	if _, err := AcquireProfileCache(); err != nil {
+	profileCatalog := c.profileCatalog
+	if profileCatalog == nil {
+		profileCatalog = catalog.NewManager(defaultProfileCatalogPaths())
+	}
+	profileLease, err := profileCatalog.Acquire()
+	if err != nil {
 		return dyncfgConfigError(err)
 	}
-	releaseProfileCache := true
+	releaseProfileLease := true
 	releaseProfiles := func() {
-		if releaseProfileCache {
-			ReleaseProfileCache()
-			releaseProfileCache = false
+		if releaseProfileLease {
+			profileLease.Close()
+			releaseProfileLease = false
 		}
 	}
 
-	idx := CurrentProfileIndex()
+	idx := profileLease.Epoch()
 	if idx == nil {
 		releaseProfiles()
 		return dyncfgConfigError(errors.New("profile index not available"))
 	}
-	profileMetricCfg, err := normalizeProfileMetricsConfig(c.ProfileMetrics)
-	if err != nil {
-		releaseProfiles()
-		return dyncfgConfigError(err)
-	}
-	if profileMetricCfg.enabled {
-		rt, tmpl, err := newProfileMetricRuntime(profileMetricCfg, idx)
+	if validated.profileMetrics.Enabled() {
+		rt, err := profilemetrics.New(validated.profileMetrics, idx, profilemetrics.Options{
+			BaseChartTemplateYAML: chartTemplateYAML,
+			SourceHashSalt:        c.sourceHashSalt(),
+		})
 		if err != nil {
 			releaseProfiles()
 			return dyncfgConfigError(err)
 		}
 		c.profileMetrics = rt
-		c.dynamicChartYAML = tmpl
 	}
 
-	var journalWriter *JournalWriter
-	if journalEnabled {
-		if err := validateNetdataLogRoot(); err != nil {
+	var jobTelemetry *telemetry.Job
+	reportReceiver := receiver.Reporter(func(event receiver.Event) {
+		c.handleReceiverEvent(jobTelemetry, event)
+	})
+	reportOutput := output.OutcomeReporter(func(outcome output.Outcome) {
+		c.handleOutputOutcome(jobTelemetry, outcome)
+	})
+	var journalWriter *journal.Writer
+	var otlpWriter *otlp.Writer
+	var journalHost journalHostProvider
+	if validated.journalEnabled {
+		if err := journal.ValidateLogRoot(); err != nil {
 			releaseProfiles()
 			return dyncfgStartupError(err)
 		}
-		dir := journalRoot(c.jobName)
-		journalCfg := retCfg.makeJournalConfig()
-		var err error
-		journalWriter, err = NewJournalWriter(dir, journalCfg)
+		dir := journal.Root(c.Name)
+		journalCfg := validated.retention.Config()
+		host, err := c.hostIdentity.FreshJournal()
+		if err != nil {
+			releaseProfiles()
+			return dyncfgStartupError(err)
+		}
+		journalHost = host
+		journalWriter, err = journal.Prepare(dir, journalCfg, host, journal.Options{Report: reportOutput})
 		if err != nil {
 			releaseProfiles()
 			return dyncfgStartupError(err)
 		}
 	}
 
-	listener, err := newListener(c.jobName, c.Listen)
+	recv := receiver.New(validated.receiver, reportReceiver)
+	bindEvents, err := recv.Bind()
 	if err != nil {
 		releaseProfiles()
 		if journalWriter != nil {
@@ -275,152 +261,101 @@ func (c *Collector) Init(ctx context.Context) error {
 		if journalWriter != nil {
 			journalWriter.Close()
 		}
-		listener.close()
+		if otlpWriter != nil {
+			otlpWriter.Close()
+		}
+		recv.Close()
 	}
 
-	var eb *EngineBoots
-	var lid *LocalEngineID
-	var v3Table *gosnmp.SnmpV3SecurityParametersTable
-	var engineIDWhitelist map[string]struct{}
-	cleanupCreatedState := func() {
-		// No engine-state files exist unless SNMPv3 setup below creates them.
-	}
-	if v3Enabled {
-		engineBootsExisted, err := engineStatePathExistsChecked(engineBootsPath(c.jobName))
-		if err != nil {
+	cleanupCreatedState := recv.RollbackPreparedState
+	if validated.receiver.V3Enabled() {
+		if c.engineStateRoot == nil {
 			cleanupPreflight()
-			return dyncfgStartupError(err)
+			return dyncfgStartupError(errors.New("SNMP engine state root is not configured"))
 		}
-		localEngineIDExisted, err := engineStatePathExistsChecked(localEngineIDPath(c.jobName))
-		if err != nil {
+		if err := recv.PrepareV3(c.engineStateRoot(), c.Name); err != nil {
 			cleanupPreflight()
-			return dyncfgStartupError(err)
-		}
-		engineStateDirExisted, err := engineStatePathExistsChecked(engineBootsDir(c.jobName))
-		if err != nil {
-			cleanupPreflight()
-			return dyncfgStartupError(err)
-		}
-		cleanupCreatedState = func() {
-			cleanupCreatedEngineState(c.jobName, !engineBootsExisted, !localEngineIDExisted, !engineStateDirExisted)
-		}
-
-		v3Table, err = buildSnmpV3SecurityTable(c.USMUsers, c.DynamicEngineID)
-		if err != nil {
-			cleanupCreatedState()
-			cleanupPreflight()
-			return dyncfgConfigError(err)
-		}
-		engineIDWhitelist, err = buildEngineIDWhitelist(c.EngineIDWhitelist)
-		if err != nil {
-			cleanupCreatedState()
-			cleanupPreflight()
-			return dyncfgConfigError(err)
-		}
-
-		lid, err = NewLocalEngineID(c.jobName, c.LocalEngineID)
-		if err != nil {
-			cleanupCreatedState()
-			cleanupPreflight()
-			return dyncfgStartupError(err)
-		}
-		if err := registerUSMUsersWithLocalEngineID(v3Table, c.USMUsers, lid.Bytes()); err != nil {
-			cleanupCreatedState()
-			cleanupPreflight()
-			return dyncfgConfigError(err)
-		}
-
-		eb, err = NewEngineBoots(c.jobName)
-		if err != nil {
-			cleanupCreatedState()
-			cleanupPreflight()
+			if receiver.IsConfigPreparationError(err) {
+				return dyncfgConfigError(err)
+			}
 			return dyncfgStartupError(err)
 		}
 	}
 
 	overrides := buildOverrideMap(c.Overrides)
-	metrics := getJobMetrics(c.jobName)
-	listener.metrics = metrics
-	listener.onReadError = c.logListenerReadError
-	c.reportListenerReceiveBufferWarnings(listener.receiveBufferWarnings)
-	var secondaryWriter TrapWriter
+	jobTelemetry = c.attachTelemetryAndHandleInitEvents(bindEvents, validated.dedup.Enabled())
+	var secondaryWriter output.Writer
 	if c.OTLP.Enabled {
-		c.warnPlaintextOTLP(otlpRuntime)
-		secondaryWriter, err = newOTLPTrapWriterWithRuntimeConfig(ctx, c.jobName, otlpRuntime, metrics, journalWriter == nil)
+		c.warnPlaintextOTLP(validated.otlp)
+		otlpWriter, err = otlp.Prepare(ctx, c.Name, validated.otlp, otlp.Options{
+			Authoritative: journalWriter == nil,
+			Report:        reportOutput,
+		})
 		if err != nil {
-			removeJobMetrics(c.jobName)
+			jobTelemetry.Detach()
 			cleanupCreatedState()
 			cleanupPreflight()
 			return dyncfgStartupError(err)
 		}
+		secondaryWriter = otlpWriter
 	}
-	var primaryWriter TrapWriter
+	var primaryWriter output.Writer
 	writeFailureDim := trapWriteFailureJournal
 	if journalWriter != nil {
-		primaryWriter = newJournalTrapWriter(journalWriter, defaultQueueCapacity, func(err error) {
-			c.warnf("SNMP trap journal writer stopped for job %q: %v", c.jobName, err)
-		})
+		primaryWriter = journalWriter
 	}
-	trapWriter := newFanoutTrapWriter(primaryWriter, secondaryWriter, metrics)
+	trapWriter := output.NewCoordinator(primaryWriter, secondaryWriter, output.BackendOTLP, reportOutput)
 	if primaryWriter == nil {
 		writeFailureDim = trapWriteFailureOTLP
 	}
-	metrics.setDedupEnabled(c.Dedup.Enabled)
-	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics, writeFailureDim, c.monotonicUsec)
+	jobName := c.Name
+	deduper := newJobDeduper(jobName, validated.dedup, idx, trapWriter, jobTelemetry, writeFailureDim, c.monotonicUsec)
+	dedupKeyVarbinds := validated.dedup.KeyVarbinds()
 
-	c.Versions = versions
+	var otlpStarter, journalStarter outputStarter
+	if otlpWriter != nil {
+		otlpStarter = otlpWriter
+	}
+	if journalWriter != nil {
+		journalStarter = journalWriter
+	}
+	if err := startOutputBackends(otlpStarter, journalStarter); err != nil {
+		jobTelemetry.Detach()
+		cleanupCreatedState()
+		cleanupPreflight()
+		return dyncfgStartupError(err)
+	}
+
+	c.Versions = validated.versions
 	c.vnode = c.Vnode
-	c.versions = versionSet(versions)
-	c.allowlist = NewAllowlist(allowlistPrefixes, c.Communities)
-	c.trustedRelays = trustedRelays
-	c.rateLimiter = newRateLimiter(c.RateLimit.Enabled, c.RateLimit.PerSourcePPS, c.RateLimit.Mode)
-	c.engineBoots = eb
-	c.localEngineID = lid
-	c.v3SecTable = v3Table
-	c.engineIDs = engineIDWhitelist
-	c.dynamicEngineID = c.DynamicEngineID
-	c.dynamicEngineIDMax = c.DynamicEngineIDMax
-	if c.dynamicEngineIDMax == 0 {
-		c.dynamicEngineIDMax = defaultDynamicEngineIDMax
-	}
-	c.dynamicEngineIDReg = nil
-	if c.dynamicEngineID && v3Table != nil {
-		known := make(map[dynamicEngineIDKey]struct{})
-		for _, u := range c.USMUsers {
-			if u.EngineID != "" {
-				known[dynamicEngineIDKey{
-					engineIDHex: strings.ToLower(strings.TrimSpace(u.EngineID)),
-					username:    u.Username,
-				}] = struct{}{}
-			}
-		}
-		c.dynamicEngineIDReg = newDynamicEngineIDRegistry(v3Table, c.dynamicEngineIDMax, known, c.USMUsers)
-	}
 	c.overrides = overrides
-	c.metrics = metrics
-	c.listener = listener
+	c.telemetry = jobTelemetry
+	c.receiver = recv
 	c.trapWriter = trapWriter
 	c.journalHost = nil
 	c.journalDir = ""
 	if journalWriter != nil {
-		c.journalHost = journalWriter.host
-		c.journalDir = journalWriter.JournalDirectory()
+		c.journalHost = journalHost
+		c.journalDir = journalWriter.Directory()
 		activeDirectJournalJobs.Add(1)
 	}
 	c.deduper = deduper
-	c.profileCacheHeld = true
-	releaseProfileCache = false
+	c.dedupKeyVarbinds = dedupKeyVarbinds
+	c.profileCatalog = profileCatalog
+	c.profileLease = profileLease
+	c.profileIndex = idx
+	releaseProfileLease = false
 	c.writeFailureDim = writeFailureDim
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
-	if c.reverseDNSEnabled {
-		c.reverseDNS = newReverseDNSResolver()
-	}
 
 	if deduper != nil {
-		deduper.start()
+		deduper.Start()
 	}
 
-	c.listener.start(c.handlePacket)
+	recv.CommitPreparedState()
+	c.receiver.Start(func(datagram receiver.Datagram) {
+		c.handlePacket(datagram.Data, datagram.PeerIP, datagram.Conn, datagram.Peer)
+	})
 
 	return nil
 }
@@ -434,35 +369,34 @@ func (c *Collector) Collect(ctx context.Context) error {
 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
-	if c.listener != nil {
-		c.listener.close()
-		c.listener = nil
+	if c.receiver != nil {
+		c.receiver.Close()
+		c.receiver = nil
 	}
 	if c.deduper != nil {
 		c.deduper.Close()
 		c.deduper = nil
 	}
+	c.dedupKeyVarbinds = nil
 	if c.trapWriter != nil {
 		c.trapWriter.Close()
 		c.trapWriter = nil
 	}
 	c.journalHost = nil
-	if c.reverseDNS != nil {
-		c.reverseDNS.Close()
-		c.reverseDNS = nil
-		c.reverseDNSEnabled = false
-	}
-	if c.profileCacheHeld {
-		ReleaseProfileCache()
-		c.profileCacheHeld = false
+	c.reverseDNSEnabled = false
+	if c.profileLease != nil {
+		c.profileLease.Close()
+		c.profileLease = nil
+		c.profileIndex = nil
 	}
 	if c.journalDir != "" {
 		activeDirectJournalJobs.Add(-1)
 	}
-	removeJobMetrics(c.jobName)
-	c.metrics = nil
+	if c.telemetry != nil {
+		c.telemetry.Detach()
+		c.telemetry = nil
+	}
 	c.profileMetrics = nil
-	c.dynamicChartYAML = ""
 	c.journalDir = ""
 	c.writeFailureDim = ""
 }
@@ -470,13 +404,13 @@ func (c *Collector) Cleanup(ctx context.Context) {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string {
-	if c.dynamicChartYAML != "" {
-		return c.dynamicChartYAML
+	if c.profileMetrics != nil {
+		return c.profileMetrics.ChartTemplateYAML()
 	}
 	return chartTemplateYAML
 }
 
-func (c *Collector) trapWriteFailureDim() string {
+func (c *Collector) trapWriteFailureDim() telemetry.ErrorKind {
 	if c.writeFailureDim != "" {
 		return c.writeFailureDim
 	}
@@ -484,176 +418,64 @@ func (c *Collector) trapWriteFailureDim() string {
 }
 
 func (c *Collector) collect(ctx context.Context) error {
-	if c.listener == nil {
-		return errors.New("listener not started")
+	if c.receiver == nil || !c.receiver.Ready() {
+		return errors.New("receiver not ready")
 	}
 	now := time.Now()
-	if c.rateLimiter != nil {
-		c.rateLimiter.maybeSweep(now)
-	}
-	if c.reverseDNS != nil {
-		c.reverseDNS.maybeSweep(now)
-	}
-	if c.metrics != nil {
-		if w, ok := c.trapWriter.(interface{ BinaryEncodedFields() uint64 }); ok {
-			c.metrics.setBinaryEncoded(w.BinaryEncodedFields())
+	c.receiver.Sweep(now)
+	if c.telemetry != nil {
+		if w, ok := c.trapWriter.(output.BinaryFieldCounter); ok {
+			c.telemetry.SetBinaryEncoded(w.BinaryEncodedFields())
 		}
+		c.telemetry.Collect(c.store)
 	}
-	collectMetrics(c.store, c.jobName)
 	if c.profileMetrics != nil {
-		c.profileMetrics.collect(c.store, c.jobName)
+		c.profileMetrics.Collect(c.store, c.Name)
 	}
 	return nil
 }
 
 func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
 	packetSequence := c.packetSequence.Add(1)
-	metrics := c.trapMetrics()
-	metrics.incPipelineReceived()
+	jobTelemetry := c.telemetry
+	jobTelemetry.PipelineReceived()
 	packetFinished := false
 
 	defer func() {
 		if v := recover(); v != nil {
-			c.incTrapError("decode_failed")
+			jobTelemetry.Error(telemetry.ErrorDecodeFailed)
 			if !packetFinished {
-				metrics.incPipelineDropped()
+				jobTelemetry.PipelineDropped()
 			}
 			c.Errorf("SNMP trap packet handling panic from %s: %v", peerIP, v)
 			return
 		}
 		if !packetFinished {
-			metrics.incPipelineDropped()
+			jobTelemetry.PipelineDropped()
 		}
 	}()
 
-	decodePeerIP := peerIP
-	rateLimitChecked := false
-	if srcAddr, ok := packetSourceAddr(peerIP, peer); ok {
-		decodePeerIP = net.IP(srcAddr.AsSlice())
-		if c.allowlist != nil && !c.allowlist.AllowedSource(srcAddr) {
-			c.incTrapError("dropped_allowlist")
-			return
+	result := c.receiver.Process(receiver.Datagram{Data: data, PeerIP: peerIP, Conn: conn, Peer: peer})
+	if failure := result.DecodeFailure; failure != nil {
+		if c.trapWriter != nil && c.receiver.AdmitDecodeErrorAudit(failure) {
+			c.writeDecodeErrorEntry(failure, packetSequence)
 		}
-	} else if c.allowlist != nil {
-		c.incTrapError("dropped_allowlist")
+		return
+	}
+	if result.PDU == nil {
 		return
 	}
 
-	sniffedVersion, versionKnown := sniffSNMPVersion(data)
-	if versionKnown && !c.versionAllowed(sniffedVersion) {
-		c.incTrapError("dropped_allowlist")
-		return
-	}
+	pdu := result.PDU
 
-	trustedRelay := c.trustedRelaySource(decodePeerIP)
-	pktCtx, err := c.decodeTrapWithSharedTable(data, decodePeerIP, trustedRelay)
-	if err != nil {
-		dim := ClassifyDecodeError(err)
-		if c.v3SecTable != nil {
-			rawCtx, rawErr := extractRawV3Context(data)
-			if rawErr == nil && rawCtx != nil {
-				if c.dynamicEngineID && !rawCtx.reportable {
-					retryCtx, checked, dropped := c.tryDynamicRetry(data, decodePeerIP, peer, rawCtx, trustedRelay)
-					rateLimitChecked = rateLimitChecked || checked
-					if dropped {
-						return
-					}
-					if retryCtx != nil {
-						pktCtx = retryCtx
-						err = nil
-					}
-				} else if rawCtx.discoveryProbe() && conn != nil && peer != nil {
-					allowed, checked := c.allowRateLimitedPacket(peer)
-					rateLimitChecked = rateLimitChecked || checked
-					if !allowed {
-						return
-					}
-					c.sendDiscoveryReport(rawCtx, conn, peer)
-				}
-			}
-		}
-		if err != nil {
-			if shouldExtractEngineIDOnDecodeError(dim) {
-				engineIDHex, ok, extractErr := extractSNMPv3EngineIDHex(data)
-				if extractErr == nil && ok && !engineIDHexAllowed(engineIDHex, c.engineIDs) {
-					dim = "unknown_engine_id"
-				}
-			}
-			c.incTrapError(dim)
-			c.writeDecodeErrorEntry(decodeErrorRecord{
-				data:           data,
-				peerIP:         decodePeerIP,
-				conn:           conn,
-				peer:           peer,
-				packetSequence: packetSequence,
-				kind:           dim,
-				err:            err,
-				sniffedVersion: sniffedVersion,
-				versionKnown:   versionKnown,
-			})
-			return
-		}
-	}
-
-	pdu := pktCtx.PDU
-	metrics.incPipelineDecoded()
-
-	if !c.versionAllowed(pdu.Version) {
-		c.incTrapError("dropped_allowlist")
-		return
-	}
-
-	if pdu.Version != SnmpVersionV3 && !c.communityAllowed(pdu.Community) {
-		c.incTrapError("dropped_allowlist")
-		return
-	}
-
-	if !c.ensureDynamicEngineIDRegistered(pktCtx) {
-		return
-	}
-
-	if pktCtx.Packet != nil && pdu.Version == SnmpVersionV3 {
-		if pdu.PduType == PduTypeInform {
-			if !c.localEngineIDMatches(pktCtx.Packet.SecurityParameters) {
-				c.incTrapError("unknown_engine_id")
-				return
-			}
-		} else {
-			if !isEngineIDAllowed(pktCtx.Packet.SecurityParameters, c.engineIDs) {
-				c.incTrapError("unknown_engine_id")
-				return
-			}
-		}
-	}
-
-	if pdu.PduType == PduTypeInform {
-		if pktCtx.Packet != nil && conn != nil && peer != nil {
-			var localEID []byte
-			if c.localEngineID != nil {
-				localEID = c.localEngineID.Bytes()
-			}
-			if sendErr := sendInformResponse(conn, peer, pktCtx.Packet, c.engineBoots, localEID); sendErr != nil {
-				c.warnf("SNMP trap INFORM response failed: %v", sendErr)
-				c.incTrapError("inform_response_failed")
-			}
-		}
-	}
-
-	if !rateLimitChecked {
-		allowed, _ := c.allowRateLimitedPacket(peer)
-		if !allowed {
-			return
-		}
-	}
-
-	idx := CurrentProfileIndex()
+	idx := c.profileIndex
 	var td *TrapDef
 	var profileLookupErr error
 	if idx != nil {
 		td, profileLookupErr = idx.LookupWithError(pdu.OID)
 		if profileLookupErr != nil {
 			c.warnf("SNMP trap profile lookup failed for OID %s: %v", pdu.OID, profileLookupErr)
-			c.incTrapError("profile_load_failed")
+			jobTelemetry.Error(telemetry.ErrorProfileLoadFailed)
 		}
 	}
 	unknownOID := td == nil && profileLookupErr == nil
@@ -661,31 +483,23 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		td = c.applyOverrides(td)
 	}
 
-	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), c.monotonicUsec())
+	entry := trapEntryFromPDU(c.Name, pdu, td, time.Now().UnixMicro(), c.monotonicUsec())
 	entry.PacketSequence = packetSequence
-	c.enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
+	c.enrichTrapEntry(entry)
 	renderTrapEntryTemplates(entry, td)
 	if unknownOID {
-		c.incTrapError("unknown_oid")
+		jobTelemetry.Error(telemetry.ErrorUnknownOID)
 	}
 	if trapEntryHasUnresolvedTemplate(entry) {
-		c.incTrapError("template_unresolved")
+		jobTelemetry.Error(telemetry.ErrorTemplateUnresolved)
 	}
-	metrics.recordSourceAccepted(entry)
-	if profileLookupErr != nil {
-		metrics.recordSourceError(entry, "profile_load_failed")
-	}
-	if unknownOID {
-		metrics.recordSourceError(entry, "unknown_oid")
-	}
-	if trapEntryHasUnresolvedTemplate(entry) {
-		metrics.recordSourceError(entry, "template_unresolved")
-	}
-	var admission dedupAdmission
+	jobTelemetry.PipelineAccepted()
+	var admission dedup.Admission
 	if c.deduper != nil {
-		var suppressed bool
-		admission, suppressed = c.deduper.Admit(entry, td, c.Dedup.KeyVarbinds)
-		if suppressed {
+		var decision dedup.Decision
+		admission, decision = c.deduper.Admit(entry, selectDedupKeyVarbinds(td, c.dedupKeyVarbinds))
+		if decision == dedup.DecisionSuppress {
+			jobTelemetry.DedupSuppressed()
 			packetFinished = true
 			return
 		}
@@ -694,86 +508,31 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		if c.deduper != nil {
 			c.deduper.Rollback(admission)
 		}
-		c.incTrapError(c.trapWriteFailureDim())
-		metrics.recordWriteFailure(entry, c.trapWriteFailureDim())
+		jobTelemetry.Error(c.trapWriteFailureDim())
+		jobTelemetry.PipelineWriteFailed(1)
 		packetFinished = true
 		return
 	}
 	packetFinished = true
 
 	if c.profileMetrics != nil {
-		c.profileMetrics.update(entry)
+		c.profileMetrics.Update(entry)
 	}
 
 	cat := Category("unknown")
 	if td != nil {
 		cat = Category(td.Category)
 	}
-	metrics.recordSourceCommitted(entry)
-	metrics.incEvent(cat)
-	metrics.incSeverity(entry.Severity)
+	jobTelemetry.PipelineCommitted()
+	jobTelemetry.Event(cat)
+	jobTelemetry.Severity(entry.Severity)
 }
 
-func udpPeerAddr(peer *net.UDPAddr) (netip.Addr, bool) {
-	if peer == nil {
-		return netip.Addr{}, false
+func selectDedupKeyVarbinds(td *TrapDef, jobKeys []string) []string {
+	if td != nil && len(td.DedupKeyVarbinds) > 0 {
+		return td.DedupKeyVarbinds
 	}
-	addr, ok := netip.AddrFromSlice(peer.IP)
-	if !ok {
-		return netip.Addr{}, false
-	}
-	return addr.Unmap(), true
-}
-
-func packetSourceAddr(peerIP net.IP, peer *net.UDPAddr) (netip.Addr, bool) {
-	if addr, ok := udpPeerAddr(peer); ok {
-		return addr, true
-	}
-	if peerIP == nil {
-		return netip.Addr{}, false
-	}
-	addr, err := netip.ParseAddr(peerIP.String())
-	if err != nil {
-		return netip.Addr{}, false
-	}
-	return addr.Unmap(), true
-}
-
-func (c *Collector) trustedRelaySource(peerIP net.IP) bool {
-	if len(c.trustedRelays) == 0 || peerIP == nil {
-		return false
-	}
-	addr, ok := netip.AddrFromSlice(peerIP)
-	if !ok {
-		return false
-	}
-	addr = addr.Unmap()
-	for _, prefix := range c.trustedRelays {
-		if prefix.Contains(addr) {
-			return true
-		}
-	}
-	return false
-}
-
-func shouldExtractEngineIDOnDecodeError(dim string) bool {
-	switch dim {
-	case "auth_failures", "usm_failures", "unknown_engine_id":
-		return true
-	default:
-		return false
-	}
-}
-
-func (c *Collector) localEngineIDMatches(sp gosnmp.SnmpV3SecurityParameters) bool {
-	if c.localEngineID == nil || sp == nil {
-		return false
-	}
-	usp, ok := sp.(*gosnmp.UsmSecurityParameters)
-	if !ok {
-		return false
-	}
-	return c.localEngineID.EqualRaw(usp.AuthoritativeEngineID)
+	return jobKeys
 }
 
 func (c *Collector) warnf(format string, args ...any) {
@@ -782,11 +541,91 @@ func (c *Collector) warnf(format string, args ...any) {
 	}
 }
 
-func (c *Collector) warnPlaintextOTLP(runtimeCfg otlpRuntimeConfig) {
-	if !runtimeCfg.insecure || otlpTargetIsLoopback(runtimeCfg.target) {
+func (c *Collector) attachTelemetryAndHandleInitEvents(events []receiver.Event, dedupEnabled bool) *telemetry.Job {
+	jobTelemetry := c.telemetryRegistry.Attach(c.Name, telemetry.Options{DedupEnabled: dedupEnabled})
+	for _, event := range events {
+		c.handleReceiverEvent(jobTelemetry, event)
+	}
+	return jobTelemetry
+}
+
+func newJobDeduper(
+	jobName string,
+	policy dedup.Policy,
+	idx *catalog.Epoch,
+	writer output.Writer,
+	jobTelemetry *telemetry.Job,
+	writeFailureDim telemetry.ErrorKind,
+	monotonicNow func() int64,
+) *dedup.Deduper {
+	return dedup.New(policy, dedup.Options{
+		MonotonicNow: monotonicNow,
+		ResolveName: func(oid string) string {
+			if idx != nil {
+				if td := idx.Lookup(oid); td != nil && td.Name != "" {
+					return td.Name
+				}
+			}
+			return oid
+		},
+		OnSummary: func(summary dedup.Summary) {
+			entry := &TrapEntry{
+				JobName:               jobName,
+				ReportType:            ReportTypeDedupSummary,
+				ReceivedRealtimeUsec:  summary.ReceivedRealtimeUsec,
+				ReceivedMonotonicUsec: summary.ReceivedMonotonicUsec,
+				Message:               summary.Message,
+				Severity:              "info",
+				SummaryCounts:         summary.Counts,
+			}
+			if err := writer.Write(entry); err != nil {
+				jobTelemetry.Error(writeFailureDim)
+			}
+		},
+	})
+}
+
+type outputStarter interface {
+	Start() error
+}
+
+func startOutputBackends(otlpBackend, journalBackend outputStarter) error {
+	if otlpBackend != nil {
+		if err := otlpBackend.Start(); err != nil {
+			return err
+		}
+	}
+	if journalBackend != nil {
+		if err := journalBackend.Start(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Collector) handleOutputOutcome(jobTelemetry *telemetry.Job, outcome output.Outcome) {
+	if outcome.Backend == output.BackendJournal && outcome.Err != nil {
+		c.warnf("SNMP trap journal writer stopped for job %q: %v", c.Name, outcome.Err)
+	}
+	if jobTelemetry == nil || outcome.FailedEntries == 0 {
 		return
 	}
-	c.warnf("SNMP trap OTLP endpoint %q uses plaintext transport; use https:// for remote collectors", runtimeCfg.target)
+	switch outcome.Backend {
+	case output.BackendJournal:
+		jobTelemetry.AddError(trapWriteFailureJournal, outcome.FailedEntries)
+	case output.BackendOTLP:
+		jobTelemetry.AddError(trapWriteFailureOTLP, outcome.FailedEntries)
+	}
+	if outcome.Authoritative {
+		jobTelemetry.PipelineWriteFailed(outcome.FailedEntries)
+	}
+}
+
+func (c *Collector) warnPlaintextOTLP(policy otlp.Policy) {
+	if !policy.PlaintextRemote() {
+		return
+	}
+	c.warnf("SNMP trap OTLP endpoint %q uses plaintext transport; use https:// for remote collectors", policy.Target())
 }
 
 func (c *Collector) warnCatchAllTrustedRelays(prefixes []netip.Prefix) {
@@ -801,33 +640,50 @@ func trustedRelayPrefixIsCatchAll(prefix netip.Prefix) bool {
 	return prefix.Bits() == 0
 }
 
-func (c *Collector) logListenerReadError(ep EndpointConfig, err error) {
-	if c.Logger == nil {
-		return
+func (c *Collector) handleReceiverEvent(jobTelemetry *telemetry.Job, event receiver.Event) {
+	switch event.Type {
+	case receiver.EventError:
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorKind(event.ErrorKind))
+		}
+	case receiver.EventDecoded:
+		if jobTelemetry != nil {
+			jobTelemetry.PipelineDecoded()
+		}
+	case receiver.EventListenerReadFailed:
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorListenerReadFailed)
+		}
+		if c.Logger != nil {
+			endpoint := event.Endpoint.LogName()
+			c.Limit(listenerReadErrorLogKeyPrefix+endpoint, 1, listenerReadErrorLogEvery).
+				Warningf("SNMP trap listener read failed (endpoint=%s): %v", endpoint, event.Err)
+		}
+	case receiver.EventListenerBufferDegraded:
+		if jobTelemetry != nil {
+			jobTelemetry.Error(listenerBufferDegradedMetric)
+		}
+		c.warnf(
+			"SNMP trap listener receive buffer request degraded (endpoint=%s, requested=%d bytes): %v; continuing with the OS socket buffer, high trap bursts may be dropped",
+			event.Endpoint.LogName(), event.Requested, event.Err,
+		)
+	case receiver.EventDynamicEngineIDRegistered:
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorUnknownEngineID)
+		}
+		c.warnf("Dynamic SNMPv3 engine ID registered: engineID=%s username=%s. This sender was not in the static configuration. Every first-time dynamic (engineID, username) pair is accepted and logged once per job lifetime.",
+			event.EngineID, event.Username)
+	case receiver.EventInformResponseFailed:
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorInformResponseFailed)
+		}
+		c.warnf("SNMP trap INFORM response failed: %v", event.Err)
+	case receiver.EventDiscoveryReportFailed:
+		if jobTelemetry != nil {
+			jobTelemetry.Error(telemetry.ErrorInformResponseFailed)
+		}
+		c.warnf("SNMP trap INFORM discovery Report failed: %v", event.Err)
 	}
-	endpoint := listenerEndpointLogName(ep)
-	c.Limit(listenerReadErrorLogKeyPrefix+endpoint, 1, listenerReadErrorLogEvery).
-		Warningf("SNMP trap listener read failed (endpoint=%s): %v", endpoint, err)
-}
-
-func (c *Collector) reportListenerReceiveBufferWarnings(warnings []listenerReceiveBufferWarning) {
-	for _, warning := range warnings {
-		c.incTrapError(listenerBufferDegradedMetric)
-		c.logListenerReceiveBufferWarning(warning)
-	}
-}
-
-func (c *Collector) logListenerReceiveBufferWarning(warning listenerReceiveBufferWarning) {
-	if c.Logger == nil {
-		return
-	}
-	endpoint := listenerEndpointLogName(warning.endpoint)
-	c.warnf(
-		"SNMP trap listener receive buffer request degraded (endpoint=%s, requested=%d bytes): %v; continuing with the OS socket buffer, high trap bursts may be dropped",
-		endpoint,
-		warning.requested,
-		warning.err,
-	)
 }
 
 func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
@@ -838,24 +694,7 @@ func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
 	if !ok {
 		return td
 	}
-	cp := *td
-	if td.Labels != nil {
-		cp.Labels = make(map[string]string, len(td.Labels)+len(ov.Labels))
-		maps.Copy(cp.Labels, td.Labels)
-	}
-	if ov.Category != "" {
-		cp.Category = ov.Category
-	}
-	if ov.Severity != "" {
-		cp.Severity = ov.Severity
-	}
-	if ov.Labels != nil {
-		if cp.Labels == nil {
-			cp.Labels = make(map[string]string, len(ov.Labels))
-		}
-		maps.Copy(cp.Labels, ov.Labels)
-	}
-	return &cp
+	return td.WithOverrides(ov.Category, ov.Severity, ov.Labels)
 }
 
 func buildOverrideMap(overrides []OverrideConfig) map[string]*OverrideConfig {
@@ -868,33 +707,6 @@ func buildOverrideMap(overrides []OverrideConfig) map[string]*OverrideConfig {
 		m[ov.OID] = &ov
 	}
 	return m
-}
-
-func (c *Collector) versionAllowed(version SnmpVersion) bool {
-	if len(c.versions) == 0 {
-		return true
-	}
-	_, ok := c.versions[version]
-	return ok
-}
-
-func (c *Collector) communityAllowed(community string) bool {
-	if c.allowlist != nil && !c.allowlist.AllowedCommunity(community) {
-		return false
-	}
-	return true
-}
-
-func versionSet(versions []string) map[SnmpVersion]struct{} {
-	set := make(map[SnmpVersion]struct{}, len(versions))
-	for _, version := range versions {
-		set[SnmpVersion(version)] = struct{}{}
-	}
-	return set
-}
-
-func versionListContains(versions []string, version string) bool {
-	return slices.Contains(versions, version)
 }
 
 type dyncfgCodedError struct {

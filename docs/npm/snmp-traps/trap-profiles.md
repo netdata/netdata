@@ -115,9 +115,9 @@ Use the smallest control that matches the job.
 | Add a name, message, varbind definitions, or metric rules for an unknown OID | Operator profile file | Overrides do not create a new trap definition. |
 | Add many OIDs from a vendor MIB | Custom MIB conversion | It generates profile YAML from the MIB source instead of hand-writing every trap. |
 | Replace stock behavior for one vendor file | Operator profile with the same filename | The operator file fully replaces the stock file of the same name. |
-| Add site-specific traps without replacing stock vendor files | Operator profile with a different filename; use `extends:` when the file should inherit an existing profile | It adds entries alongside the stock profile set without copying the whole stock vendor file. |
+| Add site-specific traps without replacing stock vendor files | Operator profile with a different filename | It adds complete entries alongside the stock profile set without replacing a vendor file. |
 
-`extends:` entries are bare `.yaml` or `.yml` filenames without path separators. Netdata resolves them across the operator and stock profile directories, operator files first. They can inherit traps, varbinds, metric rules, and chart definitions from another visible profile file, and fields in the extending file win where they overlap. Deeply nested or circular `extends:` chains are rejected at profile load time.
+Partial profile inheritance is not supported, and the `extends:` key is rejected. Use listener-job `overrides` for category, severity, or label policy changes; use a complete same-name operator profile when decode definitions must change.
 
 For simple policy overrides, configure the listener job:
 
@@ -132,14 +132,24 @@ overrides:
 
 Label keys become `TRAP_TAG_<KEY_UPPERCASE>` fields. For example, `change_window` becomes `TRAP_TAG_CHANGE_WINDOW`. Label keys must start with a lowercase letter and then use only lowercase letters, digits, and underscores.
 
-Job overrides use static label values. Profile-file labels can also use templates, but templated label values must come from bounded sources such as enum-backed varbinds, booleans, small numeric ranges, `TRAP_NAME`, or `TRAP_DEVICE_VENDOR`; unbounded values such as source IPs, hostnames, interface descriptions, MAC addresses, usernames, packet contents, and free-form descriptions are rejected at profile load time.
+Job overrides use static label values. Profile-file labels can also use templates, but templated label values must come from bounded sources such as enum-backed varbinds, booleans, small numeric ranges, `{{trap_name}}`, or `{{vendor}}`; unbounded values such as source IPs, hostnames, interface descriptions, MAC addresses, usernames, packet contents, and free-form descriptions are rejected at profile load time.
 
-## Profile reload behavior
+## Profile loading behavior
 
-- While a listener job is running, edits to operator profiles under `/etc/netdata/go.d/snmp.trap-profiles/` are picked up automatically.
-- If a changed operator profile is invalid, the failure is logged and the last valid profiles stay active.
-- Stock profile updates apply after the Netdata Agent restarts.
-- If no listener job is active, the next listener job creation loads and validates the profile files.
+- Profiles are immutable while any listener job holds a lease on the shared catalog epoch.
+- After changing operator or stock profiles, restart the Agent or recreate all listener jobs. The final lease release
+  unloads the epoch, and the next job creation loads operator profiles and the stock manifest.
+- Operator profiles, exactly one stock manifest (`catalogue.json` or `catalogue.json.zst`), and its profile inventory are
+  validated during collector initialization. `Collector.Check()` performs no additional validation. Gzip manifests and
+  raw-plus-Zstandard duplicates are rejected; there is no parse-all fallback.
+- Every stock manifest entry includes a SHA-256 of the exact decompressed YAML bytes. Lazy hydration verifies and parses
+  those same bytes, so a running catalog epoch rejects a profile body changed underneath its manifest. The digest binds
+  one installed generation together; it is not a package-authenticity signature.
+- Stock vendor YAML is loaded and validated only when selected by an exact trap OID, an enabled metric rule, or the
+  candidate-file set for a MIB-qualified trap name. Name resolution hydrates the MIB candidates and then requires one
+  exact trap-name match; it does not load the complete stock pack.
+- Invalid eager profiles fail listener job creation. An invalid lazily loaded stock profile increments profile-load-failure
+  metrics when a matching trap first needs that file.
 
 Profile validation failures are visible as collector errors and profile-load-failure metrics. After editing profiles, check Logs and receiver metrics before assuming a change is active; see [Metrics](/docs/npm/snmp-traps/metrics.md) for the receiver diagnostics.
 
@@ -147,7 +157,7 @@ Profile validation failures are visible as collector errors and profile-load-fai
 
 After adding or changing an operator profile:
 
-- Check the Netdata Agent logs for profile reload messages or profile validation errors.
+- Restart the Agent or recreate all listener jobs, then check the Netdata Agent logs for profile validation errors.
 - Check the `profile_load_failed`, `unknown_oid`, and `template_unresolved` dimensions in the SNMP trap processing errors chart.
 - Send or wait for a matching trap, then confirm the expected `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `MESSAGE`, `TRAP_VAR_*`, and `TRAP_TAG_*` fields in Logs.
 - If `profile_metrics.include` names a missing rule, the listener job fails validation with `profile_metrics.include rule "<name>" not found`. If the rule exists but is disabled in the profile, validation fails with `profile_metrics.include rule "<name>" is disabled by profile`. Fix the rule name, select another rule, or enable the intended rule in the loaded operator profile.
@@ -161,12 +171,14 @@ Profiles can define optional trap-to-metric rules and chart definitions. Listene
 Profile metrics are disabled by default, and the current stock pack does not ship metric rules. To create profile-derived charts today:
 
 1. Add `metrics:` and `charts:` rules to an operator profile file under `/etc/netdata/go.d/snmp.trap-profiles/`.
-2. Wait for the automatic reload if a listener job is already running, or start a listener job to load the profile files.
+2. Restart the Agent or recreate all listener jobs so the catalog epoch is rebuilt.
 3. Enable `profile_metrics` in the listener job and select the loaded rule names.
 
-Rule names in `include` come from metric rule `name` fields in loaded profile YAML files. If no loaded profile defines metric rules, enabling `profile_metrics` creates no profile-derived charts.
+Rule names in `include` come from metric rule `name` fields in profile YAML files. The stock manifest routes selected names
+to their owning files; unrelated stock files remain unloaded. If no operator or stock profile defines a selected rule,
+listener job creation fails validation.
 
-The listener-side `profile_metrics` settings — selection `mode`, `include`, the identity controls, and the cardinality `limits` — are documented in [Configuration](/docs/npm/snmp-traps/configuration.md#profile-metrics). Rule and chart syntax live in [SNMP Trap Profile Format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md).
+The listener-side `profile_metrics` settings are documented in [Configuration](/docs/npm/snmp-traps/configuration.md#profile-metrics). Rule and chart syntax live in [SNMP Trap Profile Format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md).
 
 Use profile metrics for bounded, operator-useful trap signals, such as:
 

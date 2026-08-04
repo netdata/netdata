@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Package profilecatalog is the shared profile-catalog loader used by
-// collectors that ship curated per-target "profiles" as YAML files (a profile's
-// identity is its file basename). It owns the mechanics common to every such
+// collectors that ship curated per-target "profiles" as files (a profile's
+// identity is derived from its filename). It owns the mechanics common to every such
 // collector: walking one or more search directories, resolving stock-vs-user
-// override precedence, applying a stock-fatal / user-skip error policy, and
+// override precedence, applying the selected user-file error policy, and
 // caching a process-wide catalog.
 //
 // It is deliberately oblivious to what a profile IS and to how a profile is
 // matched to a target. The caller supplies a Decode function that turns file
 // bytes into its own profile type P; matching stays in the collector. Decode
 // also chooses how deeply to parse: a collector can parse everything eagerly, or
-// parse only a lightweight header now and hydrate the heavy part later — lazy
-// loading is a property of Decode, not of this package.
+// parse only a lightweight header now and hydrate the heavy part later. A caller
+// that owns compressed or lazy file loading can use LoadFile instead of Decode.
 package profilecatalog
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -27,9 +28,8 @@ import (
 )
 
 // DirSpec is one profile search directory. Stock directories are authoritative:
-// a missing stock directory and any invalid stock profile are fatal, while a
-// missing user directory is skipped and an invalid user profile is skipped with
-// a warning.
+// a missing stock directory and any invalid stock profile are fatal. Missing
+// user directories are skipped; other user errors follow Options.UserErrors.
 type DirSpec struct {
 	Path    string
 	IsStock bool
@@ -37,20 +37,40 @@ type DirSpec struct {
 
 // FileContext describes the profile file being decoded. IsStock lets a Decode
 // function treat stock and user profiles differently (for example, validate a
-// user profile eagerly so a broken one is skipped, while deferring stock
-// validation).
+// user profile eagerly under the selected user-error policy while deferring
+// stock validation).
 type FileContext struct {
 	BaseName string
 	Path     string
 	IsStock  bool
 }
 
-// Options configures a Load. Only Decode is required.
+// UserErrorPolicy controls how errors from user profile directories are handled.
+type UserErrorPolicy uint8
+
+const (
+	// SkipInvalidUser preserves the legacy behavior: invalid user profiles are
+	// logged and skipped, allowing a valid stock profile to remain effective.
+	SkipInvalidUser UserErrorPolicy = iota
+	// FailInvalidUser makes invalid user profiles fatal to the complete load.
+	FailInvalidUser
+)
+
+// Options configures a Load. Exactly one loading callback is required.
 type Options[P any] struct {
-	// Decode turns one profile file's bytes into a P. Returning an error fails a
-	// stock profile (fatal) or skips a user profile (logged). Decode decides how
-	// deeply to parse (eager or lazy).
+	// Decode turns one profile file's bytes into a P. Exactly one of Decode and
+	// LoadFile must be set.
 	Decode func(ctx FileContext, data []byte) (P, error)
+	// LoadFile turns one profile path into a P without profilecatalog reading it.
+	// Use this when the caller owns compression, size limits, or lazy hydration.
+	LoadFile func(ctx FileContext) (P, error)
+	// ParseFileName maps a complete leaf filename to its profile identity. The
+	// bool reports whether the file is supported. nil preserves the default
+	// case-insensitive .yaml/.yml behavior.
+	ParseFileName func(name string) (baseName string, ok bool)
+	// UserErrors selects whether invalid user profiles are skipped or fail the
+	// complete load. The zero value preserves the legacy skip behavior.
+	UserErrors UserErrorPolicy
 	// NormalizeKey maps a basename to its lookup key. nil means identity; pass
 	// strings.ToLower (composed with TrimSpace) for case-insensitive lookup.
 	NormalizeKey func(baseName string) string
@@ -87,15 +107,19 @@ type stockRef struct {
 }
 
 // Load builds a Catalog from the given directories. A profile's identity is its
-// file basename. Files that are not `.yaml`/`.yml`, or whose basename starts
-// with `_`, are ignored. A user profile overrides a stock profile with the same
-// (normalized) key regardless of directory order. Duplicate user profiles are
-// skipped with a warning; duplicate stock profiles are fatal. Load never errors
-// on an empty result — the caller decides whether an empty catalog is
-// acceptable.
+// file basename. By default, files that are not `.yaml`/`.yml`, or whose
+// basename starts with `_`, are ignored; Options.ParseFileName can replace the
+// suffix policy. A user profile overrides a stock profile with the same
+// normalized key regardless of directory order. Duplicate and invalid user
+// profiles follow Options.UserErrors; duplicate and invalid stock profiles are
+// fatal. Load never errors on an empty result — the caller decides whether an
+// empty catalog is acceptable.
 func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
-	if opts.Decode == nil {
-		return Catalog[P]{}, fmt.Errorf("profilecatalog: Options.Decode is required")
+	if (opts.Decode == nil) == (opts.LoadFile == nil) {
+		return Catalog[P]{}, fmt.Errorf("profilecatalog: exactly one of Options.Decode or Options.LoadFile is required")
+	}
+	if opts.UserErrors != SkipInvalidUser && opts.UserErrors != FailInvalidUser {
+		return Catalog[P]{}, fmt.Errorf("profilecatalog: invalid user error policy %d", opts.UserErrors)
 	}
 	normalize := opts.NormalizeKey
 	if normalize == nil {
@@ -105,6 +129,10 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 	usesDefaultValidName := validName == nil
 	if validName == nil {
 		validName = DefaultValidName
+	}
+	parseFileName := opts.ParseFileName
+	if parseFileName == nil {
+		parseFileName = defaultParseFileName
 	}
 	log := opts.Log
 	if log == nil {
@@ -119,47 +147,68 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 		if strings.TrimSpace(spec.Path) == "" {
 			continue
 		}
-		if !DirExists(spec.Path) {
-			if spec.IsStock {
+		fi, err := os.Stat(spec.Path)
+		if err != nil {
+			if !spec.IsStock && errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if !spec.IsStock && opts.UserErrors == SkipInvalidUser {
+				log.Warningf("ignoring invalid user profiles directory %q: %v", spec.Path, err)
+				continue
+			}
+			if spec.IsStock && errors.Is(err, os.ErrNotExist) {
 				return Catalog[P]{}, fmt.Errorf("stock profiles directory does not exist: %s", spec.Path)
 			}
+			return Catalog[P]{}, err
+		}
+		if !fi.IsDir() {
+			err := fmt.Errorf("profiles path is not a directory: %s", spec.Path)
+			if spec.IsStock || opts.UserErrors == FailInvalidUser {
+				return Catalog[P]{}, err
+			}
+			log.Warningf("ignoring invalid user profiles directory %q: %v", spec.Path, err)
 			continue
 		}
 
-		err := filepath.WalkDir(spec.Path, func(path string, d fs.DirEntry, err error) error {
+		err = filepath.WalkDir(spec.Path, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return handleLoadError(spec, log, path, err)
+				return handleLoadError(spec, opts.UserErrors, log, path, err)
 			}
 			if d.IsDir() {
 				return nil
 			}
 
 			name := d.Name()
-			ext := strings.ToLower(filepath.Ext(name))
-			if ext != ".yaml" && ext != ".yml" {
-				return nil
-			}
 			if strings.HasPrefix(name, "_") {
 				return nil
 			}
 
-			baseName := strings.TrimSuffix(name, filepath.Ext(name))
+			baseName, ok := parseFileName(name)
+			if !ok {
+				return nil
+			}
 			if !validName(baseName) {
 				err := fmt.Errorf("profile %q: invalid basename %q", path, baseName)
 				if usesDefaultValidName {
 					err = fmt.Errorf("profile %q: basename %q must match %s", path, baseName, reValidName.String())
 				}
-				return handleLoadError(spec, log, path, err)
+				return handleLoadError(spec, opts.UserErrors, log, path, err)
 			}
 
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return handleLoadError(spec, log, path, err)
+			ctx := FileContext{BaseName: baseName, Path: path, IsStock: spec.IsStock}
+			var prof P
+			var loadErr error
+			if opts.LoadFile != nil {
+				prof, loadErr = opts.LoadFile(ctx)
+			} else {
+				var data []byte
+				data, loadErr = os.ReadFile(path)
+				if loadErr == nil {
+					prof, loadErr = opts.Decode(ctx, data)
+				}
 			}
-
-			prof, err := opts.Decode(FileContext{BaseName: baseName, Path: path, IsStock: spec.IsStock}, data)
-			if err != nil {
-				return handleLoadError(spec, log, path, err)
+			if loadErr != nil {
+				return handleLoadError(spec, opts.UserErrors, log, path, loadErr)
 			}
 
 			key := normalize(baseName)
@@ -188,7 +237,10 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 			// of prev/current is stock here.
 			switch {
 			case !spec.IsStock && !prev.e.isStock:
-				// Both user: keep the first.
+				if opts.UserErrors == FailInvalidUser {
+					return fmt.Errorf("duplicate user profile name %q in %q and %q", prev.e.baseName, prev.path, path)
+				}
+				// Both user under the legacy policy: keep the first.
 				log.Warningf("ignoring duplicate user profile %q in %q; already loaded from %q", baseName, path, prev.path)
 			case !spec.IsStock && prev.e.isStock:
 				// User profile overrides the stock one.
@@ -217,15 +269,22 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 	return cat, nil
 }
 
-// handleLoadError makes a stock-profile error fatal while downgrading a
-// user-profile error to a skip-with-warning, so one bad user file cannot stop
-// the agent from loading the rest of the catalog.
-func handleLoadError(spec DirSpec, log *logger.Logger, path string, err error) error {
-	if spec.IsStock {
+// handleLoadError makes stock-profile errors fatal and applies the selected
+// policy to user-profile errors.
+func handleLoadError(spec DirSpec, userErrors UserErrorPolicy, log *logger.Logger, path string, err error) error {
+	if spec.IsStock || userErrors == FailInvalidUser {
 		return err
 	}
 	log.Warningf("ignoring invalid user profile %q: %v", path, err)
 	return nil
+}
+
+func defaultParseFileName(name string) (string, bool) {
+	ext := strings.ToLower(filepath.Ext(name))
+	if ext != ".yaml" && ext != ".yml" {
+		return "", false
+	}
+	return strings.TrimSuffix(name, filepath.Ext(name)), true
 }
 
 // DirExists reports whether dir exists and is a directory.

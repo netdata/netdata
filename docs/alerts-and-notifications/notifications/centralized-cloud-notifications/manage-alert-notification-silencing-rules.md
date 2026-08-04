@@ -141,6 +141,22 @@ You will see configured Alert notification silencing rules for the space (if you
 **Immediate**: From now until turned off or until specific duration (start and end date automatically set).
 
 **Scheduled**: Specify start and end time when the rule becomes active and inactive (time set according to your browser local timezone).
+
+**Recurring**: Set a repeating schedule for the rule to activate and deactivate automatically on a defined cadence. Configure:
+
+- **Starts at**: the date and time of the first occurrence
+- **Lasts until**: the end time of the first occurrence (the gap between start and end defines how long each occurrence stays active)
+- **Repeat**: the recurrence pattern (e.g. weekly on Friday)
+- **Timezone**: the timezone the schedule is anchored to (typically your local one), so the window follows that zone's wall-clock time even across DST changes
+
+With a recurring rule in place, the rule activates automatically at the configured time, silences notifications for the duration, and deactivates until the next occurrence — no manual toggling needed.
+
+:::note
+
+Silencing only suppresses notifications. The alert still evaluates and remains visible in dashboards and alert views, so you don't lose any history.
+
+:::
+
 </details>
 
 ## Step-by-Step Wizards for Common Use Cases
@@ -170,6 +186,38 @@ You will see configured Alert notification silencing rules for the space (if you
 - All rooms and nodes are targeted (*).
 - Maintenance window times are set correctly.
 - Rule name includes a date for easy reference.
+
+</details>
+
+<details>
+<summary><strong>Recurring Weekly Alert Silencing</strong></summary><br/>
+
+**Use Case**: An alert fires predictably every week during a known window (e.g. a long-running MySQL job every Friday evening to Saturday morning).
+
+**Configuration Steps**:
+
+1. Choose "All users" or "Myself" based on impact
+2. Set name: "Weekly MySQL Long-Running Query - Friday Night"
+3. **Node Criteria**:
+    - Rooms: All Rooms (or the specific room containing the node)
+    - Nodes: [specific node name, e.g. child1]]
+    - Host Labels: *
+4. **Alert Criteria**:
+    - Alert Name: [exact alert name as it appears in the notification]
+    - Alert Context: *
+    - Alert Role: *
+5. **Timing**: Recurring
+    - Starts at: the coming Friday at the time the noise usually begins, e.g. Friday 18:00
+    - Lasts until: the following Saturday morning, e.g. Saturday 09:00
+    - Repeat: weekly on Friday
+    - Timezone: your local timezone
+
+**Validation Checklist**:
+
+- Node name matches exactly
+- Alert name matches exactly as it appears in notifications
+- Timezone is set to your local timezone
+- Start and end times reflect the correct window
 
 </details>
 
@@ -298,17 +346,20 @@ Before activating any silencing rule, verify:
 | **Role-Based Control**          | Alert role: webmaster                             | Silence all alerts for specific role                    |
 | **Granular Alert Control**      | Specific alert + specific node                    | Targeted silencing for known issues                     |
 | **Storage Maintenance**         | Alert: disk_space_usage, Instance: specific mount | Maintenance on specific storage volumes                 |
+| **Recurring Weekly Window**     | Specific node + specific alert name, Recurring    | Predictable weekly alert window (e.g. Friday night job) |
 
 ## Detailed Examples Reference
 
-| Rule Name                        | Rooms              | Nodes  | Host Label             | Alert Name                                     | Alert Context | Alert Instance         | Alert Role | Description                                                                         |
-|----------------------------------|--------------------|--------|------------------------|------------------------------------------------|---------------|------------------------|------------|-------------------------------------------------------------------------------------|
-| Space silencing                  | All Rooms          | *      | *                      | *                                              | *             | *                      | *          | Silences entire space, all nodes, all users. Infrastructure-wide maintenance window |
-| DB Servers Rooms                 | PostgreSQL Servers | *      | *                      | *                                              | *             | *                      | *          | Silences nodes in PostgreSQL Servers Room only, not All Nodes Room                  |
-| Node child1                      | All Rooms          | child1 | *                      | *                                              | *             | *                      | *          | Silences all Alert state transitions for node child1 in all Rooms                   |
-| Production nodes                 | All Rooms          | *      | environment:production | *                                              | *             | *                      | *          | Silences Alert state transitions for nodes with environment:production label        |
-| Third party maintenance          | All Rooms          | *      | *                      | httpcheck_posthog_netdata_cloud.request_status | *             | *                      | *          | Silences specific Alert during third-party partner maintenance                      |
-| Intended stress usage on CPU     | All Rooms          | *      | *                      | *                                              | system.cpu    | *                      | *          | Silences specific Alerts across all nodes and their CPU cores                       |
-| Silence role webmaster           | All Rooms          | *      | *                      | *                                              | *             | *                      | webmaster  | Silences all Alerts configured with role webmaster                                  |
-| Silence Alert on node            | All Rooms          | child1 | *                      | httpcheck_posthog_netdata_cloud.request_status | *             | *                      | *          | Silences specific Alert on child1 node                                              |
-| Disk Space Alerts on mount point | All Rooms          | *      | *                      | disk_space_usage                               | disk.space    | disk_space_opt_baddisk | *          | Silences specific Alert instance on all nodes /opt/baddisk                          |
+| Rule Name                        | Rooms              | Nodes         | Host Label             | Alert Name                                     | Alert Context | Alert Instance         | Alert Role | Description                                                                         |
+|----------------------------------|--------------------|---------------|------------------------|------------------------------------------------|---------------|------------------------|------------|-------------------------------------------------------------------------------------|
+| Space silencing                  | All Rooms          | *             | *                      | *                                              | *             | *                      | *          | Silences entire space, all nodes, all users. Infrastructure-wide maintenance window |
+| DB Servers Rooms                 | PostgreSQL Servers | *             | *                      | *                                              | *             | *                      | *          | Silences nodes in PostgreSQL Servers Room only, not All Nodes Room                  |
+| Node child1                      | All Rooms          | child1        | *                      | *                                              | *             | *                      | *          | Silences all Alert state transitions for node child1 in all Rooms                   |
+| Production nodes                 | All Rooms          | *             | environment:production | *                                              | *             | *                      | *          | Silences Alert state transitions for nodes with environment:production label        |
+| Third party maintenance          | All Rooms          | *             | *                      | httpcheck_posthog_netdata_cloud.request_status | *             | *                      | *          | Silences specific Alert during third-party partner maintenance                      |
+| Intended stress usage on CPU     | All Rooms          | *             | *                      | *                                              | system.cpu    | *                      | *          | Silences specific Alerts across all nodes and their CPU cores                       |
+| Silence role webmaster           | All Rooms          | *             | *                      | *                                              | *             | *                      | webmaster  | Silences all Alerts configured with role webmaster                                  |
+| Silence Alert on node            | All Rooms          | child1        | *                      | httpcheck_posthog_netdata_cloud.request_status | *             | *                      | *          | Silences specific Alert on child1 node                                              |
+| Disk Space Alerts on mount point | All Rooms          | *             | *                      | disk_space_usage                               | disk.space    | disk_space_opt_baddisk | *          | Silences specific Alert instance on all nodes /opt/baddisk                          |
+| Weekly recurring window          | All Rooms          | db-node-1     | *                      | mysql_10s_slow_queries                         | *             | *                      | *
+        | Silences a predictable weekly alert every Friday evening to Saturday morning        |

@@ -705,7 +705,7 @@ sidebar:
           - meta:
               label: Metrics
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/metrics.md
-              description: Read receiver pipeline health, severity and category rates, processing errors, deduplication, and per-source metrics.
+              description: Read receiver pipeline health, severity and category rates, processing errors, deduplication, and optional profile-defined metrics.
           - meta:
               label: Alerts
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/alerts.md
