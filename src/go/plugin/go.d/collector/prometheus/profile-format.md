@@ -575,7 +575,15 @@ NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
   ./plugin/go.d/collector/prometheus/...
 ```
 
-For an existing checkout, run `git -C src/go/testdata pull --ff-only origin master` from the repository root before replay.
+For an existing checkout, fetch `origin master`, switch to local `master`, and fast-forward it to `origin/master` before
+replay:
+
+```bash
+git -C src/go/testdata fetch --depth=1 origin master
+git -C src/go/testdata switch master
+git -C src/go/testdata merge --ff-only origin/master
+```
+
 Set `NETDATA_TESTDATA_DIR` if the checkout lives elsewhere. Ordinary tests never fetch testdata and skip only the
 external-dependent cases when the checkout root is absent. A present but incomplete or unreadable checkout fails. The
 dedicated CI workflow requires external evidence, verifies the manifest chain, and replays the objective validator for every
