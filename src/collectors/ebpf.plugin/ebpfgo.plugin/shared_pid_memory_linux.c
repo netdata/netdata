@@ -123,6 +123,15 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
+    /* Write publisher PID before the semaphore becomes acquirable.  A concurrent
+     * opener that reads pid==0 through an already-acquirable semaphore treats the
+     * producer as dead, clears the ring, and takes over.  Writing first eliminates
+     * that window: by the time sem_open succeeds any reader sees a valid PID. */
+    ctx->header->publisher_pid = (uint32_t)getpid();
+    /* Restore the prev_count==0 invariant so the first publish after replace
+     * skips the conditional memset (new segment is already kernel-zero-filled). */
+    ctx->prev_count = 0;
+
     /* New SHM is kernel-zero-filled; no explicit memset needed.
      * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
      * EEXIST means an attacker squatted in the window; evict and retry once. */
@@ -140,10 +149,6 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
         ctx->entries = NULL;
         return false;
     }
-    /* Restore the prev_count==0 invariant so the first publish after replace
-     * skips the conditional memset (new segment is already kernel-zero-filled). */
-    ctx->prev_count = 0;
-    ctx->header->publisher_pid = (uint32_t)getpid();
     return true;
 }
 
@@ -253,6 +258,12 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
+    /* For a fresh segment write publisher PID before the semaphore becomes
+     * acquirable so a concurrent opener never observes pid==0 and takes over.
+     * For a reused segment the PID is written inside the semaphore hold below. */
+    if (!reused)
+        ctx->header->publisher_pid = (uint32_t)getpid();
+
     /* For a fresh segment (reused=false) no legitimate semaphore exists;
      * O_CREAT|O_EXCL prevents squatting.  On EEXIST evict and retry once.
      * For a reused segment the semaphore already exists and must be joined
@@ -296,12 +307,8 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
             if (!pid_shm_replace_generation(ctx, length))
                 goto fail;
         }
-    } else {
-        /* Fresh segment: kernel zero-filled; no prior publisher exists.
-         * Write our PID so consumers and a racing second opener can identify
-         * the owner without acquiring the semaphore. */
-        ctx->header->publisher_pid = (uint32_t)getpid();
     }
+    /* publisher_pid for the fresh path was written before sem_open above. */
     return ctx;
 
 fail:

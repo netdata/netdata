@@ -96,6 +96,12 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
         return false;
     }
 
+    /* Write publisher PID before the semaphore becomes acquirable.  A concurrent
+     * opener that reads pid==0 through an already-acquirable semaphore treats the
+     * producer as dead, clears the ring, and takes over.  Writing first eliminates
+     * that window: by the time sem_open succeeds any reader sees a valid PID. */
+    ctx->data->hdr.publisher_pid = (uint32_t)getpid();
+
     /* New SHM is kernel-zero-filled; no explicit memset needed.
      * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
      * EEXIST means an attacker squatted in the window; evict and retry once. */
@@ -111,9 +117,6 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
         ctx->data = NULL;
         return false;
     }
-    /* Write publisher PID so concurrent openers see a live producer, matching
-     * pid_shm_replace_generation behavior. */
-    ctx->data->hdr.publisher_pid = (uint32_t)getpid();
     return true;
 }
 
@@ -193,6 +196,12 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         goto fail;
     }
 
+    /* For a fresh segment write publisher PID before the semaphore becomes
+     * acquirable so a concurrent opener never observes pid==0 and takes over.
+     * For a reused segment the PID is written inside the semaphore hold below. */
+    if (!reused)
+        ctx->data->hdr.publisher_pid = (uint32_t)getpid();
+
     /* For a fresh segment (reused=false) no legitimate semaphore exists, so use
      * O_CREAT|O_EXCL to prevent squatting; on EEXIST evict and retry once.
      * For a reused segment the existing semaphore must be joined with O_CREAT
@@ -233,12 +242,8 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
             if (!dns_shm_replace_generation(ctx, length))
                 goto fail;
         }
-    } else {
-        /* Fresh segment: kernel zero-filled; write our PID so liveness checks
-         * can identify the owner without acquiring the semaphore. */
-        ctx->data->hdr.publisher_pid = (uint32_t)getpid();
     }
-
+    /* publisher_pid for the fresh path was written before sem_open above. */
     return ctx;
 
 fail:
