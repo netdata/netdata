@@ -139,7 +139,7 @@ func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *te
 func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions(
-		[]profileMetricRule{
+		[]testMetricRule{
 			{
 				Name:   "z.tie_a_chart",
 				Type:   profileMetricTypeCounter,
@@ -149,7 +149,6 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 					Dimension: "events",
 					Chart:     "a_tie_chart",
 				},
-				SourceFile: "test-profile.yaml",
 			},
 			{
 				Name:   "a.tie_z_chart",
@@ -160,25 +159,22 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 					Dimension: "events",
 					Chart:     "z_tie_chart",
 				},
-				SourceFile: "test-profile.yaml",
 			},
 		},
-		[]profileMetricChart{
+		[]testMetricChart{
 			{
-				ID:         "a_tie_chart",
-				Title:      "A tie chart",
-				Context:    "snmp.trap.tie.a",
-				Units:      "events/s",
-				Algorithm:  "incremental",
-				SourceFile: "test-profile.yaml",
+				ID:        "a_tie_chart",
+				Title:     "A tie chart",
+				Context:   "snmp.trap.tie.a",
+				Units:     "events/s",
+				Algorithm: "incremental",
 			},
 			{
-				ID:         "z_tie_chart",
-				Title:      "Z tie chart",
-				Context:    "snmp.trap.tie.z",
-				Units:      "events/s",
-				Algorithm:  "incremental",
-				SourceFile: "test-profile.yaml",
+				ID:        "z_tie_chart",
+				Title:     "Z tie chart",
+				Context:   "snmp.trap.tie.z",
+				Units:     "events/s",
+				Algorithm: "incremental",
 			},
 		},
 	); err != nil {
@@ -225,13 +221,12 @@ func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T)
 
 func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
-		Name:       "cisco.port_security.ifindex_cap",
-		Type:       profileMetricTypeCounter,
-		OnTrap:     testPortSecurityTrapOID,
-		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
-		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_capped_violations", "violations", "port_security_violations"),
-		SourceFile: "test-profile.yaml",
+	if err := idx.addDefinitions([]testMetricRule{{
+		Name:     "cisco.port_security.ifindex_cap",
+		Type:     profileMetricTypeCounter,
+		OnTrap:   testPortSecurityTrapOID,
+		Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
+		Output:   profileMetricOutputForTest("snmp_trap_cisco_port_security_capped_violations", "violations", "port_security_violations"),
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -252,13 +247,12 @@ func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
 	profileMetricChartFromIndex(t, idx, "port_security_violations").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
-	if err := idx.addDefinitions([]profileMetricRule{{
-		Name:       "cisco.port_security.ifindex_lifecycle_cap",
-		Type:       profileMetricTypeCounter,
-		OnTrap:     testPortSecurityTrapOID,
-		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
-		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_lifecycle_capped_violations", "violations", "port_security_violations"),
-		SourceFile: "test-profile.yaml",
+	if err := idx.addDefinitions([]testMetricRule{{
+		Name:     "cisco.port_security.ifindex_lifecycle_cap",
+		Type:     profileMetricTypeCounter,
+		OnTrap:   testPortSecurityTrapOID,
+		Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
+		Output:   profileMetricOutputForTest("snmp_trap_cisco_port_security_lifecycle_capped_violations", "violations", "port_security_violations"),
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -279,13 +273,12 @@ func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.
 
 func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
-		Name:       "cisco.port_security.ifindex_job_cap",
-		Type:       profileMetricTypeCounter,
-		OnTrap:     testPortSecurityTrapOID,
-		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex"}},
-		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_job_capped_violations", "violations", "port_security_violations"),
-		SourceFile: "test-profile.yaml",
+	if err := idx.addDefinitions([]testMetricRule{{
+		Name:     "cisco.port_security.ifindex_job_cap",
+		Type:     profileMetricTypeCounter,
+		OnTrap:   testPortSecurityTrapOID,
+		Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex"}},
+		Output:   profileMetricOutputForTest("snmp_trap_cisco_port_security_job_capped_violations", "violations", "port_security_violations"),
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -310,7 +303,7 @@ func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 
 func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
+	if err := idx.addDefinitions([]testMetricRule{{
 		Name:     "cisco.port_security.ifindex_unknown",
 		Type:     profileMetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
@@ -321,7 +314,6 @@ func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
 			Dimension: "violations",
 			Chart:     "port_security_violations",
 		},
-		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}

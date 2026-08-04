@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/attribution"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
@@ -29,11 +30,12 @@ type testRuntimeConfig struct {
 // testProfileBuilder assembles source-profile data. Build is the only path
 // from mutable fixture data to a live catalog.
 type testProfileBuilder struct {
-	tb     testing.TB
-	paths  catalog.Paths
-	traps  []*testTrapDef
-	rules  []catalog.MetricRule
-	charts []catalog.MetricChart
+	tb           testing.TB
+	paths        catalog.Paths
+	fileVarbinds []testFileVarbind
+	traps        []*testTrapDef
+	rules        []testMetricRule
+	charts       []testMetricChart
 }
 type testTrapEntry = model.TrapEntry
 
@@ -47,8 +49,6 @@ type testTrapDef struct {
 	Varbinds         []any             `yaml:"varbinds,omitempty"`
 	Labels           map[string]string `yaml:"labels,omitempty"`
 	DedupKeyVarbinds []string          `yaml:"dedup_key_varbinds,omitempty"`
-
-	FileVarbinds []testFileVarbind `yaml:"-"`
 }
 
 type testFileVarbind struct {
@@ -56,7 +56,44 @@ type testFileVarbind struct {
 	Definition *testVarbindDef
 }
 
-type testVarbindDef = catalog.VarbindDef
+type testVarbindDef struct {
+	OID         string            `yaml:"oid"`
+	Type        string            `yaml:"type"`
+	Enum        map[string]string `yaml:"enum,omitempty"`
+	Constraints string            `yaml:"constraints,omitempty"`
+}
+
+type testMetricRule struct {
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"`
+	Enabled     *bool  `yaml:"enabled,omitempty"`
+	OnTrap      string `yaml:"on_trap,omitempty"`
+	ProblemTrap string `yaml:"problem_trap,omitempty"`
+	ClearTrap   string `yaml:"clear_trap,omitempty"`
+
+	Where profileMetricPredicates `yaml:"where,omitempty"`
+
+	Identity profileMetricIdentity `yaml:"identity,omitempty"`
+	Output   profileMetricOutput   `yaml:"output,omitempty"`
+	State    profileMetricState    `yaml:"state,omitempty"`
+	Scale    profileMetricScale    `yaml:"scale,omitempty"`
+
+	Missing          string `yaml:"missing,omitempty"`
+	ValueFromVarbind string `yaml:"value_from_varbind,omitempty"`
+}
+
+type testMetricChart struct {
+	ID          string              `yaml:"id"`
+	Title       string              `yaml:"title"`
+	Family      string              `yaml:"family,omitempty"`
+	Context     string              `yaml:"context"`
+	Units       string              `yaml:"units"`
+	Algorithm   string              `yaml:"algorithm,omitempty"`
+	Type        string              `yaml:"type,omitempty"`
+	Description string              `yaml:"description,omitempty"`
+	Lifecycle   *charttpl.Lifecycle `yaml:"lifecycle,omitempty"`
+}
+
 type testVarbindValue = model.VarbindValue
 type testTrapEnrichmentAudit = model.TrapEnrichmentAudit
 type testTrapEnrichmentLookup = model.TrapEnrichmentLookup
@@ -92,21 +129,23 @@ func newTestProfileBuilder(t testing.TB) *testProfileBuilder {
 	}
 }
 
-func (b *testProfileBuilder) addTraps(traps []*testTrapDef) error {
-	candidate := append(append([]*testTrapDef(nil), b.traps...), traps...)
-	lease, err := loadTestCatalogEpoch(b.tb, b.paths, candidate, b.rules, b.charts)
+func (b *testProfileBuilder) addTraps(traps []*testTrapDef, fileVarbinds ...testFileVarbind) error {
+	candidateVarbinds := append(append([]testFileVarbind(nil), b.fileVarbinds...), fileVarbinds...)
+	candidateTraps := append(append([]*testTrapDef(nil), b.traps...), traps...)
+	lease, err := loadTestCatalogEpoch(b.tb, b.paths, candidateVarbinds, candidateTraps, b.rules, b.charts)
 	if err != nil {
 		return err
 	}
 	lease.Close()
-	b.traps = candidate
+	b.fileVarbinds = candidateVarbinds
+	b.traps = candidateTraps
 	return nil
 }
 
-func (b *testProfileBuilder) addDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) error {
-	candidateRules := append(append([]catalog.MetricRule(nil), b.rules...), rules...)
-	candidateCharts := append(append([]catalog.MetricChart(nil), b.charts...), charts...)
-	lease, err := loadTestCatalogEpoch(b.tb, b.paths, b.traps, candidateRules, candidateCharts)
+func (b *testProfileBuilder) addDefinitions(rules []testMetricRule, charts []testMetricChart) error {
+	candidateRules := append(append([]testMetricRule(nil), b.rules...), rules...)
+	candidateCharts := append(append([]testMetricChart(nil), b.charts...), charts...)
+	lease, err := loadTestCatalogEpoch(b.tb, b.paths, b.fileVarbinds, b.traps, candidateRules, candidateCharts)
 	if err != nil {
 		return err
 	}
@@ -118,7 +157,7 @@ func (b *testProfileBuilder) addDefinitions(rules []catalog.MetricRule, charts [
 
 func (b *testProfileBuilder) Build() *catalog.Epoch {
 	b.tb.Helper()
-	lease, err := loadTestCatalogEpoch(b.tb, b.paths, b.traps, b.rules, b.charts)
+	lease, err := loadTestCatalogEpoch(b.tb, b.paths, b.fileVarbinds, b.traps, b.rules, b.charts)
 	if err != nil {
 		b.tb.Fatalf("build test profile catalog: %v", err)
 	}
@@ -129,28 +168,29 @@ func (b *testProfileBuilder) Build() *catalog.Epoch {
 func loadTestCatalogEpoch(
 	t testing.TB,
 	paths catalog.Paths,
+	fileVarbinds []testFileVarbind,
 	traps []*testTrapDef,
-	rules []catalog.MetricRule,
-	charts []catalog.MetricChart,
+	rules []testMetricRule,
+	charts []testMetricChart,
 ) (*catalog.Lease, error) {
 	t.Helper()
 	profile := struct {
-		Varbinds yaml.MapSlice         `yaml:"varbinds,omitempty"`
-		Traps    []*testTrapDef        `yaml:"traps"`
-		Charts   []catalog.MetricChart `yaml:"charts,omitempty"`
-		Metrics  []catalog.MetricRule  `yaml:"metrics,omitempty"`
+		Varbinds yaml.MapSlice     `yaml:"varbinds,omitempty"`
+		Traps    []*testTrapDef    `yaml:"traps"`
+		Charts   []testMetricChart `yaml:"charts,omitempty"`
+		Metrics  []testMetricRule  `yaml:"metrics,omitempty"`
 	}{
 		Traps:   make([]*testTrapDef, 0, len(traps)),
-		Charts:  append([]catalog.MetricChart(nil), charts...),
-		Metrics: append([]catalog.MetricRule(nil), rules...),
+		Charts:  append([]testMetricChart(nil), charts...),
+		Metrics: append([]testMetricRule(nil), rules...),
+	}
+	for _, vb := range fileVarbinds {
+		profile.Varbinds = append(profile.Varbinds, yaml.MapItem{Key: vb.Name, Value: vb.Definition})
 	}
 	for _, src := range traps {
 		if src == nil {
 			profile.Traps = append(profile.Traps, nil)
 			continue
-		}
-		for _, vb := range src.FileVarbinds {
-			profile.Varbinds = append(profile.Varbinds, yaml.MapItem{Key: vb.Name, Value: vb.Definition})
 		}
 		profile.Traps = append(profile.Traps, src)
 	}
@@ -220,6 +260,29 @@ func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.Cyc
 func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 	t.Helper()
 	idx := newTestProfileBuilder(t)
+	fileVarbinds := []testFileVarbind{
+		{Name: testCiscoCommandSourceVarbind, Definition: &testVarbindDef{
+			OID:         testCiscoCommandSourceOID,
+			Type:        "INTEGER",
+			Constraints: "(1..4)",
+		}},
+		{Name: testCiscoTerminalTypeVarbind, Definition: &testVarbindDef{
+			OID:  testCiscoTerminalTypeOID,
+			Type: "INTEGER",
+			Enum: map[string]string{
+				"1": "none",
+				"2": "console",
+				"3": "virtual",
+				"4": "aux",
+			},
+		}},
+		{Name: "sysUpTime.0", Definition: &testVarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks"}},
+		{Name: "ifIndex", Definition: &testVarbindDef{
+			OID:         testIfIndexOID,
+			Type:        "INTEGER",
+			Constraints: "(1..48)",
+		}},
+	}
 	traps := []*testTrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
@@ -231,24 +294,6 @@ func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 				testCiscoTerminalTypeVarbind,
 				"sysUpTime.0",
 			},
-			FileVarbinds: []testFileVarbind{
-				{Name: testCiscoCommandSourceVarbind, Definition: &testVarbindDef{
-					OID:         testCiscoCommandSourceOID,
-					Type:        "INTEGER",
-					Constraints: "(1..4)",
-				}},
-				{Name: testCiscoTerminalTypeVarbind, Definition: &testVarbindDef{
-					OID:  testCiscoTerminalTypeOID,
-					Type: "INTEGER",
-					Enum: map[string]string{
-						"1": "none",
-						"2": "console",
-						"3": "virtual",
-						"4": "aux",
-					},
-				}},
-				{Name: "sysUpTime.0", Definition: &testVarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks"}},
-			},
 		},
 		{
 			OID:      testPortSecurityTrapOID,
@@ -258,48 +303,38 @@ func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 			Varbinds: []any{
 				"ifIndex",
 			},
-			FileVarbinds: []testFileVarbind{
-				{Name: "ifIndex", Definition: &testVarbindDef{
-					OID:         testIfIndexOID,
-					Type:        "INTEGER",
-					Constraints: "(1..48)",
-				}},
-			},
 		},
 	}
-	if err := idx.addTraps(traps); err != nil {
+	if err := idx.addTraps(traps, fileVarbinds...); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
-	charts := []profileMetricChart{
+	charts := []testMetricChart{
 		{
-			ID:         "cisco_config_changes",
-			Title:      "Cisco config changes",
-			Context:    "snmp.trap.cisco.config.changes",
-			Units:      "events/s",
-			Algorithm:  "incremental",
-			Type:       "line",
-			SourceFile: "test-profile.yaml",
+			ID:        "cisco_config_changes",
+			Title:     "Cisco config changes",
+			Context:   "snmp.trap.cisco.config.changes",
+			Units:     "events/s",
+			Algorithm: "incremental",
+			Type:      "line",
 		},
 		{
-			ID:         "cisco_terminal_type",
-			Title:      "Cisco terminal type",
-			Context:    "snmp.trap.cisco.terminal.type",
-			Units:      "type",
-			Algorithm:  "absolute",
-			Type:       "line",
-			SourceFile: "test-profile.yaml",
+			ID:        "cisco_terminal_type",
+			Title:     "Cisco terminal type",
+			Context:   "snmp.trap.cisco.terminal.type",
+			Units:     "type",
+			Algorithm: "absolute",
+			Type:      "line",
 		},
 		{
-			ID:         "port_security_violations",
-			Title:      "Port security violations",
-			Context:    "snmp.trap.cisco.port.security.violations",
-			Units:      "events/s",
-			Algorithm:  "incremental",
-			Type:       "line",
-			SourceFile: "test-profile.yaml",
+			ID:        "port_security_violations",
+			Title:     "Port security violations",
+			Context:   "snmp.trap.cisco.port.security.violations",
+			Units:     "events/s",
+			Algorithm: "incremental",
+			Type:      "line",
 		},
 	}
-	rules := []profileMetricRule{
+	rules := []testMetricRule{
 		{
 			Name:   "cisco.config.changed",
 			Type:   profileMetricTypeCounter,
@@ -309,7 +344,6 @@ func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 				Dimension: "events",
 				Chart:     "cisco_config_changes",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:             "cisco.config.terminal_type",
@@ -321,7 +355,6 @@ func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 				Dimension: "terminal_type",
 				Chart:     "cisco_terminal_type",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:     "cisco.port_security.ifindex",
@@ -333,7 +366,6 @@ func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 				Dimension: "violations",
 				Chart:     "port_security_violations",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 	}
 	if err := idx.addDefinitions(rules, charts); err != nil {
@@ -500,21 +532,20 @@ func sourceRuntimeWithLimits(t *testing.T, idx *testProfileBuilder, limits profi
 	})
 }
 
-func profileMetricChartForTest(id, title, context, units, algorithm string) profileMetricChart {
-	return profileMetricChart{
-		ID:         id,
-		Title:      title,
-		Context:    context,
-		Units:      units,
-		Algorithm:  algorithm,
-		Type:       "line",
-		SourceFile: "test-profile.yaml",
+func profileMetricChartForTest(id, title, context, units, algorithm string) testMetricChart {
+	return testMetricChart{
+		ID:        id,
+		Title:     title,
+		Context:   context,
+		Units:     units,
+		Algorithm: algorithm,
+		Type:      "line",
 	}
 }
 
-func addProfileMetricRuleWithChart(t *testing.T, idx *testProfileBuilder, rule profileMetricRule, chart profileMetricChart) {
+func addProfileMetricRuleWithChart(t *testing.T, idx *testProfileBuilder, rule testMetricRule, chart testMetricChart) {
 	t.Helper()
-	if err := idx.addDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}); err != nil {
+	if err := idx.addDefinitions([]testMetricRule{rule}, []testMetricChart{chart}); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 }
@@ -530,7 +561,7 @@ func profileMetricCatalogForTest(t *testing.T, idx *testProfileBuilder) profileM
 	return profileMetricCatalog{rulesByName: defs.RulesByName, chartsByID: defs.ChartsByID}
 }
 
-func profileMetricChartFromIndex(t *testing.T, idx *testProfileBuilder, id string) *profileMetricChart {
+func profileMetricChartFromIndex(t *testing.T, idx *testProfileBuilder, id string) *testMetricChart {
 	t.Helper()
 	for i := range idx.charts {
 		if idx.charts[i].ID == id {

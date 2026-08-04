@@ -1670,11 +1670,8 @@ Evidence:
 
 - `src/go/plugin/go.d/collector/snmp_traps/internal/jobruntime/pipeline.go` returns early for dedup-suppressed traps and
   authoritative write failures, then updates profile, event, and severity metrics only after a successful write.
-- Phase A profile metric tests verify no profile metric is emitted for write
-  failures and dedup-suppressed traps. Pre-Phase-A
-  `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go:818`
-  through `:831` and `:962` through `:985` covered the removed job-level
-  operator metric runtime.
+- `src/go/plugin/go.d/collector/snmp_traps/internal/jobruntime/profile_metrics_integration_test.go` verifies that profile
+  metrics are not emitted after authoritative write failures or for dedup-suppressed traps.
 
 ### Composition And Override Semantics
 

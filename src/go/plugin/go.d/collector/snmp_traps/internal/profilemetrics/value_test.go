@@ -44,7 +44,7 @@ func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
 
 func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
+	if err := idx.addDefinitions([]testMetricRule{{
 		Name:             "cisco.config.console_terminal_type",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -58,7 +58,6 @@ func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 			Dimension: "terminal_type",
 			Chart:     "cisco_terminal_type",
 		},
-		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -105,7 +104,7 @@ func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *test
 
 func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
+	if err := idx.addDefinitions([]testMetricRule{{
 		Name:             "cisco.config.terminal_type_scaled",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -117,7 +116,6 @@ func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 			Dimension: "terminal_type_scaled",
 			Chart:     "cisco_terminal_type",
 		},
-		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -144,7 +142,7 @@ func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 
 func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
+	if err := idx.addDefinitions([]testMetricRule{{
 		Name:             "cisco.config.sysuptime_seconds",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
@@ -155,15 +153,13 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 			Dimension: "seconds",
 			Chart:     "cisco_sysuptime_seconds",
 		},
-		SourceFile: "test-profile.yaml",
-	}}, []profileMetricChart{{
-		ID:         "cisco_sysuptime_seconds",
-		Title:      "Cisco sysUpTime seconds",
-		Context:    "snmp.trap.cisco.sysuptime.seconds",
-		Units:      "seconds",
-		Algorithm:  "absolute",
-		Type:       "line",
-		SourceFile: "test-profile.yaml",
+	}}, []testMetricChart{{
+		ID:        "cisco_sysuptime_seconds",
+		Title:     "Cisco sysUpTime seconds",
+		Context:   "snmp.trap.cisco.sysuptime.seconds",
+		Units:     "seconds",
+		Algorithm: "absolute",
+		Type:      "line",
 	}}); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -184,7 +180,7 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 
 func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{
+	if err := idx.addDefinitions([]testMetricRule{
 		{
 			Name:             "cisco.config.terminal_type_missing_drop",
 			Type:             profileMetricTypeSample,
@@ -196,7 +192,6 @@ func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
 				Dimension: "missing_drop",
 				Chart:     "cisco_terminal_type",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:             "cisco.config.terminal_type_missing_error",
@@ -209,7 +204,6 @@ func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
 				Dimension: "missing_error",
 				Chart:     "cisco_terminal_type",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 	}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)

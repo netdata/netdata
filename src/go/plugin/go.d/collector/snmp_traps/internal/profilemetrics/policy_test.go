@@ -12,13 +12,12 @@ import (
 
 func TestProfileMetricSelection(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	require.NoError(t, idx.addDefinitions([]profileMetricRule{{
-		Name:       "disabled.rule",
-		Type:       profileMetricTypeCounter,
-		Enabled:    new(false),
-		OnTrap:     testCiscoConfigTrapOID,
-		Output:     profileMetricOutput{Metric: "snmp_trap_disabled_events", Dimension: "events", Chart: "cisco_config_changes"},
-		SourceFile: "test-profile.yaml",
+	require.NoError(t, idx.addDefinitions([]testMetricRule{{
+		Name:    "disabled.rule",
+		Type:    profileMetricTypeCounter,
+		Enabled: new(false),
+		OnTrap:  testCiscoConfigTrapOID,
+		Output:  profileMetricOutput{Metric: "snmp_trap_disabled_events", Dimension: "events", Chart: "cisco_config_changes"},
 	}}, nil))
 	cat := profileMetricCatalogForTest(t, idx)
 
@@ -104,7 +103,7 @@ func TestNewProfileMetricRuntimeRejectsNilProfileIndex(t *testing.T) {
 
 func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	err := idx.addDefinitions([]profileMetricRule{{
+	err := idx.addDefinitions([]testMetricRule{{
 		Name:   "cisco.config.duplicate_dimension",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -113,7 +112,6 @@ func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		SourceFile: "site-profile.yaml",
 	}}, nil)
 	if err != nil {
 		t.Fatalf("addProfileMetrics rejected alternate same-dimension rule before selection: %v", err)

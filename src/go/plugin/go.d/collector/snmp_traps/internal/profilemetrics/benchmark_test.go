@@ -95,6 +95,24 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 func benchmarkProfileMetricIndex(b testing.TB) *testProfileBuilder {
 	b.Helper()
 	idx := newTestProfileBuilder(b)
+	fileVarbinds := []testFileVarbind{
+		{Name: testCiscoTerminalTypeVarbind, Definition: &testVarbindDef{
+			OID:  testCiscoTerminalTypeOID,
+			Type: "INTEGER",
+			Enum: map[string]string{
+				"1": "none",
+				"2": "console",
+				"3": "virtual",
+				"4": "aux",
+			},
+		}},
+		{Name: "sysUpTime.0", Definition: &testVarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks"}},
+		{Name: "ifIndex", Definition: &testVarbindDef{
+			OID:         testIfIndexOID,
+			Type:        "INTEGER",
+			Constraints: "(1..48)",
+		}},
+	}
 	traps := []*testTrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
@@ -102,19 +120,6 @@ func benchmarkProfileMetricIndex(b testing.TB) *testProfileBuilder {
 			Category: "config_change",
 			Severity: "notice",
 			Varbinds: []any{testCiscoTerminalTypeVarbind, "sysUpTime.0"},
-			FileVarbinds: []testFileVarbind{
-				{Name: testCiscoTerminalTypeVarbind, Definition: &testVarbindDef{
-					OID:  testCiscoTerminalTypeOID,
-					Type: "INTEGER",
-					Enum: map[string]string{
-						"1": "none",
-						"2": "console",
-						"3": "virtual",
-						"4": "aux",
-					},
-				}},
-				{Name: "sysUpTime.0", Definition: &testVarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks"}},
-			},
 		},
 		{
 			OID:      testPortSecurityTrapOID,
@@ -122,26 +127,18 @@ func benchmarkProfileMetricIndex(b testing.TB) *testProfileBuilder {
 			Category: "security",
 			Severity: "warning",
 			Varbinds: []any{"ifIndex"},
-			FileVarbinds: []testFileVarbind{
-				{Name: "ifIndex", Definition: &testVarbindDef{
-					OID:         testIfIndexOID,
-					Type:        "INTEGER",
-					Constraints: "(1..48)",
-				}},
-			},
 		},
 	}
-	if err := idx.addTraps(traps); err != nil {
+	if err := idx.addTraps(traps, fileVarbinds...); err != nil {
 		b.Fatalf("addTraps: %v", err)
 	}
 
-	rules := []profileMetricRule{
+	rules := []testMetricRule{
 		{
-			Name:       "bench.config.changed",
-			Type:       profileMetricTypeCounter,
-			OnTrap:     testCiscoConfigTrapOID,
-			Output:     profileMetricOutput{Metric: "snmp_trap_bench_config_events", Dimension: "events", Chart: "bench_config_changes"},
-			SourceFile: "benchmark-profile.yaml",
+			Name:   "bench.config.changed",
+			Type:   profileMetricTypeCounter,
+			OnTrap: testCiscoConfigTrapOID,
+			Output: profileMetricOutput{Metric: "snmp_trap_bench_config_events", Dimension: "events", Chart: "bench_config_changes"},
 		},
 		{
 			Name:             "bench.config.terminal_type",
@@ -149,7 +146,6 @@ func benchmarkProfileMetricIndex(b testing.TB) *testProfileBuilder {
 			OnTrap:           testCiscoConfigTrapOID,
 			ValueFromVarbind: testCiscoTerminalTypeVarbind,
 			Output:           profileMetricOutput{Metric: "snmp_trap_bench_terminal_type", Dimension: "terminal_type", Chart: "bench_terminal_type"},
-			SourceFile:       "benchmark-profile.yaml",
 		},
 		{
 			Name:   "bench.config.console_state",
@@ -160,23 +156,21 @@ func benchmarkProfileMetricIndex(b testing.TB) *testProfileBuilder {
 				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
 				TTL:       "1ns",
 			},
-			Output:     profileMetricOutput{Metric: "snmp_trap_bench_console_state", Dimension: "active", Chart: "bench_console_state"},
-			SourceFile: "benchmark-profile.yaml",
+			Output: profileMetricOutput{Metric: "snmp_trap_bench_console_state", Dimension: "active", Chart: "bench_console_state"},
 		},
 		{
-			Name:       "bench.port_security.ifindex",
-			Type:       profileMetricTypeCounter,
-			OnTrap:     testPortSecurityTrapOID,
-			Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 32}},
-			Output:     profileMetricOutput{Metric: "snmp_trap_bench_port_security_violations", Dimension: "violations", Chart: "bench_port_security"},
-			SourceFile: "benchmark-profile.yaml",
+			Name:     "bench.port_security.ifindex",
+			Type:     profileMetricTypeCounter,
+			OnTrap:   testPortSecurityTrapOID,
+			Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 32}},
+			Output:   profileMetricOutput{Metric: "snmp_trap_bench_port_security_violations", Dimension: "violations", Chart: "bench_port_security"},
 		},
 	}
-	charts := []profileMetricChart{
-		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
-		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}, SourceFile: "benchmark-profile.yaml"},
+	charts := []testMetricChart{
+		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}},
+		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}},
+		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}},
+		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: 256}},
 	}
 	if err := idx.addDefinitions(rules, charts); err != nil {
 		b.Fatalf("addProfileMetrics: %v", err)

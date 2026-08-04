@@ -10,7 +10,7 @@ import (
 
 func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
+	if err := idx.addDefinitions([]testMetricRule{{
 		Name:   "cisco.config.console",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -23,7 +23,6 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 			Dimension: "console_events",
 			Chart:     "cisco_config_changes",
 		},
-		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -43,7 +42,7 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
+	if err := idx.addDefinitions([]testMetricRule{{
 		Name:   "cisco.config.synthetic_fields",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -58,7 +57,6 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 			Dimension: "synthetic_field_events",
 			Chart:     "cisco_config_changes",
 		},
-		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
@@ -81,7 +79,7 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{
+	if err := idx.addDefinitions([]testMetricRule{
 		{
 			Name:   "cisco.config.rich_predicates",
 			Type:   profileMetricTypeCounter,
@@ -99,7 +97,6 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 				Dimension: "events",
 				Chart:     "cisco_config_changes",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:   "cisco.config.absent_predicate",
@@ -114,7 +111,6 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 				Dimension: "absent_events",
 				Chart:     "cisco_config_changes",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 	}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
@@ -148,7 +144,7 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{
+	if err := idx.addDefinitions([]testMetricRule{
 		{
 			Name:   "cisco.config.exists_false",
 			Type:   profileMetricTypeCounter,
@@ -162,7 +158,6 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "exists_false_events",
 				Chart:     "cisco_config_changes",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:   "cisco.config.numeric_in",
@@ -177,7 +172,6 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "numeric_in_events",
 				Chart:     "cisco_config_changes",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 		{
 			Name:   "cisco.config.synthetic_not",
@@ -193,7 +187,6 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "synthetic_not_events",
 				Chart:     "cisco_config_changes",
 			},
-			SourceFile: "test-profile.yaml",
 		},
 	}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
@@ -234,7 +227,7 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 
 func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
+	if err := idx.addDefinitions([]testMetricRule{{
 		Name:   "cisco.config.finite_range",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
@@ -247,7 +240,6 @@ func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
 			Dimension: "finite_range_events",
 			Chart:     "cisco_config_changes",
 		},
-		SourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}

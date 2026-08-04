@@ -62,13 +62,43 @@ func TestProfileMetricTestProfileBuilderUsesProductionCatalog(t *testing.T) {
 		idx := newTestProfileBuilder(t)
 		candidate := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")
 		candidate.Varbinds = []any{"brokenVarbind"}
-		candidate.FileVarbinds = []testFileVarbind{{Name: "brokenVarbind"}}
 
 		var err error
 		require.NotPanics(t, func() {
-			err = idx.addTraps([]*testTrapDef{candidate})
+			err = idx.addTraps([]*testTrapDef{candidate}, testFileVarbind{Name: "brokenVarbind"})
 		})
 		require.Error(t, err)
+	})
+
+	t.Run("file varbind source order reaches manager", func(t *testing.T) {
+		idx := newTestProfileBuilder(t)
+		candidate := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")
+		candidate.Varbinds = []any{"orderedVarbind"}
+		fileVarbinds := []testFileVarbind{
+			{Name: "orderedVarbind", Definition: &testVarbindDef{OID: "1.3.6.1.4.1.99999.10", Type: "INTEGER"}},
+			{Name: "orderedVarbind", Definition: &testVarbindDef{OID: "1.3.6.1.4.1.99999.11", Type: "INTEGER"}},
+		}
+
+		require.NoError(t, idx.addTraps([]*testTrapDef{candidate}, fileVarbinds...))
+		resolved, err := idx.Build().ResolveTrap(candidate.OID)
+		require.NoError(t, err)
+		varbind := resolved.VarbindByName("orderedVarbind")
+		require.NotNil(t, varbind)
+		require.Equal(t, "1.3.6.1.4.1.99999.11", varbind.OID)
+	})
+
+	t.Run("file varbind references are not inferred", func(t *testing.T) {
+		idx := newTestProfileBuilder(t)
+		candidate := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")
+		fileVarbind := testFileVarbind{
+			Name:       "unreferencedVarbind",
+			Definition: &testVarbindDef{OID: "1.3.6.1.4.1.99999.10", Type: "INTEGER"},
+		}
+
+		require.NoError(t, idx.addTraps([]*testTrapDef{candidate}, fileVarbind))
+		resolved, err := idx.Build().ResolveTrap(candidate.OID)
+		require.NoError(t, err)
+		require.Nil(t, resolved.VarbindByName("unreferencedVarbind"))
 	})
 
 	t.Run("build returns an immutable snapshot", func(t *testing.T) {
@@ -104,28 +134,28 @@ func TestProfileMetricTestProfileBuilderUsesProductionCatalog(t *testing.T) {
 		idx := newTestProfileBuilder(t)
 		require.NoError(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")}))
 		chart := profileMetricChartForTest("test_events", "Test events", "snmp.trap.test.events", "events/s", "incremental")
-		rule := profileMetricRule{
+		rule := testMetricRule{
 			Name:   "test.events",
 			Type:   profileMetricTypeCounter,
 			OnTrap: "TEST-MIB::candidate",
 			Output: profileMetricOutputForTest("snmp_trap_test_events", "events", chart.ID),
 		}
-		require.NoError(t, idx.addDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}))
-		require.Error(t, idx.addDefinitions([]profileMetricRule{rule}, nil))
-		require.Error(t, idx.addDefinitions(nil, []profileMetricChart{chart}))
+		require.NoError(t, idx.addDefinitions([]testMetricRule{rule}, []testMetricChart{chart}))
+		require.Error(t, idx.addDefinitions([]testMetricRule{rule}, nil))
+		require.Error(t, idx.addDefinitions(nil, []testMetricChart{chart}))
 	})
 
 	t.Run("metric definitions are normalized", func(t *testing.T) {
 		idx := newTestProfileBuilder(t)
 		require.NoError(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")}))
 		chart := profileMetricChartForTest("test_events", "Test events", "snmp.trap.test.events", "events/s", "")
-		rule := profileMetricRule{
+		rule := testMetricRule{
 			Name:   "test.events",
 			Type:   " COUNTER ",
 			OnTrap: " TEST-MIB::candidate ",
 			Output: profileMetricOutputForTest("snmp_trap_test_events", "events", chart.ID),
 		}
-		require.NoError(t, idx.addDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}))
+		require.NoError(t, idx.addDefinitions([]testMetricRule{rule}, []testMetricChart{chart}))
 		defs, err := idx.Build().Definitions([]string{rule.Name})
 		require.NoError(t, err)
 		gotRule := requireRule(t, defs, rule.Name)
