@@ -22,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profiletest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
@@ -49,7 +50,7 @@ func buildBenchV2cTrap(b testing.TB, trapOID string, extra ...gosnmp.SnmpPDU) []
 
 func setBenchProfileIndex(b *testing.B, traps map[string]*catalog.TrapDef) *catalog.Epoch {
 	b.Helper()
-	paths := rootTestProfileCatalogPaths(b)
+	paths := profiletest.CatalogPaths(b)
 	defs := make([]*catalog.TrapDef, 0, len(traps))
 	for _, trap := range traps {
 		defs = append(defs, trap)

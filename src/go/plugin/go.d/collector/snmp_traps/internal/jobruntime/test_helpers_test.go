@@ -27,6 +27,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profiletest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/telemetry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/traptest"
@@ -100,7 +101,7 @@ func setSingleTestTrap(t *testing.T, trap *catalog.TrapDef) *catalog.Epoch {
 
 func setTestProfileIndex(t *testing.T, traps map[string]*catalog.TrapDef) *catalog.Epoch {
 	t.Helper()
-	paths := rootTestProfileCatalogPaths(t)
+	paths := profiletest.CatalogPaths(t)
 	if len(traps) > 0 {
 		defs := make([]*catalog.TrapDef, 0, len(traps))
 		for _, trap := range traps {
