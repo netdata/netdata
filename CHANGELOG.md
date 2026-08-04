@@ -878,6 +878,22 @@
 - Refactor(go.d/snmp-traps): reduce profile surface ([#23359](https://github.com/netdata/netdata/issues/23359))
 - Refactor(go.d/snmp-traps): remove built-in source metrics ([#23360](https://github.com/netdata/netdata/issues/23360))
 - Refactor(snmp-traps): internalize output backends ([#23361](https://github.com/netdata/netdata/issues/23361))
+- Fix(go.d/jobmgr): settle pre-activation retirement races ([#23362](https://github.com/netdata/netdata/issues/23362))
+- Refactor(go.d/snmp-traps): internalize profile catalog ownership ([#23363](https://github.com/netdata/netdata/issues/23363))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.32 to 1.32.33 in /src/go ([#23372](https://github.com/netdata/netdata/issues/23372))
+- Build(deps): bump google.golang.org/grpc from 1.82.1 to 1.83.0 in /src/go ([#23368](https://github.com/netdata/netdata/issues/23368))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.35.1 to 1.35.2 in /src/go ([#23373](https://github.com/netdata/netdata/issues/23373))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.66.0 to 1.66.1 in /src/go ([#23369](https://github.com/netdata/netdata/issues/23369))
+- Fix(go.d/snmp): apply scale factor for arubaWiredTempSensorTemperature ([#23376](https://github.com/netdata/netdata/issues/23376))
+- Refactor(go.d/snmp-traps): internalize profile metric runtime ([#23375](https://github.com/netdata/netdata/issues/23375))
+- Docs: Fix invalid netdata -W plugins command in journal README ([#23318](https://github.com/netdata/netdata/issues/23318))
+- Docs: Warn that dashboard deletion is permanent and unrecoverable ([#23322](https://github.com/netdata/netdata/issues/23322))
+- Docs: Clarify systemd service network monitoring via network-viewer ([#23323](https://github.com/netdata/netdata/issues/23323))
+- Docs: Clarify one-second minimum collection interval limit ([#23325](https://github.com/netdata/netdata/issues/23325))
+- Update manage-alert-notification-silencing-rules.md ([#23382](https://github.com/netdata/netdata/issues/23382))
+- Refactor(go.d/snmp-traps): internalize receiver ownership ([#23377](https://github.com/netdata/netdata/issues/23377))
+- Refactor(go.d): share reverse DNS across SNMP collectors ([#23385](https://github.com/netdata/netdata/issues/23385))
+- Refactor(go.d): isolate SNMP trap dedup and telemetry ([#23387](https://github.com/netdata/netdata/issues/23387))
 
 ## [2.10.0] - 2026-04-09
 
