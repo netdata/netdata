@@ -99,10 +99,10 @@ func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
 
 	trapEnrichment := pointerField(t, topologyCollector, "trapEnrichment")
 	require.NotZero(t, trapEnrichment)
-	require.NotZero(t, pointerField(t, trapsCollector, "enricher"))
+	require.NotZero(t, nestedPointerField(t, trapsCollector, "services", "enricher"))
 
 	topologyReverseDNS := nestedPointerField(t, topologyCollector, "topologyRegistry", "reverseDNS")
-	trapsReverseDNS := nestedInterfacePointerField(t, trapsCollector, "enricher", "reverseDNS")
+	trapsReverseDNS := nestedInterfacePointerField(t, trapsCollector, "services", "enricher", "reverseDNS")
 	require.NotZero(t, topologyReverseDNS)
 	assert.Equal(t, topologyReverseDNS, trapsReverseDNS)
 	negativeTTL := durationField(t, topologyCollector, "topologyRegistry", "reverseDNS", "negativeTTL")
@@ -144,15 +144,16 @@ func nestedPointerField(t *testing.T, obj any, outerName, innerName string) uint
 	return inner.Pointer()
 }
 
-func nestedInterfacePointerField(t *testing.T, obj any, outerName, innerName string) uintptr {
+func nestedInterfacePointerField(t *testing.T, obj any, names ...string) uintptr {
 	t.Helper()
-	inner := fieldPath(t, obj, outerName, innerName)
-	require.Equal(t, reflect.Interface, inner.Kind(), "field %q.%q", outerName, innerName)
-	require.False(t, inner.IsNil(), "field %q.%q is nil", outerName, innerName)
+	inner := fieldPath(t, obj, names...)
+	name := strings.Join(names, ".")
+	require.Equal(t, reflect.Interface, inner.Kind(), "field %q", name)
+	require.False(t, inner.IsNil(), "field %q is nil", name)
 
 	elem := inner.Elem()
-	require.Equal(t, reflect.Pointer, elem.Kind(), "field %q.%q concrete value", outerName, innerName)
-	require.False(t, elem.IsNil(), "field %q.%q concrete value is nil", outerName, innerName)
+	require.Equal(t, reflect.Pointer, elem.Kind(), "field %q concrete value", name)
+	require.False(t, elem.IsNil(), "field %q concrete value is nil", name)
 	return elem.Pointer()
 }
 
