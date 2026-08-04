@@ -111,6 +111,13 @@ static void test_listener_backlog(SPAWN_SERVER *server) {
 
         if(connect(clients[i], (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
             int error = errno;
+
+            // AF_UNIX stream connect() completes synchronously on every supported platform, so an
+            // in-progress result is unreachable today. Accept it anyway: it means the listener queued
+            // the connection, which is what this test asserts - never a backlog rejection.
+            if(error == EINPROGRESS || error == EALREADY)
+                continue;
+
             test_listener_backlog_cleanup(server, clients, connections);
 
             if(error != EAGAIN && error != EWOULDBLOCK && error != ECONNREFUSED) {
