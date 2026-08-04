@@ -40,7 +40,24 @@ static void fix_directory_file_permissions_at(int dir_fd, const char *dirname, u
                 (void) snprintfz(sub_name, FILENAME_MAX, "%s/%s", dirname, de->d_name);
                 fix_directory_file_permissions_at(sub_fd, sub_name, uid, gid, recursive);
             }
+            else
+                netdata_log_error(
+                    "Not fixing ownership inside directory '%s/%s': cannot open it without following symlinks",
+                    dirname, de->d_name);
         }
+
+        // A symlink is never followed: whoever can write into this directory could
+        // have planted it, and we are still root. Reported in both modes - the
+        // recursive one chowns the link itself and stops there, the non-recursive
+        // one only chowns regular files - because either way the files behind the
+        // link keep the ownership they had, which is what an operator who
+        // relocated a directory with a symlink needs to be told. Relocate with a
+        // bind mount, or with the matching option in the [directories] section of
+        // netdata.conf, instead.
+        if (de->d_type == DT_LNK)
+            netdata_log_error(
+                "Not fixing ownership through symbolic link '%s/%s': its target is left as it is",
+                dirname, de->d_name);
     }
 
     closedir(dir);
