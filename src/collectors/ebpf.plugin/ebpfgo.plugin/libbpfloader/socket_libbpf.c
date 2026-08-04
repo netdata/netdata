@@ -871,6 +871,23 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         if (rt->acc_count > 1u)
             qsort(rt->acc, (size_t)rt->acc_count, sizeof(*rt->acc), pid_ht_compare);
 
+        /* Evict dead PIDs: ring-buffer events only arrive for active processes, so
+         * dead entries accumulate indefinitely and produce zero-delta rows in the
+         * snapshot.  Each PID appears exactly once in rt->acc (deduplicated by
+         * accumulation), so no per-cycle cache is needed.  EPERM means alive (the
+         * process exists but we lack signal permission); only ESRCH confirms gone. */
+        {
+            uint32_t live = 0;
+            for (uint32_t i = 0; i < rt->acc_count; i++) {
+                if (kill((pid_t)rt->acc[i].pid, 0) == 0 || errno == EPERM) {
+                    if (live != i)
+                        rt->acc[live] = rt->acc[i];
+                    live++;
+                }
+            }
+            rt->acc_count = live;
+        }
+
         /* Grow the persistent output buffer if needed. */
         if ((int)rt->acc_count > rt->per_pid_cap) {
             rt->per_pid_entries = reallocz(rt->per_pid_entries,
@@ -883,14 +900,10 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         rt->per_pid_count = (int)rt->acc_count;
         *out_count = (int)rt->acc_count;
 
-        /* Rebuild the htable index after qsort reordered rt->acc in-place.
-         * The accumulator is NOT reset: keeping monotonically increasing per-PID
-         * totals matches the base-flavor contract that Go's UpdateSocketApps
-         * expects (it subtracts the previous snapshot to get the interval delta).
-         * Dead PIDs retain their last values and produce zero delta, which is
-         * the same behaviour as stale entries in the base-flavor BPF map. */
-        if (rt->acc_count > 1u)
-            socket_acc_htable_rebuild(rt);
+        /* Rebuild the htable index after qsort + eviction modified rt->acc.
+         * The accumulator is NOT reset: monotonically increasing per-PID totals
+         * let Go's UpdateSocketApps compute interval deltas by subtraction. */
+        socket_acc_htable_rebuild(rt);
 
         return rt->per_pid_entries;
     }

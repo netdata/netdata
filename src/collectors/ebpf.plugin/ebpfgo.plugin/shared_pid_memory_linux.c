@@ -97,13 +97,11 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     (void)sem_unlink(ctx->sem_name);
     (void)shm_unlink(ctx->shm_name);
 
-    /* O_EXCL: we just called shm_unlink so no legitimate segment exists.
-     * EEXIST means a squatter recreated the name in the window; evict and retry once. */
+    /* O_EXCL ensures we own the new segment.  On EEXIST back off rather than
+     * evicting: we cannot distinguish a squatter from a concurrent legitimate
+     * publisher without risking destroying a live segment.  The caller retries
+     * next cycle; our prior shm_unlink above already evicted the old generation. */
     ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_EXCL | O_RDWR, 0640);
-    if (ctx->shm_fd < 0 && errno == EEXIST) {
-        (void)shm_unlink(ctx->shm_name);
-        ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_EXCL | O_RDWR, 0640);
-    }
     if (ctx->shm_fd < 0)
         return false;
     /* Mark created before any further steps; close() unlinks on any failure path. */
@@ -232,12 +230,10 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
         (void)shm_unlink(ctx->shm_name);
-        /* O_EXCL: we just called shm_unlink; EEXIST means a squatter; evict and retry once. */
+        /* O_EXCL: we just called shm_unlink.  On EEXIST back off rather than
+         * evicting: cannot distinguish a squatter from a concurrent legitimate
+         * publisher without risking destroying a live segment. */
         ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_EXCL | O_RDWR, 0640);
-        if (ctx->shm_fd < 0 && errno == EEXIST) {
-            (void)shm_unlink(ctx->shm_name);
-            ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_EXCL | O_RDWR, 0640);
-        }
         if (ctx->shm_fd < 0)
             goto fail;
         reused = false;
