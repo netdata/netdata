@@ -147,3 +147,129 @@ int rrdfunctions_verify_access_unittest(void) {
 
     return errors;
 }
+
+// ----------------------------------------------------------------------------
+// Pins the contents of the ACLK node instance manifest.
+//
+// host_functions_to_manifest_dict() decides what the agent tells Netdata Cloud
+// about this node's functions. Two exclusions are contractual:
+//
+//   - dyncfg functions. They are an internal configuration transport, not
+//     user-facing, and the cloud must never be offered them. The exclusion is
+//     by RRD_FUNCTION_DYNCFG, which get_function_options() derives from the
+//     SANITIZED KEY, so the classifier is pinned directly below against every
+//     name shape the tree actually produces.
+//
+//   - restricted functions ("__" prefix, or the "hidden" tag).
+//
+// It also pins that help survives as a byte copy, because the entry has to stay
+// valid after the host functions read lock is released.
+//
+// Deliberately does NOT register the bare "config" name: that is the live dyncfg
+// function on localhost (dyncfg-tree.c), and registering plus deleting it here
+// would tear down real dyncfg state for the tests that follow. The bare and
+// leading-space shapes are covered by the classifier assertions instead.
+
+int rrdfunctions_manifest_unittest(void) {
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    RRDHOST *host = localhost;
+    if(!host) {
+        fprintf(stderr, "  FAILED: localhost is NULL (rrd_init not prepared)\n");
+        return 1;
+    }
+
+    int errors = 0;
+
+    // 1. The dyncfg classifier, on the sanitized key. " config" matters because the sanitizer
+    //    strips the leading space, so it lands on the "config" key and must classify as dyncfg -
+    //    classifying the raw name instead would hand a dyncfg-reserved key to a regular function.
+    struct { const char *raw; bool expected_dyncfg; } names[] = {
+        { PLUGINSD_FUNCTION_CONFIG, true  },   // dyncfg-tree.c
+        { "config test:job",        true  },   // dyncfg_insert_cb() builds "config <id>"
+        { " config",                true  },   // sanitizes to "config"
+        { "  config  ",             true  },
+        { "configuration",          false },   // NOT dyncfg - "config" is only a prefix here
+        { "config-something",       false },
+        { "manifest-visible-fn",    false },
+    };
+
+    for(size_t i = 0; i < _countof(names); i++) {
+        char key[PLUGINSD_LINE_MAX];
+        rrd_functions_sanitize(key, names[i].raw, sizeof(key));
+        bool got = rrd_function_name_is_dyncfg(key);
+
+        if(got != names[i].expected_dyncfg) {
+            fprintf(stderr, "  FAILED classifier: '%s' -> key '%s' -> dyncfg=%s, expected %s\n",
+                    names[i].raw, key, got ? "true" : "false",
+                    names[i].expected_dyncfg ? "true" : "false");
+            errors++;
+        }
+        else
+            fprintf(stderr, "  OK classifier: %-20s -> key '%-18s' dyncfg=%s\n",
+                    names[i].raw, key, got ? "true" : "false");
+    }
+
+    // 2. The manifest dictionary itself, using names that cannot collide with live functions.
+    struct {
+        const char *name;
+        const char *tags;
+        bool expected_in_manifest;
+    } fns[] = {
+        { "config manifest-test:job",  "config",                false },  // dyncfg -> excluded
+        { "__manifest-hidden-fn",      "top",                   false },  // "__" -> restricted
+        { "manifest-tagged-fn",        RRDFUNCTIONS_TAG_HIDDEN, false },  // hidden tag -> restricted
+        { "manifest-visible-fn",       "top",                   true  },
+        { "manifest-logs-fn",          "logs",                  true  },
+    };
+
+    for(size_t i = 0; i < _countof(fns); i++)
+        rrd_function_add(host, NULL, fns[i].name, 10, 0, 1, "manifest help text", fns[i].tags,
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, rrdfunctions_unittest_noop_cb, NULL);
+
+    DICTIONARY *manifest = host_functions_to_manifest_dict(host);
+
+    for(size_t i = 0; i < _countof(fns); i++) {
+        struct rrd_function_manifest_entry *e = dictionary_get(manifest, fns[i].name);
+        bool present = (e != NULL);
+
+        if(present != fns[i].expected_in_manifest) {
+            fprintf(stderr, "  FAILED '%s': %s the manifest, expected %s\n",
+                    fns[i].name, present ? "IS in" : "is NOT in",
+                    fns[i].expected_in_manifest ? "present" : "absent");
+            errors++;
+        }
+        else if(present && (!e->help || strcmp(e->help, "manifest help text") != 0)) {
+            fprintf(stderr, "  FAILED '%s': help not copied (got '%s')\n",
+                    fns[i].name, e->help ? e->help : "(null)");
+            errors++;
+        }
+        else
+            fprintf(stderr, "  OK %-26s -> %s\n",
+                    fns[i].name, present ? "in manifest" : "excluded");
+    }
+
+    // 3. No dyncfg function of any kind may appear, including the live ones this test did not
+    //    register - a belt-and-braces sweep over whatever the running agent has.
+    struct rrd_function_manifest_entry *v;
+    dfe_start_read(manifest, v) {
+        (void)v;
+        char key[PLUGINSD_LINE_MAX];
+        rrd_functions_sanitize(key, v_dfe.name, sizeof(key));
+        if(rrd_function_name_is_dyncfg(key)) {
+            fprintf(stderr, "  FAILED: dyncfg function '%s' present in the manifest\n", v_dfe.name);
+            errors++;
+        }
+    }
+    dfe_done(v);
+
+    dictionary_destroy(manifest);
+
+    for(size_t i = 0; i < _countof(fns); i++)
+        rrd_function_del(host, NULL, fns[i].name, false, true);
+
+    fprintf(stderr, "%s() %s (%d error%s)\n\n",
+            __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
+
+    return errors;
+}
