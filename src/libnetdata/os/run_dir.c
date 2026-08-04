@@ -5,6 +5,13 @@
 
 static char *cached_run_dir = NULL;
 static bool cached_run_dir_available = false;
+static bool cached_run_dir_writable = false; // the cached answer satisfied a writable request
+
+// A read-only answer that has already been handed out, superseded by a writable
+// one. Retained, not freed: callers are allowed to keep the pointer they got,
+// which used to live for the whole process. At most one string per process.
+static char *superseded_run_dir = NULL;
+
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 static uid_t target_uid = (uid_t)-1;
@@ -248,20 +255,51 @@ success:
 }
 
 const char *os_run_dir(bool rw) {
-    // Fast path - return cached directory if available
-    if(__atomic_load_n(&cached_run_dir_available, __ATOMIC_ACQUIRE))
-        return cached_run_dir;
+    // Fast path - reuse the cached directory only when it answers this request.
+    // cached_run_dir_writable implies cached_run_dir_available, so the writable
+    // flag is the whole test for rw callers.
+    if(__atomic_load_n(rw ? &cached_run_dir_writable : &cached_run_dir_available, __ATOMIC_ACQUIRE))
+        return __atomic_load_n(&cached_run_dir, __ATOMIC_ACQUIRE);
 
     spinlock_lock(&spinlock);
 
     // Check again under lock in case another thread set it
     char *run_dir = cached_run_dir;
-    if(!run_dir) {
-        run_dir = detect_run_dir(rw);
-        cached_run_dir = run_dir;
 
-        if(run_dir)
+    // A read-only resolution reports what already exists: it creates nothing and
+    // only asks for R_OK. So it can settle on a directory we cannot write into
+    // (a read-only /run bind mount, a root-owned /run/netdata when we are not
+    // root), or on the /tmp fallback while /run/netdata simply does not exist
+    // yet. Handing that answer to the first writable caller would make its
+    // bind()/mkdir() fail on a directory nobody validated for writing - and it
+    // would also skip the nd_setenv() that tells our children where the run dir
+    // is. Detect again instead.
+    if(!run_dir || (rw && !cached_run_dir_writable)) {
+        char *found = detect_run_dir(rw);
+
+        if(found && run_dir) {
+            if(strcmp(run_dir, found) == 0) {
+                // same directory, only its validation got stronger - keep the
+                // pointer callers already have
+                freez(found);
+                found = run_dir;
+            }
+            else
+                superseded_run_dir = run_dir;
+        }
+
+        if(found) {
+            // published before the flags, so a reader that sees a flag sees this
+            __atomic_store_n(&cached_run_dir, found, __ATOMIC_RELEASE);
+            if(rw)
+                __atomic_store_n(&cached_run_dir_writable, true, __ATOMIC_RELEASE);
             __atomic_store_n(&cached_run_dir_available, true, __ATOMIC_RELEASE);
+        }
+
+        // When no writable directory exists, the read-only answer stays cached
+        // for the read-only callers, but this caller gets nothing: it asked for a
+        // directory it can write into, and there is none.
+        run_dir = found;
     }
 
     spinlock_unlock(&spinlock);

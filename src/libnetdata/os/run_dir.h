@@ -9,8 +9,15 @@
  * Initialize and get the runtime directory for Netdata
  * This function gets or creates the runtime directory based on environment or system defaults
  *
- * @param rw When true, create the directory if it doesn't exist
- * @return const char* The runtime directory path
+ * The answer is cached for the process lifetime, per level of validation: a
+ * read-only answer only reports a directory that already exists and is readable,
+ * so the first rw=true caller re-runs the detection rather than inherit it. A
+ * pointer already returned stays valid either way.
+ *
+ * @param rw When true, the directory must be writable by us, and is created if it
+ *           does not exist. Returns NULL when there is no such directory, even if
+ *           a read-only caller already found a readable one.
+ * @return const char* The runtime directory path, or NULL
  */
 const char *os_run_dir(bool rw);
 

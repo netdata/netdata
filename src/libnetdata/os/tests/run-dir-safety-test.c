@@ -5,7 +5,9 @@
 //
 // os_run_dir_is_safe() is exercised directly rather than through os_run_dir(),
 // which caches its answer for the process lifetime and creates directories as a
-// side effect.
+// side effect. os_run_dir() itself is called only by the last case, which is
+// about that cache, and only with NETDATA_RUN_DIR pointed inside this test's own
+// temporary tree.
 
 #include "libnetdata/libnetdata.h"
 
@@ -361,6 +363,47 @@ int main(void) {
         check("sticky parent, third account, a different uid declared", p, false);
 
         os_run_dir_set_target_uid((uid_t)-1);
+    }
+
+    // os_run_dir() caches its answer for the process lifetime, so this case runs
+    // last: it is the one that populates that cache.
+    // A read-only resolution is weaker than a writable one - it creates nothing
+    // and only asks for R_OK - so it can settle on a directory we cannot write
+    // into, and the first writable caller must re-run the detection instead of
+    // inheriting that answer. Otherwise it binds its sockets in a directory
+    // nobody checked it can write into, and fails.
+    // NETDATA_RUN_DIR is repointed between the two calls purely as the probe: a
+    // detection that really re-ran lands on the second directory, an inherited
+    // answer is still the first one. Both directories are inside this test's own
+    // tree, so nothing outside it is created or consulted.
+    fprintf(stderr, "os_run_dir() caching, read-only answer then writable request:\n");
+    {
+        char ro_leaf[FILENAME_MAX + 1], rw_leaf[FILENAME_MAX + 1];
+        make_parent(under(ro_leaf, sizeof(ro_leaf), "cached_readable"), 0500); // readable, not writable
+        make_parent(under(rw_leaf, sizeof(rw_leaf), "cached_writable"), 0755);
+
+        nd_setenv("NETDATA_RUN_DIR", ro_leaf, 1);
+        const char *ro = os_run_dir(false);
+
+        nd_setenv("NETDATA_RUN_DIR", rw_leaf, 1);
+        const char *rw = os_run_dir(true);
+
+        if(!ro || strcmp(ro, ro_leaf) != 0) {
+            fprintf(stderr, "  FAILED   %-52s got '%s'\n", "read-only resolution", ro ? ro : "(null)");
+            failures++;
+        }
+        else if(rw && strcmp(rw, rw_leaf) == 0)
+            fprintf(stderr, "  ok       %-52s (re-detected)\n", "writable request after a read-only one");
+        else {
+            fprintf(stderr, "  FAILED   %-52s got '%s' - the writable request reused the "
+                            "read-only answer\n",
+                    "writable request after a read-only one", rw ? rw : "(null)");
+            failures++;
+        }
+
+        // the earlier read-only answer stays valid, and readable again for cleanup
+        if(chmod(ro_leaf, 0755) == -1)
+            fprintf(stderr, "warning: could not chmod '%s' back\n", ro_leaf);
     }
 
     // best effort cleanup; the tree is under /tmp and named after our pid
