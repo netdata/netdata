@@ -72,7 +72,13 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
     (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
     (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
 
-    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0640);
+    /* O_EXCL: we just called shm_unlink so no legitimate segment exists.
+     * EEXIST means a squatter recreated the name in the window; evict and retry once. */
+    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0640);
+    if (ctx->shm_fd < 0 && errno == EEXIST) {
+        (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
+        ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0640);
+    }
     if (ctx->shm_fd < 0)
         return false;
     /* Mark created before any further steps; close() unlinks on any failure path. */
@@ -105,6 +111,9 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
         ctx->data = NULL;
         return false;
     }
+    /* Write publisher PID so concurrent openers see a live producer, matching
+     * pid_shm_replace_generation behavior. */
+    ctx->data->hdr.publisher_pid = (uint32_t)getpid();
     return true;
 }
 
@@ -160,7 +169,12 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
         (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
-        ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0640);
+        /* O_EXCL: we just called shm_unlink; EEXIST means a squatter; evict and retry once. */
+        ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0640);
+        if (ctx->shm_fd < 0 && errno == EEXIST) {
+            (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
+            ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0640);
+        }
         if (ctx->shm_fd < 0)
             goto fail;
         reused = false;

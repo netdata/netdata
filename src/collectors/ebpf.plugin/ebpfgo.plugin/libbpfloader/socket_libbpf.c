@@ -883,10 +883,14 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         rt->per_pid_count = (int)rt->acc_count;
         *out_count = (int)rt->acc_count;
 
-        /* Reset accumulator: deltas are per-cycle, not cumulative. */
-        rt->acc_count = 0u;
-        if (rt->acc_htable)
-            memset(rt->acc_htable, 0, (size_t)rt->acc_htable_sz * sizeof(*rt->acc_htable));
+        /* Rebuild the htable index after qsort reordered rt->acc in-place.
+         * The accumulator is NOT reset: keeping monotonically increasing per-PID
+         * totals matches the base-flavor contract that Go's UpdateSocketApps
+         * expects (it subtracts the previous snapshot to get the interval delta).
+         * Dead PIDs retain their last values and produce zero delta, which is
+         * the same behaviour as stale entries in the base-flavor BPF map. */
+        if (rt->acc_count > 1u)
+            socket_acc_htable_rebuild(rt);
 
         return rt->per_pid_entries;
     }

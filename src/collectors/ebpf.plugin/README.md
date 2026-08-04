@@ -76,9 +76,9 @@ To edit the `ebpf.d.conf`:
 
 ### `[global]` configuration options
 
-The `[global]` section defines settings for the whole eBPF collector. For `update every`, the collector follows the
-pluginsd command-line interval when Netdata provides one, and falls back to the configuration value only when no
-pluginsd interval is available.
+The `[global]` section defines settings for the whole eBPF collector. For `update every`, the configuration file value
+takes precedence when set; the pluginsd command-line interval is used only as a fallback when no configuration file
+value is present, and the built-in default is used last.
 
 #### eBPF load mode
 

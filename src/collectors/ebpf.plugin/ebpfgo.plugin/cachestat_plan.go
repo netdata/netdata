@@ -137,7 +137,6 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
-
 	kver, isRHF, err := resolveKernelAndRH()
 	if err != nil {
 		return CachestatLegacyConfig{}, err

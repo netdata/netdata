@@ -162,12 +162,6 @@ func main() {
 		if herr != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: dns load failed: %v\n", herr)
 		} else if handle != nil && handle.Runtime != nil {
-			// dns-queries is served by network-viewer.plugin on Linux via SHM;
-			// ebpf-go.plugin only writes the aggregate counters to shared memory.
-			pluginOutputMu.Lock()
-			api.HOST("")
-			pluginOutputMu.Unlock()
-
 			anyStarted = true
 
 			wg.Add(1)
