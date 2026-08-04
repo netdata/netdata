@@ -156,10 +156,10 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     /* New SHM is kernel-zero-filled; no explicit memset needed.
      * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
      * EEXIST means an attacker squatted in the window; evict and retry once. */
-    ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0600, 1);
+    ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
     if (ctx->sem == SEM_FAILED && errno == EEXIST) {
         (void)sem_unlink(ctx->sem_name);
-        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0600, 1);
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
     }
     if (ctx->sem == SEM_FAILED) {
         /* mapping is set but sem is not — next publish would write without a
@@ -248,8 +248,23 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
     /* If a crashed writer left a segment whose size differs from what this
      * run needs, unlink and re-create to get a new inode.  Consumers detect
      * the inode change on their next refresh and remap, preventing a SIGBUS
-     * from a stale larger mapping accessing pages past the shrunk file end. */
+     * from a stale larger mapping accessing pages past the shrunk file end.
+     * Exception: if the publisher_pid field is readable and the publisher is
+     * alive the segment is in-flight (pwrite completed, ftruncate pending).
+     * Evicting now would orphan the initialiser's fd; fail gracefully so the
+     * caller retries next cycle after ftruncate finishes. */
     if (reused && pre_stat.st_size != (off_t)length) {
+        if (pre_stat.st_size >= (off_t)sizeof(uint32_t)) {
+            uint32_t peek_pid = 0;
+            if (pread(ctx->shm_fd, &peek_pid, sizeof(peek_pid),
+                      (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) == (ssize_t)sizeof(peek_pid) &&
+                peek_pid > 0 &&
+                (kill((pid_t)peek_pid, 0) == 0 || errno == EPERM)) {
+                close(ctx->shm_fd);
+                ctx->shm_fd = -1;
+                goto fail;
+            }
+        }
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
         (void)shm_unlink(ctx->shm_name);
@@ -296,13 +311,13 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
      * For a reused segment the semaphore already exists and must be joined
      * with O_CREAT so all parties share the same underlying object. */
     if (!reused) {
-        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0600, 1);
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
         if (ctx->sem == SEM_FAILED && errno == EEXIST) {
             (void)sem_unlink(ctx->sem_name);
-            ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0600, 1);
+            ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
         }
     } else {
-        ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0600, 1);
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0660, 1);
     }
     if (ctx->sem == SEM_FAILED)
         goto fail;

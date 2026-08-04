@@ -1767,25 +1767,23 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
 #endif
 
 #if defined(OS_LINUX)
-        /* Accumulate eBPF per-PID socket counters from the incoming socket.
-         * Note: if the same PID owns multiple sockets that land in the same
-         * aggregation group, its counters are summed multiple times — this
-         * matches the existing SUM_THEM_ALL behaviour for tcpi_total_retrans
-         * and is intentional (we sum connections, not unique PIDs). */
-        {
+        /* Copy eBPF per-PID socket counters once per aggregation group.
+         * eBPF data is keyed by PID; accumulating on every socket would
+         * over-report when the same PID owns multiple sockets in the group. */
+        if(!t->network_viewer.ebpf_valid) {
             struct ebpf_pid_stat _ebpf_n;
             if(network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid, &_ebpf_n)) {
-                t->network_viewer.ebpf_bytes_sent         += _ebpf_n.socket.bytes_sent;
-                t->network_viewer.ebpf_bytes_received     += _ebpf_n.socket.bytes_received;
-                t->network_viewer.ebpf_call_tcp_sent      += _ebpf_n.socket.call_tcp_sent;
-                t->network_viewer.ebpf_call_tcp_received  += _ebpf_n.socket.call_tcp_received;
-                t->network_viewer.ebpf_retransmit         += _ebpf_n.socket.retransmit;
-                t->network_viewer.ebpf_call_udp_sent      += _ebpf_n.socket.call_udp_sent;
-                t->network_viewer.ebpf_call_udp_received  += _ebpf_n.socket.call_udp_received;
-                t->network_viewer.ebpf_call_close         += _ebpf_n.socket.call_close;
-                t->network_viewer.ebpf_call_tcp_v4_conn   += _ebpf_n.socket.call_tcp_v4_connection;
-                t->network_viewer.ebpf_call_tcp_v6_conn   += _ebpf_n.socket.call_tcp_v6_connection;
-                t->network_viewer.ebpf_valid               = true;
+                t->network_viewer.ebpf_bytes_sent        = _ebpf_n.socket.bytes_sent;
+                t->network_viewer.ebpf_bytes_received    = _ebpf_n.socket.bytes_received;
+                t->network_viewer.ebpf_call_tcp_sent     = _ebpf_n.socket.call_tcp_sent;
+                t->network_viewer.ebpf_call_tcp_received = _ebpf_n.socket.call_tcp_received;
+                t->network_viewer.ebpf_retransmit        = _ebpf_n.socket.retransmit;
+                t->network_viewer.ebpf_call_udp_sent     = _ebpf_n.socket.call_udp_sent;
+                t->network_viewer.ebpf_call_udp_received = _ebpf_n.socket.call_udp_received;
+                t->network_viewer.ebpf_call_close        = _ebpf_n.socket.call_close;
+                t->network_viewer.ebpf_call_tcp_v4_conn  = _ebpf_n.socket.call_tcp_v4_connection;
+                t->network_viewer.ebpf_call_tcp_v6_conn  = _ebpf_n.socket.call_tcp_v6_connection;
+                t->network_viewer.ebpf_valid              = true;
             }
         }
 #endif

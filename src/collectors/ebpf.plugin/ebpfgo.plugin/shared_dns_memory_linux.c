@@ -124,10 +124,10 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
     /* New SHM is kernel-zero-filled; no explicit memset needed.
      * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
      * EEXIST means an attacker squatted in the window; evict and retry once. */
-    ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
+    ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
     if (ctx->sem == SEM_FAILED && errno == EEXIST) {
         (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
-        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
     }
     if (ctx->sem == SEM_FAILED) {
         /* mapping is set but sem is not — next publish would write without a
@@ -186,8 +186,22 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
     }
 
     /* Same size-mismatch guard as shared_pid_memory_linux.c: unlink and
-     * re-create when a crashed writer left a segment of a different size. */
+     * re-create when a crashed writer left a segment of a different size.
+     * Same peek-before-evict: if the publisher is alive the segment is
+     * in-flight (pwrite done, ftruncate pending); fail gracefully so the
+     * caller retries next cycle. */
     if (reused && pre_stat.st_size != (off_t)length) {
+        if (pre_stat.st_size >= (off_t)sizeof(uint32_t)) {
+            uint32_t peek_pid = 0;
+            if (pread(ctx->shm_fd, &peek_pid, sizeof(peek_pid),
+                      (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) == (ssize_t)sizeof(peek_pid) &&
+                peek_pid > 0 &&
+                (kill((pid_t)peek_pid, 0) == 0 || errno == EPERM)) {
+                close(ctx->shm_fd);
+                ctx->shm_fd = -1;
+                goto fail;
+            }
+        }
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
         (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
@@ -231,13 +245,13 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
      * For a reused segment the existing semaphore must be joined with O_CREAT
      * (which opens it when already present) so all parties share one object. */
     if (!reused) {
-        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
         if (ctx->sem == SEM_FAILED && errno == EEXIST) {
             (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
-            ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
+            ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
         }
     } else {
-        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0600, 1);
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
     }
     if (ctx->sem == SEM_FAILED)
         goto fail;
