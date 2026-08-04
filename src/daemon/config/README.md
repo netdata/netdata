@@ -151,6 +151,23 @@ The multiplication of all the **enabled** tiers `dbengine tier N update every it
 | stock Health config |                 `/usr/lib/netdata/conf.d/health.d`                 | Contains the stock Alert configuration files for each collector                                                                                                                    |
 |      registry       |              `/opt/netdata/var/lib/netdata/registry`               | Contains the [registry](/src/registry/README.md) database and GUID that uniquely identifies each Netdata Agent                                                                     |
 
+**Moving a directory to another filesystem.** Either set the option above to the new
+path, or bind-mount the new location onto the old path. Both are supported.
+
+**Do not use a symbolic link.** At startup, while it still runs as `root`, the Agent
+gives these directories to the `netdata` user so that it can keep writing to them
+after it drops privileges - and it does that without following symbolic links. If you
+replace one of these directories, or a directory inside one of them, with a symbolic
+link, the Agent changes the ownership of the link itself and leaves the files behind
+it as they were. It may then be unable to write them once it is no longer `root`. It
+reports every symbolic link it skips this way.
+
+**The run directory is stricter.** A symbolic link at `NETDATA_RUN_DIR` is refused
+outright, and the Agent falls back to its next candidate and logs why. This is not
+about ownership: that directory holds the sockets the Agent creates while still
+`root`, under names that are easy to predict, so it has to be certain which directory
+those names live in.
+
 </details>
 
 <details>

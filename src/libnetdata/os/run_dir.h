@@ -42,6 +42,13 @@ void os_run_dir_set_target_uid(uid_t uid);
  * symlinked final component, a non-directory, and any directory another account
  * could have planted or could replace. Trailing slashes are trimmed internally,
  * so a caller cannot accidentally disable the symlink check by passing one.
+ *
+ * rw is the level of validation, not just an access mode. With rw the directory is
+ * about to be created, chowned and bound to while still root, so in a
+ * world-writable sticky parent (the /tmp fallback) it must also belong to us or to
+ * the declared "run as user". A read-only caller is exempt from that one
+ * requirement: it only reads or connects, and it cannot know which uid the agent
+ * runs as.
  */
 bool os_run_dir_is_safe(const char *candidate, bool rw);
 

@@ -3,6 +3,11 @@
 // netdata binds sockets in this directory and chowns it while still running as root, so
 // it must refuse anything another account could have planted or could replace.
 //
+// Two rules are checked, because os_run_dir_is_safe() serves two callers: the agent
+// itself (rw), which is about to create, chown and bind here as root, and a client
+// (read-only) that only reads or connects to what is already there. The read-only
+// rule differs in exactly one requirement - see the read-only section below.
+//
 // os_run_dir_is_safe() is exercised directly rather than through os_run_dir(),
 // which caches its answer for the process lifetime and creates directories as a
 // side effect. os_run_dir() itself is called only by the last case, which is
@@ -18,6 +23,19 @@ static char root_dir[FILENAME_MAX + 1];
 static int failures = 0;
 static int skipped = 0;
 
+static void check_mode(const char *what, const char *dir, bool rw, bool expected) {
+    bool got = os_run_dir_is_safe(dir, rw);
+    if (got == expected)
+        fprintf(stderr, "  ok       %-52s (%s)\n", what, got ? "accepted" : "refused");
+    else {
+        fprintf(stderr, "  FAILED   %-52s got %s, expected %s\n",
+                what, got ? "accepted" : "refused", expected ? "accepted" : "refused");
+        failures++;
+    }
+}
+
+// the run directory as the agent itself resolves it: the rule that has to hold
+// while we are still root
 static void check(const char *what, const char *dir, bool expected) {
     bool got = os_run_dir_is_safe(dir, true);
     if (got == expected)
@@ -176,6 +194,23 @@ int main(void) {
     snprintfz(p, sizeof(p), "%s/group_writable", exclusive);
     make_parent(p, 0775);
     check("directory writable by its group (systemd 0775 shape)", p, true);
+
+    // The read-only resolution a client performs - netdatacli looking for
+    // netdata.pipe, a plugin looking for a socket. It creates nothing and chowns
+    // nothing, so the sticky-parent ownership requirement does not apply to it: a
+    // client cannot know which uid the agent runs as (the root case is below).
+    // Everything else does apply, so it still cannot be pointed elsewhere.
+    fprintf(stderr, "read-only resolution, for a client rather than the agent:\n");
+    snprintfz(p, sizeof(p), "%s/ours", sticky);
+    check_mode("directory we own, sticky parent", p, false, true);
+    snprintfz(p, sizeof(p), "%s/to_etc", exclusive);
+    check_mode("symlink to /etc", p, false, false);
+    snprintfz(p, sizeof(p), "%s/ours", open_parent);
+    check_mode("world-writable parent without the sticky bit", p, false, false);
+    snprintfz(p, sizeof(p), "%s/other_writable", exclusive);
+    check_mode("directory writable by everyone", p, false, false);
+    snprintfz(p, sizeof(p), "%s/afile", exclusive);
+    check_mode("a regular file, not a directory", p, false, false);
 
     fprintf(stderr, "privileged open, symlink at the final component:\n");
     {
@@ -337,9 +372,9 @@ int main(void) {
 
     fprintf(stderr, "cases that need root:\n");
     if (geteuid() != 0) {
-        fprintf(stderr, "  SKIPPED  third-account ownership and the restart case"
-                        " (re-run as root to cover them)\n");
-        skipped += 2;
+        fprintf(stderr, "  SKIPPED  third-account ownership, the restart case, and the"
+                        " read-only client case (re-run as root to cover them)\n");
+        skipped += 4;
     }
     else {
         snprintfz(p, sizeof(p), "%s/foreign", sticky);
@@ -366,6 +401,11 @@ int main(void) {
         check("sticky parent, third account, a different uid declared", p, false);
 
         os_run_dir_set_target_uid((uid_t)-1);
+
+        // The netdatacli case: root asking where an agent that runs as another uid
+        // keeps its socket. The agent's own rule refuses this directory, and a
+        // client asked to obey it could not reach such an agent at all.
+        check_mode("read-only, sticky parent, a third account's directory", p, false, true);
     }
 
     // os_run_dir() caches its answer for the process lifetime, so this case runs
