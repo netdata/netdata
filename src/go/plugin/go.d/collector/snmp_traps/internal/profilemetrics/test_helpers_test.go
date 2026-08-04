@@ -138,23 +138,26 @@ func cloneTestMetricRule(src *catalog.MetricRule) *catalog.MetricRule {
 		return nil
 	}
 	dst := *src
+	if src.Enabled != nil {
+		enabled := *src.Enabled
+		dst.Enabled = &enabled
+	}
 	if src.Identity.Resource != nil {
 		resource := *src.Identity.Resource
 		dst.Identity.Resource = &resource
 	}
 	if src.Where != nil {
-		dst.Where = append(catalog.MetricPredicates(nil), src.Where...)
-		for i := range dst.Where {
-			dst.Where[i].In = append([]any(nil), src.Where[i].In...)
-			dst.Where[i].Range = append([]any(nil), src.Where[i].Range...)
+		dst.Where = make(catalog.MetricPredicates, len(src.Where))
+		for i := range src.Where {
+			dst.Where[i] = cloneTestMetricPredicate(src.Where[i])
 		}
 	}
 	if src.State.SetWhen != nil {
-		pred := *src.State.SetWhen
+		pred := cloneTestMetricPredicate(*src.State.SetWhen)
 		dst.State.SetWhen = &pred
 	}
 	if src.State.ClearWhen != nil {
-		pred := *src.State.ClearWhen
+		pred := cloneTestMetricPredicate(*src.State.ClearWhen)
 		dst.State.ClearWhen = &pred
 	}
 	if src.State.ProblemValue != nil {
@@ -164,6 +167,56 @@ func cloneTestMetricRule(src *catalog.MetricRule) *catalog.MetricRule {
 	return &dst
 }
 
+func cloneTestMetricPredicate(src catalog.MetricPredicate) catalog.MetricPredicate {
+	dst := src
+	dst.Equals = cloneTestCatalogValue(src.Equals)
+	dst.In = cloneTestCatalogValues(src.In)
+	dst.GreaterThan = cloneTestCatalogValue(src.GreaterThan)
+	dst.LessThan = cloneTestCatalogValue(src.LessThan)
+	dst.Range = cloneTestCatalogValues(src.Range)
+	if src.Exists != nil {
+		exists := *src.Exists
+		dst.Exists = &exists
+	}
+	if src.Absent != nil {
+		absent := *src.Absent
+		dst.Absent = &absent
+	}
+	return dst
+}
+
+func cloneTestCatalogValues(src []any) []any {
+	if src == nil {
+		return nil
+	}
+	dst := make([]any, len(src))
+	for i := range src {
+		dst[i] = cloneTestCatalogValue(src[i])
+	}
+	return dst
+}
+
+func cloneTestCatalogValue(src any) any {
+	switch value := src.(type) {
+	case []any:
+		return cloneTestCatalogValues(value)
+	case map[any]any:
+		dst := make(map[any]any, len(value))
+		for key, item := range value {
+			dst[cloneTestCatalogValue(key)] = cloneTestCatalogValue(item)
+		}
+		return dst
+	case map[string]any:
+		dst := make(map[string]any, len(value))
+		for key, item := range value {
+			dst[key] = cloneTestCatalogValue(item)
+		}
+		return dst
+	default:
+		return src
+	}
+}
+
 func cloneTestMetricChart(src *catalog.MetricChart) *catalog.MetricChart {
 	if src == nil {
 		return nil
@@ -171,6 +224,10 @@ func cloneTestMetricChart(src *catalog.MetricChart) *catalog.MetricChart {
 	dst := *src
 	if src.Lifecycle != nil {
 		lifecycle := *src.Lifecycle
+		if src.Lifecycle.Dimensions != nil {
+			dimensions := *src.Lifecycle.Dimensions
+			lifecycle.Dimensions = &dimensions
+		}
 		dst.Lifecycle = &lifecycle
 	}
 	return &dst
@@ -181,7 +238,7 @@ func cloneTestTrapDef(src *catalog.TrapDef) *catalog.TrapDef {
 		return nil
 	}
 	dst := *src
-	dst.VarbindRefs = append([]any(nil), src.VarbindRefs...)
+	dst.VarbindRefs = cloneTestCatalogValues(src.VarbindRefs)
 	dst.DedupKeyVarbinds = append([]string(nil), src.DedupKeyVarbinds...)
 	if src.Labels != nil {
 		dst.Labels = make(map[string]string, len(src.Labels))

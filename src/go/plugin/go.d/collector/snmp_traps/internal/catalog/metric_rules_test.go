@@ -223,6 +223,37 @@ func TestValidateProfileDefinitionUniquenessRejectsDuplicateMetricDefinitions(t 
 	}
 }
 
+func TestParseProfileBundleRunsMetricDefinitionUniquenessValidation(t *testing.T) {
+	tests := map[string]struct {
+		profile string
+		want    string
+	}{
+		"rule name": {
+			profile: `
+metrics:
+  - name: duplicate.rule
+  - name: duplicate.rule
+`,
+			want: "duplicate metric rule duplicate.rule in profile",
+		},
+		"chart ID": {
+			profile: `
+charts:
+  - id: duplicate_chart
+  - id: duplicate_chart
+`,
+			want: "duplicate metric chart duplicate_chart in profile",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := parseProfileBundle("test-profile.yaml", []byte(tc.profile))
+			require.ErrorContains(t, err, tc.want)
+		})
+	}
+}
+
 func TestNormalizeProfileMetricDefinitionsAppliesAllDefaults(t *testing.T) {
 	rule := profileMetricRule{Name: "test.sample", Type: " SAMPLE "}
 	require.NoError(t, normalizeProfileMetricRule(&rule))
