@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProfileMetricTestCatalogSemanticsMatchProduction(t *testing.T) {
+func TestProfileMetricTestProfileBuilderUsesProductionCatalog(t *testing.T) {
 	trap := func(oid, name string) *testTrapDef {
 		return &testTrapDef{
 			OID:      oid,
@@ -19,50 +19,76 @@ func TestProfileMetricTestCatalogSemanticsMatchProduction(t *testing.T) {
 		}
 	}
 
+	t.Run("stock resolution before mutation", func(t *testing.T) {
+		idx := newTestProfileBuilder(t).Build()
+		resolved, err := idx.ResolveTrap("IF-MIB::linkDown")
+		require.NoError(t, err)
+		require.Equal(t, testLinkDownTrapOID, resolved.OID)
+	})
+
 	t.Run("duplicate OID", func(t *testing.T) {
-		idx := newTestCatalog(t)
+		idx := newTestProfileBuilder(t)
 		require.NoError(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.1", "TEST-MIB::first")}))
 		require.Error(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.1", "TEST-MIB::second")}))
 	})
 
 	t.Run("duplicate name", func(t *testing.T) {
-		idx := newTestCatalog(t)
+		idx := newTestProfileBuilder(t)
 		require.NoError(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.1", "TEST-MIB::same")}))
 		require.Error(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.2", "TEST-MIB::same")}))
 	})
 
 	t.Run("alternate OID", func(t *testing.T) {
-		idx := newTestCatalog(t)
+		idx := newTestProfileBuilder(t)
 		require.NoError(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.0.1", "TEST-MIB::first")}))
 		require.Error(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.1", "TEST-MIB::second")}))
 	})
 
 	t.Run("failed batch is atomic", func(t *testing.T) {
-		idx := newTestCatalog(t)
+		idx := newTestProfileBuilder(t)
 		existing := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::existing")
 		require.NoError(t, idx.addTraps([]*testTrapDef{existing}))
 		candidate := trap("1.3.6.1.4.1.99999.2", "TEST-MIB::candidate")
 		require.Error(t, idx.addTraps([]*testTrapDef{candidate, nil}))
-		resolved, err := idx.ResolveTrap(existing.OID)
+		built := idx.Build()
+		resolved, err := built.ResolveTrap(existing.OID)
 		require.NoError(t, err)
 		require.Equal(t, existing.OID, resolved.OID)
-		_, err = idx.ResolveTrap(candidate.OID)
+		_, err = built.ResolveTrap(candidate.OID)
 		require.Error(t, err)
 	})
 
+	t.Run("build returns an immutable snapshot", func(t *testing.T) {
+		profile := newTestProfileBuilder(t)
+		first := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::first")
+		require.NoError(t, profile.addTraps([]*testTrapDef{first}))
+		firstEpoch := profile.Build()
+
+		second := trap("1.3.6.1.4.1.99999.2", "TEST-MIB::second")
+		require.NoError(t, profile.addTraps([]*testTrapDef{second}))
+		secondEpoch := profile.Build()
+
+		_, err := firstEpoch.ResolveTrap(second.OID)
+		require.Error(t, err)
+		resolved, err := secondEpoch.ResolveTrap(second.OID)
+		require.NoError(t, err)
+		require.Equal(t, second.OID, resolved.OID)
+	})
+
 	t.Run("references are trimmed", func(t *testing.T) {
-		idx := newTestCatalog(t)
+		idx := newTestProfileBuilder(t)
 		candidate := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")
 		require.NoError(t, idx.addTraps([]*testTrapDef{candidate}))
+		built := idx.Build()
 		for _, ref := range []string{" 1.3.6.1.4.1.99999.1 ", " TEST-MIB::candidate "} {
-			resolved, err := idx.ResolveTrap(ref)
+			resolved, err := built.ResolveTrap(ref)
 			require.NoError(t, err)
 			require.Equal(t, candidate.OID, resolved.OID)
 		}
 	})
 
 	t.Run("duplicate metric definitions", func(t *testing.T) {
-		idx := newTestCatalog(t)
+		idx := newTestProfileBuilder(t)
 		require.NoError(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")}))
 		chart := profileMetricChartForTest("test_events", "Test events", "snmp.trap.test.events", "events/s", "incremental")
 		rule := profileMetricRule{
@@ -77,7 +103,7 @@ func TestProfileMetricTestCatalogSemanticsMatchProduction(t *testing.T) {
 	})
 
 	t.Run("metric definitions are normalized", func(t *testing.T) {
-		idx := newTestCatalog(t)
+		idx := newTestProfileBuilder(t)
 		require.NoError(t, idx.addTraps([]*testTrapDef{trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")}))
 		chart := profileMetricChartForTest("test_events", "Test events", "snmp.trap.test.events", "events/s", "")
 		rule := profileMetricRule{
@@ -87,7 +113,7 @@ func TestProfileMetricTestCatalogSemanticsMatchProduction(t *testing.T) {
 			Output: profileMetricOutputForTest("snmp_trap_test_events", "events", chart.ID),
 		}
 		require.NoError(t, idx.addDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}))
-		defs, err := idx.Definitions([]string{rule.Name})
+		defs, err := idx.Build().Definitions([]string{rule.Name})
 		require.NoError(t, err)
 		gotRule := requireRule(t, defs, rule.Name)
 		require.Equal(t, profileMetricTypeCounter, gotRule.Type)

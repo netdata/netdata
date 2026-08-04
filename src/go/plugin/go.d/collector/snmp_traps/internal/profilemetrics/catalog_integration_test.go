@@ -61,7 +61,7 @@ metrics:
 	require.NoError(t, err)
 	assert.Empty(t, defs.RulesByName)
 
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, testRuntimeConfig{
+	rt := newTestProfileMetricRuntimeFromCatalogWithConfig(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"stock.cold_start"},
 	})
@@ -111,7 +111,7 @@ metrics:
 	require.NoError(t, err)
 	t.Cleanup(lease.Close)
 	idx := lease.Epoch()
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, testRuntimeConfig{
+	rt := newTestProfileMetricRuntimeFromCatalogWithConfig(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"site.cold_start"},
 	})

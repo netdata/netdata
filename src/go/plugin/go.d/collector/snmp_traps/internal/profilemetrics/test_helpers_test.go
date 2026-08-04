@@ -27,13 +27,12 @@ type testRuntimeConfig struct {
 	Include []string
 }
 
-// testCatalog is a mutable fixture builder whose Catalog methods always load
-// the complete profile through the production catalog owner.
-type testCatalog struct {
+// testProfileBuilder assembles source-profile data. Build is the only path
+// from mutable fixture data to a live catalog.
+type testProfileBuilder struct {
 	tb     testing.TB
 	paths  catalog.Paths
 	traps  []*catalog.TrapDef
-	lease  *catalog.Lease
 	rules  []catalog.MetricRule
 	charts []catalog.MetricChart
 }
@@ -67,68 +66,46 @@ const (
 	profileMetricMissingError            = catalog.MetricMissingError
 )
 
-func newTestCatalog(t testing.TB) *testCatalog {
+func newTestProfileBuilder(t testing.TB) *testProfileBuilder {
 	t.Helper()
-	idx := &testCatalog{
+	return &testProfileBuilder{
 		tb:    t,
 		paths: profiletest.CatalogPaths(t),
 	}
-	t.Cleanup(func() {
-		if idx.lease != nil {
-			idx.lease.Close()
-		}
-	})
-	return idx
 }
 
-func (idx *testCatalog) addTraps(traps []*testTrapDef) error {
-	candidate := append(append([]*catalog.TrapDef(nil), idx.traps...), traps...)
-	lease, err := loadTestCatalogEpoch(idx.tb, idx.paths, candidate, idx.rules, idx.charts)
+func (b *testProfileBuilder) addTraps(traps []*testTrapDef) error {
+	candidate := append(append([]*catalog.TrapDef(nil), b.traps...), traps...)
+	lease, err := loadTestCatalogEpoch(b.tb, b.paths, candidate, b.rules, b.charts)
 	if err != nil {
 		return err
 	}
-	if idx.lease != nil {
-		idx.lease.Close()
-	}
-	idx.traps = candidate
-	idx.lease = lease
+	lease.Close()
+	b.traps = candidate
 	return nil
 }
 
-func (idx *testCatalog) addDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) error {
-	candidateRules := append(append([]catalog.MetricRule(nil), idx.rules...), rules...)
-	candidateCharts := append(append([]catalog.MetricChart(nil), idx.charts...), charts...)
-	lease, err := loadTestCatalogEpoch(idx.tb, idx.paths, idx.traps, candidateRules, candidateCharts)
+func (b *testProfileBuilder) addDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) error {
+	candidateRules := append(append([]catalog.MetricRule(nil), b.rules...), rules...)
+	candidateCharts := append(append([]catalog.MetricChart(nil), b.charts...), charts...)
+	lease, err := loadTestCatalogEpoch(b.tb, b.paths, b.traps, candidateRules, candidateCharts)
 	if err != nil {
 		return err
 	}
-	idx.replaceLease(lease)
-	idx.rules = candidateRules
-	idx.charts = candidateCharts
+	lease.Close()
+	b.rules = candidateRules
+	b.charts = candidateCharts
 	return nil
 }
 
-func (idx *testCatalog) Definitions(names []string) (catalog.MetricDefinitions, error) {
-	lease, err := loadTestCatalogEpoch(idx.tb, idx.paths, idx.traps, idx.rules, idx.charts)
+func (b *testProfileBuilder) Build() *catalog.Epoch {
+	b.tb.Helper()
+	lease, err := loadTestCatalogEpoch(b.tb, b.paths, b.traps, b.rules, b.charts)
 	if err != nil {
-		return catalog.MetricDefinitions{}, err
+		b.tb.Fatalf("build test profile catalog: %v", err)
 	}
-	idx.replaceLease(lease)
-	return lease.Epoch().Definitions(names)
-}
-
-func (idx *testCatalog) ResolveTrap(ref string) (*testTrapDef, error) {
-	if idx.lease == nil {
-		return nil, fmt.Errorf("trap %q not found", ref)
-	}
-	return idx.lease.Epoch().ResolveTrap(ref)
-}
-
-func (idx *testCatalog) replaceLease(lease *catalog.Lease) {
-	if idx.lease != nil {
-		idx.lease.Close()
-	}
-	idx.lease = lease
+	b.tb.Cleanup(lease.Close)
+	return lease.Epoch()
 }
 
 func loadTestCatalogEpoch(
@@ -235,9 +212,9 @@ func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.Cyc
 	return ms
 }
 
-func newPopulatedTestCatalog(t *testing.T) *testCatalog {
+func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 	t.Helper()
-	idx := newTestCatalog(t)
+	idx := newTestProfileBuilder(t)
 	traps := []*testTrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
@@ -367,20 +344,40 @@ func newPopulatedTestCatalog(t *testing.T) *testCatalog {
 	return idx
 }
 
-func newTestProfileMetricRuntime(t *testing.T, idx Catalog, include []string) *Runtime {
+func newTestProfileMetricRuntime(t *testing.T, profile *testProfileBuilder, include []string) *Runtime {
 	t.Helper()
-	return newTestProfileMetricRuntimeWithConfig(t, idx, testRuntimeConfig{
+	return newTestProfileMetricRuntimeWithConfig(t, profile, testRuntimeConfig{
 		Enabled: true,
 		Include: include,
 	})
 }
 
-func newTestProfileMetricRuntimeWithConfig(t *testing.T, idx Catalog, cfg testRuntimeConfig) *Runtime {
+func newTestProfileMetricRuntimeWithConfig(t *testing.T, profile *testProfileBuilder, cfg testRuntimeConfig) *Runtime {
 	t.Helper()
-	return newTestProfileMetricRuntimeWithPolicy(t, idx, cfg, nil)
+	return newTestProfileMetricRuntimeWithPolicy(t, profile, cfg, nil)
 }
 
-func newTestProfileMetricRuntimeWithPolicy(t *testing.T, idx Catalog, cfg testRuntimeConfig, configure func(*Policy)) *Runtime {
+func newTestProfileMetricRuntimeWithPolicy(
+	t *testing.T,
+	profile *testProfileBuilder,
+	cfg testRuntimeConfig,
+	configure func(*Policy),
+) *Runtime {
+	t.Helper()
+	return newTestProfileMetricRuntimeFromCatalog(t, profile.Build(), cfg, configure)
+}
+
+func newTestProfileMetricRuntimeFromCatalogWithConfig(t *testing.T, idx Catalog, cfg testRuntimeConfig) *Runtime {
+	t.Helper()
+	return newTestProfileMetricRuntimeFromCatalog(t, idx, cfg, nil)
+}
+
+func newTestProfileMetricRuntimeFromCatalog(
+	t *testing.T,
+	idx Catalog,
+	cfg testRuntimeConfig,
+	configure func(*Policy),
+) *Runtime {
 	t.Helper()
 	normalized, err := normalizeTestRuntimeConfig(cfg)
 	if err != nil {
@@ -484,7 +481,7 @@ func assertProfileMetricOverflow(t *testing.T, store metrix.CollectorStore, want
 	assertProfileMetricValue(t, store, "snmp_trap_profile_metrics_overflow_dropped", profileMetricJobLabels(), want)
 }
 
-func sourceRuntimeWithLimits(t *testing.T, idx Catalog, limits profileMetricLimitsPolicy) *Runtime {
+func sourceRuntimeWithLimits(t *testing.T, idx *testProfileBuilder, limits profileMetricLimitsPolicy) *Runtime {
 	t.Helper()
 	return newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
@@ -517,25 +514,25 @@ func profileMetricChartForTest(id, title, context, units, algorithm string) prof
 	}
 }
 
-func addProfileMetricRuleWithChart(t *testing.T, idx *testCatalog, rule profileMetricRule, chart profileMetricChart) {
+func addProfileMetricRuleWithChart(t *testing.T, idx *testProfileBuilder, rule profileMetricRule, chart profileMetricChart) {
 	t.Helper()
 	if err := idx.addDefinitions([]profileMetricRule{rule}, []profileMetricChart{chart}); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 }
 
-func profileMetricCatalogForTest(t *testing.T, idx *testCatalog) profileMetricCatalog {
+func profileMetricCatalogForTest(t *testing.T, idx *testProfileBuilder) profileMetricCatalog {
 	t.Helper()
 	names := make([]string, 0, len(idx.rules))
 	for i := range idx.rules {
 		names = append(names, idx.rules[i].Name)
 	}
-	defs, err := idx.Definitions(names)
+	defs, err := idx.Build().Definitions(names)
 	require.NoError(t, err)
 	return profileMetricCatalog{rulesByName: defs.RulesByName, chartsByID: defs.ChartsByID}
 }
 
-func profileMetricChartFromIndex(t *testing.T, idx *testCatalog, id string) *profileMetricChart {
+func profileMetricChartFromIndex(t *testing.T, idx *testProfileBuilder, id string) *profileMetricChart {
 	t.Helper()
 	for i := range idx.charts {
 		if idx.charts[i].ID == id {

@@ -34,7 +34,7 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 		MaxResourcesPerSource: 32,
 		MaxInstancesPerJob:    4096,
 	}
-	rt, _, err := newTestRuntime(cfg, idx, "benchmark")
+	rt, _, err := newTestRuntime(cfg, idx.Build(), "benchmark")
 	if err != nil {
 		b.Fatalf("newTestRuntime: %v", err)
 	}
@@ -92,9 +92,9 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 	}
 }
 
-func benchmarkProfileMetricIndex(b testing.TB) *testCatalog {
+func benchmarkProfileMetricIndex(b testing.TB) *testProfileBuilder {
 	b.Helper()
-	idx := newTestCatalog(b)
+	idx := newTestProfileBuilder(b)
 	traps := []*testTrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,

@@ -9,7 +9,7 @@ import (
 )
 
 func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.console",
 		Type:   profileMetricTypeCounter,
@@ -42,7 +42,7 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 }
 
 func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.synthetic_fields",
 		Type:   profileMetricTypeCounter,
@@ -80,7 +80,7 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 }
 
 func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{
 		{
 			Name:   "cisco.config.rich_predicates",
@@ -147,7 +147,7 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 }
 
 func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{
 		{
 			Name:   "cisco.config.exists_false",
@@ -233,7 +233,7 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.finite_range",
 		Type:   profileMetricTypeCounter,

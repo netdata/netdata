@@ -11,7 +11,7 @@ import (
 )
 
 func TestProfileMetricSelection(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	require.NoError(t, idx.addDefinitions([]profileMetricRule{{
 		Name:       "disabled.rule",
 		Type:       profileMetricTypeCounter,
@@ -72,7 +72,7 @@ func TestProfileMetricSelection(t *testing.T) {
 }
 
 func TestProfileMetricSelectionRejectsMoreThanMaxRules(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	cat := profileMetricCatalogForTest(t, idx)
 	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
@@ -103,7 +103,7 @@ func TestNewProfileMetricRuntimeRejectsNilProfileIndex(t *testing.T) {
 }
 
 func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	err := idx.addDefinitions([]profileMetricRule{{
 		Name:   "cisco.config.duplicate_dimension",
 		Type:   profileMetricTypeCounter,
@@ -125,7 +125,7 @@ func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 	}
-	_, _, err = newTestRuntime(cfg, idx, "test")
+	_, _, err = newTestRuntime(cfg, idx.Build(), "test")
 	if err == nil ||
 		!strings.Contains(err.Error(), "reuses output.dimension") ||
 		!strings.Contains(err.Error(), "cisco.config.changed") {

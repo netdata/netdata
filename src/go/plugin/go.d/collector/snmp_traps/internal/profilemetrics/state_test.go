@@ -10,7 +10,7 @@ import (
 )
 
 func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	addProfileMetricRuleWithChart(
 		t,
 		idx,
@@ -49,7 +49,7 @@ func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	addProfileMetricRuleWithChart(
 		t,
 		idx,
@@ -105,7 +105,7 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addTraps([]*testTrapDef{
 		{OID: testLinkUpTrapOID, Name: "IF-MIB::linkUp", Category: "state_change", Severity: "notice", SourceFile: "test-profile.yaml"},
 	}); err != nil {
@@ -162,7 +162,7 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 }
 
 func TestProfileMetricRuntimeStateTTLClearsAndExpires(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	addProfileMetricRuleWithChart(
 		t,
 		idx,

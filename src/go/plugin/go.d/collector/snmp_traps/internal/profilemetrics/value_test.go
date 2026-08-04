@@ -10,7 +10,7 @@ import (
 )
 
 func TestProfileMetricRuntimeIncludedCounterBySource(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -27,7 +27,7 @@ func TestProfileMetricRuntimeIncludedCounterBySource(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -43,7 +43,7 @@ func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.console_terminal_type",
 		Type:             profileMetricTypeSample,
@@ -83,7 +83,7 @@ func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	profileMetricChartFromIndex(t, idx, "cisco_terminal_type").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 3}
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")
@@ -104,7 +104,7 @@ func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *test
 }
 
 func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.terminal_type_scaled",
 		Type:             profileMetricTypeSample,
@@ -143,7 +143,7 @@ func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{{
 		Name:             "cisco.config.sysuptime_seconds",
 		Type:             profileMetricTypeSample,
@@ -183,7 +183,7 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
-	idx := newPopulatedTestCatalog(t)
+	idx := newPopulatedTestProfile(t)
 	if err := idx.addDefinitions([]profileMetricRule{
 		{
 			Name:             "cisco.config.terminal_type_missing_drop",
