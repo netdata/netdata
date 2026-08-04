@@ -72,7 +72,7 @@ function(netdata_version)
   elseif(version_type STREQUAL "release-candidate")
     set(NETDATA_PACKAGE_VERSION ${version_major}.${version_minor}.${version_patch}~rc${version_tweak} PARENT_SCOPE)
   else()
-    set(NETDATA_PACKAGE_VERSION ${version_major}.${version_minor}.${version_patch}-${version_tweak}-${version_descr} PARENT_SCOPE)
+    set(NETDATA_PACKAGE_VERSION ${version_major}.${version_minor}.${version_patch}-${version_tweak}.${version_descr} PARENT_SCOPE)
   endif()
 
   set(NETDATA_VERSION_MAJOR "${version_major}" PARENT_SCOPE)
