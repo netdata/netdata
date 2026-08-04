@@ -268,9 +268,12 @@ int main(void) {
         bool route_usable = (stat(probe, &via_proc) == 0 && fstat(dfd, &via_fd) == 0 &&
                              via_proc.st_dev == via_fd.st_dev && via_proc.st_ino == via_fd.st_ino);
 
-        // the swap, exactly as a run-dir owner could perform it
+        // The swap, exactly as a run-dir owner could perform it. Replacing a path
+        // that was just examined is a TOCTOU race by construction - here it is the
+        // fixture, not a defect: the race is precisely what the descriptor route
+        // below has to survive.
         if (rename(rundir, moved) == -1) fatal("test setup: rename '%s'", rundir);
-        if (symlink(attacker, rundir) == -1) fatal("test setup: symlink '%s'", rundir);
+        if (symlink(attacker, rundir) == -1) fatal("test setup: symlink '%s'", rundir); // NOSONAR
 
         struct sockaddr_un addr = { .sun_family = AF_UNIX };
         snprintfz(addr.sun_path, sizeof(addr.sun_path) - 1, "/proc/self/fd/%d/s.sock", dfd);
@@ -388,21 +391,34 @@ int main(void) {
         nd_setenv("NETDATA_RUN_DIR", rw_leaf, 1);
         const char *rw = os_run_dir(true);
 
+        const char *what = "writable request after a read-only one";
+
         if(!ro || strcmp(ro, ro_leaf) != 0) {
             fprintf(stderr, "  FAILED   %-52s got '%s'\n", "read-only resolution", ro ? ro : "(null)");
             failures++;
         }
         else if(rw && strcmp(rw, rw_leaf) == 0)
-            fprintf(stderr, "  ok       %-52s (re-detected)\n", "writable request after a read-only one");
-        else {
+            fprintf(stderr, "  ok       %-52s (re-detected)\n", what);
+        else if(!rw) {
+            // it re-detected, but found nothing: the failure is in the detection,
+            // not in the cache
+            fprintf(stderr, "  FAILED   %-52s returned NULL for a writable directory "
+                            "that exists\n", what);
+            failures++;
+        }
+        else if(strcmp(rw, ro_leaf) == 0) {
             fprintf(stderr, "  FAILED   %-52s got '%s' - the writable request reused the "
-                            "read-only answer\n",
-                    "writable request after a read-only one", rw ? rw : "(null)");
+                            "read-only answer\n", what, rw);
+            failures++;
+        }
+        else {
+            fprintf(stderr, "  FAILED   %-52s got '%s', expected '%s'\n", what, rw, rw_leaf);
             failures++;
         }
 
-        // the earlier read-only answer stays valid, and readable again for cleanup
-        if(chmod(ro_leaf, 0755) == -1)
+        // the earlier read-only answer stays valid, and writable again so the
+        // cleanup below can remove it. Only for us: nothing here is shared.
+        if(chmod(ro_leaf, 0700) == -1)
             fprintf(stderr, "warning: could not chmod '%s' back\n", ro_leaf);
     }
 
