@@ -209,6 +209,44 @@ static inline bool pluginsd_update_host_ephemerality(RRDHOST *host) {
 
 #define VNODE_BASE_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
 
+// A host has exactly one writer. For a vnode that writer is the local collector that defines it.
+//
+// RRDHOST_OPTION_VIRTUAL_HOST makes the streaming handshake reject incoming connections for this
+// machine GUID (stream_receiver_accept_connection(), STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL), but it
+// does not evict a receiver that is already attached: while the vnode was stale the option was
+// cleared, so a peer that also collects this device may have streamed it back to us in the meantime.
+//
+// Callers MUST set RRDHOST_OPTION_VIRTUAL_HOST before calling this (so no new receiver can attach
+// behind our back) and MUST NOT write to the host when this returns false.
+static bool pluginsd_host_claim_as_local_vnode(RRDHOST *host, const char *keyword) {
+    // stream_receiver_signal_to_stop_and_wait() also returns true when no receiver is attached,
+    // so we check first: that is the only way to tell "nothing to do" (the common case, silent)
+    // from "we disconnected someone" (rare, and the only diagnostic for a GUID conflict).
+    rrdhost_receiver_lock(host);
+    bool has_receiver = host->receiver != NULL;
+    rrdhost_receiver_unlock(host);
+
+    if(!has_receiver)
+        return true;
+
+    // the peer identity is logged by the receiver itself, with this disconnect reason
+    if(!stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_RCV_DISCONNECT_LOCAL_VNODE_CLAIMED)) {
+        nd_log_daemon(NDLP_ERR,
+                      "PLUGINSD: %s: host '%s' (machine guid %s) is collected locally as a vnode, but its "
+                      "streaming receiver could not be stopped - not collecting into it",
+                      keyword, rrdhost_hostname(host), host->machine_guid);
+        return false;
+    }
+
+    nd_log_daemon(NDLP_WARNING,
+                  "PLUGINSD: %s: host '%s' (machine guid %s) was receiving a stream while it is collected "
+                  "locally as a vnode - the stream has been disconnected. If this is a real child node, "
+                  "its machine guid conflicts with the guid of a locally collected vnode.",
+                  keyword, rrdhost_hostname(host), host->machine_guid);
+
+    return true;
+}
+
 static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     if(!parser->user.host_define.parsing_host)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
@@ -250,6 +288,17 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     }
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+
+    // the option above closes the door to new receivers; this evicts one that is already inside.
+    // on failure the option is left set, so no new receiver can attach until this plugin is torn
+    // down; the teardown clears it for every vnode it tracks, which is correct - by then we are
+    // no longer collecting, so a peer streaming this host to us is welcome.
+    if(!pluginsd_host_claim_as_local_vnode(host, PLUGINSD_KEYWORD_HOST_DEFINE_END)) {
+        pluginsd_host_define_cleanup(parser);
+        parser->user.retry = true;
+        return PARSER_RC_ERROR;
+    }
+
     rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
     object_state_activate_if_not_activated(&host->state_id);
     ml_host_start(host);
@@ -355,6 +404,17 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         // Check if we need to enable
         if (!rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
             rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+
+            // while this vnode was stale, a peer collecting the same device may have started
+            // streaming it to us - we must be its only writer before we collect into it again.
+            // on failure we retry the plugin: routing this data into a host we do not exclusively
+            // own would corrupt it, and routing it to localhost would misattribute it.
+            if(!pluginsd_host_claim_as_local_vnode(host, PLUGINSD_KEYWORD_HOST)) {
+                parser->user.host = NULL;
+                parser->user.retry = true;
+                return PARSER_RC_ERROR;
+            }
+
             rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
             nd_log_daemon(NDLP_INFO, "VNODE: Re-enabling virtual host \"%s\"", rrdhost_hostname(host));
             schedule_node_state_update(host, 1000);
