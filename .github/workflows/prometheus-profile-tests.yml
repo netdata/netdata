@@ -14,68 +14,64 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: prometheus-profile-tests-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
-  file-check:
-    name: Check Modified Files
-    runs-on: ubuntu-latest
-    outputs:
-      run: ${{ steps.check-run.outputs.run }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Check files
-        id: check-files
-        uses: step-security/changed-files@v45
-        with:
-          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
-          files: |
-            .github/workflows/prometheus-profile-tests.yml
-            .gitattributes
-            .agents/skills/project-prometheus-profiles/**
-            src/go/**
-
-      - name: Check run
-        id: check-run
-        env:
-          ANY_MODIFIED: ${{ steps.check-files.outputs.any_modified }}
-        run: |
-          if [[ "${ANY_MODIFIED}" == 'true' ]]; then
-            echo 'run=true' >> "${GITHUB_OUTPUT}"
-          else
-            echo 'run=false' >> "${GITHUB_OUTPUT}"
-          fi
-
   proof-tests:
-    needs: file-check
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Check modified files
+        id: check-files
+        uses: actions/github-script@v9
+        with:
+          result-encoding: string
+          retries: 3
+          script: |
+            if (context.eventName !== 'pull_request') {
+              return 'true';
+            }
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100,
+            });
+            if (files.length < context.payload.pull_request.changed_files) {
+              return 'true';
+            }
+            const relevant = (path) =>
+              path === '.github/workflows/prometheus-profile-tests.yml' ||
+              path === '.gitattributes' ||
+              path.startsWith('.agents/skills/project-prometheus-profiles/') ||
+              path.startsWith('src/go/');
+            return files.some((file) =>
+              relevant(file.filename) ||
+              (file.previous_filename && relevant(file.previous_filename))
+            ) ? 'true' : 'false';
+
       - name: Skip check
-        if: needs.file-check.outputs.run != 'true'
+        if: steps.check-files.outputs.result != 'true'
         run: echo 'No Prometheus profile proof dependencies changed.'
 
       - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
+        if: steps.check-files.outputs.result == 'true'
         uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Install Go
-        if: needs.file-check.outputs.run == 'true'
+        if: steps.check-files.outputs.result == 'true'
         uses: actions/setup-go@v7
         with:
           go-version-file: src/go/go.mod
 
       - name: Clone latest testdata master
-        if: needs.file-check.outputs.run == 'true'
+        if: steps.check-files.outputs.result == 'true'
         shell: bash
         run: |
           set -euxo pipefail
@@ -101,7 +97,7 @@ jobs:
           git -C src/go/testdata sparse-checkout set "${evidence_dirs[@]}"
 
       - name: Verify external evidence integrity
-        if: needs.file-check.outputs.run == 'true'
+        if: steps.check-files.outputs.result == 'true'
         env:
           NETDATA_PROMETHEUS_TESTDATA_REQUIRED: '1'
         run: |
@@ -110,11 +106,11 @@ jobs:
             ./plugin/go.d/collector/prometheus/promprofiles
 
       - name: Verify authoring launcher
-        if: needs.file-check.outputs.run == 'true'
+        if: steps.check-files.outputs.result == 'true'
         run: python3 .agents/skills/project-prometheus-profiles/scripts/test_validate_profile.py
 
       - name: Verify Prometheus profile proofs
-        if: needs.file-check.outputs.run == 'true'
+        if: steps.check-files.outputs.result == 'true'
         env:
           NETDATA_PROMETHEUS_TESTDATA_REQUIRED: '1'
         run: |
