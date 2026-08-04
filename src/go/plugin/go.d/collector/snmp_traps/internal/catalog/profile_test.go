@@ -1040,7 +1040,6 @@ traps:
 	idx := lease.Epoch()
 	assert.Nil(t, idx.Lookup("1.3.6.1.4.1.99998.6"))
 	require.NotNil(t, idx.Lookup("1.3.6.1.4.1.99998.7"))
-	require.Equal(t, []ProfileInfo{{Name: "vendor", Path: filepath.Join(userDir, "vendor.yaml"), IsStock: false}}, idx.Profiles())
 }
 
 func TestUserProfileWithDistinctIdentityAddsAlongsideStock(t *testing.T) {
@@ -1074,10 +1073,6 @@ traps:
 	t.Cleanup(lease.Close)
 	assert.NotNil(t, lease.Epoch().Lookup("1.3.6.1.4.1.99998.27"))
 	assert.NotNil(t, lease.Epoch().Lookup("1.3.6.1.4.1.99998.28"))
-	assert.Equal(t, []ProfileInfo{
-		{Name: "site", Path: filepath.Join(userDir, "site.yaml"), IsStock: false},
-		{Name: "vendor", Path: filepath.Join(stockDir, "vendor.yaml"), IsStock: true},
-	}, lease.Epoch().Profiles())
 }
 
 func TestUserMetricCollisionWithReferencedStockProfileIsRejected(t *testing.T) {
@@ -1452,7 +1447,7 @@ func TestProfileLoadEmptyUserDirKeepsStockProfiles(t *testing.T) {
 	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
 	t.Cleanup(releaseTestEpoch)
-	assert.Len(t, idx.Profiles(), 1)
+	assert.NotNil(t, idx.Lookup("1.3.6.1.4.1.99999.999"))
 }
 
 func TestProfileLoadMissingName(t *testing.T) {

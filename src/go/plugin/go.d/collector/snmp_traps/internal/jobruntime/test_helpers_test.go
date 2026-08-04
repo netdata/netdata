@@ -116,15 +116,15 @@ func setTestProfileIndex(t *testing.T, traps map[string]*catalog.TrapDef) *catal
 	return lease.Epoch()
 }
 
-func newTestV2Collector(jobName string, writer output.Writer, prefixes []netip.Prefix, communities []string, indexes ...*catalog.Epoch) *Job {
-	return newTestV2CollectorWithPolicy(jobName, writer, receiver.PolicyConfig{
+func newTestV2Job(jobName string, writer output.Writer, prefixes []netip.Prefix, communities []string, indexes ...*catalog.Epoch) *Job {
+	return newTestV2JobWithPolicy(jobName, writer, receiver.PolicyConfig{
 		Versions:        []string{"v2c"},
 		Communities:     communities,
 		SourceAllowlist: prefixes,
 	}, indexes...)
 }
 
-func newTestV2CollectorWithPolicy(jobName string, writer output.Writer, cfg receiver.PolicyConfig, indexes ...*catalog.Epoch) *Job {
+func newTestV2JobWithPolicy(jobName string, writer output.Writer, cfg receiver.PolicyConfig, indexes ...*catalog.Epoch) *Job {
 	registry := telemetry.NewRegistry()
 	var profileIndex *catalog.Epoch
 	if len(indexes) > 0 {
@@ -200,12 +200,12 @@ func bindTestReceiver(t *testing.T, j *Job) *receiver.Receiver {
 	return recv
 }
 
-func newDefaultTestV2Collector(writer output.Writer, indexes ...*catalog.Epoch) *Job {
-	return newTestV2Collector("test", writer, nil, []string{"public"}, indexes...)
+func newDefaultTestV2Job(writer output.Writer, indexes ...*catalog.Epoch) *Job {
+	return newTestV2Job("test", writer, nil, []string{"public"}, indexes...)
 }
 
-func (j *Job) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
-	j.handleDatagram(receiver.Datagram{Data: data, PeerIP: peerIP, Conn: conn, Peer: peer})
+func testDatagram(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) receiver.Datagram {
+	return receiver.Datagram{Data: data, PeerIP: peerIP, Conn: conn, Peer: peer}
 }
 
 func newTestJobTelemetry(t testing.TB, jobName string, dedupEnabled bool) *telemetry.Job {
@@ -221,7 +221,7 @@ func collectJobMetricsForTest(t testing.TB, job *telemetry.Job) metrix.Collector
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
 	if !ok {
-		t.Fatal("collector store does not expose cycle control")
+		t.Fatal("metric store does not expose cycle control")
 	}
 	managed.CycleController().BeginCycle()
 	job.Collect(store)
@@ -240,9 +240,9 @@ func assertJobMetric(t testing.TB, job *telemetry.Job, jobName, metric string, w
 	}
 }
 
-func newDedupTestV2Collector(t *testing.T, jobName string, writer output.Writer, indexes ...*catalog.Epoch) (*Job, *telemetry.Job) {
+func newDedupTestV2Job(t *testing.T, jobName string, writer output.Writer, indexes ...*catalog.Epoch) (*Job, *telemetry.Job) {
 	t.Helper()
-	j := newTestV2Collector(jobName, writer, nil, []string{"public"}, indexes...)
+	j := newTestV2Job(jobName, writer, nil, []string{"public"}, indexes...)
 	registry := telemetry.NewRegistry()
 	j.telemetry.Detach()
 	j.telemetry = registry.Attach(jobName, telemetry.Options{DedupEnabled: true})
@@ -260,10 +260,10 @@ func testNoAuthV3User(engineID string) receiver.USMUser {
 	return receiver.USMUser{Username: "testuser", EngineID: engineID, AuthProto: "none", PrivProto: "none"}
 }
 
-func newTestV3Collector(t *testing.T, jobName string, writer output.Writer, users []receiver.USMUser, engineIDs []string) *Job {
+func newTestV3Job(t *testing.T, jobName string, writer output.Writer, users []receiver.USMUser, engineIDs []string) *Job {
 	t.Helper()
 	cfg := receiver.PolicyConfig{Versions: []string{"v3"}, USMUsers: users, EngineIDWhitelist: engineIDs}
-	j := newTestV2CollectorWithPolicy(jobName, writer, cfg)
+	j := newTestV2JobWithPolicy(jobName, writer, cfg)
 	if err := j.receiver.PrepareV3(t.TempDir(), jobName); err != nil {
 		t.Fatalf("prepare test v3 receiver: %v", err)
 	}

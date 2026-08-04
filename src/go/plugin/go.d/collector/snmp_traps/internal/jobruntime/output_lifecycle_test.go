@@ -70,23 +70,23 @@ func TestPreparedOutputsStartIgnoresTypedNilBackend(t *testing.T) {
 }
 
 func TestHandleOutputOutcomePreservesBackendAuthorityMetrics(t *testing.T) {
-	collector := &Job{policy: NewPolicy(PolicyConfig{JobName: "local"})}
+	job := &Job{policy: NewPolicy(PolicyConfig{JobName: "local"})}
 	metrics := newTestJobTelemetry(t, "local", false)
 
-	collector.handleOutputOutcome(metrics, output.Outcome{
+	job.handleOutputOutcome(metrics, output.Outcome{
 		Backend: output.BackendOTLP, Stage: output.StageEnqueue, FailedEntries: 2,
 	})
 	assertJobMetric(t, metrics, "local", "snmp_trap_errors_otlp_export_failed", 2)
 	assertJobMetric(t, metrics, "local", "snmp_trap_pipeline_write_failed", 0)
 
-	collector.handleOutputOutcome(metrics, output.Outcome{
+	job.handleOutputOutcome(metrics, output.Outcome{
 		Backend: output.BackendOTLP, Stage: output.StageExport, FailedEntries: 3, Authoritative: true,
 	})
 	assertJobMetric(t, metrics, "local", "snmp_trap_errors_otlp_export_failed", 5)
 	assertJobMetric(t, metrics, "local", "snmp_trap_pipeline_write_failed", 3)
 }
 
-func TestCollectorCleanupWritesFinalDedupSummaryBeforeClosingOutput(t *testing.T) {
+func TestJobCleanupWritesFinalDedupSummaryBeforeClosingOutput(t *testing.T) {
 	const jobName = "cleanup-order"
 	policy, err := dedup.Normalize(dedup.Config{Enabled: true, WindowSec: 3600})
 	require.NoError(t, err)

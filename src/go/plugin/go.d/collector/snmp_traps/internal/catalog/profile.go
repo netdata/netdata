@@ -213,7 +213,6 @@ type Epoch struct {
 	metricRulesByOut  map[string]*profileMetricRule
 	metricChartsByID  map[string]*profileMetricChart
 	stock             *stockProfileStore
-	profiles          []ProfileInfo
 
 	// Validation overlays exist only on a staged epoch. They let one bundle
 	// validate against already-published definitions and parsed lazy
@@ -235,21 +234,6 @@ func newEpoch() *Epoch {
 		metricRulesByOut:  make(map[string]*profileMetricRule),
 		metricChartsByID:  make(map[string]*profileMetricChart),
 	}
-}
-
-// ProfileInfo describes one effective extensionless profile identity.
-type ProfileInfo struct {
-	Name    string
-	Path    string
-	IsStock bool
-}
-
-// Profiles returns the effective profile inventory sorted by identity.
-func (idx *Epoch) Profiles() []ProfileInfo {
-	if idx == nil {
-		return nil
-	}
-	return append([]ProfileInfo(nil), idx.profiles...)
 }
 
 // Lookup returns the TrapDef for a given numeric OID, or nil if not found.

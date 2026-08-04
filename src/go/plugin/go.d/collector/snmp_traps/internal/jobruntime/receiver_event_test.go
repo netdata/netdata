@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCollectorReceiverReadErrorLogIsRateLimited(t *testing.T) {
+func TestJobReceiverReadErrorLogIsRateLimited(t *testing.T) {
 	var buf bytes.Buffer
 	c := newTestEventJob(logger.NewWithWriter(&buf))
 	metrics := newTestJobTelemetry(t, "read-errors", false)
@@ -41,7 +41,7 @@ func TestCollectorReceiverReadErrorLogIsRateLimited(t *testing.T) {
 	assertJobMetric(t, metrics, "read-errors", "snmp_trap_errors_listener_read_failed", 2)
 }
 
-func TestCollectorAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
+func TestJobAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
 	var buf bytes.Buffer
 	c := newTestEventJob(logger.NewWithWriter(&buf))
 	c.policy.jobName = "buffer-degraded"
@@ -66,7 +66,7 @@ func TestCollectorAttachesTelemetryBeforeHandlingBindEvents(t *testing.T) {
 	assert.Contains(t, out, "boom")
 }
 
-func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
+func TestJobMapsReceiverErrorKinds(t *testing.T) {
 	tests := map[receiver.ErrorKind]string{
 		receiver.ErrorMalformedPDU:  "snmp_trap_errors_malformed_pdu",
 		receiver.ErrorAuthFailure:   "snmp_trap_errors_auth_failures",
@@ -89,7 +89,7 @@ func TestCollectorMapsReceiverErrorKinds(t *testing.T) {
 	}
 }
 
-func TestCollectorMapsReceiverOperationalEvents(t *testing.T) {
+func TestJobMapsReceiverOperationalEvents(t *testing.T) {
 	tests := map[string]struct {
 		event     receiver.Event
 		metric    string

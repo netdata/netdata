@@ -370,10 +370,6 @@ func (tw *Writer) Close() error {
 	return workerErr
 }
 
-func (tw *Writer) Directory() string {
-	return tw.sink.directory()
-}
-
 func (tw *Writer) setFailure(err error) {
 	var shouldReport bool
 	tw.failedMu.Lock()

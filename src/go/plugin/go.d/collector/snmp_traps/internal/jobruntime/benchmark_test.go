@@ -103,7 +103,7 @@ func TestBenchmarkJobUsesRequiredDependencies(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// End-to-end packet path through Job.handlePacket
+// End-to-end packet path through Job.handleDatagram
 // ---------------------------------------------------------------------------
 
 func BenchmarkPacketTrap(b *testing.B) {
@@ -136,7 +136,7 @@ func BenchmarkPacketTrap(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		pkt := make([]byte, len(data))
 		copy(pkt, data)
-		c.handlePacket(pkt, peer, nil, nil)
+		c.handleDatagram(testDatagram(pkt, peer, nil, nil))
 	}
 	b.StopTimer()
 	written := writer.Written()
@@ -232,7 +232,7 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 			}})
 			topologyByIP := make(map[string]*snmptopology.TrapTopologyEnrichment, numJobs)
 			writers := make([]*countingWriter, numJobs)
-			collectors := make([]*Job, numJobs)
+			jobs := make([]*Job, numJobs)
 			peers := make([]net.IP, numJobs)
 			for i := range numJobs {
 				sourceIP := fmt.Sprintf("192.0.2.%d", i+1)
@@ -260,10 +260,10 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 
 				writers[i] = &countingWriter{}
 				jobName := fmt.Sprintf("bench-enriched-%d", i+1)
-				collectors[i] = newBenchmarkJob(jobName, writers[i], idx)
-				collectors[i].policy.reverseDNSEnabled = true
-				collectors[i].deps.Enricher = newTestTrapEnricher(store, testTrapTopologyEnricher(func(ip, _ string) *snmptopology.TrapTopologyEnrichment { return topologyByIP[ip] }), dns)
-				collectors[i].receiver = newTestReceiver(collectors[i], receiver.PolicyConfig{
+				jobs[i] = newBenchmarkJob(jobName, writers[i], idx)
+				jobs[i].policy.reverseDNSEnabled = true
+				jobs[i].deps.Enricher = newTestTrapEnricher(store, testTrapTopologyEnricher(func(ip, _ string) *snmptopology.TrapTopologyEnrichment { return topologyByIP[ip] }), dns)
+				jobs[i].receiver = newTestReceiver(jobs[i], receiver.PolicyConfig{
 					Versions:    []string{"v2c"},
 					Communities: []string{"example"},
 				})
@@ -273,13 +273,13 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
-				job := int(nextJob.Add(1)-1) % numJobs
-				collector := collectors[job]
-				peer := peers[job]
+				jobIndex := int(nextJob.Add(1)-1) % numJobs
+				job := jobs[jobIndex]
+				peer := peers[jobIndex]
 				for pb.Next() {
 					pkt := make([]byte, len(data))
 					copy(pkt, data)
-					collector.handlePacket(pkt, peer, nil, nil)
+					job.handleDatagram(testDatagram(pkt, peer, nil, nil))
 				}
 			})
 			b.StopTimer()
@@ -296,7 +296,7 @@ func BenchmarkPacketTrapEnrichedJobs(b *testing.B) {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Multi-job scale shape (independent collectors, shared source distribution)
+// 3. Multi-job scale shape (independent jobs, shared source distribution)
 // ---------------------------------------------------------------------------
 
 func BenchmarkMultiJob(b *testing.B) {
@@ -316,14 +316,14 @@ func BenchmarkMultiJob(b *testing.B) {
 			idx := setBenchProfileIndex(b, map[string]*catalog.TrapDef{trap.OID: trap})
 
 			writers := make([]*countingWriter, numJobs)
-			collectors := make([]*Job, numJobs)
+			jobs := make([]*Job, numJobs)
 			peers := make([]net.IP, numJobs)
 			for i := range numJobs {
 				jn := fmt.Sprintf("bm-multi-%d", i)
 				peers[i] = net.ParseIP(fmt.Sprintf("10.1.2.%d", i+1))
 				writers[i] = &countingWriter{}
-				collectors[i] = newBenchmarkJob(jn, writers[i], idx)
-				collectors[i].receiver = newTestReceiver(collectors[i], receiver.PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"example"}})
+				jobs[i] = newBenchmarkJob(jn, writers[i], idx)
+				jobs[i].receiver = newTestReceiver(jobs[i], receiver.PolicyConfig{Versions: []string{"v2c"}, Communities: []string{"example"}})
 			}
 
 			b.ReportAllocs()
@@ -342,7 +342,7 @@ func BenchmarkMultiJob(b *testing.B) {
 					for range iterations {
 						pkt := make([]byte, len(data))
 						copy(pkt, data)
-						collectors[jobIdx].handlePacket(pkt, peers[jobIdx], nil, nil)
+						jobs[jobIdx].handleDatagram(testDatagram(pkt, peers[jobIdx], nil, nil))
 					}
 				}(i, count)
 			}
@@ -380,7 +380,7 @@ func reportDrops(b *testing.B, packets, entries int64) {
 // BenchmarkFullPacketToJournalProductionQueue measures the combined path with
 // the production journal queue capacity. Queue-full drops are reported rather
 // than hidden by an oversized benchmark-only queue:
-// synthetic SNMPv2c packet -> handlePacket -> journal writer queue ->
+// synthetic SNMPv2c packet -> handleDatagram -> journal writer queue ->
 // SDK-backed journal append/sync. journalctl row counting runs after the timed
 // section so the throughput metric reflects ingestion and persistence only.
 func BenchmarkFullPacketToJournalProductionQueue(b *testing.B) {
@@ -413,14 +413,14 @@ func BenchmarkFullPacketToJournalProductionQueue(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		pkt := make([]byte, len(data))
 		copy(pkt, data)
-		c.handlePacket(pkt, peer, nil, nil)
+		c.handleDatagram(testDatagram(pkt, peer, nil, nil))
 	}
 	if err := tw.Flush(); err != nil {
 		b.Fatalf("Flush: %v", err)
 	}
 	b.StopTimer()
 
-	journalDir := tw.Directory()
+	journalDir := dir
 	if err := tw.Close(); err != nil {
 		b.Fatalf("Close: %v", err)
 	}
@@ -455,7 +455,7 @@ func newBenchmarkJournalWriter(b *testing.B, dir string) *journal.Writer {
 }
 
 // BenchmarkUDPPacketToJournal measures the real local UDP receive path:
-// UDP socket -> receiver read loop -> Job.handlePacket ->
+// UDP socket -> receiver read loop -> Job.handleDatagram ->
 // journal writer queue -> SDK-backed journal append/sync.
 func BenchmarkUDPPacketToJournal(b *testing.B) {
 	requireJournalctlBenchmark(b)
@@ -528,7 +528,8 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	}
 	idx := setBenchProfileIndex(b, map[string]*catalog.TrapDef{trap.OID: trap})
 
-	tw := newBenchmarkJournalWriter(b, b.TempDir())
+	dir := b.TempDir()
+	tw := newBenchmarkJournalWriter(b, dir)
 	b.Cleanup(func() {
 		_ = tw.Close()
 	})
@@ -558,10 +559,10 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 		writer:     tw,
 		receiver:   recv,
 		conn:       conn,
-		journalDir: tw.Directory(),
+		journalDir: dir,
 	}
 	recv.Start(func(datagram receiver.Datagram) {
-		c.handlePacket(datagram.Data, datagram.PeerIP, datagram.Conn, datagram.Peer)
+		c.handleDatagram(datagram)
 		h.delivered.Add(1)
 	})
 
@@ -631,8 +632,8 @@ func BenchmarkAcquireProfileCatalogDefaultProfiles(b *testing.B) {
 		if err != nil {
 			b.Fatalf("acquire profile catalog: %v", err)
 		}
-		if len(lease.Epoch().Profiles()) == 0 {
-			b.Fatal("expected non-empty profile catalog")
+		if lease.Epoch() == nil {
+			b.Fatal("expected loaded profile catalog")
 		}
 		lease.Close()
 	}

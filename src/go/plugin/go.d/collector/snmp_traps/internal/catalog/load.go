@@ -68,7 +68,6 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 	var userBundles []profileLoadBundle
 	for _, named := range sources.InOrder() {
 		source := named.Profile
-		index.profiles = append(index.profiles, ProfileInfo{Name: named.Name, Path: source.path, IsStock: source.stock})
 		if source.stock {
 			continue
 		}
@@ -80,7 +79,6 @@ func loadEpoch(paths Paths) (*Epoch, error) {
 		}
 		userBundles = append(userBundles, *source.bundle)
 	}
-	slices.SortFunc(index.profiles, func(a, b ProfileInfo) int { return strings.Compare(a.Name, b.Name) })
 
 	store, err := buildStockProfileStore(paths.StockDir, sources, index)
 	if err != nil {

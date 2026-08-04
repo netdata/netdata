@@ -124,7 +124,7 @@ func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 		require.NoError(t, writer.Write(testTrapEntry()))
 	}
 
-	journalDir := writer.Directory()
+	journalDir := sdk.directory()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var count int

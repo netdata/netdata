@@ -11,22 +11,19 @@ const (
 	ErrorStartup
 )
 
-type Error struct {
+type codedError struct {
 	kind ErrorKind
 	err  error
 }
 
-func (e *Error) Error() string { return e.err.Error() }
-func (e *Error) Unwrap() error { return e.err }
-func (e *Error) Kind() ErrorKind {
-	return e.kind
-}
+func (e *codedError) Error() string { return e.err.Error() }
+func (e *codedError) Unwrap() error { return e.err }
 
-func configError(err error) error  { return &Error{kind: ErrorConfig, err: err} }
-func startupError(err error) error { return &Error{kind: ErrorStartup, err: err} }
+func configError(err error) error  { return &codedError{kind: ErrorConfig, err: err} }
+func startupError(err error) error { return &codedError{kind: ErrorStartup, err: err} }
 
 func KindOf(err error) ErrorKind {
-	var target *Error
+	var target *codedError
 	if errors.As(err, &target) {
 		return target.kind
 	}

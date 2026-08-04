@@ -153,7 +153,10 @@ directory creation/open, active file creation, writer lock acquisition, machine 
 policy validation, and retention policy validation are proven during job creation. `Writer.Start()` launches the queue
 worker only after every job resource has passed preflight.
 
-The configured per-job root is `${NETDATA_LOG_DIR}/traps/{job_name}/`. The plugin validates that `${NETDATA_LOG_DIR}` exists before creating the Netdata-owned child tree. The SDK appends the machine-id child directory, so the effective query directory is `${NETDATA_LOG_DIR}/traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `Directory()` for `journalctl --directory` validation.
+The configured per-job root is `${NETDATA_LOG_DIR}/traps/{job_name}/`. The plugin validates that `${NETDATA_LOG_DIR}`
+exists before creating the Netdata-owned child tree. The SDK appends the machine-id child directory, so the effective
+storage directory is `${NETDATA_LOG_DIR}/traps/{job_name}/{machine_id}/`. Use the configured per-job root for recursive
+`journalctl --directory` validation.
 
 **Output backend selection**:
 

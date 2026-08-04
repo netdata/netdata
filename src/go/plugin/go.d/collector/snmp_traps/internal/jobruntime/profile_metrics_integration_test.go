@@ -54,10 +54,10 @@ metrics:
 
 	packet := readColdStartUDPPacket(t)
 	failedWriter := &mockTrapWriter{err: errors.New("write failed")}
-	c := newDefaultTestV2Collector(failedWriter)
+	c := newDefaultTestV2Job(failedWriter)
 	c.profileIndex = lease.Epoch()
 	c.profileMetrics = rt
-	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+	c.handleDatagram(testDatagram(packet.Payload, packet.Peer, nil, nil))
 
 	store := metrix.NewCollectorStore()
 	collectProfileMetricsForTest(t, rt, store, "test")
@@ -67,7 +67,7 @@ metrics:
 
 	successWriter := &mockTrapWriter{}
 	c.writer = successWriter
-	c.handlePacket(packet.Payload, packet.Peer, nil, nil)
+	c.handleDatagram(testDatagram(packet.Payload, packet.Peer, nil, nil))
 	require.Len(t, successWriter.entries, 1)
 
 	collectProfileMetricsForTest(t, rt, store, "test")
@@ -77,14 +77,14 @@ metrics:
 	}
 
 	dedupWriter := &mockTrapWriter{}
-	dedupCollector, _ := newDedupTestV2Collector(t, "test", dedupWriter)
-	dedupCollector.profileIndex = lease.Epoch()
-	dedupCollector.profileMetrics = rt
-	dedupCollector.deduper.Start()
-	t.Cleanup(dedupCollector.deduper.Close)
+	dedupJob, _ := newDedupTestV2Job(t, "test", dedupWriter)
+	dedupJob.profileIndex = lease.Epoch()
+	dedupJob.profileMetrics = rt
+	dedupJob.deduper.Start()
+	t.Cleanup(dedupJob.deduper.Close)
 
-	dedupCollector.handlePacket(packet.Payload, packet.Peer, nil, nil)
-	dedupCollector.handlePacket(packet.Payload, packet.Peer, nil, nil)
+	dedupJob.handleDatagram(testDatagram(packet.Payload, packet.Peer, nil, nil))
+	dedupJob.handleDatagram(testDatagram(packet.Payload, packet.Peer, nil, nil))
 	require.Len(t, dedupWriter.entries, 1)
 
 	collectProfileMetricsForTest(t, rt, store, "test")
