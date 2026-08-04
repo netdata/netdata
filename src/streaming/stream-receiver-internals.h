@@ -121,6 +121,7 @@ typedef enum {
     RRDHOST_SET_RECEIVER_OK,                // attached
     RRDHOST_SET_RECEIVER_ALREADY_ATTACHED,  // another receiver already attached
     RRDHOST_SET_RECEIVER_CLEANUP_BUSY,      // obsolete-all cleanup is running; caller should answer BUSY_TRY_LATER
+    RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL,    // the host is collected locally as a vnode; caller should answer LOCAL_VNODE
 } RRDHOST_SET_RECEIVER_RESULT;
 
 RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt);

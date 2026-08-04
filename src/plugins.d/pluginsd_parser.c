@@ -216,8 +216,10 @@ static inline bool pluginsd_update_host_ephemerality(RRDHOST *host) {
 // does not evict a receiver that is already attached: while the vnode was stale the option was
 // cleared, so a peer that also collects this device may have streamed it back to us in the meantime.
 //
-// Callers MUST set RRDHOST_OPTION_VIRTUAL_HOST before calling this (so no new receiver can attach
-// behind our back) and MUST NOT write to the host when this returns false.
+// Callers MUST set RRDHOST_OPTION_VIRTUAL_HOST before calling this and MUST NOT write to the host
+// when this returns false. Setting the option first is what keeps a receiver from attaching behind
+// our back: rrdhost_set_receiver() re-checks it under the receiver lock we take below, so a
+// connection that passed the accept-time check is refused once we have claimed the host.
 static bool pluginsd_host_claim_as_local_vnode(RRDHOST *host, const char *keyword) {
     // stream_receiver_signal_to_stop_and_wait() also returns true when no receiver is attached,
     // so we check first: that is the only way to tell "nothing to do" (the common case, silent)
