@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -28,16 +27,15 @@ type testRuntimeConfig struct {
 	Include []string
 }
 
-// testCatalog keeps trap loading/resolution production-backed while allowing
-// unchecked metric definitions for tests of Runtime's defensive validation.
+// testCatalog is a mutable fixture builder whose Catalog methods always load
+// the complete profile through the production catalog owner.
 type testCatalog struct {
-	tb        testing.TB
-	paths     catalog.Paths
-	trapDefs  []*catalog.TrapDef
-	trapLease *catalog.Lease
-	trapEpoch *catalog.Epoch
-	rules     map[string]*catalog.MetricRule
-	charts    map[string]*catalog.MetricChart
+	tb     testing.TB
+	paths  catalog.Paths
+	traps  []*catalog.TrapDef
+	lease  *catalog.Lease
+	rules  []catalog.MetricRule
+	charts []catalog.MetricChart
 }
 type testTrapEntry = model.TrapEntry
 type testTrapDef = catalog.TrapDef
@@ -72,14 +70,12 @@ const (
 func newTestCatalog(t testing.TB) *testCatalog {
 	t.Helper()
 	idx := &testCatalog{
-		tb:     t,
-		paths:  profiletest.CatalogPaths(t),
-		rules:  make(map[string]*catalog.MetricRule),
-		charts: make(map[string]*catalog.MetricChart),
+		tb:    t,
+		paths: profiletest.CatalogPaths(t),
 	}
 	t.Cleanup(func() {
-		if idx.trapLease != nil {
-			idx.trapLease.Close()
+		if idx.lease != nil {
+			idx.lease.Close()
 		}
 	})
 	return idx
@@ -91,73 +87,73 @@ func (idx *testCatalog) addTraps(traps []*testTrapDef) error {
 			return fmt.Errorf("trap definition at index %d is nil", i)
 		}
 	}
-	candidate := append(append([]*catalog.TrapDef(nil), idx.trapDefs...), traps...)
-	lease, err := loadTestTrapEpoch(idx.tb, idx.paths, candidate)
+	candidate := append(append([]*catalog.TrapDef(nil), idx.traps...), traps...)
+	lease, err := loadTestCatalogEpoch(idx.tb, idx.paths, candidate, idx.rules, idx.charts)
 	if err != nil {
 		return err
 	}
-	if idx.trapLease != nil {
-		idx.trapLease.Close()
+	if idx.lease != nil {
+		idx.lease.Close()
 	}
-	idx.trapDefs = candidate
-	idx.trapLease = lease
-	idx.trapEpoch = lease.Epoch()
+	idx.traps = candidate
+	idx.lease = lease
 	return nil
 }
 
 func (idx *testCatalog) addDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) error {
-	for i := range rules {
-		rule := rules[i]
-		idx.rules[rule.Name] = &rule
+	candidateRules := append(append([]catalog.MetricRule(nil), idx.rules...), rules...)
+	candidateCharts := append(append([]catalog.MetricChart(nil), idx.charts...), charts...)
+	lease, err := loadTestCatalogEpoch(idx.tb, idx.paths, idx.traps, candidateRules, candidateCharts)
+	if err != nil {
+		return err
 	}
-	for i := range charts {
-		chart := charts[i]
-		if chart.Type == "" {
-			chart.Type = "line"
-		}
-		idx.charts[chart.ID] = &chart
-	}
+	idx.replaceLease(lease)
+	idx.rules = candidateRules
+	idx.charts = candidateCharts
 	return nil
 }
 
 func (idx *testCatalog) Definitions(names []string) (catalog.MetricDefinitions, error) {
-	defs := catalog.MetricDefinitions{
-		RulesByName: make(map[string]*catalog.MetricRule),
-		ChartsByID:  make(map[string]*catalog.MetricChart),
+	lease, err := loadTestCatalogEpoch(idx.tb, idx.paths, idx.traps, idx.rules, idx.charts)
+	if err != nil {
+		return catalog.MetricDefinitions{}, err
 	}
-	if names == nil {
-		maps.Copy(defs.RulesByName, idx.rules)
-		maps.Copy(defs.ChartsByID, idx.charts)
-		return defs, nil
-	}
-	for _, name := range names {
-		rule := idx.rules[name]
-		if rule == nil {
-			continue
-		}
-		defs.RulesByName[name] = rule
-		if chart := idx.charts[rule.Output.Chart]; chart != nil {
-			defs.ChartsByID[chart.ID] = chart
-		}
-	}
-	return defs, nil
+	idx.replaceLease(lease)
+	return lease.Epoch().Definitions(names)
 }
 
 func (idx *testCatalog) ResolveTrap(ref string) (*testTrapDef, error) {
-	if idx.trapEpoch == nil {
+	if idx.lease == nil {
 		return nil, fmt.Errorf("trap %q not found", ref)
 	}
-	return idx.trapEpoch.ResolveTrap(ref)
+	return idx.lease.Epoch().ResolveTrap(ref)
 }
 
-func loadTestTrapEpoch(t testing.TB, paths catalog.Paths, traps []*catalog.TrapDef) (*catalog.Lease, error) {
+func (idx *testCatalog) replaceLease(lease *catalog.Lease) {
+	if idx.lease != nil {
+		idx.lease.Close()
+	}
+	idx.lease = lease
+}
+
+func loadTestCatalogEpoch(
+	t testing.TB,
+	paths catalog.Paths,
+	traps []*catalog.TrapDef,
+	rules []catalog.MetricRule,
+	charts []catalog.MetricChart,
+) (*catalog.Lease, error) {
 	t.Helper()
 	profile := struct {
 		Varbinds map[string]catalog.VarbindDef `yaml:"varbinds,omitempty"`
 		Traps    []*catalog.TrapDef            `yaml:"traps"`
+		Charts   []catalog.MetricChart         `yaml:"charts,omitempty"`
+		Metrics  []catalog.MetricRule          `yaml:"metrics,omitempty"`
 	}{
 		Varbinds: make(map[string]catalog.VarbindDef),
 		Traps:    make([]*catalog.TrapDef, 0, len(traps)),
+		Charts:   append([]catalog.MetricChart(nil), charts...),
+		Metrics:  append([]catalog.MetricRule(nil), rules...),
 	}
 	for _, src := range traps {
 		trap := *src
@@ -531,14 +527,24 @@ func addProfileMetricRuleWithChart(t *testing.T, idx *testCatalog, rule profileM
 
 func profileMetricCatalogForTest(t *testing.T, idx *testCatalog) profileMetricCatalog {
 	t.Helper()
-	return profileMetricCatalog{rulesByName: idx.rules, chartsByID: idx.charts}
+	names := make([]string, 0, len(idx.rules))
+	for i := range idx.rules {
+		names = append(names, idx.rules[i].Name)
+	}
+	defs, err := idx.Definitions(names)
+	require.NoError(t, err)
+	return profileMetricCatalog{rulesByName: defs.RulesByName, chartsByID: defs.ChartsByID}
 }
 
 func profileMetricChartFromIndex(t *testing.T, idx *testCatalog, id string) *profileMetricChart {
 	t.Helper()
-	chart := profileMetricCatalogForTest(t, idx).chartsByID[id]
-	require.NotNil(t, chart)
-	return chart
+	for i := range idx.charts {
+		if idx.charts[i].ID == id {
+			return &idx.charts[i]
+		}
+	}
+	t.Fatalf("profile metric chart %q not found", id)
+	return nil
 }
 
 func profileMetricOutputForTest(metric, dimension, chart string) profileMetricOutput {
