@@ -7,8 +7,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -71,7 +74,6 @@ func TestDefaultCatalog_StockProfileProofBundles(t *testing.T) {
 
 	proofRoot := filepath.Join(repoRoot, "src/go/plugin/go.d/collector/prometheus/profile-proofs")
 	assertProofDirectoryCoverage(t, proofRoot, proofs)
-	assertProofLFAttributes(t, repoRoot)
 
 	metadataPath := filepath.Join(repoRoot, "src/go/plugin/go.d/collector/prometheus/metadata.yaml")
 	for name, proof := range proofs {
@@ -81,6 +83,7 @@ func TestDefaultCatalog_StockProfileProofBundles(t *testing.T) {
 			manifestPath := filepath.Join(proofRoot, proof.proofDirectory, "SHA256SUMS.tsv")
 			entries := readProofManifest(t, repoRoot, manifestPath)
 			require.Equal(t, inputs, proofManifestPaths(entries))
+			assertProofInputLFAttributes(t, repoRoot, manifestPath, entries)
 			verifyLocalProofInputs(t, repoRoot, entries)
 
 			jobPath := filepath.Join(proofRoot, proof.proofDirectory, "VALIDATION-JOB.yaml")
@@ -132,18 +135,41 @@ func assertProofDirectoryCoverage(t *testing.T, proofRoot string, proofs map[str
 	require.Equal(t, expected, actual, "every stock proof directory must be registered")
 }
 
-func assertProofLFAttributes(t *testing.T, repoRoot string) {
+func assertProofInputLFAttributes(t *testing.T, repoRoot, manifestPath string, entries []proofManifestEntry) {
 	t.Helper()
 
-	content, err := os.ReadFile(filepath.Join(repoRoot, ".gitattributes"))
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Log("git is unavailable; skipping effective EOL attribute assertion")
+		return
+	}
+	worktree, err := exec.Command(gitPath, "-C", repoRoot, "rev-parse", "--is-inside-work-tree").Output()
+	if err != nil || strings.TrimSpace(string(worktree)) != "true" {
+		t.Log("Git worktree metadata is unavailable; skipping effective EOL attribute assertion")
+		return
+	}
+
+	manifestRelative, err := filepath.Rel(repoRoot, manifestPath)
 	require.NoError(t, err)
-	lines := strings.Split(string(content), "\n")
-	for _, expected := range []string{
-		".gitattributes text eol=lf",
-		"src/go/plugin/go.d/collector/prometheus/profile-proofs/** text eol=lf",
-		"src/go/plugin/go.d/config/go.d/prometheus.profiles/default/*.yaml text eol=lf",
-	} {
-		require.Contains(t, lines, expected, "hashed proof inputs must retain LF checkout bytes")
+	paths := []string{".gitattributes", filepath.ToSlash(manifestRelative)}
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.path, "src/go/testdata/") {
+			paths = append(paths, entry.path)
+		}
+	}
+	args := []string{"-C", repoRoot, "check-attr", "-z", "eol", "--"}
+	output, err := exec.Command(gitPath, append(args, paths...)...).Output()
+	require.NoError(t, err)
+	fields := bytes.Split(output, []byte{0})
+	require.NotEmpty(t, fields)
+	require.Empty(t, fields[len(fields)-1], "git check-attr output must end with NUL")
+	fields = fields[:len(fields)-1]
+	require.Len(t, fields, len(paths)*3)
+	for index, path := range paths {
+		offset := index * 3
+		require.Equal(t, path, string(fields[offset]))
+		require.Equal(t, "eol", string(fields[offset+1]))
+		require.Equal(t, "lf", string(fields[offset+2]), "hashed proof input %q must retain LF checkout bytes", path)
 	}
 }
 
@@ -273,6 +299,7 @@ func verifyExternalEvidenceManifest(t *testing.T, manifestPath, profileName stri
 
 	root := filepath.Dir(manifestPath)
 	seen := make(map[string]bool)
+	var declaredPaths []string
 	var inventories, fixtures int
 	for _, file := range manifest.Files {
 		clean := filepath.Clean(filepath.FromSlash(file.Path))
@@ -282,6 +309,7 @@ func verifyExternalEvidenceManifest(t *testing.T, manifestPath, profileName stri
 			"external evidence path %q must use canonical slash form", file.Path)
 		require.Falsef(t, seen[file.Path], "duplicate external evidence path %q", file.Path)
 		seen[file.Path] = true
+		declaredPaths = append(declaredPaths, file.Path)
 
 		switch file.Kind {
 		case "source_inventory":
@@ -306,6 +334,46 @@ func verifyExternalEvidenceManifest(t *testing.T, manifestPath, profileName stri
 	}
 	require.Equal(t, 1, inventories, "external evidence manifest must contain one source inventory")
 	require.Positive(t, fixtures, "external evidence manifest must contain at least one Prometheus fixture")
+	slices.Sort(declaredPaths)
+	require.Equal(t, declaredPaths, externalEvidenceFiles(t, root),
+		"external evidence manifest must declare every regular file in its revision directory")
+}
+
+func externalEvidenceFiles(t *testing.T, root string) []string {
+	t.Helper()
+
+	var paths []string
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root || entry.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relative = filepath.ToSlash(relative)
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("external evidence path %q is a symlink", relative)
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("external evidence path %q is not a regular file", relative)
+		}
+		if relative == "manifest.yaml" {
+			return nil
+		}
+		paths = append(paths, relative)
+		return nil
+	})
+	require.NoError(t, err)
+	slices.Sort(paths)
+	return paths
 }
 
 func assertProofJobMatchesMetadata(t *testing.T, metadataPath, jobPath string, proof stockProfileProof) {

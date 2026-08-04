@@ -575,13 +575,12 @@ NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
   ./plugin/go.d/collector/prometheus/...
 ```
 
-For an existing checkout, fetch `origin master`, switch to local `master`, and fast-forward it to `origin/master` before
-replay:
+For an existing checkout, shallow-fetch `origin master` and detach at the fetched tip before replay. This preserves any local
+feature branch while making the tested tree exactly the fetched `master`:
 
 ```bash
 git -C src/go/testdata fetch --depth=1 origin master
-git -C src/go/testdata switch master
-git -C src/go/testdata merge --ff-only origin/master
+git -C src/go/testdata switch --detach FETCH_HEAD
 ```
 
 Set `NETDATA_TESTDATA_DIR` if the checkout lives elsewhere. Ordinary tests never fetch testdata and skip only the

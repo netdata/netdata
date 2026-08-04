@@ -33,13 +33,12 @@ Stock-profile fixtures and generated source inventories live in
 `NETDATA_TESTDATA_DIR` to another checkout. Referenced evidence paths are
 immutable; their manifest size and SHA-256 are pinned by the compact proof in
 Netdata, and the external manifest pins every evidence file.
-For an existing default checkout, fetch `origin master`, switch to local
-`master`, and fast-forward it to `origin/master` before replay.
+For an existing default checkout, shallow-fetch `origin master` and detach at
+the fetched tip before replay. Local feature branches remain unchanged.
 
 ```text
 git -C src/go/testdata fetch --depth=1 origin master
-git -C src/go/testdata switch master
-git -C src/go/testdata merge --ff-only origin/master
+git -C src/go/testdata switch --detach FETCH_HEAD
 ```
 
 The dedicated test replays every stock proof and fails when external evidence

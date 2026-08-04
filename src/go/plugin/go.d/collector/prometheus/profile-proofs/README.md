@@ -4,13 +4,14 @@
 
 This directory contains the compact authoring proof for stock Prometheus profiles whose source surface cannot be established
 from one live endpoint. Bulky machine-readable evidence lives in [`netdata/testdata`](https://github.com/netdata/testdata)
-under `prometheus/profiles/<profile>/`; each local proof pins that external evidence by manifest digest and byte size.
+under `prometheus/profiles/<profile-revision>/`; each local proof pins that external evidence by manifest digest and byte
+size.
 
 ## Files
 
 - `OPERATOR-MODEL.md` defines entities, capabilities, processing stages, identities, populations, units, and exclusions, then
   reconciles those decisions with the emitted profile.
-- `src/go/testdata/prometheus/profiles/<profile>/SOURCE-INVENTORY.tsv` is the binding source-family and exact-selector ledger.
+- `src/go/testdata/prometheus/profiles/<profile-revision>/SOURCE-INVENTORY.tsv` is the binding source-family and exact-selector ledger.
   Each row records its source evidence and final chart, job-exclusion, or writer-ineligible disposition.
 - `EVIDENCE.md` identifies upstream revisions, source and documentation locations, feature gates, observed versus synthetic
   evidence, fixture provenance, and reproducible validation commands.
@@ -54,12 +55,12 @@ Local setup from the repository root:
 git clone --depth=1 --branch master https://github.com/netdata/testdata.git src/go/testdata
 ```
 
-For an existing checkout, explicitly update local `master` before replay:
+For an existing checkout, fetch and detach at the latest remote `master` before replay. The local feature branches remain
+unchanged:
 
 ```bash
 git -C src/go/testdata fetch --depth=1 origin master
-git -C src/go/testdata switch master
-git -C src/go/testdata merge --ff-only origin/master
+git -C src/go/testdata switch --detach FETCH_HEAD
 ```
 
 Set `NETDATA_TESTDATA_DIR` to use a checkout elsewhere. Ordinary tests skip only when the checkout root is absent; a present

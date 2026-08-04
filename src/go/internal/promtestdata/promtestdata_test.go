@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -140,5 +141,18 @@ func TestResolveRejectsMissingAndNonRegularFiles(t *testing.T) {
 	}
 	if _, err := resolve("directory"); err == nil {
 		t.Fatal("directory resolved as a regular file")
+	}
+
+	if runtime.GOOS != "windows" {
+		target := filepath.Join(root, "target.prom")
+		if err := os.WriteFile(target, []byte("value 1\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, filepath.Join(root, "symlink.prom")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := resolve("symlink.prom"); err == nil {
+			t.Fatal("symlink resolved as a regular file")
+		}
 	}
 }

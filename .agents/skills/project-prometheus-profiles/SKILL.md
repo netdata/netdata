@@ -926,8 +926,7 @@ Update an existing checkout before replay:
 
 ```text
 git -C src/go/testdata fetch --depth=1 origin master
-git -C src/go/testdata switch master
-git -C src/go/testdata merge --ff-only origin/master
+git -C src/go/testdata switch --detach FETCH_HEAD
 ```
 
 `src/go/testdata` is ignored. `NETDATA_TESTDATA_DIR` MAY point to another

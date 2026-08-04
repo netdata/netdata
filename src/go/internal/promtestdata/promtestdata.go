@@ -73,7 +73,7 @@ func resolve(relativePath string) (string, error) {
 		return "", fmt.Errorf("testdata root %s is not a directory", root)
 	}
 	path := filepath.Join(root, clean)
-	info, err = os.Stat(path)
+	info, err = os.Lstat(path)
 	if err != nil {
 		return "", err
 	}
