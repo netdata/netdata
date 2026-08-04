@@ -2,6 +2,7 @@
 
 #define PULSE_INTERNALS 1
 #include "pulse-aral.h"
+#include "database/engine/dbengine-stats.h"
 
 struct aral_info {
     const char *name;
@@ -67,8 +68,29 @@ void pulse_aral_init(void) {
     pulse_aral_register_statistics(uuidmap_aral_statistics(), "uuidmap");
 }
 
+#ifdef ENABLE_DBENGINE
+// Pull engine-published ARAL registrations into the pulse dedup
+// registry. dbengine_stats_snapshot_arals copies live (stats, name)
+// pairs under the engine's lock, so each pair in the snapshot is
+// consistent even if the engine concurrently registers, unregisters,
+// or reuses a slot. pulse_aral_register_statistics is idempotent on
+// the stats pointer, so calling it every cycle is safe.
+static void pulse_aral_import_dbengine_registrations(void) {
+    dbengine_aral_snapshot_t snap[DBENGINE_MAX_ARAL_REGISTRATIONS];
+    size_t n = dbengine_stats_snapshot_arals(snap);
+    for(size_t i = 0; i < n; i++) {
+        if(snap[i].stats && snap[i].name)
+            pulse_aral_register_statistics(snap[i].stats, snap[i].name);
+    }
+}
+#endif
+
 void pulse_aral_do(bool extended) {
     if(!extended) return;
+
+#ifdef ENABLE_DBENGINE
+    pulse_aral_import_dbengine_registrations();
+#endif
 
     spinlock_lock(&globals.spinlock);
     Word_t s = 0;
