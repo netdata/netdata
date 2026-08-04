@@ -6,20 +6,23 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestProfileMetricSelection(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	require.NoError(t, idx.addDefinitions([]testMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{{
 		Name:    "disabled.rule",
 		Type:    profileMetricTypeCounter,
 		Enabled: new(false),
 		OnTrap:  testCiscoConfigTrapOID,
+		Identity: profileMetricIdentity{
+			Device: profileMetricIdentitySource,
+		},
 		Output:  profileMetricOutput{Metric: "snmp_trap_disabled_events", Dimension: "events", Chart: "cisco_config_changes"},
-	}}, nil))
-	cat := profileMetricCatalogForTest(t, idx)
+		Missing: profileMetricMissingDrop,
+		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
+	cat := profileMetricCatalogForTest(idx)
 
 	tests := map[string]struct {
 		cfg   testRuntimeConfig
@@ -71,8 +74,8 @@ func TestProfileMetricSelection(t *testing.T) {
 }
 
 func TestProfileMetricSelectionRejectsMoreThanMaxRules(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	cat := profileMetricCatalogForTest(t, idx)
+	idx := newPopulatedTestCatalog(t)
+	cat := profileMetricCatalogForTest(idx)
 	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed", "cisco.config.terminal_type"},
@@ -101,21 +104,23 @@ func TestNewProfileMetricRuntimeRejectsNilProfileIndex(t *testing.T) {
 	}
 }
 
-func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	err := idx.addDefinitions([]testMetricRule{{
+func TestNewRejectsSelectedDuplicateChartDimensions(t *testing.T) {
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{{
 		Name:   "cisco.config.duplicate_dimension",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
+		Identity: profileMetricIdentity{
+			Device: profileMetricIdentitySource,
+		},
 		Output: profileMetricOutput{
 			Metric:    "snmp_trap_cisco_config_duplicate_dimension_events",
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
+		Missing: profileMetricMissingDrop,
+		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 	}}, nil)
-	if err != nil {
-		t.Fatalf("addProfileMetrics rejected alternate same-dimension rule before selection: %v", err)
-	}
 	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed", "cisco.config.duplicate_dimension"},
@@ -123,7 +128,7 @@ func TestProfileMetricValidationRejectsDuplicateChartDimensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 	}
-	_, _, err = newTestRuntime(cfg, idx.Build(), "test")
+	_, _, err = newTestRuntime(cfg, idx, "test")
 	if err == nil ||
 		!strings.Contains(err.Error(), "reuses output.dimension") ||
 		!strings.Contains(err.Error(), "cisco.config.changed") {

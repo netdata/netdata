@@ -192,6 +192,19 @@ traps:
 	assert.NotNil(t, td.SharedVarbinds)
 }
 
+func TestBuildSharedVarbindsUsesOnlyExplicitReferences(t *testing.T) {
+	fileVarbinds := map[string]VarbindDef{
+		"referenced":   {OID: "1.3.6.1.4.1.99999.1", Type: "INTEGER"},
+		"unreferenced": {OID: "1.3.6.1.4.1.99999.2", Type: "INTEGER"},
+	}
+	trap := &TrapDef{VarbindRefs: []any{"referenced"}}
+
+	shared := buildSharedVarbinds(trap, fileVarbinds)
+	require.Len(t, shared, 1)
+	require.Equal(t, "referenced", shared["1.3.6.1.4.1.99999.1"].RawName)
+	require.NotContains(t, shared, "1.3.6.1.4.1.99999.2")
+}
+
 func TestProfileLoadSupportedFormats(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

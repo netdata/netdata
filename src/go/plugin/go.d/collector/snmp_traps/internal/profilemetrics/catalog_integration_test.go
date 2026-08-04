@@ -3,6 +3,9 @@
 package profilemetrics
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +15,28 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func writeProfileYAML(t *testing.T, dir, name, content string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644))
+}
+
+func writeProfileCatalogue(t *testing.T, stockDir string, manifest any) {
+	t.Helper()
+	data, err := json.Marshal(manifest)
+	require.NoError(t, err)
+	var entries map[string]map[string]any
+	require.NoError(t, json.Unmarshal(data, &entries))
+	for owner, entry := range entries {
+		file, _ := entry["file"].(string)
+		profileData, err := os.ReadFile(filepath.Join(stockDir, file))
+		require.NoError(t, err, "read stock profile for catalogue entry %q", owner)
+		entry["sha256"] = fmt.Sprintf("%x", sha256.Sum256(profileData))
+	}
+	data, err = json.Marshal(entries)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(stockDir), "catalogue.json"), data, 0o644))
+}
 
 func TestProfileMetricRuntimeHydratesOnlySelectedStockRule(t *testing.T) {
 	root := t.TempDir()

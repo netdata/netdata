@@ -12,7 +12,7 @@ import (
 )
 
 func TestProfileMetricRuntimeUsesVnodeHostScopeWhenAvailable(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	entry.SourceVnodeID = "vnode-1"
@@ -33,7 +33,7 @@ func TestProfileMetricRuntimeUsesVnodeHostScopeWhenAvailable(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeFallsBackWhenVnodeAttributionConflicts(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	entry.SourceVnodeID = "vnode-1"
@@ -59,7 +59,7 @@ func TestProfileMetricRuntimeFallsBackWhenVnodeAttributionConflicts(t *testing.T
 }
 
 func TestProfileMetricRuntimeDefaultHashSourcePrivacy(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
@@ -67,7 +67,7 @@ func TestProfileMetricRuntimeDefaultHashSourcePrivacy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 	}
-	rt, _, err := newTestRuntime(cfg, idx.Build(), "test")
+	rt, _, err := newTestRuntime(cfg, idx, "test")
 	if err != nil {
 		t.Fatalf("newTestRuntime failed: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestProfileMetricRuntimeDefaultHashSourcePrivacy(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSourceLabelIgnoresVnodeScope(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
@@ -121,7 +121,7 @@ func TestProfileMetricRuntimeSourceLabelIgnoresVnodeScope(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeAttributionFailureDiagnostics(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	entry.SourceIP = ""
@@ -145,7 +145,7 @@ func TestProfileMetricRuntimeAttributionFailureDiagnostics(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeListenerIdentity(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
@@ -171,7 +171,7 @@ func TestProfileMetricRuntimeListenerIdentity(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeCountsSourceRouteTransitions(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -189,7 +189,7 @@ func TestProfileMetricRuntimeCountsSourceRouteTransitions(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeResourceIdentity(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.port_security.ifindex"})
 	entry := &testTrapEntry{
 		JobName:       "profile-job",
@@ -218,7 +218,7 @@ func TestProfileMetricRuntimeResourceIdentity(t *testing.T) {
 }
 
 func TestProfileMetricChartTemplateUsesResourceLabels(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.port_security.ifindex"},
@@ -226,7 +226,7 @@ func TestProfileMetricChartTemplateUsesResourceLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalizeTestRuntimeConfig failed: %v", err)
 	}
-	_, tmpl, err := newTestRuntime(cfg, idx.Build(), "test")
+	_, tmpl, err := newTestRuntime(cfg, idx, "test")
 	if err != nil {
 		t.Fatalf("newTestRuntime failed: %v", err)
 	}

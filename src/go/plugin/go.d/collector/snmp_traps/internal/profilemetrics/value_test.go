@@ -7,10 +7,11 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 )
 
 func TestProfileMetricRuntimeIncludedCounterBySource(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.changed"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -27,7 +28,7 @@ func TestProfileMetricRuntimeIncludedCounterBySource(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
+	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -43,12 +44,13 @@ func TestProfileMetricRuntimeIncludedSampleUsesVarbindValue(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{{
 		Name:             "cisco.config.console_terminal_type",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
 		ValueFromVarbind: testCiscoTerminalTypeVarbind,
+		Identity:         profileMetricIdentity{Device: catalog.MetricIdentitySource},
 		Where: profileMetricPredicates{{
 			Varbind: testCiscoTerminalTypeVarbind,
 			Equals:  "console",
@@ -58,9 +60,9 @@ func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 			Dimension: "terminal_type",
 			Chart:     "cisco_terminal_type",
 		},
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		Missing: profileMetricMissingDrop,
+		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.console_terminal_type"})
 	pass := ciscoConfigTrapEntry("profile-job")
 	fail := ciscoConfigTrapEntry("profile-job")
@@ -82,8 +84,8 @@ func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	profileMetricChartFromIndex(t, idx, "cisco_terminal_type").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 3}
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withChartLifecycle("cisco_terminal_type", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 3})
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	store := metrix.NewCollectorStore()
@@ -103,12 +105,13 @@ func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *test
 }
 
 func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{{
 		Name:             "cisco.config.terminal_type_scaled",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
 		ValueFromVarbind: testCiscoTerminalTypeVarbind,
+		Identity:         profileMetricIdentity{Device: catalog.MetricIdentitySource},
 		Missing:          profileMetricMissingZero,
 		Scale:            profileMetricScale{Multiplier: 10, Divisor: 2},
 		Output: profileMetricOutput{
@@ -116,9 +119,7 @@ func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 			Dimension: "terminal_type_scaled",
 			Chart:     "cisco_terminal_type",
 		},
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type_scaled"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -141,12 +142,14 @@ func TestProfileMetricRuntimeSampleScaleAndMissingZero(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{{
 		Name:             "cisco.config.sysuptime_seconds",
 		Type:             profileMetricTypeSample,
 		OnTrap:           testCiscoConfigTrapOID,
 		ValueFromVarbind: "sysUpTime.0",
+		Identity:         profileMetricIdentity{Device: catalog.MetricIdentitySource},
+		Missing:          profileMetricMissingDrop,
 		Scale:            profileMetricScale{Multiplier: 2, Divisor: 1},
 		Output: profileMetricOutput{
 			Metric:    "snmp_trap_cisco_sysuptime_scaled_seconds",
@@ -160,9 +163,11 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 		Units:     "seconds",
 		Algorithm: "absolute",
 		Type:      "line",
-	}}); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		Lifecycle: &charttpl.Lifecycle{
+			MaxInstances:      catalog.DefaultMetricChartMaxInstances,
+			ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+		},
+	}})
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.sysuptime_seconds"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	entry.Varbinds[2].Value = uint64(10000)
@@ -179,14 +184,16 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{
 		{
 			Name:             "cisco.config.terminal_type_missing_drop",
 			Type:             profileMetricTypeSample,
 			OnTrap:           testCiscoConfigTrapOID,
 			ValueFromVarbind: testCiscoTerminalTypeVarbind,
 			Missing:          profileMetricMissingDrop,
+			Identity:         profileMetricIdentity{Device: catalog.MetricIdentitySource},
+			Scale:            profileMetricScale{Multiplier: 1, Divisor: 1},
 			Output: profileMetricOutput{
 				Metric:    "snmp_trap_cisco_terminal_type_missing_drop",
 				Dimension: "missing_drop",
@@ -199,15 +206,15 @@ func TestProfileMetricRuntimeMissingDropAndErrorDiagnostics(t *testing.T) {
 			OnTrap:           testCiscoConfigTrapOID,
 			ValueFromVarbind: testCiscoTerminalTypeVarbind,
 			Missing:          profileMetricMissingError,
+			Identity:         profileMetricIdentity{Device: catalog.MetricIdentitySource},
+			Scale:            profileMetricScale{Multiplier: 1, Divisor: 1},
 			Output: profileMetricOutput{
 				Metric:    "snmp_trap_cisco_terminal_type_missing_error",
 				Dimension: "missing_error",
 				Chart:     "cisco_terminal_type",
 			},
 		},
-	}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+	}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{
 		"cisco.config.terminal_type_missing_drop",
 		"cisco.config.terminal_type_missing_error",

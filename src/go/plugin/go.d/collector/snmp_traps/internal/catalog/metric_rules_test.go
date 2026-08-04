@@ -183,6 +183,66 @@ func profileMetricChartFromIndex(t *testing.T, idx *Epoch, id string) *profileMe
 	return chart
 }
 
+func TestResolveProfileMetricTrapTrimsReferences(t *testing.T) {
+	idx := newTestMetricEpoch()
+	trap := &TrapDef{
+		OID:      "1.3.6.1.4.1.99999.1",
+		Name:     "TEST-MIB::candidate",
+		Category: "diagnostic",
+		Severity: "info",
+	}
+	require.NoError(t, idx.addTraps([]*TrapDef{trap}))
+
+	for _, ref := range []string{" 1.3.6.1.4.1.99999.1 ", " TEST-MIB::candidate "} {
+		resolved, err := idx.ResolveTrap(ref)
+		require.NoError(t, err)
+		require.Same(t, trap, resolved)
+	}
+}
+
+func TestValidateProfileDefinitionUniquenessRejectsDuplicateMetricDefinitions(t *testing.T) {
+	tests := map[string]struct {
+		definition ProfileDefinition
+		want       string
+	}{
+		"rule name": {
+			definition: ProfileDefinition{Metrics: []profileMetricRule{{Name: "duplicate.rule"}, {Name: "duplicate.rule"}}},
+			want:       "duplicate metric rule duplicate.rule in profile",
+		},
+		"chart ID": {
+			definition: ProfileDefinition{Charts: []profileMetricChart{{ID: "duplicate_chart"}, {ID: "duplicate_chart"}}},
+			want:       "duplicate metric chart duplicate_chart in profile",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := validateProfileDefinitionUniqueness("test-profile.yaml", &tc.definition)
+			require.ErrorContains(t, err, tc.want)
+		})
+	}
+}
+
+func TestNormalizeProfileMetricDefinitionsAppliesAllDefaults(t *testing.T) {
+	rule := profileMetricRule{Name: "test.sample", Type: " SAMPLE "}
+	require.NoError(t, normalizeProfileMetricRule(&rule))
+	require.Equal(t, profileMetricTypeSample, rule.Type)
+	require.Equal(t, MetricIdentitySource, rule.Identity.Device)
+	require.Equal(t, "snmp_trap_test_sample", rule.Output.Metric)
+	require.Equal(t, "value", rule.Output.Dimension)
+	require.Equal(t, "test_sample", rule.Output.Chart)
+	require.Equal(t, MetricMissingDrop, rule.Missing)
+	require.Equal(t, profileMetricScale{Multiplier: 1, Divisor: 1}, rule.Scale)
+
+	chart := profileMetricChart{ID: "test_sample", Title: "Test sample", Units: "value"}
+	require.NoError(t, normalizeProfileMetricChart(&chart))
+	require.Equal(t, "snmp.trap.test_sample", chart.Context)
+	require.Equal(t, "incremental", chart.Algorithm)
+	require.Equal(t, "line", chart.Type)
+	require.Equal(t, DefaultMetricChartMaxInstances, chart.Lifecycle.MaxInstances)
+	require.Equal(t, DefaultMetricExpireAfterCycles, chart.Lifecycle.ExpireAfterCycles)
+}
+
 func TestLoadProfileAcceptsCanonicalMetricSyntax(t *testing.T) {
 	dir := t.TempDir()
 	profile := `

@@ -424,37 +424,8 @@ func parseProfileBundle(filename string, content []byte) (profileLoadBundle, err
 	if err := unmarshalProfileYAML(content, &def); err != nil {
 		return profileLoadBundle{}, err
 	}
-
-	trapOIDs := make(map[string]bool, len(def.Traps))
-	for _, td := range def.Traps {
-		if td.OID == "" {
-			continue
-		}
-		if trapOIDs[td.OID] {
-			return profileLoadBundle{}, fmt.Errorf("%s: duplicate trap OID %s in profile", filename, td.OID)
-		}
-		trapOIDs[td.OID] = true
-	}
-
-	metricNames := make(map[string]bool, len(def.Metrics))
-	for _, metric := range def.Metrics {
-		if metric.Name == "" {
-			continue
-		}
-		if metricNames[metric.Name] {
-			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric rule %s in profile", filename, metric.Name)
-		}
-		metricNames[metric.Name] = true
-	}
-	chartIDs := make(map[string]bool, len(def.Charts))
-	for _, chart := range def.Charts {
-		if chart.ID == "" {
-			continue
-		}
-		if chartIDs[chart.ID] {
-			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric chart %s in profile", filename, chart.ID)
-		}
-		chartIDs[chart.ID] = true
+	if err := validateProfileDefinitionUniqueness(filename, &def); err != nil {
+		return profileLoadBundle{}, err
 	}
 
 	absFile, _ := filepath.Abs(filename)
@@ -490,6 +461,41 @@ func parseProfileBundle(filename string, content []byte) (profileLoadBundle, err
 	}
 
 	return profileLoadBundle{traps: traps, metrics: metrics, charts: charts}, nil
+}
+
+func validateProfileDefinitionUniqueness(filename string, def *ProfileDefinition) error {
+	trapOIDs := make(map[string]bool, len(def.Traps))
+	for _, td := range def.Traps {
+		if td.OID == "" {
+			continue
+		}
+		if trapOIDs[td.OID] {
+			return fmt.Errorf("%s: duplicate trap OID %s in profile", filename, td.OID)
+		}
+		trapOIDs[td.OID] = true
+	}
+
+	metricNames := make(map[string]bool, len(def.Metrics))
+	for _, metric := range def.Metrics {
+		if metric.Name == "" {
+			continue
+		}
+		if metricNames[metric.Name] {
+			return fmt.Errorf("%s: duplicate metric rule %s in profile", filename, metric.Name)
+		}
+		metricNames[metric.Name] = true
+	}
+	chartIDs := make(map[string]bool, len(def.Charts))
+	for _, chart := range def.Charts {
+		if chart.ID == "" {
+			continue
+		}
+		if chartIDs[chart.ID] {
+			return fmt.Errorf("%s: duplicate metric chart %s in profile", filename, chart.ID)
+		}
+		chartIDs[chart.ID] = true
+	}
+	return nil
 }
 
 func readProfileFile(filename string) ([]byte, error) {

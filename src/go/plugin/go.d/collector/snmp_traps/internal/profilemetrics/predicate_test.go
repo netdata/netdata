@@ -9,11 +9,14 @@ import (
 )
 
 func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{{
 		Name:   "cisco.config.console",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
+		Identity: profileMetricIdentity{
+			Device: profileMetricIdentitySource,
+		},
 		Where: profileMetricPredicates{{
 			Varbind: testCiscoTerminalTypeVarbind,
 			Equals:  "console",
@@ -23,9 +26,9 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 			Dimension: "console_events",
 			Chart:     "cisco_config_changes",
 		},
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		Missing: profileMetricMissingDrop,
+		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.console"})
 	consoleEntry := ciscoConfigTrapEntry("profile-job")
 	virtualEntry := ciscoConfigTrapEntry("profile-job")
@@ -41,11 +44,14 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 }
 
 func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{{
 		Name:   "cisco.config.synthetic_fields",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
+		Identity: profileMetricIdentity{
+			Device: profileMetricIdentitySource,
+		},
 		Where: profileMetricPredicates{
 			{Field: "category", Equals: "config_change"},
 			{Field: "severity", In: []any{"notice"}},
@@ -57,9 +63,9 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 			Dimension: "synthetic_field_events",
 			Chart:     "cisco_config_changes",
 		},
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		Missing: profileMetricMissingDrop,
+		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.synthetic_fields"})
 	pass := ciscoConfigTrapEntry("profile-job")
 	pass.Category = testCategory("config_change")
@@ -78,12 +84,15 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 }
 
 func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{
 		{
 			Name:   "cisco.config.rich_predicates",
 			Type:   profileMetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			Where: profileMetricPredicates{
 				{Varbind: testCiscoTerminalTypeVarbind, Exists: new(true)},
 				{Varbind: testCiscoTerminalTypeVarbind, In: []any{"console", "virtual"}},
@@ -97,11 +106,16 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 				Dimension: "events",
 				Chart:     "cisco_config_changes",
 			},
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:   "cisco.config.absent_predicate",
 			Type:   profileMetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			Where: profileMetricPredicates{{
 				Varbind: "sysUpTime.0",
 				Absent:  new(true),
@@ -111,10 +125,10 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 				Dimension: "absent_events",
 				Chart:     "cisco_config_changes",
 			},
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
-	}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+	}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{
 		"cisco.config.rich_predicates",
 		"cisco.config.absent_predicate",
@@ -143,12 +157,15 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 }
 
 func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{
 		{
 			Name:   "cisco.config.exists_false",
 			Type:   profileMetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			Where: profileMetricPredicates{{
 				Varbind: "sysUpTime.0",
 				Exists:  new(false),
@@ -158,11 +175,16 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "exists_false_events",
 				Chart:     "cisco_config_changes",
 			},
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:   "cisco.config.numeric_in",
 			Type:   profileMetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			Where: profileMetricPredicates{{
 				Varbind: testCiscoCommandSourceVarbind,
 				In:      []any{2, 3},
@@ -172,11 +194,16 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "numeric_in_events",
 				Chart:     "cisco_config_changes",
 			},
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:   "cisco.config.synthetic_not",
 			Type:   profileMetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			Where: profileMetricPredicates{{
 				Field:  "category",
 				Equals: "security",
@@ -187,10 +214,10 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 				Dimension: "synthetic_not_events",
 				Chart:     "cisco_config_changes",
 			},
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
-	}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+	}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{
 		"cisco.config.exists_false",
 		"cisco.config.numeric_in",
@@ -226,11 +253,14 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addDefinitions([]testMetricRule{{
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withDefinitions([]testMetricRule{{
 		Name:   "cisco.config.finite_range",
 		Type:   profileMetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
+		Identity: profileMetricIdentity{
+			Device: profileMetricIdentitySource,
+		},
 		Where: profileMetricPredicates{{
 			Varbind: testCiscoCommandSourceVarbind,
 			Range:   []any{1, 4},
@@ -240,9 +270,9 @@ func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
 			Dimension: "finite_range_events",
 			Chart:     "cisco_config_changes",
 		},
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		Missing: profileMetricMissingDrop,
+		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.finite_range"})
 
 	for _, value := range []any{"NaN", "+Inf", "-Inf"} {

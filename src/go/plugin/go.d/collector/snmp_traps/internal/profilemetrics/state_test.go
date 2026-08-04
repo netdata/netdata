@@ -10,19 +10,23 @@ import (
 )
 
 func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	addProfileMetricRuleWithChart(
-		t,
+	idx := newPopulatedTestCatalog(t)
+	idx = addProfileMetricRuleWithChart(
 		idx,
 		testMetricRule{
 			Name:   "cisco.config.console_state",
 			Type:   profileMetricTypeState,
 			OnTrap: testCiscoConfigTrapOID,
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			State: profileMetricState{
 				SetWhen:   &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "console"},
 				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
 			},
-			Output: profileMetricOutputForTest("snmp_trap_cisco_console_session_state", "active", "cisco_console_state"),
+			Output:  profileMetricOutputForTest("snmp_trap_cisco_console_session_state", "active", "cisco_console_state"),
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
 		profileMetricChartForTest("cisco_console_state", "Cisco console configuration state", "snmp.trap.cisco.console.state", "state", "absolute"),
 	)
@@ -48,14 +52,16 @@ func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	addProfileMetricRuleWithChart(
-		t,
+	idx := newPopulatedTestCatalog(t)
+	idx = addProfileMetricRuleWithChart(
 		idx,
 		testMetricRule{
 			Name:   "cisco.config.console_custom_state",
 			Type:   profileMetricTypeState,
 			OnTrap: testCiscoConfigTrapOID,
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			Where: profileMetricPredicates{{
 				Field:  "category",
 				Equals: "config_change",
@@ -66,7 +72,9 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 				ProblemValue: new(float64(5)),
 				ClearValue:   2,
 			},
-			Output: profileMetricOutputForTest("snmp_trap_cisco_console_custom_state", "active", "cisco_console_custom_state"),
+			Output:  profileMetricOutputForTest("snmp_trap_cisco_console_custom_state", "active", "cisco_console_custom_state"),
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
 		profileMetricChartForTest("cisco_console_custom_state", "Cisco console custom state", "snmp.trap.cisco.console.custom.state", "state", "absolute"),
 	)
@@ -103,25 +111,27 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 }
 
 func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	if err := idx.addTraps([]*testTrapDef{
-		{OID: testLinkUpTrapOID, Name: "IF-MIB::linkUp", Category: "state_change", Severity: "notice"},
-	}); err != nil {
-		t.Fatalf("addTraps failed: %v", err)
-	}
-	addProfileMetricRuleWithChart(
-		t,
+	idx := newPopulatedTestCatalog(t)
+	idx = idx.withTraps(
+		&testTrapDef{OID: testLinkUpTrapOID, Name: "IF-MIB::linkUp", Category: "state_change", Severity: "notice"},
+	)
+	idx = addProfileMetricRuleWithChart(
 		idx,
 		testMetricRule{
 			Name:        "if.link_state",
 			Type:        profileMetricTypeState,
 			ProblemTrap: "IF-MIB::linkDown",
 			ClearTrap:   "IF-MIB::linkUp",
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			State: profileMetricState{
 				ProblemValue: new(float64(0)),
 				ClearValue:   1,
 			},
-			Output: profileMetricOutputForTest("snmp_trap_if_link_state", "up", "if_link_state"),
+			Output:  profileMetricOutputForTest("snmp_trap_if_link_state", "up", "if_link_state"),
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
 		profileMetricChartForTest("if_link_state", "Interface link state", "snmp.trap.if.link.state", "state", "absolute"),
 	)
@@ -159,20 +169,24 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 }
 
 func TestProfileMetricRuntimeStateTTLClearsAndExpires(t *testing.T) {
-	idx := newPopulatedTestProfile(t)
-	addProfileMetricRuleWithChart(
-		t,
+	idx := newPopulatedTestCatalog(t)
+	idx = addProfileMetricRuleWithChart(
 		idx,
 		testMetricRule{
 			Name:   "cisco.config.console_state_ttl",
 			Type:   profileMetricTypeState,
 			OnTrap: testCiscoConfigTrapOID,
+			Identity: profileMetricIdentity{
+				Device: profileMetricIdentitySource,
+			},
 			State: profileMetricState{
 				SetWhen:   &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "console"},
 				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
 				TTL:       "100ms",
 			},
-			Output: profileMetricOutputForTest("snmp_trap_cisco_console_ttl_state", "active", "cisco_console_ttl_state"),
+			Output:  profileMetricOutputForTest("snmp_trap_cisco_console_ttl_state", "active", "cisco_console_ttl_state"),
+			Missing: profileMetricMissingDrop,
+			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
 		},
 		profileMetricChartForTest("cisco_console_ttl_state", "Cisco console TTL state", "snmp.trap.cisco.console.ttl.state", "state", "absolute"),
 	)
