@@ -21,7 +21,7 @@
 - Pipeline exclusions: **83 raw families / 117 logical identities**; exact ledger dispositions are 82 job-excluded routes
   and 1 writer-ineligible information route.
 - Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
-- `SOURCE-INVENTORY.tsv` has 356 rows and maps all 273 exact authored selector routes; unresolved
+- `src/go/testdata/prometheus/profiles/litellm/SOURCE-INVENTORY.tsv` has 356 rows and maps all 273 exact authored selector routes; unresolved
   families/selectors **0**.
 
 ## Recommended-job requirement
@@ -55,10 +55,12 @@ rollout check, not part of this source-completeness claim.
 ## Reproducible artifacts
 
 - Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml`.
-- Fixture: `src/go/plugin/go.d/collector/prometheus/testdata/litellm_all_metrics.prom`.
+- Fixture: `src/go/testdata/prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom`.
 - Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml`.
-- Semantic proof: `OPERATOR-MODEL.md` and `SOURCE-INVENTORY.tsv`.
-- Evidence manifest: `EVIDENCE.md`.
+- Semantic proof: `OPERATOR-MODEL.md` and
+  `src/go/testdata/prometheus/profiles/litellm/SOURCE-INVENTORY.tsv`.
+- Evidence provenance: `EVIDENCE.md`.
+- External evidence manifest: `src/go/testdata/prometheus/profiles/litellm/manifest.yaml`.
 - Integrity manifest: `SHA256SUMS.tsv`.
 
 From `src/go`, reproduce the authoritative result with:
@@ -66,7 +68,7 @@ From `src/go`, reproduce the authoritative result with:
 ```sh
 go run ./tools/prometheus-profile-validation \
   --profile plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml \
-  --dump plugin/go.d/collector/prometheus/testdata/litellm_all_metrics.prom \
+  --dump testdata/prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom \
   --job plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml \
   --output text
 ```

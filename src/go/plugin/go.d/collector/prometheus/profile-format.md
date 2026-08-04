@@ -548,11 +548,33 @@ matches nothing -- so re-run the commands from step 1 and compare the exact seri
 `metrics` lists, selectors, and labels.
 
 To contribute a profile to Netdata, add it under `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`. Stock
-profiles are held to a stricter standard than user profiles: a broken stock profile is not skipped -- an invalid header,
-name, or duplicate fails the whole catalog, and an invalid template fails the check of every job that selects it. The
-collector test suite validates every stock profile before merge:
+profiles are held to a stricter standard than user profiles. They require source-complete, sanitized evidence; a structured
+job policy; an operator model and source-family reconciliation; and an objective validator `PASS` with zero current-source
+fallback and zero unmatched series. A broken stock profile is not skipped -- an invalid header, name, or duplicate fails
+the whole catalog, and an invalid template fails every job that selects it.
+
+Compact proof documents live under
+`src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/`. Bulky generated evidence lives in
+[`netdata/testdata`](https://github.com/netdata/testdata) under `prometheus/profiles/<profile-revision>/`: the source
+inventory, sanitized exposition fixtures, and a manifest containing every file's byte size and SHA-256 digest. Land the
+testdata change before the Netdata change that references it.
+
+Netdata tests clone the latest testdata `master`; referenced paths are therefore immutable. Update evidence by adding a new
+profile revision/directory and changing the Netdata proof to its new manifest. Do not modify or delete an external path used
+by a merged Netdata commit. The manifest digest recorded in Netdata and its per-file hashes make the proof reproducible
+without a testdata commit lock.
+
+To run the complete stock-profile gate locally, clone testdata into the ignored location, then require external evidence:
 
 ```bash
+git clone --depth=1 --branch master https://github.com/netdata/testdata.git src/go/testdata
 cd src/go
-go test -count=1 ./plugin/go.d/collector/prometheus/...
+NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
+  ./internal/promtestdata \
+  ./tools/prometheus-profile-validation \
+  ./plugin/go.d/collector/prometheus/...
 ```
+
+Set `NETDATA_TESTDATA_DIR` if the checkout lives elsewhere. Ordinary tests never fetch testdata and skip only the
+external-dependent cases when it is absent; the dedicated CI workflow requires it, verifies the manifest chain, and replays
+the objective validator for every stock proof.

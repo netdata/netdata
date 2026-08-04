@@ -11,7 +11,8 @@
 - NVMe-oF runtime registry: `prometheus/client_python 0.19.0 @ 2dcd17efd0ce2f0a1ad15cb3c150ffcdc42ced65`.
 - Official producer contracts: MGR `src/pybind/mgr/prometheus/module.py`, ceph-exporter
   `src/exporter/DaemonMetricCollector.cc`, NVMe-oF `control/prometheus.py`, every daemon performance-schema registration and
-  update callsite recorded in `SOURCE-INVENTORY.tsv`, and `doc/mgr/prometheus.rst` at each pinned Ceph revision.
+  update callsite recorded in `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv`, and
+  `doc/mgr/prometheus.rst` at each pinned Ceph revision.
 
 ## Feature, release, and producer gates
 
@@ -25,17 +26,19 @@
 
 ## Evidence classes and fixture provenance
 
-- `src/go/plugin/go.d/collector/prometheus/testdata/ceph_all_metrics.prom` is the sanitized structural union of the three Ceph
-  releases, official producers, daemon roles, modules, and optional transports. Values and identities are synthetic.
-- The seven `src/go/plugin/go.d/collector/prometheus/testdata/ceph_*_all_metrics.prom` producer fixtures separately preserve
+- `src/go/testdata/prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom` is the sanitized structural union of the three
+  Ceph releases, official producers, daemon roles, modules, and optional transports. Values and identities are synthetic.
+- The seven `src/go/testdata/prometheus/profiles/ceph/fixtures/ceph_*_all_metrics.prom` producer fixtures separately preserve
   the Reef/Squid/Tentacle MGR and ceph-exporter contracts plus NVMe-oF. Expected strict failures are only dead
   charts/dimensions from release/producer branches absent from that fixture; each has zero generic fallback and zero
   unmatched series.
 - Dynamic raw family-name grammars are proven from pinned source. Relabeling retains their dynamic key as identity before
   mapping only finite source-known suffix branches onto stable canonical names.
 - The native Ceph Dashboard REST collector is a different source and does not narrow or suppress official exporter coverage.
-- `SOURCE-INVENTORY.tsv` binds every declared family/component to exact source, owner, identity, population, unit algebra,
-  availability gate, disposition, and authored destination.
+- `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv` binds every declared family/component to exact source,
+  owner, identity, population, unit algebra, availability gate, disposition, and authored destination.
+- `src/go/testdata/prometheus/profiles/ceph/manifest.yaml` records the byte size and SHA-256 digest of every external input;
+  `SHA256SUMS.tsv` pins that manifest from the Netdata proof.
 
 ## Reproduction and integrity
 

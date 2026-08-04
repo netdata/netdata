@@ -2,22 +2,24 @@
 
 # Stock Prometheus profile proofs
 
-This directory contains the durable authoring proof for stock Prometheus profiles whose source surface cannot be established
-from one live endpoint. Each profile directory records the operator model, the source-to-profile reconciliation, the evidence
-boundary, the exact committed-input hashes, and the authoritative validation result.
+This directory contains the compact authoring proof for stock Prometheus profiles whose source surface cannot be established
+from one live endpoint. Bulky machine-readable evidence lives in [`netdata/testdata`](https://github.com/netdata/testdata)
+under `prometheus/profiles/<profile>/`; each local proof pins that external evidence by manifest digest and byte size.
 
 ## Files
 
 - `OPERATOR-MODEL.md` defines entities, capabilities, processing stages, identities, populations, units, and exclusions, then
   reconciles those decisions with the emitted profile.
-- `SOURCE-INVENTORY.tsv` is the binding source-family and exact-selector ledger. Each row records its source evidence and final
-  chart, job-exclusion, or writer-ineligible disposition.
+- `src/go/testdata/prometheus/profiles/<profile>/SOURCE-INVENTORY.tsv` is the binding source-family and exact-selector ledger.
+  Each row records its source evidence and final chart, job-exclusion, or writer-ineligible disposition.
 - `EVIDENCE.md` identifies upstream revisions, source and documentation locations, feature gates, observed versus synthetic
   evidence, fixture provenance, and reproducible validation commands.
 - `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the objective validator and mirrors the
   recommended metadata example without endpoint or authentication settings.
-- `SHA256SUMS.tsv` fingerprints the final profile, sanitized fixture inputs, metadata job-policy source, validation job,
-  operator model, and source inventory. It intentionally does not hash itself or transient validator reports.
+- `SHA256SUMS.tsv` fingerprints the final profile, compact local proof inputs, and the external evidence manifest. The
+  external manifest in turn records the path, kind, byte size, and SHA-256 digest of every fixture and source inventory. The
+  test suite compares `VALIDATION-JOB.yaml` semantically with the matching `metadata.yaml` example instead of hashing the
+  entire shared metadata file. `SHA256SUMS.tsv` intentionally does not hash itself or transient validator reports.
 - `VALIDATION.md` states the authoritative PASS result, counts, loss boundary, and evidence limitations.
 
 ## Evidence boundary
@@ -34,3 +36,22 @@ its source-versus-observation boundary and the synthetic placeholder convention 
 
 Unknown future families remain eligible for generic fallback. A zero-fallback result for the declared source union proves
 current-source completeness; it is not a reason to close the profile against future exporter additions.
+
+## External testdata contract
+
+- Tests use the latest `netdata/testdata` `master`, cloned into the ignored `src/go/testdata` directory. No commit lock is
+  stored in Netdata.
+- A referenced external path is immutable. Evidence changes MUST add a new profile revision/directory and update the Netdata
+  proof to reference its new manifest; they MUST NOT rewrite or delete a path used by a merged Netdata commit.
+- Netdata verifies the pinned external manifest and every file declared by it before replaying a proof. Latest master is the
+  transport; immutable paths and digests are the reproducibility boundary.
+- Ordinary `go test` does not access the network. External-dependent tests skip when the checkout is absent; the dedicated
+  Prometheus profile workflow sets `NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1`, so missing or invalid evidence fails CI.
+
+Local setup from the repository root:
+
+```bash
+git clone --depth=1 --branch master https://github.com/netdata/testdata.git src/go/testdata
+```
+
+Set `NETDATA_TESTDATA_DIR` to use an existing checkout elsewhere.

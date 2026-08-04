@@ -154,7 +154,7 @@ cross-cutting:
 
 ## Reconciliation ledger
 
-- `SOURCE-INVENTORY.tsv` is the binding per-family and exact-selector semantic ledger.
+- `src/go/testdata/prometheus/profiles/litellm/SOURCE-INVENTORY.tsv` is the binding per-family and exact-selector semantic ledger.
 - It accounts for **201 source families** and **273 authored selector routes** in 356 rows: **273 chart routes**, **82 job
   exclusions**, and **1 writer-ineligible information family**.
 - The profile contains **159 authored charts**. The structural-union fixture materializes **231 chart instances** and **975

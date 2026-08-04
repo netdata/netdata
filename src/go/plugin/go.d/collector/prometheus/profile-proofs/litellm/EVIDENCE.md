@@ -9,7 +9,8 @@
 - Current-source comparison: `BerriAI/litellm @ de706a35a6f1e9cb8c3cb527271df0b76a69f410`.
 - Primary source and documentation contract: `litellm/integrations/prometheus.py`,
   `litellm/integrations/prometheus_services.py`, `litellm/integrations/prometheus_helpers/**`,
-  `litellm/types/integrations/prometheus.py`, and every metric update callsite reconciled in `SOURCE-INVENTORY.tsv`.
+  `litellm/types/integrations/prometheus.py`, and every metric update callsite reconciled in
+  `src/go/testdata/prometheus/profiles/litellm/SOURCE-INVENTORY.tsv`.
 - Runtime collector contract: `prometheus/client_python 0.24.1 @ f417f6ea8f058165a1934e368fed245e91aafc14`,
   `prometheus_client/{gc_collector,platform_collector,process_collector}.py`.
 
@@ -27,12 +28,14 @@
 
 - A local authenticated scrape established LiteLLM 1.92.0 transport and the enabled subset. It remains private and does not
   define the supported surface.
-- `src/go/plugin/go.d/collector/prometheus/testdata/litellm_all_metrics.prom` is a sanitized structural union of observed and
-  source-only callback, label-filtered, single-process, and multiprocess shapes. Placeholder identities are synthetic.
+- `src/go/testdata/prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom` is a sanitized structural union of observed
+  and source-only callback, label-filtered, single-process, and multiprocess shapes. Placeholder identities are synthetic.
 - Source registration, HELP, type, bucket, and service files used by the fixture are byte-identical across the structural and
   current comparison revisions; update callsites supply the label and optionality evidence.
-- `SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner, identity, population, unit algebra,
-  availability gate, disposition, and authored destination.
+- `src/go/testdata/prometheus/profiles/litellm/SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner,
+  identity, population, unit algebra, availability gate, disposition, and authored destination.
+- `src/go/testdata/prometheus/profiles/litellm/manifest.yaml` records the byte size and SHA-256 digest of every external input;
+  `SHA256SUMS.tsv` pins that manifest from the Netdata proof.
 
 ## Reproduction and integrity
 

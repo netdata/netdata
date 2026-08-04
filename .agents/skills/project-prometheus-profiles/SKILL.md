@@ -877,19 +877,52 @@ Deliver:
 - explicit unresolved evidence limitations; known source-defined optional
   surfaces in scope must not be deferred merely for lack of a local feature.
 
-For a stock profile in this repository, commit the durable proof under
-`src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/`:
+For a stock profile in this repository, split the durable proof by artifact class:
+
+- Commit compact, human-reviewable proof under
+  `src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/`.
+- Commit bulky sanitized fixtures and the generated source inventory to
+  `netdata/testdata` under `prometheus/profiles/<profile-revision>/`.
+- Treat every referenced `netdata/testdata` path as immutable. Evidence changes
+  MUST add a new profile revision/directory; they MUST NOT rewrite or delete a
+  path used by a merged Netdata commit.
+- Use latest `netdata/testdata` `master`. Do not add a commit lock to Netdata.
+  The compact proof's manifest digest plus the external manifest's per-file
+  sizes and SHA-256 hashes provide the reproducibility boundary.
+
+The compact proof contains:
 
 - `OPERATOR-MODEL.md` contains the operator model and selector-level
   reconciliation;
-- `SOURCE-INVENTORY.tsv` contains the exact source-family/selector ledger;
 - `EVIDENCE.md` records versions, source and documentation revisions, feature
-  gates, evidence boundaries, fixture provenance, and exact reproduction steps;
+  gates, evidence boundaries, external fixture/inventory paths, provenance, and
+  exact reproduction steps;
 - `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the
   objective validator and agrees with the recommended metadata example;
-- `SHA256SUMS.tsv` hashes the final profile, fixture, metadata job-policy source,
-  validation job, operator model, and source inventory; and
+- `SHA256SUMS.tsv` hashes the final profile, compact local proof inputs, and the
+  external evidence manifest; and
 - `VALIDATION.md` is the authoritative human-readable PASS summary.
+
+The external profile-evidence directory contains:
+
+- `SOURCE-INVENTORY.tsv`, the exact source-family/selector ledger;
+- `fixtures/*.prom`, the sanitized source-complete exposition inputs; and
+- `manifest.yaml`, which records the path, kind, byte size, and SHA-256 digest
+  of every external evidence file.
+
+For local replay, clone the latest external data from the Netdata repository
+root:
+
+```text
+git clone --depth=1 --branch master https://github.com/netdata/testdata.git src/go/testdata
+```
+
+`src/go/testdata` is ignored. `NETDATA_TESTDATA_DIR` MAY point to another
+testdata checkout. Ordinary tests MUST NOT fetch network data and MAY skip only
+external-dependent coverage when the checkout is absent. Dedicated CI MUST set
+`NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1`, verify the external manifest chain,
+and replay the objective validator for every stock proof so missing evidence
+fails rather than skips.
 
 Do not substitute transient local report JSON, an uncommitted scratch document,
 or a private observed scrape for this reviewable stock proof. Raw reports MAY

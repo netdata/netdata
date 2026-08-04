@@ -487,7 +487,8 @@ dispositions, and evidence limits.
 
 ## Binding semantic ledger format
 
-`SOURCE-INVENTORY.tsv` is the exact source-family-to-authored-selector reconciliation. Its 253 rows account for all 183
+`src/go/testdata/prometheus/profiles/vllm/SOURCE-INVENTORY.tsv` is the exact source-family-to-authored-selector
+reconciliation. Its 253 rows account for all 183
 source families and all 163 authored selectors. Every chart row records owner, entity identity, signal role, observation
 population, cross-family relationship, unit algebra, label roles and optionality, availability gate, evidence limitation,
 destination, and source path. Exclusion rows preserve the same semantics and the lost question. Unresolved families and

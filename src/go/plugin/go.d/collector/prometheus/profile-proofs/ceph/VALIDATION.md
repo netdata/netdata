@@ -23,7 +23,7 @@
 - Successful job-relabel normalization: **227 raw families**, reconciled by logical identity to their charted canonical
   writer families rather than counted as source loss.
 - Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
-- `SOURCE-INVENTORY.tsv` maps all 1,779 charted source-family routes and 1,772
+- `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv` maps all 1,779 charted source-family routes and 1,772
   unique authored selectors; unresolved families/selectors **0**.
 
 ## Source-derived producer matrix
@@ -78,10 +78,12 @@ the source-completeness proof, and no Ceph daemon, exporter, or Ceph configurati
 ## Reproducible artifacts
 
 - Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml`.
-- Union and producer fixtures: `src/go/plugin/go.d/collector/prometheus/testdata/ceph*_all_metrics.prom`.
+- Union and producer fixtures: `src/go/testdata/prometheus/profiles/ceph/fixtures/ceph*_all_metrics.prom`.
 - Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml`.
-- Semantic proof: `OPERATOR-MODEL.md` and `SOURCE-INVENTORY.tsv`.
-- Evidence manifest: `EVIDENCE.md`.
+- Semantic proof: `OPERATOR-MODEL.md` and
+  `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv`.
+- Evidence provenance: `EVIDENCE.md`.
+- External evidence manifest: `src/go/testdata/prometheus/profiles/ceph/manifest.yaml`.
 - Integrity manifest: `SHA256SUMS.tsv`.
 
 From `src/go`, reproduce the authoritative union result with:
@@ -89,7 +91,7 @@ From `src/go`, reproduce the authoritative union result with:
 ```sh
 go run ./tools/prometheus-profile-validation \
   --profile plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml \
-  --dump plugin/go.d/collector/prometheus/testdata/ceph_all_metrics.prom \
+  --dump testdata/prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom \
   --job plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml \
   --output text
 ```

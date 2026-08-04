@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/internal/promtestdata"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -1013,7 +1014,8 @@ func configureProfileJobFromMetadata(t *testing.T, collr *Collector, integration
 // sanitized structural union, including optional and mutually exclusive
 // source-defined surfaces and each distinct entity identity.
 func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
-	input, err := os.ReadFile(filepath.Join("testdata", "vllm_all_metrics.prom"))
+	fixture := promtestdata.Require(t, "prometheus/profiles/vllm/fixtures/vllm_all_metrics.prom")
+	input, err := os.ReadFile(fixture)
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(
@@ -1171,7 +1173,7 @@ func testCollectorStockProfileAllMetrics(
 ) {
 	t.Helper()
 
-	input, err := os.ReadFile(filepath.Join("testdata", fixture))
+	input, err := os.ReadFile(promtestdata.Require(t, fixture))
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(
@@ -1241,7 +1243,7 @@ func testCollectorStockProfileAllMetrics(
 func TestCollector_VLLMRayProfileAllMetrics(t *testing.T) {
 	testCollectorStockProfileAllMetrics(
 		t,
-		"vllm_ray_all_metrics.prom",
+		"prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom",
 		func(collr *Collector) {
 			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm_ray", "vllm-ray")
 		},
@@ -1315,7 +1317,7 @@ func TestCollector_VLLMRayProfileAllMetrics(t *testing.T) {
 func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
 	testCollectorStockProfileAllMetrics(
 		t,
-		"litellm_all_metrics.prom",
+		"prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom",
 		func(collr *Collector) {
 			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-litellm", "litellm", "litellm")
 		},
@@ -1553,7 +1555,7 @@ func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
 func TestCollector_CephProfileAllMetrics(t *testing.T) {
 	testCollectorStockProfileAllMetrics(
 		t,
-		"ceph_all_metrics.prom",
+		"prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom",
 		func(collr *Collector) {
 			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr")
 		},
@@ -1863,32 +1865,32 @@ func TestCollector_CephProfileProducerVariants(t *testing.T) {
 		context string
 		dims    []string
 	}{
-		{"ceph_reef_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
-		{"ceph_squid_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
-		{"ceph_tentacle_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
+		{"prometheus/profiles/ceph/fixtures/ceph_reef_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
+		{"prometheus/profiles/ceph/fixtures/ceph_squid_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
+		{"prometheus/profiles/ceph/fixtures/ceph_tentacle_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
 		{
-			"ceph_reef_exporter_prio0_all_metrics.prom",
+			"prometheus/profiles/ceph/fixtures/ceph_reef_exporter_prio0_all_metrics.prom",
 			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
 		},
 		{
-			"ceph_squid_exporter_prio0_all_metrics.prom",
+			"prometheus/profiles/ceph/fixtures/ceph_squid_exporter_prio0_all_metrics.prom",
 			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
 		},
 		{
-			"ceph_tentacle_exporter_prio0_all_metrics.prom",
+			"prometheus/profiles/ceph/fixtures/ceph_tentacle_exporter_prio0_all_metrics.prom",
 			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
 		},
-		{"ceph_nvmeof_all_metrics.prom", "ceph-exporter", "prometheus.ceph.nvme_of.block_devices.byte_throughput", []string{"read_bytes", "written_bytes"}},
+		{"prometheus/profiles/ceph/fixtures/ceph_nvmeof_all_metrics.prom", "ceph-exporter", "prometheus.ceph.nvme_of.block_devices.byte_throughput", []string{"read_bytes", "written_bytes"}},
 	}
 
 	for _, test := range tests {
-		t.Run(test.fixture, func(t *testing.T) {
+		t.Run(filepath.Base(test.fixture), func(t *testing.T) {
 			testCollectorStockProfileAllMetrics(
 				t,
 				test.fixture,

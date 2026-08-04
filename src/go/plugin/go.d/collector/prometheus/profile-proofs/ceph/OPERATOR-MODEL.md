@@ -183,7 +183,7 @@ catalog regression locks critical counter-as-current, gauge-as-cumulative, snaps
 
 ## Reconciliation ledger
 
-- `SOURCE-INVENTORY.tsv` is the binding per-family and exact-selector semantic ledger.
+- `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv` is the binding per-family and exact-selector semantic ledger.
 - It accounts for **1,794 source families** in 1,794 rows: **1,779 charted source-family routes**, **10 recommended-job
   exclusions**, and **5 writer-ineligible information families**.
 - The profile contains **547 authored charts** and **1,772 unique authored selectors**. The structural union materializes

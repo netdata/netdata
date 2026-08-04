@@ -1,0 +1,66 @@
+---
+name: Prometheus Profile Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/prometheus-profile-tests.yml'
+      - '.agents/skills/project-prometheus-profiles/**'
+      - 'src/go/go.mod'
+      - 'src/go/go.sum'
+      - 'src/go/internal/promtestdata/**'
+      - 'src/go/pkg/metrix/**'
+      - 'src/go/pkg/prometheus/**'
+      - 'src/go/plugin/framework/chartengine/**'
+      - 'src/go/plugin/framework/charttpl/**'
+      - 'src/go/plugin/go.d/collector/prometheus/**'
+      - 'src/go/plugin/go.d/config/go.d/prometheus.profiles/default/**'
+      - 'src/go/tools/prometheus-profile-validation/**'
+  pull_request:
+    paths:
+      - '.github/workflows/prometheus-profile-tests.yml'
+      - '.agents/skills/project-prometheus-profiles/**'
+      - 'src/go/go.mod'
+      - 'src/go/go.sum'
+      - 'src/go/internal/promtestdata/**'
+      - 'src/go/pkg/metrix/**'
+      - 'src/go/pkg/prometheus/**'
+      - 'src/go/plugin/framework/chartengine/**'
+      - 'src/go/plugin/framework/charttpl/**'
+      - 'src/go/plugin/go.d/collector/prometheus/**'
+      - 'src/go/plugin/go.d/config/go.d/prometheus.profiles/default/**'
+      - 'src/go/tools/prometheus-profile-validation/**'
+
+jobs:
+  proof-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
+
+      - name: Clone latest testdata master
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch master --single-branch \
+            https://github.com/netdata/testdata.git src/go/testdata
+
+      - name: Verify Prometheus profile proofs
+        env:
+          NETDATA_PROMETHEUS_TESTDATA_REQUIRED: '1'
+        run: |
+          cd src/go
+          go test -count=1 \
+            ./internal/promtestdata \
+            ./tools/prometheus-profile-validation \
+            ./plugin/go.d/collector/prometheus/...

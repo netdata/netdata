@@ -17,7 +17,8 @@
 - Pipeline exclusions: **38 raw families / 50 logical identities**; exact ledger dispositions are 36 job-excluded
   compatibility/duplicate routes and 2 writer-ineligible information routes.
 - Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
-- `SOURCE-INVENTORY.tsv` maps all 142 exact authored selector routes; unresolved families/selectors **0**.
+- `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv` maps all 142 exact authored selector routes; unresolved
+  families/selectors **0**.
 
 ## Alias contract
 
@@ -41,10 +42,12 @@ source-complete synthetic PASS proves the contract; live Ray evidence can be add
 ## Reproducible artifacts
 
 - Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml`.
-- Fixture: `src/go/plugin/go.d/collector/prometheus/testdata/vllm_ray_all_metrics.prom`.
+- Fixture: `src/go/testdata/prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom`.
 - Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml`.
-- Semantic proof: `OPERATOR-MODEL.md` and `SOURCE-INVENTORY.tsv`.
-- Evidence manifest: `EVIDENCE.md`.
+- Semantic proof: `OPERATOR-MODEL.md` and
+  `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv`.
+- Evidence provenance: `EVIDENCE.md`.
+- External evidence manifest: `src/go/testdata/prometheus/profiles/vllm_ray/manifest.yaml`.
 - Integrity manifest: `SHA256SUMS.tsv`.
 
 From `src/go`, reproduce the authoritative result with:
@@ -52,7 +55,7 @@ From `src/go`, reproduce the authoritative result with:
 ```sh
 go run ./tools/prometheus-profile-validation \
   --profile plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml \
-  --dump plugin/go.d/collector/prometheus/testdata/vllm_ray_all_metrics.prom \
+  --dump testdata/prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom \
   --job plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml \
   --output text
 ```

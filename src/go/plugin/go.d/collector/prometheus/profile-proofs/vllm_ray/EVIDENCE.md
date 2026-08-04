@@ -21,12 +21,14 @@
 
 ## Evidence classes and fixture provenance
 
-- `src/go/plugin/go.d/collector/prometheus/testdata/vllm_ray_all_metrics.prom` is a sanitized source-derived structural
+- `src/go/testdata/prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom` is a sanitized source-derived structural
   union. No live Ray deployment was used or is claimed.
 - The fixture preserves Ray replica/worker identity and includes mutually optional vLLM features plus the source-proven alias
   behavior with placeholder values.
-- `SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner, identity, population, unit algebra,
-  availability gate, disposition, and authored destination.
+- `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner,
+  identity, population, unit algebra, availability gate, disposition, and authored destination.
+- `src/go/testdata/prometheus/profiles/vllm_ray/manifest.yaml` records the byte size and SHA-256 digest of every external
+  input; `SHA256SUMS.tsv` pins that manifest from the Netdata proof.
 
 ## Reproduction and integrity
 

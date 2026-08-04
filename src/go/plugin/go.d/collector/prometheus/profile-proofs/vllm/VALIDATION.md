@@ -37,10 +37,12 @@ collector failure. Live deployment validation is an operational rollout check, n
 ## Reproducible artifacts
 
 - Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm.yaml`.
-- Fixture: `src/go/plugin/go.d/collector/prometheus/testdata/vllm_all_metrics.prom`.
+- Fixture: `src/go/testdata/prometheus/profiles/vllm/fixtures/vllm_all_metrics.prom`.
 - Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION-JOB.yaml`.
-- Semantic proof: `OPERATOR-MODEL.md` and `SOURCE-INVENTORY.tsv`.
-- Evidence manifest: `EVIDENCE.md`.
+- Semantic proof: `OPERATOR-MODEL.md` and
+  `src/go/testdata/prometheus/profiles/vllm/SOURCE-INVENTORY.tsv`.
+- Evidence provenance: `EVIDENCE.md`.
+- External evidence manifest: `src/go/testdata/prometheus/profiles/vllm/manifest.yaml`.
 - Integrity manifest: `SHA256SUMS.tsv`.
 
 From `src/go`, reproduce the authoritative result with:
@@ -48,7 +50,7 @@ From `src/go`, reproduce the authoritative result with:
 ```sh
 go run ./tools/prometheus-profile-validation \
   --profile plugin/go.d/config/go.d/prometheus.profiles/default/vllm.yaml \
-  --dump plugin/go.d/collector/prometheus/testdata/vllm_all_metrics.prom \
+  --dump testdata/prometheus/profiles/vllm/fixtures/vllm_all_metrics.prom \
   --job plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION-JOB.yaml \
   --output text
 ```

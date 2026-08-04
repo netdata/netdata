@@ -67,14 +67,16 @@ those are not fabricated in this profile.
 - Unknown future `ray_vllm_*` families remain generically visible until source evidence can assign identity, unit,
   population, owner, and a curated destination.
 
-- `SOURCE-INVENTORY.tsv` accounts for all 116 declared source families and their final chart or exclusion disposition.
+- `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv` accounts for all 116 declared source families and their
+  final chart or exclusion disposition.
 - The profile has 104 authored charts and 142 selector routes. The structural union materializes 113 chart instances and
   698 dimensions.
 - The exact validation has zero fallback, unmatched series, dead charts, dead dimensions, materialization loss, or collisions.
 
 ## Binding per-family semantics
 
-`SOURCE-INVENTORY.tsv` is the binding exact-selector ledger. Its 180 rows account for all 116 source families and all 142
+`src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv` is the binding exact-selector ledger. Its 180 rows
+account for all 116 source families and all 142
 authored selectors. Each row states the closest operator owner, model-engine replica-worker identity, role, exact observation
 population from source HELP/update evidence, alias or histogram relationship, rendered unit algebra, identity/dimension/routing
 label roles, availability gate, evidence boundary, disposition, destination, and pinned source path. The 36 job exclusions are

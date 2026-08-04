@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/internal/promtestdata"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
@@ -80,7 +81,7 @@ func TestDefaultCatalog_AllStockProfilesHydrate(t *testing.T) {
 // also suppresses vLLM's deprecated pre-canonical KV-offload families so every
 // operation is represented exactly once.
 func TestDefaultCatalog_VLLMRayDeniesEveryCompatibilityGauge(t *testing.T) {
-	types := readPrometheusTypes(t, "../testdata/vllm_ray_all_metrics.prom")
+	types := readPrometheusTypes(t, "prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom")
 
 	var aliases []string
 	for name, typ := range types {
@@ -112,8 +113,8 @@ func TestDefaultCatalog_GeneratedEpochDenialsMatchSourceUnion(t *testing.T) {
 		fixture string
 		prefix  string
 	}{
-		"litellm": {fixture: "../testdata/litellm_all_metrics.prom", prefix: "litellm_"},
-		"vllm":    {fixture: "../testdata/vllm_all_metrics.prom", prefix: "vllm:"},
+		"litellm": {fixture: "prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom", prefix: "litellm_"},
+		"vllm":    {fixture: "prometheus/profiles/vllm/fixtures/vllm_all_metrics.prom", prefix: "vllm:"},
 	}
 
 	catalog, err := LoadFromDefaultDirs()
@@ -140,15 +141,15 @@ func TestDefaultCatalog_GeneratedEpochDenialsMatchSourceUnion(t *testing.T) {
 			}
 			slices.Sort(deniedCreated)
 			require.Equal(t, sourceCreated, deniedCreated,
-				"stock profile generated-epoch denials must exactly track the committed source union")
+				"stock profile generated-epoch denials must exactly track the external source union")
 		})
 	}
 }
 
-func readPrometheusTypes(t *testing.T, path string) map[string]string {
+func readPrometheusTypes(t *testing.T, relativePath string) map[string]string {
 	t.Helper()
 
-	file, err := os.Open(path)
+	file, err := os.Open(promtestdata.Require(t, relativePath))
 	require.NoError(t, err)
 	defer func() { require.NoError(t, file.Close()) }()
 

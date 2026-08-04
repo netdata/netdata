@@ -27,6 +27,21 @@ go run ./tools/prometheus-profile-validation \
 exploration, but a deliverable profile needs the intended job policy; omitting
 it produces a warning because collector defaults may not match deployment.
 
+Stock-profile fixtures and generated source inventories live in
+[`netdata/testdata`](https://github.com/netdata/testdata). Clone its latest
+`master` into the ignored `src/go/testdata` directory, or set
+`NETDATA_TESTDATA_DIR` to another checkout. Referenced evidence paths are
+immutable; their manifest size and SHA-256 are pinned by the compact proof in
+Netdata, and the external manifest pins every evidence file.
+
+The dedicated test replays every stock proof and fails when external evidence
+is unavailable:
+
+```text
+NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
+  ./tools/prometheus-profile-validation
+```
+
 Exit codes:
 
 - `0`: objective validation passed; warnings may still require review.

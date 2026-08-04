@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/internal/promtestdata"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
@@ -226,6 +227,42 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 		if chart.IDFingerprint == "" {
 			t.Fatalf("materialized chart ID fingerprint is empty: %#v", chart)
 		}
+	}
+}
+
+func TestStockProfileProofsPass(t *testing.T) {
+	goRoot, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := map[string]struct {
+		fixture string
+	}{
+		"ceph": {
+			fixture: "prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom",
+		},
+		"litellm": {
+			fixture: "prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom",
+		},
+		"vllm": {
+			fixture: "prometheus/profiles/vllm/fixtures/vllm_all_metrics.prom",
+		},
+		"vllm_ray": {
+			fixture: "prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			profilePath := filepath.Join(goRoot, "plugin/go.d/config/go.d/prometheus.profiles/default", name+".yaml")
+			jobPath := filepath.Join(goRoot, "plugin/go.d/collector/prometheus/profile-proofs", name, "VALIDATION-JOB.yaml")
+			dumpPath := promtestdata.Require(t, test.fixture)
+			result := runValidationFiles(t, profilePath, dumpPath, jobPath)
+			if result.exitCode != 0 || result.report.Verdict != verdictPass {
+				t.Fatalf("stock profile proof failed\nexit code: %d\nstderr:\n%s\nreport:\n%s",
+					result.exitCode, result.stderr, result.stdout)
+			}
+		})
 	}
 }
 
@@ -3722,6 +3759,19 @@ func runValidation(t *testing.T, profile, dump, job string) validationResult {
 		t.Fatal(err)
 	}
 
+	jobPath := ""
+	if job != "" {
+		jobPath = filepath.Join(dir, "job.yaml")
+		if err := os.WriteFile(jobPath, []byte(job), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return runValidationFiles(t, profilePath, dumpPath, jobPath)
+}
+
+func runValidationFiles(t *testing.T, profilePath, dumpPath, jobPath string) validationResult {
+	t.Helper()
+
 	args := []string{
 		"-test.run=^TestValidatorHelperProcess$",
 		"--",
@@ -3729,11 +3779,7 @@ func runValidation(t *testing.T, profile, dump, job string) validationResult {
 		"--dump", dumpPath,
 		"--output", "json",
 	}
-	if job != "" {
-		jobPath := filepath.Join(dir, "job.yaml")
-		if err := os.WriteFile(jobPath, []byte(job), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	if jobPath != "" {
 		args = append(args, "--job", jobPath)
 	}
 
