@@ -129,9 +129,9 @@ func (rt *Runtime) collectSeries(store metrix.CollectorStore, series profileMetr
 	meter := store.Write().SnapshotMeter("").WithHostScope(series.scope).WithLabels(series.labels...)
 	switch series.rule.rule.Type {
 	case catalog.MetricTypeCounter:
-		meter.Counter(series.rule.rule.Output.Metric).ObserveTotal(metrix.SampleValue(series.value))
+		meter.Counter(series.rule.rule.Output.Metric).ObserveTotal(series.value)
 	case catalog.MetricTypeSample, catalog.MetricTypeState:
-		meter.Gauge(series.rule.rule.Output.Metric).Observe(metrix.SampleValue(series.value))
+		meter.Gauge(series.rule.rule.Output.Metric).Observe(series.value)
 	}
 }
 

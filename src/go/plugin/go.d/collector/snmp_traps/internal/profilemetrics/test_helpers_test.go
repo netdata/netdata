@@ -4,6 +4,7 @@ package profilemetrics
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
@@ -121,15 +122,9 @@ func (idx *staticTestCatalog) clone() *staticTestCatalog {
 		chartsByID:  make(map[string]*catalog.MetricChart, len(idx.chartsByID)),
 		trapsByRef:  make(map[string]*catalog.TrapDef, len(idx.trapsByRef)),
 	}
-	for name, rule := range idx.rulesByName {
-		next.rulesByName[name] = rule
-	}
-	for id, chart := range idx.chartsByID {
-		next.chartsByID[id] = chart
-	}
-	for ref, trap := range idx.trapsByRef {
-		next.trapsByRef[ref] = trap
-	}
+	maps.Copy(next.rulesByName, idx.rulesByName)
+	maps.Copy(next.chartsByID, idx.chartsByID)
+	maps.Copy(next.trapsByRef, idx.trapsByRef)
 	return next
 }
 
@@ -247,9 +242,7 @@ func cloneTestTrapDef(src *catalog.TrapDef) *catalog.TrapDef {
 	dst.DedupKeyVarbinds = append([]string(nil), src.DedupKeyVarbinds...)
 	if src.Labels != nil {
 		dst.Labels = make(map[string]string, len(src.Labels))
-		for key, value := range src.Labels {
-			dst.Labels[key] = value
-		}
+		maps.Copy(dst.Labels, src.Labels)
 	}
 	if src.SharedVarbinds != nil {
 		dst.SharedVarbinds = make(map[string]*catalog.VarbindDef, len(src.SharedVarbinds))
@@ -261,9 +254,7 @@ func cloneTestTrapDef(src *catalog.TrapDef) *catalog.TrapDef {
 			cp := *def
 			if def.Enum != nil {
 				cp.Enum = make(map[string]string, len(def.Enum))
-				for key, value := range def.Enum {
-					cp.Enum[key] = value
-				}
+				maps.Copy(cp.Enum, def.Enum)
 			}
 			dst.SharedVarbinds[oid] = &cp
 		}
