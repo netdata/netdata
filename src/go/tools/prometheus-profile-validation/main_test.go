@@ -11,7 +11,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -41,6 +43,30 @@ app_size_bytes{instance="node-a",quantile="0.9"} 200
 app_size_bytes_sum{instance="node-a"} 500
 app_size_bytes_count{instance="node-a"} 3
 `
+
+type stockProofReplay struct {
+	proofDirectory   string
+	profileName      string
+	evidenceRevision string
+	fixture          string
+}
+
+type stockProofCounts struct {
+	rawFamilies      int
+	rawLogicalSeries int
+	writerSeries     int
+	authoredCharts   int
+	runtimeCharts    int
+	chartDimensions  int
+}
+
+var (
+	validationInputCountsPattern = regexp.MustCompile(
+		`Input: \*\*([0-9,]+) raw families / ([0-9,]+) logical series\*\*`)
+	validationWriterCountsPattern = regexp.MustCompile(
+		`Writer/profile: \*\*([0-9,]+) writer series\*\*, \*\*([0-9,]+) authored charts\*\*, ` +
+			`\*\*([0-9,]+) runtime chart instances\*\*, and \*\*([0-9,]+) dimensions\*\*`)
+)
 
 const validProfile = `
 match: app_*
@@ -235,34 +261,121 @@ func TestStockProfileProofsPass(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tests := map[string]struct {
-		fixture string
-	}{
+	tests := map[string]stockProofReplay{
 		"ceph": {
-			fixture: "prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom",
+			proofDirectory:   "ceph",
+			profileName:      "ceph",
+			evidenceRevision: "ceph",
+			fixture:          "ceph_all_metrics.prom",
 		},
 		"litellm": {
-			fixture: "prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom",
+			proofDirectory:   "litellm",
+			profileName:      "litellm",
+			evidenceRevision: "litellm",
+			fixture:          "litellm_all_metrics.prom",
 		},
 		"vllm": {
-			fixture: "prometheus/profiles/vllm/fixtures/vllm_all_metrics.prom",
+			proofDirectory:   "vllm",
+			profileName:      "vllm",
+			evidenceRevision: "vllm",
+			fixture:          "vllm_all_metrics.prom",
 		},
 		"vllm_ray": {
-			fixture: "prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom",
+			proofDirectory:   "vllm_ray",
+			profileName:      "vllm_ray",
+			evidenceRevision: "vllm_ray",
+			fixture:          "vllm_ray_all_metrics.prom",
 		},
 	}
+	proofRoot := filepath.Join(goRoot, "plugin/go.d/collector/prometheus/profile-proofs")
+	assertStockProofDirectoryCoverage(t, proofRoot, tests)
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			profilePath := filepath.Join(goRoot, "plugin/go.d/config/go.d/prometheus.profiles/default", name+".yaml")
-			jobPath := filepath.Join(goRoot, "plugin/go.d/collector/prometheus/profile-proofs", name, "VALIDATION-JOB.yaml")
-			dumpPath := promtestdata.Require(t, test.fixture)
+			profilePath := filepath.Join(goRoot, "plugin/go.d/config/go.d/prometheus.profiles/default", test.profileName+".yaml")
+			jobPath := filepath.Join(proofRoot, test.proofDirectory, "VALIDATION-JOB.yaml")
+			validationPath := filepath.Join(proofRoot, test.proofDirectory, "VALIDATION.md")
+			dumpPath := promtestdata.Require(t, filepath.ToSlash(filepath.Join(
+				"prometheus/profiles", test.evidenceRevision, "fixtures", test.fixture)))
 			result := runValidationFiles(t, profilePath, dumpPath, jobPath)
 			if result.exitCode != 0 || result.report.Verdict != verdictPass {
 				t.Fatalf("stock profile proof failed\nexit code: %d\nstderr:\n%s\nreport:\n%s",
 					result.exitCode, result.stderr, result.stdout)
 			}
+			want := readStockProofCounts(t, validationPath)
+			got := stockProofCounts{
+				rawFamilies:      result.report.Counts.RawFamilies,
+				rawLogicalSeries: result.report.Counts.RawLogicalSeries,
+				writerSeries:     result.report.Counts.WriterSeries,
+				authoredCharts:   result.report.Counts.AuthoredCharts,
+				runtimeCharts:    result.report.Counts.CuratedCharts,
+				chartDimensions:  result.report.Counts.ChartDimensions,
+			}
+			if got != want {
+				t.Fatalf("stock profile counts differ from %s: got %+v, want %+v", validationPath, got, want)
+			}
 		})
+	}
+}
+
+func readStockProofCounts(t *testing.T, path string) stockProofCounts {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	normalized := strings.ReplaceAll(string(content), "\n  ", " ")
+	input := validationInputCountsPattern.FindStringSubmatch(normalized)
+	if len(input) != 3 {
+		t.Fatalf("could not parse authoritative input counts from %s", path)
+	}
+	writer := validationWriterCountsPattern.FindStringSubmatch(normalized)
+	if len(writer) != 5 {
+		t.Fatalf("could not parse authoritative writer counts from %s", path)
+	}
+	return stockProofCounts{
+		rawFamilies:      parseDocumentedCount(t, path, input[1]),
+		rawLogicalSeries: parseDocumentedCount(t, path, input[2]),
+		writerSeries:     parseDocumentedCount(t, path, writer[1]),
+		authoredCharts:   parseDocumentedCount(t, path, writer[2]),
+		runtimeCharts:    parseDocumentedCount(t, path, writer[3]),
+		chartDimensions:  parseDocumentedCount(t, path, writer[4]),
+	}
+}
+
+func parseDocumentedCount(t *testing.T, path, value string) int {
+	t.Helper()
+
+	parsed, err := strconv.Atoi(strings.ReplaceAll(value, ",", ""))
+	if err != nil {
+		t.Fatalf("invalid documented count %q in %s: %v", value, path, err)
+	}
+	return parsed
+}
+
+func assertStockProofDirectoryCoverage(t *testing.T, proofRoot string, proofs map[string]stockProofReplay) {
+	t.Helper()
+
+	entries, err := os.ReadDir(proofRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var actual []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			actual = append(actual, entry.Name())
+		}
+	}
+	slices.Sort(actual)
+
+	expected := make([]string, 0, len(proofs))
+	for _, proof := range proofs {
+		expected = append(expected, proof.proofDirectory)
+	}
+	slices.Sort(expected)
+	if !slices.Equal(actual, expected) {
+		t.Fatalf("stock proof replay table does not match proof directories: got %v, want %v", actual, expected)
 	}
 }
 

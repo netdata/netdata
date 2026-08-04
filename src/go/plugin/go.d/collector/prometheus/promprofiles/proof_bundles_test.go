@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -23,11 +22,12 @@ import (
 )
 
 type stockProfileProof struct {
-	directory     string
-	integrationID string
-	exampleName   string
-	jobName       string
-	inputs        []string
+	proofDirectory   string
+	profileName      string
+	evidenceRevision string
+	integrationID    string
+	exampleName      string
+	jobName          string
 }
 
 func TestDefaultCatalog_StockProfileProofBundles(t *testing.T) {
@@ -36,84 +36,114 @@ func TestDefaultCatalog_StockProfileProofBundles(t *testing.T) {
 
 	proofs := map[string]stockProfileProof{
 		"ceph": {
-			directory:     "ceph",
-			integrationID: "collector-go.d.plugin-prometheus-ceph",
-			exampleName:   "Ceph MGR and ceph-exporter",
-			jobName:       "ceph-mgr",
-			inputs: []string{
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/EVIDENCE.md",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/OPERATOR-MODEL.md",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION.md",
-				"src/go/plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml",
-				"src/go/testdata/prometheus/profiles/ceph/manifest.yaml",
-			},
+			proofDirectory:   "ceph",
+			profileName:      "ceph",
+			evidenceRevision: "ceph",
+			integrationID:    "collector-go.d.plugin-prometheus-ceph",
+			exampleName:      "Ceph MGR and ceph-exporter",
+			jobName:          "ceph-mgr",
 		},
 		"litellm": {
-			directory:     "litellm",
-			integrationID: "collector-go.d.plugin-prometheus-litellm",
-			exampleName:   "LiteLLM",
-			jobName:       "litellm",
-			inputs: []string{
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/EVIDENCE.md",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/OPERATOR-MODEL.md",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION.md",
-				"src/go/plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml",
-				"src/go/testdata/prometheus/profiles/litellm/manifest.yaml",
-			},
+			proofDirectory:   "litellm",
+			profileName:      "litellm",
+			evidenceRevision: "litellm",
+			integrationID:    "collector-go.d.plugin-prometheus-litellm",
+			exampleName:      "LiteLLM",
+			jobName:          "litellm",
 		},
 		"vllm": {
-			directory:     "vllm",
-			integrationID: "collector-go.d.plugin-prometheus-vllm",
-			exampleName:   "Native vLLM",
-			jobName:       "vllm",
-			inputs: []string{
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/EVIDENCE.md",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/OPERATOR-MODEL.md",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION-JOB.yaml",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION.md",
-				"src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm.yaml",
-				"src/go/testdata/prometheus/profiles/vllm/manifest.yaml",
-			},
+			proofDirectory:   "vllm",
+			profileName:      "vllm",
+			evidenceRevision: "vllm",
+			integrationID:    "collector-go.d.plugin-prometheus-vllm",
+			exampleName:      "Native vLLM",
+			jobName:          "vllm",
 		},
 		"vllm_ray": {
-			directory:     "vllm_ray",
-			integrationID: "collector-go.d.plugin-prometheus-vllm",
-			exampleName:   "vLLM on Ray",
-			jobName:       "vllm-ray",
-			inputs: []string{
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/EVIDENCE.md",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/OPERATOR-MODEL.md",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml",
-				"src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION.md",
-				"src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml",
-				"src/go/testdata/prometheus/profiles/vllm_ray/manifest.yaml",
-			},
+			proofDirectory:   "vllm_ray",
+			profileName:      "vllm_ray",
+			evidenceRevision: "vllm_ray",
+			integrationID:    "collector-go.d.plugin-prometheus-vllm",
+			exampleName:      "vLLM on Ray",
+			jobName:          "vllm-ray",
 		},
 	}
+
+	proofRoot := filepath.Join(repoRoot, "src/go/plugin/go.d/collector/prometheus/profile-proofs")
+	assertProofDirectoryCoverage(t, proofRoot, proofs)
+	assertProofLFAttributes(t, repoRoot)
 
 	metadataPath := filepath.Join(repoRoot, "src/go/plugin/go.d/collector/prometheus/metadata.yaml")
 	for name, proof := range proofs {
 		t.Run(name, func(t *testing.T) {
-			slices.Sort(proof.inputs)
-			manifestPath := filepath.Join(repoRoot, "src/go/plugin/go.d/collector/prometheus/profile-proofs",
-				proof.directory, "SHA256SUMS.tsv")
+			inputs := expectedProofInputs(proof)
+			slices.Sort(inputs)
+			manifestPath := filepath.Join(proofRoot, proof.proofDirectory, "SHA256SUMS.tsv")
 			entries := readProofManifest(t, repoRoot, manifestPath)
-			require.Equal(t, proof.inputs, proofManifestPaths(entries))
+			require.Equal(t, inputs, proofManifestPaths(entries))
 			verifyLocalProofInputs(t, repoRoot, entries)
 
-			jobPath := filepath.Join(repoRoot, "src/go/plugin/go.d/collector/prometheus/profile-proofs",
-				proof.directory, "VALIDATION-JOB.yaml")
+			jobPath := filepath.Join(proofRoot, proof.proofDirectory, "VALIDATION-JOB.yaml")
 			assertProofJobMatchesMetadata(t, metadataPath, jobPath, proof)
 
 			t.Run("external evidence", func(t *testing.T) {
-				relativePath := filepath.ToSlash(filepath.Join("prometheus/profiles", proof.directory, "manifest.yaml"))
+				relativePath := filepath.ToSlash(filepath.Join("prometheus/profiles", proof.evidenceRevision, "manifest.yaml"))
 				externalManifestPath := promtestdata.Require(t, relativePath)
 				verifyExternalManifestPin(t, entries, externalManifestPath, relativePath)
-				verifyExternalEvidenceManifest(t, externalManifestPath, proof.directory)
+				verifyExternalEvidenceManifest(t, externalManifestPath, proof.profileName)
 			})
 		})
+	}
+}
+
+func expectedProofInputs(proof stockProfileProof) []string {
+	localRoot := filepath.ToSlash(filepath.Join(
+		"src/go/plugin/go.d/collector/prometheus/profile-proofs", proof.proofDirectory))
+	return []string{
+		localRoot + "/EVIDENCE.md",
+		localRoot + "/OPERATOR-MODEL.md",
+		localRoot + "/VALIDATION-JOB.yaml",
+		localRoot + "/VALIDATION.md",
+		filepath.ToSlash(filepath.Join(
+			"src/go/plugin/go.d/config/go.d/prometheus.profiles/default", proof.profileName+".yaml")),
+		filepath.ToSlash(filepath.Join(
+			"src/go/testdata/prometheus/profiles", proof.evidenceRevision, "manifest.yaml")),
+	}
+}
+
+func assertProofDirectoryCoverage(t *testing.T, proofRoot string, proofs map[string]stockProfileProof) {
+	t.Helper()
+
+	entries, err := os.ReadDir(proofRoot)
+	require.NoError(t, err)
+	var actual []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			actual = append(actual, entry.Name())
+		}
+	}
+	slices.Sort(actual)
+
+	expected := make([]string, 0, len(proofs))
+	for _, proof := range proofs {
+		expected = append(expected, proof.proofDirectory)
+	}
+	slices.Sort(expected)
+	require.Equal(t, expected, actual, "every stock proof directory must be registered")
+}
+
+func assertProofLFAttributes(t *testing.T, repoRoot string) {
+	t.Helper()
+
+	content, err := os.ReadFile(filepath.Join(repoRoot, ".gitattributes"))
+	require.NoError(t, err)
+	lines := strings.Split(string(content), "\n")
+	for _, expected := range []string{
+		".gitattributes text eol=lf",
+		"src/go/plugin/go.d/collector/prometheus/profile-proofs/** text eol=lf",
+		"src/go/plugin/go.d/config/go.d/prometheus.profiles/default/*.yaml text eol=lf",
+	} {
+		require.Contains(t, lines, expected, "hashed proof inputs must retain LF checkout bytes")
 	}
 }
 
@@ -187,10 +217,14 @@ func verifyLocalProofInputs(t *testing.T, repoRoot string, entries []proofManife
 func verifyProofInput(t *testing.T, path string, entry proofManifestEntry) {
 	t.Helper()
 
-	content, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	require.NoErrorf(t, err, "read proof input %q", entry.path)
-	require.Equalf(t, entry.bytes, int64(len(content)), "proof input %q byte count", entry.path)
-	require.Equalf(t, entry.sha256, fmt.Sprintf("%x", sha256.Sum256(content)), "proof input %q digest", entry.path)
+	defer func() { require.NoError(t, file.Close()) }()
+	hasher := sha256.New()
+	bytesRead, err := io.Copy(hasher, file)
+	require.NoErrorf(t, err, "hash proof input %q", entry.path)
+	require.Equalf(t, entry.bytes, bytesRead, "proof input %q byte count", entry.path)
+	require.Equalf(t, entry.sha256, hex.EncodeToString(hasher.Sum(nil)), "proof input %q digest", entry.path)
 }
 
 func verifyExternalManifestPin(t *testing.T, entries []proofManifestEntry, manifestPath, relativePath string) {

@@ -63,7 +63,7 @@ class NormalizeFileArgumentsTest(unittest.TestCase):
         go_root = launcher_path.parents[4] / "src" / "go"
 
         with tempfile.TemporaryDirectory() as temporary:
-            caller = Path(temporary)
+            caller = Path(temporary).resolve()
             bin_dir = caller / "bin"
             bin_dir.mkdir()
             fake_go = bin_dir / "go"

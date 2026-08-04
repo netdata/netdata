@@ -54,4 +54,6 @@ Local setup from the repository root:
 git clone --depth=1 --branch master https://github.com/netdata/testdata.git src/go/testdata
 ```
 
-Set `NETDATA_TESTDATA_DIR` to use an existing checkout elsewhere.
+For an existing checkout, run `git -C src/go/testdata pull --ff-only origin master`. Set `NETDATA_TESTDATA_DIR` to use a
+checkout elsewhere. Ordinary tests skip only when the checkout root is absent; a present but incomplete or unreadable
+checkout fails.

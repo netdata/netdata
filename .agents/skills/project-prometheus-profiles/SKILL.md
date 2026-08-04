@@ -735,8 +735,8 @@ A `PASS` proves, for that evidence:
 - every authored chart and dimension materializes;
 - every selected writer series carries the labels required by the chart's
   effective explicit instance identity;
-- optional dimension-label fixtures route both present/nonblank and missing/blank forms
-  to the same context and instance type without overlap or fallback autogen;
+- each optional dimension-label form present in the supplied fixtures routes to
+  the intended context and instance type without overlap or fallback autogen;
 - isolated planning finds no observed cross-template collision or
   same-template instance-ID collapse;
 - observed per-instance dimensions are not discarded by lifecycle caps or
@@ -749,6 +749,11 @@ A `PASS` proves, for that evidence:
 - every chart exposes at least one visible dimension;
 - histogram bucket charts use incremental observation-rate semantics; and
 - unambiguously non-volume charts do not use filled presentation.
+
+`PASS` does not prove that the author supplied both sides of an optional-label
+case. The author MUST provide paired present/nonblank and missing/blank fixtures
+when making that compatibility claim, then verify that both reach the same
+context and instance type.
 
 The report lists raw families absent after selector/relabel/writer processing
 under `pipeline_excluded`; they are not misreported as chart coverage. Successful
@@ -917,9 +922,16 @@ root:
 git clone --depth=1 --branch master https://github.com/netdata/testdata.git src/go/testdata
 ```
 
+Update an existing checkout before replay:
+
+```text
+git -C src/go/testdata pull --ff-only origin master
+```
+
 `src/go/testdata` is ignored. `NETDATA_TESTDATA_DIR` MAY point to another
 testdata checkout. Ordinary tests MUST NOT fetch network data and MAY skip only
-external-dependent coverage when the checkout is absent. Dedicated CI MUST set
+external-dependent coverage when the checkout root is absent. A present but
+incomplete or unreadable checkout MUST fail. Dedicated CI MUST set
 `NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1`, verify the external manifest chain,
 and replay the objective validator for every stock proof so missing evidence
 fails rather than skips.

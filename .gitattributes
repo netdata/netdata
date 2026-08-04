@@ -1,3 +1,6 @@
+.gitattributes text eol=lf
+src/go/plugin/go.d/collector/prometheus/profile-proofs/** text eol=lf
+src/go/plugin/go.d/config/go.d/prometheus.profiles/default/*.yaml text eol=lf
 src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/** text eol=lf linguist-generated=true
 src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json text eol=lf linguist-generated=true
 src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt linguist-generated=true

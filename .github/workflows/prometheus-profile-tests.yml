@@ -7,31 +7,15 @@ on:
       - master
     paths:
       - '.github/workflows/prometheus-profile-tests.yml'
+      - '.gitattributes'
       - '.agents/skills/project-prometheus-profiles/**'
-      - 'src/go/go.mod'
-      - 'src/go/go.sum'
-      - 'src/go/internal/promtestdata/**'
-      - 'src/go/pkg/metrix/**'
-      - 'src/go/pkg/prometheus/**'
-      - 'src/go/plugin/framework/chartengine/**'
-      - 'src/go/plugin/framework/charttpl/**'
-      - 'src/go/plugin/go.d/collector/prometheus/**'
-      - 'src/go/plugin/go.d/config/go.d/prometheus.profiles/default/**'
-      - 'src/go/tools/prometheus-profile-validation/**'
+      - 'src/go/**'
   pull_request:
     paths:
       - '.github/workflows/prometheus-profile-tests.yml'
+      - '.gitattributes'
       - '.agents/skills/project-prometheus-profiles/**'
-      - 'src/go/go.mod'
-      - 'src/go/go.sum'
-      - 'src/go/internal/promtestdata/**'
-      - 'src/go/pkg/metrix/**'
-      - 'src/go/pkg/prometheus/**'
-      - 'src/go/plugin/framework/chartengine/**'
-      - 'src/go/plugin/framework/charttpl/**'
-      - 'src/go/plugin/go.d/collector/prometheus/**'
-      - 'src/go/plugin/go.d/config/go.d/prometheus.profiles/default/**'
-      - 'src/go/tools/prometheus-profile-validation/**'
+      - 'src/go/**'
 
 jobs:
   proof-tests:
@@ -51,9 +35,38 @@ jobs:
       - name: Clone latest testdata master
         shell: bash
         run: |
-          set -euo pipefail
-          git clone --depth=1 --branch master --single-branch \
+          set -euxo pipefail
+          git clone --depth=1 --branch master --single-branch --filter=blob:none --sparse \
             https://github.com/netdata/testdata.git src/go/testdata
+
+          mapfile -t evidence_dirs < <(
+            awk -F '\t' \
+              'BEGIN {
+                prefix = "src/go/testdata/prometheus/profiles/"
+                suffix = "/manifest.yaml"
+              }
+              index($3, prefix) == 1 && substr($3, length($3) - length(suffix) + 1) == suffix {
+                revision = substr($3, length(prefix) + 1, length($3) - length(prefix) - length(suffix))
+                if (revision != "" && index(revision, "/") == 0) {
+                  print "prometheus/profiles/" revision
+                }
+              }' \
+              src/go/plugin/go.d/collector/prometheus/profile-proofs/*/SHA256SUMS.tsv \
+              | sort -u
+          )
+          test "${#evidence_dirs[@]}" -gt 0
+          git -C src/go/testdata sparse-checkout set "${evidence_dirs[@]}"
+
+      - name: Verify external evidence integrity
+        env:
+          NETDATA_PROMETHEUS_TESTDATA_REQUIRED: '1'
+        run: |
+          cd src/go
+          go test -count=1 -run '^TestDefaultCatalog_StockProfileProofBundles$' \
+            ./plugin/go.d/collector/prometheus/promprofiles
+
+      - name: Verify authoring launcher
+        run: python3 .agents/skills/project-prometheus-profiles/scripts/test_validate_profile.py
 
       - name: Verify Prometheus profile proofs
         env:

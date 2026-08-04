@@ -33,6 +33,8 @@ Stock-profile fixtures and generated source inventories live in
 `NETDATA_TESTDATA_DIR` to another checkout. Referenced evidence paths are
 immutable; their manifest size and SHA-256 are pinned by the compact proof in
 Netdata, and the external manifest pins every evidence file.
+Update an existing default checkout with
+`git -C src/go/testdata pull --ff-only origin master` before replay.
 
 The dedicated test replays every stock proof and fails when external evidence
 is unavailable:

@@ -20,10 +20,14 @@ const (
 	RequiredEnv = "NETDATA_PROMETHEUS_TESTDATA_REQUIRED"
 )
 
-var errInvalidPath = errors.New("invalid testdata path")
+var (
+	errInvalidPath         = errors.New("invalid testdata path")
+	errTestdataUnavailable = errors.New("testdata checkout unavailable")
+)
 
-// Require returns the path to an external testdata file. Missing evidence
+// Require returns the path to an external testdata file. An absent checkout
 // skips the calling test locally and fails it when RequiredEnv is set to 1.
+// A present but incomplete or unreadable checkout always fails.
 func Require(t testing.TB, relativePath string) string {
 	t.Helper()
 
@@ -41,10 +45,10 @@ func Require(t testing.TB, relativePath string) string {
 		err,
 		DirEnv,
 	)
-	if os.Getenv(RequiredEnv) == "1" {
-		t.Fatal(message)
+	if errors.Is(err, errTestdataUnavailable) && os.Getenv(RequiredEnv) != "1" {
+		t.Skip(message)
 	}
-	t.Skip(message)
+	t.Fatal(message)
 	return ""
 }
 
@@ -58,8 +62,18 @@ func resolve(relativePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	info, err := os.Stat(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("%w: %s does not exist", errTestdataUnavailable, root)
+	}
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("testdata root %s is not a directory", root)
+	}
 	path := filepath.Join(root, clean)
-	info, err := os.Stat(path)
+	info, err = os.Stat(path)
 	if err != nil {
 		return "", err
 	}
