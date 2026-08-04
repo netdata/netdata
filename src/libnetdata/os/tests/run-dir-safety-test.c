@@ -5,8 +5,10 @@
 //
 // Two rules are checked, because os_run_dir_is_safe() serves two callers: the agent
 // itself (rw), which is about to create, chown and bind here as root, and a client
-// (read-only) that only reads or connects to what is already there. The read-only
-// rule differs in exactly one requirement - see the read-only section below.
+// (read-only) that only reads or connects to what is already there. Both refuse a
+// directory they could be redirected away from - a symlink, a non-directory. Only
+// the rw rule also asks who else could replace the directory, which is what the
+// agent's privileged use of it needs - see the read-only section below.
 //
 // os_run_dir_is_safe() is exercised directly rather than through os_run_dir(),
 // which caches its answer for the process lifetime and creates directories as a
@@ -196,21 +198,29 @@ int main(void) {
     check("directory writable by its group (systemd 0775 shape)", p, true);
 
     // The read-only resolution a client performs - netdatacli looking for
-    // netdata.pipe, a plugin looking for a socket. It creates nothing and chowns
-    // nothing, so the sticky-parent ownership requirement does not apply to it: a
-    // client cannot know which uid the agent runs as (the root case is below).
-    // Everything else does apply, so it still cannot be pointed elsewhere.
+    // netdata.pipe, a plugin looking for a socket. It creates nothing, chowns
+    // nothing and binds nothing, so none of the "who else could replace this
+    // directory" rules apply to it: those exist to protect what we do here as
+    // root. What still applies is that it must not be redirected to another
+    // directory, so a symlink or a non-directory is refused for it too.
     fprintf(stderr, "read-only resolution, for a client rather than the agent:\n");
     snprintfz(p, sizeof(p), "%s/ours", sticky);
     check_mode("directory we own, sticky parent", p, false, true);
     snprintfz(p, sizeof(p), "%s/to_etc", exclusive);
     check_mode("symlink to /etc", p, false, false);
-    snprintfz(p, sizeof(p), "%s/ours", open_parent);
-    check_mode("world-writable parent without the sticky bit", p, false, false);
-    snprintfz(p, sizeof(p), "%s/other_writable", exclusive);
-    check_mode("directory writable by everyone", p, false, false);
     snprintfz(p, sizeof(p), "%s/afile", exclusive);
     check_mode("a regular file, not a directory", p, false, false);
+
+    // Accepted for a client, refused for the agent: the same directory, judged by
+    // what the caller is about to do with it. A non-root install legitimately puts
+    // its run directory under a parent the agent's own account owns, and a client
+    // that only connects must still be able to find it.
+    snprintfz(p, sizeof(p), "%s/ours", open_parent);
+    check_mode("world-writable parent without the sticky bit", p, false, true);
+    check_mode("world-writable parent without the sticky bit", p, true, false);
+    snprintfz(p, sizeof(p), "%s/other_writable", exclusive);
+    check_mode("directory writable by everyone", p, false, true);
+    check_mode("directory writable by everyone", p, true, false);
 
     fprintf(stderr, "privileged open, symlink at the final component:\n");
     {
