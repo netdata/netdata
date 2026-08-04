@@ -19,6 +19,39 @@ func TestProfileMetricTestProfileBuilderUsesProductionCatalog(t *testing.T) {
 		}
 	}
 
+	t.Run("serialized source preserves boundary input", func(t *testing.T) {
+		data, err := marshalTestCatalogSource(
+			[]testFileVarbind{
+				{Name: "orderedVarbind", Definition: &testVarbindDef{OID: "1.3.6.1.4.1.99999.10", Type: "INTEGER"}},
+				{Name: "orderedVarbind"},
+			},
+			[]*testTrapDef{{
+				OID:      "1.3.6.1.4.1.99999.1",
+				Name:     "TEST-MIB::candidate",
+				Category: "unknown",
+				Severity: "info",
+				Varbinds: []any{"secondRef", "firstRef"},
+			}},
+			nil,
+			nil,
+		)
+		require.NoError(t, err)
+		require.Equal(t, `varbinds:
+  orderedVarbind:
+    oid: 1.3.6.1.4.1.99999.10
+    type: INTEGER
+  orderedVarbind: null
+traps:
+- oid: 1.3.6.1.4.1.99999.1
+  name: TEST-MIB::candidate
+  category: unknown
+  severity: info
+  varbinds:
+  - secondRef
+  - firstRef
+`, string(data))
+	})
+
 	t.Run("stock resolution before mutation", func(t *testing.T) {
 		idx := newTestProfileBuilder(t).Build()
 		resolved, err := idx.ResolveTrap("IF-MIB::linkDown")

@@ -174,6 +174,22 @@ func loadTestCatalogEpoch(
 	charts []testMetricChart,
 ) (*catalog.Lease, error) {
 	t.Helper()
+	data, err := marshalTestCatalogSource(fileVarbinds, traps, rules, charts)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(filepath.Join(paths.UserDirs[0], "test-traps.yaml"), data, 0o600); err != nil {
+		return nil, fmt.Errorf("write test trap profile: %w", err)
+	}
+	return catalog.NewManager(paths).Acquire()
+}
+
+func marshalTestCatalogSource(
+	fileVarbinds []testFileVarbind,
+	traps []*testTrapDef,
+	rules []testMetricRule,
+	charts []testMetricChart,
+) ([]byte, error) {
 	profile := struct {
 		Varbinds yaml.MapSlice     `yaml:"varbinds,omitempty"`
 		Traps    []*testTrapDef    `yaml:"traps"`
@@ -198,10 +214,7 @@ func loadTestCatalogEpoch(
 	if err != nil {
 		return nil, fmt.Errorf("marshal test trap profile: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(paths.UserDirs[0], "test-traps.yaml"), data, 0o600); err != nil {
-		return nil, fmt.Errorf("write test trap profile: %w", err)
-	}
-	return catalog.NewManager(paths).Acquire()
+	return data, nil
 }
 
 func normalizeTestRuntimeConfig(cfg testRuntimeConfig) (Policy, error) {
