@@ -43,12 +43,17 @@ void os_run_dir_set_target_uid(uid_t uid);
  * could have planted or could replace. Trailing slashes are trimmed internally,
  * so a caller cannot accidentally disable the symlink check by passing one.
  *
- * rw is the level of validation, not just an access mode. With rw the directory is
- * about to be created, chowned and bound to while still root, so in a
- * world-writable sticky parent (the /tmp fallback) it must also belong to us or to
- * the declared "run as user". A read-only caller is exempt from that one
- * requirement: it only reads or connects, and it cannot know which uid the agent
- * runs as.
+ * rw is the level of validation, not just an access mode. Both levels refuse a
+ * symlinked final component, a non-directory, and anything we cannot access - no
+ * caller may be redirected by a symlink planted at this name.
+ *
+ * With rw the directory is additionally about to be created, chowned and bound to
+ * while still root, so it must also be one no other account can replace: not
+ * world-writable, under a parent that is exclusively ours, or - in a sticky parent
+ * such as the /tmp fallback - owned by us or by the declared "run as user".
+ * A read-only caller is exempt from all of that. It creates nothing and chowns
+ * nothing, it cannot know which uid the agent runs as, and the socket's own mode
+ * decides whether it may talk to the agent.
  */
 bool os_run_dir_is_safe(const char *candidate, bool rw);
 

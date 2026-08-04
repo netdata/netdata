@@ -1322,30 +1322,37 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     freez(server);
 }
 
-// Grant the socket its final mode without ever letting the operation land on
-// anything but the socket we just bound. This runs as root for the temporary
-// spawn server, long before become_user(), inside a directory the netdata
-// account can write into: /run/netdata is 0775 netdata:netdata on a stock
-// systemd install and carries no sticky bit, so any entry in it - including a
-// root-owned socket - can be unlinked and replaced by that account.
-// AT_SYMLINK_NOFOLLOW is what refuses a replacement: it fails rather than
-// following a link, both where the kernel implements it (macOS, FreeBSD) and
-// through the /proc-based emulation in glibc and musl. Measured on both: it
-// succeeds on the socket we bound, and returns EOPNOTSUPP once the name has
-// become a symlink.
-// There is deliberately no fallback for a failure. The only alternatives are to
-// chmod whatever the name now refers to, or to stat it and then chmod it - which
-// is the same race again, with more code to hide it in. A failure here means the
-// entry is not the socket we created, so the server would be listening on a name
-// no client can reach: refuse instead.
-static bool spawn_server_chmod_socket(SPAWN_SERVER *server, int dir_fd, const char *sock_filename) {
-    if(fchmodat(dir_fd, sock_filename, 0770, AT_SYMLINK_NOFOLLOW) == 0)
-        return true;
+// Give the socket its final mode at creation, instead of relaxing it afterwards.
+// bind() applies the process umask to the socket it creates, so binding under
+// umask 0007 produces a 0770 socket directly: there is no window in which the
+// entry exists more permissively, and no second lookup of a name that somebody
+// may have replaced in the meantime. This runs as root for the temporary spawn
+// server, long before become_user(), inside a directory the netdata account can
+// write into (/run/netdata is 0775 netdata:netdata on a stock systemd install and
+// carries no sticky bit), so that second lookup was worth removing.
+// Doing it after the fact is also not portable: the only safe form,
+// fchmodat(AT_SYMLINK_NOFOLLOW), returns ENOTSUP on glibc < 2.32 - the O_PATH
+// emulation landed there, and the kernel only grew fchmodat2() in 6.6 - which is
+// still CentOS 7, Amazon Linux 2, every RHEL 8 derivative and Debian 11.
+// umask is process-wide, so the change is serialized and held only across bind().
+// netipc's bind_owner_only_socket() does the same for its own sockets and cannot
+// be shared: that subtree deliberately carries no libnetdata dependency.
+static SPINLOCK spawn_server_umask_spinlock = SPINLOCK_INITIALIZER;
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN SERVER: refusing to set the mode of '%s' (%s) - it is no longer the socket we bound",
-           server->path, strerror(errno));
-    return false;
+static int spawn_server_bind_with_mode(int sock, const struct sockaddr_un *addr) {
+    spinlock_lock(&spawn_server_umask_spinlock);
+
+    // Flawfinder: ignore
+    mode_t old_mask = umask(S_IRWXO); // nosemgrep // NOSONAR - 0777 & ~0007 = 0770
+    int rc = bind(sock, (const struct sockaddr *)addr, sizeof(*addr));
+    int saved_errno = errno;
+    // Flawfinder: ignore
+    umask(old_mask); // nosemgrep // NOSONAR - restore immediately
+
+    spinlock_unlock(&spawn_server_umask_spinlock);
+
+    errno = saved_errno;
+    return rc;
 }
 
 #if defined(OS_LINUX)
@@ -1382,6 +1389,15 @@ static bool spawn_server_dir_fd_route_usable(int dir_fd, char *dst, size_t dst_s
 // unavailable there is no safe pathname to retry on, and refusing is the only
 // honest answer - keeping that refusal confined to the sticky-parent case is what
 // stops an environment without a usable /proc from taking netdata down.
+// The refusal is confined further, to a privileged process. What it protects is
+// the boundary between us and the account we are about to become: whoever can
+// swap this run directory is the uid we drop to. Running unprivileged there is no
+// such boundary - the only account that can swap the directory is the one we are
+// already running as, which needs no race to do anything we can do - so the
+// pathname is exactly as trustworthy as everything else that account does, and
+// refusing would only deny a spawn server to installs that have no /proc to bind
+// through: netdata run as a normal user on macOS and FreeBSD, where the built-in
+// candidates need root and the /tmp fallback is what is left.
 static bool spawn_server_bind_socket(SPAWN_SERVER *server, int dir_fd, const char *sock_filename, bool parent_is_exclusive) {
     if(!parent_is_exclusive) {
         // Somebody other than root can rename this run directory, so its pathname
@@ -1400,7 +1416,7 @@ static bool spawn_server_bind_socket(SPAWN_SERVER *server, int dir_fd, const cha
             if(len > 0 && (size_t)len < sizeof(bind_path) &&
                spawn_server_set_unix_socket_path(&dir_fd_addr, bind_path, false, NULL)) {
 
-                if(bind(server->sock, (struct sockaddr *)&dir_fd_addr, sizeof(dir_fd_addr)) == 0)
+                if(spawn_server_bind_with_mode(server->sock, &dir_fd_addr) == 0)
                     return true;
 
                 // No retry on the pathname: the route was available, so this is a
@@ -1418,20 +1434,27 @@ static bool spawn_server_bind_socket(SPAWN_SERVER *server, int dir_fd, const cha
         (void)sock_filename;
 #endif
 
-        // Nothing here can be made safe: there is no descriptor route on this
-        // platform (or none usable), and the pathname is exactly what an attacker
-        // controls. Say so plainly and point at the fix, rather than binding it
-        // anyway with a warning nobody reads.
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN SERVER: refusing to create '%s': its run directory is inside a directory "
-               "others can write to, and this system cannot bind through a directory descriptor. "
-               "Set NETDATA_RUN_DIR to a directory whose parent only root can write to.",
-               server->path);
-        return false;
+        // There is no descriptor route on this platform (or none usable). While we
+        // are privileged the pathname is exactly what somebody else controls, and
+        // nothing here can be made safe: say so plainly and point at the fix,
+        // rather than binding it anyway with a warning nobody reads.
+        if(geteuid() == 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: refusing to create '%s': its run directory is inside a directory "
+                   "others can write to, and this system cannot bind through a directory descriptor. "
+                   "Set NETDATA_RUN_DIR to a directory whose parent only root can write to.",
+                   server->path);
+            return false;
+        }
+
+        // Unprivileged: there is no boundary to protect here, so fall through and
+        // bind the pathname.
     }
 
-    // The parent is exclusively ours, so nobody but root can rename or replace the
-    // run directory and the pathname still names the directory we validated.
+    // Either the parent is exclusively ours - so nobody but root can rename or
+    // replace the run directory and the pathname still names the directory we
+    // validated - or we are unprivileged, and whoever could replace it is the
+    // account we are already running as.
     struct sockaddr_un server_addr = {
         .sun_family = AF_UNIX,
     };
@@ -1442,10 +1465,9 @@ static bool spawn_server_bind_socket(SPAWN_SERVER *server, int dir_fd, const cha
 
     // bind() cannot be redirected onto an existing name: any entry already there,
     // a planted symlink included, makes it fail rather than write through it.
-    if(bind(server->sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        int error = errno;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind() '%s': %s (%d)",
-               server->path, strerror(error), error);
+    if(spawn_server_bind_with_mode(server->sock, &server_addr) == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind() '%s' (%s)",
+               server->path, strerror(errno));
         return false;
     }
 
@@ -1496,9 +1518,9 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server, const cha
         return false;
     }
 
-    bool ok = spawn_server_chmod_socket(server, dir_fd, sock_filename);
+    // no chmod step: the socket was created 0770 by spawn_server_bind_with_mode()
     close(dir_fd);
-    return ok;
+    return true;
 }
 
 static void replace_stdio_with_dev_null() {

@@ -3165,8 +3165,9 @@ add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
 target_link_libraries(stream-replay-endpoints-test libnetdata)
 
 # POSIX ownership semantics only: on Windows os_run_dir_is_safe() short-circuits
-# to true (Cygwin has no uid 0 and no sticky bit), so every refusal case here
-# would fail by design.
+# to true once past the symlink, directory and access checks (Cygwin has no uid 0
+# and no sticky bit), so the ownership and parent-trust refusal cases here would
+# fail by design.
 if(NOT OS_WINDOWS)
         add_executable(run-dir-safety-test EXCLUDE_FROM_ALL
                 src/libnetdata/os/tests/run-dir-safety-test.c)
