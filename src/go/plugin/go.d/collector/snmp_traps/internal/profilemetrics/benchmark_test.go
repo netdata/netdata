@@ -94,7 +94,7 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 
 func benchmarkProfileMetricIndex(b testing.TB) *testCatalog {
 	b.Helper()
-	idx := newTestCatalog()
+	idx := newTestCatalog(b)
 	traps := []*testTrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,

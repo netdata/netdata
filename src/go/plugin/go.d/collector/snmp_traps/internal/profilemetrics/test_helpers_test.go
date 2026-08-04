@@ -9,12 +9,16 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/attribution"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profiletest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/require"
 )
@@ -24,11 +28,16 @@ type testRuntimeConfig struct {
 	Include []string
 }
 
+// testCatalog keeps trap loading/resolution production-backed while allowing
+// unchecked metric definitions for tests of Runtime's defensive validation.
 type testCatalog struct {
-	trapsByOID  map[string]*catalog.TrapDef
-	trapsByName map[string]*catalog.TrapDef
-	rules       map[string]*catalog.MetricRule
-	charts      map[string]*catalog.MetricChart
+	tb        testing.TB
+	paths     catalog.Paths
+	trapDefs  []*catalog.TrapDef
+	trapLease *catalog.Lease
+	trapEpoch *catalog.Epoch
+	rules     map[string]*catalog.MetricRule
+	charts    map[string]*catalog.MetricChart
 }
 type testTrapEntry = model.TrapEntry
 type testTrapDef = catalog.TrapDef
@@ -60,23 +69,39 @@ const (
 	profileMetricMissingError            = catalog.MetricMissingError
 )
 
-func newTestCatalog() *testCatalog {
-	return &testCatalog{
-		trapsByOID:  make(map[string]*catalog.TrapDef),
-		trapsByName: make(map[string]*catalog.TrapDef),
-		rules:       make(map[string]*catalog.MetricRule),
-		charts:      make(map[string]*catalog.MetricChart),
+func newTestCatalog(t testing.TB) *testCatalog {
+	t.Helper()
+	idx := &testCatalog{
+		tb:     t,
+		paths:  profiletest.CatalogPaths(t),
+		rules:  make(map[string]*catalog.MetricRule),
+		charts: make(map[string]*catalog.MetricChart),
 	}
+	t.Cleanup(func() {
+		if idx.trapLease != nil {
+			idx.trapLease.Close()
+		}
+	})
+	return idx
 }
 
 func (idx *testCatalog) addTraps(traps []*testTrapDef) error {
-	for _, trap := range traps {
+	for i, trap := range traps {
 		if trap == nil {
-			return fmt.Errorf("nil trap definition")
+			return fmt.Errorf("trap definition at index %d is nil", i)
 		}
-		idx.trapsByOID[trap.OID] = trap
-		idx.trapsByName[trap.Name] = trap
 	}
+	candidate := append(append([]*catalog.TrapDef(nil), idx.trapDefs...), traps...)
+	lease, err := loadTestTrapEpoch(idx.tb, idx.paths, candidate)
+	if err != nil {
+		return err
+	}
+	if idx.trapLease != nil {
+		idx.trapLease.Close()
+	}
+	idx.trapDefs = candidate
+	idx.trapLease = lease
+	idx.trapEpoch = lease.Epoch()
 	return nil
 }
 
@@ -119,18 +144,47 @@ func (idx *testCatalog) Definitions(names []string) (catalog.MetricDefinitions, 
 }
 
 func (idx *testCatalog) ResolveTrap(ref string) (*testTrapDef, error) {
-	if trap := idx.trapsByOID[ref]; trap != nil {
-		return trap, nil
+	if idx.trapEpoch == nil {
+		return nil, fmt.Errorf("trap %q not found", ref)
 	}
-	if alt := model.AlternateTrapOID(ref); alt != ref {
-		if trap := idx.trapsByOID[alt]; trap != nil {
-			return trap, nil
+	return idx.trapEpoch.ResolveTrap(ref)
+}
+
+func loadTestTrapEpoch(t testing.TB, paths catalog.Paths, traps []*catalog.TrapDef) (*catalog.Lease, error) {
+	t.Helper()
+	profile := struct {
+		Varbinds map[string]catalog.VarbindDef `yaml:"varbinds,omitempty"`
+		Traps    []*catalog.TrapDef            `yaml:"traps"`
+	}{
+		Varbinds: make(map[string]catalog.VarbindDef),
+		Traps:    make([]*catalog.TrapDef, 0, len(traps)),
+	}
+	for _, src := range traps {
+		trap := *src
+		trap.VarbindRefs = append([]any(nil), src.VarbindRefs...)
+		if len(trap.VarbindRefs) == 0 && len(src.SharedVarbinds) > 0 {
+			names := make([]string, 0, len(src.SharedVarbinds))
+			for _, vb := range src.SharedVarbinds {
+				names = append(names, vb.RawName)
+			}
+			slices.Sort(names)
+			for _, name := range names {
+				trap.VarbindRefs = append(trap.VarbindRefs, name)
+			}
 		}
+		for _, vb := range src.SharedVarbinds {
+			profile.Varbinds[vb.RawName] = *vb
+		}
+		profile.Traps = append(profile.Traps, &trap)
 	}
-	if trap := idx.trapsByName[ref]; trap != nil {
-		return trap, nil
+	data, err := yaml.Marshal(profile)
+	if err != nil {
+		return nil, fmt.Errorf("marshal test trap profile: %w", err)
 	}
-	return nil, fmt.Errorf("trap %q not found", ref)
+	if err := os.WriteFile(filepath.Join(paths.UserDirs[0], "test-traps.yaml"), data, 0o600); err != nil {
+		return nil, fmt.Errorf("write test trap profile: %w", err)
+	}
+	return catalog.NewManager(paths).Acquire()
 }
 
 func normalizeTestRuntimeConfig(cfg testRuntimeConfig) (Policy, error) {
@@ -188,7 +242,7 @@ func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.Cyc
 
 func newPopulatedTestCatalog(t *testing.T) *testCatalog {
 	t.Helper()
-	idx := newTestCatalog()
+	idx := newTestCatalog(t)
 	traps := []*testTrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,

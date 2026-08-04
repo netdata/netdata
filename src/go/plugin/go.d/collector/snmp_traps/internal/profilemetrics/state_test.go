@@ -107,8 +107,7 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
 	if err := idx.addTraps([]*testTrapDef{
-		{OID: testLinkDownTrapOID, Name: "SNMPv2-MIB::linkDown", Category: "state_change", Severity: "warning", SourceFile: "test-profile.yaml"},
-		{OID: testLinkUpTrapOID, Name: "SNMPv2-MIB::linkUp", Category: "state_change", Severity: "notice", SourceFile: "test-profile.yaml"},
+		{OID: testLinkUpTrapOID, Name: "IF-MIB::linkUp", Category: "state_change", Severity: "notice", SourceFile: "test-profile.yaml"},
 	}); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
@@ -118,8 +117,8 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 		profileMetricRule{
 			Name:        "if.link_state",
 			Type:        profileMetricTypeState,
-			ProblemTrap: "SNMPv2-MIB::linkDown",
-			ClearTrap:   "SNMPv2-MIB::linkUp",
+			ProblemTrap: "IF-MIB::linkDown",
+			ClearTrap:   "IF-MIB::linkUp",
 			State: profileMetricState{
 				ProblemValue: new(float64(0)),
 				ClearValue:   1,
@@ -134,7 +133,7 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 	entry.Varbinds = nil
 
 	entry.TrapOID = testLinkUpTrapOID
-	entry.TrapName = "SNMPv2-MIB::linkUp"
+	entry.TrapName = "IF-MIB::linkUp"
 	rt.Update(entry)
 
 	store := metrix.NewCollectorStore()
@@ -146,7 +145,7 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 	}
 
 	entry.TrapOID = testLinkDownTrapOID
-	entry.TrapName = "SNMPv2-MIB::linkDown"
+	entry.TrapName = "IF-MIB::linkDown"
 	rt.Update(entry)
 	collectProfileMetricsOnce(t, rt, store, "profile-job")
 	if v, ok := store.Read().Value("snmp_trap_if_link_state", labels); !ok || v != 0 {
@@ -154,7 +153,7 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 	}
 
 	entry.TrapOID = testLinkUpTrapOID
-	entry.TrapName = "SNMPv2-MIB::linkUp"
+	entry.TrapName = "IF-MIB::linkUp"
 	rt.Update(entry)
 	collectProfileMetricsOnce(t, rt, store, "profile-job")
 	if v, ok := store.Read().Value("snmp_trap_if_link_state", labels); !ok || v != 1 {
