@@ -88,7 +88,7 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 		MapsPerCore:    true,
 		ObjectFlavor:   cachestatDefaultObjectFlavor,
 		Enabled:        true,
-		AppsEnabled:    true,
+		AppsEnabled:    false,
 		CgroupsEnabled: false,
 		AppsLevel:      0, // NETDATA_APPS_LEVEL_REAL_PARENT — matches stock cachestat.conf default
 		Targets:        defaultCachestatTargets(),

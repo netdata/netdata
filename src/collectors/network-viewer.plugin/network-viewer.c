@@ -20,18 +20,34 @@ static SPAWN_SERVER *spawn_srv = NULL;
 
 #define ENABLE_DETAILED_VIEW
 
-#define LOCAL_SOCKETS_EXTENDED_MEMBERS struct { \
-        size_t count;                           \
-        struct {                                \
-            pid_t pid;                          \
-            uid_t uid;                          \
-            SOCKET_DIRECTION direction;         \
-            int state;                          \
-            uint64_t net_ns_inode;              \
-            struct socket_endpoint server;      \
-            const char *local_address_space;    \
-            const char *remote_address_space;   \
-        } aggregated_key;                       \
+#define LOCAL_SOCKETS_EXTENDED_MEMBERS struct {                  \
+        size_t count;                                            \
+        struct {                                                 \
+            pid_t pid;                                           \
+            uid_t uid;                                           \
+            SOCKET_DIRECTION direction;                          \
+            int state;                                           \
+            uint64_t net_ns_inode;                               \
+            struct socket_endpoint server;                       \
+            const char *local_address_space;                     \
+            const char *remote_address_space;                    \
+        } aggregated_key;                                        \
+        /* eBPF per-group sums, valid only when ebpf_valid=true. \
+         * Accumulated during aggregation so the serialiser does \
+         * not perform a per-PID lookup for each aggregated row. \
+         * Mirrors the uint64_t fields of ebpf_socket_publish_apps, \
+         * using primitive types to avoid an include-order dependency. */ \
+        uint64_t ebpf_bytes_sent;                                \
+        uint64_t ebpf_bytes_received;                            \
+        uint64_t ebpf_call_tcp_sent;                             \
+        uint64_t ebpf_call_tcp_received;                         \
+        uint64_t ebpf_retransmit;                                \
+        uint64_t ebpf_call_udp_sent;                             \
+        uint64_t ebpf_call_udp_received;                         \
+        uint64_t ebpf_call_close;                                \
+        uint64_t ebpf_call_tcp_v4_conn;                          \
+        uint64_t ebpf_call_tcp_v6_conn;                          \
+        bool ebpf_valid;                                         \
     } network_viewer;
 
 #include "libnetdata/local-sockets/local-sockets.h"
@@ -1490,21 +1506,58 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
 #endif
 #endif
 
-        // eBPF per-PID socket counters from ebpfgo.plugin shared memory
+        // eBPF per-PID socket counters from ebpfgo.plugin shared memory.
+        // Aggregated rows use the pre-summed accumulators built during aggregation;
+        // detailed rows do a live lookup for the individual PID.
 #if defined(OS_LINUX)
         {
-            struct ebpf_pid_stat es;
-            bool have_es = network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid, &es);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.bytes_sent         : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.bytes_received      : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_sent       : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_received   : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.retransmit          : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_udp_sent       : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_udp_received   : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_close          : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_v4_connection : 0);
-            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_v6_connection : 0);
+            bool have_es;
+            uint64_t ebpf_bytes_sent = 0, ebpf_bytes_received = 0;
+            uint64_t ebpf_call_tcp_sent = 0, ebpf_call_tcp_received = 0;
+            uint64_t ebpf_retransmit = 0, ebpf_call_udp_sent = 0, ebpf_call_udp_received = 0;
+            uint64_t ebpf_call_close = 0, ebpf_call_tcp_v4 = 0, ebpf_call_tcp_v6 = 0;
+
+            if(aggregated) {
+                have_es = n->network_viewer.ebpf_valid;
+                if(have_es) {
+                    ebpf_bytes_sent         = n->network_viewer.ebpf_bytes_sent;
+                    ebpf_bytes_received     = n->network_viewer.ebpf_bytes_received;
+                    ebpf_call_tcp_sent      = n->network_viewer.ebpf_call_tcp_sent;
+                    ebpf_call_tcp_received  = n->network_viewer.ebpf_call_tcp_received;
+                    ebpf_retransmit         = n->network_viewer.ebpf_retransmit;
+                    ebpf_call_udp_sent      = n->network_viewer.ebpf_call_udp_sent;
+                    ebpf_call_udp_received  = n->network_viewer.ebpf_call_udp_received;
+                    ebpf_call_close         = n->network_viewer.ebpf_call_close;
+                    ebpf_call_tcp_v4        = n->network_viewer.ebpf_call_tcp_v4_conn;
+                    ebpf_call_tcp_v6        = n->network_viewer.ebpf_call_tcp_v6_conn;
+                }
+            }
+            else {
+                struct ebpf_pid_stat es;
+                have_es = network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid, &es);
+                if(have_es) {
+                    ebpf_bytes_sent         = es.socket.bytes_sent;
+                    ebpf_bytes_received     = es.socket.bytes_received;
+                    ebpf_call_tcp_sent      = es.socket.call_tcp_sent;
+                    ebpf_call_tcp_received  = es.socket.call_tcp_received;
+                    ebpf_retransmit         = es.socket.retransmit;
+                    ebpf_call_udp_sent      = es.socket.call_udp_sent;
+                    ebpf_call_udp_received  = es.socket.call_udp_received;
+                    ebpf_call_close         = es.socket.call_close;
+                    ebpf_call_tcp_v4        = es.socket.call_tcp_v4_connection;
+                    ebpf_call_tcp_v6        = es.socket.call_tcp_v6_connection;
+                }
+            }
+            buffer_json_add_array_item_uint64(wb, ebpf_bytes_sent);
+            buffer_json_add_array_item_uint64(wb, ebpf_bytes_received);
+            buffer_json_add_array_item_uint64(wb, ebpf_call_tcp_sent);
+            buffer_json_add_array_item_uint64(wb, ebpf_call_tcp_received);
+            buffer_json_add_array_item_uint64(wb, ebpf_retransmit);
+            buffer_json_add_array_item_uint64(wb, ebpf_call_udp_sent);
+            buffer_json_add_array_item_uint64(wb, ebpf_call_udp_received);
+            buffer_json_add_array_item_uint64(wb, ebpf_call_close);
+            buffer_json_add_array_item_uint64(wb, ebpf_call_tcp_v4);
+            buffer_json_add_array_item_uint64(wb, ebpf_call_tcp_v6);
         }
 #else
         buffer_json_add_array_item_uint64(wb, 0);
@@ -1712,12 +1765,68 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         // The available space in the receive buffer.
         KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_space, n->info.tcp.tcpi_rcv_space);
 #endif
+
+#if defined(OS_LINUX)
+        /* Accumulate eBPF per-PID socket counters from the incoming socket.
+         * Note: if the same PID owns multiple sockets that land in the same
+         * aggregation group, its counters are summed multiple times — this
+         * matches the existing SUM_THEM_ALL behaviour for tcpi_total_retrans
+         * and is intentional (we sum connections, not unique PIDs). */
+        {
+            struct ebpf_pid_stat _ebpf_n;
+            if(network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid, &_ebpf_n)) {
+                t->network_viewer.ebpf_bytes_sent         += _ebpf_n.socket.bytes_sent;
+                t->network_viewer.ebpf_bytes_received     += _ebpf_n.socket.bytes_received;
+                t->network_viewer.ebpf_call_tcp_sent      += _ebpf_n.socket.call_tcp_sent;
+                t->network_viewer.ebpf_call_tcp_received  += _ebpf_n.socket.call_tcp_received;
+                t->network_viewer.ebpf_retransmit         += _ebpf_n.socket.retransmit;
+                t->network_viewer.ebpf_call_udp_sent      += _ebpf_n.socket.call_udp_sent;
+                t->network_viewer.ebpf_call_udp_received  += _ebpf_n.socket.call_udp_received;
+                t->network_viewer.ebpf_call_close         += _ebpf_n.socket.call_close;
+                t->network_viewer.ebpf_call_tcp_v4_conn   += _ebpf_n.socket.call_tcp_v4_connection;
+                t->network_viewer.ebpf_call_tcp_v6_conn   += _ebpf_n.socket.call_tcp_v6_connection;
+                t->network_viewer.ebpf_valid               = true;
+            }
+        }
+#endif
     }
     else {
         t = mallocz(sizeof(*t));
         memcpy(t, n, sizeof(*t));
         t->cmdline = string_dup(t->cmdline);
         simple_hashtable_set_slot_AGGREGATED_SOCKETS(ht, sl, hash, t);
+#if defined(OS_LINUX)
+        /* Initialise eBPF sums for the first socket in the new aggregation
+         * group.  The memcpy above left network_viewer.ebpf_* unset. */
+        {
+            struct ebpf_pid_stat _ebpf_t;
+            t->network_viewer.ebpf_valid = network_viewer_ebpf_shared_memory_lookup((pid_t)t->pid, &_ebpf_t);
+            if(t->network_viewer.ebpf_valid) {
+                t->network_viewer.ebpf_bytes_sent        = _ebpf_t.socket.bytes_sent;
+                t->network_viewer.ebpf_bytes_received    = _ebpf_t.socket.bytes_received;
+                t->network_viewer.ebpf_call_tcp_sent     = _ebpf_t.socket.call_tcp_sent;
+                t->network_viewer.ebpf_call_tcp_received = _ebpf_t.socket.call_tcp_received;
+                t->network_viewer.ebpf_retransmit        = _ebpf_t.socket.retransmit;
+                t->network_viewer.ebpf_call_udp_sent     = _ebpf_t.socket.call_udp_sent;
+                t->network_viewer.ebpf_call_udp_received = _ebpf_t.socket.call_udp_received;
+                t->network_viewer.ebpf_call_close        = _ebpf_t.socket.call_close;
+                t->network_viewer.ebpf_call_tcp_v4_conn  = _ebpf_t.socket.call_tcp_v4_connection;
+                t->network_viewer.ebpf_call_tcp_v6_conn  = _ebpf_t.socket.call_tcp_v6_connection;
+            }
+            else {
+                t->network_viewer.ebpf_bytes_sent        = 0;
+                t->network_viewer.ebpf_bytes_received    = 0;
+                t->network_viewer.ebpf_call_tcp_sent     = 0;
+                t->network_viewer.ebpf_call_tcp_received = 0;
+                t->network_viewer.ebpf_retransmit        = 0;
+                t->network_viewer.ebpf_call_udp_sent     = 0;
+                t->network_viewer.ebpf_call_udp_received = 0;
+                t->network_viewer.ebpf_call_close        = 0;
+                t->network_viewer.ebpf_call_tcp_v4_conn  = 0;
+                t->network_viewer.ebpf_call_tcp_v6_conn  = 0;
+            }
+        }
+#endif
     }
 }
 

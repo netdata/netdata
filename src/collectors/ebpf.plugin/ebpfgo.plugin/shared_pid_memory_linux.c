@@ -154,10 +154,10 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     /* New SHM is kernel-zero-filled; no explicit memset needed.
      * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
      * EEXIST means an attacker squatted in the window; evict and retry once. */
-    ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
+    ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0600, 1);
     if (ctx->sem == SEM_FAILED && errno == EEXIST) {
         (void)sem_unlink(ctx->sem_name);
-        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0600, 1);
     }
     if (ctx->sem == SEM_FAILED) {
         /* mapping is set but sem is not — next publish would write without a
@@ -294,13 +294,13 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
      * For a reused segment the semaphore already exists and must be joined
      * with O_CREAT so all parties share the same underlying object. */
     if (!reused) {
-        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0600, 1);
         if (ctx->sem == SEM_FAILED && errno == EEXIST) {
             (void)sem_unlink(ctx->sem_name);
-            ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0660, 1);
+            ctx->sem = sem_open(ctx->sem_name, O_CREAT | O_EXCL, 0600, 1);
         }
     } else {
-        ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0660, 1);
+        ctx->sem = sem_open(ctx->sem_name, O_CREAT, 0600, 1);
     }
     if (ctx->sem == SEM_FAILED)
         goto fail;

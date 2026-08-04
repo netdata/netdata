@@ -120,10 +120,10 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
     /* New SHM is kernel-zero-filled; no explicit memset needed.
      * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
      * EEXIST means an attacker squatted in the window; evict and retry once. */
-    ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
+    ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
     if (ctx->sem == SEM_FAILED && errno == EEXIST) {
         (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
-        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
     }
     if (ctx->sem == SEM_FAILED) {
         /* mapping is set but sem is not — next publish would write without a
@@ -225,13 +225,13 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
      * For a reused segment the existing semaphore must be joined with O_CREAT
      * (which opens it when already present) so all parties share one object. */
     if (!reused) {
-        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
         if (ctx->sem == SEM_FAILED && errno == EEXIST) {
             (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
-            ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0660, 1);
+            ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
         }
     } else {
-        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
+        ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0600, 1);
     }
     if (ctx->sem == SEM_FAILED)
         goto fail;
