@@ -103,7 +103,7 @@ func (idx *staticTestCatalog) withChartLifecycle(id string, lifecycle charttpl.L
 	if chart == nil {
 		panic(fmt.Sprintf("profile metric chart %q not found", id))
 	}
-	chart.Lifecycle = &lifecycle
+	chart.Lifecycle = cloneTestChartLifecycle(&lifecycle)
 	next.chartsByID[id] = chart
 	return next
 }
@@ -222,13 +222,18 @@ func cloneTestMetricChart(src *catalog.MetricChart) *catalog.MetricChart {
 		return nil
 	}
 	dst := *src
-	if src.Lifecycle != nil {
-		lifecycle := *src.Lifecycle
-		if src.Lifecycle.Dimensions != nil {
-			dimensions := *src.Lifecycle.Dimensions
-			lifecycle.Dimensions = &dimensions
-		}
-		dst.Lifecycle = &lifecycle
+	dst.Lifecycle = cloneTestChartLifecycle(src.Lifecycle)
+	return &dst
+}
+
+func cloneTestChartLifecycle(src *charttpl.Lifecycle) *charttpl.Lifecycle {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	if src.Dimensions != nil {
+		dimensions := *src.Dimensions
+		dst.Dimensions = &dimensions
 	}
 	return &dst
 }

@@ -93,4 +93,13 @@ func TestStaticTestCatalogSnapshotsMutableInputs(t *testing.T) {
 	require.Equal(t, "original", gotInline["enum"].(map[any]any)["1"])
 	require.Equal(t, "original", gotTrap.Labels["site"])
 	require.Equal(t, "original", gotTrap.SharedVarbinds["1.3.6.1.4.1.99999.2"].Enum["1"])
+
+	replacementDimensions := &charttpl.DimensionLifecycle{MaxDims: 7, ExpireAfterCycles: 8}
+	next := idx.withChartLifecycle("test_chart", charttpl.Lifecycle{Dimensions: replacementDimensions})
+	replacementDimensions.MaxDims = 100
+
+	nextDefs, err := next.Definitions([]string{"test.rule"})
+	require.NoError(t, err)
+	require.Equal(t, 7, nextDefs.ChartsByID["test_chart"].Lifecycle.Dimensions.MaxDims)
+	require.Equal(t, 5, defs.ChartsByID["test_chart"].Lifecycle.Dimensions.MaxDims)
 }
