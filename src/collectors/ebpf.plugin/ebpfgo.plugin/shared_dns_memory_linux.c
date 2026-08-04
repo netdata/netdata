@@ -82,12 +82,13 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
     ctx->shm_eexist_backoff = false;
     ctx->shm_name_created   = false;
 
-    /* O_EXCL ensures we own the new segment.  On EEXIST a concurrent publisher
-     * has claimed the name; record the backoff flag and return false. */
+    /* O_EXCL ensures we own the new segment.  On any failure the name's
+     * ownership is ambiguous — a concurrent publisher may have claimed it in
+     * the window between our shm_unlink and this call.  Record the backoff
+     * flag regardless of errno so the next retry skips the unlink. */
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0640);
     if (ctx->shm_fd < 0) {
-        if (errno == EEXIST)
-            ctx->shm_eexist_backoff = true;
+        ctx->shm_eexist_backoff = true;
         return false;
     }
     /* Mark created before any further steps; close() unlinks on any failure path. */
@@ -96,18 +97,21 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
     if (fchown(ctx->shm_fd, getuid(), getgid()) != 0)
         return false;
 
-    if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
-        return false;
-
-    /* Write publisher PID directly to the fd BEFORE mmap to close the window
-     * between ftruncate (segment visible, size > 0) and semaphore creation.
-     * pwrite on the same tmpfs-backed fd is coherent with mmap on Linux. */
+    /* Write publisher_pid BEFORE ftruncate.  Same rationale as
+     * pid_shm_replace_generation: pwrite extends the empty fd to
+     * sizeof(publisher_pid) bytes with our PID; ftruncate then grows it to
+     * length, preserving our PID and zero-filling the rest.  This eliminates
+     * the window where size==length && publisher_pid==0 that lets a concurrent
+     * shared_dns_memory_open() treat this live fresh segment as dead. */
     {
         uint32_t mypid = (uint32_t)getpid();
         if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
                    (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
             return false;
     }
+
+    if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
+        return false;
 
     ctx->data = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->data == MAP_FAILED) {
@@ -200,6 +204,19 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
             goto fail;
     }
 
+    /* For a fresh segment write publisher_pid BEFORE ftruncate.  Same rationale
+     * as dns_shm_replace_generation: pwrite extends the fd to sizeof(publisher_pid)
+     * bytes with our PID; ftruncate then grows it to length, preserving our PID
+     * and zero-filling the rest.  This eliminates the window where
+     * size==length && publisher_pid==0 that lets a concurrent opener wipe it.
+     * For a reused segment the PID is written inside the semaphore hold below. */
+    if (!reused) {
+        uint32_t mypid = (uint32_t)getpid();
+        if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
+                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
+            goto fail;
+    }
+
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         goto fail;
 
@@ -207,17 +224,6 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
     if (ctx->data == MAP_FAILED) {
         ctx->data = NULL;
         goto fail;
-    }
-
-    /* For a fresh segment write publisher PID directly to the fd BEFORE sem_open
-     * to close the window between ftruncate (segment visible) and semaphore
-     * creation.  pwrite on the same tmpfs fd is coherent with mmap on Linux.
-     * For a reused segment the PID is written inside the semaphore hold below. */
-    if (!reused) {
-        uint32_t mypid = (uint32_t)getpid();
-        if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
-                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
-            goto fail;
     }
 
     /* For a fresh segment (reused=false) no legitimate semaphore exists, so use
@@ -261,7 +267,7 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
                 goto fail;
         }
     }
-    /* publisher_pid for the fresh path was written before sem_open above. */
+    /* publisher_pid for the fresh path was written before ftruncate above. */
     return ctx;
 
 fail:

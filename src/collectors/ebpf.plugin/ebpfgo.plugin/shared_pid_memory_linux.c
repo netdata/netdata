@@ -108,13 +108,13 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     ctx->shm_eexist_backoff  = false;
     ctx->shm_name_created    = false;
 
-    /* O_EXCL ensures we own the new segment.  On EEXIST a concurrent publisher
-     * has claimed the name; record the backoff flag so the NEXT retry skips the
-     * unlink, and return false so the caller retries next cycle. */
+    /* O_EXCL ensures we own the new segment.  On any failure the name's
+     * ownership is ambiguous — a concurrent publisher may have claimed it in
+     * the window between our shm_unlink and this call.  Record the backoff
+     * flag regardless of errno so the next retry skips the unlink. */
     ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_EXCL | O_RDWR, 0640);
     if (ctx->shm_fd < 0) {
-        if (errno == EEXIST)
-            ctx->shm_eexist_backoff = true;
+        ctx->shm_eexist_backoff = true;
         return false;
     }
     /* Mark created before any further steps; close() unlinks on any failure path. */
@@ -123,20 +123,22 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     if (fchown(ctx->shm_fd, getuid(), getgid()) != 0)
         return false;
 
-    if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
-        return false;
-
-    /* Write publisher PID directly to the fd BEFORE mmap.  After ftruncate the
-     * segment is non-zero in size and visible to concurrent openers.  A concurrent
-     * opener using sem_open(O_CREAT) could acquire the semaphore before us and read
-     * publisher_pid==0, deciding the producer is dead.  pwrite before mmap closes
-     * that window: on Linux, pwrite and mmap on the same tmpfs-backed fd are coherent. */
+    /* Write publisher_pid BEFORE ftruncate.  pwrite extends the empty fd to
+     * sizeof(publisher_pid) bytes with our PID at offset 0; ftruncate then
+     * grows it to length, preserving that value and zero-filling the rest.
+     * This eliminates the window where size==length && publisher_pid==0 that
+     * lets a concurrent shared_pid_memory_open() treat this live fresh segment
+     * as a dead one and wipe it.  pwrite and mmap on the same tmpfs fd are
+     * coherent on Linux. */
     {
         uint32_t mypid = (uint32_t)getpid();
         if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
                    (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
             return false;
     }
+
+    if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
+        return false;
 
     ctx->mapping = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->mapping == MAP_FAILED) {
@@ -264,6 +266,20 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
             goto fail;
     }
 
+    /* For a fresh segment write publisher_pid BEFORE ftruncate.  Same rationale
+     * as pid_shm_replace_generation: pwrite extends the fd to sizeof(publisher_pid)
+     * bytes with our PID; ftruncate then grows the segment to length, preserving
+     * our PID at offset 0 and zero-filling the rest.  This eliminates the window
+     * where size==length && publisher_pid==0 that lets a concurrent opener treat
+     * this live fresh segment as a dead one and wipe it.
+     * For a reused segment the PID is written inside the semaphore hold below. */
+    if (!reused) {
+        uint32_t mypid = (uint32_t)getpid();
+        if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
+                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
+            goto fail;
+    }
+
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         goto fail;
 
@@ -274,20 +290,6 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
     }
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
-
-    /* For a fresh segment write publisher PID directly to the fd BEFORE
-     * sem_open, closing the window between ftruncate (segment becomes visible)
-     * and semaphore creation.  A concurrent opener using sem_open(O_CREAT) could
-     * acquire the semaphore before us and read publisher_pid==0 through the mapping,
-     * deciding the producer is dead.  pwrite on the same tmpfs fd is coherent with
-     * mmap on Linux, so any subsequent mapper sees the non-zero PID immediately.
-     * For a reused segment the PID is written inside the semaphore hold below. */
-    if (!reused) {
-        uint32_t mypid = (uint32_t)getpid();
-        if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
-                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
-            goto fail;
-    }
 
     /* For a fresh segment (reused=false) no legitimate semaphore exists;
      * O_CREAT|O_EXCL prevents squatting.  On EEXIST evict and retry once.
@@ -333,7 +335,7 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
                 goto fail;
         }
     }
-    /* publisher_pid for the fresh path was written before sem_open above. */
+    /* publisher_pid for the fresh path was written before ftruncate above. */
     return ctx;
 
 fail:
