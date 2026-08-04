@@ -469,6 +469,9 @@ static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void 
 
 ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void (*start_routine)(void *), void *arg)
 {
+    internal_fatal(!nd_environment_is_process_frozen(),
+                   "attempted to create thread '%s' before freezing the process environment", tag);
+
     ND_THREAD *nti = callocz(1, sizeof(*nti));
     spinlock_init(&nti->canceller.spinlock);
     nti->arg = arg;

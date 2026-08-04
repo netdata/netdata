@@ -747,6 +747,8 @@ void nfacct_signals()
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("nfacct.plugin");
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
     netdata_threads_init_for_external_plugins(0);
 
     // ------------------------------------------------------------------------

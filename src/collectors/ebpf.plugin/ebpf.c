@@ -1184,19 +1184,19 @@ static void ebpf_allocate_common_vectors()
 static void ebpf_set_global_variables()
 {
     // Get environment variables
-    ebpf_plugin_dir = getenv("NETDATA_PLUGINS_DIR");
+    ebpf_plugin_dir = nd_environment_get_dup("NETDATA_PLUGINS_DIR");
     if (!ebpf_plugin_dir)
         ebpf_plugin_dir = PLUGINS_DIR;
 
-    ebpf_user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    ebpf_user_config_dir = nd_environment_get_dup("NETDATA_USER_CONFIG_DIR");
     if (!ebpf_user_config_dir)
         ebpf_user_config_dir = CONFIG_DIR;
 
-    ebpf_stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    ebpf_stock_config_dir = nd_environment_get_dup("NETDATA_STOCK_CONFIG_DIR");
     if (!ebpf_stock_config_dir)
         ebpf_stock_config_dir = LIBCONFIG_DIR;
 
-    ebpf_configured_log_dir = getenv("NETDATA_LOG_DIR");
+    ebpf_configured_log_dir = nd_environment_get_dup("NETDATA_LOG_DIR");
     if (!ebpf_configured_log_dir)
         ebpf_configured_log_dir = LOG_DIR;
 
@@ -1668,7 +1668,7 @@ void ebpf_send_statistic_data()
  */
 static void update_internal_metric_variable()
 {
-    const char *s = getenv("NETDATA_INTERNALS_MONITORING");
+    CLEAN_CHAR_P *s = nd_environment_get_dup("NETDATA_INTERNALS_MONITORING");
     if (s && *s && strcmp(s, "NO") == 0)
         publish_internal_metrics = false;
 }
@@ -2296,7 +2296,6 @@ int main(int argc, char **argv)
 #endif
 
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
-    netdata_threads_init_for_external_plugins(0);
 
     libjudy_malloc_init();
 
@@ -2319,7 +2318,8 @@ int main(int argc, char **argv)
 
     ebpf_mutex_initialize();
 
-    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(!netdata_configured_host_prefix)
+        netdata_configured_host_prefix = "";
     if (verify_netdata_host_prefix(true) == -1)
         ebpf_exit(1);
 
@@ -2338,6 +2338,11 @@ int main(int argc, char **argv)
     read_local_ports("/proc/net/tcp6", IPPROTO_TCP);
     read_local_ports("/proc/net/udp", IPPROTO_UDP);
     read_local_ports("/proc/net/udp6", IPPROTO_UDP);
+
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
+
+    netdata_threads_init_for_external_plugins(0);
 
     ebpf_set_static_routine();
 

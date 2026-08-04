@@ -259,6 +259,11 @@ static bool test_snapshot_lookup_helpers(void)
 
 int main(void)
 {
+    if (nd_environment_init() != 0 || nd_environment_freeze_process() != 0) {
+        fprintf(stderr, "failed to initialize and freeze the process environment: %s\n", strerror(errno));
+        return 1;
+    }
+
     char temp_dir[] = "./cgroup-lookup-netipc-test.XXXXXX";
     char service_name[64];
     const char *known_path = "/docker/0123456789abcdef";

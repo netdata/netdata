@@ -2,6 +2,11 @@
 
 #include "common.h"
 
+static void set_required_environment(const char *name, const char *value) {
+    if(nd_environment_set(name, value, true) != 0)
+        fatal("Cannot publish required child environment variable '%s': %s", name, strerror(errno));
+}
+
 void verify_required_directory(const char *env, const char *dir, bool create_it, int perms) {
     errno_clear();
 
@@ -10,14 +15,14 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
 
     if (chdir(dir) == 0) {
         if(env)
-            nd_setenv(env, dir, 1);
+            set_required_environment(env, dir);
         return;
     }
 
     if(create_it) {
         if(mkdir(dir, perms) == 0) {
             if(env)
-                nd_setenv(env, dir, 1);
+                set_required_environment(env, dir);
             return;
         }
     }
@@ -65,12 +70,12 @@ void set_environment_for_plugins_and_scripts(void) {
     {
         char b[16];
         snprintfz(b, sizeof(b) - 1, "%d", (int)nd_profile.update_every);
-        nd_setenv("NETDATA_UPDATE_EVERY", b, 1);
+        set_required_environment("NETDATA_UPDATE_EVERY", b);
     }
 
-    nd_setenv("NETDATA_VERSION", NETDATA_VERSION, 1);
-    nd_setenv("NETDATA_HOSTNAME", netdata_configured_hostname, 1);
-    nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
+    set_required_environment("NETDATA_VERSION", NETDATA_VERSION);
+    set_required_environment("NETDATA_HOSTNAME", netdata_configured_hostname);
+    set_required_environment("NETDATA_HOST_PREFIX", netdata_configured_host_prefix);
 
     verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
     verify_required_directory("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
@@ -92,7 +97,7 @@ void set_environment_for_plugins_and_scripts(void) {
             buffer_strcat(user_plugins_dirs, plugin_directories[i]);
         }
 
-        nd_setenv("NETDATA_USER_PLUGINS_DIRS", buffer_tostring(user_plugins_dirs), 1);
+        set_required_environment("NETDATA_USER_PLUGINS_DIRS", buffer_tostring(user_plugins_dirs));
 
         buffer_free(user_plugins_dirs);
     }
@@ -104,25 +109,28 @@ void set_environment_for_plugins_and_scripts(void) {
         clean = 1;
     }
 
-    nd_setenv("NETDATA_LISTEN_PORT", default_port, 1);
+    set_required_environment("NETDATA_LISTEN_PORT", default_port);
     if (clean)
         freez((char *)default_port);
 
     // set the path we need
     char path[4096];
-    const char *p = getenv("PATH");
-    if (!p) p = "/bin:/usr/bin";
-    snprintfz(path, sizeof(path), "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
-    setenv("PATH", inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
+    CLEAN_CHAR_P *current_path = nd_environment_get_dup("PATH");
+    snprintfz(path, sizeof(path), "%s:%s", current_path ? current_path : "/bin:/usr/bin",
+              "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
+    set_required_environment(
+        "PATH", inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path));
 
     // python options
-    p = getenv("PYTHONPATH");
-    if (!p) p = "";
-    setenv("PYTHONPATH", inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
+    CLEAN_CHAR_P *python_path = nd_environment_get_dup("PYTHONPATH");
+    set_required_environment(
+        "PYTHONPATH",
+        inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PYTHONPATH",
+                             python_path ? python_path : ""));
 
     // disable buffering for python plugins
-    setenv("PYTHONUNBUFFERED", "1", 1);
+    set_required_environment("PYTHONUNBUFFERED", "1");
 
     // switch to standard locale for plugins
-    setenv("LC_ALL", "C", 1);
+    set_required_environment("LC_ALL", "C");
 }

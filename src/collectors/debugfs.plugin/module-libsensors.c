@@ -1128,7 +1128,8 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
 }
 
 static FILE *sensors_open_file(const char *env_var, const char *def_dir, const char *file) {
-    const char *dir = getenv(env_var);
+    CLEAN_CHAR_P *env_dir = nd_environment_get_dup(env_var);
+    const char *dir = env_dir;
     if(!dir || !*dir)
         dir = def_dir;
 
@@ -1324,7 +1325,7 @@ static void libsensors_function_sensors(
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-    const char *hostname = getenv("NETDATA_HOSTNAME");
+    CLEAN_CHAR_P *hostname = nd_environment_get_dup("NETDATA_HOSTNAME");
     buffer_json_member_add_string(wb, "hostname", hostname ? hostname : "localhost");
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");

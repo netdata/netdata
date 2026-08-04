@@ -30,6 +30,11 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, const LOCAL_SOCKE
 // --------------------------------------------------------------------------------------------------------------------
 
 int main(int argc, char **argv) {
+    if(nd_environment_init() != 0) {
+        fprintf(stderr, "Cannot initialize the process environment: %s\n", strerror(errno));
+        return 1;
+    }
+
     static struct rusage started, ended;
     getrusage(RUSAGE_SELF, &started);
     bool debug = false;
@@ -64,8 +69,8 @@ int main(int argc, char **argv) {
         .listening_ports_hashtable = { 0 },
     };
 
-    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(!netdata_configured_host_prefix) netdata_configured_host_prefix = "";
+    CLEAN_CHAR_P *configured_host_prefix = nd_environment_get_dup("NETDATA_HOST_PREFIX");
+    netdata_configured_host_prefix = configured_host_prefix ? configured_host_prefix : "";
 
     // Validate host prefix (must be a real procfs/sysfs mount)
     if(verify_netdata_host_prefix(true) == -1)
@@ -262,7 +267,10 @@ int main(int argc, char **argv) {
     }
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
-    SPAWN_SERVER *spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback, argc, (const char **)argv);
+    const char *runtime_directory = os_run_dir(true);
+    SPAWN_SERVER *spawn_server = runtime_directory ?
+        spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback,
+                            argc, (const char **)argv, nd_environment_process(), runtime_directory) : NULL;
     if(spawn_server == NULL) {
         fprintf(stderr, "Cannot create spawn server.\n");
         exit(1);
@@ -270,6 +278,15 @@ int main(int argc, char **argv) {
 
     ls.spawn_server = spawn_server;
 #endif
+
+    if(nd_environment_freeze_process() != 0) {
+        int error = errno;
+#if defined(LOCAL_SOCKETS_USE_SETNS)
+        spawn_server_destroy(spawn_server);
+#endif
+        fprintf(stderr, "Cannot freeze the process environment: %s\n", strerror(error));
+        return 1;
+    }
 
     local_sockets_process(&ls);
 

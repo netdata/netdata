@@ -14,8 +14,13 @@ static SPINLOCK netdata_main_spawn_server_spinlock = SPINLOCK_INITIALIZER;
 bool netdata_main_spawn_server_init(const char *name, int argc, const char **argv) {
     if(netdata_main_spawn_server == NULL) {
         spinlock_lock(&netdata_main_spawn_server_spinlock);
-        if(netdata_main_spawn_server == NULL)
-            netdata_main_spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, name, NULL, argc, argv);
+        if(netdata_main_spawn_server == NULL) {
+            ND_ENVIRONMENT *environment = nd_environment_process();
+            const char *runtime_directory = os_run_dir(true);
+            if(environment && runtime_directory)
+                netdata_main_spawn_server = spawn_server_create(
+                    SPAWN_SERVER_OPTION_EXEC, name, NULL, argc, argv, environment, runtime_directory);
+        }
         spinlock_unlock(&netdata_main_spawn_server_spinlock);
     }
 
@@ -58,7 +63,8 @@ FILE *spawn_popen_stdout(POPEN_INSTANCE *pi) {
 }
 
 POPEN_INSTANCE *spawn_popen_run_argv(const char **argv) {
-    netdata_main_spawn_server_init(NULL, 0, NULL);
+    if(!netdata_main_spawn_server_init(NULL, 0, NULL))
+        return NULL;
 
     SPAWN_INSTANCE *si = spawn_server_exec(netdata_main_spawn_server, nd_log_collectors_fd(),
         0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);

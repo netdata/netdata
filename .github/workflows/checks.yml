@@ -31,10 +31,16 @@ jobs:
           files: |
             **/*.c
             **/*.cc
+            **/*.cpp
             **/*.h
             **/*.hh
+            **/*.hpp
+            **/*.m
+            **/*.mm
             **/*.in
             **/*.patch
+            src/libnetdata/environment/check-native-environment.py
+            src/libnetdata/environment/check-native-environment-unittest.py
             src/aclk/aclk-schemas/
             src/ml/dlib/
           files_ignore: |
@@ -52,6 +58,7 @@ jobs:
             .gitignore
             .github/data/distros.yml
             .github/workflows/build.yml
+            .github/workflows/checks.yml
             packaging/cmake/
             packaging/*.version
             packaging/*.checksums
@@ -119,3 +126,27 @@ jobs:
       - name: Build
         if: needs.file-check.outputs.run == 'true'
         run: docker build -f .github/dockerfiles/Dockerfile.clang .
+
+  native-environment-checks:
+    # Gated on file-check, whose source globs must cover every suffix
+    # check-native-environment.py scans (.c/.cc/.cpp/.h/.hh/.hpp/.m/.mm) or a bypass
+    # in an uncovered suffix could skip this job. No submodules: the allowlist covers
+    # only main-tree files, so scanning third-party submodule code would false-positive.
+    name: Native Environment
+    needs:
+      - file-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v7
+      - name: Test native environment checker
+        if: needs.file-check.outputs.run == 'true'
+        run: python3 src/libnetdata/environment/check-native-environment-unittest.py
+      - name: Check native environment bypass
+        if: needs.file-check.outputs.run == 'true'
+        run: python3 src/libnetdata/environment/check-native-environment.py

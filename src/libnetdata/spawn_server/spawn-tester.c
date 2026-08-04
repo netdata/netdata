@@ -2,18 +2,33 @@
 
 #define ENV_VAR_KEY "SPAWN_TESTER"
 #define ENV_VAR_VALUE "1234567890"
+#define ENV_VAR_VALUE_UPDATED "updated-after-freeze"
+
+#if defined(SPAWN_SERVER_VERSION_NOFORK) || \
+    (!defined(OS_WINDOWS) && !defined(SPAWN_SERVER_VERSION_UV) && !defined(SPAWN_SERVER_VERSION_POSIX_SPAWN))
+#define SPAWN_TESTER_NOFORK 1
+#endif
 
 size_t warnings = 0;
 
-void child_check_environment(void) {
-    const char *s = getenv(ENV_VAR_KEY);
-    if(!s || !*s || strcmp(s, ENV_VAR_VALUE) != 0) {
+static void child_check_environment_value(const char *expected) {
+    if(nd_environment_init() != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot initialize the process environment");
+        exit(1);
+    }
+
+    CLEAN_CHAR_P *s = nd_environment_get_dup(ENV_VAR_KEY);
+    if(!s || !*s || strcmp(s, expected) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Wrong environment. Variable '%s' should have value '%s' but it has '%s'",
-               ENV_VAR_KEY, ENV_VAR_VALUE, s ? s : "(unset)");
+               ENV_VAR_KEY, expected, s ? s : "(unset)");
 
         exit(1);
     }
+}
+
+void child_check_environment(void) {
+    child_check_environment_value(ENV_VAR_VALUE);
 }
 
 static bool is_valid_fd(int fd) {
@@ -136,6 +151,34 @@ static void test_popen_echo_loop(POPEN_INSTANCE *pi, const char *msg, size_t ite
         }
     }
     fprintf(stderr, "\n");
+}
+
+static int plugin_check_environment(const char *expected) {
+    child_check_fds();
+    child_check_environment_value(expected);
+    return 0;
+}
+
+static void test_popen_updated_environment(const char *argv0) {
+    const char *params[] = {
+        argv0,
+        "plugin-check-environment",
+        ENV_VAR_VALUE_UPDATED,
+        NULL,
+    };
+
+    POPEN_INSTANCE *pi = spawn_popen_run_argv(params);
+    if(!pi) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot run environment observation child");
+        exit(1);
+    }
+
+    int code = spawn_popen_wait(pi);
+    if(code != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Post-freeze environment observation child exited with code %d", code);
+        exit(1);
+    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -496,7 +539,7 @@ void test_popen_plugin_timedwait_kill(const char *argv0) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-#if !defined(OS_WINDOWS)
+#if defined(SPAWN_TESTER_NOFORK)
 static int callback_wait_for_sigterm(SPAWN_REQUEST *request) {
     struct sigaction sigterm_action, sigchld_action;
     sigset_t mask;
@@ -518,9 +561,10 @@ static int callback_wait_for_sigterm(SPAWN_REQUEST *request) {
         pause();
 }
 
-static void test_callback_signal_lifecycle(int argc, const char **argv) {
+static void test_callback_signal_lifecycle(int argc, const char **argv, const char *runtime_directory) {
     SPAWN_SERVER *server = spawn_server_create(
-        SPAWN_SERVER_OPTION_CALLBACK, "test-callback", callback_wait_for_sigterm, argc, argv);
+        SPAWN_SERVER_OPTION_CALLBACK, "test-callback", callback_wait_for_sigterm, argc, argv,
+        nd_environment_process(), runtime_directory);
     if(!server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create callback spawn server");
         exit(1);
@@ -582,15 +626,161 @@ int main(int argc, const char **argv) {
     if(argc > 1 && strcmp(argv[1], "plugin-close-to-stop") == 0)
         return plugin_close_to_stop();
 
+    if(argc == 3 && strcmp(argv[1], "plugin-check-environment") == 0)
+        return plugin_check_environment(argv[2]);
+
     if(argc <= 1 || strcmp(argv[1], "test") != 0) {
         fprintf(stderr, "Run me with 'test' parameter!\n");
         exit(1);
     }
 
+    if(nd_environment_init() != 0) {
+        fprintf(stderr, "Cannot initialize the process environment: %s\n", strerror(errno));
+        return 1;
+    }
+
     nd_setenv(ENV_VAR_KEY, ENV_VAR_VALUE, 1);
 
     fprintf(stderr, "\n\nTESTING fds\n\n");
-    SPAWN_SERVER *server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, "test", NULL, argc, argv);
+#if !defined(OS_WINDOWS)
+    char inaccessible_runtime_template[] = "/tmp/netdata-spawn-no-search-XXXXXX";
+    char *inaccessible_runtime = NULL;
+    if(geteuid() != 0) {
+        inaccessible_runtime = mkdtemp(inaccessible_runtime_template);
+        if(!inaccessible_runtime || chmod(inaccessible_runtime, 0200) != 0) {
+            fprintf(stderr, "Cannot create a non-searchable runtime directory fixture: %s\n", strerror(errno));
+            return 1;
+        }
+
+        if(nd_environment_set("NETDATA_RUN_DIR", inaccessible_runtime, true) != 0) {
+            int error = errno;
+            chmod(inaccessible_runtime, 0700);
+            rmdir(inaccessible_runtime);
+            fprintf(stderr, "Cannot configure the runtime directory fixture: %s\n", strerror(error));
+            return 1;
+        }
+    }
+#endif
+    const char *runtime_directory = os_run_dir(true);
+#if !defined(OS_WINDOWS)
+    bool accepted_inaccessible_runtime = inaccessible_runtime && runtime_directory &&
+                                         strcmp(runtime_directory, inaccessible_runtime) == 0;
+    int cleanup_error = 0;
+    if(inaccessible_runtime) {
+        if(chmod(inaccessible_runtime, 0700) != 0)
+            cleanup_error = errno;
+        else if(rmdir(inaccessible_runtime) != 0)
+            cleanup_error = errno;
+    }
+
+    if(cleanup_error) {
+        fprintf(stderr, "Cannot remove the runtime directory fixture: %s\n", strerror(cleanup_error));
+        return 1;
+    }
+
+    if(accepted_inaccessible_runtime) {
+        fprintf(stderr, "A non-searchable runtime directory was accepted\n");
+        return 1;
+    }
+#endif
+    if(!runtime_directory) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot resolve the spawn test runtime directory");
+        exit(1);
+    }
+#if defined(SPAWN_TESTER_NOFORK)
+    SPAWN_SERVER *invalid_runtime_server = spawn_server_create(
+        SPAWN_SERVER_OPTION_EXEC, "invalid-runtime-test", NULL, argc, argv,
+        nd_environment_process(), NULL);
+    if(invalid_runtime_server) {
+        spawn_server_destroy(invalid_runtime_server);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Nofork server creation unexpectedly accepted a missing runtime directory");
+        exit(1);
+    }
+
+    char permission_runtime_template[FILENAME_MAX + 1];
+    int permission_runtime_length = snprintf(
+        permission_runtime_template, sizeof(permission_runtime_template),
+        "%s/netdata-spawn-public-XXXXXX", runtime_directory);
+    if(permission_runtime_length < 0 || (size_t)permission_runtime_length >= sizeof(permission_runtime_template)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot generate the public runtime directory fixture path");
+        exit(1);
+    }
+
+    char *permission_runtime = mkdtemp(permission_runtime_template);
+    if(!permission_runtime) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create the public runtime directory fixture");
+        exit(1);
+    }
+
+    if(chmod(permission_runtime, 0775) != 0) {
+        int error = errno;
+        rmdir(permission_runtime);
+        errno = error;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot prepare the group-writable runtime directory fixture");
+        exit(1);
+    }
+
+    SPAWN_SERVER *group_runtime_server = spawn_server_create(
+        SPAWN_SERVER_OPTION_EXEC, "group-runtime-test", NULL, argc, argv,
+        nd_environment_process(), permission_runtime);
+    if(!group_runtime_server) {
+        int error = errno;
+        chmod(permission_runtime, 0700);
+        rmdir(permission_runtime);
+        errno = error;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Nofork server creation unexpectedly rejected a group-writable runtime directory");
+        exit(1);
+    }
+    spawn_server_destroy(group_runtime_server);
+
+    if(chmod(permission_runtime, 0777) != 0) {
+        int error = errno;
+        chmod(permission_runtime, 0700);
+        rmdir(permission_runtime);
+        errno = error;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot prepare the publicly writable runtime directory fixture");
+        exit(1);
+    }
+
+    errno_clear();
+    SPAWN_SERVER *public_runtime_server = spawn_server_create(
+        SPAWN_SERVER_OPTION_EXEC, "public-runtime-test", NULL, argc, argv,
+        nd_environment_process(), permission_runtime);
+    int public_runtime_error = errno;
+    bool public_runtime_accepted = public_runtime_server != NULL;
+    if(public_runtime_server)
+        spawn_server_destroy(public_runtime_server);
+
+    int public_runtime_cleanup_error = 0;
+    if(chmod(permission_runtime, 0700) != 0)
+        public_runtime_cleanup_error = errno;
+    else if(rmdir(permission_runtime) != 0)
+        public_runtime_cleanup_error = errno;
+
+    if(public_runtime_cleanup_error) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Cannot remove the public runtime directory fixture: %s",
+               strerror(public_runtime_cleanup_error));
+        exit(1);
+    }
+
+    if(public_runtime_accepted || public_runtime_error != EACCES) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Nofork server creation did not reject a publicly writable runtime directory with EACCES");
+        exit(1);
+    }
+#endif
+#if defined(OS_WINDOWS) || defined(SPAWN_SERVER_VERSION_UV) || defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
+    if(nd_environment_freeze_process() != 0) {
+        fprintf(stderr, "Cannot freeze the process environment: %s\n", strerror(errno));
+        return 1;
+    }
+#endif
+    SPAWN_SERVER *server = spawn_server_create(
+        SPAWN_SERVER_OPTION_EXEC, "test", NULL, argc, argv,
+        nd_environment_process(), runtime_directory);
     if(!server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create spawn server");
         exit(1);
@@ -607,15 +797,64 @@ int main(int argc, const char **argv) {
         fprintf(stderr, "\n\nTESTING fds No %zu (close to stop)\n\n", i + 1);
         test_int_fds_plugin_close_to_stop(server, argv[0]);
     }
+
+#if defined(SPAWN_SERVER_VERSION_UV)
+    fprintf(stderr, "\n\nTESTING server destruction with a live child\n\n");
+    const char *sleep_argv[] = { argv[0], "plugin-sleep-to-stop", NULL };
+    SPAWN_INSTANCE *live_child = spawn_server_exec(
+        server, STDERR_FILENO, -1, sleep_argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
+    if(!live_child) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start the live-child shutdown test");
+        exit(1);
+    }
+
+    pid_t live_child_pid = spawn_server_instance_pid(live_child);
+    spawn_server_destroy(server);
+    server = NULL;
+
+    int live_child_status = spawn_server_exec_wait(NULL, live_child);
+    errno_clear();
+    if(live_child_status < 0 || kill(live_child_pid, 0) != -1 || errno != ESRCH) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Server destruction did not terminate and reap child pid %d (status %d, errno %d)",
+               live_child_pid, live_child_status, errno);
+        exit(1);
+    }
+#endif
+
     spawn_server_destroy(server);
 
-#if !defined(OS_WINDOWS)
+#if defined(SPAWN_TESTER_NOFORK)
     fprintf(stderr, "\n\nTESTING callback signal lifecycle\n\n");
-    test_callback_signal_lifecycle(argc, argv);
+    test_callback_signal_lifecycle(argc, argv, runtime_directory);
 #endif
 
     fprintf(stderr, "\n\nTESTING popen\n\n");
-    netdata_main_spawn_server_init("test", argc, argv);
+    if(!netdata_main_spawn_server_init("test", argc, argv)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create global spawn server");
+        exit(1);
+    }
+#if !defined(OS_WINDOWS)
+    if(nd_environment_freeze_process() != 0) {
+        int error = errno;
+        netdata_main_spawn_server_cleanup();
+        fprintf(stderr, "Cannot freeze the process environment: %s\n", strerror(error));
+        return 1;
+    }
+#endif
+
+    if(nd_environment_set(ENV_VAR_KEY, ENV_VAR_VALUE_UPDATED, true) != 0) {
+        netdata_main_spawn_server_cleanup();
+        fprintf(stderr, "Cannot update the managed environment after freeze: %s\n", strerror(errno));
+        return 1;
+    }
+    test_popen_updated_environment(argv[0]);
+    if(nd_environment_set(ENV_VAR_KEY, ENV_VAR_VALUE, true) != 0) {
+        netdata_main_spawn_server_cleanup();
+        fprintf(stderr, "Cannot restore the managed environment after freeze: %s\n", strerror(errno));
+        return 1;
+    }
+
     for(size_t i = 0; i < 5; i++) {
         fprintf(stderr, "\n\nTESTING popen No %zu (kill to stop)\n\n", i + 1);
         test_popen_plugin_kill_to_stop(argv[0]);
@@ -637,6 +876,25 @@ int main(int argc, const char **argv) {
         test_popen_plugin_timedwait_kill(argv[0]);
     }
     netdata_main_spawn_server_cleanup();
+
+#if defined(SPAWN_TESTER_NOFORK)
+    SPAWN_SERVER *late_server = spawn_server_create(
+        SPAWN_SERVER_OPTION_EXEC, "late-test", NULL, argc, argv,
+        nd_environment_process(), runtime_directory);
+    if(late_server) {
+        spawn_server_destroy(late_server);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Direct nofork server creation unexpectedly succeeded after environment freeze");
+        exit(1);
+    }
+
+    if(netdata_main_spawn_server_init("late-test", argc, argv)) {
+        netdata_main_spawn_server_cleanup();
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Global nofork server creation unexpectedly succeeded after environment freeze");
+        exit(1);
+    }
+#endif
 
     fprintf(stderr, "\n\nTests passed! (%zu warnings)\n\n", warnings);
 

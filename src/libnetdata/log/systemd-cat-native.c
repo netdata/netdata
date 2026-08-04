@@ -304,8 +304,10 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
         }
     }
 
-    if(global_systemd_invocation_id[0] == '\0' && getenv("INVOCATION_ID"))
-        snprintfz(global_systemd_invocation_id, sizeof(global_systemd_invocation_id), "_SYSTEMD_INVOCATION_ID=%s\n", getenv("INVOCATION_ID"));
+    CLEAN_CHAR_P *invocation_id = nd_environment_get_dup("INVOCATION_ID");
+    if(global_systemd_invocation_id[0] == '\0' && invocation_id)
+        snprintfz(global_systemd_invocation_id, sizeof(global_systemd_invocation_id),
+                  "_SYSTEMD_INVOCATION_ID=%s\n", invocation_id);
 
     if(!key)
         key = DEFAULT_PRIVATE_KEY;
@@ -736,12 +738,15 @@ cleanup:
 
 int main(int argc, char *argv[]) {
     nd_log_initialize_for_external_plugins(argv[0]);
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
 
     int timeout_ms = 0; // wait forever
     bool log_as_netdata = false;
     const char *newline = "\\n";
     const char *namespace = NULL;
-    const char *socket = getenv("NETDATA_SYSTEMD_JOURNAL_PATH");
+    CLEAN_CHAR_P *socket_from_environment = nd_environment_get_dup("NETDATA_SYSTEMD_JOURNAL_PATH");
+    const char *socket = socket_from_environment;
 #ifdef HAVE_LIBCURL
     const char *url = NULL;
     const char *key = NULL;

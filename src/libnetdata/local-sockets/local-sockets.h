@@ -189,7 +189,6 @@ typedef struct local_socket_state {
     struct timing_work timings[30];
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
-    bool spawn_server_is_mine;
     SPAWN_SERVER *spawn_server;
 #endif
 
@@ -1350,14 +1349,6 @@ static inline void local_sockets_init(LS_STATE *ls) {
     ls->tmp_protocol = 0;
 #endif
 
-#if defined(LOCAL_SOCKETS_USE_SETNS)
-    if(ls->config.namespaces && ls->spawn_server == NULL) {
-        ls->spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback, 0, NULL);
-        ls->spawn_server_is_mine = true;
-    }
-    else
-        ls->spawn_server_is_mine = false;
-#endif
 }
 
 static inline void local_sockets_cleanup(LS_STATE *ls) {
@@ -1366,14 +1357,6 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
         procfile_close(ls->ff);
         ls->ff = NULL;
     }
-
-#if defined(LOCAL_SOCKETS_USE_SETNS)
-    if(ls->spawn_server_is_mine) {
-        spawn_server_destroy(ls->spawn_server);
-        ls->spawn_server = NULL;
-        ls->spawn_server_is_mine = false;
-    }
-#endif
 
     // free the sockets hashtable data
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);

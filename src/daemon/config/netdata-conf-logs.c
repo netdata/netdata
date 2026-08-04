@@ -37,7 +37,8 @@ void netdata_conf_section_logs(void) {
     logs = (unsigned long)inicfg_get_number(&netdata_config, CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
     nd_log_set_flood_protection(logs, period);
 
-    const char *netdata_log_level = getenv("NETDATA_LOG_LEVEL");
+    CLEAN_CHAR_P *netdata_log_level_env = nd_environment_get_dup("NETDATA_LOG_LEVEL");
+    const char *netdata_log_level = netdata_log_level_env;
     netdata_log_level = netdata_log_level ? nd_log_id2priority(nd_log_priority2id(netdata_log_level)) : NDLP_INFO_STR;
 
     nd_log_set_priority_level(inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "level", netdata_log_level));

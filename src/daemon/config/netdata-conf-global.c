@@ -3,6 +3,11 @@
 #include "netdata-conf-global.h"
 #include "daemon/common.h"
 
+static void set_required_environment(const char *name, const char *value) {
+    if(nd_environment_set(name, value, true) != 0)
+        fatal("Cannot publish required environment variable '%s': %s", name, strerror(errno));
+}
+
 size_t netdata_conf_cpus(void) {
     static size_t processors = 0;
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
@@ -35,7 +40,7 @@ size_t netdata_conf_cpus(void) {
 
     char buf[24];
     snprintfz(buf, sizeof(buf), "%zu", cached_processors);
-    nd_setenv("NETDATA_CONF_CPUS", buf, 1);
+    set_required_environment("NETDATA_CONF_CPUS", buf);
     __atomic_store_n(&processors, cached_processors, __ATOMIC_RELEASE);
 
 skip:
@@ -56,7 +61,7 @@ void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_thre
 
     char buf[32];
     snprintfz(buf, sizeof(buf), "%zu", wanted_arenas);
-    setenv("MALLOC_ARENA_MAX", buf, true);
+    set_required_environment("MALLOC_ARENA_MAX", buf);
 
 #if defined(HAVE_C_MALLOPT)
     wanted_arenas = inicfg_get_number(&netdata_config, CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", wanted_arenas);
@@ -133,7 +138,7 @@ void libuv_initialize(void) {
 
     char buf[20 + 1];
     snprintfz(buf, sizeof(buf) - 1, "%d", libuv_worker_threads);
-    setenv("UV_THREADPOOL_SIZE", buf, 1);
+    set_required_environment("UV_THREADPOOL_SIZE", buf);
 }
 
 void netdata_conf_section_global_hostname(void) {
@@ -173,7 +178,7 @@ void netdata_conf_section_global_wmi_timeout(void) {
 
     char buf[32];
     snprintfz(buf, sizeof(buf), "%lld", configured);
-    nd_setenv("NETDATA_WMI_STARTUP_TIMEOUT_MS", buf, 1);
+    set_required_environment("NETDATA_WMI_STARTUP_TIMEOUT_MS", buf);
 #endif
 }
 
@@ -190,4 +195,3 @@ void netdata_conf_section_global_run_as_user(const char **user) {
         *user = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
     }
 }
-

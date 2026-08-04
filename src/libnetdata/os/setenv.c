@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define NETDATA_NATIVE_ENVIRONMENT_ACCESS 1
 #include "libnetdata/libnetdata.h"
 
 #ifndef HAVE_SETENV
@@ -25,6 +26,11 @@ int os_setenv(const char *name, const char *value, int overwrite) {
 #endif
 
 void nd_setenv(const char *name, const char *value, int overwrite) {
+    if(nd_environment_is_initialized()) {
+        (void)nd_environment_set(name, value, overwrite != 0);
+        return;
+    }
+
 #if defined(OS_WINDOWS)
     if(overwrite)
         SetEnvironmentVariable(name, value);

@@ -100,14 +100,15 @@ static void __attribute__((destructor)) aclk_proxy_mutex_destroy(void)
     netdata_mutex_destroy(&aclk_proxy_mutex);
 }
 
-static inline int check_environment_proxy(const char **proxy, ACLK_PROXY_TYPE *type)
+static inline int check_environment_proxy(char **proxy, ACLK_PROXY_TYPE *type)
 {
     const char *var = "http_proxy";
-    char *tmp = getenv(var);
+    CLEAN_CHAR_P *tmp = nd_environment_get_dup(var);
 
     if (!tmp || !*tmp) {
+        freez(tmp);
         var = "https_proxy";
-        tmp = getenv(var);
+        tmp = nd_environment_get_dup(var);
         if (!tmp || !*tmp)
             return 1;
     }
@@ -125,6 +126,7 @@ static inline int check_environment_proxy(const char **proxy, ACLK_PROXY_TYPE *t
                "ACLK: using %s proxy %s (%s, from %s)",
                *type == PROXY_TYPE_HTTP ? "HTTP" : (*type == PROXY_TYPE_SOCKS5H ? "SOCKS5H" : "SOCKS5"),
                display, strchr(tmp, '@') ? "with credentials" : "without credentials", proxy_source);
+        tmp = NULL;
         return 0;
     }
 
@@ -154,7 +156,8 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
     }
 
     if (strcmp(proxy, ACLK_PROXY_ENV) == 0) {
-        if (check_environment_proxy(&proxy, type) != 0) {
+        char *environment_proxy = NULL;
+        if (check_environment_proxy(&environment_proxy, type) != 0) {
             if (cloud_config_proxy_is_explicitly_set())
                 nd_log(NDLS_DAEMON, NDLP_WARNING,
                        "ACLK: proxy is explicitly set to 'env' but neither 'http_proxy' nor 'https_proxy'"
@@ -164,6 +167,8 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
             proxy_source = NULL;
             proxy = NULL;
         }
+        else
+            proxy = environment_proxy;
         return proxy;
     }
 

@@ -29,7 +29,8 @@ int do_run_reboot_required(int update_every, usec_t dt) {
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/var/run");
 
         // Disable monitoring if running inside a container and the directory is not mounted from the host
-        if (getenv("NETDATA_LISTENER_PORT") != NULL) {
+        CLEAN_CHAR_P *listener_port = nd_environment_get_dup("NETDATA_LISTENER_PORT");
+        if (listener_port) {
             if (!netdata_configured_host_prefix || !*netdata_configured_host_prefix || is_dir_mounted(filename) != 1) {
                 return 1;
             }

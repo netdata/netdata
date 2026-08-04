@@ -2,13 +2,14 @@
 
 #include "windows-wmi.h"
 #include "windows-wmi-GetSystemInfo.h"
+#include "libnetdata/environment/environment.h"
 
 #if defined(OS_WINDOWS)
 
 #define WMI_GETSYSTEMINFO_TIMEOUT_DEFAULT_MS 5000
 
 static ULONG wmi_getsysteminfo_timeout_ms(void) {
-    const char *env = getenv("NETDATA_WMI_STARTUP_TIMEOUT_MS");
+    CLEAN_CHAR_P *env = nd_environment_get_dup("NETDATA_WMI_STARTUP_TIMEOUT_MS");
     if(!env || !*env) return WMI_GETSYSTEMINFO_TIMEOUT_DEFAULT_MS;
 
     char *end = NULL;

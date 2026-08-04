@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define NETDATA_NATIVE_ENVIRONMENT_ACCESS 1
 #include "nd_log-internals.h"
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -49,6 +50,8 @@ void nd_log_initialize_mutexes(void) {
 
 void nd_log_initialize_for_external_plugins(const char *name) {
     nd_log_initialize_mutexes();
+    if(nd_environment_init() != 0)
+        fatal("Cannot initialize the managed process environment");
 
     // if we don't run under Netdata, log to stderr,
     // otherwise, use the logging method Netdata wants us to use.
@@ -77,31 +80,39 @@ void nd_log_initialize_for_external_plugins(const char *name) {
         nd_log.sources[i].fp = NULL;
     }
 
-    nd_log_set_priority_level(getenv("NETDATA_LOG_LEVEL"));
-    nd_log_set_facility(getenv("NETDATA_SYSLOG_FACILITY"));
+    CLEAN_CHAR_P *log_level = nd_environment_get_dup("NETDATA_LOG_LEVEL");
+    CLEAN_CHAR_P *syslog_facility = nd_environment_get_dup("NETDATA_SYSLOG_FACILITY");
+    nd_log_set_priority_level(log_level);
+    nd_log_set_facility(syslog_facility);
 
     time_t period = 1200;
     size_t logs = 200;
-    const char *s = getenv("NETDATA_ERRORS_THROTTLE_PERIOD");
+    CLEAN_CHAR_P *throttle_period = nd_environment_get_dup("NETDATA_ERRORS_THROTTLE_PERIOD");
+    const char *s = throttle_period;
     if(s && *s >= '0' && *s <= '9') {
         period = str2l(s);
         if(period < 0) period = 0;
     }
 
-    s = getenv("NETDATA_ERRORS_PER_PERIOD");
+    CLEAN_CHAR_P *errors_per_period = nd_environment_get_dup("NETDATA_ERRORS_PER_PERIOD");
+    s = errors_per_period;
     if(s && *s >= '0' && *s <= '9')
         logs = str2u(s);
 
     nd_log_set_flood_protection(logs, period);
 
     if(!netdata_configured_host_prefix) {
-        s = getenv("NETDATA_HOST_PREFIX");
-        if(s && *s)
-            netdata_configured_host_prefix = (char *)s;
+        CLEAN_CHAR_P *host_prefix = nd_environment_get_dup("NETDATA_HOST_PREFIX");
+        if(host_prefix && *host_prefix) {
+            netdata_configured_host_prefix = host_prefix;
+            host_prefix = NULL;
+        }
     }
 
-    ND_LOG_METHOD method = nd_log_method2id(getenv("NETDATA_LOG_METHOD"));
-    ND_LOG_FORMAT format = nd_log_format2id(getenv("NETDATA_LOG_FORMAT"));
+    CLEAN_CHAR_P *log_method = nd_environment_get_dup("NETDATA_LOG_METHOD");
+    CLEAN_CHAR_P *log_format = nd_environment_get_dup("NETDATA_LOG_FORMAT");
+    ND_LOG_METHOD method = nd_log_method2id(log_method);
+    ND_LOG_FORMAT format = nd_log_format2id(log_format);
 
     if(!IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(method)) {
         if(is_stderr_connected_to_journal()) {
@@ -115,13 +126,15 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     }
 
     switch(method) {
-        case NDLM_JOURNAL:
-            if(!nd_log_journal_direct_init(getenv("NETDATA_SYSTEMD_JOURNAL_PATH")) &&
+        case NDLM_JOURNAL: {
+            CLEAN_CHAR_P *journal_path = nd_environment_get_dup("NETDATA_SYSTEMD_JOURNAL_PATH");
+            if(!nd_log_journal_direct_init(journal_path) &&
                 !nd_log_journal_direct_init(NULL) && !nd_log_journal_systemd_init()) {
                 nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to initialize journal. Using stderr.");
                 method = NDLM_STDERR;
             }
             break;
+        }
 
 #if defined(OS_WINDOWS)
 #if defined(HAVE_ETW)
@@ -155,6 +168,8 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     nd_log.sources[NDLS_COLLECTORS].format = format;
     nd_log.sources[NDLS_COLLECTORS].fd = -1;
     nd_log.sources[NDLS_COLLECTORS].fp = NULL;
+
+    nd_log_publish_child_environment();
 
     //    nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "FINAL_LOG_METHOD: %s", nd_log_id2method(method));
 

@@ -36,64 +36,66 @@ static void netdata_service_log(const char *fmt, ...)
 }
 
 static SERVICE_STATUS_HANDLE svc_status_handle = nullptr;
-static SERVICE_STATUS svc_status = {};
+static volatile LONG svc_current_state = SERVICE_STOPPED;
+static volatile LONG svc_environment_frozen = 0;
+static volatile LONG svc_stop_started = 0;
+static volatile LONG svc_checkpoint = 0;
 
-static HANDLE svc_stop_event_handle = nullptr;
 static DWORD svc_stop_control_code = SERVICE_CONTROL_STOP;
 
-static ND_THREAD *cleanup_thread = nullptr;
-
-static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint, DWORD dwControlsAccepted)
+static bool ReportSvcStatus(
+    DWORD dwCurrentState,
+    DWORD dwWin32ExitCode,
+    DWORD dwWaitHint,
+    DWORD dwControlsAccepted,
+    DWORD dwServiceSpecificExitCode = 0)
 {
-    static DWORD dwCheckPoint = 1;
-    svc_status.dwCurrentState = dwCurrentState;
-    svc_status.dwWin32ExitCode = dwWin32ExitCode;
-    svc_status.dwWaitHint = dwWaitHint;
-    svc_status.dwControlsAccepted = dwControlsAccepted;
+    SERVICE_STATUS status = {};
+    status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    status.dwCurrentState = dwCurrentState;
+    status.dwWin32ExitCode = dwWin32ExitCode;
+    status.dwServiceSpecificExitCode = dwServiceSpecificExitCode;
+    status.dwWaitHint = dwWaitHint;
+    status.dwControlsAccepted = dwControlsAccepted;
 
     if (dwCurrentState == SERVICE_RUNNING || dwCurrentState == SERVICE_STOPPED)
     {
-        svc_status.dwCheckPoint = 0;
+        status.dwCheckPoint = 0;
+        InterlockedExchange(&svc_checkpoint, 0);
     }
     else
     {
-        svc_status.dwCheckPoint = dwCheckPoint++;
+        status.dwCheckPoint = (DWORD)InterlockedIncrement(&svc_checkpoint);
     }
 
-    if (!SetServiceStatus(svc_status_handle, &svc_status)) {
+    if (!SetServiceStatus(svc_status_handle, &status)) {
         netdata_service_log("@ReportSvcStatus: SetServiceStatusFailed (%d)", GetLastError());
+        return false;
+    }
+
+    InterlockedExchange(&svc_current_state, (LONG)dwCurrentState);
+    return true;
+}
+
+extern "C" bool netdata_windows_service_environment_frozen(void)
+{
+    if (!svc_status_handle)
+        return true;
+
+    InterlockedExchange(&svc_environment_frozen, 1);
+
+    if (!ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0, SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN)) {
+        InterlockedExchange(&svc_environment_frozen, 0);
+        netdata_service_log("Failed to enable service stop and shutdown controls.");
         return false;
     }
 
     return true;
 }
 
-static HANDLE CreateEventHandle(const char *msg)
-{
-    HANDLE h = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-    if (!h)
-    {
-        netdata_service_log("%s", msg);
-
-        if (!ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 1000, 0))
-        {
-            netdata_service_log("Failed to set service status to stopped.");
-        }
-
-        return NULL;
-    }
-
-    return h;
-}
-
 static void call_netdata_cleanup(void *arg)
 {
     UNUSED(arg);
-
-    // Wait until we have to stop the service
-    netdata_service_log("Cleanup thread waiting for stop event...");
-    WaitForSingleObject(svc_stop_event_handle, INFINITE);
 
     // Stop the agent
     netdata_service_log("Running netdata cleanup...");
@@ -113,10 +115,6 @@ static void call_netdata_cleanup(void *arg)
     }
     netdata_exit_gracefully(reason, false);
 
-    // Close event handle
-    netdata_service_log("Closing stop event handle...");
-    CloseHandle(svc_stop_event_handle);
-
     // Set status to stopped
     netdata_service_log("Reporting the service as stopped...");
     ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
@@ -133,13 +131,19 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
         case SERVICE_CONTROL_SHUTDOWN:
         case SERVICE_CONTROL_STOP:
         {
-            if (svc_status.dwCurrentState != SERVICE_RUNNING)
+            if (!InterlockedCompareExchange(&svc_environment_frozen, 0, 0) ||
+                InterlockedCompareExchange(&svc_current_state, 0, 0) != SERVICE_RUNNING)
+                return;
+
+            if (InterlockedCompareExchange(&svc_stop_started, 1, 0))
                 return;
 
             // Set service status to stop-pending
             netdata_service_log("Setting service status to stop-pending...");
-            if (!ReportSvcStatus(SERVICE_STOP_PENDING, 0, 5000, 0))
+            if (!ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 5000, 0)) {
+                InterlockedExchange(&svc_stop_started, 0);
                 return;
+            }
 
             __atomic_store_n(&svc_stop_control_code, controlCode, __ATOMIC_RELEASE);
 
@@ -147,18 +151,19 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
             netdata_service_log("Creating cleanup thread...");
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "CLEANUP");
-            cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, call_netdata_cleanup, NULL);
-
-            // Signal the stop request
-            netdata_service_log("Signalling the cleanup thread...");
-            SetEvent(svc_stop_event_handle);
+            ND_THREAD *cleanup_thread = nd_thread_create(
+                tag, NETDATA_THREAD_OPTION_DEFAULT, call_netdata_cleanup, NULL);
+            if (!cleanup_thread) {
+                netdata_service_log("Cannot create the cleanup thread; stopping the service immediately.");
+                ReportSvcStatus(SERVICE_STOPPED, ERROR_NOT_ENOUGH_MEMORY, 0, 0);
+                ExitProcess(ERROR_NOT_ENOUGH_MEMORY);
+            }
             break;
         }
         case SERVICE_CONTROL_INTERROGATE:
-        {
-            ReportSvcStatus(svc_status.dwCurrentState, svc_status.dwWin32ExitCode, svc_status.dwWaitHint, svc_status.dwControlsAccepted);
+            // The status did not change, so the SCM already has the current value.
             break;
-        }
+
         default:
             break;
     }
@@ -180,24 +185,15 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
 
     // Set status to start-pending
     netdata_service_log("Setting service status to start-pending...");
-    svc_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
-    svc_status.dwServiceSpecificExitCode = 0;
-    svc_status.dwCheckPoint = 0;
-    if (!ReportSvcStatus(SERVICE_START_PENDING, 0, 5000, 0))
+    if (!ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 5000, 0))
     {
         netdata_service_log("Failed to set service status to start pending.");
         return;
     }
 
-    // Create stop service event handle
-    netdata_service_log("Creating stop service event handle...");
-    svc_stop_event_handle = CreateEventHandle("Failed to create stop event handle");
-    if (!svc_stop_event_handle)
-        return;
-
     // Set status to running
     netdata_service_log("Setting service status to running...");
-    if (!ReportSvcStatus(SERVICE_RUNNING, 0, 5000, SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN))
+    if (!ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0, 0))
     {
         netdata_service_log("Failed to set service status to running.");
         return;
@@ -205,16 +201,27 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
 
     // Run the agent
     netdata_service_log("Running the agent...");
-    netdata_main(argc, argv);
+    int rc = netdata_main(argc, argv);
 
-    netdata_service_log("Agent has been started...");
+    if (rc == 10) {
+        netdata_service_log("Agent has been started.");
+        return;
+    }
+
+    netdata_service_log("Agent stopped with exit code %d.", rc);
+    ReportSvcStatus(
+        SERVICE_STOPPED,
+        rc ? ERROR_SERVICE_SPECIFIC_ERROR : NO_ERROR,
+        0,
+        0,
+        (DWORD)rc);
 }
 
-static bool update_path() {
-    const char *old_path = getenv("PATH");
+extern "C" bool netdata_windows_prepare_path(void) {
+    CLEAN_CHAR_P *old_path = nd_environment_get_dup("PATH");
 
     if (!old_path) {
-        if (setenv("PATH", "/usr/bin", 1) != 0) {
+        if (nd_environment_set("PATH", "/usr/bin", true) != 0) {
             netdata_service_log("Failed to set PATH to /usr/bin");
             return false;
         }
@@ -226,7 +233,7 @@ static bool update_path() {
     char *new_path = (char *) callocz(new_path_length, sizeof(char));
     snprintfz(new_path, new_path_length, "/usr/bin:%s", old_path);
 
-    if (setenv("PATH", new_path, 1) != 0) {
+    if (nd_environment_set("PATH", new_path, true) != 0) {
         netdata_service_log("Failed to add /usr/bin to PATH");
         freez(new_path);
         return false;
@@ -243,10 +250,6 @@ int main(int argc, char *argv[])
 #else
     bool tty = isatty(fileno(stdin)) == 1;
 #endif
-
-    if (!update_path()) {
-        return 1;
-    }
 
     if (tty)
     {

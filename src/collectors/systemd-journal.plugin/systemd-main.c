@@ -401,9 +401,9 @@ int main(int argc, char **argv)
 
     nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
-    netdata_threads_init_for_external_plugins(0);
 
-    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(!netdata_configured_host_prefix)
+        netdata_configured_host_prefix = "";
     if (verify_netdata_host_prefix(true) == -1)
         exit(1);
 
@@ -438,6 +438,11 @@ int main(int argc, char **argv)
         function_systemd_journal("123", buf, &stop_monotonic_ut, &cancelled, NULL, HTTP_ACCESS_ALL, NULL, NULL);
         exit(1);
     }
+
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
+
+    netdata_threads_init_for_external_plugins(0);
 
     // ------------------------------------------------------------------------
     // watcher thread

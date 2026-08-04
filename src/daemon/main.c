@@ -14,6 +14,8 @@
 
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
+extern bool netdata_windows_prepare_path(void);
+extern bool netdata_windows_service_environment_frozen(void);
 #endif
 
 #ifdef ENABLE_SENTRY
@@ -293,11 +295,34 @@ static void fatal_status_file_save(void) {
     exit(1);
 }
 
+static bool environment_freeze_for_early_exit(const char *mode) {
+    if(nd_environment_freeze_process() == 0) {
+#ifdef OS_WINDOWS
+        if(!netdata_windows_service_environment_frozen()) {
+            fprintf(stderr, "Cannot enable Windows service controls after freezing the process environment.\n");
+            return false;
+        }
+#endif
+        return true;
+    }
+
+    fprintf(stderr, "Cannot freeze the process environment for -W %s: %s\n", mode, strerror(errno));
+    return false;
+}
+
 int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
     analytics_init();
     nd_log_initialize_mutexes();
+    if(nd_environment_init() != 0) {
+        fprintf(stderr, "Cannot initialize the process environment: %s\n", strerror(errno));
+        return 1;
+    }
+#ifdef OS_WINDOWS
+    if(!netdata_windows_prepare_path())
+        return 1;
+#endif
 
     // Register the daemon's per-thread cleanup callback. Each subsystem
     // should own the registration of its own cleanups; this one lives in
@@ -401,31 +426,37 @@ int netdata_main(int argc, char **argv) {
                         char* stresstest_string = "stresstest=";
 
                         if(strcmp(optarg, "pgd-tests") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             return pgd_test(argc, argv);
                         }
 #endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             sql_init_meta_database(DB_CHECK_RECOVER, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-compact") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             sql_init_meta_database(DB_CHECK_RECLAIM_SPACE, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-analyze") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             sql_init_meta_database(DB_CHECK_ANALYZE, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-alert-cleanup") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             sql_alert_cleanup(true);
                             return 0;
                         }
 
                         if(strcmp(optarg, "jsonctest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             if (json_c_parser_unittest()) return 1;
                             if (stream_path_json_unittest())
@@ -435,6 +466,7 @@ int netdata_main(int argc, char **argv) {
                         }
 
                         if(strcmp(optarg, "yamltest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             if (yaml_unittest()) return 1;
                             fprintf(stderr, "\n\nYAML TESTS PASSED\n\n");
@@ -443,6 +475,7 @@ int netdata_main(int argc, char **argv) {
 
                         if(strcmp(optarg, "mltest") == 0) {
 #ifdef ENABLE_ML
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             if (ml_unittest()) return 1;
                             fprintf(stderr, "\n\nML TESTS PASSED\n\n");
@@ -465,6 +498,13 @@ int netdata_main(int argc, char **argv) {
                             if (sqlite_library_init())
                                 return 1;
                             rrdlabels_aral_init(false);
+
+                            if(nd_environment_set("UV_THREADPOOL_SIZE", "48", true) != 0) {
+                                fprintf(stderr, "Cannot configure the unittest process environment: %s\n", strerror(errno));
+                                return 1;
+                            }
+                            if(!environment_freeze_for_early_exit(optarg))
+                                return 1;
 
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
@@ -534,21 +574,26 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
                         else if(strcmp(optarg, "escapetest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             return command_argument_sanitization_tests();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return dictionary_unittest(10000);
                         }
                         else if(strcmp(optarg, "dicttest-benchmark") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return dictionary_unittest_benchmark();
                         }
                         else if(strcmp(optarg, "araltest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return aral_unittest(10000);
                         }
                         else if(strcmp(optarg, "aralconcurrency") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
 #ifdef NETDATA_INTERNAL_CHECKS
                             return aral_unittest_concurrency();
@@ -558,34 +603,42 @@ int netdata_main(int argc, char **argv) {
 #endif
                         }
                         else if(strcmp(optarg, "waitqtest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return unittest_waiting_queue();
                         }
                         else if(strcmp(optarg, "uuidmaptest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return uuidmap_unittest();
                         }
                         else if(strcmp(optarg, "lockstest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return locks_stress_test();
                         }
                         else if(strcmp(optarg, "rwlockstest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return rwlocks_stress_test();
                         }
                         else if(strcmp(optarg, "rwspinlocktest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return rw_spinlock_unittest();
                         }
                         else if(strcmp(optarg, "prd-array-stress") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return prd_array_stress_test();
                         }
                         else if(strcmp(optarg, "stringtest") == 0)  {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return string_unittest(10000);
                         }
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             rrdlabels_aral_init(true);
                             int rc = rrdlabels_unittest();
@@ -593,6 +646,7 @@ int netdata_main(int argc, char **argv) {
                             return rc;
                         }
                         else if(strcmp(optarg, "rrdhostlabelstest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             rrdlabels_aral_init(true);
                             int rc = rrdhost_labels_unittest();
@@ -600,31 +654,38 @@ int netdata_main(int argc, char **argv) {
                             return rc;
                         }
                         else if(strcmp(optarg, "buffertest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return buffer_unittest();
                         }
                         else if(strcmp(optarg, "ringbuffertest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return ringbuffer_unittest();
                         }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return ws_client_unittest();
                         }
                         else if(strcmp(optarg, "mqttngtest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return mqtt_ng_unittest();
                         }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return test_cmd_pool_fifo();
                         }
                         else if(strcmp(optarg, "uuidtest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return uuid_unittest();
                         }
 #ifdef HAVE_LIBBACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return stacktrace_unittest();
                         }
@@ -646,80 +707,103 @@ int netdata_main(int argc, char **argv) {
                                 else
                                     key = argv[a];
                             }
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             return windows_perflib_dump(key, filename);
                         }
                         else if(strcmp(optarg, "perflibnamestest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return perflibnamestest_main();
                         }
 #endif
                         else if(strcmp(optarg, "utf8sanitizertest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return utf8_sanitizer_unittest();
                         }
                         else if(strcmp(optarg, "queryplantest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return query_plan_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return mc_unittest();
                         }
                         else if(strcmp(optarg, "ctxtest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return ctx_unittest();
                         }
                         else if(strcmp(optarg, "metatest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return metadata_unittest();
                         }
                         else if(strcmp(optarg, "pgctest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return pgc_unittest();
                         }
                         else if(strcmp(optarg, "mrgtest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return mrg_unittest();
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return mrg_retention_benchmark();
                         }
                         else if(strcmp(optarg, "parsertest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return pluginsd_parser_unittest();
                         }
                         else if(strcmp(optarg, "websockettest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return websocket_compression_unittest();
                         }
                         else if(strcmp(optarg, "stream_compressions_test") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return unittest_stream_compressions();
                         }
                         else if(strcmp(optarg, "progresstest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return progress_unittest();
                         }
                         else if(strcmp(optarg, "evaltest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return eval_unittest();
                         }
                         else if(strcmp(optarg, "durationtest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return duration_unittest();
                         }
                         else if(strcmp(optarg, "healthconfigtest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             unittest_running = true;
                             return health_config_unittest();
                         }
-                        else if(strcmp(optarg, "dyncfgtest") == 0)
+                        else if(strcmp(optarg, "dyncfgtest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             return unittest_run_with_rrd(dyncfg_unittest);
-                        else if(strcmp(optarg, "functionsaccesstest") == 0)
+                        }
+                        else if(strcmp(optarg, "functionsaccesstest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             return unittest_run_with_rrd(rrdfunctions_verify_access_unittest);
-                        else if(strcmp(optarg, "mcpfunctionaccesstest") == 0)
+                        }
+                        else if(strcmp(optarg, "mcpfunctionaccesstest") == 0) {
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
                             return unittest_run_with_rrd(mcp_execute_function_access_unittest);
+                        }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
@@ -727,6 +811,7 @@ int netdata_main(int argc, char **argv) {
                             netdata_conf_section_global();
                             nd_profile.update_every = 1;
                             registry_init();
+                            if(!environment_freeze_for_early_exit("createdataset")) return 1;
                             if(rrd_init("dbengine-dataset", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
                                 return 1;
@@ -759,7 +844,11 @@ int netdata_main(int argc, char **argv) {
 
                             char workers_str[16];
                             snprintf(workers_str, 15, "%u", workers);
-                            setenv("UV_THREADPOOL_SIZE", workers_str, 1);
+                            if(nd_environment_set("UV_THREADPOOL_SIZE", workers_str, true) != 0) {
+                                fprintf(stderr, "Cannot configure the stress-test process environment: %s\n", strerror(errno));
+                                return 1;
+                            }
+                            if(!environment_freeze_for_early_exit("stresstest")) return 1;
                             dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
                                                  page_cache_mb, disk_space_mb);
                             return 0;
@@ -941,10 +1030,16 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
                         else if(strcmp(optarg, "buildinfo") == 0) {
+#ifdef OS_WINDOWS
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
+#endif
                             print_build_info();
                             return 0;
                         }
                         else if(strcmp(optarg, "buildinfojson") == 0) {
+#ifdef OS_WINDOWS
+                            if(!environment_freeze_for_early_exit(optarg)) return 1;
+#endif
                             print_build_info_json();
                             return 0;
                         }
@@ -996,26 +1091,7 @@ int netdata_main(int argc, char **argv) {
     netdata_conf_section_logs();
     nd_log_limits_unlimited();
     nd_log_initialize();
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // this MUST be before anything else - to load the old status file before saving a new one
-
-    daemon_status_file_init(); // this loads the old file
-    machine_guid_get(); // after loading the old daemon status file - we may need the machine guid from it
-    nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
-    nd_log_register_fatal_final_cb(fatal_status_file_save);
-    exit_initiated_init();
-
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("signals");
-
-    signals_block_all_except_deadly();
-    nd_initialize_signals(false); // catches deadly signals and stores them in the status file
-
-    // ----------------------------------------------------------------------------------------------------------------
-
-    netdata_conf_section_global(); // get hostname, host prefix, profile, etc
-    registry_init(); // for machine_guid, must be after netdata_conf_section_global()
+    nd_log_publish_child_environment();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("run dir");
@@ -1037,16 +1113,39 @@ int netdata_main(int argc, char **argv) {
 //        }
     }
 
+#if !defined(OS_WINDOWS)
+    // macOS DMI discovery may need system_profiler while loading the old status file.
+    delta_startup_time("temp spawn server");
+    if(!netdata_main_spawn_server_init("init", argc, (const char **)argv))
+        fatal("Cannot create the initialization spawn server.");
+#endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // load the old status file before anything saves a new one
+
+    daemon_status_file_init(); // this loads the old file
+    machine_guid_get(); // after loading the old daemon status file - we may need the machine guid from it
+    nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
+    nd_log_register_fatal_final_cb(fatal_status_file_save);
+    exit_initiated_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("signals");
+
+    signals_block_all_except_deadly();
+    nd_initialize_signals(false); // catches deadly signals and stores them in the status file
+
+    // ----------------------------------------------------------------------------------------------------------------
+
+    netdata_conf_section_global(); // get hostname, host prefix, profile, etc
+    registry_init(); // for machine_guid, must be after netdata_conf_section_global()
+
     nd_profile_setup();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("crash reports");
 
     daemon_status_file_check_crash();
-
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("temp spawn server");
-    netdata_main_spawn_server_init("init", argc, (const char **)argv);
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("ssl");
@@ -1184,18 +1283,6 @@ int netdata_main(int argc, char **argv) {
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("plugins spawn server");
-
-    netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
-
-#ifdef ENABLE_SENTRY
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("sentry");
-
-    nd_sentry_init();
-#endif
-
-    // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("home");
 
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
@@ -1206,7 +1293,39 @@ int netdata_main(int argc, char **argv) {
     else
         netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
 
-    nd_setenv("HOME", netdata_configured_home_dir, 1);
+    if(nd_environment_set("HOME", netdata_configured_home_dir, true) != 0)
+        fatal("Cannot publish the Netdata home directory to the process environment.");
+
+#if defined(OS_WINDOWS)
+    if(!spawn_server_windows_publish_cygwin_path())
+        fatal("Cannot publish the MSYS runtime path.");
+
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
+
+    if(!netdata_windows_service_environment_frozen()) {
+        fprintf(stderr, "Cannot enable Windows service controls after freezing the process environment.\n");
+        return 1;
+    }
+#endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("plugins spawn server");
+
+    if(!netdata_main_spawn_server_init("plugins", argc, (const char **)argv))
+        fatal("Cannot create the plugins spawn server.");
+
+#if !defined(OS_WINDOWS)
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
+#endif
+
+#ifdef ENABLE_SENTRY
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("sentry");
+
+    nd_sentry_init();
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("dyncfg");

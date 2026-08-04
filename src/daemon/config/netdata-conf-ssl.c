@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define NETDATA_NATIVE_ENVIRONMENT_ACCESS 1
 #include "daemon/common.h"
 #include "netdata-conf-ssl.h"
 #include <curl/curl.h>

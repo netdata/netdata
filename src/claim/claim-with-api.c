@@ -498,26 +498,29 @@ static bool claim_extra_opts_has_token(const char *opts, const char *token, size
 }
 
 bool claim_agent_from_environment(void) {
-    const char *url = getenv("NETDATA_CLAIM_URL");
+    CLEAN_CHAR_P *url_env = nd_environment_get_dup("NETDATA_CLAIM_URL");
+    const char *url = url_env;
     if(!url || !*url) {
         url = inicfg_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
         if(!url || !*url) return false;
     }
 
-    const char *token = getenv("NETDATA_CLAIM_TOKEN");
+    CLEAN_CHAR_P *token = nd_environment_get_dup("NETDATA_CLAIM_TOKEN");
     if(!token || !*token)
         return false;
 
-    const char *rooms = getenv("NETDATA_CLAIM_ROOMS");
+    CLEAN_CHAR_P *rooms_env = nd_environment_get_dup("NETDATA_CLAIM_ROOMS");
+    const char *rooms = rooms_env;
     if(!rooms)
         rooms = "";
 
-    const char *proxy = getenv("NETDATA_CLAIM_PROXY");
+    CLEAN_CHAR_P *proxy_env = nd_environment_get_dup("NETDATA_CLAIM_PROXY");
+    const char *proxy = proxy_env;
     if(!proxy || !*proxy)
         proxy = "env";
 
     bool insecure = CONFIG_BOOLEAN_NO;
-    const char *from_env = getenv("NETDATA_EXTRA_CLAIM_OPTS");
+    CLEAN_CHAR_P *from_env = nd_environment_get_dup("NETDATA_EXTRA_CLAIM_OPTS");
     if(claim_extra_opts_has_token(from_env, "-insecure", sizeof("-insecure") - 1))
         insecure = CONFIG_BOOLEAN_YES;
 

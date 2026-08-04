@@ -4,13 +4,6 @@
 
 #if defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
 
-#ifdef __APPLE__
-#include <crt_externs.h>
-#define environ (*_NSGetEnviron())
-#else
-extern char **environ;
-#endif
-
 #define SPAWN_SERVER_MAX_DEFERRED_REAPERS 1
 
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si) { return si->read_fd; }
@@ -47,8 +40,15 @@ static struct {
 //    }
 //}
 
-SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
+SPAWN_SERVER *spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name,
+                                  spawn_request_callback_t cb __maybe_unused, int argc __maybe_unused,
+                                  const char **argv __maybe_unused, ND_ENVIRONMENT *environment,
+                                  const char *runtime_directory __maybe_unused) {
+    if(!environment)
+        return NULL;
+
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
+    server->environment = environment;
 
     if (name)
         server->name = strdupz(name);
@@ -92,33 +92,28 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     int stdin_pipe[2] = { -1, -1 };
     int stdout_pipe[2] = { -1, -1 };
+    posix_spawn_file_actions_t file_actions;
+    posix_spawnattr_t attr;
+    ND_ENV_SNAPSHOT *snapshot = NULL;
+    bool file_actions_initialized = false;
+    bool attr_initialized = false;
+    bool listed = false;
 
     if (pipe(stdin_pipe) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdin pipe() failed: %s", cmdline);
-        freez(si);
-        return NULL;
+        goto cleanup;
     }
 
     if (pipe(stdout_pipe) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdout pipe() failed: %s", cmdline);
-        close(stdin_pipe[PIPE_READ]);
-        close(stdin_pipe[PIPE_WRITE]);
-        freez(si);
-        return NULL;
+        goto cleanup;
     }
-
-    posix_spawn_file_actions_t file_actions;
-    posix_spawnattr_t attr;
 
     if (posix_spawn_file_actions_init(&file_actions) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawn_file_actions_init() failed: %s", cmdline);
-        close(stdin_pipe[PIPE_READ]);
-        close(stdin_pipe[PIPE_WRITE]);
-        close(stdout_pipe[PIPE_READ]);
-        close(stdout_pipe[PIPE_WRITE]);
-        freez(si);
-        return NULL;
+        goto cleanup;
     }
+    file_actions_initialized = true;
 
     posix_spawn_file_actions_adddup2(&file_actions, stdin_pipe[PIPE_READ], STDIN_FILENO);
     posix_spawn_file_actions_adddup2(&file_actions, stdout_pipe[PIPE_WRITE], STDOUT_FILENO);
@@ -133,36 +128,32 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     if (posix_spawnattr_init(&attr) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_init() failed: %s", cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        close(stdin_pipe[PIPE_READ]);
-        close(stdin_pipe[PIPE_WRITE]);
-        close(stdout_pipe[PIPE_READ]);
-        close(stdout_pipe[PIPE_WRITE]);
-        freez(si);
-        return NULL;
+        goto cleanup;
     }
+    attr_initialized = true;
 
     // Set the flags to reset the signal mask and signal actions
     sigset_t empty_mask;
     sigemptyset(&empty_mask);
     if (posix_spawnattr_setsigmask(&attr, &empty_mask) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed: %s", cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup;
     }
 
     short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
     if (posix_spawnattr_setflags(&attr, flags) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup;
     }
+
+    snapshot = nd_environment_snapshot_acquire(server->environment);
+    if(!snapshot)
+        goto cleanup;
 
     spinlock_lock(&spawn_globals.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
     spinlock_unlock(&spawn_globals.spinlock);
+    listed = true;
 
     // unfortunately, on CYGWIN/MSYS posix_spawn() is not thread safe
     // so, we run it one by one.
@@ -173,23 +164,14 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
 
     errno_clear();
-    if (posix_spawn(&si->child_pid, argv[0], &file_actions, &attr, (char * const *)argv, environ) != 0) {
+    int spawn_rc = posix_spawn(&si->child_pid, argv[0], &file_actions, &attr, (char *const *)argv,
+                               (char *const *)nd_environment_snapshot_envp(snapshot));
+    nd_environment_snapshot_release(snapshot);
+    snapshot = NULL;
+    if (spawn_rc != 0) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: posix_spawn() failed: %s", cmdline);
-
-        spinlock_lock(&spawn_globals.spinlock);
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
-        spinlock_unlock(&spawn_globals.spinlock);
-
-        posix_spawnattr_destroy(&attr);
-        posix_spawn_file_actions_destroy(&file_actions);
-
-        close(stdin_pipe[PIPE_READ]);
-        close(stdin_pipe[PIPE_WRITE]);
-        close(stdout_pipe[PIPE_READ]);
-        close(stdout_pipe[PIPE_WRITE]);
-        freez(si);
-        return NULL;
+        goto cleanup;
     }
     spinlock_unlock(&spinlock);
 
@@ -209,6 +191,27 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
            "SPAWN SERVER: process created with pid %d: %s",
            si->child_pid, cmdline);
     return si;
+
+cleanup:
+    nd_environment_snapshot_release(snapshot);
+
+    if(listed) {
+        spinlock_lock(&spawn_globals.spinlock);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
+        spinlock_unlock(&spawn_globals.spinlock);
+    }
+
+    if(attr_initialized)
+        posix_spawnattr_destroy(&attr);
+    if(file_actions_initialized)
+        posix_spawn_file_actions_destroy(&file_actions);
+
+    if(stdin_pipe[PIPE_READ] != -1) close(stdin_pipe[PIPE_READ]);
+    if(stdin_pipe[PIPE_WRITE] != -1) close(stdin_pipe[PIPE_WRITE]);
+    if(stdout_pipe[PIPE_READ] != -1) close(stdout_pipe[PIPE_READ]);
+    if(stdout_pipe[PIPE_WRITE] != -1) close(stdout_pipe[PIPE_WRITE]);
+    freez(si);
+    return NULL;
 }
 
 static int spawn_server_waitpid(SPAWN_INSTANCE *si);

@@ -1278,6 +1278,8 @@ int main(int argc, char **argv)
 {
     netdata_mutex_init(&stdout_mutex);
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
     netdata_threads_init_for_external_plugins(0);
 
     PerflibNamesRegistryInitialize();

@@ -16,13 +16,6 @@ pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) { return si->child_pid; }
 
 pid_t spawn_server_pid(SPAWN_SERVER *server) { return server->server_pid; }
 
-#ifdef __APPLE__
-#include <crt_externs.h>
-#define environ (*_NSGetEnviron())
-#else
-extern char **environ;
-#endif
-
 static size_t spawn_server_id = 0;
 static volatile sig_atomic_t spawn_server_exit = false;
 static volatile sig_atomic_t spawn_server_sigchld = false;
@@ -83,13 +76,13 @@ static int connect_to_spawn_server(const char *path, bool log) {
 // Encoding and decoding of spawn server request argv type of data
 
 // Function to encode argv or envp
-static void* argv_encode(const char **argv, size_t *out_size) {
+static void *argv_encode(const char *const *argv, size_t *out_size) {
     size_t buffer_size = 1024; // Initial buffer size
     size_t buffer_used = 0;
     char *buffer = mallocz(buffer_size);
 
     if(argv) {
-        for (const char **p = argv; *p != NULL; p++) {
+        for (const char *const *p = argv; *p != NULL; p++) {
             if (strlen(*p) == 0)
                 continue; // Skip empty strings
 
@@ -160,6 +153,30 @@ static const char** argv_decode(const char *buffer, size_t size) {
     argv[count] = NULL; // Null-terminate the array
 
     return argv;
+}
+
+static char **environment_vector_dup(ND_ENVIRONMENT *environment) {
+    ND_ENV_SNAPSHOT *snapshot = nd_environment_snapshot_acquire(environment);
+    if(!snapshot)
+        return NULL;
+
+    size_t entries = nd_environment_snapshot_entries(snapshot);
+    const char *const *envp = nd_environment_snapshot_envp(snapshot);
+    char **copy = callocz(entries + 1, sizeof(*copy));
+    for(size_t i = 0; i < entries; i++)
+        copy[i] = strdupz(envp[i]);
+
+    nd_environment_snapshot_release(snapshot);
+    return copy;
+}
+
+static void environment_vector_free(char **envp) {
+    if(!envp)
+        return;
+
+    for(size_t i = 0; envp[i]; i++)
+        freez(envp[i]);
+    freez(envp);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -380,7 +397,9 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
             if(pid > 0) {
                 kill(pid, SIGKILL);
 
-                while(waitpid(pid, NULL, 0) == -1 && errno == EINTR) { }
+                while(waitpid(pid, NULL, 0) == -1 && errno == EINTR) {
+                    // Retry until the child is reaped or waitpid() fails permanently.
+                }
             }
 
             spawn_server_exit = true;
@@ -409,6 +428,9 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to reset callback child signal handlers.");
             _exit(EXIT_FAILURE);
         }
+
+        if(nd_environment_fork_child_reset_from_native() != 0)
+            _exit(EXIT_FAILURE);
 
         mask_rc = pthread_sigmask(SIG_SETMASK, &previous_mask, NULL);
         if(mask_rc != 0) {
@@ -467,8 +489,19 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
         close(stdout_fd); stdout_fd = rq->fds[1] = STDOUT_FILENO;
         close(stderr_fd); stderr_fd = rq->fds[2] = STDERR_FILENO;
 
-        // overwrite the process environment
-        environ = (char **)rq->envp;
+        if(nd_environment_fork_child_replace(rq->envp) != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot adopt the environment for request No %zu",
+                   rq->request_id);
+            exit(EXIT_FAILURE);
+        }
+
+        if(nd_environment_freeze_process() != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot freeze the callback environment for request No %zu",
+                   rq->request_id);
+            exit(EXIT_FAILURE);
+        }
 
         // run the callback and return its code
         exit(server->cb(rq));
@@ -619,7 +652,7 @@ static bool spawn_server_recvmsg_fully(int sock, const struct iovec *iov, size_t
     struct iovec pending[SPAWN_SERVER_IOV_MAX];
     memcpy(pending, iov, sizeof(*iov) * iovlen);
 
-    size_t remaining;
+    size_t remaining = 0;
     if(unlikely(!spawn_server_iov_total_size(pending, iovlen, &remaining))) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN SERVER: cannot recvmsg() %s: iovec byte count overflows",
@@ -702,7 +735,7 @@ static bool spawn_server_sendmsg_fully(int sock, const struct iovec *iov, size_t
     struct iovec pending[SPAWN_SERVER_IOV_MAX];
     memcpy(pending, iov, sizeof(*iov) * iovlen);
 
-    size_t remaining;
+    size_t remaining = 0;
     if(unlikely(!spawn_server_iov_total_size(pending, iovlen, &remaining))) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot sendmsg() %s: iovec byte count overflows",
@@ -807,13 +840,19 @@ static bool spawn_server_is_running(const char *path) {
     return sr.status == STATUS_REPORT_PING;
 }
 
-static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
+static bool spawn_server_send_request(ND_UUID *magic, ND_ENVIRONMENT *environment, SPAWN_REQUEST *request) {
     bool ret = false;
 
     size_t env_size = 0;
     size_t argv_size = 0;
 
-    void *encoded_env = argv_encode(request->envp, &env_size);
+    ND_ENV_SNAPSHOT *snapshot = nd_environment_snapshot_acquire(environment);
+    if(!snapshot)
+        return false;
+
+    void *encoded_env = argv_encode(nd_environment_snapshot_envp(snapshot), &env_size);
+    nd_environment_snapshot_release(snapshot);
+
     void *encoded_argv = argv_encode(request->argv, &argv_size);
 
     struct msghdr msg = {0};
@@ -1377,8 +1416,55 @@ static void replace_stdio_with_dev_null() {
     close(dev_null_fd);
 }
 
-SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name, spawn_request_callback_t child_callback, int argc, const char **argv) {
+SPAWN_SERVER *spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name,
+                                  spawn_request_callback_t child_callback, int argc, const char **argv,
+                                  ND_ENVIRONMENT *environment, const char *runtime_directory) {
+    if(nd_environment_is_process_frozen()) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: refusing to fork a nofork server after the environment freeze");
+        return NULL;
+    }
+
+    if(!environment) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: environment context is required");
+        return NULL;
+    }
+
+    if(!runtime_directory || !*runtime_directory) {
+        errno = EINVAL;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: runtime directory is required");
+        return NULL;
+    }
+
+    struct stat runtime_directory_stat;
+    if(stat(runtime_directory, &runtime_directory_stat) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: runtime directory '%s' is not accessible", runtime_directory);
+        return NULL;
+    }
+
+    if(!S_ISDIR(runtime_directory_stat.st_mode)) {
+        errno = ENOTDIR;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: runtime directory '%s' is not a directory", runtime_directory);
+        return NULL;
+    }
+
+    if(runtime_directory_stat.st_mode & S_IWOTH) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: runtime directory '%s' is publicly writable", runtime_directory);
+        errno = EACCES;
+        return NULL;
+    }
+
+    if(access(runtime_directory, W_OK | X_OK) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: runtime directory '%s' is not writable or searchable", runtime_directory);
+        return NULL;
+    }
+
     SPAWN_SERVER *server = callocz(1, sizeof(SPAWN_SERVER));
+    char **isolated_child_environment = NULL;
     server->pipe[0] = -1;
     server->pipe[1] = -1;
     server->sock = -1;
@@ -1386,37 +1472,9 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     server->argc = argc;
     server->argv = argv;
     server->options = options;
+    server->environment = environment;
     server->id = __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED);
     os_uuid_generate_random(server->magic.uuid);
-
-    const char *runtime_directory = getenv("NETDATA_RUN_DIR");
-    if(!runtime_directory || !*runtime_directory)
-        runtime_directory = os_run_dir(true);
-
-    if (runtime_directory) {
-        struct stat statbuf;
-
-        if(!*runtime_directory)
-            // it is empty
-                runtime_directory = NULL;
-
-        else if (stat(runtime_directory, &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) {
-            // it exists and it is a directory
-
-            if (access(runtime_directory, W_OK) != 0) {
-                // it is not writable by us
-                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Runtime directory '%s' is not writable, falling back to '/tmp'", runtime_directory);
-                runtime_directory = NULL;
-            }
-        }
-        else {
-            // it does not exist
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Runtime directory '%s' does not exist, falling back to '/tmp'", runtime_directory);
-            runtime_directory = NULL;
-        }
-    }
-    if(!runtime_directory)
-        runtime_directory = "/tmp";
 
     char path[1024];
     int path_length;
@@ -1463,9 +1521,26 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         goto cleanup;
     }
 
+    if(environment != nd_environment_process()) {
+        isolated_child_environment = environment_vector_dup(environment);
+        if(!isolated_child_environment) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot snapshot the isolated server environment");
+            goto cleanup;
+        }
+    }
+
     pid_t pid = fork();
     if (pid == 0) {
         // the child - the spawn server
+
+        int environment_rc = isolated_child_environment ?
+            nd_environment_fork_child_replace((const char *const *)isolated_child_environment) :
+            nd_environment_fork_child_reset_from_native();
+        environment_vector_free(isolated_child_environment);
+        isolated_child_environment = NULL;
+        if(environment_rc != 0)
+            _exit(EXIT_FAILURE);
 
         char buf[16];
         snprintfz(buf, sizeof(buf), "spawn-%s", server->name);
@@ -1483,10 +1558,14 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         };
         os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), 0);
         nd_log_reopen_log_files_for_spawn_server(buf);
+        if(nd_environment_freeze_process() != 0)
+            _exit(EXIT_FAILURE);
         _exit(spawn_server_event_loop(server));
     }
     else if (pid > 0) {
         // the parent
+        environment_vector_free(isolated_child_environment);
+        isolated_child_environment = NULL;
         server->server_pid = pid;
         close(server->sock); server->sock = -1;
         close(server->pipe[1]); server->pipe[1] = -1;
@@ -1515,6 +1594,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot fork()");
 
 cleanup:
+    environment_vector_free(isolated_child_environment);
     spawn_server_destroy(server);
     return NULL;
 }
@@ -1701,14 +1781,13 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
             [2] = stderr_fd,
             [3] = custom_fd,
         },
-        .envp = (const char **)environ,
         .argv = argv,
         .data = data,
         .data_size = data_size,
         .type = type
     };
 
-    if(!spawn_server_send_request(&server->magic, &request))
+    if(!spawn_server_send_request(&server->magic, server->environment, &request))
         goto cleanup;
 
     close(pipe_stdin[0]); pipe_stdin[0] = -1;
