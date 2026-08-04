@@ -101,23 +101,19 @@ func benchmarkProfileMetricIndex(b testing.TB) *testProfileBuilder {
 			Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 			Category: "config_change",
 			Severity: "notice",
-			SharedVarbinds: map[string]*testVarbindDef{
-				testCiscoTerminalTypeOID: {
-					OID:     testCiscoTerminalTypeOID,
-					Type:    "INTEGER",
-					RawName: testCiscoTerminalTypeVarbind,
+			Varbinds: []any{testCiscoTerminalTypeVarbind, "sysUpTime.0"},
+			FileVarbinds: []testFileVarbind{
+				{Name: testCiscoTerminalTypeVarbind, Definition: &testVarbindDef{
+					OID:  testCiscoTerminalTypeOID,
+					Type: "INTEGER",
 					Enum: map[string]string{
 						"1": "none",
 						"2": "console",
 						"3": "virtual",
 						"4": "aux",
 					},
-				},
-				model.SysUpTimeOID: {
-					OID:     model.SysUpTimeOID,
-					Type:    "TimeTicks",
-					RawName: "sysUpTime.0",
-				},
+				}},
+				{Name: "sysUpTime.0", Definition: &testVarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks"}},
 			},
 		},
 		{
@@ -125,13 +121,13 @@ func benchmarkProfileMetricIndex(b testing.TB) *testProfileBuilder {
 			Name:     "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 			Category: "security",
 			Severity: "warning",
-			SharedVarbinds: map[string]*testVarbindDef{
-				testIfIndexOID: {
+			Varbinds: []any{"ifIndex"},
+			FileVarbinds: []testFileVarbind{
+				{Name: "ifIndex", Definition: &testVarbindDef{
 					OID:         testIfIndexOID,
 					Type:        "INTEGER",
-					RawName:     "ifIndex",
 					Constraints: "(1..48)",
-				},
+				}},
 			},
 		},
 	}

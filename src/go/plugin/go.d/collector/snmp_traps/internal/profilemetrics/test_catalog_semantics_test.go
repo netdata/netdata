@@ -58,6 +58,19 @@ func TestProfileMetricTestProfileBuilderUsesProductionCatalog(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("invalid file varbind reaches production validation", func(t *testing.T) {
+		idx := newTestProfileBuilder(t)
+		candidate := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")
+		candidate.Varbinds = []any{"brokenVarbind"}
+		candidate.FileVarbinds = []testFileVarbind{{Name: "brokenVarbind"}}
+
+		var err error
+		require.NotPanics(t, func() {
+			err = idx.addTraps([]*testTrapDef{candidate})
+		})
+		require.Error(t, err)
+	})
+
 	t.Run("build returns an immutable snapshot", func(t *testing.T) {
 		profile := newTestProfileBuilder(t)
 		first := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::first")

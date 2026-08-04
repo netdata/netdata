@@ -107,7 +107,7 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *testing.T) {
 	idx := newPopulatedTestProfile(t)
 	if err := idx.addTraps([]*testTrapDef{
-		{OID: testLinkUpTrapOID, Name: "IF-MIB::linkUp", Category: "state_change", Severity: "notice", SourceFile: "test-profile.yaml"},
+		{OID: testLinkUpTrapOID, Name: "IF-MIB::linkUp", Category: "state_change", Severity: "notice"},
 	}); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}

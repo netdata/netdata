@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	"gopkg.in/yaml.v2"
@@ -32,12 +31,31 @@ type testRuntimeConfig struct {
 type testProfileBuilder struct {
 	tb     testing.TB
 	paths  catalog.Paths
-	traps  []*catalog.TrapDef
+	traps  []*testTrapDef
 	rules  []catalog.MetricRule
 	charts []catalog.MetricChart
 }
 type testTrapEntry = model.TrapEntry
-type testTrapDef = catalog.TrapDef
+
+type testTrapDef struct {
+	OID              string            `yaml:"oid"`
+	Name             string            `yaml:"name"`
+	Category         string            `yaml:"category"`
+	Severity         string            `yaml:"severity"`
+	Description      string            `yaml:"description,omitempty"`
+	Status           string            `yaml:"status,omitempty"`
+	Varbinds         []any             `yaml:"varbinds,omitempty"`
+	Labels           map[string]string `yaml:"labels,omitempty"`
+	DedupKeyVarbinds []string          `yaml:"dedup_key_varbinds,omitempty"`
+
+	FileVarbinds []testFileVarbind `yaml:"-"`
+}
+
+type testFileVarbind struct {
+	Name       string
+	Definition *testVarbindDef
+}
+
 type testVarbindDef = catalog.VarbindDef
 type testVarbindValue = model.VarbindValue
 type testTrapEnrichmentAudit = model.TrapEnrichmentAudit
@@ -75,7 +93,7 @@ func newTestProfileBuilder(t testing.TB) *testProfileBuilder {
 }
 
 func (b *testProfileBuilder) addTraps(traps []*testTrapDef) error {
-	candidate := append(append([]*catalog.TrapDef(nil), b.traps...), traps...)
+	candidate := append(append([]*testTrapDef(nil), b.traps...), traps...)
 	lease, err := loadTestCatalogEpoch(b.tb, b.paths, candidate, b.rules, b.charts)
 	if err != nil {
 		return err
@@ -111,43 +129,30 @@ func (b *testProfileBuilder) Build() *catalog.Epoch {
 func loadTestCatalogEpoch(
 	t testing.TB,
 	paths catalog.Paths,
-	traps []*catalog.TrapDef,
+	traps []*testTrapDef,
 	rules []catalog.MetricRule,
 	charts []catalog.MetricChart,
 ) (*catalog.Lease, error) {
 	t.Helper()
 	profile := struct {
-		Varbinds map[string]catalog.VarbindDef `yaml:"varbinds,omitempty"`
-		Traps    []*catalog.TrapDef            `yaml:"traps"`
-		Charts   []catalog.MetricChart         `yaml:"charts,omitempty"`
-		Metrics  []catalog.MetricRule          `yaml:"metrics,omitempty"`
+		Varbinds yaml.MapSlice         `yaml:"varbinds,omitempty"`
+		Traps    []*testTrapDef        `yaml:"traps"`
+		Charts   []catalog.MetricChart `yaml:"charts,omitempty"`
+		Metrics  []catalog.MetricRule  `yaml:"metrics,omitempty"`
 	}{
-		Varbinds: make(map[string]catalog.VarbindDef),
-		Traps:    make([]*catalog.TrapDef, 0, len(traps)),
-		Charts:   append([]catalog.MetricChart(nil), charts...),
-		Metrics:  append([]catalog.MetricRule(nil), rules...),
+		Traps:   make([]*testTrapDef, 0, len(traps)),
+		Charts:  append([]catalog.MetricChart(nil), charts...),
+		Metrics: append([]catalog.MetricRule(nil), rules...),
 	}
 	for _, src := range traps {
 		if src == nil {
 			profile.Traps = append(profile.Traps, nil)
 			continue
 		}
-		trap := *src
-		trap.VarbindRefs = append([]any(nil), src.VarbindRefs...)
-		if len(trap.VarbindRefs) == 0 && len(src.SharedVarbinds) > 0 {
-			names := make([]string, 0, len(src.SharedVarbinds))
-			for _, vb := range src.SharedVarbinds {
-				names = append(names, vb.RawName)
-			}
-			slices.Sort(names)
-			for _, name := range names {
-				trap.VarbindRefs = append(trap.VarbindRefs, name)
-			}
+		for _, vb := range src.FileVarbinds {
+			profile.Varbinds = append(profile.Varbinds, yaml.MapItem{Key: vb.Name, Value: vb.Definition})
 		}
-		for _, vb := range src.SharedVarbinds {
-			profile.Varbinds[vb.RawName] = *vb
-		}
-		profile.Traps = append(profile.Traps, &trap)
+		profile.Traps = append(profile.Traps, src)
 	}
 	data, err := yaml.Marshal(profile)
 	if err != nil {
@@ -221,34 +226,28 @@ func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 			Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 			Category: "config_change",
 			Severity: "notice",
-			VarbindRefs: []any{
+			Varbinds: []any{
 				testCiscoCommandSourceVarbind,
 				testCiscoTerminalTypeVarbind,
 				"sysUpTime.0",
 			},
-			SharedVarbinds: map[string]*testVarbindDef{
-				testCiscoCommandSourceOID: {
+			FileVarbinds: []testFileVarbind{
+				{Name: testCiscoCommandSourceVarbind, Definition: &testVarbindDef{
 					OID:         testCiscoCommandSourceOID,
 					Type:        "INTEGER",
-					RawName:     testCiscoCommandSourceVarbind,
 					Constraints: "(1..4)",
-				},
-				testCiscoTerminalTypeOID: {
-					OID:     testCiscoTerminalTypeOID,
-					Type:    "INTEGER",
-					RawName: testCiscoTerminalTypeVarbind,
+				}},
+				{Name: testCiscoTerminalTypeVarbind, Definition: &testVarbindDef{
+					OID:  testCiscoTerminalTypeOID,
+					Type: "INTEGER",
 					Enum: map[string]string{
 						"1": "none",
 						"2": "console",
 						"3": "virtual",
 						"4": "aux",
 					},
-				},
-				model.SysUpTimeOID: {
-					OID:     model.SysUpTimeOID,
-					Type:    "TimeTicks",
-					RawName: "sysUpTime.0",
-				},
+				}},
+				{Name: "sysUpTime.0", Definition: &testVarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks"}},
 			},
 		},
 		{
@@ -256,16 +255,15 @@ func newPopulatedTestProfile(t *testing.T) *testProfileBuilder {
 			Name:     "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 			Category: "security",
 			Severity: "warning",
-			VarbindRefs: []any{
+			Varbinds: []any{
 				"ifIndex",
 			},
-			SharedVarbinds: map[string]*testVarbindDef{
-				testIfIndexOID: {
+			FileVarbinds: []testFileVarbind{
+				{Name: "ifIndex", Definition: &testVarbindDef{
 					OID:         testIfIndexOID,
 					Type:        "INTEGER",
-					RawName:     "ifIndex",
 					Constraints: "(1..48)",
-				},
+				}},
 			},
 		},
 	}
