@@ -39,9 +39,14 @@ func TestProfileMetricTestCatalogSemanticsMatchProduction(t *testing.T) {
 
 	t.Run("failed batch is atomic", func(t *testing.T) {
 		idx := newTestCatalog(t)
-		candidate := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::candidate")
+		existing := trap("1.3.6.1.4.1.99999.1", "TEST-MIB::existing")
+		require.NoError(t, idx.addTraps([]*testTrapDef{existing}))
+		candidate := trap("1.3.6.1.4.1.99999.2", "TEST-MIB::candidate")
 		require.Error(t, idx.addTraps([]*testTrapDef{candidate, nil}))
-		_, err := idx.ResolveTrap(candidate.OID)
+		resolved, err := idx.ResolveTrap(existing.OID)
+		require.NoError(t, err)
+		require.Equal(t, existing.OID, resolved.OID)
+		_, err = idx.ResolveTrap(candidate.OID)
 		require.Error(t, err)
 	})
 

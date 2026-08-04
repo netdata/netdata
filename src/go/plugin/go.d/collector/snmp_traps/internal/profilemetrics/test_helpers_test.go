@@ -82,11 +82,6 @@ func newTestCatalog(t testing.TB) *testCatalog {
 }
 
 func (idx *testCatalog) addTraps(traps []*testTrapDef) error {
-	for i, trap := range traps {
-		if trap == nil {
-			return fmt.Errorf("trap definition at index %d is nil", i)
-		}
-	}
 	candidate := append(append([]*catalog.TrapDef(nil), idx.traps...), traps...)
 	lease, err := loadTestCatalogEpoch(idx.tb, idx.paths, candidate, idx.rules, idx.charts)
 	if err != nil {
@@ -156,6 +151,10 @@ func loadTestCatalogEpoch(
 		Metrics:  append([]catalog.MetricRule(nil), rules...),
 	}
 	for _, src := range traps {
+		if src == nil {
+			profile.Traps = append(profile.Traps, nil)
+			continue
+		}
 		trap := *src
 		trap.VarbindRefs = append([]any(nil), src.VarbindRefs...)
 		if len(trap.VarbindRefs) == 0 && len(src.SharedVarbinds) > 0 {
