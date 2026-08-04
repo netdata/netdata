@@ -12,6 +12,7 @@
 #include <semaphore.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,8 @@ struct shared_dns_memory {
     uint8_t replace_fail_count; /* consecutive replace_generation() failures after mapping loss */
     int shm_fd;
     sem_t *sem;
-    bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
+    bool shm_name_created;   /* set when this context created/recreated the SHM name; triggers unlink on any exit */
+    bool shm_eexist_backoff; /* set when replace_generation backed off on EEXIST; skips shm_unlink on next retry */
 };
 
 static void shared_dns_memory_invalidate(struct shared_dns_memory *ctx)
@@ -69,16 +71,25 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
     }
-    (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
-    (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
+    /* If the previous attempt backed off on EEXIST, the name may belong to a
+     * concurrent legitimate publisher.  Skip unlink to avoid destroying their
+     * segment.  Otherwise evict whatever stale generation we left behind. */
+    if (!ctx->shm_eexist_backoff) {
+        (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
+        (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
+    }
+    /* Consume the backoff flag and reset ownership. */
+    ctx->shm_eexist_backoff = false;
+    ctx->shm_name_created   = false;
 
-    /* O_EXCL ensures we own the new segment.  On EEXIST back off rather than
-     * evicting: we cannot distinguish a squatter from a concurrent legitimate
-     * publisher without risking destroying a live segment.  The caller retries
-     * next cycle; our prior shm_unlink above already evicted the old generation. */
+    /* O_EXCL ensures we own the new segment.  On EEXIST a concurrent publisher
+     * has claimed the name; record the backoff flag and return false. */
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0640);
-    if (ctx->shm_fd < 0)
+    if (ctx->shm_fd < 0) {
+        if (errno == EEXIST)
+            ctx->shm_eexist_backoff = true;
         return false;
+    }
     /* Mark created before any further steps; close() unlinks on any failure path. */
     ctx->shm_name_created = true;
     /* Transfer ownership to real UID so consumers can verify the producer. */
@@ -88,17 +99,23 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         return false;
 
+    /* Write publisher PID directly to the fd BEFORE mmap to close the window
+     * between ftruncate (segment visible, size > 0) and semaphore creation.
+     * pwrite on the same tmpfs-backed fd is coherent with mmap on Linux. */
+    {
+        uint32_t mypid = (uint32_t)getpid();
+        if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
+                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
+            return false;
+    }
+
     ctx->data = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->data == MAP_FAILED) {
         ctx->data = NULL;
         return false;
     }
 
-    /* Write publisher PID before the semaphore becomes acquirable.  A concurrent
-     * opener that reads pid==0 through an already-acquirable semaphore treats the
-     * producer as dead, clears the ring, and takes over.  Writing first eliminates
-     * that window: by the time sem_open succeeds any reader sees a valid PID. */
-    ctx->data->hdr.publisher_pid = (uint32_t)getpid();
+    /* publisher_pid was written via pwrite above. */
 
     /* New SHM is kernel-zero-filled; no explicit memset needed.
      * O_EXCL: we just called sem_unlink so no legitimate semaphore exists.
@@ -192,11 +209,16 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         goto fail;
     }
 
-    /* For a fresh segment write publisher PID before the semaphore becomes
-     * acquirable so a concurrent opener never observes pid==0 and takes over.
+    /* For a fresh segment write publisher PID directly to the fd BEFORE sem_open
+     * to close the window between ftruncate (segment visible) and semaphore
+     * creation.  pwrite on the same tmpfs fd is coherent with mmap on Linux.
      * For a reused segment the PID is written inside the semaphore hold below. */
-    if (!reused)
-        ctx->data->hdr.publisher_pid = (uint32_t)getpid();
+    if (!reused) {
+        uint32_t mypid = (uint32_t)getpid();
+        if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
+                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
+            goto fail;
+    }
 
     /* For a fresh segment (reused=false) no legitimate semaphore exists, so use
      * O_CREAT|O_EXCL to prevent squatting; on EEXIST evict and retry once.

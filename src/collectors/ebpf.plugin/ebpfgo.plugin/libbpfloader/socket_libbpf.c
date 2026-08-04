@@ -74,6 +74,10 @@ typedef struct {
 #define SOCKET_GLOBAL_MAP_ENTRIES 18
 #define SOCKET_PID_LIVENESS_CACHE 256
 
+/* Run the dead-PID eviction pass every this many collection cycles to amortise
+ * the per-PID kill() overhead on hosts with many active network processes. */
+#define SOCKET_ACC_EVICT_INTERVAL 4
+
 /* -------------------------------------------------------------------------
  * tbl_nd_socket per-PID aggregation types
  * ---------------------------------------------------------------------- */
@@ -207,6 +211,7 @@ struct netdata_ebpf_socket_runtime {
     struct netdata_socket_per_pid_entry *acc; /* dense per-PID accumulator array */
     uint32_t acc_cap;
     uint32_t acc_count;
+    uint32_t acc_evict_counter; /* cycles since last dead-PID eviction pass */
     uint32_t *acc_htable;    /* PID → (acc_index + 1); 0 = empty slot */
     uint32_t acc_htable_sz;  /* power-of-two capacity */
 #endif
@@ -871,12 +876,12 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         if (rt->acc_count > 1u)
             qsort(rt->acc, (size_t)rt->acc_count, sizeof(*rt->acc), pid_ht_compare);
 
-        /* Evict dead PIDs: ring-buffer events only arrive for active processes, so
-         * dead entries accumulate indefinitely and produce zero-delta rows in the
-         * snapshot.  Each PID appears exactly once in rt->acc (deduplicated by
-         * accumulation), so no per-cycle cache is needed.  EPERM means alive (the
-         * process exists but we lack signal permission); only ESRCH confirms gone. */
-        {
+        /* Evict dead PIDs every SOCKET_ACC_EVICT_INTERVAL cycles to amortise the
+         * per-PID kill() cost.  Dead entries accumulate for at most that many cycles
+         * before eviction, producing zero-delta rows in the meantime.  EPERM means
+         * alive (process exists but no signal permission); only ESRCH confirms gone. */
+        rt->acc_evict_counter = (rt->acc_evict_counter + 1u) % SOCKET_ACC_EVICT_INTERVAL;
+        if (rt->acc_evict_counter == 0u) {
             uint32_t live = 0;
             for (uint32_t i = 0; i < rt->acc_count; i++) {
                 if (kill((pid_t)rt->acc[i].pid, 0) == 0 || errno == EPERM) {

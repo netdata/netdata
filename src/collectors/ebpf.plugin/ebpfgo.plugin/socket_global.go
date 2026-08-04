@@ -118,18 +118,15 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 
 	state := &socketGlobalState{}
 
-	// Lazily-opened SHM publisher, used only when socket is the designated
-	// publisher (cachestat is not running or has no apps/cgroups consumers).
+	// SHM publisher: opened lazily inside collectAndPublish so that a transient
+	// EEXIST backoff on the first cycle does not permanently prevent publishing.
+	// Matches the lazy-open pattern used by cachestat_global.go.
 	var shmPublisher *SharedPidMemoryPublisher
-	if shouldPublish && store != nil {
-		p, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
-		if perr != nil {
-			logPluginErr("socket.shm_open", "socket", "shared memory open", perr)
-		} else {
-			shmPublisher = p
-			defer shmPublisher.Close()
+	defer func() {
+		if shmPublisher != nil {
+			shmPublisher.Close()
 		}
-	}
+	}()
 
 	clearSocketApps := func() {
 		if store == nil {
@@ -151,6 +148,15 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 	}
 
 	collectAndPublish := func(usecSince int) {
+		if shmPublisher == nil && shouldPublish && store != nil {
+			p, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
+			if perr != nil {
+				logPluginErr("socket.shm_open", "socket", "shared memory open", perr)
+			} else {
+				shmPublisher = p
+			}
+		}
+
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("socket.snapshot", "socket", "snapshot", err)

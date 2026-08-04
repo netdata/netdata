@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,8 @@ struct shared_pid_memory {
     uint8_t replace_fail_count; /* consecutive replace_generation() failures after mapping loss */
     int shm_fd;
     sem_t *sem;
-    bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
+    bool shm_name_created;  /* set when this context created/recreated the SHM name; triggers unlink on any exit */
+    bool shm_eexist_backoff; /* set when replace_generation backed off on EEXIST; skips shm_unlink on next retry */
     char *shm_name;        /* owned copy of the POSIX SHM object name */
     char *sem_name;        /* owned copy of the POSIX semaphore name */
 };
@@ -94,16 +96,27 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
         close(ctx->shm_fd);
         ctx->shm_fd = -1;
     }
-    (void)sem_unlink(ctx->sem_name);
-    (void)shm_unlink(ctx->shm_name);
+    /* If the previous attempt backed off on EEXIST, the name may belong to a
+     * concurrent legitimate publisher.  Skip unlink to avoid destroying their
+     * segment.  Otherwise evict whatever stale generation we left behind. */
+    if (!ctx->shm_eexist_backoff) {
+        (void)sem_unlink(ctx->sem_name);
+        (void)shm_unlink(ctx->shm_name);
+    }
+    /* Consume the backoff flag and reset ownership: we no longer own anything
+     * regardless of what happened in the previous attempt. */
+    ctx->shm_eexist_backoff  = false;
+    ctx->shm_name_created    = false;
 
-    /* O_EXCL ensures we own the new segment.  On EEXIST back off rather than
-     * evicting: we cannot distinguish a squatter from a concurrent legitimate
-     * publisher without risking destroying a live segment.  The caller retries
-     * next cycle; our prior shm_unlink above already evicted the old generation. */
+    /* O_EXCL ensures we own the new segment.  On EEXIST a concurrent publisher
+     * has claimed the name; record the backoff flag so the NEXT retry skips the
+     * unlink, and return false so the caller retries next cycle. */
     ctx->shm_fd = shm_open(ctx->shm_name, O_CREAT | O_EXCL | O_RDWR, 0640);
-    if (ctx->shm_fd < 0)
+    if (ctx->shm_fd < 0) {
+        if (errno == EEXIST)
+            ctx->shm_eexist_backoff = true;
         return false;
+    }
     /* Mark created before any further steps; close() unlinks on any failure path. */
     ctx->shm_name_created = true;
     /* Transfer ownership to real UID so consumers can verify the producer. */
@@ -113,6 +126,18 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         return false;
 
+    /* Write publisher PID directly to the fd BEFORE mmap.  After ftruncate the
+     * segment is non-zero in size and visible to concurrent openers.  A concurrent
+     * opener using sem_open(O_CREAT) could acquire the semaphore before us and read
+     * publisher_pid==0, deciding the producer is dead.  pwrite before mmap closes
+     * that window: on Linux, pwrite and mmap on the same tmpfs-backed fd are coherent. */
+    {
+        uint32_t mypid = (uint32_t)getpid();
+        if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
+                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
+            return false;
+    }
+
     ctx->mapping = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->mapping == MAP_FAILED) {
         ctx->mapping = NULL;
@@ -121,12 +146,8 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
-    /* Write publisher PID before the semaphore becomes acquirable.  A concurrent
-     * opener that reads pid==0 through an already-acquirable semaphore treats the
-     * producer as dead, clears the ring, and takes over.  Writing first eliminates
-     * that window: by the time sem_open succeeds any reader sees a valid PID. */
-    ctx->header->publisher_pid = (uint32_t)getpid();
-    /* Restore the prev_count==0 invariant so the first publish after replace
+    /* publisher_pid was written via pwrite above.
+     * Restore the prev_count==0 invariant so the first publish after replace
      * skips the conditional memset (new segment is already kernel-zero-filled). */
     ctx->prev_count = 0;
 
@@ -254,11 +275,19 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
-    /* For a fresh segment write publisher PID before the semaphore becomes
-     * acquirable so a concurrent opener never observes pid==0 and takes over.
+    /* For a fresh segment write publisher PID directly to the fd BEFORE
+     * sem_open, closing the window between ftruncate (segment becomes visible)
+     * and semaphore creation.  A concurrent opener using sem_open(O_CREAT) could
+     * acquire the semaphore before us and read publisher_pid==0 through the mapping,
+     * deciding the producer is dead.  pwrite on the same tmpfs fd is coherent with
+     * mmap on Linux, so any subsequent mapper sees the non-zero PID immediately.
      * For a reused segment the PID is written inside the semaphore hold below. */
-    if (!reused)
-        ctx->header->publisher_pid = (uint32_t)getpid();
+    if (!reused) {
+        uint32_t mypid = (uint32_t)getpid();
+        if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
+                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
+            goto fail;
+    }
 
     /* For a fresh segment (reused=false) no legitimate semaphore exists;
      * O_CREAT|O_EXCL prevents squatting.  On EEXIST evict and retry once.
