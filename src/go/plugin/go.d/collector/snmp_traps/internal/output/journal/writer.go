@@ -31,7 +31,6 @@ type journalSink interface {
 	sync() error
 	sweepRetention() error
 	close() error
-	directory() string
 	binaryFieldCount() uint64
 }
 

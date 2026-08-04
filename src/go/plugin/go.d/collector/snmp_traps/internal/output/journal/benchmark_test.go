@@ -21,9 +21,14 @@ func BenchmarkTrapWriterSerializeAndWrite(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		writeWithBackpressure(b, writer, entry)
 	}
+	if err := writer.Flush(); err != nil {
+		b.Fatalf("flush: %v", err)
+	}
 	b.StopTimer()
 	b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "entries/s")
-	_ = writer.Close()
+	if err := writer.Close(); err != nil {
+		b.Fatalf("close: %v", err)
+	}
 }
 
 func BenchmarkJournalTrapWriterDrain(b *testing.B) {

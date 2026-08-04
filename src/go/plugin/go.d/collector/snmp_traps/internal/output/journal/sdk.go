@@ -44,8 +44,6 @@ type sdkWriter struct {
 	log                 *sdkjournal.Log
 	cfg                 Config
 	host                hostidentity.Provider
-	journalDir          string
-	activePath          string
 	binaryEncodedFields atomic.Uint64
 }
 
@@ -109,11 +107,9 @@ func newSDKWriter(dir string, cfg Config, host hostidentity.Provider) (*sdkWrite
 	}
 
 	return &sdkWriter{
-		log:        log,
-		cfg:        cfg,
-		host:       host,
-		journalDir: log.JournalDirectory(),
-		activePath: log.ActivePath(),
+		log:  log,
+		cfg:  cfg,
+		host: host,
 	}, nil
 }
 
@@ -163,9 +159,6 @@ func (w *sdkWriter) writeRaw(payloads [][]byte, binaryEncodedFields int, realtim
 	if binaryEncodedFields > 0 {
 		w.binaryEncodedFields.Add(uint64(binaryEncodedFields))
 	}
-	if activePath := w.log.ActivePath(); activePath != "" {
-		w.activePath = activePath
-	}
 	return nil
 }
 
@@ -203,21 +196,4 @@ func (w *sdkWriter) close() error {
 	err := w.log.Close()
 	w.log = nil
 	return err
-}
-
-func (w *sdkWriter) directory() string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	return w.journalDir
-}
-
-func (w *sdkWriter) activeFile() string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if w.log != nil {
-		w.activePath = w.log.ActivePath()
-	}
-	return w.activePath
 }

@@ -24,7 +24,6 @@ func (discardJournalSink) writeRaw([][]byte, int, int64, int64) error { return n
 func (discardJournalSink) sync() error                                { return nil }
 func (discardJournalSink) sweepRetention() error                      { return nil }
 func (discardJournalSink) close() error                               { return nil }
-func (discardJournalSink) directory() string                          { return "" }
 func (discardJournalSink) binaryFieldCount() uint64                   { return 0 }
 
 func TestWriterConcurrentWriteCloseDoesNotPanic(t *testing.T) {
@@ -113,7 +112,8 @@ func TestRetentionSweepInterval(t *testing.T) {
 func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 	journaltest.RequireJournalctl(t)
 
-	sdk, err := newTestSDKWriter(t.TempDir(), Config{RotateSize: 200 * bytesPerMB})
+	dir := t.TempDir()
+	sdk, err := newTestSDKWriter(dir, Config{RotateSize: 200 * bytesPerMB})
 	require.NoError(t, err)
 	writer := newWriter(sdk, sdk.cfg, 1<<10, nil)
 	writer.flushInterval = 100 * time.Millisecond
@@ -124,12 +124,11 @@ func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 		require.NoError(t, writer.Write(testTrapEntry()))
 	}
 
-	journalDir := sdk.directory()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var count int
 	for ctx.Err() == nil {
-		count = journalctlRowCount(ctx, journalDir, "TRAP_CATEGORY=security", "TRAP_OID")
+		count = journalctlRowCount(ctx, dir, "TRAP_CATEGORY=security", "TRAP_OID")
 		if count >= want {
 			break
 		}
@@ -140,7 +139,7 @@ func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel2()
-	require.GreaterOrEqual(t, journalctlRowCount(ctx2, journalDir, "TRAP_CATEGORY=security", "TRAP_OID"), want)
+	require.GreaterOrEqual(t, journalctlRowCount(ctx2, dir, "TRAP_CATEGORY=security", "TRAP_OID"), want)
 }
 
 func testTrapEntry() *model.TrapEntry {
