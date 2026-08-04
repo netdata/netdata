@@ -21,40 +21,6 @@ type testRuntimeConfig struct {
 	Include []string
 }
 
-type testTrapEntry = model.TrapEntry
-type testTrapDef = catalog.TrapDef
-type testVarbindDef = catalog.VarbindDef
-type testMetricRule = catalog.MetricRule
-type testMetricChart = catalog.MetricChart
-
-type testVarbindValue = model.VarbindValue
-type testTrapEnrichmentAudit = model.TrapEnrichmentAudit
-type testTrapEnrichmentLookup = model.TrapEnrichmentLookup
-type testTrapSourceAudit = model.TrapSourceAudit
-type testCategory = model.Category
-type testSeverity = model.Severity
-type profileMetricIdentity = catalog.MetricIdentity
-type profileMetricResource = catalog.MetricResource
-type profileMetricOutput = catalog.MetricOutput
-type profileMetricScale = catalog.MetricScale
-type profileMetricState = catalog.MetricState
-type profileMetricPredicates = catalog.MetricPredicates
-
-const (
-	profileMetricTypeCounter = catalog.MetricTypeCounter
-	profileMetricTypeSample  = catalog.MetricTypeSample
-	profileMetricTypeState   = catalog.MetricTypeState
-
-	profileMetricIdentitySource      = catalog.MetricIdentitySource
-	profileMetricIdentitySourceLabel = catalog.MetricIdentitySourceLabel
-	profileMetricIdentityListener    = catalog.MetricIdentityListener
-
-	profileMetricMissingDrop             = catalog.MetricMissingDrop
-	profileMetricMissingZero             = catalog.MetricMissingZero
-	profileMetricMissingUnknownDimension = catalog.MetricMissingUnknownDimension
-	profileMetricMissingError            = catalog.MetricMissingError
-)
-
 // staticTestCatalog is an immutable, exact-reference implementation of the
 // catalog contract consumed by profilemetrics. Catalog parsing, validation,
 // normalization, and lazy stock resolution are intentionally absent.
@@ -64,7 +30,7 @@ type staticTestCatalog struct {
 	trapsByRef  map[string]*catalog.TrapDef
 }
 
-func newStaticTestCatalog(traps []*testTrapDef, rules []testMetricRule, charts []testMetricChart) *staticTestCatalog {
+func newStaticTestCatalog(traps []*catalog.TrapDef, rules []catalog.MetricRule, charts []catalog.MetricChart) *staticTestCatalog {
 	idx := &staticTestCatalog{
 		rulesByName: make(map[string]*catalog.MetricRule, len(rules)),
 		chartsByID:  make(map[string]*catalog.MetricChart, len(charts)),
@@ -105,7 +71,7 @@ func (idx *staticTestCatalog) ResolveTrap(ref string) (*catalog.TrapDef, error) 
 	return trap, nil
 }
 
-func (idx *staticTestCatalog) withDefinitions(rules []testMetricRule, charts []testMetricChart) *staticTestCatalog {
+func (idx *staticTestCatalog) withDefinitions(rules []catalog.MetricRule, charts []catalog.MetricChart) *staticTestCatalog {
 	next := idx.clone()
 	for i := range rules {
 		rule := cloneTestMetricRule(&rules[i])
@@ -118,7 +84,7 @@ func (idx *staticTestCatalog) withDefinitions(rules []testMetricRule, charts []t
 	return next
 }
 
-func (idx *staticTestCatalog) withTraps(traps ...*testTrapDef) *staticTestCatalog {
+func (idx *staticTestCatalog) withTraps(traps ...*catalog.TrapDef) *staticTestCatalog {
 	next := idx.clone()
 	for _, trap := range traps {
 		if trap == nil {
@@ -167,7 +133,7 @@ func (idx *staticTestCatalog) clone() *staticTestCatalog {
 	return next
 }
 
-func cloneTestMetricRule(src *testMetricRule) *testMetricRule {
+func cloneTestMetricRule(src *catalog.MetricRule) *catalog.MetricRule {
 	if src == nil {
 		return nil
 	}
@@ -177,7 +143,7 @@ func cloneTestMetricRule(src *testMetricRule) *testMetricRule {
 		dst.Identity.Resource = &resource
 	}
 	if src.Where != nil {
-		dst.Where = append(profileMetricPredicates(nil), src.Where...)
+		dst.Where = append(catalog.MetricPredicates(nil), src.Where...)
 		for i := range dst.Where {
 			dst.Where[i].In = append([]any(nil), src.Where[i].In...)
 			dst.Where[i].Range = append([]any(nil), src.Where[i].Range...)
@@ -198,7 +164,7 @@ func cloneTestMetricRule(src *testMetricRule) *testMetricRule {
 	return &dst
 }
 
-func cloneTestMetricChart(src *testMetricChart) *testMetricChart {
+func cloneTestMetricChart(src *catalog.MetricChart) *catalog.MetricChart {
 	if src == nil {
 		return nil
 	}
@@ -210,7 +176,7 @@ func cloneTestMetricChart(src *testMetricChart) *testMetricChart {
 	return &dst
 }
 
-func cloneTestTrapDef(src *testTrapDef) *testTrapDef {
+func cloneTestTrapDef(src *catalog.TrapDef) *catalog.TrapDef {
 	if src == nil {
 		return nil
 	}
@@ -266,7 +232,7 @@ func testBaseChartTemplate() string {
 	return string(raw)
 }
 
-func fallbackTrapSourceIdentity(entry *testTrapEntry, jobName, sourceHashSalt string) (string, string) {
+func fallbackTrapSourceIdentity(entry *model.TrapEntry, jobName, sourceHashSalt string) (string, string) {
 	source, ok := attribution.Resolve(entry, jobName, attribution.DeviceSource, sourceHashSalt)
 	if !ok {
 		return "", ""
@@ -298,13 +264,13 @@ func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.Cyc
 
 func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 	t.Helper()
-	commandSource := &testVarbindDef{
+	commandSource := &catalog.VarbindDef{
 		OID:         testCiscoCommandSourceOID,
 		Type:        "INTEGER",
 		Constraints: "(1..4)",
 		RawName:     testCiscoCommandSourceVarbind,
 	}
-	terminalType := &testVarbindDef{
+	terminalType := &catalog.VarbindDef{
 		OID:  testCiscoTerminalTypeOID,
 		Type: "INTEGER",
 		Enum: map[string]string{
@@ -315,14 +281,14 @@ func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 		},
 		RawName: testCiscoTerminalTypeVarbind,
 	}
-	sysUpTime := &testVarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks", RawName: "sysUpTime.0"}
-	ifIndex := &testVarbindDef{
+	sysUpTime := &catalog.VarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks", RawName: "sysUpTime.0"}
+	ifIndex := &catalog.VarbindDef{
 		OID:         testIfIndexOID,
 		Type:        "INTEGER",
 		Constraints: "(1..48)",
 		RawName:     "ifIndex",
 	}
-	traps := []*testTrapDef{
+	traps := []*catalog.TrapDef{
 		{
 			OID:      testCiscoConfigTrapOID,
 			Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
@@ -333,7 +299,7 @@ func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 				testCiscoTerminalTypeVarbind,
 				"sysUpTime.0",
 			},
-			SharedVarbinds: map[string]*testVarbindDef{
+			SharedVarbinds: map[string]*catalog.VarbindDef{
 				testCiscoCommandSourceOID: commandSource,
 				testCiscoTerminalTypeOID:  terminalType,
 				model.SysUpTimeOID:        sysUpTime,
@@ -347,11 +313,11 @@ func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 			VarbindRefs: []any{
 				"ifIndex",
 			},
-			SharedVarbinds: map[string]*testVarbindDef{testIfIndexOID: ifIndex},
+			SharedVarbinds: map[string]*catalog.VarbindDef{testIfIndexOID: ifIndex},
 		},
 		{OID: testLinkDownTrapOID, Name: "IF-MIB::linkDown", Category: "state_change", Severity: "warning"},
 	}
-	charts := []testMetricChart{
+	charts := []catalog.MetricChart{
 		{
 			ID:        "cisco_config_changes",
 			Title:     "Cisco config changes",
@@ -389,53 +355,53 @@ func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 			},
 		},
 	}
-	rules := []testMetricRule{
+	rules := []catalog.MetricRule{
 		{
 			Name:   "cisco.config.changed",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
-			Identity: profileMetricIdentity{
+			Identity: catalog.MetricIdentity{
 				Device: catalog.MetricIdentitySource,
 			},
-			Output: profileMetricOutput{
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_config_events",
 				Dimension: "events",
 				Chart:     "cisco_config_changes",
 			},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:             "cisco.config.terminal_type",
-			Type:             profileMetricTypeSample,
+			Type:             catalog.MetricTypeSample,
 			OnTrap:           testCiscoConfigTrapOID,
 			ValueFromVarbind: testCiscoTerminalTypeVarbind,
-			Identity: profileMetricIdentity{
+			Identity: catalog.MetricIdentity{
 				Device: catalog.MetricIdentitySource,
 			},
-			Output: profileMetricOutput{
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_terminal_type",
 				Dimension: "terminal_type",
 				Chart:     "cisco_terminal_type",
 			},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:   "cisco.port_security.ifindex",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: testPortSecurityTrapOID,
-			Identity: profileMetricIdentity{
+			Identity: catalog.MetricIdentity{
 				Device:   catalog.MetricIdentitySource,
-				Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 48},
+				Resource: &catalog.MetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 48},
 			},
-			Output: profileMetricOutput{
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_port_security_violations",
 				Dimension: "violations",
 				Chart:     "port_security_violations",
 			},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 	}
 	return newStaticTestCatalog(traps, rules, charts)
@@ -504,18 +470,18 @@ func collectProfileMetricsOnce(t *testing.T, rt *Runtime, store metrix.Collector
 	}
 }
 
-func ciscoConfigTrapEntry(jobName string) *testTrapEntry {
-	return &testTrapEntry{
+func ciscoConfigTrapEntry(jobName string) *model.TrapEntry {
+	return &model.TrapEntry{
 		JobName:       jobName,
 		TrapOID:       testCiscoConfigTrapOID,
 		TrapName:      "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
+		Enrichment: &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{
 			Selected: "192.0.2.10",
 			Method:   "udp_peer",
 		}},
-		Varbinds: []testVarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: testCiscoCommandSourceOID, Type: "INTEGER", Value: 2},
 			{OID: testCiscoTerminalTypeOID, Type: "INTEGER", Value: 2},
 			{OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
@@ -523,13 +489,13 @@ func ciscoConfigTrapEntry(jobName string) *testTrapEntry {
 	}
 }
 
-func ciscoConfigTrapEntryFromSource(jobName, source string) *testTrapEntry {
+func ciscoConfigTrapEntryFromSource(jobName, source string) *model.TrapEntry {
 	entry := ciscoConfigTrapEntry(jobName)
 	setTrapEntrySource(entry, source)
 	return entry
 }
 
-func setTrapEntrySource(entry *testTrapEntry, source string) {
+func setTrapEntrySource(entry *model.TrapEntry, source string) {
 	entry.SourceIP = source
 	entry.SourceUDPPeer = source
 	entry.Enrichment.Source.Selected = source
@@ -599,8 +565,8 @@ func sourceRuntimeWithLimits(t *testing.T, idx Catalog, limits profileMetricLimi
 	})
 }
 
-func profileMetricChartForTest(id, title, context, units, algorithm string) testMetricChart {
-	return testMetricChart{
+func profileMetricChartForTest(id, title, context, units, algorithm string) catalog.MetricChart {
+	return catalog.MetricChart{
 		ID:        id,
 		Title:     title,
 		Context:   context,
@@ -614,26 +580,26 @@ func profileMetricChartForTest(id, title, context, units, algorithm string) test
 	}
 }
 
-func addProfileMetricRuleWithChart(idx *staticTestCatalog, rule testMetricRule, chart testMetricChart) *staticTestCatalog {
-	return idx.withDefinitions([]testMetricRule{rule}, []testMetricChart{chart})
+func addProfileMetricRuleWithChart(idx *staticTestCatalog, rule catalog.MetricRule, chart catalog.MetricChart) *staticTestCatalog {
+	return idx.withDefinitions([]catalog.MetricRule{rule}, []catalog.MetricChart{chart})
 }
 
 func profileMetricCatalogForTest(idx *staticTestCatalog) profileMetricCatalog {
 	return profileMetricCatalog{rulesByName: idx.rulesByName, chartsByID: idx.chartsByID}
 }
 
-func profileMetricOutputForTest(metric, dimension, chart string) profileMetricOutput {
-	return profileMetricOutput{Metric: metric, Dimension: dimension, Chart: chart}
+func profileMetricOutputForTest(metric, dimension, chart string) catalog.MetricOutput {
+	return catalog.MetricOutput{Metric: metric, Dimension: dimension, Chart: chart}
 }
 
-func portSecurityTrapEntry(resource any) *testTrapEntry {
-	return &testTrapEntry{
+func portSecurityTrapEntry(resource any) *model.TrapEntry {
+	return &model.TrapEntry{
 		JobName:       testProfileMetricJobName,
 		TrapOID:       testPortSecurityTrapOID,
 		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment:    &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
-		Varbinds:      []testVarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: resource}},
+		Enrichment:    &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
+		Varbinds:      []model.VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: resource}},
 	}
 }

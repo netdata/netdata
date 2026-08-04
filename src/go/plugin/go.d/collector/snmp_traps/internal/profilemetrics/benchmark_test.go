@@ -56,7 +56,7 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 		rt.Update(benchmarkProfileMetricPortTrapEntry("bench-profile", "10.254.0.1", i+1))
 	}
 
-	entries := make([]*testTrapEntry, 0, nearMaxSources+nearMaxResources)
+	entries := make([]*model.TrapEntry, 0, nearMaxSources+nearMaxResources)
 	for i := range nearMaxSources {
 		terminalType := 2
 		if i%2 == 1 {
@@ -94,7 +94,7 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 }
 
 func benchmarkProfileMetricCatalog() *staticTestCatalog {
-	terminalType := &testVarbindDef{
+	terminalType := &catalog.VarbindDef{
 		OID:  testCiscoTerminalTypeOID,
 		Type: "INTEGER",
 		Enum: map[string]string{
@@ -105,21 +105,21 @@ func benchmarkProfileMetricCatalog() *staticTestCatalog {
 		},
 		RawName: testCiscoTerminalTypeVarbind,
 	}
-	sysUpTime := &testVarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks", RawName: "sysUpTime.0"}
-	ifIndex := &testVarbindDef{
+	sysUpTime := &catalog.VarbindDef{OID: model.SysUpTimeOID, Type: "TimeTicks", RawName: "sysUpTime.0"}
+	ifIndex := &catalog.VarbindDef{
 		OID:         testIfIndexOID,
 		Type:        "INTEGER",
 		Constraints: "(1..48)",
 		RawName:     "ifIndex",
 	}
-	traps := []*testTrapDef{
+	traps := []*catalog.TrapDef{
 		{
 			OID:         testCiscoConfigTrapOID,
 			Name:        "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 			Category:    "config_change",
 			Severity:    "notice",
 			VarbindRefs: []any{testCiscoTerminalTypeVarbind, "sysUpTime.0"},
-			SharedVarbinds: map[string]*testVarbindDef{
+			SharedVarbinds: map[string]*catalog.VarbindDef{
 				testCiscoTerminalTypeOID: terminalType,
 				model.SysUpTimeOID:       sysUpTime,
 			},
@@ -130,59 +130,59 @@ func benchmarkProfileMetricCatalog() *staticTestCatalog {
 			Category:       "security",
 			Severity:       "warning",
 			VarbindRefs:    []any{"ifIndex"},
-			SharedVarbinds: map[string]*testVarbindDef{testIfIndexOID: ifIndex},
+			SharedVarbinds: map[string]*catalog.VarbindDef{testIfIndexOID: ifIndex},
 		},
 	}
 
-	rules := []testMetricRule{
+	rules := []catalog.MetricRule{
 		{
 			Name:   "bench.config.changed",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
-			Identity: profileMetricIdentity{
-				Device: profileMetricIdentitySource,
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
 			},
-			Output:  profileMetricOutput{Metric: "snmp_trap_bench_config_events", Dimension: "events", Chart: "bench_config_changes"},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Output:  catalog.MetricOutput{Metric: "snmp_trap_bench_config_events", Dimension: "events", Chart: "bench_config_changes"},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:             "bench.config.terminal_type",
-			Type:             profileMetricTypeSample,
+			Type:             catalog.MetricTypeSample,
 			OnTrap:           testCiscoConfigTrapOID,
 			ValueFromVarbind: testCiscoTerminalTypeVarbind,
-			Identity:         profileMetricIdentity{Device: profileMetricIdentitySource},
-			Output:           profileMetricOutput{Metric: "snmp_trap_bench_terminal_type", Dimension: "terminal_type", Chart: "bench_terminal_type"},
-			Missing:          profileMetricMissingDrop,
-			Scale:            profileMetricScale{Multiplier: 1, Divisor: 1},
+			Identity:         catalog.MetricIdentity{Device: catalog.MetricIdentitySource},
+			Output:           catalog.MetricOutput{Metric: "snmp_trap_bench_terminal_type", Dimension: "terminal_type", Chart: "bench_terminal_type"},
+			Missing:          catalog.MetricMissingDrop,
+			Scale:            catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:   "bench.config.console_state",
-			Type:   profileMetricTypeState,
+			Type:   catalog.MetricTypeState,
 			OnTrap: testCiscoConfigTrapOID,
-			Identity: profileMetricIdentity{
-				Device: profileMetricIdentitySource,
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
 			},
-			State: profileMetricState{
-				SetWhen:   &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "console"},
-				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
+			State: catalog.MetricState{
+				SetWhen:   &catalog.MetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "console"},
+				ClearWhen: &catalog.MetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
 				TTL:       "1ns",
 			},
-			Output:  profileMetricOutput{Metric: "snmp_trap_bench_console_state", Dimension: "active", Chart: "bench_console_state"},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Output:  catalog.MetricOutput{Metric: "snmp_trap_bench_console_state", Dimension: "active", Chart: "bench_console_state"},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:     "bench.port_security.ifindex",
-			Type:     profileMetricTypeCounter,
+			Type:     catalog.MetricTypeCounter,
 			OnTrap:   testPortSecurityTrapOID,
-			Identity: profileMetricIdentity{Device: profileMetricIdentitySource, Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 32}},
-			Output:   profileMetricOutput{Metric: "snmp_trap_bench_port_security_violations", Dimension: "violations", Chart: "bench_port_security"},
-			Missing:  profileMetricMissingDrop,
-			Scale:    profileMetricScale{Multiplier: 1, Divisor: 1},
+			Identity: catalog.MetricIdentity{Device: catalog.MetricIdentitySource, Resource: &catalog.MetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 32}},
+			Output:   catalog.MetricOutput{Metric: "snmp_trap_bench_port_security_violations", Dimension: "violations", Chart: "bench_port_security"},
+			Missing:  catalog.MetricMissingDrop,
+			Scale:    catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 	}
-	charts := []testMetricChart{
+	charts := []catalog.MetricChart{
 		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: 256}},
 		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: 256}},
 		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: 256}},
@@ -191,36 +191,36 @@ func benchmarkProfileMetricCatalog() *staticTestCatalog {
 	return newStaticTestCatalog(traps, rules, charts)
 }
 
-func benchmarkProfileMetricConfigTrapEntry(jobName, sourceIP string, terminalType int) *testTrapEntry {
-	return &testTrapEntry{
+func benchmarkProfileMetricConfigTrapEntry(jobName, sourceIP string, terminalType int) *model.TrapEntry {
+	return &model.TrapEntry{
 		JobName:       jobName,
 		TrapOID:       testCiscoConfigTrapOID,
 		TrapName:      "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 		SourceIP:      sourceIP,
 		SourceUDPPeer: sourceIP,
-		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
+		Enrichment: &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{
 			Selected: sourceIP,
 			Method:   "udp_peer",
 		}},
-		Varbinds: []testVarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: testCiscoTerminalTypeOID, Type: "INTEGER", Value: terminalType},
 			{OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
 		},
 	}
 }
 
-func benchmarkProfileMetricPortTrapEntry(jobName, sourceIP string, ifIndex int) *testTrapEntry {
-	return &testTrapEntry{
+func benchmarkProfileMetricPortTrapEntry(jobName, sourceIP string, ifIndex int) *model.TrapEntry {
+	return &model.TrapEntry{
 		JobName:       jobName,
 		TrapOID:       testPortSecurityTrapOID,
 		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 		SourceIP:      sourceIP,
 		SourceUDPPeer: sourceIP,
-		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
+		Enrichment: &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{
 			Selected: sourceIP,
 			Method:   "udp_peer",
 		}},
-		Varbinds: []testVarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: testIfIndexOID, Type: "INTEGER", Value: ifIndex},
 		},
 	}

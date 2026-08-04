@@ -6,21 +6,23 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
 )
 
 func TestProfileMetricSelection(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withDefinitions([]testMetricRule{{
+	idx = idx.withDefinitions([]catalog.MetricRule{{
 		Name:    "disabled.rule",
-		Type:    profileMetricTypeCounter,
+		Type:    catalog.MetricTypeCounter,
 		Enabled: new(false),
 		OnTrap:  testCiscoConfigTrapOID,
-		Identity: profileMetricIdentity{
-			Device: profileMetricIdentitySource,
+		Identity: catalog.MetricIdentity{
+			Device: catalog.MetricIdentitySource,
 		},
-		Output:  profileMetricOutput{Metric: "snmp_trap_disabled_events", Dimension: "events", Chart: "cisco_config_changes"},
-		Missing: profileMetricMissingDrop,
-		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+		Output:  catalog.MetricOutput{Metric: "snmp_trap_disabled_events", Dimension: "events", Chart: "cisco_config_changes"},
+		Missing: catalog.MetricMissingDrop,
+		Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 	}}, nil)
 	cat := profileMetricCatalogForTest(idx)
 
@@ -106,20 +108,20 @@ func TestNewProfileMetricRuntimeRejectsNilProfileIndex(t *testing.T) {
 
 func TestNewRejectsSelectedDuplicateChartDimensions(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withDefinitions([]testMetricRule{{
+	idx = idx.withDefinitions([]catalog.MetricRule{{
 		Name:   "cisco.config.duplicate_dimension",
-		Type:   profileMetricTypeCounter,
+		Type:   catalog.MetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
-		Identity: profileMetricIdentity{
-			Device: profileMetricIdentitySource,
+		Identity: catalog.MetricIdentity{
+			Device: catalog.MetricIdentitySource,
 		},
-		Output: profileMetricOutput{
+		Output: catalog.MetricOutput{
 			Metric:    "snmp_trap_cisco_config_duplicate_dimension_events",
 			Dimension: "events",
 			Chart:     "cisco_config_changes",
 		},
-		Missing: profileMetricMissingDrop,
-		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+		Missing: catalog.MetricMissingDrop,
+		Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 	}}, nil)
 	cfg, err := normalizeTestRuntimeConfig(testRuntimeConfig{
 		Enabled: true,

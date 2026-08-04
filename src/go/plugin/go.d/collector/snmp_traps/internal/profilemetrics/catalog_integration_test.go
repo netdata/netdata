@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,13 +141,13 @@ metrics:
 		Enabled: true,
 		Include: []string{"site.cold_start"},
 	})
-	entry := &testTrapEntry{
+	entry := &model.TrapEntry{
 		JobName:       "profile-job",
 		TrapOID:       "1.3.6.1.6.3.1.1.5.1",
 		TrapName:      "SNMPv2-MIB::coldStart",
 		SourceIP:      "192.0.2.30",
 		SourceUDPPeer: "192.0.2.30",
-		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
+		Enrichment: &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{
 			Selected: "192.0.2.30",
 			Method:   "udp_peer",
 		}},

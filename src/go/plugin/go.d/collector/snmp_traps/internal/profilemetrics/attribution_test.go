@@ -9,6 +9,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 func TestProfileMetricRuntimeUsesVnodeHostScopeWhenAvailable(t *testing.T) {
@@ -38,7 +40,7 @@ func TestProfileMetricRuntimeFallsBackWhenVnodeAttributionConflicts(t *testing.T
 	entry := ciscoConfigTrapEntry("profile-job")
 	entry.SourceVnodeID = "vnode-1"
 	entry.DeviceHostname = "switch-1"
-	entry.Enrichment.Topology = &testTrapEnrichmentLookup{
+	entry.Enrichment.Topology = &model.TrapEnrichmentLookup{
 		Status: "conflict",
 		Reason: "vnode_mismatch",
 	}
@@ -100,7 +102,7 @@ func TestProfileMetricRuntimeSourceLabelIgnoresVnodeScope(t *testing.T) {
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
 	}, func(cfg *Policy) {
-		cfg.identity.Device = profileMetricIdentitySourceLabel
+		cfg.identity.Device = catalog.MetricIdentitySourceLabel
 	})
 	entry := ciscoConfigTrapEntry("profile-job")
 	entry.SourceVnodeID = "vnode-1"
@@ -150,7 +152,7 @@ func TestProfileMetricRuntimeListenerIdentity(t *testing.T) {
 		Enabled: true,
 		Include: []string{"cisco.config.changed"},
 	}, func(cfg *Policy) {
-		cfg.identity.Device = profileMetricIdentityListener
+		cfg.identity.Device = catalog.MetricIdentityListener
 	})
 	first := ciscoConfigTrapEntry("profile-job")
 	second := ciscoConfigTrapEntry("profile-job")
@@ -191,17 +193,17 @@ func TestProfileMetricRuntimeCountsSourceRouteTransitions(t *testing.T) {
 func TestProfileMetricRuntimeResourceIdentity(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.port_security.ifindex"})
-	entry := &testTrapEntry{
+	entry := &model.TrapEntry{
 		JobName:       "profile-job",
 		TrapOID:       testPortSecurityTrapOID,
 		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment: &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{
+		Enrichment: &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{
 			Selected: "192.0.2.10",
 			Method:   "udp_peer",
 		}},
-		Varbinds: []testVarbindValue{
+		Varbinds: []model.VarbindValue{
 			{OID: testIfIndexOID, Type: "INTEGER", Value: 7},
 		},
 	}

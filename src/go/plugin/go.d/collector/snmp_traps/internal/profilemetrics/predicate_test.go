@@ -6,28 +6,30 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withDefinitions([]testMetricRule{{
+	idx = idx.withDefinitions([]catalog.MetricRule{{
 		Name:   "cisco.config.console",
-		Type:   profileMetricTypeCounter,
+		Type:   catalog.MetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
-		Identity: profileMetricIdentity{
-			Device: profileMetricIdentitySource,
+		Identity: catalog.MetricIdentity{
+			Device: catalog.MetricIdentitySource,
 		},
-		Where: profileMetricPredicates{{
+		Where: catalog.MetricPredicates{{
 			Varbind: testCiscoTerminalTypeVarbind,
 			Equals:  "console",
 		}},
-		Output: profileMetricOutput{
+		Output: catalog.MetricOutput{
 			Metric:    "snmp_trap_cisco_console_config_events",
 			Dimension: "console_events",
 			Chart:     "cisco_config_changes",
 		},
-		Missing: profileMetricMissingDrop,
-		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+		Missing: catalog.MetricMissingDrop,
+		Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.console"})
 	consoleEntry := ciscoConfigTrapEntry("profile-job")
@@ -45,34 +47,34 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withDefinitions([]testMetricRule{{
+	idx = idx.withDefinitions([]catalog.MetricRule{{
 		Name:   "cisco.config.synthetic_fields",
-		Type:   profileMetricTypeCounter,
+		Type:   catalog.MetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
-		Identity: profileMetricIdentity{
-			Device: profileMetricIdentitySource,
+		Identity: catalog.MetricIdentity{
+			Device: catalog.MetricIdentitySource,
 		},
-		Where: profileMetricPredicates{
+		Where: catalog.MetricPredicates{
 			{Field: "category", Equals: "config_change"},
 			{Field: "severity", In: []any{"notice"}},
 			{Field: "trap_name", Equals: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged"},
 			{Field: "trap_oid", Equals: testCiscoConfigTrapOID},
 		},
-		Output: profileMetricOutput{
+		Output: catalog.MetricOutput{
 			Metric:    "snmp_trap_cisco_config_synthetic_field_events",
 			Dimension: "synthetic_field_events",
 			Chart:     "cisco_config_changes",
 		},
-		Missing: profileMetricMissingDrop,
-		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+		Missing: catalog.MetricMissingDrop,
+		Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.synthetic_fields"})
 	pass := ciscoConfigTrapEntry("profile-job")
-	pass.Category = testCategory("config_change")
-	pass.Severity = testSeverity("notice")
+	pass.Category = model.Category("config_change")
+	pass.Severity = model.Severity("notice")
 	fail := ciscoConfigTrapEntry("profile-job")
-	fail.Category = testCategory("security")
-	fail.Severity = testSeverity("notice")
+	fail.Category = model.Category("security")
+	fail.Severity = model.Severity("notice")
 
 	rt.Update(pass)
 	rt.Update(fail)
@@ -85,15 +87,15 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withDefinitions([]testMetricRule{
+	idx = idx.withDefinitions([]catalog.MetricRule{
 		{
 			Name:   "cisco.config.rich_predicates",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
-			Identity: profileMetricIdentity{
-				Device: profileMetricIdentitySource,
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
 			},
-			Where: profileMetricPredicates{
+			Where: catalog.MetricPredicates{
 				{Varbind: testCiscoTerminalTypeVarbind, Exists: new(true)},
 				{Varbind: testCiscoTerminalTypeVarbind, In: []any{"console", "virtual"}},
 				{Varbind: testCiscoCommandSourceVarbind, GreaterThan: 1},
@@ -101,32 +103,32 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 				{Varbind: testCiscoCommandSourceVarbind, Range: []any{2, 3}},
 				{Varbind: testCiscoTerminalTypeVarbind, Equals: "aux", Not: true},
 			},
-			Output: profileMetricOutput{
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_config_rich_predicate_events",
 				Dimension: "events",
 				Chart:     "cisco_config_changes",
 			},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:   "cisco.config.absent_predicate",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
-			Identity: profileMetricIdentity{
-				Device: profileMetricIdentitySource,
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
 			},
-			Where: profileMetricPredicates{{
+			Where: catalog.MetricPredicates{{
 				Varbind: "sysUpTime.0",
 				Absent:  new(true),
 			}},
-			Output: profileMetricOutput{
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_config_absent_predicate_events",
 				Dimension: "absent_events",
 				Chart:     "cisco_config_changes",
 			},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 	}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{
@@ -158,64 +160,64 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 
 func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withDefinitions([]testMetricRule{
+	idx = idx.withDefinitions([]catalog.MetricRule{
 		{
 			Name:   "cisco.config.exists_false",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
-			Identity: profileMetricIdentity{
-				Device: profileMetricIdentitySource,
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
 			},
-			Where: profileMetricPredicates{{
+			Where: catalog.MetricPredicates{{
 				Varbind: "sysUpTime.0",
 				Exists:  new(false),
 			}},
-			Output: profileMetricOutput{
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_config_exists_false_events",
 				Dimension: "exists_false_events",
 				Chart:     "cisco_config_changes",
 			},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:   "cisco.config.numeric_in",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
-			Identity: profileMetricIdentity{
-				Device: profileMetricIdentitySource,
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
 			},
-			Where: profileMetricPredicates{{
+			Where: catalog.MetricPredicates{{
 				Varbind: testCiscoCommandSourceVarbind,
 				In:      []any{2, 3},
 			}},
-			Output: profileMetricOutput{
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_config_numeric_in_events",
 				Dimension: "numeric_in_events",
 				Chart:     "cisco_config_changes",
 			},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 		{
 			Name:   "cisco.config.synthetic_not",
-			Type:   profileMetricTypeCounter,
+			Type:   catalog.MetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
-			Identity: profileMetricIdentity{
-				Device: profileMetricIdentitySource,
+			Identity: catalog.MetricIdentity{
+				Device: catalog.MetricIdentitySource,
 			},
-			Where: profileMetricPredicates{{
+			Where: catalog.MetricPredicates{{
 				Field:  "category",
 				Equals: "security",
 				Not:    true,
 			}},
-			Output: profileMetricOutput{
+			Output: catalog.MetricOutput{
 				Metric:    "snmp_trap_cisco_config_synthetic_not_events",
 				Dimension: "synthetic_not_events",
 				Chart:     "cisco_config_changes",
 			},
-			Missing: profileMetricMissingDrop,
-			Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+			Missing: catalog.MetricMissingDrop,
+			Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 		},
 	}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{
@@ -254,24 +256,24 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 
 func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withDefinitions([]testMetricRule{{
+	idx = idx.withDefinitions([]catalog.MetricRule{{
 		Name:   "cisco.config.finite_range",
-		Type:   profileMetricTypeCounter,
+		Type:   catalog.MetricTypeCounter,
 		OnTrap: testCiscoConfigTrapOID,
-		Identity: profileMetricIdentity{
-			Device: profileMetricIdentitySource,
+		Identity: catalog.MetricIdentity{
+			Device: catalog.MetricIdentitySource,
 		},
-		Where: profileMetricPredicates{{
+		Where: catalog.MetricPredicates{{
 			Varbind: testCiscoCommandSourceVarbind,
 			Range:   []any{1, 4},
 		}},
-		Output: profileMetricOutput{
+		Output: catalog.MetricOutput{
 			Metric:    "snmp_trap_cisco_config_finite_range_events",
 			Dimension: "finite_range_events",
 			Chart:     "cisco_config_changes",
 		},
-		Missing: profileMetricMissingDrop,
-		Scale:   profileMetricScale{Multiplier: 1, Divisor: 1},
+		Missing: catalog.MetricMissingDrop,
+		Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.finite_range"})
 
