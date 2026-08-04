@@ -14,6 +14,21 @@ static char *superseded_run_dir = NULL;
 
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
+// A process that cannot get a run directory usually keeps asking. Nothing retries
+// on a timer, but spawn_popen_run_argv() re-creates the spawn server on every
+// popen() for as long as it has none, and every attempt walks the same candidates
+// and refuses them for the same reasons. The explanation is worth printing once;
+// printing it per popen() buries the rest of the log.
+// Deliberately not a cached failure: the candidates are re-examined, so a run
+// directory that appears later is still picked up. Only the reporting stops.
+// Advisory: a race can duplicate or drop a line, never change what is returned.
+static bool run_dir_report_errors = true;
+
+#define run_dir_log_error(...) do {                                             \
+        if (run_dir_report_errors)                                              \
+            netdata_log_error(__VA_ARGS__);                                     \
+    } while(0)
+
 static uid_t target_uid = (uid_t)-1;
 
 void os_run_dir_set_target_uid(uid_t uid) {
@@ -61,7 +76,8 @@ static inline bool is_dir_accessible(const char *dir, bool rw) {
 // With rw the agent is about to create, chown and bind here while still root, so
 // the full rule applies. Without rw the caller only reads or connects to what is
 // already there - netdatacli looking for netdata.pipe, a plugin looking for a
-// socket - and one requirement is dropped for it: see the sticky case below.
+// socket - and the rules about who else could replace the directory do not apply
+// to it, because it is not what they protect: see the read-only cut below.
 bool os_run_dir_is_safe(const char *candidate, bool rw) {
     // Trimmed here, not just in the callers: with a trailing slash the kernel
     // resolves the final component as a directory, so lstat() would report a
@@ -82,14 +98,14 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
     // next candidate (typically /tmp/netdata), and an operator who symlinked the run
     // directory on purpose would otherwise have nothing to go on.
     if (S_ISLNK(st.st_mode)) {
-        netdata_log_error(
+        run_dir_log_error(
             "Refusing run directory '%s': it is a symbolic link. Point NETDATA_RUN_DIR at the "
             "directory itself, or bind-mount it there.", dir);
         return false;
     }
 
     if (!S_ISDIR(st.st_mode)) {
-        netdata_log_error("Refusing run directory '%s': not a directory", dir);
+        run_dir_log_error("Refusing run directory '%s': not a directory", dir);
         return false;
     }
 
@@ -97,6 +113,24 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
     // built-in candidates, not a misconfiguration
     if (access(dir, rw ? W_OK : R_OK) == -1)
         return false;
+
+    // Everything above applies to every caller: whatever it does next, it must not
+    // be pointed at another directory by a symlink planted at this name.
+    //
+    // Everything below is about who may replace this directory while we act on it
+    // as root, so it is the writable caller's question alone. A read-only caller
+    // creates nothing, chowns nothing and binds nothing - it opens what is already
+    // there, and the socket's own mode decides whether it may talk to the agent.
+    // Answering it anyway had a cost and no benefit:
+    //  - it broke ordinary non-root installs. A run directory under a parent owned
+    //    by the netdata user (a source install, NETDATA_RUN_DIR=~netdata/run) is
+    //    UNSAFE to a client running as root, so netdatacli could not find an agent
+    //    that was running perfectly well.
+    //  - the sticky case below already concedes the same threat for read-only
+    //    callers: a /tmp/netdata planted by a third account passes it. Refusing the
+    //    strictly safer shapes while allowing that one is not a policy.
+    if (!rw)
+        return true;
 
 #if defined(OS_WINDOWS)
     // Windows has no POSIX ownership: Cygwin synthesizes st_uid from the NTFS
@@ -117,7 +151,7 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
     // every start, so refusing S_IWGRP would leave the default install with no
     // run directory at all.
     if (st.st_mode & S_IWOTH) {
-        netdata_log_error(
+        run_dir_log_error(
             "Refusing run directory '%s': mode %04o lets any local user write into it",
             dir, (unsigned int)(st.st_mode & 07777));
         return false;
@@ -145,30 +179,30 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
             // become_user()). What protects that use is performing it through a
             // descriptor - os_open_dir_privileged() and fchown() - not this
             // check.
-            //
-            // A read-only caller is exempt: it creates nothing and chowns nothing,
-            // and it cannot answer the question anyway - netdatacli run by root
-            // does not know which uid the agent runs as, so requiring the
-            // directory to be "ours" only made it unable to find an agent that
-            // uses this fallback. Everything else above still applies to it, so it
-            // cannot be pointed elsewhere by a planted symlink, and the socket's
-            // own mode is what decides whether it may actually talk to the agent.
-            if (!rw || run_dir_owner_is_ours(st.st_uid))
+            if (run_dir_owner_is_ours(st.st_uid))
                 return true;
 
-            netdata_log_error(
+            run_dir_log_error(
                 "Refusing run directory '%s': owned by uid %u, inside a world-writable parent",
                 dir, (unsigned int)st.st_uid);
             return false;
 
         case OS_DIR_PARENT_UNKNOWN:
-            netdata_log_error("Refusing run directory '%s': cannot examine its parent directory", dir);
+            run_dir_log_error("Refusing run directory '%s': cannot examine its parent directory", dir);
             return false;
 
         default:
-            netdata_log_error(
-                "Refusing run directory '%s': anyone can replace it, because its parent is neither "
-                "ours nor sticky. Set NETDATA_RUN_DIR to a directory only netdata can write into.",
+            // Not "anyone": name what is actually wrong, because the two shapes
+            // that land here have different fixes. The parent either belongs to
+            // another account - including the account we are about to become, which
+            // is the whole point of checking while we are still root - or is
+            // writable by others without the sticky bit that would stop them
+            // renaming what is inside it.
+            run_dir_log_error(
+                "Refusing run directory '%s': its parent directory is not exclusively ours, so "
+                "another account can replace this directory while we are still root. Set "
+                "NETDATA_RUN_DIR to a directory whose parent is owned by root and is not writable "
+                "by group or others.",
                 dir);
             return false;
     }
@@ -200,7 +234,10 @@ static char *detect_run_dir(bool rw) {
 
     // An operator-supplied run dir (e.g. a mounted tmpfs in a hardened,
     // read-only-/run container) is honored, but gets the same validation as
-    // every other branch, since it is chowned as root.
+    // every other branch, since it is chowned as root. For a writable resolution
+    // that includes its parent: pointing this at a directory inside a tree the
+    // netdata account owns is refused while we are still root, because that
+    // account could swap it under us. Its parent has to be root-owned too.
     const char *env_dir = getenv("NETDATA_RUN_DIR");
     if (env_dir && *env_dir) {
         // trim first: a trailing slash makes the kernel resolve the final
@@ -210,7 +247,7 @@ static char *detect_run_dir(bool rw) {
 
         // an operator asked for this directory explicitly - never fall through
         // to the built-in branches without saying why
-        netdata_log_error("Ignoring NETDATA_RUN_DIR='%s': not a usable run directory", env_dir);
+        run_dir_log_error("Ignoring NETDATA_RUN_DIR='%s': not a usable run directory", env_dir);
     }
 
 #if defined(OS_LINUX)
@@ -325,6 +362,11 @@ const char *os_run_dir(bool rw) {
                 __atomic_store_n(&cached_run_dir_writable, true, __ATOMIC_RELEASE);
             __atomic_store_n(&cached_run_dir_available, true, __ATOMIC_RELEASE);
         }
+        else
+            // Every candidate has just been walked and refused, and each refusal
+            // has said why. A caller that comes back gets the same walk and the
+            // same reasons, so stop repeating them - see run_dir_report_errors.
+            run_dir_report_errors = false;
 
         // When no writable directory exists, the read-only answer stays cached
         // for the read-only callers, but this caller gets nothing: it asked for a

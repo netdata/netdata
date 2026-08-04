@@ -47,14 +47,18 @@ static void fix_directory_file_permissions_at(int dir_fd, const char *dirname, u
         }
 
         // A symlink is never followed: whoever can write into this directory could
-        // have planted it, and we are still root. Reported in both modes - the
-        // recursive one chowns the link itself and stops there, the non-recursive
-        // one only chowns regular files - because either way the files behind the
-        // link keep the ownership they had, which is what an operator who
-        // relocated a directory with a symlink needs to be told. Relocate with a
-        // bind mount, or with the matching option in the [directories] section of
-        // netdata.conf, instead.
-        if (de->d_type == DT_LNK)
+        // have planted it, and we are still root. Reported only in the recursive
+        // mode, because that is the only mode whose handling changed: there we now
+        // chown the link itself and stop, where we used to chown whatever it
+        // pointed at, so the files behind it keep the ownership they had - which is
+        // what an operator who relocated a directory with a symlink needs to be
+        // told. Relocate with a bind mount, or with the matching option in the
+        // [directories] section of netdata.conf, instead.
+        // The non-recursive mode only ever chowns regular files, so a symlink was
+        // never fixed there and nothing has changed for it. Reporting it anyway
+        // means an error per symlink on every single start: the shipped container
+        // image points all 7 files in its log directory at /dev/stdout.
+        if (recursive && de->d_type == DT_LNK)
             netdata_log_error(
                 "Not fixing ownership through symbolic link '%s/%s': its target is left as it is",
                 dirname, de->d_name);
