@@ -66,7 +66,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     now_realtime_timeval(&node_info.updated_at);
 
     char *host_version = NULL;
-    bool is_virtual_host = (rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || IS_VIRTUAL_HOST_OS(host));
+    bool is_virtual_host = (rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST) || IS_VIRTUAL_HOST_OS(host));
 
     if (host != localhost && !is_virtual_host)
         host_version = stream_receiver_program_version_strdupz(host);

@@ -211,13 +211,13 @@ static inline bool pluginsd_update_host_ephemerality(RRDHOST *host) {
 
 // A host has exactly one writer. For a vnode that writer is the local collector that defines it.
 //
-// RRDHOST_OPTION_VIRTUAL_HOST makes the streaming handshake reject incoming connections for this
+// RRDHOST_FLAG_VIRTUAL_HOST makes the streaming handshake reject incoming connections for this
 // machine GUID (stream_receiver_accept_connection(), STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL), but it
-// does not evict a receiver that is already attached: while the vnode was stale the option was
+// does not evict a receiver that is already attached: while the vnode was stale the flag was
 // cleared, so a peer that also collects this device may have streamed it back to us in the meantime.
 //
-// Callers MUST set RRDHOST_OPTION_VIRTUAL_HOST before calling this and MUST NOT write to the host
-// when this returns false. Setting the option first is what keeps a receiver from attaching behind
+// Callers MUST set RRDHOST_FLAG_VIRTUAL_HOST before calling this and MUST NOT write to the host
+// when this returns false. Setting the flag first is what keeps a receiver from attaching behind
 // our back: rrdhost_set_receiver() re-checks it under the receiver lock we take below, so a
 // connection that passed the accept-time check is refused once we have claimed the host.
 static bool pluginsd_host_claim_as_local_vnode(RRDHOST *host, const char *keyword) {
@@ -289,10 +289,10 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         return PARSER_RC_ERROR;
     }
 
-    rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+    rrdhost_flag_set(host, RRDHOST_FLAG_VIRTUAL_HOST);
 
-    // the option above closes the door to new receivers; this evicts one that is already inside.
-    // on failure the option is left set, so no new receiver can attach until this plugin is torn
+    // the flag above closes the door to new receivers; this evicts one that is already inside.
+    // on failure the flag is left set, so no new receiver can attach until this plugin is torn
     // down; the teardown clears it for every vnode it tracks, which is correct - by then we are
     // no longer collecting, so a peer streaming this host to us is welcome.
     if(!pluginsd_host_claim_as_local_vnode(host, PLUGINSD_KEYWORD_HOST_DEFINE_END)) {
@@ -369,13 +369,16 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                     continue;
 
                 min_check_interval = MIN(min_check_interval, stale_after_seconds);
-                if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+                if (rrdhost_flag_check(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST)) {
                     time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
                     uint32_t seen_seconds_ago = (now > last_seen) ? (uint32_t)(now - last_seen) : 0;
 
                     if (seen_seconds_ago >= stale_after_seconds) {
-                        rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
-                        rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+                        // one atomic clear, so a concurrent flags snapshot cannot observe the impossible
+                        // "not virtual but still collector-online" pair - rrdhost_status_ingest() reads both
+                        // bits from a single snapshot and would report the wrong ingest type. This is about
+                        // consistent status reporting; writer exclusivity is enforced by the receiver lock.
+                        rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST | RRDHOST_FLAG_COLLECTOR_ONLINE);
                         nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE, last seen %u seconds ago", rrdhost_hostname(virtual_host), seen_seconds_ago);
                         schedule_node_state_update(virtual_host, 1000);
                         stream_sender_signal_to_stop_and_wait(virtual_host, STREAM_HANDSHAKE_SND_VNODE_IS_STALE, false);
@@ -404,8 +407,8 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     if (Pvalue) {
         *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
         // Check if we need to enable
-        if (!rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
-            rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+        if (!rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST)) {
+            rrdhost_flag_set(host, RRDHOST_FLAG_VIRTUAL_HOST);
 
             // while this vnode was stale, a peer collecting the same device may have started
             // streaming it to us - we must be its only writer before we collect into it again.
@@ -1471,10 +1474,11 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
         while (JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next)) {
             RRDHOST *virtual_host = (RRDHOST *) Index;
             nd_log_daemon(NDLP_INFO, "PLUGINSD: Checking virtual status for %s", rrdhost_hostname(virtual_host));
-            if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+            if (rrdhost_flag_check(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST)) {
                 nd_log_daemon(NDLP_INFO, "PLUGINSD: Reseting virtual host status for %s", rrdhost_hostname(virtual_host));
-                rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
-                rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+                // one atomic clear, for the same status-snapshot consistency reason as the stale
+                // detection in pluginsd_host()
+                rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST | RRDHOST_FLAG_COLLECTOR_ONLINE);
                 schedule_node_state_update(virtual_host, 1000);
             }
         }

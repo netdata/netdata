@@ -1250,8 +1250,8 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
     // stream_receiver_accept_connection() already rejects locally collected vnodes, but that check
     // runs before the socket takeover and this attach - the connection can spend seconds in between
     // (stale-receiver wait, host creation, first response). Meanwhile the collector may claim the
-    // vnode: it sets RRDHOST_OPTION_VIRTUAL_HOST and then evicts any attached receiver under this
-    // same lock (pluginsd_host_claim_as_local_vnode()). Re-checking the option here is what makes the
+    // vnode: it sets RRDHOST_FLAG_VIRTUAL_HOST and then evicts any attached receiver under this
+    // same lock (pluginsd_host_claim_as_local_vnode()). Re-checking the flag here is what makes the
     // two paths mutually exclusive: either we attach first and the collector evicts us, or the
     // collector claims first and we are refused. Without it, we would become a second writer.
     if (rrdhost_is_virtual(host)) {
