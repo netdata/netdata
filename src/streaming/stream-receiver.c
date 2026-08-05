@@ -1074,10 +1074,10 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
                 size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %ld seconds - closing connection - "
+                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %" PRId64 " seconds - closing connection - "
                    "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, timeout_s,
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, (int64_t)timeout_s,
                    stats.bytes_sent, stats.sends, duration, pending, stats.buffer_ratio);
 
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT);

@@ -544,11 +544,11 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM PARENTS '%s': received stream_info data from '%s': "
-           "status: %d, nodes: %zu, receivers: %zu, first_time_s: %ld, last_time_s: %ld, "
+           "status: %d, nodes: %zu, receivers: %zu, first_time_s: %" PRId64 ", last_time_s: %" PRId64 ", "
            "db status: %s, db liveness: %s, ingest type: %s, ingest status: %s",
            hostname, string2str(d->destination),
            d->remote.status, d->remote.nodes, d->remote.receivers,
-           d->remote.db_first_time_s, d->remote.db_last_time_s,
+           (int64_t)d->remote.db_first_time_s, (int64_t)d->remote.db_last_time_s,
            RRDHOST_DB_STATUS_2str(d->remote.db_status),
            RRDHOST_DB_LIVENESS_2str(d->remote.db_liveness),
            RRDHOST_INGEST_TYPE_2str(d->remote.ingest_type),
@@ -636,10 +636,10 @@ bool stream_parent_connect_to_one_unsafe(
             potential++;
             host->stream.snd.status.reason = d->reason;
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM PARENTS '%s': skipping useful parent '%s': POSTPONED FOR %ld SECS MORE: %s",
+                   "STREAM PARENTS '%s': skipping useful parent '%s': POSTPONED FOR %" PRId64 " SECS MORE: %s",
                    rrdhost_hostname(host),
                    string2str(d->destination),
-                   (time_t)((d->postpone_until_ut - now_ut) / USEC_PER_SEC),
+                   (int64_t)((d->postpone_until_ut - now_ut) / USEC_PER_SEC),
                    stream_handshake_error_to_string(d->reason));
             continue;
         }
