@@ -11,10 +11,8 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
@@ -23,19 +21,9 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 )
 
-// Varied stems prevent a narrow job allowlist from passing merely because it
-// happens to admit the validator's primary probe name.
-var futureMetricStems = [...]string{
-	"netdata_future_metric",
-	"upstream_added_metric",
-	"exporter_new_signal",
-}
-
-const futureMetricCandidateAlphabet = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:"
-
-// addForwardCompatibilityChecks keeps openness structural and uses synthetic
-// names beyond the bounded source fixture. The fixture is consulted only to
-// prove exact exclusions and every explicitly bounded wildcard name grammar.
+// addForwardCompatibilityChecks owns structural contributor policy. Runtime
+// openness is proved separately by raw future inputs traversing an isolated
+// production collector and chart-planner sequence.
 func addForwardCompatibilityChecks(
 	ctx context.Context,
 	profile promprofiles.Profile,
@@ -358,79 +346,6 @@ func addForwardCompatibilityChecks(
 		}
 	}
 
-	canaries, wildcard := syntheticFutureMetrics(profile.Match)
-	if len(canaries) == 0 {
-		if wildcard {
-			r.addError(
-				"future_metric_canary_unavailable",
-				"match",
-				fmt.Sprintf("cannot synthesize a valid future Prometheus family from profile match %q", profile.Match),
-				"A contributed wildcard profile must have a deterministic valid future-family probe so closed profile and job policy cannot pass on bounded current evidence.",
-			)
-		}
-		return nil
-	}
-	r.Profile.FutureMetricCanary = canaries[0]
-	checkedCanaries := make(map[string]struct{}, len(canaries))
-	appliedBlocksByCanary := make(map[string]map[int]struct{}, len(canaries))
-	processedPrimaryNames := make(map[string]string, len(canaries))
-	for _, canary := range canaries {
-		processed, dropped, appliedBlocks := checkFutureMetricPolicy(canary, expr, policy, authoredMetricNames, true, r)
-		if !dropped {
-			if first, ok := processedPrimaryNames[processed.Name]; ok && first != canary {
-				r.addError(
-					"future_metric_identity_collapse",
-					"relabeling",
-					fmt.Sprintf("synthetic future families %q and %q are both relabeled to %q", first, canary, processed.Name),
-					"Distinct unknown families must keep distinct generic identities after recommended relabeling. Many-to-one renaming can merge unrelated values or metric types.",
-				)
-			} else {
-				processedPrimaryNames[processed.Name] = canary
-			}
-		}
-		checkedCanaries[canary] = struct{}{}
-		appliedBlocksByCanary[canary] = appliedBlocks
-	}
-
-	profileScope, err := matcher.NewSimplePatternsMatcher(profile.Match)
-	if err != nil {
-		return err
-	}
-	for blockIndex, block := range policy.Relabeling {
-		termCanaries, _ := syntheticFutureMetricTerms(block.Match)
-		for _, term := range termCanaries {
-			covered := false
-			for _, blockCanary := range term.canaries {
-				if !profileScope.MatchString(blockCanary) {
-					continue
-				}
-				if _, ok := checkedCanaries[blockCanary]; !ok {
-					_, _, appliedBlocks := checkFutureMetricPolicy(blockCanary, expr, policy, authoredMetricNames, false, r)
-					checkedCanaries[blockCanary] = struct{}{}
-					appliedBlocksByCanary[blockCanary] = appliedBlocks
-				}
-				if _, ok := appliedBlocksByCanary[blockCanary][blockIndex]; ok {
-					covered = true
-				}
-			}
-			affectsRouting, err := analyzer.RulesMayAffectFutureRouting(block.MetricRelabelConfigs)
-			if err != nil {
-				return err
-			}
-			termOverlap, err := simplePatternScopesMayOverlap(matcherAnalyzer, profile.Match, term.scopeExpr())
-			if err != nil {
-				return err
-			}
-			if !covered && affectsRouting && termOverlap {
-				r.addError(
-					"future_relabel_canary_unavailable",
-					fmt.Sprintf("relabeling[%d].match", blockIndex),
-					fmt.Sprintf("cannot synthesize a future-family probe for wildcard term %q inside profile scope %q and relabel scope %q", term.pattern, profile.Match, block.Match),
-					"Every positive wildcard term in a relabel block that can discard or rename metrics must expose a deterministic future-family probe. One harmless term cannot prove that another term preserves later exporter families.",
-				)
-			}
-		}
-	}
 	return nil
 }
 
@@ -832,228 +747,12 @@ func profileAuthoredMetricNames(profile promprofiles.Profile) map[string]struct{
 	return names
 }
 
-type prometheusLabelView struct {
-	labels labels.Labels
-}
-
-func (v prometheusLabelView) Len() int { return len(v.labels) }
-
-func (v prometheusLabelView) Get(key string) (string, bool) {
-	for _, label := range v.labels {
-		if label.Name == key {
-			return label.Value, true
-		}
-	}
-	return "", false
-}
-
-func (v prometheusLabelView) Range(fn func(key, value string) bool) {
-	for _, label := range v.labels {
-		if !fn(label.Name, label.Value) {
-			return
-		}
-	}
-}
-
-func (v prometheusLabelView) CloneMap() map[string]string {
-	values := make(map[string]string, len(v.labels))
-	v.Range(func(key, value string) bool {
-		values[key] = value
-		return true
-	})
-	return values
-}
-
-var _ metrix.LabelView = prometheusLabelView{}
-
-func checkFutureMetricPolicy(
-	canary string,
-	expr *metrixselector.Expr,
-	policy jobPolicy,
-	authoredMetricNames map[string]struct{},
-	checkGenericRouting bool,
-	r *report,
-) (prompkg.Sample, bool, map[int]struct{}) {
-	if !policy.Selector.Empty() {
-		selector, err := (promselector.Expr{Allow: policy.Selector.Allow, Deny: policy.Selector.Deny}).Parse()
-		if err == nil && selector != nil && !selector.Matches(labels.FromStrings(labels.MetricName, canary)) {
-			r.addError(
-				"future_metric_blocked_by_job_selector",
-				"selector",
-				fmt.Sprintf("job selector rejects synthetic future family %q", canary),
-				"The recommended job policy must remain open over the profile's future exporter namespace; use only bounded exclusions for known families.",
-			)
-		}
-	}
-
-	processed, dropped, appliedBlocks := checkFutureMetricRelabeling(canary, policy, r)
-	if dropped || !checkGenericRouting {
-		return processed, dropped, appliedBlocks
-	}
-	if _, ok := authoredMetricNames[processed.Name]; ok {
-		r.addError(
-			"future_metric_routed_to_authored_metric",
-			"relabeling",
-			fmt.Sprintf("synthetic future family %q is relabeled to authored metric %q", canary, processed.Name),
-			"Unknown future families must remain generic. Relabeling them onto an authored metric silently changes their chart meaning instead of preserving fallback visibility.",
-		)
-		return processed, false, appliedBlocks
-	}
-	if expr != nil {
-		selector, err := (metrixselector.Expr{Allow: expr.Allow, Deny: expr.Deny}).Parse()
-		if err == nil && selector != nil && !selector.Matches(processed.Name, prometheusLabelView{labels: processed.Labels}) {
-			r.addError(
-				"future_metric_blocked_by_profile",
-				"autogen.selector",
-				fmt.Sprintf("synthetic future family %q becomes %q and is not eligible for generic fallback", canary, processed.Name),
-				"A profile may suppress exact known families, but it must preserve unknown families matching its exporter scope after recommended job relabeling.",
-			)
-		}
-	}
-	return processed, false, appliedBlocks
-}
-
-func checkFutureMetricRelabeling(canary string, policy jobPolicy, r *report) (prompkg.Sample, bool, map[int]struct{}) {
-	sample := prompkg.Sample{Name: canary, Labels: labels.EmptyLabels()}
-	appliedBlocks := make(map[int]struct{})
-	for blockIndex, block := range policy.Relabeling {
-		match, err := matcher.NewSimplePatternsMatcher(block.Match)
-		if err != nil || !match.MatchString(sample.Name) {
-			continue
-		}
-		appliedBlocks[blockIndex] = struct{}{}
-		processor, err := relabel.New(block.MetricRelabelConfigs)
-		if err != nil {
-			continue
-		}
-		processed, drop := processor.Apply(sample)
-		if drop.Dropped() {
-			r.addError(
-				"future_metric_blocked_by_job_relabel",
-				fmt.Sprintf("relabeling[%d].metric_relabel_configs[%d]", blockIndex, drop.RuleIndex),
-				fmt.Sprintf("job relabeling drops synthetic future family %q", canary),
-				"A contributed job may drop exact known series or bounded source-proven aliases, but it must not discard an unknown future family in the profile namespace.",
-			)
-			return sample, true, appliedBlocks
-		}
-		sample = processed
-	}
-	return sample, false, appliedBlocks
-}
-
 func exactMetricFamilySelector(expr string) (string, bool) {
 	name := strings.TrimSpace(expr)
 	if strings.Contains(name, "{") {
 		return "", false
 	}
 	return name, !hasUnescapedGlobMeta(name) && commonmodel.UTF8Validation.IsValidMetricName(name)
-}
-
-type futureMetricTermCanaries struct {
-	pattern          string
-	earlierNegatives []string
-	canaries         []string
-}
-
-func (t futureMetricTermCanaries) scopeExpr() string {
-	terms := make([]string, 0, len(t.earlierNegatives)+1)
-	for _, negative := range t.earlierNegatives {
-		terms = append(terms, "!"+negative)
-	}
-	terms = append(terms, t.pattern)
-	return strings.Join(terms, " ")
-}
-
-func syntheticFutureMetricTerms(matchExpr string) ([]futureMetricTermCanaries, bool) {
-	scope, err := matcher.NewSimplePatternsMatcher(matchExpr)
-	if err != nil {
-		return nil, false
-	}
-	hasWildcard := false
-	var terms []futureMetricTermCanaries
-	var earlierNegatives []string
-	for term := range strings.FieldsSeq(matchExpr) {
-		if after, ok := strings.CutPrefix(term, "!"); ok {
-			earlierNegatives = append(earlierNegatives, after)
-			continue
-		}
-		if !hasUnescapedGlobMeta(term) {
-			continue
-		}
-		hasWildcard = true
-		entry := futureMetricTermCanaries{
-			pattern:          term,
-			earlierNegatives: append([]string(nil), earlierNegatives...),
-		}
-		seen := make(map[string]struct{})
-		for attempt := range len(futureMetricCandidateAlphabet) * 4 {
-			candidate, ok := syntheticMetricFromGlob(term, attempt)
-			if ok && commonmodel.UTF8Validation.IsValidMetricName(candidate) && scope.MatchString(candidate) {
-				if _, ok := seen[candidate]; !ok {
-					entry.canaries = append(entry.canaries, candidate)
-					seen[candidate] = struct{}{}
-				}
-				if len(entry.canaries) == len(futureMetricStems) {
-					break
-				}
-			}
-		}
-		terms = append(terms, entry)
-	}
-	return terms, hasWildcard
-}
-
-func syntheticFutureMetrics(matchExpr string) ([]string, bool) {
-	terms, wildcard := syntheticFutureMetricTerms(matchExpr)
-	var canaries []string
-	seen := make(map[string]struct{})
-	for _, term := range terms {
-		for _, canary := range term.canaries {
-			if _, ok := seen[canary]; ok {
-				continue
-			}
-			seen[canary] = struct{}{}
-			canaries = append(canaries, canary)
-		}
-	}
-	return canaries, wildcard
-}
-
-func syntheticMetricFromGlob(pattern string, attempt int) (string, bool) {
-	var b strings.Builder
-	wildcardIndex := 0
-	for i := 0; i < len(pattern); i++ {
-		switch pattern[i] {
-		case '\\':
-			if i+1 >= len(pattern) {
-				return "", false
-			}
-			i++
-			b.WriteByte(pattern[i])
-		case '*':
-			stem := futureMetricStems[(attempt+wildcardIndex)%len(futureMetricStems)]
-			fmt.Fprintf(&b, "%s_%d", stem, attempt)
-			wildcardIndex++
-		case '?':
-			b.WriteByte(futureMetricCandidateAlphabet[(attempt+wildcardIndex)%len(futureMetricCandidateAlphabet)])
-			wildcardIndex++
-		case '[':
-			end := globClassEnd(pattern, i)
-			if end < 0 {
-				return "", false
-			}
-			value, ok := syntheticGlobClassValue(pattern[i:end+1], attempt+wildcardIndex)
-			if !ok {
-				return "", false
-			}
-			b.WriteByte(value)
-			wildcardIndex++
-			i = end
-		default:
-			b.WriteByte(pattern[i])
-		}
-	}
-	return b.String(), true
 }
 
 func hasUnescapedGlobMeta(pattern string) bool {
@@ -1067,35 +766,4 @@ func hasUnescapedGlobMeta(pattern string) bool {
 		}
 	}
 	return false
-}
-
-func globClassEnd(pattern string, start int) int {
-	for i := start + 1; i < len(pattern); i++ {
-		if pattern[i] == '\\' {
-			i++
-			continue
-		}
-		if pattern[i] == ']' {
-			return i
-		}
-	}
-	return -1
-}
-
-func syntheticGlobClassValue(class string, offset int) (byte, bool) {
-	classMatcher, err := matcher.NewGlobMatcher(class)
-	if err != nil {
-		return 0, false
-	}
-	var candidates []byte
-	for i := range len(futureMetricCandidateAlphabet) {
-		candidate := futureMetricCandidateAlphabet[i]
-		if classMatcher.MatchString(string(candidate)) {
-			candidates = append(candidates, candidate)
-		}
-	}
-	if len(candidates) == 0 {
-		return 0, false
-	}
-	return candidates[offset%len(candidates)], true
 }

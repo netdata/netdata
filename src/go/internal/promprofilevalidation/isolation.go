@@ -16,6 +16,20 @@ type isolatedCatalog struct {
 	profileName string
 	fileURL     string
 	catalog     promprofiles.Catalog
+	root        string
+	dumpRaw     []byte
+}
+
+func (i isolatedCatalog) stageFutureInputs(inputs []futureInput) (string, error) {
+	combined, err := appendFutureInputs(i.dumpRaw, inputs)
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(i.root, "metrics-with-future-inputs.txt")
+	if err := os.WriteFile(path, combined, 0o600); err != nil {
+		return "", fmt.Errorf("stage future-input exposition: %w", err)
+	}
+	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String(), nil
 }
 
 func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func(), error) {
@@ -92,5 +106,7 @@ func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func()
 		profileName: name,
 		fileURL:     (&url.URL{Scheme: "file", Path: filepath.ToSlash(stagedDump)}).String(),
 		catalog:     preflight,
+		root:        root,
+		dumpRaw:     dumpRaw,
 	}, cleanup, nil
 }

@@ -20,10 +20,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/internal/promtestdata"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
-	commonmodel "github.com/prometheus/common/model"
 )
 
 const validDump = `
@@ -185,7 +183,7 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 	if result.report.Verdict != verdictPass {
 		t.Fatalf("expected PASS report, got %#v", result.report.Findings)
 	}
-	if result.report.Profile.FutureMetricCanary != "app_netdata_future_metric_0" {
+	if !strings.HasPrefix(result.report.Profile.FutureMetricCanary, "app_") {
 		t.Fatalf("future metric canary: got %q", result.report.Profile.FutureMetricCanary)
 	}
 	if result.report.Counts.RawFamilies != 4 {
@@ -632,7 +630,7 @@ func TestValidateProfileRejectsJobSelectorThatOnlyAdmitsPredictableCanary(t *tes
 	requireFinding(t, result, "future_metric_blocked_by_job_selector")
 }
 
-func TestValidateProfileRejectsJobSelectorThatAdmitsEveryPublicCanary(t *testing.T) {
+func TestValidateProfileRejectsJobSelectorThatAdmitsOnlyLegacyFixedCanaries(t *testing.T) {
 	job := `
 selector:
   allow:
@@ -646,9 +644,7 @@ selector:
 `
 	result := runValidation(t, validProfile, validDump, job)
 	requireFinding(t, result, "closed_job_selector_allow")
-	if hasFinding(result.report, "future_metric_blocked_by_job_selector", "error") {
-		t.Fatalf("all finite canaries passed; structural namespace coverage must catch the closed allowlist: %#v", result.report.Findings)
-	}
+	requireFinding(t, result, "future_metric_blocked_by_job_selector")
 }
 
 func TestValidateProfileAcceptsJobSelectorOpenToFutureFamily(t *testing.T) {
@@ -772,10 +768,7 @@ relabeling:
         action: drop
 `
 	result := runValidation(t, validProfile, validDump, job)
-	requireFinding(t, result, "future_relabel_canary_unavailable")
-	if hasFinding(result.report, "future_metric_blocked_by_job_relabel", "error") {
-		t.Fatalf("the block excludes every public canary; the unavailable-probe check must catch it: %#v", result.report.Findings)
-	}
+	requireFinding(t, result, "open_ended_relabel_name_discard")
 }
 
 func TestValidateProfileAcceptsUnprobedLabelOnlyRelabelBlock(t *testing.T) {
@@ -866,7 +859,7 @@ relabeling:
         action: drop
 `
 	result := runValidation(t, validProfile, validDump, job)
-	requireFinding(t, result, "future_relabel_canary_unavailable")
+	requireFinding(t, result, "future_metric_blocked_by_job_relabel")
 }
 
 func TestValidateProfileRejectsLabelDependentDiscardUnderWildcardRelabelScope(t *testing.T) {
@@ -1013,6 +1006,9 @@ relabeling:
 
 func TestValidateProfileRejectsFutureMetricRoutedToAuthoredMetric(t *testing.T) {
 	job := `
+future_inputs:
+  - name: app_future_signal
+    labels: {instance: node-future}
 relabeling:
   - match: '!app_temperature !app_requests_total !app_latency_seconds_* !app_size_bytes* app_*'
     metric_relabel_configs:
@@ -1028,6 +1024,9 @@ relabeling:
 
 func TestValidateProfileRejectsFutureMetricIdentityCollapse(t *testing.T) {
 	job := `
+future_inputs:
+  - name: app_future_one
+  - name: app_future_two
 relabeling:
   - match: '!app_temperature !app_requests_total !app_latency_seconds_* !app_size_bytes* app_*'
     metric_relabel_configs:
@@ -1049,6 +1048,8 @@ func TestValidateProfileChecksFallbackAfterRelabeling(t *testing.T) {
 		1,
 	)
 	job := `
+future_inputs:
+  - name: app_future_signal
 relabeling:
   - match: '!app_temperature !app_requests_total !app_latency_seconds_* !app_size_bytes* app_*'
     metric_relabel_configs:
@@ -1291,6 +1292,9 @@ app_worker_alpha_temperature{instance="node-b"} 43
 app_worker_beta_requests_total{instance="node-b"} 11
 `
 	job := `
+future_inputs:
+  - name: app_worker_future_temperature
+    labels: {instance: node-future}
 relabeling:
   - match: app_worker_*
     metric_relabel_configs:
@@ -1513,6 +1517,9 @@ func TestValidateProfileAcceptsUnreachableDynamicIdentityLabelWrite(t *testing.T
 app_sensor_alpha_temperature{instance="node-b"} 43
 `
 	job := `
+future_inputs:
+  - name: app_sensor_future_temperature
+    labels: {instance: node-future}
 relabeling:
   - match: app_sensor_*
     metric_relabel_configs:
@@ -1620,6 +1627,9 @@ app_worker_alpha_temperature{instance="node-b"} 43
 app_worker_beta_temperature{instance="node-b"} 44
 `
 	job := `
+future_inputs:
+  - name: app_worker_future_temperature
+    labels: {instance: node-future}
 relabeling:
   - match: app_worker_*
     metric_relabel_configs:
@@ -1674,6 +1684,9 @@ func TestValidateProfileAcceptsCompleteNestedDynamicIdentityExtraction(t *testin
 app_worker_barX_temperature{instance="node-b"} 43
 `
 	job := `
+future_inputs:
+  - name: app_worker_barFuture_temperature
+    labels: {instance: node-future}
 relabeling:
   - match: app_worker_*
     metric_relabel_configs:
@@ -1701,6 +1714,9 @@ func TestValidateProfileAcceptsDynamicRewriteWithDisjointLabelMap(t *testing.T) 
 app_worker_alpha_temperature{instance="node-b"} 43
 `
 	job := `
+future_inputs:
+  - name: app_worker_future_temperature
+    labels: {instance: node-future}
 relabeling:
   - match: app_worker_*
     metric_relabel_configs:
@@ -1897,6 +1913,9 @@ func TestValidateProfileAcceptsSourceProvenCanonicalDynamicTailRewrite(t *testin
 app_temperature_sensor_a{instance="node-b"} 43
 `
 	job := `
+future_inputs:
+  - name: app_temperature_sensor_future
+    labels: {instance: node-future}
 relabeling:
   - match: app_temperature_*
     metric_relabel_configs:
@@ -2010,46 +2029,6 @@ relabeling:
 `
 	result := runValidation(t, profile, validDump, job)
 	requireFinding(t, result, "closed_relabel_filter")
-}
-
-func TestSyntheticFutureMetricSupportsCompleteSimplePatternGlobSyntax(t *testing.T) {
-	canaries, wildcard := syntheticFutureMetrics(`!app_a* app_[bc]?*`)
-	if !wildcard || len(canaries) != len(futureMetricStems) {
-		t.Fatalf("expected varied future canaries, got canaries=%v wildcard=%v", canaries, wildcard)
-	}
-	scope, err := matcher.NewSimplePatternsMatcher(`!app_a* app_[bc]?*`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, canary := range canaries {
-		if !commonmodel.UTF8Validation.IsValidMetricName(canary) {
-			t.Fatalf("canary %q is not a valid Prometheus metric name", canary)
-		}
-		if !scope.MatchString(canary) {
-			t.Fatalf("canary %q does not match its source scope", canary)
-		}
-	}
-
-	if canaries, wildcard := syntheticFutureMetrics(`app_\*`); len(canaries) != 0 || wildcard {
-		t.Fatalf("escaped glob metacharacter must not create a canary: canaries=%v wildcard=%v", canaries, wildcard)
-	}
-
-	canaries, wildcard = syntheticFutureMetrics(`app_* service_*`)
-	if !wildcard || len(canaries) != 2*len(futureMetricStems) {
-		t.Fatalf("every positive wildcard namespace needs a canary: canaries=%v wildcard=%v", canaries, wildcard)
-	}
-}
-
-func TestSyntheticFutureMetricAcceptsUTF8MetricName(t *testing.T) {
-	canaries, wildcard := syntheticFutureMetrics(`[0-9]*`)
-	if !wildcard || len(canaries) != len(futureMetricStems) {
-		t.Fatalf("expected UTF-8-valid numeric canaries, got canaries=%v wildcard=%v", canaries, wildcard)
-	}
-	for _, canary := range canaries {
-		if !commonmodel.UTF8Validation.IsValidMetricName(canary) {
-			t.Fatalf("canary %q is not a UTF-8-valid Prometheus metric name", canary)
-		}
-	}
 }
 
 func TestValidateProfileAcceptsUTF8MetricAndLabelNames(t *testing.T) {

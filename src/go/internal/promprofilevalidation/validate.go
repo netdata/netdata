@@ -5,6 +5,7 @@ package promprofilevalidation
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -165,20 +166,17 @@ func validateProfile(parent context.Context, opts Options) report {
 		return r
 	}
 
-	managed, ok := metrix.AsCycleManagedStore(coll.MetricStore())
-	if !ok {
-		r.addError("collector_store", "", "collector store does not expose cycle control", "Validation must drive Collect with the same begin/commit contract as the framework.")
-		return r
-	}
-	controller := managed.CycleController()
-	controller.BeginCycle()
-	if err := coll.Collect(ctx); err != nil {
-		controller.AbortCycle()
-		r.addError("collector_collect", opts.DumpPath, err.Error(), "The real writer pipeline must complete a collection cycle.")
-		return r
-	}
-	if err := controller.CommitCycleSuccess(); err != nil {
-		r.addError("collector_commit", "", err.Error(), "Only successfully committed series are valid chartengine evidence.")
+	if err := collectAndCommit(ctx, coll); err != nil {
+		var cycleErr *collectorCycleError
+		errors.As(err, &cycleErr)
+		switch cycleErr.stage {
+		case "store":
+			r.addError("collector_store", "", cycleErr.err.Error(), "Validation must drive Collect with the same begin/commit contract as the framework.")
+		case "collect":
+			r.addError("collector_collect", opts.DumpPath, cycleErr.err.Error(), "The real writer pipeline must complete a collection cycle.")
+		case "commit":
+			r.addError("collector_commit", "", cycleErr.err.Error(), "Only successfully committed series are valid chartengine evidence.")
+		}
 		return r
 	}
 	relabelAudits := pipelineSummary.finalize()
@@ -211,30 +209,24 @@ func validateProfile(parent context.Context, opts Options) report {
 	addObservedLabelAggregationHeuristics(merged, reader, &r)
 
 	emitTypeID := validationEmitTypeID(r.Job.Name)
-	routeSummary := newPlanRouteSummary()
-	engine, err := chartengine.New(
-		chartengine.WithEmitTypeIDBudgetPrefix(emitTypeID),
-		chartengine.WithRuntimeStore(nil),
-		chartengine.WithPlanRouteDiagnosticObserver(routeSummary.observe),
-	)
+	planned, err := prepareRoutePlan(reader, templateYAML, emitTypeID)
 	if err != nil {
-		r.addError("engine_init", "", err.Error(), "The authoritative planner must initialize.")
+		var planErr *routePlanError
+		errors.As(err, &planErr)
+		switch planErr.stage {
+		case "init":
+			r.addError("engine_init", "", planErr.err.Error(), "The authoritative planner must initialize.")
+		case "load":
+			r.addError("engine_load", "", planErr.err.Error(), "The authoritative compiler must accept the exact merged template served by the collector.")
+		case "plan":
+			r.addError("engine_plan", "", planErr.err.Error(), "The real chartengine must route the committed collector series.")
+		case "commit":
+			r.addError("engine_commit", "", planErr.err.Error(), "A successful plan must satisfy chartengine's lifecycle transaction.")
+		}
 		return r
 	}
-	if err := engine.LoadYAML([]byte(templateYAML), 1); err != nil {
-		r.addError("engine_load", "", err.Error(), "The authoritative compiler must accept the exact merged template served by the collector.")
-		return r
-	}
-	attempt, err := engine.PreparePlan(reader)
-	if err != nil {
-		r.addError("engine_plan", "", err.Error(), "The real chartengine must route the committed collector series.")
-		return r
-	}
-	plan := attempt.Plan()
-	if err := attempt.Commit(); err != nil {
-		r.addError("engine_commit", "", err.Error(), "A successful plan must satisfy chartengine's lifecycle transaction.")
-		return r
-	}
+	plan := planned.plan
+	routeSummary := planned.routes
 	addObservedScaleHeuristics(plan, &r)
 
 	r.Charts = materializeCharts(plan)
@@ -457,6 +449,23 @@ func validateProfile(parent context.Context, opts Options) report {
 			"",
 			fmt.Sprintf("writer exposed %d flattened series while chartengine scanned %d", r.Counts.WriterSeries, r.Counts.SeriesScanned),
 			"An engine selector or reader-level rule may intentionally filter series, but the difference must be understood rather than treated as profile coverage.",
+		)
+	}
+	if err := addFutureOpennessChecks(
+		ctx,
+		isolated,
+		profile,
+		policy,
+		rawSamples,
+		reader,
+		r.Job.Name,
+		&r,
+	); err != nil {
+		r.addError(
+			"future_openness_run",
+			opts.JobPath,
+			err.Error(),
+			"The isolated future-input collector and chart plan must complete through the same production pipeline as current evidence.",
 		)
 	}
 	return r

@@ -22,16 +22,20 @@ type Options struct {
 	JobPath     string
 }
 
-type jobPolicy = promcollector.Config
+type jobPolicy struct {
+	promcollector.Config `yaml:",inline"`
+	FutureInputs         []futureInput `yaml:"future_inputs,omitempty"`
+}
 
 var allowedJobPolicyKeys = map[string]struct{}{
 	"name": {}, "app": {}, "selector": {}, "relabeling": {},
 	"fallback_type": {}, "expected_prefix": {},
 	"max_time_series": {}, "max_time_series_per_metric": {},
+	"future_inputs": {},
 }
 
 func loadJobPolicy(path string) (jobPolicy, error) {
-	policy := promcollector.DefaultConfig()
+	policy := jobPolicy{Config: promcollector.DefaultConfig()}
 	if path == "" {
 		return policy, nil
 	}
@@ -66,6 +70,9 @@ func loadJobPolicy(path string) (jobPolicy, error) {
 	if policy.MaxTSPerMetric < 0 {
 		return jobPolicy{}, fmt.Errorf("job policy: max_time_series_per_metric must be non-negative")
 	}
+	if err := validateFutureInputs(policy.FutureInputs); err != nil {
+		return jobPolicy{}, fmt.Errorf("job policy: %w", err)
+	}
 	return policy, nil
 }
 
@@ -99,7 +106,7 @@ func validateJobPolicyTopLevel(raw []byte) error {
 }
 
 func applyJobPolicy(coll *promcollector.Collector, policy jobPolicy, fileURL, profileName string) effectiveJobReport {
-	coll.Config = policy
+	coll.Config = policy.Config
 	if coll.Name == "" {
 		coll.Name = "profile_validation"
 	}
@@ -112,15 +119,16 @@ func applyJobPolicy(coll *promcollector.Collector, policy jobPolicy, fileURL, pr
 	}
 
 	return effectiveJobReport{
-		Name:               coll.Name,
-		App:                coll.Application,
-		SelectorAllow:      slices.Clone(coll.Selector.Allow),
-		SelectorDeny:       slices.Clone(coll.Selector.Deny),
-		RelabelBlocks:      len(coll.Relabeling),
-		FallbackGauge:      slices.Clone(coll.FallbackType.Gauge),
-		FallbackCounter:    slices.Clone(coll.FallbackType.Counter),
-		ExpectedPrefix:     coll.ExpectedPrefix,
-		MaxTimeSeries:      coll.MaxTS,
-		MaxSeriesPerMetric: coll.MaxTSPerMetric,
+		Name:                 coll.Name,
+		App:                  coll.Application,
+		SelectorAllow:        slices.Clone(coll.Selector.Allow),
+		SelectorDeny:         slices.Clone(coll.Selector.Deny),
+		RelabelBlocks:        len(coll.Relabeling),
+		FallbackGauge:        slices.Clone(coll.FallbackType.Gauge),
+		FallbackCounter:      slices.Clone(coll.FallbackType.Counter),
+		ExpectedPrefix:       coll.ExpectedPrefix,
+		MaxTimeSeries:        coll.MaxTS,
+		MaxSeriesPerMetric:   coll.MaxTSPerMetric,
+		DeclaredFutureInputs: len(policy.FutureInputs),
 	}
 }

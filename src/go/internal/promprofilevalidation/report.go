@@ -59,16 +59,17 @@ type profileReport struct {
 }
 
 type effectiveJobReport struct {
-	Name               string   `json:"name"`
-	App                string   `json:"app,omitempty"`
-	SelectorAllow      []string `json:"selector_allow,omitempty"`
-	SelectorDeny       []string `json:"selector_deny,omitempty"`
-	RelabelBlocks      int      `json:"relabel_blocks"`
-	FallbackGauge      []string `json:"fallback_gauge,omitempty"`
-	FallbackCounter    []string `json:"fallback_counter,omitempty"`
-	ExpectedPrefix     string   `json:"expected_prefix,omitempty"`
-	MaxTimeSeries      int      `json:"max_time_series"`
-	MaxSeriesPerMetric int      `json:"max_time_series_per_metric"`
+	Name                 string   `json:"name"`
+	App                  string   `json:"app,omitempty"`
+	SelectorAllow        []string `json:"selector_allow,omitempty"`
+	SelectorDeny         []string `json:"selector_deny,omitempty"`
+	RelabelBlocks        int      `json:"relabel_blocks"`
+	FallbackGauge        []string `json:"fallback_gauge,omitempty"`
+	FallbackCounter      []string `json:"fallback_counter,omitempty"`
+	ExpectedPrefix       string   `json:"expected_prefix,omitempty"`
+	MaxTimeSeries        int      `json:"max_time_series"`
+	MaxSeriesPerMetric   int      `json:"max_time_series_per_metric"`
+	DeclaredFutureInputs int      `json:"declared_future_inputs"`
 }
 
 type countReport struct {
@@ -206,7 +207,7 @@ func newReport() report {
 		Verdict: verdictPass,
 		EvidenceLimits: []string{
 			"Validation proves behavior for the supplied dump and structured job policy, not metrics or label values absent from that evidence.",
-			"The synthetic future-family canary proves that policy admits a new matching name; it does not establish that future metric's type, labels, semantics, or cardinality.",
+			"The isolated future-input run proves the declared or derived raw probes traverse current selector, relabel, writer, profile, and fallback behavior; it cannot establish every future metric's labels, semantics, or cardinality.",
 			"Observed planner and public-wire chart/context/dimension collisions are checked; possible collisions from unseen future values cannot be proven from one dump.",
 			"A lifecycle cap that accommodates this dump may still omit entities or dimensions in a larger configuration.",
 			"Exact candidate validation does not prove that profile.match uniquely auto-selects this exporter against unrelated endpoints.",
@@ -249,7 +250,7 @@ func writeTextReport(w io.Writer, r report) error {
 		fmt.Fprintf(&b, "Profile: %s (match=%q, app=%q)\n", r.Profile.Name, r.Profile.Match, r.Profile.App)
 	}
 	if r.Profile.FutureMetricCanary != "" {
-		fmt.Fprintf(&b, "Future metric canary: %s (synthetic forward-compatibility probe)\n", r.Profile.FutureMetricCanary)
+		fmt.Fprintf(&b, "First future raw probe: %s (isolated forward-compatibility run)\n", r.Profile.FutureMetricCanary)
 	}
 	fmt.Fprintf(
 		&b,
@@ -518,6 +519,9 @@ func sortReport(r *report) {
 		if r.Findings[i].Code != r.Findings[j].Code {
 			return r.Findings[i].Code < r.Findings[j].Code
 		}
-		return r.Findings[i].Path < r.Findings[j].Path
+		if r.Findings[i].Path != r.Findings[j].Path {
+			return r.Findings[i].Path < r.Findings[j].Path
+		}
+		return r.Findings[i].Message < r.Findings[j].Message
 	})
 }

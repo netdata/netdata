@@ -23,6 +23,11 @@ type pipelineDestinationOccurrence struct {
 	scalar bool
 }
 
+type pipelineRuleKey struct {
+	block int
+	rule  int
+}
+
 type pipelineDiagnosticSummary struct {
 	audits              relabelPolicyAudits
 	blockInputLabels    map[pipelineBlockSampleKey]map[string]struct{}
@@ -31,6 +36,11 @@ type pipelineDiagnosticSummary struct {
 	writerFamilyRejects map[string]promcollector.PipelineReason
 	writerSeriesRejects map[pipelineDestinationOccurrence]promcollector.PipelineReason
 	selectorRejected    map[prompkg.RawSampleIdentity]struct{}
+	rawAccepted         map[prompkg.RawSampleIdentity]struct{}
+	relabelDropped      map[prompkg.RawSampleIdentity]promcollector.PipelineDiagnostic
+	blockEntries        map[prompkg.RawSampleIdentity]map[int]string
+	rulesEvaluated      map[prompkg.RawSampleIdentity]map[pipelineRuleKey]promcollector.PipelineDiagnostic
+	destinationsByRaw   map[prompkg.RawSampleIdentity]map[pipelineDestinationOccurrence]struct{}
 	typedRejects        map[string]struct{}
 	selectedProfiles    map[string]struct{}
 }
@@ -54,6 +64,11 @@ func newPipelineDiagnosticSummary(policy jobPolicy, batch prompkg.SampleBatch) *
 		writerFamilyRejects: make(map[string]promcollector.PipelineReason),
 		writerSeriesRejects: make(map[pipelineDestinationOccurrence]promcollector.PipelineReason),
 		selectorRejected:    make(map[prompkg.RawSampleIdentity]struct{}),
+		rawAccepted:         make(map[prompkg.RawSampleIdentity]struct{}),
+		relabelDropped:      make(map[prompkg.RawSampleIdentity]promcollector.PipelineDiagnostic),
+		blockEntries:        make(map[prompkg.RawSampleIdentity]map[int]string),
+		rulesEvaluated:      make(map[prompkg.RawSampleIdentity]map[pipelineRuleKey]promcollector.PipelineDiagnostic),
+		destinationsByRaw:   make(map[prompkg.RawSampleIdentity]map[pipelineDestinationOccurrence]struct{}),
 		typedRejects:        make(map[string]struct{}),
 		selectedProfiles:    make(map[string]struct{}),
 	}
@@ -104,7 +119,15 @@ func (s *pipelineDiagnosticSummary) observe(fact promcollector.PipelineDiagnosti
 	switch fact.Decision {
 	case promcollector.PipelineRawSelectorRejected:
 		s.selectorRejected[fact.RawIdentity] = struct{}{}
+	case promcollector.PipelineRawAccepted:
+		s.rawAccepted[fact.RawIdentity] = struct{}{}
 	case promcollector.PipelineRelabelBlockEntered:
+		entries := s.blockEntries[fact.RawIdentity]
+		if entries == nil {
+			entries = make(map[int]string)
+			s.blockEntries[fact.RawIdentity] = entries
+		}
+		entries[fact.BlockIndex] = fact.InputMetricName
 		key := pipelineBlockSampleKey{raw: fact.RawIdentity, block: fact.BlockIndex}
 		labels := s.blockInputLabels[key]
 		if labels == nil {
@@ -115,6 +138,12 @@ func (s *pipelineDiagnosticSummary) observe(fact promcollector.PipelineDiagnosti
 			labels[name] = struct{}{}
 		}
 	case promcollector.PipelineRelabelRuleEvaluated:
+		rules := s.rulesEvaluated[fact.RawIdentity]
+		if rules == nil {
+			rules = make(map[pipelineRuleKey]promcollector.PipelineDiagnostic)
+			s.rulesEvaluated[fact.RawIdentity] = rules
+		}
+		rules[pipelineRuleKey{block: fact.BlockIndex, rule: fact.RuleIndex}] = fact
 		key := relabelDiscardRuleKey{block: fact.BlockIndex, rule: fact.RuleIndex}
 		if audit := s.audits.nameRewrites[key]; audit != nil && fact.RelabelRuleMatched {
 			audit.metricNames[fact.InputMetricName] = struct{}{}
@@ -129,6 +158,7 @@ func (s *pipelineDiagnosticSummary) observe(fact promcollector.PipelineDiagnosti
 			audit.rawSamples[fact.RawIdentity] = struct{}{}
 		}
 	case promcollector.PipelineRelabelDropped:
+		s.relabelDropped[fact.RawIdentity] = fact
 		if fact.RelabelDrop.Reason == relabel.DropReasonInvalidMetricName {
 			drops := &s.audits.invalidNameDrops
 			drops.blocks[fact.BlockIndex] = struct{}{}
@@ -143,6 +173,12 @@ func (s *pipelineDiagnosticSummary) observe(fact promcollector.PipelineDiagnosti
 			scalar: fact.ScalarValue,
 		}
 		s.audits.provenance.sourceDestinations(fact.Source)[destination] = struct{}{}
+		destinations := s.destinationsByRaw[fact.RawIdentity]
+		if destinations == nil {
+			destinations = make(map[pipelineDestinationOccurrence]struct{})
+			s.destinationsByRaw[fact.RawIdentity] = destinations
+		}
+		destinations[destination] = struct{}{}
 	case promcollector.PipelineTypedFamilyRejected:
 		s.typedRejects[fact.MetricName] = struct{}{}
 	case promcollector.PipelineWriterFamilyRejected:
