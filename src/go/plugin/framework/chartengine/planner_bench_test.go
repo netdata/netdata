@@ -86,6 +86,49 @@ func BenchmarkBuildPlanBySeriesCardinality(b *testing.B) {
 	}
 }
 
+func BenchmarkBuildPlanRouteDiagnostics(b *testing.B) {
+	const seriesCount = 10_000
+	reader := benchmarkCollectorReader(b, seriesCount)
+
+	for _, diagnostics := range []bool{false, true} {
+		name := "disabled"
+		var (
+			opts  []Option
+			facts int
+		)
+		if diagnostics {
+			name = "enabled"
+			opts = append(opts, WithPlanRouteDiagnosticObserver(func(PlanRouteDiagnostic) {
+				facts++
+			}))
+		}
+
+		b.Run(name, func(b *testing.B) {
+			engine, err := New(opts...)
+			if err != nil {
+				b.Fatalf("new engine: %v", err)
+			}
+			if err := engine.LoadYAML([]byte(benchTemplateYAML), 1); err != nil {
+				b.Fatalf("load template: %v", err)
+			}
+			if _, err := buildPlan(engine, reader); err != nil {
+				b.Fatalf("warm build plan: %v", err)
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := buildPlan(engine, reader); err != nil {
+					b.Fatalf("build plan: %v", err)
+				}
+			}
+			if diagnostics && facts == 0 {
+				b.Fatal("diagnostic observer received no facts")
+			}
+		})
+	}
+}
+
 func BenchmarkBuildPlanAutogenUnmatchedBaseline(b *testing.B) {
 	tests := map[string]int{
 		"series_100":   100,
