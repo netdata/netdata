@@ -216,6 +216,7 @@ You can use asterisks (`*`) to create patterns:
 
 - Asterisks can be placed anywhere within pattern (e.g., `fi*fox`) without affecting the matching criteria (**comm** or **cmdline**).
 - To include process names with spaces, enclose them in quotes (single or double), like this: `'Plex Media Serv'` or `"my other process"`.
+- **Substring patterns that contain spaces** — such as a pattern matching part of a command line including arguments — must be enclosed in quotes too; otherwise the spaces split the pattern into separate entries. For example, `'*my_app.exe --mode production*'` is one substring pattern, while the unquoted `*my_app.exe --mode production*` is read as three separate patterns (`*my_app.exe`, `--mode`, `production*`).
 - To include processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`.
 - To include processes with double quotes, enclose them in single quotes: `'process with this " double quote'`.
 - The order of the entries in the configuration list is crucial. The first matching entry will be used, so it's important to follow a top-down hierarchy. Processes that don't match any entry will inherit the group from their parent processes.
