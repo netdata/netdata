@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -18,6 +17,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/internal/promtestdata"
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
@@ -174,17 +175,6 @@ app_current 1
 app_capacity 1000
 `
 
-func TestValidatorHelperProcess(t *testing.T) {
-	if os.Getenv("NETDATA_PROFILE_VALIDATOR_HELPER") != "1" {
-		return
-	}
-	separator := slices.Index(os.Args, "--")
-	if separator < 0 {
-		os.Exit(2)
-	}
-	os.Exit(runCLI(os.Args[separator+1:], os.Stdout, os.Stderr))
-}
-
 func TestCLIHelpSucceeds(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if exitCode := runCLI([]string{"--help"}, &stdout, &stderr); exitCode != 0 {
@@ -253,6 +243,55 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 		if chart.IDFingerprint == "" {
 			t.Fatalf("materialized chart ID fingerprint is empty: %#v", chart)
 		}
+	}
+}
+
+func TestStageIsolatedCatalogDoesNotMutateProcessDiscovery(t *testing.T) {
+	dir := t.TempDir()
+	profilePath := filepath.Join(dir, "candidate.yaml")
+	dumpPath := filepath.Join(dir, "metrics.prom")
+	if err := os.WriteFile(profilePath, []byte(validProfile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dumpPath, []byte(validDump), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	wantExecutableName := executable.Name
+	wantExecutableDirectory := executable.Directory
+	wantUserConfigDir := buildinfo.UserConfigDir
+	wantStockConfigDir := buildinfo.StockConfigDir
+
+	isolated, cleanup, err := stageIsolatedCatalog(profilePath, dumpPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	if _, ok := isolated.catalog.Get("candidate"); !ok {
+		t.Fatal("isolated catalog did not contain candidate profile")
+	}
+
+	if executable.Name != wantExecutableName ||
+		executable.Directory != wantExecutableDirectory ||
+		buildinfo.UserConfigDir != wantUserConfigDir ||
+		buildinfo.StockConfigDir != wantStockConfigDir {
+		t.Fatalf("isolated catalog staging mutated process discovery globals")
+	}
+}
+
+func TestValidateProfileRejectsDuplicatePhysicalEvidence(t *testing.T) {
+	duplicateDump := strings.Replace(
+		validDump,
+		`app_temperature{instance="node-a"} 42`,
+		"app_temperature{instance=\"node-a\"} 42\napp_temperature{instance=\"node-a\"} 43",
+		1,
+	)
+	result := runValidation(t, validProfile, duplicateDump, "")
+	if result.exitCode == 0 {
+		t.Fatalf("duplicate evidence unexpectedly passed\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "duplicate_source_sample", "error") {
+		t.Fatalf("missing duplicate-source error: %#v", result.report.Findings)
 	}
 }
 
@@ -2347,7 +2386,7 @@ func TestInspectEmittedPlanAssociatesContextsInEmitterOrder(t *testing.T) {
 		chartengine.CreateChartAction{ChartID: "m", Meta: chartengine.ChartMeta{Context: "distinct"}},
 	}}
 
-	result, err := inspectEmittedPlan(plan)
+	result, err := inspectEmittedPlan(plan, validationEmitTypeID("profile_validation"), "profile_validation")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2420,7 +2459,11 @@ template:
 func TestInspectEmittedPlanFindsEmptyContextWireValue(t *testing.T) {
 	action := chartengine.CreateChartAction{ChartID: "value"}
 	action.Meta.Context = "'"
-	result, err := inspectEmittedPlan(chartengine.Plan{Actions: []chartengine.EngineAction{action}})
+	result, err := inspectEmittedPlan(
+		chartengine.Plan{Actions: []chartengine.EngineAction{action}},
+		validationEmitTypeID("profile_validation"),
+		"profile_validation",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2432,7 +2475,11 @@ func TestInspectEmittedPlanFindsEmptyContextWireValue(t *testing.T) {
 func TestInspectEmittedPlanHandlesLargeChartLine(t *testing.T) {
 	action := chartengine.CreateChartAction{ChartID: "value"}
 	action.Meta.Title = strings.Repeat("x", 70*1024)
-	result, err := inspectEmittedPlan(chartengine.Plan{Actions: []chartengine.EngineAction{action}})
+	result, err := inspectEmittedPlan(
+		chartengine.Plan{Actions: []chartengine.EngineAction{action}},
+		validationEmitTypeID("profile_validation"),
+		"profile_validation",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3884,70 +3931,29 @@ func runValidation(t *testing.T, profile, dump, job string) validationResult {
 
 func runValidationFiles(t *testing.T, profilePath, dumpPath, jobPath string) validationResult {
 	t.Helper()
-
-	args := []string{
-		"-test.run=^TestValidatorHelperProcess$",
-		"--",
-		"--profile", profilePath,
-		"--dump", dumpPath,
-		"--output", "json",
+	got := validateProfile(validationOptions{
+		profilePath: profilePath,
+		dumpPath:    dumpPath,
+		jobPath:     jobPath,
+	})
+	var stdout bytes.Buffer
+	if err := writeJSONReport(&stdout, got); err != nil {
+		t.Fatalf("write report: %v", err)
 	}
-	if jobPath != "" {
-		args = append(args, "--job", jobPath)
-	}
-
-	cmd := exec.Command(os.Args[0], args...)
-	cmd.Env = append(
-		withoutEnvironmentKeys(
-			os.Environ(),
-			"NETDATA_CYGWIN_BASE_PATH",
-			"NETDATA_USER_CONFIG_DIR",
-			"NETDATA_STOCK_CONFIG_DIR",
-		),
-		"NETDATA_PROFILE_VALIDATOR_HELPER=1",
-		"NETDATA_CYGWIN_BASE_PATH=/hostile/ambient/cygwin",
-		"NETDATA_USER_CONFIG_DIR=/hostile/ambient/user/config",
-		"NETDATA_STOCK_CONFIG_DIR=/hostile/ambient/stock/config",
-	)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
 	exitCode := 0
-	if err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			t.Fatalf("run helper: %v\nstderr:\n%s", err, stderr.String())
-		}
-		exitCode = exitErr.ExitCode()
+	if got.Verdict != verdictPass {
+		exitCode = 1
 	}
 
-	var got report
-	if decodeErr := json.Unmarshal(stdout.Bytes(), &got); decodeErr != nil {
-		t.Fatalf("decode report: %v\nstdout:\n%s\nstderr:\n%s", decodeErr, stdout.String(), stderr.String())
+	var decoded report
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &decoded); decodeErr != nil {
+		t.Fatalf("decode report: %v\nstdout:\n%s", decodeErr, stdout.String())
 	}
 	return validationResult{
 		exitCode: exitCode,
 		stdout:   stdout.String(),
-		stderr:   stderr.String(),
-		report:   got,
+		report:   decoded,
 	}
-}
-
-func withoutEnvironmentKeys(environ []string, keys ...string) []string {
-	blocked := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		blocked[key] = struct{}{}
-	}
-	out := make([]string, 0, len(environ))
-	for _, item := range environ {
-		key, _, _ := strings.Cut(item, "=")
-		if _, ok := blocked[key]; !ok {
-			out = append(out, item)
-		}
-	}
-	return out
 }
 
 func requireFinding(t *testing.T, result validationResult, code string) {

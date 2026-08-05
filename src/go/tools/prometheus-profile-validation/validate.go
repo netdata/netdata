@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -18,12 +17,12 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	commonmodel "github.com/prometheus/common/model"
@@ -64,11 +63,7 @@ func validateProfile(opts validationOptions) report {
 	}
 	defer cleanup()
 
-	catalog, err := promprofiles.DefaultCatalog()
-	if err != nil {
-		r.addError("profile_catalog", opts.profilePath, err.Error(), "The collector must resolve the candidate through its real runtime catalog.")
-		return r
-	}
+	catalog := isolated.catalog
 	profile, ok := catalog.Get(isolated.profileName)
 	if !ok {
 		r.addError("profile_catalog", opts.profilePath, "candidate missing from isolated runtime catalog", "Exact profile selection cannot succeed without the candidate.")
@@ -91,14 +86,31 @@ func validateProfile(opts validationOptions) report {
 	ctx, cancel := context.WithTimeout(context.Background(), validationTimeout)
 	defer cancel()
 
-	rawFamilies, err := scrapeRawFamilies(ctx, isolated.fileURL)
-	if err != nil {
-		r.addError("dump_parse", opts.dumpPath, err.Error(), "The real Prometheus parser must accept and assemble the supplied exposition.")
-		return r
-	}
 	rawSamples, err := scrapeRawSamples(ctx, isolated.fileURL)
 	if err != nil {
 		r.addError("dump_parse", opts.dumpPath, err.Error(), "The real Prometheus sample parser must accept the supplied exposition before job shaping.")
+		return r
+	}
+	if duplicates := prompkg.FindSampleDuplicates(rawSamples); len(duplicates) > 0 {
+		first := duplicates[0]
+		sample := rawSamples.Samples[first.DuplicateIndex]
+		r.addError(
+			"duplicate_source_sample",
+			fmt.Sprintf("samples[%d]", first.DuplicateIndex),
+			fmt.Sprintf(
+				"%d duplicate physical sample component(s); metric %q at classified sample %d repeats sample %d",
+				len(duplicates),
+				sample.Name,
+				first.DuplicateIndex,
+				first.FirstIndex,
+			),
+			"Source-complete evidence must contain each scalar or typed-family component exactly once; duplicates collapse or overwrite before objective assertions.",
+		)
+		return r
+	}
+	rawFamilies, err := prompkg.Assemble(rawSamples)
+	if err != nil {
+		r.addError("dump_assemble", opts.dumpPath, err.Error(), "The production Prometheus assembler must accept the classified evidence batch.")
 		return r
 	}
 	r.RawFamilies, r.Counts.RawLogicalSeries = inventoryRawFamilies(rawFamilies)
@@ -111,7 +123,7 @@ func validateProfile(opts validationOptions) report {
 	addAuthoredProfileHeuristics(authoredTemplate, r.RawFamilies, &r)
 	addObservedDistributionHeuristics(authoredTemplate, r.RawFamilies, &r)
 
-	coll := promcollector.New()
+	coll := promcollector.NewWithOptions(promcollector.WithProfileCatalog(catalog))
 	r.Job = applyJobPolicy(coll, policy, isolated.fileURL, isolated.profileName)
 	if err := coll.Init(ctx); err != nil {
 		r.addError("collector_init", opts.jobPath, err.Error(), "Selector, relabeling, fallback typing, limits, and exact profile selection are validated by the real collector.")
@@ -165,7 +177,8 @@ func validateProfile(opts validationOptions) report {
 	addDashboardHeuristics(merged, &r)
 	addObservedLabelAggregationHeuristics(merged, reader, &r)
 
-	engine, err := chartengine.New()
+	emitTypeID := validationEmitTypeID(r.Job.Name)
+	engine, err := chartengine.New(chartengine.WithEmitTypeIDBudgetPrefix(emitTypeID))
 	if err != nil {
 		r.addError("engine_init", "", err.Error(), "The authoritative planner must initialize.")
 		return r
@@ -196,7 +209,7 @@ func validateProfile(opts validationOptions) report {
 			r.Counts.CuratedCharts++
 		}
 	}
-	emitted, err := inspectEmittedPlan(plan)
+	emitted, err := inspectEmittedPlan(plan, emitTypeID, r.Job.Name)
 	if err != nil {
 		r.addError(
 			"chart_emit",
@@ -442,11 +455,6 @@ func validateInputFile(path string) error {
 		return fmt.Errorf("%q is not a regular file", path)
 	}
 	return nil
-}
-
-func scrapeRawFamilies(ctx context.Context, fileURL string) (prompkg.MetricFamilies, error) {
-	client := prompkg.New(http.DefaultClient, web.RequestConfig{URL: fileURL})
-	return client.ScrapeContext(ctx)
 }
 
 func scrapeRawSamples(ctx context.Context, fileURL string) (prompkg.SampleBatch, error) {
@@ -758,8 +766,6 @@ func materializeCharts(plan chartengine.Plan) []materializedChart {
 	return out
 }
 
-const validationWireTypeID = "prometheus.profile_validation"
-
 type emittedPlanInspection struct {
 	plannedCharts       int
 	emittedCharts       int
@@ -772,15 +778,13 @@ type emittedPlanInspection struct {
 	dimensionCollisions []dimensionCollisionReport
 }
 
-func inspectEmittedPlan(plan chartengine.Plan) (emittedPlanInspection, error) {
+func inspectEmittedPlan(plan chartengine.Plan, typeID, jobName string) (emittedPlanInspection, error) {
 	var result emittedPlanInspection
-	createByID := make(map[string]chartengine.CreateChartAction)
 	emissionPlan := chartengine.Plan{}
 	for _, action := range plan.Actions {
-		switch item := action.(type) {
+		switch action.(type) {
 		case chartengine.CreateChartAction:
 			result.plannedCharts++
-			createByID[item.ChartID] = item
 			emissionPlan.Actions = append(emissionPlan.Actions, action)
 		case chartengine.CreateDimensionAction:
 			result.plannedDimensions++
@@ -788,22 +792,14 @@ func inspectEmittedPlan(plan chartengine.Plan) (emittedPlanInspection, error) {
 		}
 	}
 
-	orderedCreates := make([]chartengine.CreateChartAction, 0, len(createByID))
-	for _, item := range createByID {
-		orderedCreates = append(orderedCreates, item)
-	}
-	slices.SortFunc(orderedCreates, func(a, b chartengine.CreateChartAction) int {
-		return strings.Compare(a.ChartID, b.ChartID)
-	})
-
-	var wire bytes.Buffer
-	if err := chartemit.ApplyPlan(netdataapi.New(&wire), emissionPlan, chartemit.EmitEnv{
-		TypeID:      validationWireTypeID,
+	inspection, err := chartemit.InspectPlan(emissionPlan, chartemit.EmitEnv{
+		TypeID:      typeID,
 		UpdateEvery: 1,
 		Plugin:      "go.d.plugin",
 		Module:      "prometheus",
-		JobName:     "profile_validation",
-	}); err != nil {
+		JobName:     jobName,
+	})
+	if err != nil {
 		return result, safePublicEmitterError(err)
 	}
 
@@ -814,62 +810,40 @@ func inspectEmittedPlan(plan chartengine.Plan) (emittedPlanInspection, error) {
 	wireChartCounts := make(map[string]int)
 	rawContextsByWire := make(map[string]map[string]struct{})
 	perChart := make(map[string]map[string]*dimensionCount)
-	currentChart := ""
-	createIndex := 0
-	for rawLine := range bytes.SplitSeq(wire.Bytes(), []byte{'\n'}) {
-		line := string(rawLine)
-		switch {
-		case strings.HasPrefix(line, "CHART "):
-			fields, ok := wireQuotedFields(line)
-			if !ok || len(fields) != 12 {
-				return result, fmt.Errorf("parse emitted CHART line")
-			}
-			wireChartID := fields[0]
-			wireContext := fields[5]
-			result.emittedCharts++
-			wireChartCounts[wireChartID]++
-			currentChart = fingerprintID(wireChartID)
-			if perChart[currentChart] == nil {
-				perChart[currentChart] = make(map[string]*dimensionCount)
-			}
-
-			if createIndex < len(orderedCreates) {
-				raw := orderedCreates[createIndex]
-				createIndex++
-				wireIDPrefix := validationWireTypeID + "."
-				if !strings.HasPrefix(wireChartID, wireIDPrefix) {
-					return result, fmt.Errorf("emitted CHART ID has an unexpected type prefix")
-				}
-				if strings.TrimPrefix(wireChartID, wireIDPrefix) == "" {
-					result.emptyChartIDs = append(result.emptyChartIDs, fingerprintID(raw.ChartID))
-				}
-				if wireContext == "" {
-					result.emptyContexts = append(result.emptyContexts, fingerprintID(raw.ChartID))
-				}
-				rawContexts := rawContextsByWire[wireContext]
-				if rawContexts == nil {
-					rawContexts = make(map[string]struct{})
-					rawContextsByWire[wireContext] = rawContexts
-				}
-				rawContexts[raw.Meta.Context] = struct{}{}
-			}
-		case strings.HasPrefix(line, "DIMENSION "):
-			if currentChart == "" {
-				return result, fmt.Errorf("emitted DIMENSION before CHART")
-			}
-			fields, ok := wireQuotedFields(line)
-			if !ok || len(fields) != 6 {
-				return result, fmt.Errorf("parse emitted DIMENSION line")
-			}
-			value := fields[0]
-			result.emittedDimensions++
-			item := perChart[currentChart][value]
-			if item == nil {
-				item = &dimensionCount{fingerprint: fingerprintID(value)}
-				perChart[currentChart][value] = item
-			}
-			item.count++
+	for _, chart := range inspection.Charts {
+		wireChartID := chart.WireTypeID + "." + chart.WireChartID
+		result.emittedCharts++
+		wireChartCounts[wireChartID]++
+		chartFingerprint := fingerprintID(wireChartID)
+		if perChart[chartFingerprint] == nil {
+			perChart[chartFingerprint] = make(map[string]*dimensionCount)
 		}
+		if chart.WireChartID == "" {
+			result.emptyChartIDs = append(result.emptyChartIDs, fingerprintID(chart.SourceChartID))
+		}
+		if chart.WireContext == "" {
+			result.emptyContexts = append(result.emptyContexts, fingerprintID(chart.SourceChartID))
+		}
+		rawContexts := rawContextsByWire[chart.WireContext]
+		if rawContexts == nil {
+			rawContexts = make(map[string]struct{})
+			rawContextsByWire[chart.WireContext] = rawContexts
+		}
+		rawContexts[chart.SourceContext] = struct{}{}
+	}
+	for _, dimension := range inspection.Dimensions {
+		result.emittedDimensions++
+		wireChartID := dimension.WireTypeID + "." + dimension.WireChartID
+		chartFingerprint := fingerprintID(wireChartID)
+		if perChart[chartFingerprint] == nil {
+			perChart[chartFingerprint] = make(map[string]*dimensionCount)
+		}
+		item := perChart[chartFingerprint][dimension.WireName]
+		if item == nil {
+			item = &dimensionCount{fingerprint: fingerprintID(dimension.WireName)}
+			perChart[chartFingerprint][dimension.WireName] = item
+		}
+		item.count++
 	}
 
 	slices.Sort(result.emptyChartIDs)
@@ -912,20 +886,19 @@ func inspectEmittedPlan(plan chartengine.Plan) (emittedPlanInspection, error) {
 	return result, nil
 }
 
+func validationEmitTypeID(jobName string) string {
+	cfg := confgroup.Config{}
+	cfg.SetModule("prometheus").SetName(jobName)
+	cfg.ApplyDefaults(confgroup.Default{})
+	return cfg.FullName()
+}
+
 func safePublicEmitterError(err error) error {
 	message := "public chart emitter rejected the plan"
 	if strings.Contains(err.Error(), "type.id exceeds max length") {
 		message = "public chart emitter rejected a type.id that exceeds the maximum length"
 	}
 	return fmt.Errorf("%s (error fingerprint %s)", message, fingerprintID(err.Error()))
-}
-
-func wireQuotedFields(line string) ([]string, bool) {
-	start := strings.IndexByte(line, '\'')
-	if start < 0 || !strings.HasSuffix(line, "'") {
-		return nil, false
-	}
-	return strings.Split(line[start+1:len(line)-1], "' '"), true
 }
 
 func fingerprintID(value string) string {

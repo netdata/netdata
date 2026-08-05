@@ -30,6 +30,7 @@ type ChartInspection struct {
 type DimensionInspection struct {
 	SourceChartID string
 	SourceName    string
+	WireTypeID    string
 	WireChartID   string
 	WireName      string
 	Obsolete      bool
@@ -63,7 +64,7 @@ func inspectCreatePhase(out *PlanInspection, env EmitEnv, actions normalizedActi
 		createChart := actions.createCharts[chartID]
 		out.addChart(env, createChart.ChartID, createChart.Meta, false)
 		for _, dim := range actions.createDimsByID[chartID] {
-			out.addDimension(dim.ChartID, dimensionEmission{
+			out.addDimension(env, dim.ChartID, dimensionEmission{
 				Name:       dim.Name,
 				Hidden:     dim.Hidden,
 				Float:      dim.Float,
@@ -87,7 +88,7 @@ func inspectCreatePhase(out *PlanInspection, env EmitEnv, actions normalizedActi
 		}
 		out.addChart(env, chartID, dims[0].ChartMeta, false)
 		for _, dim := range dims {
-			out.addDimension(chartID, dimensionEmission{
+			out.addDimension(env, chartID, dimensionEmission{
 				Name:       dim.Name,
 				Hidden:     dim.Hidden,
 				Float:      dim.Float,
@@ -113,7 +114,7 @@ func inspectLabelUpdatePhase(out *PlanInspection, env EmitEnv, updates []UpdateC
 func inspectRemovePhase(out *PlanInspection, env EmitEnv, actions normalizedActions) {
 	for _, removeDim := range actions.removeDimensions {
 		out.addChart(env, removeDim.ChartID, removeDim.ChartMeta, false)
-		out.addDimension(removeDim.ChartID, dimensionEmission{
+		out.addDimension(env, removeDim.ChartID, dimensionEmission{
 			Name:       removeDim.Name,
 			Hidden:     removeDim.Hidden,
 			Float:      removeDim.Float,
@@ -140,7 +141,7 @@ func (p *PlanInspection) addChart(env EmitEnv, chartID string, meta chartengine.
 	})
 }
 
-func (p *PlanInspection) addDimension(chartID string, dim dimensionEmission) {
+func (p *PlanInspection) addDimension(env EmitEnv, chartID string, dim dimensionEmission) {
 	opts, ok := prepareDimension(dim)
 	if !ok {
 		return
@@ -148,6 +149,7 @@ func (p *PlanInspection) addDimension(chartID string, dim dimensionEmission) {
 	p.Dimensions = append(p.Dimensions, DimensionInspection{
 		SourceChartID: chartID,
 		SourceName:    dim.Name,
+		WireTypeID:    sanitizeWireID(env.TypeID),
 		WireChartID:   sanitizeWireID(chartID),
 		WireName:      opts.ID,
 		Obsolete:      dim.Obsolete,

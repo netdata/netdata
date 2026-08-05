@@ -9,15 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
 
 type isolatedCatalog struct {
 	profileName string
 	fileURL     string
+	catalog     promprofiles.Catalog
 }
 
 func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func(), error) {
@@ -58,27 +56,12 @@ func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func()
 		return isolatedCatalog{}, nil, err
 	}
 
-	userRoot := filepath.Join(root, "prefix", "etc", "netdata")
-	userProfiles := filepath.Join(userRoot, "go.d", "prometheus.profiles")
-	execDir := filepath.Join(root, "prefix", "usr", "libexec", "netdata", "plugins.d")
-	stockProfiles := filepath.Join(
-		root,
-		"prefix",
-		"usr",
-		"lib",
-		"netdata",
-		"conf.d",
-		"go.d",
-		"prometheus.profiles",
-		"default",
-	)
-	for _, dir := range []string{userProfiles, execDir, stockProfiles} {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return fail(fmt.Errorf("create isolated catalog directory %q: %w", dir, err))
-		}
+	profilesDir := filepath.Join(root, "profiles")
+	if err := os.MkdirAll(profilesDir, 0o700); err != nil {
+		return fail(fmt.Errorf("create isolated catalog directory %q: %w", profilesDir, err))
 	}
 
-	stagedProfile := filepath.Join(userProfiles, name+".yaml")
+	stagedProfile := filepath.Join(profilesDir, name+".yaml")
 	if err := os.WriteFile(stagedProfile, raw, 0o600); err != nil {
 		return fail(fmt.Errorf("stage candidate profile: %w", err))
 	}
@@ -91,7 +74,7 @@ func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func()
 	// errors are intentionally skipped by the runtime loader, which could
 	// otherwise hide a broken candidate behind an empty catalog.
 	preflight, err := promprofiles.LoadFromDirs([]promprofiles.DirSpec{{
-		Path:    userProfiles,
+		Path:    profilesDir,
 		IsStock: true,
 	}})
 	if err != nil {
@@ -105,34 +88,9 @@ func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func()
 		return fail(fmt.Errorf("strict profile template preflight: %w", err))
 	}
 
-	// DefaultCatalog is process-global. A validator process therefore validates
-	// exactly one candidate and points that global discovery at this isolated
-	// prefix before the collector first accesses it.
-	executable.Name = "go.d"
-	executable.Directory = execDir
-	buildinfo.UserConfigDir = ""
-	buildinfo.StockConfigDir = ""
-	for _, key := range []string{
-		"NETDATA_CYGWIN_BASE_PATH",
-		"NETDATA_USER_CONFIG_DIR",
-		"NETDATA_STOCK_CONFIG_DIR",
-	} {
-		if err := os.Setenv(key, ""); err != nil {
-			return fail(fmt.Errorf("isolate %s environment: %w", key, err))
-		}
-	}
-	pluginconfig.MustInit(pluginconfig.InitInput{ConfDir: []string{userRoot}})
-
-	catalog, err := promprofiles.DefaultCatalog()
-	if err != nil {
-		return fail(fmt.Errorf("load isolated runtime profile catalog: %w", err))
-	}
-	if _, ok := catalog.Get(name); !ok {
-		return fail(fmt.Errorf("isolated runtime profile catalog did not load candidate %q", name))
-	}
-
 	return isolatedCatalog{
 		profileName: name,
 		fileURL:     (&url.URL{Scheme: "file", Path: filepath.ToSlash(stagedDump)}).String(),
+		catalog:     preflight,
 	}, cleanup, nil
 }
