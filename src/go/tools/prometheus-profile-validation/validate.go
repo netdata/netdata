@@ -147,7 +147,10 @@ func validateProfile(opts validationOptions) report {
 	if err := coll.Check(ctx); err != nil {
 		relabelAudits := pipelineSummary.finalize()
 		addRelabelPolicyFindings(relabelAudits, &r)
-		addForwardCompatibilityChecks(profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r)
+		if err := addForwardCompatibilityChecks(ctx, profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r); err != nil {
+			r.addError("forward_compatibility_analysis", opts.jobPath, err.Error(), "Static matcher and relabel analysis must complete within its deterministic work budget.")
+			return r
+		}
 		r.addError("collector_check", opts.dumpPath, err.Error(), "The candidate must match the post-policy scrape and pass the collector startup gates.")
 		return r
 	}
@@ -170,7 +173,10 @@ func validateProfile(opts validationOptions) report {
 	}
 	relabelAudits := pipelineSummary.finalize()
 	addRelabelPolicyFindings(relabelAudits, &r)
-	addForwardCompatibilityChecks(profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r)
+	if err := addForwardCompatibilityChecks(ctx, profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r); err != nil {
+		r.addError("forward_compatibility_analysis", opts.jobPath, err.Error(), "Static matcher and relabel analysis must complete within its deterministic work budget.")
+		return r
+	}
 
 	reader := coll.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	materializedFamilies := inventoryWriterSeries(reader)

@@ -92,7 +92,7 @@ func newPipelineDiagnosticSummary(policy jobPolicy, batch prompkg.SampleBatch) *
 }
 
 func isMetricNameReplace(config relabel.Config) bool {
-	return normalizedRelabelAction(config.Action) == relabel.Replace &&
+	return relabel.EffectiveAction(config) == relabel.Replace &&
 		len(config.SourceLabels) == 1 && config.SourceLabels[0] == "__name__" &&
 		config.TargetLabel == "__name__"
 }

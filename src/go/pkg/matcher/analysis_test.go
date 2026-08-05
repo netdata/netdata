@@ -94,6 +94,18 @@ func TestGlobIntersectionWitnessHonorsCancellationAndBudget(t *testing.T) {
 	assert.LessOrEqual(t, stats.Transitions, 1)
 }
 
+func TestAnalyzerSharesBudgetAcrossQueries(t *testing.T) {
+	analyzer, err := NewAnalyzer(context.Background(), AnalysisBudget{MaxStates: 1, MaxTransitions: 1})
+	require.NoError(t, err)
+
+	_, intersects, err := analyzer.GlobIntersectionWitness("", "", nil, false)
+	require.NoError(t, err)
+	assert.True(t, intersects)
+	_, _, err = analyzer.GlobIntersectionWitness("", "", nil, false)
+	assert.ErrorIs(t, err, ErrAnalysisBudgetExceeded)
+	assert.Equal(t, AnalysisStats{States: 1}, analyzer.Stats())
+}
+
 func TestGlobIntersectionWitnessRejectsInvalidInput(t *testing.T) {
 	_, _, _, err := GlobIntersectionWitness(context.Background(), "[", "*", GlobIntersectionOptions{})
 	require.Error(t, err)

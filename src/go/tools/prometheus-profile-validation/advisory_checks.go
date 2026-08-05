@@ -231,16 +231,8 @@ type relabelPolicyAudits struct {
 	provenance       pipelineProvenance
 }
 
-func normalizedRelabelAction(action promrelabel.Action) promrelabel.Action {
-	action = promrelabel.Action(strings.ToLower(strings.TrimSpace(string(action))))
-	if action == "" {
-		return promrelabel.Replace
-	}
-	return action
-}
-
 func sampleDiscardingRelabelAction(action promrelabel.Action) (promrelabel.Action, bool) {
-	action = normalizedRelabelAction(action)
+	action = promrelabel.NormalizeAction(action)
 	switch action {
 	case promrelabel.Drop, promrelabel.DropEqual, promrelabel.Keep, promrelabel.KeepEqual:
 		return action, true

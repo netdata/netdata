@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -23,6 +24,17 @@ func NewGlobMatcher(expr string) (Matcher, error) {
 		return nil, err
 	}
 	return newValidatedGlobMatcher(expr), nil
+}
+
+// QuoteGlobLiteral escapes value so NewGlobMatcher treats it as literal text.
+func QuoteGlobLiteral(value string) string {
+	return strings.NewReplacer(
+		`\`, `\\`,
+		`*`, `\*`,
+		`?`, `\?`,
+		`[`, `\[`,
+		`]`, `\]`,
+	).Replace(value)
 }
 
 func validateGlobPattern(expr string) error {

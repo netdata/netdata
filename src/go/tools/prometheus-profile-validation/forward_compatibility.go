@@ -3,14 +3,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"maps"
-	"regexp"
 	"regexp/syntax"
 	"slices"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -18,16 +16,12 @@ import (
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	commonmodel "github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 )
-
-var prometheusMetricNamePattern = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
-var prometheusLabelNamePattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-
-const metricNameCandidateAlphabet = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:"
-const metricNameInitialAlphabet = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ:"
 
 // Varied stems prevent a narrow job allowlist from passing merely because it
 // happens to admit the validator's primary probe name.
@@ -37,17 +31,39 @@ var futureMetricStems = [...]string{
 	"exporter_new_signal",
 }
 
+const futureMetricCandidateAlphabet = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:"
+
 // addForwardCompatibilityChecks keeps openness structural and uses synthetic
 // names beyond the bounded source fixture. The fixture is consulted only to
 // prove exact exclusions and every explicitly bounded wildcard name grammar.
 func addForwardCompatibilityChecks(
+	ctx context.Context,
 	profile promprofiles.Profile,
 	policy jobPolicy,
 	rawFamilies []rawFamilyReport,
 	rawSamples prompkg.SampleBatch,
 	relabelAudits relabelPolicyAudits,
 	r *report,
-) {
+) error {
+	analyzer, err := relabel.NewAnalyzer(ctx, relabel.AnalysisBudget{
+		MaxValues: maxBoundedMetricNameGrammarBranches,
+	})
+	if err != nil {
+		return err
+	}
+	matcherAnalyzer, err := matcher.NewAnalyzer(ctx, matcher.AnalysisBudget{})
+	if err != nil {
+		return err
+	}
+	flowAnalyzer, err := promcollector.NewRelabelNameFlowAnalyzer(
+		ctx,
+		analyzer,
+		matcherAnalyzer,
+		promcollector.RelabelNameFlowBudget{},
+	)
+	if err != nil {
+		return err
+	}
 	expr := profile.AutogenSelector()
 	authoredMetricNames := profileAuthoredMetricNames(profile)
 	rawFamilyNames := make(map[string]struct{}, len(rawFamilies))
@@ -134,11 +150,23 @@ func addForwardCompatibilityChecks(
 			"When a recommended job has an allow list, copy profile.match, copy each positive wildcard term unchanged into an unconstrained allow expression, or use '*'. Synthetic probes alone cannot prove an allowlist is open to every future name.",
 		)
 	}
-	var priorNameMutations []nameMutationEffect
+	var priorNameMutations []promcollector.RelabelNameMutation
 	for blockIndex, block := range policy.Relabeling {
-		originalNameAtEntry := !nameMutationEffectsMayReach(priorNameMutations, block.Match, false)
-		nameDerivedOnlyFromOriginal := !nameMutationEffectsMayReach(priorNameMutations, block.Match, true)
-		blockReachable := simplePatternScopesMayOverlap(profile.Match, block.Match) || !originalNameAtEntry
+		mayReceiveMutation, err := flowAnalyzer.MutationsMayReach(priorNameMutations, block.Match, false)
+		if err != nil {
+			return err
+		}
+		mayReceiveApplicationMutation, err := flowAnalyzer.MutationsMayReach(priorNameMutations, block.Match, true)
+		if err != nil {
+			return err
+		}
+		profileOverlap, err := simplePatternScopesMayOverlap(matcherAnalyzer, profile.Match, block.Match)
+		if err != nil {
+			return err
+		}
+		originalNameAtEntry := !mayReceiveMutation
+		nameDerivedOnlyFromOriginal := !mayReceiveApplicationMutation
+		blockReachable := profileOverlap || !originalNameAtEntry
 		exactScopeNames, exactScope := exactRelabelBlockMetricScope(block.Match)
 		boundedExactScope := exactScope && originalNameAtEntry
 		if boundedExactScope {
@@ -154,7 +182,7 @@ func addForwardCompatibilityChecks(
 			}
 		}
 		for ruleIndex, rule := range block.MetricRelabelConfigs {
-			action := normalizedRelabelAction(rule.Action)
+			action := relabel.EffectiveAction(rule)
 			if action == relabel.Keep || action == relabel.KeepEqual {
 				r.addError(
 					"closed_relabel_filter",
@@ -167,8 +195,11 @@ func addForwardCompatibilityChecks(
 			if !blockReachable {
 				continue
 			}
-			mayWriteMetricName := relabelRuleMayWriteMetricName(rule, action)
-			mutationReadsOnlyName := relabelNameMutationIsNameDerived(rule, action)
+			mayWriteMetricName, err := analyzer.RuleMayWriteLabel(rule, labels.MetricName)
+			if err != nil {
+				return err
+			}
+			mutationReadsOnlyName := relabel.RuleNameDerivedOnly(rule)
 			mutationOutputIsNameDerived := mutationReadsOnlyName && nameDerivedOnlyFromOriginal
 			if mayWriteMetricName && !boundedExactScope && !mutationOutputIsNameDerived {
 				r.addError(
@@ -181,16 +212,23 @@ func addForwardCompatibilityChecks(
 			if mayWriteMetricName && !boundedExactScope && mutationOutputIsNameDerived {
 				path := fmt.Sprintf("relabeling[%d].metric_relabel_configs[%d]", blockIndex, ruleIndex)
 				audit := relabelAudits.nameRewrites[relabelDiscardRuleKey{block: blockIndex, rule: ruleIndex}]
-				grammar, ok := analyzeBoundedMetricNameRewriteGrammar(rule, action)
-				outputs, outputsFinite := finiteRegexpReplacementOutputs(
-					rule.Regex.String(), rule.Replacement, maxBoundedMetricNameGrammarBranches,
-				)
+				grammar, ok, err := analyzeBoundedMetricNameRewriteGrammar(analyzer, rule, action)
+				if err != nil {
+					return err
+				}
+				outputs, outputsFinite, err := analyzer.ReplacementOutputs(rule.Regex, rule.Replacement)
+				if err != nil {
+					return err
+				}
 				identityLabel := ""
 				identityPreserved := true
 				if ok && grammar.hasDynamicIdentity() && outputsFinite {
-					identityLabel, identityPreserved = relabelRewritePreservesDynamicIdentity(
-						policy.Relabeling, blockIndex, ruleIndex, rule, grammar, outputs,
+					identityLabel, identityPreserved, err = flowAnalyzer.PreservedCaptureLabel(
+						policy.Relabeling, blockIndex, ruleIndex, rule, grammar.dynamicCaptureIDs, outputs,
 					)
+					if err != nil {
+						return err
+					}
 					if identityPreserved && audit != nil {
 						if _, exists := audit.blockInputLabelNames[identityLabel]; exists {
 							identityPreserved = false
@@ -260,7 +298,10 @@ func addForwardCompatibilityChecks(
 			if (action == relabel.Drop || action == relabel.DropEqual) &&
 				!boundedExactScope && relabelDiscardIsMetricNameBound(rule, action) {
 				path := fmt.Sprintf("relabeling[%d].metric_relabel_configs[%d]", blockIndex, ruleIndex)
-				grammar, ok := analyzeBoundedMetricNameDiscardGrammar(rule, action)
+				grammar, ok, err := analyzeBoundedMetricNameDiscardGrammar(analyzer, rule, action)
+				if err != nil {
+					return err
+				}
 				if !ok {
 					r.addError(
 						"open_ended_relabel_name_discard",
@@ -305,7 +346,11 @@ func addForwardCompatibilityChecks(
 				)
 			}
 			if mayWriteMetricName {
-				priorNameMutations = append(priorNameMutations, relabelNameMutationEffect(rule, action, mutationOutputIsNameDerived))
+				effect, err := flowAnalyzer.Mutation(rule, mutationOutputIsNameDerived)
+				if err != nil {
+					return err
+				}
+				priorNameMutations = append(priorNameMutations, effect)
 				if !mutationOutputIsNameDerived {
 					nameDerivedOnlyFromOriginal = false
 				}
@@ -323,7 +368,7 @@ func addForwardCompatibilityChecks(
 				"A contributed wildcard profile must have a deterministic valid future-family probe so closed profile and job policy cannot pass on bounded current evidence.",
 			)
 		}
-		return
+		return nil
 	}
 	r.Profile.FutureMetricCanary = canaries[0]
 	checkedCanaries := make(map[string]struct{}, len(canaries))
@@ -349,7 +394,7 @@ func addForwardCompatibilityChecks(
 
 	profileScope, err := matcher.NewSimplePatternsMatcher(profile.Match)
 	if err != nil {
-		return
+		return err
 	}
 	for blockIndex, block := range policy.Relabeling {
 		termCanaries, _ := syntheticFutureMetricTerms(block.Match)
@@ -368,8 +413,15 @@ func addForwardCompatibilityChecks(
 					covered = true
 				}
 			}
-			if !covered && relabelRulesMayAffectFutureRouting(block.MetricRelabelConfigs) &&
-				simplePatternScopesMayOverlap(profile.Match, term.scopeExpr()) {
+			affectsRouting, err := analyzer.RulesMayAffectFutureRouting(block.MetricRelabelConfigs)
+			if err != nil {
+				return err
+			}
+			termOverlap, err := simplePatternScopesMayOverlap(matcherAnalyzer, profile.Match, term.scopeExpr())
+			if err != nil {
+				return err
+			}
+			if !covered && affectsRouting && termOverlap {
 				r.addError(
 					"future_relabel_canary_unavailable",
 					fmt.Sprintf("relabeling[%d].match", blockIndex),
@@ -379,60 +431,7 @@ func addForwardCompatibilityChecks(
 			}
 		}
 	}
-}
-
-type nameMutationEffect struct {
-	outputPattern      string
-	applicationDerived bool
-	reachable          bool
-}
-
-func relabelNameMutationEffect(rule relabel.Config, action relabel.Action, nameDerived bool) nameMutationEffect {
-	effect := nameMutationEffect{applicationDerived: !nameDerived, reachable: true, outputPattern: "*"}
-	if action != relabel.Replace {
-		return effect
-	}
-	metadata, ok := parseRegexpCaptureMetadata(rule.Regex.String())
-	if !ok {
-		return effect
-	}
-	tokens, ok := parseRegexpReplacementTemplate(
-		rule.Replacement, metadata.named, metadata.ambiguousNames, metadata.captures,
-	)
-	if !ok {
-		return effect
-	}
-	var output strings.Builder
-	lastWildcard := false
-	for _, token := range tokens {
-		if token.isCapture {
-			if !lastWildcard {
-				output.WriteByte('*')
-			}
-			lastWildcard = true
-		} else {
-			output.WriteString(token.literal)
-			lastWildcard = false
-		}
-	}
-	if output.Len() == 0 {
-		effect.reachable = false
-		return effect
-	}
-	effect.outputPattern = output.String()
-	return effect
-}
-
-func nameMutationEffectsMayReach(effects []nameMutationEffect, matchExpr string, applicationDerivedOnly bool) bool {
-	for _, effect := range effects {
-		if !effect.reachable || (applicationDerivedOnly && !effect.applicationDerived) {
-			continue
-		}
-		if simplePatternScopesMayOverlapAnyMetricName(effect.outputPattern, matchExpr) {
-			return true
-		}
-	}
-	return false
+	return nil
 }
 
 // uncoveredWildcardProfileTerms returns wildcard exporter namespaces that a
@@ -513,7 +512,7 @@ func exactRelabelBlockMetricScope(matchExpr string) ([]string, bool) {
 			continue
 		}
 		hasPositive = true
-		if hasUnescapedGlobMeta(term) || !prometheusMetricNamePattern.MatchString(term) {
+		if hasUnescapedGlobMeta(term) || !commonmodel.UTF8Validation.IsValidMetricName(term) {
 			return nil, false
 		}
 		names = append(names, term)
@@ -547,103 +546,126 @@ func (g boundedMetricNameGrammar) hasDynamicIdentity() bool {
 	return g.hasInternalDynamicKey() || len(g.dynamicTailPrefixes) > 0
 }
 
-func analyzeBoundedMetricNameDiscardGrammar(rule relabel.Config, action relabel.Action) (boundedMetricNameGrammar, bool) {
+func analyzeBoundedMetricNameDiscardGrammar(
+	analyzer *relabel.Analyzer,
+	rule relabel.Config,
+	action relabel.Action,
+) (boundedMetricNameGrammar, bool, error) {
 	if action != relabel.Drop {
-		return boundedMetricNameGrammar{}, false
+		return boundedMetricNameGrammar{}, false, nil
 	}
-	return analyzeBoundedMetricNameGrammar(rule.Regex.String(), false)
+	return analyzeBoundedMetricNameGrammar(analyzer, rule.Regex.String(), false)
 }
 
-func analyzeBoundedMetricNameRewriteGrammar(rule relabel.Config, action relabel.Action) (boundedMetricNameGrammar, bool) {
+func analyzeBoundedMetricNameRewriteGrammar(
+	analyzer *relabel.Analyzer,
+	rule relabel.Config,
+	action relabel.Action,
+) (boundedMetricNameGrammar, bool, error) {
 	if action != relabel.Replace || len(rule.SourceLabels) != 1 || rule.SourceLabels[0] != labels.MetricName ||
 		rule.TargetLabel != labels.MetricName {
-		return boundedMetricNameGrammar{}, false
+		return boundedMetricNameGrammar{}, false, nil
 	}
-	grammar, ok := analyzeBoundedMetricNameGrammar(rule.Regex.String(), true)
-	if !ok {
-		return boundedMetricNameGrammar{}, false
+	grammar, ok, err := analyzeBoundedMetricNameGrammar(analyzer, rule.Regex.String(), true)
+	if err != nil || !ok {
+		return boundedMetricNameGrammar{}, false, err
 	}
 	if len(grammar.dynamicTailPrefixes) == 0 {
-		return grammar, true
+		return grammar, true, nil
 	}
 	if len(grammar.dynamicTailPrefixes) != 1 {
-		return boundedMetricNameGrammar{}, false
+		return boundedMetricNameGrammar{}, false, nil
 	}
 	prefix := grammar.dynamicTailPrefixes[0]
 	if !strings.HasSuffix(prefix, "_") || rule.Replacement != strings.TrimSuffix(prefix, "_") {
-		return boundedMetricNameGrammar{}, false
+		return boundedMetricNameGrammar{}, false, nil
 	}
-	return grammar, true
+	return grammar, true, nil
 }
 
-func analyzeBoundedMetricNameGrammar(expr string, allowDynamicTail bool) (boundedMetricNameGrammar, bool) {
+func analyzeBoundedMetricNameGrammar(
+	analyzer *relabel.Analyzer,
+	expr string,
+	allowDynamicTail bool,
+) (boundedMetricNameGrammar, bool, error) {
 	parsed, err := syntax.Parse(expr, syntax.Perl)
 	if err != nil {
-		return boundedMetricNameGrammar{}, false
+		return boundedMetricNameGrammar{}, false, nil
 	}
 	parsed = parsed.Simplify()
-	if names, finite := enumerateFiniteRegexp(parsed, maxBoundedMetricNameGrammarBranches); finite {
+	if names, finite, err := analyzer.EnumerateFiniteSyntax(parsed); err != nil {
+		return boundedMetricNameGrammar{}, false, err
+	} else if finite {
 		if len(names) == 0 {
-			return boundedMetricNameGrammar{}, false
+			return boundedMetricNameGrammar{}, false, nil
 		}
 		for _, name := range names {
-			if !prometheusMetricNamePattern.MatchString(name) {
-				return boundedMetricNameGrammar{}, false
+			if !commonmodel.UTF8Validation.IsValidMetricName(name) {
+				return boundedMetricNameGrammar{}, false, nil
 			}
 		}
-		return boundedMetricNameGrammar{exactNames: names}, true
+		return boundedMetricNameGrammar{exactNames: names}, true, nil
 	}
 
 	parts := flattenRegexpConcat(parsed, nil)
 	dynamicIndex := -1
 	for i, part := range parts {
-		if _, finite := enumerateFiniteRegexp(part.expr, maxBoundedMetricNameGrammarBranches); finite {
+		if _, finite, err := analyzer.EnumerateFiniteSyntax(part.expr); err != nil {
+			return boundedMetricNameGrammar{}, false, err
+		} else if finite {
 			continue
 		}
 		if dynamicIndex >= 0 {
 			// Stock alias normalization has one dynamic entity key. Multiple
 			// open-ended regions cannot be reviewed as a bounded metric grammar.
-			return boundedMetricNameGrammar{}, false
+			return boundedMetricNameGrammar{}, false, nil
 		}
 		dynamicIndex = i
 	}
 	if dynamicIndex <= 0 || regexpCanMatchEmpty(parts[dynamicIndex].expr) {
-		return boundedMetricNameGrammar{}, false
+		return boundedMetricNameGrammar{}, false, nil
 	}
 
-	prefixes, ok := enumerateFiniteRegexpSequence(parts[:dynamicIndex], maxBoundedMetricNameGrammarBranches)
+	prefixes, ok, err := enumerateFiniteRegexpSequence(analyzer, parts[:dynamicIndex])
+	if err != nil {
+		return boundedMetricNameGrammar{}, false, err
+	}
 	if !ok || len(prefixes) == 0 {
-		return boundedMetricNameGrammar{}, false
+		return boundedMetricNameGrammar{}, false, nil
 	}
 	for _, prefix := range prefixes {
-		if prefix == "" || !prometheusMetricNamePattern.MatchString(prefix) {
-			return boundedMetricNameGrammar{}, false
+		if prefix == "" || !commonmodel.UTF8Validation.IsValidMetricName(prefix) {
+			return boundedMetricNameGrammar{}, false, nil
 		}
 	}
 	if dynamicIndex == len(parts)-1 {
 		if !allowDynamicTail {
-			return boundedMetricNameGrammar{}, false
+			return boundedMetricNameGrammar{}, false, nil
 		}
 		return boundedMetricNameGrammar{
 			dynamicTailPrefixes: prefixes,
 			dynamicCaptureIDs:   slices.Clone(parts[dynamicIndex].enclosingCaptureIDs),
-		}, true
+		}, true, nil
 	}
 
-	suffixes, ok := enumerateFiniteRegexpSequence(parts[dynamicIndex+1:], maxBoundedMetricNameGrammarBranches)
+	suffixes, ok, err := enumerateFiniteRegexpSequence(analyzer, parts[dynamicIndex+1:])
+	if err != nil {
+		return boundedMetricNameGrammar{}, false, err
+	}
 	if !ok || len(suffixes) == 0 || len(prefixes) > maxBoundedMetricNameGrammarBranches/len(suffixes) {
-		return boundedMetricNameGrammar{}, false
+		return boundedMetricNameGrammar{}, false, nil
 	}
 	for _, suffix := range suffixes {
-		if !strings.HasPrefix(suffix, "_") || !prometheusMetricNamePattern.MatchString(strings.TrimPrefix(suffix, "_")) {
-			return boundedMetricNameGrammar{}, false
+		if !strings.HasPrefix(suffix, "_") ||
+			!commonmodel.UTF8Validation.IsValidMetricName(strings.TrimPrefix(suffix, "_")) {
+			return boundedMetricNameGrammar{}, false, nil
 		}
 	}
 	return boundedMetricNameGrammar{
 		prefixes:          prefixes,
 		suffixes:          suffixes,
 		dynamicCaptureIDs: slices.Clone(parts[dynamicIndex].enclosingCaptureIDs),
-	}, true
+	}, true, nil
 }
 
 type regexpConcatPart struct {
@@ -665,19 +687,18 @@ func flattenRegexpConcat(re *syntax.Regexp, enclosingCaptureIDs []int) []regexpC
 	return out
 }
 
-func enumerateFiniteRegexpSequence(parts []regexpConcatPart, limit int) ([]string, bool) {
-	values := []string{""}
-	for _, part := range parts {
-		item, finite := enumerateFiniteRegexp(part.expr, limit)
-		if !finite {
-			return nil, false
-		}
-		values, finite = concatFiniteRegexpValues(values, item, limit)
-		if !finite {
-			return nil, false
-		}
+func enumerateFiniteRegexpSequence(
+	analyzer *relabel.Analyzer,
+	parts []regexpConcatPart,
+) ([]string, bool, error) {
+	if len(parts) == 0 {
+		return []string{""}, true, nil
 	}
-	return values, true
+	subs := make([]*syntax.Regexp, 0, len(parts))
+	for _, part := range parts {
+		subs = append(subs, part.expr)
+	}
+	return analyzer.EnumerateFiniteSyntax(&syntax.Regexp{Op: syntax.OpConcat, Sub: subs})
 }
 
 func regexpCanMatchEmpty(re *syntax.Regexp) bool {
@@ -761,7 +782,7 @@ func (g boundedMetricNameGrammar) nonCanonicalRewriteOutputs(
 
 	outputs := make(map[string]struct{})
 	for _, output := range possibleOutputs {
-		if !prometheusMetricNamePattern.MatchString(output) {
+		if !commonmodel.UTF8Validation.IsValidMetricName(output) {
 			outputs[output] = struct{}{}
 			continue
 		}
@@ -779,1025 +800,9 @@ func (g boundedMetricNameGrammar) finiteBranchCount() int {
 	return len(g.prefixes) * len(g.suffixes)
 }
 
-type regexpReplacementToken struct {
-	literal   string
-	capture   int
-	isCapture bool
-}
-
-type regexpCaptureMetadata struct {
-	parsed         *syntax.Regexp
-	captures       map[int]*syntax.Regexp
-	named          map[string]int
-	ambiguousNames map[string]struct{}
-	nestedInOpen   map[int]struct{}
-}
-
-func parseRegexpCaptureMetadata(expr string) (regexpCaptureMetadata, bool) {
-	parsed, err := syntax.Parse(expr, syntax.Perl)
-	if err != nil {
-		return regexpCaptureMetadata{}, false
-	}
-
-	metadata := regexpCaptureMetadata{
-		parsed:         parsed,
-		captures:       map[int]*syntax.Regexp{0: parsed},
-		named:          make(map[string]int),
-		ambiguousNames: make(map[string]struct{}),
-		nestedInOpen:   make(map[int]struct{}),
-	}
-	var walk func(*syntax.Regexp, bool)
-	walk = func(re *syntax.Regexp, openAncestor bool) {
-		openHere := false
-		if re.Op == syntax.OpCapture {
-			metadata.captures[re.Cap] = re.Sub[0]
-			if openAncestor {
-				metadata.nestedInOpen[re.Cap] = struct{}{}
-			}
-			if _, finite := enumerateFiniteRegexp(re.Sub[0], maxBoundedMetricNameGrammarBranches); !finite {
-				openHere = true
-			}
-			if re.Name != "" {
-				if _, ok := metadata.named[re.Name]; ok {
-					metadata.ambiguousNames[re.Name] = struct{}{}
-				} else {
-					metadata.named[re.Name] = re.Cap
-				}
-			}
-		}
-		for _, sub := range re.Sub {
-			walk(sub, openAncestor || openHere)
-		}
-	}
-	walk(parsed, false)
-	return metadata, true
-}
-
-func finiteRegexpReplacementOutputs(expr, replacement string, limit int) ([]string, bool) {
-	metadata, ok := parseRegexpCaptureMetadata(expr)
-	if !ok || limit <= 0 {
-		return nil, false
-	}
-	requiredCaptures := regexpRequiredCaptures(metadata.parsed)
-
-	tokens, ok := parseRegexpReplacementTemplate(
-		replacement, metadata.named, metadata.ambiguousNames, metadata.captures,
-	)
-	if !ok {
-		return nil, false
-	}
-	values := make(map[int][]string)
-	for _, token := range tokens {
-		if !token.isCapture {
-			continue
-		}
-		if _, ok := values[token.capture]; ok {
-			continue
-		}
-		if _, nested := metadata.nestedInOpen[token.capture]; nested {
-			return nil, false
-		}
-		items, finite := enumerateFiniteRegexp(metadata.captures[token.capture], limit)
-		if !finite {
-			return nil, false
-		}
-		if _, required := requiredCaptures[token.capture]; !required && !slices.Contains(items, "") {
-			items = append(items, "")
-		}
-		values[token.capture] = items
-	}
-
-	captureIDs := slices.Sorted(maps.Keys(values))
-	assignments := make(map[int]string, len(captureIDs))
-	outputs := make(map[string]struct{})
-	assignmentCount := 0
-	var enumerate func(int) bool
-	enumerate = func(index int) bool {
-		if index < len(captureIDs) {
-			capture := captureIDs[index]
-			for _, value := range values[capture] {
-				assignments[capture] = value
-				if !enumerate(index + 1) {
-					return false
-				}
-			}
-			return true
-		}
-
-		assignmentCount++
-		if assignmentCount > limit {
-			return false
-		}
-		var output strings.Builder
-		for _, token := range tokens {
-			if token.isCapture {
-				output.WriteString(assignments[token.capture])
-			} else {
-				output.WriteString(token.literal)
-			}
-		}
-		outputs[output.String()] = struct{}{}
-		return len(outputs) <= limit
-	}
-	if !enumerate(0) {
-		return nil, false
-	}
-	return slices.Sorted(maps.Keys(outputs)), true
-}
-
-func relabelRewritePreservesDynamicIdentity(
-	blocks []relabel.Block,
-	blockIndex, rewriteIndex int,
-	rewrite relabel.Config,
-	grammar boundedMetricNameGrammar,
-	possibleOutputs []string,
-) (string, bool) {
-	metadata, ok := parseRegexpCaptureMetadata(rewrite.Regex.String())
-	if !ok {
-		return "", false
-	}
-	dynamicCaptures := make(map[int]struct{}, len(grammar.dynamicCaptureIDs))
-	for _, capture := range grammar.dynamicCaptureIDs {
-		dynamicCaptures[capture] = struct{}{}
-	}
-	if len(dynamicCaptures) == 0 {
-		return "", false
-	}
-
-	rules := blocks[blockIndex].MetricRelabelConfigs
-	for ruleIndex := rewriteIndex - 1; ruleIndex >= 0; ruleIndex-- {
-		candidate := rules[ruleIndex]
-		if normalizedRelabelAction(candidate.Action) != relabel.Replace ||
-			len(candidate.SourceLabels) != 1 || candidate.SourceLabels[0] != labels.MetricName ||
-			candidate.Regex.String() != rewrite.Regex.String() ||
-			candidate.TargetLabel == labels.MetricName ||
-			!prometheusLabelNamePattern.MatchString(candidate.TargetLabel) {
-			continue
-		}
-		tokens, ok := parseRegexpReplacementTemplate(
-			candidate.Replacement, metadata.named, metadata.ambiguousNames, metadata.captures,
-		)
-		if !ok || len(tokens) != 1 || !tokens[0].isCapture {
-			continue
-		}
-		if _, ok := dynamicCaptures[tokens[0].capture]; !ok {
-			continue
-		}
-		if !relabelRulesPreserveLabel(rules[ruleIndex+1:rewriteIndex], candidate.TargetLabel, nil) ||
-			!relabelRulesPreserveLabel(rules[rewriteIndex+1:], candidate.TargetLabel, possibleOutputs) ||
-			!laterRelabelBlocksPreserveLabel(blocks[blockIndex+1:], candidate.TargetLabel, possibleOutputs,
-				relabelRulesMayMutateMetricName(rules[rewriteIndex+1:])) {
-			continue
-		}
-		return candidate.TargetLabel, true
-	}
-	return "", false
-}
-
-func laterRelabelBlocksPreserveLabel(
-	blocks []relabel.Block,
-	labelName string,
-	possibleNames []string,
-	nameUnknown bool,
-) bool {
-	for _, block := range blocks {
-		reachable := nameUnknown
-		if !reachable {
-			match, err := matcher.NewSimplePatternsMatcher(block.Match)
-			if err != nil {
-				return false
-			}
-			if slices.ContainsFunc(possibleNames, match.MatchString) {
-				reachable = true
-			}
-		}
-		if !reachable {
-			continue
-		}
-		var names []string
-		if !nameUnknown {
-			names = possibleNames
-		}
-		if !relabelRulesPreserveLabel(block.MetricRelabelConfigs, labelName, names) {
-			return false
-		}
-		if relabelRulesMayMutateMetricName(block.MetricRelabelConfigs) {
-			nameUnknown = true
-		}
-	}
-	return true
-}
-
-func relabelRulesMayMutateMetricName(rules []relabel.Config) bool {
-	for _, rule := range rules {
-		if relabelRuleMayWriteMetricName(rule, normalizedRelabelAction(rule.Action)) {
-			return true
-		}
-	}
-	return false
-}
-
-func relabelRulesPreserveLabel(rules []relabel.Config, labelName string, possibleNames []string) bool {
-	for _, rule := range rules {
-		action := normalizedRelabelAction(rule.Action)
-		mayApply := relabelRuleMayApplyToMetricNames(rule, action, possibleNames)
-		switch action {
-		case relabel.Replace, relabel.HashMod, relabel.Lowercase, relabel.Uppercase:
-			if mayApply && (rule.TargetLabel == labelName || strings.Contains(rule.TargetLabel, "$")) {
-				return false
-			}
-		case relabel.LabelDrop:
-			if rule.Regex.MatchString(labelName) {
-				return false
-			}
-		case relabel.LabelKeep:
-			if !rule.Regex.MatchString(labelName) {
-				return false
-			}
-		case relabel.LabelMap:
-			if relabelTemplateMayExpandToLabelName(rule, action, rule.Replacement, labelName) {
-				return false
-			}
-		}
-		if relabelRuleMayWriteMetricName(rule, action) {
-			possibleNames = finiteMetricNamesAfterRelabelRule(rule, action, possibleNames)
-		}
-	}
-	return true
-}
-
-func relabelRuleMayApplyToMetricNames(rule relabel.Config, action relabel.Action, possibleNames []string) bool {
-	if possibleNames == nil || action != relabel.Replace ||
-		len(rule.SourceLabels) != 1 || rule.SourceLabels[0] != labels.MetricName {
-		return true
-	}
-	return slices.ContainsFunc(possibleNames, rule.Regex.MatchString)
-}
-
-func finiteMetricNamesAfterRelabelRule(
-	rule relabel.Config,
-	action relabel.Action,
-	possibleNames []string,
-) []string {
-	if possibleNames == nil || action != relabel.Replace ||
-		len(rule.SourceLabels) != 1 || rule.SourceLabels[0] != labels.MetricName ||
-		rule.TargetLabel != labels.MetricName {
-		return nil
-	}
-	outputs := make(map[string]struct{}, len(possibleNames))
-	for _, name := range possibleNames {
-		output := name
-		if rule.Regex.MatchString(name) {
-			output = rule.Regex.ReplaceAllString(name, rule.Replacement)
-		}
-		if prometheusMetricNamePattern.MatchString(output) {
-			outputs[output] = struct{}{}
-		}
-	}
-	return slices.Sorted(maps.Keys(outputs))
-}
-
-func parseRegexpReplacementTemplate(
-	template string,
-	named map[string]int,
-	ambiguousNames map[string]struct{},
-	captures map[int]*syntax.Regexp,
-) ([]regexpReplacementToken, bool) {
-	var tokens []regexpReplacementToken
-	appendLiteral := func(value string) {
-		if value == "" {
-			return
-		}
-		if len(tokens) > 0 && !tokens[len(tokens)-1].isCapture {
-			tokens[len(tokens)-1].literal += value
-			return
-		}
-		tokens = append(tokens, regexpReplacementToken{literal: value})
-	}
-	for len(template) > 0 {
-		before, after, ok := strings.Cut(template, "$")
-		appendLiteral(before)
-		if !ok {
-			break
-		}
-		template = after
-		if strings.HasPrefix(template, "$") {
-			appendLiteral("$")
-			template = template[1:]
-			continue
-		}
-		name, num, rest, ok := extractRegexpReplacementReference(template)
-		if !ok {
-			appendLiteral("$")
-			continue
-		}
-		template = rest
-		capture := num
-		if capture < 0 {
-			if _, ambiguous := ambiguousNames[name]; ambiguous {
-				return nil, false
-			}
-			var exists bool
-			capture, exists = named[name]
-			if !exists {
-				continue
-			}
-		}
-		if _, exists := captures[capture]; exists {
-			tokens = append(tokens, regexpReplacementToken{capture: capture, isCapture: true})
-		}
-	}
-	return tokens, true
-}
-
-func regexpRequiredCaptures(re *syntax.Regexp) map[int]struct{} {
-	switch re.Op {
-	case syntax.OpCapture:
-		required := regexpRequiredCaptures(re.Sub[0])
-		required[re.Cap] = struct{}{}
-		return required
-	case syntax.OpConcat:
-		required := make(map[int]struct{})
-		for _, sub := range re.Sub {
-			for capture := range regexpRequiredCaptures(sub) {
-				required[capture] = struct{}{}
-			}
-		}
-		return required
-	case syntax.OpAlternate:
-		if len(re.Sub) == 0 {
-			return map[int]struct{}{}
-		}
-		required := regexpRequiredCaptures(re.Sub[0])
-		for _, sub := range re.Sub[1:] {
-			branch := regexpRequiredCaptures(sub)
-			for capture := range required {
-				if _, ok := branch[capture]; !ok {
-					delete(required, capture)
-				}
-			}
-		}
-		return required
-	case syntax.OpPlus:
-		return regexpRequiredCaptures(re.Sub[0])
-	case syntax.OpRepeat:
-		if re.Min > 0 {
-			return regexpRequiredCaptures(re.Sub[0])
-		}
-	}
-	return map[int]struct{}{}
-}
-
-// extractRegexpReplacementReference mirrors regexp's $name/${name} parsing.
-func extractRegexpReplacementReference(str string) (name string, num int, rest string, ok bool) {
-	if str == "" {
-		return "", 0, "", false
-	}
-	brace := false
-	if str[0] == '{' {
-		brace = true
-		str = str[1:]
-	}
-	i := 0
-	for i < len(str) {
-		r, size := utf8.DecodeRuneInString(str[i:])
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
-			break
-		}
-		i += size
-	}
-	if i == 0 {
-		return "", 0, "", false
-	}
-	name = str[:i]
-	if brace {
-		if i >= len(str) || str[i] != '}' {
-			return "", 0, "", false
-		}
-		i++
-	}
-
-	num = 0
-	for i := range len(name) {
-		if name[i] < '0' || name[i] > '9' || num >= 1e8 {
-			num = -1
-			break
-		}
-		num = num*10 + int(name[i]) - '0'
-	}
-	if name[0] == '0' && len(name) > 1 {
-		num = -1
-	}
-	return name, num, str[i:], true
-}
-
-func relabelRuleMayWriteMetricName(rule relabel.Config, action relabel.Action) bool {
-	switch action {
-	case relabel.Replace:
-		return relabelTemplateMayExpandToLabelName(rule, action, rule.TargetLabel, labels.MetricName)
-	case relabel.HashMod, relabel.Lowercase, relabel.Uppercase:
-		return rule.TargetLabel == labels.MetricName
-	case relabel.LabelMap:
-		return relabelTemplateMayExpandToLabelName(rule, action, rule.Replacement, labels.MetricName)
-	default:
-		return false
-	}
-}
-
-func relabelTemplateMayExpandToLabelName(
-	rule relabel.Config,
-	action relabel.Action,
-	template, labelName string,
-) bool {
-	if !strings.Contains(template, "$") {
-		if template != labelName {
-			return false
-		}
-	}
-	if action == relabel.LabelMap && labelMapPreservesInputName(rule.Regex.String(), template) {
-		// Mapping every input label back to itself cannot overwrite the protected
-		// label with another label's value. rangeLabels also excludes __name__.
-		return false
-	}
-	metadata, ok := parseRegexpCaptureMetadata(rule.Regex.String())
-	if !ok {
-		return true
-	}
-	tokens, ok := parseRegexpReplacementTemplate(
-		template, metadata.named, metadata.ambiguousNames, metadata.captures,
-	)
-	if !ok {
-		return true
-	}
-	if len(tokens) > 0 && !tokens[0].isCapture && !strings.HasPrefix(labelName, tokens[0].literal) {
-		return false
-	}
-	if len(tokens) > 0 && !tokens[len(tokens)-1].isCapture &&
-		!strings.HasSuffix(labelName, tokens[len(tokens)-1].literal) {
-		return false
-	}
-
-	candidates, finite := finiteRegexpLanguage(rule.Regex.String(), 256)
-	if !finite {
-		return true
-	}
-	for _, candidate := range candidates {
-		if action == relabel.LabelMap && candidate == labels.MetricName {
-			continue
-		}
-		if rule.Regex.MatchString(candidate) &&
-			rule.Regex.ReplaceAllString(candidate, template) == labelName &&
-			(action != relabel.LabelMap || candidate != labelName) {
-			return true
-		}
-	}
-	return false
-}
-
-func labelMapPreservesInputName(regex, replacement string) bool {
-	switch replacement {
-	case "$0", "${0}":
-		return true
-	case "$1", "${1}":
-		return regex == "(.*)" || regex == "(.+)"
-	default:
-		return false
-	}
-}
-
-func relabelNameMutationIsNameDerived(rule relabel.Config, action relabel.Action) bool {
-	if action == relabel.LabelMap {
-		// Runtime labelmap ignores source_labels and derives new label names
-		// from the labels it maps, so it cannot prove name-only provenance.
-		return false
-	}
-	if len(rule.SourceLabels) == 0 {
-		return false
-	}
-	for _, source := range rule.SourceLabels {
-		if source != labels.MetricName {
-			return false
-		}
-	}
-	return true
-}
-
-func relabelRulesMayAffectFutureRouting(rules []relabel.Config) bool {
-	for _, rule := range rules {
-		action := normalizedRelabelAction(rule.Action)
-		switch action {
-		case relabel.Drop, relabel.DropEqual, relabel.Keep, relabel.KeepEqual:
-			return true
-		default:
-			if relabelRuleMayWriteMetricName(rule, action) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func finiteRegexpLanguage(expr string, limit int) ([]string, bool) {
-	parsed, err := syntax.Parse(expr, syntax.Perl)
-	if err != nil {
-		return nil, false
-	}
-	return enumerateFiniteRegexp(parsed.Simplify(), limit)
-}
-
-func enumerateFiniteRegexp(re *syntax.Regexp, limit int) ([]string, bool) {
-	if limit <= 0 {
-		return nil, false
-	}
-	switch re.Op {
-	case syntax.OpNoMatch:
-		return nil, true
-	case syntax.OpEmptyMatch, syntax.OpBeginLine, syntax.OpEndLine, syntax.OpBeginText,
-		syntax.OpEndText, syntax.OpWordBoundary, syntax.OpNoWordBoundary:
-		return []string{""}, true
-	case syntax.OpLiteral:
-		if re.Flags&syntax.FoldCase != 0 {
-			return nil, false
-		}
-		return []string{string(re.Rune)}, true
-	case syntax.OpCharClass:
-		var values []string
-		for i := 0; i+1 < len(re.Rune); i += 2 {
-			lo, hi := re.Rune[i], re.Rune[i+1]
-			if hi-lo+1 > rune(limit-len(values)) {
-				return nil, false
-			}
-			for value := lo; value <= hi; value++ {
-				values = append(values, string(value))
-			}
-		}
-		return values, true
-	case syntax.OpCapture:
-		return enumerateFiniteRegexp(re.Sub[0], limit)
-	case syntax.OpConcat:
-		values := []string{""}
-		for _, sub := range re.Sub {
-			part, finite := enumerateFiniteRegexp(sub, limit)
-			if !finite {
-				return nil, false
-			}
-			values, finite = concatFiniteRegexpValues(values, part, limit)
-			if !finite {
-				return nil, false
-			}
-		}
-		return values, true
-	case syntax.OpAlternate:
-		var values []string
-		seen := make(map[string]struct{})
-		for _, sub := range re.Sub {
-			part, finite := enumerateFiniteRegexp(sub, limit)
-			if !finite {
-				return nil, false
-			}
-			for _, value := range part {
-				if _, ok := seen[value]; ok {
-					continue
-				}
-				if len(values) == limit {
-					return nil, false
-				}
-				seen[value] = struct{}{}
-				values = append(values, value)
-			}
-		}
-		return values, true
-	case syntax.OpQuest:
-		part, finite := enumerateFiniteRegexp(re.Sub[0], limit)
-		if !finite {
-			return nil, false
-		}
-		if slices.Contains(part, "") {
-			return part, true
-		}
-		if len(part) == limit {
-			return nil, false
-		}
-		return append([]string{""}, part...), true
-	case syntax.OpRepeat:
-		if re.Max < 0 || re.Max > limit {
-			return nil, false
-		}
-		part, finite := enumerateFiniteRegexp(re.Sub[0], limit)
-		if !finite {
-			return nil, false
-		}
-		all := make([]string, 0, limit)
-		current := []string{""}
-		for count := 0; count <= re.Max; count++ {
-			if count >= re.Min {
-				if len(all)+len(current) > limit {
-					return nil, false
-				}
-				all = append(all, current...)
-			}
-			if count == re.Max {
-				break
-			}
-			current, finite = concatFiniteRegexpValues(current, part, limit)
-			if !finite {
-				return nil, false
-			}
-		}
-		return all, true
-	default:
-		// AnyChar, AnyCharNotNL, Star, and Plus describe an unbounded language.
-		return nil, false
-	}
-}
-
-func concatFiniteRegexpValues(left, right []string, limit int) ([]string, bool) {
-	if len(left) == 0 || len(right) == 0 {
-		return nil, true
-	}
-	if len(left) > limit/len(right) {
-		return nil, false
-	}
-	values := make([]string, 0, len(left)*len(right))
-	for _, prefix := range left {
-		for _, suffix := range right {
-			values = append(values, prefix+suffix)
-		}
-	}
-	return values, true
-}
-
-func simplePatternScopesMayOverlap(leftExpr, rightExpr string) bool {
-	return simplePatternScopesMayOverlapWith(leftExpr, rightExpr, true)
-}
-
-func simplePatternScopesMayOverlapAnyMetricName(leftExpr, rightExpr string) bool {
-	return simplePatternScopesMayOverlapWith(leftExpr, rightExpr, false)
-}
-
-func simplePatternScopesMayOverlapWith(leftExpr, rightExpr string, legacyMetricName bool) bool {
-	left := orderedSimplePatternPositiveBranches(leftExpr)
-	right := orderedSimplePatternPositiveBranches(rightExpr)
-	if len(left) == 0 || len(right) == 0 {
-		return false
-	}
-	for _, leftBranch := range left {
-		for _, rightBranch := range right {
-			negatives := append(slices.Clone(leftBranch.earlierNegatives), rightBranch.earlierNegatives...)
-			intersects, ok := simpleGlobPatternsIntersectExcluding(
-				leftBranch.pattern,
-				rightBranch.pattern,
-				negatives,
-				legacyMetricName,
-			)
-			if !ok || intersects {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-type simplePatternPositiveBranch struct {
-	pattern          string
-	earlierNegatives []string
-}
-
-func orderedSimplePatternPositiveBranches(expr string) []simplePatternPositiveBranch {
-	var branches []simplePatternPositiveBranch
-	var negatives []string
-	for term := range strings.FieldsSeq(expr) {
-		if after, ok := strings.CutPrefix(term, "!"); ok {
-			negatives = append(negatives, after)
-			continue
-		}
-		branches = append(branches, simplePatternPositiveBranch{
-			pattern:          term,
-			earlierNegatives: append([]string(nil), negatives...),
-		})
-	}
-	return branches
-}
-
-type simpleGlobToken struct {
-	kind    byte
-	literal rune
-	ranges  []simpleGlobRange
-	negated bool
-}
-
-type simpleGlobRange struct {
-	lo rune
-	hi rune
-}
-
-const (
-	simpleGlobLiteral byte = iota
-	simpleGlobAny
-	simpleGlobStar
-	simpleGlobClass
-)
-
-func simpleGlobPatternsIntersectOnMetricName(leftPattern, rightPattern string) (bool, bool) {
-	return simpleGlobPatternsIntersect(leftPattern, rightPattern, true)
-}
-
-func simpleGlobPatternsIntersect(leftPattern, rightPattern string, legacyMetricName bool) (bool, bool) {
-	return simpleGlobPatternsIntersectExcluding(leftPattern, rightPattern, nil, legacyMetricName)
-}
-
-func simpleGlobPatternsIntersectExcluding(
-	leftPattern string,
-	rightPattern string,
-	negativePatterns []string,
-	legacyMetricName bool,
-) (bool, bool) {
-	left, ok := parseSimpleGlob(leftPattern)
-	if !ok {
-		return false, false
-	}
-	right, ok := parseSimpleGlob(rightPattern)
-	if !ok {
-		return false, false
-	}
-	negative := make([][]simpleGlobToken, 0, len(negativePatterns))
-	patterns := [][]simpleGlobToken{left, right}
-	for _, pattern := range negativePatterns {
-		parsed, ok := parseSimpleGlob(pattern)
-		if !ok {
-			return false, false
-		}
-		negative = append(negative, parsed)
-		patterns = append(patterns, parsed)
-	}
-	generalAlphabet := simpleGlobIntersectionAlphabet(patterns...)
-
-	type state struct {
-		left     []int
-		right    []int
-		negative [][]int
-		started  bool
-	}
-	start := state{
-		left:     simpleGlobEpsilonClosure(left, 0),
-		right:    simpleGlobEpsilonClosure(right, 0),
-		negative: make([][]int, len(negative)),
-	}
-	for i := range negative {
-		start.negative[i] = simpleGlobEpsilonClosure(negative[i], 0)
-	}
-	queue := []state{start}
-	seen := make(map[string]struct{})
-	seen[simpleGlobProductStateKey(start.left, start.right, start.negative, false)] = struct{}{}
-	add := func(candidate state) {
-		key := simpleGlobProductStateKey(candidate.left, candidate.right, candidate.negative, candidate.started)
-		if _, ok := seen[key]; ok {
-			return
-		}
-		seen[key] = struct{}{}
-		queue = append(queue, candidate)
-	}
-
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		if current.started && simpleGlobPositionSetAccepts(current.left, len(left)) &&
-			simpleGlobPositionSetAccepts(current.right, len(right)) {
-			excluded := false
-			for i := range negative {
-				if simpleGlobPositionSetAccepts(current.negative[i], len(negative[i])) {
-					excluded = true
-					break
-				}
-			}
-			if !excluded {
-				return true, true
-			}
-		}
-		alphabet := generalAlphabet
-		if legacyMetricName && !current.started {
-			alphabet = metricNameInitialAlphabet
-		} else if legacyMetricName {
-			alphabet = metricNameCandidateAlphabet
-		}
-		for _, candidate := range alphabet {
-			leftNext := simpleGlobNextPositionSet(left, current.left, candidate)
-			if len(leftNext) == 0 {
-				continue
-			}
-			rightNext := simpleGlobNextPositionSet(right, current.right, candidate)
-			if len(rightNext) == 0 {
-				continue
-			}
-			negativeNext := make([][]int, len(negative))
-			for i := range negative {
-				negativeNext[i] = simpleGlobNextPositionSet(negative[i], current.negative[i], candidate)
-			}
-			add(state{left: leftNext, right: rightNext, negative: negativeNext, started: true})
-		}
-	}
-	return false, true
-}
-
-func simpleGlobNextPositionSet(pattern []simpleGlobToken, positions []int, candidate rune) []int {
-	seen := make(map[int]struct{})
-	for _, position := range positions {
-		for _, next := range simpleGlobNextPositions(pattern, position, candidate) {
-			seen[next] = struct{}{}
-		}
-	}
-	return slices.Sorted(maps.Keys(seen))
-}
-
-func simpleGlobPositionSetAccepts(positions []int, end int) bool {
-	_, ok := slices.BinarySearch(positions, end)
-	return ok
-}
-
-func simpleGlobProductStateKey(left, right []int, negative [][]int, started bool) string {
-	var b strings.Builder
-	if started {
-		b.WriteByte('1')
-	} else {
-		b.WriteByte('0')
-	}
-	write := func(positions []int) {
-		b.WriteByte('|')
-		for _, position := range positions {
-			fmt.Fprintf(&b, "%d,", position)
-		}
-	}
-	write(left)
-	write(right)
-	for _, positions := range negative {
-		write(positions)
-	}
-	return b.String()
-}
-
-func simpleGlobIntersectionAlphabet(patterns ...[]simpleGlobToken) string {
-	candidates := map[rune]struct{}{
-		'a': {}, '_': {}, '0': {}, '-': {}, '.': {}, ':': {}, 'é': {},
-	}
-	add := func(value rune) {
-		if value >= 0 && value <= 0x10ffff {
-			candidates[value] = struct{}{}
-		}
-	}
-	for _, pattern := range patterns {
-		for _, token := range pattern {
-			switch token.kind {
-			case simpleGlobLiteral:
-				add(token.literal)
-			case simpleGlobClass:
-				for _, item := range token.ranges {
-					add(item.lo)
-					add(item.hi)
-					add(item.lo - 1)
-					add(item.hi + 1)
-				}
-			}
-		}
-	}
-	var alphabet strings.Builder
-	for candidate := range candidates {
-		alphabet.WriteRune(candidate)
-	}
-	return alphabet.String()
-}
-
-func simpleGlobEpsilonClosure(tokens []simpleGlobToken, position int) []int {
-	positions := []int{position}
-	for position < len(tokens) && tokens[position].kind == simpleGlobStar {
-		position++
-		positions = append(positions, position)
-	}
-	return positions
-}
-
-func simpleGlobNextPositions(tokens []simpleGlobToken, position int, candidate rune) []int {
-	if position >= len(tokens) {
-		return nil
-	}
-	token := tokens[position]
-	if token.kind == simpleGlobStar {
-		return simpleGlobEpsilonClosure(tokens, position)
-	}
-	if !simpleGlobTokenMatches(token, candidate) {
-		return nil
-	}
-	return simpleGlobEpsilonClosure(tokens, position+1)
-}
-
-func simpleGlobTokenMatches(token simpleGlobToken, candidate rune) bool {
-	switch token.kind {
-	case simpleGlobLiteral:
-		return token.literal == candidate
-	case simpleGlobAny:
-		return true
-	case simpleGlobClass:
-		matched := false
-		for _, item := range token.ranges {
-			if item.lo <= candidate && candidate <= item.hi {
-				matched = true
-				break
-			}
-		}
-		return matched != token.negated
-	default:
-		return false
-	}
-}
-
-func parseSimpleGlob(pattern string) ([]simpleGlobToken, bool) {
-	runes := []rune(pattern)
-	var tokens []simpleGlobToken
-	for index := 0; index < len(runes); index++ {
-		switch runes[index] {
-		case '\\':
-			index++
-			if index >= len(runes) {
-				return nil, false
-			}
-			tokens = append(tokens, simpleGlobToken{kind: simpleGlobLiteral, literal: runes[index]})
-		case '*':
-			if len(tokens) == 0 || tokens[len(tokens)-1].kind != simpleGlobStar {
-				tokens = append(tokens, simpleGlobToken{kind: simpleGlobStar})
-			}
-		case '?':
-			tokens = append(tokens, simpleGlobToken{kind: simpleGlobAny})
-		case '[':
-			token, end, ok := parseSimpleGlobClass(runes, index)
-			if !ok {
-				return nil, false
-			}
-			tokens = append(tokens, token)
-			index = end
-		default:
-			tokens = append(tokens, simpleGlobToken{kind: simpleGlobLiteral, literal: runes[index]})
-		}
-	}
-	return tokens, true
-}
-
-func parseSimpleGlobClass(pattern []rune, start int) (simpleGlobToken, int, bool) {
-	token := simpleGlobToken{kind: simpleGlobClass}
-	index := start + 1
-	if index < len(pattern) && pattern[index] == '^' {
-		token.negated = true
-		index++
-	}
-	for index < len(pattern) && pattern[index] != ']' {
-		lo, next, ok := parseSimpleGlobClassRune(pattern, index)
-		if !ok {
-			return simpleGlobToken{}, 0, false
-		}
-		index = next
-		hi := lo
-		if index < len(pattern) && pattern[index] == '-' {
-			hi, index, ok = parseSimpleGlobClassRune(pattern, index+1)
-			if !ok || hi < lo {
-				return simpleGlobToken{}, 0, false
-			}
-		}
-		token.ranges = append(token.ranges, simpleGlobRange{lo: lo, hi: hi})
-	}
-	if index >= len(pattern) || pattern[index] != ']' || len(token.ranges) == 0 {
-		return simpleGlobToken{}, 0, false
-	}
-	return token, index, true
-}
-
-func parseSimpleGlobClassRune(pattern []rune, index int) (rune, int, bool) {
-	if index >= len(pattern) || pattern[index] == '-' || pattern[index] == ']' {
-		return 0, 0, false
-	}
-	if pattern[index] == '\\' {
-		index++
-		if index >= len(pattern) {
-			return 0, 0, false
-		}
-	}
-	return pattern[index], index + 1, true
-}
-
-func simplePatternLiteralPrefix(pattern string) (string, bool) {
-	var prefix strings.Builder
-	for i := 0; i < len(pattern); i++ {
-		switch pattern[i] {
-		case '\\':
-			if i+1 >= len(pattern) {
-				return prefix.String(), false
-			}
-			i++
-			prefix.WriteByte(pattern[i])
-		case '*', '?', '[':
-			return prefix.String(), false
-		default:
-			prefix.WriteByte(pattern[i])
-		}
-	}
-	return prefix.String(), true
+func simplePatternScopesMayOverlap(analyzer *matcher.Analyzer, leftExpr, rightExpr string) (bool, error) {
+	_, intersects, err := analyzer.SimplePatternIntersectionWitness(leftExpr, rightExpr, true)
+	return intersects, err
 }
 
 func profileAuthoredMetricNames(profile promprofiles.Profile) map[string]struct{} {
@@ -1941,7 +946,7 @@ func exactMetricFamilySelector(expr string) (string, bool) {
 	if strings.Contains(name, "{") {
 		return "", false
 	}
-	return name, prometheusMetricNamePattern.MatchString(name)
+	return name, !hasUnescapedGlobMeta(name) && commonmodel.UTF8Validation.IsValidMetricName(name)
 }
 
 type futureMetricTermCanaries struct {
@@ -1981,9 +986,9 @@ func syntheticFutureMetricTerms(matchExpr string) ([]futureMetricTermCanaries, b
 			earlierNegatives: append([]string(nil), earlierNegatives...),
 		}
 		seen := make(map[string]struct{})
-		for attempt := range len(metricNameCandidateAlphabet) * 4 {
+		for attempt := range len(futureMetricCandidateAlphabet) * 4 {
 			candidate, ok := syntheticMetricFromGlob(term, attempt)
-			if ok && prometheusMetricNamePattern.MatchString(candidate) && scope.MatchString(candidate) {
+			if ok && commonmodel.UTF8Validation.IsValidMetricName(candidate) && scope.MatchString(candidate) {
 				if _, ok := seen[candidate]; !ok {
 					entry.canaries = append(entry.canaries, candidate)
 					seen[candidate] = struct{}{}
@@ -2030,7 +1035,7 @@ func syntheticMetricFromGlob(pattern string, attempt int) (string, bool) {
 			fmt.Fprintf(&b, "%s_%d", stem, attempt)
 			wildcardIndex++
 		case '?':
-			b.WriteByte(metricNameCandidateAlphabet[(attempt+wildcardIndex)%len(metricNameCandidateAlphabet)])
+			b.WriteByte(futureMetricCandidateAlphabet[(attempt+wildcardIndex)%len(futureMetricCandidateAlphabet)])
 			wildcardIndex++
 		case '[':
 			end := globClassEnd(pattern, i)
@@ -2083,8 +1088,8 @@ func syntheticGlobClassValue(class string, offset int) (byte, bool) {
 		return 0, false
 	}
 	var candidates []byte
-	for i := range len(metricNameCandidateAlphabet) {
-		candidate := metricNameCandidateAlphabet[i]
+	for i := range len(futureMetricCandidateAlphabet) {
+		candidate := futureMetricCandidateAlphabet[i]
 		if classMatcher.MatchString(string(candidate)) {
 			candidates = append(candidates, candidate)
 		}

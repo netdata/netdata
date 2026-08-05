@@ -22,7 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	commonmodel "github.com/prometheus/common/model"
 )
 
 const validDump = `
@@ -831,71 +831,6 @@ relabeling:
 	}
 }
 
-func TestSimpleGlobPatternsIntersectOnMetricName(t *testing.T) {
-	tests := map[string]struct {
-		left  string
-		right string
-		want  bool
-	}{
-		"disjoint character class": {left: "app_a*", right: "app_[b]*"},
-		"overlapping character class": {
-			left: "app_[ab]*", right: "app_b*", want: true,
-		},
-		"negated character class": {
-			left: "app_?", right: "app_[^a]", want: true,
-		},
-		"stars can match empty": {
-			left: "app_*", right: "app_", want: true,
-		},
-		"invalid metric initial character": {left: "1*", right: "1*"},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			got, ok := simpleGlobPatternsIntersectOnMetricName(tc.left, tc.right)
-			if !ok {
-				t.Fatal("valid simple globs were not parsed")
-			}
-			if got != tc.want {
-				t.Fatalf("intersection: got %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestSimplePatternScopesMayOverlapHonorsOrderedNegatives(t *testing.T) {
-	tests := map[string]struct {
-		left  string
-		right string
-		want  bool
-	}{
-		"character class intersection excluded": {
-			left: `!app_[ab]* app_*`, right: `app_a*`, want: false,
-		},
-		"union of earlier negatives excludes intersection": {
-			left: `!app_a* !app_b* app_*`, right: `app_[ab]*`, want: false,
-		},
-		"one character class branch remains": {
-			left: `!app_a* app_*`, right: `app_[ab]*`, want: true,
-		},
-		"earlier positive wins over later negative": {
-			left: `app_a* !app_a* app_*`, right: `app_a*`, want: true,
-		},
-		"earlier negative wins over later positive": {
-			left: `!app_a* app_a*`, right: `app_a*`, want: false,
-		},
-		"negatives from both operands exclude intersection": {
-			left: `!app_a* app_*`, right: `!app_b* app_[ab]*`, want: false,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := simplePatternScopesMayOverlap(tc.left, tc.right); got != tc.want {
-				t.Fatalf("scope overlap: got %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestValidateProfileRejectsRelabelTermWithoutCanaryCoverage(t *testing.T) {
 	job := `
 relabeling:
@@ -1028,101 +963,6 @@ relabeling:
 	result := runValidation(t, validProfile, validDump, job)
 	if result.exitCode != 0 {
 		t.Fatalf("an exact original metric block bounds labelmap name rewriting\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
-	}
-}
-
-func TestRelabelRuleMayWriteMetricName(t *testing.T) {
-	tests := map[string]struct {
-		action      relabel.Action
-		regex       string
-		target      string
-		replacement string
-		want        bool
-	}{
-		"static labelmap destination": {
-			action: relabel.LabelMap, regex: "metric_name", replacement: "__name__", want: true,
-		},
-		"finite safe labelmap captures": {
-			action: relabel.LabelMap, regex: "(instance|family)", replacement: "$1",
-		},
-		"finite reachable labelmap captures": {
-			action: relabel.LabelMap, regex: "(name|instance)", replacement: "__${1}__", want: true,
-		},
-		"identity labelmap excludes metric name input": {
-			action: relabel.LabelMap, regex: "(.*)", replacement: "$1",
-		},
-		"incompatible replace target prefix": {
-			action: relabel.Replace, regex: "node-(a)", target: "app_$1",
-		},
-		"finite safe replace target": {
-			action: relabel.Replace, regex: "(instance|family)", target: "__${1}__",
-		},
-		"finite reachable replace target": {
-			action: relabel.Replace, regex: "(name|instance)", target: "__${1}__", want: true,
-		},
-		"literal safe label": {
-			action: relabel.Replace, regex: "(.*)", target: "instance",
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			rule := relabel.Config{
-				Regex:       relabel.MustNewRegexp(tc.regex),
-				TargetLabel: tc.target,
-				Replacement: tc.replacement,
-				Action:      tc.action,
-			}
-			if got := relabelRuleMayWriteMetricName(rule, tc.action); got != tc.want {
-				t.Fatalf("got %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestRelabelLabelMapMayOverwriteProtectedLabel(t *testing.T) {
-	tests := map[string]struct {
-		regex       string
-		replacement string
-		want        bool
-	}{
-		"finite disjoint destination": {
-			regex: "(instance)", replacement: "copy_${1}",
-		},
-		"dynamic disjoint prefix": {
-			regex: "(.+)", replacement: "copy_${1}",
-		},
-		"dynamic disjoint suffix": {
-			regex: "(.+)", replacement: "${1}_copy",
-		},
-		"finite self-map": {
-			regex: "(worker)", replacement: "${1}",
-		},
-		"infinite identity map": {
-			regex: "(.*)", replacement: "${1}",
-		},
-		"static overwrite from another label": {
-			regex: "(instance)", replacement: "worker", want: true,
-		},
-		"finite branch can overwrite": {
-			regex: "(worker|instance)", replacement: "worker", want: true,
-		},
-		"unresolved dynamic destination": {
-			regex: "(.+)", replacement: "${1}er", want: true,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			rule := relabel.Config{
-				Regex:       relabel.MustNewRegexp(tc.regex),
-				Replacement: tc.replacement,
-				Action:      relabel.LabelMap,
-			}
-			if got := relabelTemplateMayExpandToLabelName(
-				rule, relabel.LabelMap, rule.Replacement, "worker",
-			); got != tc.want {
-				t.Fatalf("got %v, want %v", got, tc.want)
-			}
-		})
 	}
 }
 
@@ -1726,57 +1566,6 @@ relabeling:
 	requireFinding(t, result, "open_ended_relabel_name_rewrite")
 }
 
-func TestFiniteRegexpReplacementOutputs(t *testing.T) {
-	tests := map[string]struct {
-		expr        string
-		replacement string
-		want        []string
-		finite      bool
-	}{
-		"finite suffix capture": {
-			expr:        `app_worker_(.+)_(temperature|requests_total)`,
-			replacement: `app_${2}`,
-			want:        []string{"app_requests_total", "app_temperature"},
-			finite:      true,
-		},
-		"nested finite capture": {
-			expr:        `app_worker_(.+(temperature|requests_total))`,
-			replacement: `app_${2}`,
-			finite:      false,
-		},
-		"dynamic capture": {
-			expr:        `app_worker_(.+)_old`,
-			replacement: `${1}`,
-			finite:      false,
-		},
-		"constant": {
-			expr:        `app_temperature_(.+)`,
-			replacement: `app_temperature`,
-			want:        []string{"app_temperature"},
-			finite:      true,
-		},
-		"capture absent on one branch": {
-			expr:        `app_(foo|(bar))_(.+)`,
-			replacement: `app_${2}`,
-			want:        []string{"app_", "app_bar"},
-			finite:      true,
-		},
-		"ambiguous named capture": {
-			expr:        `app_(?P<kind>temperature)|app_(?P<kind>requests_total)`,
-			replacement: `app_${kind}`,
-			finite:      false,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			got, finite := finiteRegexpReplacementOutputs(tc.expr, tc.replacement, 256)
-			if finite != tc.finite || !slices.Equal(got, tc.want) {
-				t.Fatalf("outputs=%q finite=%v, want outputs=%q finite=%v", got, finite, tc.want, tc.finite)
-			}
-		})
-	}
-}
-
 func TestValidateProfileRejectsDynamicRewriteWithoutIdentityExtraction(t *testing.T) {
 	dump := validDump + `
 # TYPE app_worker_alpha_temperature gauge
@@ -2208,7 +1997,7 @@ func TestSyntheticFutureMetricSupportsCompleteSimplePatternGlobSyntax(t *testing
 		t.Fatal(err)
 	}
 	for _, canary := range canaries {
-		if !prometheusMetricNamePattern.MatchString(canary) {
+		if !commonmodel.UTF8Validation.IsValidMetricName(canary) {
 			t.Fatalf("canary %q is not a valid Prometheus metric name", canary)
 		}
 		if !scope.MatchString(canary) {
@@ -2226,10 +2015,47 @@ func TestSyntheticFutureMetricSupportsCompleteSimplePatternGlobSyntax(t *testing
 	}
 }
 
-func TestValidateProfileRejectsWildcardScopeWithoutValidFutureCanary(t *testing.T) {
-	profile := strings.Replace(validProfile, "match: app_*", "match: '[0-9]*'", 1)
-	result := runValidation(t, profile, validDump, "")
-	requireFinding(t, result, "future_metric_canary_unavailable")
+func TestSyntheticFutureMetricAcceptsUTF8MetricName(t *testing.T) {
+	canaries, wildcard := syntheticFutureMetrics(`[0-9]*`)
+	if !wildcard || len(canaries) != len(futureMetricStems) {
+		t.Fatalf("expected UTF-8-valid numeric canaries, got canaries=%v wildcard=%v", canaries, wildcard)
+	}
+	for _, canary := range canaries {
+		if !commonmodel.UTF8Validation.IsValidMetricName(canary) {
+			t.Fatalf("canary %q is not a UTF-8-valid Prometheus metric name", canary)
+		}
+	}
+}
+
+func TestValidateProfileAcceptsUTF8MetricAndLabelNames(t *testing.T) {
+	profile := `
+match: 'my.noncompliant.*'
+app: utf8
+template:
+  family: Test
+  context_namespace: utf8
+  chart_defaults:
+    instances:
+      by_labels: ['label.name']
+  metrics: ['my.noncompliant.metric']
+  charts:
+    - title: UTF-8 Metric
+      context: metric
+      units: value
+      priority: 100
+      dimensions:
+        - selector: 'my.noncompliant.metric'
+          name: value
+`
+	dump := `
+# HELP "my.noncompliant.metric" help text
+# TYPE "my.noncompliant.metric" gauge
+{"my.noncompliant.metric","label.name"="value"} 1
+`
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("UTF-8-valid metric/label names must follow production semantics\nstderr:\n%s\nreport:\n%s", result.stderr, result.stdout)
+	}
 }
 
 func TestValidateProfileFindsDeadChart(t *testing.T) {

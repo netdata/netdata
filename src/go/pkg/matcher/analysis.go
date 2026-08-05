@@ -39,6 +39,34 @@ type GlobIntersectionOptions struct {
 	Budget          AnalysisBudget
 }
 
+// Analyzer performs multiple intersection queries against one aggregate work
+// budget. It is not goroutine-safe.
+type Analyzer struct {
+	ctx   context.Context
+	meter *analysisMeter
+}
+
+// NewAnalyzer creates a cancelable analysis session. Its budget is shared by
+// every query made through the returned Analyzer.
+func NewAnalyzer(ctx context.Context, budget AnalysisBudget) (*Analyzer, error) {
+	if ctx == nil {
+		return nil, errors.New("nil matcher analysis context")
+	}
+	meter, err := newAnalysisMeter(budget)
+	if err != nil {
+		return nil, err
+	}
+	return &Analyzer{ctx: ctx, meter: meter}, nil
+}
+
+// Stats returns aggregate work consumed so far.
+func (a *Analyzer) Stats() AnalysisStats {
+	if a == nil || a.meter == nil {
+		return AnalysisStats{}
+	}
+	return a.meter.stats
+}
+
 // GlobIntersectionWitness returns the shortest deterministic string matched by
 // both globs and none of Exclude. Invalid globs, cancellation, and exhausted
 // work budgets are returned as errors.
@@ -48,14 +76,30 @@ func GlobIntersectionWitness(
 	rightPattern string,
 	opts GlobIntersectionOptions,
 ) (witness string, intersects bool, stats AnalysisStats, err error) {
-	meter, err := newAnalysisMeter(opts.Budget)
+	analyzer, err := NewAnalyzer(ctx, opts.Budget)
 	if err != nil {
 		return "", false, AnalysisStats{}, err
 	}
-	witness, intersects, err = globIntersectionWitness(
-		ctx, leftPattern, rightPattern, opts.Exclude, opts.RequireNonEmpty, meter,
+	witness, intersects, err = analyzer.GlobIntersectionWitness(
+		leftPattern, rightPattern, opts.Exclude, opts.RequireNonEmpty,
 	)
-	return witness, intersects, meter.stats, err
+	return witness, intersects, analyzer.Stats(), err
+}
+
+// GlobIntersectionWitness is the session form of the package function. The
+// query consumes the Analyzer's aggregate work budget.
+func (a *Analyzer) GlobIntersectionWitness(
+	leftPattern string,
+	rightPattern string,
+	exclude []string,
+	requireNonEmpty bool,
+) (witness string, intersects bool, err error) {
+	if a == nil || a.ctx == nil || a.meter == nil {
+		return "", false, errors.New("nil matcher analyzer")
+	}
+	return globIntersectionWitness(
+		a.ctx, leftPattern, rightPattern, exclude, requireNonEmpty, a.meter,
+	)
 }
 
 // SimplePatternIntersectionWitness returns the shortest deterministic string
@@ -68,33 +112,47 @@ func SimplePatternIntersectionWitness(
 	requireNonEmpty bool,
 	budget AnalysisBudget,
 ) (witness string, intersects bool, stats AnalysisStats, err error) {
-	meter, err := newAnalysisMeter(budget)
+	analyzer, err := NewAnalyzer(ctx, budget)
 	if err != nil {
 		return "", false, AnalysisStats{}, err
 	}
+	witness, intersects, err = analyzer.SimplePatternIntersectionWitness(leftExpr, rightExpr, requireNonEmpty)
+	return witness, intersects, analyzer.Stats(), err
+}
+
+// SimplePatternIntersectionWitness is the session form of the package
+// function. The query consumes the Analyzer's aggregate work budget.
+func (a *Analyzer) SimplePatternIntersectionWitness(
+	leftExpr string,
+	rightExpr string,
+	requireNonEmpty bool,
+) (witness string, intersects bool, err error) {
+	if a == nil || a.ctx == nil || a.meter == nil {
+		return "", false, errors.New("nil matcher analyzer")
+	}
 	left, err := parseSimplePatternAnalysisBranches(leftExpr)
 	if err != nil {
-		return "", false, meter.stats, err
+		return "", false, err
 	}
 	right, err := parseSimplePatternAnalysisBranches(rightExpr)
 	if err != nil {
-		return "", false, meter.stats, err
+		return "", false, err
 	}
 	for _, leftBranch := range left {
 		for _, rightBranch := range right {
 			excluded := append(slices.Clone(leftBranch.earlierNegatives), rightBranch.earlierNegatives...)
 			witness, intersects, err := globIntersectionWitness(
-				ctx, leftBranch.pattern, rightBranch.pattern, excluded, requireNonEmpty, meter,
+				a.ctx, leftBranch.pattern, rightBranch.pattern, excluded, requireNonEmpty, a.meter,
 			)
 			if err != nil {
-				return "", false, meter.stats, err
+				return "", false, err
 			}
 			if intersects {
-				return witness, true, meter.stats, nil
+				return witness, true, nil
 			}
 		}
 	}
-	return "", false, meter.stats, nil
+	return "", false, nil
 }
 
 type analysisMeter struct {
