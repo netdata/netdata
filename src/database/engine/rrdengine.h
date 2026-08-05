@@ -420,6 +420,7 @@ struct rrdengine_instance {
 
     struct {
         PAD64(unsigned) last_fileno;                       // newest index of datafile and journalfile
+        PAD64(unsigned) next_fileno;                       // reserves failed-creation paths until queued cleanup completes
         PAD64(unsigned) last_flush_fileno;                 // newest index of datafile received data
 
         PAD64(size_t) collectors_running;
@@ -590,7 +591,13 @@ static inline void rrdeng_reset_accounting_if_fresh(struct rrdengine_instance *c
 }
 
 #define ctx_last_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_fileno, __ATOMIC_RELAXED)
-#define ctx_last_fileno_increment(ctx) __atomic_add_fetch(&(ctx)->atomic.last_fileno, 1, __ATOMIC_RELAXED)
+#define ctx_last_fileno_set(ctx, fileno) __atomic_store_n(&(ctx)->atomic.last_fileno, fileno, __ATOMIC_RELAXED)
+#define ctx_next_fileno_set(ctx, fileno) __atomic_store_n(&(ctx)->atomic.next_fileno, fileno, __ATOMIC_RELAXED)
+#define ctx_next_fileno_reserve(ctx) __atomic_add_fetch(&(ctx)->atomic.next_fileno, 1, __ATOMIC_RELAXED)
+static inline void ctx_fileno_initialize_from_scan(struct rrdengine_instance *ctx, unsigned last_fileno, unsigned max_seen_fileno) {
+    ctx_last_fileno_set(ctx, last_fileno);
+    ctx_next_fileno_set(ctx, max_seen_fileno);
+}
 
 #define ctx_last_flush_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_flush_fileno, __ATOMIC_RELAXED)
 static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, unsigned fileno) {

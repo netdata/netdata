@@ -96,7 +96,7 @@ void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengin
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 int close_data_file(struct rrdengine_datafile *datafile);
 int unlink_data_file(struct rrdengine_datafile *datafile);
-int destroy_data_file_unsafe(struct rrdengine_datafile *datafile);
+int destroy_data_file_unsafe(struct rrdengine_datafile *datafile, bool accounted); // only accounted files reclaim bytes on completion
 int create_data_file(struct rrdengine_datafile *datafile);
 int create_new_datafile_pair(struct rrdengine_instance *ctx);
 int init_data_files(struct rrdengine_instance *ctx);

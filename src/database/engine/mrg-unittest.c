@@ -129,6 +129,19 @@ static int dbengine_accounting_helpers_unittest(void) {
     errors += mrg_unittest_expect_counter_sub(&ctx, 9, 4, true, 5, "normal decrement");
     errors += mrg_unittest_expect_counter_sub(&ctx, 9, 0, true, 9, "zero decrement");
 
+    ctx_fileno_initialize_from_scan(&ctx, 5, 6); // orphan journal cleanup must reserve its higher filename
+    unsigned failed_fileno = ctx_next_fileno_reserve(&ctx);
+    unsigned retry_fileno = ctx_next_fileno_reserve(&ctx);
+    ctx_last_fileno_set(&ctx, retry_fileno);
+    if(failed_fileno != 7 || retry_fileno != 8 || ctx_last_fileno_get(&ctx) != retry_fileno) {
+        fprintf(stderr,
+                "DBENGINE METRIC: file-number reservation failed, expected failed/retry/last 7/8/8 got %u/%u/%u\n",
+                failed_fileno,
+                retry_fileno,
+                ctx_last_fileno_get(&ctx));
+        errors++;
+    }
+
 #ifndef NETDATA_INTERNAL_CHECKS
     errors += mrg_unittest_expect_counter_sub(&ctx, 3, 9, false, 0, "underflow saturation");
 #endif

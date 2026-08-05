@@ -217,7 +217,7 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
     return ret;
 }
 
-int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
+int destroy_data_file_unsafe(struct rrdengine_datafile *datafile, bool accounted)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     int ret;
@@ -226,7 +226,7 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
     generate_datafilepath(datafile, path, sizeof(path));
 
     CLOSE_FILE(ctx, path,  datafile->file, ret);
-    ret = rrdeng_file_deletion_schedule(ctx, path, datafile->pos, true);
+    ret = rrdeng_file_deletion_schedule(ctx, path, accounted ? datafile->pos : 0, true);
 
     return ret;
 }
@@ -271,7 +271,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     posix_memalign_freez(superblock);
     if (ret < 0) {
-        (void) destroy_data_file_unsafe(datafile);
+        (void) destroy_data_file_unsafe(datafile, false);
         ctx_io_error(ctx);
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
         nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create datafile %s", path);
@@ -374,7 +374,7 @@ static int scan_data_files_cmp(const void *a, const void *b)
 static int scan_data_files(struct rrdengine_instance *ctx)
 {
     int ret, matched_files, failed_to_load, i;
-    unsigned tier, fileno;
+    unsigned tier, fileno, max_seen_fileno = 0;
     uv_fs_t req;
     uv_dirent_t dent;
     struct rrdengine_datafile **datafiles, *datafile;
@@ -399,6 +399,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
         // This is a datafile
         if (2 == ret) {
+            max_seen_fileno = MAX(max_seen_fileno, fileno);
             datafile = datafile_alloc_and_init(ctx, tier, fileno);
             datafiles[matched_files++] = datafile;
             Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
@@ -423,6 +424,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             }
 
             if (!unknown_file) {
+                max_seen_fileno = MAX(max_seen_fileno, fileno);
                 (void) JudyLIns(&journafile_JudyL, (Word_t)fileno, PJE0);
             }
         }
@@ -442,7 +444,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
 
-    ctx->atomic.last_fileno = datafiles[matched_files - 1]->fileno;
+    ctx_fileno_initialize_from_scan(ctx, datafiles[matched_files - 1]->fileno, max_seen_fileno);
 
     // Remove journal files that do not have a matching data file
     // by scanning the judy array of the journal files
@@ -450,7 +452,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         bool first_then_next = true;
         Word_t idx = 0;
         Pvoid_t *PValue;
-        size_t deleted_journals = 0;
+        size_t scheduled_journals = 0;
         while ((PValue = JudyLFirstThenNext(journafile_JudyL, &idx, &first_then_next))) {
             char path[RRDENG_PATH_MAX];
             if (unlikely(!JudyLGet(datafiles_JudyL, (Word_t)idx, PJE0))) {
@@ -465,7 +467,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 ret = rrdeng_file_deletion_schedule(ctx, path, 0, false);
                 if (ret == 0) {
                     netdata_log_info("DBENGINE: scheduled deletion of journal file without matching data file: %s", path);
-                    deleted_journals++;
+                    scheduled_journals++;
                 }
 
                 (void)snprintfz(
@@ -479,13 +481,13 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 ret = rrdeng_file_deletion_schedule(ctx, path, 0, false);
                 if (ret == 0) {
                     netdata_log_info("DBENGINE: scheduled deletion of journal file without matching data file: %s", path);
-                    deleted_journals++;
+                    scheduled_journals++;
                 }
             }
         }
 
-        if (deleted_journals)
-            netdata_log_info("DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
+        if (scheduled_journals)
+            netdata_log_info("DBENGINE: scheduled deletion of %zu journal files without matching data files", scheduled_journals);
     }
 
     (void) JudyLFreeArray(&journafile_JudyL, NULL);
@@ -512,16 +514,16 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
-            netdata_log_error("DBENGINE: deleting invalid data and journal file pair.");
+            netdata_log_error("DBENGINE: scheduling deletion of invalid data and journal file pair.");
             ret = journalfile_unlink(journalfile);
             if (!ret) {
                 journalfile_v1_generate_path(datafile, path, sizeof(path));
-                netdata_log_info("DBENGINE: deleted journal file \"%s\".", path);
+                netdata_log_info("DBENGINE: scheduled deletion of journal file \"%s\".", path);
             }
             ret = unlink_data_file(datafile);
             if (!ret) {
                 generate_datafilepath(datafile, path, sizeof(path));
-                netdata_log_info("DBENGINE: deleted data file \"%s\".", path);
+                netdata_log_info("DBENGINE: scheduled deletion of data file \"%s\".", path);
             }
             freez(journalfile);
             freez(datafile);
@@ -546,7 +548,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
 
     struct rrdengine_datafile *datafile;
     struct rrdengine_journalfile *journalfile;
-    unsigned fileno = ctx_last_fileno_get(ctx) + 1;
+    unsigned fileno = ctx_next_fileno_reserve(ctx);
     int ret;
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -569,12 +571,12 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile);
-    ctx_last_fileno_increment(ctx);
+    ctx_last_fileno_set(ctx, fileno);
 
     return 0;
 
 error_after_journalfile:
-    (void) destroy_data_file_unsafe(datafile);
+    (void) destroy_data_file_unsafe(datafile, false);
     freez(journalfile);
 
 error_after_datafile:
@@ -595,7 +597,8 @@ int init_data_files(struct rrdengine_instance *ctx)
         return ret;
     } else if (0 == ret) {
         netdata_log_info("DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
-        ctx->atomic.last_fileno = 0;
+        ctx_last_fileno_set(ctx, 0);
+        ctx_next_fileno_set(ctx, 0);
         ret = create_new_datafile_pair(ctx);
         if (ret) {
             netdata_log_error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);

@@ -316,6 +316,9 @@ int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *pa
     deletion->datafile = datafile;
     strncpyz(deletion->path, path, sizeof(deletion->path) - 1);
 
+    if (bytes)
+        __atomic_add_fetch(&ctx->atomic.pending_deletion_bytes, bytes, __ATOMIC_RELAXED);
+
     spinlock_lock(&ctx->deletion.spinlock);
     if (ctx->deletion.tail)
         ctx->deletion.tail->next = deletion;
@@ -332,9 +335,6 @@ int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *pa
             ctx->deletion.tail = NULL;
     }
     spinlock_unlock(&ctx->deletion.spinlock);
-
-    if (bytes)
-        __atomic_add_fetch(&ctx->atomic.pending_deletion_bytes, bytes, __ATOMIC_RELAXED);
 
     if (start) {
         int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
@@ -1908,7 +1908,7 @@ void datafile_delete(
         scheduled_bytes += journal_file_bytes;
     if (scheduled_journal_files & JOURNALFILE_DELETED_V2)
         scheduled_bytes += journal_v2_bytes;
-    ret = destroy_data_file_unsafe(datafile);
+    ret = destroy_data_file_unsafe(datafile, true);
     if (!ret) {
         scheduled_datafile = true;
         scheduled_bytes += datafile_bytes;
