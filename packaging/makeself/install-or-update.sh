@@ -179,6 +179,16 @@ run find /opt/netdata -type d -exec chmod go+rx '{}' \+
 
 install_netdata_dirs
 
+# Earlier static packages leaked the builder's otel-plugin state into the
+# archive; extracting it left root-owned parent directories under
+# var/log/netdata/otel, which the otel-plugin (running as netdata) cannot
+# write to, crash-looping the plugin. Repair ownership on every
+# install/update so affected installs self-heal. The daemon only chowns
+# the log dir non-recursively, so nothing else fixes the subtree.
+if [ -d "${NETDATA_LOG_DIR}/otel" ]; then
+  run chown -R ${NETDATA_USER}:${NETDATA_GROUP} "${NETDATA_LOG_DIR}/otel"
+fi
+
 if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
   run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
 fi

@@ -83,11 +83,15 @@ Homebrew will place your Netdata configuration directory at `/opt/homebrew/etc/n
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/opt/homebrew/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
 
+### Start the Netdata Agent
+
+Homebrew installs Netdata but does not start the Agent automatically, so the local dashboard at `http://localhost:19999` is not available until you start it yourself. See [macOS (Homebrew)](/docs/netdata-agent/start-stop-restart.md#macos-homebrew) for the `brew services` commands to start, stop, restart, and check the status of the Agent.
+
 ### Connect a Homebrew-installed Agent to Netdata Cloud
 
 The easiest way to connect a Homebrew-installed Netdata Agent to Netdata Cloud is via the local dashboard UI, as described in [Method 1: Via UI](/src/claim/README.md#method-1-via-ui-recommended):
 
-1. Open the local dashboard in your browser at `http://localhost:19999` (or the Agent's IP address at port 19999).
+1. Open the local dashboard in your browser at `http://localhost:19999` (or the Agent's IP address at port 19999). The Agent must be running first; if you haven't started it yet, see [Start the Netdata Agent](#start-the-netdata-agent) above.
 2. Sign in to your Netdata Cloud account.
 3. Click the **Connect** button and follow the on-screen instructions.
 
@@ -134,6 +138,8 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
    ```
 
+   To include the OpenTelemetry plugin (`otel-plugin`), also install a Rust toolchain — either `brew install rust` or a stable toolchain via [rustup](https://rustup.rs/). The plugin is built automatically when a toolchain covering the minimum version (`rust-version` in `src/crates/Cargo.toml`) is available; without one, the installer prints a warning and builds the agent without the plugin.
+
 4. Download Netdata from our GitHub repository:
 
    ```bash
@@ -159,3 +165,4 @@ Netdata works on macOS, albeit with some limitations.
 
 - The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
 - You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).
+- The OpenTelemetry plugin (`otel-plugin`) is built by default when a Rust toolchain is available, so a macOS node can also ingest OTLP metrics, logs, and traces.

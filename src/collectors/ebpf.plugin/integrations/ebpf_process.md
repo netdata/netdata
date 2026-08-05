@@ -80,11 +80,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -96,15 +98,15 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netdata.ebpf_aral_stat_size | memory | bytes |
-| netdata.ebpf_aral_stat_alloc | aral | calls |
-| netdata.ebpf_threads | total, running | threads |
-| netdata.ebpf_pids | user, kernel | pids |
-| netdata.ebpf_load_methods | legacy, co-re | methods |
-| netdata.ebpf_kernel_memory | memory_locked | bytes |
-| netdata.ebpf_hash_tables_count | hash_table | hash tables |
-| netdata.ebpf_hash_tables_insert_pid_elements | thread | rows |
-| netdata.ebpf_hash_tables_remove_pid_elements | thread | rows |
-| netdata.ebpf_ipc_usage | positions | % |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netdata.ebpf_aral_stat_size | Bytes allocated for ARAL. | memory | bytes |
+| netdata.ebpf_aral_stat_alloc | Calls to allocate memory. | aral | calls |
+| netdata.ebpf_threads | Threads info | total, running | threads |
+| netdata.ebpf_pids | Total number of monitored PIDs | user, kernel | pids |
+| netdata.ebpf_load_methods | Load info | legacy, co-re | methods |
+| netdata.ebpf_kernel_memory | Memory allocated for hash tables. | memory_locked | bytes |
+| netdata.ebpf_hash_tables_count | Number of hash tables loaded | hash_table | hash tables |
+| netdata.ebpf_hash_tables_insert_pid_elements | Number of times an element was inserted in a hash table. | thread | rows |
+| netdata.ebpf_hash_tables_remove_pid_elements | Number of times an element was removed in a hash table. | thread | rows |
+| netdata.ebpf_ipc_usage | IPC used array positions | positions | % |

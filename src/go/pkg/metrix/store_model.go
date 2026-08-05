@@ -75,12 +75,20 @@ type committedSeries struct {
 
 type readSnapshot struct {
 	collectMeta CollectMeta
-	series      map[string]*committedSeries   // key => series
-	byName      map[string][]*committedSeries // metric name => stable ordered series list
+	series      map[string]*committedSeries // key => series
+	// index is non-nil when a complete immutable index was built with this
+	// snapshot. Collector canonical snapshots build it lazily through collector.
+	index     *snapshotSeriesIndex
+	collector *collectorSnapshotState
 	// runtimeBase links runtime snapshots in overlay mode (nil for materialized snapshots).
 	runtimeBase *readSnapshot
 	// runtimeDepth tracks overlay chain depth for runtime compaction heuristics.
 	runtimeDepth int
+}
+
+type collectorSnapshotState struct {
+	index     retryableLazyPointer[snapshotSeriesIndex]
+	flattened retryableLazyPointer[readSnapshot]
 }
 
 type cycleFrame struct {

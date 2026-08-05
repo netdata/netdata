@@ -24,10 +24,13 @@ func Compile(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("chartengine: nil template spec")
 	}
-	if err := spec.Validate(); err != nil {
+	if _, err := charttpl.Validate(spec); err != nil {
 		return nil, fmt.Errorf("chartengine: invalid template spec: %w", err)
 	}
+	return compileValidated(spec, revision)
+}
 
+func compileValidated(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	c := compiler{
 		metricsSet: make(map[string]struct{}),
 	}
@@ -96,7 +99,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 
 	metricKinds := make(map[string]bool)
 	for i := range chart.Dimensions {
-		compiledDim, err := compileDimension(chart.Dimensions[i], scope.metrics)
+		compiledDim, err := compileDimension(chart.Dimensions[i], chart.Aggregation, scope.metrics)
 		if err != nil {
 			return program.Chart{}, fmt.Errorf("dimension[%d]: %w", i, err)
 		}
@@ -177,9 +180,8 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 			},
 			Precedence: program.DefaultLabelPrecedence(),
 		},
-		Lifecycle:       compileLifecycle(chart.Lifecycle),
-		Dimensions:      dimensions,
-		CollisionReduce: program.ReduceSum,
+		Lifecycle:  compileLifecycle(chart.Lifecycle),
+		Dimensions: dimensions,
 	}
 
 	return out, nil
@@ -192,7 +194,11 @@ type compiledDimension struct {
 	metricKinds      []string
 }
 
-func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}) (compiledDimension, error) {
+func compileDimension(
+	dim charttpl.Dimension,
+	chartAggregation charttpl.Aggregation,
+	visibleMetrics map[string]struct{},
+) (compiledDimension, error) {
 	compiledSel, err := metrixselector.ParseCompiled(dim.Selector)
 	if err != nil {
 		return compiledDimension{}, fmt.Errorf("selector: %w", err)
@@ -231,6 +237,10 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 
 	metricKinds := metricKindsFromNames(meta.MetricNames)
 	options := compileDimensionOptions(dim.Options)
+	aggregation, err := compileAggregation(chartAggregation)
+	if err != nil {
+		return compiledDimension{}, err
+	}
 
 	return compiledDimension{
 		dimension: program.Dimension{
@@ -243,6 +253,7 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 			NameTemplate:            nameTemplate,
 			NameFromLabel:           nameFromLabel,
 			InferNameFromSeriesMeta: inferFromSeriesMeta,
+			Aggregation:             aggregation,
 			Hidden:                  options.hidden,
 			Multiplier:              options.multiplier,
 			Divisor:                 options.divisor,
@@ -255,10 +266,25 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 	}, nil
 }
 
+func compileAggregation(raw charttpl.Aggregation) (program.Aggregation, error) {
+	switch raw {
+	case "", charttpl.AggregationSum:
+		return program.AggregationSum, nil
+	case charttpl.AggregationMin:
+		return program.AggregationMin, nil
+	case charttpl.AggregationMax:
+		return program.AggregationMax, nil
+	case charttpl.AggregationAvg:
+		return program.AggregationAvg, nil
+	default:
+		return 0, fmt.Errorf("aggregation: unsupported value %q", raw)
+	}
+}
+
 type compiledDimensionOptions struct {
-	hidden     bool
 	multiplier int
 	divisor    int
+	hidden     bool
 	float      bool
 }
 

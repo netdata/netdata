@@ -135,11 +135,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -151,12 +153,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.swap_read | read | calls/s |
-| cgroup.swap_write | write | calls/s |
-| services.swap_read | a dimension per systemd service | calls/s |
-| services.swap_write | a dimension per systemd service | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.swap_read | Calls to function swap_readpage. | read | calls/s |
+| cgroup.swap_write | Calls to function swap_writepage. | write | calls/s |
+| services.swap_read | Calls to swap_readpage. | a dimension per systemd service | calls/s |
+| services.swap_write | Calls to function swap_writepage. | a dimension per systemd service | calls/s |
+
 
 ### Per apps
 
@@ -170,10 +173,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_call_swap_readpage | a dimension per app group | calls/s |
-| app.ebpf_call_swap_writepage | a dimension per app group | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.ebpf_call_swap_readpage | Calls to function swap_readpage. | a dimension per app group | calls/s |
+| app.ebpf_call_swap_writepage | Calls to function swap_writepage. | a dimension per app group | calls/s |
+
 
 ### Per eBPF SWAP instance
 
@@ -183,6 +187,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.swapcalls | write, read | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.swapcalls | Calls to access swap memory | write, read | calls/s |

@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from _common import (
-    COLLECTOR_SOURCES,
     GITHUB_ACTIONS,
     INTEGRATIONS_PATH,
     REPO_PATH,
+    TAXONOMY_SOURCES,
     WARNINGS,
     load_collectors,
     load_yaml,
@@ -155,7 +155,7 @@ def source_info():
 
 def discover_taxonomy_files():
     files = []
-    for _, root, recursive in COLLECTOR_SOURCES:
+    for _, root, recursive in TAXONOMY_SOURCES:
         if root.exists() and root.is_dir() and recursive:
             files.extend(root.glob('*/taxonomy.yaml'))
         elif root.exists() and root.is_file() and root.name == 'taxonomy.yaml':
@@ -285,7 +285,7 @@ def dynamic_declarations(module):
 
 def build_metadata_indexes(findings):
     warning_start = len(WARNINGS)
-    modules = load_collectors()
+    modules = load_collectors(TAXONOMY_SOURCES)
     for path, message in WARNINGS[warning_start:]:
         findings.append(Finding('TAX001', FATAL, Path(path), message))
 

@@ -9,7 +9,6 @@ impl FlowQueryService {
         request: &FlowsRequest,
     ) -> Result<RawScanBenchResult> {
         let setup = self.prepare_query(request)?;
-        let prefilter_pairs = cursor_prefilter_pairs(&request.selections);
         let started = Instant::now();
         let mut result = RawScanBenchResult {
             files_opened: 0,
@@ -46,9 +45,8 @@ impl FlowQueryService {
 
                 let mut reader = JournalReader::default();
                 reader.set_location(Location::Head);
-                for pair in &prefilter_pairs {
-                    let match_expr = format!("{}={}", pair.0, pair.1);
-                    reader.add_match(match_expr.as_bytes());
+                for pair in &setup.prefilter_matches {
+                    reader.add_match(pair);
                 }
 
                 loop {
@@ -131,7 +129,6 @@ impl FlowQueryService {
             "raw projected stage benchmark requires projected raw grouped query support"
         );
 
-        let prefilter_pairs = cursor_prefilter_pairs(&request.selections);
         let mut grouped_aggregates = ProjectedGroupAccumulator::new(&setup.effective_group_by);
         let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
         let mut row_missing_values = std::iter::repeat_with(|| None)
@@ -159,7 +156,7 @@ impl FlowQueryService {
             &setup,
             request,
             &mut grouped_aggregates,
-            &prefilter_pairs,
+            &setup.prefilter_matches,
             &projected_capture_positions,
             &projected_field_specs,
             &mut row_group_field_ids,
@@ -176,9 +173,9 @@ impl FlowQueryService {
     pub(crate) fn benchmark_scan_matching_grouped_records_projected_raw_direct(
         &self,
         setup: &QuerySetup,
-        request: &FlowsRequest,
+        _request: &FlowsRequest,
         grouped_aggregates: &mut ProjectedGroupAccumulator,
-        prefilter_pairs: &[(String, String)],
+        prefilter_matches: &[Vec<u8>],
         projected_capture_positions: &FastHashMap<String, usize>,
         projected_field_specs: &[ProjectedFieldSpec],
         row_group_field_ids: &mut [Option<u32>],
@@ -200,12 +197,15 @@ impl FlowQueryService {
             work_checksum: 0,
             elapsed_usec: 0,
         };
-        let prefilter_matches = prefilter_pairs
-            .iter()
-            .map(|(field, value)| format!("{field}={value}").into_bytes())
-            .collect::<Vec<_>>();
         let mut data_offsets = Vec::new();
         let mut decompress_buf = Vec::new();
+        let mut sink = ProjectedGroupingSink::new(
+            grouped_aggregates,
+            &setup.effective_group_by,
+            row_group_field_ids,
+            row_missing_values,
+            self.max_groups,
+        );
 
         for span in &setup.spans {
             if span.files.is_empty() {
@@ -234,7 +234,7 @@ impl FlowQueryService {
 
                 let mut reader = JournalReader::default();
                 reader.set_location(Location::Head);
-                for pair in &prefilter_matches {
+                for pair in prefilter_matches {
                     reader.add_match(pair);
                 }
 
@@ -266,10 +266,7 @@ impl FlowQueryService {
                         continue;
                     }
 
-                    row_group_field_ids.fill(None);
-                    for value in row_missing_values.iter_mut() {
-                        let _ = value.take();
-                    }
+                    sink.reset_row();
                     for value in projected_captured_values.iter_mut() {
                         let _ = value.take();
                     }
@@ -402,11 +399,8 @@ impl FlowQueryService {
                                         projected_field_specs,
                                         &mut remaining_mask,
                                         &mut metrics,
-                                        grouped_aggregates,
-                                        row_group_field_ids,
-                                        row_missing_values,
+                                        &mut sink,
                                         projected_captured_values,
-                                        self.max_groups,
                                     );
                                 } else {
                                     apply_projected_payload(
@@ -415,11 +409,8 @@ impl FlowQueryService {
                                         pending_spec_indexes,
                                         &mut remaining,
                                         &mut metrics,
-                                        grouped_aggregates,
-                                        row_group_field_ids,
-                                        row_missing_values,
+                                        &mut sink,
                                         projected_captured_values,
-                                        self.max_groups,
                                     );
                                 }
                             }
@@ -433,10 +424,10 @@ impl FlowQueryService {
                             result.matched_entries = result.matched_entries.saturating_add(1);
                         }
                         RawProjectedBenchStage::GroupAndAccumulate => {
-                            if !request.selections.is_empty()
+                            if !setup.selections.is_empty()
                                 && !captured_facet_matches_selections_except(
                                     None,
-                                    &request.selections,
+                                    &setup.selections,
                                     projected_capture_positions,
                                     projected_captured_values,
                                 )
@@ -444,17 +435,13 @@ impl FlowQueryService {
                                 continue;
                             }
 
-                            grouped_aggregates.accumulate_projected(
-                                &setup.effective_group_by,
+                            sink.consume_row(
                                 timestamp_usec,
                                 RecordHandle::JournalRealtime {
                                     tier: span.span.tier,
                                     timestamp_usec,
                                 },
                                 metrics,
-                                row_group_field_ids,
-                                row_missing_values,
-                                self.max_groups,
                             )?;
                             result.matched_entries = result.matched_entries.saturating_add(1);
                         }

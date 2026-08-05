@@ -29,6 +29,14 @@ This page covers AWS Secrets Manager specific setup. For the full resolver overv
 
 Netdata reads existing secrets from AWS Secrets Manager. It does not create, rotate, or manage those secrets. If you use `secret-name#key`, the secret value must be stored as a JSON `SecretString`.
 
+The Dynamic Configuration **Test** action runs the configured production credential-source path and discards the result. In `env` mode it reads the Netdata process environment without network access. In `ecs` mode it performs one logical request to the ECS task credential endpoint. In `imds` mode it performs the IMDSv2 token, role-name, and credential requests sequentially. Metadata redirects and proxies are disabled. Go can transparently retransmit a bodyless metadata GET once after a qualifying reused-connection failure; the Test does not add application retries.
+
+Operational success proves only that the selected source returned non-empty access-key and secret-key values at that time. The session token remains optional and is not part of the guarantee. Test does not contact AWS Secrets Manager, STS, KMS, or another AWS data-plane endpoint, so it does not prove that AWS accepts the credentials, that they are current or temporary, that the configured region is correct, or that the identity can read or decrypt any secret.
+
+Test requires no additional AWS IAM permission beyond the configured credential source and does not mutate an AWS resource or policy. IMDS mode creates only the normal short-lived metadata-service token and can produce ordinary metadata-service telemetry.
+
+Each credential-source response is limited to 1 MiB. Every request uses the configured `timeout`; IMDS can consume approximately three sequential timeout periods, while an earlier Dynamic Configuration caller deadline or cancellation wins.
+
 
 ## Setup
 
@@ -218,6 +226,17 @@ Check the selected `auth_mode`.
 - For `env`, make sure the Netdata service has `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 - For `ecs`, make sure Netdata runs in ECS and `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` is available.
 - For `imds`, make sure the EC2 instance profile is attached and IMDSv2 is reachable.
+
+
+### The Dynamic Configuration Test fails
+
+The Test action exercises only the configured credential source. It does not call AWS Secrets Manager or test a secret path.
+
+- For `env`, verify that the Netdata service environment contains non-empty `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` values.
+- For `ecs`, verify that `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` is present and is a valid path-style relative URI supplied by ECS.
+- For `imds`, verify that IMDSv2 is reachable, returns a non-empty token, and exposes one valid IAM role name and its credentials.
+
+A successful Test does not prove that AWS accepts the returned credentials or that they have permission to access a particular secret. Check the configured region, `secretsmanager:GetSecretValue`, and any required `kms:Decrypt` permission separately.
 
 
 ### Access denied or wrong region

@@ -88,11 +88,13 @@ The following alerts are available:
 | [ btrfs_device_generation_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS generation errors |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -109,15 +111,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| btrfs.disk | unallocated, data_free, data_used, meta_free, meta_used, sys_free, sys_used | MiB |
-| btrfs.data | free, used | MiB |
-| btrfs.metadata | free, used, reserved | MiB |
-| btrfs.system | free, used | MiB |
-| btrfs.commits | commits | commits |
-| btrfs.commits_perc_time | commits | percentage |
-| btrfs.commit_timings | last, max | ms |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| btrfs.disk | BTRFS Physical Disk Allocation | unallocated, data_free, data_used, meta_free, meta_used, sys_free, sys_used | MiB |
+| btrfs.data | BTRFS Data Allocation | free, used | MiB |
+| btrfs.metadata | BTRFS Metadata Allocation | free, used, reserved | MiB |
+| btrfs.system | BTRFS System Allocation | free, used | MiB |
+| btrfs.commits | BTRFS Commits | commits | commits |
+| btrfs.commits_perc_time | BTRFS Commits Time Share | commits | percentage |
+| btrfs.commit_timings | BTRFS Commit Timings | last, max | ms |
+
 
 ### Per btrfs device
 
@@ -133,6 +136,6 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| btrfs.device_errors | write_errs, read_errs, flush_errs, corruption_errs, generation_errs | errors |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| btrfs.device_errors | BTRFS Device Errors | write_errs, read_errs, flush_errs, corruption_errs, generation_errs | errors |

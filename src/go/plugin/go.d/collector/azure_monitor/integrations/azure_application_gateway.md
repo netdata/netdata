@@ -641,11 +641,13 @@ The following alerts are available:
 | [ am_appgw_waf_blocked_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.waf_requests | App Gateway WAF block ratio on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -667,28 +669,28 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.application_gateway.throughput | average | bytes/s |
-| azure_monitor.application_gateway.traffic_volume | received, sent | bytes/s |
-| azure_monitor.application_gateway.requests | total, failed | requests/s |
-| azure_monitor.application_gateway.response_status | gateway, backend | responses/s |
-| azure_monitor.application_gateway.backend_health | healthy, unhealthy | hosts |
-| azure_monitor.application_gateway.backend_request_load | per_healthy_host | requests |
-| azure_monitor.application_gateway.backend_latency | connect, first_byte, last_byte | milliseconds |
-| azure_monitor.application_gateway.client_latency | total_time, client_rtt | milliseconds |
-| azure_monitor.application_gateway.current_connections | current | connections |
-| azure_monitor.application_gateway.new_connections | average | connections/s |
-| azure_monitor.application_gateway.websocket_connections | active | connections |
-| azure_monitor.application_gateway.websocket_close_codes | total | connections/s |
-| azure_monitor.application_gateway.capacity | capacity, compute, billed, fixed_billed | units |
-| azure_monitor.application_gateway.cpu | average | percentage |
-| azure_monitor.application_gateway.tls_connections | total | connections/s |
-| azure_monitor.application_gateway.waf_requests | total, blocked, matched | requests/s |
-| azure_monitor.application_gateway.waf_rule_matches | managed, custom, bot | matches/s |
-| azure_monitor.application_gateway.waf_challenges | captcha, js_challenge | requests/s |
-| azure_monitor.application_gateway.waf_penalty_box | size | IPs |
-| azure_monitor.application_gateway.waf_penalty_box_hits | total | hits/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.application_gateway.throughput | Azure Application Gateway Throughput | average | bytes/s |
+| azure_monitor.application_gateway.traffic_volume | Azure Application Gateway Traffic Volume | received, sent | bytes/s |
+| azure_monitor.application_gateway.requests | Azure Application Gateway Requests | total, failed | requests/s |
+| azure_monitor.application_gateway.response_status | Azure Application Gateway Response Status | gateway, backend | responses/s |
+| azure_monitor.application_gateway.backend_health | Azure Application Gateway Backend Health | healthy, unhealthy | hosts |
+| azure_monitor.application_gateway.backend_request_load | Azure Application Gateway Backend Request Load | per_healthy_host | requests |
+| azure_monitor.application_gateway.backend_latency | Azure Application Gateway Backend Latency | connect, first_byte, last_byte | milliseconds |
+| azure_monitor.application_gateway.client_latency | Azure Application Gateway Client Latency | total_time, client_rtt | milliseconds |
+| azure_monitor.application_gateway.current_connections | Azure Application Gateway Current Connections | current | connections |
+| azure_monitor.application_gateway.new_connections | Azure Application Gateway New Connections | average | connections/s |
+| azure_monitor.application_gateway.websocket_connections | Azure Application Gateway WebSocket Connections | active | connections |
+| azure_monitor.application_gateway.websocket_close_codes | Azure Application Gateway WebSocket Close Codes | total | connections/s |
+| azure_monitor.application_gateway.capacity | Azure Application Gateway Capacity | capacity, compute, billed, fixed_billed | units |
+| azure_monitor.application_gateway.cpu | Azure Application Gateway CPU Utilization | average | percentage |
+| azure_monitor.application_gateway.tls_connections | Azure Application Gateway TLS Connections | total | connections/s |
+| azure_monitor.application_gateway.waf_requests | Azure Application Gateway WAF Requests | total, blocked, matched | requests/s |
+| azure_monitor.application_gateway.waf_rule_matches | Azure Application Gateway WAF Rule Matches | managed, custom, bot | matches/s |
+| azure_monitor.application_gateway.waf_challenges | Azure Application Gateway WAF Challenges | captcha, js_challenge | requests/s |
+| azure_monitor.application_gateway.waf_penalty_box | Azure Application Gateway WAF Penalty Box | size | IPs |
+| azure_monitor.application_gateway.waf_penalty_box_hits | Azure Application Gateway WAF Penalty Box Hits | total | hits/s |
 
 
 

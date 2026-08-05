@@ -191,7 +191,13 @@ mark_as_advanced(ENABLE_DASHBOARD)
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
-cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" False "OS_LINUX OR OS_WINDOWS" False)
+# OTel is opt-in on Windows, while supported Unix platforms use the normal default.
+set(_OTEL_DEFAULT ${DEFAULT_FEATURE_STATE})
+if(OS_WINDOWS)
+    set(_OTEL_DEFAULT False)
+endif()
+cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${_OTEL_DEFAULT} "OS_LINUX OR OS_MACOS OR OS_WINDOWS" False)
+unset(_OTEL_DEFAULT)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
@@ -1594,6 +1600,8 @@ set(API_PLUGIN_FILES
         src/web/api/queries/trimmed_mean/trimmed_mean.h
         src/web/api/queries/extremes/extremes.c
         src/web/api/queries/extremes/extremes.h
+        src/web/api/queries/latest/latest.c
+        src/web/api/queries/latest/latest.h
         src/web/api/queries/weights.c
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
@@ -1819,6 +1827,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-inflight.h
         src/database/rrdfunctions-exporters.c
         src/database/rrdfunctions-exporters.h
+        src/database/rrdfunctions-unittest.c
         src/database/rrdfunctions-internals.h
         src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
@@ -2025,6 +2034,7 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-list-metadata.h
         src/web/mcp/mcp-tools-execute-function.c
         src/web/mcp/mcp-tools-execute-function.h
+        src/web/mcp/mcp-tools-execute-function-unittest.c
         src/web/mcp/mcp-tools-execute-function-internal.h
         src/web/mcp/mcp-tools-execute-function-registry.c
         src/web/mcp/mcp-tools-execute-function-registry.h
@@ -3145,6 +3155,18 @@ endif()
 add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-handshake-hops-test.c)
 target_link_libraries(stream-receiver-hops-test libnetdata)
+
+add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-replay-endpoints-test.c)
+target_link_libraries(stream-replay-endpoints-test libnetdata)
+
+if(OS_LINUX)
+        add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
+                src/web/api/tests/http-auth-bearer-test.c)
+        target_compile_options(http-auth-bearer-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(http-auth-bearer-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(http-auth-bearer-test libnetdata)
+endif()
 
 if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL

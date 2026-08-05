@@ -48,6 +48,7 @@ typedef enum rrdr_time_grouping {
     RRDR_GROUPING_DES,
     RRDR_GROUPING_COUNTIF,
     RRDR_GROUPING_EXTREMES,
+    RRDR_GROUPING_LATEST,
 } RRDR_TIME_GROUPING;
 
 const char *time_grouping_id2txt(RRDR_TIME_GROUPING group);

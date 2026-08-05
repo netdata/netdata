@@ -144,11 +144,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -160,16 +162,17 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.shmget | get | calls/s |
-| cgroup.shmat | at | calls/s |
-| cgroup.shmdt | dt | calls/s |
-| cgroup.shmctl | ctl | calls/s |
-| services.shmget | a dimension per systemd service | calls/s |
-| services.shmat | a dimension per systemd service | calls/s |
-| services.shmdt | a dimension per systemd service | calls/s |
-| services.shmctl | a dimension per systemd service | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.shmget | Calls to syscall shmget(2). | get | calls/s |
+| cgroup.shmat | Calls to syscall shmat(2). | at | calls/s |
+| cgroup.shmdt | Calls to syscall shmdt(2). | dt | calls/s |
+| cgroup.shmctl | Calls to syscall shmctl(2). | ctl | calls/s |
+| services.shmget | Calls to syscall shmget(2). | a dimension per systemd service | calls/s |
+| services.shmat | Calls to syscall shmat(2). | a dimension per systemd service | calls/s |
+| services.shmdt | Calls to syscall shmdt(2). | a dimension per systemd service | calls/s |
+| services.shmctl | Calls to syscall shmctl(2). | a dimension per systemd service | calls/s |
+
 
 ### Per apps
 
@@ -183,12 +186,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_shmget_call | calls | calls/s |
-| app.ebpf_shmat_call | calls | calls/s |
-| app.ebpf_shmdt_call | calls | calls/s |
-| app.ebpf_shmctl_call | calls | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.ebpf_shmget_call | Calls to syscall shmget(2). | calls | calls/s |
+| app.ebpf_shmat_call | Calls to syscall shmat(2). | calls | calls/s |
+| app.ebpf_shmdt_call | Calls to syscall shmdt(2). | calls | calls/s |
+| app.ebpf_shmctl_call | Calls to syscall shmctl(2). | calls | calls/s |
+
 
 ### Per eBPF SHM instance
 
@@ -198,6 +202,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.shared_memory_calls | get, at, dt, ctl | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.shared_memory_calls | Calls to shared memory system calls | get, at, dt, ctl | calls/s |

@@ -37,15 +37,17 @@ pub const CONTAINER_VERSION: u32 = 1;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("JSON error: {0}")]
+    // Wrapper variants are transparent: embedding the source in the message
+    // while also chaining it would print it twice in anyhow chains.
+    #[error(transparent)]
     Json(#[from] serde_json::Error),
 
     #[error("unsupported catalog format version: {0}")]
     UnsupportedVersion(u32),
 
-    #[error("container error: {0}")]
+    #[error(transparent)]
     Container(#[from] chunk_file::container::Error),
 
-    #[error("I/O error: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 }

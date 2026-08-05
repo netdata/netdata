@@ -3,6 +3,7 @@
 package nginx
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -10,11 +11,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	req, err := web.NewHTTPRequest(c.RequestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request to '%s': %w'", c.URL, err)
 	}
+	req = req.WithContext(ctx)
 
 	var status *stubStatus
 	var perr error

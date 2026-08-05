@@ -185,11 +185,13 @@ The following alerts are available:
 | [ apcupsd_ups_status_commlost ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS communication link is lost |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -201,20 +203,20 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| apcupsd.ups_status | TRIM, BOOST, CAL, ONLINE, ONBATT, OVERLOAD, LOWBATT, REPLACEBATT, NOBATT, SLAVE, SLAVEDOWN, COMMLOST, SHUTTING_DOWN | status |
-| apcupsd.ups_selftest | NO, NG, WN, IP, OK, BT, UNK | status |
-| apcupsd.ups_battery_charge | charge | percent |
-| apcupsd.ups_battery_time_remaining | timeleft | seconds |
-| apcupsd.ups_battery_time_since_replacement | since_replacement | seconds |
-| apcupsd.ups_battery_voltage | voltage, nominal_voltage | Volts |
-| apcupsd.ups_load_capacity_utilization | load | percent |
-| apcupsd.ups_load | load | Watts |
-| apcupsd.ups_temperature | temperature | Celsius |
-| apcupsd.ups_input_voltage | voltage, min_voltage, max_voltage | Volts |
-| apcupsd.ups_input_frequency | frequency | Hz |
-| apcupsd.ups_output_voltage | voltage | Volts |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| apcupsd.ups_status | UPS Status | TRIM, BOOST, CAL, ONLINE, ONBATT, OVERLOAD, LOWBATT, REPLACEBATT, NOBATT, SLAVE, SLAVEDOWN, COMMLOST, SHUTTING_DOWN | status |
+| apcupsd.ups_selftest | UPS Self-Test Status | NO, NG, WN, IP, OK, BT, UNK | status |
+| apcupsd.ups_battery_charge | UPS Battery Charge | charge | percent |
+| apcupsd.ups_battery_time_remaining | UPS Estimated Runtime on Battery | timeleft | seconds |
+| apcupsd.ups_battery_time_since_replacement | UPS Time Since Battery Replacement | since_replacement | seconds |
+| apcupsd.ups_battery_voltage | UPS Battery Voltage | voltage, nominal_voltage | Volts |
+| apcupsd.ups_load_capacity_utilization | UPS Load Capacity Utilization | load | percent |
+| apcupsd.ups_load | UPS Load | load | Watts |
+| apcupsd.ups_temperature | UPS Internal Temperature | temperature | Celsius |
+| apcupsd.ups_input_voltage | UPS Input Voltage | voltage, min_voltage, max_voltage | Volts |
+| apcupsd.ups_input_frequency | UPS Input Frequency | frequency | Hz |
+| apcupsd.ups_output_voltage | UPS Output Voltage | voltage | Volts |
 
 
 

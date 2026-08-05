@@ -77,6 +77,6 @@ These are standard Netdata health alerts. Route or silence them like any other a
 
 ## What's next
 
-- [Metrics](/docs/npm/snmp-traps/metrics.md) - Read the receiver pipeline, processing errors, dedup counters, and source metrics these alerts watch.
+- [Metrics](/docs/npm/snmp-traps/metrics.md) - Read the receiver pipeline, processing errors, and dedup counters these alerts watch.
 - [Troubleshooting](/docs/npm/snmp-traps/troubleshooting.md) - Investigate the failures that raise these alerts.
 - [Configuration](/docs/npm/snmp-traps/configuration.md) - Tune allowlists, rate limits, deduplication, and output backends that change alert behavior.

@@ -144,11 +144,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -164,14 +166,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dmcache.device_cache_space_usage | free, used | bytes |
-| dmcache.device_metadata_space_usage | free, used | bytes |
-| dmcache.device_cache_read_efficiency | hits, misses | requests/s |
-| dmcache.device_cache_write_efficiency | hits, misses | requests/s |
-| dmcache.device_cache_activity | promotions, demotions | bytes/s |
-| dmcache.device_cache_dirty_size | dirty | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dmcache.device_cache_space_usage | DMCache space usage | free, used | bytes |
+| dmcache.device_metadata_space_usage | DMCache metadata space usage | free, used | bytes |
+| dmcache.device_cache_read_efficiency | DMCache read efficiency | hits, misses | requests/s |
+| dmcache.device_cache_write_efficiency | DMCache write efficiency | hits, misses | requests/s |
+| dmcache.device_cache_activity | DMCache activity | promotions, demotions | bytes/s |
+| dmcache.device_cache_dirty_size | DMCache dirty data size | dirty | bytes |
 
 
 

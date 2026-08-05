@@ -129,11 +129,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -145,6 +147,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.softirq_latency | soft IRQs | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.softirq_latency | Soft IRQ latency | soft IRQs | milliseconds |

@@ -27,14 +27,6 @@ const (
 	ChartTypeHeatmap ChartType = "heatmap"
 )
 
-// ReduceOp defines aggregation for series collisions mapped to one dimension.
-type ReduceOp string
-
-const (
-	// ReduceSum is the phase-1 collision reduction rule.
-	ReduceSum ReduceOp = "sum"
-)
-
 // Chart is one compiled chart template in immutable program IR.
 type Chart struct {
 	// TemplateID is compiler-assigned stable ID inside one Program revision.
@@ -47,9 +39,6 @@ type Chart struct {
 
 	// Dimensions are declaration-ordered templates.
 	Dimensions []Dimension
-
-	// CollisionReduce is currently fixed to ReduceSum in phase-1.
-	CollisionReduce ReduceOp
 }
 
 // ChartMeta carries user-facing chart metadata after normalization/defaulting.
@@ -106,9 +95,6 @@ func validateChart(chart Chart) error {
 	}
 	if err := validateLabelPolicy(chart.Labels); err != nil {
 		errs = append(errs, fmt.Errorf("labels: %w", err))
-	}
-	if chart.CollisionReduce == "" {
-		errs = append(errs, fmt.Errorf("collision reduce op is required"))
 	}
 	if len(chart.Dimensions) == 0 {
 		errs = append(errs, fmt.Errorf("at least one dimension is required"))

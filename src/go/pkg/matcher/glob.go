@@ -19,20 +19,32 @@ var (
 
 // NewGlobMatcher create a new matcher with glob format
 func NewGlobMatcher(expr string) (Matcher, error) {
+	if err := validateGlobPattern(expr); err != nil {
+		return nil, err
+	}
+	return newValidatedGlobMatcher(expr), nil
+}
+
+func validateGlobPattern(expr string) error {
+	if expr == "" || expr == "*" {
+		return nil
+	}
+	if !erGlobPattern.MatchString(expr) {
+		return errBadGlobPattern
+	}
+	return nil
+}
+
+func newValidatedGlobMatcher(expr string) Matcher {
 	switch expr {
 	case "":
-		return stringFullMatcher(""), nil
+		return stringFullMatcher("")
 	case "*":
-		return TRUE(), nil
+		return TRUE()
 	}
 
-	// any strings pass this regexp check are valid pattern
-	if !erGlobPattern.MatchString(expr) {
-		return nil, errBadGlobPattern
-	}
-
-	size := len(expr)
 	chars := []rune(expr)
+	size := len(chars)
 	startWith := true
 	endWith := true
 	startIdx := 0
@@ -41,7 +53,7 @@ func NewGlobMatcher(expr string) (Matcher, error) {
 		startWith = false
 		startIdx = 1
 	}
-	if chars[endIdx] == '*' {
+	if chars[endIdx] == '*' && !isEscapedGlobRune(chars, endIdx) {
 		endWith = false
 		endIdx--
 	}
@@ -54,13 +66,22 @@ func NewGlobMatcher(expr string) (Matcher, error) {
 			unescapedExpr = append(unescapedExpr, nextCh)
 			i++
 		} else if isGlobMeta(ch) {
-			return globMatcher(expr), nil
+			return globMatcher(expr)
 		} else {
 			unescapedExpr = append(unescapedExpr, ch)
 		}
 	}
 
-	return NewStringMatcher(string(unescapedExpr), startWith, endWith)
+	matcher, _ := NewStringMatcher(string(unescapedExpr), startWith, endWith)
+	return matcher
+}
+
+func isEscapedGlobRune(chars []rune, index int) bool {
+	backslashes := 0
+	for i := index - 1; i >= 0 && chars[i] == '\\'; i-- {
+		backslashes++
+	}
+	return backslashes%2 == 1
 }
 
 func isGlobMeta(ch rune) bool {
@@ -109,11 +130,11 @@ Pattern:
 			return false, err
 		}
 		if star {
-			// Look for match skipping i+1 bytes.
-			// Cannot skip /.
-			for i := 0; i < len(name); i++ {
-				//for i := 0; i < len(name) && name[i] != Separator; i++ {
-				t, ok, err := matchChunk(chunk, name[i+1:])
+			// Look for a match after skipping one or more runes.
+			for rest := name; len(rest) > 0; {
+				_, size := utf8.DecodeRuneInString(rest)
+				rest = rest[size:]
+				t, ok, err := matchChunk(chunk, rest)
 				if ok {
 					// if we're the last chunk, make sure we exhausted the name
 					if len(pattern) == 0 && len(t) > 0 {

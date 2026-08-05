@@ -21,15 +21,23 @@ Around 80 fields are available as facets. They're a subset of the full 91-field 
 
 Everything else — IPs, ports, protocol, AS numbers and names, country, state, city, exporter labels, interfaces, MACs, VLANs, NAT addresses, TCP flags, ToS, etc. — is filterable.
 
+The filter ribbon shows only fields that have at least one value in the collector's retained facet vocabulary. A field appears after its first value is retained and disappears after its last value ages out. An actively selected field remains visible even when its retained vocabulary is empty, so you can clear the filter. This availability is collector-retention-wide, not limited to the time window currently shown.
+
 ## Filter logic
 
 Within a single field: **OR**. Selecting `PROTOCOL = TCP` and `PROTOCOL = UDP` shows TCP-or-UDP.
 
 Across different fields: **AND**. Adding `SRC_COUNTRY = US` to the above shows TCP-or-UDP from the US.
 
+The six address fields — `EXPORTER_IP`, `SRC_ADDR`, `DST_ADDR`, `NEXT_HOP`, `SRC_ADDR_NAT`, and `DST_ADDR_NAT` — accept either exact IPv4/IPv6 addresses or CIDRs. Exact addresses and CIDRs selected in the same field are ORed together. For example, selecting `10.0.0.0/8` and `2001:db8::7` on `SRC_ADDR`, plus `PROTOCOL = TCP`, means:
+
+`(source is inside 10.0.0.0/8 OR source is 2001:db8::7) AND protocol is TCP`.
+
+CIDR selection does not change these Boolean rules. `SRC_PREFIX` and `DST_PREFIX` are stored labels and continue to use exact-value filtering; they do not mean "address overlaps this network."
+
 ## No negative match
 
-You cannot directly say "everything except X". The workaround is to select all values and remove the unwanted one — works for low-cardinality fields like `PROTOCOL` (a handful of values). For high-cardinality fields like `SRC_AS_NAME`, the autocomplete only surfaces the top 100 values, so there's no practical way to "select all and remove".
+You cannot directly say "everything except X". The workaround is to select all values and remove the unwanted one — works for low-cardinality fields like `PROTOCOL` (a handful of values). For high-cardinality fields like `SRC_AS_NAME`, the autocomplete only surfaces the top 256 values, so there's no practical way to "select all and remove".
 
 Negative matching is not supported.
 
@@ -37,14 +45,28 @@ Negative matching is not supported.
 
 Type into a facet field and the dashboard suggests existing values from your live data. The list:
 
-- Shows up to **100 matching values**, sorted alphabetically.
+- Shows up to **256 results**. Retained values are sorted alphabetically; generated CIDRs use the ranking described below.
+- Retained values for every facet come from the same retention-wide vocabulary. Non-IP facets with up to **256 retained values** return the complete static list; facets with 257 or more values switch to autocomplete. A facet can switch back to a static list when older values leave retention.
+- IP address facets keep autocomplete enabled so `/` can suggest CIDRs. They still return their complete inline value list while the retained vocabulary has at most 256 values; above that limit, the inline list is omitted.
 - Matching policy is per-field. Free-form text fields (`SRC_AS_NAME`, `EXPORTER_NAME`, `IN_IF_DESCRIPTION`, MAC addresses, AS paths, BGP communities, country/city/state names) match by **substring**, so typing `Akamai` finds `AS20940 Akamai International`. IPs and short numeric fields (ports, protocols, ASN numbers, interface speeds) match by **prefix**, so typing `10.0.` narrows to that range.
 - Runs against an **in-memory snapshot of the live journal** plus on-disk FST sidecars for promoted high-cardinality fields. Autocomplete never reads the raw flow tiers, and is fast even on busy collectors.
 - The autocomplete `term` is hard-capped at 256 bytes; longer requests are rejected.
 
 For high-cardinality fields, autocomplete is the only practical way to discover values. You can't scroll a list of millions of IP addresses, but you can find one by typing what you remember.
 
-**Autocomplete and regular filtering are different paths.** When you select a value from the dropdown, the resulting filter is **exact equality**, not substring. The dropdown only helps you discover values; the filter that gets applied is `key = value` (or `key in [values]`) and uses indexes — never a substring scan over flow data.
+### CIDR autocomplete
+
+Typing `/` in an IP address facet switches that request from retained-value lookup to CIDR generation. The backend generates a bounded candidate set, then returns only networks containing at least one address in that field's compact retention-wide vocabulary. It does not scan journal rows or flow tiers.
+
+- Loose IPv4 input fills missing octets: `10/8` can suggest `10.0.0.0/8`; `10.1/` can suggest `10.1.0.0/16`. One trailing dot before `/` is tolerated after one through three octets, so `10./`, `10.1./`, and `10.1.2./` behave like the same inputs without that dot.
+- Loose IPv6 input fills omitted trailing groups: `2001:db8/32` can suggest `2001:db8::/32`.
+- Digits after `/` are an autocomplete fragment. `10.1/1` generates the naturally implied `10.1.0.0/16` first, then the exact prefix-length match `0.0.0.0/1`, followed by the other canonical matches `/10` through `/19`. Candidates with no retained address in the selected facet are omitted, so the first returned value may differ.
+- Suggestions are always canonical IPv4 or IPv6 CIDRs. Loose forms are accepted only while searching; a direct Function selection must contain a complete address and prefix length. The backend normalizes a valid non-network address such as `10.1.2.99/24` to its network before matching.
+- Candidate validation is retention-wide, like ordinary facet discovery. A suggested CIDR can still have no data in the current time window or after other filters are applied.
+
+**Autocomplete and regular filtering are different paths.** The dropdown uses prefix or substring matching only to discover retained values. A selected non-IP value uses exact equality. A selected IP value uses exact-address or CIDR containment, never substring matching over flow data.
+
+Small IP networks containing at most 256 addresses can be represented as exact indexed matches. Broader networks are checked by the typed CIDR matcher after any other exact filters have narrowed the scan. Exact addresses and CIDRs return the same results in table, Sankey, and time-series views.
 
 ## Full-text search
 
@@ -55,7 +77,7 @@ The search box at the top of the filter ribbon performs a regex match against th
 - Any non-empty search **forces raw tier**. The full-text search only works against the raw journal — it doesn't apply to the rollup tiers. Time depth is therefore bounded by raw-tier retention.
 - The plugin's "fast aggregation" path is also disabled when full-text search is active, because aggregation needs to scan every record. Expect somewhat slower responses than tier-based aggregation queries.
 
-For "find anything containing this string in any field", the search is the right tool. For "filter by an exact value of a specific field", use the facet on that field — it's faster and doesn't trigger raw-tier mode.
+For "find anything containing this string in any field", the search is the right tool. For an exact value or IP network, use the facet on that field. Facet filters follow that field's tier availability: source, destination, and NAT address fields are currently raw-tier-only; exporter IP and next hop are available in rollups.
 
 ## URL preservation
 
@@ -68,6 +90,8 @@ A practical note: filters use a structured representation (per-field IN-list) th
 - **Search for `192.168.1.1` matches unrelated rows.** Regex semantics: each `.` is "any byte". Escape: `192\.168\.1\.1`.
 - **Time depth shrinks unexpectedly after typing in search.** Full-text search forces raw tier. Clear the search to use rollup tiers and longer time ranges.
 - **Negative match is unsupported.** Workaround: select-all-minus-one for low-cardinality fields. For high-cardinality fields, use a positive filter that narrows the result set instead.
+- **A loose CIDR works in autocomplete but fails as a direct selection.** Send a complete address and prefix such as `10.0.0.0/8`, not `10/8`.
+- **A suggested CIDR returns no data in the current view.** Suggestions prove that the selected field contains a matching address somewhere in retained data. They are not recalculated for the current time window or other active filters.
 - **Filter on an ICMP virtual facet seems slower than expected.** `ICMPV4` / `ICMPV6` virtual facets aren't optimised by the journal index — they're evaluated per-record. The query still returns; the cost shows up as longer wall time on busy collectors.
 - **`query_max_groups` exceeded.** Result rows after the limit fold into `__overflow__`. Narrow the filter or reduce group-by depth.
 - **GET-style args don't carry selections.** When integrating the function call yourself, send a JSON payload — the dashboard does this automatically.

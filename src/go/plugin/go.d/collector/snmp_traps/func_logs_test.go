@@ -10,19 +10,18 @@ import (
 	"testing"
 	"time"
 
+	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
+
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/funcctl"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/snmptrapsfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/snmptrapsfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
-	methods := snmpTrapsMethods()
+	methods := snmpTrapsMethods(func() bool { return false })
 	require.Len(t, methods, 1)
 
 	byID := make(map[string]funcapi.FunctionConfig, len(methods))
@@ -38,6 +37,51 @@ func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 	assert.True(t, logs.RawRequest)
 	assert.True(t, logs.RequireCloud)
 	assert.NotNil(t, logs.Available)
+}
+
+func TestSNMPTrapsLogsMethodAvailabilityFollowsDirectJournalJobs(t *testing.T) {
+	activity := &journalActivity{}
+	methods := snmpTrapsMethods(activity.Available)
+	require.Len(t, methods, 1)
+	logs := methods[0]
+	require.NotNil(t, logs.Available)
+	assert.False(t, logs.Available())
+
+	lease := activity.Acquire()
+	t.Cleanup(lease.Close)
+	assert.True(t, logs.Available())
+	lease.Close()
+	assert.False(t, logs.Available())
+}
+
+func TestSNMPTrapsLogsMethodAvailabilityTracksAllJournalLeases(t *testing.T) {
+	activity := &journalActivity{}
+	logs := snmpTrapsMethods(activity.Available)[0]
+
+	first := activity.Acquire()
+	second := activity.Acquire()
+	assert.True(t, logs.Available())
+
+	first.Close()
+	first.Close()
+	assert.True(t, logs.Available())
+
+	second.Close()
+	assert.False(t, logs.Available())
+}
+
+func TestSNMPTrapsLogsMethodAvailabilityIsCreatorScoped(t *testing.T) {
+	firstCreator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	secondCreator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	firstLogs := firstCreator.AgentFunctions()[0]
+	secondLogs := secondCreator.AgentFunctions()[0]
+
+	firstCollector := firstCreator.CreateV2().(*Collector)
+	lease := firstCollector.services.journalActivity.Acquire()
+	t.Cleanup(lease.Close)
+
+	assert.True(t, firstLogs.Available())
+	assert.False(t, secondLogs.Available())
 }
 
 func TestSNMPTrapsJournalFunctionUsesPublicFunctionName(t *testing.T) {
@@ -142,43 +186,6 @@ func TestSNMPTrapsLogsFunctionUnavailableWithoutJournal(t *testing.T) {
 	assert.Contains(t, resp.Message, "direct journal output has no sources")
 }
 
-func TestSNMPTrapsLogsDispatchDoesNotRequireRunningJob(t *testing.T) {
-	startJournalJobs := activeDirectJournalJobs.Load()
-	activeDirectJournalJobs.Store(1)
-	t.Cleanup(func() { activeDirectJournalJobs.Store(startJournalJobs) })
-	t.Setenv(netdataLogDirEnv, filepath.Join(t.TempDir(), "logs"))
-
-	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
-
-	reg := newSNMPTrapsTestFunctionRegistry()
-	var gotCode int
-	var gotResp map[string]any
-	controller := funcctl.New(funcctl.Options{
-		FnReg: reg,
-		JSONWriter: func(data []byte, code int) {
-			gotCode = code
-			require.NoError(t, json.Unmarshal(data, &gotResp))
-		},
-	})
-	controller.RegisterModules(collectorapi.Registry{"snmp_traps": creator})
-
-	require.Contains(t, reg.registeredNames(), snmpTrapsFunctionName)
-
-	reg.call(snmpTrapsFunctionName, context.Background(), functions.Function{
-		UID:     "snmp-traps-jobless-dispatch",
-		Timeout: time.Second,
-		Payload: []byte(`{}`),
-	})
-
-	require.NotNil(t, gotResp)
-	assert.Equal(t, 503, gotCode)
-	assert.Equal(t, float64(503), gotResp["status"])
-	errorMessage := fmt.Sprint(gotResp["errorMessage"])
-	assert.Contains(t, errorMessage, "direct journal output has no sources")
-	assert.NotContains(t, errorMessage, "unknown job")
-	assert.NotContains(t, errorMessage, "requires raw request handling")
-}
-
 func TestSNMPTrapsLogsFunctionRejectsUnknownMethod(t *testing.T) {
 	handler := snmptrapsfunc.NewHandler(t.TempDir())
 
@@ -199,12 +206,7 @@ func TestSNMPTrapsLogsFunctionRejectsInvalidJSON(t *testing.T) {
 func writeTestTrapJournal(t *testing.T, root, jobName, message, category string) string {
 	t.Helper()
 
-	w, err := newTestJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, w.Close()) })
-
-	now := time.Now().UnixMicro()
-	require.NoError(t, w.WriteEntry([]JournalField{
+	fields := []rawJournalField{
 		{Name: "MESSAGE", Value: []byte(message)},
 		{Name: "PRIORITY", Value: []byte("4")},
 		{Name: "SYSLOG_IDENTIFIER", Value: []byte(jobName)},
@@ -219,19 +221,14 @@ func writeTestTrapJournal(t *testing.T, root, jobName, message, category string)
 		{Name: "TRAP_SOURCE_IP", Value: []byte("192.0.2.1")},
 		{Name: "TRAP_DEVICE_VENDOR", Value: []byte("test-vendor")},
 		{Name: "TRAP_JSON", Value: []byte(`{"trap_oid":"1.3.6.1.6.3.1.1.5.1"}`)},
-	}, now, 1000))
-	require.NoError(t, w.Sync())
-	return w.JournalDirectory()
+	}
+	return writeRawTestJournal(t, filepath.Join(root, jobName), fields)
 }
 
 func writeHighVarbindTrapJournal(t *testing.T, root, jobName string, varbinds int) string {
 	t.Helper()
 
-	w, err := newTestJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, w.Close()) })
-
-	fields := []JournalField{
+	fields := []rawJournalField{
 		{Name: "MESSAGE", Value: []byte("high varbind trap entry")},
 		{Name: "PRIORITY", Value: []byte("4")},
 		{Name: "SYSLOG_IDENTIFIER", Value: []byte(jobName)},
@@ -247,20 +244,54 @@ func writeHighVarbindTrapJournal(t *testing.T, root, jobName string, varbinds in
 		{Name: "TRAP_DEVICE_VENDOR", Value: []byte("test-vendor")},
 	}
 	for i := range varbinds {
-		fields = append(fields, JournalField{
+		fields = append(fields, rawJournalField{
 			Name:  fmt.Sprintf("TRAP_VAR_SYNTHETIC_%03d", i),
 			Value: fmt.Appendf(nil, "enum-%03d", i),
 		})
 	}
-	fields = append(fields, JournalField{
+	fields = append(fields, rawJournalField{
 		Name:  "TRAP_JSON",
 		Value: []byte(`{"trap_oid":"1.3.6.1.6.3.1.1.5.3"}`),
 	})
 
+	return writeRawTestJournal(t, filepath.Join(root, jobName), fields)
+}
+
+type rawJournalField struct {
+	Name  string
+	Value []byte
+}
+
+func writeRawTestJournal(t *testing.T, dir string, fields []rawJournalField) string {
+	t.Helper()
+	host := newTestJournalHostProvider()
+	log, err := sdkjournal.NewLog(dir, sdkjournal.LogConfig{
+		Source: "snmp-traps",
+		Options: sdkjournal.Options{
+			MachineID: host.MachineID(), BootID: host.BootID(), Compact: true,
+			Compression: sdkjournal.CompressionNone,
+		},
+		OpenMode:     sdkjournal.LogOpenEager,
+		IdentityMode: sdkjournal.LogIdentityStrict,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, log.Close()) })
+
+	payloads := make([][]byte, 0, len(fields))
+	for _, field := range fields {
+		payload := make([]byte, 0, len(field.Name)+1+len(field.Value))
+		payload = append(payload, field.Name...)
+		payload = append(payload, '=')
+		payload = append(payload, field.Value...)
+		payloads = append(payloads, payload)
+	}
 	now := time.Now().UnixMicro()
-	require.NoError(t, w.WriteEntry(fields, now, 1000))
-	require.NoError(t, w.Sync())
-	return w.JournalDirectory()
+	require.NoError(t, log.AppendRaw(payloads, sdkjournal.EntryOptions{
+		RealtimeUsec: uint64(now), RealtimeUsecSet: true,
+		MonotonicUsec: 1000, MonotonicUsecSet: true, BootID: host.BootID(),
+	}))
+	require.NoError(t, log.Sync())
+	return log.JournalDirectory()
 }
 
 func funcapiRawRequest(method string, info bool, payload []byte) funcapi.RawMethodRequest {
@@ -270,55 +301,6 @@ func funcapiRawRequest(method string, info bool, payload []byte) funcapi.RawMeth
 		Payload: payload,
 		Timeout: time.Second,
 	}
-}
-
-type snmpTrapsTestFunctionRegistry struct {
-	handlers        map[string]func(functions.Function)
-	contextHandlers map[string]functions.Handler
-}
-
-func newSNMPTrapsTestFunctionRegistry() *snmpTrapsTestFunctionRegistry {
-	return &snmpTrapsTestFunctionRegistry{
-		handlers:        make(map[string]func(functions.Function)),
-		contextHandlers: make(map[string]functions.Handler),
-	}
-}
-
-func (r *snmpTrapsTestFunctionRegistry) Register(name string, fn func(functions.Function)) {
-	r.handlers[name] = fn
-}
-
-func (r *snmpTrapsTestFunctionRegistry) RegisterWithContext(name string, fn functions.Handler) {
-	r.handlers[name] = func(f functions.Function) {
-		fn(context.Background(), f)
-	}
-	r.contextHandlers[name] = fn
-}
-
-func (r *snmpTrapsTestFunctionRegistry) Unregister(name string) {
-	delete(r.handlers, name)
-	delete(r.contextHandlers, name)
-}
-
-func (r *snmpTrapsTestFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
-func (r *snmpTrapsTestFunctionRegistry) UnregisterPrefix(string, string)                         {}
-func (r *snmpTrapsTestFunctionRegistry) RegisterPrefixWithContext(string, string, functions.Handler) {
-}
-
-func (r *snmpTrapsTestFunctionRegistry) call(name string, ctx context.Context, fn functions.Function) {
-	if handler := r.contextHandlers[name]; handler != nil {
-		handler(ctx, fn)
-		return
-	}
-	r.handlers[name](fn)
-}
-
-func (r *snmpTrapsTestFunctionRegistry) registeredNames() []string {
-	out := make([]string, 0, len(r.handlers))
-	for name := range r.handlers {
-		out = append(out, name)
-	}
-	return out
 }
 
 func assertResponseHistogramID(t *testing.T, response map[string]any, want string) {

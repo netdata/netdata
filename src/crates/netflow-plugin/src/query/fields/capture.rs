@@ -1,8 +1,7 @@
 use crate::presentation;
-use crate::query::{FACET_ALLOWED_OPTIONS, FlowsRequest};
+use crate::query::{CompiledSelections, FACET_ALLOWED_OPTIONS, FlowsRequest};
 use hashbrown::HashMap as FastHashMap;
 use std::borrow::Cow;
-use std::collections::HashMap;
 
 pub(crate) fn captured_stored_facet_field_value<'a>(
     field: &str,
@@ -40,23 +39,12 @@ pub(crate) fn captured_facet_field_value<'a>(
 
 pub(crate) fn captured_facet_matches_selections_except(
     ignored_field: Option<&str>,
-    selections: &HashMap<String, Vec<String>>,
+    selections: &CompiledSelections,
     capture_positions: &FastHashMap<String, usize>,
     captured_values: &[Option<String>],
 ) -> bool {
-    selections.iter().all(|(field, values)| {
-        if ignored_field.is_some_and(|ignored| ignored.eq_ignore_ascii_case(field)) {
-            return true;
-        }
-        if values.is_empty() {
-            return true;
-        }
-        let Some(record_value) =
-            captured_facet_field_value(field, capture_positions, captured_values)
-        else {
-            return false;
-        };
-        values.iter().any(|value| value == record_value.as_ref())
+    selections.matches(ignored_field, |field| {
+        captured_facet_field_value(field, capture_positions, captured_values)
     })
 }
 

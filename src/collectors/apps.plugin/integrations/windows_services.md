@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -95,16 +97,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | windows |
-|:------|:----------|:----|:---:|
-| service.cpu_utilization | user, system | percentage | • |
-| service.mem_usage | rss | MiB | • |
-| service.vmem_usage | vmem | MiB | • |
-| service.mem_page_faults | minor | pgfaults/s | • |
-| service.swap_usage | swap | MiB | • |
-| service.disk_logical_io | reads, writes | KiB/s | • |
-| service.fds_open | handles | fds | • |
-| service.processes | processes | processes | • |
-| service.threads | threads | threads | • |
-| service.uptime | uptime | seconds | • |
-| service.uptime_summary | min, avg, max | seconds | • |
+| Metric | Description | Dimensions | Unit | windows |
+|:------|:------------|:----------|:----|:---:|
+| service.cpu_utilization | Windows Service CPU utilization (100% = 1 core) | user, system | percentage | • |
+| service.mem_usage | Windows Service memory RSS usage | rss | MiB | • |
+| service.vmem_usage | Windows Service virtual memory size | vmem | MiB | • |
+| service.mem_page_faults | Windows Service memory page faults | minor | pgfaults/s | • |
+| service.swap_usage | Windows Service swap usage | swap | MiB | • |
+| service.disk_logical_io | Windows Service disk logical IO | reads, writes | KiB/s | • |
+| service.fds_open | Windows Service open handles | handles | fds | • |
+| service.processes | Windows Service processes | processes | processes | • |
+| service.threads | Windows Service threads | threads | threads | • |
+| service.uptime | Windows Service uptime | uptime | seconds | • |
+| service.uptime_summary | Windows Service uptime summary | min, avg, max | seconds | • |

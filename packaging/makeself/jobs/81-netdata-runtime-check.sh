@@ -200,7 +200,14 @@ check_static_installer_systemd_capability_bounding_set || exit 1
 
 trap - EXIT
 
-run rm -rv "${NETDATA_INSTALL_PATH}/var/lib/netdata" "${NETDATA_INSTALL_PATH}/var/cache/netdata"
+# var/log must be cleaned too: the runtime check above ran the agent, so
+# the tree holds builder runtime state (daemon logs, the otel-plugin's
+# storage dirs and seq high-water file). Shipping it is harmful — makeself
+# archives only files and empty leaf dirs, so on extraction the missing
+# parent dirs are created root-owned and the otel-plugin (running as
+# netdata) can no longer write its state, crash-looping the plugin.
+# 90-prepare-archive-source.sh re-creates all three dirs empty afterwards.
+run rm -rv "${NETDATA_INSTALL_PATH}/var/lib/netdata" "${NETDATA_INSTALL_PATH}/var/cache/netdata" "${NETDATA_INSTALL_PATH}/var/log/netdata"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

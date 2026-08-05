@@ -46,7 +46,7 @@ For the details behind these recommendations, see [Configuration](/docs/npm/snmp
 
 **Why it hurts:** A trusted relay can supply original source identity through `snmpTrapAddress.0`. If the trusted range is broad, untrusted senders on that path can influence source attribution.
 
-**First symptom:** `TRAP_SOURCE_IP` differs from `TRAP_SOURCE_UDP_PEER` in ways the team cannot explain, enrichment looks wrong, or per-source metrics group traps under the wrong device identity.
+**First symptom:** `TRAP_SOURCE_IP` differs from `TRAP_SOURCE_UDP_PEER` in ways the team cannot explain, enrichment looks wrong, or trap rows group under the wrong device identity.
 
 **Better practice:** Trust only the known relay peer, for example `192.0.2.10/32`. Validate relayed traps by comparing `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, and `TRAP_ENRICHMENT.source` as described in [Validation and Data Quality](/docs/npm/snmp-traps/validation-and-data-quality.md).
 
@@ -118,7 +118,7 @@ For the details behind these recommendations, see [Configuration](/docs/npm/snmp
 
 **First symptom:** Operators see fewer profile-metric instances than expected, while the affected traps still appear as accepted log rows. `snmp.trap.profile_metric_diagnostics` shows `overflow_dropped`, `rule_missed`, `extraction_failed`, `attribution_failed`, or `source_transitions`.
 
-**Better practice:** Keep `profile_metrics` disabled until rules are reviewed. Prefer `profile_metrics.mode: exact`, enable only bounded rules, keep `profile_metrics.identity.source_id_privacy: hash`, and set limits intentionally. See [Configuration](/docs/npm/snmp-traps/configuration.md) and [Metrics](/docs/npm/snmp-traps/metrics.md).
+**Better practice:** Keep `profile_metrics` disabled until rules are reviewed, then list only bounded rules explicitly in `profile_metrics.include`. Source identity, cardinality limits, and overflow behavior use fixed safe policies. See [Configuration](/docs/npm/snmp-traps/configuration.md) and [Metrics](/docs/npm/snmp-traps/metrics.md).
 
 ## Disabling journal while expecting local queries
 

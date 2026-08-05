@@ -29,6 +29,12 @@ This page covers Vault specific setup. For the full resolver overview and syntax
 
 Netdata reads existing secrets from Vault. It does not create or renew Vault tokens. If the configured token expires or becomes invalid, secret resolution fails until Netdata can read a valid token again. If you use `token_file` mode, Netdata re-reads the file on every secret resolution, so an external process (e.g. Vault Agent, a cron job) can renew the token by writing to the file. For KV v2 secrets, Netdata does not add `/data/` to the path automatically.
 
+The Dynamic Configuration **Test** action initiates one real authenticated `GET /v1/auth/token/lookup-self` request using the configured token, namespace header, TLS settings, proxy path, and timeout. HTTP 200 is operational success by status; its response body is not inspected. An exact permission-only HTTP 403 body is reported as validation-only because it cannot reliably distinguish a valid token without self-lookup permission from an invalid token on older Vault versions or another authentication restriction. Invalid-token, ambiguous, malformed, or oversized HTTP 403 bodies fail, as does every other HTTP status.
+
+The request does not read a secret or prove access to any secret path. It also cannot prove that an intermediary preserved the namespace header or that Vault used it. A gateway or allowlist can block the self-lookup route even when configured secret reads would work. When the request reaches Vault, it creates normal audit and activity evidence. For a limited-use service token, Test can consume the final remaining use and cause later secret resolution to fail; an external proxy or service mesh can also retry independently.
+
+A configured token file must resolve to a regular file no larger than 1 MiB. Symlinks to regular files are supported.
+
 
 ## Setup
 
@@ -84,7 +90,7 @@ The following options can be defined for this secretstore backend.
 |  | [tls_skip_verify](#option-tls-skip-verify) | Disable TLS certificate verification for Vault requests. | no | no |
 |  | timeout | Timeout in seconds for HTTP requests made by this secretstore backend. | 3 | no |
 | **Token** | mode_token.token | Vault token value. Required when `mode` is `token`. |  | yes |
-| **Token File** | mode_token_file.path | Path to a file containing the Vault token. Required when `mode` is `token_file`. |  | yes |
+| **Token File** | [mode_token_file.path](#option-token-file-mode-token-file-path) | Path to a file containing the Vault token. Required when `mode` is `token_file`. |  | yes |
 
 <a id="option-mode"></a>
 ##### mode
@@ -101,6 +107,12 @@ Prefer `token_file` for production so the token is stored separately from the se
 ##### tls_skip_verify
 
 This is insecure. Use it only as a temporary workaround or in a non-production environment.
+
+
+<a id="option-token-file-mode-token-file-path"></a>
+##### mode_token_file.path
+
+The path may be a regular file or a symlink to a regular file. The file must be no larger than 1 MiB.
 
 
 
@@ -248,6 +260,13 @@ Check the Netdata Agent logs when the collector starts or restarts. Vault resolv
 ### Vault returns permission denied or the token has expired
 
 Check the Vault token policy and, if you use Vault Enterprise namespaces, confirm that `namespace` is correct. If you use a short-lived token, make sure the token is renewed or replaced before it expires.
+
+
+### The Dynamic Configuration Test fails
+
+The Test action makes a real authenticated request to Vault's token self-lookup endpoint. HTTP 200 is operational success by status; its response body is not inspected. An exact permission-only HTTP 403 body is reported as validation-only because it cannot reliably prove whether the token is valid. Invalid-token, ambiguous, malformed, or oversized HTTP 403 bodies fail. An unreachable endpoint and every other HTTP status also fail.
+
+Operational success proves only that the responding endpoint returned HTTP 200 for self-lookup at that time. It does not prove that Vault accepted the token or that the token can read a particular secret path. Check secret-path policies separately. A gateway or deployment allowlist can reject the self-lookup route even when configured secret reads would work.
 
 
 ### Secret or key is not found

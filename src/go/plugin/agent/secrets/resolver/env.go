@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func (r *Resolver) resolveEnv(ctx context.Context, name, original string) (string, error) {
+func resolveEnv(ctx context.Context, name, original string) (string, error) {
 	val, ok := os.LookupEnv(name)
 	if !ok {
 		return "", fmt.Errorf("resolving secret '%s': environment variable '%s' is not set", original, name)

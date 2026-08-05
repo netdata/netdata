@@ -640,11 +640,13 @@ The following alerts are available:
 | [ am_synapse_link_processing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.link_processing_latency | Synapse Link processing latency on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -666,26 +668,26 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.synapse.builtin_sql_pool_data_processed | processed | bytes/s |
-| azure_monitor.synapse.builtin_sql_pool_login_attempts | login_attempts | attempts/s |
-| azure_monitor.synapse.builtin_sql_pool_requests | requests | requests/s |
-| azure_monitor.synapse.activity_runs | ended | runs/s |
-| azure_monitor.synapse.pipeline_runs | ended | runs/s |
-| azure_monitor.synapse.trigger_runs | ended | runs/s |
-| azure_monitor.synapse.link_connection_events | events | events/s |
-| azure_monitor.synapse.link_table_events | events | events/s |
-| azure_monitor.synapse.link_processed_rows | changed_rows | rows/s |
-| azure_monitor.synapse.link_data_volume | processed | bytes/s |
-| azure_monitor.synapse.link_processing_latency | average | seconds |
-| azure_monitor.synapse.streaming_event_flow | in, out | events/s |
-| azure_monitor.synapse.streaming_input_throughput | received | bytes/s |
-| azure_monitor.synapse.streaming_input_sources | received | sources/s |
-| azure_monitor.synapse.streaming_event_timing | late, early, out_of_order, backlogged | events/s |
-| azure_monitor.synapse.streaming_watermark_delay | delay | seconds |
-| azure_monitor.synapse.streaming_errors | runtime, data_conversion, deserialization | errors/s |
-| azure_monitor.synapse.streaming_resource_utilization | utilization | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.synapse.builtin_sql_pool_data_processed | Azure Synapse Built-in SQL Pool Data Processed | processed | bytes/s |
+| azure_monitor.synapse.builtin_sql_pool_login_attempts | Azure Synapse Built-in SQL Pool Login Attempts | login_attempts | attempts/s |
+| azure_monitor.synapse.builtin_sql_pool_requests | Azure Synapse Built-in SQL Pool Requests Ended | requests | requests/s |
+| azure_monitor.synapse.activity_runs | Azure Synapse Activity Runs | ended | runs/s |
+| azure_monitor.synapse.pipeline_runs | Azure Synapse Pipeline Runs | ended | runs/s |
+| azure_monitor.synapse.trigger_runs | Azure Synapse Trigger Runs | ended | runs/s |
+| azure_monitor.synapse.link_connection_events | Azure Synapse Link Connection Events | events | events/s |
+| azure_monitor.synapse.link_table_events | Azure Synapse Link Table Events | events | events/s |
+| azure_monitor.synapse.link_processed_rows | Azure Synapse Link Processed Changed Rows | changed_rows | rows/s |
+| azure_monitor.synapse.link_data_volume | Azure Synapse Link Processed Data Volume | processed | bytes/s |
+| azure_monitor.synapse.link_processing_latency | Azure Synapse Link Processing Latency | average | seconds |
+| azure_monitor.synapse.streaming_event_flow | Azure Synapse Streaming Event Flow | in, out | events/s |
+| azure_monitor.synapse.streaming_input_throughput | Azure Synapse Streaming Input Data Throughput | received | bytes/s |
+| azure_monitor.synapse.streaming_input_sources | Azure Synapse Streaming Input Sources Received | received | sources/s |
+| azure_monitor.synapse.streaming_event_timing | Azure Synapse Streaming Event Timing Issues | late, early, out_of_order, backlogged | events/s |
+| azure_monitor.synapse.streaming_watermark_delay | Azure Synapse Streaming Watermark Delay | delay | seconds |
+| azure_monitor.synapse.streaming_errors | Azure Synapse Streaming Errors | runtime, data_conversion, deserialization | errors/s |
+| azure_monitor.synapse.streaming_resource_utilization | Azure Synapse Streaming Resource Utilization | utilization | percentage |
 
 
 

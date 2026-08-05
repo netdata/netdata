@@ -289,3 +289,99 @@ func TestServiceQuarantineComponent(t *testing.T) {
 		t.Run(name, tc.run)
 	}
 }
+
+func TestServiceFinalizeComponent(t *testing.T) {
+	tests := map[string]struct {
+		run func(*testing.T)
+	}{
+		"emits current store and removes emitter state": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				svc.SetTickEvery(time.Hour)
+				store := metrix.NewRuntimeStore()
+				store.Write().StatefulMeter("component").Gauge("load").Set(7)
+				require.NoError(t, svc.RegisterComponent(ComponentConfig{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+				}))
+				out := &safeBuffer{}
+				svc.Start("go.d", out)
+				defer svc.Stop()
+
+				svc.FinalizeComponent("component")
+
+				result := out.String()
+				require.Contains(t, result, "component_load")
+				require.Contains(t, result, "SET 'value' = 7")
+				assert.Empty(t, svc.registry.snapshot())
+
+				mark := len(result)
+				svc.mu.Lock()
+				job := svc.job
+				svc.mu.Unlock()
+				require.NotNil(t, job)
+				job.runOnce(2)
+				assert.Equal(t, mark, len(out.String()))
+			},
+		},
+		"waits out an in-progress tick before final emission": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				svc.SetTickEvery(time.Hour)
+				store := metrix.NewRuntimeStore()
+				store.Write().StatefulMeter("component").Gauge("load").Set(7)
+				require.NoError(t, svc.RegisterComponent(ComponentConfig{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+				}))
+				out := &gatedWriter{
+					started: make(chan struct{}),
+					release: make(chan struct{}),
+				}
+				svc.Start("go.d", out)
+				defer svc.Stop()
+				svc.Tick(1)
+				select {
+				case <-out.started:
+				case <-time.After(time.Second):
+					t.Fatal("tick did not reach its write")
+				}
+				store.Write().StatefulMeter("component").Gauge("load").Set(8)
+
+				finalized := make(chan struct{})
+				go func() {
+					svc.FinalizeComponent("component")
+					close(finalized)
+				}()
+				returned := func() bool {
+					select {
+					case <-finalized:
+						return true
+					default:
+						return false
+					}
+				}
+				require.Never(
+					t,
+					returned,
+					200*time.Millisecond,
+					10*time.Millisecond,
+				)
+				close(out.release)
+				require.Eventually(
+					t,
+					returned,
+					time.Second,
+					10*time.Millisecond,
+				)
+				require.Contains(t, out.String(), "SET 'value' = 8")
+				assert.Empty(t, svc.registry.snapshot())
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, test.run)
+	}
+}

@@ -147,10 +147,15 @@ The following rules apply when routing conflicts arise:
 |-----------------------------------------------|------------------------------------------------------------------------------------------------|
 | Template vs autogen chart ID collision        | Template wins; autogen chart is replaced                                                       |
 | Cross-template chart ID collision             | Existing owner keeps ownership; subsequent series are **silently ignored** (see warning below) |
-| Duplicate dimension observations within build | First observed dimension metadata wins; values are reduced (summed)                            |
+| Duplicate dimension observations within build | First observed dimension metadata wins; values use the chart's configured reducer            |
 
 > [!WARNING]
 > Cross-template chart ID collisions cause silent data loss — conflicting series are dropped with no error and no log entry. If metrics are missing, check for duplicate rendered chart IDs across template groups.
+
+Authored charts can set one reducer for all their dimensions. Supported values are `sum` (default), `min`, `max`, and
+`avg`. Reduction is scoped to one successful plan build and happens before multiplier/divisor and
+`absolute`/`incremental` chart processing. Autogen routes retain their existing sum behavior. See the chart-template
+format's [aggregation section](../charttpl/README.md#aggregation) for semantics and metric-type constraints.
 
 ## Lifecycle Defaults and Policy
 
@@ -168,11 +173,17 @@ Default lifecycle policy when template omits lifecycle:
 | Topic                 | Behavior                                                                                                                                       |
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
+| Authored precedence   | All authored routes are resolved first; conditional rules and fallback apply only when none matched                                             |
+| Conditional rules     | `AutogenPolicy.Rules` scope fallback selectors by source family; all applicable selectors must accept, so any rejection suppresses fallback     |
 | Context namespace     | Autogen context = top-level `context_namespace` + the full metric name (which includes any `SnapshotMeter` prefix); empty namespace leaves the bare name. A non-empty meter prefix stacks after `context_namespace`, so pair `context_namespace` with `SnapshotMeter("")` to avoid a doubled prefix |
-| Structured families   | Autogen has dedicated source builders for flattened `Histogram`, `Summary`, `StateSet`, and `MeasureSet` families                              |
+| Structured families   | Histogram/summary components use the base family and retain structural labels; StateSet keeps its name; MeasureSet fields use the source before `_<field>` |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |
 | Type ID budget        | Enforced via `AutogenPolicy.MaxTypeIDLen` + effective emit type-id prefix (`WithEmitTypeIDBudgetPrefix(...)`)                                  |
 | Lifecycle             | Autogen applies `ExpireAfterSuccessCycles` to **both** chart and dimension expiry (unlike template lifecycle where they default independently) |
+
+Rejected fallback series continue through collection and remain accounted as unmatched routing; no separate runtime
+counter is emitted. Use an upstream selector or relabeling/filtering mechanism when data, rather than only fallback
+charts, must be removed.
 
 Histogram bucket charts use non-overlapping range bucket totals from
 `metrix.ReadFlatten()` and are emitted as `heatmap` charts in both autogen and

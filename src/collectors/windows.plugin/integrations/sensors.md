@@ -114,11 +114,13 @@ You can add custom sensor information by creating a dedicated sensor section.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -136,27 +138,27 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.hw.sensor.temperature.input | input | Cel |
-| system.hw.sensor.temperature.histogram | 40, 50, 60, 70, 80, 85, 90, 95, 100, +Inf | sensors |
-| system.hw.sensor.power.input | input | W |
-| system.hw.sensor.current.input | input | A |
-| system.hw.sensor.humidity.input | input | % |
-| system.hw.sensor.lux.input | input | lx |
-| system.hw.sensor.color.input | input | Cel |
-| system.hw.sensor.voltage.input | input | V |
-| system.hw.sensor.resistance.input | input | Ohms |
-| system.hw.sensor.capacitance.input | input | F |
-| system.hw.sensor.inductance.input | input | H |
-| system.hw.sensor.pressure.input | input | Pa |
-| system.hw.sensor.latitude.input | input | Degrees |
-| system.hw.sensor.longitude.input | input | Degrees |
-| system.hw.sensor.force.input | input | N |
-| system.hw.sensor.gauge_pressure.input | input | Pa |
-| system.hw.sensor.human_presence.input | input | presence |
-| system.hw.sensor.human_proximity.input | input | m |
-| system.hw.sensor.distance.input | inputX, inputY, inputZ | m |
-| system.hw.sensor.acceleration.input | inputX, inputY, inputZ | g |
-| system.hw.sensor.state.input | ready, not_available, no_data, initializing, access_denied, error | status |
-| system.hw.sensor.custom | inputN | nd |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.hw.sensor.temperature.input | Sensor Temperature | input | Cel |
+| system.hw.sensor.temperature.histogram | Distribution of all temperature sensors in fixed bands | 40, 50, 60, 70, 80, 85, 90, 95, 100, +Inf | sensors |
+| system.hw.sensor.power.input | Sensor Power | input | W |
+| system.hw.sensor.current.input | Sensor Current | input | A |
+| system.hw.sensor.humidity.input | Sensor Humidity | input | % |
+| system.hw.sensor.lux.input | Ambient light level | input | lx |
+| system.hw.sensor.color.input | Color temperature of light | input | Cel |
+| system.hw.sensor.voltage.input | Electrical potential | input | V |
+| system.hw.sensor.resistance.input | Electrical resistance | input | Ohms |
+| system.hw.sensor.capacitance.input | Electrical capacitance | input | F |
+| system.hw.sensor.inductance.input | Electrical indutance | input | H |
+| system.hw.sensor.pressure.input | Ambient atmospheric pressure | input | Pa |
+| system.hw.sensor.latitude.input | Geographic latitude | input | Degrees |
+| system.hw.sensor.longitude.input | Geographic longitude | input | Degrees |
+| system.hw.sensor.force.input | Force | input | N |
+| system.hw.sensor.gauge_pressure.input | Gauge Pressure | input | Pa |
+| system.hw.sensor.human_presence.input | Human presence | input | presence |
+| system.hw.sensor.human_proximity.input | Human proximity | input | m |
+| system.hw.sensor.distance.input | Distance | inputX, inputY, inputZ | m |
+| system.hw.sensor.acceleration.input | Acceleration | inputX, inputY, inputZ | g |
+| system.hw.sensor.state.input | Current sensor state. | ready, not_available, no_data, initializing, access_denied, error | status |
+| system.hw.sensor.custom | Custom Chart | inputN | nd |

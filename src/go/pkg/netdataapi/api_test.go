@@ -279,6 +279,94 @@ func TestCONFIGCREATE(t *testing.T) {
 	require.Equal(t, expected, w.String())
 }
 
+func TestCONFIGCREATEAcceptsWindowsSourcePath(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
+
+	require.NoError(t, api.TryCONFIGCREATE(ConfigOpts{
+		ID:                "go.d:collector:module:job",
+		Status:            "running",
+		ConfigType:        "job",
+		Path:              "/collectors/go.d/Jobs",
+		SourceType:        "user",
+		Source:            `discoverer=file_reader,file=C:\Program Files\Netdata\go.d\job.conf`,
+		SupportedCommands: "schema get",
+	}))
+
+	require.Contains(
+		t,
+		w.String(),
+		`'discoverer=file_reader,file=C:\Program Files\Netdata\go.d\job.conf'`,
+	)
+}
+
+func TestCONFIGCREATERefusesUnsafeProtocolFields(t *testing.T) {
+	base := ConfigOpts{
+		ID:                "go.d:collector:module:job",
+		Status:            "running",
+		ConfigType:        "job",
+		Path:              "/collectors/go.d/Jobs",
+		SourceType:        "user",
+		Source:            "file=/etc/netdata/go.d/job.conf",
+		SupportedCommands: "schema get",
+	}
+	tests := map[string]ConfigOpts{
+		"ID separator": func() ConfigOpts {
+			opts := base
+			opts.ID = "go.d:collector:module job"
+			return opts
+		}(),
+		"status separator": func() ConfigOpts {
+			opts := base
+			opts.Status = "not running"
+			return opts
+		}(),
+		"config type delimiter": func() ConfigOpts {
+			opts := base
+			opts.ConfigType = "operator's"
+			return opts
+		}(),
+		"path separator": func() ConfigOpts {
+			opts := base
+			opts.Path = "/collectors/go.d/Service Discovery"
+			return opts
+		}(),
+		"source type delimiter": func() ConfigOpts {
+			opts := base
+			opts.SourceType = "source=user"
+			return opts
+		}(),
+		"quoted field delimiter": func() ConfigOpts {
+			opts := base
+			opts.Source = "file=/etc/netdata/go.d/operator's.conf"
+			return opts
+		}(),
+		"quoted field line break": func() ConfigOpts {
+			opts := base
+			opts.Source = "file=/etc/netdata/go.d/job.conf\nCONFIG injected delete"
+			return opts
+		}(),
+		"quoted field trailing escape": func() ConfigOpts {
+			opts := base
+			opts.Source = `file=C:\`
+			return opts
+		}(),
+		"supported commands delimiter": func() ConfigOpts {
+			opts := base
+			opts.SupportedCommands = "schema operator's"
+			return opts
+		}(),
+	}
+
+	for name, opts := range tests {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			require.Error(t, New(&output).TryCONFIGCREATE(opts))
+			require.Empty(t, output.String())
+		})
+	}
+}
+
 func TestCONFIGDELETE(t *testing.T) {
 	w := &bytes.Buffer{}
 	api := New(w)
@@ -290,6 +378,13 @@ func TestCONFIGDELETE(t *testing.T) {
 	require.Equal(t, expected, w.String())
 }
 
+func TestCONFIGDELETERefusesUnsafeID(t *testing.T) {
+	var output bytes.Buffer
+
+	require.Error(t, New(&output).TryCONFIGDELETE("test config"))
+	require.Empty(t, output.String())
+}
+
 func TestCONFIGSTATUS(t *testing.T) {
 	w := &bytes.Buffer{}
 	api := New(w)
@@ -299,4 +394,22 @@ func TestCONFIGSTATUS(t *testing.T) {
 	expected := "CONFIG test-config status inactive\n\n"
 
 	require.Equal(t, expected, w.String())
+}
+
+func TestCONFIGSTATUSRefusesUnsafeFields(t *testing.T) {
+	tests := map[string]struct {
+		id     string
+		status string
+	}{
+		"ID":     {id: "test config", status: "running"},
+		"status": {id: "test-config", status: "not running"},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			require.Error(t, New(&output).TryCONFIGSTATUS(test.id, test.status))
+			require.Empty(t, output.String())
+		})
+	}
 }

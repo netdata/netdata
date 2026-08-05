@@ -1,16 +1,14 @@
 use crate::enrichment::FlowEnricher;
-use netflow_parser::NetflowPacket;
 use netflow_parser::scoped_parser::AutoScopedParser;
 use netflow_parser::static_versions::{v5::V5, v7::V7};
-use netflow_parser::variable_versions::data_number::{DataNumber, FieldValue};
+use netflow_parser::variable_versions::ipfix::lookup::{
+    IANAIPFixField, IPFixField, ReverseInformationElement,
+};
 use netflow_parser::variable_versions::ipfix::{
     FlowSet as NetflowIPFixFlowSet, FlowSetBody as IPFixFlowSetBody,
     FlowSetHeader as NetflowIPFixFlowSetHeader, Header as NetflowIPFixHeader, IPFix,
     OptionsData as IPFixOptionsData, OptionsTemplate as NetflowIPFixOptionsTemplate,
     Template as NetflowIPFixTemplate, TemplateField as NetflowIPFixTemplateField,
-};
-use netflow_parser::variable_versions::ipfix_lookup::{
-    IANAIPFixField, IPFixField, ReverseInformationElement,
 };
 use netflow_parser::variable_versions::v9::{
     FlowSet as NetflowV9FlowSet, FlowSetBody as V9FlowSetBody,
@@ -20,7 +18,10 @@ use netflow_parser::variable_versions::v9::{
     OptionsTemplates as NetflowV9OptionsTemplates, Template as NetflowV9Template,
     TemplateField as NetflowV9TemplateField, Templates as NetflowV9Templates, V9,
 };
-use netflow_parser::variable_versions::v9_lookup::V9Field;
+use netflow_parser::{
+    AutoSourceKey, DataNumber, FieldValue, NetflowPacket, NetflowParser, ParseResult, V9Field,
+    V9SourceKey,
+};
 use serde::{Deserialize, Serialize};
 use sflow_parser::models::{
     Address, FlowData, FlowRecord as SFlowRecord, HeaderProtocol, SFlowDatagram, SampleData,
@@ -29,7 +30,7 @@ use sflow_parser::parse_datagram;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use twox_hash::XxHash64;
 
 mod common;
@@ -48,46 +49,23 @@ const ETYPE_VLAN: u16 = 0x8100;
 const ETYPE_VLAN_QINQ: u16 = 0x88a8;
 const ETYPE_VLAN_QINQ_LEGACY: u16 = 0x9100;
 const ETYPE_MPLS_UNICAST: u16 = 0x8847;
+#[cfg(test)]
 const IPFIX_SET_ID_TEMPLATE: u16 = 2;
+#[cfg(test)]
 const IPFIX_FIELD_INPUT_SNMP: u16 = 10;
-const IPFIX_FIELD_OUTPUT_SNMP: u16 = 14;
+#[cfg(test)]
 const IPFIX_FIELD_DIRECTION: u16 = 61;
-const IPFIX_FIELD_OCTET_DELTA_COUNT: u16 = 1;
-const IPFIX_FIELD_PACKET_DELTA_COUNT: u16 = 2;
-const IPFIX_FIELD_PROTOCOL_IDENTIFIER: u16 = 4;
-const IPFIX_FIELD_SOURCE_TRANSPORT_PORT: u16 = 7;
-const IPFIX_FIELD_SOURCE_IPV4_ADDRESS: u16 = 8;
-const IPFIX_FIELD_DESTINATION_TRANSPORT_PORT: u16 = 11;
-const IPFIX_FIELD_DESTINATION_IPV4_ADDRESS: u16 = 12;
-const IPFIX_FIELD_SOURCE_IPV6_ADDRESS: u16 = 27;
-const IPFIX_FIELD_DESTINATION_IPV6_ADDRESS: u16 = 28;
-const IPFIX_FIELD_MINIMUM_TTL: u16 = 52;
-const IPFIX_FIELD_MAXIMUM_TTL: u16 = 53;
-const IPFIX_FIELD_IP_VERSION: u16 = 60;
-const IPFIX_FIELD_FORWARDING_STATUS: u16 = 89;
-const IPFIX_FIELD_FLOW_START_MILLISECONDS: u16 = 152;
-const IPFIX_FIELD_FLOW_END_MILLISECONDS: u16 = 153;
-const IPFIX_FIELD_SAMPLING_INTERVAL: u16 = 34;
-const IPFIX_FIELD_SAMPLER_ID: u16 = 48;
-const IPFIX_FIELD_SAMPLER_RANDOM_INTERVAL: u16 = 50;
-const IPFIX_FIELD_DATALINK_FRAME_SIZE: u16 = 312;
+#[cfg(test)]
 const IPFIX_FIELD_DATALINK_FRAME_SECTION: u16 = 315;
-const IPFIX_FIELD_SELECTOR_ID: u16 = 302;
-const IPFIX_FIELD_SAMPLING_PACKET_INTERVAL: u16 = 305;
-const IPFIX_FIELD_SAMPLING_PACKET_SPACE: u16 = 306;
-const IPFIX_FIELD_MPLS_LABEL_1: u16 = 70;
-const IPFIX_FIELD_MPLS_LABEL_10: u16 = 79;
-const V9_FIELD_LAYER2_PACKET_SECTION_DATA: u16 = 104;
 const JUNIPER_PEN: u32 = 2636;
 const JUNIPER_COMMON_PROPERTIES_ID: u16 = 137;
 const SFLOW_INTERFACE_LOCAL: u32 = 0x3fff_ffff;
 const SFLOW_INTERFACE_FORMAT_INDEX: u32 = 0;
 const SFLOW_INTERFACE_FORMAT_DISCARD: u32 = 1;
 const VXLAN_UDP_PORT: u16 = 4789;
-const DECODER_STATE_SCHEMA_VERSION: u32 = 3;
+pub(crate) const DECODER_STATE_SCHEMA_VERSION: u32 = 5;
 const DECODER_STATE_MAGIC: &[u8; 4] = b"NDFS";
 const DECODER_STATE_HEADER_LEN: usize = 4 + 4 + 8 + 8;
-
 pub(crate) use crate::flow::*;
 
 pub(crate) fn canonicalize_ip_addr(ip: IpAddr) -> IpAddr {
@@ -101,7 +79,8 @@ pub(crate) fn canonicalize_ip_addr(ip: IpAddr) -> IpAddr {
 }
 
 pub(crate) fn normalize_template_scope_source(source: SocketAddr) -> SocketAddr {
-    // Parser/template scope should follow exporter identity, not ephemeral UDP source ports.
+    // Legacy NetFlow and the existing IPFIX path intentionally use exporter
+    // identity without the UDP source port. NetFlow v9 is scoped separately.
     SocketAddr::new(canonicalize_ip_addr(source.ip()), 0)
 }
 
@@ -123,7 +102,56 @@ pub(crate) struct DecodeStats {
     pub(crate) parse_attempts: u64,
     pub(crate) parsed_packets: u64,
     pub(crate) parse_errors: u64,
-    pub(crate) template_errors: u64,
+    pub(crate) missing_template_sets: u64,
+    pub(crate) disabled_protocol_packets: u64,
+    pub(crate) parser_source_evictions: u64,
+    pub(crate) partial_counter_records: u64,
+    pub(crate) decapsulation_failed_records: u64,
+    pub(crate) sampling_option_records: u64,
+    pub(crate) unsupported_data_sets: u64,
+    pub(crate) decoded_rows: u64,
+    pub(crate) enrichment_filtered_rows: u64,
+    pub(crate) ipfix_zero_reverse_records: u64,
+    pub(crate) v9_data_sets: u64,
+    pub(crate) v9_options_data_sets: u64,
+    pub(crate) v9_template_sets: u64,
+    pub(crate) v9_options_template_sets: u64,
+    pub(crate) v9_missing_template_sets: u64,
+    pub(crate) v9_ignored_sets: u64,
+    pub(crate) ipfix_data_sets: u64,
+    pub(crate) ipfix_options_data_sets: u64,
+    pub(crate) ipfix_template_sets: u64,
+    pub(crate) ipfix_options_template_sets: u64,
+    pub(crate) ipfix_missing_template_sets: u64,
+    pub(crate) ipfix_ignored_sets: u64,
+    pub(crate) v9_data_templates: u64,
+    pub(crate) v9_options_templates: u64,
+    pub(crate) ipfix_data_templates: u64,
+    pub(crate) ipfix_options_templates: u64,
+    pub(crate) netflow_v5_records: u64,
+    pub(crate) netflow_v7_records: u64,
+    pub(crate) netflow_v9_records: u64,
+    pub(crate) ipfix_records: u64,
+    pub(crate) v9_options_records: u64,
+    pub(crate) ipfix_options_records: u64,
+    pub(crate) sflow_flow_samples: u64,
+    pub(crate) sflow_counter_samples: u64,
+    pub(crate) sflow_discarded_samples: u64,
+    pub(crate) sflow_rt_metric_samples: u64,
+    pub(crate) sflow_rt_flow_samples: u64,
+    pub(crate) sflow_unknown_samples: u64,
+    pub(crate) nsel_records: u64,
+    pub(crate) nsel_update_records: u64,
+    pub(crate) nsel_create_records: u64,
+    pub(crate) nsel_teardown_records: u64,
+    pub(crate) nsel_denied_records: u64,
+    pub(crate) nsel_unsupported_event_records: u64,
+    pub(crate) nsel_malformed_records: u64,
+    pub(crate) nsel_counterless_update_records: u64,
+    pub(crate) nsel_partial_counter_records: u64,
+    pub(crate) nsel_zero_responder_records: u64,
+    pub(crate) nsel_forward_rows: u64,
+    pub(crate) nsel_reverse_rows: u64,
     pub(crate) netflow_v5_packets: u64,
     pub(crate) netflow_v7_packets: u64,
     pub(crate) netflow_v9_packets: u64,
@@ -136,7 +164,56 @@ impl DecodeStats {
         self.parse_attempts += other.parse_attempts;
         self.parsed_packets += other.parsed_packets;
         self.parse_errors += other.parse_errors;
-        self.template_errors += other.template_errors;
+        self.missing_template_sets += other.missing_template_sets;
+        self.disabled_protocol_packets += other.disabled_protocol_packets;
+        self.parser_source_evictions += other.parser_source_evictions;
+        self.partial_counter_records += other.partial_counter_records;
+        self.decapsulation_failed_records += other.decapsulation_failed_records;
+        self.sampling_option_records += other.sampling_option_records;
+        self.unsupported_data_sets += other.unsupported_data_sets;
+        self.decoded_rows += other.decoded_rows;
+        self.enrichment_filtered_rows += other.enrichment_filtered_rows;
+        self.ipfix_zero_reverse_records += other.ipfix_zero_reverse_records;
+        self.v9_data_sets += other.v9_data_sets;
+        self.v9_options_data_sets += other.v9_options_data_sets;
+        self.v9_template_sets += other.v9_template_sets;
+        self.v9_options_template_sets += other.v9_options_template_sets;
+        self.v9_missing_template_sets += other.v9_missing_template_sets;
+        self.v9_ignored_sets += other.v9_ignored_sets;
+        self.ipfix_data_sets += other.ipfix_data_sets;
+        self.ipfix_options_data_sets += other.ipfix_options_data_sets;
+        self.ipfix_template_sets += other.ipfix_template_sets;
+        self.ipfix_options_template_sets += other.ipfix_options_template_sets;
+        self.ipfix_missing_template_sets += other.ipfix_missing_template_sets;
+        self.ipfix_ignored_sets += other.ipfix_ignored_sets;
+        self.v9_data_templates += other.v9_data_templates;
+        self.v9_options_templates += other.v9_options_templates;
+        self.ipfix_data_templates += other.ipfix_data_templates;
+        self.ipfix_options_templates += other.ipfix_options_templates;
+        self.netflow_v5_records += other.netflow_v5_records;
+        self.netflow_v7_records += other.netflow_v7_records;
+        self.netflow_v9_records += other.netflow_v9_records;
+        self.ipfix_records += other.ipfix_records;
+        self.v9_options_records += other.v9_options_records;
+        self.ipfix_options_records += other.ipfix_options_records;
+        self.sflow_flow_samples += other.sflow_flow_samples;
+        self.sflow_counter_samples += other.sflow_counter_samples;
+        self.sflow_discarded_samples += other.sflow_discarded_samples;
+        self.sflow_rt_metric_samples += other.sflow_rt_metric_samples;
+        self.sflow_rt_flow_samples += other.sflow_rt_flow_samples;
+        self.sflow_unknown_samples += other.sflow_unknown_samples;
+        self.nsel_records += other.nsel_records;
+        self.nsel_update_records += other.nsel_update_records;
+        self.nsel_create_records += other.nsel_create_records;
+        self.nsel_teardown_records += other.nsel_teardown_records;
+        self.nsel_denied_records += other.nsel_denied_records;
+        self.nsel_unsupported_event_records += other.nsel_unsupported_event_records;
+        self.nsel_malformed_records += other.nsel_malformed_records;
+        self.nsel_counterless_update_records += other.nsel_counterless_update_records;
+        self.nsel_partial_counter_records += other.nsel_partial_counter_records;
+        self.nsel_zero_responder_records += other.nsel_zero_responder_records;
+        self.nsel_forward_rows += other.nsel_forward_rows;
+        self.nsel_reverse_rows += other.nsel_reverse_rows;
         self.netflow_v5_packets += other.netflow_v5_packets;
         self.netflow_v7_packets += other.netflow_v7_packets;
         self.netflow_v9_packets += other.netflow_v9_packets;

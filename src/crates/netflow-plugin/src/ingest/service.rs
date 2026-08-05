@@ -14,25 +14,39 @@ struct MaterializedTierWriters {
 #[derive(Clone)]
 struct FacetLifecycleObserver {
     runtime: Arc<crate::facet_runtime::FacetRuntime>,
+    metrics: Arc<IngestMetrics>,
 }
 
 impl LogLifecycleObserver for FacetLifecycleObserver {
     fn on_event(&self, event: &LogLifecycleEvent) {
         match event {
-            // A newly created active file carries no entries the facet runtime
-            // must reconcile: active files are discovered at query time and
-            // rotation is handled below. Nothing to do (matches pre-SDK behavior).
-            LogLifecycleEvent::Created { .. } => {}
+            LogLifecycleEvent::Created { active, .. } => {
+                if let Err(err) = self
+                    .runtime
+                    .observe_active_path_created(Path::new(active.path()))
+                {
+                    self.metrics
+                        .facet_lifecycle_errors
+                        .fetch_add(1, Ordering::Relaxed);
+                    tracing::warn!("facet runtime active-file update failed: {}", err);
+                }
+            }
             LogLifecycleEvent::Rotated { archived, active } => {
                 let archived_path = Path::new(archived.path());
                 let active_path = Path::new(active.path());
                 if let Err(err) = self.runtime.observe_rotation(archived_path, active_path) {
+                    self.metrics
+                        .facet_lifecycle_errors
+                        .fetch_add(1, Ordering::Relaxed);
                     tracing::warn!("facet runtime rotation update failed: {}", err);
                 }
             }
             LogLifecycleEvent::RetainedDeleted { files } => {
                 let paths: Vec<PathBuf> = files.iter().map(|f| PathBuf::from(f.path())).collect();
                 if let Err(err) = self.runtime.observe_deleted_paths(&paths) {
+                    self.metrics
+                        .facet_lifecycle_errors
+                        .fetch_add(1, Ordering::Relaxed);
                     tracing::warn!("facet runtime retention update failed: {}", err);
                 }
             }
@@ -90,6 +104,7 @@ pub(crate) struct IngestService {
     pub(super) metrics: Arc<IngestMetrics>,
     pub(super) decoders: FlowDecoders,
     pub(super) decoder_state_dir: PathBuf,
+    pub(super) protected_decoder_state_namespaces: HashSet<DecoderStateNamespaceKey>,
     pub(super) last_decoder_state_persist_usec: u64,
     pub(super) raw_journal: Log,
     pub(super) journal_host: Arc<LocalJournalProvider>,

@@ -661,11 +661,13 @@ The following alerts are available:
 | [ am_data_factory_airflow_ir_zombies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_zombies | Data Factory Airflow zombie tasks on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -687,56 +689,56 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.data_factory.pipeline_runs | succeeded, failed, cancelled | runs/s |
-| azure_monitor.data_factory.pipeline_elapsed_time | elapsed_time | runs/s |
-| azure_monitor.data_factory.activity_runs | succeeded, failed, cancelled | runs/s |
-| azure_monitor.data_factory.trigger_runs | succeeded, failed, cancelled | runs/s |
-| azure_monitor.data_factory.ssis_ir_starts | succeeded, failed, cancelled | runs/s |
-| azure_monitor.data_factory.ssis_ir_stops | succeeded, stuck | runs/s |
-| azure_monitor.data_factory.ssis_package_executions | succeeded, failed, cancelled | executions/s |
-| azure_monitor.data_factory.ir_cpu | average | percentage |
-| azure_monitor.data_factory.ir_memory | available | bytes |
-| azure_monitor.data_factory.ir_nodes | available | nodes |
-| azure_monitor.data_factory.ir_queue | queue_length | tasks |
-| azure_monitor.data_factory.ir_task_pickup_delay | average | seconds |
-| azure_monitor.data_factory.factory_size | current, max_allowed | GiB |
-| azure_monitor.data_factory.entity_count | current, max_allowed | entities |
-| azure_monitor.data_factory.mvnet_ir_copy_capacity | utilization, available | percentage |
-| azure_monitor.data_factory.mvnet_ir_copy_queue | waiting | tasks |
-| azure_monitor.data_factory.mvnet_ir_external_capacity | utilization, available | percentage |
-| azure_monitor.data_factory.mvnet_ir_external_queue | waiting | tasks |
-| azure_monitor.data_factory.mvnet_ir_pipeline_capacity | utilization, available | percentage |
-| azure_monitor.data_factory.mvnet_ir_pipeline_queue | waiting | tasks |
-| azure_monitor.data_factory.airflow_ir_cpu | percentage | percentage |
-| azure_monitor.data_factory.airflow_ir_cpu_usage | average | millicores |
-| azure_monitor.data_factory.airflow_ir_memory | percentage | percentage |
-| azure_monitor.data_factory.airflow_ir_memory_usage | average | bytes |
-| azure_monitor.data_factory.airflow_ir_nodes | average | nodes |
-| azure_monitor.data_factory.airflow_ir_dag_collection | average | milliseconds |
-| azure_monitor.data_factory.airflow_ir_dag_bag | total | dags/s |
-| azure_monitor.data_factory.airflow_ir_dag_errors | callback_exceptions, file_refresh, import | errors/s |
-| azure_monitor.data_factory.airflow_ir_dag_processing_duration | last_duration | milliseconds |
-| azure_monitor.data_factory.airflow_ir_dag_processing_lag | last_run_seconds_ago, processor_timeouts, total_parse_time | seconds |
-| azure_monitor.data_factory.airflow_ir_dag_processing_activity | manager_stalls, processes | events/s |
-| azure_monitor.data_factory.airflow_ir_dag_run_duration | success, failed | milliseconds |
-| azure_monitor.data_factory.airflow_ir_dag_run_scheduling | dependency_check, first_task_delay, schedule_delay | milliseconds |
-| azure_monitor.data_factory.airflow_ir_executor | open_slots, queued_tasks, running_tasks | slots/s |
-| azure_monitor.data_factory.airflow_ir_jobs | started, ended, heartbeat_failures | jobs/s |
-| azure_monitor.data_factory.airflow_ir_operators | successes, failures | operations/s |
-| azure_monitor.data_factory.airflow_ir_pool_slots | open, queued, running | slots/s |
-| azure_monitor.data_factory.airflow_ir_pool_starving | starving | tasks/s |
-| azure_monitor.data_factory.airflow_ir_scheduler_critical_section | duration | milliseconds |
-| azure_monitor.data_factory.airflow_ir_scheduler_activity | critical_section_busy, heartbeats, failed_sla_emails | events/s |
-| azure_monitor.data_factory.airflow_ir_scheduler_orphaned_tasks | adopted, cleared | tasks/s |
-| azure_monitor.data_factory.airflow_ir_scheduler_tasks | executable, running, starving, killed_externally | tasks/s |
-| azure_monitor.data_factory.airflow_ir_task_instances | started, succeeded, failed, finished, previously_succeeded, created_via_operator | instances/s |
-| azure_monitor.data_factory.airflow_ir_task_instance_duration | average | milliseconds |
-| azure_monitor.data_factory.airflow_ir_task_dag_changes | removed, restored | tasks/s |
-| azure_monitor.data_factory.airflow_ir_triggers | succeeded, failed, running | triggers/s |
-| azure_monitor.data_factory.airflow_ir_trigger_issues | blocked_main_thread, celery_timeout_errors | events/s |
-| azure_monitor.data_factory.airflow_ir_zombies | killed | tasks/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.data_factory.pipeline_runs | Azure Data Factory Pipeline Runs | succeeded, failed, cancelled | runs/s |
+| azure_monitor.data_factory.pipeline_elapsed_time | Azure Data Factory Pipeline Elapsed Time Runs | elapsed_time | runs/s |
+| azure_monitor.data_factory.activity_runs | Azure Data Factory Activity Runs | succeeded, failed, cancelled | runs/s |
+| azure_monitor.data_factory.trigger_runs | Azure Data Factory Trigger Runs | succeeded, failed, cancelled | runs/s |
+| azure_monitor.data_factory.ssis_ir_starts | Azure Data Factory SSIS IR Start Operations | succeeded, failed, cancelled | runs/s |
+| azure_monitor.data_factory.ssis_ir_stops | Azure Data Factory SSIS IR Stop Operations | succeeded, stuck | runs/s |
+| azure_monitor.data_factory.ssis_package_executions | Azure Data Factory SSIS Package Executions | succeeded, failed, cancelled | executions/s |
+| azure_monitor.data_factory.ir_cpu | Azure Data Factory Integration Runtime CPU | average | percentage |
+| azure_monitor.data_factory.ir_memory | Azure Data Factory Integration Runtime Available Memory | available | bytes |
+| azure_monitor.data_factory.ir_nodes | Azure Data Factory Integration Runtime Available Nodes | available | nodes |
+| azure_monitor.data_factory.ir_queue | Azure Data Factory Integration Runtime Queue | queue_length | tasks |
+| azure_monitor.data_factory.ir_task_pickup_delay | Azure Data Factory Integration Runtime Task Pickup Delay | average | seconds |
+| azure_monitor.data_factory.factory_size | Azure Data Factory Factory Size | current, max_allowed | GiB |
+| azure_monitor.data_factory.entity_count | Azure Data Factory Entity Count | current, max_allowed | entities |
+| azure_monitor.data_factory.mvnet_ir_copy_capacity | Azure Data Factory MVNet IR Copy Capacity | utilization, available | percentage |
+| azure_monitor.data_factory.mvnet_ir_copy_queue | Azure Data Factory MVNet IR Copy Queue | waiting | tasks |
+| azure_monitor.data_factory.mvnet_ir_external_capacity | Azure Data Factory MVNet IR External Capacity | utilization, available | percentage |
+| azure_monitor.data_factory.mvnet_ir_external_queue | Azure Data Factory MVNet IR External Queue | waiting | tasks |
+| azure_monitor.data_factory.mvnet_ir_pipeline_capacity | Azure Data Factory MVNet IR Pipeline Capacity | utilization, available | percentage |
+| azure_monitor.data_factory.mvnet_ir_pipeline_queue | Azure Data Factory MVNet IR Pipeline Queue | waiting | tasks |
+| azure_monitor.data_factory.airflow_ir_cpu | Azure Data Factory Airflow IR CPU | percentage | percentage |
+| azure_monitor.data_factory.airflow_ir_cpu_usage | Azure Data Factory Airflow IR CPU Usage | average | millicores |
+| azure_monitor.data_factory.airflow_ir_memory | Azure Data Factory Airflow IR Memory | percentage | percentage |
+| azure_monitor.data_factory.airflow_ir_memory_usage | Azure Data Factory Airflow IR Memory Usage | average | bytes |
+| azure_monitor.data_factory.airflow_ir_nodes | Azure Data Factory Airflow IR Node Count | average | nodes |
+| azure_monitor.data_factory.airflow_ir_dag_collection | Azure Data Factory Airflow IR DAG DB Collection Time | average | milliseconds |
+| azure_monitor.data_factory.airflow_ir_dag_bag | Azure Data Factory Airflow IR DAG Bag Size | total | dags/s |
+| azure_monitor.data_factory.airflow_ir_dag_errors | Azure Data Factory Airflow IR DAG Errors | callback_exceptions, file_refresh, import | errors/s |
+| azure_monitor.data_factory.airflow_ir_dag_processing_duration | Azure Data Factory Airflow IR DAG Processing Duration | last_duration | milliseconds |
+| azure_monitor.data_factory.airflow_ir_dag_processing_lag | Azure Data Factory Airflow IR DAG Processing Lag | last_run_seconds_ago, processor_timeouts, total_parse_time | seconds |
+| azure_monitor.data_factory.airflow_ir_dag_processing_activity | Azure Data Factory Airflow IR DAG Processing Activity | manager_stalls, processes | events/s |
+| azure_monitor.data_factory.airflow_ir_dag_run_duration | Azure Data Factory Airflow IR DAG Run Duration | success, failed | milliseconds |
+| azure_monitor.data_factory.airflow_ir_dag_run_scheduling | Azure Data Factory Airflow IR DAG Run Scheduling Delays | dependency_check, first_task_delay, schedule_delay | milliseconds |
+| azure_monitor.data_factory.airflow_ir_executor | Azure Data Factory Airflow IR Executor | open_slots, queued_tasks, running_tasks | slots/s |
+| azure_monitor.data_factory.airflow_ir_jobs | Azure Data Factory Airflow IR Jobs | started, ended, heartbeat_failures | jobs/s |
+| azure_monitor.data_factory.airflow_ir_operators | Azure Data Factory Airflow IR Operators | successes, failures | operations/s |
+| azure_monitor.data_factory.airflow_ir_pool_slots | Azure Data Factory Airflow IR Pool Slots | open, queued, running | slots/s |
+| azure_monitor.data_factory.airflow_ir_pool_starving | Azure Data Factory Airflow IR Pool Starving Tasks | starving | tasks/s |
+| azure_monitor.data_factory.airflow_ir_scheduler_critical_section | Azure Data Factory Airflow IR Scheduler Critical Section | duration | milliseconds |
+| azure_monitor.data_factory.airflow_ir_scheduler_activity | Azure Data Factory Airflow IR Scheduler Activity | critical_section_busy, heartbeats, failed_sla_emails | events/s |
+| azure_monitor.data_factory.airflow_ir_scheduler_orphaned_tasks | Azure Data Factory Airflow IR Scheduler Orphaned Tasks | adopted, cleared | tasks/s |
+| azure_monitor.data_factory.airflow_ir_scheduler_tasks | Azure Data Factory Airflow IR Scheduler Tasks | executable, running, starving, killed_externally | tasks/s |
+| azure_monitor.data_factory.airflow_ir_task_instances | Azure Data Factory Airflow IR Task Instances | started, succeeded, failed, finished, previously_succeeded, created_via_operator | instances/s |
+| azure_monitor.data_factory.airflow_ir_task_instance_duration | Azure Data Factory Airflow IR Task Instance Duration | average | milliseconds |
+| azure_monitor.data_factory.airflow_ir_task_dag_changes | Azure Data Factory Airflow IR Task DAG Changes | removed, restored | tasks/s |
+| azure_monitor.data_factory.airflow_ir_triggers | Azure Data Factory Airflow IR Triggers | succeeded, failed, running | triggers/s |
+| azure_monitor.data_factory.airflow_ir_trigger_issues | Azure Data Factory Airflow IR Trigger Issues | blocked_main_thread, celery_timeout_errors | events/s |
+| azure_monitor.data_factory.airflow_ir_zombies | Azure Data Factory Airflow IR Zombie Tasks Killed | killed | tasks/s |
 
 
 

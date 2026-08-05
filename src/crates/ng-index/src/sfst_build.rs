@@ -164,9 +164,9 @@ fn populate_row_index(
 
         let flattened: FlattenedLogRequest = {
             let _t = metrics.scope("deserialize");
-            decode_log_frame(frame.data).map_err(|source| Error::BincodeDecode {
+            decode_log_frame(frame.data).map_err(|err| Error::BincodeDecode {
                 frame: stats.frames,
-                source,
+                err,
             })?
         };
 
@@ -354,9 +354,9 @@ fn populate_trace_row_index(
 
         let flattened: ng_flatten::FlattenedTraceRequest = {
             let _t = metrics.scope("deserialize");
-            ng_flatten::decode_trace_frame(frame.data).map_err(|source| Error::BincodeDecode {
+            ng_flatten::decode_trace_frame(frame.data).map_err(|err| Error::BincodeDecode {
                 frame: stats.frames,
-                source,
+                err,
             })?
         };
 

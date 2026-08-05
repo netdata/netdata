@@ -52,6 +52,13 @@ impl FlowStorage {
         }
     }
 
+    pub(crate) fn hash_field_ids<H: HashStrategy>(&self, field_ids: &[FieldId], hasher: &H) -> u64 {
+        match self {
+            Self::Dense(_) => hasher.hash_u32_slice(field_ids),
+            Self::Sparse(storage) => storage.hash_field_ids(field_ids, hasher),
+        }
+    }
+
     pub(crate) fn field_id(&self, flow_id: FlowId, field_index: usize) -> Option<FieldId> {
         match self {
             Self::Dense(storage) => storage.field_id(flow_id, field_index),
@@ -211,23 +218,36 @@ impl SparseFlowStorage {
     }
 
     fn row_hash<H: HashStrategy>(&self, flow_id: FlowId, hasher: &H) -> Option<u64> {
-        let (mut sparse_index, sparse_end) = self.row_bounds(flow_id)?;
+        let (sparse_start, sparse_end) = self.row_bounds(flow_id)?;
         let mut state = hasher.build_hasher();
 
-        for field_index in 0..self.arity {
-            let field_id = if sparse_index < sparse_end
-                && self.row_field_indexes[sparse_index] as usize == field_index
-            {
-                let field_id = self.row_field_ids[sparse_index];
-                sparse_index += 1;
-                field_id
-            } else {
-                self.default_field_ids[field_index]
-            };
+        for (&field_index, &field_id) in self.row_field_indexes[sparse_start..sparse_end]
+            .iter()
+            .zip(self.row_field_ids[sparse_start..sparse_end].iter())
+        {
+            state.write_u8(field_index);
             state.write_u32(field_id);
         }
 
         Some(state.finish())
+    }
+
+    fn hash_field_ids<H: HashStrategy>(&self, field_ids: &[FieldId], hasher: &H) -> u64 {
+        debug_assert_eq!(field_ids.len(), self.arity);
+
+        let mut state = hasher.build_hasher();
+        for (field_index, (&field_id, &default_field_id)) in field_ids
+            .iter()
+            .zip(self.default_field_ids.iter())
+            .enumerate()
+        {
+            if field_id == default_field_id {
+                continue;
+            }
+            state.write_u8(field_index as u8);
+            state.write_u32(field_id);
+        }
+        state.finish()
     }
 
     fn field_id(&self, flow_id: FlowId, field_index: usize) -> Option<FieldId> {

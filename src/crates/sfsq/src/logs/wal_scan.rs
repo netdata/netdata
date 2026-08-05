@@ -52,7 +52,9 @@ use super::query::LogsQuery;
 #[derive(Debug, thiserror::Error)]
 pub enum FlattenedScanError {
     /// The WAL container could not be read (open or frame iteration).
-    #[error("wal read: {0}")]
+    /// Transparent: embedding the source in the message while also
+    /// chaining it would print it twice in anyhow chains.
+    #[error(transparent)]
     Wal(#[from] wal::Error),
     /// The WAL header names a frame codec other than the ng-flatten logs
     /// format this scan implements — refuse before decoding any frame.

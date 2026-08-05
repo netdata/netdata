@@ -633,11 +633,13 @@ The following alerts are available:
 | [ am_key_vault_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.saturation | Key Vault saturation on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -659,12 +661,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.key_vault.availability | average | percentage |
-| azure_monitor.key_vault.api_latency | average | milliseconds |
-| azure_monitor.key_vault.saturation | average | percentage |
-| azure_monitor.key_vault.api_activity | hits, results | operations/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.key_vault.availability | Azure Key Vault Availability | average | percentage |
+| azure_monitor.key_vault.api_latency | Azure Key Vault API Latency | average | milliseconds |
+| azure_monitor.key_vault.saturation | Azure Key Vault Saturation | average | percentage |
+| azure_monitor.key_vault.api_activity | Azure Key Vault API Activity | hits, results | operations/s |
 
 
 

@@ -103,6 +103,12 @@ func TestExecuteQueries(t *testing.T) {
 					assert.Equal(t, tc.wantValue, outcome.value)
 				}
 			}
+			activity := c.activity.snapshot()
+			assert.Equal(t, uint64(1), activitySDKInvocationCount(activity, "123456789012", "us-east-1", activityOperationGetMetricData),
+				"failed and successful SDK invocations are both activity")
+			assert.Equal(t, uint64(len(tc.instances["us-east-1"])*2), activityCalculatedMetricRequestCount(activity, "123456789012", "us-east-1"))
+			assert.Equal(t, uint64(len(tc.instances["us-east-1"])*2), activityProfileMetricRequestEstimate(activity, "123456789012", "us-east-1", "ec2"))
+			assert.Equal(t, uint64(tc.wantOutcomes), activityQueryItemCount(activity, "123456789012", "us-east-1", "ec2"))
 		})
 	}
 }
@@ -204,11 +210,13 @@ func TestExecuteQueries_PaginationAndDedup(t *testing.T) {
 	require.Len(t, execution.outcomes, 3)
 	assert.Equal(t, 2, fake.calls, "followed NextToken to the second page")
 	activity := c.activity.snapshot()
-	assert.Equal(t, uint64(2), activityCallCount(activity, accountID, "us-east-1", activityOperationGetMetricData))
-	assert.Equal(t, uint64(4), activityMetricRequestCount(activity, accountID, "us-east-1"),
+	assert.Equal(t, uint64(2), activitySDKInvocationCount(activity, accountID, "us-east-1", activityOperationGetMetricData))
+	assert.Equal(t, uint64(4), activityCalculatedMetricRequestCount(activity, accountID, "us-east-1"),
 		"each page resubmits one CPU and one Duration billing unit")
-	assert.Equal(t, uint64(6), activityQueryCount(activity, accountID, "us-east-1", "ec2"),
-		"each page resubmits all three raw queries")
+	assert.Equal(t, uint64(4), activityProfileMetricRequestEstimate(activity, accountID, "us-east-1", "ec2"),
+		"each page replays the profile's independently calculated footprint")
+	assert.Equal(t, uint64(6), activityQueryItemCount(activity, accountID, "us-east-1", "ec2"),
+		"each page resubmits all three query items")
 
 	byName := map[string]float64{}
 	for _, query := range plan {

@@ -173,11 +173,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -194,10 +196,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hddtemp.disk_temperature | temperature | Celsius |
-| hddtemp.disk_temperature_sensor_status | ok, err, na, unk, nos, slp | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hddtemp.disk_temperature | Disk temperature | temperature | Celsius |
+| hddtemp.disk_temperature_sensor_status | Disk temperature sensor status | ok, err, na, unk, nos, slp | status |
 
 
 

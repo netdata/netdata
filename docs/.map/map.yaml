@@ -175,6 +175,16 @@ sidebar:
               label: Disk & Retention
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md
           - meta:
+              label: Extreme Cardinality Protection
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/extreme-cardinality-protection.md
+              description: How Netdata limits long-term resource use from short-lived chart instances, and how metadata cleanup affects disk space.
+              keywords:
+                - cardinality
+                - ephemerality
+                - retention
+                - metadata
+                - netdata-meta.db
+          - meta:
               label: Impact on Cloud VMs
               edit_url: https://github.com/netdata/netdata/edit/master/docs/impact-on-resources.md
               description: Recommended VM sizing and the resource impact of running Netdata on cloud VMs (AWS, Azure, GCP).
@@ -472,6 +482,16 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/cloudwatch/profile-format.md
           description: Define CloudWatch namespaces, supported regions, resource dimensions, metrics, statistics, and dynamic charts in reusable profiles.
           keywords: [aws, cloudwatch, profiles, collectors, metrics]
+      - meta:
+          label: Prometheus Profile Format
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/profile-format.md
+          description: Define curated chart profiles for Prometheus endpoints, with scoped autogen selectors that filter the fallback charts of unmatched metrics.
+          keywords: [prometheus, profiles, autogen, collectors, charts]
+      - meta:
+          label: Prometheus Metric Relabeling
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md
+          description: Rewrite, derive, or drop scraped Prometheus metrics and labels with Prometheus-compatible metric_relabel_configs rules before charts are built.
+          keywords: [prometheus, relabeling, metric_relabel_configs, labels, collectors]
       - type: integration_placeholder
         integration_kind: collectors
   # Exporting Metrics
@@ -685,7 +705,7 @@ sidebar:
           - meta:
               label: Metrics
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/metrics.md
-              description: Read receiver pipeline health, severity and category rates, processing errors, deduplication, and per-source metrics.
+              description: Read receiver pipeline health, severity and category rates, processing errors, deduplication, and optional profile-defined metrics.
           - meta:
               label: Alerts
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/alerts.md

@@ -168,11 +168,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -184,26 +186,26 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| squidlog.requests | requests | requests/s |
-| squidlog.excluded_requests | unmatched | requests/s |
-| squidlog.type_requests | success, bad, redirect, error | requests/s |
-| squidlog.http_status_code_class_responses | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
-| squidlog.http_status_code_responses | a dimension per HTTP response code | responses/s |
-| squidlog.bandwidth | sent | kilobits/s |
-| squidlog.response_time | min, max, avg | milliseconds |
-| squidlog.uniq_clients | clients | clients |
-| squidlog.cache_result_code_requests | a dimension per cache result code | requests/s |
-| squidlog.cache_result_code_transport_tag_requests | a dimension per cache result delivery transport tag | requests/s |
-| squidlog.cache_result_code_handling_tag_requests | a dimension per cache result handling tag | requests/s |
-| squidlog.cache_code_object_tag_requests | a dimension per cache result produced object tag | requests/s |
-| squidlog.cache_code_load_source_tag_requests | a dimension per cache result load source tag | requests/s |
-| squidlog.cache_code_error_tag_requests | a dimension per cache result error tag | requests/s |
-| squidlog.http_method_requests | a dimension per HTTP method | requests/s |
-| squidlog.mime_type_requests | a dimension per MIME type | requests/s |
-| squidlog.hier_code_requests | a dimension per hierarchy code | requests/s |
-| squidlog.server_address_forwarded_requests | a dimension per server address | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| squidlog.requests | Total Requests | requests | requests/s |
+| squidlog.excluded_requests | Excluded Requests | unmatched | requests/s |
+| squidlog.type_requests | Requests By Type | success, bad, redirect, error | requests/s |
+| squidlog.http_status_code_class_responses | Responses By HTTP Status Code Class | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
+| squidlog.http_status_code_responses | Responses By HTTP Status Code | a dimension per HTTP response code | responses/s |
+| squidlog.bandwidth | Bandwidth | sent | kilobits/s |
+| squidlog.response_time | Response Time | min, max, avg | milliseconds |
+| squidlog.uniq_clients | Unique Clients | clients | clients |
+| squidlog.cache_result_code_requests | Requests By Cache Result Code | a dimension per cache result code | requests/s |
+| squidlog.cache_result_code_transport_tag_requests | Requests By Cache Result Delivery Transport Tag | a dimension per cache result delivery transport tag | requests/s |
+| squidlog.cache_result_code_handling_tag_requests | Requests By Cache Result Handling Tag | a dimension per cache result handling tag | requests/s |
+| squidlog.cache_code_object_tag_requests | Requests By Cache Result Produced Object Tag | a dimension per cache result produced object tag | requests/s |
+| squidlog.cache_code_load_source_tag_requests | Requests By Cache Result Load Source Tag | a dimension per cache result load source tag | requests/s |
+| squidlog.cache_code_error_tag_requests | Requests By Cache Result Errors Tag | a dimension per cache result error tag | requests/s |
+| squidlog.http_method_requests | Requests By HTTP Method | a dimension per HTTP method | requests/s |
+| squidlog.mime_type_requests | Requests By MIME Type | a dimension per MIME type | requests/s |
+| squidlog.hier_code_requests | Requests By Hierarchy Code | a dimension per hierarchy code | requests/s |
+| squidlog.server_address_forwarded_requests | Forwarded Requests By Server Address | a dimension per server address | requests/s |
 
 
 

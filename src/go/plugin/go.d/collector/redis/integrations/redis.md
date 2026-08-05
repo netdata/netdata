@@ -227,11 +227,13 @@ The following alerts are available:
 | [ redis_master_link_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.master_link_down_since_time | time elapsed since the link between master and slave is down |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -243,33 +245,33 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| redis.connections | accepted, rejected | connections/s |
-| redis.clients | connected, blocked, tracking, in_timeout_table | clients |
-| redis.ping_latency | min, max, avg | seconds |
-| redis.commands | processes | commands/s |
-| redis.keyspace_lookup_hit_rate | lookup_hit_rate | percentage |
-| redis.memory | max, used, rss, peak, dataset, lua, scripts | bytes |
-| redis.mem_fragmentation_ratio | mem_fragmentation | ratio |
-| redis.key_eviction_events | evicted | keys/s |
-| redis.net | received, sent | kilobits/s |
-| redis.rdb_changes | changes | operations |
-| redis.bgsave_now | current_bgsave_time | seconds |
-| redis.bgsave_health | last_bgsave | status |
-| redis.bgsave_last_rdb_save_since_time | last_bgsave_time | seconds |
-| redis.aof_file_size | current, base | bytes |
-| redis.commands_calls | a dimension per command | calls |
-| redis.commands_usec | a dimension per command | microseconds |
-| redis.commands_usec_per_sec | a dimension per command | microseconds/s |
-| redis.key_expiration_events | expired | keys/s |
-| redis.database_keys | a dimension per database | keys |
-| redis.database_expires_keys | a dimension per database | keys |
-| redis.connected_replicas | connected | replicas |
-| redis.master_link_status | up, down | status |
-| redis.master_last_io_since_time | time | seconds |
-| redis.master_link_down_since_time | time | seconds |
-| redis.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| redis.connections | Accepted and rejected (maxclients limit) connections | accepted, rejected | connections/s |
+| redis.clients | Clients | connected, blocked, tracking, in_timeout_table | clients |
+| redis.ping_latency | Ping latency | min, max, avg | seconds |
+| redis.commands | Processed commands | processes | commands/s |
+| redis.keyspace_lookup_hit_rate | Keys lookup hit rate | lookup_hit_rate | percentage |
+| redis.memory | Memory usage | max, used, rss, peak, dataset, lua, scripts | bytes |
+| redis.mem_fragmentation_ratio | Ratio between used_memory_rss and used_memory | mem_fragmentation | ratio |
+| redis.key_eviction_events | Evicted keys due to maxmemory limit | evicted | keys/s |
+| redis.net | Bandwidth | received, sent | kilobits/s |
+| redis.rdb_changes | Operations that produced changes since the last SAVE or BGSAVE | changes | operations |
+| redis.bgsave_now | Duration of the on-going RDB save operation if any | current_bgsave_time | seconds |
+| redis.bgsave_health | Status of the last RDB save operation (0: ok, 1: err) | last_bgsave | status |
+| redis.bgsave_last_rdb_save_since_time | Time elapsed since the last successful RDB save | last_bgsave_time | seconds |
+| redis.aof_file_size | AOF file size | current, base | bytes |
+| redis.commands_calls | Calls per command | a dimension per command | calls |
+| redis.commands_usec | Total CPU time consumed by the commands | a dimension per command | microseconds |
+| redis.commands_usec_per_sec | Average CPU consumed per command execution | a dimension per command | microseconds/s |
+| redis.key_expiration_events | Expired keys | expired | keys/s |
+| redis.database_keys | Keys per database | a dimension per database | keys |
+| redis.database_expires_keys | Keys with an expiration per database | a dimension per database | keys |
+| redis.connected_replicas | Connected replicas | connected | replicas |
+| redis.master_link_status | Master link status | up, down | status |
+| redis.master_last_io_since_time | Time elapsed since the last interaction with master | time | seconds |
+| redis.master_link_down_since_time | Time elapsed since the link between master and slave is down | time | seconds |
+| redis.uptime | Uptime | uptime | seconds |
 
 
 

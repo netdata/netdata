@@ -65,19 +65,8 @@ func (c sdConfig) UID() string {
 	return c.Source() + ":" + c.ExposedKey()
 }
 
-// SourceTypePriority returns priority based on source type.
-// Higher value = higher priority. Matches confgroup.Config pattern.
 func (c sdConfig) SourceTypePriority() int {
-	switch c.SourceType() {
-	case confgroup.TypeDyncfg:
-		return 16
-	case confgroup.TypeUser:
-		return 8
-	case confgroup.TypeStock:
-		return 2
-	default:
-		return 0
-	}
+	return confgroup.SourceTypePriority(c.SourceType())
 }
 
 // ToPipelineConfig converts sdConfig to pipeline.Config for actually running the pipeline.

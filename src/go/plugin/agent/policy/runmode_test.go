@@ -17,31 +17,19 @@ func TestRunModeConstructors(t *testing.T) {
 		"agent terminal": {
 			makePolicy: func() RunModePolicy { return Agent(true) },
 			want: RunModePolicy{
-				IsTerminal:               true,
-				AutoEnableDiscovered:     true,
-				UseFileStatusPersistence: false,
-				EnableServiceDiscovery:   false,
-				EnableRuntimeCharts:      false,
+				IsTerminal:             true,
+				AutoEnableDiscovered:   true,
+				EnableServiceDiscovery: false,
+				EnableRuntimeCharts:    false,
 			},
 		},
 		"agent daemon": {
 			makePolicy: func() RunModePolicy { return Agent(false) },
 			want: RunModePolicy{
-				IsTerminal:               false,
-				AutoEnableDiscovered:     false,
-				UseFileStatusPersistence: true,
-				EnableServiceDiscovery:   true,
-				EnableRuntimeCharts:      true,
-			},
-		},
-		"function cli": {
-			makePolicy: FunctionCLI,
-			want: RunModePolicy{
-				IsTerminal:               false,
-				AutoEnableDiscovered:     true,
-				UseFileStatusPersistence: true,
-				EnableServiceDiscovery:   false,
-				EnableRuntimeCharts:      false,
+				IsTerminal:             false,
+				AutoEnableDiscovered:   false,
+				EnableServiceDiscovery: true,
+				EnableRuntimeCharts:    true,
 			},
 		},
 	}

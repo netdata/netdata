@@ -41,8 +41,10 @@ Each discovery cycle, the discoverer:
 
 - Only **one URL per pipeline**. To pull from multiple sources, configure multiple HTTP discovery pipelines (each as its own UI entry, or split the file into one job per source).
 - **Response size** is capped at 10 MiB.
+- A DynCfg **test** performs one complete fetch only when `method` is empty/default or exactly `GET`. It uses the configured authentication, headers, TLS, proxy, redirects, and timeout; requires HTTP 200; and parses every returned item. Redirects can make up to 10 HTTP requests. The test discards the targets without evaluating `services:` rules or creating jobs. Other configured methods are intentionally validation-only.
 - **One-shot mode** (`interval: 0`) fetches a single time when the pipeline starts. It does **not** refetch on SD reload — recreate the pipeline to refresh.
-- **`bearer_token_file`** under `/var/run/secrets/` is treated as optional when Netdata is **not** running in Kubernetes (so the same config can be used in a Helm deployment without erroring out on dev hosts).
+- A missing **`bearer_token_file`** under `/var/run/secrets/` is treated as optional when Netdata is **not** running in Kubernetes (so the same config can be used in a Helm deployment without erroring out on dev hosts).
+- Configured bearer-token and TLS files have [file-safety requirements](#option-headers-username-password-bearer-token-file-proxy-url-tls-skip-verify-etc).
 - The discoverer does not introspect the items it received — anything beyond what the upstream endpoint provides must be inferred via service rules.
 
 
@@ -107,7 +109,7 @@ With `auto`, the decoder uses `Content-Type` when it is unambiguous (`applicatio
 <a id="option-headers-username-password-bearer-token-file-proxy-url-tls-skip-verify-etc"></a>
 ##### headers / username / password / bearer_token_file / proxy_url / tls_skip_verify / etc.
 
-See any go.d HTTP-based collector (`httpcheck`, `prometheus`, `nginx`, …) for the full set. Notable: when `bearer_token_file` points under `/var/run/secrets/` and Netdata is **not** running inside Kubernetes, missing token files are silently ignored.
+See any go.d HTTP-based collector (`httpcheck`, `prometheus`, `nginx`, …) for the full set. Bearer-token and TLS CA paths must resolve to regular files no larger than 1 MiB. When both `tls_cert` and `tls_key` are configured, each path has the same requirement. Symlinks to regular files are supported. When `bearer_token_file` points under `/var/run/secrets/` and Netdata is **not** running inside Kubernetes, a missing token file is silently ignored.
 
 
 
@@ -305,6 +307,13 @@ Your endpoint mixes shapes — some items target `httpcheck`, some target `prome
 ## Verify discovery worked
 
 After enabling the discoverer, confirm the endpoint is reachable and items are being parsed.
+
+### Test a UI-managed configuration
+
+DynCfg test performs one complete production fetch for an empty/default or exact `GET` method. Success proves that the request could be built, the configured auth/TLS/proxy/redirect path worked at that instant, the endpoint returned HTTP 200 with at most 10 MiB, and every item parsed into a target.
+
+The fetched targets are discarded: the test does not evaluate `services:` rules, render or validate collector jobs, publish targets, or install jobs. Non-GET methods are intentionally reported as validation-only because executing them could mutate the endpoint.
+
 
 ### Confirm the endpoint is being fetched
 

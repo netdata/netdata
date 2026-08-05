@@ -243,11 +243,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -266,18 +268,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| smartctl.device_smart_status | passed, failed | status |
-| smartctl.device_ata_smart_error_log_count | error_log | logs |
-| smartctl.device_power_on_time | power_on_time | seconds |
-| smartctl.device_temperature | temperature | Celsius |
-| smartctl.device_power_cycles_count | power | cycles |
-| smartctl.device_read_errors_rate | corrected, uncorrected | errors/s |
-| smartctl.device_write_errors_rate | corrected, uncorrected | errors/s |
-| smartctl.device_verify_errors_rate | corrected, uncorrected | errors/s |
-| smartctl.device_smart_attr_{attribute_name} | {attribute_name} | {attribute_unit} |
-| smartctl.device_smart_attr_{attribute_name}_normalized | {attribute_name} | value |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| smartctl.device_smart_status | Device smart status | passed, failed | status |
+| smartctl.device_ata_smart_error_log_count | Device ATA smart error log count | error_log | logs |
+| smartctl.device_power_on_time | Device power on time | power_on_time | seconds |
+| smartctl.device_temperature | Device temperature | temperature | Celsius |
+| smartctl.device_power_cycles_count | Device power cycles | power | cycles |
+| smartctl.device_read_errors_rate | Device read errors | corrected, uncorrected | errors/s |
+| smartctl.device_write_errors_rate | Device write errors | corrected, uncorrected | errors/s |
+| smartctl.device_verify_errors_rate | Device verify errors | corrected, uncorrected | errors/s |
+| smartctl.device_smart_attr_{attribute_name} | Device smart attribute {attribute_name} | {attribute_name} | {attribute_unit} |
+| smartctl.device_smart_attr_{attribute_name}_normalized | Device smart attribute {attribute_name} normalized | {attribute_name} | value |
 
 
 

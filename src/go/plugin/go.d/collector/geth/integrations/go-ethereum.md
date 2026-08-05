@@ -196,11 +196,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -212,24 +214,24 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| geth.eth_db_chaindata_ancient_io_rate | reads, writes | bytes/s |
-| geth.eth_db_chaindata_ancient_io | reads, writes | bytes |
-| geth.eth_db_chaindata_disk_io | reads, writes | bytes |
-| geth.goroutines | goroutines | goroutines |
-| geth.eth_db_chaindata_disk_io_rate | reads, writes | bytes/s |
-| geth.chaindata_db_size | level_db, ancient_db | bytes |
-| geth.chainhead | block, receipt, header | block |
-| geth.tx_pool_pending | invalid, pending, local, discard, no_funds, ratelimit, replace | transactions |
-| geth.tx_pool_current | invalid, pending, local, pool | transactions |
-| geth.tx_pool_queued | discard, eviction, no_funds, ratelimit | transactions |
-| geth.p2p_bandwidth | ingress, egress | bytes/s |
-| geth.reorgs | executed | reorgs |
-| geth.reorgs_blocks | added, dropped | blocks |
-| geth.p2p_peers | peers | peers |
-| geth.p2p_peers_calls | dials, serves | calls/s |
-| geth.rpc_calls | failed, successful | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| geth.eth_db_chaindata_ancient_io_rate | Ancient Chaindata rate | reads, writes | bytes/s |
+| geth.eth_db_chaindata_ancient_io | Session ancient Chaindata | reads, writes | bytes |
+| geth.eth_db_chaindata_disk_io | Session chaindata on disk | reads, writes | bytes |
+| geth.goroutines | Number of goroutines | goroutines | goroutines |
+| geth.eth_db_chaindata_disk_io_rate | On disk Chaindata rate | reads, writes | bytes/s |
+| geth.chaindata_db_size | Chaindata Size | level_db, ancient_db | bytes |
+| geth.chainhead | Chainhead | block, receipt, header | block |
+| geth.tx_pool_pending | Pending Transaction Pool | invalid, pending, local, discard, no_funds, ratelimit, replace | transactions |
+| geth.tx_pool_current | Transaction Pool | invalid, pending, local, pool | transactions |
+| geth.tx_pool_queued | Queued Transaction Pool | discard, eviction, no_funds, ratelimit | transactions |
+| geth.p2p_bandwidth | P2P bandwidth | ingress, egress | bytes/s |
+| geth.reorgs | Executed Reorgs | executed | reorgs |
+| geth.reorgs_blocks | Blocks Added/Removed from Reorg | added, dropped | blocks |
+| geth.p2p_peers | Number of Peers | peers | peers |
+| geth.p2p_peers_calls | P2P Serves and Dials | dials, serves | calls/s |
+| geth.rpc_calls | rpc calls | failed, successful | calls/s |
 
 
 

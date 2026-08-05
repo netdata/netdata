@@ -21,20 +21,22 @@ Module: /proc/net/netstat
 
 ## Overview
 
-This integration provides metrics from the `netstat`, `snmp` and `snmp6` modules.
+Monitor host-wide IP, TCP, UDP, ICMP, broadcast, multicast, fragmentation, and ECN activity from Linux kernel protocol counters.
 
 
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+- linux
+
+This collector only supports collecting metrics from a single instance of this integration.
 
 
 ### Default Behavior
 
 #### Auto-Detection
 
-This integration doesn't support auto-detection.
+No instance discovery is required. The module runs by default, and its chart-family options default to `auto`, creating the applicable charts when their proc sources are available without waiting for a non-zero sample.
 
 #### Limits
 
@@ -55,15 +57,32 @@ No action required.
 
 #### Options
 
+Use the `[plugin:proc:/proc/net/netstat]`, `[plugin:proc:/proc/net/snmp]`, and `[plugin:proc:/proc/net/snmp6]` sections to configure these sources. Each section supports `filename to monitor`; the sections also provide `auto`, `yes`, or `no` switches for their chart families.
 
-
-There are no configuration options.
 
 
 
 #### via File
 
-There is no configuration file.
+The configuration file name for this integration is `netdata.conf`.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config netdata.conf
+```
 
 ##### Examples
 There are no configuration examples.
@@ -90,12 +109,14 @@ The following alerts are available:
 | [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
+Host-wide protocol metrics from `/proc/net/netstat`, `/proc/net/snmp`, and `/proc/net/snmp6`. These complement per-interface traffic, error, drop, and link-state metrics. See [Monitoring Network Statistics](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/README.md#monitoring-network-statistics) for explanations of the key metric groups.
 
 
 ### Per Network statistics instance
@@ -106,56 +127,56 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ip | received, sent | kilobits/s |
-| ip.tcpmemorypressures | pressures | events/s |
-| ip.tcpconnaborts | baddata, userclosed, nomemory, timeout, linger, failed | connections/s |
-| ip.tcpreorders | timestamp, sack, fack, reno | packets/s |
-| ip.tcpofo | inqueue, dropped, merged, pruned | packets/s |
-| ip.tcpsyncookies | received, sent, failed | packets/s |
-| ip.tcp_syn_queue | drops, cookies | packets/s |
-| ip.tcp_accept_queue | overflows, drops | packets/s |
-| ip.tcpsock | connections | active connections |
-| ip.tcppackets | received, sent | packets/s |
-| ip.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
-| ip.tcpopens | active, passive | connections/s |
-| ip.tcphandshake | EstabResets, OutRsts, AttemptFails, SynRetrans | events/s |
-| ipv4.packets | received, sent, forwarded, delivered | packets/s |
-| ipv4.errors | InDiscards, OutDiscards, InNoRoutes, OutNoRoutes, InHdrErrors, InAddrErrors, InTruncatedPkts, InCsumErrors | packets/s |
-| ipv4.bcast | received, sent | kilobits/s |
-| ipv4.bcastpkts | received, sent | packets/s |
-| ipv4.mcast | received, sent | kilobits/s |
-| ipv4.mcastpkts | received, sent | packets/s |
-| ipv4.icmp | received, sent | packets/s |
-| ipv4.icmpmsg | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
-| ipv4.icmp_errors | InErrors, OutErrors, InCsumErrors | packets/s |
-| ipv4.udppackets | received, sent | packets/s |
-| ipv4.udperrors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
-| ipv4.udplite | received, sent | packets/s |
-| ipv4.udplite_errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | packets/s |
-| ipv4.ecnpkts | CEP, NoECTP, ECTP0, ECTP1 | packets/s |
-| ipv4.fragsin | ok, failed, all | packets/s |
-| ipv4.fragsout | ok, failed, created | packets/s |
-| system.ipv6 | received, sent | kilobits/s |
-| ipv6.packets | received, sent, forwarded, delivers | packets/s |
-| ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InUnknownProtos, InTooBigErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
-| ipv6.bcast | received, sent | kilobits/s |
-| ipv6.mcast | received, sent | kilobits/s |
-| ipv6.mcastpkts | received, sent | packets/s |
-| ipv6.udppackets | received, sent | packets/s |
-| ipv6.udperrors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
-| ipv6.udplitepackets | received, sent | packets/s |
-| ipv6.udpliteerrors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors | events/s |
-| ipv6.icmp | received, sent | messages/s |
-| ipv6.icmpredir | received, sent | redirects/s |
-| ipv6.icmperrors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutPktTooBigs, OutTimeExcds, OutParmProblems | errors/s |
-| ipv6.icmpechos | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
-| ipv6.groupmemb | InQueries, OutQueries, InResponses, OutResponses, InReductions, OutReductions | messages/s |
-| ipv6.icmprouter | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmpmldv2 | received, sent | reports/s |
-| ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
-| ipv6.ect | InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts | packets/s |
-| ipv6.fragsin | ok, failed, timeout, all | packets/s |
-| ipv6.fragsout | ok, failed, all | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.ip | IPv4 Bandwidth | received, sent | kilobits/s |
+| ip.tcpmemorypressures | TCP Memory Pressures | pressures | events/s |
+| ip.tcpconnaborts | TCP Connection Aborts | baddata, userclosed, nomemory, timeout, linger, failed | connections/s |
+| ip.tcpreorders | TCP Reordered Packets by Detection Method | timestamp, sack, fack, reno | packets/s |
+| ip.tcpofo | TCP Out-Of-Order Queue | inqueue, dropped, merged, pruned | packets/s |
+| ip.tcpsyncookies | TCP SYN Cookies | received, sent, failed | packets/s |
+| ip.tcp_syn_queue | TCP SYN Queue Issues | drops, cookies | packets/s |
+| ip.tcp_accept_queue | TCP Accept Queue Issues | overflows, drops | packets/s |
+| ip.tcpsock | TCP Connections | connections | active connections |
+| ip.tcppackets | IPv4 TCP Packets | received, sent | packets/s |
+| ip.tcperrors | IPv4 TCP Errors | InErrs, InCsumErrors, RetransSegs | packets/s |
+| ip.tcpopens | IPv4 TCP Opens | active, passive | connections/s |
+| ip.tcphandshake | IPv4 TCP Handshake Issues | EstabResets, OutRsts, AttemptFails, SynRetrans | events/s |
+| ipv4.packets | IPv4 Packets | received, sent, forwarded, delivered | packets/s |
+| ipv4.errors | IPv4 Errors | InDiscards, OutDiscards, InNoRoutes, OutNoRoutes, InHdrErrors, InAddrErrors, InUnknownProtos, InTruncatedPkts, InCsumErrors | packets/s |
+| ipv4.bcast | IPv4 Broadcast Bandwidth | received, sent | kilobits/s |
+| ipv4.bcastpkts | IPv4 Broadcast Packets | received, sent | packets/s |
+| ipv4.mcast | IP Multicast Bandwidth | received, sent | kilobits/s |
+| ipv4.mcastpkts | IPv4 Multicast Packets | received, sent | packets/s |
+| ipv4.icmp | IPv4 ICMP Packets | received, sent | packets/s |
+| ipv4.icmpmsg | IPv4 ICMP Messages | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
+| ipv4.icmp_errors | IPv4 ICMP Errors | InErrors, OutErrors, InCsumErrors | packets/s |
+| ipv4.udppackets | IPv4 UDP Packets | received, sent | packets/s |
+| ipv4.udperrors | IPv4 UDP Errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
+| ipv4.udplite | IPv4 UDPLite Packets | received, sent | packets/s |
+| ipv4.udplite_errors | IPv4 UDPLite Errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | packets/s |
+| ipv4.ecnpkts | IPv4 ECN Statistics | CEP, NoECTP, ECTP0, ECTP1 | packets/s |
+| ipv4.fragsin | IPv4 Fragments Reassembly | ok, failed, all | packets/s |
+| ipv4.fragsout | IPv4 Fragments Sent | ok, failed, created | packets/s |
+| system.ipv6 | IPv6 Bandwidth | received, sent | kilobits/s |
+| ipv6.packets | IPv6 Packets | received, sent, forwarded, delivered | packets/s |
+| ipv6.errors | IPv6 Errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InUnknownProtos, InTooBigErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
+| ipv6.bcast | IPv6 Broadcast Bandwidth | received, sent | kilobits/s |
+| ipv6.mcast | IPv6 Multicast Bandwidth | received, sent | kilobits/s |
+| ipv6.mcastpkts | IPv6 Multicast Packets | received, sent | packets/s |
+| ipv6.udppackets | IPv6 UDP Packets | received, sent | packets/s |
+| ipv6.udperrors | IPv6 UDP Errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
+| ipv6.udplitepackets | IPv6 UDPlite Packets | received, sent | packets/s |
+| ipv6.udpliteerrors | IPv6 UDP Lite Errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors | events/s |
+| ipv6.icmp | IPv6 ICMP Messages | received, sent | messages/s |
+| ipv6.icmpredir | IPv6 ICMP Redirects | received, sent | redirects/s |
+| ipv6.icmperrors | IPv6 ICMP Errors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutPktTooBigs, OutTimeExcds, OutParmProblems | errors/s |
+| ipv6.icmpechos | IPv6 ICMP Echo | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
+| ipv6.groupmemb | IPv6 ICMP Group Membership | InQueries, OutQueries, InResponses, OutResponses, InReductions, OutReductions | messages/s |
+| ipv6.icmprouter | IPv6 Router Messages | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmpneighbor | IPv6 Neighbor Messages | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmpmldv2 | IPv6 ICMP MLDv2 Reports | received, sent | reports/s |
+| ipv6.icmptypes | IPv6 ICMP Types | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
+| ipv6.ect | IPv6 ECT Packets | InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts | packets/s |
+| ipv6.fragsin | IPv6 Fragments Reassembly | ok, failed, timeout, all | packets/s |
+| ipv6.fragsout | IPv6 Fragments Sent | ok, failed, all | packets/s |

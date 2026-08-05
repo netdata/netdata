@@ -81,6 +81,7 @@ type ProfileMetricSelectorConfig struct {
 	Profile    string                  `yaml:"profile" json:"profile"`
 	Defaults   *bool                   `yaml:"defaults,omitempty" json:"defaults,omitempty"`
 	Statistics []string                `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Query      *cwquery.Config         `yaml:"query,omitempty" json:"query,omitempty"`
 	Include    []MetricSelectionConfig `yaml:"include" json:"include"`
 }
 
@@ -89,8 +90,9 @@ func (c ProfileMetricSelectorConfig) includesDefaults() bool {
 }
 
 type MetricSelectionConfig struct {
-	Name       string   `yaml:"name" json:"name"`
-	Statistics []string `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Name       string          `yaml:"name" json:"name"`
+	Statistics []string        `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Query      *cwquery.Config `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type RuleDefaultsConfig struct {
@@ -129,13 +131,6 @@ type LimitsConfig struct {
 	MaxDiscoveryGroups int `yaml:"max_discovery_groups,omitempty" json:"max_discovery_groups"`
 }
 
-func (c LimitsConfig) maxDiscoveryGroups() int {
-	if c.MaxDiscoveryGroups == 0 {
-		return defaultMaxDiscoveryGroups
-	}
-	return c.MaxDiscoveryGroups
-}
-
 type DiscoveryConfig struct {
 	RefreshEvery int `yaml:"refresh_every,omitempty" json:"refresh_every"`
 	// RecentlyActiveOnly is horizon-aware: when enabled, ListMetrics uses
@@ -145,6 +140,8 @@ type DiscoveryConfig struct {
 	RecentlyActiveOnly *bool `yaml:"recently_active_only,omitempty" json:"recently_active_only,omitempty"`
 }
 
+// applyDefaults fills unset options. New() already presets every default, so these branches fire only
+// for an explicit zero: writing 0 selects the default rather than "unlimited" or "never".
 func (c *Config) applyDefaults() {
 	if c.UpdateEvery <= 0 {
 		c.UpdateEvery = defaultUpdateEvery
@@ -181,10 +178,11 @@ func (c Config) validate() error {
 	if c.Timeout.Duration() < 0 {
 		errs = append(errs, errors.New("'timeout' cannot be negative"))
 	}
+	// An explicit 0 already became the default in applyDefaults, so only a negative value reaches here.
 	if c.Limits.MaxInstances < 0 {
-		errs = append(errs, errors.New("'limits.max_instances' must be >= 1"))
+		errs = append(errs, errors.New("'limits.max_instances' cannot be negative"))
 	}
-	if value := c.Limits.maxDiscoveryGroups(); value < 1 || value > maxDiscoveryGroupsPerJob {
+	if value := c.Limits.MaxDiscoveryGroups; value < 1 || value > maxDiscoveryGroupsPerJob {
 		errs = append(errs, fmt.Errorf("'limits.max_discovery_groups' must be between 1 and %d", maxDiscoveryGroupsPerJob))
 	}
 	if err := validateConfigStructure(c); err != nil {

@@ -643,11 +643,13 @@ The following alerts are available:
 | [ am_cosmos_db_cassandra_connection_closures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.cassandra_connections | Cosmos DB Cassandra connection closures on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -669,28 +671,28 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.cosmos_db.total_requests | count | requests/s |
-| azure_monitor.cosmos_db.request_units | total | RU/s |
-| azure_monitor.cosmos_db.normalized_ru_consumption | maximum | percentage |
-| azure_monitor.cosmos_db.server_side_latency | direct, gateway | milliseconds |
-| azure_monitor.cosmos_db.replication_latency | average | milliseconds |
-| azure_monitor.cosmos_db.storage | data, index, quota | bytes |
-| azure_monitor.cosmos_db.document_count | average | documents |
-| azure_monitor.cosmos_db.partition_size | maximum | bytes |
-| azure_monitor.cosmos_db.partition_count | maximum | partitions |
-| azure_monitor.cosmos_db.provisioned_throughput | provisioned, autoscale_max, autoscaled | RU/s |
-| azure_monitor.cosmos_db.partition_throughput | maximum | RU/s |
-| azure_monitor.cosmos_db.availability | average | percentage |
-| azure_monitor.cosmos_db.metadata_requests | count | requests/s |
-| azure_monitor.cosmos_db.api_requests | mongo, cassandra, gremlin | requests/s |
-| azure_monitor.cosmos_db.api_request_charges | mongo, cassandra, gremlin | RU/s |
-| azure_monitor.cosmos_db.cassandra_connections | total | connections/s |
-| azure_monitor.cosmos_db.dedicated_gateway_cpu | average | percentage |
-| azure_monitor.cosmos_db.dedicated_gateway_memory | average | bytes |
-| azure_monitor.cosmos_db.dedicated_gateway_requests | count | requests/s |
-| azure_monitor.cosmos_db.integrated_cache_hit_rate | item, query | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.cosmos_db.total_requests | Azure Cosmos DB Total Requests | count | requests/s |
+| azure_monitor.cosmos_db.request_units | Azure Cosmos DB Request Units Consumed | total | RU/s |
+| azure_monitor.cosmos_db.normalized_ru_consumption | Azure Cosmos DB Normalized RU Consumption | maximum | percentage |
+| azure_monitor.cosmos_db.server_side_latency | Azure Cosmos DB Server-Side Latency | direct, gateway | milliseconds |
+| azure_monitor.cosmos_db.replication_latency | Azure Cosmos DB Replication Latency | average | milliseconds |
+| azure_monitor.cosmos_db.storage | Azure Cosmos DB Storage | data, index, quota | bytes |
+| azure_monitor.cosmos_db.document_count | Azure Cosmos DB Document Count | average | documents |
+| azure_monitor.cosmos_db.partition_size | Azure Cosmos DB Physical Partition Size | maximum | bytes |
+| azure_monitor.cosmos_db.partition_count | Azure Cosmos DB Physical Partition Count | maximum | partitions |
+| azure_monitor.cosmos_db.provisioned_throughput | Azure Cosmos DB Provisioned Throughput | provisioned, autoscale_max, autoscaled | RU/s |
+| azure_monitor.cosmos_db.partition_throughput | Azure Cosmos DB Physical Partition Throughput | maximum | RU/s |
+| azure_monitor.cosmos_db.availability | Azure Cosmos DB Service Availability | average | percentage |
+| azure_monitor.cosmos_db.metadata_requests | Azure Cosmos DB Metadata Requests | count | requests/s |
+| azure_monitor.cosmos_db.api_requests | Azure Cosmos DB API Requests | mongo, cassandra, gremlin | requests/s |
+| azure_monitor.cosmos_db.api_request_charges | Azure Cosmos DB API Request Charges | mongo, cassandra, gremlin | RU/s |
+| azure_monitor.cosmos_db.cassandra_connections | Azure Cosmos DB Cassandra Connection Closures | total | connections/s |
+| azure_monitor.cosmos_db.dedicated_gateway_cpu | Azure Cosmos DB Dedicated Gateway CPU Usage | average | percentage |
+| azure_monitor.cosmos_db.dedicated_gateway_memory | Azure Cosmos DB Dedicated Gateway Memory Usage | average | bytes |
+| azure_monitor.cosmos_db.dedicated_gateway_requests | Azure Cosmos DB Dedicated Gateway Requests | count | requests/s |
+| azure_monitor.cosmos_db.integrated_cache_hit_rate | Azure Cosmos DB Integrated Cache Hit Rate | item, query | percentage |
 
 
 

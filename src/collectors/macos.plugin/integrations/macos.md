@@ -280,11 +280,13 @@ The following alerts are available:
 | [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -297,46 +299,47 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.cpu | user, nice, system, idle | percentage |
-| system.ram | active, wired, throttled, compressor, inactive, purgeable, speculative, free | MiB |
-| mem.swapio | io, out | KiB/s |
-| mem.pgfaults | memory, cow, pagein, pageout, compress, decompress, zero_fill, reactivate, purge | faults/s |
-| system.load | load1, load5, load15 | load |
-| mem.swap | free, used | MiB |
-| system.ipv4 | received, sent | kilobits/s |
-| ipv4.tcppackets | received, sent | packets/s |
-| ipv4.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
-| ipv4.tcphandshake | EstabResets, ActiveOpens, PassiveOpens, AttemptFails | events/s |
-| ipv4.tcpconnaborts | baddata, userclosed, nomemory, timeout | connections/s |
-| ipv4.tcpofo | inqueue | packets/s |
-| ipv4.tcpsyncookies | received, sent, failed | packets/s |
-| ipv4.ecnpkts | CEP, NoECTP | packets/s |
-| ipv4.udppackets | received, sent | packets/s |
-| ipv4.udperrors | RcvbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
-| ipv4.icmp | received, sent | packets/s |
-| ipv4.icmp_errors | InErrors, OutErrors, InCsumErrors | packets/s |
-| ipv4.icmpmsg | InEchoReps, OutEchoReps, InEchos, OutEchos | packets/s |
-| ipv4.packets | received, sent, forwarded, delivered | packets/s |
-| ipv4.fragsout | ok, failed, created | packets/s |
-| ipv4.fragsin | ok, failed, all | packets/s |
-| ipv4.errors | InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos | packets/s |
-| ipv6.packets | received, sent, forwarded, delivers | packets/s |
-| ipv6.fragsout | ok, failed, all | packets/s |
-| ipv6.fragsin | ok, failed, timeout, all | packets/s |
-| ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
-| ipv6.icmp | received, sent | messages/s |
-| ipv6.icmpredir | received, sent | redirects/s |
-| ipv6.icmperrors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems | errors/s |
-| ipv6.icmpechos | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
-| ipv6.icmprouter | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
-| system.uptime | uptime | seconds |
-| system.io | in, out | KiB/s |
-| macos.smc_thermal_level | cpu, gpu, io | level |
-| macos.smc_prochot | cpu, smc | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.cpu | Total CPU utilization | user, nice, system, idle | percentage |
+| system.ram | System RAM | active, wired, throttled, compressor, inactive, purgeable, speculative, free | MiB |
+| mem.swapio | Swap I/O | io, out | KiB/s |
+| mem.pgfaults | Memory Page Faults | memory, cow, pagein, pageout, compress, decompress, zero_fill, reactivate, purge | faults/s |
+| system.load | System Load Average | load1, load5, load15 | load |
+| mem.swap | System Swap | free, used | MiB |
+| system.ipv4 | IPv4 Bandwidth | received, sent | kilobits/s |
+| ipv4.tcppackets | IPv4 TCP Packets | received, sent | packets/s |
+| ipv4.tcperrors | IPv4 TCP Errors | InErrs, InCsumErrors, RetransSegs | packets/s |
+| ipv4.tcphandshake | IPv4 TCP Handshake Issues | EstabResets, ActiveOpens, PassiveOpens, AttemptFails | events/s |
+| ipv4.tcpconnaborts | TCP Connection Aborts | baddata, userclosed, nomemory, timeout | connections/s |
+| ipv4.tcpofo | TCP Out-Of-Order Queue | inqueue | packets/s |
+| ipv4.tcpsyncookies | TCP SYN Cookies | received, sent, failed | packets/s |
+| ipv4.ecnpkts | IPv4 ECN Statistics | CEP, NoECTP | packets/s |
+| ipv4.udppackets | IPv4 UDP Packets | received, sent | packets/s |
+| ipv4.udperrors | IPv4 UDP Errors | RcvbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
+| ipv4.icmp | IPv4 ICMP Packets | received, sent | packets/s |
+| ipv4.icmp_errors | IPv4 ICMP Errors | InErrors, OutErrors, InCsumErrors | packets/s |
+| ipv4.icmpmsg | IPv4 ICMP Messages | InEchoReps, OutEchoReps, InEchos, OutEchos | packets/s |
+| ipv4.packets | IPv4 Packets | received, sent, forwarded, delivered | packets/s |
+| ipv4.fragsout | IPv4 Fragments Sent | ok, failed, created | packets/s |
+| ipv4.fragsin | IPv4 Fragments Reassembly | ok, failed, all | packets/s |
+| ipv4.errors | IPv4 Errors | InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos | packets/s |
+| ipv6.packets | IPv6 Packets | received, sent, forwarded, delivers | packets/s |
+| ipv6.fragsout | IPv6 Fragments Sent | ok, failed, all | packets/s |
+| ipv6.fragsin | IPv6 Fragments Reassembly | ok, failed, timeout, all | packets/s |
+| ipv6.errors | IPv6 Errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
+| ipv6.icmp | IPv6 ICMP Messages | received, sent | messages/s |
+| ipv6.icmpredir | IPv6 ICMP Redirects | received, sent | redirects/s |
+| ipv6.icmperrors | IPv6 ICMP Errors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems | errors/s |
+| ipv6.icmpechos | IPv6 ICMP Echo | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
+| ipv6.icmprouter | IPv6 Router Messages | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmpneighbor | IPv6 Neighbor Messages | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmptypes | IPv6 ICMP Types | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
+| system.uptime | System Uptime | uptime | seconds |
+| system.io | Disk I/O | in, out | KiB/s |
+| macos.smc_thermal_level | SMC thermal levels | cpu, gpu, io | level |
+| macos.smc_prochot | SMC processor-hot assertions | cpu, smc | status |
+
 
 ### Per gpu
 
@@ -351,13 +354,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| macos.gpu_utilization | utilization | percentage |
-| macos.gpu_performance_state_residency | pstate_&lt;index&gt;_&lt;mhz&gt;mhz | percentage |
-| macos.gpu_clock_freq | frequency | MHz |
-| macos.gpu_power_draw | power_draw | W |
-| macos.gpu_temperature | temperature | degrees Celsius |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| macos.gpu_utilization | GPU utilization (active residency) | utilization | percentage |
+| macos.gpu_performance_state_residency | GPU active-time residency by performance state | pstate_&lt;index&gt;_&lt;mhz&gt;mhz | percentage |
+| macos.gpu_clock_freq | Weighted average GPU clock frequency | frequency | MHz |
+| macos.gpu_power_draw | GPU power draw | power_draw | W |
+| macos.gpu_temperature | GPU temperature | temperature | degrees Celsius |
+
 
 ### Per power source
 
@@ -373,12 +377,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powersupply.capacity | capacity | percentage |
-| powersupply.voltage | voltage | V |
-| powersupply.current | current | A |
-| powersupply.cycles | cycles | cycles |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powersupply.capacity | Battery capacity | capacity | percentage |
+| powersupply.voltage | Power supply voltage | voltage | V |
+| powersupply.current | Power supply current | current | A |
+| powersupply.cycles | Battery cycle count | cycles | cycles |
+
 
 ### Per sensor
 
@@ -401,17 +406,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.hw.sensor.temperature.input | input | degrees Celsius |
-| system.hw.sensor.fan.input | input | rotations per minute |
-| system.hw.sensor.voltage.input | input | V |
-| system.hw.sensor.current.input | input | A |
-| system.hw.sensor.power.input | input | W |
-| system.hw.sensor.temperature.subsystem | min, avg, max | degrees Celsius |
-| system.hw.sensor.power.subsystem | power | W |
-| system.hw.sensor.temperature.histogram | 40, 50, 60, 70, 80, 85, 90, 95, 100, +Inf | sensors |
-| system.hw.sensor.state.input | nominal, moderate, heavy, sleeping, trapping, undefined | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.hw.sensor.temperature.input | Temperature sensor input | input | degrees Celsius |
+| system.hw.sensor.fan.input | Fan speed sensor input | input | rotations per minute |
+| system.hw.sensor.voltage.input | Voltage sensor input | input | V |
+| system.hw.sensor.current.input | Current sensor input | input | A |
+| system.hw.sensor.power.input | Power sensor input | input | W |
+| system.hw.sensor.temperature.subsystem | Temperature summary per hardware subsystem | min, avg, max | degrees Celsius |
+| system.hw.sensor.power.subsystem | Power total per hardware subsystem | power | W |
+| system.hw.sensor.temperature.histogram | Distribution of all temperature sensors in fixed bands | 40, 50, 60, 70, 80, 85, 90, 95, 100, +Inf | sensors |
+| system.hw.sensor.state.input | Sensor state input | nominal, moderate, heavy, sleeping, trapping, undefined | status |
+
 
 ### Per nvme device
 
@@ -428,18 +434,19 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nvme.device_estimated_endurance_perc | used | percentage |
-| nvme.device_available_spare_perc | spare | percentage |
-| nvme.device_composite_temperature | temperature | celsius |
-| nvme.device_io_transferred_count | read, written | bytes |
-| nvme.device_power_cycles_count | power | cycles |
-| nvme.device_power_on_time | power-on | seconds |
-| nvme.device_unsafe_shutdowns_count | unsafe | shutdowns |
-| nvme.device_critical_warnings_state | available_spare, temp_threshold, nvm_subsystem_reliability, read_only, volatile_mem_backup_failed, persistent_memory_read_only | state |
-| nvme.device_media_errors_rate | media | errors/s |
-| nvme.device_error_log_entries_rate | error_log | entries/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nvme.device_estimated_endurance_perc | Estimated endurance used | used | percentage |
+| nvme.device_available_spare_perc | Remaining spare capacity | spare | percentage |
+| nvme.device_composite_temperature | Composite temperature | temperature | celsius |
+| nvme.device_io_transferred_count | Amount of data transferred to and from device | read, written | bytes |
+| nvme.device_power_cycles_count | Power cycles | power | cycles |
+| nvme.device_power_on_time | Power-on time | power-on | seconds |
+| nvme.device_unsafe_shutdowns_count | Unsafe shutdowns | unsafe | shutdowns |
+| nvme.device_critical_warnings_state | Critical warnings state | available_spare, temp_threshold, nvm_subsystem_reliability, read_only, volatile_mem_backup_failed, persistent_memory_read_only | state |
+| nvme.device_media_errors_rate | Media and data integrity errors | media | errors/s |
+| nvme.device_error_log_entries_rate | Error log entries | error_log | entries/s |
+
 
 ### Per disk
 
@@ -449,15 +456,16 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.io | read, writes | KiB/s |
-| disk.ops | read, writes | operations/s |
-| disk.util | utilization | % of time working |
-| disk.iotime | reads, writes | milliseconds/s |
-| disk.await | reads, writes | milliseconds/operation |
-| disk.avgsz | reads, writes | KiB/operation |
-| disk.svctm | svctm | milliseconds/operation |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| disk.io | Disk I/O Bandwidth | read, writes | KiB/s |
+| disk.ops | Disk Completed I/O Operations | read, writes | operations/s |
+| disk.util | Disk Utilization Time | utilization | % of time working |
+| disk.iotime | Disk Total I/O Time | reads, writes | milliseconds/s |
+| disk.await | Average Completed I/O Operation Time | reads, writes | milliseconds/operation |
+| disk.avgsz | Average Completed I/O Operation Bandwidth | reads, writes | KiB/operation |
+| disk.svctm | Average Service Time | svctm | milliseconds/operation |
+
 
 ### Per mount point
 
@@ -467,10 +475,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.space | avail, used, reserved_for_root | GiB |
-| disk.inodes | avail, used, reserved_for_root | inodes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| disk.space | Disk Space Usage for {mounted dir} [{mounted filesystem}] | avail, used, reserved_for_root | GiB |
+| disk.inodes | Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}] | avail, used, reserved_for_root | inodes |
+
 
 ### Per network device
 
@@ -480,13 +489,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| net.net | received, sent | kilobits/s |
-| net.packets | received, sent, multicast_received, multicast_sent | packets/s |
-| net.errors | inbound, outbound | errors/s |
-| net.drops | inbound | drops/s |
-| net.events | frames, collisions, carrier | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| net.net | Bandwidth | received, sent | kilobits/s |
+| net.packets | Packets | received, sent, multicast_received, multicast_sent | packets/s |
+| net.errors | Interface Errors | inbound, outbound | errors/s |
+| net.drops | Interface Drops | inbound | drops/s |
+| net.events | Network Interface Events | frames, collisions, carrier | events/s |
 
 
 

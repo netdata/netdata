@@ -77,11 +77,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -97,23 +99,23 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| systemd.service.cpu.utilization | user, system | percentage |
-| systemd.service.memory.usage | ram, swap | MiB |
-| systemd.service.memory.failcnt | fail | failures/s |
-| systemd.service.memory.ram.usage | rss, cache, mapped_file, rss_huge | MiB |
-| systemd.service.memory.writeback | writeback, dirty | MiB |
-| systemd.service.memory.paging.faults | minor, major | MiB/s |
-| systemd.service.memory.paging.io | in, out | MiB/s |
-| systemd.service.disk.io | read, write | KiB/s |
-| systemd.service.disk.iops | read, write | operations/s |
-| systemd.service.disk.throttle.io | read, write | KiB/s |
-| systemd.service.disk.throttle.iops | read, write | operations/s |
-| systemd.service.disk.queued_iops | read, write | operations/s |
-| systemd.service.disk.merged_iops | read, write | operations/s |
-| systemd.service.pids.current | pids | pids |
-| systemd.service.cachestat_ratio | ratio | % |
-| systemd.service.cachestat_dirties | dirty | page/s |
-| systemd.service.cachestat_hits | hit | hits/s |
-| systemd.service.cachestat_misses | miss | misses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| systemd.service.cpu.utilization | Systemd Services CPU utilization (100% = 1 core) | user, system | percentage |
+| systemd.service.memory.usage | Systemd Services Used Memory | ram, swap | MiB |
+| systemd.service.memory.failcnt | Systemd Services Memory Limit Failures | fail | failures/s |
+| systemd.service.memory.ram.usage | Systemd Services Memory | rss, cache, mapped_file, rss_huge | MiB |
+| systemd.service.memory.writeback | Systemd Services Writeback Memory | writeback, dirty | MiB |
+| systemd.service.memory.paging.faults | Systemd Services Memory Minor and Major Page Faults | minor, major | MiB/s |
+| systemd.service.memory.paging.io | Systemd Services Memory Paging IO | in, out | MiB/s |
+| systemd.service.disk.io | Systemd Services Disk Read/Write Bandwidth | read, write | KiB/s |
+| systemd.service.disk.iops | Systemd Services Disk Read/Write Operations | read, write | operations/s |
+| systemd.service.disk.throttle.io | Systemd Services Throttle Disk Read/Write Bandwidth | read, write | KiB/s |
+| systemd.service.disk.throttle.iops | Systemd Services Throttle Disk Read/Write Operations | read, write | operations/s |
+| systemd.service.disk.queued_iops | Systemd Services Queued Disk Read/Write Operations | read, write | operations/s |
+| systemd.service.disk.merged_iops | Systemd Services Merged Disk Read/Write Operations | read, write | operations/s |
+| systemd.service.pids.current | Systemd Services Number of Processes | pids | pids |
+| systemd.service.cachestat_ratio | Hit ratio | ratio | % |
+| systemd.service.cachestat_dirties | Number of dirty pages | dirty | page/s |
+| systemd.service.cachestat_hits | Number of accessed files | hit | hits/s |
+| systemd.service.cachestat_misses | Files out of page cache | miss | misses/s |

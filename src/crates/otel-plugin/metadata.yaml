@@ -133,6 +133,38 @@ modules:
                 Limits cardinality explosion from high-cardinality label combinations.
               default_value: 100
               required: false
+            - name: base_dir
+              description: Directory where OpenTelemetry logs and traces are stored on disk.
+              detailed_description: |
+                Must be an absolute path. The default lives under the Netdata log
+                directory and is shared by both logs and traces.
+              default_value: "/var/log/netdata/otel/v2"
+              required: false
+            - name: logs.rotation.default.max_file_size
+              description: File size that triggers log rotation. A new file is started when the current one reaches this size.
+              default_value: "25MB"
+              required: false
+            - name: logs.rotation.default.max_entries
+              description: Number of log entries that triggers log rotation. A new file is started when the current one reaches this count.
+              default_value: 50000
+              required: false
+            - name: logs.retention.default.max_files
+              description: Maximum number of rotated log files kept on local disk. The oldest files are deleted when exceeded.
+              default_value: 100000
+              required: false
+            - name: logs.retention.default.max_total_size
+              description: Maximum total disk space used by log files on local disk. The oldest files are deleted when exceeded.
+              detailed_description: |
+                Local retention is bounded by whichever limit is reached first:
+                total size, file count, or age. With the defaults, logs occupy at
+                most 1 GB on the VM and are kept up to 7 days, regardless of
+                incoming volume.
+              default_value: "1GB"
+              required: false
+            - name: logs.retention.default.max_age
+              description: Maximum age of log files before they are deleted from local disk.
+              default_value: "7 days"
+              required: false
         examples:
           folding:
             title: Config

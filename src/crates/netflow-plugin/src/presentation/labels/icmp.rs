@@ -1,5 +1,6 @@
 use super::common::{exact_label, exact_label_map};
 use super::*;
+use std::borrow::Cow;
 
 const ICMPV4_TYPE_LABEL_PAIRS: &[(&str, &str)] = &[
     ("0", "Echo Reply"),
@@ -188,13 +189,28 @@ pub(crate) fn icmp_virtual_value(
     }
 
     match (icmp_type.parse::<u8>(), icmp_code.parse::<u8>()) {
-        (Ok(icmp_type), Ok(icmp_code)) => Some(
-            icmp_combined_name(protocol.parse().ok()?, icmp_type, icmp_code)
-                .map(str::to_string)
-                .unwrap_or_else(|| format!("{icmp_type}/{icmp_code}")),
-        ),
+        (Ok(icmp_type), Ok(icmp_code)) => {
+            icmp_virtual_value_from_parts(protocol.parse().ok()?, icmp_type, icmp_code)
+                .map(Cow::into_owned)
+        }
         _ => Some(format!("{icmp_type}/{icmp_code}")),
     }
+}
+
+pub(crate) fn icmp_virtual_value_from_parts(
+    protocol: u8,
+    icmp_type: u8,
+    icmp_code: u8,
+) -> Option<Cow<'static, str>> {
+    if !matches!(protocol, 1 | 58) {
+        return None;
+    }
+
+    Some(
+        icmp_combined_name(protocol, icmp_type, icmp_code)
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|| Cow::Owned(format!("{icmp_type}/{icmp_code}"))),
+    )
 }
 
 fn icmp_combined_name(protocol: u8, icmp_type: u8, icmp_code: u8) -> Option<&'static str> {

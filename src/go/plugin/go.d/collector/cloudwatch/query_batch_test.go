@@ -84,6 +84,24 @@ func TestBuildQueryBatches_DoesNotSplitMetricBillingGroup(t *testing.T) {
 	assert.Equal(t, 3, multiCount)
 }
 
+func TestBuildQueryBatches_ActivityFollowsEffectivePolicyBatches(t *testing.T) {
+	queries := makeActivityQueries(1, 1)
+	queries[0].policy = cwquery.Policy{Period: time.Minute, Lookback: 5 * time.Minute}
+	queries[1].policy = cwquery.Policy{Period: 5 * time.Minute, Lookback: 15 * time.Minute}
+	clients := map[clientKey]cloudwatchClient{{target: "base", region: "us-east-1"}: &gmdCloudWatch{}}
+
+	batches := buildQueryBatches(queries, clients, time.Unix(1_000_000_000, 0))
+	require.Len(t, batches, 2)
+	wantProfile := map[time.Duration]string{time.Minute: "alpha", 5 * time.Minute: "beta"}
+	for _, batch := range batches {
+		assert.Equal(t, uint64(1), batch.activityCounts.calculatedMetricRequests)
+		require.Len(t, batch.activityCounts.profiles, 1)
+		assert.Equal(t, wantProfile[batch.key.policy.Period], batch.activityCounts.profiles[0].profile)
+		assert.Equal(t, uint64(1), batch.activityCounts.profiles[0].metricRequestEstimate)
+		assert.Equal(t, uint64(1), batch.activityCounts.profiles[0].queryItems)
+	}
+}
+
 func TestPackBillingUnitShapes(t *testing.T) {
 	t.Run("fragmentation is included in batch count", func(t *testing.T) {
 		groups := make(map[structuralID]int)

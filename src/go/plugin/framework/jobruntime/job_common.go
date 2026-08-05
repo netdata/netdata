@@ -3,6 +3,7 @@
 package jobruntime
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -76,6 +77,31 @@ func disableAutoDetection(autoDetectEvery *int) {
 
 func isRetryableError(err error) bool {
 	return dyncfg.IsRetryableError(err)
+}
+
+func sanitizeLifecycleError(sanitize func(error) error, err error) (sanitized error) {
+	if err == nil || sanitize == nil {
+		return err
+	}
+	defer func() {
+		if recover() != nil {
+			sanitized = errors.New("jobruntime: lifecycle error sanitizer panicked")
+		}
+	}()
+	sanitized = sanitize(err)
+	if sanitized == nil {
+		return errors.New("jobruntime: lifecycle error sanitizer discarded a failure")
+	}
+	return sanitized
+}
+
+func lifecycleLogMessageSanitizer(sanitize func(error) error) func(string) string {
+	if sanitize == nil {
+		return nil
+	}
+	return func(message string) string {
+		return sanitizeLifecycleError(sanitize, errors.New(message)).Error()
+	}
 }
 
 func consumeAutoDetectTry(autoDetectTries *int) {

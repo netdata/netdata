@@ -47,5 +47,13 @@ func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
 		"no-namespaces",
 	}
 
-	return ndexec.RunUnprivileged(nil, e.timeout, e.binPath, args...)
+	out, _, _, err := ndexec.RunUnprivilegedWithOptionsUsageContext(
+		ctx,
+		nil,
+		e.timeout,
+		ndexec.RunOptions{},
+		e.binPath,
+		args...,
+	)
+	return out, err
 }

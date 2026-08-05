@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -124,21 +126,21 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| adcs.cert_requests | requests | requests/s |
-| adcs.cert_request_processing_time | processing_times | seconds |
-| adcs.cert_retrievals | retrievals | retrievals/s |
-| adcs.cert_failed_requests | failed | requests/s |
-| adcs.cert_issued_requests | issued | requests/s |
-| adcs.cert_pending_requests | pending | requests/s |
-| adcs.cert_challenge_responses | challenge | responses/s |
-| adcs.cert_retrieval_processing_time | processing_time | seconds |
-| adcs.cert_request_cryptographic_signing_time | singing_time | seconds |
-| adcs.cert_request_policy_module_processing | processing_time | seconds |
-| adcs.cert_request_policy_module_processing | processing_time | seconds |
-| adcs.cert_challenge_response_processing_time | processing_time | seconds |
-| adcs.cert_signed_certificate_timestamp_lists | processing_time | lists/s |
-| adcs.cert_signed_certificate_timestamp_lists | lists | lists/s |
-| adcs.cert_signed_certificate_timestamp_list_processing_time | processing_time | seconds |
-| adcs.cert_retrieval_processing_time | processing_time | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| adcs.cert_requests | Certificate requests processed | requests | requests/s |
+| adcs.cert_request_processing_time | Certificate last request processing time | processing_times | seconds |
+| adcs.cert_retrievals | Total of certificate retrievals | retrievals | retrievals/s |
+| adcs.cert_failed_requests | Certificate failed requests processed | failed | requests/s |
+| adcs.cert_issued_requests | Certificate issued requests processed | issued | requests/s |
+| adcs.cert_pending_requests | Certificate pending requests processed | pending | requests/s |
+| adcs.cert_challenge_responses | Certificate challenge responses | challenge | responses/s |
+| adcs.cert_retrieval_processing_time | Certificate last retrieval processing time | processing_time | seconds |
+| adcs.cert_request_cryptographic_signing_time | Certificate last signing operation request time | singing_time | seconds |
+| adcs.cert_request_policy_module_processing | Certificate last policy module processing request time | processing_time | seconds |
+| adcs.cert_request_policy_module_processing | Certificate last policy module processing request time | processing_time | seconds |
+| adcs.cert_challenge_response_processing_time | Certificate last challenge response time | processing_time | seconds |
+| adcs.cert_signed_certificate_timestamp_lists | Certificate Signed Certificate Timestamp Lists processed | processing_time | lists/s |
+| adcs.cert_signed_certificate_timestamp_lists | Certificate Signed Certificate Timestamp Lists processed | lists | lists/s |
+| adcs.cert_signed_certificate_timestamp_list_processing_time | Certificate last Signed Certificate Timestamp List process time | processing_time | seconds |
+| adcs.cert_retrieval_processing_time | Certificate last retrieval processing time | processing_time | seconds |

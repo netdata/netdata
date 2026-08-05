@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,36 +122,36 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| exchange.transport_queues_active_mail_box_delivery | active | messages |
-| exchange.transport_queues_external_active_remote_delivery | active | messages |
-| exchange.transport_queues_internal_active_remote_delivery | active | messages |
-| exchange.transport_queues_unreachable | unreachable | messages |
-| exchange.transport_queues_poison | unreachable | messages |
-| exchange.activesync_ping_cmds_pending | pending | commands |
-| exchange.activesync_requests | received | requests/s |
-| exchange.activesync_sync_cmds | processed | commands/s |
-| exchange.rpc_active_user_count | active | users |
-| exchange.rpc_avg_latency | latency | seconds |
-| exchange.rpc_connection_count | connections | connections |
-| exchange.rpc_requests | processed | requests |
-| exchange.rpc_active_user | users | users |
-| exchange.rpc_connection | connections | connections |
-| exchange.rpc_operations | operations | operations/s |
-| exchange.rpc_user_count | users | users |
-| exchange.owa_current_unique_users | logged-in | users |
-| exchange.owa_requests_total | handled | requests/s |
-| exchange.workload_active_tasks | active | tasks |
-| exchange.workload_completed_tasks | completed | tasks/s |
-| exchange.workload_queued_tasks | queued | tasks/s |
-| exchange.workload_yielded_tasks | yielded | tasks/s |
-| exchange.workload_activity_status | active, paused | status |
-| exchange.http_proxy_avg_auth_latency | latency | seconds |
-| exchange.http_proxy_avg_cas_processing_latency_sec | latency | seconds |
-| exchange.http_proxy_mailbox_proxy_failure_rate | failures | seconds |
-| exchange.http_proxy_mailbox_server_locator_avg_latency_sec | latency | seconds |
-| exchange.http_proxy_outstanding_proxy_requests | requests | seconds |
-| exchange.http_proxy_requests | requests | seconds |
-| exchange.autodiscover_requests | processed | requests/s |
-| exchange.avail_service_requests | serviced | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| exchange.transport_queues_active_mail_box_delivery | Active Mailbox Delivery Queue length. | active | messages |
+| exchange.transport_queues_external_active_remote_delivery | External Active Remote Delivery Queue length. | active | messages |
+| exchange.transport_queues_internal_active_remote_delivery | Internal Active Remote Delivery Queue length. | active | messages |
+| exchange.transport_queues_unreachable | Unreachable Queue length. | unreachable | messages |
+| exchange.transport_queues_poison | Poison Queue Length. | unreachable | messages |
+| exchange.activesync_ping_cmds_pending | Ping commands pending in queue. | pending | commands |
+| exchange.activesync_requests | HTTP requests received from ASP.NET. | received | requests/s |
+| exchange.activesync_sync_cmds | Sync commands processed. | processed | commands/s |
+| exchange.rpc_active_user_count | Active unique users in the last 2 minutes. | active | users |
+| exchange.rpc_avg_latency | Average latency. | latency | seconds |
+| exchange.rpc_connection_count | Client connections. | connections | connections |
+| exchange.rpc_requests | Clients requests currently being processed. | processed | requests |
+| exchange.rpc_active_user | Active unique users in the last 2 minutes. | users | users |
+| exchange.rpc_connection | Client connections. | connections | connections |
+| exchange.rpc_operations | RPC operations. | operations | operations/s |
+| exchange.rpc_user_count | RPC users. | users | users |
+| exchange.owa_current_unique_users | Unique users currently logged on to Outlook Web App. | logged-in | users |
+| exchange.owa_requests_total | Requests handled by Outlook Web App. | handled | requests/s |
+| exchange.workload_active_tasks | Workload active tasks. | active | tasks |
+| exchange.workload_completed_tasks | Workload completed tasks. | completed | tasks/s |
+| exchange.workload_queued_tasks | Workload queued tasks. | queued | tasks/s |
+| exchange.workload_yielded_tasks | Workload yielded tasks. | yielded | tasks/s |
+| exchange.workload_activity_status | Workload activity status | active, paused | status |
+| exchange.http_proxy_avg_auth_latency | Average time spent authenticating CAS requests. | latency | seconds |
+| exchange.http_proxy_avg_cas_processing_latency_sec | Average latency (sec) of CAS processing time. | latency | seconds |
+| exchange.http_proxy_mailbox_proxy_failure_rate | Percentage of failures between this CAS and MBX servers. | failures | seconds |
+| exchange.http_proxy_mailbox_server_locator_avg_latency_sec | Average latency of MailboxServerLocator web service calls. | latency | seconds |
+| exchange.http_proxy_outstanding_proxy_requests | Concurrent outstanding proxy requests. | requests | seconds |
+| exchange.http_proxy_requests | Number of proxy requests processed each second. | requests | seconds |
+| exchange.autodiscover_requests | Autodiscover service requests processed | processed | requests/s |
+| exchange.avail_service_requests | Requests serviced | serviced | requests/s |

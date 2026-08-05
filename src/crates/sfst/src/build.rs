@@ -266,10 +266,24 @@ pub(crate) fn build_and_write(
     // produced this index was already durably deleted, losing the
     // seq's data with no recovery path.
     let (guard, file) = file_registry::durable::AtomicFile::create(out_path)?;
+    // The streaming writes happen through the file handle, outside the
+    // guard's own annotated steps — annotate their failures (ENOSPC mid
+    // chunk stream is a realistic production event) with the temp path
+    // being written, like every other durable-write step.
+    let annotate_io = |e: Error, op: &str| match e {
+        Error::Io(io) => Error::Io(file_registry::durable::annotate(io, op, guard.tmp_path())),
+        other => other,
+    };
     let (buf, summary, metadata) =
-        build_into(row_index, std::io::BufWriter::new(file), content_meta)?;
-    let file = buf.into_inner().map_err(|e| e.into_error())?;
-    let file_size = file.metadata()?.len();
+        build_into(row_index, std::io::BufWriter::new(file), content_meta)
+            .map_err(|e| annotate_io(e, "write SFST chunks to temp file"))?;
+    let file = buf
+        .into_inner()
+        .map_err(|e| annotate_io(e.into_error().into(), "flush temp file"))?;
+    let file_size = file
+        .metadata()
+        .map_err(|e| file_registry::durable::annotate(e, "stat temp file", guard.tmp_path()))?
+        .len();
     guard.commit(file)?;
     tracing::info!(
         "index written path={} size_kb={} write_ms={} total_ms={}",

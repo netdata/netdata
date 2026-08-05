@@ -105,11 +105,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -121,9 +123,9 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv6.packets | received, sent, forwarded, delivers | packets/s |
-| ipv6.fragsout | ok, failed, all | packets/s |
-| ipv6.fragsin | ok, failed, timeout, all | packets/s |
-| ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipv6.packets | IPv6 Packets | received, sent, forwarded, delivers | packets/s |
+| ipv6.fragsout | IPv6 Fragments Sent | ok, failed, all | packets/s |
+| ipv6.fragsin | IPv6 Fragments Reassembly | ok, failed, timeout, all | packets/s |
+| ipv6.errors | IPv6 Errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |

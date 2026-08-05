@@ -354,6 +354,46 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
         return PARSER_RC_ERROR;
     }
 
+    // Reserved dynamic-configuration function names ("config", "config <id>") are
+    // owned exclusively by the dyncfg subsystem on localhost. A LOCAL plugin
+    // registering one would collide in host->functions and make
+    // rrd_functions_conflict_callback() swap the built-in dyncfg execute callback
+    // out, hijacking the config tree. Local plugins do dyncfg via the DYNCFG
+    // protocol (not FUNCTION), so no legitimate local registration uses these names.
+    //
+    // Streaming is the exception and MUST be preserved: a child streams a single
+    // synthetic "config" proxy (dyncfg_add_streaming()) so the parent can forward
+    // config commands to it. That registration targets the child's host (never the
+    // parent's localhost built-in), so it cannot hijack anything. Only guard
+    // non-streaming (local plugin) registrations, matching the from_streaming
+    // distinction used by the FUNCTION_DEL handler / rrd_function_del().
+    //
+    // Check the SANITIZED name: rrd_function_add() keys host->functions on the
+    // sanitized form, which strips leading spaces/control chars. A raw name like
+    // " config" or "\tconfig" would otherwise slip past this guard yet still
+    // collide with the built-in "config" key. The predicate only inspects
+    // "config" plus the following byte, so the buffer needs room for "config", one
+    // full following UTF-8 character (up to 4 bytes), and the terminator. That
+    // makes the classification of that byte byte-identical to the full key
+    // rrd_function_add() computes, so e.g. "config<multibyte>" is correctly NOT
+    // treated as a dyncfg name (distinct key, no collision), while "config" and
+    // "config <id>" still are.
+    bool from_streaming = (parser->repertoire & PARSER_INIT_STREAMING) != 0;
+    if(!from_streaming) {
+        char sanitized_name[sizeof(PLUGINSD_FUNCTION_CONFIG) + 4];
+        rrd_functions_sanitize(sanitized_name, name, sizeof(sanitized_name));
+        if(rrd_function_name_is_dyncfg(sanitized_name)) {
+            // Log the sanitized name (what we actually classify on), not the raw name:
+            // a raw name with leading whitespace/control chars or embedded newlines
+            // would make this log line misleading or malformed. The id part of a
+            // "config <id>" name is truncated here, which is fine for a warning.
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "PLUGINSD: 'host:%s' attempted to register reserved dynamic-configuration function '%s' via FUNCTION. Ignoring it.",
+                   rrdhost_hostname(host), sanitized_name);
+            return PARSER_RC_OK;
+        }
+    }
+
     int timeout_s = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
     if (timeout_str && *timeout_str) {
         timeout_s = str2i(timeout_str);

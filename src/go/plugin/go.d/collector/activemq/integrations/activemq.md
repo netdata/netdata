@@ -230,11 +230,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -246,11 +248,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| activemq.messages | enqueued, dequeued | messages/s |
-| activemq.unprocessed_messages | unprocessed | messages |
-| activemq.consumers | consumers | consumers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| activemq.messages | Messaged | enqueued, dequeued | messages/s |
+| activemq.unprocessed_messages | Unprocessed Messages | unprocessed | messages |
+| activemq.consumers | Consumers | consumers | consumers |
 
 
 

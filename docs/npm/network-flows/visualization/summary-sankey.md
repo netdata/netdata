@@ -77,7 +77,7 @@ A filter strip sits between the Sankey and the table. Three things you can do he
 
 Filter logic is "AND across fields, OR within a field". Selecting `PROTOCOL = TCP` and `PROTOCOL = UDP` shows TCP-or-UDP. Selecting `PROTOCOL = TCP` plus `SRC_COUNTRY = US` shows only US-source TCP.
 
-There is no negative match. To exclude a value, select all values and remove the unwanted one — works for low-cardinality fields, becomes impractical for high-cardinality ones (the autocomplete cap is 100).
+There is no negative match. To exclude a value, select all values and remove the unwanted one — works for low-cardinality fields, becomes impractical for high-cardinality ones (the autocomplete cap is 256).
 
 See [Filters and Facets](/docs/npm/network-flows/visualization/filters-facets.md) for the full mechanics.
 

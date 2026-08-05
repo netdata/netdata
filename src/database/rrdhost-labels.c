@@ -179,8 +179,14 @@ static bool rrdhost_load_kubernetes_labels(void) {
     POPEN_INSTANCE *instance = spawn_popen_run(label_script);
     if(!instance) return false;
 
+    FILE *child_stdout = spawn_popen_stdout(instance);
+    if(unlikely(!child_stdout)) {
+        spawn_popen_kill(instance, 0);
+        return false;
+    }
+
     char buffer[1000 + 1];
-    while (fgets(buffer, 1000, spawn_popen_stdout(instance)) != NULL)
+    while (fgets(buffer, 1000, child_stdout) != NULL)
         rrdlabels_add_pair(localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
 
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'

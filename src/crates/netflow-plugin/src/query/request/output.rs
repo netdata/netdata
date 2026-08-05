@@ -34,6 +34,8 @@ pub(crate) struct QuerySetup {
     pub(crate) sort_by: SortBy,
     pub(crate) timeseries_layout: Option<TimeseriesLayout>,
     pub(crate) effective_group_by: Vec<String>,
+    pub(crate) selections: CompiledSelections,
+    pub(crate) prefilter_matches: Vec<Vec<u8>>,
     pub(crate) limit: usize,
     pub(crate) spans: Vec<PreparedQuerySpan>,
     pub(crate) stats: HashMap<String, u64>,

@@ -111,6 +111,7 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -118,6 +119,7 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 Per-sensor charts are created for every supported reading of every discovered sensor; the alarm charts expose only the states each sensor driver actually supports. The temperature histogram is a single host-wide chart with the same fixed bands on every operating system: each dimension is a DISJOINT band named after its EXCLUSIVE upper bound in degrees Celsius, and every temperature sensor is counted in exactly one band.
+
 
 
 ### Per sensor
@@ -137,26 +139,27 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.hw.sensor.temperature.input | input | degrees Celsius |
-| system.hw.sensor.temperature.alarm | clear, warning, cap, alarm, critical, emergency, fault | status |
-| system.hw.sensor.voltage.input | input | Volts |
-| system.hw.sensor.voltage.average | average | Volts |
-| system.hw.sensor.voltage.alarm | clear, warning, cap, alarm, critical, emergency, fault | status |
-| system.hw.sensor.fan.input | input | rotations per minute |
-| system.hw.sensor.fan.alarm | clear, warning, cap, alarm, critical, emergency, fault | status |
-| system.hw.sensor.current.input | input | Amperes |
-| system.hw.sensor.current.average | average | Amperes |
-| system.hw.sensor.current.alarm | clear, warning, cap, alarm, critical, emergency, fault | status |
-| system.hw.sensor.power.input | input | Watts |
-| system.hw.sensor.power.average | average | Watts |
-| system.hw.sensor.power.alarm | clear, warning, cap, alarm, critical, emergency, fault | status |
-| system.hw.sensor.energy.input | input | Joules |
-| system.hw.sensor.energy.alarm | clear, warning, cap, alarm, critical, emergency, fault | status |
-| system.hw.sensor.humidity.input | input | percentage |
-| system.hw.sensor.humidity.alarm | clear, warning, cap, alarm, critical, emergency, fault | status |
-| system.hw.sensor.intrusion.alarm | clear, warning, cap, alarm, critical, emergency, fault | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.hw.sensor.temperature.input | Sensor Temperature | input | degrees Celsius |
+| system.hw.sensor.temperature.alarm | Sensor Temperature Alarm Status | clear, warning, cap, alarm, critical, emergency, fault | status |
+| system.hw.sensor.voltage.input | Sensor Voltage | input | Volts |
+| system.hw.sensor.voltage.average | Sensor Voltage Average | average | Volts |
+| system.hw.sensor.voltage.alarm | Sensor Voltage Alarm Status | clear, warning, cap, alarm, critical, emergency, fault | status |
+| system.hw.sensor.fan.input | Sensor Fan Speed | input | rotations per minute |
+| system.hw.sensor.fan.alarm | Sensor Fan Alarm Status | clear, warning, cap, alarm, critical, emergency, fault | status |
+| system.hw.sensor.current.input | Sensor Current | input | Amperes |
+| system.hw.sensor.current.average | Sensor Current Average | average | Amperes |
+| system.hw.sensor.current.alarm | Sensor Current Alarm Status | clear, warning, cap, alarm, critical, emergency, fault | status |
+| system.hw.sensor.power.input | Sensor Power | input | Watts |
+| system.hw.sensor.power.average | Sensor Power Average | average | Watts |
+| system.hw.sensor.power.alarm | Sensor Power Alarm Status | clear, warning, cap, alarm, critical, emergency, fault | status |
+| system.hw.sensor.energy.input | Sensor Energy | input | Joules |
+| system.hw.sensor.energy.alarm | Sensor Energy Alarm Status | clear, warning, cap, alarm, critical, emergency, fault | status |
+| system.hw.sensor.humidity.input | Sensor Humidity | input | percentage |
+| system.hw.sensor.humidity.alarm | Sensor Humidity Alarm Status | clear, warning, cap, alarm, critical, emergency, fault | status |
+| system.hw.sensor.intrusion.alarm | Sensor Intrusion Alarm Status | clear, warning, cap, alarm, critical, emergency, fault | status |
+
 
 ### Per Linux Hardware Sensors (libsensors) instance
 
@@ -166,6 +169,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.hw.sensor.temperature.histogram | 40, 50, 60, 70, 80, 85, 90, 95, 100, +Inf | sensors |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.hw.sensor.temperature.histogram | Distribution of all temperature sensors in fixed bands | 40, 50, 60, 70, 80, 85, 90, 95, 100, +Inf | sensors |

@@ -87,9 +87,18 @@ func enforceChartInstanceCaps(
 	chartsByID map[string]*chartState,
 	state *materializedState,
 ) []RemoveChartAction {
-	observedByTemplate := make(map[string][]string)
+	var observedByTemplate map[string][]string
 	for chartID, cs := range chartsByID {
+		if cs.lifecycle.MaxInstances <= 0 {
+			continue
+		}
+		if observedByTemplate == nil {
+			observedByTemplate = make(map[string][]string)
+		}
 		observedByTemplate[cs.templateID] = append(observedByTemplate[cs.templateID], chartID)
+	}
+	if len(observedByTemplate) == 0 {
+		return nil
 	}
 	for templateID := range observedByTemplate {
 		sort.Strings(observedByTemplate[templateID])
@@ -97,10 +106,10 @@ func enforceChartInstanceCaps(
 
 	existingByTemplate := make(map[string][]string)
 	for chartID, matChart := range state.charts {
+		if _, enabled := observedByTemplate[matChart.templateID]; !enabled {
+			continue
+		}
 		existingByTemplate[matChart.templateID] = append(existingByTemplate[matChart.templateID], chartID)
-	}
-	for templateID := range existingByTemplate {
-		sort.Strings(existingByTemplate[templateID])
 	}
 
 	removeCharts := make([]RemoveChartAction, 0)
@@ -120,9 +129,6 @@ func enforceChartInstanceCaps(
 		// max_instances is a soft cap:
 		// currently active chart instances are never evicted in the same successful cycle.
 		maxInstances := lifecycle.MaxInstances
-		if maxInstances <= 0 {
-			continue
-		}
 
 		existingIDs := existingByTemplate[templateID]
 		existingSet := make(map[string]struct{}, len(existingIDs))
@@ -204,36 +210,42 @@ func enforceDimensionCaps(
 	state *materializedState,
 ) []RemoveDimensionAction {
 	// Per-chart dimension caps: evict least-recently-seen inactive dims first, then drop new dims.
-	removeDims := make([]RemoveDimensionAction, 0)
-	chartIDs := make([]string, 0, len(chartsByID))
-	for chartID := range chartsByID {
+	var chartIDs []string
+	for chartID, cs := range chartsByID {
+		if cs.lifecycle.Dimensions.MaxDims <= 0 {
+			continue
+		}
+		if chartIDs == nil {
+			chartIDs = make([]string, 0, len(chartsByID))
+		}
 		chartIDs = append(chartIDs, chartID)
 	}
+	if len(chartIDs) == 0 {
+		return nil
+	}
 	sort.Strings(chartIDs)
+
+	removeDims := make([]RemoveDimensionAction, 0)
 	for _, chartID := range chartIDs {
 		cs := chartsByID[chartID]
 		maxDims := cs.lifecycle.Dimensions.MaxDims
-		if maxDims <= 0 {
-			continue
-		}
 		matChart := state.charts[chartID]
 		existingCount := 0
 		if matChart != nil {
 			existingCount = len(matChart.dimensions)
 		}
 
-		newNames := make([]string, 0, cs.observedCount)
+		newCount := 0
 		for name, entry := range cs.entries {
 			if entry == nil || entry.seenSeq != cs.currentBuildSeq {
 				continue
 			}
 			if matChart == nil || matChart.dimensions[name] == nil {
-				newNames = append(newNames, name)
+				newCount++
 			}
 		}
-		sort.Strings(newNames)
 
-		total := existingCount + len(newNames)
+		total := existingCount + newCount
 		if total <= maxDims {
 			continue
 		}

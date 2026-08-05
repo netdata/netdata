@@ -17,8 +17,8 @@ modules:
       keywords: []
     overview:
       data_collection:
-        metrics_description: "This collector monitors XenServer and XCP-ng host and domains statistics."
-        method_description: ""
+        metrics_description: "This collector monitors XenServer and XCP-ng host and domain statistics."
+        method_description: "Reads host and domain statistics directly from the local Xen hypervisor through the system Xen libraries. The plugin must run on the Xen hypervisor host itself (dom0, on a XenServer or XCP-ng host); it cannot collect from inside guest VMs and there is no option to connect to a remote or network Xen host."
       supported_platforms:
         include: []
         exclude: []
@@ -42,6 +42,12 @@ modules:
                 Note: On Cent-OS systems you will need `centos-release-xen` repository and the required package for xen is `xen-devel`
               
               2. Re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
+          - title: Host placement
+            description: |
+              Install the Netdata Agent on the Xen hypervisor host (dom0, on a XenServer or XCP-ng host). Installing it inside a guest VM or on a non-Xen host will not expose Xen host or domain metrics, because the plugin reads the local Xen hypervisor only.
+          - title: Xen Orchestra Appliance (XOA)
+            description: |
+              Netdata has no dedicated XOA integration. The xenstat.plugin collects XenServer/XCP-ng host and domain statistics from the hypervisor layer, not XOA-specific application metrics. The XOA VM can be monitored as a standard Linux system if access is available.
       configuration:
         file:
           name: "netdata.conf"
@@ -64,7 +70,12 @@ modules:
           list: []
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: Xen XCP-ng host or domain metrics are not appearing
+            description: |
+              **Cause:** The Netdata Agent is installed inside a guest VM or on a non-Xen host instead of the Xen hypervisor host (dom0). The plugin reads the local Xen hypervisor only, so a guest VM cannot report the host or other domains, and there is no remote-collection option.
+
+              **Resolution:** Follow the Libraries and Host placement prerequisites above.
     alerts: []
     metrics:
       folding:

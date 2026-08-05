@@ -647,11 +647,13 @@ The following alerts are available:
 | [ am_redis_cache_geo_replication_sync_offset ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_sync_offset | Redis geo-replication sync offset on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -673,40 +675,40 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.redis_cache.cache_hits | hits, misses | operations/s |
-| azure_monitor.redis_cache.throughput | read, write | bytes/s |
-| azure_monitor.redis_cache.server_load | maximum | percentage |
-| azure_monitor.redis_cache.cpu | maximum | percentage |
-| azure_monitor.redis_cache.memory_usage | used, rss | bytes |
-| azure_monitor.redis_cache.memory_utilization | maximum | percentage |
-| azure_monitor.redis_cache.clients | maximum | clients |
-| azure_monitor.redis_cache.operations | maximum | operations/s |
-| azure_monitor.redis_cache.commands | total | commands/s |
-| azure_monitor.redis_cache.command_types | get, set | commands/s |
-| azure_monitor.redis_cache.latency | average | microseconds |
-| azure_monitor.redis_cache.key_events | evicted, expired | keys/s |
-| azure_monitor.redis_cache.total_keys | maximum | keys |
-| azure_monitor.redis_cache.errors | maximum | errors |
-| azure_monitor.redis_cache.miss_rate | miss_rate | percentage |
-| azure_monitor.redis_cache.latency_p99 | p99 | microseconds |
-| azure_monitor.redis_cache.connection_rate | created, closed | connections/s |
-| azure_monitor.redis_cache.aad_clients | maximum | clients |
-| azure_monitor.redis_cache.instance_cache_hits | hits, misses | operations/s |
-| azure_monitor.redis_cache.instance_throughput | read, write | bytes/s |
-| azure_monitor.redis_cache.instance_server_load | server_load, cpu | percentage |
-| azure_monitor.redis_cache.instance_memory_usage | used, rss | bytes |
-| azure_monitor.redis_cache.instance_memory_utilization | maximum | percentage |
-| azure_monitor.redis_cache.instance_clients | maximum | clients |
-| azure_monitor.redis_cache.instance_operations | maximum | operations/s |
-| azure_monitor.redis_cache.instance_commands | total, get, set | commands/s |
-| azure_monitor.redis_cache.instance_total_keys | maximum | keys |
-| azure_monitor.redis_cache.instance_key_events | evicted, expired | keys/s |
-| azure_monitor.redis_cache.geo_replication_lag | average | seconds |
-| azure_monitor.redis_cache.geo_replication_sync_offset | average | bytes |
-| azure_monitor.redis_cache.geo_replication_sync_events | started, finished | events/s |
-| azure_monitor.redis_cache.geo_replication_health | average | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.redis_cache.cache_hits | Azure Cache for Redis Hit Rate | hits, misses | operations/s |
+| azure_monitor.redis_cache.throughput | Azure Cache for Redis Throughput | read, write | bytes/s |
+| azure_monitor.redis_cache.server_load | Azure Cache for Redis Server Load | maximum | percentage |
+| azure_monitor.redis_cache.cpu | Azure Cache for Redis CPU Utilization | maximum | percentage |
+| azure_monitor.redis_cache.memory_usage | Azure Cache for Redis Memory Usage | used, rss | bytes |
+| azure_monitor.redis_cache.memory_utilization | Azure Cache for Redis Memory Utilization | maximum | percentage |
+| azure_monitor.redis_cache.clients | Azure Cache for Redis Connected Clients | maximum | clients |
+| azure_monitor.redis_cache.operations | Azure Cache for Redis Operations | maximum | operations/s |
+| azure_monitor.redis_cache.commands | Azure Cache for Redis Commands Processed | total | commands/s |
+| azure_monitor.redis_cache.command_types | Azure Cache for Redis Command Types | get, set | commands/s |
+| azure_monitor.redis_cache.latency | Azure Cache for Redis Latency | average | microseconds |
+| azure_monitor.redis_cache.key_events | Azure Cache for Redis Key Events | evicted, expired | keys/s |
+| azure_monitor.redis_cache.total_keys | Azure Cache for Redis Total Keys | maximum | keys |
+| azure_monitor.redis_cache.errors | Azure Cache for Redis Errors | maximum | errors |
+| azure_monitor.redis_cache.miss_rate | Azure Cache for Redis Miss Rate | miss_rate | percentage |
+| azure_monitor.redis_cache.latency_p99 | Azure Cache for Redis P99 Latency | p99 | microseconds |
+| azure_monitor.redis_cache.connection_rate | Azure Cache for Redis Connection Rate | created, closed | connections/s |
+| azure_monitor.redis_cache.aad_clients | Azure Cache for Redis Entra Token Clients | maximum | clients |
+| azure_monitor.redis_cache.instance_cache_hits | Azure Cache for Redis Instance Hit Rate | hits, misses | operations/s |
+| azure_monitor.redis_cache.instance_throughput | Azure Cache for Redis Instance Throughput | read, write | bytes/s |
+| azure_monitor.redis_cache.instance_server_load | Azure Cache for Redis Instance Server Load | server_load, cpu | percentage |
+| azure_monitor.redis_cache.instance_memory_usage | Azure Cache for Redis Instance Memory Usage | used, rss | bytes |
+| azure_monitor.redis_cache.instance_memory_utilization | Azure Cache for Redis Instance Memory Utilization | maximum | percentage |
+| azure_monitor.redis_cache.instance_clients | Azure Cache for Redis Instance Connected Clients | maximum | clients |
+| azure_monitor.redis_cache.instance_operations | Azure Cache for Redis Instance Operations | maximum | operations/s |
+| azure_monitor.redis_cache.instance_commands | Azure Cache for Redis Instance Commands Processed | total, get, set | commands/s |
+| azure_monitor.redis_cache.instance_total_keys | Azure Cache for Redis Instance Total Keys | maximum | keys |
+| azure_monitor.redis_cache.instance_key_events | Azure Cache for Redis Instance Key Events | evicted, expired | keys/s |
+| azure_monitor.redis_cache.geo_replication_lag | Azure Cache for Redis Geo-Replication Connectivity Lag | average | seconds |
+| azure_monitor.redis_cache.geo_replication_sync_offset | Azure Cache for Redis Geo-Replication Data Sync Offset | average | bytes |
+| azure_monitor.redis_cache.geo_replication_sync_events | Azure Cache for Redis Geo-Replication Sync Events | started, finished | events/s |
+| azure_monitor.redis_cache.geo_replication_health | Azure Cache for Redis Geo-Replication Health | average | status |
 
 
 

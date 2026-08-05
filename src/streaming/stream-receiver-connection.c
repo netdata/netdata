@@ -239,6 +239,16 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_BUSY_TRY_LATER);
             return false;
         }
+        if (result == RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL) {
+            // the same rejection the accept-time gate sends, so the child backs off identically
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; this host was claimed as a locally collected vnode",
+                STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL, NDLP_WARNING);
+
+            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_LOCAL_VNODE);
+            return false;
+        }
         if (result == RRDHOST_SET_RECEIVER_ALREADY_ATTACHED) {
             stream_receiver_log_status(
                 rpt,
@@ -641,10 +651,14 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
     {
         RRDHOST *existing = rrdhost_find_by_guid(rpt->machine_guid);
-        // RRDHOST_OPTION_VIRTUAL_HOST is only set by local collectors (pluginsd_host_define_end),
+        // RRDHOST_FLAG_VIRTUAL_HOST is only set by local collectors (pluginsd_host_define_end),
         // never by streaming. The stale detection in pluginsd_host() clears it when a vnode stops
         // being collected, so archived/orphaned vnodes will not have this flag set.
         // No additional checks for RRDHOST_FLAG_COLLECTOR_ONLINE or RRDHOST_FLAG_ARCHIVED are needed.
+        //
+        // This is the fast path: it rejects before we take over the socket and before host creation.
+        // It is not authoritative - the collector may claim the vnode while this connection is still
+        // being set up - so rrdhost_set_receiver() re-checks the flag under the receiver lock.
         if(existing && rrdhost_is_virtual(existing)) {
             stream_receiver_takeover_web_connection(w, rpt);
 

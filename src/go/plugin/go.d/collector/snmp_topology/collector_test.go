@@ -15,7 +15,7 @@ import (
 )
 
 func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
+	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	require.Nil(t, creator.Create)
 	require.NotNil(t, creator.CreateV2)
 	require.Equal(t, collectorapi.InstancePolicySingle, creator.InstancePolicy)
@@ -59,14 +59,17 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			require.PanicsWithValue(t, tc.wantPanic, func() {
-				_ = newCreator(tc.store, tc.traps)
+				_ = newCreator(tc.store, tc.traps, newTestReverseDNSResolver())
 			})
 		})
 	}
+	require.PanicsWithValue(t, "snmp_topology Register requires a non-nil reverse DNS resolver", func() {
+		_ = newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), nil)
+	})
 }
 
 func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
+	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
 	require.Nil(t, methods[0].Available)
@@ -84,7 +87,7 @@ func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(
 }
 
 func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle())
+	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
 	require.Nil(t, methods[0].Available)
@@ -136,10 +139,13 @@ func TestSNMPTopologyNewRequiresSharedDependencies(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			require.PanicsWithValue(t, tc.wantPanic, func() {
-				_ = New(tc.store, tc.traps)
+				_ = New(tc.store, tc.traps, newTestReverseDNSResolver())
 			})
 		})
 	}
+	require.PanicsWithValue(t, "snmp_topology New requires a non-nil reverse DNS resolver", func() {
+		_ = New(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), nil)
+	})
 }
 
 type topologyRuntimeJobForTest struct {

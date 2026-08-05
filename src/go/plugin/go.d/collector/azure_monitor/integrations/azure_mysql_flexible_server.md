@@ -655,11 +655,13 @@ The following alerts are available:
 | [ am_mysql_flexible_history_list_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.history_list_length | MySQL Flexible history list length on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -681,41 +683,41 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.mysql_flexible.cpu | average | percentage |
-| azure_monitor.mysql_flexible.memory | average | percentage |
-| azure_monitor.mysql_flexible.io_utilization | average | percentage |
-| azure_monitor.mysql_flexible.cpu_credits | consumed, remaining | credits |
-| azure_monitor.mysql_flexible.ha_status | io, sql | status |
-| azure_monitor.mysql_flexible.replica_status | io, sql | status |
-| azure_monitor.mysql_flexible.uptime | uptime | seconds |
-| azure_monitor.mysql_flexible.replication_lag | replica, ha | seconds |
-| azure_monitor.mysql_flexible.innodb_row_lock_time | average | milliseconds |
-| azure_monitor.mysql_flexible.innodb_row_lock_waits | total | waits/s |
-| azure_monitor.mysql_flexible.aborted_connections | total | connections/s |
-| azure_monitor.mysql_flexible.active_connections | average | connections |
-| azure_monitor.mysql_flexible.total_connections | total | connections/s |
-| azure_monitor.mysql_flexible.active_transactions | average | transactions |
-| azure_monitor.mysql_flexible.threads_running | maximum | threads |
-| azure_monitor.mysql_flexible.queries | total, slow | queries/s |
-| azure_monitor.mysql_flexible.dml_statements | select, insert, update, delete | statements/s |
-| azure_monitor.mysql_flexible.ddl_statements | create_table, alter_table, drop_table, create_db, drop_db | statements/s |
-| azure_monitor.mysql_flexible.lock_deadlocks | total | deadlocks/s |
-| azure_monitor.mysql_flexible.lock_timeouts | total | timeouts/s |
-| azure_monitor.mysql_flexible.innodb_buffer_pool_pages | data, dirty, free, flushed | pages |
-| azure_monitor.mysql_flexible.innodb_buffer_pool_io | read_requests, disk_reads | requests/s |
-| azure_monitor.mysql_flexible.innodb_data_writes | total | writes/s |
-| azure_monitor.mysql_flexible.sort_merge_passes | total | passes/s |
-| azure_monitor.mysql_flexible.network | in, out | bytes/s |
-| azure_monitor.mysql_flexible.storage_io | total | operations/s |
-| azure_monitor.mysql_flexible.storage | used, limit | bytes |
-| azure_monitor.mysql_flexible.storage_utilization | average | percentage |
-| azure_monitor.mysql_flexible.storage_breakdown | data, ibdata1, binlog, others | bytes |
-| azure_monitor.mysql_flexible.backup_storage | used | bytes |
-| azure_monitor.mysql_flexible.serverlog_storage | used, limit | bytes |
-| azure_monitor.mysql_flexible.serverlog_storage_utilization | average | percentage |
-| azure_monitor.mysql_flexible.history_list_length | maximum | entries |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.mysql_flexible.cpu | Azure MySQL Flexible Server CPU Utilization | average | percentage |
+| azure_monitor.mysql_flexible.memory | Azure MySQL Flexible Server Memory Utilization | average | percentage |
+| azure_monitor.mysql_flexible.io_utilization | Azure MySQL Flexible Server Storage I/O Utilization | average | percentage |
+| azure_monitor.mysql_flexible.cpu_credits | Azure MySQL Flexible Server CPU Credits | consumed, remaining | credits |
+| azure_monitor.mysql_flexible.ha_status | Azure MySQL Flexible Server HA Replication Status | io, sql | status |
+| azure_monitor.mysql_flexible.replica_status | Azure MySQL Flexible Server Replica Status | io, sql | status |
+| azure_monitor.mysql_flexible.uptime | Azure MySQL Flexible Server Uptime | uptime | seconds |
+| azure_monitor.mysql_flexible.replication_lag | Azure MySQL Flexible Server Replication Lag | replica, ha | seconds |
+| azure_monitor.mysql_flexible.innodb_row_lock_time | Azure MySQL Flexible Server InnoDB Row Lock Time | average | milliseconds |
+| azure_monitor.mysql_flexible.innodb_row_lock_waits | Azure MySQL Flexible Server InnoDB Row Lock Waits | total | waits/s |
+| azure_monitor.mysql_flexible.aborted_connections | Azure MySQL Flexible Server Aborted Connections | total | connections/s |
+| azure_monitor.mysql_flexible.active_connections | Azure MySQL Flexible Server Active Connections | average | connections |
+| azure_monitor.mysql_flexible.total_connections | Azure MySQL Flexible Server Total Connections | total | connections/s |
+| azure_monitor.mysql_flexible.active_transactions | Azure MySQL Flexible Server Active Transactions | average | transactions |
+| azure_monitor.mysql_flexible.threads_running | Azure MySQL Flexible Server Threads Running | maximum | threads |
+| azure_monitor.mysql_flexible.queries | Azure MySQL Flexible Server Queries | total, slow | queries/s |
+| azure_monitor.mysql_flexible.dml_statements | Azure MySQL Flexible Server DML Statements | select, insert, update, delete | statements/s |
+| azure_monitor.mysql_flexible.ddl_statements | Azure MySQL Flexible Server DDL Statements | create_table, alter_table, drop_table, create_db, drop_db | statements/s |
+| azure_monitor.mysql_flexible.lock_deadlocks | Azure MySQL Flexible Server Deadlocks | total | deadlocks/s |
+| azure_monitor.mysql_flexible.lock_timeouts | Azure MySQL Flexible Server Lock Timeouts | total | timeouts/s |
+| azure_monitor.mysql_flexible.innodb_buffer_pool_pages | Azure MySQL Flexible Server InnoDB Buffer Pool Pages | data, dirty, free, flushed | pages |
+| azure_monitor.mysql_flexible.innodb_buffer_pool_io | Azure MySQL Flexible Server InnoDB Buffer Pool I/O | read_requests, disk_reads | requests/s |
+| azure_monitor.mysql_flexible.innodb_data_writes | Azure MySQL Flexible Server InnoDB Data Writes | total | writes/s |
+| azure_monitor.mysql_flexible.sort_merge_passes | Azure MySQL Flexible Server Sort Merge Passes | total | passes/s |
+| azure_monitor.mysql_flexible.network | Azure MySQL Flexible Server Network Traffic | in, out | bytes/s |
+| azure_monitor.mysql_flexible.storage_io | Azure MySQL Flexible Server Storage I/O | total | operations/s |
+| azure_monitor.mysql_flexible.storage | Azure MySQL Flexible Server Storage | used, limit | bytes |
+| azure_monitor.mysql_flexible.storage_utilization | Azure MySQL Flexible Server Storage Utilization | average | percentage |
+| azure_monitor.mysql_flexible.storage_breakdown | Azure MySQL Flexible Server Storage Breakdown | data, ibdata1, binlog, others | bytes |
+| azure_monitor.mysql_flexible.backup_storage | Azure MySQL Flexible Server Backup Storage | used | bytes |
+| azure_monitor.mysql_flexible.serverlog_storage | Azure MySQL Flexible Server Server Log Storage | used, limit | bytes |
+| azure_monitor.mysql_flexible.serverlog_storage_utilization | Azure MySQL Flexible Server Server Log Storage Utilization | average | percentage |
+| azure_monitor.mysql_flexible.history_list_length | Azure MySQL Flexible Server History List Length | maximum | entries |
 
 
 

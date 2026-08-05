@@ -45,7 +45,7 @@ State and country survive into all four tiers.
 
 For the full IP-intelligence concept (composition rule, ASN provider chain,
 auto-detect path order, dual-stack handling, hot reload semantics), see
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 You build (or download) the MMDB file with your own tooling, place it on the
@@ -222,7 +222,7 @@ The plugin reloads custom databases the same way it reloads stock ones
 plugin will pick it up; if it was edited byte-by-byte (rare with MMDB
 builders) verify size or mtime actually changed. The reload mechanism
 and its 30-second cadence are documented in
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 Operational practice: have your build pipeline write the new MMDB to a
 temp file in the same directory and `rename(2)` it over the live path so
 the swap is atomic.

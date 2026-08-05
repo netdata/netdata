@@ -192,11 +192,13 @@ The following alerts are available:
 | [ kubelet_operations_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_operations_errors | number of Docker or runtime operation errors |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -208,26 +210,27 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_kubelet.apiserver_audit_requests_rejected | rejected | requests/s |
-| k8s_kubelet.apiserver_storage_data_key_generation_failures | failures | events/s |
-| k8s_kubelet.apiserver_storage_data_key_generation_latencies | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | observes/s |
-| k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | percentage |
-| k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses | cache misses | events/s |
-| k8s_kubelet.kubelet_containers_running | total | running_containers |
-| k8s_kubelet.kubelet_pods_running | total | running_pods |
-| k8s_kubelet.kubelet_pods_log_filesystem_used_bytes | a dimension per namespace and pod | B |
-| k8s_kubelet.kubelet_runtime_operations | a dimension per operation type | operations/s |
-| k8s_kubelet.kubelet_runtime_operations_errors | a dimension per operation type | errors/s |
-| k8s_kubelet.kubelet_docker_operations | a dimension per operation type | operations/s |
-| k8s_kubelet.kubelet_docker_operations_errors | a dimension per operation type | errors/s |
-| k8s_kubelet.kubelet_node_config_error | experiencing_error | bool |
-| k8s_kubelet.kubelet_pleg_relist_interval_microseconds | 0.5, 0.9, 0.99 | microseconds |
-| k8s_kubelet.kubelet_pleg_relist_latency_microseconds | 0.5, 0.9, 0.99 | microseconds |
-| k8s_kubelet.kubelet_token_requests | total, failed | token_requests/s |
-| k8s_kubelet.rest_client_requests_by_code | a dimension per HTTP status code | requests/s |
-| k8s_kubelet.rest_client_requests_by_method | a dimension per HTTP method | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_kubelet.apiserver_audit_requests_rejected | API Server Audit Requests | rejected | requests/s |
+| k8s_kubelet.apiserver_storage_data_key_generation_failures | API Server Failed Data Encryption Key(DEK) Generation Operations | failures | events/s |
+| k8s_kubelet.apiserver_storage_data_key_generation_latencies | API Server Latencies Of Data Encryption Key(DEK) Generation Operations | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | observes/s |
+| k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent | API Server Latencies Of Data Encryption Key(DEK) Generation Operations Percentage | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | percentage |
+| k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses | API Server Storage Envelope Transformation Cache Misses | cache misses | events/s |
+| k8s_kubelet.kubelet_containers_running | Number Of Containers Currently Running | total | running_containers |
+| k8s_kubelet.kubelet_pods_running | Number Of Pods Currently Running | total | running_pods |
+| k8s_kubelet.kubelet_pods_log_filesystem_used_bytes | Bytes Used By The Pod Logs On The Filesystem | a dimension per namespace and pod | B |
+| k8s_kubelet.kubelet_runtime_operations | Runtime Operations By Type | a dimension per operation type | operations/s |
+| k8s_kubelet.kubelet_runtime_operations_errors | Runtime Operations Errors By Type | a dimension per operation type | errors/s |
+| k8s_kubelet.kubelet_docker_operations | Docker Operations By Type | a dimension per operation type | operations/s |
+| k8s_kubelet.kubelet_docker_operations_errors | Docker Operations Errors By Type | a dimension per operation type | errors/s |
+| k8s_kubelet.kubelet_node_config_error | Node Configuration-Related Error | experiencing_error | bool |
+| k8s_kubelet.kubelet_pleg_relist_interval_microseconds | PLEG Relisting Interval Summary | 0.5, 0.9, 0.99 | microseconds |
+| k8s_kubelet.kubelet_pleg_relist_latency_microseconds | PLEG Relisting Latency Summary | 0.5, 0.9, 0.99 | microseconds |
+| k8s_kubelet.kubelet_token_requests | Token() Requests To The Alternate Token Source | total, failed | token_requests/s |
+| k8s_kubelet.rest_client_requests_by_code | HTTP Requests By Status Code | a dimension per HTTP status code | requests/s |
+| k8s_kubelet.rest_client_requests_by_method | HTTP Requests By Status Method | a dimension per HTTP method | requests/s |
+
 
 ### Per volume manager
 
@@ -237,9 +240,9 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_kubelet.volume_manager_total_volumes | actual, desired | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_kubelet.volume_manager_total_volumes | Volume Manager State Of The World | actual, desired | state |
 
 
 

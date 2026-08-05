@@ -43,28 +43,21 @@ To prepare a VM template:
 
 ## Node Types: Ephemeral vs Permanent
 
-VMs cloned from templates can be configured as **ephemeral** or **permanent** nodes. This affects how Netdata handles disconnections, alerts, and cleanup.
+VMs cloned from templates can be configured as **ephemeral** (no alerts on disconnect, auto-cleanup after 24h — auto-scaling instances, spot VMs, short-lived workloads) or **permanent** (alerts trigger on disconnect, no automatic cleanup — the node stays visible until manually removed or its metrics fully rotate out via retention — long-running production systems).
 
-| Type | Behavior | Use Case |
-|------|-----------|----------|
-| **Ephemeral** | No alerts on disconnect, auto-cleanup after 24h | Auto-scaling instances, spot VMs, short-lived workloads |
-| **Permanent** | Alerts trigger on disconnect | Long-running production systems |
-
-### Configuring Ephemeral Nodes in Templates
-
-To make cloned VMs ephemeral by default, add to `/etc/netdata/netdata.conf` **in the template**:
+Set this **in the template** before conversion, in `netdata.conf` (`/etc/netdata/netdata.conf` on Linux, `C:\Program Files\Netdata\etc\netdata\netdata.conf` on Windows):
 
 ```ini
+# Ephemeral (auto-scaling, spot instances)
 [global]
 is ephemeral node = yes
+
+# Permanent (default - production systems)
+[global]
+is ephemeral node = no
 ```
 
-### When to Use Each Type
-
-- **Ephemeral**: Auto-scaling groups, spot instances, Kubernetes pod templates, CI/CD build agents
-- **Permanent**: Production database servers, core infrastructure, stable monitoring targets
-
-See [Node Ephemerality](/docs/nodes-ephemerality.md) for full documentation.
+See [Node Ephemerality](/docs/nodes-ephemerality.md) for full documentation, cleanup rules, and alerting details.
 
 ## Files to Delete
 
@@ -87,9 +80,19 @@ See [Node Ephemerality](/docs/nodes-ephemerality.md) for full documentation.
 
 ### 1. Stop Netdata
 
+#### Linux
+
 ```bash
 sudo systemctl stop netdata
 ```
+
+#### Windows (PowerShell)
+
+```powershell
+Stop-Service Netdata
+```
+
+Verify the service stopped with `Get-Service Netdata`. See [Service Control](/docs/netdata-agent/start-stop-restart.md) for details.
 
 ### 2. Delete All Identity and Data Files
 
@@ -100,6 +103,8 @@ sudo systemctl stop netdata
 The following commands permanently delete Netdata data. Verify you are on the template VM.
 
 :::
+
+#### Linux
 
 ```bash
 # Machine GUID (Agent Self Identity)
@@ -121,12 +126,41 @@ sudo rm -f /var/cache/netdata/context-meta.db*
 sudo rm -rf /var/cache/netdata/dbengine*
 ```
 
+#### Windows (PowerShell)
+
+Run in an elevated (Administrator) PowerShell session — paths assume the default Windows install location (`C:\Program Files\Netdata`). Deleting a file you don't have permission for fails silently under `-ErrorAction SilentlyContinue`, so a non-elevated session can leave identity files in place with no error shown.
+
+```powershell
+# Machine GUID (Agent Self Identity)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id" -Force -ErrorAction SilentlyContinue
+
+# Status file backups (GUID recovery locations)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\status-netdata.json" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\status-netdata.json" -Force -ErrorAction SilentlyContinue
+
+# ACLK authentication (Claimed ID, RSA keys)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\cloud.d\*" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Databases and metrics (metadata, all dbengine tiers)
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\netdata-meta.db*" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\context-meta.db*" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\dbengine*" -Recurse -Force -ErrorAction SilentlyContinue
+```
+
 ### 3. Configure Auto-Claiming (Optional)
 
-To have clones automatically claim to Netdata Cloud on first boot, ensure `/etc/netdata/claim.conf` exists:
+To have clones automatically claim to Netdata Cloud on first boot, ensure `claim.conf` exists.
+
+#### Linux
 
 ```bash
 cat /etc/netdata/claim.conf
+```
+
+#### Windows (PowerShell)
+
+```powershell
+Get-Content "C:\Program Files\Netdata\etc\netdata\claim.conf"
 ```
 
 Should contain:
@@ -157,6 +191,7 @@ The Netdata cleanup commands are the same for all hypervisors. The difference is
 |------------|------------------|---------------|------------|
 | **Proxmox** | Convert to Template | Before conversion | cloud-init scripts |
 | **VMware/vSphere** | VM Templates | Before conversion | Guest customization |
+| **Hyper-V** | Checkpoints/Templates | Before checkpoint/export | PowerShell scripts |
 | **libvirt/KVM** | virt-sysprep | During sysprep | `--delete` flags |
 | **AWS** | AMI | Before image creation | user-data scripts |
 | **Azure** | Managed Image | Before capture | cloud-init |
@@ -204,14 +239,14 @@ Each instance installs fresh with unique identity.
 
 Cause: [GUID recovered from status backup](/docs/learn/node-identities.md#status-file-backups). Netdata checks multiple backup locations before generating a new GUID.
 
-Solution: Delete **all** status file locations, not just the primary GUID file. See the cleanup commands in [Step 2](#2-delete-all-identity-and-data-files).
+Solution: Delete **all** status file locations, not just the primary GUID file. See the cleanup commands in [Step 2](#2-delete-all-identity-and-data-files). The same fix applies on Windows — run the equivalent PowerShell commands in [Fixing Already-Deployed Clones](#fixing-already-deployed-clones).
 
 ### Clones don't connect to Parent
 
 Cause: Either clones share the same [Machine GUID](/docs/learn/node-identities.md#agent-self-identity) (only one can connect at a time), or `stream.conf` wasn't configured in the template.
 
 Solution:
-- Verify each clone has a unique GUID: `cat /var/lib/netdata/registry/netdata.public.unique.id`
+- Verify each clone has a unique GUID: `cat /var/lib/netdata/registry/netdata.public.unique.id` (Linux) or `Get-Content "C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id"` (Windows PowerShell)
 - Verify `stream.conf` exists and has the correct Parent destination and API key
 - If GUIDs are duplicated, run the cleanup on each clone (loses metrics)
 
@@ -241,7 +276,9 @@ Solution: Create `/etc/netdata/claim.conf` with your Space token.
 
 ### Fixing Already-Deployed Clones
 
-If clones were deployed with identity files:
+If clones were deployed with identity files, run the cleanup on each affected clone.
+
+#### Linux
 
 ```bash
 # On each affected clone
@@ -266,6 +303,32 @@ sudo rm -f /var/cache/netdata/context-meta.db*
 sudo rm -rf /var/cache/netdata/dbengine*
 
 sudo systemctl start netdata
+```
+
+#### Windows (PowerShell)
+
+Run the following in an elevated PowerShell session on each affected clone.
+
+```powershell
+# On each affected clone
+Stop-Service Netdata
+
+# Machine GUID
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id" -Force -ErrorAction SilentlyContinue
+
+# Status file backups (all locations)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\status-netdata.json" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\status-netdata.json" -Force -ErrorAction SilentlyContinue
+
+# ACLK authentication (if re-claiming to Cloud)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\cloud.d\*" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Databases and metrics
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\netdata-meta.db*" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\context-meta.db*" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\dbengine*" -Recurse -Force -ErrorAction SilentlyContinue
+
+Start-Service Netdata
 ```
 
 :::warning
@@ -304,32 +367,3 @@ The token only allows claiming to your Space. It cannot read data or modify othe
 
 </details>
 
-<details>
-<summary>Should I make my template VMs ephemeral or permanent?</summary>
-
-Use **ephemeral** for auto-scaling groups, spot instances, or any VMs that may terminate at any time. Use **permanent** for long-running production systems where disconnections indicate problems.
-
-Configure in the template before conversion:
-
-```ini
-# For ephemeral (auto-scaling, spot instances)
-[global]
-is ephemeral node = yes
-
-# For permanent (default - production systems)
-[global]
-is ephemeral node = no
-```
-
-See [Node Types](/docs/learn/vm-templates.md#node-types-ephemeral-vs-permanent) for full guidance.
-
-</details>
-
-<details>
-<summary>Does ephemerality affect cleanup behavior?</summary>
-
-Yes. Ephemeral nodes are automatically cleaned up after 24 hours of disconnection (configurable via `cleanup ephemeral hosts after`). Permanent nodes never auto-cleanup - they remain visible until manually removed, or their metrics are fully rotated due to retention.
-
-This prevents dashboards from cluttering with stale auto-scaled instances while preserving long-term monitoring data for permanent infrastructure.
-
-</details>

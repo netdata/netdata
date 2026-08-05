@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 )
 
 func TestParseHumanSize(t *testing.T) {
@@ -16,30 +18,30 @@ func TestParseHumanSize(t *testing.T) {
 		expected uint64
 		wantErr  bool
 	}{
-		"10GB":         {"10GB", 10 * bytesPerGB, false},
-		"1GB":          {"1GB", 1 * bytesPerGB, false},
-		"100MB":        {"100MB", 100 * bytesPerMB, false},
-		"5MB":          {"5MB", 5 * bytesPerMB, false},
-		"200MB":        {"200MB", 200 * bytesPerMB, false},
-		"1KB":          {"1KB", 1 * bytesPerKB, false},
+		"10GB":         {"10GB", 10 * (1024 * 1024 * 1024), false},
+		"1GB":          {"1GB", 1 * (1024 * 1024 * 1024), false},
+		"100MB":        {"100MB", 100 * (1024 * 1024), false},
+		"5MB":          {"5MB", 5 * (1024 * 1024), false},
+		"200MB":        {"200MB", 200 * (1024 * 1024), false},
+		"1KB":          {"1KB", 1 * (1024), false},
 		"512B":         {"512B", 512, false},
 		"1024":         {"1024", 1024, false},
 		"empty":        {"", 0, true},
 		"null":         {"null", 0, true},
 		"garbage":      {"xyz", 0, true},
 		"negative":     {"-1GB", 0, true},
-		"float_gb":     {"1.5GB", uint64(1.5 * bytesPerGB), false},
-		"float_mb":     {"0.5MB", uint64(0.5 * bytesPerMB), false},
-		"lowercase_gb": {"10gb", 10 * bytesPerGB, false},
-		"lowercase_mb": {"100mb", 100 * bytesPerMB, false},
-		"mixedcase_gb": {"10Gb", 10 * bytesPerGB, false},
-		"mixedcase_mb": {"100Mb", 100 * bytesPerMB, false},
-		"mixedcase_kb": {"64Kb", 64 * bytesPerKB, false},
+		"float_gb":     {"1.5GB", uint64(1.5 * (1024 * 1024 * 1024)), false},
+		"float_mb":     {"0.5MB", uint64(0.5 * (1024 * 1024)), false},
+		"lowercase_gb": {"10gb", 10 * (1024 * 1024 * 1024), false},
+		"lowercase_mb": {"100mb", 100 * (1024 * 1024), false},
+		"mixedcase_gb": {"10Gb", 10 * (1024 * 1024 * 1024), false},
+		"mixedcase_mb": {"100Mb", 100 * (1024 * 1024), false},
+		"mixedcase_kb": {"64Kb", 64 * (1024), false},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := parseHumanSize(tc.input)
+			got, err := journal.ParseSize(tc.input)
 			if tc.wantErr && err == nil {
 				t.Fatalf("expected error, got %d", got)
 			}
@@ -48,36 +50,6 @@ func TestParseHumanSize(t *testing.T) {
 			}
 			if !tc.wantErr && got != tc.expected {
 				t.Fatalf("expected %d, got %d", tc.expected, got)
-			}
-		})
-	}
-}
-
-func TestFormatHumanSizePreservesRoundTrip(t *testing.T) {
-	tests := map[string]struct {
-		bytes uint64
-		want  string
-	}{
-		"exact_gb":      {bytes: 10 * bytesPerGB, want: "10GB"},
-		"exact_mb":      {bytes: 200 * bytesPerMB, want: "200MB"},
-		"exact_kb":      {bytes: 64 * bytesPerKB, want: "64KB"},
-		"fractional_gb": {bytes: uint64(1.5 * bytesPerGB), want: "1536MB"},
-		"fractional_kb": {bytes: bytesPerKB + 1, want: "1025B"},
-		"plain_bytes":   {bytes: 512, want: "512B"},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			got := formatHumanSize(tc.bytes)
-			if got != tc.want {
-				t.Fatalf("formatHumanSize(%d) = %q, want %q", tc.bytes, got, tc.want)
-			}
-			parsed, err := parseHumanSize(got)
-			if err != nil {
-				t.Fatalf("parse formatted size %q: %v", got, err)
-			}
-			if parsed != tc.bytes {
-				t.Fatalf("parseHumanSize(formatHumanSize(%d)) = %d", tc.bytes, parsed)
 			}
 		})
 	}
@@ -105,7 +77,7 @@ func TestParseHumanDuration(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := parseHumanDuration(tc.input)
+			got, err := journal.ParseDuration(tc.input)
 			if tc.wantErr && err == nil {
 				t.Fatalf("expected error, got %v", got)
 			}
@@ -121,12 +93,12 @@ func TestParseHumanDuration(t *testing.T) {
 
 func TestValidateRetention(t *testing.T) {
 	tests := map[string]struct {
-		rc      RetentionConfig
+		rc      journal.Retention
 		wantErr bool
 	}{
 		"defaults": {
-			rc: RetentionConfig{
-				MaxSize:     new(defaultMaxSize),
+			rc: journal.Retention{
+				MaxSize:     new(journal.DefaultMaxSize),
 				MaxDuration: nil,
 				RotateSize:  nil,
 				RotateDur:   nil,
@@ -134,7 +106,7 @@ func TestValidateRetention(t *testing.T) {
 			wantErr: false,
 		},
 		"both_null": {
-			rc: RetentionConfig{
+			rc: journal.Retention{
 				MaxSize:     nil,
 				MaxDuration: nil,
 				RotateSize:  nil,
@@ -143,7 +115,7 @@ func TestValidateRetention(t *testing.T) {
 			wantErr: false,
 		},
 		"zero_max_size": {
-			rc: RetentionConfig{
+			rc: journal.Retention{
 				MaxSize:     new(uint64(0)),
 				MaxDuration: nil,
 				RotateSize:  nil,
@@ -152,8 +124,8 @@ func TestValidateRetention(t *testing.T) {
 			wantErr: true,
 		},
 		"negative_max_duration": {
-			rc: RetentionConfig{
-				MaxSize:     new(defaultMaxSize),
+			rc: journal.Retention{
+				MaxSize:     new(journal.DefaultMaxSize),
 				MaxDuration: new(-1 * time.Second),
 				RotateSize:  nil,
 				RotateDur:   nil,
@@ -161,8 +133,8 @@ func TestValidateRetention(t *testing.T) {
 			wantErr: true,
 		},
 		"zero_rotation_duration": {
-			rc: RetentionConfig{
-				MaxSize:     new(defaultMaxSize),
+			rc: journal.Retention{
+				MaxSize:     new(journal.DefaultMaxSize),
 				MaxDuration: nil,
 				RotateSize:  nil,
 				RotateDur:   new(time.Duration(0)),
@@ -170,8 +142,8 @@ func TestValidateRetention(t *testing.T) {
 			wantErr: false,
 		},
 		"negative_rotation_duration": {
-			rc: RetentionConfig{
-				MaxSize:     new(defaultMaxSize),
+			rc: journal.Retention{
+				MaxSize:     new(journal.DefaultMaxSize),
 				MaxDuration: nil,
 				RotateSize:  nil,
 				RotateDur:   new(-1 * time.Hour),
@@ -179,8 +151,8 @@ func TestValidateRetention(t *testing.T) {
 			wantErr: true,
 		},
 		"very_short_max_duration": {
-			rc: RetentionConfig{
-				MaxSize:     new(defaultMaxSize),
+			rc: journal.Retention{
+				MaxSize:     new(journal.DefaultMaxSize),
 				MaxDuration: new(500 * time.Millisecond),
 				RotateSize:  nil,
 				RotateDur:   nil,
@@ -191,7 +163,7 @@ func TestValidateRetention(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := validateRetention(tc.rc)
+			err := journal.ValidateRetention(tc.rc)
 			if tc.wantErr && err == nil {
 				t.Fatalf("expected error")
 			}
@@ -204,35 +176,35 @@ func TestValidateRetention(t *testing.T) {
 
 func TestEffectiveRotateSize(t *testing.T) {
 	tests := map[string]struct {
-		rc       RetentionConfig
+		rc       journal.Retention
 		expected uint64
 	}{
 		"default_10GB": {
-			rc:       RetentionConfig{MaxSize: new(uint64(10 * bytesPerGB))},
-			expected: maxRotationSize,
+			rc:       journal.Retention{MaxSize: new(uint64(10 * (1024 * 1024 * 1024)))},
+			expected: (200 * 1024 * 1024),
 		},
 		"1GB_min_clamp": {
-			rc:       RetentionConfig{MaxSize: new(uint64(1 * bytesPerGB))},
-			expected: uint64(1 * bytesPerGB / rotationSizeDiv),
+			rc:       journal.Retention{MaxSize: new(uint64(1 * (1024 * 1024 * 1024)))},
+			expected: uint64(1 * (1024 * 1024 * 1024) / 20),
 		},
 		"100GB_max_clamp": {
-			rc:       RetentionConfig{MaxSize: new(uint64(100 * bytesPerGB))},
-			expected: maxRotationSize,
+			rc:       journal.Retention{MaxSize: new(uint64(100 * (1024 * 1024 * 1024)))},
+			expected: (200 * 1024 * 1024),
 		},
 		"null_size_uses_upper_clamp": {
-			rc:       RetentionConfig{MaxSize: nil},
-			expected: maxRotationSize,
+			rc:       journal.Retention{MaxSize: nil},
+			expected: (200 * 1024 * 1024),
 		},
 		"explicit_rotation_overrides_auto": {
-			rc: RetentionConfig{
-				MaxSize:    new(uint64(10 * bytesPerGB)),
-				RotateSize: new(uint64(100 * bytesPerMB)),
+			rc: journal.Retention{
+				MaxSize:    new(uint64(10 * (1024 * 1024 * 1024))),
+				RotateSize: new(uint64(100 * (1024 * 1024))),
 			},
-			expected: 100 * bytesPerMB,
+			expected: 100 * (1024 * 1024),
 		},
 		"small_200MB": {
-			rc:       RetentionConfig{MaxSize: new(uint64(200 * bytesPerMB))},
-			expected: uint64(200 * bytesPerMB / rotationSizeDiv),
+			rc:       journal.Retention{MaxSize: new(uint64(200 * (1024 * 1024)))},
+			expected: uint64(200 * (1024 * 1024) / 20),
 		},
 	}
 
@@ -247,10 +219,10 @@ func TestEffectiveRotateSize(t *testing.T) {
 }
 
 func TestEffectiveRotateDurationDefaultDisabled(t *testing.T) {
-	if got := (RetentionConfig{}).EffectiveRotateDur(); got != 0 {
+	if got := (journal.Retention{}).EffectiveRotateDur(); got != 0 {
 		t.Fatalf("expected disabled default rotate duration, got %v", got)
 	}
-	if got := (RetentionConfig{RotateDur: new(1 * time.Hour)}).EffectiveRotateDur(); got != time.Hour {
+	if got := (journal.Retention{RotateDur: new(1 * time.Hour)}).EffectiveRotateDur(); got != time.Hour {
 		t.Fatalf("expected explicit rotate duration 1h, got %v", got)
 	}
 }
@@ -266,7 +238,7 @@ func TestParseRetentionConfigDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if rc.MaxSize == nil || *rc.MaxSize != 10*bytesPerGB {
+	if rc.MaxSize == nil || *rc.MaxSize != 10*(1024*1024*1024) {
 		t.Fatalf("expected max_size 10GB, got %v", rc.MaxSize)
 	}
 	if rc.MaxDuration != nil {
@@ -352,9 +324,9 @@ func TestParseRetentionConfigRotationDurationDisabled(t *testing.T) {
 }
 
 func TestJournalRoot(t *testing.T) {
-	withTestCacheDir(t)
-	root := journalRoot("local")
-	want := filepath.Join(netdataLogDir(), "traps", "local")
+	cacheDir := withTestCacheDir(t)
+	root := journal.Root("local")
+	want := filepath.Join(cacheDir, "log", "traps", "local")
 	if root != want {
 		t.Fatalf("expected %q, got %q", want, root)
 	}
@@ -364,7 +336,7 @@ func TestJournalRootPrefersNetdataLogDirEnv(t *testing.T) {
 	logDir := filepath.Join(t.TempDir(), "env-log")
 	withNetdataLogDir(t, logDir)
 
-	root := journalRoot("local")
+	root := journal.Root("local")
 	want := filepath.Join(logDir, "traps", "local")
 	if root != want {
 		t.Fatalf("expected %q, got %q", want, root)
@@ -375,7 +347,7 @@ func TestValidateNetdataLogRootRequiresExistingDirectory(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "missing")
 	withNetdataLogDir(t, root)
 
-	err := validateNetdataLogRoot()
+	err := journal.ValidateLogRoot()
 	if err == nil {
 		t.Fatal("expected missing Netdata log root error")
 	}
@@ -394,16 +366,11 @@ func TestValidateNetdataLogRootRejectsFile(t *testing.T) {
 	}
 	withNetdataLogDir(t, root)
 
-	err := validateNetdataLogRoot()
+	err := journal.ValidateLogRoot()
 	if err == nil {
 		t.Fatal("expected non-directory Netdata log root error")
 	}
 	if !strings.Contains(err.Error(), "not a directory") {
 		t.Fatalf("expected non-directory root error, got %v", err)
 	}
-}
-
-//go:fix inline
-func stringPtr(s string) *string {
-	return new(s)
 }

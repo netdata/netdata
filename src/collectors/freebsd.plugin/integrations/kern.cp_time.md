@@ -109,11 +109,13 @@ The following alerts are available:
 | [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU utilization over the last 10 minutes (excluding nice) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -125,9 +127,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.cpu | nice, system, user, interrupt, idle | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.cpu | Total CPU utilization | nice, system, user, interrupt, idle | percentage |
+
 
 ### Per core
 
@@ -137,6 +140,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.cpu | nice, system, user, interrupt, idle | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cpu.cpu | Core utilization | nice, system, user, interrupt, idle | percentage |

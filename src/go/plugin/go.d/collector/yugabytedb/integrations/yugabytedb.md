@@ -249,11 +249,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -269,10 +271,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.master_client_operations | operations | ops/s |
-| yugabytedb.master_client_operations_latency | latency | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.master_client_operations | Master Client Operations | operations | ops/s |
+| yugabytedb.master_client_operations_latency | Master Client Operations Latency | latency | microseconds |
+
 
 ### Per Master DDL operations
 
@@ -286,10 +289,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.master_ddl_operations | operations | ops/s |
-| yugabytedb.master_ddl_operations_latency | latency | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.master_ddl_operations | Master DDL Operations | operations | ops/s |
+| yugabytedb.master_ddl_operations_latency | Master DDL Operations Latency | latency | microseconds |
+
 
 ### Per TabletServerService (Master)
 
@@ -303,11 +307,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.master_tabletserverservice_operations | operations | ops/s |
-| yugabytedb.master_tabletserverservice_operations_latency | latency | microseconds |
-| yugabytedb.master_tabletserverservice_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.master_tabletserverservice_operations | Master TabletServerService Operations | operations | ops/s |
+| yugabytedb.master_tabletserverservice_operations_latency | Master TabletServerService Operations Latency | latency | microseconds |
+| yugabytedb.master_tabletserverservice_traffic | Master TabletServerService Traffic | received, sent | bytes/s |
+
 
 ### Per PgClientService (Master)
 
@@ -321,11 +326,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.master_pgclientservice_operations | operations | ops/s |
-| yugabytedb.master_pgclientservice_operations_latency | latency | microseconds |
-| yugabytedb.master_pgclientservice_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.master_pgclientservice_operations | Master PgClientService Operations | operations | ops/s |
+| yugabytedb.master_pgclientservice_operations_latency | Master PgClientService Operations Latency | latency | microseconds |
+| yugabytedb.master_pgclientservice_traffic | Master PgClientService Traffic | received, sent | bytes/s |
+
 
 ### Per RemoteBootstrapService (Master)
 
@@ -339,11 +345,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.master_remotebootstrapservice_operations | operations | ops/s |
-| yugabytedb.master_remotebootstrapservice_operations_latency | latency | microseconds |
-| yugabytedb.master_remotebootstrapservice_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.master_remotebootstrapservice_operations | Master RemoteBootstrapService Operations | operations | ops/s |
+| yugabytedb.master_remotebootstrapservice_operations_latency | Master RemoteBootstrapService Operations Latency | latency | microseconds |
+| yugabytedb.master_remotebootstrapservice_traffic | Master RemoteBootstrapService Traffic | received, sent | bytes/s |
+
 
 ### Per Raft operations (Master)
 
@@ -357,11 +364,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.master_consensus_operations | operations | ops/s |
-| yugabytedb.master_consensus_operations_latency | latency | microseconds |
-| yugabytedb.master_consensus_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.master_consensus_operations | Master Consensus Operations | operations | ops/s |
+| yugabytedb.master_consensus_operations_latency | Master Consensus Operations Operations Latency | latency | microseconds |
+| yugabytedb.master_consensus_traffic | Master Consensus Traffic | received, sent | bytes/s |
+
 
 ### Per TabletServerService (Tablet Server)
 
@@ -375,11 +383,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.tserver_tabletserverservice_operations | operations | ops/s |
-| yugabytedb.tserver_tabletserverservice_operations_latency | latency | microseconds |
-| yugabytedb.tserver_tabletserverservice_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.tserver_tabletserverservice_operations | TServer TabletServerService Operations | operations | ops/s |
+| yugabytedb.tserver_tabletserverservice_operations_latency | TServer TabletServerService Operations Latency | latency | microseconds |
+| yugabytedb.tserver_tabletserverservice_traffic | TServer TabletServerService Traffic | received, sent | bytes/s |
+
 
 ### Per TabletServerAdminService (Tablet Server)
 
@@ -393,11 +402,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.tserver_tabletserveradminservice_operations | operations | ops/s |
-| yugabytedb.tserver_tabletserveradminservice_operations_latency | latency | microseconds |
-| yugabytedb.tserver_tabletserveradminservice_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.tserver_tabletserveradminservice_operations | TServer TabletServerAdminService Operations | operations | ops/s |
+| yugabytedb.tserver_tabletserveradminservice_operations_latency | TServer TabletServerAdminService Operations Latency | latency | microseconds |
+| yugabytedb.tserver_tabletserveradminservice_traffic | TServer TabletServerAdminService Traffic | received, sent | bytes/s |
+
 
 ### Per TabletServerBackupService (Tablet Server)
 
@@ -411,11 +421,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.tserver_tabletserverbackupservice_operations | operations | ops/s |
-| yugabytedb.tserver_tabletserverbackupservice_operations_latency | latency | microseconds |
-| yugabytedb.tserver_tabletserverbackupservice_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.tserver_tabletserverbackupservice_operations | TServer TabletServerBackupService Operations | operations | ops/s |
+| yugabytedb.tserver_tabletserverbackupservice_operations_latency | TServer TabletServerBackupService Operations Latency | latency | microseconds |
+| yugabytedb.tserver_tabletserverbackupservice_traffic | TServer TabletServerBackupService Traffic | received, sent | bytes/s |
+
 
 ### Per PgClientService (Tablet Server)
 
@@ -429,11 +440,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.tserver_pgclientservice_operations | operations | ops/s |
-| yugabytedb.tserver_pgclientservice_operations_latency | latency | microseconds |
-| yugabytedb.tserver_pgclientservice_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.tserver_pgclientservice_operations | TServer PgClientService Operations | operations | ops/s |
+| yugabytedb.tserver_pgclientservice_operations_latency | TServer PgClientService Operations Latency | latency | microseconds |
+| yugabytedb.tserver_pgclientservice_traffic | TServer PgClientService Traffic | received, sent | bytes/s |
+
 
 ### Per RemoteBootstrapService (Tablet Server)
 
@@ -447,11 +459,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.tserver_remotebootstrapservice_operations | operations | ops/s |
-| yugabytedb.tserver_remotebootstrapservice_operations_latency | latency | microseconds |
-| yugabytedb.tserver_remotebootstrapservice_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.tserver_remotebootstrapservice_operations | TServer RemoteBootstrapService Operations | operations | ops/s |
+| yugabytedb.tserver_remotebootstrapservice_operations_latency | TServer RemoteBootstrapService Operations Latency | latency | microseconds |
+| yugabytedb.tserver_remotebootstrapservice_traffic | TServer RemoteBootstrapService Traffic | received, sent | bytes/s |
+
 
 ### Per Raft operations (Tablet Server)
 
@@ -465,11 +478,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.tserver_consensus_operations | operations | ops/s |
-| yugabytedb.tserver_consensus_operations_latency | latency | microseconds |
-| yugabytedb.tserver_consensus_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.tserver_consensus_operations | TServer Consensus Operations | operations | ops/s |
+| yugabytedb.tserver_consensus_operations_latency | TServer Consensus Operations Operations Latency | latency | microseconds |
+| yugabytedb.tserver_consensus_traffic | TServer Consensus Traffic | received, sent | bytes/s |
+
 
 ### Per SQL Statements (YCQL)
 
@@ -483,10 +497,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.ycql_sql_statements | statements | statements/s |
-| yugabytedb.yCql_sql_statements_latency | latency | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.ycql_sql_statements | YCQL SQL Statements | statements | statements/s |
+| yugabytedb.yCql_sql_statements_latency | YCQL SQL Statements Latency | latency | microseconds |
+
 
 ### Per YSQL server
 
@@ -496,12 +511,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.ysql_connection_usage | available, used | connections |
-| yugabytedb.ysql_active_connections | active | connections |
-| yugabytedb.ysql_established_connections | established | connections/s |
-| yugabytedb.ysql_over_limit_connections | over_limit | rejects/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.ysql_connection_usage | YSQL Connections Usage | available, used | connections |
+| yugabytedb.ysql_active_connections | YSQL Active Connections | active | connections |
+| yugabytedb.ysql_established_connections | YSQL Established Connections | established | connections/s |
+| yugabytedb.ysql_over_limit_connections | YSQL Rejected Over Limit Connections | over_limit | rejects/s |
+
 
 ### Per SQL Statements (YSQL)
 
@@ -515,10 +531,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| yugabytedb.ysql_sql_statements | statements | statements/s |
-| yugabytedb.ysql_sql_statements_latency | latency | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| yugabytedb.ysql_sql_statements | YSQL SQL Statements | statements | statements/s |
+| yugabytedb.ysql_sql_statements_latency | YSQL SQL Statements Latency | latency | microseconds |
 
 
 

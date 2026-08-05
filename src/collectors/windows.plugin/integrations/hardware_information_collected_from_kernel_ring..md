@@ -54,7 +54,15 @@ The default configuration for this integration is not expected to impose a signi
 
 ### Prerequisites
 
-No action required.
+#### Install the Netdata Driver (netdata_driver.sys)
+
+CPU temperature monitoring on Windows requires the Netdata kernel driver (`netdata_driver.sys`) to be installed on the host. The driver is an optional component and is not installed by default.
+
+When you install Netdata with the Windows MSI installer, select the **Netdata Driver: Hardware Metrics Collection** option on the feature selection screen. If Netdata is already installed without the driver, the installer's Change/Modify option does not expose this checkbox again; uninstall Netdata first, then reinstall it and select the option during setup.
+
+Editing `netdata.conf` alone is not enough. Without the driver, the `GetHardwareInfo` module cannot read the CPU `msr` register, so the `cpu.temperature` chart is never created and CPU temperature will not appear on the dashboard. The collector records an error in the Netdata log, but no temperature chart is produced.
+
+
 
 ### Configuration
 
@@ -104,11 +112,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,6 +130,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.temperature | a dimension per core | Celcius |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cpu.temperature | Core temperature | a dimension per core | Celcius |

@@ -1,0 +1,225 @@
+//go:build !windows
+
+package jobmgrtest
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/jobmgrtest/runner"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestRootProtocolObservationReportsEarlyProcessExit(t *testing.T) {
+	process, err := runner.Start(runner.Spec{
+		Executable: "/bin/sh",
+		Arguments:  []string{"-c", "printf failed >&2; exit 7"},
+	})
+	require.NoError(t, err)
+	defer process.Kill()
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	err = newRootProtocolObservation("fixture").wait(
+		ctx,
+		process,
+		func(int, int) bool { return false },
+	)
+	require.ErrorContains(t, err, "exited before expected protocol lifecycle")
+	require.ErrorContains(t, err, "failed")
+	require.NotErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestShippedRootQuitRejectsDelayedStartupSeparatorsAsKeepalive(t *testing.T) {
+	directory := t.TempDir()
+	executable := filepath.Join(directory, "startup-separators")
+	script := "#!/bin/sh\n" +
+		"printf 'CONFIG fixture create accepted template path source type commands 0x0000 0x0000\\n\\n'\n" +
+		"sleep 0.05\n" +
+		"printf 'CONFIG other create accepted template path source type commands 0x0000 0x0000\\n\\n'\n" +
+		"IFS= read -r line\n"
+	require.NoError(t, os.WriteFile(executable, []byte(script), 0o700))
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+	err := runShippedRoot(
+		ctx,
+		directory,
+		shippedRoot{
+			name:       "startup-separators",
+			executable: executable,
+			module:     "fixture",
+			templateID: "fixture",
+		},
+		shippedRootQuit,
+	)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestShippedRootDriverValidatesConfigsBeforeAvailability(t *testing.T) {
+	tests := map[string]struct {
+		overridePath string
+		payload      string
+		removePath   string
+		wantError    bool
+	}{
+		"exact empty jobs": {},
+		"missing":          {removePath: "go.d/testrandom.conf", wantError: true},
+		"nonempty jobs": {
+			overridePath: "go.d/testrandom.conf",
+			payload:      "jobs:\n  - name: unexpected\n",
+			wantError:    true,
+		},
+		"unknown field": {
+			overridePath: "go.d/testrandom.conf",
+			payload:      "jobs: []\nunexpected: true\n",
+			wantError:    true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			configDir := t.TempDir()
+			writeEmptyRootConfigs(t, configDir)
+			if test.overridePath != "" {
+				require.NoError(t, os.WriteFile(
+					filepath.Join(configDir, test.overridePath),
+					[]byte(test.payload),
+					0o600,
+				))
+			}
+			if test.removePath != "" {
+				require.NoError(t, os.Remove(filepath.Join(configDir, test.removePath)))
+			}
+			driver := ShippedRootDriver{
+				ConfigDir: configDir,
+			}
+
+			missing, err := driver.RunMatrixAvailable(t.Context())
+			if test.wantError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"godplugin", "ibmdplugin", "scriptsdplugin"}, missing)
+		})
+	}
+}
+
+func TestShippedRootDriverHasClosedRootMembership(t *testing.T) {
+	driver := ShippedRootDriver{
+		GoDPlugin:      "go",
+		IBMPlugin:      "ibm",
+		ScriptsDPlugin: "scripts",
+	}
+	observed := make(map[string]shippedRoot)
+	for _, root := range driver.roots() {
+		observed[root.name] = root
+	}
+
+	require.Equal(t, map[string]shippedRoot{
+		"godplugin": {
+			name:       "godplugin",
+			executable: "go",
+			module:     "testrandom",
+			configFile: "go.d/testrandom.conf",
+			templateID: "go.d:collector:testrandom",
+		},
+		"ibmdplugin": {
+			name:       "ibmdplugin",
+			executable: "ibm",
+			module:     "websphere_mp",
+			configFile: "ibm.d/websphere_mp.conf",
+			templateID: "ibm.d:collector:websphere_mp",
+		},
+		"scriptsdplugin": {
+			name:       "scriptsdplugin",
+			executable: "scripts",
+			module:     "nagios",
+			configFile: "scripts.d/nagios.conf",
+			templateID: "scripts.d:collector:nagios",
+		},
+	}, observed)
+}
+
+func TestShippedRootDriverHasClosedScenarioMembership(t *testing.T) {
+	require.Equal(t, [...]shippedRootScenario{
+		shippedRootQuit,
+		shippedRootRepeatedHUP,
+		shippedRootShutdown,
+	}, shippedRootScenarios)
+}
+
+func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
+	tests := map[string]struct {
+		chunks          []string
+		wantGenerations int
+		wantKeepalives  int
+	}{
+		"split template publication": {
+			chunks: []string{
+				`CONFIG fix`,
+				"ture create accepted template path source type commands 0x0000 0x0000\n\n",
+			},
+			wantGenerations: 1,
+		},
+		"startup separators are not keepalives": {
+			chunks: []string{
+				"CONFIG fixture create accepted template path source type commands 0x0000 0x0000\n\n",
+				"CONFIG other create accepted template path source type commands 0x0000 0x0000\n\n",
+				"HOST ''\n\n",
+			},
+			wantGenerations: 1,
+		},
+		"standalone blank after separator is a keepalive": {
+			chunks: []string{
+				"CONFIG fixture create accepted template path source type commands 0x0000 0x0000\n\n",
+				"\n",
+			},
+			wantGenerations: 1,
+			wantKeepalives:  1,
+		},
+		"other routes do not count": {
+			chunks: []string{
+				"FUNCTION GLOBAL \"other\" 30 \"help\" \"tags\" 0xFFFF 1 1\n\n",
+				"FUNCTION_DEL GLOBAL \"other\"\n\n",
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			observation := newRootProtocolObservation("fixture")
+			for _, chunk := range test.chunks {
+				require.NoError(t, observation.observe([]byte(chunk)))
+			}
+			generations, keepalives := observation.snapshot()
+			require.Equal(t, test.wantGenerations, generations)
+			require.Equal(t, test.wantKeepalives, keepalives)
+		})
+	}
+}
+
+func TestRootProtocolObservationRejectsGlobalConfigFunction(t *testing.T) {
+	tests := map[string]string{
+		"publication": "FUNCTION GLOBAL \"config\" 30 \"help\" \"tags\" 0x0013 1 1\n",
+		"withdrawal":  "FUNCTION_DEL GLOBAL \"config\"\n",
+	}
+	for name, line := range tests {
+		t.Run(name, func(t *testing.T) {
+			observation := newRootProtocolObservation("fixture")
+			require.ErrorContains(t, observation.observe([]byte(line)), "daemon-owned config Function")
+		})
+	}
+}
+
+func writeEmptyRootConfigs(t *testing.T, configDir string) {
+	t.Helper()
+	for _, relative := range []string{"go.d/testrandom.conf", "ibm.d/websphere_mp.conf", "scripts.d/nagios.conf"} {
+		path := filepath.Join(configDir, relative)
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte("jobs: []\n"), 0o600))
+	}
+}

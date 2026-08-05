@@ -185,7 +185,8 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
             r.gap.from = r.local_db.last_entry_t;
         else
             // we don't have any data, the gap is the max timeframe we are allowed to replicate
-            r.gap.from = r.local_db.wall_clock_time - r.host->stream.replication.period;
+            r.gap.from = r.local_db.wall_clock_time > r.host->stream.replication.period ?
+                             r.local_db.wall_clock_time - r.host->stream.replication.period : 0;
 
     }
     else {

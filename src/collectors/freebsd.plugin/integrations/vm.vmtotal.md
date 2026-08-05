@@ -109,11 +109,13 @@ The following alerts are available:
 | [ active_processes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf) | system.active_processes | system process IDs (PID) space utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -125,8 +127,8 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.active_processes | active | processes |
-| system.processes | running, blocked | processes |
-| mem.real | used | MiB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.active_processes | System Active Processes | active | processes |
+| system.processes | System Processes | running, blocked | processes |
+| mem.real | Total Real Memory In Use | used | MiB |

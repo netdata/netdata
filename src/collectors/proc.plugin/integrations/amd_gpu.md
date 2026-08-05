@@ -77,11 +77,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -97,15 +99,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| amdgpu.gpu_utilization | utilization | percentage |
-| amdgpu.gpu_mem_utilization | utilization | percentage |
-| amdgpu.gpu_clk_frequency | frequency | MHz |
-| amdgpu.gpu_mem_clk_frequency | frequency | MHz |
-| amdgpu.gpu_mem_vram_usage_perc | usage | percentage |
-| amdgpu.gpu_mem_vram_usage | free, used | bytes |
-| amdgpu.gpu_mem_vis_vram_usage_perc | usage | percentage |
-| amdgpu.gpu_mem_vis_vram_usage | free, used | bytes |
-| amdgpu.gpu_mem_gtt_usage_perc | usage | percentage |
-| amdgpu.gpu_mem_gtt_usage | free, used | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| amdgpu.gpu_utilization | GPU utilization | utilization | percentage |
+| amdgpu.gpu_mem_utilization | GPU memory utilization | utilization | percentage |
+| amdgpu.gpu_clk_frequency | GPU clock frequency | frequency | MHz |
+| amdgpu.gpu_mem_clk_frequency | GPU memory clock frequency | frequency | MHz |
+| amdgpu.gpu_mem_vram_usage_perc | VRAM memory usage percentage | usage | percentage |
+| amdgpu.gpu_mem_vram_usage | VRAM memory usage | free, used | bytes |
+| amdgpu.gpu_mem_vis_vram_usage_perc | visible VRAM memory usage percentage | usage | percentage |
+| amdgpu.gpu_mem_vis_vram_usage | visible VRAM memory usage | free, used | bytes |
+| amdgpu.gpu_mem_gtt_usage_perc | GTT memory usage percentage | usage | percentage |
+| amdgpu.gpu_mem_gtt_usage | GTT memory usage | free, used | bytes |

@@ -7,7 +7,7 @@ pub(crate) const MAX_QUERY_LIMIT: usize = 500;
 pub(crate) const MAX_GROUP_BY_FIELDS: usize = 10;
 #[cfg(test)]
 pub(crate) const DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS: usize = 50_000;
-pub(crate) const FACET_VALUE_LIMIT: usize = 100;
+pub(crate) const FACET_STATIC_VALUE_LIMIT: usize = 256;
 /// Hard cap on the autocomplete `term` to prevent runaway substring scans
 /// on large vocabularies. AS names, MAC addresses, IPv6 strings, CIDRs all
 /// fit comfortably under this; longer terms get rejected at deserialize.
@@ -43,19 +43,6 @@ pub(crate) const CITY_MAP_GROUP_BY_FIELDS: &[&str] = &[
     "DST_GEO_LONGITUDE",
 ];
 
-pub(crate) const RAW_ONLY_FIELDS: &[&str] = &[
-    "SRC_ADDR",
-    "DST_ADDR",
-    "SRC_PORT",
-    "DST_PORT",
-    "SRC_GEO_CITY",
-    "DST_GEO_CITY",
-    "SRC_GEO_LATITUDE",
-    "DST_GEO_LATITUDE",
-    "SRC_GEO_LONGITUDE",
-    "DST_GEO_LONGITUDE",
-];
-
 pub(crate) fn default_group_by() -> Vec<String> {
     DEFAULT_GROUP_BY_FIELDS
         .iter()
@@ -87,8 +74,11 @@ pub(crate) static GROUP_BY_ALLOWED_FIELDS: LazyLock<HashSet<&'static str>> = Laz
         .collect()
 });
 
-pub(crate) static SELECTION_ALLOWED_FIELDS: LazyLock<HashSet<&'static str>> =
-    LazyLock::new(|| supported_flow_field_names().collect());
+pub(crate) static SELECTION_ALLOWED_FIELDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    supported_flow_field_names()
+        .filter(|field| !field_is_metric(field))
+        .collect()
+});
 
 pub(crate) static GROUP_BY_ALLOWED_OPTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
     supported_flow_field_names()

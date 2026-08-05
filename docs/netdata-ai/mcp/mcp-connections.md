@@ -22,7 +22,9 @@ This is the reverse of connecting an AI client *to* Netdata. Here, **Netdata rea
 
    ![Choose an authentication method](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-auth.png)
 
-4. Provide the required configuration parameters — such as the connection name or account region — then click **Connect & discover tools**.
+4. Provide the required configuration parameters — such as the connection name, or your account URL with the provider — then click **Connect & discover tools**.
+
+   An **account URL** is the address you use to reach the provider, including your organization's subdomain. For PagerDuty that is `https://acme.pagerduty.com`, or `https://acme.eu.pagerduty.com` if your account is hosted in the EU. Netdata derives the correct regional endpoint from it, and refuses the connection if the account you authorize with is not the one configured here.
 
    ![Connection parameters](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-connection.png)
 

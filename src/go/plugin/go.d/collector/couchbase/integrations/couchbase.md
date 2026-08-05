@@ -201,11 +201,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -217,16 +219,16 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| couchbase.bucket_quota_percent_used | a dimension per bucket | percentage |
-| couchbase.bucket_ops_per_sec | a dimension per bucket | ops/s |
-| couchbase.bucket_disk_fetches | a dimension per bucket | fetches |
-| couchbase.bucket_item_count | a dimension per bucket | items |
-| couchbase.bucket_disk_used_stats | a dimension per bucket | bytes |
-| couchbase.bucket_data_used | a dimension per bucket | bytes |
-| couchbase.bucket_mem_used | a dimension per bucket | bytes |
-| couchbase.bucket_vb_active_num_non_resident | a dimension per bucket | items |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| couchbase.bucket_quota_percent_used | Quota Percent Used Per Bucket | a dimension per bucket | percentage |
+| couchbase.bucket_ops_per_sec | Operations Per Second Per Bucket | a dimension per bucket | ops/s |
+| couchbase.bucket_disk_fetches | Disk Fetches Per Bucket | a dimension per bucket | fetches |
+| couchbase.bucket_item_count | Item Count Per Bucket | a dimension per bucket | items |
+| couchbase.bucket_disk_used_stats | Disk Used Per Bucket | a dimension per bucket | bytes |
+| couchbase.bucket_data_used | Data Used Per Bucket | a dimension per bucket | bytes |
+| couchbase.bucket_mem_used | Memory Used Per Bucket | a dimension per bucket | bytes |
+| couchbase.bucket_vb_active_num_non_resident | Number Of Non-Resident Items Per Bucket | a dimension per bucket | items |
 
 
 

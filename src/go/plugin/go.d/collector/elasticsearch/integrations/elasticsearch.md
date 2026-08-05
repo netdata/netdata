@@ -262,11 +262,13 @@ The following alerts are available:
 | [ elasticsearch_node_index_health_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_index_health | node index $label:index health status is red. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -284,39 +286,40 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| elasticsearch.node_indices_indexing | index | operations/s |
-| elasticsearch.node_indices_indexing_current | index | operations |
-| elasticsearch.node_indices_indexing_time | index | milliseconds |
-| elasticsearch.node_indices_search | queries, fetches | operations/s |
-| elasticsearch.node_indices_search_current | queries, fetches | operations |
-| elasticsearch.node_indices_search_time | queries, fetches | milliseconds |
-| elasticsearch.node_indices_refresh | refresh | operations/s |
-| elasticsearch.node_indices_refresh_time | refresh | milliseconds |
-| elasticsearch.node_indices_flush | flush | operations/s |
-| elasticsearch.node_indices_flush_time | flush | milliseconds |
-| elasticsearch.node_indices_fielddata_memory_usage | used | bytes |
-| elasticsearch.node_indices_fielddata_evictions | evictions | operations/s |
-| elasticsearch.node_indices_segments_count | segments | segments |
-| elasticsearch.node_indices_segments_memory_usage_total | used | bytes |
-| elasticsearch.node_indices_segments_memory_usage | terms, stored_fields, term_vectors, norms, points, doc_values, index_writer, version_map, fixed_bit_set | bytes |
-| elasticsearch.node_indices_translog_operations | total, uncommitted | operations |
-| elasticsearch.node_indices_translog_size | total, uncommitted | bytes |
-| elasticsearch.node_file_descriptors | open | fd |
-| elasticsearch.node_jvm_heap | inuse | percentage |
-| elasticsearch.node_jvm_heap_bytes | committed, used | bytes |
-| elasticsearch.node_jvm_buffer_pools_count | direct, mapped | pools |
-| elasticsearch.node_jvm_buffer_pool_direct_memory | total, used | bytes |
-| elasticsearch.node_jvm_buffer_pool_mapped_memory | total, used | bytes |
-| elasticsearch.node_jvm_gc_count | young, old | gc/s |
-| elasticsearch.node_jvm_gc_time | young, old | milliseconds |
-| elasticsearch.node_thread_pool_queued | generic, search, search_throttled, get, analyze, write, snapshot, warmer, refresh, listener, fetch_shard_started, fetch_shard_store, flush, force_merge, management | threads |
-| elasticsearch.node_thread_pool_rejected | generic, search, search_throttled, get, analyze, write, snapshot, warmer, refresh, listener, fetch_shard_started, fetch_shard_store, flush, force_merge, management | threads |
-| elasticsearch.node_cluster_communication_packets | received, sent | pps |
-| elasticsearch.node_cluster_communication_traffic | received, sent | bytes/s |
-| elasticsearch.node_http_connections | open | connections |
-| elasticsearch.node_breakers_trips | requests, fielddata, in_flight_requests, model_inference, accounting, parent | trips/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| elasticsearch.node_indices_indexing | Indexing Operations | index | operations/s |
+| elasticsearch.node_indices_indexing_current | Indexing Operations Current | index | operations |
+| elasticsearch.node_indices_indexing_time | Time Spent On Indexing Operations | index | milliseconds |
+| elasticsearch.node_indices_search | Search Operations | queries, fetches | operations/s |
+| elasticsearch.node_indices_search_current | Search Operations Current | queries, fetches | operations |
+| elasticsearch.node_indices_search_time | node_indices_search_time | queries, fetches | milliseconds |
+| elasticsearch.node_indices_refresh | Refresh Operations | refresh | operations/s |
+| elasticsearch.node_indices_refresh_time | Time Spent On Refresh Operations | refresh | milliseconds |
+| elasticsearch.node_indices_flush | Flush Operations | flush | operations/s |
+| elasticsearch.node_indices_flush_time | Time Spent On Flush Operations | flush | milliseconds |
+| elasticsearch.node_indices_fielddata_memory_usage | Fielddata Cache Memory Usage | used | bytes |
+| elasticsearch.node_indices_fielddata_evictions | Fielddata Evictions | evictions | operations/s |
+| elasticsearch.node_indices_segments_count | Segments Count | segments | segments |
+| elasticsearch.node_indices_segments_memory_usage_total | Segments Memory Usage Total | used | bytes |
+| elasticsearch.node_indices_segments_memory_usage | Segments Memory Usage | terms, stored_fields, term_vectors, norms, points, doc_values, index_writer, version_map, fixed_bit_set | bytes |
+| elasticsearch.node_indices_translog_operations | Translog Operations | total, uncommitted | operations |
+| elasticsearch.node_indices_translog_size | Translog Size | total, uncommitted | bytes |
+| elasticsearch.node_file_descriptors | Process File Descriptors | open | fd |
+| elasticsearch.node_jvm_heap | JVM Heap Percentage Currently in Use | inuse | percentage |
+| elasticsearch.node_jvm_heap_bytes | JVM Heap Commit And Usage | committed, used | bytes |
+| elasticsearch.node_jvm_buffer_pools_count | JVM Buffer Pools Count | direct, mapped | pools |
+| elasticsearch.node_jvm_buffer_pool_direct_memory | JVM Buffer Pool Direct Memory | total, used | bytes |
+| elasticsearch.node_jvm_buffer_pool_mapped_memory | JVM Buffer Pool Mapped Memory | total, used | bytes |
+| elasticsearch.node_jvm_gc_count | JVM Garbage Collections | young, old | gc/s |
+| elasticsearch.node_jvm_gc_time | JVM Time Spent On Garbage Collections | young, old | milliseconds |
+| elasticsearch.node_thread_pool_queued | Thread Pool Queued Threads Count | generic, search, search_throttled, get, analyze, write, snapshot, warmer, refresh, listener, fetch_shard_started, fetch_shard_store, flush, force_merge, management | threads |
+| elasticsearch.node_thread_pool_rejected | Thread Pool Rejected Threads Count | generic, search, search_throttled, get, analyze, write, snapshot, warmer, refresh, listener, fetch_shard_started, fetch_shard_store, flush, force_merge, management | threads |
+| elasticsearch.node_cluster_communication_packets | Cluster Communication | received, sent | pps |
+| elasticsearch.node_cluster_communication_traffic | Cluster Communication Bandwidth | received, sent | bytes/s |
+| elasticsearch.node_http_connections | HTTP Connections | open | connections |
+| elasticsearch.node_breakers_trips | Circuit Breaker Trips Count | requests, fielddata, in_flight_requests, model_inference, accounting, parent | trips/s |
+
 
 ### Per cluster
 
@@ -330,19 +333,20 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| elasticsearch.cluster_health_status | green, yellow, red | status |
-| elasticsearch.cluster_number_of_nodes | nodes, data_nodes | nodes |
-| elasticsearch.cluster_shards_count | active_primary, active, relocating, initializing, unassigned, delayed_unaasigned | shards |
-| elasticsearch.cluster_pending_tasks | pending | tasks |
-| elasticsearch.cluster_number_of_in_flight_fetch | in_flight_fetch | fetches |
-| elasticsearch.cluster_indices_count | indices | indices |
-| elasticsearch.cluster_indices_shards_count | total, primaries, replication | shards |
-| elasticsearch.cluster_indices_docs_count | docs | docs |
-| elasticsearch.cluster_indices_store_size | size | bytes |
-| elasticsearch.cluster_indices_query_cache | hit, miss | events/s |
-| elasticsearch.cluster_nodes_by_role_count | coordinating_only, data, data_cold, data_content, data_frozen, data_hot, data_warm, ingest, master, ml, remote_cluster_client, voting_only | nodes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| elasticsearch.cluster_health_status | Cluster Status | green, yellow, red | status |
+| elasticsearch.cluster_number_of_nodes | Cluster Nodes Count | nodes, data_nodes | nodes |
+| elasticsearch.cluster_shards_count | Cluster Shards Count | active_primary, active, relocating, initializing, unassigned, delayed_unaasigned | shards |
+| elasticsearch.cluster_pending_tasks | Cluster Pending Tasks | pending | tasks |
+| elasticsearch.cluster_number_of_in_flight_fetch | Cluster Unfinished Fetches | in_flight_fetch | fetches |
+| elasticsearch.cluster_indices_count | Cluster Indices Count | indices | indices |
+| elasticsearch.cluster_indices_shards_count | Cluster Indices Shards Count | total, primaries, replication | shards |
+| elasticsearch.cluster_indices_docs_count | Cluster Indices Docs Count | docs | docs |
+| elasticsearch.cluster_indices_store_size | Cluster Indices Store Size | size | bytes |
+| elasticsearch.cluster_indices_query_cache | Cluster Indices Query Cache | hit, miss | events/s |
+| elasticsearch.cluster_nodes_by_role_count | Cluster Nodes By Role Count | coordinating_only, data, data_cold, data_content, data_frozen, data_hot, data_warm, ingest, master, ml, remote_cluster_client, voting_only | nodes |
+
 
 ### Per index
 
@@ -357,12 +361,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| elasticsearch.node_index_health | green, yellow, red | status |
-| elasticsearch.node_index_shards_count | shards | shards |
-| elasticsearch.node_index_docs_count | docs | docs |
-| elasticsearch.node_index_store_size | store_size | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| elasticsearch.node_index_health | Index Health | green, yellow, red | status |
+| elasticsearch.node_index_shards_count | Index Shards Count | shards | shards |
+| elasticsearch.node_index_docs_count | Index Docs Count | docs | docs |
+| elasticsearch.node_index_store_size | Index Store Size | store_size | bytes |
 
 
 

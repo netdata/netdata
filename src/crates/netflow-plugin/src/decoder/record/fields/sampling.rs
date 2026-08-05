@@ -8,19 +8,21 @@ fn decode_v9_scope_sampler_id(
         | netflow_parser::variable_versions::v9::ScopeDataField::Interface(raw)
         | netflow_parser::variable_versions::v9::ScopeDataField::LineCard(raw)
         | netflow_parser::variable_versions::v9::ScopeDataField::NetFlowCache(raw)
-        | netflow_parser::variable_versions::v9::ScopeDataField::Template(raw) => raw.as_slice(),
+        | netflow_parser::variable_versions::v9::ScopeDataField::Template(raw)
+        | netflow_parser::variable_versions::v9::ScopeDataField::Unknown(_, raw) => raw.as_slice(),
     };
     decode_akvorado_unsigned(raw)
 }
 
 pub(crate) fn observe_v9_sampling_options(
-    exporter_ip: IpAddr,
+    exporter_source: SocketAddr,
     version: u16,
     observation_domain_id: u32,
     sampling: &mut SamplingState,
-    options_data: V9OptionsData,
-) {
-    for record in options_data.fields {
+    options_data: &V9OptionsData,
+) -> Vec<DecoderStateNamespaceKey> {
+    let mut dirty = Vec::new();
+    for record in &options_data.fields {
         let mut sampler_id = record
             .scope_fields
             .iter()
@@ -28,50 +30,54 @@ pub(crate) fn observe_v9_sampling_options(
             .unwrap_or(0);
         let mut rate: Option<u64> = None;
 
-        for fields in record.options_fields {
-            for (field, value) in fields {
-                let value_str = field_value_to_string(&value);
-                match field {
-                    V9Field::FlowSamplerId => {
-                        if let Ok(parsed) = value_str.parse::<u64>() {
-                            sampler_id = parsed;
-                        }
+        for (field, value) in &record.options_fields {
+            let value_str = field_value_to_string(value);
+            match field {
+                V9Field::FlowSamplerId => {
+                    if let Ok(parsed) = value_str.parse::<u64>() {
+                        sampler_id = parsed;
                     }
-                    V9Field::SamplingInterval | V9Field::FlowSamplerRandomInterval => {
-                        rate = value_str.parse::<u64>().ok();
-                    }
-                    _ => {}
                 }
+                V9Field::SamplingInterval | V9Field::FlowSamplerRandomInterval => {
+                    rate = value_str.parse::<u64>().ok();
+                }
+                _ => {}
             }
         }
 
         if let Some(rate) = rate.filter(|rate| *rate > 0) {
-            sampling.set(
-                exporter_ip,
+            for key in sampling.set(
+                exporter_source,
                 version,
                 observation_domain_id,
                 sampler_id,
                 rate,
-            );
+            ) {
+                if !dirty.contains(&key) {
+                    dirty.push(key);
+                }
+            }
         }
     }
+    dirty
 }
 
 pub(crate) fn observe_ipfix_sampling_options(
-    exporter_ip: IpAddr,
+    exporter_source: SocketAddr,
     version: u16,
     observation_domain_id: u32,
     sampling: &mut SamplingState,
-    options_data: IPFixOptionsData,
-) {
-    for record in options_data.fields {
+    options_data: &IPFixOptionsData,
+) -> Vec<DecoderStateNamespaceKey> {
+    let mut dirty = Vec::new();
+    for record in &options_data.fields {
         let mut sampler_id = 0_u64;
         let mut rate: Option<u64> = None;
         let mut packet_interval: Option<u64> = None;
         let mut packet_space: Option<u64> = None;
 
         for (field, value) in record {
-            let value_str = field_value_to_string(&value);
+            let value_str = field_value_to_string(value);
             match field {
                 IPFixField::IANA(IANAIPFixField::SamplerId)
                 | IPFixField::IANA(IANAIPFixField::SelectorId) => {
@@ -100,21 +106,26 @@ pub(crate) fn observe_ipfix_sampling_options(
         }
 
         if let Some(rate) = rate.filter(|rate| *rate > 0) {
-            sampling.set(
-                exporter_ip,
+            for key in sampling.set(
+                exporter_source,
                 version,
                 observation_domain_id,
                 sampler_id,
                 rate,
-            );
+            ) {
+                if !dirty.contains(&key) {
+                    dirty.push(key);
+                }
+            }
         }
     }
+    dirty
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netflow_parser::variable_versions::data_number::DataNumber;
+    use netflow_parser::DataNumber;
     use netflow_parser::variable_versions::v9::{OptionsDataFields, ScopeDataField};
 
     #[test]
@@ -123,24 +134,30 @@ mod tests {
         let options = V9OptionsData {
             fields: vec![OptionsDataFields {
                 scope_fields: vec![ScopeDataField::System(vec![0, 7])],
-                options_fields: vec![vec![(
+                options_fields: vec![(
                     V9Field::SamplingInterval,
                     FieldValue::DataNumber(DataNumber::U16(4000)),
-                )]],
+                )],
             }],
         };
 
-        observe_v9_sampling_options(
-            IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)),
+        let dirty = observe_v9_sampling_options(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 2055),
             9,
             42,
             &mut sampling,
-            options,
+            &options,
         );
 
         assert_eq!(
-            sampling.get(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 9, 42, 7),
+            sampling.get(
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 2055),
+                9,
+                42,
+                7
+            ),
             Some(4000)
         );
+        assert_eq!(dirty.len(), 1);
     }
 }

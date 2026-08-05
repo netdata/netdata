@@ -73,7 +73,7 @@ Fields populated:
 For the cross-cutting Enrichment concept (provider chains, merge order rules,
 how static composes with dynamic sources, the static-blocks-classifiers
 interaction, and shared failure modes), see
-[Enrichment](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[Enrichment](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 Edit `netflow.yaml`, restart the plugin, and the YAML-defined data is loaded
@@ -147,7 +147,7 @@ load with a parse error.
 | enrichment.metadata_static.exporters.&lt;key&gt;.if_indexes.&lt;n&gt;.boundary | Interface boundary marker. Accepts the integers `0` (undefined), `1` (external -- faces the outside world: Internet, peer, transit), `2` (internal -- faces your own infrastructure), or the case-insensitive strings `"undefined"`, `"external"`, `"internal"`. Any other value fails config load. Filtering for `IN_IF_BOUNDARY=1` cleanly gives you "traffic that arrived from outside". | 0 | no |
 | enrichment.metadata_static.exporters.&lt;key&gt;.if_indexes.&lt;n&gt;.speed | Interface speed in **bits per second**. A 1 Gbps interface is `1000000000`, not `1000` and not `1000000`. Operators thinking in megabits get the value wrong by a factor of 1000 to 1000000. A `0` value means "not set" and removes the field from the output. | 0 | no |
 | enrichment.networks | Map keyed by CIDR. Longest-prefix match contributes the most-specific fields; less-specific containing prefixes contribute their non-empty fields too. The same merge rule is used by `network_sources`. Each value is either a string (shorthand for `name:`) or a map with `name`, `role`, `site`, `region`, `country`, `state`, `city`, `latitude`, `longitude`, `tenant`, `asn`. | {} | no |
-| enrichment.networks.&lt;cidr&gt;.asn | Forces the AS *number* for traffic in this prefix, overriding whatever the `asn_providers` chain computed. The AS *name* is still resolved from the ASN MMDB -- there is no `asn_name` config field. See the ASN section of [Enrichment](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment). | 0 | no |
+| enrichment.networks.&lt;cidr&gt;.asn | Forces the AS *number* for traffic in this prefix, overriding whatever the `asn_providers` chain computed. The AS *name* is still resolved from the ASN MMDB -- there is no `asn_name` config field. See the ASN section of [Enrichment](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md). | 0 | no |
 | enrichment.networks.&lt;cidr&gt;.latitude / longitude | Per-CIDR coordinate override. Out-of-range values (latitude not in [-90, 90] or longitude not in [-180, 180]) and non-finite values are silently coerced to empty strings -- the field is dropped, no error. Validate input out of band if your data matters. | null | no |
 | enrichment.default_sampling_rate | Global fallback applied only when the flow record does not already carry a sampling rate. Either a single integer or a CIDR-keyed map (longest-prefix match against the exporter IP). | 0 | no |
 | enrichment.override_sampling_rate | Per-exporter substitution that **always** wins when its prefix matches the exporter IP, regardless of what the flow record carried. Either a single integer or a CIDR-keyed map. | {} | no |
@@ -308,10 +308,7 @@ entry to overwrite. The same merge rule applies to entries from
 
 ### GeoIP returns spurious data for an internal range
 
-Until you declare your RFC1918 / RFC6598 / link-local ranges as
-`enrichment.networks` entries, the GeoIP-derived country / city / coord
-fields can pick up junk for those addresses. Adding a `networks` entry
-for the range overrides the GeoIP layer at the merge step.
+Declare an `enrichment.networks` entry for the range to override the GeoIP layer at the merge step -- see [Private and non-routable IPs](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md#private-and-non-routable-ips) for why GeoIP is unreliable for RFC1918 / RFC6598 / link-local ranges and how the override works.
 
 
 ### ifIndex changed after a hardware swap

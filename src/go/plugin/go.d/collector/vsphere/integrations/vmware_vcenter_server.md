@@ -443,11 +443,13 @@ The following alerts are available:
 | [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | ESXi Host memory utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -463,9 +465,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.inventory_objects | datacenters, folders, clusters, hosts, vms, datastores, resource_pools | objects |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.inventory_objects | vSphere inventory object count after include filters are applied | datacenters, folders, clusters, hosts, vms, datastores, resource_pools | objects |
+
 
 ### Per virtual machine
 
@@ -485,32 +488,33 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.vm_cpu_utilization | used | percentage |
-| vsphere.vm_mem_utilization | used | percentage |
-| vsphere.vm_mem_usage | granted, consumed, active, shared | KiB |
-| vsphere.vm_mem_swap_usage | swapped | KiB |
-| vsphere.vm_mem_swap_io | in, out | KiB/s |
-| vsphere.vm_disk_io | read, write | KiB/s |
-| vsphere.vm_disk_max_latency | latency | milliseconds |
-| vsphere.vm_net_traffic | received, sent | KiB/s |
-| vsphere.vm_net_packets | received, sent | packets |
-| vsphere.vm_net_drops | received, sent | drops |
-| vsphere.vm_overall_status | green, red, yellow, gray | status |
-| vsphere.vm_power_state | powered_on, powered_off, suspended | status |
-| vsphere.vm_connection_state | connected, disconnected, orphaned, inaccessible, invalid | status |
-| vsphere.vm_tools_running_status | running, not_running, executing_scripts, unknown | status |
-| vsphere.vm_tools_version_status | current, need_upgrade, not_installed, unmanaged, too_old, supported_old, supported_new, too_new, blacklisted, unknown | status |
-| vsphere.vm_consolidation_needed | needed, not_needed | status |
-| vsphere.vm_system_uptime | uptime | seconds |
-| vsphere.vm_config_cpu | vcpus | vCPUs |
-| vsphere.vm_config_memory | memory | MiB |
-| vsphere.vm_config_devices | disks, nics | devices |
-| vsphere.vm_storage_usage | committed, uncommitted, unshared | bytes |
-| vsphere.vm_snapshot_count | count | snapshots |
-| vsphere.vm_snapshot_max_age | age | seconds |
-| vsphere.vm_snapshot_max_chain_depth | depth | snapshots |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.vm_cpu_utilization | Virtual Machine CPU utilization | used | percentage |
+| vsphere.vm_mem_utilization | Virtual Machine memory utilization | used | percentage |
+| vsphere.vm_mem_usage | Virtual Machine memory usage | granted, consumed, active, shared | KiB |
+| vsphere.vm_mem_swap_usage | Virtual Machine VMKernel memory swap usage | swapped | KiB |
+| vsphere.vm_mem_swap_io | Virtual Machine VMKernel memory swap IO | in, out | KiB/s |
+| vsphere.vm_disk_io | Virtual Machine disk IO | read, write | KiB/s |
+| vsphere.vm_disk_max_latency | Virtual Machine disk max latency | latency | milliseconds |
+| vsphere.vm_net_traffic | Virtual Machine network traffic | received, sent | KiB/s |
+| vsphere.vm_net_packets | Virtual Machine network packets | received, sent | packets |
+| vsphere.vm_net_drops | Virtual Machine network dropped packets | received, sent | drops |
+| vsphere.vm_overall_status | Virtual Machine overall alarm status | green, red, yellow, gray | status |
+| vsphere.vm_power_state | Virtual Machine power state | powered_on, powered_off, suspended | status |
+| vsphere.vm_connection_state | Virtual Machine connection state | connected, disconnected, orphaned, inaccessible, invalid | status |
+| vsphere.vm_tools_running_status | Virtual Machine VMware Tools running status | running, not_running, executing_scripts, unknown | status |
+| vsphere.vm_tools_version_status | Virtual Machine VMware Tools version status | current, need_upgrade, not_installed, unmanaged, too_old, supported_old, supported_new, too_new, blacklisted, unknown | status |
+| vsphere.vm_consolidation_needed | Virtual Machine disk consolidation status | needed, not_needed | status |
+| vsphere.vm_system_uptime | Virtual Machine system uptime | uptime | seconds |
+| vsphere.vm_config_cpu | Virtual Machine configured CPU | vcpus | vCPUs |
+| vsphere.vm_config_memory | Virtual Machine configured memory | memory | MiB |
+| vsphere.vm_config_devices | Virtual Machine configured devices | disks, nics | devices |
+| vsphere.vm_storage_usage | Virtual Machine storage usage | committed, uncommitted, unshared | bytes |
+| vsphere.vm_snapshot_count | Virtual Machine snapshot count | count | snapshots |
+| vsphere.vm_snapshot_max_age | Virtual Machine oldest snapshot age; zero means no snapshots | age | seconds |
+| vsphere.vm_snapshot_max_chain_depth | Virtual Machine maximum snapshot chain depth; zero means no snapshots | depth | snapshots |
+
 
 ### Per virtual machine power
 
@@ -530,10 +534,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.vm_power_usage | power | watts |
-| vsphere.vm_energy_usage | energy | joules |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.vm_power_usage | Virtual Machine power usage | power | watts |
+| vsphere.vm_energy_usage | Virtual Machine energy usage | energy | joules |
+
 
 ### Per vSAN virtual machine
 
@@ -554,11 +559,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.vsan_vm_operations | read, write | operations/s |
-| vsphere.vsan_vm_throughput | read, write | bytes/s |
-| vsphere.vsan_vm_latency | read, write | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.vsan_vm_operations | vSAN Virtual Machine operations | read, write | operations/s |
+| vsphere.vsan_vm_throughput | vSAN Virtual Machine throughput | read, write | bytes/s |
+| vsphere.vsan_vm_latency | vSAN Virtual Machine latency | read, write | microseconds |
+
 
 ### Per host power
 
@@ -577,12 +583,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.host_power_usage | power, cap | watts |
-| vsphere.host_power_capacity_usage | used, usable, idle, system, vm | watts |
-| vsphere.host_power_capacity_utilization | used | percentage |
-| vsphere.host_energy_usage | energy | joules |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.host_power_usage | ESXi Host power usage | power, cap | watts |
+| vsphere.host_power_capacity_usage | ESXi Host power capacity usage | used, usable, idle, system, vm | watts |
+| vsphere.host_power_capacity_utilization | ESXi Host power capacity utilization | used | percentage |
+| vsphere.host_energy_usage | ESXi Host energy usage | energy | joules |
+
 
 ### Per vSAN host
 
@@ -602,13 +609,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.vsan_host_operations | read, write | operations/s |
-| vsphere.vsan_host_throughput | read, write | bytes/s |
-| vsphere.vsan_host_latency | read, write | microseconds |
-| vsphere.vsan_host_congestions | congestions | congestions/s |
-| vsphere.vsan_host_cache_hit_rate | hit_rate | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.vsan_host_operations | vSAN Host operations | read, write | operations/s |
+| vsphere.vsan_host_throughput | vSAN Host throughput | read, write | bytes/s |
+| vsphere.vsan_host_latency | vSAN Host latency | read, write | microseconds |
+| vsphere.vsan_host_congestions | vSAN Host congestion events | congestions | congestions/s |
+| vsphere.vsan_host_cache_hit_rate | vSAN Host client cache hit rate | hit_rate | percentage |
+
 
 ### Per host
 
@@ -627,23 +635,24 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.host_cpu_utilization | used | percentage |
-| vsphere.host_mem_utilization | used | percentage |
-| vsphere.host_mem_usage | granted, consumed, active, shared, sharedcommon | KiB |
-| vsphere.host_mem_swap_io | in, out | KiB/s |
-| vsphere.host_disk_io | read, write | KiB/s |
-| vsphere.host_disk_max_latency | latency | milliseconds |
-| vsphere.host_net_traffic | received, sent | KiB/s |
-| vsphere.host_net_packets | received, sent | packets |
-| vsphere.host_net_drops | received, sent | drops |
-| vsphere.host_net_errors | received, sent | errors |
-| vsphere.host_overall_status | green, red, yellow, gray | status |
-| vsphere.host_power_state | powered_on, powered_off, standby, unknown | status |
-| vsphere.host_connection_state | connected, not_responding, disconnected | status |
-| vsphere.host_maintenance_status | normal, in_maintenance | status |
-| vsphere.host_system_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.host_cpu_utilization | ESXi Host CPU utilization | used | percentage |
+| vsphere.host_mem_utilization | ESXi Host memory utilization | used | percentage |
+| vsphere.host_mem_usage | ESXi Host memory usage | granted, consumed, active, shared, sharedcommon | KiB |
+| vsphere.host_mem_swap_io | ESXi Host VMKernel memory swap IO | in, out | KiB/s |
+| vsphere.host_disk_io | ESXi Host disk IO | read, write | KiB/s |
+| vsphere.host_disk_max_latency | ESXi Host disk max latency | latency | milliseconds |
+| vsphere.host_net_traffic | ESXi Host network traffic | received, sent | KiB/s |
+| vsphere.host_net_packets | ESXi Host network packets | received, sent | packets |
+| vsphere.host_net_drops | ESXi Host network drops | received, sent | drops |
+| vsphere.host_net_errors | ESXi Host network errors | received, sent | errors |
+| vsphere.host_overall_status | ESXi Host overall alarm status | green, red, yellow, gray | status |
+| vsphere.host_power_state | ESXi Host power state | powered_on, powered_off, standby, unknown | status |
+| vsphere.host_connection_state | ESXi Host connection state | connected, not_responding, disconnected | status |
+| vsphere.host_maintenance_status | ESXi Host maintenance status | normal, in_maintenance | status |
+| vsphere.host_system_uptime | ESXi Host system uptime | uptime | seconds |
+
 
 ### Per datastore
 
@@ -662,17 +671,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.datastore_disk_io | read, write | KiB/s |
-| vsphere.datastore_disk_iops | reads, writes | operations/s |
-| vsphere.datastore_disk_latency | read, write | milliseconds |
-| vsphere.datastore_space_utilization | used | percentage |
-| vsphere.datastore_space_usage | capacity, free, used, uncommitted | bytes |
-| vsphere.datastore_overall_status | green, red, yellow, gray | status |
-| vsphere.datastore_accessibility_status | accessible, inaccessible | status |
-| vsphere.datastore_maintenance_status | normal, entering_maintenance, in_maintenance, unknown | status |
-| vsphere.datastore_multiple_host_access | enabled, disabled, unknown | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.datastore_disk_io | Datastore disk IO | read, write | KiB/s |
+| vsphere.datastore_disk_iops | Datastore disk IOPS | reads, writes | operations/s |
+| vsphere.datastore_disk_latency | Datastore disk latency | read, write | milliseconds |
+| vsphere.datastore_space_utilization | Datastore space utilization | used | percentage |
+| vsphere.datastore_space_usage | Datastore space usage; capacity, free, used, and uncommitted are zero when the datastore is inaccessible | capacity, free, used, uncommitted | bytes |
+| vsphere.datastore_overall_status | Datastore overall alarm status | green, red, yellow, gray | status |
+| vsphere.datastore_accessibility_status | Datastore accessibility status | accessible, inaccessible | status |
+| vsphere.datastore_maintenance_status | Datastore maintenance mode status | normal, entering_maintenance, in_maintenance, unknown | status |
+| vsphere.datastore_multiple_host_access | Datastore multi-host access status | enabled, disabled, unknown | status |
+
 
 ### Per datastore cluster
 
@@ -690,12 +700,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.datastore_cluster_space_utilization | used | percentage |
-| vsphere.datastore_cluster_space_usage | capacity, free, used | bytes |
-| vsphere.datastore_cluster_storage_drs_status | enabled, disabled | status |
-| vsphere.datastore_cluster_overall_status | green, red, yellow, gray | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.datastore_cluster_space_utilization | Datastore Cluster space utilization | used | percentage |
+| vsphere.datastore_cluster_space_usage | Datastore Cluster space usage | capacity, free, used | bytes |
+| vsphere.datastore_cluster_storage_drs_status | Datastore Cluster Storage DRS status | enabled, disabled | status |
+| vsphere.datastore_cluster_overall_status | Datastore Cluster overall status | green, red, yellow, gray | status |
+
 
 ### Per vSAN cluster
 
@@ -714,15 +725,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.vsan_cluster_space_usage | used, free, total | bytes |
-| vsphere.vsan_cluster_space_utilization | used | percentage |
-| vsphere.vsan_cluster_health_status | green, yellow, red, unknown | status |
-| vsphere.vsan_cluster_operations | read, write | operations/s |
-| vsphere.vsan_cluster_throughput | read, write | bytes/s |
-| vsphere.vsan_cluster_latency | read, write | microseconds |
-| vsphere.vsan_cluster_congestions | congestions | congestions/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.vsan_cluster_space_usage | vSAN Cluster space usage | used, free, total | bytes |
+| vsphere.vsan_cluster_space_utilization | vSAN Cluster space utilization | used | percentage |
+| vsphere.vsan_cluster_health_status | vSAN Cluster health status | green, yellow, red, unknown | status |
+| vsphere.vsan_cluster_operations | vSAN Cluster operations | read, write | operations/s |
+| vsphere.vsan_cluster_throughput | vSAN Cluster throughput | read, write | bytes/s |
+| vsphere.vsan_cluster_latency | vSAN Cluster latency | read, write | microseconds |
+| vsphere.vsan_cluster_congestions | vSAN Cluster congestion events | congestions | congestions/s |
+
 
 ### Per cluster
 
@@ -740,39 +752,40 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.cluster_hosts | total, effective | hosts |
-| vsphere.cluster_cpu_capacity | total, effective | MHz |
-| vsphere.cluster_mem_capacity | total, effective | bytes |
-| vsphere.cluster_cpu_topology | cores, threads | count |
-| vsphere.cluster_drs_config | enabled | status |
-| vsphere.cluster_drs_mode | manual, partially_automated, fully_automated, unknown | status |
-| vsphere.cluster_drs_vmotion_rate | rate | level |
-| vsphere.cluster_ha_config | enabled, admission_control | status |
-| vsphere.cluster_ha_host_monitoring | enabled, disabled, unknown | status |
-| vsphere.cluster_ha_vm_monitoring | disabled, vm_monitoring_only, vm_and_app_monitoring, unknown | status |
-| vsphere.cluster_ha_vm_component_protection | enabled, disabled, unknown | status |
-| vsphere.cluster_overall_status | green, red, yellow, gray | status |
-| vsphere.cluster_vmotions | vmotions | migrations |
-| vsphere.cluster_drs_score | score | percentage |
-| vsphere.cluster_drs_balance | current, target | score |
-| vsphere.cluster_vm_count | total, powered_off | VMs |
-| vsphere.cluster_usage_cpu | demand, entitled, reserved | MHz |
-| vsphere.cluster_usage_mem | demand, entitled, reserved | MB |
-| vsphere.cluster_cpu_utilization | used | percentage |
-| vsphere.cluster_cpu_usage | used, total | MHz |
-| vsphere.cluster_mem_utilization | used | percentage |
-| vsphere.cluster_mem_usage | consumed, active, granted, shared, overhead, swap_used | KiB |
-| vsphere.cluster_services_fairness | cpu, memory | score |
-| vsphere.cluster_services_effective_cpu | effective_cpu | MHz |
-| vsphere.cluster_services_effective_mem | effective_mem | MB |
-| vsphere.cluster_services_failover | failures_tolerable | failures |
-| vsphere.cluster_vm_migrations | vmotion, svmotion, xvmotion | operations |
-| vsphere.cluster_vm_lifecycle | poweron, poweroff, create, destroy, clone, deploy | operations |
-| vsphere.cluster_vm_management | reconfigure, reset, suspend, register, unregister | operations |
-| vsphere.cluster_vm_guest_ops | reboot, shutdown, standby | operations |
-| vsphere.cluster_vm_cold_migrations | change_ds, change_host, change_host_ds | operations |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.cluster_hosts | Cluster host count | total, effective | hosts |
+| vsphere.cluster_cpu_capacity | Cluster CPU capacity | total, effective | MHz |
+| vsphere.cluster_mem_capacity | Cluster memory capacity | total, effective | bytes |
+| vsphere.cluster_cpu_topology | Cluster CPU topology | cores, threads | count |
+| vsphere.cluster_drs_config | Cluster DRS enabled | enabled | status |
+| vsphere.cluster_drs_mode | Cluster DRS automation mode | manual, partially_automated, fully_automated, unknown | status |
+| vsphere.cluster_drs_vmotion_rate | Cluster DRS vMotion recommendation threshold | rate | level |
+| vsphere.cluster_ha_config | Cluster HA configuration | enabled, admission_control | status |
+| vsphere.cluster_ha_host_monitoring | Cluster HA host monitoring | enabled, disabled, unknown | status |
+| vsphere.cluster_ha_vm_monitoring | Cluster HA VM monitoring | disabled, vm_monitoring_only, vm_and_app_monitoring, unknown | status |
+| vsphere.cluster_ha_vm_component_protection | Cluster HA VM component protection | enabled, disabled, unknown | status |
+| vsphere.cluster_overall_status | Cluster overall alarm status | green, red, yellow, gray | status |
+| vsphere.cluster_vmotions | Cluster cumulative vMotion count | vmotions | migrations |
+| vsphere.cluster_drs_score | Cluster DRS score | score | percentage |
+| vsphere.cluster_drs_balance | Cluster DRS load balance | current, target | score |
+| vsphere.cluster_vm_count | Cluster VM count | total, powered_off | VMs |
+| vsphere.cluster_usage_cpu | Cluster DRS CPU usage summary | demand, entitled, reserved | MHz |
+| vsphere.cluster_usage_mem | Cluster DRS memory usage summary | demand, entitled, reserved | MB |
+| vsphere.cluster_cpu_utilization | Cluster CPU utilization | used | percentage |
+| vsphere.cluster_cpu_usage | Cluster CPU usage | used, total | MHz |
+| vsphere.cluster_mem_utilization | Cluster memory utilization | used | percentage |
+| vsphere.cluster_mem_usage | Cluster memory usage | consumed, active, granted, shared, overhead, swap_used | KiB |
+| vsphere.cluster_services_fairness | Cluster DRS resource distribution fairness | cpu, memory | score |
+| vsphere.cluster_services_effective_cpu | Cluster effective CPU capacity | effective_cpu | MHz |
+| vsphere.cluster_services_effective_mem | Cluster effective memory capacity | effective_mem | MB |
+| vsphere.cluster_services_failover | Cluster HA failover capacity | failures_tolerable | failures |
+| vsphere.cluster_vm_migrations | Cluster VM migration operations | vmotion, svmotion, xvmotion | operations |
+| vsphere.cluster_vm_lifecycle | Cluster VM lifecycle operations | poweron, poweroff, create, destroy, clone, deploy | operations |
+| vsphere.cluster_vm_management | Cluster VM management operations | reconfigure, reset, suspend, register, unregister | operations |
+| vsphere.cluster_vm_guest_ops | Cluster VM guest operations | reboot, shutdown, standby | operations |
+| vsphere.cluster_vm_cold_migrations | Cluster VM cold migration operations | change_ds, change_host, change_host_ds | operations |
+
 
 ### Per resource pool
 
@@ -791,18 +804,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.resource_pool_cpu_usage | usage, demand | MHz |
-| vsphere.resource_pool_cpu_entitlement | distributed | MHz |
-| vsphere.resource_pool_cpu_allocation | reservation_used, unreserved_for_vm, max_usage | MHz |
-| vsphere.resource_pool_mem_usage | host, guest | MB |
-| vsphere.resource_pool_mem_entitlement | distributed | MB |
-| vsphere.resource_pool_mem_allocation | reservation_used, unreserved_for_vm, max_usage | bytes |
-| vsphere.resource_pool_mem_breakdown | private, shared, swapped, ballooned, overhead, consumed_overhead, compressed | MB |
-| vsphere.resource_pool_cpu_config | reservation, limit | MHz |
-| vsphere.resource_pool_mem_config | reservation, limit | MB |
-| vsphere.resource_pool_overall_status | green, red, yellow, gray | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vsphere.resource_pool_cpu_usage | Resource Pool CPU usage vs demand | usage, demand | MHz |
+| vsphere.resource_pool_cpu_entitlement | Resource Pool CPU entitlement | distributed | MHz |
+| vsphere.resource_pool_cpu_allocation | Resource Pool CPU allocation | reservation_used, unreserved_for_vm, max_usage | MHz |
+| vsphere.resource_pool_mem_usage | Resource Pool memory usage | host, guest | MB |
+| vsphere.resource_pool_mem_entitlement | Resource Pool memory entitlement | distributed | MB |
+| vsphere.resource_pool_mem_allocation | Resource Pool memory allocation | reservation_used, unreserved_for_vm, max_usage | bytes |
+| vsphere.resource_pool_mem_breakdown | Resource Pool memory state breakdown | private, shared, swapped, ballooned, overhead, consumed_overhead, compressed | MB |
+| vsphere.resource_pool_cpu_config | Resource Pool CPU configured reservation and limit | reservation, limit | MHz |
+| vsphere.resource_pool_mem_config | Resource Pool memory configured reservation and limit | reservation, limit | MB |
+| vsphere.resource_pool_overall_status | Resource Pool overall alarm status | green, red, yellow, gray | status |
 
 
 

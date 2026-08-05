@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package vnoderegistry tracks v2 vnode HOST_DEFINE metadata shared across jobs.
+// Package vnoderegistry diagnoses conflicting v2 vnode metadata shared across jobs.
 package vnoderegistry
 
 import (
@@ -24,29 +24,20 @@ const maxReportedMetadataStatesPerGUID = 64
 // registry ownership after it has emitted cleanup for the corresponding scope.
 type Owner string
 
-// Registration reports the result of registering vnode metadata for an owner.
+// Registration reports a successfully emitted owner's registry observation.
 type Registration struct {
-	// Info is the metadata retained by the registry after registration.
+	// Info is the successfully emitted owner's normalized metadata.
 	Info netdataapi.HostInfo
 
-	// Previous is set when an existing GUID's metadata was updated.
-	Previous netdataapi.HostInfo
+	// Conflicting is metadata retained for another owner of the same GUID.
+	Conflicting netdataapi.HostInfo
 
-	// NeedDefine is true when this registration created or updated the registry entry.
-	NeedDefine bool
+	// MetadataConflict is true when another owner reports different metadata.
+	MetadataConflict bool
 
-	// OwnerAdded is true when this call added a new owner record.
-	OwnerAdded bool
-
-	// MetadataUpdated is true when Info replaced previously retained metadata.
-	MetadataUpdated bool
-
-	// UpdateFirstSeen is true only for the first occurrence of a distinct metadata
-	// transition. Callers should use this to avoid log spam.
-	UpdateFirstSeen bool
-
-	revision         uint64
-	previousRevision uint64
+	// ConflictFirstSeen is true only for the first conflicting observation of a
+	// distinct metadata state. Callers should use this to avoid log spam.
+	ConflictFirstSeen bool
 }
 
 type Registry struct {
@@ -55,9 +46,7 @@ type Registry struct {
 }
 
 type entry struct {
-	info           netdataapi.HostInfo
-	revision       uint64
-	owners         map[Owner]struct{}
+	owners         map[Owner]netdataapi.HostInfo
 	reportedStates map[string]struct{}
 	reportedOrder  []string
 }
@@ -67,11 +56,10 @@ func New() *Registry {
 	return &Registry{entries: make(map[string]*entry)}
 }
 
-// Register records that owner emits metrics under info.GUID.
+// Register records that owner successfully emitted metrics under info.GUID.
 //
-// New metadata for an existing GUID replaces the retained metadata. This keeps
-// runtime vnode updates simple: callers should log MetadataUpdated as a warning
-// because repeated conflicting writers can still cause metadata flip-flop.
+// Metadata is retained per owner. Callers should log a first-seen conflict as a
+// warning because different definitions for one GUID cannot both be canonical.
 func (r *Registry) Register(owner Owner, info netdataapi.HostInfo) (Registration, error) {
 	if r == nil {
 		return Registration{}, fmt.Errorf("vnoderegistry: nil registry")
@@ -91,85 +79,28 @@ func (r *Registry) Register(owner Owner, info netdataapi.HostInfo) (Registration
 	if r.entries == nil {
 		r.entries = make(map[string]*entry)
 	}
-
 	ent, ok := r.entries[info.GUID]
 	if !ok {
 		ent = &entry{
-			info:           cloneHostInfo(info),
-			revision:       1,
-			owners:         map[Owner]struct{}{owner: {}},
+			owners:         map[Owner]netdataapi.HostInfo{owner: cloneHostInfo(info)},
 			reportedStates: make(map[string]struct{}),
 		}
 		r.entries[info.GUID] = ent
-		return Registration{
-			Info:       cloneHostInfo(ent.info),
-			NeedDefine: true,
-			OwnerAdded: true,
-			revision:   ent.revision,
-		}, nil
+		return Registration{Info: cloneHostInfo(info)}, nil
 	}
 
-	_, hadOwner := ent.owners[owner]
-	ent.owners[owner] = struct{}{}
-
-	result := Registration{
-		Info:       cloneHostInfo(ent.info),
-		OwnerAdded: !hadOwner,
-		revision:   ent.revision,
-	}
-	if hostInfoEqual(ent.info, info) {
-		return result, nil
-	}
-
-	previous := cloneHostInfo(ent.info)
-	previousRevision := ent.revision
-	ent.info = cloneHostInfo(info)
-	ent.revision++
-	result.Info = cloneHostInfo(ent.info)
-	result.Previous = previous
-	result.revision = ent.revision
-	result.previousRevision = previousRevision
-	result.NeedDefine = true
-	result.MetadataUpdated = true
-
-	updateKey := hostInfoFingerprint(info)
-	if markReportedState(ent, updateKey) {
-		result.UpdateFirstSeen = true
+	ent.owners[owner] = cloneHostInfo(info)
+	result := Registration{Info: cloneHostInfo(info)}
+	for otherOwner, otherInfo := range ent.owners {
+		if otherOwner == owner || hostInfoEqual(otherInfo, info) {
+			continue
+		}
+		result.Conflicting = cloneHostInfo(otherInfo)
+		result.MetadataConflict = true
+		result.ConflictFirstSeen = markReportedState(ent, hostInfoFingerprint(info))
+		break
 	}
 	return result, nil
-}
-
-// Rollback undoes a registration that has not been emitted successfully.
-//
-// Rollback is best-effort: if another registration changed the same GUID after
-// reg, the metadata restore is skipped to avoid undoing a later writer.
-func (r *Registry) Rollback(owner Owner, reg Registration) {
-	if r == nil {
-		return
-	}
-	owner = Owner(strings.TrimSpace(string(owner)))
-	guid := strings.TrimSpace(reg.Info.GUID)
-	if owner == "" || guid == "" {
-		return
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	ent, ok := r.entries[guid]
-	if !ok {
-		return
-	}
-	if reg.OwnerAdded {
-		delete(ent.owners, owner)
-	}
-	if reg.MetadataUpdated && ent.revision == reg.revision && hostInfoEqual(ent.info, reg.Info) {
-		ent.info = cloneHostInfo(reg.Previous)
-		ent.revision = reg.previousRevision
-	}
-	if len(ent.owners) == 0 {
-		delete(r.entries, guid)
-	}
 }
 
 // Release removes one owner record for guid. It returns true when the GUID entry
@@ -197,26 +128,6 @@ func (r *Registry) Release(owner Owner, guid string) bool {
 	}
 	delete(r.entries, guid)
 	return true
-}
-
-// Lookup returns the retained metadata for guid.
-func (r *Registry) Lookup(guid string) (netdataapi.HostInfo, bool) {
-	if r == nil {
-		return netdataapi.HostInfo{}, false
-	}
-	guid = strings.TrimSpace(guid)
-	if guid == "" {
-		return netdataapi.HostInfo{}, false
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	ent, ok := r.entries[guid]
-	if !ok {
-		return netdataapi.HostInfo{}, false
-	}
-	return cloneHostInfo(ent.info), true
 }
 
 // Owners returns the sorted owner IDs currently registered for guid.

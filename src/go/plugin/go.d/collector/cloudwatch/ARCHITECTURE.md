@@ -10,9 +10,9 @@ not here.
 The one rule that shapes most of what follows:
 
 > `GetMetricData` is billed by requested metrics, so the collector normally queries
-> each series only when its next aligned effective-period window is eligible and re-emits cached values in between.
-> Transient failures use bounded per-query backoff; `update_every` therefore affects failure-time retry cost, not the
-> normal successful cadence.
+> each series on the first shared `update_every` tick that observes a newer aligned effective-period window, and
+> re-emits cached values in between. Transient failures use bounded per-query backoff. When `period < update_every`,
+> collection ticks also quantize successful execution and intermediate eligible windows can be skipped.
 
 ## What It Does
 
@@ -44,7 +44,7 @@ flowchart LR
     tags("Resolve tags<br/>membership + labels")
     plan("Plan + state<br/>stable query + policy")
     query("Query<br/>GetMetricData<br/>billed — the cost driver")
-    activity("Collector activity<br/>calls · billing units · raw queries")
+    activity("Collector activity<br/>SDK invocations · calculated units · profile estimates · query items")
     store("metrix store<br/>gauges + labels")
     charts("Dynamic charts<br/>cloudwatch.*")
 
@@ -170,15 +170,17 @@ compiler state, and installed execution plan:
   default-enabled series. Profiles without a metric group keep those defaults. A
   group includes defaults unless `defaults: false`, then adds its exact included
   MetricNames; statistics resolve from the metric entry, group, or profile in that
-  order.
+  order. Group query overrides attach only to explicit `include[]` expansions;
+  item query overrides attach only to that item's expanded metric/statistic series.
 - `rule_defaults.filters.resource_tags` is inherited when a rule omits
   `filters.resource_tags`; a present list replaces the default and `[]` disables it.
   Predicates are canonicalized once: exact case-sensitive keys are ANDed and the
   exact values for one key are ORed.
 - `compileConfig` coordinates a private staged compiler that resolves every reference, rejects unused credential/target
   definitions, applies profile defaults/include/exclude semantics, rejects duplicate
-  profile groups/MetricNames/normalized statistics, resolves inherited and replaced
-  statistics into canonical exact exported-series descriptors, intersects
+  profile groups and normalized statistics, pre-indexes profile MetricNames/statistics,
+  resolves inherited and replaced statistics into canonical exact exported-series
+  descriptors, rejects overlap between repeated explicit-item expansions, intersects
   intrinsic supported regions, enforces target/role partition consistency, and
   emits immutable ordered scopes.
 - Ordered policy scopes and tag-membership identities are separate. Scopes with the
@@ -349,6 +351,12 @@ The rolling window is `end = align_down(now - publication_delay, period)` and
 collection cycles after terminal completion re-emit the retained presentation
 without another AWS query.
 
+This deliberately differs from YACE's align-then-subtract ordering. With a six-hour period, five-minute delay, and
+`now=12:02`, this collector computes `align_down(11:57, 6h) = 06:00`; an align-then-subtract implementation computes
+`align_down(12:02, 6h) - 5m = 11:55`. The collector waits for the first shared collection tick at or after `12:05`
+before the `12:00` boundary is eligible. Increasing lookback searches more older buckets for sparse or late data; it
+does not change this end boundary or repair alignment.
+
 One batch can contain queries that finish differently. Outcomes update each
 stable query independently:
 
@@ -387,10 +395,12 @@ stable query independently:
   dirty flag remains set so a later cycle can rebuild from corrected inputs. There
   is no first-N truncation.
 - Each `plannedQuery` contains a fully resolved `{period, lookback,
-  publication_delay}` policy. Resolution is field-by-field: rule, rule defaults,
-  profile metric, profile defaults, then the built-in lookback/publication-delay
-  fallbacks. Profile `query.period` is required; the lookback fallback follows the
-  resolved period.
+  publication_delay}` policy. Resolution is field-by-field, from highest to lowest
+  precedence: job metric item, job metric group, rule, rule defaults, profile metric,
+  profile defaults, then the built-in lookback/publication-delay fallbacks. A group
+  source applies only to explicit `include[]` expansions; an item source applies
+  only to that item's expanded series. Profile `query.period` is required; the
+  lookback fallback follows the resolved period.
   Publication delay is collector scheduling policy, not an AWS SLA. In particular,
   the stock S3 storage profile's `1d` is a conservative choice; AWS documents that
   storage metrics are reported once per day but does not guarantee delivery within
@@ -409,6 +419,9 @@ observation state per stable query.
   end is newer than its last terminal completion. Adding a sibling query never
   makes completed siblings due, and clock jumps query only the current rolling
   window rather than backfilling missed buckets.
+- Eligibility has no independent timer. `dueQueries` runs only inside the shared
+  Netdata collection loop. If multiple period boundaries become eligible between
+  two `update_every` ticks, the next tick queries only the newest rolling window.
 - A transient attempt leaves completion unchanged and starts retry state for that
   stable query and eligible window. The first retry waits one `update_every`; each
   later delay doubles and is capped at the effective period. A new eligible window
@@ -449,8 +462,9 @@ observation state per stable query.
   fractional values render at full precision without a per-dimension
   `options.float`.
 - **Retention re-emit (sample-and-hold).** This decouples two cadences: the
-  **query cadence** follows each series' aligned effective period, while the **write cadence** is the collect loop
-  (`update_every`, free `metrix` writes). Netdata expects a value per dimension
+  **query eligibility** follows each series' aligned effective period, while both
+  request execution and the **write cadence** occur on the collect loop
+  (`update_every`; `metrix` writes are free). Netdata expects a value per dimension
   per collect cycle, so a stable query that is not due, or whose current attempt
   is transient, is re-written from its last cached value—a long-period metric
   (e.g. daily S3) renders as a continuous step line instead of gaps, at no extra
@@ -597,8 +611,9 @@ Each instance exports seven series across five CloudWatch MetricNames. Mixed
 `Average` and `Sum` entries are intentional: `Average` remains the raw gauge,
 while `rate: true` normalizes only the `Sum` sibling to a per-second value. Stock
 timing is `period=5m`, `lookback=5m`, and `publication_delay=5m`. Exact
-metric/statistic rules can assign one-minute Average and six-hour Sum policies
-without either rule shadowing the other's series.
+metric/statistic items in one profile group can assign one-minute Average and
+six-hour Sum policies. Repeating a MetricName is valid only when the expanded
+statistic sets are disjoint.
 
 ### PrivateLink service grains
 
@@ -625,7 +640,7 @@ bytes, new connections, and sent reset packets. Stock timing is 5m/5m/5m.
 `EndpointsCount` is a five-minute service-only gauge that records zero when AWS
 returns no datapoint; absent traffic gauges remain gaps. Exact rules can select
 one-minute traffic Average, five-minute endpoint count, and six-hour byte Sum as
-independent query policies.
+independent per-selection query policies in one rule.
 
 ## Credentials, Targets, And Account Identity
 
@@ -688,11 +703,12 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   Point-aware batching keeps each AWS billing unit of up to five statistics for
   one structural metric in a single request, avoiding duplicate billing at a
   batch boundary.
-- **Per-query aligned-window completion is the governor** — a metric is queried
-  once per effective period (a 300s metric every aligned 300s window, a daily metric every ~24h),
-  not every collect cycle, so cost tracks each series' effective query period rather than
-  `update_every`. Between queries, values are re-emitted from cache at zero AWS
-  cost (see Emission And Sample-And-Hold).
+- **Per-query aligned-window completion is the governor** — on each collect tick,
+  a metric is queried only if that tick observes a newer eligible window. When
+  `update_every <= period`, successful steady-state frequency follows the period;
+  when `update_every > period`, execution is limited by `update_every` and skipped
+  intermediate windows are not backfilled. Between queries, values are re-emitted
+  from cache at zero AWS cost (see Emission And Sample-And-Hold).
 
 Narrow the bill with focused rule target/profile/region selections or longer effective
 periods configured through rule/default query timing; nested profile query defaults are the fallback.
@@ -701,32 +717,51 @@ per-region prices on the CloudWatch pricing page.)
 
 ### Collector activity and billing inputs
 
-`activity.go` keeps three bounded activity accumulators. Three chart templates
-under the public `cloudwatch.collector_*` contexts render their exact counts as
+`activity.go` keeps four bounded activity accumulators. Four chart templates
+under the public `cloudwatch.collector_*` contexts render interval counts as
 absolute gauges for the interval since the preceding successfully committed
 collector frame:
 
-- **CloudWatch API Calls** counts collector-issued `ListMetrics` and
-  `GetMetricData` method calls. It materializes one chart per
-  `(account_id, region, operation)` with a fixed `calls` dimension. Every requested
-  continuation page is another call.
-- **CloudWatch Metric Requests** counts the calculated `GetMetricData` billing
-  units submitted by the collector. Up to five statistics for one structural AWS
-  metric in one request form one unit; a pagination page submits those units again.
-  It materializes per `(account_id, region)` with a fixed `requests` dimension.
-- **CloudWatch Raw Queries** counts submitted `MetricDataQuery` items, split by
-  profile. It materializes one chart per `(account_id, region, profile)` with a
-  fixed `queries` dimension. This is the profile-level tuning view, not AWS's
-  billing unit.
+- **CloudWatch SDK Invocations** counts attempted collector-issued `ListMetrics`
+  and `GetMetricData` SDK method invocations. It materializes one chart per
+  `(account_id, region, operation)` with a fixed `invocations` dimension. Failed
+  attempts and every requested continuation page count; SDK-internal retries do not.
+- **GetMetricData Calculated Metric Requests** counts the calculated billing units
+  submitted by the collector. Up to five statistics for one structural AWS metric
+  in one request form one unit. It materializes per `(account_id, region)` with a
+  fixed `calculated_metric_requests` dimension.
+- **GetMetricData Profile Metric Request Estimates** independently applies that
+  calculation to each profile's items within each submitted request. It materializes
+  per `(account_id, region, profile)` with a fixed `estimated_metric_requests`
+  dimension. This is a non-additive estimate for relative cost ranking: shared
+  structural metrics can contribute to several profiles, profile values need not
+  sum to the calculated total, and no `_shared` profile is emitted.
+- **GetMetricData Query Items** counts submitted `MetricDataQuery` items by source
+  profile. It materializes per `(account_id, region, profile)` with a fixed
+  `query_items` dimension.
 
-Physical calls and billing units are attributed only to account and region because
-one shared discovery stream or query batch can serve multiple profiles. Targets that
-resolve to the same account therefore aggregate. Raw queries keep their profile of
-origin because every planned series has exactly one.
+For one account and region over the same interval, after summing all profile
+instances and considering only the `GetMetricData` operation, the counts satisfy:
+query items ≥ summed profile metric-request estimates ≥ calculated metric
+requests ≥ `GetMetricData` SDK invocations. The profile sum can exceed the
+calculated total because cross-profile overlap is counted independently.
+
+The calculated total is attributed only to account and region because one query
+batch can serve multiple profiles. Profile estimates and query items keep the source
+profile because every planned series has exactly one. Different effective policies
+produce separate batches and separate estimates. Targets that resolve to the same
+account aggregate.
+
+`buildQueryBatches` computes one immutable activity summary per physical request
+after packing. Initial and continuation pages replay that same summary, so each
+submitted page counts the complete request footprint. Recording scans and hashes no
+queries. Once the bounded scope keys exist, steady-state page recording allocates
+nothing; first insertion or map growth may allocate while holding the activity mutex.
+Per-page work is proportional only to the number of profiles represented in the batch.
 
 `netdata.go.plugin.collector.cloudwatch.*` names the internal `metrix` selectors;
 it is not a chart-context prefix. The chart spec's `context_namespace: cloudwatch`
-keeps all three activity contexts beside the service-profile contexts in the UI.
+keeps all four activity contexts beside the service-profile contexts in the UI.
 
 Pending activity lives outside the staged `metrix` frame. At the start of the next
 cycle, `activity.go` checks `CollectMeta.LastSuccessSeq` and clears the prior interval
@@ -734,17 +769,18 @@ only when that sequence proves its frame committed. A failed collection or faile
 metric-store commit therefore carries its work into the next successful frame. Once
 a series is known, a successful cached interval with no real AWS work publishes zero.
 Cleanup, job replacement, and process restart reset the pending activity and known
-keys. The gauges count calls issued by the collector, not retry attempts performed
-internally by the AWS SDK. These metrics are cost inputs, not an AWS invoice: AWS owns
-the billing rules, may change them, and does not separately document pagination
-billing semantics.
+keys. SDK invocation counts cover CloudWatch `ListMetrics` and `GetMetricData`, not
+Resource Groups Tagging API, STS, or credential-provider calls. These metrics are
+cost inputs, not an AWS invoice: AWS owns the billing rules, may change them, and does
+not separately document pagination billing semantics.
 
 ## Key Invariants
 
 - **Instance identity = exact dimension-name match** — a metric joins a profile
   only if its dimension-name set equals the profile's exactly.
 - **Query window is policy-driven** — `end = align_down(now - publication_delay,
-  period)` and `start = end - lookback`; the newest fully eligible finite bucket wins.
+  period)` and `start = end - lookback`; `end` is exclusive and the newest fully
+  eligible finite bucket wins. The policy is evaluated on shared collection ticks.
 - **No-data policy is per-metric** — a successfully-queried empty result records
   0 (`nil_as_zero`, defaulting on only for `rate: true` `sum`/`sample_count`) or
   gaps after a terminal successful window expires the retained datapoint.

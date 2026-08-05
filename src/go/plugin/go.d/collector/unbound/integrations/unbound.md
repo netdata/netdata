@@ -212,11 +212,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -228,32 +230,33 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| unbound.queries | queries | queries |
-| unbound.queries_ip_ratelimited | ratelimited | queries |
-| unbound.dnscrypt_queries | crypted, cert, cleartext, malformed | queries |
-| unbound.cache | hits, miss | events |
-| unbound.cache_percentage | hits, miss | percentage |
-| unbound.prefetch | prefetches | prefetches |
-| unbound.expired | expired | replies |
-| unbound.zero_ttl_replies | zero_ttl | replies |
-| unbound.recursive_replies | recursive | replies |
-| unbound.recursion_time | avg, median | milliseconds |
-| unbound.request_list_usage | avg, max | queries |
-| unbound.current_request_list_usage | all, users | queries |
-| unbound.request_list_jostle_list | overwritten, dropped | queries |
-| unbound.tcpusage | usage | buffers |
-| unbound.uptime | time | seconds |
-| unbound.cache_memory | message, rrset, dnscrypt_nonce, dnscrypt_shared_secret | KB |
-| unbound.mod_memory | iterator, respip, validator, subnet, ipsec | KB |
-| unbound.mem_streamwait | streamwait | KB |
-| unbound.cache_count | infra, key, msg, rrset, dnscrypt_nonce, shared_secret | items |
-| unbound.type_queries | a dimension per query type | queries |
-| unbound.class_queries | a dimension per query class | queries |
-| unbound.opcode_queries | a dimension per query opcode | queries |
-| unbound.flag_queries | qr, aa, tc, rd, ra, z, ad, cd | queries |
-| unbound.rcode_answers | a dimension per reply rcode | replies |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| unbound.queries | Received Queries | queries | queries |
+| unbound.queries_ip_ratelimited | Rate Limited Queries | ratelimited | queries |
+| unbound.dnscrypt_queries | DNSCrypt Queries | crypted, cert, cleartext, malformed | queries |
+| unbound.cache | Cache Statistics | hits, miss | events |
+| unbound.cache_percentage | Cache Statistics Percentage | hits, miss | percentage |
+| unbound.prefetch | Cache Prefetches | prefetches | prefetches |
+| unbound.expired | Replies Served From Expired Cache | expired | replies |
+| unbound.zero_ttl_replies | Replies Served From Expired Cache | zero_ttl | replies |
+| unbound.recursive_replies | Replies That Needed Recursive Processing | recursive | replies |
+| unbound.recursion_time | Time Spent On Recursive Processing | avg, median | milliseconds |
+| unbound.request_list_usage | Request List Usage | avg, max | queries |
+| unbound.current_request_list_usage | Current Request List Usage | all, users | queries |
+| unbound.request_list_jostle_list | Request List Jostle List Events | overwritten, dropped | queries |
+| unbound.tcpusage | TCP Handler Buffers | usage | buffers |
+| unbound.uptime | Uptime | time | seconds |
+| unbound.cache_memory | Cache Memory | message, rrset, dnscrypt_nonce, dnscrypt_shared_secret | KB |
+| unbound.mod_memory | Module Memory | iterator, respip, validator, subnet, ipsec | KB |
+| unbound.mem_streamwait | TCP and TLS Stream Waif Buffer Memory | streamwait | KB |
+| unbound.cache_count | Cache Items Count | infra, key, msg, rrset, dnscrypt_nonce, shared_secret | items |
+| unbound.type_queries | Queries By Type | a dimension per query type | queries |
+| unbound.class_queries | Queries By Class | a dimension per query class | queries |
+| unbound.opcode_queries | Queries By OpCode | a dimension per query opcode | queries |
+| unbound.flag_queries | Queries By Flag | qr, aa, tc, rd, ra, z, ad, cd | queries |
+| unbound.rcode_answers | Replies By RCode | a dimension per reply rcode | replies |
+
 
 ### Per thread
 
@@ -263,22 +266,22 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| unbound.thread_queries | queries | queries |
-| unbound.thread_queries_ip_ratelimited | ratelimited | queries |
-| unbound.thread_dnscrypt_queries | crypted, cert, cleartext, malformed | queries |
-| unbound.thread_cache | hits, miss | events |
-| unbound.thread_cache_percentage | hits, miss | percentage |
-| unbound.thread_prefetch | prefetches | prefetches |
-| unbound.thread_expired | expired | replies |
-| unbound.thread_zero_ttl_replies | zero_ttl | replies |
-| unbound.thread_recursive_replies | recursive | replies |
-| unbound.thread_recursion_time | avg, median | milliseconds |
-| unbound.thread_request_list_usage | avg, max | queries |
-| unbound.thread_current_request_list_usage | all, users | queries |
-| unbound.thread_request_list_jostle_list | overwritten, dropped | queries |
-| unbound.thread_tcpusage | usage | buffers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| unbound.thread_queries | Thread Received Queries | queries | queries |
+| unbound.thread_queries_ip_ratelimited | Thread Rate Limited Queries | ratelimited | queries |
+| unbound.thread_dnscrypt_queries | Thread DNSCrypt Queries | crypted, cert, cleartext, malformed | queries |
+| unbound.thread_cache | Cache Statistics | hits, miss | events |
+| unbound.thread_cache_percentage | Cache Statistics Percentage | hits, miss | percentage |
+| unbound.thread_prefetch | Cache Prefetches | prefetches | prefetches |
+| unbound.thread_expired | Replies Served From Expired Cache | expired | replies |
+| unbound.thread_zero_ttl_replies | Replies Served From Expired Cache | zero_ttl | replies |
+| unbound.thread_recursive_replies | Replies That Needed Recursive Processing | recursive | replies |
+| unbound.thread_recursion_time | Time Spent On Recursive Processing | avg, median | milliseconds |
+| unbound.thread_request_list_usage | Time Spent On Recursive Processing | avg, max | queries |
+| unbound.thread_current_request_list_usage | Current Request List Usage | all, users | queries |
+| unbound.thread_request_list_jostle_list | Request List Jostle List Events | overwritten, dropped | queries |
+| unbound.thread_tcpusage | TCP Handler Buffers | usage | buffers |
 
 
 

@@ -102,7 +102,7 @@ RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host) {
 
 int16_t rrdhost_ingestion_hops(RRDHOST *host) {
     if(host == localhost) return 0;
-    if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) return 1;
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST)) return 1;
 
     spinlock_lock(&host->rrdhost_update_lock);
     int16_t hops = host->system_info ? rrdhost_system_info_hops(host->system_info) : 1;
@@ -226,7 +226,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
         else if(has_receiver)
             s->ingest.type = RRDHOST_INGEST_TYPE_CHILD;
-        else if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+        else if(flags & RRDHOST_FLAG_VIRTUAL_HOST)
             s->ingest.type = RRDHOST_INGEST_TYPE_VIRTUAL;
         else
             s->ingest.type = RRDHOST_INGEST_TYPE_ARCHIVED;

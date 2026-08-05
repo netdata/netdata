@@ -117,11 +117,13 @@ The following alerts are available:
 | [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -133,13 +135,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv4.tcppackets | received, sent | packets/s |
-| ipv4.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
-| ipv4.tcphandshake | EstabResets, ActiveOpens, PassiveOpens, AttemptFails | events/s |
-| ipv4.tcpconnaborts | baddata, userclosed, nomemory, timeout, linger | connections/s |
-| ipv4.tcpofo | inqueue | packets/s |
-| ipv4.tcpsyncookies | received, sent, failed | packets/s |
-| ipv4.tcplistenissues | overflows | packets/s |
-| ipv4.ecnpkts | InCEPkts, InECT0Pkts, InECT1Pkts, OutECT0Pkts, OutECT1Pkts | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipv4.tcppackets | IPv4 TCP Packets | received, sent | packets/s |
+| ipv4.tcperrors | IPv4 TCP Errors | InErrs, InCsumErrors, RetransSegs | packets/s |
+| ipv4.tcphandshake | IPv4 TCP Handshake Issues | EstabResets, ActiveOpens, PassiveOpens, AttemptFails | events/s |
+| ipv4.tcpconnaborts | TCP Connection Aborts | baddata, userclosed, nomemory, timeout, linger | connections/s |
+| ipv4.tcpofo | TCP Out-Of-Order Queue | inqueue | packets/s |
+| ipv4.tcpsyncookies | TCP SYN Cookies | received, sent, failed | packets/s |
+| ipv4.tcplistenissues | TCP Listen Socket Issues | overflows | packets/s |
+| ipv4.ecnpkts | IPv4 ECN Statistics | InCEPkts, InECT0Pkts, InECT1Pkts, OutECT0Pkts, OutECT1Pkts | packets/s |

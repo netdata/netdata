@@ -14,9 +14,7 @@ type siteState struct {
 	CountryCode        string
 	CountryName        string
 	Region             string
-	LastConnected      string
-	ConnectedSince     string
-	HostCount          int64
+	HostCount          *int64
 
 	Metrics    trafficMetrics
 	Interfaces map[string]*interfaceState
@@ -25,19 +23,16 @@ type siteState struct {
 }
 
 type deviceState struct {
-	ID             string
-	Identifier     string
-	Name           string
-	Type           string
-	Connected      bool
-	HaRole         string
-	SocketID       string
-	SocketPlatform string
-	SocketSerial   string
-	SocketVersion  string
-	InternalIP     string
-	LastPopName    string
-	ConnectedSince string
+	ID            string
+	Identifier    string
+	Name          string
+	Connected     *bool
+	HaRole        string
+	SocketID      string
+	SocketSerial  string
+	SocketVersion string
+	InternalIP    string
+	LastPopName   string
 }
 
 type interfaceState struct {
@@ -48,15 +43,13 @@ type interfaceState struct {
 	DeviceSocketID      string
 	DeviceSocketSerial  string
 	Type                string
-	DestType            string
-	Connected           bool
+	Connected           *bool
 	PopName             string
 	TunnelRemoteIP      string
-	TunnelUptime        int64
+	TunnelUptime        *int64
 	UpstreamBandwidth   int64
 	DownstreamBandwidth int64
-	PhysicalPort        int64
-	LinkUp              bool
+	LinkUp              *bool
 	Metrics             trafficMetrics
 }
 

@@ -91,7 +91,7 @@ pub(crate) fn apply_v9_special_mappings_record(rec: &mut FlowRecord, field: V9Fi
                 rec.set_icmpv6_type(value.parse().unwrap_or(0));
             }
         }
-        V9Field::ImpIpv6CodeValue => {
+        V9Field::IcmpIpv6CodeValue => {
             if !rec.has_icmpv6_code() {
                 rec.set_icmpv6_code(value.parse().unwrap_or(0));
             }

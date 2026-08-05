@@ -44,7 +44,7 @@ You can modify how often collectors gather metrics to optimize CPU usage. This c
 ### Global
 
 1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
-2. Set the `update every` value (default is `1`, meaning one-second intervals):
+2. Set the `update every` value (default is `1`, meaning one-second intervals). Valid values are 1–3600 seconds; the Agent clamps anything outside this range to the nearest bound and logs a warning:
     ```text
     [db]
         update every = 2

@@ -98,11 +98,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -114,17 +116,17 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.cpu_some_pressure | some10, some60, some300 | percentage |
-| system.cpu_some_pressure_stall_time | time | ms |
-| system.cpu_full_pressure | some10, some60, some300 | percentage |
-| system.cpu_full_pressure_stall_time | time | ms |
-| system.memory_some_pressure | some10, some60, some300 | percentage |
-| system.memory_some_pressure_stall_time | time | ms |
-| system.memory_full_pressure | some10, some60, some300 | percentage |
-| system.memory_full_pressure_stall_time | time | ms |
-| system.io_some_pressure | some10, some60, some300 | percentage |
-| system.io_some_pressure_stall_time | time | ms |
-| system.io_full_pressure | some10, some60, some300 | percentage |
-| system.io_full_pressure_stall_time | time | ms |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.cpu_some_pressure | CPU some pressure | some10, some60, some300 | percentage |
+| system.cpu_some_pressure_stall_time | CPU some pressure stall time | time | ms |
+| system.cpu_full_pressure | CPU full pressure | some10, some60, some300 | percentage |
+| system.cpu_full_pressure_stall_time | CPU full pressure stall time | time | ms |
+| system.memory_some_pressure | Memory some pressure | some10, some60, some300 | percentage |
+| system.memory_some_pressure_stall_time | Memory some pressure stall time | time | ms |
+| system.memory_full_pressure | Memory full pressure | some10, some60, some300 | percentage |
+| system.memory_full_pressure_stall_time | Memory full pressure stall time | time | ms |
+| system.io_some_pressure | I/O some pressure | some10, some60, some300 | percentage |
+| system.io_some_pressure_stall_time | I/O some pressure stall time | time | ms |
+| system.io_full_pressure | I/O some pressure | some10, some60, some300 | percentage |
+| system.io_full_pressure_stall_time | I/O some pressure stall time | time | ms |

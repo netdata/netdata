@@ -97,3 +97,7 @@ This method is useful when you want to:
 - Replicate configuration across multiple agents
 
 </details>
+
+## Apply Your Changes
+
+After saving a configuration file, [restart the Netdata Agent as appropriate for that file and platform](/docs/netdata-agent/start-stop-restart.md).

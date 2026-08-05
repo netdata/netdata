@@ -3,7 +3,7 @@ use super::*;
 #[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[schemars(
     extend("x-chart-id" = "netflow.input_packets"),
-    extend("x-chart-title" = "Netflow Input Packets"),
+    extend("x-chart-title" = "Netflow UDP Input Packets"),
     extend("x-chart-units" = "packets/s"),
     extend("x-chart-type" = "line"),
     extend("x-chart-family" = "netflow"),
@@ -13,13 +13,21 @@ pub(super) struct InputPacketsMetrics {
     #[schemars(extend("x-dimension-algorithm" = "incremental"))]
     pub(super) udp_received: u64,
     #[schemars(extend("x-dimension-algorithm" = "incremental"))]
-    pub(super) parse_attempts: u64,
+    pub(super) kernel_dropped: u64,
     #[schemars(extend("x-dimension-algorithm" = "incremental"))]
-    pub(super) parsed_packets: u64,
-    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
-    pub(super) parse_errors: u64,
-    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
-    pub(super) template_errors: u64,
+    pub(super) empty: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.protocol_packets"),
+    extend("x-chart-title" = "Netflow Protocol Packets"),
+    extend("x-chart-units" = "packets/s"),
+    extend("x-chart-type" = "stacked"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.protocol_packets"),
+)]
+pub(super) struct ProtocolPacketsMetrics {
     #[schemars(extend("x-dimension-algorithm" = "incremental"))]
     pub(super) netflow_v5: u64,
     #[schemars(extend("x-dimension-algorithm" = "incremental"))]
@@ -30,6 +38,234 @@ pub(super) struct InputPacketsMetrics {
     pub(super) ipfix: u64,
     #[schemars(extend("x-dimension-algorithm" = "incremental"))]
     pub(super) sflow: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.flow_sets"),
+    extend("x-chart-title" = "Netflow Sets"),
+    extend("x-chart-units" = "sets/s"),
+    extend("x-chart-type" = "stacked"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.flow_sets"),
+)]
+pub(super) struct FlowSetMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) v9_data: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) v9_options_data: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) v9_templates: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) v9_options_templates: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) v9_missing_template: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) v9_ignored: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_data: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_options_data: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_templates: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_options_templates: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_missing_template: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_ignored: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.templates"),
+    extend("x-chart-title" = "Netflow Template Definitions"),
+    extend("x-chart-units" = "templates/s"),
+    extend("x-chart-type" = "stacked"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.templates"),
+)]
+pub(super) struct TemplateMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) v9_data: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) v9_options: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_data: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_options: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.flow_records"),
+    extend("x-chart-title" = "Netflow Decoded Data Records"),
+    extend("x-chart-units" = "records/s"),
+    extend("x-chart-type" = "stacked"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.flow_records"),
+)]
+pub(super) struct FlowRecordMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) netflow_v5: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) netflow_v7: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) netflow_v9: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.options_records"),
+    extend("x-chart-title" = "Netflow Options Records"),
+    extend("x-chart-units" = "records/s"),
+    extend("x-chart-type" = "stacked"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.options_records"),
+)]
+pub(super) struct OptionsRecordMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) netflow_v9: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) sampling_data: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.sflow_samples"),
+    extend("x-chart-title" = "sFlow Samples"),
+    extend("x-chart-units" = "samples/s"),
+    extend("x-chart-type" = "stacked"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.sflow_samples"),
+)]
+pub(super) struct SflowSampleMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) flow: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) counter: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) discarded_packet: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) rt_metric: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) rt_flow: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) unknown: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.decoder_exceptions"),
+    extend("x-chart-title" = "Netflow Decoder Exceptions"),
+    extend("x-chart-units" = "events/s"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.decoder_exceptions"),
+)]
+pub(super) struct DecoderExceptionMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) udp_receive_errors: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) udp_socket_setup_errors: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) parse_errors: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) missing_template_sets: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) disabled_protocol_packets: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) parser_source_evictions: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) partial_counter_records: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) decapsulation_failed_records: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) unsupported_data_sets: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) ipfix_zero_reverse_records: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.flow_rows"),
+    extend("x-chart-title" = "Netflow Row Pipeline"),
+    extend("x-chart-units" = "rows/s"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.flow_rows"),
+)]
+pub(super) struct FlowRowMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) decoded: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) classifier_filtered: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) journaled: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) write_failed: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.nsel_events"),
+    extend("x-chart-title" = "Cisco NSEL Events"),
+    extend("x-chart-units" = "records/s"),
+    extend("x-chart-type" = "stacked"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.nsel_events"),
+)]
+pub(super) struct NselEventMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) update: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) create: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) teardown: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) denied: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) unsupported: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) malformed: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.nsel_rows"),
+    extend("x-chart-title" = "Cisco NSEL Rows"),
+    extend("x-chart-units" = "rows/s"),
+    extend("x-chart-type" = "stacked"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.nsel_rows"),
+)]
+pub(super) struct NselRowMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) forward: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) reverse: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.nsel_exceptions"),
+    extend("x-chart-title" = "Cisco NSEL Exceptions"),
+    extend("x-chart-units" = "events/s"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.nsel_exceptions"),
+)]
+pub(super) struct NselExceptionMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) counterless_updates: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) partial_counter_directions: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) zero_responder: u64,
 }
 
 #[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
@@ -230,6 +466,12 @@ pub(super) struct JournalIoOpsMetrics {
     pub(super) decoder_state_write_errors: u64,
     #[schemars(extend("x-dimension-algorithm" = "incremental"))]
     pub(super) decoder_state_move_errors: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) facet_active_update_errors: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) facet_lifecycle_errors: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) facet_persist_errors: u64,
 }
 
 #[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]

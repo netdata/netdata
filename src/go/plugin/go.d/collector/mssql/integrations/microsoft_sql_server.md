@@ -467,11 +467,13 @@ The following alerts are available:
 | [ mssql_sql_agent_job_last_execution_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf) | mssql.job_last_execution_status | SQL Server Agent job failed in the last completed execution |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -483,33 +485,34 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.user_connections | user | connections | • | • |
-| mssql.session_connections | user, internal | connections | • | • |
-| mssql.blocked_processes | blocked | processes | • | • |
-| mssql.batch_requests | batch | requests/s | • | • |
-| mssql.compilations | compilations | compilations/s | • | • |
-| mssql.recompilations | recompilations | recompilations/s | • | • |
-| mssql.auto_param_attempts | total, safe, failed | attempts/s | • | • |
-| mssql.sql_errors | errors | errors/s | • | • |
-| mssql.buffer_cache_hit_ratio | hit_ratio | percentage | • | • |
-| mssql.buffer_page_life_expectancy | life_expectancy | seconds | • | • |
-| mssql.buffer_page_iops | read, written | pages/s | • | • |
-| mssql.buffer_checkpoint_pages | flushed | pages/s | • | • |
-| mssql.buffer_page_lookups | lookups | lookups/s | • | • |
-| mssql.buffer_lazy_writes | lazy_writes | writes/s | • | • |
-| mssql.memory_total | memory | bytes | • | • |
-| mssql.memory_connection | memory | bytes | • | • |
-| mssql.memory_pending_grants | pending | processes | • | • |
-| mssql.memory_external_benefit | benefit | benefit | • | • |
-| mssql.page_splits | page | splits/s | • | • |
-| mssql.process_memory_resident | resident | bytes | • | • |
-| mssql.process_memory_virtual | virtual | bytes | • | • |
-| mssql.process_memory_utilization | utilization | percentage | • | • |
-| mssql.process_page_faults | page_faults | faults | • | • |
-| mssql.os_memory | used, available | bytes | • | • |
-| mssql.os_pagefile | used, available | bytes | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.user_connections | User Connections | user | connections | • | • |
+| mssql.session_connections | Session Connections | user, internal | connections | • | • |
+| mssql.blocked_processes | Blocked Processes | blocked | processes | • | • |
+| mssql.batch_requests | Batch Requests | batch | requests/s | • | • |
+| mssql.compilations | SQL Compilations | compilations | compilations/s | • | • |
+| mssql.recompilations | SQL Re-Compilations | recompilations | recompilations/s | • | • |
+| mssql.auto_param_attempts | Auto-Parameterization Attempts | total, safe, failed | attempts/s | • | • |
+| mssql.sql_errors | SQL Errors | errors | errors/s | • | • |
+| mssql.buffer_cache_hit_ratio | Buffer Cache Hit Ratio | hit_ratio | percentage | • | • |
+| mssql.buffer_page_life_expectancy | Page Life Expectancy | life_expectancy | seconds | • | • |
+| mssql.buffer_page_iops | Buffer Page I/O | read, written | pages/s | • | • |
+| mssql.buffer_checkpoint_pages | Buffer Checkpoint Pages Flushed | flushed | pages/s | • | • |
+| mssql.buffer_page_lookups | Buffer Page Lookups | lookups | lookups/s | • | • |
+| mssql.buffer_lazy_writes | Buffer Lazy Writes | lazy_writes | writes/s | • | • |
+| mssql.memory_total | Total Server Memory | memory | bytes | • | • |
+| mssql.memory_connection | Connection Memory | memory | bytes | • | • |
+| mssql.memory_pending_grants | Pending Memory Grants | pending | processes | • | • |
+| mssql.memory_external_benefit | External Benefit of Memory | benefit | benefit | • | • |
+| mssql.page_splits | Page Splits | page | splits/s | • | • |
+| mssql.process_memory_resident | SQL Server Process Resident Memory (Working Set) | resident | bytes | • | • |
+| mssql.process_memory_virtual | SQL Server Process Virtual Memory Committed | virtual | bytes | • | • |
+| mssql.process_memory_utilization | SQL Server Process Memory Utilization | utilization | percentage | • | • |
+| mssql.process_page_faults | SQL Server Process Page Faults | page_faults | faults | • | • |
+| mssql.os_memory | OS Physical Memory | used, available | bytes | • | • |
+| mssql.os_pagefile | OS Page File | used, available | bytes | • | • |
+
 
 ### Per database
 
@@ -523,22 +526,23 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.database_active_transactions | active | transactions | • | • |
-| mssql.database_transactions | transactions | transactions/s | • | • |
-| mssql.database_write_transactions | write | transactions/s | • | • |
-| mssql.database_log_flushes | flushes | flushes/s | • | • |
-| mssql.database_log_flushed | flushed | bytes/s | • | • |
-| mssql.database_log_growths | growths | growths | • | • |
-| mssql.database_log_file_size | used, free | bytes | • | • |
-| mssql.database_log_percent_used | used | percentage | • | • |
-| mssql.database_log_truncations_shrinks | truncations, shrinks | events/s | • | • |
-| mssql.database_io_stall | read, write | ms | • | • |
-| mssql.database_data_file_size | size | bytes | • | • |
-| mssql.database_backup_restore_throughput | throughput | bytes/s | • | • |
-| mssql.database_state | online, restoring, recovering, pending, suspect, emergency, offline | state | • | • |
-| mssql.database_read_only | read_only, read_write | status | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.database_active_transactions | Active Transactions | active | transactions | • | • |
+| mssql.database_transactions | Transactions | transactions | transactions/s | • | • |
+| mssql.database_write_transactions | Write Transactions | write | transactions/s | • | • |
+| mssql.database_log_flushes | Log Flushes | flushes | flushes/s | • | • |
+| mssql.database_log_flushed | Log Bytes Flushed | flushed | bytes/s | • | • |
+| mssql.database_log_growths | Log Growths | growths | growths | • | • |
+| mssql.database_log_file_size | Transaction Log File Size | used, free | bytes | • | • |
+| mssql.database_log_percent_used | Transaction Log Space Utilization | used | percentage | • | • |
+| mssql.database_log_truncations_shrinks | Transaction Log Truncations and Shrinks | truncations, shrinks | events/s | • | • |
+| mssql.database_io_stall | I/O Stall Time | read, write | ms | • | • |
+| mssql.database_data_file_size | Data File Size | size | bytes | • | • |
+| mssql.database_backup_restore_throughput | Backup/Restore Throughput | throughput | bytes/s | • | • |
+| mssql.database_state | Database State | online, restoring, recovering, pending, suspect, emergency, offline | state | • | • |
+| mssql.database_read_only | Database Read-Only Status | read_only, read_write | status | • | • |
+
 
 ### Per lock stats
 
@@ -552,12 +556,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.lock_stats_deadlocks | deadlocks | deadlocks/s | • | • |
-| mssql.lock_stats_waits | waits | waits/s | • | • |
-| mssql.lock_stats_timeouts | timeouts | timeouts/s | • | • |
-| mssql.lock_stats_requests | requests | requests/s | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.lock_stats_deadlocks | Deadlocks by Resource Type | deadlocks | deadlocks/s | • | • |
+| mssql.lock_stats_waits | Lock Waits by Resource Type | waits | waits/s | • | • |
+| mssql.lock_stats_timeouts | Lock Timeouts by Resource Type | timeouts | timeouts/s | • | • |
+| mssql.lock_stats_requests | Lock Requests by Resource Type | requests | requests/s | • | • |
+
 
 ### Per lock resource
 
@@ -571,9 +576,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.locks_by_resource | locks | locks | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.locks_by_resource | Lock Count by Resource Type | locks | locks | • | • |
+
 
 ### Per wait type
 
@@ -588,13 +594,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.wait_total_time | duration | ms | • | • |
-| mssql.wait_resource_time | duration | ms | • | • |
-| mssql.wait_signal_time | duration | ms | • | • |
-| mssql.wait_max_time | max_time | ms | • | • |
-| mssql.wait_count | waits | waits/s | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.wait_total_time | Total Wait Time | duration | ms | • | • |
+| mssql.wait_resource_time | Resource Wait Time | duration | ms | • | • |
+| mssql.wait_signal_time | Signal Wait Time | duration | ms | • | • |
+| mssql.wait_max_time | Maximum Wait Time | max_time | ms | • | • |
+| mssql.wait_count | Wait Count | waits | waits/s | • | • |
+
 
 ### Per job
 
@@ -608,13 +615,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.job_status | enabled, disabled | status | • |   |
-| mssql.job_last_execution_status | unknown, ok, warning, error, canceled | status | • |   |
-| mssql.job_last_execution_duration | duration | seconds | • |   |
-| mssql.job_last_execution_age | age | seconds | • |   |
-| mssql.job_current_execution_time | duration | seconds | • |   |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.job_status | Job Status | enabled, disabled | status | • |   |
+| mssql.job_last_execution_status | Job Last Execution Status | unknown, ok, warning, error, canceled | status | • |   |
+| mssql.job_last_execution_duration | Job Last Execution Duration | duration | seconds | • |   |
+| mssql.job_last_execution_age | Job Last Execution Age | age | seconds | • |   |
+| mssql.job_current_execution_time | Job Current Execution Time | duration | seconds | • |   |
+
 
 ### Per replication
 
@@ -629,12 +637,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.replication_status | started, succeeded, in_progress, idle, retrying, failed | status | • | • |
-| mssql.replication_warning | expiration, latency, merge_expiration, merge_slow_duration, merge_fast_duration, merge_fast_speed, merge_slow_speed | flags | • | • |
-| mssql.replication_latency | average, best, worst | seconds | • | • |
-| mssql.replication_subscriptions | total, agents_running | subscriptions | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.replication_status | Replication Status | started, succeeded, in_progress, idle, retrying, failed | status | • | • |
+| mssql.replication_warning | Replication Warnings | expiration, latency, merge_expiration, merge_slow_duration, merge_fast_duration, merge_fast_speed, merge_slow_speed | flags | • | • |
+| mssql.replication_latency | Replication Latency | average, best, worst | seconds | • | • |
+| mssql.replication_subscriptions | Replication Subscriptions | total, agents_running | subscriptions | • | • |
+
 
 ### Per availability group
 
@@ -648,11 +657,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
-| mssql.ag_recovery_health | primary_online, primary_in_progress, secondary_online, secondary_in_progress | state | • | • |
-| mssql.ag_threads | capture, redo, parallel_redo | threads | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.ag_sync_health | Availability Group Synchronization Health | not_healthy, partially_healthy, healthy | state | • | • |
+| mssql.ag_recovery_health | Availability Group Recovery Health | primary_online, primary_in_progress, secondary_online, secondary_in_progress | state | • | • |
+| mssql.ag_threads | Availability Group Threads (SQL Server 2019+) | capture, redo, parallel_redo | threads | • | • |
+
 
 ### Per availability group replica
 
@@ -669,11 +679,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_replica_role | primary, secondary, resolving, unknown | state | • | • |
-| mssql.ag_replica_connected_state | connected, disconnected, unknown | state | • | • |
-| mssql.ag_replica_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.ag_replica_role | Availability Group Replica Role | primary, secondary, resolving, unknown | state | • | • |
+| mssql.ag_replica_connected_state | Availability Group Replica Connected State | connected, disconnected, unknown | state | • | • |
+| mssql.ag_replica_sync_health | Availability Group Replica Synchronization Health | not_healthy, partially_healthy, healthy | state | • | • |
+
 
 ### Per availability group database replica
 
@@ -689,18 +700,19 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_db_sync_state | not_synchronizing, synchronizing, synchronized, reverting, initializing | state | • | • |
-| mssql.ag_db_log_send_queue | queue_size | bytes | • | • |
-| mssql.ag_db_log_send_rate | send_rate | bytes/s | • | • |
-| mssql.ag_db_redo_queue | queue_size | bytes | • | • |
-| mssql.ag_db_redo_rate | redo_rate | bytes/s | • | • |
-| mssql.ag_db_filestream_send_rate | send_rate | bytes/s | • | • |
-| mssql.ag_db_secondary_lag | lag | seconds | • | • |
-| mssql.ag_db_suspended | active, suspended | state | • | • |
-| mssql.ag_db_failover_readiness | ready, not_ready | state | • | • |
-| mssql.ag_db_joined_state | joined, not_joined | state | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.ag_db_sync_state | AG Database Synchronization State | not_synchronizing, synchronizing, synchronized, reverting, initializing | state | • | • |
+| mssql.ag_db_log_send_queue | AG Database Log Send Queue Size | queue_size | bytes | • | • |
+| mssql.ag_db_log_send_rate | AG Database Log Send Rate | send_rate | bytes/s | • | • |
+| mssql.ag_db_redo_queue | AG Database Redo Queue Size | queue_size | bytes | • | • |
+| mssql.ag_db_redo_rate | AG Database Redo Rate (averaged over active redo time since startup) | redo_rate | bytes/s | • | • |
+| mssql.ag_db_filestream_send_rate | AG Database Filestream Send Rate | send_rate | bytes/s | • | • |
+| mssql.ag_db_secondary_lag | AG Database Secondary Lag (SQL Server 2016+) | lag | seconds | • | • |
+| mssql.ag_db_suspended | AG Database Data Movement Suspended State | active, suspended | state | • | • |
+| mssql.ag_db_failover_readiness | AG Database Failover Readiness | ready, not_ready | state | • | • |
+| mssql.ag_db_joined_state | AG Database Joined State | joined, not_joined | state | • | • |
+
 
 ### Per WSFC cluster
 
@@ -710,9 +722,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_cluster_quorum_state | normal, forced, unknown | state | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.ag_cluster_quorum_state | WSFC Cluster Quorum State | normal, forced, unknown | state | • | • |
+
 
 ### Per WSFC cluster member
 
@@ -726,10 +739,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_cluster_member_state | up, down | state | • | • |
-| mssql.ag_cluster_member_quorum_votes | votes | votes | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.ag_cluster_member_state | WSFC Cluster Member State | up, down | state | • | • |
+| mssql.ag_cluster_member_quorum_votes | WSFC Cluster Member Quorum Votes | votes | votes | • | • |
+
 
 ### Per AG page repair
 
@@ -743,9 +757,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_page_repair | successful, failed | repairs | • | • |
+| Metric | Description | Dimensions | Unit | SQL Server | Azure SQL Database |
+|:------|:------------|:----------|:----|:---:|:---:|
+| mssql.ag_page_repair | AG Automatic Page Repair Events | successful, failed | repairs | • | • |
 
 
 

@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -91,15 +93,15 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nfsd.readcache | hits, misses, nocache | reads/s |
-| nfsd.filehandles | stale | handles/s |
-| nfsd.io | read, write | kilobytes/s |
-| nfsd.threads | threads | threads |
-| nfsd.net | udp, tcp | packets/s |
-| nfsd.rpc | calls, bad_format, bad_auth | calls/s |
-| nfsd.proc2 | a dimension per proc2 call | calls/s |
-| nfsd.proc3 | a dimension per proc3 call | calls/s |
-| nfsd.proc4 | a dimension per proc4 call | calls/s |
-| nfsd.proc4ops | a dimension per proc4 operation | operations/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nfsd.readcache | NFS Server Read Cache | hits, misses, nocache | reads/s |
+| nfsd.filehandles | NFS Server File Handles | stale | handles/s |
+| nfsd.io | NFS Server I/O | read, write | kilobytes/s |
+| nfsd.threads | NFS Server Threads | threads | threads |
+| nfsd.net | NFS Server Network Statistics | udp, tcp | packets/s |
+| nfsd.rpc | NFS Server Remote Procedure Calls Statistics | calls, bad_format, bad_auth | calls/s |
+| nfsd.proc2 | NFS v2 Server Remote Procedure Calls | a dimension per proc2 call | calls/s |
+| nfsd.proc3 | NFS v3 Server Remote Procedure Calls | a dimension per proc3 call | calls/s |
+| nfsd.proc4 | NFS v4 Server Remote Procedure Calls | a dimension per proc4 call | calls/s |
+| nfsd.proc4ops | NFS v4 Server Operations | a dimension per proc4 operation | operations/s |

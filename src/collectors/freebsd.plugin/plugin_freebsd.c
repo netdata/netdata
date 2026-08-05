@@ -22,6 +22,7 @@ static struct freebsd_module {
     {.name = "vm.stats.vm.v_swappgs",   .dim = "swap_io",         .enabled = 1, .func = do_vm_stats_sys_v_swappgs},
     {.name = "vm.vmtotal",              .dim = "vmtotal",         .enabled = 1, .func = do_vm_vmtotal},
     {.name = "vm.stats.vm.v_forks",     .dim = "forks",           .enabled = 1, .func = do_vm_stats_sys_v_forks},
+    {.name = "vm.stats.sys.v_syscall",  .dim = "syscalls",       .enabled = 1, .func = do_vm_stats_sys_v_syscalls},
     {.name = "vm.stats.sys.v_swtch",    .dim = "context_swtch",   .enabled = 1, .func = do_vm_stats_sys_v_swtch},
     {.name = "hw.intrcnt",              .dim = "hw_intr",         .enabled = 1, .func = do_hw_intcnt},
     {.name = "vm.stats.sys.v_intr",     .dim = "dev_intr",        .enabled = 1, .func = do_vm_stats_sys_v_intr},

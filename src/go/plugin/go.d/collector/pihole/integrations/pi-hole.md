@@ -226,11 +226,13 @@ The following alerts are available:
 | [ pihole_gravity_list_last_update ](https://github.com/netdata/netdata/blob/master/src/health/health.d/pihole.conf) | pihole.gravity_list_last_update_time_ago | gravity.list (blocklist) file last update time |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -242,17 +244,17 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| pihole.dns_queries_total | queries | queries/s |
-| pihole.dns_queries_blocked_percent | blocked | percent |
-| pihole.dns_queries_by_destination | cached, blocked, forwarded | queries/s |
-| pihole.dns_queries_by_type | A, AAA, ANY, SRV, SOA, PTR, TXT, NAPTR, MX, DS, RRSIG, DNSKEY, NS, SVCB, HTTPS, OTHER | queries/s |
-| pihole.dns_queries_by_status | UNKNOWN, GRAVITY, FORWARDED, CACHE, REGEX, DENYLIST, EXTERNAL_BLOCKED_IP, EXTERNAL_BLOCKED_NULL, EXTERNAL_BLOCKED_NXRA, GRAVITY_CNAME, REGEX_CNAME, DENYLIST_CNAME, RETRIED, RETRIED_DNSSEC, IN_PROGRESS, DBBUSY, SPECIAL_DOMAIN, CACHE_STALE, EXTERNAL_BLOCKED_EDE15 | queries/s |
-| pihole.dns_replies_by_status | UNKNOWN, NODATA, NXDOMAIN, CNAME, IP, DOMAIN, RRNAME, SERVFAIL, REFUSED, NOTIMP, DNSSEC, NONE, OTHER | replies/s |
-| pihole.active_clients | active | clients |
-| pihole.gravity_list_blocked_domains | blocked | domains |
-| pihole.gravity_list_last_update_time_ago | last_update_ago | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| pihole.dns_queries_total | Pi-hole DNS Queries Total (Cached, Blocked and Forwarded) | queries | queries/s |
+| pihole.dns_queries_blocked_percent | Pi-hole DNS Queries Blocked Percent | blocked | percent |
+| pihole.dns_queries_by_destination | Pi-hole DNS Queries by Destination | cached, blocked, forwarded | queries/s |
+| pihole.dns_queries_by_type | Pi-hole DNS Queries by Type | A, AAA, ANY, SRV, SOA, PTR, TXT, NAPTR, MX, DS, RRSIG, DNSKEY, NS, SVCB, HTTPS, OTHER | queries/s |
+| pihole.dns_queries_by_status | Pi-hole DNS Queries by Status | UNKNOWN, GRAVITY, FORWARDED, CACHE, REGEX, DENYLIST, EXTERNAL_BLOCKED_IP, EXTERNAL_BLOCKED_NULL, EXTERNAL_BLOCKED_NXRA, GRAVITY_CNAME, REGEX_CNAME, DENYLIST_CNAME, RETRIED, RETRIED_DNSSEC, IN_PROGRESS, DBBUSY, SPECIAL_DOMAIN, CACHE_STALE, EXTERNAL_BLOCKED_EDE15 | queries/s |
+| pihole.dns_replies_by_status | Pi-hole DNS Replies by Status | UNKNOWN, NODATA, NXDOMAIN, CNAME, IP, DOMAIN, RRNAME, SERVFAIL, REFUSED, NOTIMP, DNSSEC, NONE, OTHER | replies/s |
+| pihole.active_clients | Pi-hole Active Clients (Seen in the Last 24 Hours) | active | clients |
+| pihole.gravity_list_blocked_domains | Pi-hole Gravity List Blocked Domains | blocked | domains |
+| pihole.gravity_list_last_update_time_ago | Pi-hole Gravity List Time Since Last Update | last_update_ago | seconds |
 
 
 

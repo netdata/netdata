@@ -53,7 +53,7 @@ Populates these flow record fields when a lookup succeeds:
 For the cross-provider mechanics (lookup pass ordering, the 30-second hot-reload poll,
 the auto-detect path order, multi-database composition, IPv4/IPv6 handling, the failure
 modes shared by every MMDB provider), see
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 Files are read on plugin start and reloaded automatically when their mtime or size
@@ -100,7 +100,7 @@ the binary is available (packaged 32-bit installs do not include it) to populate
 sudo /usr/sbin/topology-ip-intel-downloader
 ```
 
-See the [Enrichment Intel Downloader](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment-intel-downloader)
+See the [Enrichment Intel Downloader](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/intel-downloader.md)
 page for downloader options and how to schedule periodic refreshes. DB-IP Lite
 data is published monthly, so a monthly cron of the downloader is the right
 cadence -- more frequent runs will not produce newer data.
@@ -191,7 +191,7 @@ private space. The DB-IP-built ASN database tags private ranges so `*_AS_NAME`
 renders as `AS0 Private IP Address Space`, while geographic fields stay empty and
 private addresses do not appear on maps. Declare your internal CIDRs under
 `enrichment.networks` when you want internal labels -- see
-[Static metadata](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[Private and non-routable IPs](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md#private-and-non-routable-ips).
 
 
 ### Stale databases

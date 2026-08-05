@@ -52,8 +52,19 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 	if e == nil {
 		return fmt.Errorf("chartengine: nil engine")
 	}
+	validation, err := charttpl.Validate(spec)
+	if err != nil {
+		return fmt.Errorf("chartengine: invalid template spec: %w", err)
+	}
+	return e.load(spec, validation, revision)
+}
 
-	compiled, err := Compile(spec, revision)
+func (e *Engine) load(spec *charttpl.Spec, validation charttpl.Validation, revision uint64) error {
+	if e == nil {
+		return fmt.Errorf("chartengine: nil engine")
+	}
+
+	compiled, err := compileValidated(spec, revision)
 	if err != nil {
 		e.logWarningf("chartengine load failed revision=%d: %v", revision, err)
 		return err
@@ -63,15 +74,16 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 	cfg := e.state.cfg
 	e.mu.RUnlock()
 
-	autogenPolicy, selectorPolicy, err := resolveEffectivePolicy(cfg, spec.Engine)
+	policy, err := resolveEffectivePolicy(cfg, spec.Engine, validation.AutogenRules())
 	if err != nil {
 		e.logWarningf("chartengine load failed revision=%d: %v", revision, err)
 		return err
 	}
 
 	e.mu.Lock()
-	e.state.cfg.autogen = autogenPolicy
-	e.state.cfg.selector = selectorPolicy
+	e.state.cfg.autogen = policy.autogen
+	e.state.cfg.autogenRules = policy.autogenRules
+	e.state.cfg.selector = policy.selector
 	e.state.cfg.autogenContextNamespace = spec.ContextNamespace
 	e.state.program = compiled
 	e.state.matchIndex = buildMatchIndex(compiled.Charts())
@@ -87,11 +99,11 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 
 // LoadYAML decodes chart-template YAML, compiles it, and publishes the program.
 func (e *Engine) LoadYAML(data []byte, revision uint64) error {
-	spec, err := charttpl.DecodeYAML(data)
+	spec, validation, err := charttpl.DecodeYAMLValidated(data)
 	if err != nil {
 		return err
 	}
-	return e.Load(spec, revision)
+	return e.load(spec, validation, revision)
 }
 
 // ResetMaterialized clears only materialized chart/dimension lifecycle state.

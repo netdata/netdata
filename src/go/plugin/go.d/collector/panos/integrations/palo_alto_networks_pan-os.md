@@ -196,11 +196,13 @@ The following alerts are available:
 | [ panos_license_expires_soon ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.time_until_expiration | Warning under 30 days before expiration, critical under 7 days. Expired licenses trigger panos_license_expired instead. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -219,11 +221,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.system.uptime | uptime | seconds |
-| panos.system.device_certificate_status | valid, invalid | status |
-| panos.system.operational_mode | normal, other | mode |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.system.uptime | System Uptime | uptime | seconds |
+| panos.system.device_certificate_status | Device Certificate Status | valid, invalid | status |
+| panos.system.operational_mode | Operational Mode | normal, other | mode |
+
 
 ### Per High availability
 
@@ -233,13 +236,14 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.ha.status | enabled, disabled | status |
-| panos.ha.local.state | active, passive, non_functional, suspended, unknown | state |
-| panos.ha.peer.state | active, passive, non_functional, suspended, unknown | state |
-| panos.ha.peer.connection_status | up, down, unknown | status |
-| panos.ha.state_sync_status | synchronized, not_synchronized, unknown | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.ha.status | HA Status | enabled, disabled | status |
+| panos.ha.local.state | Local HA State | active, passive, non_functional, suspended, unknown | state |
+| panos.ha.peer.state | Peer HA State | active, passive, non_functional, suspended, unknown | state |
+| panos.ha.peer.connection_status | HA Peer Connection Status | up, down, unknown | status |
+| panos.ha.state_sync_status | HA State Synchronization | synchronized, not_synchronized, unknown | status |
+
 
 ### Per High availability link
 
@@ -253,9 +257,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.ha.link_status | up, down, unknown | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.ha.link_status | HA Link Status | up, down, unknown | status |
+
 
 ### Per Environment sensor
 
@@ -271,14 +276,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.environment.temperature | temperature | Celsius |
-| panos.environment.fan_speed | speed | RPM |
-| panos.environment.voltage | voltage | Volts |
-| panos.environment.sensor_alarm_status | clear, alarm | status |
-| panos.environment.power_supply_presence_status | present, absent | status |
-| panos.environment.power_supply_alarm_status | clear, alarm | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.environment.temperature | Environment Temperature | temperature | Celsius |
+| panos.environment.fan_speed | Environment Fan Speed | speed | RPM |
+| panos.environment.voltage | Environment Voltage | voltage | Volts |
+| panos.environment.sensor_alarm_status | Environment Sensor Alarm | clear, alarm | status |
+| panos.environment.power_supply_presence_status | Power Supply Presence | present, absent | status |
+| panos.environment.power_supply_alarm_status | Power Supply Alarm | clear, alarm | status |
+
 
 ### Per License summary
 
@@ -288,9 +294,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.license.count | total, expired | licenses |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.license.count | Licenses | total, expired | licenses |
+
 
 ### Per License
 
@@ -305,10 +312,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.license.status | valid, expired | status |
-| panos.license.time_until_expiration | time_until_expiration | days |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.license.status | License Status | valid, expired | status |
+| panos.license.time_until_expiration | Time until expiration for non-expired licenses. A value of -1 means PAN-OS reports that the license never expires. | time_until_expiration | days |
+
 
 ### Per IPsec summary
 
@@ -318,9 +326,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.ipsec.tunnels | active | tunnels |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.ipsec.tunnels | IPsec Tunnels | active | tunnels |
+
 
 ### Per IPsec tunnel
 
@@ -339,9 +348,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.ipsec.tunnel.sa_lifetime | remaining_lifetime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.ipsec.tunnel.sa_lifetime | IPsec Tunnel SA Remaining Lifetime | remaining_lifetime | seconds |
+
 
 ### Per BGP peer
 
@@ -359,14 +369,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.bgp.peer.state | idle, connect, active, opensent, openconfirm, established, unknown | state |
-| panos.bgp.peer.uptime | uptime | seconds |
-| panos.bgp.peer.messages | in, out | messages/s |
-| panos.bgp.peer.updates | in, out | messages/s |
-| panos.bgp.peer.flaps | flaps | flaps/s |
-| panos.bgp.peer.established_transitions | established | transitions/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.bgp.peer.state | BGP Peer State | idle, connect, active, opensent, openconfirm, established, unknown | state |
+| panos.bgp.peer.uptime | BGP Peer Uptime | uptime | seconds |
+| panos.bgp.peer.messages | BGP Peer Messages | in, out | messages/s |
+| panos.bgp.peer.updates | BGP Peer Updates | in, out | messages/s |
+| panos.bgp.peer.flaps | BGP Peer Flaps | flaps | flaps/s |
+| panos.bgp.peer.established_transitions | BGP Peer Established Transitions | established | transitions/s |
+
 
 ### Per BGP peer address family
 
@@ -386,10 +397,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.bgp.peer.prefixes_received | total, accepted, rejected | prefixes |
-| panos.bgp.peer.prefixes_advertised | advertised | prefixes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.bgp.peer.prefixes_received | BGP Peer Received Prefixes | total, accepted, rejected | prefixes |
+| panos.bgp.peer.prefixes_advertised | BGP Peer Advertised Prefixes | advertised | prefixes |
+
 
 ### Per BGP virtual router
 
@@ -403,10 +415,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| panos.bgp.vr.peers_by_state | idle, connect, active, opensent, openconfirm, established, unknown | peers |
-| panos.bgp.vr.peers_total | configured, established | peers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.bgp.vr.peers_by_state | BGP Peers by State | idle, connect, active, opensent, openconfirm, established, unknown | peers |
+| panos.bgp.vr.peers_total | BGP Peers Total | configured, established | peers |
 
 
 

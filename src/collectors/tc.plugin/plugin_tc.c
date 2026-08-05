@@ -929,7 +929,11 @@ void tc_main(void *ptr) {
         }
 
         char buffer[TC_LINE_MAX+1] = "";
-        while(fgets(buffer, TC_LINE_MAX, spawn_popen_stdout(tc_child_instance)) != NULL) {
+        FILE *child_stdout = spawn_popen_stdout(tc_child_instance);
+        if(unlikely(!child_stdout))
+            goto child_done;
+
+        while(fgets(buffer, TC_LINE_MAX, child_stdout) != NULL) {
             if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
             buffer[TC_LINE_MAX] = '\0';
@@ -1135,6 +1139,7 @@ void tc_main(void *ptr) {
             worker_is_idle();
         }
 
+child_done:;
         // fgets() failed or loop broke
         int code = spawn_popen_kill(tc_child_instance, 0);
         tc_child_instance = NULL;

@@ -649,11 +649,13 @@ The following alerts are available:
 | [ am_sql_elastic_pool_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.serverless_utilization | SQL Elastic Pool serverless memory on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -675,24 +677,24 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.sql_elastic_pool.cpu | average, maximum | percentage |
-| azure_monitor.sql_elastic_pool.instance_cpu | average | percentage |
-| azure_monitor.sql_elastic_pool.instance_memory | average | percentage |
-| azure_monitor.sql_elastic_pool.dtu_consumption | average | percentage |
-| azure_monitor.sql_elastic_pool.io_utilization | data_read, log_write | percentage |
-| azure_monitor.sql_elastic_pool.resource_utilization | workers, sessions | percentage |
-| azure_monitor.sql_elastic_pool.sessions_count | average | sessions |
-| azure_monitor.sql_elastic_pool.storage | used, allocated, limit | bytes |
-| azure_monitor.sql_elastic_pool.storage_utilization | used, allocated | percentage |
-| azure_monitor.sql_elastic_pool.xtp_storage | average | percentage |
-| azure_monitor.sql_elastic_pool.tempdb_size | data, log | KiB |
-| azure_monitor.sql_elastic_pool.tempdb_log_utilization | average | percentage |
-| azure_monitor.sql_elastic_pool.vcore_usage | used, limit | vCores |
-| azure_monitor.sql_elastic_pool.edtu_usage | used, limit | eDTU |
-| azure_monitor.sql_elastic_pool.serverless_utilization | cpu, memory | percentage |
-| azure_monitor.sql_elastic_pool.serverless_billing | total | vCore-seconds/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.sql_elastic_pool.cpu | Azure SQL Elastic Pool CPU Utilization | average, maximum | percentage |
+| azure_monitor.sql_elastic_pool.instance_cpu | Azure SQL Elastic Pool Instance CPU Utilization | average | percentage |
+| azure_monitor.sql_elastic_pool.instance_memory | Azure SQL Elastic Pool Instance Memory Utilization | average | percentage |
+| azure_monitor.sql_elastic_pool.dtu_consumption | Azure SQL Elastic Pool DTU Consumption | average | percentage |
+| azure_monitor.sql_elastic_pool.io_utilization | Azure SQL Elastic Pool I/O Utilization | data_read, log_write | percentage |
+| azure_monitor.sql_elastic_pool.resource_utilization | Azure SQL Elastic Pool Resource Utilization | workers, sessions | percentage |
+| azure_monitor.sql_elastic_pool.sessions_count | Azure SQL Elastic Pool Sessions Count | average | sessions |
+| azure_monitor.sql_elastic_pool.storage | Azure SQL Elastic Pool Storage | used, allocated, limit | bytes |
+| azure_monitor.sql_elastic_pool.storage_utilization | Azure SQL Elastic Pool Storage Utilization | used, allocated | percentage |
+| azure_monitor.sql_elastic_pool.xtp_storage | Azure SQL Elastic Pool In-Memory OLTP Storage | average | percentage |
+| azure_monitor.sql_elastic_pool.tempdb_size | Azure SQL Elastic Pool Tempdb Size | data, log | KiB |
+| azure_monitor.sql_elastic_pool.tempdb_log_utilization | Azure SQL Elastic Pool Tempdb Log Utilization | average | percentage |
+| azure_monitor.sql_elastic_pool.vcore_usage | Azure SQL Elastic Pool vCore Usage | used, limit | vCores |
+| azure_monitor.sql_elastic_pool.edtu_usage | Azure SQL Elastic Pool eDTU Usage | used, limit | eDTU |
+| azure_monitor.sql_elastic_pool.serverless_utilization | Azure SQL Elastic Pool Serverless Utilization | cpu, memory | percentage |
+| azure_monitor.sql_elastic_pool.serverless_billing | Azure SQL Elastic Pool Serverless Billing | total | vCore-seconds/s |
 
 
 

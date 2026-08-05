@@ -207,11 +207,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -229,9 +231,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| monit.service_check_status | ok, error, initializing, not_monitored | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| monit.service_check_status | Service Check Status | ok, error, initializing, not_monitored | status |
 
 
 

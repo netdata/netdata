@@ -5,6 +5,17 @@ use crate::memory_allocator::AllocatorMemorySample;
 pub(super) struct NetflowChartsSnapshot {
     pub(super) input_packets: InputPacketsMetrics,
     pub(super) input_bytes: InputBytesMetrics,
+    pub(super) protocol_packets: ProtocolPacketsMetrics,
+    pub(super) flow_sets: FlowSetMetrics,
+    pub(super) templates: TemplateMetrics,
+    pub(super) flow_records: FlowRecordMetrics,
+    pub(super) options_records: OptionsRecordMetrics,
+    pub(super) sflow_samples: SflowSampleMetrics,
+    pub(super) decoder_exceptions: DecoderExceptionMetrics,
+    pub(super) flow_rows: FlowRowMetrics,
+    pub(super) nsel_events: NselEventMetrics,
+    pub(super) nsel_rows: NselRowMetrics,
+    pub(super) nsel_exceptions: NselExceptionMetrics,
     pub(super) raw_journal_ops: RawJournalOpsMetrics,
     pub(super) raw_journal_bytes: RawJournalBytesMetrics,
     pub(super) materialized_tier_ops: MaterializedTierOpsMetrics,
@@ -83,15 +94,103 @@ impl NetflowChartsSnapshot {
         Self {
             input_packets: InputPacketsMetrics {
                 udp_received: metrics.udp_packets_received.load(Ordering::Relaxed),
-                parse_attempts: metrics.parse_attempts.load(Ordering::Relaxed),
-                parsed_packets: metrics.parsed_packets.load(Ordering::Relaxed),
-                parse_errors: metrics.parse_errors.load(Ordering::Relaxed),
-                template_errors: metrics.template_errors.load(Ordering::Relaxed),
+                kernel_dropped: metrics.udp_kernel_drops.load(Ordering::Relaxed),
+                empty: metrics.udp_empty_packets.load(Ordering::Relaxed),
+            },
+            protocol_packets: ProtocolPacketsMetrics {
                 netflow_v5: metrics.netflow_v5_packets.load(Ordering::Relaxed),
                 netflow_v7: metrics.netflow_v7_packets.load(Ordering::Relaxed),
                 netflow_v9: metrics.netflow_v9_packets.load(Ordering::Relaxed),
                 ipfix: metrics.ipfix_packets.load(Ordering::Relaxed),
                 sflow: metrics.sflow_datagrams.load(Ordering::Relaxed),
+            },
+            flow_sets: FlowSetMetrics {
+                v9_data: metrics.v9_data_sets.load(Ordering::Relaxed),
+                v9_options_data: metrics.v9_options_data_sets.load(Ordering::Relaxed),
+                v9_templates: metrics.v9_template_sets.load(Ordering::Relaxed),
+                v9_options_templates: metrics.v9_options_template_sets.load(Ordering::Relaxed),
+                v9_missing_template: metrics.v9_missing_template_sets.load(Ordering::Relaxed),
+                v9_ignored: metrics.v9_ignored_sets.load(Ordering::Relaxed),
+                ipfix_data: metrics.ipfix_data_sets.load(Ordering::Relaxed),
+                ipfix_options_data: metrics.ipfix_options_data_sets.load(Ordering::Relaxed),
+                ipfix_templates: metrics.ipfix_template_sets.load(Ordering::Relaxed),
+                ipfix_options_templates: metrics
+                    .ipfix_options_template_sets
+                    .load(Ordering::Relaxed),
+                ipfix_missing_template: metrics.ipfix_missing_template_sets.load(Ordering::Relaxed),
+                ipfix_ignored: metrics.ipfix_ignored_sets.load(Ordering::Relaxed),
+            },
+            templates: TemplateMetrics {
+                v9_data: metrics.v9_data_templates.load(Ordering::Relaxed),
+                v9_options: metrics.v9_options_templates.load(Ordering::Relaxed),
+                ipfix_data: metrics.ipfix_data_templates.load(Ordering::Relaxed),
+                ipfix_options: metrics.ipfix_options_templates.load(Ordering::Relaxed),
+            },
+            flow_records: FlowRecordMetrics {
+                netflow_v5: metrics.netflow_v5_records.load(Ordering::Relaxed),
+                netflow_v7: metrics.netflow_v7_records.load(Ordering::Relaxed),
+                netflow_v9: metrics.netflow_v9_records.load(Ordering::Relaxed),
+                ipfix: metrics.ipfix_records.load(Ordering::Relaxed),
+            },
+            options_records: OptionsRecordMetrics {
+                netflow_v9: metrics.v9_options_records.load(Ordering::Relaxed),
+                ipfix: metrics.ipfix_options_records.load(Ordering::Relaxed),
+                sampling_data: metrics.sampling_option_records.load(Ordering::Relaxed),
+            },
+            sflow_samples: SflowSampleMetrics {
+                flow: metrics.sflow_flow_samples.load(Ordering::Relaxed),
+                counter: metrics.sflow_counter_samples.load(Ordering::Relaxed),
+                discarded_packet: metrics.sflow_discarded_samples.load(Ordering::Relaxed),
+                rt_metric: metrics.sflow_rt_metric_samples.load(Ordering::Relaxed),
+                rt_flow: metrics.sflow_rt_flow_samples.load(Ordering::Relaxed),
+                unknown: metrics.sflow_unknown_samples.load(Ordering::Relaxed),
+            },
+            decoder_exceptions: DecoderExceptionMetrics {
+                udp_receive_errors: metrics.udp_receive_errors.load(Ordering::Relaxed),
+                udp_socket_setup_errors: metrics.udp_socket_setup_errors.load(Ordering::Relaxed),
+                parse_errors: metrics.parse_errors.load(Ordering::Relaxed),
+                missing_template_sets: metrics.missing_template_sets.load(Ordering::Relaxed),
+                disabled_protocol_packets: metrics
+                    .disabled_protocol_packets
+                    .load(Ordering::Relaxed),
+                parser_source_evictions: metrics.parser_source_evictions.load(Ordering::Relaxed),
+                partial_counter_records: metrics.partial_counter_records.load(Ordering::Relaxed),
+                decapsulation_failed_records: metrics
+                    .decapsulation_failed_records
+                    .load(Ordering::Relaxed),
+                unsupported_data_sets: metrics.unsupported_data_sets.load(Ordering::Relaxed),
+                ipfix_zero_reverse_records: metrics
+                    .ipfix_zero_reverse_records
+                    .load(Ordering::Relaxed),
+            },
+            flow_rows: FlowRowMetrics {
+                decoded: metrics.decoded_rows.load(Ordering::Relaxed),
+                classifier_filtered: metrics.enrichment_filtered_rows.load(Ordering::Relaxed),
+                journaled: metrics.journal_entries_written.load(Ordering::Relaxed),
+                write_failed: metrics.journal_write_errors.load(Ordering::Relaxed),
+            },
+            nsel_events: NselEventMetrics {
+                update: metrics.nsel_update_records.load(Ordering::Relaxed),
+                create: metrics.nsel_create_records.load(Ordering::Relaxed),
+                teardown: metrics.nsel_teardown_records.load(Ordering::Relaxed),
+                denied: metrics.nsel_denied_records.load(Ordering::Relaxed),
+                unsupported: metrics
+                    .nsel_unsupported_event_records
+                    .load(Ordering::Relaxed),
+                malformed: metrics.nsel_malformed_records.load(Ordering::Relaxed),
+            },
+            nsel_rows: NselRowMetrics {
+                forward: metrics.nsel_forward_rows.load(Ordering::Relaxed),
+                reverse: metrics.nsel_reverse_rows.load(Ordering::Relaxed),
+            },
+            nsel_exceptions: NselExceptionMetrics {
+                counterless_updates: metrics
+                    .nsel_counterless_update_records
+                    .load(Ordering::Relaxed),
+                partial_counter_directions: metrics
+                    .nsel_partial_counter_records
+                    .load(Ordering::Relaxed),
+                zero_responder: metrics.nsel_zero_responder_records.load(Ordering::Relaxed),
             },
             input_bytes: InputBytesMetrics {
                 udp_received: metrics.udp_bytes_received.load(Ordering::Relaxed),
@@ -158,6 +257,11 @@ impl NetflowChartsSnapshot {
                 decoder_state_move_errors: metrics
                     .decoder_state_move_errors
                     .load(Ordering::Relaxed),
+                facet_active_update_errors: metrics
+                    .facet_active_update_errors
+                    .load(Ordering::Relaxed),
+                facet_lifecycle_errors: metrics.facet_lifecycle_errors.load(Ordering::Relaxed),
+                facet_persist_errors: metrics.facet_persist_errors.load(Ordering::Relaxed),
             },
             journal_io_bytes: JournalIoBytesMetrics {
                 decoder_state_persist_bytes: metrics

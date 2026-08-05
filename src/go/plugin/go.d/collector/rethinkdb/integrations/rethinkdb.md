@@ -192,11 +192,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -208,13 +210,14 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rethinkdb.cluster_servers_stats_request | success, timeout | servers |
-| rethinkdb.cluster_client_connections | connections | connections |
-| rethinkdb.cluster_active_clients | active | clients |
-| rethinkdb.cluster_queries | queries | queries/s |
-| rethinkdb.cluster_documents | read, written | documents/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| rethinkdb.cluster_servers_stats_request | Cluster Servers Stats Request | success, timeout | servers |
+| rethinkdb.cluster_client_connections | Cluster Client Connections | connections | connections |
+| rethinkdb.cluster_active_clients | Cluster Active Clients | active | clients |
+| rethinkdb.cluster_queries | Cluster Queries | queries | queries/s |
+| rethinkdb.cluster_documents | Cluster Documents | read, written | documents/s |
+
 
 ### Per server
 
@@ -229,13 +232,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rethinkdb.server_stats_request_status | success, timeout | status |
-| rethinkdb.server_client_connections | connections | connections |
-| rethinkdb.server_active_clients | active | clients |
-| rethinkdb.server_queries | queries | queries/s |
-| rethinkdb.server_documents | read, written | documents/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| rethinkdb.server_stats_request_status | Server Stats Request Status | success, timeout | status |
+| rethinkdb.server_client_connections | Server Client Connections | connections | connections |
+| rethinkdb.server_active_clients | Server Active Clients | active | clients |
+| rethinkdb.server_queries | Server Queries | queries | queries/s |
+| rethinkdb.server_documents | Server Documents | read, written | documents/s |
 
 
 

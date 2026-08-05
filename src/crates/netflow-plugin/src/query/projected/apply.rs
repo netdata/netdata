@@ -17,14 +17,11 @@ fn apply_projected_metric(
 }
 
 #[inline(always)]
-fn apply_projected_action(
+fn apply_projected_action<S: ProjectedRowSink + ?Sized>(
     action: &ProjectedPayloadAction,
     value_bytes: &[u8],
-    grouped_aggregates: &ProjectedGroupAccumulator,
-    row_group_field_ids: &mut [Option<u32>],
-    row_missing_values: &mut [Option<String>],
+    sink: &mut S,
     projected_captured_values: &mut [Option<String>],
-    max_groups: usize,
 ) {
     if *action == ProjectedPayloadAction::default() {
         return;
@@ -43,26 +40,17 @@ fn apply_projected_action(
     }
 
     if let Some(field_index) = action.group_slot {
-        match grouped_aggregates.find_field_value(field_index, value_ref) {
-            Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
-            None if grouped_aggregates.grouped_total() < max_groups => {
-                row_missing_values[field_index] = Some(value_ref.to_string());
-            }
-            None => {}
-        }
+        sink.observe_group_value(field_index, value_ref);
     }
 }
 
 #[inline(always)]
-fn apply_projected_match(
+fn apply_projected_match<S: ProjectedRowSink + ?Sized>(
     spec: &ProjectedFieldSpec,
     value_bytes: &[u8],
     metrics: &mut QueryFlowMetrics,
-    grouped_aggregates: &ProjectedGroupAccumulator,
-    row_group_field_ids: &mut [Option<u32>],
-    row_missing_values: &mut [Option<String>],
+    sink: &mut S,
     projected_captured_values: &mut [Option<String>],
-    max_groups: usize,
 ) {
     if let Some(metric_field) = spec.targets.metric {
         apply_projected_metric(metrics, metric_field, value_bytes);
@@ -71,26 +59,20 @@ fn apply_projected_match(
     apply_projected_action(
         &spec.targets.action,
         value_bytes,
-        grouped_aggregates,
-        row_group_field_ids,
-        row_missing_values,
+        sink,
         projected_captured_values,
-        max_groups,
     );
 }
 
 #[inline(always)]
-pub(crate) fn apply_projected_payload(
+pub(crate) fn apply_projected_payload<S: ProjectedRowSink + ?Sized>(
     payload: &[u8],
     projected_field_specs: &[ProjectedFieldSpec],
     pending_spec_indexes: &mut [usize],
     remaining: &mut usize,
     metrics: &mut QueryFlowMetrics,
-    grouped_aggregates: &ProjectedGroupAccumulator,
-    row_group_field_ids: &mut [Option<u32>],
-    row_missing_values: &mut [Option<String>],
+    sink: &mut S,
     projected_captured_values: &mut [Option<String>],
-    max_groups: usize,
 ) -> Option<usize> {
     if *remaining == 0 {
         return None;
@@ -106,16 +88,7 @@ pub(crate) fn apply_projected_payload(
             continue;
         };
 
-        apply_projected_match(
-            spec,
-            value_bytes,
-            metrics,
-            grouped_aggregates,
-            row_group_field_ids,
-            row_missing_values,
-            projected_captured_values,
-            max_groups,
-        );
+        apply_projected_match(spec, value_bytes, metrics, sink, projected_captured_values);
 
         *remaining -= 1;
         pending_spec_indexes.swap(pending_index, *remaining);
@@ -126,17 +99,14 @@ pub(crate) fn apply_projected_payload(
 }
 
 #[inline(always)]
-pub(crate) fn apply_projected_payload_planned(
+pub(crate) fn apply_projected_payload_planned<S: ProjectedRowSink + ?Sized>(
     payload: &[u8],
     projected_match_plan: &ProjectedFieldMatchPlan,
     projected_field_specs: &[ProjectedFieldSpec],
     remaining_mask: &mut u64,
     metrics: &mut QueryFlowMetrics,
-    grouped_aggregates: &ProjectedGroupAccumulator,
-    row_group_field_ids: &mut [Option<u32>],
-    row_missing_values: &mut [Option<String>],
+    sink: &mut S,
     projected_captured_values: &mut [Option<String>],
-    max_groups: usize,
 ) -> Option<usize> {
     if *remaining_mask == 0 || payload.is_empty() {
         return None;
@@ -162,16 +132,7 @@ pub(crate) fn apply_projected_payload_planned(
             continue;
         };
 
-        apply_projected_match(
-            spec,
-            value_bytes,
-            metrics,
-            grouped_aggregates,
-            row_group_field_ids,
-            row_missing_values,
-            projected_captured_values,
-            max_groups,
-        );
+        apply_projected_match(spec, value_bytes, metrics, sink, projected_captured_values);
 
         *remaining_mask &= !(1_u64 << spec_index);
         return Some(spec_index);

@@ -637,11 +637,13 @@ The following alerts are available:
 | [ am_storage_accounts_server_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Storage server latency peak on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -663,14 +665,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.storage_accounts.availability | average | percentage |
-| azure_monitor.storage_accounts.transactions | total | transactions/s |
-| azure_monitor.storage_accounts.throughput | ingress, egress | bytes/s |
-| azure_monitor.storage_accounts.e2e_latency | average, maximum | milliseconds |
-| azure_monitor.storage_accounts.server_latency | average, maximum | milliseconds |
-| azure_monitor.storage_accounts.used_capacity | average | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.storage_accounts.availability | Azure Storage Account Availability | average | percentage |
+| azure_monitor.storage_accounts.transactions | Azure Storage Account Transactions | total | transactions/s |
+| azure_monitor.storage_accounts.throughput | Azure Storage Account Throughput | ingress, egress | bytes/s |
+| azure_monitor.storage_accounts.e2e_latency | Azure Storage Account End-to-End Latency | average, maximum | milliseconds |
+| azure_monitor.storage_accounts.server_latency | Azure Storage Account Server Latency | average, maximum | milliseconds |
+| azure_monitor.storage_accounts.used_capacity | Azure Storage Account Used Capacity | average | bytes |
 
 
 

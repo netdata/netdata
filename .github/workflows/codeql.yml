@@ -121,6 +121,29 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:cpp"
+          output: ${{ runner.temp }}/codeql-sarif
+          upload: failure-only
+      # CodeQL indexes everything the compiler traces, which for a real build
+      # includes FetchContent-fetched protobuf/abseil and protoc-generated
+      # .pb.cc under build/. The config's paths-ignore cannot exclude them:
+      # for C/C++ it only applies when analyzing without building. Drop those
+      # results here instead, keeping full-build accuracy on our own sources.
+      - name: Drop results from build/ (vendored + generated code)
+        run: |
+          for f in "${RUNNER_TEMP}"/codeql-sarif/*.sarif; do
+            before=$(jq '[.runs[].results[]] | length' "$f")
+            jq '.runs[].results |= map(select(
+                  (.locations[0].physicalLocation.artifactLocation.uri // "")
+                  | startswith("build/") | not))' "$f" > "$f.tmp"
+            mv "$f.tmp" "$f"
+            after=$(jq '[.runs[].results[]] | length' "$f")
+            echo "$(basename "$f"): ${before} results, ${after} kept after dropping build/"
+          done
+      - name: Upload filtered results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ runner.temp }}/codeql-sarif
+          category: "/language:cpp"
 
   analyze-python:
     name: Analyze Python

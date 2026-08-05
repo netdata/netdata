@@ -5,6 +5,8 @@ package snmp_traps
 import (
 	"fmt"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
 )
 
 type jsonRetentionConfig struct {
@@ -14,31 +16,8 @@ type jsonRetentionConfig struct {
 	RotateDur   *string `yaml:"rotation_duration,omitempty" json:"rotation_duration"`
 }
 
-func (rc RetentionConfig) toJSON() jsonRetentionConfig {
-	jc := jsonRetentionConfig{}
-	if rc.MaxSize != nil {
-		s := formatHumanSize(*rc.MaxSize)
-		jc.MaxSize = &s
-	}
-	if rc.MaxDuration != nil {
-		if *rc.MaxDuration > 0 {
-			s := humanDuration(*rc.MaxDuration)
-			jc.MaxDuration = &s
-		}
-	}
-	if rc.RotateSize != nil {
-		s := formatHumanSize(*rc.RotateSize)
-		jc.RotateSize = &s
-	}
-	if rc.RotateDur != nil {
-		s := humanDuration(*rc.RotateDur)
-		jc.RotateDur = &s
-	}
-	return jc
-}
-
-func parseRetentionConfig(jc jsonRetentionConfig) (RetentionConfig, error) {
-	rc := RetentionConfig{
+func parseRetentionConfig(jc jsonRetentionConfig) (journal.Retention, error) {
+	rc := journal.Retention{
 		MaxSize:     nil,
 		MaxDuration: nil,
 		RotateSize:  nil,
@@ -49,14 +28,14 @@ func parseRetentionConfig(jc jsonRetentionConfig) (RetentionConfig, error) {
 		if *jc.MaxSize == "" || *jc.MaxSize == "null" {
 			rc.MaxSize = nil
 		} else {
-			v, err := parseHumanSize(*jc.MaxSize)
+			v, err := journal.ParseSize(*jc.MaxSize)
 			if err != nil {
 				return rc, fmt.Errorf("retention.max_size: %w", err)
 			}
 			rc.MaxSize = &v
 		}
 	} else {
-		d := defaultMaxSize
+		d := journal.DefaultMaxSize
 		rc.MaxSize = &d
 	}
 
@@ -64,7 +43,7 @@ func parseRetentionConfig(jc jsonRetentionConfig) (RetentionConfig, error) {
 		if *jc.MaxDuration == "" || *jc.MaxDuration == "null" {
 			rc.MaxDuration = nil
 		} else {
-			d, err := parseHumanDuration(*jc.MaxDuration)
+			d, err := journal.ParseDuration(*jc.MaxDuration)
 			if err != nil {
 				return rc, fmt.Errorf("retention.max_duration: %w", err)
 			}
@@ -76,7 +55,7 @@ func parseRetentionConfig(jc jsonRetentionConfig) (RetentionConfig, error) {
 		if *jc.RotateSize == "" || *jc.RotateSize == "null" {
 			rc.RotateSize = nil
 		} else {
-			v, err := parseHumanSize(*jc.RotateSize)
+			v, err := journal.ParseSize(*jc.RotateSize)
 			if err != nil {
 				return rc, fmt.Errorf("retention.rotation_size: %w", err)
 			}
@@ -89,7 +68,7 @@ func parseRetentionConfig(jc jsonRetentionConfig) (RetentionConfig, error) {
 			d := time.Duration(0)
 			rc.RotateDur = &d
 		} else {
-			d, err := parseHumanDuration(*jc.RotateDur)
+			d, err := journal.ParseDuration(*jc.RotateDur)
 			if err != nil {
 				return rc, fmt.Errorf("retention.rotation_duration: %w", err)
 			}
@@ -100,17 +79,5 @@ func parseRetentionConfig(jc jsonRetentionConfig) (RetentionConfig, error) {
 		}
 	}
 
-	return rc, validateRetention(rc)
-}
-
-func (rc RetentionConfig) makeJournalConfig() JournalConfig {
-	jc := JournalConfig{
-		MaxSize:    rc.EffectiveMaxSize(),
-		RotateSize: rc.EffectiveRotateSize(),
-		RotateDur:  rc.EffectiveRotateDur(),
-	}
-	if d := rc.EffectiveMaxDuration(); d > 0 {
-		jc.MaxDuration = d
-	}
-	return jc
+	return rc, journal.ValidateRetention(rc)
 }

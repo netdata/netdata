@@ -268,11 +268,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -284,15 +286,16 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.system_health | health | status |
-| powervault.hw_health_controller | ok, degraded, fault, unknown | controllers |
-| powervault.hw_health_drive | ok, degraded, fault, unknown | drives |
-| powervault.hw_health_fan | ok, degraded, fault, unknown | fans |
-| powervault.hw_health_psu | ok, degraded, fault, unknown | PSUs |
-| powervault.hw_health_fru | ok, degraded, fault, unknown | FRUs |
-| powervault.hw_health_port | ok, degraded, fault, unknown | ports |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powervault.system_health | System Health Status | health | status |
+| powervault.hw_health_controller | Controller Health Status | ok, degraded, fault, unknown | controllers |
+| powervault.hw_health_drive | Drive Health Status | ok, degraded, fault, unknown | drives |
+| powervault.hw_health_fan | Fan Health Status | ok, degraded, fault, unknown | fans |
+| powervault.hw_health_psu | Power Supply Health Status | ok, degraded, fault, unknown | PSUs |
+| powervault.hw_health_fru | FRU Health Status | ok, degraded, fault, unknown | FRUs |
+| powervault.hw_health_port | Port Health Status | ok, degraded, fault, unknown | ports |
+
 
 ### Per controller
 
@@ -306,16 +309,17 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.controller_iops | iops | ops/s |
-| powervault.controller_throughput | throughput | bytes/s |
-| powervault.controller_cpu_load | cpu_load | percentage |
-| powervault.controller_write_cache_used | write_cache_used | percentage |
-| powervault.controller_forwarded_cmds | forwarded | commands |
-| powervault.controller_io | read, written | bytes |
-| powervault.controller_ops | read, write | ops |
-| powervault.controller_cache_hits | read_hits, read_misses, write_hits, write_misses | hits |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powervault.controller_iops | Controller IOPS | iops | ops/s |
+| powervault.controller_throughput | Controller Throughput | throughput | bytes/s |
+| powervault.controller_cpu_load | Controller CPU Load | cpu_load | percentage |
+| powervault.controller_write_cache_used | Controller Write Cache Usage | write_cache_used | percentage |
+| powervault.controller_forwarded_cmds | Controller Forwarded Commands | forwarded | commands |
+| powervault.controller_io | Controller Cumulative I/O | read, written | bytes |
+| powervault.controller_ops | Controller Cumulative Operations | read, write | ops |
+| powervault.controller_cache_hits | Controller Cache Hits and Misses | read_hits, read_misses, write_hits, write_misses | hits |
+
 
 ### Per volume
 
@@ -329,15 +333,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.volume_iops | iops | ops/s |
-| powervault.volume_throughput | throughput | bytes/s |
-| powervault.volume_write_cache_percent | write_cache | percentage |
-| powervault.volume_io | read, written | bytes |
-| powervault.volume_ops | read, write | ops |
-| powervault.volume_cache_hits | read_hits, read_misses, write_hits, write_misses | hits |
-| powervault.volume_tier_distribution | ssd, sas, sata | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powervault.volume_iops | Volume IOPS | iops | ops/s |
+| powervault.volume_throughput | Volume Throughput | throughput | bytes/s |
+| powervault.volume_write_cache_percent | Volume Write Cache Usage | write_cache | percentage |
+| powervault.volume_io | Volume Cumulative I/O | read, written | bytes |
+| powervault.volume_ops | Volume Cumulative Operations | read, write | ops |
+| powervault.volume_cache_hits | Volume Cache Hits and Misses | read_hits, read_misses, write_hits, write_misses | hits |
+| powervault.volume_tier_distribution | Volume Storage Tier Distribution | ssd, sas, sata | percentage |
+
 
 ### Per port
 
@@ -351,11 +356,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.port_io | read, written | bytes |
-| powervault.port_ops | read, write | ops |
-| powervault.phy_errors | disparity, lost_dwords, invalid_dwords | errors |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powervault.port_io | Port Cumulative I/O | read, written | bytes |
+| powervault.port_ops | Port Cumulative Operations | read, write | ops |
+| powervault.phy_errors | SAS PHY Errors | disparity, lost_dwords, invalid_dwords | errors |
+
 
 ### Per pool
 
@@ -369,9 +375,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.pool_capacity | total, available | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powervault.pool_capacity | Pool Capacity | total, available | bytes |
+
 
 ### Per drive
 
@@ -385,11 +392,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.drive_temperature | temperature | Celsius |
-| powervault.drive_power_on_hours | power_on_hours | hours |
-| powervault.drive_ssd_life_left | life_left | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powervault.drive_temperature | Drive Temperature | temperature | Celsius |
+| powervault.drive_power_on_hours | Drive Power-On Hours | power_on_hours | hours |
+| powervault.drive_ssd_life_left | Drive SSD Life Remaining | life_left | percentage |
+
 
 ### Per sensor
 
@@ -405,12 +413,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.sensor_temperature | temperature | Celsius |
-| powervault.sensor_voltage | voltage | millivolts |
-| powervault.sensor_current | current | milliamps |
-| powervault.sensor_charge_capacity | charge_capacity | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powervault.sensor_temperature | Sensor Temperature | temperature | Celsius |
+| powervault.sensor_voltage | Sensor Voltage | voltage | millivolts |
+| powervault.sensor_current | Sensor Current | current | milliamps |
+| powervault.sensor_charge_capacity | Sensor Charge Capacity | charge_capacity | percentage |
 
 
 

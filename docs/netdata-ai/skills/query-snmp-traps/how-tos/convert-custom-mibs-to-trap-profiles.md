@@ -10,8 +10,7 @@ Netdata SNMP trap profile YAMLs?
 - `MIB_DIR`: directory containing the operator-provided MIB files.
 - Optional `MIB_MODULE`: one module name to test first, for example
   `NAGIOS-NOTIFY-MIB`.
-- `NODE_UUID`: Netdata node UUID, only needed when reloading profiles
-  through the Agent Function path.
+- `NODE_UUID`: Netdata node UUID used for verification queries.
 - `SNMP_TRAPS_JOB`: trap listener job name for verification queries.
   Default examples use `local`.
 
@@ -70,15 +69,13 @@ Netdata SNMP trap profile YAMLs?
      /etc/netdata/go.d/snmp.trap-profiles/
    ```
 
-6. Wait for active SNMP trap jobs to reload user profiles automatically.
+6. Restart the Netdata Agent or recreate all active SNMP trap jobs.
 
-   The collector watches `/etc/netdata/go.d/snmp.trap-profiles/` while at
-   least one SNMP trap job is active. If a changed profile is invalid, the
-   collector keeps using the last valid profile index; subsequent DynCfg
-   test/apply also fails until the profile file is fixed. Stock profile
-   updates are picked up after trap jobs stop/start or the Netdata Agent
-   restarts. If no trap job is active, the next job creation loads and
-   validates the profile files.
+   Profiles are immutable while the shared catalog epoch has active job leases.
+   The final lease release unloads the epoch; the next job creation loads and
+   validates the operator profile files. The generated `catalogue.json` is a
+   review artifact for the conversion output; install the selected YAML files,
+   not that generated manifest, in the operator profile directory.
 
 7. Verify that unknown OIDs resolve:
 
@@ -133,9 +130,11 @@ durable artifacts.
 - Helper output is mechanical unless `--classify` is used with an
   OpenAI-compatible endpoint. Review generated category, severity, and
   descriptions before installing profiles for production use.
-- If generated YAML is malformed, active jobs keep the last valid profile
-  index and new job creation/test fails instead of silently accepting bad
-  profiles.
+- Active jobs keep their current profile epoch after files are edited. Creating
+  another job while any old job still holds a lease reuses that same epoch and
+  does not test the edits. Restart the Agent or recreate every trap job; after
+  the final old lease is released, the next job initialization reloads the
+  files and rejects malformed generated YAML instead of silently accepting it.
 - A validation run with `NAGIOS-NOTIFY-MIB` produced `nagios.yaml`
   containing four traps: `nHostEvent`, `nHostNotify`, `nSvcEvent`, and
   `nSvcNotify`.

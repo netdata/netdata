@@ -107,11 +107,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -123,12 +125,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cups.dests_state | idle, printing, stopped | dests |
-| cups.dests_option | total, acceptingjobs, shared | dests |
-| cups.job_num | pending, held, processing | jobs |
-| cups.job_size | pending, held, processing | KB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cups.dests_state | Destinations by state | idle, printing, stopped | dests |
+| cups.dests_option | Destinations by option | total, acceptingjobs, shared | dests |
+| cups.job_num | Active jobs | pending, held, processing | jobs |
+| cups.job_size | Active jobs size | pending, held, processing | KB |
+
 
 ### Per destination
 
@@ -138,7 +141,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cups.destination_job_num | pending, held, processing | jobs |
-| cups.destination_job_size | pending, held, processing | KB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cups.destination_job_num | Active jobs of {destination} | pending, held, processing | jobs |
+| cups.destination_job_size | Active jobs size of {destination} | pending, held, processing | KB |

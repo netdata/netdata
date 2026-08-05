@@ -102,7 +102,13 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     } else if (ret == 0) {
         collector_info("Cannot get the output of \"%s\" within timeout (%d ms)", exec, timeout);
     } else {
-        while (fgets(buf, MAXSIZE_PROC_CMDLINE, spawn_popen_stdout(pi)) != NULL) {
+        FILE *child_stdout = spawn_popen_stdout(pi);
+        if(unlikely(!child_stdout)) {
+            spawn_popen_kill(pi, 0);
+            return retval;
+        }
+
+        while (fgets(buf, MAXSIZE_PROC_CMDLINE, child_stdout) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
                 end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
                 if (!*begin)
@@ -167,7 +173,13 @@ static enum cgroups_type cgroups_try_detect_version()
         collector_error("cannot run 'grep cgroup /proc/filesystems'");
         return CGROUPS_AUTODETECT_FAIL;
     }
-    while (fgets(buf, MAXSIZE_PROC_CMDLINE, spawn_popen_stdout(pi)) != NULL) {
+    FILE *child_stdout = spawn_popen_stdout(pi);
+    if(unlikely(!child_stdout)) {
+        spawn_popen_kill(pi, 0);
+        return CGROUPS_AUTODETECT_FAIL;
+    }
+
+    while (fgets(buf, MAXSIZE_PROC_CMDLINE, child_stdout) != NULL) {
         if (strstr(buf, "cgroup2")) {
             cgroups2_available = 1;
             break;

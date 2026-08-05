@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,37 +122,37 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| adfs.ad_login_connection_failures | connection | failures/s |
-| adfs.certificate_authentications | authentications | authentications/s |
-| adfs.db_artifact_failures | connection | failures/s |
-| adfs.db_artifact_query_time_seconds | query_time | seconds/s |
-| adfs.db_config_failures | connection | failures/s |
-| adfs.db_config_query_time_seconds | query_time | seconds/s |
-| adfs.device_authentications | authentications | authentications/s |
-| adfs.extranet_account_lockouts | lockouts | lockouts/s |
-| adfs.external_authentications | success, failure | authentications/s |
-| adfs.federated_authentications | authentications | authentications/s |
-| adfs.federation_metadata_requests | requests | requests/s |
-| adfs.oauth_authorization_requests | requests | requests/s |
-| adfs.oauth_client_authentications | success, failure | authentications/s |
-| adfs.oauth_client_credentials_requests | success, failure | requests/s |
-| adfs.oauth_client_privkey_jwt_authentications | success, failure | authentications/s |
-| adfs.oauth_client_secret_basic_authentications | success, failure | authentications/s |
-| adfs.oauth_client_secret_basic_authentications | success, failure | authentications/s |
-| adfs.oauth_client_secret_post_authentications | success, failure | authentications/s |
-| adfs.oauth_client_windows_authentications | success, failure | requests/s |
-| adfs.oauth_logon_certificate_requests | success, failure | requests/s |
-| adfs.oauth_password_grant_requests | success, failure | requests/s |
-| adfs.oauth_token_requests_success | success | requests/s |
-| adfs.passive_requests | passive | requests/s |
-| adfs.passport_authentications | passport | authentications/s |
-| adfs.password_change_requests | success, failure | requests/s |
-| adfs.samlp_token_requests_success | success | requests/s |
-| adfs.sso_authentications | success, failure | authentications/s |
-| adfs.token_requests | requests | requests/s |
-| adfs.userpassword_authentications | success, failure | authentications/s |
-| adfs.windows_integrated_authentications | authentications | authentications/s |
-| adfs.wsfed_token_requests_success | success | requests/s |
-| adfs.wstrust_token_requests_success | success | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| adfs.ad_login_connection_failures | Connection failures | connection | failures/s |
+| adfs.certificate_authentications | User Certificate authentications | authentications | authentications/s |
+| adfs.db_artifact_failures | Connection failures to the artifact database | connection | failures/s |
+| adfs.db_artifact_query_time_seconds | Time taken for an artifact database query | query_time | seconds/s |
+| adfs.db_config_failures | Connection failures to the configuration database | connection | failures/s |
+| adfs.db_config_query_time_seconds | Time taken for a configuration database query | query_time | seconds/s |
+| adfs.device_authentications | Device authentications | authentications | authentications/s |
+| adfs.extranet_account_lockouts | Extranet account lockouts | lockouts | lockouts/s |
+| adfs.external_authentications | Authentications from external MFA providers | success, failure | authentications/s |
+| adfs.federated_authentications | Authentications from Federated Sources | authentications | authentications/s |
+| adfs.federation_metadata_requests | Federation Metadata requests | requests | requests/s |
+| adfs.oauth_authorization_requests | Incoming requests to the OAuth Authorization endpoint | requests | requests/s |
+| adfs.oauth_client_authentications | OAuth client credentials requests | success, failure | authentications/s |
+| adfs.oauth_client_credentials_requests | OAuth client credentials requests | success, failure | requests/s |
+| adfs.oauth_client_privkey_jwt_authentications | OAuth client private key JWT authentications | success, failure | authentications/s |
+| adfs.oauth_client_secret_basic_authentications | OAuth client secret basic authentications | success, failure | authentications/s |
+| adfs.oauth_client_secret_basic_authentications | OAuth client secret basic authentications | success, failure | authentications/s |
+| adfs.oauth_client_secret_post_authentications | OAuth client secret post authentications | success, failure | authentications/s |
+| adfs.oauth_client_windows_authentications | OAuth client windows integrated authentications | success, failure | requests/s |
+| adfs.oauth_logon_certificate_requests | OAuth logon certificate requests | success, failure | requests/s |
+| adfs.oauth_password_grant_requests | OAuth password grant requests | success, failure | requests/s |
+| adfs.oauth_token_requests_success | Successful RP token requests over OAuth protocol | success | requests/s |
+| adfs.passive_requests | Passive requests | passive | requests/s |
+| adfs.passport_authentications | Microsoft Passport SSO authentications | passport | authentications/s |
+| adfs.password_change_requests | Password change requests | success, failure | requests/s |
+| adfs.samlp_token_requests_success | Successful RP token requests over SAML-P protocol | success | requests/s |
+| adfs.sso_authentications | SSO authentications | success, failure | authentications/s |
+| adfs.token_requests | Token access requests | requests | requests/s |
+| adfs.userpassword_authentications | AD U/P authentications | success, failure | authentications/s |
+| adfs.windows_integrated_authentications | Windows integrated authentications using Kerberos or NTLM | authentications | authentications/s |
+| adfs.wsfed_token_requests_success | Successful RP token requests over WS-Fed protocol | success | requests/s |
+| adfs.wstrust_token_requests_success | Successful RP token requests over WS-Trust protocol | success | requests/s |

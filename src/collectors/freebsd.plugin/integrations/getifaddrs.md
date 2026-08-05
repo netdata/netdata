@@ -124,11 +124,13 @@ The following alerts are available:
 | [ interface_outbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | number of outbound errors for the network interface ${label:device} in the last 10 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -140,12 +142,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.net | received, sent | kilobits/s |
-| system.packets | received, sent, multicast_received, multicast_sent | packets/s |
-| system.ipv4 | received, sent | kilobits/s |
-| system.ipv6 | received, sent | kilobits/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.net | Network Traffic | received, sent | kilobits/s |
+| system.packets | Network Packets | received, sent, multicast_received, multicast_sent | packets/s |
+| system.ipv4 | IPv4 Bandwidth | received, sent | kilobits/s |
+| system.ipv6 | IPv6 Bandwidth | received, sent | kilobits/s |
+
 
 ### Per network device
 
@@ -155,10 +158,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| net.net | received, sent | kilobits/s |
-| net.packets | received, sent, multicast_received, multicast_sent | packets/s |
-| net.errors | inbound, outbound | errors/s |
-| net.drops | inbound, outbound | drops/s |
-| net.events | collisions | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| net.net | Bandwidth | received, sent | kilobits/s |
+| net.packets | Packets | received, sent, multicast_received, multicast_sent | packets/s |
+| net.errors | Interface Errors | inbound, outbound | errors/s |
+| net.drops | Interface Drops | inbound, outbound | drops/s |
+| net.events | Network Interface Events | collisions | events/s |

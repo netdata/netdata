@@ -7,10 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -56,6 +58,60 @@ func (f writeFunc) Write(p []byte) (int, error) {
 	return f(p)
 }
 
+type failFirstJobOutputTransaction struct {
+	output bytes.Buffer
+	calls  int
+	err    error
+}
+
+func (output *failFirstJobOutputTransaction) Write(payload []byte) (int, error) {
+	return output.output.Write(payload)
+}
+
+func (output *failFirstJobOutputTransaction) CommitJobOutput(
+	payload []byte,
+	state OutputStateTransaction,
+) error {
+	output.calls++
+	if output.calls == 1 {
+		return errors.Join(output.err, state.Abort())
+	}
+	if _, err := output.output.Write(payload); err != nil {
+		return errors.Join(err, state.Abort())
+	}
+	if err := state.Commit(); err != nil {
+		return errors.Join(err, state.Abort())
+	}
+	return nil
+}
+
+func (output *failFirstJobOutputTransaction) String() string {
+	return output.output.String()
+}
+
+type failFirstPlainJobOutput struct {
+	output bytes.Buffer
+	calls  int
+	err    error
+}
+
+func (output *failFirstPlainJobOutput) Write(payload []byte) (int, error) {
+	output.calls++
+	if output.calls == 1 {
+		return 0, output.err
+	}
+	return output.output.Write(payload)
+}
+
+func (output *failFirstPlainJobOutput) String() string {
+	return output.output.String()
+}
+
+type retryJobOutput interface {
+	io.Writer
+	String() string
+}
+
 func (m *mockRuntimeComponentService) RegisterComponent(cfg runtimecomp.ComponentConfig) error {
 	if m.registerErr != nil {
 		return m.registerErr
@@ -69,6 +125,7 @@ func (m *mockRuntimeComponentService) UnregisterComponent(name string) {
 }
 
 func (m *mockRuntimeComponentService) QuarantineComponent(_ string) {}
+func (m *mockRuntimeComponentService) FinalizeComponent(_ string)   {}
 
 func (m *mockRuntimeComponentService) RegisterProducer(_ string, _ func() error) error {
 	return nil
@@ -181,7 +238,7 @@ func newRegistryTestJobV2(t *testing.T, fullName string, registry *vnoderegistry
 		Vnode:         vnode,
 		VnodeRegistry: registry,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 	return job
 }
 
@@ -253,26 +310,6 @@ groups:
 `
 }
 
-// The pre-Start snapshot commit is visible without a collection: a job stopped
-// before its first tick must clean up on the reconciled vnode, not the stale
-// creation-time vnode.
-func TestJobV2_SetVnodeSnapshotCommitsRevisionBeforeStart(t *testing.T) {
-	mod := &mockModuleV2{store: metrix.NewCollectorStore(), template: chartTemplateV2()}
-	job := newTestJobV2(mod, &bytes.Buffer{})
-	snapshot := VnodeSnapshot{
-		Vnode:            &vnodes.VirtualNode{Name: "v", Hostname: "baseline", GUID: "guid-b"},
-		Revision:         7,
-		MetadataRevision: 5,
-	}
-
-	job.SetVnodeSnapshot(snapshot)
-
-	assert.Equal(t, "baseline", job.Vnode().Hostname,
-		"the snapshot must be committed into the job, visible without a collection")
-	assert.Equal(t, uint64(7), job.vnodeRevision)
-	assert.Equal(t, uint64(5), job.vnodeMetadataRevision)
-}
-
 func TestJobV2RunnerDoesNotRunDuringAutoDetection(t *testing.T) {
 	started := make(chan struct{})
 	mod := &mockRunnerModuleV2{
@@ -287,7 +324,7 @@ func TestJobV2RunnerDoesNotRunDuringAutoDetection(t *testing.T) {
 	}
 	job := newTestJobV2(mod, &bytes.Buffer{})
 
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	require.Never(t, func() bool {
 		select {
@@ -313,11 +350,11 @@ func TestJobV2RunnerDoesNotStartAfterPreStartStop(t *testing.T) {
 		},
 	}
 	job := newTestJobV2(mod, &bytes.Buffer{})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.Stop()
 	go func() {
-		job.Start()
+		job.StartManaged(make(chan struct{}))
 		close(stopped)
 	}()
 
@@ -333,7 +370,7 @@ func TestJobV2RunnerDoesNotStartAfterPreStartStop(t *testing.T) {
 	}
 }
 
-func TestJobV2RunnerStopWaitsBeforeCleanup(t *testing.T) {
+func TestJobV2RunnerStopJoinsBeforeCleanup(t *testing.T) {
 	started := make(chan struct{})
 	ctxCanceled := make(chan struct{})
 	releaseRunner := make(chan struct{})
@@ -357,9 +394,9 @@ func TestJobV2RunnerStopWaitsBeforeCleanup(t *testing.T) {
 		},
 	}
 	job := newTestJobV2(mod, &bytes.Buffer{})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
-	go job.Start()
+	go job.StartManaged(make(chan struct{}))
 	select {
 	case <-started:
 	case <-time.After(time.Second):
@@ -391,20 +428,24 @@ func TestJobV2RunnerStopWaitsBeforeCleanup(t *testing.T) {
 	close(releaseRunner)
 	require.Eventually(t, func() bool {
 		select {
-		case <-cleanupCalled:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, 10*time.Millisecond)
-	require.Eventually(t, func() bool {
-		select {
 		case <-stopped:
 			return true
 		default:
 			return false
 		}
 	}, time.Second, 10*time.Millisecond)
+	select {
+	case <-cleanupCalled:
+		t.Fatal("cleanup ran without lifecycle-owner request")
+	default:
+	}
+
+	job.Cleanup()
+	select {
+	case <-cleanupCalled:
+	default:
+		t.Fatal("explicit cleanup did not reach collector")
+	}
 }
 
 func TestJobV2RunnerPanicRecovered(t *testing.T) {
@@ -421,10 +462,10 @@ func TestJobV2RunnerPanicRecovered(t *testing.T) {
 		},
 	}
 	job := newTestJobV2(mod, &bytes.Buffer{})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	go func() {
-		job.Start()
+		job.StartManaged(make(chan struct{}))
 		close(stopped)
 	}()
 	select {
@@ -432,13 +473,104 @@ func TestJobV2RunnerPanicRecovered(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("runner did not start")
 	}
-	require.Eventually(t, job.Panicked, time.Second, 10*time.Millisecond)
+	require.Eventually(t, job.panicked.Load, time.Second, 10*time.Millisecond)
 
 	job.Stop()
 	select {
 	case <-stopped:
 	case <-time.After(time.Second):
 		t.Fatal("job did not stop")
+	}
+}
+
+func TestJobV2SteadyStateCollectorFailuresAreSanitizedBeforeLogging(t *testing.T) {
+	tests := []struct {
+		name    string
+		collect func(context.Context) error
+	}{
+		{
+			name: "error",
+			collect: func(context.Context) error {
+				return errors.New("resolved-v2-collect-error-marker")
+			},
+		},
+		{
+			name: "panic",
+			collect: func(context.Context) error {
+				panic("resolved-v2-collect-panic-marker")
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			const safeMarker = "sanitized v2 collect failure"
+			mod := &mockModuleV2{
+				store:       metrix.NewCollectorStore(),
+				template:    chartTemplateV2(),
+				collectFunc: test.collect,
+			}
+			job := NewJobV2(JobV2Config{
+				PluginName: pluginName, Name: jobName, ModuleName: modName,
+				FullName: modName + "_" + jobName, Module: mod, Out: &bytes.Buffer{},
+				LifecycleErrorSanitizer: func(error) error { return errors.New(safeMarker) },
+			})
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			var logs bytes.Buffer
+			captured := logger.NewWithWriter(&logs)
+			job.Logger = captured
+			mod.GetBase().Logger = captured
+
+			_, _ = job.collectAndEmit(0)
+
+			require.NotContains(t, logs.String(), "resolved-v2-collect-error-marker")
+			require.NotContains(t, logs.String(), "resolved-v2-collect-panic-marker")
+			require.Contains(t, logs.String(), safeMarker)
+		})
+	}
+}
+
+func TestJobV2RunnerFailuresAreSanitizedBeforeLogging(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(context.Context) error
+	}{
+		{
+			name: "error",
+			run: func(context.Context) error {
+				return errors.New("resolved-v2-runner-error-marker")
+			},
+		},
+		{
+			name: "panic",
+			run: func(context.Context) error {
+				panic("resolved-v2-runner-panic-marker")
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			const safeMarker = "sanitized v2 runner failure"
+			mod := &mockRunnerModuleV2{
+				mockModuleV2: &mockModuleV2{},
+				runFunc:      test.run,
+			}
+			job := NewJobV2(JobV2Config{
+				PluginName: pluginName, Name: jobName, ModuleName: modName,
+				FullName: modName + "_" + jobName, Module: mod, Out: &bytes.Buffer{},
+				LifecycleErrorSanitizer: func(error) error { return errors.New(safeMarker) },
+			})
+			var logs bytes.Buffer
+			captured := logger.NewWithWriter(&logs)
+			job.Logger = captured
+			mod.GetBase().Logger = captured
+
+			err := job.runCollectorRunner(context.Background(), mod)
+			job.handleCollectorRunnerExit(context.Background(), err)
+
+			require.NotContains(t, logs.String(), "resolved-v2-runner-error-marker")
+			require.NotContains(t, logs.String(), "resolved-v2-runner-panic-marker")
+			require.Contains(t, logs.String(), safeMarker)
+		})
 	}
 }
 
@@ -453,7 +585,7 @@ func TestJobV2Scenarios(t *testing.T) {
 					template: chartTemplateV2(),
 				}
 				job := newTestJobV2(mod, &bytes.Buffer{})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				require.NotNil(t, job.store)
 				require.NotNil(t, job.cycle)
 				state, err := job.ensureScopeState(metrix.HostScope{})
@@ -473,7 +605,7 @@ func TestJobV2Scenarios(t *testing.T) {
 					template: chartTemplateV2(),
 				}
 				job := newTestJobV2(mod, &bytes.Buffer{})
-				require.ErrorContains(t, job.AutoDetection(context.Background()), "nil metric store")
+				require.ErrorContains(t, job.AutoDetectionManaged(context.Background()), "nil metric store")
 			},
 		},
 		"runOnce collects and emits chart actions": {
@@ -490,7 +622,7 @@ func TestJobV2Scenarios(t *testing.T) {
 
 				var out bytes.Buffer
 				job := newTestJobV2(mod, &out)
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				job.runOnce()
 
 				wire := out.String()
@@ -504,7 +636,46 @@ DIMENSION 'busy' 'busy' 'absolute' '1' '1' ''
 BEGIN 'module_job.workers_busy'
 SET 'busy' = 7
 END`, chartengine.Priority))
-				assert.False(t, job.Panicked())
+				assert.False(t, job.panicked.Load())
+			},
+		},
+		"failed output retries chart definitions on the next cycle": {
+			run: func(t *testing.T) {
+				outputs := map[string]func(error) retryJobOutput{
+					"transactional writer": func(err error) retryJobOutput {
+						return &failFirstJobOutputTransaction{err: err}
+					},
+					"plain writer": func(err error) retryJobOutput {
+						return &failFirstPlainJobOutput{err: err}
+					},
+				}
+				for name, newOutput := range outputs {
+					t.Run(name, func(t *testing.T) {
+						store := metrix.NewCollectorStore()
+						mod := &mockModuleV2{
+							store:    store,
+							template: chartTemplateV2(),
+							collectFunc: func(context.Context) error {
+								store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(7)
+								return nil
+							},
+						}
+						output := newOutput(errors.New("write failed"))
+						job := NewJobV2(JobV2Config{
+							PluginName: pluginName, Name: jobName, ModuleName: modName,
+							FullName: modName + "_" + jobName, Module: mod,
+							Out: output, UpdateEvery: 1,
+						})
+						require.NoError(t, job.AutoDetectionManaged(context.Background()))
+
+						job.runOnce()
+						assert.Empty(t, output.String())
+						job.runOnce()
+
+						assert.Contains(t, output.String(), "CHART 'module_job.workers_busy'")
+						assert.Contains(t, output.String(), "SET 'busy' = 7")
+					})
+				}
 			},
 		},
 		"collect error aborts cycle and emits nothing": {
@@ -520,7 +691,7 @@ END`, chartengine.Priority))
 
 				var out bytes.Buffer
 				job := newTestJobV2(mod, &out)
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				job.runOnce()
 
 				assert.Equal(t, "", out.String())
@@ -546,15 +717,15 @@ END`, chartengine.Priority))
 
 				var out bytes.Buffer
 				job := newTestJobV2(mod, &out)
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
-				assert.True(t, job.Panicked())
+				assert.True(t, job.panicked.Load())
 				assert.Equal(t, metrix.CollectStatusFailed, store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus)
 				out.Reset()
 
 				job.runOnce()
-				assert.False(t, job.Panicked())
+				assert.False(t, job.panicked.Load())
 				assert.Equal(t, metrix.CollectStatusSuccess, store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus)
 				assert.Contains(t, out.String(), "SET 'busy' = 11")
 			},
@@ -583,7 +754,7 @@ END`, chartengine.Priority))
 
 				var out bytes.Buffer
 				job := newTestJobV2(mod, &out)
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				job.runOnce()
 
 				wire := out.String()
@@ -632,7 +803,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					RuntimeService: runtimeSvc,
 				})
 
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				require.Len(t, runtimeSvc.registered, 1)
 				cfg := runtimeSvc.registered[0]
 				assert.Equal(t, job.runtimeComponentName, cfg.Name)
@@ -675,7 +846,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					RuntimeService: runtimeSvc,
 				})
 
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 			},
 		},
 		"runtime registration failure is non-fatal for autodetection": {
@@ -697,7 +868,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					RuntimeService: runtimeSvc,
 				})
 
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				assert.False(t, job.runtimeComponentRegistered)
 				assert.Empty(t, runtimeSvc.registered)
 			},
@@ -721,7 +892,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					RuntimeService: runtimeSvc,
 				})
 
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				require.True(t, job.runtimeComponentRegistered)
 				componentName := job.runtimeComponentName
 
@@ -743,14 +914,14 @@ END`, chartengine.Priority, chartengine.Priority))
 
 				var out bytes.Buffer
 				job := newTestJobV2(mod, &out)
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				// Simulate partial protocol bytes already present in the cycle buffer.
 				_, err := job.buf.WriteString("BEGIN 'broken'\nSET 'x' = 1\n")
 				require.NoError(t, err)
 
 				job.runOnce()
-				assert.True(t, job.Panicked())
+				assert.True(t, job.panicked.Load())
 				assert.Equal(t, "", out.String())
 				assert.Zero(t, job.buf.Len())
 			},
@@ -793,7 +964,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					Revision:         1,
 					MetadataRevision: 1,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				runDone := make(chan struct{})
 				go func() {
@@ -815,7 +986,7 @@ END`, chartengine.Priority, chartengine.Priority))
 
 				job.runOnce()
 				assert.Equal(t, "old-guid", mod.vnode.GUID)
-				assert.Equal(t, "old-guid", job.Vnode().GUID)
+				assert.Equal(t, "old-guid", job.currentVnode().GUID)
 			},
 		},
 		"stop cancels in-flight collect context": {
@@ -833,11 +1004,11 @@ END`, chartengine.Priority, chartengine.Priority))
 				}
 
 				job := newTestJobV2(mod, &bytes.Buffer{})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				startDone := make(chan struct{})
 				go func() {
-					job.Start()
+					job.StartManaged(make(chan struct{}))
 					close(startDone)
 				}()
 
@@ -902,7 +1073,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					AutoDetectEvery: 1,
 				})
 
-				require.Error(t, job.AutoDetection(context.Background()))
+				require.Error(t, job.AutoDetectionManaged(context.Background()))
 				assert.False(t, job.RetryAutoDetection())
 			},
 		},
@@ -924,7 +1095,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					AutoDetectEvery: 1,
 				})
 
-				require.Error(t, job.AutoDetection(context.Background()))
+				require.Error(t, job.AutoDetectionManaged(context.Background()))
 				assert.True(t, job.RetryAutoDetection())
 			},
 		},
@@ -944,7 +1115,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					AutoDetectEvery: 1,
 				})
 
-				require.Error(t, job.AutoDetection(context.Background()))
+				require.Error(t, job.AutoDetectionManaged(context.Background()))
 				assert.False(t, job.RetryAutoDetection())
 			},
 		},
@@ -969,11 +1140,11 @@ END`, chartengine.Priority, chartengine.Priority))
 					FunctionOnly:    true,
 				})
 
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				done := make(chan struct{})
 				go func() {
-					job.Start()
+					job.StartManaged(make(chan struct{}))
 					close(done)
 				}()
 
@@ -992,7 +1163,7 @@ END`, chartengine.Priority, chartengine.Priority))
 				assert.Equal(t, 0, collectCalls)
 			},
 		},
-		"function-only autodetection check failure cleans up": {
+		"function-only autodetection check failure requires rejected cleanup": {
 			run: func(t *testing.T) {
 				cleanupCalls := 0
 				mod := &mockModuleV2{
@@ -1015,7 +1186,10 @@ END`, chartengine.Priority, chartengine.Priority))
 					FunctionOnly:    true,
 				})
 
-				require.Error(t, job.AutoDetection(context.Background()))
+				require.Error(t, job.AutoDetectionManaged(context.Background()))
+				assert.False(t, mod.cleaned)
+				assert.Zero(t, cleanupCalls)
+				job.CleanupRejected()
 				assert.True(t, mod.cleaned)
 				assert.Equal(t, 1, cleanupCalls)
 			},
@@ -1051,7 +1225,39 @@ func TestJobV2_CleanupCanBeCalledRepeatedly(t *testing.T) {
 	assert.True(t, mod.cleaned)
 }
 
-func TestJobV2_StartMarksNotRunningBeforeCleanup(t *testing.T) {
+func TestJobV2CleanupUsesDedicatedOutput(t *testing.T) {
+	store := metrix.NewCollectorStore()
+	module := &mockModuleV2{
+		store:    store,
+		template: chartTemplateV2(),
+		collectFunc: func(context.Context) error {
+			store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(1)
+			return nil
+		},
+	}
+	var liveOutput bytes.Buffer
+	var cleanupOutput bytes.Buffer
+	job := NewJobV2(JobV2Config{
+		PluginName: pluginName,
+		Name:       jobName,
+		ModuleName: modName,
+		FullName:   modName + "_" + jobName,
+		Module:     module,
+		Out:        &liveOutput,
+		CleanupOut: &cleanupOutput,
+	})
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
+
+	job.runOnce()
+	require.Contains(t, liveOutput.String(), "CHART")
+	liveOutput.Reset()
+
+	job.Cleanup()
+	require.Empty(t, liveOutput.Bytes())
+	require.Contains(t, cleanupOutput.String(), "obsolete")
+}
+
+func TestJobV2_CleanupObservesStoppedRuntime(t *testing.T) {
 	cleanupStarted := make(chan struct{})
 	cleanupRelease := make(chan struct{})
 	cleanupEntered := make(chan struct{}, 1)
@@ -1071,11 +1277,11 @@ func TestJobV2_StartMarksNotRunningBeforeCleanup(t *testing.T) {
 
 	var out bytes.Buffer
 	job := newTestJobV2(mod, &out)
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	startDone := make(chan struct{})
 	go func() {
-		job.Start()
+		job.StartManaged(make(chan struct{}))
 		close(startDone)
 	}()
 
@@ -1088,16 +1294,6 @@ func TestJobV2_StartMarksNotRunningBeforeCleanup(t *testing.T) {
 	}()
 
 	select {
-	case <-cleanupStarted:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for cleanup to start")
-	}
-
-	assert.False(t, job.IsRunning(), "job must report not running while cleanup is in progress")
-
-	close(cleanupRelease)
-
-	select {
 	case <-stopDone:
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for stop to finish")
@@ -1107,6 +1303,27 @@ func TestJobV2_StartMarksNotRunningBeforeCleanup(t *testing.T) {
 	case <-startDone:
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for start loop to exit")
+	}
+	assert.False(t, job.IsRunning(), "job must report not running after runtime join")
+
+	cleanupDone := make(chan struct{})
+	go func() {
+		job.Cleanup()
+		close(cleanupDone)
+	}()
+
+	select {
+	case <-cleanupStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for cleanup to start")
+	}
+	assert.False(t, job.IsRunning(), "job must remain not running while cleanup is in progress")
+
+	close(cleanupRelease)
+	select {
+	case <-cleanupDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for cleanup to finish")
 	}
 
 	select {
@@ -1143,7 +1360,7 @@ func TestJobV2VnodeEmissionLifecycle(t *testing.T) {
 		Revision:         1,
 		MetadataRevision: 1,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.runOnce()
 	wire := out.String()
@@ -1222,7 +1439,7 @@ func TestJobV2_PullVnodeUpdateDuringCollectAppliesOnNextCycle(t *testing.T) {
 		VnodeMetadataRevision: 1,
 		VnodeLookup:           current.lookup,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	done := make(chan struct{})
 	go func() {
@@ -1278,7 +1495,7 @@ func TestJobV2_PullSourceOnlyUpdateDoesNotRedefineHost(t *testing.T) {
 		VnodeMetadataRevision: 1,
 		VnodeLookup:           current.lookup,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 	job.runOnce()
 
 	out.Reset()
@@ -1380,7 +1597,7 @@ BEGIN 'module_job.workers_busy'`,
 
 			var out bytes.Buffer
 			job := newTestJobV2WithVnode(mod, &out, *modVnode.Copy())
-			require.NoError(t, job.AutoDetection(context.Background()))
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 			initialInfo, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{
 				GUID:     "node-guid",
@@ -1420,7 +1637,40 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 	cases := map[string]struct {
 		run func(t *testing.T)
 	}{
-		"shared registry suppresses duplicate and updates changed metadata": {
+		"concurrent first owners remain self defining when earlier preparation fails": {
+			run: func(t *testing.T) {
+				registry := vnoderegistry.New()
+				jobAOut := &bytes.Buffer{}
+				jobBOut := &bytes.Buffer{}
+				vnode := vnodes.VirtualNode{
+					Hostname: "node-host",
+					GUID:     "node-guid",
+					Labels:   map[string]string{"region": "eu"},
+				}
+				jobA := newRegistryTestJobV2(t, "module_job_a", registry, jobAOut, vnode)
+				jobB := newRegistryTestJobV2(t, "module_job_b", registry, jobBOut, vnode)
+
+				preparedA, ok := jobA.collectAndEmit(0)
+				require.True(t, ok)
+				preparedB, ok := jobB.collectAndEmit(0)
+				require.True(t, ok)
+
+				require.NoError(t, jobB.finishPreparedEmission(preparedB))
+				assert.Contains(t, jobBOut.String(), `HOST_DEFINE 'node-guid' 'node-host'`)
+
+				writeErr := errors.New("write failed")
+				jobA.out = writeFunc(func([]byte) (int, error) { return 0, writeErr })
+				require.ErrorIs(t, jobA.finishPreparedEmission(preparedA), writeErr)
+				assert.Equal(t, []vnoderegistry.Owner{
+					vnoderegistry.Owner("module_job_b\xffjob\xffnode-guid"),
+				}, registry.Owners("node-guid"))
+
+				jobBOut.Reset()
+				jobB.runOnce()
+				assert.NotContains(t, jobBOut.String(), `HOST_DEFINE 'node-guid'`)
+			},
+		},
+		"per-owner definitions remain local while registry tracks conflicts": {
 			run: func(t *testing.T) {
 				registry := vnoderegistry.New()
 				jobAOut := &bytes.Buffer{}
@@ -1449,16 +1699,9 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				assert.Contains(t, jobBOut.String(), `HOST_DEFINE 'node-guid' 'node-host-b'`)
 				assert.Contains(t, jobBOut.String(), `HOST 'node-guid'`)
 
-				info, ok := registry.Lookup("node-guid")
-				require.True(t, ok)
-				assert.Equal(t, "node-host-b", info.Hostname)
-
 				jobAOut.Reset()
 				jobA.runOnce()
-				assert.Contains(t, jobAOut.String(), `HOST_DEFINE 'node-guid' 'node-host-a'`)
-				info, ok = registry.Lookup("node-guid")
-				require.True(t, ok)
-				assert.Equal(t, "node-host-a", info.Hostname)
+				assert.NotContains(t, jobAOut.String(), `HOST_DEFINE 'node-guid'`)
 
 				assert.Equal(t, []vnoderegistry.Owner{
 					vnoderegistry.Owner("module_job_a\xffjob\xffnode-guid"),
@@ -1471,7 +1714,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				assert.Equal(t, 0, registry.Len())
 			},
 		},
-		"rollback on apply failure": {
+		"apply failure does not record owner": {
 			run: func(t *testing.T) {
 				registry := vnoderegistry.New()
 				_, err := registry.Register("other", netdataapi.HostInfo{
@@ -1505,18 +1748,15 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 						GUID:     "node-guid",
 					},
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 
 				assert.Empty(t, out.String())
-				info, ok := registry.Lookup("node-guid")
-				require.True(t, ok)
-				assert.Equal(t, "node-host-a", info.Hostname)
 				assert.Equal(t, []vnoderegistry.Owner{vnoderegistry.Owner("other")}, registry.Owners("node-guid"))
 			},
 		},
-		"rollback on commit failure emits nothing and next cycle recovers": {
+		"post-write commit failure reports error and next cycle retries": {
 			run: func(t *testing.T) {
 				registry := vnoderegistry.New()
 				store := metrix.NewCollectorStore()
@@ -1545,19 +1785,20 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 						GUID:     "node-guid",
 					},
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				prepared, ok := job.collectAndEmit(0)
 				require.True(t, ok)
 				require.Len(t, prepared.scopes, 1)
 				require.NotEmpty(t, prepared.scopes[0].output)
-				assert.NotEmpty(t, registry.Owners("node-guid"))
+				assert.Empty(t, registry.Owners("node-guid"))
 
 				requireDefaultScopeState(t, job).engine.ResetMaterialized()
 				require.ErrorIs(t, job.finishPreparedEmission(prepared), chartengine.ErrStalePlanAttempt)
-				assert.Empty(t, out.String())
+				assert.Contains(t, out.String(), "SET 'busy' = 1")
 				assert.Empty(t, registry.Owners("node-guid"))
 
+				out.Reset()
 				current = 2
 				job.runOnce()
 				assert.Contains(t, out.String(), `HOST_DEFINE 'node-guid' 'node-host'`)
@@ -1601,7 +1842,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 					Revision:         1,
 					MetadataRevision: 1,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 				assert.Equal(t, []vnoderegistry.Owner{vnoderegistry.Owner("module_job\xffjob\xffnode-guid-a")}, registry.Owners("node-guid-a"))
@@ -1655,7 +1896,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 					Revision:         1,
 					MetadataRevision: 1,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 				require.Equal(t, []vnoderegistry.Owner{vnoderegistry.Owner("module_job\xffjob\xffnode-guid")}, registry.Owners("node-guid"))
@@ -1687,7 +1928,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				require.Equal(t, []vnoderegistry.Owner{vnoderegistry.Owner("module_job\xffjob\xffnode-guid")}, registry.Owners("node-guid"))
 
 				ownerPresentDuringWrite := false
-				job.out = writeFunc(func(p []byte) (int, error) {
+				job.cleanupOut = writeFunc(func(p []byte) (int, error) {
 					ownerPresentDuringWrite = assert.Contains(t, registry.Owners("node-guid"), vnoderegistry.Owner("module_job\xffjob\xffnode-guid"))
 					return len(p), nil
 				})
@@ -1749,7 +1990,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 						GUID:     "node-guid",
 					},
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 
@@ -1788,7 +2029,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 						GUID:     "node-guid",
 					},
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 				assert.Equal(t, "", out.String())
@@ -1820,7 +2061,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 					Hostname: "node-host",
 					GUID:     "node-guid",
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 				assert.Equal(t, "", out.String())
@@ -1873,7 +2114,7 @@ func TestJobV2HostScopeScenarios(t *testing.T) {
 					UpdateEvery:   1,
 					VnodeRegistry: registry,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 
@@ -1921,7 +2162,7 @@ CHART 'module_job.workers_busy'`)
 					UpdateEvery:   1,
 					VnodeRegistry: registry,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 
@@ -1962,7 +2203,7 @@ CHART 'module_job.workers_busy'`)
 					UpdateEvery:   1,
 					VnodeRegistry: registry,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 				require.Contains(t, out.String(), `HOST_DEFINE 'guid-a' 'host-a'`)
@@ -2007,7 +2248,7 @@ CHART 'module_job.workers_busy'`)
 					UpdateEvery:   1,
 					VnodeRegistry: registry,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 				assert.Empty(t, out.String())
@@ -2042,7 +2283,7 @@ CHART 'module_job.workers_busy'`)
 
 				var out bytes.Buffer
 				job := newTestJobV2(mod, &out)
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
 				require.NotNil(t, job.scopeStates[defaultHostScopeKey])
@@ -2059,7 +2300,7 @@ CHART 'module_job.workers_busy'`)
 				assert.NotNil(t, job.scopeStates["scope-a"])
 			},
 		},
-		"per-scope commit failure does not block peer scope": {
+		"post-write per-scope commit failure does not block peer scope": {
 			run: func(t *testing.T) {
 				store := metrix.NewCollectorStore()
 				mod := &mockModuleV2{
@@ -2085,7 +2326,7 @@ CHART 'module_job.workers_busy'`)
 					UpdateEvery:   1,
 					VnodeRegistry: registry,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				prepared, ok := job.collectAndEmit(0)
 				require.True(t, ok)
@@ -2101,7 +2342,8 @@ CHART 'module_job.workers_busy'`)
 				wire := out.String()
 				assert.Contains(t, wire, `HOST ''`)
 				assert.Contains(t, wire, "SET 'busy' = 1")
-				assert.NotContains(t, wire, "guid-a")
+				assert.Contains(t, wire, "guid-a")
+				assert.Contains(t, wire, "SET 'busy' = 7")
 				assert.Empty(t, registry.Owners("guid-a"))
 				assert.NotNil(t, job.scopeStates[defaultHostScopeKey])
 			},
@@ -2112,7 +2354,7 @@ CHART 'module_job.workers_busy'`)
 				mod := &mockModuleV2{store: store, template: chartTemplateV2()}
 				var out bytes.Buffer
 				job := newTestJobV2(mod, &out)
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				okMeta := chartengine.ChartMeta{
 					Title:    "OK",
@@ -2179,7 +2421,7 @@ CHART 'module_job.workers_busy'`)
 					UpdateEvery:   1,
 					VnodeRegistry: registry,
 				})
-				require.NoError(t, job.AutoDetection(context.Background()))
+				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				job.api = netdataapi.New(writeFunc(func(p []byte) (int, error) {
 					if bytes.Contains(p, []byte("HOST_DEFINE 'guid-a'")) {
 						panic("boom")
@@ -2189,7 +2431,7 @@ CHART 'module_job.workers_busy'`)
 
 				job.runOnce()
 
-				assert.True(t, job.Panicked())
+				assert.True(t, job.panicked.Load())
 				assert.Empty(t, out.String())
 				assert.Empty(t, registry.Owners(scopeA.GUID))
 				value, ok := job.runtimeStore.Read(metrix.ReadRaw()).Value("netdata.go.plugin.framework.chartengine.build_success_total", nil)
@@ -2201,7 +2443,7 @@ CHART 'module_job.workers_busy'`)
 				out.Reset()
 				job.runOnce()
 
-				assert.False(t, job.Panicked())
+				assert.False(t, job.panicked.Load())
 				assert.Contains(t, out.String(), `HOST_DEFINE 'guid-a' 'host-a'`)
 				assert.NotEmpty(t, registry.Owners(scopeA.GUID))
 			},
@@ -2251,7 +2493,7 @@ func TestJobV2CleanupUsesLastSuccessfulHostAfterFailedHostSwitch(t *testing.T) {
 		Revision:         1,
 		MetadataRevision: 1,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.runOnce()
 	out.Reset()
@@ -2305,7 +2547,7 @@ func TestJobV2CleanupUsesLastSuccessfulVnodeForStaleSuppressionAfterFailedHostSw
 		Revision:         1,
 		MetadataRevision: 1,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.runOnce()
 	out.Reset()
@@ -2351,7 +2593,7 @@ func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
 		Revision:         1,
 		MetadataRevision: 1,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 	require.Equal(t, 1, mod.templateCalls)
 
 	job.runOnce()
@@ -2402,7 +2644,7 @@ func TestJobV2CleanupDoesNotSuppressGlobalCleanupForDifferentStaleVnode(t *testi
 		Revision:         1,
 		MetadataRevision: 1,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.runOnce()
 	out.Reset()
@@ -2456,7 +2698,7 @@ func TestJobV2CleanupUsesPreModuleCleanupSnapshotForStaleSuppression(t *testing.
 
 	var out bytes.Buffer
 	job := newTestJobV2WithVnode(mod, &out, *modVnode.Copy())
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.runOnce()
 	out.Reset()
@@ -2485,7 +2727,7 @@ func TestJobV2CleanupDoesNotSuppressExplicitScopeForStaleJobVnode(t *testing.T) 
 			"_node_stale_after_seconds": "60",
 		},
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.scopeStates = map[string]*jobV2ScopeState{
 		"scope-a": {
@@ -2525,7 +2767,7 @@ func TestJobV2CleanupNoSuccessfulEmissionsIsNoOp(t *testing.T) {
 
 	var out bytes.Buffer
 	job := newTestJobV2(mod, &out)
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.Cleanup()
 

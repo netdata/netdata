@@ -50,7 +50,7 @@ The country map and state map can use the rollup tiers. They're cheap over long 
 The city map and the globe **need raw-tier data**. City, latitude, and longitude are dropped from the rollup tiers (1m / 5m / 1h) to keep cardinality manageable. So:
 
 - Country / state map over the last 30 days — fine, uses the 1-hour tier.
-- City map over the last 30 days — likely empty on busy collectors. Raw-tier retention defaults to its own 10GB size cap with no time-based age limit, so high flow volume can exhaust raw history quickly.
+- City map over the last 30 days — likely empty on busy collectors. Raw-tier retention defaults to its own 10GB retained-artifact budget with no time-based age limit, so high flow volume can exhaust raw history quickly.
 
 If your city map looks empty over a long window, try the country map first to confirm data is arriving, then narrow the time range until the city map fills in.
 
@@ -74,7 +74,7 @@ Globe view, top-N at 500, rotated over the Atlantic. The 3D projection shows US 
 
 ### GeoIP is required
 
-Without a GeoIP database, country / state / city / coordinate fields are empty and the maps are blank. Native packages include a stock DB-IP database — see the [DB-IP integration card](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md) and the [Enrichment Intel Downloader](/docs/npm/network-flows/intel-downloader.md). Source builds need the operator to run the downloader once.
+Without a GeoIP database, country / state / city / coordinate fields are empty and the maps are blank. Native packages and static builds that include the NetFlow plugin (x86_64, ARMv7, and AArch64) include a stock DB-IP database — see the [DB-IP integration card](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md) and the [Enrichment Intel Downloader](/docs/npm/network-flows/intel-downloader.md). Source builds need the operator to run the downloader once.
 
 ### CDN traffic shifts
 

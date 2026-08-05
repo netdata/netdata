@@ -206,6 +206,97 @@ representative examples -- not necessarily every tunable.
 Collectors MUST NOT hardcode timeouts, paths, ports, or credentials. Stock
 config and schema MUST NOT contradict each other.
 
+`config_schema.json` is a **form contract**, not a validation layer. Nothing in
+the agent validates a job config against it; runtime enforcement is the
+collector's own `validate()`. Write it for the operator filling the form:
+
+- An **optional** array MUST NOT declare `minItems`. The dyncfg form
+  materializes such an array even when the operator never opened that section,
+  fills its required leaves with nulls, and then refuses to delete the item it
+  created — producing a job that can never be saved. `minItems` belongs only on
+  an array the parent `required` list demands, or one carrying a `default`.
+  This rule is enforced for every collector by
+  `src/go/plugin/go.d/collector/config_schema_test.go`
+  (`TestConfigSchemasDoNotMaterializeOptionalArrays`). Express "non-empty when
+  present" in `validate()` instead.
+- A key revealed by a `dependencies` branch MUST NOT also be declared as a
+  plain sibling property. The branch exists so the form shows that key only for
+  the selected discriminator value; declaring it twice makes the form show it
+  for every value, and leaves the runtime deciding what a field from an
+  unselected branch means. Enforced for every collector by
+  `src/go/plugin/go.d/collector/config_schema_test.go`
+  (`TestConfigSchemasDoNotDeclareBranchKeysAsProperties`).
+- Type an optional array or object to match the Go field, which is nil-able:
+  `["array", "null"]` / `["object", "null"]`. A YAML key written with no value
+  decodes to nil, which the runtime reads as "absent" and accepts, so a bare
+  `"array"` makes the schema reject a config that works. Keep the scalar type on
+  required lists and on item schemas, where a null really is invalid. This union
+  is the majority convention in the tree.
+- A schema rule stricter than the runtime blocks legitimate configs in the UI; a
+  looser one lets the UI offer a config the collector rejects on `add`. Keep
+  both layers deliberate — but note a deliberate asymmetry is fine where only one
+  layer can act on it: `minimum: 1` on an option whose code treats `0` as "use the
+  default" is correct, because the form should not offer `0` while a file may
+  legitimately contain it.
+
+Do NOT write tests that describe what a schema file contains — its `required`
+list, its defaults, its `ui:help` prose, its placeholders. The schema is
+hand-authored data, so such a test restates the file it reads: when the schema is
+wrong the test pins the mistake as correct and fixing it means editing the test.
+Only two kinds of schema assertion carry weight:
+
+- **Rules** — a forbidden pattern that fails on a wrong schema, such as the
+  repo-wide `minItems` check, or a per-collector check that a field whose
+  omission drives runtime precedence carries no `default` (see
+  `cloudwatch/config_test.go`, `TestConfigSchema_FormContract`).
+- **Drift checks** — an expected value taken from an independent source, such as
+  a UI bound asserted equal to the Go constant that enforces it. Copying the
+  value out of the schema turns this back into a restatement.
+
+Everything else about config behavior belongs in tests of `validate()`, which is
+the layer that actually runs. Feed every config test the collector's own `Config`
+type — mutate a valid base config per case:
+
+- Do NOT hand-build `map[string]any` payloads. That is a transport detail outside
+  the collector, and round-tripping one through `yaml.Marshal` fabricates a
+  pipeline production never runs.
+- Do NOT drive config tests from YAML source text. It only restates the struct
+  tags, so it breaks whenever `Config` changes while testing `yaml.v3` rather than
+  collector code. "Unknown keys are ignored" and "a mapping fails where a sequence
+  is expected" are decoder behavior, and a guard against a spelling that never
+  shipped protects nothing.
+- Wire-form coverage already has one canonical home: `testdata/config.json` and
+  `testdata/config.yaml`, driven by `collecttest.TestConfigurationSerialize` from
+  `TestCollector_ConfigurationSerialize`. Put a representative value in those
+  fixtures — including any explicit zero whose round-trip carries meaning, such as
+  a `0s` duration that must not be read as "inherit" — instead of writing a
+  collector-local decode test.
+- Where the shape of a `Config` field encodes a contract, test the accessor that
+  reads it rather than the decoding that filled it. `cloudwatch/config_test.go`,
+  `TestRuleConfig_effectiveResourceTagFilters` covers the pointer-to-slice
+  nil-versus-empty rule that way.
+- Before adding a case, check whether the rule already has coverage nearer its
+  owner: a helper package validates its own types (`internal/awsauth`), and
+  compile-stage reference rules belong with the compile tests, not the config
+  tests.
+
+Put **every** default in the constructor. `New()` MUST set a value for each option
+that has one, so it returns a usable collector — callers and tests rely on that,
+and a constructor that yields an unusable object is a footgun. Then:
+
+- A config normalizer (`applyDefaults`, run from `Init`) handles only what the
+  constructor cannot see: an explicit sentinel such as a `0` the operator typed,
+  or a nil pointer on a config not built through `New()`.
+- Do NOT add a third, read-time fallback (`if v <= 0 { v = default }` at the point
+  of use, or an accessor that re-applies the default). It can never fire once the
+  constructor and normalizer have run, so it is dead code that still has to be
+  read, and it hides which layer owns the value. Read the field directly.
+- A nil check on a pointer field is different — that is memory safety, not
+  defaulting, and it stays.
+- Before "simplifying" defaults, check what the constructor guarantees its callers.
+  Apply the change and count the test failures before recommending it; production
+  reachability alone will understate the blast radius.
+
 Credentials use the `${env:}/${file:}/${cmd:}/${store:}` indirection — see `src/collectors/SECRETS.md`. Privileged operations route through `src/collectors/utils/ndsudo.c`.
 
 ### 2.7 Generated artifacts are not source
@@ -290,18 +381,30 @@ Aggregation temporality drives the chart algorithm: Gauge → absolute, Sum delt
 
 The plugin does **not** recognize OTel semantic conventions specifically (`host.name`, `service.name`, `deployment.environment`) — they pass through as labels. Cardinality control is `metrics.max_new_charts_per_request` in `otel.yaml`. Stock examples: `src/crates/otel-ingestor/configs/otel.d/v1/metrics/`.
 
-### 3.5 Prometheus — deterministic; shape upstream to shape dashboard
+### 3.5 Prometheus — deterministic mapping; shape with relabeling and profiles
 
-The generic Prometheus scraper (`src/go/plugin/go.d/collector/prometheus/`) auto-maps from the exposition format with no per-metric synthetic shaping:
+The generic Prometheus scraper (`src/go/plugin/go.d/collector/prometheus/`) auto-maps from the exposition format:
 
 - metric name → chart ID + dimension ID
-- Prometheus labels → Netdata chart labels (with optional `label_prefix`)
+- Prometheus labels → Netdata chart labels
 - type (`counter`, `gauge`, `histogram`, `summary`) → chart type and dimension algorithm
 - histograms and summaries explode into 3 charts each (buckets/quantiles, `_sum`, `_count`)
 - recognized suffixes: `_total` (counter), `_bucket` + `le` label (histogram), `_sum`, `_count`, `quantile` label (summary), `_info` (skipped)
 - unit suffixes drive the units string: `_seconds`, `_bytes`, `_hertz`
 
-Operator controls are **scoping, not shaping**: time-series **selectors** (allow/deny on metric name and label values, `src/go/plugin/go.d/collector/prometheus/README.md:110-127`) and `fallback_type` glob patterns for untyped metrics. There is **no** equivalent of statsd `synthetic_charts` — you cannot group disparate Prometheus metrics into a composite chart Netdata-side. To shape the dashboard, shape the upstream exporter: rename metrics, add labels, fix types upstream.
+Operator controls (profiles documented in `src/go/plugin/go.d/collector/prometheus/profile-format.md`, relabeling in
+`src/go/plugin/go.d/collector/prometheus/relabel/README.md`):
+
+- **Scoping**: the time-series `selector` job option (allow/deny on metric name and label values, syntax in `src/go/pkg/prometheus/selector/README.md`) and `fallback_type` glob patterns for untyped metrics.
+- **Shaping**: the job-level `relabeling` option (Prometheus-compatible `metric_relabel_configs`; it replaced
+  the removed `label_prefix`) renames metrics and rewrites labels before charts are built. **Chart profiles**
+  (`match`/`app`/`autogen.selector`/`template` YAMLs, stock under
+  `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`, user under
+  `/etc/netdata/go.d/prometheus.profiles/`) ship curated per-exporter dashboards — the Prometheus analog of
+  statsd `synthetic_charts`. Metrics not covered by an authored profile chart keep their autogen charts unless an
+  applicable profile selector rejects them. Each selector is limited to its profile's `match` scope; when scopes
+  overlap, every applicable selector must accept the series. This changes fallback charts only; use the job selector
+  or a relabeling `drop` action to discard samples.
 
 ### 3.6 Chart priorities
 
@@ -332,7 +435,9 @@ A collector is *production-quality* when it satisfies all of:
 8. For remote targets: is vnode wiring done?
 9. For SNMP: did I extend a profile rather than hardcode OIDs?
 10. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
-11. For Prometheus scraping: are selectors correct? Are untyped metrics handled?
+11. For Prometheus scraping: are selectors and relabeling rules correct? Are untyped metrics handled? Should the
+    exporter get a stock chart profile (`profile-format.md`), and should that profile suppress unmatched fallback
+    charts with a scoped `autogen.selector` while retaining their samples?
 12. For cross-plugin enrichment: am I using netipc?
 13. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
 14. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
@@ -576,6 +681,8 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | SNMP stock profiles | starting from a known device | `src/go/plugin/go.d/config/go.d/snmp.profiles/default/` |
 | statsd synthetic_charts | operator-curated dashboards | `src/collectors/statsd.plugin/README.md` (lines 397-639) |
 | Prometheus mapping | generic exposition scrape | `src/go/plugin/go.d/collector/prometheus/README.md` |
+| Prometheus profile format | curated exporter dashboards + autogen fallback selectors | `src/go/plugin/go.d/collector/prometheus/profile-format.md` |
+| Prometheus metric relabeling | rewriting scraped metric names/labels | `src/go/plugin/go.d/collector/prometheus/relabel/README.md` |
 | log2journal | parsing application logs into the journal | `src/collectors/log2journal/log2journal.d/` |
 | Auto-discovery rules | adding service-detection rules | `src/go/plugin/go.d/config/go.d/sd/{net_listeners,docker,snmp,http}.conf` |
 | Topology library | topology producers in Go | `src/go/pkg/topology/v1` |

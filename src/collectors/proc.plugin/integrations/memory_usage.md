@@ -99,11 +99,13 @@ The following alerts are available:
 | [ 1hour_memory_hw_corrupted ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.hwcorrupt | amount of memory corrupted due to a hardware failure |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -115,22 +117,22 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ram | free, used, cached, buffers | MiB |
-| mem.available | avail | MiB |
-| mem.swap | free, used | MiB |
-| mem.swap_cached | cached | MiB |
-| mem.zswap | in-ram, on-disk | MiB |
-| mem.hwcorrupt | HardwareCorrupted | MiB |
-| mem.commited | Commited_AS | MiB |
-| mem.writeback | Dirty, Writeback, FuseWriteback, NfsWriteback, Bounce | MiB |
-| mem.kernel | Slab, KernelStack, PageTables, VmallocUsed, Percpu | MiB |
-| mem.slab | reclaimable, unreclaimable | MiB |
-| mem.hugepages | free, used, surplus, reserved | MiB |
-| mem.thp | anonymous, shmem | MiB |
-| mem.thp_details | ShmemPmdMapped, FileHugePages, FilePmdMapped | MiB |
-| mem.reclaiming | Active, Inactive, Active(anon), Inactive(anon), Active(file), Inactive(file), Unevictable, Mlocked | MiB |
-| mem.high_low | high_used, low_used, high_free, low_free | MiB |
-| mem.cma | used, free | MiB |
-| mem.directmaps | 4k, 2m, 4m, 1g | MiB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.ram | System RAM | free, used, cached, buffers | MiB |
+| mem.available | Available RAM for applications | avail | MiB |
+| mem.swap | System Swap | free, used | MiB |
+| mem.swap_cached | Swap Memory Cached in RAM | cached | MiB |
+| mem.zswap | Zswap Usage | in-ram, on-disk | MiB |
+| mem.hwcorrupt | Corrupted Memory detected by ECC | HardwareCorrupted | MiB |
+| mem.commited | Committed (Allocated) Memory | Commited_AS | MiB |
+| mem.writeback | Writeback Memory | Dirty, Writeback, FuseWriteback, NfsWriteback, Bounce | MiB |
+| mem.kernel | Memory Used by Kernel | Slab, KernelStack, PageTables, VmallocUsed, Percpu | MiB |
+| mem.slab | Reclaimable Kernel Memory | reclaimable, unreclaimable | MiB |
+| mem.hugepages | Dedicated HugePages Memory | free, used, surplus, reserved | MiB |
+| mem.thp | Transparent HugePages Memory | anonymous, shmem | MiB |
+| mem.thp_details | Details of Transparent HugePages Usage | ShmemPmdMapped, FileHugePages, FilePmdMapped | MiB |
+| mem.reclaiming | Memory Reclaiming | Active, Inactive, Active(anon), Inactive(anon), Active(file), Inactive(file), Unevictable, Mlocked | MiB |
+| mem.high_low | High and Low Used and Free Memory Areas | high_used, low_used, high_free, low_free | MiB |
+| mem.cma | Contiguous Memory Allocator (CMA) Memory | used, free | MiB |
+| mem.directmaps | Direct Memory Mappings | 4k, 2m, 4m, 1g | MiB |

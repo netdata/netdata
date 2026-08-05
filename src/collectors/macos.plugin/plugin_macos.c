@@ -39,6 +39,7 @@ static void macos_main_cleanup(void *pptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     macos_gpu_cleanup();
+    macos_iokit_cleanup();
     macos_sensors_cleanup();
     macos_powermetrics_cleanup();
     macos_nvme_smart_cleanup();

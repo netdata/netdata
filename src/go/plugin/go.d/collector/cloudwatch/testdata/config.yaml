@@ -32,8 +32,12 @@ rules:
       - profile: ec2
         defaults: false
         statistics: [Average]
+        query:
+          period: 10m
         include:
           - name: CPUUtilization
+            query:
+              publication_delay: 0s
       - profile: rds
         defaults: false
         statistics: [Average]

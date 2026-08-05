@@ -148,11 +148,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -168,13 +170,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ethtool.optical_module_receiver_signal_power | rx_power | dBm |
-| ethtool.optical_module_laser_output_power | tx_power | dBm |
-| ethtool.optical_module_laser_bias_current | bias_current | mA |
-| ethtool.optical_module_temperature | temperature | Celsius |
-| ethtool.optical_module_voltage | voltage | Volts |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ethtool.optical_module_receiver_signal_power | Module Receiver Signal Average Optical Power | rx_power | dBm |
+| ethtool.optical_module_laser_output_power | Module Laser Output Power | tx_power | dBm |
+| ethtool.optical_module_laser_bias_current | Module Laser Bias Current | bias_current | mA |
+| ethtool.optical_module_temperature | Module Temperature | temperature | Celsius |
+| ethtool.optical_module_voltage | Module Voltage | voltage | Volts |
 
 
 

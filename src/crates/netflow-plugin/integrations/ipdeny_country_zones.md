@@ -36,7 +36,7 @@ coverage is required.
 
 For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
 provider chains), see
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 The netflow plugin reads MMDB files only. Use Netdata's

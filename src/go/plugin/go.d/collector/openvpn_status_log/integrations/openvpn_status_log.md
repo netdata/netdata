@@ -150,11 +150,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -166,10 +168,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| openvpn.active_clients | clients | clients |
-| openvpn.total_traffic | in, out | kilobits/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| openvpn.active_clients | Total Number Of Active Clients | clients | clients |
+| openvpn.total_traffic | Total Traffic | in, out | kilobits/s |
+
 
 ### Per user
 
@@ -183,10 +186,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| openvpn.user_traffic | in, out | kilobits/s |
-| openvpn.user_connection_time | time | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| openvpn.user_traffic | User Traffic | in, out | kilobits/s |
+| openvpn.user_connection_time | User Connection Time | time | seconds |
 
 
 

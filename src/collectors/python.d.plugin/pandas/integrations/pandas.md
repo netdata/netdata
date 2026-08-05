@@ -326,6 +326,7 @@ sql:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -335,6 +336,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 This collector is expecting one row in the final pandas DataFrame. It is that first row that will be taken
 as the most recent values for each dimension on each chart using (`df.to_dict(orient='records')[0]`).
 See [pd.to_dict()](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_dict.html)."
+
 
 
 ### Per Pandas instance

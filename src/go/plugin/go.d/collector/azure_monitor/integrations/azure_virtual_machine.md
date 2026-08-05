@@ -659,11 +659,13 @@ The following alerts are available:
 | [ am_vm_uncached_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf) | azure_monitor.virtual_machines.vm_uncached_burst_credits | VM uncached burst IO credits on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -685,44 +687,44 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.virtual_machines.cpu | average | percentage |
-| azure_monitor.virtual_machines.cpu_credits | consumed, remaining | credits |
-| azure_monitor.virtual_machines.memory | available | bytes |
-| azure_monitor.virtual_machines.memory_percentage | available | percentage |
-| azure_monitor.virtual_machines.availability | average | state |
-| azure_monitor.virtual_machines.network_traffic | in, out | bytes/s |
-| azure_monitor.virtual_machines.network_flows | in, out | flows |
-| azure_monitor.virtual_machines.network_flow_creation_rate | in, out | flows/s |
-| azure_monitor.virtual_machines.disk_throughput | read, write | bytes/s |
-| azure_monitor.virtual_machines.disk_iops | read, write | operations/s |
-| azure_monitor.virtual_machines.os_disk_throughput | read, write | bytes/s |
-| azure_monitor.virtual_machines.os_disk_iops | read, write | operations/s |
-| azure_monitor.virtual_machines.os_disk_latency | average | milliseconds |
-| azure_monitor.virtual_machines.os_disk_queue_depth | average | operations |
-| azure_monitor.virtual_machines.os_disk_throttling | bandwidth, iops | percentage |
-| azure_monitor.virtual_machines.os_disk_burst_capacity | max_burst, target | bytes/s |
-| azure_monitor.virtual_machines.os_disk_burst_iops_capacity | max_burst, target | iops |
-| azure_monitor.virtual_machines.os_disk_burst_credits | bandwidth, io | percentage |
-| azure_monitor.virtual_machines.data_disk_throughput | read, write | bytes/s |
-| azure_monitor.virtual_machines.data_disk_iops | read, write | operations/s |
-| azure_monitor.virtual_machines.data_disk_latency | average | milliseconds |
-| azure_monitor.virtual_machines.data_disk_queue_depth | average | operations |
-| azure_monitor.virtual_machines.data_disk_throttling | bandwidth, iops | percentage |
-| azure_monitor.virtual_machines.data_disk_burst_capacity | max_burst, target | bytes/s |
-| azure_monitor.virtual_machines.data_disk_burst_iops_capacity | max_burst, target | iops |
-| azure_monitor.virtual_machines.data_disk_burst_credits | bandwidth, io | percentage |
-| azure_monitor.virtual_machines.temp_disk_throughput | read, write | bytes/s |
-| azure_monitor.virtual_machines.temp_disk_iops | read, write | operations/s |
-| azure_monitor.virtual_machines.temp_disk_latency | average | milliseconds |
-| azure_monitor.virtual_machines.temp_disk_queue_depth | average | operations |
-| azure_monitor.virtual_machines.premium_data_disk_cache | hit, miss | percentage |
-| azure_monitor.virtual_machines.premium_os_disk_cache | hit, miss | percentage |
-| azure_monitor.virtual_machines.vm_cached_throttling | bandwidth, iops | percentage |
-| azure_monitor.virtual_machines.vm_uncached_throttling | bandwidth, iops | percentage |
-| azure_monitor.virtual_machines.vm_cached_burst_credits | bandwidth, io | percentage |
-| azure_monitor.virtual_machines.vm_uncached_burst_credits | bandwidth, io | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.virtual_machines.cpu | Azure Virtual Machine CPU Utilization | average | percentage |
+| azure_monitor.virtual_machines.cpu_credits | Azure Virtual Machine CPU Credits | consumed, remaining | credits |
+| azure_monitor.virtual_machines.memory | Azure Virtual Machine Available Memory | available | bytes |
+| azure_monitor.virtual_machines.memory_percentage | Azure Virtual Machine Available Memory Percentage | available | percentage |
+| azure_monitor.virtual_machines.availability | Azure Virtual Machine Availability | average | state |
+| azure_monitor.virtual_machines.network_traffic | Azure Virtual Machine Network Traffic | in, out | bytes/s |
+| azure_monitor.virtual_machines.network_flows | Azure Virtual Machine Network Flows | in, out | flows |
+| azure_monitor.virtual_machines.network_flow_creation_rate | Azure Virtual Machine Network Flow Creation Rate | in, out | flows/s |
+| azure_monitor.virtual_machines.disk_throughput | Azure Virtual Machine Disk Throughput | read, write | bytes/s |
+| azure_monitor.virtual_machines.disk_iops | Azure Virtual Machine Disk IOPS | read, write | operations/s |
+| azure_monitor.virtual_machines.os_disk_throughput | Azure Virtual Machine OS Disk Throughput | read, write | bytes/s |
+| azure_monitor.virtual_machines.os_disk_iops | Azure Virtual Machine OS Disk IOPS | read, write | operations/s |
+| azure_monitor.virtual_machines.os_disk_latency | Azure Virtual Machine OS Disk Latency | average | milliseconds |
+| azure_monitor.virtual_machines.os_disk_queue_depth | Azure Virtual Machine OS Disk Queue Depth | average | operations |
+| azure_monitor.virtual_machines.os_disk_throttling | Azure Virtual Machine OS Disk Throttling | bandwidth, iops | percentage |
+| azure_monitor.virtual_machines.os_disk_burst_capacity | Azure Virtual Machine OS Disk Burst Capacity | max_burst, target | bytes/s |
+| azure_monitor.virtual_machines.os_disk_burst_iops_capacity | Azure Virtual Machine OS Disk Burst IOPS Capacity | max_burst, target | iops |
+| azure_monitor.virtual_machines.os_disk_burst_credits | Azure Virtual Machine OS Disk Burst Credits Used | bandwidth, io | percentage |
+| azure_monitor.virtual_machines.data_disk_throughput | Azure Virtual Machine Data Disk Throughput | read, write | bytes/s |
+| azure_monitor.virtual_machines.data_disk_iops | Azure Virtual Machine Data Disk IOPS | read, write | operations/s |
+| azure_monitor.virtual_machines.data_disk_latency | Azure Virtual Machine Data Disk Latency | average | milliseconds |
+| azure_monitor.virtual_machines.data_disk_queue_depth | Azure Virtual Machine Data Disk Queue Depth | average | operations |
+| azure_monitor.virtual_machines.data_disk_throttling | Azure Virtual Machine Data Disk Throttling | bandwidth, iops | percentage |
+| azure_monitor.virtual_machines.data_disk_burst_capacity | Azure Virtual Machine Data Disk Burst Capacity | max_burst, target | bytes/s |
+| azure_monitor.virtual_machines.data_disk_burst_iops_capacity | Azure Virtual Machine Data Disk Burst IOPS Capacity | max_burst, target | iops |
+| azure_monitor.virtual_machines.data_disk_burst_credits | Azure Virtual Machine Data Disk Burst Credits Used | bandwidth, io | percentage |
+| azure_monitor.virtual_machines.temp_disk_throughput | Azure Virtual Machine Temp Disk Throughput | read, write | bytes/s |
+| azure_monitor.virtual_machines.temp_disk_iops | Azure Virtual Machine Temp Disk IOPS | read, write | operations/s |
+| azure_monitor.virtual_machines.temp_disk_latency | Azure Virtual Machine Temp Disk Latency | average | milliseconds |
+| azure_monitor.virtual_machines.temp_disk_queue_depth | Azure Virtual Machine Temp Disk Queue Depth | average | operations |
+| azure_monitor.virtual_machines.premium_data_disk_cache | Azure Virtual Machine Premium Data Disk Cache | hit, miss | percentage |
+| azure_monitor.virtual_machines.premium_os_disk_cache | Azure Virtual Machine Premium OS Disk Cache | hit, miss | percentage |
+| azure_monitor.virtual_machines.vm_cached_throttling | Azure Virtual Machine Cached IO Throttling | bandwidth, iops | percentage |
+| azure_monitor.virtual_machines.vm_uncached_throttling | Azure Virtual Machine Uncached IO Throttling | bandwidth, iops | percentage |
+| azure_monitor.virtual_machines.vm_cached_burst_credits | Azure Virtual Machine Cached Burst Credits Used | bandwidth, io | percentage |
+| azure_monitor.virtual_machines.vm_uncached_burst_credits | Azure Virtual Machine Uncached Burst Credits Used | bandwidth, io | percentage |
 
 
 

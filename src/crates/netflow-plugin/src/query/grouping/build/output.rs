@@ -34,13 +34,14 @@ pub(crate) fn build_grouped_flows(
             DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS,
         );
     }
-    build_grouped_flows_from_aggregates(aggregates, overflow.aggregate, sort_by, limit)
+    build_grouped_flows_from_aggregates(aggregates, overflow.aggregate, group_by, sort_by, limit)
 }
 
 #[cfg(test)]
 pub(crate) fn build_grouped_flows_from_aggregates(
     aggregates: HashMap<GroupKey, AggregatedFlow>,
     overflow: Option<AggregatedFlow>,
+    group_by: &[String],
     sort_by: SortBy,
     limit: usize,
 ) -> BuildResult {
@@ -51,12 +52,12 @@ pub(crate) fn build_grouped_flows_from_aggregates(
 
     for agg in ranked.rows {
         totals.add(agg.metrics);
-        flows.push(flow_value_from_aggregate(agg));
+        flows.push(flow_value_from_aggregate(agg, group_by));
     }
 
     if let Some(other_agg) = ranked.other {
         totals.add(other_agg.metrics);
-        flows.push(flow_value_from_aggregate(other_agg));
+        flows.push(flow_value_from_aggregate(other_agg, group_by));
     }
 
     BuildResult {
@@ -85,13 +86,16 @@ pub(crate) fn synthetic_aggregate_from_compact(
     })
 }
 
-pub(crate) fn flow_value_from_aggregate(agg: AggregatedFlow) -> Value {
+pub(crate) fn flow_value_from_aggregate(agg: AggregatedFlow, group_by: &[String]) -> Value {
     let mut flow_obj = Map::new();
     let mut labels = agg.labels;
     if let Some(folded_labels) = &agg.folded_labels {
         folded_labels.render_into(&mut labels);
     }
-    flow_obj.insert("key".to_string(), json!(labels));
+    flow_obj.insert(
+        "key".to_string(),
+        Value::Object(ordered_group_labels(&labels, group_by)),
+    );
     flow_obj.insert("metrics".to_string(), agg.metrics.to_value());
     Value::Object(flow_obj)
 }

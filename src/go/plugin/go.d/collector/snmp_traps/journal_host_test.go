@@ -49,10 +49,6 @@ func (p *staticJournalHostProvider) MonotonicUsec() uint64 {
 	return p.nextMono.Add(1)
 }
 
-func newTestJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {
-	return newJournalWriterWithHostProvider(dir, cfg, newTestJournalHostProvider())
-}
-
 func withTestBuildinfoVarLibDir(t *testing.T, dir string) {
 	t.Helper()
 	old := buildinfo.VarLibDir
@@ -110,7 +106,7 @@ func TestNetdataHostFilesystemPrefixIgnoresEmptyNetdataHostPrefix(t *testing.T) 
 	}
 }
 
-func TestJournalHostLoadOptionsIncludesHostFilesystemPrefix(t *testing.T) {
+func TestJournalHostLoadConfigIncludesHostFilesystemPrefix(t *testing.T) {
 	if pluginconfig.VarLibDir() != "" {
 		t.Skip("pluginconfig VarLibDir is already initialized")
 	}
@@ -120,17 +116,17 @@ func TestJournalHostLoadOptionsIncludesHostFilesystemPrefix(t *testing.T) {
 	libDir := filepath.Join(t.TempDir(), "opt", "netdata", "var", "lib", "netdata")
 	withTestBuildinfoVarLibDir(t, libDir)
 
-	opts := journalHostLoadOptions()
+	cfg := journalHostLoadConfig()
 
-	if got, want := opts.StateDir, filepath.Join(libDir, journalHostStateDirName); got != want {
+	if got, want := cfg.StateDir, filepath.Join(libDir, journalHostStateDirName); got != want {
 		t.Fatalf("StateDir = %q, want %q", got, want)
 	}
-	if got, want := opts.HostFilesystemPrefix, "/host"; got != want {
+	if got, want := cfg.HostFilesystemPrefix, "/host"; got != want {
 		t.Fatalf("HostFilesystemPrefix = %q, want %q", got, want)
 	}
 }
 
-func TestEngineBootsBaseDirUsesJournalHostLibDirResolver(t *testing.T) {
+func TestNetdataEngineStateRootUsesNetdataLibDir(t *testing.T) {
 	if pluginconfig.VarLibDir() != "" {
 		t.Skip("pluginconfig VarLibDir is already initialized")
 	}
@@ -140,7 +136,7 @@ func TestEngineBootsBaseDirUsesJournalHostLibDirResolver(t *testing.T) {
 	withTestBuildinfoVarLibDir(t, libDir)
 
 	want := filepath.Join(libDir, "snmp-trap")
-	if got := engineBootsBaseDir(); got != want {
-		t.Fatalf("engineBootsBaseDir() = %q, want %q", got, want)
+	if got := netdataEngineStateRoot(); got != want {
+		t.Fatalf("netdataEngineStateRoot() = %q, want %q", got, want)
 	}
 }

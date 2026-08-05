@@ -9,6 +9,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 )
 
+// Descriptor callbacks return resource failures to orchestration for sanitized
+// diagnostics; they must not log raw configuration or credentials. Callbacks
+// may use dyncfg.NewPublicError only with static, code-authored explanations.
 type Descriptor struct {
 	Type            string
 	Schema          string
@@ -66,8 +69,7 @@ func NewDescriptor[T any](
 		NewDiscoverers: func(cfg any, source string) ([]model.Discoverer, error) {
 			v, ok := cfg.(T)
 			if !ok {
-				var z T
-				return nil, &typedConfigError{typ: typ, got: cfg, want: z}
+				return nil, &typedConfigError{typ: typ}
 			}
 			return newDiscs(v, source)
 		},
@@ -75,9 +77,7 @@ func NewDescriptor[T any](
 }
 
 type typedConfigError struct {
-	typ  string
-	got  any
-	want any
+	typ string
 }
 
 func (e *typedConfigError) Error() string {

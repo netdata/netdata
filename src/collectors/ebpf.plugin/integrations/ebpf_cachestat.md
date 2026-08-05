@@ -135,11 +135,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -151,13 +153,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.cachestat_ratio | ratio | % |
-| cgroup.cachestat_dirties | dirty | page/s |
-| cgroup.cachestat_hits | hit | hits/s |
-| cgroup.cachestat_misses | miss | misses/s |
-| services.cachestat_ratio | a dimension per systemd service | % |
-| services.cachestat_dirties | a dimension per systemd service | page/s |
-| services.cachestat_hits | a dimension per systemd service | hits/s |
-| services.cachestat_misses | a dimension per systemd service | misses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.cachestat_ratio | Hit ratio | ratio | % |
+| cgroup.cachestat_dirties | Number of dirty pages | dirty | page/s |
+| cgroup.cachestat_hits | Number of accessed files | hit | hits/s |
+| cgroup.cachestat_misses | Files out of page cache | miss | misses/s |
+| services.cachestat_ratio | Hit ratio | a dimension per systemd service | % |
+| services.cachestat_dirties | Number of dirty pages | a dimension per systemd service | page/s |
+| services.cachestat_hits | Number of accessed files | a dimension per systemd service | hits/s |
+| services.cachestat_misses | Files out of page cache | a dimension per systemd service | misses/s |

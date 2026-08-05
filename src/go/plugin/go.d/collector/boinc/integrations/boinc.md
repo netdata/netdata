@@ -181,11 +181,13 @@ The following alerts are available:
 | [ boinc_upload_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf) | boinc.tasks_state | average number of failed uploads over the last 10 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -197,12 +199,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| boinc.tasks | total, active | tasks |
-| boinc.tasks_per_state | new, downloading, downloaded, compute_error, uploading, uploaded, aborted, upload_failed | tasks |
-| boinc.active_tasks_per_state | uninitialized, executing, abort_pending, quit_pending, suspended, copy_pending | tasks |
-| boinc.active_tasks_per_scheduler_state | uninitialized, preempted, scheduled | tasks |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| boinc.tasks | Overall Tasks | total, active | tasks |
+| boinc.tasks_per_state | Tasks per State | new, downloading, downloaded, compute_error, uploading, uploaded, aborted, upload_failed | tasks |
+| boinc.active_tasks_per_state | Active Tasks per State | uninitialized, executing, abort_pending, quit_pending, suspended, copy_pending | tasks |
+| boinc.active_tasks_per_scheduler_state | Active Tasks per Scheduler State | uninitialized, preempted, scheduled | tasks |
 
 
 

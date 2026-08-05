@@ -51,6 +51,12 @@ func buildChartTemplate(app string) (string, error) {
 func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (string, error) {
 	spec := newAutogenSpec(app)
 	for _, p := range profiles {
+		if selector := p.AutogenSelector(); selector != nil {
+			spec.Engine.Autogen.Rules = append(spec.Engine.Autogen.Rules, charttpl.EngineAutogenRule{
+				Scope:    p.Match,
+				Selector: *selector,
+			})
+		}
 		// Template() returns an independent deep copy, so mutating g below cannot
 		// corrupt the shared process-wide catalog.
 		g, err := p.Template()

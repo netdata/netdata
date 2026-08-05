@@ -655,11 +655,13 @@ The following alerts are available:
 | [ am_postgres_flexible_temp_bytes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.temp_bytes | PostgreSQL Flexible temp file I/O on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -681,51 +683,51 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.postgres_flexible.cpu | average | percentage |
-| azure_monitor.postgres_flexible.memory | average | percentage |
-| azure_monitor.postgres_flexible.availability | maximum | state |
-| azure_monitor.postgres_flexible.iops | total, read, write | operations/s |
-| azure_monitor.postgres_flexible.disk_throughput | read, write | bytes/s |
-| azure_monitor.postgres_flexible.disk_saturation | bandwidth, iops | percentage |
-| azure_monitor.postgres_flexible.disk_queue_depth | average | operations |
-| azure_monitor.postgres_flexible.buffer_cache | hits, reads | blocks/s |
-| azure_monitor.postgres_flexible.active_connections | average | connections |
-| azure_monitor.postgres_flexible.connection_rate | succeeded, failed | connections/s |
-| azure_monitor.postgres_flexible.transactions | committed, rolled_back | transactions/s |
-| azure_monitor.postgres_flexible.transaction_rate | total, xact_total | transactions/s |
-| azure_monitor.postgres_flexible.deadlocks | total | deadlocks/s |
-| azure_monitor.postgres_flexible.tuple_reads | returned, fetched | tuples/s |
-| azure_monitor.postgres_flexible.tuple_writes | inserted, updated, deleted | tuples/s |
-| azure_monitor.postgres_flexible.temp_files | total | files/s |
-| azure_monitor.postgres_flexible.temp_bytes | total | bytes/s |
-| azure_monitor.postgres_flexible.long_running | query, transaction | seconds |
-| azure_monitor.postgres_flexible.xid_usage | max_used, oldest_xmin | transactions |
-| azure_monitor.postgres_flexible.xmin_age | maximum | transactions |
-| azure_monitor.postgres_flexible.network | in, out | bytes/s |
-| azure_monitor.postgres_flexible.storage | used, free | bytes |
-| azure_monitor.postgres_flexible.storage_utilization | average | percentage |
-| azure_monitor.postgres_flexible.wal_storage | used | bytes |
-| azure_monitor.postgres_flexible.database_size | average | bytes |
-| azure_monitor.postgres_flexible.backup_storage | used | bytes |
-| azure_monitor.postgres_flexible.replication_lag_time | average | seconds |
-| azure_monitor.postgres_flexible.replication_lag_bytes | physical, logical | bytes |
-| azure_monitor.postgres_flexible.sessions_by_state | maximum | sessions |
-| azure_monitor.postgres_flexible.sessions_by_wait_event_type | maximum | sessions |
-| azure_monitor.postgres_flexible.autovacuum_operations | vacuum, autovacuum, analyze, autoanalyze | operations |
-| azure_monitor.postgres_flexible.autovacuum_table_coverage | vacuumed, autovacuumed, analyzed, autoanalyzed, total | tables |
-| azure_monitor.postgres_flexible.tuple_liveness | live, dead, modified_since_analyze | tuples |
-| azure_monitor.postgres_flexible.bloat | maximum | percentage |
-| azure_monitor.postgres_flexible.backend_count | maximum | connections |
-| azure_monitor.postgres_flexible.pgbouncer_client_connections | active, waiting | connections |
-| azure_monitor.postgres_flexible.pgbouncer_server_connections | active, idle | connections |
-| azure_monitor.postgres_flexible.pgbouncer_pool_count | pools | pools |
-| azure_monitor.postgres_flexible.pgbouncer_pooled_connections | pooled_connections | connections |
-| azure_monitor.postgres_flexible.cpu_credits | consumed, remaining | credits |
-| azure_monitor.postgres_flexible.postmaster_cpu | average | percentage |
-| azure_monitor.postgres_flexible.max_connections | maximum | connections |
-| azure_monitor.postgres_flexible.tcp_connection_backlog | maximum | connections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.postgres_flexible.cpu | Azure PostgreSQL Flexible Server CPU Utilization | average | percentage |
+| azure_monitor.postgres_flexible.memory | Azure PostgreSQL Flexible Server Memory Utilization | average | percentage |
+| azure_monitor.postgres_flexible.availability | Azure PostgreSQL Flexible Server Database Alive | maximum | state |
+| azure_monitor.postgres_flexible.iops | Azure PostgreSQL Flexible Server IOPS | total, read, write | operations/s |
+| azure_monitor.postgres_flexible.disk_throughput | Azure PostgreSQL Flexible Server Disk Throughput | read, write | bytes/s |
+| azure_monitor.postgres_flexible.disk_saturation | Azure PostgreSQL Flexible Server Disk Saturation | bandwidth, iops | percentage |
+| azure_monitor.postgres_flexible.disk_queue_depth | Azure PostgreSQL Flexible Server Disk Queue Depth | average | operations |
+| azure_monitor.postgres_flexible.buffer_cache | Azure PostgreSQL Flexible Server Buffer Cache | hits, reads | blocks/s |
+| azure_monitor.postgres_flexible.active_connections | Azure PostgreSQL Flexible Server Active Connections | average | connections |
+| azure_monitor.postgres_flexible.connection_rate | Azure PostgreSQL Flexible Server Connection Rate | succeeded, failed | connections/s |
+| azure_monitor.postgres_flexible.transactions | Azure PostgreSQL Flexible Server Transactions | committed, rolled_back | transactions/s |
+| azure_monitor.postgres_flexible.transaction_rate | Azure PostgreSQL Flexible Server Transaction Rate | total, xact_total | transactions/s |
+| azure_monitor.postgres_flexible.deadlocks | Azure PostgreSQL Flexible Server Deadlocks | total | deadlocks/s |
+| azure_monitor.postgres_flexible.tuple_reads | Azure PostgreSQL Flexible Server Tuple Reads | returned, fetched | tuples/s |
+| azure_monitor.postgres_flexible.tuple_writes | Azure PostgreSQL Flexible Server Tuple Writes | inserted, updated, deleted | tuples/s |
+| azure_monitor.postgres_flexible.temp_files | Azure PostgreSQL Flexible Server Temp Files Created | total | files/s |
+| azure_monitor.postgres_flexible.temp_bytes | Azure PostgreSQL Flexible Server Temp Bytes Written | total | bytes/s |
+| azure_monitor.postgres_flexible.long_running | Azure PostgreSQL Flexible Server Long Running Operations | query, transaction | seconds |
+| azure_monitor.postgres_flexible.xid_usage | Azure PostgreSQL Flexible Server Transaction ID Usage | max_used, oldest_xmin | transactions |
+| azure_monitor.postgres_flexible.xmin_age | Azure PostgreSQL Flexible Server Backend XID Age | maximum | transactions |
+| azure_monitor.postgres_flexible.network | Azure PostgreSQL Flexible Server Network Traffic | in, out | bytes/s |
+| azure_monitor.postgres_flexible.storage | Azure PostgreSQL Flexible Server Storage | used, free | bytes |
+| azure_monitor.postgres_flexible.storage_utilization | Azure PostgreSQL Flexible Server Storage Utilization | average | percentage |
+| azure_monitor.postgres_flexible.wal_storage | Azure PostgreSQL Flexible Server WAL Storage | used | bytes |
+| azure_monitor.postgres_flexible.database_size | Azure PostgreSQL Flexible Server Database Size | average | bytes |
+| azure_monitor.postgres_flexible.backup_storage | Azure PostgreSQL Flexible Server Backup Storage | used | bytes |
+| azure_monitor.postgres_flexible.replication_lag_time | Azure PostgreSQL Flexible Server Replication Lag | average | seconds |
+| azure_monitor.postgres_flexible.replication_lag_bytes | Azure PostgreSQL Flexible Server Replication Lag Bytes | physical, logical | bytes |
+| azure_monitor.postgres_flexible.sessions_by_state | Azure PostgreSQL Flexible Server Sessions by State | maximum | sessions |
+| azure_monitor.postgres_flexible.sessions_by_wait_event_type | Azure PostgreSQL Flexible Server Sessions by Wait Event Type | maximum | sessions |
+| azure_monitor.postgres_flexible.autovacuum_operations | Azure PostgreSQL Flexible Server Autovacuum Operations | vacuum, autovacuum, analyze, autoanalyze | operations |
+| azure_monitor.postgres_flexible.autovacuum_table_coverage | Azure PostgreSQL Flexible Server Autovacuum Table Coverage | vacuumed, autovacuumed, analyzed, autoanalyzed, total | tables |
+| azure_monitor.postgres_flexible.tuple_liveness | Azure PostgreSQL Flexible Server Tuple Liveness | live, dead, modified_since_analyze | tuples |
+| azure_monitor.postgres_flexible.bloat | Azure PostgreSQL Flexible Server Table Bloat | maximum | percentage |
+| azure_monitor.postgres_flexible.backend_count | Azure PostgreSQL Flexible Server Backend Count | maximum | connections |
+| azure_monitor.postgres_flexible.pgbouncer_client_connections | Azure PostgreSQL Flexible Server PgBouncer Client Connections | active, waiting | connections |
+| azure_monitor.postgres_flexible.pgbouncer_server_connections | Azure PostgreSQL Flexible Server PgBouncer Server Connections | active, idle | connections |
+| azure_monitor.postgres_flexible.pgbouncer_pool_count | Azure PostgreSQL Flexible Server PgBouncer Pool Count | pools | pools |
+| azure_monitor.postgres_flexible.pgbouncer_pooled_connections | Azure PostgreSQL Flexible Server PgBouncer Pooled Connections | pooled_connections | connections |
+| azure_monitor.postgres_flexible.cpu_credits | Azure PostgreSQL Flexible Server CPU Credits | consumed, remaining | credits |
+| azure_monitor.postgres_flexible.postmaster_cpu | Azure PostgreSQL Flexible Server Postmaster CPU Usage | average | percentage |
+| azure_monitor.postgres_flexible.max_connections | Azure PostgreSQL Flexible Server Max Connections | maximum | connections |
+| azure_monitor.postgres_flexible.tcp_connection_backlog | Azure PostgreSQL Flexible Server TCP Connection Backlog | maximum | connections |
 
 
 

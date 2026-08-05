@@ -128,11 +128,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -149,28 +151,29 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.channel.status | inactive, binding, starting, running, stopping, retrying, stopped, requesting, paused, disconnected, initializing, switching | status |
-| mq.channel.messages | messages | messages/s |
-| mq.channel.bytes | bytes | bytes/s |
-| mq.channel.batches | batches | batches/s |
-| mq.channel.batch_size | batch_size | messages |
-| mq.channel.batch_interval | batch_interval | milliseconds |
-| mq.channel.intervals | disc_interval, hb_interval, keep_alive_interval | seconds |
-| mq.channel.short_retry_count | short_retry | retries |
-| mq.channel.long_retry_interval | long_retry | seconds |
-| mq.channel.max_msg_length | max_msg_length | bytes |
-| mq.channel.sharing_conversations | sharing_conversations | conversations |
-| mq.channel.network_priority | network_priority | priority |
-| mq.channel.buffer_counts | sent, received | buffers |
-| mq.channel.current_messages | current | messages |
-| mq.channel.xmitq_time | xmitq_time | milliseconds |
-| mq.channel.mca_status | mca_status | status |
-| mq.channel.indoubt_status | indoubt_status | status |
-| mq.channel.ssl_key_resets | ssl_key_resets | resets |
-| mq.channel.npm_speed | npm_speed | speed |
-| mq.channel.current_sharing_convs | current_sharing | conversations |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.channel.status | Channel Status | inactive, binding, starting, running, stopping, retrying, stopped, requesting, paused, disconnected, initializing, switching | status |
+| mq.channel.messages | Channel Message Rate | messages | messages/s |
+| mq.channel.bytes | Channel Data Transfer Rate | bytes | bytes/s |
+| mq.channel.batches | Channel Batch Rate | batches | batches/s |
+| mq.channel.batch_size | Channel Batch Size | batch_size | messages |
+| mq.channel.batch_interval | Channel Batch Interval | batch_interval | milliseconds |
+| mq.channel.intervals | Channel Intervals | disc_interval, hb_interval, keep_alive_interval | seconds |
+| mq.channel.short_retry_count | Channel Short Retry Count | short_retry | retries |
+| mq.channel.long_retry_interval | Channel Long Retry Interval | long_retry | seconds |
+| mq.channel.max_msg_length | Channel Max Message Length | max_msg_length | bytes |
+| mq.channel.sharing_conversations | Channel Sharing Conversations | sharing_conversations | conversations |
+| mq.channel.network_priority | Channel Network Priority | network_priority | priority |
+| mq.channel.buffer_counts | Channel Buffer Counts | sent, received | buffers |
+| mq.channel.current_messages | Channel Current Messages | current | messages |
+| mq.channel.xmitq_time | Channel Transmission Queue Time | xmitq_time | milliseconds |
+| mq.channel.mca_status | Channel MCA Status | mca_status | status |
+| mq.channel.indoubt_status | Channel In-Doubt Status | indoubt_status | status |
+| mq.channel.ssl_key_resets | Channel SSL Key Resets | ssl_key_resets | resets |
+| mq.channel.npm_speed | Channel Non-Persistent Message Speed | npm_speed | speed |
+| mq.channel.current_sharing_convs | Channel Current Sharing Conversations | current_sharing | conversations |
+
 
 ### Per channelstatistics
 
@@ -185,13 +188,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.channel_stats.messages | messages | messages/s |
-| mq.channel_stats.bytes | bytes | bytes/s |
-| mq.channel_stats.batches | full_batches, incomplete_batches | batches/s |
-| mq.channel_stats.batch_size | avg_batch_size | messages |
-| mq.channel_stats.put_retries | put_retries | retries/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.channel_stats.messages | Channel Messages (Statistics) | messages | messages/s |
+| mq.channel_stats.bytes | Channel Bytes (Statistics) | bytes | bytes/s |
+| mq.channel_stats.batches | Channel Batches (Statistics) | full_batches, incomplete_batches | batches/s |
+| mq.channel_stats.batch_size | Channel Average Batch Size (Statistics) | avg_batch_size | messages |
+| mq.channel_stats.put_retries | Channel Put Retries (Statistics) | put_retries | retries/s |
+
 
 ### Per listener
 
@@ -207,11 +211,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.listener.status | stopped, starting, running, stopping, retrying | status |
-| mq.listener.backlog | backlog | connections |
-| mq.listener.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.listener.status | Listener Status | stopped, starting, running, stopping, retrying | status |
+| mq.listener.backlog | Listener Connection Backlog | backlog | connections |
+| mq.listener.uptime | Listener Uptime | uptime | seconds |
+
 
 ### Per mqistatistics
 
@@ -225,12 +230,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.mqi_stats.opens | opens_total, opens_failed | operations/s |
-| mq.mqi_stats.closes | closes_total, closes_failed | operations/s |
-| mq.mqi_stats.inqs | inqs_total, inqs_failed | operations/s |
-| mq.mqi_stats.sets | sets_total, sets_failed | operations/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.mqi_stats.opens | MQOPEN Operations (Statistics) | opens_total, opens_failed | operations/s |
+| mq.mqi_stats.closes | MQCLOSE Operations (Statistics) | closes_total, closes_failed | operations/s |
+| mq.mqi_stats.inqs | MQINQ Operations (Statistics) | inqs_total, inqs_failed | operations/s |
+| mq.mqi_stats.sets | MQSET Operations (Statistics) | sets_total, sets_failed | operations/s |
+
 
 ### Per queue
 
@@ -245,30 +251,31 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.queue.depth | current, max | messages |
-| mq.queue.depth_percentage | percentage | percentage |
-| mq.queue.messages | enqueued, dequeued | messages/s |
-| mq.queue.connections | input, output | connections |
-| mq.queue.high_depth | high_depth | messages |
-| mq.queue.uncommitted_msgs | uncommitted | messages |
-| mq.queue.file_size | current, max | bytes |
-| mq.queue.last_activity | since_last_get, since_last_put | seconds |
-| mq.queue.oldest_msg_age | oldest_msg_age | seconds |
-| mq.queue.time_indicators | short_period, long_period | microseconds |
-| mq.queue.service_interval | service_interval | milliseconds |
-| mq.queue.inhibit_status | inhibit_get, inhibit_put | status |
-| mq.queue.priority | def_priority | priority |
-| mq.queue.message_persistence | persistent, non_persistent | boolean |
-| mq.queue.retention_interval | retention_interval | hours |
-| mq.queue.triggers | trigger_depth, trigger_type | messages |
-| mq.queue.backout_threshold | backout_threshold | retries |
-| mq.queue.max_msg_length | max_msg_length | bytes |
-| mq.queue.scope | queue_manager, cell | boolean |
-| mq.queue.usage | normal, transmission | boolean |
-| mq.queue.msg_delivery_sequence | priority, fifo | boolean |
-| mq.queue.harden_get_backout | enabled, disabled | boolean |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.queue.depth | Queue Depth | current, max | messages |
+| mq.queue.depth_percentage | Queue Depth Percentage | percentage | percentage |
+| mq.queue.messages | Queue Messages | enqueued, dequeued | messages/s |
+| mq.queue.connections | Queue Connections | input, output | connections |
+| mq.queue.high_depth | Queue Peak Depth | high_depth | messages |
+| mq.queue.uncommitted_msgs | Queue Uncommitted Messages | uncommitted | messages |
+| mq.queue.file_size | Queue File Size | current, max | bytes |
+| mq.queue.last_activity | Time Since Last Queue Activity | since_last_get, since_last_put | seconds |
+| mq.queue.oldest_msg_age | Queue Oldest Message Age | oldest_msg_age | seconds |
+| mq.queue.time_indicators | Queue Time Indicators | short_period, long_period | microseconds |
+| mq.queue.service_interval | Queue Service Interval | service_interval | milliseconds |
+| mq.queue.inhibit_status | Queue Inhibit Status | inhibit_get, inhibit_put | status |
+| mq.queue.priority | Queue Priority Configuration | def_priority | priority |
+| mq.queue.message_persistence | Queue Default Message Persistence | persistent, non_persistent | boolean |
+| mq.queue.retention_interval | Queue Retention Interval | retention_interval | hours |
+| mq.queue.triggers | Queue Trigger Configuration | trigger_depth, trigger_type | messages |
+| mq.queue.backout_threshold | Queue Error Handling | backout_threshold | retries |
+| mq.queue.max_msg_length | Queue Max Message Length | max_msg_length | bytes |
+| mq.queue.scope | Queue Scope | queue_manager, cell | boolean |
+| mq.queue.usage | Queue Usage Type | normal, transmission | boolean |
+| mq.queue.msg_delivery_sequence | Message Delivery Sequence | priority, fifo | boolean |
+| mq.queue.harden_get_backout | Harden Get Backout | enabled, disabled | boolean |
+
 
 ### Per queuegroup
 
@@ -282,15 +289,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.queue_group.depth | current, max | messages |
-| mq.queue_group.depth_percentage | percentage | percentage |
-| mq.queue_group.messages | enqueued, dequeued | messages/s |
-| mq.queue_group.connections | input, output | connections |
-| mq.queue_group.uncommitted_msgs | uncommitted | messages |
-| mq.queue_group.file_size | current, max | bytes |
-| mq.queue_group.oldest_msg_age | oldest_msg_age | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.queue_group.depth | Queue Group Depth | current, max | messages |
+| mq.queue_group.depth_percentage | Queue Group Depth Percentage | percentage | percentage |
+| mq.queue_group.messages | Queue Group Messages | enqueued, dequeued | messages/s |
+| mq.queue_group.connections | Queue Group Connections | input, output | connections |
+| mq.queue_group.uncommitted_msgs | Queue Group Uncommitted Messages | uncommitted | messages |
+| mq.queue_group.file_size | Queue Group File Size | current, max | bytes |
+| mq.queue_group.oldest_msg_age | Queue Group Oldest Message Age | oldest_msg_age | seconds |
+
 
 ### Per IBM MQ instance
 
@@ -300,15 +308,16 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.qmgr.status | status | status |
-| mq.qmgr.connection_count | connections | connections |
-| mq.qmgr.uptime | uptime | seconds |
-| mq.queues.overview | monitored, excluded, invisible, failed | queues |
-| mq.channels.overview | monitored, excluded, invisible, failed | channels |
-| mq.topics.overview | monitored, excluded, invisible, failed | topics |
-| mq.listeners.overview | monitored, excluded, invisible, failed | listeners |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.qmgr.status | Queue Manager Status | status | status |
+| mq.qmgr.connection_count | Queue Manager Connections | connections | connections |
+| mq.qmgr.uptime | Queue Manager Uptime | uptime | seconds |
+| mq.queues.overview | Queues Monitoring Status | monitored, excluded, invisible, failed | queues |
+| mq.channels.overview | Channels Monitoring Status | monitored, excluded, invisible, failed | channels |
+| mq.topics.overview | Topics Monitoring Status | monitored, excluded, invisible, failed | topics |
+| mq.listeners.overview | Listeners Monitoring Status | monitored, excluded, invisible, failed | listeners |
+
 
 ### Per IBM MQ instance
 
@@ -318,14 +327,15 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.qmgr.cpu_usage | user, system | percentage |
-| mq.qmgr.memory_usage | total | bytes |
-| mq.qmgr.ram_usage | total | bytes |
-| mq.qmgr.log_utilization | used | percentage |
-| mq.qmgr.log_file_size | size | bytes |
-| mq.qmgr.log_write_rate | rate | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.qmgr.cpu_usage | Queue Manager CPU Usage | user, system | percentage |
+| mq.qmgr.memory_usage | Queue Manager Memory Usage | total | bytes |
+| mq.qmgr.ram_usage | Queue Manager RAM Usage | total | bytes |
+| mq.qmgr.log_utilization | Queue Manager Log Utilization | used | percentage |
+| mq.qmgr.log_file_size | Queue Manager Log File Size | size | bytes |
+| mq.qmgr.log_write_rate | Queue Manager Log Write Rate | rate | bytes/s |
+
 
 ### Per queuestatistics
 
@@ -340,15 +350,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.queue_stats.depth_min_max | min_depth, max_depth | messages |
-| mq.queue_stats.avg_queue_time | non_persistent, persistent | microseconds |
-| mq.queue_stats.time_indicators | short_period, long_period | microseconds |
-| mq.queue_stats.operations | puts_non_persistent, puts_persistent, gets_non_persistent, gets_persistent, put1s, browses | operations/s |
-| mq.queue_stats.bytes | put_bytes_non_persistent, put_bytes_persistent, get_bytes_non_persistent, get_bytes_persistent, browse_bytes | bytes/s |
-| mq.queue_stats.failures | puts_failed, put1s_failed, gets_failed, browses_failed | failures/s |
-| mq.queue_stats.message_lifecycle | expired, purged, not_queued | messages/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.queue_stats.depth_min_max | Queue Depth Min/Max (Statistics) | min_depth, max_depth | messages |
+| mq.queue_stats.avg_queue_time | Queue Average Time (Statistics) | non_persistent, persistent | microseconds |
+| mq.queue_stats.time_indicators | Queue Time Indicators (Statistics) | short_period, long_period | microseconds |
+| mq.queue_stats.operations | Queue Operations (Statistics) | puts_non_persistent, puts_persistent, gets_non_persistent, gets_persistent, put1s, browses | operations/s |
+| mq.queue_stats.bytes | Queue Bytes (Statistics) | put_bytes_non_persistent, put_bytes_persistent, get_bytes_non_persistent, get_bytes_persistent, browse_bytes | bytes/s |
+| mq.queue_stats.failures | Queue Operation Failures (Statistics) | puts_failed, put1s_failed, gets_failed, browses_failed | failures/s |
+| mq.queue_stats.message_lifecycle | Queue Message Lifecycle (Statistics) | expired, purged, not_queued | messages/s |
+
 
 ### Per subscription
 
@@ -363,10 +374,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.subscription.messages | pending | messages |
-| mq.subscription.last_message_age | age | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.subscription.messages | IBM MQ Subscription Messages | pending | messages |
+| mq.subscription.last_message_age | IBM MQ Subscription Last Message Age | age | seconds |
+
 
 ### Per topic
 
@@ -380,9 +392,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mq.topic.publishers | publishers | publishers |
-| mq.topic.subscribers | subscribers | subscribers |
-| mq.topic.messages | messages | messages/s |
-| mq.topic.time_since_last_message | time_since_last_msg | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mq.topic.publishers | Topic Publishers | publishers | publishers |
+| mq.topic.subscribers | Topic Subscribers | subscribers | subscribers |
+| mq.topic.messages | Topic Message Rate | messages | messages/s |
+| mq.topic.time_since_last_message | Time Since Last Message | time_since_last_msg | seconds |

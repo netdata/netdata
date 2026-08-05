@@ -14,6 +14,8 @@ Netdata can collect, store, and visualise network flow data from your routers an
 
 This section is for network engineers, security analysts, and IT managers who want to understand what's happening on the wire. The same dashboard answers all three audiences from the same data.
 
+Opening Network Flows requires an Agent connected to Netdata Cloud and a signed-in user whose Space role permits sensitive functions. See the [Network Flows access requirement](/docs/npm/network-flows/installation.md#connect-this-agent-to-netdata-to-use-this-function).
+
 ## What flow data is
 
 A network flow is a *summary of a conversation*. Routers and switches watch packets as they pass through, group them by source IP, destination IP, source port, destination port, and protocol, and produce one record per flow when the conversation ends or after a timeout. That record contains:
@@ -67,7 +69,7 @@ The Netdata netflow plugin decodes:
 
 - **NetFlow v5** (legacy, IPv4-only)
 - **NetFlow v7** (rare, Cisco Catalyst 5000)
-- **NetFlow v9** (the modern Cisco / Juniper / FortiGate / Arista format)
+- **NetFlow v9** (the modern Cisco / Juniper / FortiGate / Arista format), including automatically detected Cisco ASA NSEL
 - **IPFIX** (RFC 7011, the IETF-standardised successor to NetFlow v9)
 - **sFlow v5** (the packet-sampling protocol most switches use)
 
@@ -83,7 +85,7 @@ Each flow record is enriched at ingestion with:
 - **Live BGP attributes** (AS path, communities, next-hop) — from BMP, BioRIS, or static prefix configuration
 - **Decapsulated inner-packet fields** for SRv6 / VXLAN traffic
 
-Flow records land in a four-tier journal: raw + 1-minute + 5-minute + 1-hour rollups, with independent retention per tier. Rollup tiers drop a few high-cardinality fields (IPs, ports, city/coordinates) to stay compact, so any query that filters or groups by those fields is served from the raw tier; everything else can use a coarser tier. The dashboard auto-picks the best tier for each query.
+Flow records land in a four-tier journal: raw + 1-minute + 5-minute + 1-hour rollups, with independent retention per tier. Rollup tiers drop high-cardinality and protocol-specific details such as addresses, prefixes, ports, cities/coordinates, MACs, BGP paths/communities, NAT fields, fragmentation details, and MPLS labels. Any query that filters or groups by a field absent from rollups is served from the raw tier; everything else can use a coarser tier. The dashboard auto-picks the best tier for each query.
 
 ## What sampling does to your numbers
 
@@ -93,7 +95,7 @@ The multiplication is per-flow, so different exporters and different interfaces 
 
 Sampling has a real statistical limit, separate from the multiplication. At 1-in-1000, a single-packet flow has roughly a 99.9% chance of not being sampled at all. If you need to catch small, rare events (security beaconing, scanning), pick a lower sampling rate on the exporters that watch that traffic, or run unsampled there.
 
-For the exact pre-multiplication counts the exporter literally reported, see `RAW_BYTES` and `RAW_PACKETS` in the [field reference](/docs/npm/network-flows/field-reference.md).
+For the selected canonical counters before sampling multiplication, see `RAW_BYTES` and `RAW_PACKETS` in the [field reference](/docs/npm/network-flows/field-reference.md). The field reference also explains how Netdata selects between incoming and post-observation NetFlow/IPFIX counter families.
 
 ## What the dashboard looks like
 

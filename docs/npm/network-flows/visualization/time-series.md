@@ -51,10 +51,10 @@ The minimum bucket size is **60 seconds**. Zoom in past one minute and the chart
 
 Some queries can't use the rollup tiers. They drop to raw tier and inherit raw-tier retention:
 
-- Filtering or grouping by `SRC_ADDR`, `DST_ADDR`, `SRC_PORT`, `DST_PORT`, or any geo city / latitude / longitude field
+- Filtering or grouping by any [raw-only field](../retention-querying.md#what-survives-the-rollup)
 - Any non-empty full-text search
 
-In those cases the 100-bucket rule still applies, but the source tier is raw tier. Time depth is bounded by raw-tier retention (default: the raw tier has a 10GB size cap and no time-based age limit, so busy collectors can exhaust raw history quickly).
+In those cases the 100-bucket rule still applies, but the source tier is raw tier. Time depth is bounded by raw-tier retention (default: the raw tier has a 10GB retained-artifact budget and no time-based age limit, so busy collectors can exhaust raw history quickly).
 
 If you've been working at a higher tier and add an IP filter, the time depth on your chart may suddenly shrink — that's the tier switch.
 

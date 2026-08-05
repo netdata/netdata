@@ -5,11 +5,13 @@ package snmptopology
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,16 +36,75 @@ func (c *reverseDNSTestClock) Add(d time.Duration) {
 	c.mu.Unlock()
 }
 
+type testTopologyReverseDNSConfig struct {
+	lookup        reversedns.LookupFunc
+	now           func() time.Time
+	timeout       time.Duration
+	positiveTTL   time.Duration
+	negativeTTL   time.Duration
+	maxCandidates int
+	concurrency   int
+}
+
+type testTopologyReverseDNSWarmer struct {
+	*topologyReverseDNSWarmer
+	resolver *reversedns.Resolver
+}
+
+func newTestTopologyReverseDNSWarmer(config testTopologyReverseDNSConfig) *testTopologyReverseDNSWarmer {
+	resolver := reversedns.New(reversedns.Config{
+		Lookup:        config.lookup,
+		Now:           config.now,
+		LookupTimeout: config.timeout,
+		PositiveTTL:   config.positiveTTL,
+		NegativeTTL:   config.negativeTTL,
+	})
+	warmer := newTopologyReverseDNSWarmerWithConfig(resolver, topologyReverseDNSConfig{
+		maxCandidates: config.maxCandidates,
+		concurrency:   config.concurrency,
+	})
+	return &testTopologyReverseDNSWarmer{topologyReverseDNSWarmer: warmer, resolver: resolver}
+}
+
+func (r *testTopologyReverseDNSWarmer) warm(ctx context.Context, candidates []string) {
+	r.topologyReverseDNSWarmer.warm(ctx, testTopologyReverseDNSCandidates(candidates))
+}
+
+func (r *testTopologyReverseDNSWarmer) warmAsync(ctx context.Context, candidates []string) bool {
+	return r.topologyReverseDNSWarmer.warmAsync(ctx, testTopologyReverseDNSCandidates(candidates))
+}
+
+func (r *testTopologyReverseDNSWarmer) lookupCached(ip string) string {
+	addr, ok := normalizeTopologyReverseDNSCandidateIP(ip)
+	if !ok {
+		return ""
+	}
+	result := r.resolver.Lookup(addr)
+	if result.State == reversedns.StatePositive {
+		return result.Name
+	}
+	return ""
+}
+
+func (r *testTopologyReverseDNSWarmer) newCandidateCollector() *topologyReverseDNSCandidateCollector {
+	return newTopologyReverseDNSCandidateCollector(r.resolver)
+}
+
+func testTopologyReverseDNSCandidates(candidates []string) []netip.Addr {
+	out := make([]netip.Addr, 0, len(candidates))
+	for _, candidate := range candidates {
+		if addr, ok := normalizeTopologyReverseDNSCandidateIP(candidate); ok {
+			out = append(out, addr)
+		}
+	}
+	return out
+}
+
 func TestTopologyReverseDNSDefaultConfig(t *testing.T) {
 	config := normalizeTopologyReverseDNSConfig(topologyReverseDNSConfig{})
 
-	require.Equal(t, 500*time.Millisecond, config.timeout)
-	require.Equal(t, 24*time.Hour, config.positiveTTL)
-	require.Equal(t, 24*time.Hour, config.negativeTTL)
 	require.Equal(t, 1024, config.maxCandidates)
 	require.Equal(t, 4, config.concurrency)
-	require.NotNil(t, config.lookup)
-	require.NotNil(t, config.now)
 }
 
 func TestNormalizeTopologyReverseDNSCandidateIP(t *testing.T) {
@@ -70,15 +131,17 @@ func TestNormalizeTopologyReverseDNSCandidateIP(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			got, ok := normalizeTopologyReverseDNSCandidateIP(tc.in)
 			require.Equal(t, tc.wantOK, ok)
-			require.Equal(t, tc.want, got)
+			if ok {
+				require.Equal(t, tc.want, got.String())
+			}
 		})
 	}
 }
 
-func TestTopologyReverseDNSResolverWarmCachesNormalizedPositiveResult(t *testing.T) {
+func TestTopologyReverseDNSWarmerCachesNormalizedPositiveResult(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	var calls []string
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	resolver := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:         clock.Now,
 		positiveTTL: time.Hour,
 		negativeTTL: time.Minute,
@@ -96,29 +159,10 @@ func TestTopologyReverseDNSResolverWarmCachesNormalizedPositiveResult(t *testing
 	require.Equal(t, "switch-a.example.test", resolver.lookupCached("::ffff:192.0.2.10"))
 }
 
-func TestNormalizeTopologyReverseDNSName(t *testing.T) {
-	tests := map[string]struct {
-		in   []string
-		want string
-	}{
-		"empty":               {},
-		"blank names":         {in: []string{"", " ", "."}},
-		"trim lower suffix":   {in: []string{" Switch-A.Example.Test. "}, want: "switch-a.example.test"},
-		"dedupe":              {in: []string{"switch-a.example.test.", "SWITCH-A.EXAMPLE.TEST"}, want: "switch-a.example.test"},
-		"deterministic first": {in: []string{"switch-b.example.test.", "switch-a.example.test."}, want: "switch-a.example.test"},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.want, normalizeTopologyReverseDNSName(tc.in))
-		})
-	}
-}
-
-func TestTopologyReverseDNSResolverNegativeCacheSuppressesRetriesUntilTTL(t *testing.T) {
+func TestTopologyReverseDNSWarmerNegativeCacheSuppressesRetriesUntilTTL(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	var calls atomic.Int64
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	resolver := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:         clock.Now,
 		positiveTTL: time.Hour,
 		negativeTTL: time.Minute,
@@ -139,10 +183,10 @@ func TestTopologyReverseDNSResolverNegativeCacheSuppressesRetriesUntilTTL(t *tes
 	require.Equal(t, int64(2), calls.Load())
 }
 
-func TestTopologyReverseDNSResolverPositiveCacheSuppressesRetriesUntilTTL(t *testing.T) {
+func TestTopologyReverseDNSWarmerPositiveCacheSuppressesRetriesUntilTTL(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	var calls atomic.Int64
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	resolver := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:         clock.Now,
 		positiveTTL: time.Minute,
 		negativeTTL: time.Hour,
@@ -170,37 +214,47 @@ func TestTopologyReverseDNSResolverPositiveCacheSuppressesRetriesUntilTTL(t *tes
 func TestTopologyReverseDNSCandidateCollectorRecordsCandidatesAndUsesOnlyCache(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	var liveCalls atomic.Int64
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	resolver := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now: clock.Now,
 		lookup: func(context.Context, string) ([]string, error) {
 			liveCalls.Add(1)
-			return []string{"unexpected.example.test"}, nil
+			return []string{"switch-a.example.test"}, nil
 		},
 	})
-	resolver.store("192.0.2.10", "switch-a.example.test", clock.Now().Add(time.Hour))
+	resolver.warm(context.Background(), []string{"192.0.2.10"})
+	require.Equal(t, int64(1), liveCalls.Load())
+	liveCalls.Store(0)
 	collector := resolver.newCandidateCollector()
 
 	require.Equal(t, "switch-a.example.test", collector.lookupCached("192.0.2.10"))
 	require.Empty(t, collector.lookupCached("192.0.2.11"))
 	require.Empty(t, collector.lookupCached("127.0.0.1"))
 
-	require.Equal(t, []string{"192.0.2.10", "192.0.2.11"}, collector.collectedCandidates())
+	require.Equal(t, []netip.Addr{
+		netip.MustParseAddr("192.0.2.10"),
+		netip.MustParseAddr("192.0.2.11"),
+	}, collector.collectedCandidates())
 	require.Zero(t, liveCalls.Load())
 }
 
-func TestTopologyReverseDNSResolverWarmStopsOnContextCancel(t *testing.T) {
+func TestTopologyReverseDNSWarmerStopsOnContextCancel(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	started := make(chan struct{}, 3)
+	release := make(chan struct{})
 	var calls atomic.Int64
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	resolver := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:         clock.Now,
 		timeout:     time.Minute,
 		concurrency: 2,
 		lookup: func(ctx context.Context, _ string) ([]string, error) {
 			calls.Add(1)
 			started <- struct{}{}
-			<-ctx.Done()
-			return nil, ctx.Err()
+			select {
+			case <-release:
+				return nil, nil
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 		},
 	})
 
@@ -223,15 +277,16 @@ func TestTopologyReverseDNSResolverWarmStopsOnContextCancel(t *testing.T) {
 	case <-time.After(time.Second):
 		require.Fail(t, "warm did not stop after context cancellation")
 	}
+	close(release)
 	require.LessOrEqual(t, calls.Load(), int64(2))
 }
 
-func TestTopologyReverseDNSResolverWarmHonorsConcurrencyLimit(t *testing.T) {
+func TestTopologyReverseDNSWarmerHonorsConcurrencyLimit(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	var calls atomic.Int64
 	var inFlight atomic.Int64
 	var maxInFlight atomic.Int64
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	resolver := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:         clock.Now,
 		timeout:     time.Second,
 		concurrency: 3,
@@ -259,10 +314,10 @@ func TestTopologyReverseDNSResolverWarmHonorsConcurrencyLimit(t *testing.T) {
 	require.LessOrEqual(t, maxInFlight.Load(), int64(3))
 }
 
-func TestTopologyReverseDNSResolverWarmHonorsCandidateLimit(t *testing.T) {
+func TestTopologyReverseDNSWarmerHonorsCandidateLimit(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	var calls atomic.Int64
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	resolver := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:           clock.Now,
 		timeout:       time.Second,
 		maxCandidates: 3,
@@ -280,12 +335,12 @@ func TestTopologyReverseDNSResolverWarmHonorsCandidateLimit(t *testing.T) {
 	require.Equal(t, int64(3), calls.Load())
 }
 
-func TestTopologyReverseDNSResolverWarmAsyncDoesNotOverlap(t *testing.T) {
+func TestTopologyReverseDNSWarmerAsyncDoesNotOverlap(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	started := make(chan struct{})
 	release := make(chan struct{})
 	var calls atomic.Int64
-	resolver := newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	resolver := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:         clock.Now,
 		timeout:     time.Second,
 		concurrency: 1,

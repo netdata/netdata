@@ -26,7 +26,7 @@ The `systemd` journal plugin provides an efficient way to view, explore, and ana
 |-------------|---------|
 | Netdata Agent v1.44+ | This plugin requires Netdata version 1.44 or newer |
 | Netdata Cloud account | Required to use Netdata Functions, including this plugin |
-| **Not supported in**: | Static builds (use Debian-based containers instead) |
+| **Not supported in**: | Non-Linux builds (macOS, Windows, FreeBSD), the ARMv6l static build (Raspberry Pi 1 / Zero), or a source build compiled with `--disable-plugin-systemd-journal` |
 
 :::tip
 
@@ -527,7 +527,7 @@ Use the following solutions to resolve common issues with the systemd journal pl
 |---------------|----------|
 | Running an older Netdata version (pre-1.44) | Update Netdata to version **1.44 or later** |
 | Using Alpine-based Docker container | Use the **Debian-based Netdata container** (from 1.44+) |
-| Using a static build of Netdata (`/opt/netdata`) | Switch to a package-based installation or source build |
+| Using the ARMv6l static build (Raspberry Pi 1 / Zero) | Switch to a package-based installation, or a source build with `--enable-plugin-systemd-journal` |
 | Missing `libsystemd` or required dependencies | Make sure `libsystemd` is installed on the host |
 
 ### How to fix slow or timing out queries
@@ -573,7 +573,7 @@ Sampling ensures responsiveness at scale, but selecting sources and filters rema
 
 | Error Message | Meaning | Solution |
 |--------------|---------|----------|
-| "Plugin not available" | The systemd-journal plugin isn't loaded | Check your Netdata installation type (must not be Alpine or static) |
+| "Plugin not available" | The systemd-journal plugin isn't loaded | See [How to check if the plugin is running](#how-to-check-if-the-plugin-is-running) |
 | "Unable to open journal" | Permission issues accessing journal files | Ensure Netdata has proper permissions for journal directories |
 | "Timeout while querying" | Query is taking too long to complete | Reduce the query scope with filters or shorter timeframes |
 | "No sources detected" | Cannot find valid journal files | Check journal file locations and setup |
@@ -583,11 +583,29 @@ Sampling ensures responsiveness at scale, but selecting sources and filters rema
 
 ### How to check if the plugin is running
 
+Confirm the plugin binary is present and executable:
+
 ```bash
-sudo netdata -W plugins
+# native/package install
+ls -l /usr/libexec/netdata/plugins.d/systemd-journal.plugin
+
+# static install
+ls -l /opt/netdata/usr/libexec/netdata/plugins.d/systemd-journal.plugin
 ```
 
-Check that the `systemd-journal` plugin is listed as active.
+Confirm the Agent was built with the journal plugin. A line for `systemd-journal (monitor journal logs)` showing `YES` means the plugin is compiled into this build. `NO` means this build doesn't include it — for example, a non-Linux build (macOS, Windows, FreeBSD), a source build compiled with `--disable-plugin-systemd-journal`, or the ARMv6 static build (Raspberry Pi 1 / Zero):
+
+```bash
+sudo netdata -W buildinfo
+```
+
+Confirm the plugin process is running while the Agent is active:
+
+```bash
+ps aux | grep '[s]ystemd-journal.plugin'
+```
+
+If the plugin is present and running but you still see no persistent journal data, see [How to confirm journal sources are detected](#how-to-confirm-journal-sources-are-detected) below.
 
 ### How to confirm journal sources are detected
 

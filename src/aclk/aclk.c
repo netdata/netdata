@@ -532,9 +532,6 @@ const char *aclk_status_to_string(void) {
         return https_client_resp_t_2str((https_client_resp_t)status);
 
     switch(status) {
-        case ACLK_STATUS_CONNECTED:
-            return "connected";
-
         case ACLK_STATUS_OFFLINE:
             return "offline";
 

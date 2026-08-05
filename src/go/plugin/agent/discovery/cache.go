@@ -3,6 +3,8 @@
 package discovery
 
 import (
+	"sort"
+
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
@@ -34,5 +36,8 @@ func (c cache) groups() []*confgroup.Group {
 	for _, group := range c {
 		groups = append(groups, group)
 	}
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].Source < groups[j].Source
+	})
 	return groups
 }
