@@ -463,7 +463,7 @@ func (re Regexp) MarshalJSON() ([]byte, error) {
 // IsZero reports whether the regex is unset or the shared default "(.*)", so
 // omitempty drops it from marshaled output.
 func (re Regexp) IsZero() bool {
-	return re.Regexp == nil || re.Regexp == defaultConfig.Regex.Regexp
+	return re.Regexp == nil || re.original == defaultConfig.Regex.original
 }
 
 // Apply runs the rules against one sample. It returns the (possibly mutated)

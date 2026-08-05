@@ -54,9 +54,11 @@ func (c *Collector) check(ctx context.Context) error {
 			return fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
 		}
 	}
-	writable := c.writer.countWritable(mfs)
+	var writable int
 	if typesBound {
 		writable = c.writer.countBoundWritable(mfs)
+	} else {
+		writable = c.writer.countWritable(mfs)
 	}
 	if writable == 0 {
 		return fmt.Errorf("endpoint '%s' exposes no usable metrics", c.URL)
@@ -98,9 +100,6 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 	if err != nil {
 		return nil, nil, false, err
 	}
-	// Bind job-owned fallback policy on post-job names before profile selection
-	// and normalization. It is used only if a selected profile relabels samples.
-	c.writer.bindFallbackTypes(&postJob)
 	if err := c.validateNonEmpty(postJobFamilies); err != nil {
 		return nil, nil, false, err
 	}
@@ -121,6 +120,10 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 		return candidate, postJobFamilies, false, nil
 	}
 
+	// Bind job-owned fallback policy on post-job names before profile
+	// normalization. Jobs without an active normalizer keep normal type
+	// resolution on the assembled families.
+	c.writer.bindFallbackTypes(&postJob)
 	finalFamilies, err := c.profileRelabelAndAssemble(postJob, candidate.normalizers, true)
 	if err != nil {
 		return nil, nil, false, err
