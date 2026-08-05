@@ -181,13 +181,16 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Applications](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/integrations/applications.md) | Monitor Applications for optimal software performance and resource usage. |
 | [CPU performance](https://github.com/netdata/netdata/blob/master/src/collectors/perf.plugin/integrations/cpu_performance.md) | This collector monitors CPU performance metrics about cycles, instructions, migrations, cache operations and more. |
 | [dev.cpu.0.freq](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/dev.cpu.0.freq.md) | Read current CPU Scaling frequency. |
+| [eBPF Cachestat](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/ebpfgo.plugin/integrations/ebpf_cachestat.md) | Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files. |
 | [eBPF DCstat](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_dcstat.md) | Monitor directory cache events per application given an overall vision about files on memory or storage device. |
+| [eBPF DNS](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/ebpfgo.plugin/integrations/ebpf_dns.md) | Monitor DNS query and response traffic at the kernel level, broken down by transport protocol (UDP/TCP) and IP family (IPv4/IPv6). |
 | [eBPF Filedescriptor](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_filedescriptor.md) | Monitor calls for functions responsible to open or close a file descriptor and possible errors. |
 | [eBPF Hardirq](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_hardirq.md) | Monitor latency for each HardIRQ available. |
 | [eBPF OOMkill](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_oomkill.md) | Monitor applications that reach out of memory. |
 | [eBPF Process](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_process.md) | Monitor internal memory usage. |
 | [eBPF Processes](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_processes.md) | Monitor calls for function creating tasks (threads and processes) inside Linux kernel. |
 | [eBPF SHM](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_shm.md) | Monitor syscall responsible to manipulate shared memory. |
+| [eBPF Socket](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/ebpfgo.plugin/integrations/ebpf_socket.md) | Monitor TCP and UDP function calls, bandwidth, errors, and connection counts. |
 | [eBPF SoftIRQ](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_softirq.md) | Monitor latency for each SoftIRQ available. |
 | [eBPF SWAP](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_swap.md) | Monitors when swap has I/O events and applications executing events. |
 | [Entropy](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/entropy.md) | Entropy, a measure of the randomness or unpredictability of data. |

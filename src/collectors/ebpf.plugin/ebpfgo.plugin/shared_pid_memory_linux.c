@@ -254,7 +254,7 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
      * Evicting now would orphan the initialiser's fd; fail gracefully so the
      * caller retries next cycle after ftruncate finishes. */
     if (reused && pre_stat.st_size != (off_t)length) {
-        if (pre_stat.st_size >= (off_t)sizeof(uint32_t)) {
+        if (pre_stat.st_size == (off_t)sizeof(uint32_t)) {
             uint32_t peek_pid = 0;
             if (pread(ctx->shm_fd, &peek_pid, sizeof(peek_pid),
                       (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) == (ssize_t)sizeof(peek_pid) &&

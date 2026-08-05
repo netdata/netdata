@@ -191,7 +191,7 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
      * in-flight (pwrite done, ftruncate pending); fail gracefully so the
      * caller retries next cycle. */
     if (reused && pre_stat.st_size != (off_t)length) {
-        if (pre_stat.st_size >= (off_t)sizeof(uint32_t)) {
+        if (pre_stat.st_size == (off_t)sizeof(uint32_t)) {
             uint32_t peek_pid = 0;
             if (pread(ctx->shm_fd, &peek_pid, sizeof(peek_pid),
                       (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) == (ssize_t)sizeof(peek_pid) &&
