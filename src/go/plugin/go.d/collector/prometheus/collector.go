@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 //go:embed "config_schema.json"
@@ -51,11 +52,11 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	prom          prometheus.Prometheus
-	relabelBlocks []relabelBlock
-	store         metrix.CollectorStore
-	writer        *metricFamilyWriter
-	runtime       *promRuntime
+	prom       prometheus.Prometheus
+	jobRelabel *relabel.Pipeline
+	store      metrix.CollectorStore
+	writer     *metricFamilyWriter
+	runtime    *promRuntime
 
 	// loadProfileCatalog resolves the profile catalog; a field so tests inject a fake.
 	loadProfileCatalog func() (promprofiles.Catalog, error)
@@ -78,11 +79,11 @@ func (c *Collector) Init(context.Context) error {
 
 	// With no relabeling blocks the scrape keeps the direct, no-buffering Scrape fast
 	// path; invalid rules or match patterns fail Init here.
-	blocks, err := c.initRelabelBlocks()
+	pipeline, err := relabel.NewPipeline(c.Relabeling)
 	if err != nil {
 		return fmt.Errorf("init relabeling: %v", err)
 	}
-	c.relabelBlocks = blocks
+	c.jobRelabel = pipeline
 
 	gaugeFallback, err := c.initFallbackTypeMatcher(c.FallbackType.Gauge)
 	if err != nil {

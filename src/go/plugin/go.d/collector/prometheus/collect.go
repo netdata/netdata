@@ -66,7 +66,7 @@ func (c *Collector) scrape(ctx context.Context, checking bool) (prometheus.Metri
 // classified sample stream and runs the relabel pipeline (relabel, assemble, curate typed
 // families) in relabelAndAssemble.
 func (c *Collector) scrapeMetricFamilies(ctx context.Context, checking bool) (prometheus.MetricFamilies, error) {
-	if len(c.relabelBlocks) == 0 {
+	if c.jobRelabel == nil {
 		return c.prom.ScrapeContext(ctx)
 	}
 

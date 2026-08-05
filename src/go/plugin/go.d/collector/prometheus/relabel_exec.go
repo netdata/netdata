@@ -12,35 +12,9 @@ import (
 	commonmodel "github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
-
-// relabelBlock is a compiled relabeling block: a metric-name matcher (required,
-// never nil) and the relabel processor for its rules.
-type relabelBlock struct {
-	match matcher.Matcher
-	proc  *relabel.Processor
-}
-
-// applyBlocks runs each block whose match matches the sample's current name, in
-// order, threading the sample through. It returns the relabeled sample, or the
-// sample as it stood when a rule dropped it plus that drop.
-func (c *Collector) applyBlocks(sample prompkg.Sample) (prompkg.Sample, relabel.DropInfo) {
-	for i := range c.relabelBlocks {
-		b := &c.relabelBlocks[i]
-		if !b.match.MatchString(sample.Name) {
-			continue
-		}
-		out, drop := b.proc.Apply(sample)
-		if drop.Dropped() {
-			return sample, drop
-		}
-		sample = out
-	}
-	return sample, relabel.DropInfo{}
-}
 
 // Structural label names and family-name suffixes that bind the components of a
 // typed family (histogram/summary) together. Defined locally because the
@@ -115,7 +89,7 @@ func (c *Collector) applyJobRelabel(batch prompkg.SampleBatch) (prompkg.SampleBa
 	for _, raw := range batch.Samples {
 		rawKey, isTyped := typedFamilyKeyOf(raw)
 
-		sample, drop := c.applyBlocks(raw)
+		sample, drop := c.jobRelabel.Apply(raw)
 		if drop.Dropped() {
 			// Log the sample as it stood when the drop happened — an earlier block may
 			// have renamed it. (rawKey stays keyed on the original for family tracking.)

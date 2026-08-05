@@ -64,7 +64,7 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: false,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{
+				Relabeling: []relabel.Block{{
 					Match:                "app_*",
 					MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}},
 				}},
@@ -74,7 +74,7 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{
+				Relabeling: []relabel.Block{{
 					Match:                "[a-",
 					MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}},
 				}},
@@ -84,21 +84,21 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{{Action: "bogus"}}}},
+				Relabeling: []relabel.Block{{Match: "*", MetricRelabelConfigs: []relabel.Config{{Action: "bogus"}}}},
 			},
 		},
 		"relabeling block with no match": {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}}}},
+				Relabeling: []relabel.Block{{MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}}}},
 			},
 		},
 		"relabeling block with no rules": {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{Match: "app_*"}},
+				Relabeling: []relabel.Block{{Match: "app_*"}},
 			},
 		},
 		"profiles mode none": {
@@ -461,7 +461,7 @@ test_gauge_metric{label1="value2"} 12
 		"relabel applies before assembly (drop + rename via __name__)": {
 			prepare: func() *Collector {
 				c := New()
-				c.Relabeling = []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{
+				c.Relabeling = []relabel.Block{{Match: "*", MetricRelabelConfigs: []relabel.Config{
 					{
 						SourceLabels: []string{"__name__"},
 						Regex:        relabel.MustNewRegexp("test_drop_me"),
@@ -496,7 +496,7 @@ test_drop_me{label1="value1"} 22
 		"relabel rewrites a regular label (copy via Replace)": {
 			prepare: func() *Collector {
 				c := New()
-				c.Relabeling = []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{
+				c.Relabeling = []relabel.Block{{Match: "*", MetricRelabelConfigs: []relabel.Config{
 					{
 						SourceLabels: []string{"method"},
 						Regex:        relabel.MustNewRegexp("(.+)"),

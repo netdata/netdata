@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -170,7 +169,7 @@ func TestCollector_relabelTypedFamilyIntegrity(t *testing.T) {
 			newCollr := func() *Collector {
 				c := New()
 				c.URL = srv.URL
-				c.Relabeling = []RelabelBlock{{Match: "*", MetricRelabelConfigs: tc.rules}}
+				c.Relabeling = []relabel.Block{{Match: "*", MetricRelabelConfigs: tc.rules}}
 				require.NoError(t, c.Init(context.Background()))
 				return c
 			}
@@ -206,9 +205,12 @@ app_lat_sum 2.5
 app_lat_count 6
 `)
 
-	proc, err := relabel.New(renameMetric("app_lat(.*)", "renamed_lat${1}"))
+	pipeline, err := relabel.NewPipeline([]relabel.Block{{
+		Match:                "*",
+		MetricRelabelConfigs: renameMetric("app_lat(.*)", "renamed_lat${1}"),
+	}})
 	require.NoError(t, err)
-	c := &Collector{relabelBlocks: []relabelBlock{{match: matcher.TRUE(), proc: proc}}}
+	c := &Collector{jobRelabel: pipeline}
 
 	mfs, err := c.relabelAndAssemble(batch, false)
 	require.NoError(t, err)
@@ -234,7 +236,7 @@ other_requests_total{code="200"} 9
 
 	collr := New()
 	collr.URL = srv.URL
-	collr.Relabeling = []RelabelBlock{{
+	collr.Relabeling = []relabel.Block{{
 		Match:                "app_*",
 		MetricRelabelConfigs: setLabel([]string{"code"}, "(.+)", "verb", "${1}"),
 	}}

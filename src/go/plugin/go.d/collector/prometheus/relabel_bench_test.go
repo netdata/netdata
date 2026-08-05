@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
@@ -17,7 +16,7 @@ import (
 // batch, so HTTP and parsing are excluded and the delta is purely the executor:
 //
 //   - assemble_only: prompkg.Assemble — what the no-rules fast path does after parse.
-//   - relabel_assemble_validate: applyBlocks + Assemble + typed-family validation.
+//   - relabel_assemble_validate: Pipeline.Apply + Assemble + typed-family validation.
 //
 // The relabel block adds a static label to every series, so every typed family is
 // touched and the full validation pass runs (a near worst case). Parsing's own
@@ -52,17 +51,20 @@ func BenchmarkRelabelExecutor(b *testing.B) {
 	})
 
 	b.Run("relabel_assemble_validate", func(b *testing.B) {
-		proc, err := relabel.New([]relabel.Config{{
-			SourceLabels: []string{"__name__"},
-			Regex:        relabel.MustNewRegexp("(.+)"),
-			TargetLabel:  "env",
-			Replacement:  "prod",
-			Action:       relabel.Replace,
+		pipeline, err := relabel.NewPipeline([]relabel.Block{{
+			Match: "*",
+			MetricRelabelConfigs: []relabel.Config{{
+				SourceLabels: []string{"__name__"},
+				Regex:        relabel.MustNewRegexp("(.+)"),
+				TargetLabel:  "env",
+				Replacement:  "prod",
+				Action:       relabel.Replace,
+			}},
 		}})
 		if err != nil {
 			b.Fatal(err)
 		}
-		c := &Collector{relabelBlocks: []relabelBlock{{match: matcher.TRUE(), proc: proc}}}
+		c := &Collector{jobRelabel: pipeline}
 
 		b.ReportAllocs()
 		b.ResetTimer()
