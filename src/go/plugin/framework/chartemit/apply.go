@@ -45,8 +45,8 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if api == nil {
 		return fmt.Errorf("chartemit: nil netdata api")
 	}
-	if strings.TrimSpace(env.TypeID) == "" {
-		return fmt.Errorf("chartemit: emit env type_id is required")
+	if err := validateEmitEnv(env); err != nil {
+		return err
 	}
 	if env.UpdateEvery <= 0 {
 		env.UpdateEvery = 1
@@ -65,6 +65,13 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	emitLabelUpdatePhase(api, env, normalized.updateLabels)
 	emitUpdatePhase(api, env, normalized.updateCharts)
 	emitRemovePhase(api, env, normalized)
+	return nil
+}
+
+func validateEmitEnv(env EmitEnv) error {
+	if strings.TrimSpace(env.TypeID) == "" {
+		return fmt.Errorf("chartemit: emit env type_id is required")
+	}
 	return nil
 }
 
@@ -273,16 +280,24 @@ func emitRemovePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 }
 
 func emitDimension(api *netdataapi.API, dim dimensionEmission) {
-	name := sanitizeWireID(dim.Name)
-	if name == "" {
+	opts, ok := prepareDimension(dim)
+	if !ok {
 		return
 	}
-	api.DIMENSION(netdataapi.DimensionOpts{
+	api.DIMENSION(opts)
+}
+
+func prepareDimension(dim dimensionEmission) (netdataapi.DimensionOpts, bool) {
+	name := sanitizeWireID(dim.Name)
+	if name == "" {
+		return netdataapi.DimensionOpts{}, false
+	}
+	return netdataapi.DimensionOpts{
 		ID:         name,
 		Name:       name,
 		Algorithm:  dim.Algorithm,
 		Multiplier: handleZero(dim.Multiplier),
 		Divisor:    handleZero(dim.Divisor),
 		Options:    makeDimensionOptions(dim.Hidden, dim.Obsolete, dim.Float),
-	})
+	}, true
 }
