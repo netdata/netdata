@@ -187,6 +187,8 @@ extern __thread struct log_stack_entry *thread_log_stack_base[THREAD_LOG_STACK_M
 extern __thread size_t thread_log_stack_next;
 extern __thread struct log_field thread_log_fields[_NDF_MAX];
 ND_LOG_SOURCES nd_log_resolve_source_from_stack(ND_LOG_SOURCES source);
+bool nd_log_source_has_flood_protection(ND_LOG_SOURCES source);
+ND_LOG_SOURCES nd_log_resolve_source_with_flood_protection(ND_LOG_SOURCES source, bool *limit);
 
 // --------------------------------------------------------------------------------------------------------------------
 

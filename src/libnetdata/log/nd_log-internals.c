@@ -782,6 +782,16 @@ ND_LOG_SOURCES nd_log_resolve_source_from_stack(ND_LOG_SOURCES source) {
     return source;
 }
 
+bool nd_log_source_has_flood_protection(ND_LOG_SOURCES source) {
+    return source == NDLS_DAEMON || source == NDLS_COLLECTORS;
+}
+
+ND_LOG_SOURCES nd_log_resolve_source_with_flood_protection(ND_LOG_SOURCES source, bool *limit) {
+    source = nd_log_resolve_source_from_stack(source);
+    *limit = nd_log_source_has_flood_protection(source);
+    return source;
+}
+
 void log_stack_pop(void *ptr) {
     if(!ptr) return;
 
@@ -895,6 +905,10 @@ int log_stack_unittest(void) {
         ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, "access"),
         ND_LOG_FIELD_END(),
     };
+    struct log_stack_entry source_daemon[] = {
+        ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, "daemon"),
+        ND_LOG_FIELD_END(),
+    };
     struct log_stack_entry source_unknown[] = {
         ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, "unknown"),
         ND_LOG_FIELD_END(),
@@ -941,6 +955,18 @@ int log_stack_unittest(void) {
     LOG_STACK_TEST(nd_log_resolve_source_from_stack(NDLS_DAEMON) == NDLS_DAEMON,
                    "invalid numeric source preserves the caller source");
     log_stack_pop(&source_invalid_numeric);
+
+    log_stack_push(source_health);
+    bool limit = true;
+    LOG_STACK_TEST(nd_log_resolve_source_with_flood_protection(NDLS_DAEMON, &limit) == NDLS_HEALTH && !limit,
+                   "daemon override to health uses health flood-protection policy");
+    log_stack_pop(&source_health);
+
+    log_stack_push(source_daemon);
+    limit = false;
+    LOG_STACK_TEST(nd_log_resolve_source_with_flood_protection(NDLS_ACCESS, &limit) == NDLS_DAEMON && limit,
+                   "access override to daemon uses daemon flood-protection policy");
+    log_stack_pop(&source_daemon);
 
     LOG_STACK_TEST(thread_log_stack_next == 0, "source override test frames are balanced");
 

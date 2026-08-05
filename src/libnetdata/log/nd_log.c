@@ -421,8 +421,8 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #endif
 
     source = nd_log_validate_source(source);
-    bool limit = source == NDLS_DAEMON || source == NDLS_COLLECTORS;
-    source = nd_log_resolve_source_from_stack(source);
+    bool limit;
+    source = nd_log_resolve_source_with_flood_protection(source, &limit);
 
     if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
         return;
@@ -444,8 +444,8 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 #endif
 
     source = nd_log_validate_source(source);
-    bool limit = source == NDLS_DAEMON || source == NDLS_COLLECTORS;
-    source = nd_log_resolve_source_from_stack(source);
+    bool limit;
+    source = nd_log_resolve_source_with_flood_protection(source, &limit);
 
     if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
         return;
@@ -562,11 +562,12 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
 
         ND_LOG_SOURCES source = NDLS_DAEMON;
         source = nd_log_validate_source(source);
-        source = nd_log_resolve_source_from_stack(source);
+        bool limit;
+        source = nd_log_resolve_source_with_flood_protection(source, &limit);
 
         va_list args;
         va_start(args, fmt);
-        nd_logger(file, function, line, source, NDLP_ALERT, true, saved_errno, saved_winerror, fmt, args);
+        nd_logger(file, function, line, source, NDLP_ALERT, limit, saved_errno, saved_winerror, fmt, args);
         va_end(args);
     }
 
