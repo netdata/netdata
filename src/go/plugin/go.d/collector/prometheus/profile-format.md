@@ -571,6 +571,7 @@ git clone --depth=1 --branch master https://github.com/netdata/testdata.git src/
 cd src/go
 NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
   ./internal/promtestdata \
+  ./internal/promprofilevalidation \
   ./tools/prometheus-profile-validation \
   ./plugin/go.d/collector/prometheus/...
 ```

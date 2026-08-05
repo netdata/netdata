@@ -4,6 +4,7 @@ package promprofilevalidation
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -172,7 +173,7 @@ func collectorJobFullName(jobName string) string {
 
 func safePublicEmitterError(err error) error {
 	message := "public chart emitter rejected the plan"
-	if strings.Contains(err.Error(), "type.id exceeds max length") {
+	if errors.Is(err, chartemit.ErrTypeIDBudgetExceeded) {
 		message = "public chart emitter rejected a type.id that exceeds the maximum length"
 	}
 	return fmt.Errorf("%s (error fingerprint %s)", message, fingerprintID(err.Error()))

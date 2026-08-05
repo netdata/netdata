@@ -5,6 +5,9 @@ package promprofilevalidation
 import (
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 func TestValidateProfileWarnsAboutObservedLabelsWithoutAnAuthoredRole(t *testing.T) {
@@ -37,6 +40,93 @@ app_value{instance="node-a",mode="sync",engine="sensitive-engine-value"} 1
 	if strings.Contains(result.stdout, "sensitive-engine-value") {
 		t.Fatalf("label-role review leaked an observed label value:\n%s", result.stdout)
 	}
+}
+
+func TestValidateProfileTreatsDistributionLabelNamesAsOrdinaryOnGaugeSeries(t *testing.T) {
+	dump := `
+# TYPE app_value gauge
+app_value{instance="node-a",le="ordinary-gauge-label"} 1
+`
+	result := runValidation(t, singleInstanceValueGaugeProfile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("label-role review must preserve author judgment\nreport:\n%s", result.stdout)
+	}
+
+	var message string
+	for _, item := range result.report.Findings {
+		if item.Code == "observed_label_aggregation" && item.Severity == "warning" {
+			message = item.Message
+			break
+		}
+	}
+	if !strings.Contains(message, "le") {
+		t.Fatalf("an ordinary gauge label named le was mistaken for histogram structure: %q", message)
+	}
+}
+
+func TestObservedLabelAggregationScansWriterSeriesOnce(t *testing.T) {
+	templateYAML := `
+version: v1
+groups:
+  - family: Example
+    metrics: [app.one, app.two]
+    charts:
+      - title: One
+        context: app.one
+        units: values
+        dimensions:
+          - selector: app.one
+            name: one
+      - title: Two
+        context: app.two
+        units: values
+        dimensions:
+          - selector: app.two
+            name: two
+`
+	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	if !ok {
+		t.Fatal("collector store does not expose cycle control")
+	}
+	cycle := managed.CycleController()
+	cycle.BeginCycle()
+	meter := store.Write().SnapshotMeter("app")
+	meter.Gauge("one").Observe(1, meter.LabelSet(metrix.Label{Key: "extra", Value: "a"}))
+	meter.Gauge("two").Observe(2, meter.LabelSet(metrix.Label{Key: "extra", Value: "b"}))
+	if err := cycle.CommitCycleSuccess(); err != nil {
+		t.Fatal(err)
+	}
+
+	reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	planned, err := prepareRoutePlan(reader, templateYAML, "prometheus_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	counting := &countingSeriesIdentityReader{Reader: reader}
+	var got report
+	if err := addObservedLabelAggregationHeuristics(spec, counting, planned.routes, &got); err != nil {
+		t.Fatal(err)
+	}
+	if counting.passes != 1 {
+		t.Fatalf("writer series scanned %d times, want one pass regardless of chart count", counting.passes)
+	}
+}
+
+type countingSeriesIdentityReader struct {
+	metrix.Reader
+	passes int
+}
+
+func (r *countingSeriesIdentityReader) ForEachSeriesIdentity(
+	fn func(metrix.SeriesIdentity, metrix.SeriesMeta, string, metrix.LabelView, metrix.SampleValue),
+) {
+	r.passes++
+	r.Reader.ForEachSeriesIdentity(fn)
 }
 
 func TestValidateProfileWarnsOnSiblingIdentityMismatchWithoutReplacingJudgment(t *testing.T) {

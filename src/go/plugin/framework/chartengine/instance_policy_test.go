@@ -13,7 +13,7 @@ import (
 func TestResolveInstanceLabelPolicyUsesPlannerSemantics(t *testing.T) {
 	policy, err := ResolveInstanceLabelPolicy(&charttpl.Instances{ByLabels: []string{
 		"region",
-		"*",
+		" * ",
 		"! host",
 		"host",
 		"region",

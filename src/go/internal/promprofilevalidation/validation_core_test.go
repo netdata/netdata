@@ -94,12 +94,12 @@ func TestStageIsolatedCatalogDoesNotMutateProcessDiscovery(t *testing.T) {
 	wantUserConfigDir := buildinfo.UserConfigDir
 	wantStockConfigDir := buildinfo.StockConfigDir
 
-	isolated, cleanup, err := stageIsolatedCatalog(profilePath, dumpPath)
+	staged, cleanup, err := stageValidationInputs(profilePath, dumpPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cleanup()
-	if _, ok := isolated.catalog.Get("candidate"); !ok {
+	if _, ok := staged.catalog.Get("candidate"); !ok {
 		t.Fatal("isolated catalog did not contain candidate profile")
 	}
 

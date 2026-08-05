@@ -4,6 +4,7 @@ package chartemit
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -12,6 +13,10 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
+
+// ErrTypeIDBudgetExceeded identifies an emitted type/chart ID that cannot fit
+// the Netdata wire-protocol limit.
+var ErrTypeIDBudgetExceeded = errors.New("chartemit: type.id exceeds max length")
 
 const (
 	// Netdata wire protocol label sources (CLABEL third argument).
@@ -138,7 +143,7 @@ func validateTypeIDBudget(typeID string, actions normalizedActions) error {
 	for chartID := range seen {
 		id := sanitizeWireID(chartID)
 		if len(typeID)+1+len(id) > maxTypeIDLen {
-			return fmt.Errorf("chartemit: type.id exceeds max length (%d): %s.%s", maxTypeIDLen, typeID, id)
+			return fmt.Errorf("%w (%d): %s.%s", ErrTypeIDBudgetExceeded, maxTypeIDLen, typeID, id)
 		}
 	}
 	return nil

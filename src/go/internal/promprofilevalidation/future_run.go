@@ -15,7 +15,7 @@ import (
 
 func addFutureOpennessChecks(
 	ctx context.Context,
-	isolated isolatedCatalog,
+	staged stagedValidationInputs,
 	profile promprofiles.Profile,
 	policy jobPolicy,
 	currentBatch prompkg.SampleBatch,
@@ -41,7 +41,7 @@ func addFutureOpennessChecks(
 		return nil
 	}
 
-	futureURL, err := isolated.stageFutureInputs(inputs)
+	futureURL, err := staged.stageFutureInputs(inputs)
 	if err != nil {
 		return fmt.Errorf("stage future-input evidence: %w", err)
 	}
@@ -59,10 +59,10 @@ func addFutureOpennessChecks(
 
 	pipeline := newPipelineDiagnosticSummary(policy, futureBatch)
 	coll := prometheus.NewWithOptions(
-		prometheus.WithProfileCatalog(isolated.catalog),
+		prometheus.WithProfileCatalog(staged.catalog),
 		prometheus.WithPipelineDiagnosticObserver(pipeline.observe),
 	)
-	applyJobPolicy(coll, policy, futureURL, isolated.profileName)
+	applyJobPolicy(coll, policy, futureURL, staged.profileName)
 	if err := coll.Init(ctx); err != nil {
 		return fmt.Errorf("future collector init: %w", err)
 	}

@@ -3,6 +3,7 @@
 package chartemit
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,4 +36,12 @@ func TestInspectPlanUsesEmissionNormalization(t *testing.T) {
 	assert.Equal(t, "value", inspection.Dimensions[0].WireName)
 	assert.Equal(t, "value", inspection.Dimensions[1].WireName)
 	assert.NotEqual(t, inspection.Charts[0].SourceChartID, inspection.Charts[1].SourceChartID)
+}
+
+func TestInspectPlanClassifiesTypeIDBudgetFailure(t *testing.T) {
+	plan := Plan{Actions: []EngineAction{
+		CreateChartAction{ChartID: "chart", Meta: chartengine.ChartMeta{}},
+	}}
+	_, err := InspectPlan(plan, EmitEnv{TypeID: strings.Repeat("x", maxTypeIDLen)})
+	require.ErrorIs(t, err, ErrTypeIDBudgetExceeded)
 }

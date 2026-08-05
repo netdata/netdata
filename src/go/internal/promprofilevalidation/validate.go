@@ -54,17 +54,17 @@ func validateProfile(parent context.Context, opts Options) report {
 		)
 	}
 
-	isolated, cleanup, err := stageIsolatedCatalog(opts.ProfilePath, opts.DumpPath)
+	staged, cleanup, err := stageValidationInputs(opts.ProfilePath, opts.DumpPath)
 	if err != nil {
 		r.addError("profile_load", opts.ProfilePath, err.Error(), "The real strict profile catalog and template decoder must accept the candidate.")
 		return r
 	}
 	defer cleanup()
 
-	catalog := isolated.catalog
-	profile, ok := catalog.Get(isolated.profileName)
+	catalog := staged.catalog
+	profile, ok := catalog.Get(staged.profileName)
 	if !ok {
-		r.addError("profile_catalog", opts.ProfilePath, "candidate missing from isolated runtime catalog", "Exact profile selection cannot succeed without the candidate.")
+		r.addError("profile_catalog", opts.ProfilePath, "candidate missing from staged validation catalog", "Exact profile selection cannot succeed without the candidate.")
 		return r
 	}
 	r.Profile = profileReport{Name: profile.Name, Match: profile.Match, App: profile.App}
@@ -84,7 +84,7 @@ func validateProfile(parent context.Context, opts Options) report {
 	ctx, cancel := context.WithTimeout(parent, validationTimeout)
 	defer cancel()
 
-	rawSamples, err := scrapeRawSamples(ctx, isolated.fileURL)
+	rawSamples, err := scrapeRawSamples(ctx, staged.fileURL)
 	if err != nil {
 		r.addError("dump_parse", opts.DumpPath, err.Error(), "The real Prometheus sample parser must accept the supplied exposition before job shaping.")
 		return r
@@ -126,7 +126,7 @@ func validateProfile(parent context.Context, opts Options) report {
 		promcollector.WithProfileCatalog(catalog),
 		promcollector.WithPipelineDiagnosticObserver(pipelineSummary.observe),
 	)
-	r.Job = applyJobPolicy(coll, policy, isolated.fileURL, isolated.profileName)
+	r.Job = applyJobPolicy(coll, policy, staged.fileURL, staged.profileName)
 	if err := coll.Init(ctx); err != nil {
 		r.addError("collector_init", opts.JobPath, err.Error(), "Selector, relabeling, fallback typing, limits, and exact profile selection are validated by the real collector.")
 		return r
@@ -218,7 +218,10 @@ func validateProfile(parent context.Context, opts Options) report {
 	}
 	plan := planned.plan
 	routeSummary := planned.routes
-	addObservedLabelAggregationHeuristics(merged, reader, routeSummary, &r)
+	if err := addObservedLabelAggregationHeuristics(merged, reader, routeSummary, &r); err != nil {
+		r.addError("chart_label_policy", "", err.Error(), "The authoritative chartengine instance-label policy must accept the decoded template.")
+		return r
+	}
 	addObservedScaleHeuristics(plan, &r)
 
 	r.Charts = materializeCharts(plan)
@@ -445,7 +448,7 @@ func validateProfile(parent context.Context, opts Options) report {
 	}
 	if err := addFutureOpennessChecks(
 		ctx,
-		isolated,
+		staged,
 		profile,
 		policy,
 		rawSamples,

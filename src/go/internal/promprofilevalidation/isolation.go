@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
 
-type isolatedCatalog struct {
+type stagedValidationInputs struct {
 	profileName string
 	fileURL     string
 	catalog     promprofiles.Catalog
@@ -20,7 +20,7 @@ type isolatedCatalog struct {
 	dumpRaw     []byte
 }
 
-func (i isolatedCatalog) stageFutureInputs(inputs []futureInput) (string, error) {
+func (i stagedValidationInputs) stageFutureInputs(inputs []futureInput) (string, error) {
 	combined, err := appendFutureInputs(i.dumpRaw, inputs)
 	if err != nil {
 		return "", err
@@ -32,20 +32,20 @@ func (i isolatedCatalog) stageFutureInputs(inputs []futureInput) (string, error)
 	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String(), nil
 }
 
-func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func(), error) {
+func stageValidationInputs(profilePath, dumpPath string) (stagedValidationInputs, func(), error) {
 	profileAbs, err := filepath.Abs(profilePath)
 	if err != nil {
-		return isolatedCatalog{}, nil, fmt.Errorf("resolve profile path: %w", err)
+		return stagedValidationInputs{}, nil, fmt.Errorf("resolve profile path: %w", err)
 	}
 	dumpAbs, err := filepath.Abs(dumpPath)
 	if err != nil {
-		return isolatedCatalog{}, nil, fmt.Errorf("resolve dump path: %w", err)
+		return stagedValidationInputs{}, nil, fmt.Errorf("resolve dump path: %w", err)
 	}
 
 	base := filepath.Base(profileAbs)
 	name := strings.TrimSuffix(base, filepath.Ext(base))
 	if !promprofiles.IsValidProfileName(name) {
-		return isolatedCatalog{}, nil, fmt.Errorf(
+		return stagedValidationInputs{}, nil, fmt.Errorf(
 			"profile basename %q must be lowercase letters, digits, or underscores and start with a letter",
 			name,
 		)
@@ -53,21 +53,21 @@ func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func()
 
 	raw, err := os.ReadFile(profileAbs)
 	if err != nil {
-		return isolatedCatalog{}, nil, fmt.Errorf("read profile %q: %w", profilePath, err)
+		return stagedValidationInputs{}, nil, fmt.Errorf("read profile %q: %w", profilePath, err)
 	}
 	dumpRaw, err := os.ReadFile(dumpAbs)
 	if err != nil {
-		return isolatedCatalog{}, nil, fmt.Errorf("read dump %q: %w", dumpPath, err)
+		return stagedValidationInputs{}, nil, fmt.Errorf("read dump %q: %w", dumpPath, err)
 	}
 
 	root, err := os.MkdirTemp("", "netdata-prometheus-profile-validation-")
 	if err != nil {
-		return isolatedCatalog{}, nil, fmt.Errorf("create isolated validation directory: %w", err)
+		return stagedValidationInputs{}, nil, fmt.Errorf("create isolated validation directory: %w", err)
 	}
 	cleanup := func() { _ = os.RemoveAll(root) }
-	fail := func(err error) (isolatedCatalog, func(), error) {
+	fail := func(err error) (stagedValidationInputs, func(), error) {
 		cleanup()
-		return isolatedCatalog{}, nil, err
+		return stagedValidationInputs{}, nil, err
 	}
 
 	profilesDir := filepath.Join(root, "profiles")
@@ -102,7 +102,7 @@ func stageIsolatedCatalog(profilePath, dumpPath string) (isolatedCatalog, func()
 		return fail(fmt.Errorf("strict profile template preflight: %w", err))
 	}
 
-	return isolatedCatalog{
+	return stagedValidationInputs{
 		profileName: name,
 		fileURL:     (&url.URL{Scheme: "file", Path: filepath.ToSlash(stagedDump)}).String(),
 		catalog:     preflight,

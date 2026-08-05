@@ -23,6 +23,13 @@ type observedLabelAggregation struct {
 	titles []string
 }
 
+type observedLabelChart struct {
+	path       string
+	title      string
+	handled    map[string]struct{}
+	aggregated map[string]struct{}
+}
+
 // addObservedLabelAggregationHeuristics identifies labels that selected series
 // carry but the authored chart does not use for identity, dimensions, promoted
 // metadata, selector routing, or explicit by_labels exclusion. Aggregation can
@@ -32,22 +39,26 @@ func addObservedLabelAggregationHeuristics(
 	reader metrix.Reader,
 	routes *planRouteSummary,
 	r *report,
-) {
+) error {
 	if spec == nil || routes == nil {
-		return
+		return nil
 	}
 
-	grouped := make(map[string]*observedLabelAggregation)
+	chartsByTemplate := make(map[string]*observedLabelChart)
+	charts := make([]*observedLabelChart, 0)
 	for _, ref := range enumerateChartRefs(spec) {
 		templateID, ok := chartengine.ChartTemplateIDAt(ref.groupPath, ref.chartIndex)
 		if !ok {
 			continue // The authoritative compiler reports template identity errors.
 		}
 		template := routes.templates[templateID]
-		if template == nil || len(template.resolvedSeries) == 0 {
+		if template == nil {
 			continue
 		}
-		handled, wildcard := handledChartLabels(ref.chart)
+		handled, wildcard, err := handledChartLabels(ref.chart)
+		if err != nil {
+			return err
+		}
 		for key := range template.dimensionKeyLabels {
 			handled[key] = struct{}{}
 		}
@@ -66,42 +77,56 @@ func addObservedLabelAggregationHeuristics(
 		if wildcard {
 			continue
 		}
+		chart := &observedLabelChart{
+			path:       ref.path,
+			title:      ref.chart.Title,
+			handled:    handled,
+			aggregated: make(map[string]struct{}),
+		}
+		chartsByTemplate[templateID] = chart
+		charts = append(charts, chart)
+	}
 
-		aggregated := make(map[string]struct{})
-		reader.ForEachSeriesIdentity(func(
-			identity metrix.SeriesIdentity,
-			_ metrix.SeriesMeta,
-			_ string,
-			labels metrix.LabelView,
-			_ metrix.SampleValue,
-		) {
-			if _, resolved := template.resolvedSeries[identity.ID]; !resolved {
-				return
+	reader.ForEachSeriesIdentity(func(
+		identity metrix.SeriesIdentity,
+		_ metrix.SeriesMeta,
+		_ string,
+		labels metrix.LabelView,
+		_ metrix.SampleValue,
+	) {
+		for templateID := range routes.resolvedTemplatesBySeries[identity.ID] {
+			chart := chartsByTemplate[templateID]
+			if chart == nil {
+				continue
 			}
 			labels.Range(func(key, _ string) bool {
 				key = strings.TrimSpace(key)
-				if key == "" || key == metrix.HistogramBucketLabel || key == metrix.SummaryQuantileLabel {
+				if key == "" {
 					return true
 				}
-				if _, ok := handled[key]; !ok {
-					aggregated[key] = struct{}{}
+				if _, ok := chart.handled[key]; !ok {
+					chart.aggregated[key] = struct{}{}
 				}
 				return true
 			})
-		})
-		if len(aggregated) == 0 {
+		}
+	})
+
+	grouped := make(map[string]*observedLabelAggregation)
+	for _, chart := range charts {
+		if len(chart.aggregated) == 0 {
 			continue
 		}
 
-		keys := slices.Sorted(maps.Keys(aggregated))
+		keys := slices.Sorted(maps.Keys(chart.aggregated))
 		groupKey := strings.Join(keys, "\x00")
 		group := grouped[groupKey]
 		if group == nil {
 			group = &observedLabelAggregation{keys: keys}
 			grouped[groupKey] = group
 		}
-		group.paths = append(group.paths, ref.path)
-		group.titles = append(group.titles, ref.chart.Title)
+		group.paths = append(group.paths, chart.path)
+		group.titles = append(group.titles, chart.title)
 	}
 
 	groupKeys := slices.Sorted(maps.Keys(grouped))
@@ -135,9 +160,10 @@ func addObservedLabelAggregationHeuristics(
 			"An omitted label removes that comparison and may merge distinct entities when new values appear. Aggregation can be correct, but explain the lost filtering/comparison and expected cardinality; do not add identity or promotion merely to silence the warning.",
 		)
 	}
+	return nil
 }
 
-func handledChartLabels(chart charttpl.Chart) (map[string]struct{}, bool) {
+func handledChartLabels(chart charttpl.Chart) (map[string]struct{}, bool, error) {
 	handled := make(map[string]struct{})
 	for _, key := range chart.LabelPromoted {
 		if key = strings.TrimSpace(key); key != "" {
@@ -145,22 +171,18 @@ func handledChartLabels(chart charttpl.Chart) (map[string]struct{}, bool) {
 		}
 	}
 
-	wildcard := false
 	if chart.Instances == nil {
-		return handled, wildcard
+		return handled, false, nil
 	}
-	for _, identityToken := range chart.Instances.ByLabels {
-		identityToken = strings.TrimSpace(identityToken)
-		switch {
-		case identityToken == "*":
-			wildcard = true
-		case strings.HasPrefix(identityToken, "!"):
-			if key := strings.TrimSpace(strings.TrimPrefix(identityToken, "!")); key != "" {
-				handled[key] = struct{}{}
-			}
-		case identityToken != "":
-			handled[identityToken] = struct{}{}
-		}
+	policy, err := chartengine.ResolveInstanceLabelPolicy(chart.Instances)
+	if err != nil {
+		return nil, false, err
 	}
-	return handled, wildcard
+	for _, key := range policy.ExplicitKeys {
+		handled[key] = struct{}{}
+	}
+	for _, key := range policy.ExcludedKeys {
+		handled[key] = struct{}{}
+	}
+	return handled, policy.IncludeAll, nil
 }

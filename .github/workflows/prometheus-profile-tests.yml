@@ -110,5 +110,6 @@ jobs:
           cd src/go
           go test -count=1 \
             ./internal/promtestdata \
+            ./internal/promprofilevalidation \
             ./tools/prometheus-profile-validation \
             ./plugin/go.d/collector/prometheus/...

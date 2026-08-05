@@ -22,16 +22,18 @@ type planSeriesDiagnostic struct {
 }
 
 type planRouteSummary struct {
-	series        map[metrix.SeriesID]*planSeriesDiagnostic
-	templates     map[string]*planTemplateDiagnostic
-	ownersByChart map[string]map[string]struct{}
+	series                    map[metrix.SeriesID]*planSeriesDiagnostic
+	templates                 map[string]*planTemplateDiagnostic
+	resolvedTemplatesBySeries map[metrix.SeriesID]map[string]struct{}
+	ownersByChart             map[string]map[string]struct{}
 }
 
 func newPlanRouteSummary() *planRouteSummary {
 	return &planRouteSummary{
-		series:        make(map[metrix.SeriesID]*planSeriesDiagnostic),
-		templates:     make(map[string]*planTemplateDiagnostic),
-		ownersByChart: make(map[string]map[string]struct{}),
+		series:                    make(map[metrix.SeriesID]*planSeriesDiagnostic),
+		templates:                 make(map[string]*planTemplateDiagnostic),
+		resolvedTemplatesBySeries: make(map[metrix.SeriesID]map[string]struct{}),
+		ownersByChart:             make(map[string]map[string]struct{}),
 	}
 }
 
@@ -64,10 +66,15 @@ func (s *planRouteSummary) observe(fact chartengine.PlanRouteDiagnostic) {
 		template.chartIDs[fact.ChartID] = struct{}{}
 		template.instanceIdentities[fact.InstanceIdentity] = struct{}{}
 		template.dimensionIndexes[fact.DimensionIndex] = struct{}{}
-		template.resolvedSeries[fact.SeriesIdentity.ID] = struct{}{}
 		if fact.DimensionKeyLabel != "" {
 			template.dimensionKeyLabels[fact.DimensionKeyLabel] = struct{}{}
 		}
+		resolvedTemplates := s.resolvedTemplatesBySeries[fact.SeriesIdentity.ID]
+		if resolvedTemplates == nil {
+			resolvedTemplates = make(map[string]struct{})
+			s.resolvedTemplatesBySeries[fact.SeriesIdentity.ID] = resolvedTemplates
+		}
+		resolvedTemplates[fact.ChartTemplateID] = struct{}{}
 		output := planDimensionOutput{chartID: fact.ChartID, name: fact.DimensionName}
 		template.dimensionOutputs[output] = struct{}{}
 		template.dimensionIdentities[planDimensionIdentity{
@@ -126,7 +133,6 @@ type planTemplateDiagnostic struct {
 	chartIDs            map[string]struct{}
 	instanceIdentities  map[chartengine.PlanInstanceIdentity]struct{}
 	dimensionIndexes    map[int]struct{}
-	resolvedSeries      map[metrix.SeriesID]struct{}
 	dimensionKeyLabels  map[string]struct{}
 	dimensionOutputs    map[planDimensionOutput]struct{}
 	dimensionIdentities map[planDimensionIdentity]struct{}
@@ -144,7 +150,6 @@ func (s *planRouteSummary) template(templateID string) *planTemplateDiagnostic {
 		chartIDs:            make(map[string]struct{}),
 		instanceIdentities:  make(map[chartengine.PlanInstanceIdentity]struct{}),
 		dimensionIndexes:    make(map[int]struct{}),
-		resolvedSeries:      make(map[metrix.SeriesID]struct{}),
 		dimensionKeyLabels:  make(map[string]struct{}),
 		dimensionOutputs:    make(map[planDimensionOutput]struct{}),
 		dimensionIdentities: make(map[planDimensionIdentity]struct{}),
