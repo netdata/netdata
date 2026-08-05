@@ -116,7 +116,16 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
 
     // Everything above applies to every caller: whatever it does next, it must not
     // be pointed at another directory by a symlink planted at this name.
-    //
+
+#if defined(OS_WINDOWS)
+    // Nothing below applies here, for either caller. Windows has no POSIX
+    // ownership: Cygwin synthesizes st_uid from the NTFS ACL (there is no uid 0)
+    // and never reports a sticky bit unless one was set explicitly, so those checks
+    // would refuse every candidate and leave the agent with no run dir at all.
+    // There is also no privilege drop here, so there is nothing for them to
+    // protect.
+    return true;
+#else
     // Everything below is about who may replace this directory while we act on it
     // as root, so it is the writable caller's question alone. A read-only caller
     // creates nothing, chowns nothing and binds nothing - it opens what is already
@@ -132,14 +141,6 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
     if (!rw)
         return true;
 
-#if defined(OS_WINDOWS)
-    // Windows has no POSIX ownership: Cygwin synthesizes st_uid from the NTFS
-    // ACL (there is no uid 0) and never reports a sticky bit unless one was set
-    // explicitly, so the check below would refuse every candidate and leave the
-    // agent with no run dir at all. There is also no privilege drop here, so
-    // there is nothing for it to protect.
-    return true;
-#else
     // The leaf's own mode matters as much as its parent's: everything netdata
     // puts here (the spawn server sockets, netdata.pipe) is created and used
     // while still root, so a directory every local user can write into lets any
