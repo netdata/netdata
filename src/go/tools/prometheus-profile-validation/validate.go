@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -122,17 +121,33 @@ func validateProfile(opts validationOptions) report {
 	addAuthoredProfileHeuristics(authoredTemplate, r.RawFamilies, &r)
 	addObservedDistributionHeuristics(authoredTemplate, r.RawFamilies, &r)
 
-	coll := promcollector.NewWithOptions(promcollector.WithProfileCatalog(catalog))
+	pipelineSummary := newPipelineDiagnosticSummary(policy, rawSamples)
+	coll := promcollector.NewWithOptions(
+		promcollector.WithProfileCatalog(catalog),
+		promcollector.WithPipelineDiagnosticObserver(pipelineSummary.observe),
+	)
 	r.Job = applyJobPolicy(coll, policy, isolated.fileURL, isolated.profileName)
 	if err := coll.Init(ctx); err != nil {
 		r.addError("collector_init", opts.jobPath, err.Error(), "Selector, relabeling, fallback typing, limits, and exact profile selection are validated by the real collector.")
 		return r
 	}
 	defer coll.Cleanup(context.Background())
-	addJobDenyReview(policy.Selector, rawSamples, r.RawFamilies, &r)
-	relabelAudits := addRelabelPolicyReview(policy.Selector, policy.Relabeling, policy.FallbackType, rawSamples, &r)
-	addForwardCompatibilityChecks(profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r)
+	writerEligibility, err := coll.InspectWriterEligibility(rawFamilies)
+	if err != nil {
+		r.addError("writer_inspection", opts.dumpPath, err.Error(), "Selector policy review must use the initialized production writer policy.")
+		return r
+	}
+	writerEligibleFamilies := make(map[string]struct{})
+	for _, family := range writerEligibility {
+		if family.WritableSeries > 0 {
+			writerEligibleFamilies[family.Family] = struct{}{}
+		}
+	}
+	addJobDenyReview(policy.Selector, rawSamples, writerEligibleFamilies, &r)
 	if err := coll.Check(ctx); err != nil {
+		relabelAudits := pipelineSummary.finalize()
+		addRelabelPolicyFindings(relabelAudits, &r)
+		addForwardCompatibilityChecks(profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r)
 		r.addError("collector_check", opts.dumpPath, err.Error(), "The candidate must match the post-policy scrape and pass the collector startup gates.")
 		return r
 	}
@@ -153,11 +168,14 @@ func validateProfile(opts validationOptions) report {
 		r.addError("collector_commit", "", err.Error(), "Only successfully committed series are valid chartengine evidence.")
 		return r
 	}
+	relabelAudits := pipelineSummary.finalize()
+	addRelabelPolicyFindings(relabelAudits, &r)
+	addForwardCompatibilityChecks(profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r)
 
 	reader := coll.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	materializedFamilies := inventoryWriterSeries(reader)
 	r.Counts.WriterSeries = materializedFamilies.series
-	r.PipelineExcluded, r.PipelineRenamed = reconcileRawFamilies(r.RawFamilies, materializedFamilies, r.Job, relabelAudits.provenance)
+	r.PipelineExcluded, r.PipelineRenamed = reconcileRawFamilies(r.RawFamilies, r.Job, pipelineSummary)
 	r.Counts.PipelineExcluded = len(r.PipelineExcluded)
 	r.Counts.PipelineRenamed = len(r.PipelineRenamed)
 
@@ -489,80 +507,21 @@ func inventoryRawFamilies(families prompkg.MetricFamilies) ([]rawFamilyReport, i
 }
 
 type writerInventory struct {
-	sourceSeries map[writerSeriesKey]struct{}
-	series       int
+	series int
 }
 
 func inventoryWriterSeries(reader metrix.Reader) writerInventory {
-	out := writerInventory{
-		sourceSeries: make(map[writerSeriesKey]struct{}),
-	}
-	reader.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, _ metrix.SampleValue) {
+	var out writerInventory
+	reader.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, _ metrix.SeriesMeta, _ string, _ metrix.LabelView, _ metrix.SampleValue) {
 		out.series++
-		family := sourceFamilyName(name, meta)
-		out.sourceSeries[writerSeriesKey{family: family, identity: sourceIdentityKey(labels, meta)}] = struct{}{}
 	})
 	return out
 }
 
-func (i writerInventory) contains(key writerSeriesKey) bool {
-	_, ok := i.sourceSeries[key]
-	return ok
-}
-
-func sourceIdentityKey(labels metrix.LabelView, meta metrix.SeriesMeta) string {
-	exclude := ""
-	switch meta.FlattenRole {
-	case metrix.FlattenRoleHistogramBucket:
-		exclude = metrix.HistogramBucketLabel
-	case metrix.FlattenRoleSummaryQuantile:
-		exclude = metrix.SummaryQuantileLabel
-	}
-
-	var keys []string
-	labels.Range(func(key, _ string) bool {
-		if key != exclude {
-			keys = append(keys, key)
-		}
-		return true
-	})
-	sort.Strings(keys)
-
-	var b strings.Builder
-	for _, key := range keys {
-		value, _ := labels.Get(key)
-		fmt.Fprintf(&b, "%d:%s=%d:%s;", len(key), key, len(value), value)
-	}
-	return b.String()
-}
-
-func sourceFamilyName(name string, meta metrix.SeriesMeta) string {
-	switch meta.SourceKind {
-	case metrix.MetricKindHistogram:
-		switch meta.FlattenRole {
-		case metrix.FlattenRoleHistogramBucket:
-			return strings.TrimSuffix(name, "_bucket")
-		case metrix.FlattenRoleHistogramCount:
-			return strings.TrimSuffix(name, "_count")
-		case metrix.FlattenRoleHistogramSum:
-			return strings.TrimSuffix(name, "_sum")
-		}
-	case metrix.MetricKindSummary:
-		switch meta.FlattenRole {
-		case metrix.FlattenRoleSummaryCount:
-			return strings.TrimSuffix(name, "_count")
-		case metrix.FlattenRoleSummarySum:
-			return strings.TrimSuffix(name, "_sum")
-		}
-	}
-	return name
-}
-
 func reconcileRawFamilies(
 	raw []rawFamilyReport,
-	writer writerInventory,
 	job effectiveJobReport,
-	provenance pipelineProvenance,
+	pipeline *pipelineDiagnosticSummary,
 ) ([]pipelineExcludedReport, []pipelineRenamedReport) {
 	var excluded []pipelineExcludedReport
 	var renamed []pipelineRenamedReport
@@ -571,17 +530,18 @@ func reconcileRawFamilies(
 		writerSeries := 0
 		renamedSeries := 0
 		finalNames := make(map[string]struct{})
-		for _, destinations := range provenance[family.Name] {
+		for source := range pipeline.sourcesByFamily[family.Name] {
+			destinations := pipeline.audits.provenance[source]
 			materialized := false
 			materializedRename := false
 			for destination := range destinations {
-				if !writer.contains(destination) {
+				if _, accepted := pipeline.writerAccepted[destination]; !accepted {
 					continue
 				}
 				materialized = true
-				if destination.family != family.Name {
+				if destination.series.Family != family.Name {
 					materializedRename = true
-					finalNames[destination.family] = struct{}{}
+					finalNames[destination.series.Family] = struct{}{}
 				}
 			}
 			if materialized {
@@ -613,7 +573,7 @@ func reconcileRawFamilies(
 			switch {
 			case family.Shape == "info_suffix":
 				category = "writer_policy_skips_info_suffix"
-			case job.MaxSeriesPerMetric > 0 && family.Series > job.MaxSeriesPerMetric:
+			case pipeline.writerFamilyRejects[family.Name] == promcollector.PipelineReasonSeriesLimit:
 				category = "writer_policy_series_limit"
 			case family.Shape == "summary_without_quantiles":
 				category = "writer_requires_summary_quantiles"
@@ -621,6 +581,10 @@ func reconcileRawFamilies(
 				category = "writer_requires_histogram_buckets"
 			case family.Shape == "untyped" && !strings.HasSuffix(family.Name, "_total"):
 				category = "untyped_requires_matching_fallback_type"
+			case pipeline.writerFamilyRejects[family.Name] == promcollector.PipelineReasonInvalidFamilySchema:
+				category = "writer_invalid_family_schema"
+			case pipeline.writerFamilyRejects[family.Name] == promcollector.PipelineReasonUnsupportedType:
+				category = "writer_unsupported_type"
 			}
 		}
 		excluded = append(excluded, pipelineExcludedReport{

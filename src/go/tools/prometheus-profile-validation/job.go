@@ -12,6 +12,7 @@ import (
 
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,14 +26,14 @@ type validationOptions struct {
 // TLS, and profile selection are forced by the validator so a validation run
 // cannot contact an arbitrary service or load a different profile.
 type jobPolicy struct {
-	Name           string                       `yaml:"name,omitempty"`
-	Application    string                       `yaml:"app,omitempty"`
-	Selector       promselector.Expr            `yaml:"selector,omitempty"`
-	Relabeling     []promcollector.RelabelBlock `yaml:"relabeling,omitempty"`
-	FallbackType   fallbackTypePolicy           `yaml:"fallback_type,omitempty"`
-	ExpectedPrefix string                       `yaml:"expected_prefix,omitempty"`
-	MaxTS          *int                         `yaml:"max_time_series,omitempty"`
-	MaxTSPerMetric *int                         `yaml:"max_time_series_per_metric,omitempty"`
+	Name           string             `yaml:"name,omitempty"`
+	Application    string             `yaml:"app,omitempty"`
+	Selector       promselector.Expr  `yaml:"selector,omitempty"`
+	Relabeling     []relabel.Block    `yaml:"relabeling,omitempty"`
+	FallbackType   fallbackTypePolicy `yaml:"fallback_type,omitempty"`
+	ExpectedPrefix string             `yaml:"expected_prefix,omitempty"`
+	MaxTS          *int               `yaml:"max_time_series,omitempty"`
+	MaxTSPerMetric *int               `yaml:"max_time_series_per_metric,omitempty"`
 }
 
 type fallbackTypePolicy struct {

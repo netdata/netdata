@@ -18,7 +18,7 @@ func (c *Collector) profileRelabelAndAssemble(
 		source := helpFamilyName(raw)
 		result := relabelResult{raw: raw, sample: raw}
 		if idx, ok := normalizerIndexByFamily[source]; ok {
-			result.sample, result.drop = normalizers[idx].pipeline.Apply(raw)
+			result.sample, result.drop = c.applyObservedPipeline(raw, normalizers[idx].pipeline, false, false)
 		}
 		c.appendRelabelResult(&processed, t, help, profileRelabelStage, result)
 	}

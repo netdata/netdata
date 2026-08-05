@@ -111,6 +111,12 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 	if err != nil {
 		return nil, nil, false, err
 	}
+	for _, profile := range candidate.profiles {
+		c.observePipeline(PipelineDiagnostic{
+			Decision:    PipelineProfileSelected,
+			ProfileName: profile.Name,
+		})
+	}
 	normalizationOrder := profilesInNormalizationOrder(candidate.profiles, c.Profiles)
 	candidate.fallbacks, err = compileProfileFallbacks(normalizationOrder)
 	if err != nil {
@@ -207,7 +213,7 @@ func (c *Collector) validateExpectedPrefix(mfs prometheus.MetricFamilies) error 
 // classified sample stream and runs the relabel pipeline (relabel, assemble, curate typed
 // families) in relabelAndAssemble.
 func (c *Collector) scrapeMetricFamilies(ctx context.Context, checking bool) (prometheus.MetricFamilies, error) {
-	if c.jobRelabel == nil {
+	if c.jobRelabel == nil && c.pipelineObserver == nil {
 		return c.prom.ScrapeContext(ctx)
 	}
 

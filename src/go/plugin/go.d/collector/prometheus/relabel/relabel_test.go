@@ -427,6 +427,47 @@ func TestProcessor_Apply(t *testing.T) {
 	}
 }
 
+func TestProcessorApplyWithObserverReportsActualRuleBoundaries(t *testing.T) {
+	processor, err := New([]Config{
+		{
+			SourceLabels: []string{commonmodel.MetricNameLabel},
+			Regex:        MustNewRegexp("app_(.*)"),
+			TargetLabel:  commonmodel.MetricNameLabel,
+			Replacement:  "service_${1}",
+			Action:       Replace,
+		},
+		{
+			SourceLabels: []string{commonmodel.MetricNameLabel},
+			Regex:        MustNewRegexp("service_drop"),
+			Action:       Drop,
+		},
+	})
+	require.NoError(t, err)
+
+	var facts []RuleDiagnostic
+	_, drop := processor.ApplyWithObserver(
+		sample("app_drop", nil, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+		func(fact RuleDiagnostic) { facts = append(facts, fact) },
+	)
+	require.True(t, drop.Dropped())
+	require.Len(t, facts, 2)
+	assert.Equal(t, RuleDiagnostic{
+		RuleIndex:        0,
+		Action:           Replace,
+		InputMetricName:  "app_drop",
+		OutputMetricName: "service_drop",
+		Matched:          true,
+	}, facts[0])
+	assert.Equal(t, RuleDiagnostic{
+		RuleIndex:        1,
+		Action:           Drop,
+		InputMetricName:  "service_drop",
+		OutputMetricName: "service_drop",
+		Matched:          true,
+		Dropped:          true,
+	}, facts[1])
+}
+
 func TestNew_Validate(t *testing.T) {
 	tests := map[string]struct {
 		cfgs        []Config

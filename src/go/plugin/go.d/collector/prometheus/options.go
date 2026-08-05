@@ -15,3 +15,11 @@ func WithProfileCatalog(catalog promprofiles.Catalog) CollectorOption {
 		c.loadProfileCatalog = func() (promprofiles.Catalog, error) { return catalog, nil }
 	}
 }
+
+// WithPipelineDiagnosticObserver enables synchronous production-pipeline facts
+// for validation and tests. It does not change user collector configuration.
+func WithPipelineDiagnosticObserver(observe PipelineDiagnosticObserver) CollectorOption {
+	return func(c *Collector) {
+		c.pipelineObserver = observe
+	}
+}

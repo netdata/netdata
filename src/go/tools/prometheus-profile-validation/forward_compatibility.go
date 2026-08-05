@@ -18,7 +18,6 @@ import (
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/prometheus/prometheus/model/labels"
@@ -907,7 +906,7 @@ func finiteRegexpReplacementOutputs(expr, replacement string, limit int) ([]stri
 }
 
 func relabelRewritePreservesDynamicIdentity(
-	blocks []promcollector.RelabelBlock,
+	blocks []relabel.Block,
 	blockIndex, rewriteIndex int,
 	rewrite relabel.Config,
 	grammar boundedMetricNameGrammar,
@@ -956,7 +955,7 @@ func relabelRewritePreservesDynamicIdentity(
 }
 
 func laterRelabelBlocksPreserveLabel(
-	blocks []promcollector.RelabelBlock,
+	blocks []relabel.Block,
 	labelName string,
 	possibleNames []string,
 	nameUnknown bool,

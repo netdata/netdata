@@ -64,11 +64,12 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	prom       prometheus.Prometheus
-	jobRelabel *relabel.Pipeline
-	store      metrix.CollectorStore
-	writer     *metricFamilyWriter
-	runtime    *promRuntime
+	prom             prometheus.Prometheus
+	jobRelabel       *relabel.Pipeline
+	store            metrix.CollectorStore
+	writer           *metricFamilyWriter
+	runtime          *promRuntime
+	pipelineObserver PipelineDiagnosticObserver
 
 	// loadProfileCatalog resolves the profile catalog; a field so tests inject a fake.
 	loadProfileCatalog func() (promprofiles.Catalog, error)
@@ -110,6 +111,7 @@ func (c *Collector) Init(context.Context) error {
 		maxTSPerMetric:        c.MaxTSPerMetric,
 		isFallbackTypeGauge:   gaugeFallback,
 		isFallbackTypeCounter: counterFallback,
+		observePipeline:       c.pipelineObserver,
 	}, c.Logger)
 
 	return nil

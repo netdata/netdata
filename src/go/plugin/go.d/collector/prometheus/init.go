@@ -38,6 +38,9 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 	}
 
 	if sr != nil {
+		if c.pipelineObserver != nil {
+			sr = pipelineObservingSelector{next: sr, collector: c}
+		}
 		return prometheus.NewWithSelector(httpClient, req, sr), nil
 	}
 	return prometheus.New(httpClient, req), nil

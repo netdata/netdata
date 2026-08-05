@@ -111,3 +111,42 @@ func (p *Pipeline) Apply(sample prompkg.Sample) (prompkg.Sample, DropInfo) {
 	}
 	return sample, DropInfo{}
 }
+
+// ApplyWithObserver runs the same pipeline as Apply and reports entered blocks
+// and evaluated rules. It is intended for opt-in validation diagnostics.
+func (p *Pipeline) ApplyWithObserver(
+	sample prompkg.Sample,
+	observeBlock BlockDiagnosticObserver,
+	observeRule PipelineRuleDiagnosticObserver,
+) (prompkg.Sample, DropInfo) {
+	if p == nil {
+		return sample, DropInfo{}
+	}
+	for i := range p.blocks {
+		block := &p.blocks[i]
+		if !block.match.MatchString(sample.Name) {
+			continue
+		}
+		if observeBlock != nil {
+			labelNames := make([]string, 0, len(sample.Labels))
+			for _, label := range sample.Labels {
+				labelNames = append(labelNames, label.Name)
+			}
+			observeBlock(BlockDiagnostic{
+				BlockIndex:      i,
+				InputMetricName: sample.Name,
+				InputLabelNames: labelNames,
+			})
+		}
+		out, drop := block.proc.ApplyWithObserver(sample, func(fact RuleDiagnostic) {
+			if observeRule != nil {
+				observeRule(i, fact)
+			}
+		})
+		if drop.Dropped() {
+			return sample, drop
+		}
+		sample = out
+	}
+	return sample, DropInfo{}
+}
