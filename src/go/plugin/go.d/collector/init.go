@@ -107,6 +107,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/pulsar"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/puppet"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rabbitmq"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rasdaemon"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redis"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rethinkdb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/riakkv"
