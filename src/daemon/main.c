@@ -698,13 +698,11 @@ int netdata_main(int argc, char **argv) {
                             int rc = unittest_prepare_rrd(&user);
                             if (!rc)
                                 rc = dbengine_platform_unittest();
-                            if (rc)
-                                return rc;
 
                             sqlite_close_databases();
                             sqlite_library_shutdown();
                             rrdlabels_aral_destroy(false);
-                            return 0;
+                            return rc;
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
