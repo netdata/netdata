@@ -1,0 +1,5 @@
+{
+  "update_every": 10,
+  "timeout": 10,
+  "binary_path": "/usr/sbin/ras-mc-ctl"
+}
