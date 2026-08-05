@@ -73,10 +73,11 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 }
 
 // decodeProfile strict-decodes the one top-level profile document, retaining
-// template and relabeling nodes for lazy stock hydration. User profiles hydrate
-// both fields eagerly so a broken override is skipped and valid stock survives.
+// immutable raw bytes and a cheap relabel-presence signal for lazy stock
+// hydration. User profiles hydrate both fields eagerly so a broken override is
+// skipped and valid stock survives.
 func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) {
-	var doc profileDocument
+	var doc profileDocument[yaml.Node, yaml.Node]
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&doc); err != nil {
@@ -89,8 +90,8 @@ func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) 
 		App:             doc.App,
 		autogenSelector: nil,
 		lazy: &lazyProfile{
-			template:   doc.Template,
-			relabeling: doc.Relabeling,
+			raw:           bytes.Clone(data),
+			hasRelabeling: doc.Relabeling.Kind != 0,
 		},
 	}
 	if doc.Autogen != nil {

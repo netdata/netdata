@@ -17,15 +17,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
-// profileDocument is the single strict top-level profile shape. Heavy fields are
-// retained as nodes and typed-decoded only when hydrated, avoiding a second
-// top-level schema that could drift as fields are added.
-type profileDocument struct {
-	Match      string    `yaml:"match"`
-	App        string    `yaml:"app,omitempty"`
-	Autogen    *autogen  `yaml:"autogen,omitempty"`
-	Relabeling yaml.Node `yaml:"relabeling,omitempty"`
-	Template   yaml.Node `yaml:"template"`
+// profileDocument is the single strict top-level profile shape. Its heavy field
+// types vary by decode: yaml.Node for the cheap header pass and concrete types
+// for one lazy hydration. Decoding the complete raw document each time preserves
+// YAML anchors referenced across top-level fields without duplicating this list.
+type profileDocument[R, T any] struct {
+	Match      string   `yaml:"match"`
+	App        string   `yaml:"app,omitempty"`
+	Autogen    *autogen `yaml:"autogen,omitempty"`
+	Relabeling R        `yaml:"relabeling,omitempty"`
+	Template   T        `yaml:"template"`
 }
 
 type autogen struct {
@@ -51,12 +52,13 @@ type Profile struct {
 // lazyProfile holds deferred stock-profile fields. It is referenced by pointer so
 // Profile value copies share hydration and sync.Once values are never copied.
 type lazyProfile struct {
-	template     yaml.Node
+	raw           []byte
+	hasRelabeling bool
+
 	templateOnce sync.Once
 	tmpl         charttpl.Group
 	templateErr  error
 
-	relabeling     yaml.Node
 	relabelingOnce sync.Once
 	blocks         []relabel.Block
 	relabelingErr  error
@@ -71,7 +73,7 @@ func (p Profile) Template() (charttpl.Group, error) {
 		return charttpl.Group{}, fmt.Errorf("profile %q: no template loaded", p.Name)
 	}
 	p.lazy.templateOnce.Do(func() {
-		p.lazy.tmpl, p.lazy.templateErr = parseTemplate(p.Name, p.lazy.template)
+		p.lazy.tmpl, p.lazy.templateErr = parseTemplate(p.Name, p.lazy.raw)
 	})
 	if p.lazy.templateErr != nil {
 		return charttpl.Group{}, p.lazy.templateErr
@@ -83,7 +85,7 @@ func (p Profile) Template() (charttpl.Group, error) {
 // without hydrating it. Present null and empty values return true so their
 // validation errors cannot silently take the no-relabel fast path.
 func (p Profile) HasRelabeling() bool {
-	return p.lazy != nil && p.lazy.relabeling.Kind != 0
+	return p.lazy != nil && p.lazy.hasRelabeling
 }
 
 // Relabeling hydrates and validates profile-owned relabel blocks on first use.
@@ -93,7 +95,7 @@ func (p Profile) Relabeling() ([]relabel.Block, error) {
 		return nil, nil
 	}
 	p.lazy.relabelingOnce.Do(func() {
-		p.lazy.blocks, p.lazy.relabelingErr = parseRelabeling(p.Name, p.lazy.relabeling)
+		p.lazy.blocks, p.lazy.relabelingErr = parseRelabeling(p.Name, p.lazy.raw)
 	})
 	if p.lazy.relabelingErr != nil {
 		return nil, p.lazy.relabelingErr
@@ -156,16 +158,17 @@ func (p *Profile) validateHeader() error {
 	return nil
 }
 
-// parseTemplate typed-decodes and validates the retained chart-template node.
-func parseTemplate(name string, node yaml.Node) (charttpl.Group, error) {
-	if node.Kind == 0 {
-		return charttpl.Group{}, fmt.Errorf("profile %q: 'template' is required", name)
-	}
-
-	var group charttpl.Group
-	if err := decodeNodeStrict(node, &group); err != nil {
+// parseTemplate typed-decodes and validates the chart template from the complete
+// document so aliases may reference anchors declared in another top-level field.
+func parseTemplate(name string, raw []byte) (charttpl.Group, error) {
+	var doc profileDocument[yaml.Node, *charttpl.Group]
+	if err := decodeDocumentStrict(raw, &doc); err != nil {
 		return charttpl.Group{}, fmt.Errorf("profile %q: unmarshal 'template': %w", name, err)
 	}
+	if doc.Template == nil {
+		return charttpl.Group{}, fmt.Errorf("profile %q: 'template' is required", name)
+	}
+	group := *doc.Template
 
 	if !groupHasChart(group) {
 		return charttpl.Group{}, fmt.Errorf("profile %q: 'template' must contain at least one chart", name)
@@ -182,11 +185,12 @@ func parseTemplate(name string, node yaml.Node) (charttpl.Group, error) {
 	return group, nil
 }
 
-func parseRelabeling(name string, node yaml.Node) ([]relabel.Block, error) {
-	var blocks []relabel.Block
-	if err := decodeNodeStrict(node, &blocks); err != nil {
+func parseRelabeling(name string, raw []byte) ([]relabel.Block, error) {
+	var doc profileDocument[[]relabel.Block, yaml.Node]
+	if err := decodeDocumentStrict(raw, &doc); err != nil {
 		return nil, fmt.Errorf("profile %q: unmarshal 'relabeling': %w", name, err)
 	}
+	blocks := doc.Relabeling
 	if len(blocks) == 0 {
 		return nil, fmt.Errorf("profile %q: 'relabeling' must not be empty", name)
 	}
@@ -196,11 +200,7 @@ func parseRelabeling(name string, node yaml.Node) ([]relabel.Block, error) {
 	return blocks, nil
 }
 
-func decodeNodeStrict(node yaml.Node, dst any) error {
-	raw, err := yaml.Marshal(&node)
-	if err != nil {
-		return err
-	}
+func decodeDocumentStrict(raw []byte, dst any) error {
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	dec.KnownFields(true)
 	return dec.Decode(dst)

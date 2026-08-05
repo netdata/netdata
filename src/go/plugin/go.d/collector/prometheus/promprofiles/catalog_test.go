@@ -210,6 +210,61 @@ func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 	}
 }
 
+func TestProfileTemplateHydrationPreservesCrossFieldYAMLAnchors(t *testing.T) {
+	content := `match: &metric app_metric
+template:
+  family: test
+  metrics: [*metric]
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: *metric
+          name: value
+`
+
+	cat, err := loadCatalog(t, fileSpec{name: "app.yaml", content: content})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	_, err = profile.Template()
+	require.NoError(t, err)
+}
+
+func TestProfileRelabelHydrationPreservesCrossFieldYAMLAnchors(t *testing.T) {
+	content := `match: app_*
+app: &target app_normalized
+relabeling:
+  - match: app_raw
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_raw
+        target_label: __name__
+        replacement: *target
+template:
+  family: test
+  metrics: [app_normalized]
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: app_normalized
+          name: value
+`
+
+	cat, err := loadCatalog(t, fileSpec{name: "app.yaml", content: content})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	blocks, err := profile.Relabeling()
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+	require.Len(t, blocks[0].MetricRelabelConfigs, 1)
+	assert.Equal(t, "app_normalized", blocks[0].MetricRelabelConfigs[0].Replacement)
+}
+
 func TestProfileAutogenSelectorOwnership(t *testing.T) {
 	cat, err := loadCatalog(t, fileSpec{
 		stock: true,

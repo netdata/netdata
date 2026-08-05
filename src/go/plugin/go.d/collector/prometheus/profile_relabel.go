@@ -4,6 +4,7 @@ package prometheus
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -114,11 +115,8 @@ func resolveProfileOwners(batch prompkg.SampleBatch, normalizers []profileNormal
 			if !normalizer.root.MatchString(base) {
 				continue
 			}
-			for _, physicalName := range physicalNames {
-				if normalizer.pipeline.Matches(physicalName) {
-					candidates = append(candidates, normalizer)
-					break
-				}
+			if slices.ContainsFunc(physicalNames, normalizer.pipeline.Matches) {
+				candidates = append(candidates, normalizer)
 			}
 		}
 
