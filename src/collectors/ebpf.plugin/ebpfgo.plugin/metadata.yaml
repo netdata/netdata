@@ -350,7 +350,7 @@ modules:
               required: false
             - name: btf path
               description: Path to the directory containing BTF files used for CO-RE (Compile Once, Run Everywhere) loading.
-              default_value: /sys/kernel/btf/
+              default_value: /sys/kernel/btf
               required: false
             - name: ebpf object flavor
               description: "Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel."

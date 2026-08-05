@@ -135,8 +135,9 @@ typedef struct {
 } netdata_socket_rb_event_t;
 
 /* Per-PID aggregated socket metrics — output type for per-PID snapshot.
- * Field order mirrors ebpf_socket_publish_apps_t in ebpf-ipc.h so the Go
- * layer can copy directly into ebpfSocketPublishApps. */
+ * Field order mirrors struct ebpf_socket_publish_apps in
+ * apps_ebpf_shared_pid_row.h so the Go layer can copy directly into
+ * ebpfSocketPublishApps. */
 struct netdata_socket_per_pid_entry {
     uint32_t pid;
     uint64_t bytes_sent;       /* tcp_bytes_sent: TCP only; UDP traffic is in udp_bytes_sent */

@@ -49,6 +49,8 @@ func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
 	}
 }
 
+// Snapshot returns a copy of the current in-memory entries.
+// Used only by tests to inspect store state; production code reads via Publish.
 func (s *cachestatSharedMemoryStore) Snapshot() []ebpfPidStat {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
