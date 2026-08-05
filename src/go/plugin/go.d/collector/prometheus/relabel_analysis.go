@@ -162,6 +162,12 @@ func (a *RelabelNameFlowAnalyzer) PreservedCaptureLabel(
 		if err != nil {
 			return "", false, err
 		}
+		preservesNameBefore, err := a.relabel.RulesPreserveLabel(
+			rules[ruleIndex+1:rewriteIndex], labels.MetricName, nil,
+		)
+		if err != nil {
+			return "", false, err
+		}
 		preservesAfter, err := a.relabel.RulesPreserveLabel(
 			rules[rewriteIndex+1:], candidate.TargetLabel, possibleOutputs,
 		)
@@ -178,7 +184,7 @@ func (a *RelabelNameFlowAnalyzer) PreservedCaptureLabel(
 		if err != nil {
 			return "", false, err
 		}
-		if preservesBefore && preservesAfter && preservesLater {
+		if preservesBefore && preservesNameBefore && preservesAfter && preservesLater {
 			return candidate.TargetLabel, true, nil
 		}
 	}

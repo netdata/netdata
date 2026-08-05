@@ -536,10 +536,11 @@ func (a *Analyzer) concatFiniteValues(left, right []string) ([]string, bool, err
 	if len(left) == 0 || len(right) == 0 {
 		return nil, true, nil
 	}
-	if len(left) > a.budget.MaxValues/len(right) {
-		return nil, false, nil
+	capacity := a.budget.MaxValues
+	if len(left) <= a.budget.MaxValues/len(right) {
+		capacity = len(left) * len(right)
 	}
-	values := make(map[string]struct{}, len(left)*len(right))
+	values := make(map[string]struct{}, capacity)
 	for _, prefix := range left {
 		for _, suffix := range right {
 			if err := a.step(1); err != nil {

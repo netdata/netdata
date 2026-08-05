@@ -41,6 +41,45 @@ app_histogram_count 7
 	assert.Equal(t, withoutDiagnostics, withDiagnostics)
 }
 
+func TestPipelineDiagnosticsDoNotChangeRelabelOutput(t *testing.T) {
+	dumpPath := filepath.Join(t.TempDir(), "metrics.txt")
+	require.NoError(t, os.WriteFile(dumpPath, []byte(`
+# TYPE raw_keep gauge
+raw_keep 1
+# TYPE raw_drop gauge
+raw_drop 2
+`), 0o600))
+	configure := func(collector *Collector) {
+		collector.Relabeling = []relabel.Block{
+			{
+				Match: "raw_*",
+				MetricRelabelConfigs: []relabel.Config{{
+					SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp(`raw_(.*)`),
+					TargetLabel: "__name__", Replacement: `app_${1}`, Action: relabel.Replace,
+				}},
+			},
+			{
+				Match: "app_*",
+				MetricRelabelConfigs: []relabel.Config{{
+					TargetLabel: "stage", Replacement: "validated", Action: relabel.Replace,
+				}},
+			},
+			{
+				Match: "app_drop",
+				MetricRelabelConfigs: []relabel.Config{{
+					SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp(`app_drop`), Action: relabel.Drop,
+				}},
+			},
+		}
+	}
+
+	withoutDiagnostics := collectConfiguredPipelineSnapshot(t, "file://"+dumpPath, configure)
+	withDiagnostics := collectConfiguredPipelineSnapshot(
+		t, "file://"+dumpPath, configure, WithPipelineDiagnosticObserver(func(PipelineDiagnostic) {}),
+	)
+	assert.Equal(t, withoutDiagnostics, withDiagnostics)
+}
+
 func TestWriterPipelineDiagnosticDistinguishesInvalidValue(t *testing.T) {
 	var facts []PipelineDiagnostic
 	store := metrix.NewCollectorStore()
@@ -195,7 +234,7 @@ ignored 1
 	})
 	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
 		return fact.Decision == PipelineRelabelDropped &&
-			fact.RuleIndex == 1 && fact.RelabelAction == relabel.Drop
+			fact.RuleIndex == 1 && fact.RelabelAction == relabel.Drop && fact.MetricName == "app_value"
 	})
 	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
 		return fact.Decision == PipelineRelabelOutput &&
@@ -230,9 +269,21 @@ func assertPipelineFact(t *testing.T, facts []PipelineDiagnostic, matches func(P
 }
 
 func collectPipelineSnapshot(t *testing.T, url string, opts ...CollectorOption) map[string]uint64 {
+	return collectConfiguredPipelineSnapshot(t, url, nil, opts...)
+}
+
+func collectConfiguredPipelineSnapshot(
+	t *testing.T,
+	url string,
+	configure func(*Collector),
+	opts ...CollectorOption,
+) map[string]uint64 {
 	t.Helper()
 	collector := NewWithOptions(opts...)
 	collector.URL = url
+	if configure != nil {
+		configure(collector)
+	}
 	require.NoError(t, collector.Init(context.Background()))
 	t.Cleanup(func() { collector.Cleanup(context.Background()) })
 	require.NoError(t, collector.Check(context.Background()))

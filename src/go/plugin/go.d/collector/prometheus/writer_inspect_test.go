@@ -4,8 +4,11 @@ package prometheus
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,5 +63,49 @@ app_summary_count 0
 	for _, item := range got {
 		assert.Equal(t, PipelineReasonInvalidSeriesValue, item.RejectionReason, item.Family)
 		assert.Zero(t, item.WritableSeries, item.Family)
+	}
+}
+
+func TestInspectWriterEligibilityHonorsExistingFamilyContract(t *testing.T) {
+	tests := map[string]struct {
+		initial string
+		inspect string
+		reason  PipelineReason
+	}{
+		"family type drift": {
+			initial: "# TYPE app_value gauge\napp_value 1\n",
+			inspect: "# TYPE app_value counter\napp_value 2\n",
+			reason:  PipelineReasonFamilyTypeDrift,
+		},
+		"distribution schema drift": {
+			initial: "# TYPE app_value histogram\napp_value_bucket{le=\"1\"} 1\napp_value_bucket{le=\"+Inf\"} 1\napp_value_sum 1\napp_value_count 1\n",
+			inspect: "# TYPE app_value histogram\napp_value_bucket{le=\"2\"} 1\napp_value_bucket{le=\"+Inf\"} 1\napp_value_sum 1\napp_value_count 1\n",
+			reason:  PipelineReasonDistributionSchemaDrift,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			dumpPath := filepath.Join(t.TempDir(), "metrics.txt")
+			require.NoError(t, os.WriteFile(dumpPath, []byte(tc.initial), 0o600))
+
+			collector := New()
+			collector.URL = "file://" + dumpPath
+			require.NoError(t, collector.Init(context.Background()))
+			defer collector.Cleanup(context.Background())
+			require.NoError(t, collector.Check(context.Background()))
+
+			managed, ok := metrix.AsCycleManagedStore(collector.MetricStore())
+			require.True(t, ok)
+			managed.CycleController().BeginCycle()
+			require.NoError(t, collector.Collect(context.Background()))
+			require.NoError(t, managed.CycleController().CommitCycleSuccess())
+
+			got, err := collector.InspectWriterEligibility(scrape(t, tc.inspect))
+			require.NoError(t, err)
+			require.Equal(t, []WriterEligibility{{
+				Family: "app_value", TotalSeries: 1, RejectionReason: tc.reason,
+			}}, got)
+		})
 	}
 }

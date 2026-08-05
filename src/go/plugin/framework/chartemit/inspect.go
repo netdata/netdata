@@ -3,10 +3,6 @@
 package chartemit
 
 import (
-	"cmp"
-	"slices"
-	"sort"
-
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
@@ -36,6 +32,24 @@ type DimensionInspection struct {
 	Obsolete      bool
 }
 
+type inspectionDefinitionVisitor struct {
+	out *PlanInspection
+	env EmitEnv
+}
+
+func (v inspectionDefinitionVisitor) visitChart(
+	chartID string,
+	meta chartengine.ChartMeta,
+	_ map[string]string,
+	_, obsolete bool,
+) {
+	v.out.addChart(v.env, chartID, meta, obsolete)
+}
+
+func (v inspectionDefinitionVisitor) visitDimension(chartID string, dim dimensionEmission) {
+	v.out.addDimension(v.env, chartID, dim)
+}
+
 // InspectPlan returns structured definition facts from the same normalization,
 // sanitization, ordering, and type-ID budget used by ApplyPlan.
 func InspectPlan(plan Plan, env EmitEnv) (PlanInspection, error) {
@@ -48,85 +62,11 @@ func InspectPlan(plan Plan, env EmitEnv) (PlanInspection, error) {
 	}
 
 	var out PlanInspection
-	inspectCreatePhase(&out, env, actions)
-	inspectLabelUpdatePhase(&out, env, actions.updateLabels)
-	inspectRemovePhase(&out, env, actions)
+	visitor := inspectionDefinitionVisitor{out: &out, env: env}
+	visitCreatePhase(visitor, actions)
+	visitLabelUpdatePhase(visitor, actions.updateLabels)
+	visitRemovePhase(visitor, actions)
 	return out, nil
-}
-
-func inspectCreatePhase(out *PlanInspection, env EmitEnv, actions normalizedActions) {
-	createdChartIDs := make([]string, 0, len(actions.createCharts))
-	for chartID := range actions.createCharts {
-		createdChartIDs = append(createdChartIDs, chartID)
-	}
-	sort.Strings(createdChartIDs)
-	for _, chartID := range createdChartIDs {
-		createChart := actions.createCharts[chartID]
-		out.addChart(env, createChart.ChartID, createChart.Meta, false)
-		for _, dim := range actions.createDimsByID[chartID] {
-			out.addDimension(env, dim.ChartID, dimensionEmission{
-				Name:       dim.Name,
-				Hidden:     dim.Hidden,
-				Float:      dim.Float,
-				Algorithm:  string(dim.Algorithm),
-				Multiplier: dim.Multiplier,
-				Divisor:    dim.Divisor,
-			})
-		}
-		delete(actions.createDimsByID, chartID)
-	}
-
-	remainingChartIDs := make([]string, 0, len(actions.createDimsByID))
-	for chartID := range actions.createDimsByID {
-		remainingChartIDs = append(remainingChartIDs, chartID)
-	}
-	sort.Strings(remainingChartIDs)
-	for _, chartID := range remainingChartIDs {
-		dims := actions.createDimsByID[chartID]
-		if len(dims) == 0 {
-			continue
-		}
-		out.addChart(env, chartID, dims[0].ChartMeta, false)
-		for _, dim := range dims {
-			out.addDimension(env, chartID, dimensionEmission{
-				Name:       dim.Name,
-				Hidden:     dim.Hidden,
-				Float:      dim.Float,
-				Algorithm:  string(dim.Algorithm),
-				Multiplier: dim.Multiplier,
-				Divisor:    dim.Divisor,
-			})
-		}
-	}
-}
-
-func inspectLabelUpdatePhase(out *PlanInspection, env EmitEnv, updates []UpdateChartLabelsAction) {
-	if len(updates) > 1 {
-		slices.SortFunc(updates, func(a, b UpdateChartLabelsAction) int {
-			return cmp.Compare(a.ChartID, b.ChartID)
-		})
-	}
-	for _, update := range updates {
-		out.addChart(env, update.ChartID, update.Meta, false)
-	}
-}
-
-func inspectRemovePhase(out *PlanInspection, env EmitEnv, actions normalizedActions) {
-	for _, removeDim := range actions.removeDimensions {
-		out.addChart(env, removeDim.ChartID, removeDim.ChartMeta, false)
-		out.addDimension(env, removeDim.ChartID, dimensionEmission{
-			Name:       removeDim.Name,
-			Hidden:     removeDim.Hidden,
-			Float:      removeDim.Float,
-			Algorithm:  string(removeDim.Algorithm),
-			Multiplier: removeDim.Multiplier,
-			Divisor:    removeDim.Divisor,
-			Obsolete:   true,
-		})
-	}
-	for _, removeChart := range actions.removeCharts {
-		out.addChart(env, removeChart.ChartID, removeChart.Meta, true)
-	}
 }
 
 func (p *PlanInspection) addChart(env EmitEnv, chartID string, meta chartengine.ChartMeta, obsolete bool) {

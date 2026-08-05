@@ -216,6 +216,16 @@ func TestAnalyzerMaxValuesIncludesOptionalEmptyValue(t *testing.T) {
 	}
 }
 
+func TestAnalyzerDeduplicatesConcatenationBeforeMaxValues(t *testing.T) {
+	analyzer, err := NewAnalyzer(context.Background(), AnalysisBudget{MaxValues: 3})
+	require.NoError(t, err)
+
+	values, finite, err := analyzer.EnumerateFiniteRegexp(`ab?b?`)
+	require.NoError(t, err)
+	assert.True(t, finite)
+	assert.Equal(t, []string{"a", "ab", "abb"}, values)
+}
+
 func TestParseReplacementTemplateAllocationEnvelope(t *testing.T) {
 	template := strings.Repeat(`$-`, 512)
 	allocations := testing.AllocsPerRun(10, func() {

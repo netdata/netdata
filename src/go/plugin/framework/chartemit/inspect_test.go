@@ -45,3 +45,27 @@ func TestInspectPlanClassifiesTypeIDBudgetFailure(t *testing.T) {
 	_, err := InspectPlan(plan, EmitEnv{TypeID: strings.Repeat("x", maxTypeIDLen)})
 	require.ErrorIs(t, err, ErrTypeIDBudgetExceeded)
 }
+
+func TestInspectPlanVisitsEveryDefinitionPhase(t *testing.T) {
+	meta := chartengine.ChartMeta{Context: "service.requests"}
+	plan := Plan{Actions: []EngineAction{
+		CreateChartAction{ChartID: "created", Meta: meta},
+		CreateDimensionAction{ChartID: "created", ChartMeta: meta, Name: "created_dim"},
+		UpdateChartLabelsAction{ChartID: "labels", Meta: meta},
+		RemoveDimensionAction{ChartID: "removed_dim_chart", ChartMeta: meta, Name: "removed_dim"},
+		RemoveChartAction{ChartID: "removed_chart", Meta: meta},
+	}}
+
+	inspection, err := InspectPlan(plan, EmitEnv{TypeID: "job.full_name", UpdateEvery: 1})
+	require.NoError(t, err)
+	assert.Equal(t, []ChartInspection{
+		{SourceChartID: "created", SourceContext: meta.Context, WireTypeID: "job.full_name", WireChartID: "created", WireContext: meta.Context},
+		{SourceChartID: "labels", SourceContext: meta.Context, WireTypeID: "job.full_name", WireChartID: "labels", WireContext: meta.Context},
+		{SourceChartID: "removed_dim_chart", SourceContext: meta.Context, WireTypeID: "job.full_name", WireChartID: "removed_dim_chart", WireContext: meta.Context},
+		{SourceChartID: "removed_chart", SourceContext: meta.Context, WireTypeID: "job.full_name", WireChartID: "removed_chart", WireContext: meta.Context, Obsolete: true},
+	}, inspection.Charts)
+	assert.Equal(t, []DimensionInspection{
+		{SourceChartID: "created", SourceName: "created_dim", WireTypeID: "job.full_name", WireChartID: "created", WireName: "created_dim"},
+		{SourceChartID: "removed_dim_chart", SourceName: "removed_dim", WireTypeID: "job.full_name", WireChartID: "removed_dim_chart", WireName: "removed_dim", Obsolete: true},
+	}, inspection.Dimensions)
+}

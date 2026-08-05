@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
 // ErrTypeIDBudgetExceeded identifies an emitted type/chart ID that cannot fit
@@ -45,6 +46,34 @@ type dimensionEmission struct {
 	Obsolete   bool
 }
 
+type definitionVisitor interface {
+	visitChart(chartID string, meta chartengine.ChartMeta, labels map[string]string, emitLabels, obsolete bool)
+	visitDimension(chartID string, dim dimensionEmission)
+}
+
+type emissionDefinitionVisitor struct {
+	api *netdataapi.API
+	env EmitEnv
+}
+
+func (v emissionDefinitionVisitor) visitChart(
+	chartID string,
+	meta chartengine.ChartMeta,
+	labels map[string]string,
+	emitLabels bool,
+	obsolete bool,
+) {
+	emitChart(v.api, v.env, chartID, meta, obsolete)
+	if emitLabels {
+		emitChartLabels(v.api, v.env, labels)
+		v.api.CLABELCOMMIT()
+	}
+}
+
+func (v emissionDefinitionVisitor) visitDimension(_ string, dim dimensionEmission) {
+	emitDimension(v.api, dim)
+}
+
 // ApplyPlan emits chartengine actions to the Netdata wire API.
 func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if api == nil {
@@ -66,10 +95,11 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if err := emitHostSelection(api, env); err != nil {
 		return err
 	}
-	emitCreatePhase(api, env, normalized)
-	emitLabelUpdatePhase(api, env, normalized.updateLabels)
+	visitor := emissionDefinitionVisitor{api: api, env: env}
+	visitCreatePhase(visitor, normalized)
+	visitLabelUpdatePhase(visitor, normalized.updateLabels)
 	emitUpdatePhase(api, env, normalized.updateCharts)
-	emitRemovePhase(api, env, normalized)
+	visitRemovePhase(visitor, normalized)
 	return nil
 }
 
@@ -176,7 +206,7 @@ func normalizeActions(actions []EngineAction) normalizedActions {
 	return out
 }
 
-func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions) {
+func visitCreatePhase[V definitionVisitor](visitor V, actions normalizedActions) {
 	createdChartIDs := make([]string, 0, len(actions.createCharts))
 	for chartID := range actions.createCharts {
 		createdChartIDs = append(createdChartIDs, chartID)
@@ -184,12 +214,10 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 	sort.Strings(createdChartIDs)
 	for _, chartID := range createdChartIDs {
 		createChart := actions.createCharts[chartID]
-		emitChart(api, env, createChart.ChartID, createChart.Meta, false)
-		emitChartLabels(api, env, createChart.Labels)
-		api.CLABELCOMMIT()
+		visitor.visitChart(createChart.ChartID, createChart.Meta, createChart.Labels, true, false)
 		dims := actions.createDimsByID[chartID]
 		for _, dim := range dims {
-			emitDimension(api, dimensionEmission{
+			visitor.visitDimension(chartID, dimensionEmission{
 				Name:       dim.Name,
 				Hidden:     dim.Hidden,
 				Float:      dim.Float,
@@ -212,9 +240,9 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 		if len(dims) == 0 {
 			continue
 		}
-		emitChart(api, env, chartID, dims[0].ChartMeta, false)
+		visitor.visitChart(chartID, dims[0].ChartMeta, nil, false, false)
 		for _, dim := range dims {
-			emitDimension(api, dimensionEmission{
+			visitor.visitDimension(chartID, dimensionEmission{
 				Name:       dim.Name,
 				Hidden:     dim.Hidden,
 				Float:      dim.Float,
@@ -226,7 +254,7 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 	}
 }
 
-func emitLabelUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartLabelsAction) {
+func visitLabelUpdatePhase[V definitionVisitor](visitor V, updates []UpdateChartLabelsAction) {
 	if len(updates) == 0 {
 		return
 	}
@@ -236,9 +264,7 @@ func emitLabelUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChar
 		})
 	}
 	for _, update := range updates {
-		emitChart(api, env, update.ChartID, update.Meta, false)
-		emitChartLabels(api, env, update.Labels)
-		api.CLABELCOMMIT()
+		visitor.visitChart(update.ChartID, update.Meta, update.Labels, true, false)
 	}
 }
 
@@ -266,10 +292,10 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 	}
 }
 
-func emitRemovePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions) {
+func visitRemovePhase[V definitionVisitor](visitor V, actions normalizedActions) {
 	for _, removeDim := range actions.removeDimensions {
-		emitChart(api, env, removeDim.ChartID, removeDim.ChartMeta, false)
-		emitDimension(api, dimensionEmission{
+		visitor.visitChart(removeDim.ChartID, removeDim.ChartMeta, nil, false, false)
+		visitor.visitDimension(removeDim.ChartID, dimensionEmission{
 			Name:       removeDim.Name,
 			Hidden:     removeDim.Hidden,
 			Float:      removeDim.Float,
@@ -280,7 +306,7 @@ func emitRemovePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 		})
 	}
 	for _, removeChart := range actions.removeCharts {
-		emitChart(api, env, removeChart.ChartID, removeChart.Meta, true)
+		visitor.visitChart(removeChart.ChartID, removeChart.Meta, nil, false, true)
 	}
 }
 

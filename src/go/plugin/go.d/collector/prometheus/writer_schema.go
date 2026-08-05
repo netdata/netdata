@@ -43,6 +43,23 @@ func deriveMetricFamilySchema(
 	return metricFamilySchema{}, PipelineReasonInvalidFamilySchema
 }
 
+func (w *metricFamilyWriter) inspectMetricFamilySchema(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, PipelineReason) {
+	if handle, ok := w.handles[mf.Name()]; ok {
+		if handle.typ != typ {
+			return metricFamilySchema{}, PipelineReasonFamilyTypeDrift
+		}
+		return metricFamilySchema{
+			summaryQuantiles: handle.summaryQuantiles,
+			histogramBounds:  handle.histogramBounds,
+		}, ""
+	}
+	return deriveMetricFamilySchema(mf, typ, allowUntypedFallback)
+}
+
 // inspectMetricSchema separates an incompatible metric representation/schema
 // from a structurally valid series whose value cannot be written. The writer
 // uses the distinction only for diagnostics; both outcomes remain unwritable.

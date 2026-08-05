@@ -72,6 +72,16 @@ func TestRelabelNameFlowPreservedCaptureLabel(t *testing.T) {
 				rewriteRule,
 			}}},
 		},
+		"metric name changed between extraction and rewrite": {
+			blocks: []relabel.Block{{Match: "*", MetricRelabelConfigs: []relabel.Config{
+				identityRule,
+				{
+					SourceLabels: []string{labels.MetricName}, Regex: relabel.MustNewRegexp(`raw_temperature`),
+					TargetLabel: labels.MetricName, Replacement: `app_worker_alpha_temperature`, Action: relabel.Replace,
+				},
+				rewriteRule,
+			}}},
+		},
 		"dropped in reachable later block": {
 			blocks: []relabel.Block{
 				{Match: "app_*", MetricRelabelConfigs: []relabel.Config{identityRule, rewriteRule}},

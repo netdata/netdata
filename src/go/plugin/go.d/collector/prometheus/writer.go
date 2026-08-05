@@ -424,13 +424,15 @@ func (w *metricFamilyWriter) observeMetric(
 	metric prompkg.Metric,
 	allowFallback bool,
 ) PipelineReason {
-	schema, reason := inspectMetricSchema(metric, handle.typ, allowFallback)
-	if reason != "" {
-		return reason
-	}
-	if !slices.Equal(handle.summaryQuantiles, schema.summaryQuantiles) || !slices.Equal(handle.histogramBounds, schema.histogramBounds) {
+	if reason := metricSchemaRejectionReason(metric, handle.typ, metricFamilySchema{
+		summaryQuantiles: handle.summaryQuantiles,
+		histogramBounds:  handle.histogramBounds,
+	}, allowFallback); reason != "" {
+		if reason != PipelineReasonDistributionSchemaDrift {
+			return reason
+		}
 		w.Debugf("skip a series of metric '%s': distribution schema drift", handle.name)
-		return PipelineReasonDistributionSchemaDrift
+		return reason
 	}
 
 	sig := w.seriesSig(metric)

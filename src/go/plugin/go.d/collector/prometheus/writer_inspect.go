@@ -11,7 +11,7 @@ import (
 )
 
 // WriterEligibility is a read-only application of the initialized writer's
-// family/type/schema/value policy. It does not create handles or write samples.
+// family/type/schema/value policy and current cached family contracts.
 type WriterEligibility struct {
 	Family          string
 	TotalSeries     int
@@ -19,9 +19,9 @@ type WriterEligibility struct {
 	RejectionReason PipelineReason
 }
 
-// InspectWriterEligibility evaluates families with the same initialized writer
-// policy used by Check and Collect. It is intended for diagnostic
-// counterfactuals such as explaining selector exclusions.
+// InspectWriterEligibility evaluates families without creating, reconciling,
+// or refreshing handles and without writing samples. It is intended for
+// diagnostic counterfactuals such as explaining selector exclusions.
 func (c *Collector) InspectWriterEligibility(mfs prompkg.MetricFamilies) ([]WriterEligibility, error) {
 	if c == nil || c.writer == nil {
 		return nil, fmt.Errorf("prometheus writer is not initialized")
@@ -41,19 +41,25 @@ func (c *Collector) InspectWriterEligibility(mfs prompkg.MetricFamilies) ([]Writ
 			result = append(result, item)
 			continue
 		}
-		schema, reason := deriveMetricFamilySchema(mf, typ, allowUntypedFallback)
+		schema, reason := c.writer.inspectMetricFamilySchema(mf, typ, allowUntypedFallback)
 		if reason != "" {
 			item.RejectionReason = reason
 			result = append(result, item)
 			continue
 		}
+		var seriesReason PipelineReason
 		for _, metric := range mf.Metrics() {
-			if metricIsWritable(metric, typ, schema, allowUntypedFallback) {
+			if reason := metricSchemaRejectionReason(metric, typ, schema, allowUntypedFallback); reason == "" {
 				item.WritableSeries++
+			} else if seriesReason == "" {
+				seriesReason = reason
 			}
 		}
 		if item.WritableSeries == 0 {
-			item.RejectionReason = PipelineReasonInvalidSeriesSchema
+			item.RejectionReason = seriesReason
+			if item.RejectionReason == "" {
+				item.RejectionReason = PipelineReasonInvalidSeriesSchema
+			}
 		}
 		result = append(result, item)
 	}
