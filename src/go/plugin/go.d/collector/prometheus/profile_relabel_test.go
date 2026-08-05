@@ -18,6 +18,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
@@ -128,8 +129,8 @@ func TestCollector_ProfileRelabelingUsesFirstApplicableNormalizer(t *testing.T) 
 
 func TestCollector_ProfileRelabelingCombinedEntriesPrecedeAutoProfiles(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
-		"alpha": testRelabelProfileYAML("app_*", "app_raw", "app_alpha"),
-		"zeta":  testRelabelProfileYAML("app_*", "app_raw", "app_zeta"),
+		"alpha": strings.Replace(testRelabelProfileYAML("app_*", "app_raw", "app_alpha"), "template:\n", "app: alpha\ntemplate:\n", 1),
+		"zeta":  strings.Replace(testRelabelProfileYAML("app_*", "app_raw", "app_zeta"), "template:\n", "app: zeta\ntemplate:\n", 1),
 	})
 	collr, srv := newProfileRelabelCollector(t, catalog, "# TYPE app_raw gauge\napp_raw 1\n")
 	defer srv.Close()
@@ -144,6 +145,41 @@ func TestCollector_ProfileRelabelingCombinedEntriesPrecedeAutoProfiles(t *testin
 	assert.InDelta(t, 1, value(t, got, "app_zeta", nil), 1e-9)
 	noSeries(t, got, "app_alpha", nil)
 	noSeries(t, got, "app_raw", nil)
+
+	spec, err := charttpl.DecodeYAML([]byte(collr.ChartTemplateYAML()))
+	require.NoError(t, err)
+	assert.Equal(t, "prometheus.alpha", spec.ContextNamespace)
+	require.Len(t, spec.Groups, 3)
+	assert.Equal(t, []string{"app_alpha"}, spec.Groups[1].Metrics)
+	assert.Equal(t, []string{"app_zeta"}, spec.Groups[2].Metrics)
+}
+
+func TestCollector_ProfileRelabelingAutoNameOrderDoesNotChangeProfileSelectionOrder(t *testing.T) {
+	catalog := loadTestCatalogFromOrderedDirs(t,
+		map[string]string{
+			"zeta": strings.Replace(testRelabelProfileYAML("app_*", "app_raw", "app_zeta"), "template:\n", "app: zeta\ntemplate:\n", 1),
+		},
+		map[string]string{
+			"alpha": strings.Replace(testRelabelProfileYAML("app_*", "app_raw", "app_alpha"), "template:\n", "app: alpha\ntemplate:\n", 1),
+		},
+	)
+	collr, srv := newProfileRelabelCollector(t, catalog, "# TYPE app_raw gauge\napp_raw 1\n")
+	defer srv.Close()
+	collr.Profiles = ProfilesConfig{Mode: profilesModeAuto}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	collectProfileRelabelOnce(t, collr)
+	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	assert.InDelta(t, 1, value(t, got, "app_alpha", nil), 1e-9)
+	noSeries(t, got, "app_zeta", nil)
+
+	spec, err := charttpl.DecodeYAML([]byte(collr.ChartTemplateYAML()))
+	require.NoError(t, err)
+	assert.Equal(t, "prometheus.zeta", spec.ContextNamespace)
+	require.Len(t, spec.Groups, 3)
+	assert.Equal(t, []string{"app_zeta"}, spec.Groups[1].Metrics)
+	assert.Equal(t, []string{"app_alpha"}, spec.Groups[2].Metrics)
 }
 
 func TestSelectProfileNormalizersSkipsProfilesWhoseBlocksDoNotMatch(t *testing.T) {
@@ -165,23 +201,38 @@ func TestSelectProfileNormalizersSkipsProfilesWhoseBlocksDoNotMatch(t *testing.T
 func TestSelectProfileNormalizersUsesFamilyPrecedenceAcrossPhysicalSamples(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"first":  testRelabelProfileYAML("app_*", "app_lat_sum", "app_first_sum"),
-		"second": testRelabelProfileYAML("app_*", "app_lat_bucket", "app_second_bucket"),
+		"middle": testRelabelProfileYAML("app_*", "app_lat_count", "app_middle_count"),
+		"last":   testRelabelProfileYAML("app_*", "app_lat_bucket", "app_last_bucket"),
 	})
-	profiles, err := catalog.Resolve([]string{"first", "second"})
+	profiles, err := catalog.Resolve([]string{"first", "middle", "last"})
 	require.NoError(t, err)
 	normalizers, err := compileProfileNormalizers(profiles)
 	require.NoError(t, err)
-	batch := scrapeSamples(t, `
+
+	inputs := map[string]string{
+		"lower precedence components first": `
 # TYPE app_lat histogram
 app_lat_bucket{le="0.5"} 4
 app_lat_bucket{le="+Inf"} 6
+app_lat_count 6
+app_lat_sum 2.5
+`,
+		"highest precedence component first": `
+# TYPE app_lat histogram
 app_lat_sum 2.5
 app_lat_count 6
-`)
+app_lat_bucket{le="0.5"} 4
+app_lat_bucket{le="+Inf"} 6
+`,
+	}
 
-	selected := selectProfileNormalizers(batch, normalizers)
-	require.Contains(t, selected, "app_lat")
-	assert.Equal(t, 0, selected["app_lat"])
+	for name, input := range inputs {
+		t.Run(name, func(t *testing.T) {
+			selected := selectProfileNormalizers(scrapeSamples(t, input), normalizers)
+			require.Contains(t, selected, "app_lat")
+			assert.Equal(t, 0, selected["app_lat"])
+		})
+	}
 }
 
 func TestCollector_ProfileRelabelingDoesNotChainProfiles(t *testing.T) {

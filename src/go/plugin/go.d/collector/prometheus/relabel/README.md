@@ -95,8 +95,7 @@ jobs:
 ```
 
 The same field may appear at the root of a profile. The profile's root `match` controls selection and source-family
-applicability;
-the relabeling block `match` controls which physical series names its rules process:
+applicability; the relabeling block `match` controls which physical series names its rules process:
 
 ```yaml
 match: 'myapp_*'
@@ -219,7 +218,8 @@ Dispatch does not predict rule results or output names. The root `match` constra
 the chosen pipeline may produce a different namespace. Every selected chart template sees those final names and labels,
 so profile authors must account for interactions between profiles selected for the same endpoint. See the profile
 format's [`relabeling` section](/src/go/plugin/go.d/collector/prometheus/profile-format.md#relabeling) for authoring
-guidance.
+guidance. A family renamed outside the profile's root `match` also leaves that profile's `autogen.selector` scope, so an
+uncovered output keeps generic autogen unless another applicable profile scope rejects it.
 
 Untyped fallback type is bound from the post-job, pre-profile name. Profile relabeling preserves that decision but
 cannot create one by adding `_total` or renaming a final metric into a configured `fallback_type` pattern.

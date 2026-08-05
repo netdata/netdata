@@ -235,6 +235,9 @@ Profile relabeling uses first-applicable precedence over the shared metric strea
   to every selected profile; profiles do not receive private copies of the source metrics.
 - The root `match` constrains source applicability, not output names. Profile authors are responsible for making the
   produced names and labels agree with every selected template that consumes them.
+- If a produced family no longer matches the profile's root `match`, that profile's `autogen.selector` no longer applies
+  to it either. An uncovered output family therefore keeps generic autogen unless another applicable profile scope
+  rejects it.
 - Histogram and summary integrity is validated independently after job and profile relabeling. Partial component
   renames/drops, structural `le`/`quantile` changes, splits, and merges are rejected during checking and contained by
   dropping the corrupted family if they first appear at runtime.

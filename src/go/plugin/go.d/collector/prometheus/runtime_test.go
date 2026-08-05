@@ -288,13 +288,22 @@ func profileNames(profiles []promprofiles.Profile) []string {
 // stock catalog.
 func loadTestCatalog(t *testing.T, profiles map[string]string) promprofiles.Catalog {
 	t.Helper()
+	return loadTestCatalogFromOrderedDirs(t, profiles)
+}
 
-	dir := t.TempDir()
-	for name, data := range profiles {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(data), 0o600))
+func loadTestCatalogFromOrderedDirs(t *testing.T, profileSets ...map[string]string) promprofiles.Catalog {
+	t.Helper()
+
+	var specs []promprofiles.DirSpec
+	for _, profiles := range profileSets {
+		dir := t.TempDir()
+		for name, data := range profiles {
+			require.NoError(t, os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(data), 0o600))
+		}
+		specs = append(specs, promprofiles.DirSpec{Path: dir, IsStock: true})
 	}
 
-	catalog, err := promprofiles.LoadFromDirs([]promprofiles.DirSpec{{Path: dir, IsStock: true}})
+	catalog, err := promprofiles.LoadFromDirs(specs)
 	require.NoError(t, err)
 	return catalog
 }
