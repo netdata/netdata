@@ -153,14 +153,17 @@ func BenchmarkRelabelScrapeModes(b *testing.B) {
 }
 
 // BenchmarkProfileRelabelDispatch isolates first-applicable family dispatch.
-// The sixteen-profile case gives every source family one applicable normalizer
-// and guards against accidental profile chaining or an unbounded dispatch cache.
+// The sixteen-profile cases guard against accidental profile chaining,
+// repeated matcher work for labeled series, or an unbounded dispatch cache.
 // The 2026-08-05 baseline measured 6,462-6,517 ns/op for one profile,
 // 7,582-7,813 ns/op for sixteen disjoint roots, and 23,870-24,008 ns/op for
 // sixteen overlapping roots with disjoint blocks; all used 16,216 B/op and 93
-// allocations. First-applicable dispatch measured 2,455-2,560 ns/op,
-// 4,807-4,865 ns/op, and 7,066-7,145 ns/op respectively, with 1,640 B/op and
-// 7 allocations in all three cases.
+// allocations. Before physical-name caching, first-applicable dispatch measured
+// 2,455-2,560 ns/op, 4,807-4,865 ns/op, and 7,066-7,145 ns/op respectively;
+// the sixteen-profile all-miss case measured 24,166-24,685 ns/op. The bounded
+// one-entry cache measured 2,497-2,564 ns/op, 4,074-4,212 ns/op,
+// 5,459-5,684 ns/op, and 6,604-6,658 ns/op respectively. The first three use
+// 1,640 B/op and 7 allocations; all-miss uses 48 B/op and 1 allocation.
 func BenchmarkProfileRelabelDispatch(b *testing.B) {
 	batch := scrapeSamples(b, benchExposition())
 
@@ -192,6 +195,16 @@ func BenchmarkProfileRelabelDispatch(b *testing.B) {
 			selectProfileNormalizers(batch, normalizers)
 		}
 	})
+
+	b.Run("sixteen_overlapping_roots_nonmatching_blocks", func(b *testing.B) {
+		normalizers := benchmarkNonmatchingNormalizers(b, 16)
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for range b.N {
+			selectProfileNormalizers(batch, normalizers)
+		}
+	})
 }
 
 func benchmarkDisjointNormalizers(tb testing.TB, overlappingRoots bool) []profileNormalizer {
@@ -207,6 +220,16 @@ func benchmarkDisjointNormalizers(tb testing.TB, overlappingRoots bool) []profil
 			root = "*"
 		}
 		normalizers = append(normalizers, benchmarkProfileNormalizer(tb, root, base+"*", "profile_stage"))
+	}
+	return normalizers
+}
+
+func benchmarkNonmatchingNormalizers(tb testing.TB, count int) []profileNormalizer {
+	tb.Helper()
+	normalizers := make([]profileNormalizer, 0, count)
+	for i := range count {
+		normalizers = append(normalizers,
+			benchmarkProfileNormalizer(tb, "*", fmt.Sprintf("missing_%d*", i), "profile_stage"))
 	}
 	return normalizers
 }

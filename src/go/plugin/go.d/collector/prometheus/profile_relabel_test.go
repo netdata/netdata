@@ -173,6 +173,7 @@ func TestSelectProfileNormalizersUsesFamilyPrecedenceAcrossPhysicalSamples(t *te
 	require.NoError(t, err)
 	batch := scrapeSamples(t, `
 # TYPE app_lat histogram
+app_lat_bucket{le="0.5"} 4
 app_lat_bucket{le="+Inf"} 6
 app_lat_sum 2.5
 app_lat_count 6

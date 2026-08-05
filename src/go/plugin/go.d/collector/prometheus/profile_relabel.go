@@ -32,23 +32,54 @@ func (c *Collector) profileRelabelAndAssemble(
 // applicable profile normalizer. Applicability is evaluated only from original
 // names, so profile pipelines never chain through names produced by one another.
 func selectProfileNormalizers(batch prompkg.SampleBatch, normalizers []profileNormalizer) map[string]int {
+	type sourceName struct {
+		family   string
+		physical string
+	}
+	type checkedSource struct {
+		name    sourceName
+		matched int
+		valid   bool
+	}
+
 	selected := make(map[string]int)
+	// Labeled series for one physical metric normally arrive consecutively. Cache
+	// only that name: a family-level miss would be wrong when a later component
+	// (for example _sum after _bucket) makes a profile applicable.
+	var last checkedSource
 	for _, sample := range batch.Samples {
 		base := helpFamilyName(sample)
 		limit := len(normalizers)
 		if idx, ok := selected[base]; ok {
 			limit = idx
 		}
+		if limit == 0 {
+			continue
+		}
+
+		key := sourceName{family: base, physical: sample.Name}
+		if last.valid && last.name == key {
+			if last.matched < limit {
+				selected[base] = last.matched
+			}
+			continue
+		}
+
+		matched := limit
 		for i := range normalizers[:limit] {
 			normalizer := &normalizers[i]
 			if !normalizer.root.MatchString(base) {
 				continue
 			}
 			if normalizer.pipeline.Matches(sample.Name) {
-				selected[base] = i
+				matched = i
 				break
 			}
 		}
+		if matched < limit {
+			selected[base] = matched
+		}
+		last = checkedSource{name: key, matched: matched, valid: true}
 	}
 	return selected
 }
