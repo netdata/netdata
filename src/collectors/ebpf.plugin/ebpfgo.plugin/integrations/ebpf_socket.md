@@ -173,7 +173,7 @@ following columns:
 
 ### Per eBPF Socket instance
 
-These metrics describe host-level TCP/UDP activity, including connections, bandwidth, protocol calls, retransmits, and send/receive errors.
+All data is delivered through the on-demand `network-protocols` function consumed by network-viewer; no traditional Netdata charts are published for this scope.
 
 This scope has no labels.
 

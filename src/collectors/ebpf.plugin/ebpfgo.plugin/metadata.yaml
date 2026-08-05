@@ -25,7 +25,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
+        metrics_description: "Monitor Linux page cache events giving users a general vision about how the kernel is manipulating files."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include:
@@ -416,6 +416,6 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics describe host-level TCP/UDP activity, including connections, bandwidth, protocol calls, retransmits, and send/receive errors."
+          description: "All data is delivered through the on-demand `network-protocols` function consumed by network-viewer; no traditional Netdata charts are published for this scope."
           labels: []
           metrics: []

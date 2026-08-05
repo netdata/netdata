@@ -21,7 +21,7 @@ Module: cachestat
 
 ## Overview
 
-Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files.
+Monitor Linux page cache events giving users a general vision about how the kernel is manipulating files.
 
 Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel.
 
