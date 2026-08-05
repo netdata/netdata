@@ -118,7 +118,7 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 
 `WithPlanRouteDiagnosticObserver` is an opt-in validation/test surface. When enabled, the planner synchronously streams
 attempt-local facts for filtering, candidate rejection, chart-identity rejection, resolved routes, accepted routes,
-collisions, lifecycle rejection, and unmatched series.
+autogen displacement, collisions, lifecycle rejection, and unmatched series.
 
 - Diagnostic planning bypasses route-cache lookup and storage so every scanned series produces complete facts.
 - The default path is unchanged when no observer is configured; it continues to use the route cache.

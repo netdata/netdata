@@ -3,6 +3,8 @@
 package chartengine
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +12,127 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
+
+func TestPlanRouteDiagnosticsDoNotChangeChartIdentityRejection(t *testing.T) {
+	template := []byte(`
+version: v1
+groups:
+  - family: Test
+    metrics: [app_state]
+    charts:
+      - title: State
+        context: app.state
+        units: state
+        instances:
+          by_labels: [instance]
+        dimensions:
+          - selector: app_state
+`)
+
+	store := metrix.NewCollectorStore()
+	cycle := mustCycleController(t, store)
+	cycle.BeginCycle()
+	store.Write().SnapshotMeter("").Gauge("app_state").Observe(1)
+	require.NoError(t, cycle.CommitCycleSuccess())
+	reader := store.Read(metrix.ReadFlatten())
+
+	withoutDiagnostics, err := New()
+	require.NoError(t, err)
+	require.NoError(t, withoutDiagnostics.LoadYAML(template, 1))
+	want, err := buildPlan(withoutDiagnostics, reader)
+	require.NoError(t, err)
+
+	var facts []PlanRouteDiagnostic
+	withDiagnostics, err := New(WithPlanRouteDiagnosticObserver(func(fact PlanRouteDiagnostic) {
+		facts = append(facts, fact)
+	}))
+	require.NoError(t, err)
+	require.NoError(t, withDiagnostics.LoadYAML(template, 1))
+	got, err := buildPlan(withDiagnostics, reader)
+	require.NoError(t, err)
+
+	assert.Equal(t, want, got)
+	require.Equal(t, 1, countPlanRouteDecisions(facts, PlanRouteChartIdentityRejected))
+	for _, fact := range facts {
+		if fact.Decision == PlanRouteChartIdentityRejected {
+			assert.Equal(t, []string{"instance"}, fact.MissingInstanceLabels)
+		}
+	}
+}
+
+func TestPlanRouteDiagnosticsReportAutogenCollisionInBothOrders(t *testing.T) {
+	tests := map[string]struct {
+		autogenMetric  string
+		authoredMetric string
+		wantDecision   PlanRouteDecision
+	}{
+		"accepted autogen owner is displaced": {
+			autogenMetric:  "aaa_total",
+			authoredMetric: "zzz_total",
+			wantDecision:   PlanRouteAutogenDisplaced,
+		},
+		"incoming autogen route is rejected": {
+			autogenMetric:  "zzz_total",
+			authoredMetric: "aaa_total",
+			wantDecision:   PlanRouteCollisionRejected,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var facts []PlanRouteDiagnostic
+			engine, err := New(
+				WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}),
+				WithPlanRouteDiagnosticObserver(func(fact PlanRouteDiagnostic) {
+					facts = append(facts, fact)
+				}),
+			)
+			require.NoError(t, err)
+			template := fmt.Sprintf(`
+version: v1
+groups:
+  - family: Test
+    metrics: [svc.%s]
+    charts:
+      - id: svc.%s-method=GET
+        title: Authored
+        context: svc.authored
+        units: requests/s
+        dimensions:
+          - selector: svc.%s{method="GET"}
+            name: total
+`, tc.authoredMetric, tc.autogenMetric, tc.authoredMetric)
+			require.NoError(t, engine.LoadYAML([]byte(template), 1))
+
+			store := metrix.NewCollectorStore()
+			cycle := mustCycleController(t, store)
+			meter := store.Write().SnapshotMeter("svc")
+			labels := meter.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+			cycle.BeginCycle()
+			meter.Counter(tc.autogenMetric).ObserveTotal(1, labels)
+			meter.Counter(tc.authoredMetric).ObserveTotal(2, labels)
+			require.NoError(t, cycle.CommitCycleSuccess())
+
+			_, err = buildPlan(engine, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+			require.Equal(t, 1, countPlanRouteDecisions(facts, tc.wantDecision))
+			for _, fact := range facts {
+				if fact.Decision != tc.wantDecision {
+					continue
+				}
+				if tc.wantDecision == PlanRouteAutogenDisplaced {
+					assert.False(t, fact.Autogen)
+					assert.False(t, strings.HasPrefix(fact.ChartTemplateID, autogenTemplatePrefix))
+					assert.True(t, strings.HasPrefix(fact.ExistingChartTemplateID, autogenTemplatePrefix))
+				} else {
+					assert.True(t, fact.Autogen)
+					assert.True(t, strings.HasPrefix(fact.ChartTemplateID, autogenTemplatePrefix))
+					assert.False(t, strings.HasPrefix(fact.ExistingChartTemplateID, autogenTemplatePrefix))
+				}
+			}
+		})
+	}
+}
 
 func TestPlanRouteDiagnosticsRemainCompleteAcrossRepeatedPlans(t *testing.T) {
 	var facts []PlanRouteDiagnostic

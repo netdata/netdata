@@ -143,21 +143,13 @@ func (e *Engine) resolveSeriesRoutes(
 		}
 		if !ok || strings.TrimSpace(chartID) == "" {
 			if observe != nil {
-				missingLabels := []string(nil)
-				_, _, dimensionOK, dimensionErr := resolveDimensionName(candidate.dimension, name, labels, meta)
-				if dimensionErr != nil {
-					return nil, false, dimensionErr
-				}
-				if dimensionOK {
-					missingLabels = missingChartInstanceLabels(chart.Identity, labels)
-				}
 				observe(PlanRouteDiagnostic{
 					Decision:              PlanRouteChartIdentityRejected,
 					SeriesIdentity:        identity,
 					MetricName:            name,
 					ChartTemplateID:       candidate.chartTemplateID,
 					DimensionIndex:        candidate.dimensionIndex,
-					MissingInstanceLabels: missingLabels,
+					MissingInstanceLabels: missingChartInstanceLabels(chart.Identity, labels),
 				})
 			}
 			continue

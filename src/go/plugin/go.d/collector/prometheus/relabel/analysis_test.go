@@ -5,13 +5,20 @@ package relabel
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	benchmarkReplacementTokens []replacementToken
+	benchmarkReplacementOK     bool
 )
 
 func TestAnalyzerEnumerateFiniteRegexp(t *testing.T) {
@@ -169,14 +176,55 @@ func TestAnalyzerHonorsCancellationAndBudget(t *testing.T) {
 	cancel()
 	analyzer, err := NewAnalyzer(ctx, AnalysisBudget{})
 	require.NoError(t, err)
-	_, _, err = analyzer.EnumerateFiniteRegexp(`[a-z]{2}`)
+	_, _, err = analyzer.EnumerateFiniteRegexp(`[`) // cancellation must win before parsing
+	assert.ErrorIs(t, err, context.Canceled)
+
+	_, err = analyzer.RulesMayAffectFutureRouting([]Config{{Action: Drop}})
 	assert.ErrorIs(t, err, context.Canceled)
 
 	analyzer, err = NewAnalyzer(context.Background(), AnalysisBudget{MaxValues: 256, MaxOperations: 1})
 	require.NoError(t, err)
-	_, _, err = analyzer.EnumerateFiniteRegexp(`(a|b)(c|d)`)
+	_, _, err = analyzer.EnumerateFiniteRegexp(strings.Repeat(`(`, 128)) // budget must win before parsing
 	assert.ErrorIs(t, err, ErrAnalysisBudgetExceeded)
 	assert.LessOrEqual(t, analyzer.Stats().Operations, 1)
+
+	analyzer, err = NewAnalyzer(context.Background(), AnalysisBudget{MaxValues: 256, MaxOperations: 128})
+	require.NoError(t, err)
+	_, _, err = analyzer.ReplacementOutputs(MustNewRegexp(`(.*)`), strings.Repeat(`$-`, 512))
+	assert.ErrorIs(t, err, ErrAnalysisBudgetExceeded)
+}
+
+func TestAnalyzerMaxValuesIncludesOptionalEmptyValue(t *testing.T) {
+	tests := map[string]func(*Analyzer) ([]string, bool, error){
+		"optional regexp": func(analyzer *Analyzer) ([]string, bool, error) {
+			return analyzer.EnumerateFiniteRegexp(`a?`)
+		},
+		"optional capture projection": func(analyzer *Analyzer) ([]string, bool, error) {
+			return analyzer.ReplacementOutputs(MustNewRegexp(`.+|(b)`), `${1}`)
+		},
+	}
+
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			analyzer, err := NewAnalyzer(context.Background(), AnalysisBudget{MaxValues: 1})
+			require.NoError(t, err)
+			values, finite, err := run(analyzer)
+			require.NoError(t, err)
+			assert.False(t, finite)
+			assert.Nil(t, values)
+		})
+	}
+}
+
+func TestParseReplacementTemplateAllocationEnvelope(t *testing.T) {
+	template := strings.Repeat(`$-`, 512)
+	allocations := testing.AllocsPerRun(10, func() {
+		tokens, ok := parseReplacementTemplate(template, captureMetadata{})
+		if !ok || len(tokens) != 1 {
+			panic("unexpected replacement parse")
+		}
+	})
+	assert.Less(t, allocations, float64(20))
 }
 
 func FuzzAnalyzerFiniteRegexpRuntimeParity(f *testing.F) {
@@ -213,6 +261,18 @@ func BenchmarkAnalyzerReplacementOutputs(b *testing.B) {
 		if err != nil || !finite {
 			b.Fatalf("finite=%v err=%v", finite, err)
 		}
+	}
+}
+
+func BenchmarkParseReplacementTemplate(b *testing.B) {
+	for _, size := range []int{128, 1024, 8192} {
+		template := strings.Repeat(`$-`, size/2)
+		b.Run(fmt.Sprintf("bytes_%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			for range b.N {
+				benchmarkReplacementTokens, benchmarkReplacementOK = parseReplacementTemplate(template, captureMetadata{})
+			}
+		})
 	}
 }
 

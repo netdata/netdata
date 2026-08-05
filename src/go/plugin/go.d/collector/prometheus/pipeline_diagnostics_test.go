@@ -66,6 +66,50 @@ app_value{id="invalid"} NaN
 	})
 }
 
+func TestWriterPipelineDiagnosticClassifiesAllInvalidValues(t *testing.T) {
+	tests := map[string]string{
+		"gauge": `
+# TYPE app_value gauge
+app_value NaN
+`,
+		"histogram": `
+# TYPE app_value histogram
+app_value_bucket{le="1"} 1
+app_value_bucket{le="+Inf"} 1
+app_value_sum +Inf
+app_value_count 1
+`,
+		"summary": `
+# TYPE app_value summary
+app_value{quantile="0.5"} NaN
+app_value_sum 0
+app_value_count 0
+`,
+	}
+
+	for name, input := range tests {
+		t.Run(name, func(t *testing.T) {
+			var facts []PipelineDiagnostic
+			store := metrix.NewCollectorStore()
+			writer := newMetricFamilyWriter(
+				store,
+				metricFamilyWriterPolicy{observePipeline: func(fact PipelineDiagnostic) { facts = append(facts, fact) }},
+				logger.New(),
+			)
+			managed, ok := metrix.AsCycleManagedStore(store)
+			require.True(t, ok)
+			managed.CycleController().BeginCycle()
+
+			assert.Zero(t, writer.writeMetricFamilies(scrape(t, input)))
+			assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
+				return fact.Decision == PipelineWriterFamilyRejected &&
+					fact.Reason == PipelineReasonInvalidSeriesValue &&
+					fact.MetricName == "app_value"
+			})
+		})
+	}
+}
+
 func TestPipelineDiagnosticsFollowRealCollectorDecisions(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"candidate": `

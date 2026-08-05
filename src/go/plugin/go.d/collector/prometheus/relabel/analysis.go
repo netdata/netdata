@@ -70,7 +70,7 @@ func (a *Analyzer) Stats() AnalysisStats { return a.stats }
 // EnumerateFiniteRegexp returns the complete, sorted language when it is finite
 // and fits MaxValues. finite is false for an unbounded or larger language.
 func (a *Analyzer) EnumerateFiniteRegexp(expr string) (values []string, finite bool, err error) {
-	parsed, err := syntax.Parse(expr, syntax.Perl)
+	parsed, err := a.parseRegexp(expr)
 	if err != nil {
 		return nil, false, err
 	}
@@ -103,7 +103,10 @@ func (a *Analyzer) ReplacementOutputs(regexp Regexp, replacement string) (output
 	if err != nil {
 		return nil, false, err
 	}
-	tokens, ok := parseReplacementTemplate(replacement, metadata)
+	tokens, ok, err := a.replacementTokens(replacement, metadata)
+	if err != nil {
+		return nil, false, err
+	}
 	if !ok {
 		return nil, false, nil
 	}
@@ -142,6 +145,12 @@ func (a *Analyzer) ReplacementOutputs(regexp Regexp, replacement string) (output
 			return nil, false, err
 		}
 		if _, required := regexpRequiredCaptures(metadata.parsed)[capture]; !required && !slices.Contains(values, "") {
+			if len(values) >= a.budget.MaxValues {
+				return nil, false, nil
+			}
+			if err := a.step(1); err != nil {
+				return nil, false, err
+			}
 			values = append(values, "")
 		}
 		result := make(map[string]struct{}, len(values))
@@ -164,7 +173,10 @@ func (a *Analyzer) ExactCaptureReference(regexp Regexp, replacement string) (cap
 	if err != nil {
 		return 0, false, err
 	}
-	tokens, ok := parseReplacementTemplate(replacement, metadata)
+	tokens, ok, err := a.replacementTokens(replacement, metadata)
+	if err != nil {
+		return 0, false, err
+	}
 	if !ok || len(tokens) != 1 || !tokens[0].isCapture {
 		return 0, false, nil
 	}
@@ -179,7 +191,10 @@ func (a *Analyzer) ReplacementGlob(regexp Regexp, replacement string) (pattern s
 	if err != nil {
 		return "", false, err
 	}
-	tokens, ok := parseReplacementTemplate(replacement, metadata)
+	tokens, ok, err := a.replacementTokens(replacement, metadata)
+	if err != nil {
+		return "", false, err
+	}
 	if !ok {
 		return "", false, nil
 	}
@@ -204,6 +219,9 @@ func (a *Analyzer) ReplacementGlob(regexp Regexp, replacement string) (pattern s
 
 // RuleMayWriteLabel conservatively reports whether rule can write labelName.
 func (a *Analyzer) RuleMayWriteLabel(rule Config, labelName string) (bool, error) {
+	if err := a.step(1); err != nil {
+		return false, err
+	}
 	action := EffectiveAction(rule)
 	switch action {
 	case Replace:
@@ -238,6 +256,9 @@ func RuleNameDerivedOnly(rule Config) bool {
 // write the metric name.
 func (a *Analyzer) RulesMayAffectFutureRouting(rules []Config) (bool, error) {
 	for _, rule := range rules {
+		if err := a.step(1); err != nil {
+			return false, err
+		}
 		switch EffectiveAction(rule) {
 		case Drop, DropEqual, Keep, KeepEqual:
 			return true, nil
@@ -258,6 +279,9 @@ func (a *Analyzer) RulesMayAffectFutureRouting(rules []Config) (bool, error) {
 // unchanged for possibleMetricNames. A nil name set means any name is possible.
 func (a *Analyzer) RulesPreserveLabel(rules []Config, labelName string, possibleMetricNames []string) (bool, error) {
 	for _, rule := range rules {
+		if err := a.step(1); err != nil {
+			return false, err
+		}
 		action := EffectiveAction(rule)
 		mayApply := ruleMayApplyToMetricNames(rule, action, possibleMetricNames)
 		switch action {
@@ -325,7 +349,10 @@ func (a *Analyzer) templateMayExpandToLabel(
 	if err != nil {
 		return false, err
 	}
-	tokens, ok := parseReplacementTemplate(template, metadata)
+	tokens, ok, err := a.replacementTokens(template, metadata)
+	if err != nil {
+		return false, err
+	}
 	if !ok {
 		return true, nil
 	}
@@ -364,6 +391,25 @@ func (a *Analyzer) step(operations int) error {
 	}
 	a.stats.Operations += operations
 	return nil
+}
+
+func (a *Analyzer) parseRegexp(expr string) (*syntax.Regexp, error) {
+	if err := a.consumeParserInput(expr); err != nil {
+		return nil, err
+	}
+	return syntax.Parse(expr, syntax.Perl)
+}
+
+// consumeParserInput charges linear parser/tokenizer work before it begins, so
+// cancellation and the aggregate operation budget bound even malformed input.
+func (a *Analyzer) consumeParserInput(input string) error {
+	if err := a.step(1); err != nil {
+		return err
+	}
+	if len(input) == 0 {
+		return nil
+	}
+	return a.step(len(input))
 }
 
 func (a *Analyzer) enumerateFiniteSyntax(re *syntax.Regexp) ([]string, bool, error) {
@@ -438,7 +484,15 @@ func (a *Analyzer) enumerateFiniteSyntax(re *syntax.Regexp) ([]string, bool, err
 		if err != nil || !finite {
 			return nil, finite, err
 		}
-		part = append(part, "")
+		if !slices.Contains(part, "") {
+			if len(part) >= a.budget.MaxValues {
+				return nil, false, nil
+			}
+			if err := a.step(1); err != nil {
+				return nil, false, err
+			}
+			part = append(part, "")
+		}
 		slices.Sort(part)
 		return slices.Compact(part), true, nil
 	case syntax.OpRepeat:
@@ -515,7 +569,7 @@ type captureMetadata struct {
 }
 
 func (a *Analyzer) captureMetadata(expr string) (captureMetadata, error) {
-	parsed, err := syntax.Parse(expr, syntax.Perl)
+	parsed, err := a.parseRegexp(expr)
 	if err != nil {
 		return captureMetadata{}, err
 	}
@@ -559,17 +613,26 @@ func (a *Analyzer) captureMetadata(expr string) (captureMetadata, error) {
 	return metadata, nil
 }
 
+func (a *Analyzer) replacementTokens(template string, metadata captureMetadata) ([]replacementToken, bool, error) {
+	if err := a.consumeParserInput(template); err != nil {
+		return nil, false, err
+	}
+	tokens, ok := parseReplacementTemplate(template, metadata)
+	return tokens, ok, nil
+}
+
 func parseReplacementTemplate(template string, metadata captureMetadata) ([]replacementToken, bool) {
 	var tokens []replacementToken
+	var literal strings.Builder
+	flushLiteral := func() {
+		if literal.Len() == 0 {
+			return
+		}
+		tokens = append(tokens, replacementToken{literal: literal.String()})
+		literal.Reset()
+	}
 	appendLiteral := func(value string) {
-		if value == "" {
-			return
-		}
-		if len(tokens) > 0 && !tokens[len(tokens)-1].isCapture {
-			tokens[len(tokens)-1].literal += value
-			return
-		}
-		tokens = append(tokens, replacementToken{literal: value})
+		literal.WriteString(value)
 	}
 	for len(template) > 0 {
 		before, after, ok := strings.Cut(template, "$")
@@ -601,9 +664,11 @@ func parseReplacementTemplate(template string, metadata captureMetadata) ([]repl
 			}
 		}
 		if _, exists := metadata.captures[capture]; exists {
+			flushLiteral()
 			tokens = append(tokens, replacementToken{capture: capture, isCapture: true})
 		}
 	}
+	flushLiteral()
 	return tokens, true
 }
 

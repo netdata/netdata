@@ -15,6 +15,7 @@ const (
 	PlanRouteDimensionRejected         PlanRouteDecision = "dimension_rejected"
 	PlanRouteResolved                  PlanRouteDecision = "route_resolved"
 	PlanRouteAccepted                  PlanRouteDecision = "route_accepted"
+	PlanRouteAutogenDisplaced          PlanRouteDecision = "autogen_displaced"
 	PlanRouteCollisionRejected         PlanRouteDecision = "chart_id_collision_rejected"
 	PlanRouteLifecycleRejected         PlanRouteDecision = "lifecycle_rejected"
 	PlanRouteUnmatched                 PlanRouteDecision = "series_unmatched"
@@ -64,4 +65,27 @@ func (ctx *planBuildContext) observeRouteDiagnostic(fact PlanRouteDiagnostic) {
 		return
 	}
 	ctx.routeObserver(fact)
+}
+
+func (ctx *planBuildContext) observeAutogenDisplacement(
+	route routeBinding,
+	identity metrix.SeriesIdentity,
+	metricName string,
+	displacedTemplateID string,
+) {
+	if ctx == nil || ctx.routeObserver == nil {
+		return
+	}
+	ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+		Decision:                PlanRouteAutogenDisplaced,
+		SeriesIdentity:          identity,
+		MetricName:              metricName,
+		ChartTemplateID:         route.ChartTemplateID,
+		DimensionIndex:          route.DimensionIndex,
+		ChartID:                 route.ChartID,
+		DimensionName:           route.DimensionName,
+		DimensionKeyLabel:       route.DimensionKeyLabel,
+		ExistingChartTemplateID: displacedTemplateID,
+		Autogen:                 route.Autogen,
+	})
 }

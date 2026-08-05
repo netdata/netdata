@@ -617,6 +617,7 @@ func (ctx *planBuildContext) accumulateRoute(
 	if exists && cs.templateID != route.ChartTemplateID {
 		if !route.Autogen && isAutogenTemplateID(cs.templateID) {
 			// Template wins over autogen on chart-id collision.
+			ctx.observeAutogenDisplacement(route, identity, metricName, cs.templateID)
 			ctx.chartOwners[route.ChartID] = route.ChartTemplateID
 			delete(ctx.chartsByID, route.ChartID)
 			cs = nil
@@ -646,6 +647,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		if ownerExists && ownerTemplateID != route.ChartTemplateID {
 			if !route.Autogen && isAutogenTemplateID(ownerTemplateID) {
 				// Template wins over autogen on chart-id collision.
+				ctx.observeAutogenDisplacement(route, identity, metricName, ownerTemplateID)
 				ctx.chartOwners[route.ChartID] = route.ChartTemplateID
 				delete(ctx.chartsByID, route.ChartID)
 			} else {
