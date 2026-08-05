@@ -58,8 +58,8 @@ app_lat_count{inst="b"} 5
 ` + relabelSibling
 )
 
-// TestCollector_relabelTypedFamilyIntegrity drives the real collector (Init → Check,
-// Init → Collect) and asserts that relabeling which would silently corrupt a
+// TestCollector_relabelTypedFamilyIntegrity drives the real collector (Init → Check →
+// Collect) and asserts that relabeling which would silently corrupt a
 // histogram/summary is a hard error under Check and a drop-and-reassemble under
 // Collect, while clean relabeling and the unrelated sibling are preserved.
 func TestCollector_relabelTypedFamilyIntegrity(t *testing.T) {
@@ -162,8 +162,9 @@ func TestCollector_relabelTypedFamilyIntegrity(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			currentInput := tc.input
 			srv := httptest.NewServer(http.HandlerFunc(
-				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.input)) }))
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(currentInput)) }))
 			defer srv.Close()
 
 			newCollr := func() *Collector {
@@ -175,6 +176,7 @@ func TestCollector_relabelTypedFamilyIntegrity(t *testing.T) {
 			}
 
 			// Check: corruption fails autodetection.
+			currentInput = tc.input
 			checkErr := newCollr().Check(context.Background())
 			if tc.wantCheckErr {
 				assert.Error(t, checkErr)
@@ -182,8 +184,12 @@ func TestCollector_relabelTypedFamilyIntegrity(t *testing.T) {
 				assert.NoError(t, checkErr)
 			}
 
-			// Collect: corruption is dropped, survivors written.
+			// Runtime behavior is tested only after a successful Check, then an
+			// exporter-shape drift introduces the corrupt family.
+			currentInput = "# TYPE startup gauge\nstartup 1\n"
 			collr := newCollr()
+			require.NoError(t, collr.Check(context.Background()))
+			currentInput = tc.input
 			cc := cycle(t, collr.MetricStore())
 			cc.BeginCycle()
 			require.NoError(t, collr.Collect(context.Background()))
@@ -212,7 +218,7 @@ app_lat_count 6
 	require.NoError(t, err)
 	c := &Collector{jobRelabel: pipeline}
 
-	mfs, err := c.relabelAndAssemble(batch, false)
+	_, mfs, err := c.relabelAndAssemble(batch, c.jobRelabel, jobRelabelStage, false)
 	require.NoError(t, err)
 
 	renamed := mfs.GetHistogram("renamed_lat")
@@ -241,6 +247,7 @@ other_requests_total{code="200"} 9
 		MetricRelabelConfigs: setLabel([]string{"code"}, "(.+)", "verb", "${1}"),
 	}}
 	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	cc := cycle(t, collr.MetricStore())
 	cc.BeginCycle()

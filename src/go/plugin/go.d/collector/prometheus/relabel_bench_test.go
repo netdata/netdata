@@ -3,10 +3,14 @@
 package prometheus
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
@@ -69,11 +73,128 @@ func BenchmarkRelabelExecutor(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			if _, err := c.relabelAndAssemble(batch, false); err != nil {
+			if _, _, err := c.relabelAndAssemble(batch, c.jobRelabel, jobRelabelStage, false); err != nil {
 				b.Fatal(err)
 			}
 		}
 	})
+}
+
+// BenchmarkRelabelScrapeModes measures the complete steady-state fetch and parse
+// path for each supported stage combination. Unlike BenchmarkRelabelExecutor,
+// this includes the direct parser versus buffered-sample parser difference.
+func BenchmarkRelabelScrapeModes(b *testing.B) {
+	exposition := benchExposition()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(exposition))
+	}))
+	b.Cleanup(srv.Close)
+
+	tests := []struct {
+		name         string
+		jobRules     bool
+		profileRules bool
+	}{
+		{name: "no_rules"},
+		{name: "job_rules", jobRules: true},
+		{name: "profile_rules", profileRules: true},
+		{name: "job_and_profile_rules", jobRules: true, profileRules: true},
+	}
+
+	for _, tc := range tests {
+		b.Run(tc.name, func(b *testing.B) {
+			collr := New()
+			collr.URL = srv.URL
+			collr.Profiles = ProfilesConfig{Mode: profilesModeNone}
+			if tc.jobRules {
+				collr.Relabeling = benchmarkRelabelBlocks("job_stage")
+			}
+			if err := collr.Init(context.Background()); err != nil {
+				b.Fatal(err)
+			}
+
+			var normalizers []profileNormalizer
+			if tc.profileRules {
+				normalizers = []profileNormalizer{benchmarkProfileNormalizer(b, "all", "*", "*", "profile_stage")}
+			}
+
+			b.ReportAllocs()
+			b.SetBytes(int64(len(exposition)))
+			b.ResetTimer()
+			for range b.N {
+				var err error
+				if len(normalizers) == 0 {
+					_, err = collr.scrape(context.Background(), false)
+				} else {
+					_, err = collr.scrapeProfileNormalized(context.Background(), normalizers, false)
+				}
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkProfileRelabelDispatch isolates ownership resolution. The sixteen-
+// profile case gives every source family one disjoint owner and guards against
+// accidental pairwise profile composition or an unbounded dispatch cache.
+func BenchmarkProfileRelabelDispatch(b *testing.B) {
+	batch := scrapeSamples(b, benchExposition())
+
+	b.Run("one_profile", func(b *testing.B) {
+		normalizers := []profileNormalizer{benchmarkProfileNormalizer(b, "all", "*", "*", "profile_stage")}
+		b.ReportAllocs()
+		b.ResetTimer()
+		for range b.N {
+			resolveProfileOwners(batch, normalizers)
+		}
+	})
+
+	b.Run("sixteen_disjoint_profiles", func(b *testing.B) {
+		normalizers := make([]profileNormalizer, 0, 16)
+		normalizers = append(normalizers,
+			benchmarkProfileNormalizer(b, "http", "http_requests_total", "http_requests_total", "profile_stage"))
+		for i := range 15 {
+			base := fmt.Sprintf("lat_%d_seconds", i)
+			normalizers = append(normalizers,
+				benchmarkProfileNormalizer(b, fmt.Sprintf("lat_%d", i), base, base+"*", "profile_stage"))
+		}
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for range b.N {
+			resolveProfileOwners(batch, normalizers)
+		}
+	})
+}
+
+func benchmarkProfileNormalizer(tb testing.TB, name, rootPattern, blockPattern, label string) profileNormalizer {
+	tb.Helper()
+	root, err := matcher.NewSimplePatternsMatcher(rootPattern)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	pipeline, err := relabel.NewPipeline(benchmarkRelabelBlocksForMatch(blockPattern, label))
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return profileNormalizer{name: name, root: root, pipeline: pipeline}
+}
+
+func benchmarkRelabelBlocks(label string) []relabel.Block {
+	return benchmarkRelabelBlocksForMatch("*", label)
+}
+
+func benchmarkRelabelBlocksForMatch(match, label string) []relabel.Block {
+	return []relabel.Block{{
+		Match: match,
+		MetricRelabelConfigs: []relabel.Config{{
+			TargetLabel: label,
+			Replacement: "true",
+			Action:      relabel.Replace,
+		}},
+	}}
 }
 
 // benchExposition builds a representative scrape: many labeled counters plus a set

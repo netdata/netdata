@@ -28,6 +28,23 @@ const (
 	suffixBucket  = "_bucket"
 )
 
+type relabelStage struct {
+	name       string
+	limiterKey string
+}
+
+var (
+	jobRelabelStage     = relabelStage{name: "job relabeling", limiterKey: "job-relabel-typed-family-corruption"}
+	profileRelabelStage = relabelStage{name: "profile relabeling", limiterKey: "profile-relabel-typed-family-corruption"}
+)
+
+type relabelResult struct {
+	raw     prompkg.Sample
+	sample  prompkg.Sample
+	drop    relabel.DropInfo
+	discard bool
+}
+
 // relabelAndAssemble runs the job-level relabel pipeline: relabel every sample,
 // assemble, then curate typed families so relabeling cannot silently corrupt a
 // histogram/summary. A histogram/summary is a set of physical samples
@@ -41,86 +58,135 @@ const (
 // so a broken rule fails fast. Under Collect it is false: corrupted families are
 // dropped and the rest reassembled once, with a warning, so a transient
 // exposition change cannot take the whole job down.
-func (c *Collector) relabelAndAssemble(batch prompkg.SampleBatch, checking bool) (prompkg.MetricFamilies, error) {
-	processed, tracking := c.applyJobRelabel(batch)
+func (c *Collector) relabelAndAssemble(
+	batch prompkg.SampleBatch,
+	pipeline *relabel.Pipeline,
+	stage relabelStage,
+	checking bool,
+) (prompkg.SampleBatch, prompkg.MetricFamilies, error) {
+	processed, tracking := c.applyPipelineRelabel(batch, pipeline, stage)
+	return c.assembleRelabeled(processed, tracking, stage, checking)
+}
+
+func (c *Collector) assembleRelabeled(
+	processed prompkg.SampleBatch,
+	tracking *relabelTracking,
+	stage relabelStage,
+	checking bool,
+) (prompkg.SampleBatch, prompkg.MetricFamilies, error) {
 
 	mfs, err := prompkg.Assemble(processed)
 	if err != nil {
-		return nil, err
+		return prompkg.SampleBatch{}, nil, err
 	}
 
 	// No typed family was altered (or dropped) by relabeling: nothing to curate.
 	if !tracking.anyTypedTouched {
-		return mfs, nil
+		return processed, mfs, nil
 	}
 
 	invalid, violations := validateTypedFamilies(tracking, mfs)
 	if len(invalid) == 0 {
-		return mfs, nil
+		return processed, mfs, nil
 	}
 
 	if checking {
-		return nil, fmt.Errorf("relabeling corrupts typed metric families: %s", violations[0])
+		return prompkg.SampleBatch{}, nil, fmt.Errorf("%s corrupts typed metric families: %s", stage.name, violations[0])
 	}
 
 	// Runtime: drop the corrupted families and reassemble. This can recur every scrape
 	// if a rule stays bad or the exporter changed, so rate-limit the warning to avoid
 	// flooding the log; the per-family detail stays at debug.
-	c.Limit("relabel-typed-family-corruption", 1, 10*time.Minute).
-		Warningf("relabeling produced %d typed-family corruption(s); dropped the affected families (enable debug for names)", len(violations))
+	c.Limit(stage.limiterKey, 1, 10*time.Minute).
+		Warningf("%s produced %d typed-family corruption(s); dropped the affected families (enable debug for names)", stage.name, len(violations))
 	for _, v := range violations {
-		c.Debugf("relabeling dropped corrupted typed family: %s", v)
+		c.Debugf("%s dropped corrupted typed family: %s", stage.name, v)
 	}
 
 	// Closed invalid set computed in one pass, so a single re-filter + reassembly
 	// terminates: dropping samples can only remove corruption, never add it.
 	filtered := filterInvalidTypedFamilies(processed, invalid)
-	return prompkg.Assemble(filtered)
+	mfs, err = prompkg.Assemble(filtered)
+	return filtered, mfs, err
 }
 
-// applyJobRelabel runs the relabel processor over every sample, building the
-// processed batch (kept samples + HELP remapped from raw family name to final
-// family name) and the typed-family tracking the validator consumes.
-func (c *Collector) applyJobRelabel(batch prompkg.SampleBatch) (prompkg.SampleBatch, *relabelTracking) {
+func (c *Collector) applyPipelineRelabel(
+	batch prompkg.SampleBatch,
+	pipeline *relabel.Pipeline,
+	stage relabelStage,
+) (prompkg.SampleBatch, *relabelTracking) {
 	t := newRelabelTracking()
 	help := newHelpRemap()
 	out := prompkg.SampleBatch{Samples: make([]prompkg.Sample, 0, len(batch.Samples))}
-
 	for _, raw := range batch.Samples {
-		rawKey, isTyped := typedFamilyKeyOf(raw)
-
-		sample, drop := c.jobRelabel.Apply(raw)
-		if drop.Dropped() {
-			// Log the sample as it stood when the drop happened — an earlier block may
-			// have renamed it. (rawKey stays keyed on the original for family tracking.)
-			c.onRelabelDrop(sample, drop)
-			if isTyped {
-				t.recordDropped(rawKey)
-			}
-			continue
-		}
-
-		touched := sample.Name != raw.Name || !labels.Equal(sample.Labels, raw.Labels)
-		if isTyped {
-			finalKey, _ := typedFamilyKeyOf(sample) // Kind is preserved by relabeling, so still typed
-			t.recordKept(rawKey, finalKey, raw, sample, touched)
-		}
-
-		out.Samples = append(out.Samples, sample)
-		help.add(helpFamilyName(raw), helpFamilyName(sample))
+		sample, drop := pipeline.Apply(raw)
+		c.appendRelabelResult(&out, t, help, stage, relabelResult{raw: raw, sample: sample, drop: drop})
 	}
-
 	out.Help = help.remap(batch.Help)
 	return out, t
 }
 
+// materializeRelabel builds the kept sample batch, HELP remap, and shared typed-
+// family provenance from relabel outcomes. Policy-discarded results are omitted
+// as complete source families and do not look like rule-level partial drops.
+func (c *Collector) materializeRelabel(
+	helpEntries []prompkg.HelpEntry,
+	results []relabelResult,
+	stage relabelStage,
+) (prompkg.SampleBatch, *relabelTracking) {
+	t := newRelabelTracking()
+	help := newHelpRemap()
+	out := prompkg.SampleBatch{Samples: make([]prompkg.Sample, 0, len(results))}
+
+	for _, result := range results {
+		c.appendRelabelResult(&out, t, help, stage, result)
+	}
+
+	out.Help = help.remap(helpEntries)
+	return out, t
+}
+
+func (c *Collector) appendRelabelResult(
+	out *prompkg.SampleBatch,
+	t *relabelTracking,
+	help *helpRemap,
+	stage relabelStage,
+	result relabelResult,
+) {
+	if result.discard {
+		return
+	}
+	raw := result.raw
+	sample := result.sample
+	rawKey, isTyped := typedFamilyKeyOf(raw)
+
+	if result.drop.Dropped() {
+		// Log the sample as it stood when the drop happened — an earlier block may
+		// have renamed it. (rawKey stays keyed on the original for family tracking.)
+		c.onRelabelDrop(stage, sample, result.drop)
+		if isTyped {
+			t.recordDropped(rawKey)
+		}
+		return
+	}
+
+	touched := sample.Name != raw.Name || !labels.Equal(sample.Labels, raw.Labels)
+	if isTyped {
+		finalKey, _ := typedFamilyKeyOf(sample) // Kind is preserved by relabeling, so still typed
+		t.recordKept(rawKey, finalKey, raw, sample, touched)
+	}
+
+	out.Samples = append(out.Samples, sample)
+	help.add(helpFamilyName(raw), helpFamilyName(sample))
+}
+
 // onRelabelDrop logs why a relabel rule dropped a sample, at debug level. It logs
 // the metric name and the rule outcome, never label values (cardinality/PII).
-func (c *Collector) onRelabelDrop(s prompkg.Sample, d relabel.DropInfo) {
+func (c *Collector) onRelabelDrop(stage relabelStage, s prompkg.Sample, d relabel.DropInfo) {
 	c.When(d.RuleIndex >= 0).
-		Debugf("relabel dropped metric %q: %s (rule %d, action %q)", s.Name, d.Reason, d.RuleIndex, d.Action).
+		Debugf("%s dropped metric %q: %s (rule %d, action %q)", stage.name, s.Name, d.Reason, d.RuleIndex, d.Action).
 		Else().
-		Debugf("relabel dropped metric %q: %s", s.Name, d.Reason)
+		Debugf("%s dropped metric %q: %s", stage.name, s.Name, d.Reason)
 }
 
 // typedFamilyKey identifies one logical histogram/summary instance: the base

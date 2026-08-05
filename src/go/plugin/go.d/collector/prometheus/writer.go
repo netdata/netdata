@@ -114,13 +114,21 @@ func newMetricFamilyWriter(store metrix.CollectorStore, policy metricFamilyWrite
 // countWritable reports how many series across all families could be written. Used at Check to
 // confirm the endpoint exposes usable metrics, before any cycle has run.
 func (w *metricFamilyWriter) countWritable(mfs prompkg.MetricFamilies) int {
+	return w.countWritableWithFallback(mfs, true)
+}
+
+func (w *metricFamilyWriter) countBoundWritable(mfs prompkg.MetricFamilies) int {
+	return w.countWritableWithFallback(mfs, false)
+}
+
+func (w *metricFamilyWriter) countWritableWithFallback(mfs prompkg.MetricFamilies, allowFallback bool) int {
 	count := 0
 	for _, mf := range mfs {
 		if w.skipMetricFamily(mf) {
 			continue
 		}
 
-		typ, ok := w.resolveFamilyType(mf)
+		typ, ok := w.resolveFamilyType(mf, allowFallback)
 		if !ok {
 			continue
 		}
@@ -140,6 +148,14 @@ func (w *metricFamilyWriter) countWritable(mfs prompkg.MetricFamilies) int {
 }
 
 func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int {
+	return w.writeMetricFamiliesWithFallback(mfs, true)
+}
+
+func (w *metricFamilyWriter) writeBoundMetricFamilies(mfs prompkg.MetricFamilies) int {
+	return w.writeMetricFamiliesWithFallback(mfs, false)
+}
+
+func (w *metricFamilyWriter) writeMetricFamiliesWithFallback(mfs prompkg.MetricFamilies, allowFallback bool) int {
 	w.cycle++
 	w.reconcileHandles()
 
@@ -149,7 +165,7 @@ func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int
 			continue
 		}
 
-		typ, ok := w.resolveFamilyType(mf)
+		typ, ok := w.resolveFamilyType(mf, allowFallback)
 		if !ok {
 			continue
 		}
@@ -228,18 +244,34 @@ func (w *metricFamilyWriter) skipMetricFamily(mf *prompkg.MetricFamily) bool {
 	return false
 }
 
-func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily) (commonmodel.MetricType, bool) {
-	switch mf.Type() {
+func (w *metricFamilyWriter) bindFallbackTypes(batch *prompkg.SampleBatch) {
+	for i := range batch.Samples {
+		sample := &batch.Samples[i]
+		if typ, ok := w.resolveType(sample.Name, sample.FamilyType, true); ok {
+			sample.FamilyType = typ
+		}
+	}
+}
+
+func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily, allowFallback bool) (commonmodel.MetricType, bool) {
+	return w.resolveType(mf.Name(), mf.Type(), allowFallback)
+}
+
+func (w *metricFamilyWriter) resolveType(name string, declared commonmodel.MetricType, allowFallback bool) (commonmodel.MetricType, bool) {
+	switch declared {
 	case commonmodel.MetricTypeGauge,
 		commonmodel.MetricTypeCounter,
 		commonmodel.MetricTypeSummary,
 		commonmodel.MetricTypeHistogram:
-		return mf.Type(), true
+		return declared, true
 	case commonmodel.MetricTypeUnknown:
-		if w.policy.isFallbackTypeGauge.MatchString(mf.Name()) {
+		if !allowFallback {
+			return "", false
+		}
+		if w.policy.isFallbackTypeGauge.MatchString(name) {
 			return commonmodel.MetricTypeGauge, true
 		}
-		if w.policy.isFallbackTypeCounter.MatchString(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
+		if w.policy.isFallbackTypeCounter.MatchString(name) || strings.HasSuffix(name, "_total") {
 			return commonmodel.MetricTypeCounter, true
 		}
 		return "", false
