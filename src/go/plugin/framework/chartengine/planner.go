@@ -535,7 +535,7 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			}
 		}
 		if len(routes) == 0 {
-			autoRoutes, ok, reason, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
+			autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
 			if err != nil {
 				firstErr = err
 				return
@@ -550,11 +550,17 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 				if trackStats {
 					ctx.seriesUnmatched++
 					if ctx.routeObserver != nil {
+						ruleScope := ""
+						if ruleIndex >= 0 && ruleIndex < len(e.state.cfg.autogen.Rules) {
+							ruleScope = e.state.cfg.autogen.Rules[ruleIndex].Scope
+						}
 						ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
-							Decision:       PlanRouteUnmatched,
-							Reason:         reason,
-							SeriesIdentity: identity,
-							MetricName:     name,
+							Decision:         PlanRouteUnmatched,
+							Reason:           reason,
+							SeriesIdentity:   identity,
+							MetricName:       name,
+							AutogenRuleIndex: ruleIndex,
+							AutogenRuleScope: ruleScope,
 						})
 					}
 				}

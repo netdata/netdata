@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"maps"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -178,7 +177,12 @@ func validateProfile(opts validationOptions) report {
 	addObservedLabelAggregationHeuristics(merged, reader, &r)
 
 	emitTypeID := validationEmitTypeID(r.Job.Name)
-	engine, err := chartengine.New(chartengine.WithEmitTypeIDBudgetPrefix(emitTypeID))
+	routeSummary := newPlanRouteSummary()
+	engine, err := chartengine.New(
+		chartengine.WithEmitTypeIDBudgetPrefix(emitTypeID),
+		chartengine.WithRuntimeStore(nil),
+		chartengine.WithPlanRouteDiagnosticObserver(routeSummary.observe),
+	)
 	if err != nil {
 		r.addError("engine_init", "", err.Error(), "The authoritative planner must initialize.")
 		return r
@@ -286,25 +290,7 @@ func validateProfile(opts validationOptions) report {
 			)
 		}
 	}
-	runtimeCountersOK := true
-	for suffix, destination := range map[string]*int{
-		"series_scanned_total":         &r.Counts.SeriesScanned,
-		"series_autogen_matched_total": &r.Counts.SeriesAutogen,
-		"series_unmatched_total":       &r.Counts.SeriesUnmatched,
-	} {
-		value, err := runtimeMetricInt(engine, suffix)
-		if err != nil {
-			runtimeCountersOK = false
-			r.addError(
-				"runtime_metrics",
-				suffix,
-				err.Error(),
-				"Coverage counters are authoritative evidence; absence or an invalid value cannot be interpreted as zero.",
-			)
-			continue
-		}
-		*destination = value
-	}
+	r.Counts.SeriesScanned, r.Counts.SeriesAutogen, r.Counts.SeriesUnmatched = routeSummary.counts()
 
 	unavailableIdentities, identityAuditErrs := inspectUnavailableInstanceIdentities(refs, reader)
 	for _, item := range identityAuditErrs {
@@ -339,7 +325,7 @@ func validateProfile(opts validationOptions) report {
 		r.addError("isolated_chart_plan", item.path, item.err.Error(), "Every authored chart is planned alone to expose dead selectors and rendered IDs hidden by whole-plan collision suppression.")
 	}
 
-	if runtimeCountersOK && r.Counts.SeriesAutogen != 0 {
+	if r.Counts.SeriesAutogen != 0 {
 		r.addError(
 			"unexpected_autogen",
 			"",
@@ -347,8 +333,8 @@ func validateProfile(opts validationOptions) report {
 			"The source-complete fixture must curate every series that survives the job/writer pipeline. Generic fallback preserves unknown future metrics; it does not excuse a current-source coverage gap.",
 		)
 	}
-	if runtimeCountersOK && r.Counts.SeriesUnmatched != 0 {
-		if profileSuppressionExplainsUnmatched(profile, merged, reader, r.Counts.SeriesAutogen, r.Counts.SeriesUnmatched) {
+	if r.Counts.SeriesUnmatched != 0 {
+		if routeSummary.allUnmatchedExplainedByProfile(profile, merged) {
 			r.addWarning(
 				"profile_suppressed_series",
 				"autogen.selector",
@@ -651,89 +637,6 @@ func reconcileRawFamilies(
 		})
 	}
 	return excluded, renamed
-}
-
-func runtimeMetricInt(engine *chartengine.Engine, suffix string) (int, error) {
-	if engine == nil || engine.RuntimeStore() == nil {
-		return 0, fmt.Errorf("chartengine runtime store is unavailable")
-	}
-	name := "netdata.go.plugin.framework.chartengine." + suffix
-	value, ok := engine.RuntimeStore().Read(metrix.ReadRaw()).Value(name, nil)
-	if !ok {
-		return 0, fmt.Errorf("required runtime metric %q is absent", name)
-	}
-	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || math.Trunc(value) != value {
-		return 0, fmt.Errorf("required runtime metric %q has invalid counter value %v", name, value)
-	}
-	maxInt := int(^uint(0) >> 1)
-	if value > float64(maxInt) {
-		return 0, fmt.Errorf("required runtime metric %q exceeds the platform int range", name)
-	}
-	return int(value), nil
-}
-
-func profileSuppressionExplainsUnmatched(
-	profile promprofiles.Profile,
-	merged *charttpl.Spec,
-	reader metrix.Reader,
-	currentAutogen, currentUnmatched int,
-) bool {
-	expr := profile.AutogenSelector()
-	if expr == nil || len(expr.Deny) == 0 || currentUnmatched == 0 || merged == nil || merged.Engine == nil || merged.Engine.Autogen == nil {
-		return false
-	}
-	raw, err := merged.MarshalTemplate()
-	if err != nil {
-		return false
-	}
-	relaxed, err := charttpl.DecodeYAML([]byte(raw))
-	if err != nil || relaxed.Engine == nil || relaxed.Engine.Autogen == nil {
-		return false
-	}
-
-	rules := relaxed.Engine.Autogen.Rules[:0]
-	removed := 0
-	for _, rule := range relaxed.Engine.Autogen.Rules {
-		if rule.Scope == profile.Match &&
-			slices.Equal(rule.Selector.Allow, expr.Allow) &&
-			slices.Equal(rule.Selector.Deny, expr.Deny) {
-			removed++
-			continue
-		}
-		rules = append(rules, rule)
-	}
-	if removed == 0 {
-		return false
-	}
-	relaxed.Engine.Autogen.Rules = rules
-	raw, err = relaxed.MarshalTemplate()
-	if err != nil {
-		return false
-	}
-
-	engine, err := chartengine.New()
-	if err != nil {
-		return false
-	}
-	if err := engine.LoadYAML([]byte(raw), 1); err != nil {
-		return false
-	}
-	attempt, err := engine.PreparePlan(reader)
-	if err != nil {
-		return false
-	}
-	if err := attempt.Commit(); err != nil {
-		return false
-	}
-	relaxedAutogen, err := runtimeMetricInt(engine, "series_autogen_matched_total")
-	if err != nil {
-		return false
-	}
-	relaxedUnmatched, err := runtimeMetricInt(engine, "series_unmatched_total")
-	if err != nil {
-		return false
-	}
-	return relaxedUnmatched == 0 && relaxedAutogen == currentAutogen+currentUnmatched
 }
 
 func materializeCharts(plan chartengine.Plan) []materializedChart {

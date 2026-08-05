@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
@@ -3732,13 +3733,29 @@ relabeling:
 	}
 }
 
-func TestRuntimeMetricIntRejectsMissingEvidence(t *testing.T) {
-	engine, err := chartengine.New(chartengine.WithRuntimeStore(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runtimeMetricInt(engine, "series_scanned_total"); err == nil {
-		t.Fatal("missing runtime store must not be interpreted as a zero counter")
+func TestPlanRouteSummaryCountsDistinctSeries(t *testing.T) {
+	summary := newPlanRouteSummary()
+	summary.observe(chartengine.PlanRouteDiagnostic{
+		Decision:       chartengine.PlanRouteAccepted,
+		SeriesIdentity: metrix.SeriesIdentity{ID: "curated"},
+	})
+	summary.observe(chartengine.PlanRouteDiagnostic{
+		Decision:       chartengine.PlanRouteAccepted,
+		SeriesIdentity: metrix.SeriesIdentity{ID: "curated"},
+	})
+	summary.observe(chartengine.PlanRouteDiagnostic{
+		Decision:       chartengine.PlanRouteAccepted,
+		SeriesIdentity: metrix.SeriesIdentity{ID: "autogen"},
+		Autogen:        true,
+	})
+	summary.observe(chartengine.PlanRouteDiagnostic{
+		Decision:       chartengine.PlanRouteUnmatched,
+		SeriesIdentity: metrix.SeriesIdentity{ID: "unmatched"},
+	})
+
+	scanned, autogen, unmatched := summary.counts()
+	if scanned != 3 || autogen != 1 || unmatched != 1 {
+		t.Fatalf("unexpected route counts: scanned=%d autogen=%d unmatched=%d", scanned, autogen, unmatched)
 	}
 }
 

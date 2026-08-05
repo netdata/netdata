@@ -45,6 +45,8 @@ type PlanRouteDiagnostic struct {
 	ChartID                 string
 	DimensionName           string
 	ExistingChartTemplateID string
+	AutogenRuleIndex        int
+	AutogenRuleScope        string
 	Autogen                 bool
 }
 
