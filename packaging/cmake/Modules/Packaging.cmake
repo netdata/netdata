@@ -628,10 +628,10 @@ set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_REQUIRES "netdata = ${CPACK_PACKAGE_VERSION}")
 set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_CONFLICTS "netdata < ${CPACK_PACKAGE_VERSION}")
 if(NETDATA_RPM_HAVE_WEAK_DEPS)
   set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_RECOMMENDS
-      "netdata-plugin-apps = ${CPACK_PACKAGE_VERSION}, netdata-ebpf-legacy-code >= ${NETDATA_RPM_VERSION}")
+      "netdata-plugin-apps = ${CPACK_PACKAGE_VERSION}, netdata-ebpf-legacy-code >= ${CPACK_PACKAGE_VERSION}")
 else()
   string(APPEND CPACK_RPM_PLUGIN-EBPF_PACKAGE_REQUIRES
-         ", netdata-plugin-apps = ${CPACK_PACKAGE_VERSION}, netdata-ebpf-legacy-code >= ${NETDATA_RPM_VERSION}")
+         ", netdata-plugin-apps = ${CPACK_PACKAGE_VERSION}, netdata-ebpf-legacy-code >= ${CPACK_PACKAGE_VERSION}")
 endif()
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
@@ -812,7 +812,7 @@ set(CPACK_DEBIAN_PLUGIN-IBM_DEBUGINFO_PACKAGE Off)
 set(CPACK_RPM_PLUGIN-IBM_PACKAGE_NAME "netdata-plugin-ibm")
 set(CPACK_RPM_PLUGIN-IBM_PACKAGE_SUMMARY "The IBM ecosystem metrics collection plugin for the Netdata Agent")
 set(CPACK_RPM_PLUGIN-IBM_PACKAGE_REQUIRES
-    "netdata = ${CPACK_PACKAGE_VERSION}, netdata-plugin-ibm-libs = ${NETDATA_RPM_VERSION}, unixODBC")
+    "netdata = ${CPACK_PACKAGE_VERSION}, netdata-plugin-ibm-libs = ${CPACK_PACKAGE_VERSION}, unixODBC")
 set(CPACK_RPM_PLUGIN-IBM_PACKAGE_CONFLICTS "netdata < ${CPACK_PACKAGE_VERSION}")
 # The vendored IBM MQ client must not generate automatic provides/requires.
 set(CPACK_RPM_PLUGIN-IBM_PACKAGE_AUTOREQPROV "no")
