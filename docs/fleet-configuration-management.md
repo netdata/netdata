@@ -269,6 +269,41 @@ Windows monitoring is handled by the native **windows.plugin** which uses Window
 - Automatically groups Windows services and applications
 - Monitors all processes for CPU, memory, handles, and I/O usage
 
+### Bulk Deploying Windows Child Nodes (Streaming)
+
+The Windows MSI installer only accepts Netdata Cloud claiming properties (`TOKEN`, `ROOMS`, `PROXY`, `URL`, `INSECURE`) — it has no installer property for the streaming `destination` or `api key`. To stream metrics from many Windows child nodes to a parent without editing each node individually, install the MSI silently on every host and then push a single ready-made `stream.conf` to the fleet as a post-install step.
+
+On Windows, the child-side streaming file is `C:\Program Files\Netdata\etc\netdata\stream.conf`. A stock reference template ships at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\stream.conf`.
+
+Before deploying, generate the parent API key: on the receiving parent, create a UUID and add an `[API_KEY]` section to its `stream.conf`. See [Configuring Metrics Centralization Points](observability-centralization-points/metrics-centralization-points/configuration.md) for the parent-side setup, then reuse that same API key on every Windows child.
+
+**Deploy `stream.conf` with PowerShell** (run as Administrator, or via PowerShell remoting):
+
+```powershell
+$streamConf = @'
+[stream]
+    enabled = yes
+    destination = PARENT_IP:19999
+    api key = API_KEY
+'@
+
+$streamConf | Out-File -FilePath "C:\Program Files\Netdata\etc\netdata\stream.conf" -Encoding ASCII
+
+Restart-Service Netdata
+```
+
+Replace `PARENT_IP` with your parent's address and `API_KEY` with the UUID generated on the parent.
+
+**Distribute at scale** so no node needs manual editing:
+
+- **SCCM**: package the MSI silent install, the `stream.conf` file, and the service restart into a single deployment.
+- **GPO**: use a Group Policy Preference to copy a pre-built `stream.conf` into `C:\Program Files\Netdata\etc\netdata\`, plus a Scheduled Task preference to run `Restart-Service Netdata`.
+- **PowerShell remoting**: run the script above across a list of targets with `Invoke-Command`.
+
+Restarting the Netdata service is required: the agent reads `stream.conf` at startup, so streaming only starts after `Restart-Service Netdata` (or `sc stop Netdata` then `sc start Netdata`).
+
+For MSI silent-install details, see [Install Netdata on Windows](../packaging/windows/WINDOWS_INSTALLER.md).
+
 ### Kubernetes Environments
 When Netdata runs inside a Kubernetes cluster, it provides comprehensive multi-level discovery:
 
