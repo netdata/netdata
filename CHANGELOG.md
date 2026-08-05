@@ -894,6 +894,12 @@
 - Refactor(go.d/snmp-traps): internalize receiver ownership ([#23377](https://github.com/netdata/netdata/issues/23377))
 - Refactor(go.d): share reverse DNS across SNMP collectors ([#23385](https://github.com/netdata/netdata/issues/23385))
 - Refactor(go.d): isolate SNMP trap dedup and telemetry ([#23387](https://github.com/netdata/netdata/issues/23387))
+- Refactor(go.d/snmp_traps): isolate SNMP trap job runtime ([#23389](https://github.com/netdata/netdata/issues/23389))
+- Docs(go.d/snmp_traps): add developer architecture guide ([#23391](https://github.com/netdata/netdata/issues/23391))
+- Fix: validate host prefix format to prevent '%' in printf strings ([#23342](https://github.com/netdata/netdata/issues/23342))
+- Fix listen backlog and add backlog listener test for spawn server ([#23380](https://github.com/netdata/netdata/issues/23380))
+- Docs(mcp): describe the account URL field in MCP Connections ([#23393](https://github.com/netdata/netdata/issues/23393))
+- Fix(vnode): ensure exclusive ownership of local vnodes during streaming ([#23388](https://github.com/netdata/netdata/issues/23388))
 
 ## [2.10.0] - 2026-04-09
 

@@ -170,36 +170,42 @@ Runtime ownership is split at protocol acceptance:
 - `internal/telemetry` owns the retained built-in per-job counters and their
   `metrix` emission. Event paths and collection retain one explicit job handle;
   registry lookup and locking are lifecycle-only.
-- The root collector owns public config DTOs and lifecycle/transaction
+- `internal/jobruntime` owns one job's resources and lifecycle/transaction
   orchestration. After receiver acceptance, it sequences catalog lookup,
   overrides, attribution/enrichment, template rendering, dedup admission,
   authoritative output commitment, profile-metric updates, and built-in metric
   updates.
+- The root collector owns public config DTOs and normalization, framework
+  methods/assets, and composition of shared plugin services into the immutable
+  job policy and explicit dependencies.
 - Runtime receiver outcomes use one event callback. The receiver package does
   not depend on collector telemetry, logging, profile, or output packages.
 - `Receiver.Bind()` returns non-fatal bind-time events as explicit values.
-  Root attaches the job telemetry handle before handling them; runtime events
-  continue through the receiver callback.
+  `jobruntime.Job` attaches the job telemetry handle before handling them;
+  runtime events continue through the receiver callback.
 
 Each endpoint owns one receive goroutine and one reusable datagram buffer. The
-receive loop invokes the root packet workflow synchronously before reusing that
-buffer. There is no receiver queue, channel, or intermediate worker between the
+receive loop invokes the `jobruntime.Job` packet workflow synchronously before
+reusing that buffer. There is no receiver queue, channel, or intermediate worker between the
 socket read and packet handling. Output backends retain their own bounded queues
 under the `internal/output.Writer` contract.
 
 Initialization is staged so failed jobs do not leak sockets or newly created
 SNMPv3 state:
 
-1. Validate public config and build the immutable receiver policy.
-2. Prepare the journal backend when enabled; no receiver socket is bound yet.
-3. Construct the receiver and bind every endpoint; any bind failure closes
+1. Root validates public config and builds the immutable job and component
+   policies.
+2. `jobruntime.Job` acquires the catalog lease and constructs profile metrics
+   when enabled.
+3. Prepare the journal backend when enabled; no receiver socket is bound yet.
+4. Construct the receiver and bind every endpoint; any bind failure closes
    earlier sockets and the prepared journal backend.
-4. Prepare receiver-local SNMPv3 state when v3 is enabled.
-5. Attach the per-job telemetry handle, then handle the receiver's returned
+5. Prepare receiver-local SNMPv3 state when v3 is enabled.
+6. Attach the per-job telemetry handle, then handle the receiver's returned
    bind-time events so degraded default receive-buffer requests are counted.
-6. Prepare the OTLP backend, compose the output coordinator and deduper, then
+7. Prepare the OTLP backend, compose the output coordinator and deduper, then
    start the prepared output backends.
-7. Publish the fully constructed collector state, start deduplication when
+8. Publish the fully constructed collector state, start deduplication when
    enabled, commit prepared v3 state, and start endpoint receive loops last.
 
 Failures after v3 preparation but before receiver start detach an attached

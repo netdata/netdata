@@ -713,10 +713,12 @@ Evidence:
   source evidence used for log filtering and audit.
 - `src/go/plugin/go.d/collector/snmp_traps/config.go:26` through `:28` defines
   trusted relay configuration.
-- `Collector.warnCatchAllTrustedRelays` warns that catch-all trusted relays let
-  every peer override source identity via `snmpTrapAddress.0`.
-- `Collector.handleReceiverEvent` handles INFORM response failures and records
-  `inform_response_failed` through the retained telemetry handle.
+- The root `Collector.warnCatchAllTrustedRelays` composition warning explains
+  that catch-all trusted relays let every peer override source identity via
+  `snmpTrapAddress.0`.
+- `internal/jobruntime.Job` handles receiver events, including INFORM response
+  failures, and records `inform_response_failed` through the retained telemetry
+  handle.
 
 ## Explicit Non-Goals
 
@@ -1666,17 +1668,10 @@ design explicitly changes it:
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:680` through `:686`
-  returns early for dedup-suppressed traps.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:688` through `:696`
-  returns early for write failures.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:699` through `:709`
-  updates profile, event, and severity metrics after successful write.
-- Phase A profile metric tests verify no profile metric is emitted for write
-  failures and dedup-suppressed traps. Pre-Phase-A
-  `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go:818`
-  through `:831` and `:962` through `:985` covered the removed job-level
-  operator metric runtime.
+- `src/go/plugin/go.d/collector/snmp_traps/internal/jobruntime/pipeline.go` returns early for dedup-suppressed traps and
+  authoritative write failures, then updates profile, event, and severity metrics only after a successful write.
+- `src/go/plugin/go.d/collector/snmp_traps/internal/jobruntime/profile_metrics_integration_test.go` verifies that profile
+  metrics are not emitted after authoritative write failures or for dedup-suppressed traps.
 
 ### Composition And Override Semantics
 

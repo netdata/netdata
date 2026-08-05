@@ -1245,6 +1245,20 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
         return RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
     }
 
+    // A vnode has exactly one writer: the local collector that defines it.
+    //
+    // stream_receiver_accept_connection() already rejects locally collected vnodes, but that check
+    // runs before the socket takeover and this attach - the connection can spend seconds in between
+    // (stale-receiver wait, host creation, first response). Meanwhile the collector may claim the
+    // vnode: it sets RRDHOST_FLAG_VIRTUAL_HOST and then evicts any attached receiver under this
+    // same lock (pluginsd_host_claim_as_local_vnode()). Re-checking the flag here is what makes the
+    // two paths mutually exclusive: either we attach first and the collector evicts us, or the
+    // collector claims first and we are refused. Without it, we would become a second writer.
+    if (rrdhost_is_virtual(host)) {
+        rrdhost_receiver_unlock(host);
+        return RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL;
+    }
+
     if (!host->receiver) {
         object_state_activate_if_not_activated(&host->state_id);
 

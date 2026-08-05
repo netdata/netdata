@@ -41,6 +41,22 @@ type collectorOTLPFixture struct {
 	endpoint string
 }
 
+type testHostIdentity struct {
+	fresh  func() (hostidentity.Provider, error)
+	cached func() (hostidentity.Provider, error)
+}
+
+func (s testHostIdentity) FreshJournal() (hostidentity.Provider, error) {
+	return s.fresh()
+}
+
+func (s testHostIdentity) CachedFallback() (hostidentity.Provider, error) {
+	if s.cached != nil {
+		return s.cached()
+	}
+	return s.fresh()
+}
+
 func startCollectorOTLPFixture(t *testing.T) *collectorOTLPFixture {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -96,36 +112,13 @@ func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
 	}
 }
 
-func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
-	rt := newRootTestProfileMetricRuntime(t)
-	c := newTestSNMPTrapsCollector()
-	c.profileMetrics = rt
-
-	collecttest.AssertChartTemplateSchema(t, c.ChartTemplateYAML())
-	charts := chartTemplatesByIDFromYAML(t, c.ChartTemplateYAML())
-	assert.Contains(t, charts, "profile_metric_diagnostics")
-	assert.Contains(t, charts, "cisco_config_changes")
-
-	spec, err := charttpl.DecodeYAML([]byte(c.ChartTemplateYAML()))
-	require.NoError(t, err)
-	program, err := chartengine.Compile(spec, 1)
-	require.NoError(t, err)
-
-	contexts := make(map[string]bool)
-	for _, chart := range program.Charts() {
-		contexts[chart.Meta.Context] = true
-	}
-	assert.Contains(t, contexts, "snmp.trap.profile_metric_diagnostics")
-	assert.Contains(t, contexts, "snmp.trap.cisco.config.changes")
-}
-
 func TestCollectorInitBuildsEnabledProfileMetricRuntime(t *testing.T) {
 	withTestCacheDir(t)
 	paths := rootTestProfileCatalogPaths(t)
 	writeRootTestProfileMetricProfile(t, paths.UserDirs[0])
 
 	c := newTestSNMPTrapsCollector()
-	c.profileCatalog = catalog.NewManager(paths)
+	c.services.catalog = catalog.NewManager(paths)
 	c.Name = "profile-metrics-init"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.ProfileMetrics = ProfileMetricsConfig{
@@ -135,13 +128,24 @@ func TestCollectorInitBuildsEnabledProfileMetricRuntime(t *testing.T) {
 
 	require.NoError(t, c.Init(context.Background()))
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
-	require.NotNil(t, c.profileMetrics)
+	require.NotNil(t, c.job)
 
 	template := c.ChartTemplateYAML()
 	collecttest.AssertChartTemplateSchema(t, template)
 	charts := chartTemplatesByIDFromYAML(t, template)
 	assert.Contains(t, charts, "profile_metric_diagnostics")
 	assert.Contains(t, charts, "cisco_config_changes")
+
+	spec, err := charttpl.DecodeYAML([]byte(template))
+	require.NoError(t, err)
+	program, err := chartengine.Compile(spec, 1)
+	require.NoError(t, err)
+	contexts := make(map[string]bool)
+	for _, chart := range program.Charts() {
+		contexts[chart.Meta.Context] = true
+	}
+	assert.Contains(t, contexts, "snmp.trap.profile_metric_diagnostics")
+	assert.Contains(t, contexts, "snmp.trap.cisco.config.changes")
 }
 
 func TestCollectorCreatorDefaults(t *testing.T) {
@@ -154,11 +158,23 @@ func TestCollectorCreatorSharesPluginDependencies(t *testing.T) {
 	first := creator.CreateV2().(*Collector)
 	second := creator.CreateV2().(*Collector)
 
-	assert.Same(t, first.hostIdentity, second.hostIdentity)
-	assert.Same(t, first.profileCatalog, second.profileCatalog)
-	assert.Same(t, first.enricher, second.enricher)
-	assert.Same(t, first.telemetryRegistry, second.telemetryRegistry)
-	assert.NotNil(t, first.engineStateRoot)
+	assert.Same(t, first.services.hostIdentity, second.services.hostIdentity)
+	assert.Same(t, first.services.catalog, second.services.catalog)
+	assert.Same(t, first.services.enricher, second.services.enricher)
+	assert.Same(t, first.services.telemetryRegistry, second.services.telemetryRegistry)
+	assert.NotNil(t, first.services.engineStateRoot)
+}
+
+func TestPluginServicesCatalogCandidateCommitsOnlyOnSuccess(t *testing.T) {
+	services := &pluginServices{}
+
+	failed, _ := services.catalogCandidate()
+	retry, commit := services.catalogCandidate()
+	assert.NotSame(t, failed, retry)
+
+	commit()
+	committed, _ := services.catalogCandidate()
+	assert.Same(t, retry, committed)
 }
 
 func TestCollectorCreatorResolvesProfilePathsOnFirstCollector(t *testing.T) {
@@ -192,7 +208,7 @@ traps:
 	executable.Directory = executableDir
 
 	collector := creator.CreateV2().(*Collector)
-	lease, err := collector.profileCatalog.Acquire()
+	lease, err := collector.services.catalog.Acquire()
 	require.NoError(t, err)
 	lease.Close()
 }
@@ -233,7 +249,10 @@ traps:
 	require.NoError(t, collector.Init(context.Background()))
 	t.Cleanup(func() { collector.Cleanup(context.Background()) })
 
-	td, err := collector.profileIndex.LookupWithError("1.3.6.1.6.3.1.1.5.1")
+	lease, err := collector.services.catalog.Acquire()
+	require.NoError(t, err)
+	t.Cleanup(lease.Close)
+	td, err := lease.Epoch().LookupWithError("1.3.6.1.6.3.1.1.5.1")
 	require.NoError(t, err)
 	require.NotNil(t, td)
 	assert.Equal(t, "SNMPv2-MIB::coldStart", td.Name)
@@ -246,7 +265,7 @@ func TestCollectorNewUsesIndependentHostIdentityService(t *testing.T) {
 	first := New(deviceStore, topologyEnricher, reverseDNS)
 	second := New(deviceStore, topologyEnricher, reverseDNS)
 
-	assert.NotSame(t, first.hostIdentity, second.hostIdentity)
+	assert.NotSame(t, first.services.hostIdentity, second.services.hostIdentity)
 }
 
 func TestCollectorCreatorRequiresSharedDependencies(t *testing.T) {
@@ -444,9 +463,9 @@ func TestConfigLabelKeyValidation(t *testing.T) {
 func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	profileDir := t.TempDir()
 	writeProfileYAML(t, profileDir, "invalid.yaml", "unknown_profile_key: true\n")
-	setTestDirs(t, profileDir)
+	manager := setTestDirs(t, profileDir)
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: 162}}
 	c.ProfileMetrics = ProfileMetricsConfig{Enabled: true}
@@ -455,10 +474,7 @@ func TestCollectorInitValidatesBeforeAcquiringResources(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "profile_metrics.include")
 	assert.NotContains(t, err.Error(), "unknown_profile_key")
-	assert.Nil(t, c.profileLease)
-	assert.Nil(t, c.receiver)
-	assert.Nil(t, c.trapWriter)
-	assert.Nil(t, c.telemetry)
+	assert.Nil(t, c.job)
 }
 
 func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {
@@ -643,57 +659,55 @@ func TestValidateVersions(t *testing.T) {
 }
 
 func TestCollectorInit_BindsEndpointsAndCheckIsNoop(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 	c.Versions = []string{" V1 ", "V2C"}
 
-	startJournalJobs := activeDirectJournalJobs.Load()
+	startJournalJobs := c.services.journalActivity.active.Load()
 	require.NoError(t, c.Init(context.Background()))
-	require.NotNil(t, c.receiver)
+	require.NotNil(t, c.job)
 	assert.Equal(t, []string{"v1", "v2c"}, c.Versions)
 	configured, ok := c.Configuration().(Config)
 	require.True(t, ok)
 	assert.Equal(t, "local", configured.Name)
 	assert.Equal(t, []string{"v1", "v2c"}, configured.Versions)
-	require.NotEmpty(t, c.journalDir)
-	require.DirExists(t, c.journalDir)
-	assert.Equal(t, startJournalJobs+1, activeDirectJournalJobs.Load())
-	assert.True(t, directJournalLogsAvailable())
-	assert.Equal(t, trapWriteFailureJournal, c.trapWriteFailureDim())
+	require.DirExists(t, journal.Root(c.Name))
+	assert.Equal(t, startJournalJobs+1, c.services.journalActivity.active.Load())
+	assert.True(t, c.services.journalActivity.Available())
 	require.NoError(t, c.Check(context.Background()))
 
 	c.Cleanup(context.Background())
-	require.Nil(t, c.receiver)
-	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
+	require.Nil(t, c.job)
+	assert.Equal(t, startJournalJobs, c.services.journalActivity.active.Load())
 }
 
 func TestCollectorInit_JournalHostFailureRetriesFreshProvider(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	provider := newTestJournalHostProvider()
 	loadCalls := 0
-	service := hostidentity.NewWithLoader(
-		func() hostidentity.LoadConfig { return hostidentity.LoadConfig{StateDir: t.TempDir()} },
-		func(hostidentity.LoadConfig) (hostidentity.Provider, error) {
+	service := testHostIdentity{
+		fresh: func() (hostidentity.Provider, error) {
 			loadCalls++
 			if loadCalls == 1 {
 				return nil, errors.New("identity unavailable")
 			}
 			return provider, nil
 		},
-	)
-	c := newCollector(
+	}
+	services := newPluginServices(
 		newTestTrapEnricher(ddsnmp.NewDeviceStore(), nil, newTestReverseDNSResolver()),
 		service,
-		currentTestCatalogManager,
 		telemetry.NewRegistry(),
 		func() string { return t.TempDir() },
 	)
+	services.catalog = manager
+	c := newCollector(services)
 	c.Name = "journal-host-retry"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 
@@ -702,33 +716,31 @@ func TestCollectorInit_JournalHostFailureRetriesFreshProvider(t *testing.T) {
 	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 503, coded.DyncfgCode())
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 
 	require.NoError(t, c.Init(context.Background()))
 	assert.Equal(t, 2, loadCalls)
-	assert.Same(t, provider, c.journalHost)
-	assert.Equal(t, int64(1000), c.monotonicUsec())
 
 	c.Cleanup(context.Background())
 }
 
 func TestCollectorInit_IdempotentDoubleInit(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
 	require.NoError(t, c.Init(context.Background()))
-	require.NotNil(t, c.receiver)
-	first := c.receiver
+	require.NotNil(t, c.job)
+	first := c.job
 	require.NoError(t, c.Init(context.Background()))
-	assert.Same(t, first, c.receiver)
+	assert.Same(t, first, c.job)
 
 	c.Cleanup(context.Background())
-	require.Nil(t, c.receiver)
+	require.Nil(t, c.job)
 }
 
 func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
@@ -746,7 +758,7 @@ func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.False(t, retryable.DyncfgRetryable())
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 }
 
 func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
@@ -761,7 +773,7 @@ func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
 	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.DyncfgCode())
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 }
 
 func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
@@ -778,7 +790,7 @@ func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Contains(t, err.Error(), "listen.receive_buffer")
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 }
 
 func TestCollectorInit_TooLargeReceiveBufferIsCodedError(t *testing.T) {
@@ -795,7 +807,7 @@ func TestCollectorInit_TooLargeReceiveBufferIsCodedError(t *testing.T) {
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Contains(t, err.Error(), "listen.receive_buffer")
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 }
 
 func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
@@ -811,19 +823,19 @@ func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Contains(t, err.Error(), "at least one SNMP trap output backend")
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 }
 
 func TestCollectorInit_MissingNetdataLogRootIsRetryableCodedError(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	root := filepath.Join(t.TempDir(), "missing")
 	withNetdataLogDir(t, root)
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 
-	startJournalJobs := activeDirectJournalJobs.Load()
+	startJournalJobs := c.services.journalActivity.active.Load()
 	err := c.Init(context.Background())
 	require.Error(t, err)
 
@@ -834,20 +846,20 @@ func TestCollectorInit_MissingNetdataLogRootIsRetryableCodedError(t *testing.T) 
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
 	assert.Contains(t, err.Error(), "Netdata log directory")
-	assert.Nil(t, c.receiver)
-	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
+	assert.Nil(t, c.job)
+	assert.Equal(t, startJournalJobs, c.services.journalActivity.active.Load())
 	assert.NoDirExists(t, root)
 }
 
 func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	disabled := false
 	badRetention := "not-a-size"
 	srv := startCollectorOTLPFixture(t)
 
 	const jobName = "otel-only"
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = jobName
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Journal.Enabled = &disabled
@@ -859,21 +871,19 @@ func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 		QueueCapacity: 16,
 	}
 
-	startJournalJobs := activeDirectJournalJobs.Load()
+	startJournalJobs := c.services.journalActivity.active.Load()
 	require.NoError(t, c.Init(context.Background()))
-	require.NotNil(t, c.receiver)
-	assert.Empty(t, c.journalDir)
-	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
+	require.NotNil(t, c.job)
+	assert.Equal(t, startJournalJobs, c.services.journalActivity.active.Load())
 	assert.NoDirExists(t, journal.Root(jobName))
-	assert.Equal(t, trapWriteFailureOTLP, c.trapWriteFailureDim())
 
 	c.Cleanup(context.Background())
-	require.Nil(t, c.receiver)
-	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
+	require.Nil(t, c.job)
+	assert.Equal(t, startJournalJobs, c.services.journalActivity.active.Load())
 }
 
 func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	disabled := false
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -881,7 +891,7 @@ func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
 	endpoint := "http://" + ln.Addr().String()
 	require.NoError(t, ln.Close())
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "otlp-preflight"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Journal.Enabled = &disabled
@@ -899,17 +909,17 @@ func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
-	assert.Nil(t, c.receiver)
-	assert.Empty(t, c.journalDir)
+	assert.Nil(t, c.job)
+	assert.NoDirExists(t, journal.Root(c.Name))
 }
 
 func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	firstPort := freeUDPPort(t)
 	secondPort := freeUDPPort(t)
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{
 		{Protocol: "udp", Address: "127.0.0.1", Port: firstPort},
@@ -917,10 +927,10 @@ func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
 	}
 
 	require.NoError(t, c.Init(context.Background()))
-	require.NotNil(t, c.receiver)
+	require.NotNil(t, c.job)
 
 	c.Cleanup(context.Background())
-	require.Nil(t, c.receiver)
+	require.Nil(t, c.job)
 
 	firstConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: firstPort})
 	require.NoError(t, err, "first endpoint should close on cleanup")
@@ -932,7 +942,7 @@ func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
 }
 
 func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	require.NoError(t, err)
@@ -940,7 +950,7 @@ func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
 
 	port := conn.LocalAddr().(*net.UDPAddr).Port
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
@@ -952,7 +962,7 @@ func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 }
 
 func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
@@ -968,14 +978,14 @@ func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
 	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.DyncfgCode())
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 }
 
 func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
-	setTestDirs(t, t.TempDir())
+	manager := setTestDirs(t, t.TempDir())
 	withTestCacheDir(t)
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Versions = []string{" V1 ", "V2C"}
@@ -985,12 +995,12 @@ func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
 	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.DyncfgCode())
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 	assert.Equal(t, []string{" V1 ", "V2C"}, c.Versions)
 }
 
 func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	firstPort := freeUDPPort(t)
 	secondConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -998,7 +1008,7 @@ func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 	defer secondConn.Close()
 	secondPort := secondConn.LocalAddr().(*net.UDPAddr).Port
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{
 		{Protocol: "udp", Address: "127.0.0.1", Port: firstPort},
@@ -1007,7 +1017,7 @@ func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 
 	err = c.Init(context.Background())
 	require.Error(t, err)
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 
 	firstConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: firstPort})
 	require.NoError(t, err, "first endpoint should have been closed after partial bind failure")
@@ -1015,15 +1025,15 @@ func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 }
 
 func TestCollectorInit_EngineStateStatErrorIsRetryableCodedError(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 
 	const jobName = "engine-state-stat-error"
 	root := filepath.Join(t.TempDir(), "state-root")
 	require.NoError(t, os.WriteFile(root, []byte("not a directory"), 0644))
 
-	c := newTestSNMPTrapsCollector()
-	c.engineStateRoot = func() string { return root }
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
+	c.services.engineStateRoot = func() string { return root }
 	c.Name = jobName
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Versions = []string{"v3"}
@@ -1045,25 +1055,25 @@ func TestCollectorInit_EngineStateStatErrorIsRetryableCodedError(t *testing.T) {
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
-	assert.Nil(t, c.receiver)
+	assert.Nil(t, c.job)
 	assert.FileExists(t, root, "pre-existing invalid state root must not be removed")
 }
 
 func TestCollectorCleanupIsIdempotent(t *testing.T) {
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "local"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
 	require.NoError(t, c.Init(context.Background()))
-	require.NotNil(t, c.receiver)
+	require.NotNil(t, c.job)
 
 	c.Cleanup(context.Background())
 	c.Cleanup(context.Background())
-	require.Nil(t, c.receiver)
+	require.Nil(t, c.job)
 }
 
 func TestCollectorCollectRequiresReadyReceiver(t *testing.T) {

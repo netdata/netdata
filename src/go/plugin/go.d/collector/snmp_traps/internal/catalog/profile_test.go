@@ -192,6 +192,19 @@ traps:
 	assert.NotNil(t, td.SharedVarbinds)
 }
 
+func TestBuildSharedVarbindsUsesOnlyExplicitReferences(t *testing.T) {
+	fileVarbinds := map[string]VarbindDef{
+		"referenced":   {OID: "1.3.6.1.4.1.99999.1", Type: "INTEGER"},
+		"unreferenced": {OID: "1.3.6.1.4.1.99999.2", Type: "INTEGER"},
+	}
+	trap := &TrapDef{VarbindRefs: []any{"referenced"}}
+
+	shared := buildSharedVarbinds(trap, fileVarbinds)
+	require.Len(t, shared, 1)
+	require.Equal(t, "referenced", shared["1.3.6.1.4.1.99999.1"].RawName)
+	require.NotContains(t, shared, "1.3.6.1.4.1.99999.2")
+}
+
 func TestProfileLoadSupportedFormats(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -559,9 +572,9 @@ metrics:
 }
 
 func TestStockHydrationPublishesOnlyBundleDelta(t *testing.T) {
-	idx := NewEpoch()
+	idx := newEpoch()
 	first := &TrapDef{OID: "1.3.6.1.4.1.99998.11", Name: "DELTA-MIB::first"}
-	require.NoError(t, idx.AddTraps([]*TrapDef{first}))
+	require.NoError(t, idx.addTraps([]*TrapDef{first}))
 	original := idx.trapsByOID
 
 	second := &TrapDef{OID: "1.3.6.1.4.1.99998.12", Name: "DELTA-MIB::second"}
@@ -574,10 +587,10 @@ func TestStockHydrationPublishesOnlyBundleDelta(t *testing.T) {
 }
 
 func TestAddTrapsRejectsNilDefinitionAtomically(t *testing.T) {
-	idx := NewEpoch()
+	idx := newEpoch()
 	valid := &TrapDef{OID: "1.3.6.1.4.1.99998.14", Name: "NIL-MIB::valid"}
 
-	err := idx.AddTraps([]*TrapDef{valid, nil})
+	err := idx.addTraps([]*TrapDef{valid, nil})
 	require.ErrorContains(t, err, "trap definition at index 1 is nil")
 	assert.Nil(t, idx.Lookup(valid.OID))
 }
@@ -781,7 +794,7 @@ func TestStockHydrationCoalescesPerFileWithoutBlockingOtherFiles(t *testing.T) {
 		slowOID = "1.3.6.1.4.1.99998.30"
 		fastOID = "1.3.6.1.4.1.99998.31"
 	)
-	idx := NewEpoch()
+	idx := newEpoch()
 	started := make(chan struct{})
 	release := make(chan struct{})
 	var slowLoads atomic.Int64
@@ -851,7 +864,7 @@ func TestStockDependencyParsingDoesNotBlockUnrelatedPublication(t *testing.T) {
 		dependencyOID = "1.3.6.1.4.1.99998.32"
 		fastOID       = "1.3.6.1.4.1.99998.33"
 	)
-	idx := NewEpoch()
+	idx := newEpoch()
 	dependencyStarted := make(chan struct{})
 	releaseDependency := make(chan struct{})
 	var releaseOnce sync.Once
@@ -1040,7 +1053,6 @@ traps:
 	idx := lease.Epoch()
 	assert.Nil(t, idx.Lookup("1.3.6.1.4.1.99998.6"))
 	require.NotNil(t, idx.Lookup("1.3.6.1.4.1.99998.7"))
-	require.Equal(t, []ProfileInfo{{Name: "vendor", Path: filepath.Join(userDir, "vendor.yaml"), IsStock: false}}, idx.Profiles())
 }
 
 func TestUserProfileWithDistinctIdentityAddsAlongsideStock(t *testing.T) {
@@ -1074,10 +1086,6 @@ traps:
 	t.Cleanup(lease.Close)
 	assert.NotNil(t, lease.Epoch().Lookup("1.3.6.1.4.1.99998.27"))
 	assert.NotNil(t, lease.Epoch().Lookup("1.3.6.1.4.1.99998.28"))
-	assert.Equal(t, []ProfileInfo{
-		{Name: "site", Path: filepath.Join(userDir, "site.yaml"), IsStock: false},
-		{Name: "vendor", Path: filepath.Join(stockDir, "vendor.yaml"), IsStock: true},
-	}, lease.Epoch().Profiles())
 }
 
 func TestUserMetricCollisionWithReferencedStockProfileIsRejected(t *testing.T) {
@@ -1135,9 +1143,9 @@ metrics:
 }
 
 func TestMetricRuleCannotReferenceChartFromAnotherProfile(t *testing.T) {
-	idx := NewEpoch()
+	idx := newEpoch()
 	td := testIFMIBLinkDownTrapDef()
-	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
+	require.NoError(t, idx.addTraps([]*TrapDef{td}))
 	require.NoError(t, idx.addBundleAtomic(profileLoadBundle{charts: []profileMetricChart{{
 		ID:        "other_chart",
 		Title:     "Other chart",
@@ -1216,9 +1224,9 @@ metrics:
 		})
 	}
 
-	idx := NewEpoch()
+	idx := newEpoch()
 	td := testIFMIBLinkDownTrapDef()
-	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
+	require.NoError(t, idx.addTraps([]*TrapDef{td}))
 	err := idx.addTestMetricDefinitions([]MetricRule{{
 		Name:   "site.ambiguous_selector",
 		Type:   profileMetricTypeCounter,
@@ -1283,8 +1291,8 @@ charts:
 
 			bundle, err := loadProfileBundle(filepath.Join(dir, "invalid.yaml"))
 			require.NoError(t, err)
-			idx := NewEpoch()
-			require.NoError(t, idx.AddTraps(bundle.traps))
+			idx := newEpoch()
+			require.NoError(t, idx.addTraps(bundle.traps))
 			err = idx.addTestMetricDefinitions(bundle.metrics, bundle.charts)
 			require.ErrorContains(t, err, "separate-OID state rule")
 		})
@@ -1292,9 +1300,9 @@ charts:
 }
 
 func TestDefinitionsReturnsOnlySelectedRulesAndCharts(t *testing.T) {
-	idx := NewEpoch()
+	idx := newEpoch()
 	td := testIFMIBLinkDownTrapDef()
-	require.NoError(t, idx.AddTraps([]*TrapDef{td}))
+	require.NoError(t, idx.addTraps([]*TrapDef{td}))
 	require.NoError(t, idx.addTestMetricDefinitions([]MetricRule{
 		{
 			Name:   "site.first",
@@ -1323,11 +1331,7 @@ func TestReadProfileFileRejectsOversizedDecompressedProfile(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAMLZstd(t, dir, "oversized.yaml.zst", strings.Repeat("x", 32))
 
-	oldLimit := maxProfileFileBytes
-	maxProfileFileBytes = 16
-	t.Cleanup(func() { maxProfileFileBytes = oldLimit })
-
-	_, err := readProfileFile(filepath.Join(dir, "oversized.yaml.zst"))
+	_, err := readProfileFileLimited(filepath.Join(dir, "oversized.yaml.zst"), 16)
 	require.ErrorContains(t, err, "exceeds maximum decompressed size")
 }
 
@@ -1456,7 +1460,7 @@ func TestProfileLoadEmptyUserDirKeepsStockProfiles(t *testing.T) {
 	idx, err := acquireTestEpoch()
 	require.NoError(t, err)
 	t.Cleanup(releaseTestEpoch)
-	assert.Len(t, idx.Profiles(), 1)
+	assert.NotNil(t, idx.Lookup("1.3.6.1.4.1.99999.999"))
 }
 
 func TestProfileLoadMissingName(t *testing.T) {

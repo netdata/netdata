@@ -8,16 +8,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/traptest"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCollectorReplayPcapThroughListenerToJournal(t *testing.T) {
 	requireJournalctl(t)
-	setMinimalProfileDir(t)
+	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 
 	port := freeUDPPort(t)
-	c := newTestSNMPTrapsCollector()
+	c := newTestSNMPTrapsCollectorWithCatalog(manager)
 	c.Name = "e2e"
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 	c.Versions = []string{"v2c"}
@@ -26,7 +28,9 @@ func TestCollectorReplayPcapThroughListenerToJournal(t *testing.T) {
 	require.NoError(t, c.Init(t.Context()))
 	t.Cleanup(func() { c.Cleanup(t.Context()) })
 
-	packet := readSinglePcapUDPPacket(t, "testdata/v2c_coldstart.pcap.hex")
+	packets := traptest.ReadPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
+	require.Len(t, packets, 1)
+	packet := packets[0]
 
 	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	require.NoError(t, err)
@@ -36,10 +40,7 @@ func TestCollectorReplayPcapThroughListenerToJournal(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		if err := c.trapWriter.Flush(); err != nil {
-			return false
-		}
-		out := runJournalctlAllowEmpty(t, c.journalDir, "TRAP_CATEGORY=state_change")
+		out := runJournalctlAllowEmpty(t, journal.Root(c.Name), "TRAP_CATEGORY=state_change")
 		return strings.Contains(out, "SNMPv2-MIB::coldStart")
 	}, 5*time.Second, 50*time.Millisecond)
 }

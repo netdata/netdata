@@ -17,8 +17,6 @@ const (
 	journalHostStateDirName = "systemd-journal-sdk"
 )
 
-type journalHostProvider = hostidentity.Provider
-
 func newHostIdentityService() *hostidentity.Service {
 	return hostidentity.New(journalHostLoadConfig)
 }
@@ -56,27 +54,4 @@ func netdataLibDir() string {
 
 func netdataEngineStateRoot() string {
 	return filepath.Join(netdataLibDir(), "snmp-trap")
-}
-
-func (c *Collector) monotonicUsec() int64 {
-	if c != nil && c.journalHost != nil {
-		return int64(c.journalHost.MonotonicUsec())
-	}
-	if c == nil || c.hostIdentity == nil {
-		return 0
-	}
-	provider, err := c.hostIdentity.CachedFallback()
-	if err != nil {
-		return 0
-	}
-	return int64(provider.MonotonicUsec())
-}
-
-func (c *Collector) sourceHashSalt() string {
-	if c != nil && c.hostIdentity != nil {
-		if provider, err := c.hostIdentity.CachedFallback(); err == nil {
-			return "machine-id:" + provider.MachineID().String()
-		}
-	}
-	return "netdata-agent"
 }

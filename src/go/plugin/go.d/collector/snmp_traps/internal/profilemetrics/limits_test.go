@@ -9,6 +9,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
 func TestProfileMetricRuntimeConcurrentUpdates(t *testing.T) {
@@ -103,7 +105,7 @@ func TestProfileMetricRuntimeMaxInstancesSkipsOnlyNewMetricInstance(t *testing.T
 
 func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 60}
+	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 60})
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 10})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -120,7 +122,7 @@ func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testi
 
 func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 1}
+	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 1})
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 10})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -138,52 +140,66 @@ func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *te
 
 func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	if err := idx.addDefinitions(
-		[]profileMetricRule{
+	idx = idx.withDefinitions(
+		[]catalog.MetricRule{
 			{
 				Name:   "z.tie_a_chart",
-				Type:   profileMetricTypeCounter,
+				Type:   catalog.MetricTypeCounter,
 				OnTrap: testCiscoConfigTrapOID,
-				Output: profileMetricOutput{
+				Identity: catalog.MetricIdentity{
+					Device: catalog.MetricIdentitySource,
+				},
+				Output: catalog.MetricOutput{
 					Metric:    "snmp_trap_tie_a_chart_events",
 					Dimension: "events",
 					Chart:     "a_tie_chart",
 				},
-				SourceFile: "test-profile.yaml",
+				Missing: catalog.MetricMissingDrop,
+				Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 			},
 			{
 				Name:   "a.tie_z_chart",
-				Type:   profileMetricTypeCounter,
+				Type:   catalog.MetricTypeCounter,
 				OnTrap: testCiscoConfigTrapOID,
-				Output: profileMetricOutput{
+				Identity: catalog.MetricIdentity{
+					Device: catalog.MetricIdentitySource,
+				},
+				Output: catalog.MetricOutput{
 					Metric:    "snmp_trap_tie_z_chart_events",
 					Dimension: "events",
 					Chart:     "z_tie_chart",
 				},
-				SourceFile: "test-profile.yaml",
+				Missing: catalog.MetricMissingDrop,
+				Scale:   catalog.MetricScale{Multiplier: 1, Divisor: 1},
 			},
 		},
-		[]profileMetricChart{
+		[]catalog.MetricChart{
 			{
-				ID:         "a_tie_chart",
-				Title:      "A tie chart",
-				Context:    "snmp.trap.tie.a",
-				Units:      "events/s",
-				Algorithm:  "incremental",
-				SourceFile: "test-profile.yaml",
+				ID:        "a_tie_chart",
+				Title:     "A tie chart",
+				Context:   "snmp.trap.tie.a",
+				Units:     "events/s",
+				Algorithm: "incremental",
+				Type:      "line",
+				Lifecycle: &charttpl.Lifecycle{
+					MaxInstances:      catalog.DefaultMetricChartMaxInstances,
+					ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+				},
 			},
 			{
-				ID:         "z_tie_chart",
-				Title:      "Z tie chart",
-				Context:    "snmp.trap.tie.z",
-				Units:      "events/s",
-				Algorithm:  "incremental",
-				SourceFile: "test-profile.yaml",
+				ID:        "z_tie_chart",
+				Title:     "Z tie chart",
+				Context:   "snmp.trap.tie.z",
+				Units:     "events/s",
+				Algorithm: "incremental",
+				Type:      "line",
+				Lifecycle: &charttpl.Lifecycle{
+					MaxInstances:      catalog.DefaultMetricChartMaxInstances,
+					ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+				},
 			},
 		},
-	); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+	)
 	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"a.tie_z_chart", "z.tie_a_chart"},
@@ -207,7 +223,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 
 func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	profileMetricChartFromIndex(t, idx, "cisco_config_changes").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
+	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1})
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 1})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -225,16 +241,15 @@ func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T)
 
 func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
-		Name:       "cisco.port_security.ifindex_cap",
-		Type:       profileMetricTypeCounter,
-		OnTrap:     testPortSecurityTrapOID,
-		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
-		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_capped_violations", "violations", "port_security_violations"),
-		SourceFile: "test-profile.yaml",
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+	idx = idx.withDefinitions([]catalog.MetricRule{{
+		Name:     "cisco.port_security.ifindex_cap",
+		Type:     catalog.MetricTypeCounter,
+		OnTrap:   testPortSecurityTrapOID,
+		Identity: catalog.MetricIdentity{Device: catalog.MetricIdentitySource, Resource: &catalog.MetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
+		Output:   profileMetricOutputForTest("snmp_trap_cisco_port_security_capped_violations", "violations", "port_security_violations"),
+		Missing:  catalog.MetricMissingDrop,
+		Scale:    catalog.MetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.port_security.ifindex_cap"})
 	first := portSecurityTrapEntry(7)
 	second := portSecurityTrapEntry(8)
@@ -251,17 +266,16 @@ func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 
 func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	profileMetricChartFromIndex(t, idx, "port_security_violations").Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
-	if err := idx.addDefinitions([]profileMetricRule{{
-		Name:       "cisco.port_security.ifindex_lifecycle_cap",
-		Type:       profileMetricTypeCounter,
-		OnTrap:     testPortSecurityTrapOID,
-		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
-		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_lifecycle_capped_violations", "violations", "port_security_violations"),
-		SourceFile: "test-profile.yaml",
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+	idx = idx.withChartLifecycle("port_security_violations", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1})
+	idx = idx.withDefinitions([]catalog.MetricRule{{
+		Name:     "cisco.port_security.ifindex_lifecycle_cap",
+		Type:     catalog.MetricTypeCounter,
+		OnTrap:   testPortSecurityTrapOID,
+		Identity: catalog.MetricIdentity{Device: catalog.MetricIdentitySource, Resource: &catalog.MetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
+		Output:   profileMetricOutputForTest("snmp_trap_cisco_port_security_lifecycle_capped_violations", "violations", "port_security_violations"),
+		Missing:  catalog.MetricMissingDrop,
+		Scale:    catalog.MetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.port_security.ifindex_lifecycle_cap"})
 	first := portSecurityTrapEntry(7)
 	second := portSecurityTrapEntry(8)
@@ -279,16 +293,15 @@ func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.
 
 func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
-		Name:       "cisco.port_security.ifindex_job_cap",
-		Type:       profileMetricTypeCounter,
-		OnTrap:     testPortSecurityTrapOID,
-		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex"}},
-		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_job_capped_violations", "violations", "port_security_violations"),
-		SourceFile: "test-profile.yaml",
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+	idx = idx.withDefinitions([]catalog.MetricRule{{
+		Name:     "cisco.port_security.ifindex_job_cap",
+		Type:     catalog.MetricTypeCounter,
+		OnTrap:   testPortSecurityTrapOID,
+		Identity: catalog.MetricIdentity{Device: catalog.MetricIdentitySource, Resource: &catalog.MetricResource{Class: "interface", KeyFromVarbind: "ifIndex"}},
+		Output:   profileMetricOutputForTest("snmp_trap_cisco_port_security_job_capped_violations", "violations", "port_security_violations"),
+		Missing:  catalog.MetricMissingDrop,
+		Scale:    catalog.MetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
 	rt := newTestProfileMetricRuntimeWithPolicy(t, idx, testRuntimeConfig{
 		Enabled: true,
 		Include: []string{"cisco.port_security.ifindex_job_cap"},
@@ -310,29 +323,27 @@ func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 
 func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	if err := idx.addDefinitions([]profileMetricRule{{
+	idx = idx.withDefinitions([]catalog.MetricRule{{
 		Name:     "cisco.port_security.ifindex_unknown",
-		Type:     profileMetricTypeCounter,
+		Type:     catalog.MetricTypeCounter,
 		OnTrap:   testPortSecurityTrapOID,
-		Missing:  profileMetricMissingUnknownDimension,
-		Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 2}},
-		Output: profileMetricOutput{
+		Missing:  catalog.MetricMissingUnknownDimension,
+		Identity: catalog.MetricIdentity{Device: catalog.MetricIdentitySource, Resource: &catalog.MetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 2}},
+		Output: catalog.MetricOutput{
 			Metric:    "snmp_trap_cisco_port_security_unknown_violations",
 			Dimension: "violations",
 			Chart:     "port_security_violations",
 		},
-		SourceFile: "test-profile.yaml",
-	}}, nil); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		Scale: catalog.MetricScale{Multiplier: 1, Divisor: 1},
+	}}, nil)
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.port_security.ifindex_unknown"})
-	entry := &testTrapEntry{
+	entry := &model.TrapEntry{
 		JobName:       "profile-job",
 		TrapOID:       testPortSecurityTrapOID,
 		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
 		SourceIP:      "192.0.2.10",
 		SourceUDPPeer: "192.0.2.10",
-		Enrichment:    &testTrapEnrichmentAudit{Source: &testTrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
+		Enrichment:    &model.TrapEnrichmentAudit{Source: &model.TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
 	}
 
 	rt.Update(entry)

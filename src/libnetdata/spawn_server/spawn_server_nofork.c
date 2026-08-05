@@ -64,14 +64,22 @@ static int connect_to_spawn_server(const char *path, bool log) {
         return -1;
 
     if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        if(log)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: cannot create socket() to connect to spawn server.");
+        if(log) {
+            int error = errno;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: cannot create socket() to connect to spawn server: %s (%d).",
+                   strerror(error), error);
+        }
         return -1;
     }
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        if(log)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot connect() to spawn server on path '%s'.", path);
+        if(log) {
+            int error = errno;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: cannot connect() to spawn server on path '%s': %s (%d).",
+                   path, strerror(error), error);
+        }
         close(sock);
         return -1;
     }
@@ -1327,7 +1335,8 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
         return false;
 
     if ((server->sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to create socket()");
+        int error = errno;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to create socket(): %s (%d)", strerror(error), error);
         return false;
     }
 
@@ -1335,12 +1344,14 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
     errno = 0;
 
     if (bind(server->sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind()");
+        int error = errno;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind(): %s (%d)", strerror(error), error);
         return false;
     }
 
-    if (listen(server->sock, 5) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to listen()");
+    if (listen(server->sock, SOMAXCONN) == -1) {
+        int error = errno;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to listen(): %s (%d)", strerror(error), error);
         return false;
     }
 

@@ -100,7 +100,7 @@ static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
 static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     STREAM_PATH p = { 0 };
 
-    bool is_localhost = host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST);
+    bool is_localhost = host == localhost || rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST);
 
     p.hostname = string_dup(localhost->hostname);
     p.host_id = localhost->host_id;
@@ -116,7 +116,7 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     if(rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST))
         p.flags |= STREAM_PATH_FLAG_EPHEMERAL;
 
-    if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST))
         p.flags |= STREAM_PATH_FLAG_VIRTUAL;
 
     if(host->health.enabled)
