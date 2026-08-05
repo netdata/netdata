@@ -328,6 +328,20 @@ Use the exact command the dialog shows — it fills in the correct path for your
 2. Copy the new UUID.
 3. Paste it with the correct Space token and Rooms, then submit once. Do not re-submit the old value or retry from a second tab — each failed attempt invalidates the current UUID again.
 
+#### `CLAIM: cannot load cloud config ... Running with internal defaults.`
+
+**Problem:** On startup, or after running `netdatacli reload-claiming-state`, the daemon log contains an error line like:
+
+```text
+CLAIM: cannot load cloud config '/var/lib/netdata/cloud.d/cloud.conf'. Running with internal defaults.
+```
+
+The path in the message reflects your Netdata library directory — `/var/lib/netdata/cloud.d/cloud.conf` by default, or a custom path such as `/data/netdata/var/lib/netdata/cloud.d/cloud.conf` when the library directory was changed via the `lib` option under the `[directories]` section of `netdata.conf`.
+
+**Why this happens:** `cloud.conf` is written only when a node is actually claimed to Netdata Cloud (it stores the `claimed_id` and the ACLK settings). A node that has never been claimed has no `cloud.conf`, so the Agent logs this line and continues with internal default Cloud settings. This is expected and harmless on an unclaimed node.
+
+**Solution:** This is not a failure — do not change the log level or try to suppress the line. To confirm the node is simply unclaimed, check the connection status via `http://NODE:19999/api/v3/info` (the `cloud` section shows `Claimed: No`) or run `sudo netdatacli aclk-state` (see [Check Connection Status](#check-connection-status)). If the node was intended to be claimed, follow one of the methods under [Connect Existing Agent](#connect-existing-agent); once it is claimed, `cloud.conf` is created and the message no longer appears.
+
 #### kickstart: unsupported Netdata installation
 
 **Problem:** If you run the kickstart script and get the following error `Existing install appears to be handled manually or through the system package manager.` you most probably installed Netdata using an unsupported package.
