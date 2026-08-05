@@ -1025,8 +1025,9 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
 
     struct aclk_sync_cfg_t *aclk_host_config = callocz(1, sizeof(struct aclk_sync_cfg_t));
     spinlock_init(&aclk_host_config->pending_ctx_spinlock);
+    spinlock_init(&aclk_host_config->node_id_spinlock);
     if (node_id && !uuid_is_null(*node_id))
-        uuid_unparse_lower(*node_id, aclk_host_config->node_id);
+        aclk_node_id_set(aclk_host_config, *node_id);
 
     // Initialize every field BEFORE publishing the pointer via CAS; the RELEASE on
     // the CAS pairs with ACQUIRE loads of host->aclk_host_config in readers so they

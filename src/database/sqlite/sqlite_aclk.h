@@ -67,8 +67,24 @@ typedef struct aclk_sync_cfg_t {
     aclk_send_timestamp_t node_manifest_send_time; // atomic: armed by collector/streaming/pluginsd
                                                    // threads and by build_node_info(); claimed by
                                                    // the alert-push worker
+    SPINLOCK node_id_spinlock;
     char node_id[UUID_STR_LEN];
 } aclk_sync_cfg_t;
+
+static inline void aclk_node_id_copy(aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])
+{
+    spinlock_lock(&aclk_host_config->node_id_spinlock);
+    memcpy(dst, aclk_host_config->node_id, UUID_STR_LEN);
+    spinlock_unlock(&aclk_host_config->node_id_spinlock);
+    dst[UUID_STR_LEN - 1] = '\0';
+}
+
+static inline void aclk_node_id_set(aclk_sync_cfg_t *aclk_host_config, const nd_uuid_t node_id)
+{
+    spinlock_lock(&aclk_host_config->node_id_spinlock);
+    uuid_unparse_lower(node_id, aclk_host_config->node_id);
+    spinlock_unlock(&aclk_host_config->node_id_spinlock);
+}
 
 static inline time_t aclk_send_timestamp_get(const aclk_send_timestamp_t *send_time)
 {

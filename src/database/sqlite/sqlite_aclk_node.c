@@ -32,7 +32,9 @@ static void build_node_collectors(RRDHOST *host)
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
     CLAIM_ID claim_id = claim_id_get();
-    upd_node_collectors.node_id = aclk_host_config->node_id;
+    char node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, node_id);
+    upd_node_collectors.node_id = node_id;
     upd_node_collectors.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
 
     upd_node_collectors.node_collectors = collectors_from_charts(host, dict);
@@ -42,35 +44,15 @@ static void build_node_collectors(RRDHOST *host)
 
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
            "ACLK RES [%s (%s)]: NODE COLLECTORS SENT",
-        aclk_host_config->node_id, rrdhost_hostname(host));
+        node_id, rrdhost_hostname(host));
 }
 
-// Copies aclk_host_config->node_id into dst and reports whether it is usable.
-//
-// The copy is not optional. set_host_node_id() fills that buffer with a plain 37-byte
-// uuid_unparse_lower() and no release fence, so validating the shared buffer and then transmitting
-// it would validate different bytes than it sends. Callers validate once and send the snapshot.
-//
-// What this does NOT do is make the copy atomic, and it cannot: the buffer is published without
-// synchronization and is read the same way by every other sender (build_node_info(),
-// build_node_collectors(), and the alert paths in sqlite_aclk_alert.c). Validation cannot detect a
-// torn copy either, because old and new node ids are both well-formed UUID strings of identical
-// shape, so any mixture of them still parses. What bounds the exposure is that the only transition
-// the agent initiates is empty -> value: the buffer starts zeroed, every byte of the 36-character
-// body is non-NUL (the 37th byte written is the terminator, already NUL in the zeroed buffer), and
-// 32 hex digits can only be reached once the full body is in place, so a torn copy of that
-// transition always fails to parse and is simply retried. A value -> different value change is
-// cloud-driven only (aclk.c requests a node id only when the host has none), and set_host_node_id()
-// re-arms the manifest, so a stale id is corrected within one window. Publishing this field
-// coherently for all senders is tracked separately.
-//
 // Usable means it parses AND is not the all-zero UUID: zero means the cloud has not registered this
 // node, and UpdateNodeInstanceManifest carries no machine_guid to fall back on, so such a message is
 // unattributable. Note node_id[0] alone is not evidence of a usable id - for the zero UUID it is '0'.
-static bool aclk_node_id_snapshot(const struct aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])
+static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])
 {
-    memcpy(dst, aclk_host_config->node_id, UUID_STR_LEN);
-    dst[UUID_STR_LEN - 1] = '\0';
+    aclk_node_id_copy(aclk_host_config, dst);
 
     nd_uuid_t parsed;
     return uuid_parse(dst, parsed) == 0 && !uuid_is_null(parsed);
@@ -113,9 +95,11 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     CLAIM_ID claim_id = claim_id_get();
+    char node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, node_id);
 
     rrd_rdlock();
-    node_info.node_id = aclk_host_config->node_id;
+    node_info.node_id = node_id;
     node_info.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
     node_info.machine_guid = host->machine_guid;
     node_info.child = (host != localhost);
@@ -156,7 +140,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
         NDLS_ACCESS,
         NDLP_DEBUG,
         "ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)",
-        aclk_host_config->node_id,
+        node_id,
         string2str(identity.common.hostname),
         host->machine_guid,
         host == localhost ? "parent" : "child");

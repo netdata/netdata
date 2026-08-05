@@ -292,7 +292,7 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
     }
 
     if (likely(aclk_host_config)) {
-        uuid_unparse_lower(*node_id, aclk_host_config->node_id);
+        aclk_node_id_set(aclk_host_config, *node_id);
 
         // The manifest is keyed by node_id at the cloud, and no function-registry event fires when
         // the node_id itself changes - so without this a host that gets (or changes) its node_id
