@@ -36,6 +36,12 @@ sudo ./edit-config stream.conf
 
 Your editor will open, with defaults and commented `stream.conf` options.
 
+:::note
+
+If running Netdata in Docker, enter the container first with `docker exec -it netdata bash`, then run `cd /etc/netdata && ./edit-config stream.conf` inside it.
+
+:::
+
 ## Configuration Steps
 
 <details>
