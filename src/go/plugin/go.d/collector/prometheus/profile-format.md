@@ -5,7 +5,7 @@ renders one chart per scraped metric (autogeneration). A profile replaces that f
 a designed dashboard menu: named sections, per-instance charts, meaningful dimensions, units, and heatmaps. You are not
 limited to the stock library -- you can author a profile for your own application's metrics too.
 
-This page documents the profile file format. Profiles may also own
+This page documents the profile file format. Profiles may also provide
 [metric relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) that normalizes an exporter's metrics
 after the profile is selected and before its chart template sees them. Jobs use the same rule format for
 operator-specific filtering and normalization before profile selection.
@@ -31,7 +31,7 @@ because the catalog is cached for the plugin's lifetime.
 
 A profile is a YAML file with two required top-level keys (`match` and `template`) plus optional `app`, `relabeling`,
 and `autogen` policy. `match` selects the profile by scraped metric names, `app` names the application the charts
-belong to, `relabeling` normalizes metrics owned by the selected profile, `autogen.selector` controls fallback charts
+belong to, `relabeling` normalizes matching metrics after selection, `autogen.selector` controls fallback charts
 within the profile's match scope, and `template` defines the curated charts. Everything below `template` is Netdata's
 [Chart Template Format](/src/go/plugin/framework/charttpl/README.md); inline comments explain each field.
 
@@ -148,8 +148,8 @@ At runtime the collector uses profiles in six ordered steps:
    names, per the job's `profiles.mode` (see
    [Selecting profiles in job configuration](#selecting-profiles-in-job-configuration)). The selection is cached until
    the job restarts. Profile-owned relabeling cannot select its own profile because it runs after this step.
-4. **Profile normalization** -- each selected profile's `relabeling` is applied automatically to the source metric
-   families it owns. The resulting namespace and typed-family integrity are checked again.
+4. **Profile normalization** -- each source family is processed by the first applicable selected profile's `relabeling`.
+   Later profiles do not process that family. The resulting typed-family integrity is checked again.
 5. **App resolution** -- the job's `app` option wins; when unset, the first selected profile that declares an `app`
    provides it; the job name is the last resort. If selected profiles declare different apps, the first (in selection
    order) wins and the rest are logged -- set the job's `app` to disambiguate.
@@ -221,18 +221,20 @@ template:
   # ...
 ```
 
-Profile relabeling has explicit ownership and namespace rules:
+Profile relabeling uses first-applicable precedence over the shared metric stream:
 
 - It runs only for selected profiles and cannot affect profile selection.
-- A source family is owned when the profile's root `match` covers its base family name and at least one profile
-  relabeling block matches one of its physical series names. All series in that source family are then processed by
-  that one profile pipeline.
-- Two selected profiles cannot own the same source family. An overlap fails job checking with the family and profile
-  names. If a new overlap appears later because an exporter changes at runtime, that source family is dropped while
-  unrelated families continue.
-- Output family names must remain inside the owning profile's root `match`. An escape fails job checking; a new
-  runtime-only escape drops that source family. This prevents unexpected generic charts outside the profile namespace.
-- Profiles are never chained. One source family has at most one profile normalizer, regardless of catalog order.
+- A profile is applicable to an original source family when its root `match` covers the base family name and at least
+  one of its relabeling blocks matches an original physical series name. Rule results and output names do not affect
+  this decision.
+- The first applicable profile processes every series in that source family through its complete pipeline. Later
+  profile pipelines do not see the family, including names produced by the first pipeline.
+- Normalizer precedence is profile-name order in `auto`; configured entry order in `exact`; and configured entries
+  first followed by remaining auto-selected profiles in profile-name order in `combined`.
+- All selected templates consume the same final stream. A first profile's name or label changes are therefore visible
+  to every selected profile; profiles do not receive private copies of the source metrics.
+- The root `match` constrains source applicability, not output names. Profile authors are responsible for making the
+  produced names and labels agree with every selected template that consumes them.
 - Histogram and summary integrity is validated independently after job and profile relabeling. Partial component
   renames/drops, structural `le`/`quantile` changes, splits, and merges are rejected during checking and contained by
   dropping the corrupted family if they first appear at runtime.
@@ -371,6 +373,11 @@ the stock nor the user catalog is a configuration error in both modes. Scraped m
 profile keep their generic autogen charts unless an applicable profile `autogen.selector` rejects them. Use
 `autogen.selector` to constrain fallback charts while retaining samples; use the job's `selector` or a `relabeling`
 drop rule to discard samples.
+
+When selected profiles contain relabeling, the mode also determines normalizer precedence: `auto` uses profile-name
+order, `exact` uses entry order, and `combined` tries its configured entries first and then the remaining auto-selected
+profiles in profile-name order. This precedence affects normalization only; profile selection, app fallback, and template
+composition retain their existing behavior.
 
 `profiles`, `relabeling`, `selector`, `fallback_type`, and `app` are all job options in `go.d/prometheus.conf` -- edit
 it with `sudo ./edit-config go.d/prometheus.conf` from your

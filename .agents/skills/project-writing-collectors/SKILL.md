@@ -403,9 +403,12 @@ Operator controls (profiles documented in `src/go/plugin/go.d/collector/promethe
 - **Ordering**: the fixed namespace lifecycle is `selector -> job relabeling/safety -> fallback type + profile
   selection -> selected profile relabeling/safety -> final gates -> charts`. A profile cannot normalize itself into
   selection. Untyped classification is bound before profile relabeling, so a final rename cannot create or change it.
-- **Profile ownership**: selected profile relabel pipelines are not chained. A source family must have at most one
-  matching owner, and every output family must remain inside that profile's root `match`; overlaps or scope escapes are
-  configuration defects, not catalog-order precedence.
+- **Profile precedence**: selected profiles share one final metric stream. For each original source family, only the
+  first applicable selected profile's complete pipeline runs; later profiles do not see that family or names produced by
+  the first pipeline. Precedence is profile-name order in `auto`, configured entry order in `exact`, and configured
+  entries followed by the remaining name-ordered auto profiles in `combined`. Root `match` and block matchers classify
+  original source names; rule results and output names do not affect dispatch. All selected templates consume the final
+  names and labels, so authors must account for cross-profile interactions.
 - **Charts**: chart profiles (`match`/`app`/`relabeling`/`autogen.selector`/`template` YAMLs, stock under
   `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`, user under
   `/etc/netdata/go.d/prometheus.profiles/`) ship curated per-exporter dashboards — the Prometheus analog of

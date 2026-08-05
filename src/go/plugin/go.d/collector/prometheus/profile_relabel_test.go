@@ -87,57 +87,131 @@ func TestCollector_ProfileRelabelingRemapsHelp(t *testing.T) {
 	assert.Equal(t, "Application value.", renamed.Help())
 }
 
-func TestCollector_ProfileRelabelingRejectsConflictingOwners(t *testing.T) {
+func TestCollector_ProfileRelabelingUsesFirstApplicableNormalizer(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"first":  testRelabelProfileYAML("app_*", "app_raw", "app_first"),
 		"second": testRelabelProfileYAML("app_*", "app_raw", "app_second"),
 	})
-	collr, srv := newProfileRelabelCollector(t, catalog, "app_raw 1\n", "first", "second")
-	defer srv.Close()
-	require.NoError(t, collr.Init(context.Background()))
 
-	err := collr.Check(context.Background())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "app_raw")
-	assert.Contains(t, err.Error(), "first")
-	assert.Contains(t, err.Error(), "second")
-	assert.Nil(t, collr.runtime)
-}
+	tests := map[string]struct {
+		profiles []string
+		want     string
+		shadowed string
+	}{
+		"configured first profile wins": {
+			profiles: []string{"first", "second"},
+			want:     "app_first",
+			shadowed: "app_second",
+		},
+		"reversing configured order changes precedence": {
+			profiles: []string{"second", "first"},
+			want:     "app_second",
+			shadowed: "app_first",
+		},
+	}
 
-func TestResolveProfileOwnersSortsConflictDiagnostics(t *testing.T) {
-	catalog := loadTestCatalog(t, map[string]string{
-		"first":  testRelabelProfilePatternYAML("app_*", "app_*", "app_(.*)", "app_${1}", "app_a"),
-		"second": testRelabelProfilePatternYAML("app_*", "app_*", "app_(.*)", "app_${1}", "app_z"),
-	})
-	profiles, err := catalog.Resolve([]string{"second", "first"})
-	require.NoError(t, err)
-	normalizers, err := compileProfileNormalizers(profiles)
-	require.NoError(t, err)
-	batch := scrapeSamples(t, "# TYPE app_z gauge\napp_z 1\n# TYPE app_a gauge\napp_a 2\n")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, srv := newProfileRelabelCollector(t, catalog, "# TYPE app_raw gauge\napp_raw 1\n", tc.profiles...)
+			defer srv.Close()
+			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
 
-	for range 100 {
-		_, conflicts := resolveProfileOwners(batch, normalizers)
-		require.Len(t, conflicts, 2)
-		assert.Equal(t, "app_a", conflicts[0].family)
-		assert.Equal(t, []string{"first", "second"}, conflicts[0].profiles)
-		assert.Equal(t, "app_z", conflicts[1].family)
-		assert.Equal(t, []string{"first", "second"}, conflicts[1].profiles)
+			collectProfileRelabelOnce(t, collr)
+			got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+			assert.InDelta(t, 1, value(t, got, tc.want, nil), 1e-9)
+			noSeries(t, got, tc.shadowed, nil)
+			noSeries(t, got, "app_raw", nil)
+		})
 	}
 }
 
-func TestCollector_ProfileRelabelingRejectsOutputOutsideProfileNamespace(t *testing.T) {
+func TestCollector_ProfileRelabelingCombinedEntriesPrecedeAutoProfiles(t *testing.T) {
+	catalog := loadTestCatalog(t, map[string]string{
+		"alpha": testRelabelProfileYAML("app_*", "app_raw", "app_alpha"),
+		"zeta":  testRelabelProfileYAML("app_*", "app_raw", "app_zeta"),
+	})
+	collr, srv := newProfileRelabelCollector(t, catalog, "# TYPE app_raw gauge\napp_raw 1\n")
+	defer srv.Close()
+	collr.Profiles = ProfilesConfig{Mode: profilesModeCombined, ModeCombined: &ProfilesModeConfig{
+		Entries: profileEntries("zeta"),
+	}}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	collectProfileRelabelOnce(t, collr)
+	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	assert.InDelta(t, 1, value(t, got, "app_zeta", nil), 1e-9)
+	noSeries(t, got, "app_alpha", nil)
+	noSeries(t, got, "app_raw", nil)
+}
+
+func TestSelectProfileNormalizersSkipsProfilesWhoseBlocksDoNotMatch(t *testing.T) {
+	catalog := loadTestCatalog(t, map[string]string{
+		"first":  testRelabelProfileYAML("app_*", "app_other", "app_first"),
+		"second": testRelabelProfileYAML("app_*", "app_raw", "app_second"),
+	})
+	profiles, err := catalog.Resolve([]string{"first", "second"})
+	require.NoError(t, err)
+	normalizers, err := compileProfileNormalizers(profiles)
+	require.NoError(t, err)
+	batch := scrapeSamples(t, "# TYPE app_raw gauge\napp_raw 1\n")
+
+	selected := selectProfileNormalizers(batch, normalizers)
+	require.Contains(t, selected, "app_raw")
+	assert.Equal(t, 1, selected["app_raw"])
+}
+
+func TestSelectProfileNormalizersUsesFamilyPrecedenceAcrossPhysicalSamples(t *testing.T) {
+	catalog := loadTestCatalog(t, map[string]string{
+		"first":  testRelabelProfileYAML("app_*", "app_lat_sum", "app_first_sum"),
+		"second": testRelabelProfileYAML("app_*", "app_lat_bucket", "app_second_bucket"),
+	})
+	profiles, err := catalog.Resolve([]string{"first", "second"})
+	require.NoError(t, err)
+	normalizers, err := compileProfileNormalizers(profiles)
+	require.NoError(t, err)
+	batch := scrapeSamples(t, `
+# TYPE app_lat histogram
+app_lat_bucket{le="+Inf"} 6
+app_lat_sum 2.5
+app_lat_count 6
+`)
+
+	selected := selectProfileNormalizers(batch, normalizers)
+	require.Contains(t, selected, "app_lat")
+	assert.Equal(t, 0, selected["app_lat"])
+}
+
+func TestCollector_ProfileRelabelingDoesNotChainProfiles(t *testing.T) {
+	catalog := loadTestCatalog(t, map[string]string{
+		"first":  testRelabelProfileYAML("app_*", "app_raw", "app_mid"),
+		"second": testRelabelProfileYAML("app_*", "app_mid", "app_final"),
+	})
+	collr, srv := newProfileRelabelCollector(t, catalog, "# TYPE app_raw gauge\napp_raw 1\n", "first", "second")
+	defer srv.Close()
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	collectProfileRelabelOnce(t, collr)
+	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	assert.InDelta(t, 1, value(t, got, "app_mid", nil), 1e-9)
+	noSeries(t, got, "app_final", nil)
+}
+
+func TestCollector_ProfileRelabelingAllowsOutputOutsideProfileMatch(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"app": testRelabelProfileYAML("app_*", "app_raw", "other_final"),
 	})
-	collr, srv := newProfileRelabelCollector(t, catalog, "app_raw 1\n", "app")
+	collr, srv := newProfileRelabelCollector(t, catalog, "# TYPE app_raw gauge\napp_raw 1\n", "app")
 	defer srv.Close()
 	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
-	err := collr.Check(context.Background())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "app_raw")
-	assert.Contains(t, err.Error(), "other_final")
-	assert.Nil(t, collr.runtime)
+	collectProfileRelabelOnce(t, collr)
+	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	assert.InDelta(t, 1, value(t, got, "other_final", nil), 1e-9)
+	noSeries(t, got, "app_raw", nil)
 }
 
 func TestCollector_ProfileRelabelingPreservesPreProfileFallbackType(t *testing.T) {
@@ -182,7 +256,7 @@ func TestCollector_ProfileRelabelingCannotCreateFallbackType(t *testing.T) {
 	assert.Nil(t, collr.runtime)
 }
 
-func TestCollector_ProfileRelabelingAllowsDisjointOwners(t *testing.T) {
+func TestCollector_ProfileRelabelingDispatchesDisjointFamilies(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"first":  testRelabelProfileYAML("app_*", "app_first_raw", "app_first_final"),
 		"second": testRelabelProfileYAML("app_*", "app_second_raw", "app_second_final"),
@@ -203,7 +277,7 @@ app_second_raw 2
 	assert.InDelta(t, 2, value(t, got, "app_second_final", nil), 1e-9)
 }
 
-func TestCollector_ProfileRelabelingDropsRuntimeOnlyConflict(t *testing.T) {
+func TestCollector_ProfileRelabelingUsesFirstNormalizerForNewRuntimeFamily(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"first":  testRelabelProfileYAML("app_*", "app_dynamic", "app_first"),
 		"second": testRelabelProfileYAML("app_*", "app_dynamic", "app_second"),
@@ -233,40 +307,8 @@ app_dynamic 3
 	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	assert.InDelta(t, 2, value(t, got, "app_safe", nil), 1e-9)
 	noSeries(t, got, "app_dynamic", nil)
-	noSeries(t, got, "app_first", nil)
+	assert.InDelta(t, 3, value(t, got, "app_first", nil), 1e-9)
 	noSeries(t, got, "app_second", nil)
-}
-
-func TestCollector_ProfileRelabelingDropsRuntimeOnlyScopeEscape(t *testing.T) {
-	catalog := loadTestCatalog(t, map[string]string{
-		"app": testRelabelProfileYAML("app_*", "app_dynamic", "other_dynamic"),
-	})
-	input := "# TYPE app_safe gauge\napp_safe 1\n"
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(input))
-	}))
-	defer srv.Close()
-
-	collr := New()
-	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesModeConfig{
-		Entries: profileEntries("app"),
-	}}
-	collr.loadProfileCatalog = func() (promprofiles.Catalog, error) { return catalog, nil }
-	require.NoError(t, collr.Init(context.Background()))
-	require.NoError(t, collr.Check(context.Background()))
-
-	input = `
-# TYPE app_safe gauge
-app_safe 2
-# TYPE app_dynamic gauge
-app_dynamic 3
-`
-	collectProfileRelabelOnce(t, collr)
-	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
-	assert.InDelta(t, 2, value(t, got, "app_safe", nil), 1e-9)
-	noSeries(t, got, "app_dynamic", nil)
-	noSeries(t, got, "other_dynamic", nil)
 }
 
 func TestCollector_ProfileRelabelingTypedFamilyCorruptionFailsCheck(t *testing.T) {
@@ -466,9 +508,14 @@ func TestCollector_UnselectedProfileRelabelingDoesNotApply(t *testing.T) {
 
 func TestCollector_ProfileRelabelingCheckRetryIsTransactional(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
-		"app": testRelabelProfileYAML("app_*", "app_raw", "other_final"),
+		"app": testRelabelProfileYAML("app_*", "app_lat_sum", "app_other_sum"),
 	})
-	input := "# TYPE app_raw gauge\napp_raw 1\n"
+	input := `
+# TYPE app_lat histogram
+app_lat_bucket{le="+Inf"} 6
+app_lat_sum 2.5
+app_lat_count 6
+`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(input))
 	}))

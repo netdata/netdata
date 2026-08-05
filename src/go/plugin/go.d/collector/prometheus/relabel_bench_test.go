@@ -131,7 +131,7 @@ func BenchmarkRelabelScrapeModes(b *testing.B) {
 
 			var normalizers []profileNormalizer
 			if tc.profileRules {
-				normalizers = []profileNormalizer{benchmarkProfileNormalizer(b, "all", "*", "*", "profile_stage")}
+				normalizers = []profileNormalizer{benchmarkProfileNormalizer(b, "*", "*", "profile_stage")}
 			}
 
 			b.ReportAllocs()
@@ -152,21 +152,24 @@ func BenchmarkRelabelScrapeModes(b *testing.B) {
 	}
 }
 
-// BenchmarkProfileRelabelDispatch isolates ownership resolution. The sixteen-
-// profile case gives every source family one disjoint owner and guards against
-// accidental pairwise profile composition or an unbounded dispatch cache. The
-// 2026-08-05 run measured 6,767 ns/op for one profile, 7,856 ns/op for sixteen
-// disjoint roots, and 22,591 ns/op for sixteen overlapping roots with disjoint
-// block ownership; all used 16,216 B/op and 93 allocations.
+// BenchmarkProfileRelabelDispatch isolates first-applicable family dispatch.
+// The sixteen-profile case gives every source family one applicable normalizer
+// and guards against accidental profile chaining or an unbounded dispatch cache.
+// The 2026-08-05 baseline measured 6,462-6,517 ns/op for one profile,
+// 7,582-7,813 ns/op for sixteen disjoint roots, and 23,870-24,008 ns/op for
+// sixteen overlapping roots with disjoint blocks; all used 16,216 B/op and 93
+// allocations. First-applicable dispatch measured 2,455-2,560 ns/op,
+// 4,807-4,865 ns/op, and 7,066-7,145 ns/op respectively, with 1,640 B/op and
+// 7 allocations in all three cases.
 func BenchmarkProfileRelabelDispatch(b *testing.B) {
 	batch := scrapeSamples(b, benchExposition())
 
 	b.Run("one_profile", func(b *testing.B) {
-		normalizers := []profileNormalizer{benchmarkProfileNormalizer(b, "all", "*", "*", "profile_stage")}
+		normalizers := []profileNormalizer{benchmarkProfileNormalizer(b, "*", "*", "profile_stage")}
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			resolveProfileOwners(batch, normalizers)
+			selectProfileNormalizers(batch, normalizers)
 		}
 	})
 
@@ -176,7 +179,7 @@ func BenchmarkProfileRelabelDispatch(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			resolveProfileOwners(batch, normalizers)
+			selectProfileNormalizers(batch, normalizers)
 		}
 	})
 
@@ -186,7 +189,7 @@ func BenchmarkProfileRelabelDispatch(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			resolveProfileOwners(batch, normalizers)
+			selectProfileNormalizers(batch, normalizers)
 		}
 	})
 }
@@ -198,18 +201,17 @@ func benchmarkDisjointNormalizers(tb testing.TB, overlappingRoots bool) []profil
 	for i := range 15 {
 		patterns = append(patterns, fmt.Sprintf("lat_%d_seconds", i))
 	}
-	for i, base := range patterns {
+	for _, base := range patterns {
 		root := base
 		if overlappingRoots {
 			root = "*"
 		}
-		normalizers = append(normalizers,
-			benchmarkProfileNormalizer(tb, fmt.Sprintf("profile_%d", i), root, base+"*", "profile_stage"))
+		normalizers = append(normalizers, benchmarkProfileNormalizer(tb, root, base+"*", "profile_stage"))
 	}
 	return normalizers
 }
 
-func benchmarkProfileNormalizer(tb testing.TB, name, rootPattern, blockPattern, label string) profileNormalizer {
+func benchmarkProfileNormalizer(tb testing.TB, rootPattern, blockPattern, label string) profileNormalizer {
 	tb.Helper()
 	root, err := matcher.NewSimplePatternsMatcher(rootPattern)
 	if err != nil {
@@ -219,7 +221,7 @@ func benchmarkProfileNormalizer(tb testing.TB, name, rootPattern, blockPattern, 
 	if err != nil {
 		tb.Fatal(err)
 	}
-	return profileNormalizer{name: name, root: root, pipeline: pipeline}
+	return profileNormalizer{root: root, pipeline: pipeline}
 }
 
 func benchmarkRelabelBlocks(label string) []relabel.Block {

@@ -219,6 +219,49 @@ func Test_combinedSelectProfiles(t *testing.T) {
 	}
 }
 
+func Test_profilesInNormalizationOrder(t *testing.T) {
+	profiles := func(names ...string) []promprofiles.Profile {
+		out := make([]promprofiles.Profile, len(names))
+		for i, name := range names {
+			out[i] = promprofiles.Profile{Name: name}
+		}
+		return out
+	}
+
+	tests := map[string]struct {
+		profiles []promprofiles.Profile
+		config   ProfilesConfig
+		want     []string
+	}{
+		"auto sorts by normalized profile name": {
+			profiles: profiles("zeta", "alpha", "beta"),
+			config:   ProfilesConfig{Mode: profilesModeAuto},
+			want:     []string{"alpha", "beta", "zeta"},
+		},
+		"exact preserves configured selection order": {
+			profiles: profiles("zeta", "alpha", "beta"),
+			config: ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesModeConfig{
+				Entries: profileEntries("zeta", "alpha", "beta"),
+			}},
+			want: []string{"zeta", "alpha", "beta"},
+		},
+		"combined puts entries first and sorts the auto remainder": {
+			profiles: profiles("beta", "alpha", "zeta", "gamma"),
+			config: ProfilesConfig{Mode: profilesModeCombined, ModeCombined: &ProfilesModeConfig{
+				Entries: profileEntries("zeta", "alpha"),
+			}},
+			want: []string{"zeta", "alpha", "beta", "gamma"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := profilesInNormalizationOrder(tc.profiles, tc.config)
+			assert.Equal(t, tc.want, profileNames(got))
+		})
+	}
+}
+
 // testMetricFamilies builds a MetricFamilies whose only meaningful content is the
 // set of family names (selection matches on the keys).
 func testMetricFamilies(names ...string) prometheus.MetricFamilies {

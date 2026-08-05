@@ -1,7 +1,7 @@
 # Metric relabeling
 
 Relabeling rewrites, adds, drops, or filters a scraped metric -- its name and its labels -- before charts are built.
-The same `relabeling` block format has two ownership levels:
+The same `relabeling` block format has two configuration levels:
 
 - **Job relabeling** is operator policy. It runs after the job's `selector` and before
   [chart profiles](/src/go/plugin/go.d/collector/prometheus/profile-format.md) are selected, so it can bring an
@@ -75,7 +75,7 @@ The drop and label-deriving techniques are explained step by step under [Relabel
 
 `relabeling` is a **list of blocks**. Each block has a `match` and a list of rules; the rules apply only to metrics
 whose name matches the block's `match`. Grouping rules under a block lets you scope a set of rules to a subset of
-metrics by name, instead of repeating a name match in every rule. Relabeling is opt-in at both ownership levels -- a
+metrics by name, instead of repeating a name match in every rule. Relabeling is opt-in at both levels -- a
 job or profile without a `relabeling` section adds no rules at that stage.
 
 ```yaml
@@ -94,7 +94,8 @@ jobs:
             action: <action>
 ```
 
-The same field may appear at the root of a profile. The profile's root `match` still controls selection and ownership;
+The same field may appear at the root of a profile. The profile's root `match` controls selection and source-family
+applicability;
 the relabeling block `match` controls which physical series names its rules process:
 
 ```yaml
@@ -203,16 +204,22 @@ option instead.
 
 Plain gauges and counters have no such restriction -- you can rename, relabel, split, or drop them freely.
 
-### Profile ownership and namespace safety
+### Profile precedence on the shared stream
 
-Selected profiles do not run as an order-dependent chain. A profile owns a source family only when its root `match`
-covers that family and one of its relabeling block matchers covers at least one physical series in the family. More than
-one owner is a conflict: it fails autodetection, or drops that source family if a new conflict first appears at runtime.
+Selected profiles share one final metric stream; the collector does not copy source metrics per profile. For each
+original source family, it chooses the first selected profile whose root `match` covers the base family and whose
+relabeling block matcher covers at least one original physical series. That profile's complete pipeline receives every
+series in the family. Later profile pipelines do not process the family and do not see names produced by the first one.
 
-A profile's output family must still match that profile's root `match`. An out-of-scope rename fails autodetection; a
-runtime-only escape drops the affected source family. These rules prevent profile order from changing results and
-prevent malformed normalization from creating unexpected generic charts. See the profile format's
-[`relabeling` section](/src/go/plugin/go.d/collector/prometheus/profile-format.md#relabeling) for authoring guidance.
+Normalizer precedence is profile-name order in `auto`, configured entry order in `exact`, and configured entries first
+followed by the remaining auto-selected profiles in profile-name order in `combined`. Block and rule order inside the
+chosen profile remains the YAML order described above.
+
+Dispatch does not predict rule results or output names. The root `match` constrains the original source family only, and
+the chosen pipeline may produce a different namespace. Every selected chart template sees those final names and labels,
+so profile authors must account for interactions between profiles selected for the same endpoint. See the profile
+format's [`relabeling` section](/src/go/plugin/go.d/collector/prometheus/profile-format.md#relabeling) for authoring
+guidance.
 
 Untyped fallback type is bound from the post-job, pre-profile name. Profile relabeling preserves that decision but
 cannot create one by adding `_total` or renaming a final metric into a configured `fallback_type` pattern.

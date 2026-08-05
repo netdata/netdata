@@ -23,7 +23,6 @@ type promRuntime struct {
 }
 
 type profileNormalizer struct {
-	name     string
 	root     matcher.Matcher
 	pipeline *relabel.Pipeline
 }
@@ -46,7 +45,7 @@ func compileProfileNormalizers(profiles []promprofiles.Profile) ([]profileNormal
 		if err != nil {
 			return nil, fmt.Errorf("profile %q: invalid match %q: %w", profile.Name, profile.Match, err)
 		}
-		normalizers = append(normalizers, profileNormalizer{name: profile.Name, root: root, pipeline: pipeline})
+		normalizers = append(normalizers, profileNormalizer{root: root, pipeline: pipeline})
 	}
 	return normalizers, nil
 }
@@ -175,6 +174,40 @@ func combinedSelectProfiles(catalog promprofiles.Catalog, names []string, mfs pr
 		out = append(out, p)
 	}
 	return out, nil
+}
+
+// profilesInNormalizationOrder preserves the selected profile order used by
+// chart/app composition while deriving the separate precedence used for sample
+// normalization.
+func profilesInNormalizationOrder(profiles []promprofiles.Profile, config ProfilesConfig) []promprofiles.Profile {
+	if len(profiles) < 2 || config.effectiveMode() == profilesModeExact {
+		return profiles
+	}
+
+	remaining := make(map[string]promprofiles.Profile, len(profiles))
+	for _, profile := range profiles {
+		remaining[promprofiles.NormalizeProfileKey(profile.Name)] = profile
+	}
+
+	ordered := make([]promprofiles.Profile, 0, len(profiles))
+	if config.effectiveMode() == profilesModeCombined {
+		for _, name := range entryNames(config.ModeCombined) {
+			key := promprofiles.NormalizeProfileKey(name)
+			if profile, ok := remaining[key]; ok {
+				ordered = append(ordered, profile)
+				delete(remaining, key)
+			}
+		}
+	}
+
+	rest := make([]promprofiles.Profile, 0, len(remaining))
+	for _, profile := range remaining {
+		rest = append(rest, profile)
+	}
+	sort.Slice(rest, func(i, j int) bool {
+		return promprofiles.NormalizeProfileKey(rest[i].Name) < promprofiles.NormalizeProfileKey(rest[j].Name)
+	})
+	return append(ordered, rest...)
 }
 
 // profileMatchesFamilies reports whether the profile's match pattern hits at

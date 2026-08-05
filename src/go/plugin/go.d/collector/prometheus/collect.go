@@ -112,7 +112,8 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 	if err != nil {
 		return nil, nil, false, err
 	}
-	candidate.normalizers, err = compileProfileNormalizers(candidate.profiles)
+	normalizationOrder := profilesInNormalizationOrder(candidate.profiles, c.Profiles)
+	candidate.normalizers, err = compileProfileNormalizers(normalizationOrder)
 	if err != nil {
 		return nil, nil, false, err
 	}
