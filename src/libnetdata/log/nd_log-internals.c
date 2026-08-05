@@ -728,7 +728,7 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static bool nd_log_stack_entry_is_valid(const struct log_stack_entry *entry) {
+bool nd_log_stack_entry_is_valid(const struct log_stack_entry *entry) {
     if(!entry || entry->id >= _NDF_MAX || !entry->set)
         return false;
 
@@ -840,6 +840,22 @@ int log_stack_unittest(void) {
         lgs[i][0] = ND_LOG_FIELD_TXT(NDF_MESSAGE, "log-stack-unittest");
         lgs[i][1] = ND_LOG_FIELD_END();
     }
+
+    struct log_stack_entry invalid_id = ND_LOG_FIELD_U64(_NDF_MAX, 1);
+    struct log_stack_entry empty_text = ND_LOG_FIELD_TXT(NDF_MESSAGE, "");
+    struct log_stack_entry null_string = ND_LOG_FIELD_STR(NDF_MESSAGE, NULL);
+    struct log_stack_entry null_buffer = ND_LOG_FIELD_BFR(NDF_MESSAGE, NULL);
+    struct log_stack_entry null_callback = ND_LOG_FIELD_CB(NDF_MESSAGE, NULL, NULL);
+    struct log_stack_entry unset = ND_LOG_FIELD_END();
+    struct log_stack_entry number = ND_LOG_FIELD_U64(NDF_MESSAGE, 1);
+
+    LOG_STACK_TEST(!nd_log_stack_entry_is_valid(&invalid_id), "out-of-range field is invalid");
+    LOG_STACK_TEST(!nd_log_stack_entry_is_valid(&empty_text), "empty text field is invalid");
+    LOG_STACK_TEST(!nd_log_stack_entry_is_valid(&null_string), "null string field is invalid");
+    LOG_STACK_TEST(!nd_log_stack_entry_is_valid(&null_buffer), "null buffer field is invalid");
+    LOG_STACK_TEST(!nd_log_stack_entry_is_valid(&null_callback), "null callback field is invalid");
+    LOG_STACK_TEST(!nd_log_stack_entry_is_valid(&unset), "unset field is invalid");
+    LOG_STACK_TEST(nd_log_stack_entry_is_valid(&number), "numeric field is valid");
 
     memset(thread_log_stack_base, 0, sizeof(thread_log_stack_base));
     thread_log_stack_next = 0;

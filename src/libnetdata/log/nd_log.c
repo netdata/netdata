@@ -246,22 +246,10 @@ static void nd_logger_merge_log_stack_to_thread_fields(void) {
             continue;
 
         for(size_t i = 0; lgs[i].id != NDF_STOP ; i++) {
-            if(lgs[i].id >= _NDF_MAX || !lgs[i].set)
+            if(!nd_log_stack_entry_is_valid(&lgs[i]))
                 continue;
 
-            struct log_stack_entry *e = &lgs[i];
-            ND_LOG_STACK_FIELD_TYPE type = lgs[i].type;
-
-            // Do not add empty or unset fields.
-            if((type == NDFT_TXT && (!e->txt || !*e->txt)) ||
-                (type == NDFT_BFR && (!e->bfr || !buffer_strlen(e->bfr))) ||
-                (type == NDFT_STR && !e->str) ||
-                (type == NDFT_UUID && (!e->uuid || uuid_is_null(*e->uuid))) ||
-                (type == NDFT_CALLBACK && !e->cb.formatter) ||
-                type == NDFT_UNSET)
-                continue;
-
-            thread_log_fields[lgs[i].id].entry = *e;
+            thread_log_fields[lgs[i].id].entry = lgs[i];
         }
     }
 }
