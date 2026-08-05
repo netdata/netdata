@@ -108,6 +108,57 @@ groups:
 	}
 }
 
+func TestPlanRouteDiagnosticsPreserveRawInstanceIdentity(t *testing.T) {
+	var facts []PlanRouteDiagnostic
+	engine, err := New(WithPlanRouteDiagnosticObserver(func(fact PlanRouteDiagnostic) {
+		facts = append(facts, fact)
+	}))
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Test
+    metrics: [app_value]
+    charts:
+      - id: value
+        title: Value
+        context: app.value
+        units: value
+        instances:
+          by_labels: [instance]
+        dimensions:
+          - selector: app_value
+            name: value
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cycle := mustCycleController(t, store)
+	meter := store.Write().SnapshotMeter("")
+	cycle.BeginCycle()
+	meter.Gauge("app_value").Observe(1, meter.LabelSet(metrix.Label{Key: "instance", Value: "a b"}))
+	meter.Gauge("app_value").Observe(2, meter.LabelSet(metrix.Label{Key: "instance", Value: "a_b"}))
+	meter.Gauge("app_value").Observe(3)
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	_, err = buildPlan(engine, store.Read(metrix.ReadRaw()))
+	require.NoError(t, err)
+	var resolved []PlanRouteDiagnostic
+	var rejected []PlanRouteDiagnostic
+	for _, fact := range facts {
+		switch fact.Decision {
+		case PlanRouteResolved:
+			resolved = append(resolved, fact)
+		case PlanRouteChartIdentityRejected:
+			rejected = append(rejected, fact)
+		}
+	}
+	require.Len(t, resolved, 2)
+	assert.Equal(t, resolved[0].ChartID, resolved[1].ChartID)
+	assert.NotEqual(t, resolved[0].InstanceIdentity, resolved[1].InstanceIdentity)
+	require.Len(t, rejected, 1)
+	assert.Equal(t, []string{"instance"}, rejected[0].MissingInstanceLabels)
+}
+
 func countPlanRouteDecisions(facts []PlanRouteDiagnostic, decision PlanRouteDecision) int {
 	count := 0
 	for _, fact := range facts {

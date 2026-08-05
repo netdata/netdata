@@ -292,16 +292,16 @@ func validateProfile(opts validationOptions) report {
 	}
 	r.Counts.SeriesScanned, r.Counts.SeriesAutogen, r.Counts.SeriesUnmatched = routeSummary.counts()
 
-	unavailableIdentities, identityAuditErrs := inspectUnavailableInstanceIdentities(refs, reader)
-	for _, item := range identityAuditErrs {
+	routeInspection := routeSummary.inspectAuthoredCharts(refs)
+	for _, item := range routeInspection.errs {
 		r.addError(
-			"instance_identity_audit",
+			"chart_route_diagnostics",
 			item.path,
 			item.err.Error(),
-			"The validator must resolve each authored dimension against the effective chart instance identity.",
+			"The validator must correlate every authored chart with facts from the production planner.",
 		)
 	}
-	for _, item := range unavailableIdentities {
+	for _, item := range routeInspection.unavailableInstances {
 		r.addError(
 			"instance_identity_label_unavailable",
 			item.path,
@@ -315,15 +315,11 @@ func validateProfile(opts validationOptions) report {
 			"Every explicit instance label must exist on every selected series. Move the chart to the correct entity boundary or override instances.by_labels with labels the series actually carries; never add a nonexistent label merely to satisfy the hierarchy.",
 		)
 	}
-	dead, deadDimensions, dimensionLosses, collisions, instanceLosses, isolationErrs := inspectChartsInIsolation(merged, refs, reader)
-	r.DeadCharts = dead
-	r.DeadDimensions = deadDimensions
-	r.DimensionLosses = dimensionLosses
-	r.Collisions = collisions
-	r.InstanceLosses = instanceLosses
-	for _, item := range isolationErrs {
-		r.addError("isolated_chart_plan", item.path, item.err.Error(), "Every authored chart is planned alone to expose dead selectors and rendered IDs hidden by whole-plan collision suppression.")
-	}
+	r.DeadCharts = routeInspection.deadCharts
+	r.DeadDimensions = routeInspection.deadDimensions
+	r.DimensionLosses = routeInspection.dimensionLosses
+	r.Collisions = routeInspection.collisions
+	r.InstanceLosses = routeInspection.instanceLosses
 
 	if r.Counts.SeriesAutogen != 0 {
 		r.addError(

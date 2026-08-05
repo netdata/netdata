@@ -13,11 +13,16 @@ const (
 	PlanRouteCandidateSelectorRejected PlanRouteDecision = "candidate_selector_rejected"
 	PlanRouteChartIdentityRejected     PlanRouteDecision = "chart_identity_rejected"
 	PlanRouteDimensionRejected         PlanRouteDecision = "dimension_rejected"
+	PlanRouteResolved                  PlanRouteDecision = "route_resolved"
 	PlanRouteAccepted                  PlanRouteDecision = "route_accepted"
 	PlanRouteCollisionRejected         PlanRouteDecision = "chart_id_collision_rejected"
 	PlanRouteLifecycleRejected         PlanRouteDecision = "lifecycle_rejected"
 	PlanRouteUnmatched                 PlanRouteDecision = "series_unmatched"
 )
+
+// PlanInstanceIdentity is an opaque collision-resistant identity for the raw
+// instance-label key/value set before chart-ID sanitization.
+type PlanInstanceIdentity [32]byte
 
 // PlanRouteReason provides the production reason behind decisions that have
 // multiple policy branches.
@@ -32,9 +37,10 @@ const (
 	PlanRouteReasonDimensionCap             PlanRouteReason = "dimension_cap"
 )
 
-// PlanRouteDiagnostic is an immutable fact emitted from the production routing
-// path. Empty chart or dimension fields mean that the decision happened before
-// that value could be resolved.
+// PlanRouteDiagnostic is a fact emitted from the production routing path.
+// Empty chart or dimension fields mean that the decision happened before that
+// value could be resolved. Slice fields are detached from engine state and are
+// owned by the callback.
 type PlanRouteDiagnostic struct {
 	Decision                PlanRouteDecision
 	Reason                  PlanRouteReason
@@ -44,6 +50,8 @@ type PlanRouteDiagnostic struct {
 	DimensionIndex          int
 	ChartID                 string
 	DimensionName           string
+	InstanceIdentity        PlanInstanceIdentity
+	MissingInstanceLabels   []string
 	ExistingChartTemplateID string
 	AutogenRuleIndex        int
 	AutogenRuleScope        string

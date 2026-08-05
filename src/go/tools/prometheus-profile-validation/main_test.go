@@ -2294,6 +2294,24 @@ func TestValidateProfileFindsObservedSameTemplateInstanceIDCollision(t *testing.
 	}
 }
 
+func TestValidateProfileFindsLifecycleInstanceMaterializationLoss(t *testing.T) {
+	profile := strings.Replace(
+		singleInstanceValueGaugeProfile,
+		"      instances:\n        by_labels: [instance]\n",
+		"      instances:\n        by_labels: [instance]\n      lifecycle:\n        max_instances: 1\n",
+		1,
+	)
+	dump := "# TYPE app_value gauge\napp_value{instance=\"a\"} 1\napp_value{instance=\"b\"} 2\n"
+	result := runValidation(t, profile, dump, "")
+	requireFinding(t, result, "instance_materialization_loss_observed")
+	if len(result.report.InstanceLosses) != 1 ||
+		result.report.InstanceLosses[0].ObservedIdentities != 2 ||
+		result.report.InstanceLosses[0].RenderedIDs != 1 ||
+		result.report.InstanceLosses[0].Cause != "lifecycle_limit_or_rendered_id_collapse" {
+		t.Fatalf("unexpected lifecycle instance loss report: %#v", result.report.InstanceLosses)
+	}
+}
+
 func TestValidateProfileFindsObservedDimensionWireIDCollision(t *testing.T) {
 	dump := "# TYPE app_value gauge\napp_value{state=\"a\"} 1\napp_value{state=\"'a\"} 2\n"
 	result := runValidation(t, singleDynamicValueGaugeProfile, dump, "")

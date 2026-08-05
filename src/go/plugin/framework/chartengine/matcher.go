@@ -143,12 +143,21 @@ func (e *Engine) resolveSeriesRoutes(
 		}
 		if !ok || strings.TrimSpace(chartID) == "" {
 			if observe != nil {
+				missingLabels := []string(nil)
+				_, _, dimensionOK, dimensionErr := resolveDimensionName(candidate.dimension, name, labels, meta)
+				if dimensionErr != nil {
+					return nil, false, dimensionErr
+				}
+				if dimensionOK {
+					missingLabels = missingChartInstanceLabels(chart.Identity, labels)
+				}
 				observe(PlanRouteDiagnostic{
-					Decision:        PlanRouteChartIdentityRejected,
-					SeriesIdentity:  identity,
-					MetricName:      name,
-					ChartTemplateID: candidate.chartTemplateID,
-					DimensionIndex:  candidate.dimensionIndex,
+					Decision:              PlanRouteChartIdentityRejected,
+					SeriesIdentity:        identity,
+					MetricName:            name,
+					ChartTemplateID:       candidate.chartTemplateID,
+					DimensionIndex:        candidate.dimensionIndex,
+					MissingInstanceLabels: missingLabels,
 				})
 			}
 			continue
@@ -169,6 +178,25 @@ func (e *Engine) resolveSeriesRoutes(
 				})
 			}
 			continue
+		}
+		if observe != nil {
+			instanceIdentity, ok, err := diagnosticChartInstanceIdentity(chart.Identity, labels)
+			if err != nil {
+				return nil, false, err
+			}
+			if !ok {
+				return nil, false, fmt.Errorf("chartengine: diagnostic instance identity diverged for chart template %q", candidate.chartTemplateID)
+			}
+			observe(PlanRouteDiagnostic{
+				Decision:         PlanRouteResolved,
+				SeriesIdentity:   identity,
+				MetricName:       name,
+				ChartTemplateID:  candidate.chartTemplateID,
+				DimensionIndex:   candidate.dimensionIndex,
+				ChartID:          chartID,
+				DimensionName:    dimName,
+				InstanceIdentity: instanceIdentity,
+			})
 		}
 		dimensionFloat := candidate.dimension.Float || metricFloat ||
 			candidate.dimension.Aggregation == program.AggregationAvg

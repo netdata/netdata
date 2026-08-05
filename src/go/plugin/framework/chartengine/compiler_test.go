@@ -36,6 +36,17 @@ func (m mapLabelView) Range(fn func(key, value string) bool) {
 	}
 }
 
+func TestChartTemplateIDAtUsesCompilerIdentity(t *testing.T) {
+	id, ok := ChartTemplateIDAt([]int{1, 2}, 3)
+	require.True(t, ok)
+	assert.Equal(t, "g1.2.c3", id)
+
+	_, ok = ChartTemplateIDAt(nil, 0)
+	assert.False(t, ok)
+	_, ok = ChartTemplateIDAt([]int{0}, -1)
+	assert.False(t, ok)
+}
+
 func TestCompileScenarios(t *testing.T) {
 	tests := map[string]struct {
 		spec    charttpl.Spec
