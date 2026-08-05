@@ -357,8 +357,11 @@ static int socket_attach_kprobes(struct netdata_ebpf_socket_runtime *rt)
 
         struct bpf_program *prog = bpf_object__find_program_by_name(rt->obj, t->prog_name);
         if (!prog) {
-            if (!t->optional)
+            if (!t->optional) {
                 fprintf(stderr, "ebpf-go: socket kprobe program %s not found\n", t->prog_name);
+                socket_destroy_links(rt);
+                return -1;
+            }
             continue;
         }
 
