@@ -31,10 +31,10 @@ import (
 //	go test ./plugin/go.d/collector/prometheus -run '^$' -bench RelabelExecutor -benchmem
 //
 // Measured on a developer laptop (Apple M4 Pro), 165 series (150 counters + 15
-// histograms), not CI — compare relative deltas, not absolutes (captured 2026-06-10):
+// histograms), not CI — compare relative deltas, not absolutes (captured 2026-08-05):
 //
-//	assemble_only                13545 ns/op    38272 B/op    414 allocs/op
-//	relabel_assemble_validate   118776 ns/op   119949 B/op   1577 allocs/op
+//	assemble_only                13511 ns/op    38272 B/op    414 allocs/op
+//	relabel_assemble_validate   121398 ns/op   119950 B/op   1577 allocs/op
 //
 // The executor adds ~105us per scrape in this near worst case (a rule rewriting every
 // series, so every typed family is validated). It is paid only on jobs that configure
@@ -83,6 +83,22 @@ func BenchmarkRelabelExecutor(b *testing.B) {
 // BenchmarkRelabelScrapeModes measures the complete steady-state fetch and parse
 // path for each supported stage combination. Unlike BenchmarkRelabelExecutor,
 // this includes the direct parser versus buffered-sample parser difference.
+// The same 2026-08-05 run measured:
+//
+//	no_rules                 96251 ns/op    46839 B/op    584 allocs/op
+//	job_rules               206978 ns/op   216616 B/op   1695 allocs/op
+//	profile_rules           240713 ns/op   288084 B/op   1794 allocs/op
+//	job_and_profile_rules   363555 ns/op   416780 B/op   2743 allocs/op
+//
+// A three-run comparison against the pre-feature master snapshot, using this
+// same fetch/parse fixture, found no material existing-path regression:
+//
+//	mode        pre-feature master                              current branch
+//	no_rules    93.2-94.3 us, 46.8-46.9 KB, 584 allocs/op       93.5-95.9 us, 46.8-47.0 KB, 584 allocs/op
+//	job_rules   208-239 us, 217.3-217.6 KB, 1696-1697 allocs    212-243 us, 217.4-217.9 KB, 1696-1697 allocs
+//
+// Profile-only and combined modes did not exist before this feature, so their
+// pre-change result is not applicable; the absolute opt-in costs are above.
 func BenchmarkRelabelScrapeModes(b *testing.B) {
 	exposition := benchExposition()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -138,7 +154,10 @@ func BenchmarkRelabelScrapeModes(b *testing.B) {
 
 // BenchmarkProfileRelabelDispatch isolates ownership resolution. The sixteen-
 // profile case gives every source family one disjoint owner and guards against
-// accidental pairwise profile composition or an unbounded dispatch cache.
+// accidental pairwise profile composition or an unbounded dispatch cache. The
+// 2026-08-05 run measured 6,767 ns/op for one profile, 7,856 ns/op for sixteen
+// disjoint roots, and 22,591 ns/op for sixteen overlapping roots with disjoint
+// block ownership; all used 16,216 B/op and 93 allocations.
 func BenchmarkProfileRelabelDispatch(b *testing.B) {
 	batch := scrapeSamples(b, benchExposition())
 
@@ -152,14 +171,7 @@ func BenchmarkProfileRelabelDispatch(b *testing.B) {
 	})
 
 	b.Run("sixteen_disjoint_profiles", func(b *testing.B) {
-		normalizers := make([]profileNormalizer, 0, 16)
-		normalizers = append(normalizers,
-			benchmarkProfileNormalizer(b, "http", "http_requests_total", "http_requests_total", "profile_stage"))
-		for i := range 15 {
-			base := fmt.Sprintf("lat_%d_seconds", i)
-			normalizers = append(normalizers,
-				benchmarkProfileNormalizer(b, fmt.Sprintf("lat_%d", i), base, base+"*", "profile_stage"))
-		}
+		normalizers := benchmarkDisjointNormalizers(b, false)
 
 		b.ReportAllocs()
 		b.ResetTimer()
@@ -167,6 +179,34 @@ func BenchmarkProfileRelabelDispatch(b *testing.B) {
 			resolveProfileOwners(batch, normalizers)
 		}
 	})
+
+	b.Run("sixteen_overlapping_roots_disjoint_blocks", func(b *testing.B) {
+		normalizers := benchmarkDisjointNormalizers(b, true)
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for range b.N {
+			resolveProfileOwners(batch, normalizers)
+		}
+	})
+}
+
+func benchmarkDisjointNormalizers(tb testing.TB, overlappingRoots bool) []profileNormalizer {
+	tb.Helper()
+	normalizers := make([]profileNormalizer, 0, 16)
+	patterns := []string{"http_requests_total"}
+	for i := range 15 {
+		patterns = append(patterns, fmt.Sprintf("lat_%d_seconds", i))
+	}
+	for i, base := range patterns {
+		root := base
+		if overlappingRoots {
+			root = "*"
+		}
+		normalizers = append(normalizers,
+			benchmarkProfileNormalizer(tb, fmt.Sprintf("profile_%d", i), root, base+"*", "profile_stage"))
+	}
+	return normalizers
 }
 
 func benchmarkProfileNormalizer(tb testing.TB, name, rootPattern, blockPattern, label string) profileNormalizer {

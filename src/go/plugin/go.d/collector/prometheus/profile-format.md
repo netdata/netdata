@@ -155,9 +155,9 @@ At runtime the collector uses profiles in six ordered steps:
    order) wins and the rest are logged -- set the job's `app` to disambiguate.
 6. **Charts** -- the selected profiles' templates are merged on top of the autogeneration base. Every series first gets
    a chance to route to every authored template dimension. If no route matches, each selected profile's
-   `autogen.selector` is evaluated only when that profile's `match` applies to the source family. Every applicable
-   selector must accept the series; one rejection suppresses fallback, independent of profile order. If no selector
-   applies, the series keeps its generic autogen chart. A selector never removes samples from the metric store.
+   `autogen.selector` is evaluated only when that profile's `match` applies to the final post-profile family. Every
+   applicable selector must accept the series; one rejection suppresses fallback, independent of profile order. If no
+   selector applies, the series keeps its generic autogen chart. A selector never removes samples from the metric store.
 
 Chart contexts compose as `prometheus.<app>.<template context_namespace>.<chart context>` -- in the example above,
 `prometheus.example.example.http_requests`. When the resolved app equals the profile's `context_namespace` (the common
@@ -245,7 +245,7 @@ operator-owned type policy independent of profile naming.
 
 `autogen.selector` uses the existing metric selector `allow`/`deny` shape to control fallback charts. It runs only
 after no authored chart-template dimension matched the flattened series, and only when this profile's `match` applies
-to the resolved source family.
+to the final post-profile family that reaches the chart engine.
 
 - `allow` alone keeps fallback only for selected series.
 - `deny` alone keeps fallback for everything except selected series.
@@ -253,7 +253,7 @@ to the resolved source family.
 - At least one non-empty `allow` or `deny` entry is required. Empty `autogen`, null or empty `selector`, both lists
   absent or empty, whitespace-only entries, and invalid selector expressions are rejected.
 - Each entry accepts the same metric-name and label expression syntax as other metric selectors. The selector receives
-  the source family as `__name__` plus all current series labels.
+  the final post-profile family as `__name__` plus the relabeled series' current labels.
 - When multiple selected profile scopes apply, every applicable selector must accept the series. One rejection
   suppresses fallback, and profile order cannot change the result. Profiles without `autogen.selector` add no rule.
 - Histograms and summaries use their base family as `__name__`: `foo_bucket`, `foo_sum`, and `foo_count` all evaluate

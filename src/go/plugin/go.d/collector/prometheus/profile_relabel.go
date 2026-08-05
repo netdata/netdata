@@ -105,22 +105,16 @@ func resolveProfileOwners(batch prompkg.SampleBatch, normalizers []profileNormal
 		families[base] = append(families[base], sample.Name)
 	}
 
-	baseNames := make([]string, 0, len(families))
-	for base := range families {
-		baseNames = append(baseNames, base)
-	}
-	sort.Strings(baseNames)
-
 	owners := make(map[string]*profileNormalizer, len(families))
 	var conflicts []profileOwnerConflict
-	for _, base := range baseNames {
+	for base, physicalNames := range families {
 		var candidates []*profileNormalizer
 		for i := range normalizers {
 			normalizer := &normalizers[i]
 			if !normalizer.root.MatchString(base) {
 				continue
 			}
-			for _, physicalName := range families[base] {
+			for _, physicalName := range physicalNames {
 				if normalizer.pipeline.Matches(physicalName) {
 					candidates = append(candidates, normalizer)
 					break
@@ -141,6 +135,7 @@ func resolveProfileOwners(batch prompkg.SampleBatch, normalizers []profileNormal
 			conflicts = append(conflicts, profileOwnerConflict{family: base, profiles: names})
 		}
 	}
+	sort.Slice(conflicts, func(i, j int) bool { return conflicts[i].family < conflicts[j].family })
 	return owners, conflicts
 }
 

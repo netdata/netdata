@@ -104,6 +104,27 @@ func TestCollector_ProfileRelabelingRejectsConflictingOwners(t *testing.T) {
 	assert.Nil(t, collr.runtime)
 }
 
+func TestResolveProfileOwnersSortsConflictDiagnostics(t *testing.T) {
+	catalog := loadTestCatalog(t, map[string]string{
+		"first":  testRelabelProfilePatternYAML("app_*", "app_*", "app_(.*)", "app_${1}", "app_a"),
+		"second": testRelabelProfilePatternYAML("app_*", "app_*", "app_(.*)", "app_${1}", "app_z"),
+	})
+	profiles, err := catalog.Resolve([]string{"second", "first"})
+	require.NoError(t, err)
+	normalizers, err := compileProfileNormalizers(profiles)
+	require.NoError(t, err)
+	batch := scrapeSamples(t, "# TYPE app_z gauge\napp_z 1\n# TYPE app_a gauge\napp_a 2\n")
+
+	for range 100 {
+		_, conflicts := resolveProfileOwners(batch, normalizers)
+		require.Len(t, conflicts, 2)
+		assert.Equal(t, "app_a", conflicts[0].family)
+		assert.Equal(t, []string{"first", "second"}, conflicts[0].profiles)
+		assert.Equal(t, "app_z", conflicts[1].family)
+		assert.Equal(t, []string{"first", "second"}, conflicts[1].profiles)
+	}
+}
+
 func TestCollector_ProfileRelabelingRejectsOutputOutsideProfileNamespace(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"app": testRelabelProfileYAML("app_*", "app_raw", "other_final"),
