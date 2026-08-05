@@ -275,7 +275,7 @@ The Windows MSI installer only accepts Netdata Cloud claiming properties (`TOKEN
 
 On Windows, the child-side streaming file is `C:\Program Files\Netdata\etc\netdata\stream.conf`. A stock reference template ships at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\stream.conf`.
 
-Before deploying, generate the parent API key: on the receiving parent, create a UUID and add an `[API_KEY]` section to its `stream.conf`. See [Configuring Metrics Centralization Points](observability-centralization-points/metrics-centralization-points/configuration.md) for the parent-side setup, then reuse that same API key on every Windows child.
+Before deploying, generate the parent API key: on the receiving parent, create a UUID and add an `[API_KEY]` section to its `stream.conf`. See [Configuring Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for the parent-side setup, then reuse that same API key on every Windows child.
 
 **Deploy `stream.conf` with PowerShell** (run as Administrator, or via PowerShell remoting):
 
@@ -302,7 +302,7 @@ Replace `PARENT_IP` with your parent's address and `API_KEY` with the UUID gener
 
 Restarting the Netdata service is required: the agent reads `stream.conf` at startup, so streaming only starts after `Restart-Service Netdata` (or `sc stop Netdata` then `sc start Netdata`).
 
-For MSI silent-install details, see [Install Netdata on Windows](../packaging/windows/WINDOWS_INSTALLER.md).
+For MSI silent-install details, see [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md).
 
 ### Kubernetes Environments
 When Netdata runs inside a Kubernetes cluster, it provides comprehensive multi-level discovery:
