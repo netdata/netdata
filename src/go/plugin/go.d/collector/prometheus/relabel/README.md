@@ -1,9 +1,15 @@
 # Metric relabeling
 
-Relabeling rewrites, adds, drops, or filters a scraped metric -- its name and its labels -- **before**
-[chart profiles](/src/go/plugin/go.d/collector/prometheus/profile-format.md) are matched and charts are built. It is a
-job-level configuration option (`relabeling`), not a profile field: it works with or without profiles, and profiles see
-the relabeled result. The rule shape is Prometheus-compatible: it mirrors
+Relabeling rewrites, adds, drops, or filters a scraped metric -- its name and its labels -- before charts are built.
+The same `relabeling` block format has two ownership levels:
+
+- **Job relabeling** is operator policy. It runs after the job's `selector` and before
+  [chart profiles](/src/go/plugin/go.d/collector/prometheus/profile-format.md) are selected, so it can bring an
+  endpoint into a profile's expected namespace.
+- **Profile relabeling** is exporter/profile policy. It is stored at the profile root, applies automatically only after
+  that profile is selected, and normalizes the metrics its template sees. It cannot cause its own selection.
+
+Both levels use the same validation and execution path. The rule shape is Prometheus-compatible: it mirrors
 Prometheus
 [`metric_relabel_configs`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs),
 so rules you already use in Prometheus carry over -- with these deliberate exceptions: the `__name__` handling of the
@@ -11,12 +17,12 @@ label-name actions (see [Actions](#actions)), and the histogram/summary integrit
 such as thinning buckets by `le` -- that Prometheus allows (see
 [Histogram and summary safety](#histogram-and-summary-safety)). When porting, wrap your flat `metric_relabel_configs`
 list in a `relabeling` block with a required `match` (use `'*'` for all metrics). The job's `selector` option runs
-first, on the original scraped names -- relabeling sees only what the selector kept, so a rename cannot recover a series
-the selector dropped under its old name.
+first, on the original scraped names -- neither relabeling stage can recover a series the selector dropped.
 
-Use it to keep noisy metrics out of your dashboards, fold high-cardinality labels away, derive new labels, rename
-metrics, normalize label casing -- or rename an exporter's metrics so a stock profile recognizes them -- without
-touching the application you are scraping.
+Use job relabeling to keep noisy metrics out of your dashboards, fold high-cardinality labels away, derive deployment
+labels, or rename an endpoint so a profile recognizes it. Put stable exporter normalization required by a curated
+profile in the profile itself, so every job that selects that profile gets the same metric contract without duplicating
+an optional job policy.
 
 > **Note:** The removed `label_prefix` option prefixed every label key. Relabeling covers its practical use case --
 > avoiding collisions with the labels Netdata adds when re-exporting -- with a targeted `labelmap` rule (see the
@@ -69,8 +75,8 @@ The drop and label-deriving techniques are explained step by step under [Relabel
 
 `relabeling` is a **list of blocks**. Each block has a `match` and a list of rules; the rules apply only to metrics
 whose name matches the block's `match`. Grouping rules under a block lets you scope a set of rules to a subset of
-metrics by name, instead of repeating a name match in every rule. Relabeling is opt-in -- jobs without a `relabeling`
-section are unaffected.
+metrics by name, instead of repeating a name match in every rule. Relabeling is opt-in at both ownership levels -- a
+job or profile without a `relabeling` section adds no rules at that stage.
 
 ```yaml
 jobs:
@@ -86,6 +92,22 @@ jobs:
             target_label: '<label>'         # or __name__ to target the metric name
             replacement: '$1'
             action: <action>
+```
+
+The same field may appear at the root of a profile. The profile's root `match` still controls selection and ownership;
+the relabeling block `match` controls which physical series names its rules process:
+
+```yaml
+match: 'myapp_*'
+relabeling:
+  - match: 'myapp_legacy_*'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'myapp_legacy_(.+)'
+        target_label: __name__
+        replacement: 'myapp_${1}'
+template:
+  # ...
 ```
 
 ### `match`
@@ -143,7 +165,17 @@ Inside a block, `metric_relabel_configs` is a list of rules applied **in order**
 
 ## How relabeling runs
 
-1. For each scraped metric, every block whose `match` matches the metric's **current** name runs, in order.
+The stage order is fixed:
+
+1. The job `selector` filters original scraped series.
+2. Job relabeling runs and its result is assembled and checked.
+3. Untyped fallback classification and profile selection use the post-job, pre-profile names.
+4. Selected profile relabeling runs and its result is assembled and checked independently.
+5. Final size/writer checks run, then charts see the normalized result.
+
+Inside either relabeling stage:
+
+1. For each metric, every block whose `match` matches the metric's **current** name runs, in order.
 2. Within a block, rules run in order. Each rule joins `source_labels` into an input string and applies its `action`.
 3. A rule can rename the metric (write `__name__`), so a later block or rule sees the new name.
 4. If any rule drops the metric, the remaining rules and blocks are skipped for it.
@@ -159,9 +191,9 @@ will **not** let relabeling silently corrupt one. A rule that would:
 - merge two metric families together, or
 - duplicate a component,
 
-is rejected. The job **fails at autodetection**, so a bad rule is caught immediately; if the exposition changes at
-runtime, the affected metric family is **dropped** (rather than charted with wrong values) and the rest of the job keeps
-working.
+is rejected independently at each stage. The job **fails at autodetection**, so a bad rule is caught immediately; if
+the exposition changes at runtime, the affected metric family is **dropped** (rather than charted with wrong values)
+and the rest of the job keeps working. A later profile stage cannot hide corruption introduced by the job stage.
 
 This also covers the common Prometheus technique of thinning histogram buckets: a `keep`/`drop` rule on the `le` (or
 `quantile`) label is treated as corrupting the metric family, never as thinning it -- the job fails its check when the
@@ -170,6 +202,20 @@ drifts into corruption later at runtime. Reduce histogram cardinality at the exp
 option instead.
 
 Plain gauges and counters have no such restriction -- you can rename, relabel, split, or drop them freely.
+
+### Profile ownership and namespace safety
+
+Selected profiles do not run as an order-dependent chain. A profile owns a source family only when its root `match`
+covers that family and one of its relabeling block matchers covers at least one physical series in the family. More than
+one owner is a conflict: it fails autodetection, or drops that source family if a new conflict first appears at runtime.
+
+A profile's output family must still match that profile's root `match`. An out-of-scope rename fails autodetection; a
+runtime-only escape drops the affected source family. These rules prevent profile order from changing results and
+prevent malformed normalization from creating unexpected generic charts. See the profile format's
+[`relabeling` section](/src/go/plugin/go.d/collector/prometheus/profile-format.md#relabeling) for authoring guidance.
+
+Untyped fallback type is bound from the post-job, pre-profile name. Profile relabeling preserves that decision but
+cannot create one by adding `_total` or renaming a final metric into a configured `fallback_type` pattern.
 
 ## Examples
 
