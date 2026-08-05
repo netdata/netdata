@@ -1334,9 +1334,26 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
 // fchmodat(AT_SYMLINK_NOFOLLOW), returns ENOTSUP on glibc < 2.32 - the O_PATH
 // emulation landed there, and the kernel only grew fchmodat2() in 6.6 - which is
 // still CentOS 7, Amazon Linux 2, every RHEL 8 derivative and Debian 11.
-// umask is process-wide, so the change is serialized and held only across bind().
-// netipc's bind_owner_only_socket() does the same for its own sockets and cannot
-// be shared: that subtree deliberately carries no libnetdata dependency.
+// umask is process-wide, and the spinlock below does not change that: all it does
+// is stop this helper from nesting with itself, so the mask it saves is always the
+// process's real one and never another instance's temporary 0007. Isolating
+// unrelated threads is not something any lock here can do - a file created
+// anywhere else in the process during the bind() would see 0007 as well. What
+// makes that safe is that no such thread exists:
+//   - the daemon sets umask(0007) permanently in become_daemon() (daemon.c), so
+//     for every spawn server created after that - and in every plugin that
+//     inherits it - this changes nothing at all;
+//   - the only one created before it (the "init" server in main.c) runs while the
+//     daemon is still single-threaded; nothing else is started until much later;
+//   - the standalone users (cgroup-network, local-listeners, network-viewer) bind
+//     theirs before they create any thread.
+// netipc's bind_owner_only_socket() does the same for its own sockets under its
+// own lock, and cannot share this one: that subtree deliberately carries no
+// libnetdata dependency. Two independent save/restore pairs on one process-wide
+// mask would restore each other's temporary value if they ever overlapped, so
+// keep them apart - cgroups.plugin is the one process with both, and it binds its
+// spawn server while reading its configuration, before the discovery thread that
+// binds netipc exists.
 static SPINLOCK spawn_server_umask_spinlock = SPINLOCK_INITIALIZER;
 
 static int spawn_server_bind_with_mode(int sock, const struct sockaddr_un *addr) {

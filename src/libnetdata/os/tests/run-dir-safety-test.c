@@ -203,24 +203,28 @@ int main(void) {
     // directory" rules apply to it: those exist to protect what we do here as
     // root. What still applies is that it must not be redirected to another
     // directory, so a symlink or a non-directory is refused for it too.
+    // Every case below names the caller it is judged as, because the same
+    // directory legitimately gets opposite answers for the two: a bare label would
+    // print twice, differing only in accepted/refused, and a failure would be
+    // ambiguous to read and to grep for.
     fprintf(stderr, "read-only resolution, for a client rather than the agent:\n");
     snprintfz(p, sizeof(p), "%s/ours", sticky);
-    check_mode("directory we own, sticky parent", p, false, true);
+    check_mode("directory we own, sticky parent (client)", p, false, true);
     snprintfz(p, sizeof(p), "%s/to_etc", exclusive);
-    check_mode("symlink to /etc", p, false, false);
+    check_mode("symlink to /etc (client)", p, false, false);
     snprintfz(p, sizeof(p), "%s/afile", exclusive);
-    check_mode("a regular file, not a directory", p, false, false);
+    check_mode("a regular file, not a directory (client)", p, false, false);
 
     // Accepted for a client, refused for the agent: the same directory, judged by
     // what the caller is about to do with it. A non-root install legitimately puts
     // its run directory under a parent the agent's own account owns, and a client
     // that only connects must still be able to find it.
     snprintfz(p, sizeof(p), "%s/ours", open_parent);
-    check_mode("world-writable parent without the sticky bit", p, false, true);
-    check_mode("world-writable parent without the sticky bit", p, true, false);
+    check_mode("world-writable parent, no sticky bit (client)", p, false, true);
+    check_mode("world-writable parent, no sticky bit (agent)", p, true, false);
     snprintfz(p, sizeof(p), "%s/other_writable", exclusive);
-    check_mode("directory writable by everyone", p, false, true);
-    check_mode("directory writable by everyone", p, true, false);
+    check_mode("directory writable by everyone (client)", p, false, true);
+    check_mode("directory writable by everyone (agent)", p, true, false);
 
     fprintf(stderr, "privileged open, symlink at the final component:\n");
     {
