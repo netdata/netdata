@@ -22,6 +22,7 @@ the same analysis from scratch.
 | Topic | Slug | Notes |
 |---|---|---|
 | Trace a stack-symbol regression to a concurrent mutator | `trace-stack-symbol-regression-to-mutator.md` | Separates direct vs stack-only matches, finds the first affected build, maps the faulting call, and validates shared-state lifetime evidence. |
+| Windows memory-corruption signatures | find-windows-memory-corruption-signatures | Corruption-proxy fatal functions, per-OS rate comparison, stack clustering, deployed-version line mapping. |
 
 ## How to add a how-to
 
