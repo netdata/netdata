@@ -143,7 +143,7 @@ type validationResult struct {
 	exitCode int
 	stdout   string
 	stderr   string
-	report   report
+	report   Report
 }
 
 func replaceOnce(t *testing.T, source, old, replacement string) string {
@@ -192,7 +192,7 @@ func runValidationFiles(t *testing.T, profilePath, dumpPath, jobPath string) val
 		exitCode = 1
 	}
 
-	var decoded report
+	var decoded Report
 	if decodeErr := json.Unmarshal(stdout.Bytes(), &decoded); decodeErr != nil {
 		t.Fatalf("decode report: %v\nstdout:\n%s", decodeErr, stdout.String())
 	}
@@ -216,7 +216,7 @@ func requireFinding(t *testing.T, result validationResult, code string) {
 	t.Fatalf("missing finding %q in %#v", code, result.report.Findings)
 }
 
-func hasFinding(r report, code, severity string) bool {
+func hasFinding(r Report, code, severity string) bool {
 	for _, item := range r.Findings {
 		if item.Code == code && item.Severity == severity {
 			return true

@@ -14,7 +14,7 @@ import (
 // addProfileMatchHeuristics checks whether the auto-selection signature also
 // accepts common runtime/instrumentation families. Those families can be
 // charted, but one generic hit is enough to select the entire profile.
-func addProfileMatchHeuristics(expression string, r *report) {
+func addProfileMatchHeuristics(expression string, r *Report) {
 	m, err := matcher.NewSimplePatternsMatcher(expression)
 	if err != nil {
 		return // The strict profile loader reports the authoritative syntax error.
@@ -53,7 +53,7 @@ func addJobDenyReview(
 	expr promselector.Expr,
 	batch prompkg.SampleBatch,
 	writerEligibleFamilies map[string]struct{},
-	r *report,
+	r *Report,
 ) {
 	if len(expr.Allow) == 0 && len(expr.Deny) == 0 {
 		return

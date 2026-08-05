@@ -80,6 +80,15 @@ func TestSimplePatternIntersectionWitnessHonorsOrderedNegatives(t *testing.T) {
 	}
 }
 
+func TestSimplePatternIntersectionWitnessChoosesShortestAcrossBranches(t *testing.T) {
+	witness, intersects, _, err := SimplePatternIntersectionWitness(
+		context.Background(), `zz* a`, `zz* a`, true, AnalysisBudget{},
+	)
+	require.NoError(t, err)
+	require.True(t, intersects)
+	assert.Equal(t, "a", witness)
+}
+
 func TestGlobIntersectionWitnessHonorsCancellationAndBudget(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

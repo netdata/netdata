@@ -26,6 +26,11 @@ launcher = load_launcher()
 
 
 class ProofBundleLauncherTest(unittest.TestCase):
+    def test_repo_root_walks_from_nested_launcher_path(self) -> None:
+        root = launcher.repo_root(launcher.__file__)
+        nested_launcher = Path(launcher.__file__).parent / "nested" / "launcher.py"
+        self.assertEqual(launcher.repo_root(str(nested_launcher)), root)
+
     def test_normalizes_testdata_root_and_injects_repo_root(self) -> None:
         caller = Path.cwd() / "caller"
         self.assertEqual(
@@ -45,7 +50,7 @@ class ProofBundleLauncherTest(unittest.TestCase):
 
     def test_main_runs_proof_tool_from_go_root(self) -> None:
         launcher_path = Path(__file__).with_name("proof-bundle.py").resolve()
-        root = launcher_path.parents[4]
+        root = launcher.repo_root(str(launcher_path))
         go_root = root / "src" / "go"
 
         with tempfile.TemporaryDirectory() as temporary:

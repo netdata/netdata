@@ -71,6 +71,22 @@ func TestUncoveredWildcardProfileTerms(t *testing.T) {
 	}
 }
 
+func TestValidateProfileFutureRunPreservesNaNSummaryQuantile(t *testing.T) {
+	dump := strings.Replace(
+		validDump,
+		`app_size_bytes{instance="node-a",quantile="0.5"} 100`,
+		`app_size_bytes{instance="node-a",quantile="0.5"} NaN`,
+		1,
+	)
+	result := runValidation(t, validProfile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("an unchanged NaN summary quantile must survive the future run\nreport:\n%s", result.stdout)
+	}
+	if hasFinding(result.report, "future_run_changed_current_evidence", "error") {
+		t.Fatalf("unchanged NaN evidence was reported as changed: %#v", result.report.Findings)
+	}
+}
+
 func TestValidateProfileRejectsOpenEndedJobSelectorDenyWithoutObservedCoverageGap(t *testing.T) {
 	result := runValidation(t, validProfile, validDump, "selector:\n  deny: ['app_*_created']\n")
 	requireFinding(t, result, "open_ended_job_selector_deny")

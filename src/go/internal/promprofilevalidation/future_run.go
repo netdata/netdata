@@ -21,7 +21,7 @@ func addFutureOpennessChecks(
 	currentBatch prompkg.SampleBatch,
 	currentReader metrix.Reader,
 	jobName string,
-	r *report,
+	r *Report,
 ) error {
 	requirements, err := buildFutureRequirements(ctx, profile, policy, currentBatch)
 	if err != nil {

@@ -28,7 +28,7 @@ type metricDeclaration struct {
 // addAuthoredProfileHeuristics checks source intent before collector merge or
 // compiler defaulting can hide it. It reports objective presentation failures
 // as errors and leaves judgment-dependent findings as warnings.
-func addAuthoredProfileHeuristics(root charttpl.Group, rawFamilies []rawFamilyReport, r *report) {
+func addAuthoredProfileHeuristics(root charttpl.Group, rawFamilies []rawFamilyReport, r *Report) {
 	familyTypes := observedDistributionTypes(rawFamilies)
 	var declarations []*metricDeclaration
 	var walk func(group charttpl.Group, path string, active map[string]*metricDeclaration)
@@ -75,7 +75,7 @@ func reviewAuthoredChart(
 	path string,
 	active map[string]*metricDeclaration,
 	familyTypes map[string]commonmodel.MetricType,
-	r *report,
+	r *Report,
 ) {
 	hasBucket := false
 	hasVisibleDimension := false
@@ -176,7 +176,7 @@ func rateLikeUnits(units string) bool {
 
 // addIncrementalUnitHeuristics uses the compiler-resolved runtime algorithm,
 // avoiding a second implementation of chartengine's selector-kind inference.
-func addIncrementalUnitHeuristics(charts []materializedChart, r *report) {
+func addIncrementalUnitHeuristics(charts []materializedChart, r *Report) {
 	type templateSummary struct {
 		title     string
 		units     string
@@ -305,7 +305,7 @@ func unambiguouslyNonVolumeUnits(units string) bool {
 func addObservedDistributionHeuristics(
 	root charttpl.Group,
 	rawFamilies []rawFamilyReport,
-	r *report,
+	r *Report,
 ) {
 	familyTypes := observedDistributionTypes(rawFamilies)
 
@@ -407,7 +407,7 @@ type dimensionScale struct {
 // addObservedScaleHeuristics uses the exact values already routed by the
 // planner. It reports only a ratio and fingerprints the chart ID so observed
 // label-derived identities and dynamic dimension names remain private.
-func addObservedScaleHeuristics(plan chartengine.Plan, r *report) {
+func addObservedScaleHeuristics(plan chartengine.Plan, r *Report) {
 	charts := make(map[string]*chartScaleMeta)
 	for _, action := range plan.Actions {
 		switch item := action.(type) {

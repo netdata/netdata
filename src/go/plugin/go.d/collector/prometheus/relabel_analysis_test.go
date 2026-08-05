@@ -30,6 +30,14 @@ func TestRelabelNameFlowMutationAndReachability(t *testing.T) {
 	assert.False(t, reaches)
 }
 
+func TestRelabelNameFlowMutationAppliesRuleDefaults(t *testing.T) {
+	flow := newTestRelabelNameFlowAnalyzer(t, RelabelNameFlowBudget{})
+	effect, err := flow.Mutation(relabel.Config{}, true)
+	require.NoError(t, err)
+	assert.True(t, effect.reachable)
+	assert.Equal(t, "*", effect.outputPattern)
+}
+
 func TestRelabelNameFlowHonorsAggregateIntersectionBudget(t *testing.T) {
 	flow := newTestRelabelNameFlowAnalyzer(t, RelabelNameFlowBudget{MaxScopeIntersections: 1})
 	first, err := flow.Mutation(relabel.Config{

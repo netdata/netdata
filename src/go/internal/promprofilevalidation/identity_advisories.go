@@ -38,7 +38,7 @@ func addObservedLabelAggregationHeuristics(
 	spec *charttpl.Spec,
 	reader metrix.Reader,
 	routes *planRouteSummary,
-	r *report,
+	r *Report,
 ) error {
 	if spec == nil || routes == nil {
 		return nil

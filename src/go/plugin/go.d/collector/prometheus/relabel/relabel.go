@@ -133,6 +133,10 @@ func (c Config) clone() Config {
 	return out
 }
 
+// WithDefaults returns a copy with the same defaults and action normalization
+// that New applies before validation and execution.
+func (c Config) WithDefaults() Config { return withDefaults(c) }
+
 // UnmarshalYAML loads a rule from YAML, starting from the rule defaults and
 // recording which optional fields the document set (so an explicit empty
 // separator/replacement/source_labels survives withDefaults). Validation happens

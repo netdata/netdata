@@ -222,6 +222,7 @@ func (a *Analyzer) RuleMayWriteLabel(rule Config, labelName string) (bool, error
 	if err := a.step(1); err != nil {
 		return false, err
 	}
+	rule = rule.WithDefaults()
 	action := EffectiveAction(rule)
 	switch action {
 	case Replace:
@@ -282,6 +283,7 @@ func (a *Analyzer) RulesPreserveLabel(rules []Config, labelName string, possible
 		if err := a.step(1); err != nil {
 			return false, err
 		}
+		rule = rule.WithDefaults()
 		action := EffectiveAction(rule)
 		mayApply := ruleMayApplyToMetricNames(rule, action, possibleMetricNames)
 		switch action {

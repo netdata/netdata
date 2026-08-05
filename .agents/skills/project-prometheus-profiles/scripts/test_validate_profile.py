@@ -11,6 +11,8 @@ import sys
 import tempfile
 import unittest
 
+import _go_tool_launcher as go_tool_launcher
+
 
 def load_launcher():
     path = Path(__file__).with_name("validate-profile.py")
@@ -60,7 +62,7 @@ class NormalizeFileArgumentsTest(unittest.TestCase):
 
     def test_main_resolves_go_from_relative_path_before_chdir(self) -> None:
         launcher_path = Path(__file__).with_name("validate-profile.py").resolve()
-        go_root = launcher_path.parents[4] / "src" / "go"
+        go_root = go_tool_launcher.repo_root(str(launcher_path)) / "src" / "go"
 
         with tempfile.TemporaryDirectory() as temporary:
             caller = Path(temporary).resolve()

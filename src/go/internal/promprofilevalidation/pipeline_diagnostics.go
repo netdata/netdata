@@ -235,7 +235,7 @@ func (s *pipelineDiagnosticSummary) finalize() relabelPolicyAudits {
 	return s.audits
 }
 
-func addRelabelPolicyFindings(audits relabelPolicyAudits, r *report) {
+func addRelabelPolicyFindings(audits relabelPolicyAudits, r *Report) {
 	keys := slices.SortedFunc(maps.Keys(audits.discards), func(a, b relabelDiscardRuleKey) int {
 		if a.block != b.block {
 			return a.block - b.block

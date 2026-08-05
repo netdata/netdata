@@ -4,6 +4,7 @@ package promprofilevalidation
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 
@@ -72,12 +73,12 @@ func inspectFutureOpenness(
 	routes *planRouteSummary,
 	current writerSnapshot,
 	futureReader metrix.Reader,
-	r *report,
+	r *Report,
 ) {
 	futureSnapshot := snapshotWriter(futureReader)
 	for id, value := range current {
 		futureValue, ok := futureSnapshot[id]
-		if !ok || futureValue != value {
+		if !ok || !sameWriterValue(futureValue, value) {
 			r.addError(
 				"future_run_changed_current_evidence",
 				"future_inputs",
@@ -285,4 +286,8 @@ func inspectFutureOpenness(
 		}
 	}
 
+}
+
+func sameWriterValue(left, right metrix.SampleValue) bool {
+	return left == right || (math.IsNaN(left) && math.IsNaN(right))
 }

@@ -8,7 +8,11 @@ import shutil
 
 
 def repo_root(script: str) -> Path:
-    return Path(script).resolve().parents[4]
+    start = Path(script).resolve().parent
+    for candidate in (start, *start.parents):
+        if (candidate / "src" / "go" / "go.mod").is_file():
+            return candidate
+    raise SystemExit(f"error: repository root not found from: {script}")
 
 
 def exec_go_tool(script: str, tool: str, arguments: list[str]) -> None:

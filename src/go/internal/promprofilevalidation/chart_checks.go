@@ -36,6 +36,7 @@ type unavailableInstanceIdentity struct {
 const (
 	globalChartIdentity   = "<global>"
 	wildcardChartIdentity = "<wildcard>"
+	excludedChartIdentity = "!"
 )
 
 func enumerateChartRefs(spec *charttpl.Spec) []chartRef {
@@ -104,7 +105,7 @@ func buildAuthoredMapping(refs []chartRef) []authoredChartMappingReport {
 // addDashboardHeuristics reports review prompts rather than release failures.
 // The engine can render these designs, but the resulting section-wide filters
 // may surprise an operator.
-func addDashboardHeuristics(spec *charttpl.Spec, r *report) error {
+func addDashboardHeuristics(spec *charttpl.Spec, r *Report) error {
 	if spec == nil {
 		return nil
 	}
@@ -252,7 +253,7 @@ type identitySetSummary struct {
 // addDisplayedFamilyIdentityHeuristics checks the actual family path rendered
 // by group and chart family composition. Charts in one displayed leaf share a
 // filter scope, so different effective identities deserve explicit review.
-func addDisplayedFamilyIdentityHeuristics(spec *charttpl.Spec, r *report) error {
+func addDisplayedFamilyIdentityHeuristics(spec *charttpl.Spec, r *Report) error {
 	families := make(map[string]*displayedFamilyIdentity)
 	var walk func(group charttpl.Group, familyParts []string) error
 	walk = func(group charttpl.Group, familyParts []string) error {
@@ -321,7 +322,7 @@ func addDisplayedFamilyIdentityHeuristics(spec *charttpl.Spec, r *report) error 
 // names because they compose the same displayed navigation path. Repeating a
 // path can be valid source organization, but it cannot communicate distinct
 // semantic branches to the dashboard reader.
-func addDuplicateSiblingFamilyWarnings(groups []charttpl.Group, path string, r *report) {
+func addDuplicateSiblingFamilyWarnings(groups []charttpl.Group, path string, r *Report) {
 	positions := make(map[string][]int)
 	for i, group := range groups {
 		family := strings.TrimSpace(group.Family)
@@ -358,7 +359,7 @@ func composeDisplayedFamily(parts []string, leaf string) string {
 }
 
 func addParentIdentityLossWarning(
-	r *report,
+	r *Report,
 	path string,
 	subject string,
 	parent map[string]struct{},
@@ -385,6 +386,11 @@ func identityRetainsParent(child, parent map[string]struct{}) bool {
 		return true // The effective parent label set cannot be inferred statically.
 	}
 	if _, ok := child[wildcardChartIdentity]; ok {
+		for label := range parent {
+			if _, excluded := child[excludedChartIdentity+label]; excluded {
+				return false
+			}
+		}
 		return true // The wildcard may retain the parent; its own warning covers uncertainty.
 	}
 	if _, ok := child[globalChartIdentity]; ok {
@@ -451,6 +457,9 @@ func chartIdentityLabels(instances *charttpl.Instances) (map[string]struct{}, er
 	}
 	if policy.IncludeAll {
 		out[wildcardChartIdentity] = struct{}{}
+		for _, label := range policy.ExcludedKeys {
+			out[excludedChartIdentity+label] = struct{}{}
+		}
 		return out, nil
 	}
 	for _, label := range policy.ExplicitKeys {

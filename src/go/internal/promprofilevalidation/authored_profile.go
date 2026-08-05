@@ -15,7 +15,7 @@ type authoredChart struct {
 	priority int
 }
 
-func inspectAuthoredCharts(profile promprofiles.Profile, r *report) ([]authoredChart, error) {
+func inspectAuthoredCharts(profile promprofiles.Profile, r *Report) ([]authoredChart, error) {
 	root, err := profile.Template()
 	if err != nil {
 		return nil, err

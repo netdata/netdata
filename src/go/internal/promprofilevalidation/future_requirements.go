@@ -100,6 +100,7 @@ func buildFutureRequirements(
 		blockRelevant := profileOverlap || mutationReachable
 		nameWrites := make(map[int]futureNameWrite)
 		for ruleIndex, rule := range block.MetricRelabelConfigs {
+			rule = rule.WithDefaults()
 			writesName, err := relabelAnalyzer.RuleMayWriteLabel(rule, promlabels.MetricName)
 			if err != nil {
 				return futureRequirements{}, err
@@ -143,6 +144,7 @@ func buildFutureRequirements(
 		if blockRelevant && futureCapable && affectsRouting {
 			requirements.blockScopes = append(requirements.blockScopes, blockScopes...)
 			for ruleIndex, rule := range block.MetricRelabelConfigs {
+				rule = rule.WithDefaults()
 				action := relabel.EffectiveAction(rule)
 				writesName, err := relabelAnalyzer.RuleMayWriteLabel(rule, promlabels.MetricName)
 				if err != nil {
@@ -202,6 +204,7 @@ func nameWriteCanReachFuture(
 	rule relabel.Config,
 	currentNames map[string]struct{},
 ) (bool, error) {
+	rule = rule.WithDefaults()
 	if !relabel.RuleNameDerivedOnly(rule) || len(rule.SourceLabels) != 1 ||
 		rule.SourceLabels[0] != promlabels.MetricName {
 		return true, nil
@@ -244,7 +247,7 @@ func prepareFutureInputs(
 	declared []futureInput,
 	current prompkg.SampleBatch,
 	authoredMetricNames map[string]struct{},
-	r *report,
+	r *Report,
 ) ([]futureInput, bool) {
 	valid := true
 	currentNames := make(map[string]struct{}, len(current.Samples))

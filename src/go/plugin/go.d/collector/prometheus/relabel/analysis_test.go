@@ -163,6 +163,18 @@ func TestAnalyzerRuleMayWriteMetricName(t *testing.T) {
 	}
 }
 
+func TestAnalyzerAppliesProcessorRuleDefaults(t *testing.T) {
+	analyzer := newTestAnalyzer(t)
+
+	preserves, err := analyzer.RulesPreserveLabel([]Config{{Action: LabelDrop}}, "instance", nil)
+	require.NoError(t, err)
+	assert.False(t, preserves, "the default (.*) labeldrop regexp removes every label")
+
+	writes, err := analyzer.RuleMayWriteLabel(Config{Action: LabelMap}, labels.MetricName)
+	require.NoError(t, err)
+	assert.False(t, writes, "the default (.*) -> $1 labelmap preserves each input name")
+}
+
 func TestAnalyzerReplacementGlobEscapesLiteralMetacharacters(t *testing.T) {
 	analyzer := newTestAnalyzer(t)
 	pattern, possible, err := analyzer.ReplacementGlob(MustNewRegexp(`(.+)`), `literal[*]_${1}`)

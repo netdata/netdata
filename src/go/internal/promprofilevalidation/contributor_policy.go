@@ -28,7 +28,7 @@ func addForwardCompatibilityChecks(
 	rawFamilies []rawFamilyReport,
 	rawSamples prompkg.SampleBatch,
 	relabelAudits relabelPolicyAudits,
-	r *report,
+	r *Report,
 ) error {
 	analyzer, err := relabel.NewAnalyzer(ctx, relabel.AnalysisBudget{
 		MaxValues: maxBoundedMetricNameGrammarBranches,
@@ -167,6 +167,7 @@ func addForwardCompatibilityChecks(
 			}
 		}
 		for ruleIndex, rule := range block.MetricRelabelConfigs {
+			rule = rule.WithDefaults()
 			action := relabel.EffectiveAction(rule)
 			if action == relabel.Keep || action == relabel.KeepEqual {
 				r.addError(

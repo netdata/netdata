@@ -9,13 +9,13 @@ import (
 	"strings"
 )
 
-func writeJSONReport(w io.Writer, r report) error {
+func writeJSONReport(w io.Writer, r Report) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(r)
 }
 
-func writeTextReport(w io.Writer, r report) error {
+func writeTextReport(w io.Writer, r Report) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "VERDICT: %s\n", r.Verdict)
 	if r.Profile.Name != "" {

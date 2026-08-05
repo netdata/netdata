@@ -24,7 +24,7 @@ func Validate(ctx context.Context, opts Options) Report {
 	return validateProfile(ctx, opts)
 }
 
-func validateProfile(parent context.Context, opts Options) report {
+func validateProfile(parent context.Context, opts Options) Report {
 	r := newReport()
 	defer sortReport(&r)
 	if parent == nil {

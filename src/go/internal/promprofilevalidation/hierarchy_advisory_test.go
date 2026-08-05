@@ -108,7 +108,7 @@ groups:
 		t.Fatal(err)
 	}
 	counting := &countingSeriesIdentityReader{Reader: reader}
-	var got report
+	var got Report
 	if err := addObservedLabelAggregationHeuristics(spec, counting, planned.routes, &got); err != nil {
 		t.Fatal(err)
 	}
@@ -285,6 +285,38 @@ template:
 	}
 	if strings.Contains(result.stdout, "sensitive-") {
 		t.Fatalf("identity hierarchy warning leaked an observed label value:\n%s", result.stdout)
+	}
+}
+
+func TestValidateProfileWarnsWhenWildcardChildExcludesParentIdentity(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  chart_defaults:
+    instances:
+      by_labels: [server]
+  metrics: [app_database_value]
+  charts:
+    - title: Database Value
+      context: database_value
+      units: values
+      priority: 100
+      instances:
+        by_labels: ['*', '!server']
+      dimensions:
+        - selector: app_database_value
+          name: value
+`
+	dump := "# TYPE app_database_value gauge\napp_database_value{server=\"a\",database=\"main\"} 2\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("wildcard parent identity loss must remain an advisory\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "identity_parent_labels_dropped", "warning") {
+		t.Fatalf("missing wildcard parent identity loss warning: %#v", result.report.Findings)
 	}
 }
 

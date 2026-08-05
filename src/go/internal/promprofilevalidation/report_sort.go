@@ -6,7 +6,7 @@ import (
 	"sort"
 )
 
-func sortReport(r *report) {
+func sortReport(r *Report) {
 	sort.Slice(r.RawFamilies, func(i, j int) bool { return r.RawFamilies[i].Name < r.RawFamilies[j].Name })
 	sort.Slice(r.PipelineExcluded, func(i, j int) bool { return r.PipelineExcluded[i].Name < r.PipelineExcluded[j].Name })
 	sort.Slice(r.PipelineRenamed, func(i, j int) bool { return r.PipelineRenamed[i].RawName < r.PipelineRenamed[j].RawName })

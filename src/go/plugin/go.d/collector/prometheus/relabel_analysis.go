@@ -75,6 +75,7 @@ func (a *RelabelNameFlowAnalyzer) Mutation(
 	rule relabel.Config,
 	nameDerived bool,
 ) (RelabelNameMutation, error) {
+	rule = rule.WithDefaults()
 	effect := RelabelNameMutation{applicationDerived: !nameDerived, reachable: true, outputPattern: "*"}
 	if relabel.EffectiveAction(rule) != relabel.Replace {
 		return effect, nil
@@ -128,6 +129,7 @@ func (a *RelabelNameFlowAnalyzer) PreservedCaptureLabel(
 	dynamicCaptureIDs []int,
 	possibleOutputs []string,
 ) (string, bool, error) {
+	rewrite = rewrite.WithDefaults()
 	dynamicCaptures := make(map[int]struct{}, len(dynamicCaptureIDs))
 	for _, capture := range dynamicCaptureIDs {
 		dynamicCaptures[capture] = struct{}{}
@@ -138,7 +140,7 @@ func (a *RelabelNameFlowAnalyzer) PreservedCaptureLabel(
 
 	rules := blocks[blockIndex].MetricRelabelConfigs
 	for ruleIndex := rewriteIndex - 1; ruleIndex >= 0; ruleIndex-- {
-		candidate := rules[ruleIndex]
+		candidate := rules[ruleIndex].WithDefaults()
 		if relabel.EffectiveAction(candidate) != relabel.Replace ||
 			len(candidate.SourceLabels) != 1 || candidate.SourceLabels[0] != labels.MetricName ||
 			candidate.Regex.String() != rewrite.Regex.String() ||

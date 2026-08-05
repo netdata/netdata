@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 var ErrAnalysisBudgetExceeded = errors.New("matcher analysis budget exceeded")
@@ -138,6 +139,9 @@ func (a *Analyzer) SimplePatternIntersectionWitness(
 	if err != nil {
 		return "", false, err
 	}
+	var shortest string
+	shortestRunes := 0
+	found := false
 	for _, leftBranch := range left {
 		for _, rightBranch := range right {
 			excluded := append(slices.Clone(leftBranch.earlierNegatives), rightBranch.earlierNegatives...)
@@ -147,12 +151,18 @@ func (a *Analyzer) SimplePatternIntersectionWitness(
 			if err != nil {
 				return "", false, err
 			}
-			if intersects {
-				return witness, true, nil
+			if !intersects {
+				continue
+			}
+			witnessRunes := utf8.RuneCountInString(witness)
+			if !found || witnessRunes < shortestRunes {
+				shortest = witness
+				shortestRunes = witnessRunes
+				found = true
 			}
 		}
 	}
-	return "", false, nil
+	return shortest, found, nil
 }
 
 type analysisMeter struct {

@@ -34,8 +34,6 @@ type Report struct {
 	EvidenceLimits      []string                             `json:"evidence_limits,omitempty"`
 }
 
-type report = Report
-
 // Passed reports whether validation found no errors.
 func (r Report) Passed() bool { return r.Verdict == verdictPass }
 
@@ -198,8 +196,8 @@ type finding struct {
 	Why      string `json:"why,omitempty"`
 }
 
-func newReport() report {
-	return report{
+func newReport() Report {
+	return Report{
 		Verdict: verdictPass,
 		EvidenceLimits: []string{
 			"Validation proves behavior for the supplied dump and structured job policy, not metrics or label values absent from that evidence.",
@@ -212,7 +210,7 @@ func newReport() report {
 	}
 }
 
-func (r *report) addError(code, path, message, why string) {
+func (r *Report) addError(code, path, message, why string) {
 	r.Verdict = verdictFail
 	r.Findings = append(r.Findings, finding{
 		Severity: "error",
@@ -223,7 +221,7 @@ func (r *report) addError(code, path, message, why string) {
 	})
 }
 
-func (r *report) addWarning(code, path, message, why string) {
+func (r *Report) addWarning(code, path, message, why string) {
 	r.Findings = append(r.Findings, finding{
 		Severity: "warning",
 		Code:     code,

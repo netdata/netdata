@@ -43,6 +43,7 @@ func analyzeBoundedMetricNameDiscardGrammar(
 	rule relabel.Config,
 	action relabel.Action,
 ) (boundedMetricNameGrammar, bool, error) {
+	rule = rule.WithDefaults()
 	if action != relabel.Drop {
 		return boundedMetricNameGrammar{}, false, nil
 	}
@@ -54,6 +55,7 @@ func analyzeBoundedMetricNameRewriteGrammar(
 	rule relabel.Config,
 	action relabel.Action,
 ) (boundedMetricNameGrammar, bool, error) {
+	rule = rule.WithDefaults()
 	if action != relabel.Replace || len(rule.SourceLabels) != 1 || rule.SourceLabels[0] != labels.MetricName ||
 		rule.TargetLabel != labels.MetricName {
 		return boundedMetricNameGrammar{}, false, nil
