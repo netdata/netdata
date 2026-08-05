@@ -8,7 +8,7 @@ How to start, stop, restart, and reload the Netdata Agent across different opera
 
 :::
 
-The Netdata Agent automatically starts at boot after installation.
+The Netdata Agent automatically starts at boot after installation, except when installed via Homebrew on macOS — see [macOS (Homebrew)](#macos-homebrew) below.
 
 :::important
 
@@ -127,6 +127,37 @@ The `netdatacli` tool is available on Windows at the Netdata installation path (
 | `netdatacli aclk-state`            | Show current ACLK/Cloud connection state                |
 | `netdatacli version`               | Display the Agent version                               |
 
+## macOS (Homebrew)
+
+:::note
+
+Unlike the other installation methods on this page, a Homebrew-installed Agent does **not** start automatically after `brew install` or at boot. Homebrew only writes the service definition; you must start it explicitly with `brew services start`, which also registers it to launch at login.
+
+:::
+
+### Using `brew services`
+
+| Action  | Command                         |
+|---------|---------------------------------|
+| start   | `brew services start netdata`   |
+| stop    | `brew services stop netdata`    |
+| restart | `brew services restart netdata` |
+| status  | `brew services info netdata`    |
+
+- `start` starts the Agent immediately and registers it to launch at login (or boot).
+- `stop` stops the Agent immediately and unregisters it from launching at login (or boot).
+- `restart` stops (if necessary) and starts the Agent immediately, and registers it to launch at login (or boot).
+
+### Check status
+
+Use `brew services info netdata` to check whether the Agent is running.
+
+You can also verify that the Agent is reachable by opening `http://localhost:19999` in a browser, or by running:
+
+```bash
+curl http://localhost:19999/api/v1/info
+```
+
 ## Quick Reference
 
 ### UNIX Commands Summary
@@ -152,3 +183,12 @@ The `netdatacli` tool is available on Windows at the Netdata installation path (
 | **Reload Labels** | —                         | —                                 | `netdatacli reload-labels`  |
 | **Shutdown**      | —                         | —                                 | `netdatacli shutdown-agent` |
 | **Ping**          | —                         | —                                 | `netdatacli ping`           |
+
+### macOS (Homebrew) Commands Summary
+
+| Task        | Command                         |
+|-------------|---------------------------------|
+| **Status**  | `brew services info netdata`    |
+| **Start**   | `brew services start netdata`   |
+| **Stop**    | `brew services stop netdata`    |
+| **Restart** | `brew services restart netdata` |
