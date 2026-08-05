@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 1
+profile:
+  name: vllm
+  path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm.yaml
+proof:
+  evidence: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/EVIDENCE.md
+  operator_model: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/OPERATOR-MODEL.md
+  validation_summary: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION.md
+external_evidence:
+  revision: vllm
+  manifest:
+    path: prometheus/profiles/vllm/manifest.yaml
+    sha256: a46e6b3a38d2ddf1897943603bd712af0ae6461fc5c87f6769d4780a74f20aa8
+    bytes: 410
+  source_inventory: prometheus/profiles/vllm/SOURCE-INVENTORY.tsv
+  fixture: prometheus/profiles/vllm/fixtures/vllm_all_metrics.prom
+validation:
+  job: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION-JOB.yaml
+  metadata_example:
+    integration_id: collector-go.d.plugin-prometheus-vllm
+    example_name: Native vLLM
+    job_name: vllm
+  expected:
+    verdict: PASS
+    raw_families: 183
+    raw_logical_series: 262
+    writer_series: 778
+    series_scanned: 778
+    series_autogen: 0
+    series_unmatched: 0
+    authored_charts: 124
+    runtime_charts: 142
+    autogen_charts: 0
+    chart_dimensions: 778
+    pipeline_excluded: 90
+    pipeline_renamed: 0
+integrity:
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/EVIDENCE.md
+    sha256: d1a7c6af919c0130131bb1615f319863ba20d53ef6d1ee6622e68424d1e2716c
+    bytes: 3447
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/OPERATOR-MODEL.md
+    sha256: c808835781882c4b010b2d78f34fcb5af942fcbbffec9c1e5a70963d0bbaed16
+    bytes: 42215
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION-JOB.yaml
+    sha256: 1c0f0eee4d11f2a990347f164bfe3a5e1d5e1628621eb546e4f7ab11013b00b2
+    bytes: 3945
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION.md
+    sha256: ce1755efdd630b7877f7405c08d271f097c9dedba5eaef9ba18ce496650aed1d
+    bytes: 2870
+  - path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm.yaml
+    sha256: 5a97a19b3e2b504268069e4f23adca8a8aa6c2c97a114f5e2b273f6748b0149a
+    bytes: 57651

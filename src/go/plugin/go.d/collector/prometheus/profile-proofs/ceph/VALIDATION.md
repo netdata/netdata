@@ -14,14 +14,10 @@
 
 ## Authoritative structural-union result
 
-- Verdict with `VALIDATION-JOB.yaml`: **PASS**.
-- Input: **1,794 raw families / 2,952 logical series**.
-- Writer/profile: **2,937 writer series**, **547 authored charts**, **981 runtime chart instances**, and
-  **2,937 dimensions**.
-- Pipeline exclusions: **15 raw families / 15 logical identities**; exact ledger dispositions are 10 recommended-job
-  exclusions and 5 writer-ineligible information families.
-- Successful job-relabel normalization: **227 raw families**, reconciled by logical identity to their charted canonical
-  writer families rather than counted as source loss.
+- `proof.yaml` is the authoritative machine-checked PASS verdict and complete objective count record.
+- The exclusion ledger dispositions are 10 recommended-job exclusions and 5 writer-ineligible information families.
+- Job-relabel normalization is reconciled by logical identity to charted canonical writer families rather than counted as
+  source loss.
 - Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
 - `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv` maps all 1,779 charted source-family routes and 1,772
   unique authored selectors; unresolved families/selectors **0**.
@@ -84,7 +80,7 @@ the source-completeness proof, and no Ceph daemon, exporter, or Ceph configurati
   `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv`.
 - Evidence provenance: `EVIDENCE.md`.
 - External evidence manifest: `src/go/testdata/prometheus/profiles/ceph/manifest.yaml`.
-- Integrity manifest: `SHA256SUMS.tsv`.
+- Machine descriptor and integrity metadata: `proof.yaml`.
 
 From `src/go`, reproduce the authoritative union result with:
 

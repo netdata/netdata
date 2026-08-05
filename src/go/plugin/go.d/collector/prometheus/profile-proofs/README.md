@@ -15,13 +15,16 @@ size.
   Each row records its source evidence and final chart, job-exclusion, or writer-ineligible disposition.
 - `EVIDENCE.md` identifies upstream revisions, source and documentation locations, feature gates, observed versus synthetic
   evidence, fixture provenance, and reproducible validation commands.
-- `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the objective validator and mirrors the
-  recommended metadata example without endpoint or authentication settings.
-- `SHA256SUMS.tsv` fingerprints the final profile, compact local proof inputs, and the external evidence manifest. The
-  external manifest in turn records the path, kind, byte size, and SHA-256 digest of every fixture and source inventory. The
-  test suite compares `VALIDATION-JOB.yaml` semantically with the matching `metadata.yaml` example instead of hashing the
-  entire shared metadata file. `SHA256SUMS.tsv` intentionally does not hash itself or transient validator reports.
-- `VALIDATION.md` states the authoritative PASS result, counts, loss boundary, and evidence limitations.
+- `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the objective validator. Its deployable fields
+  mirror the recommended metadata example without endpoint, authentication, or profile-selection settings; optional
+  `future_inputs` are validation-only raw probes and are not copied to collector metadata.
+- `proof.yaml` is the one machine-readable descriptor. It identifies the profile, compact proof documents, metadata example
+  and job, external revision/manifest/inventory/fixture, expected validator verdict/counts, and integrity digests. Tests and
+  CI discover these files; no separate proof registry exists.
+- The external manifest records the path, kind, byte size, and SHA-256 digest of every fixture and source inventory.
+  `proof.yaml` pins that manifest and every compact proof input, but intentionally does not hash itself or transient reports.
+- `VALIDATION.md` explains the result, loss boundary, producer-specific checks, and evidence limitations. Expected machine
+  facts live only in `proof.yaml`; tests do not parse prose.
 
 ## Evidence boundary
 
@@ -65,3 +68,14 @@ git -C src/go/testdata switch --detach FETCH_HEAD
 
 Set `NETDATA_TESTDATA_DIR` to use a checkout elsewhere. Ordinary tests skip only when the checkout root is absent; a present
 but incomplete or unreadable checkout fails.
+
+From the repository root, use the descriptor-backed authoring command to inspect or refresh the integrity chain:
+
+```bash
+.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py evidence-dirs
+.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py verify
+.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py refresh
+```
+
+`refresh` rewrites only descriptor integrity metadata. Run the validator first and update the descriptor's expected facts
+deliberately; integrity refresh is not validation and does not accept changed behavior by itself.

@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import shutil
 import sys
+
+from _go_tool_launcher import exec_go_tool
 
 _FILE_OPTIONS = frozenset(
     {
@@ -52,23 +52,8 @@ def _absolute_argument(value: str, caller_cwd: Path) -> str:
 
 
 def main() -> None:
-    repo_root = Path(__file__).resolve().parents[4]
-    go_root = repo_root / "src" / "go"
-    tool = go_root / "tools" / "prometheus-profile-validation"
     arguments = normalize_file_arguments(sys.argv[1:], Path.cwd())
-
-    go_path = shutil.which("go")
-    if go_path is None:
-        raise SystemExit("error: go is not available in PATH")
-    go = str(Path(go_path).resolve())
-    if not tool.is_dir():
-        raise SystemExit(f"error: validator source not found: {tool}")
-
-    os.chdir(go_root)
-    try:
-        os.execv(go, [go, "run", "./tools/prometheus-profile-validation", *arguments])
-    except OSError as error:
-        raise SystemExit(f"error: failed to execute {go}: {error}") from error
+    exec_go_tool(__file__, "./tools/prometheus-profile-validation", arguments)
 
 
 if __name__ == "__main__":

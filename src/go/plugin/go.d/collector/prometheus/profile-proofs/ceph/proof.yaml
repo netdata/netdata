@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 1
+profile:
+  name: ceph
+  path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml
+proof:
+  evidence: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/EVIDENCE.md
+  operator_model: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/OPERATOR-MODEL.md
+  validation_summary: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION.md
+external_evidence:
+  revision: ceph
+  manifest:
+    path: prometheus/profiles/ceph/manifest.yaml
+    sha256: 21ae822743e9a23a49a882e365e71fe32b0810273e0f2123a44464573359702e
+    bytes: 1704
+  source_inventory: prometheus/profiles/ceph/SOURCE-INVENTORY.tsv
+  fixture: prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom
+validation:
+  job: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml
+  metadata_example:
+    integration_id: collector-go.d.plugin-prometheus-ceph
+    example_name: Ceph MGR and ceph-exporter
+    job_name: ceph-mgr
+  expected:
+    verdict: PASS
+    raw_families: 1794
+    raw_logical_series: 2952
+    writer_series: 2937
+    series_scanned: 2937
+    series_autogen: 0
+    series_unmatched: 0
+    authored_charts: 547
+    runtime_charts: 981
+    autogen_charts: 0
+    chart_dimensions: 2937
+    pipeline_excluded: 15
+    pipeline_renamed: 227
+integrity:
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/EVIDENCE.md
+    sha256: bab5dee206c271c3f19792e95826662d69ce84976f1c6f61252c39287d6de5b3
+    bytes: 3960
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/OPERATOR-MODEL.md
+    sha256: d51c3bb3c6edf643821380565926aba9f09a21a2eafdf45b747b4cf2a8805093
+    bytes: 14668
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml
+    sha256: 782fb2e711abfcd61a069db74855de6760d10574f44187018ff9a9f4a9d41d62
+    bytes: 15823
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION.md
+    sha256: 7e15ec672990312a686a4991a789c0eaaa91556589483b8a2d4a5043fac09e3c
+    bytes: 6233
+  - path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml
+    sha256: c588142188400dbe7f3130ee32ec61c26d2d90671db4933c9812787a3e499113
+    bytes: 455390

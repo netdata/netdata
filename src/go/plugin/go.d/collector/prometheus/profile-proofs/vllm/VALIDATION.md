@@ -11,12 +11,8 @@
 
 ## Authoritative structural-union result
 
-- Verdict: **PASS**.
-- Input: **183 raw families / 262 logical series**.
-- Writer/profile: **778 writer series**, **124 authored charts**, **142 runtime chart instances**, and
-  **778 dimensions**.
-- Loss boundary: **90 pipeline-excluded raw families / 130 logical identities**, all reconciled to binding job/writer
-  dispositions.
+- `proof.yaml` is the authoritative machine-checked PASS verdict and complete objective count record.
+- Every pipeline-excluded raw family and logical identity is reconciled to a binding job/writer disposition.
 - Generic fallback, unmatched series, dead charts/dimensions, lifecycle loss, and ID/context/dimension collisions: **0**.
 - Exact semantic ledger: 253 rows; 163 chart routes, 85 job exclusions, and
   5 writer-ineligible routes; unresolved families/selectors **0**.
@@ -43,7 +39,7 @@ collector failure. Live deployment validation is an operational rollout check, n
   `src/go/testdata/prometheus/profiles/vllm/SOURCE-INVENTORY.tsv`.
 - Evidence provenance: `EVIDENCE.md`.
 - External evidence manifest: `src/go/testdata/prometheus/profiles/vllm/manifest.yaml`.
-- Integrity manifest: `SHA256SUMS.tsv`.
+- Machine descriptor and integrity metadata: `proof.yaml`.
 
 From `src/go`, reproduce the authoritative result with:
 

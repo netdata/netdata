@@ -10,12 +10,9 @@
 
 ## Authoritative structural-union result
 
-- Verdict: **PASS**.
-- Input: **116 raw families / 148 logical series**.
-- Writer/profile: **698 writer series**, **104 authored charts**, **113 runtime chart instances**, and
-  **698 dimensions**.
-- Pipeline exclusions: **38 raw families / 50 logical identities**; exact ledger dispositions are 36 job-excluded
-  compatibility/duplicate routes and 2 writer-ineligible information routes.
+- `proof.yaml` is the authoritative machine-checked PASS verdict and complete objective count record.
+- The exclusion ledger dispositions are 36 job-excluded compatibility/duplicate routes and 2 writer-ineligible information
+  routes.
 - Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
 - `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv` maps all 142 exact authored selector routes; unresolved
   families/selectors **0**.
@@ -48,7 +45,7 @@ source-complete synthetic PASS proves the contract; live Ray evidence can be add
   `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv`.
 - Evidence provenance: `EVIDENCE.md`.
 - External evidence manifest: `src/go/testdata/prometheus/profiles/vllm_ray/manifest.yaml`.
-- Integrity manifest: `SHA256SUMS.tsv`.
+- Machine descriptor and integrity metadata: `proof.yaml`.
 
 From `src/go`, reproduce the authoritative result with:
 

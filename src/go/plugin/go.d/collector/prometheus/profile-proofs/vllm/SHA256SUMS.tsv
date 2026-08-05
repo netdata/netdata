@@ -1,7 +1,0 @@
-sha256	bytes	path
-03421159e2924d5b53fcede96916209ae04abaa83004253ad1d1525d5bc71c8b	3424	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/EVIDENCE.md
-fe588fa5d45f97d89a83d7db32c858ea0bf4c508af6a24891a5f1ae77110207b	42137	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/OPERATOR-MODEL.md
-1c0f0eee4d11f2a990347f164bfe3a5e1d5e1628621eb546e4f7ab11013b00b2	3945	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION-JOB.yaml
-69bddd7c8c1900d9a064e48670faa408abea6604c014bf8b3360471cfe2b3639	2972	src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm/VALIDATION.md
-5a97a19b3e2b504268069e4f23adca8a8aa6c2c97a114f5e2b273f6748b0149a	57651	src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm.yaml
-a46e6b3a38d2ddf1897943603bd712af0ae6461fc5c87f6769d4780a74f20aa8	410	src/go/testdata/prometheus/profiles/vllm/manifest.yaml

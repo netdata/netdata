@@ -46,8 +46,13 @@ is unavailable:
 
 ```text
 NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
-  ./tools/prometheus-profile-validation
+  ./internal/promprofilevalidation \
+  ./plugin/go.d/collector/prometheus/promprofiles
 ```
+
+`go run ./tools/prometheus-profile-proof verify --repo-root ../..` verifies the
+discovered stock-proof descriptors and their complete local/external integrity
+chain.
 
 Exit codes:
 
@@ -77,12 +82,30 @@ fallback_type:
 expected_prefix: exporter_
 max_time_series: 2000
 max_time_series_per_metric: 200
+future_inputs:
+  - name: exporter_future_requests_total
+    type: counter
+    labels:
+      instance: future-instance
 ```
 
 The schema has no URL, authentication, TLS, or profile-selection fields. The
 tool snapshots the dump, forces an isolated `file://` endpoint, empties ambient
 profile catalogs, and selects only the supplied candidate. Unknown job keys and
 multiple job documents fail.
+
+`future_inputs` are validator-only raw samples. `name` is required; `type` is
+optional (`gauge` by default, `counter`, or `untyped`); and `labels` is an
+optional string map that cannot contain `__name__`. Names and label names use
+the production Prometheus UTF-8 rules. A job may declare at most 256 unique raw
+identities and one type per family. Use invented, non-sensitive labels. These
+samples enter before selector and relabel processing, so do not declare
+post-relabel names.
+
+The validator derives bounded raw witnesses when metric-name identity is
+preserved. If a reachable relabel rule can write metric names, explicit
+`future_inputs` are required because arbitrary relabeling cannot be inverted
+soundly.
 
 ## What `PASS` establishes
 
@@ -93,9 +116,15 @@ For the supplied dump and job policy, a pass establishes that:
 - required chartengine runtime coverage counters exist and are valid;
 - every current writer series is accounted for with zero generic fallback and
   zero unmatched series;
-- a deterministic synthetic future family derived from wildcard profile
-  `match` scope is admitted by both profile fallback and the structured job
-  selector/relabel policy;
+- a second isolated real collector sequence introduces declared or derived raw
+  future probes before selector/relabel processing; future results cannot
+  satisfy current coverage;
+- every positive wildcard profile term and future-relevant relabel scope/rule
+  has a probe that actually traverses the production selector, relabeler,
+  assembler, writer, exact profile selection, and planner;
+- future probes neither overwrite current writer identities nor collapse with
+  each other, and reach generic fallback unless a bounded contributor-approved
+  alias normalization legitimately maps them to an authored family;
 - any non-empty job allow list structurally covers each positive wildcard term
   in the profile scope, and wildcard relabel discard has a bounded,
   source-fixture-evidenced metric-name grammar without prior label-derived
@@ -158,20 +187,18 @@ identity set survives normalization.
 The strict current-source requirement is zero autogen and zero unmatched
 series. One explicit profile policy can pass with a warning:
 
-- `profile_suppressed_series` means a counterfactual planner run removed the
-  candidate profile's exact fallback rule, converted every formerly unmatched
-  series into generic fallback, and left zero unmatched series. The profile
-  must have an exact deny list. This proves the reported gap is an intentional
-  deny policy rather than a coincidental count; it does not prove that
-  suppressing the operator question is a good design.
+- `profile_suppressed_series` means production route facts show every unmatched
+  series was suppressed by the
+  candidate profile's explicit fallback selector. The profile must have an
+  exact deny list. This proves the reported gap is an intentional deny policy;
+  it does not prove that suppressing the operator question is a good design.
 
-Forward compatibility uses structural policy checks plus synthetic names that
-are independent from the dump. Wildcard name-discard and name-rewrite
-exceptions additionally require the source-complete dump to exercise every
-bounded grammar branch.
-The report's `profile.future_metric_canary` records the primary synthesized
-name. These objective errors reject closed contribution policy even when the
-current fixture has no coverage gap:
+Forward compatibility combines bounded structural analysis with the separate
+raw future-input run. Wildcard name-discard and name-rewrite exceptions also
+require the current source-complete dump to exercise every bounded grammar
+branch. The report's `profile.future_metric_canary` compatibility field records
+the first raw future probe. These objective errors reject closed contribution
+policy even when the current fixture has no coverage gap:
 
 - `closed_profile_fallback`: non-empty `autogen.selector.allow`;
 - `open_ended_profile_fallback_deny`: wildcard, label-only, or otherwise
@@ -191,16 +218,28 @@ current fixture has no coverage gap:
   overlapping relabel block can discard or rename metrics, but its exclusions
   hide every deterministic in-scope probe or ordered relabeling prevents the
   block from processing those probes;
-- `future_metric_blocked_by_profile`: the canary cannot reach profile fallback;
+- `future_inputs_required`: reachable relabeling can change metric names but no
+  explicit raw probes were declared;
+- `future_input_not_future`: a declared probe name already occurs in current
+  evidence;
+- `future_profile_term_uncovered`, `future_relabel_scope_uncovered`, and
+  `future_relabel_branch_uncovered`: the actual future run did not cover one
+  required positive wildcard term, relabel scope, or rename/drop rule;
+- `future_metric_blocked_by_profile`: a future writer series is unmatched by
+  chart routing;
 - `future_metric_blocked_by_job_selector`: the recommended job rejects it;
 - `future_metric_blocked_by_job_relabel`: an otherwise applicable relabel rule
   drops it;
+- `future_metric_rejected_by_writer`: the production writer rejects its final
+  family or series identity;
 - `future_metric_routed_to_authored_metric`: relabeling maps a primary future
-  canary onto a metric selected by an authored dimension instead of leaving it
-  generic;
+  probe onto a metric selected by an authored dimension without a recognized
+  bounded alias contract;
 - `future_metric_identity_collapse`: relabeling maps distinct primary future
-  canaries onto the same generic metric name, which can merge unrelated
-  families or types;
+  probes onto the same writer identity, or a future probe overwrites a current
+  identity, which can merge unrelated families or types;
+- `future_run_changed_current_evidence`: adding raw future probes changes or
+  removes a current writer identity/value;
 - `observed_relabel_identity_collapse`: after normal histogram/summary
   component assembly, the complete recommended relabel pipeline maps multiple
   observed writer-admissible source identities onto the same final metric name
@@ -362,9 +401,10 @@ dimension is still a semantic review question.
 This is an objective correctness gate, not a dashboard designer:
 
 - One dump cannot validate metrics, optional features, labels, or label values
-  absent from it. Use a comprehensive representative dump. The synthetic
-  future-family canary proves only that policy remains open to a new matching
-  name; it does not invent or validate that future metric's semantics.
+  absent from it. Use a comprehensive representative dump. Raw future probes
+  prove only that declared/derived identities traverse current policy; they do
+  not invent or validate a future metric's semantics, cardinality, or real
+  labels.
 - Observed ID collisions are checked; future unseen values can still normalize
   to the same ID.
 - A lifecycle cap that accommodates this dump may still omit entities or
@@ -379,6 +419,6 @@ This is an objective correctness gate, not a dashboard designer:
   not establish that the remaining hierarchy, chart composition, titles, units,
   instance choices, or presentation order are useful to an operator.
 
-Each process validates one candidate. Production catalog and plugin
-configuration are process-global, so end-to-end test scenarios run in separate
-subprocesses.
+Each validation call constructs isolated current and future collectors with an
+explicit candidate catalog. It does not mutate production catalog or plugin
+configuration globals, so library tests run in-process.

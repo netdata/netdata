@@ -95,8 +95,11 @@ of these proofs fails:
   only under one of the binding cases, with the lost operator question stated.
 - **Runtime proof:** the exact profile, source-complete dump, and job policy pass
   the objective validator with zero fallback and zero unmatched current series.
-  A separately synthesized future-family canary MUST remain eligible for generic
-  fallback through both the profile and job policy.
+  A separate raw future-input run MUST prove every positive wildcard profile
+  term and future-relevant relabel branch without contributing to current
+  coverage. Namespace-changing relabel jobs MUST declare the raw probes they
+  require; the validator derives probes only while metric-name identity is
+  preserved.
 
 Why: each proof catches a different failure class. Runtime coverage cannot prove
 that a `Latency` branch teaches causality; a good family tree cannot make
@@ -526,15 +529,15 @@ Profile fallback suppression is an exclusion too. Apply these binding rules:
   source-complete sample inventory. A dynamic alias grammar MUST use a bounded,
   source-proven relabel `drop` rule instead.
   A non-empty job allow list MUST structurally cover every
-  positive wildcard term in `profile.match`; finite synthetic canaries are only
-  supplemental probes. The full job policy MUST also admit the validator's
-  applicable relabel-subnamespace synthetic future families.
+  positive wildcard term in `profile.match`. The full job policy MUST also admit
+  every derived or explicitly declared raw future input needed to cover relevant
+  relabel subnamespaces.
 - Every positive wildcard term in a relabel block that can discard a sample or
-  rewrite its metric name MUST expose a deterministic synthetic family inside
-  the profile scope and the ordered block path MUST actually process it. Match
-  exclusions MUST NOT hide every probe for one term while another harmless term
-  supplies coverage; an untestable future-affecting term is a closed boundary,
-  not evidence of compatibility.
+  rewrite its metric name MUST have a declared raw `future_inputs` witness and
+  the ordered block path MUST actually process it. Match exclusions MUST NOT
+  hide every probe for one term while another harmless term supplies coverage;
+  an untestable future-affecting term is a closed boundary, not evidence of
+  compatibility.
 - A wildcard relabel block MUST NOT discard samples from application labels.
   Its `drop` decision MUST derive exclusively from `__name__` and MUST be
   structurally bounded as either a finite exact-name set or one non-empty
@@ -598,11 +601,13 @@ Profile fallback suppression is an exclusion too. Apply these binding rules:
   source-fixture sample it reaches. A rewrite MUST NOT use missing/empty label
   values or invalid replacement output as an implicit discard mechanism; use an
   explicit bounded, source-evidenced `drop` rule for an intentional exclusion.
-- After the recommended relabel pipeline, every primary future-family probe
-  MUST still route to generic fallback. It MUST NOT collide with a metric name
-  selected by an authored dimension or share its final metric name with another
-  primary probe, even when the rename derives only from the original
-  `__name__`. Many-to-one generic names can mix unrelated families or types.
+- After the recommended relabel pipeline, every raw future probe MUST reach the
+  selected profile and remain distinct from every current and future writer
+  identity. It normally routes to generic fallback. A bounded, source-proven
+  alias normalization MAY route to its corresponding authored family when the
+  validator recognizes the contributor-approved grammar. Many-to-one future
+  names or a collision with current evidence remain invalid because relabeling
+  does not aggregate values or types.
 - Name-provenance checks MUST follow reachable ordered relabel paths. An exact
   mutation taints a later exact block only when its possible output can enter
   that block; capture-bearing replacements preserve both literal prefixes and
@@ -671,9 +676,10 @@ histogram:
 The operator question decides the chart boundary; the validator's routing
 result decides whether every written current series was accounted for. Zero
 autogen and zero unmatched are mandatory for the source-complete fixture. The
-separate future-family canary proves that a later exporter addition still gets a
-generic chart. Conflating coverage with chart composition produces repetitive
-metric-type dashboards instead of useful comparisons.
+separate future-input run proves that later exporter additions traverse the raw
+selector/relabel/writer/profile route without being counted as current evidence.
+Conflating coverage with chart composition produces repetitive metric-type
+dashboards instead of useful comparisons.
 
 Keep contexts and IDs stable. Changing them creates new chart identities and
 can strand historical metadata. Different source charts that render the same
@@ -707,6 +713,26 @@ The optional compatibility launcher
 `scripts/validate-profile.py` invokes this same Go tool; it contains no
 independent validation logic.
 
+The validation job MAY add validator-only raw future probes:
+
+```yaml
+future_inputs:
+  - name: exporter_future_requests_total
+    type: counter
+    labels:
+      instance: future-instance
+```
+
+- `name` is required and uses the production Prometheus UTF-8 name rules.
+- `type` is optional: `gauge` (default), `counter`, or `untyped`.
+- `labels` is an optional string map and MUST NOT contain `__name__`.
+- A job may declare at most 256 unique raw identities and one type per family.
+- Use invented, non-sensitive values. These samples enter before job selection
+  and relabeling; do not write post-relabel names here.
+- Declare probes whenever reachable relabel rules can write metric names. For a
+  name-preserving job, the validator derives bounded witnesses from positive
+  wildcard profile/relabel terms.
+
 Run the gate on the exact profile, source-complete fixture, and structured job
 policy being delivered. Re-run after every edit. Keep separate observed-dump
 diagnostics or collector regressions; a partial real dump can legitimately leave
@@ -719,9 +745,13 @@ A `PASS` proves, for that evidence:
 - the real writer and flattening behavior are exercised;
 - every current writer series is accounted for with zero autogen and zero
   unmatched;
-- a deterministic synthetic future family derived from wildcard `match` scope
-  is admitted by the structured job selector/relabel policy and remains generic
-  after relabeling rather than colliding with an authored metric;
+- a separate real collector run introduces declared or derived raw future
+  inputs before job selection/relabeling, covers every positive profile term and
+  relevant relabel branch, and cannot satisfy current coverage;
+- every future input reaches the writer and selected profile without collapsing
+  with current/future identities; it remains generic unless a bounded
+  contributor-approved alias normalization legitimately routes it to an
+  authored family;
 - any non-empty job allow list structurally covers each positive wildcard
   profile namespace, and wildcard relabel discard has a bounded, fully
   fixture-evidenced metric-name grammar with original-name-only provenance;
@@ -903,10 +933,13 @@ The compact proof contains:
   gates, evidence boundaries, external fixture/inventory paths, provenance, and
   exact reproduction steps;
 - `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the
-  objective validator and agrees with the recommended metadata example;
-- `SHA256SUMS.tsv` hashes the final profile, compact local proof inputs, and the
-  external evidence manifest; and
-- `VALIDATION.md` is the authoritative human-readable PASS summary.
+  objective validator. Its deployable fields agree with the recommended
+  metadata example; `future_inputs`, when required, are validation-only;
+- `proof.yaml` is the discovered machine descriptor for profile/proof paths,
+  metadata example/job identity, external evidence, expected verdict/counts,
+  and integrity digests; and
+- `VALIDATION.md` explains the PASS result and evidence boundary without acting
+  as the machine assertion oracle.
 
 The external profile-evidence directory contains:
 
@@ -936,6 +969,18 @@ incomplete or unreadable checkout MUST fail. Dedicated CI MUST set
 `NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1`, verify the external manifest chain,
 and replay the objective validator for every stock proof so missing evidence
 fails rather than skips.
+
+Use the descriptor-backed launcher from the repository root:
+
+```text
+.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py evidence-dirs
+.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py verify
+.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py refresh
+```
+
+`refresh` updates only integrity digests and byte counts. It MUST be run after
+the exact validator replay and deliberate `validation.expected` update; it does
+not approve changed behavior.
 
 Do not substitute transient local report JSON, an uncommitted scratch document,
 or a private observed scrape for this reviewable stock proof. Raw reports MAY

@@ -28,13 +28,13 @@
 - `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner,
   identity, population, unit algebra, availability gate, disposition, and authored destination.
 - `src/go/testdata/prometheus/profiles/vllm_ray/manifest.yaml` records the byte size and SHA-256 digest of every external
-  input; `SHA256SUMS.tsv` pins that manifest from the Netdata proof.
+  input; `proof.yaml` pins that manifest from the Netdata proof.
 
 ## Reproduction and integrity
 
 - `VALIDATION-JOB.yaml` is the sanitized objective-validator input corresponding to the recommended metadata job policy.
-- `VALIDATION.md` contains the authoritative result and exact command.
-- `SHA256SUMS.tsv` fingerprints every committed semantic and executable proof input.
+- `VALIDATION.md` explains the result and exact command.
+- `proof.yaml` records the authoritative expected facts and fingerprints every committed semantic and executable proof input.
 - The result requires zero generic fallback and zero unmatched series for the declared source union. Unknown future
   `ray_vllm_*` families remain eligible for generic fallback.
 

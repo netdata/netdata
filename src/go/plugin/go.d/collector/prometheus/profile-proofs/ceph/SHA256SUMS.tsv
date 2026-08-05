@@ -1,7 +1,0 @@
-sha256	bytes	path
-c5fd027a102c6c0eb4c6f81e20499e3c56049742b224e8440df4b32c446a54b2	3937	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/EVIDENCE.md
-d51c3bb3c6edf643821380565926aba9f09a21a2eafdf45b747b4cf2a8805093	14668	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/OPERATOR-MODEL.md
-8dab747182a63aed126a1dd28aa27479a33761dd4bcd04b7c032d2b389d580b7	14838	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml
-aab11e6cf0a1f3279d638ba36e0cccde55266abe09f1c0962b145642a2ced17d	6442	src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION.md
-c588142188400dbe7f3130ee32ec61c26d2d90671db4933c9812787a3e499113	455390	src/go/plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml
-21ae822743e9a23a49a882e365e71fe32b0810273e0f2123a44464573359702e	1704	src/go/testdata/prometheus/profiles/ceph/manifest.yaml

@@ -442,7 +442,8 @@ union. It does not claim that one deployment registers all families together.
 
 ## Post-authoring mapping reconciliation
 
-Status: complete against the committed structural-union fixture and validation input summarized in `VALIDATION.md`.
+Status: complete against the committed structural-union fixture and validation input whose machine facts are recorded in
+`proof.yaml`; `VALIDATION.md` explains the result and evidence boundary.
 
 The validator emitted 124 authored charts with 163 unique selectors. The structural union materialized 142 chart instances;
 Mooncake operation/status and HTTP/parser identities account for the difference between authored definitions and instances.

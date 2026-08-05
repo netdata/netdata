@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 1
+profile:
+  name: vllm_ray
+  path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml
+proof:
+  evidence: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/EVIDENCE.md
+  operator_model: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/OPERATOR-MODEL.md
+  validation_summary: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION.md
+external_evidence:
+  revision: vllm_ray
+  manifest:
+    path: prometheus/profiles/vllm_ray/manifest.yaml
+    sha256: bd237be1419c680ea6592a551a08fb6818beadbae95dd0c24422671ee68f86f5
+    bytes: 418
+  source_inventory: prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv
+  fixture: prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom
+validation:
+  job: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml
+  metadata_example:
+    integration_id: collector-go.d.plugin-prometheus-vllm
+    example_name: vLLM on Ray
+    job_name: vllm-ray
+  expected:
+    verdict: PASS
+    raw_families: 116
+    raw_logical_series: 148
+    writer_series: 698
+    series_scanned: 698
+    series_autogen: 0
+    series_unmatched: 0
+    authored_charts: 104
+    runtime_charts: 113
+    autogen_charts: 0
+    chart_dimensions: 698
+    pipeline_excluded: 38
+    pipeline_renamed: 0
+integrity:
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/EVIDENCE.md
+    sha256: aa4091c191b498bca9d572685893ab0c3d288ae4ed16f70566d18a3f09b4755e
+    bytes: 2886
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/OPERATOR-MODEL.md
+    sha256: 910c29e10eefd84fcb68918514694437e4dec5f5cad0a1e7497b537b05aaecb4
+    bytes: 5826
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml
+    sha256: 08a6ae722e14114339b6c44e077d1ec74301d9d520db3cf604e67c619ce8d6a4
+    bytes: 1573
+  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION.md
+    sha256: cc0578a15b1cb4bc20c98d69600de52b56c87a7dabbc34e6ecb51c8446cf9463
+    bytes: 3015
+  - path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml
+    sha256: d6d1b53ed44ec48d81640c9d16f05b3afe40bbf69b56ddcf06008acd169db9ff
+    bytes: 49109

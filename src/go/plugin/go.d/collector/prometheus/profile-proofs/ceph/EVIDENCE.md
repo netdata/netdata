@@ -38,13 +38,13 @@
 - `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv` binds every declared family/component to exact source,
   owner, identity, population, unit algebra, availability gate, disposition, and authored destination.
 - `src/go/testdata/prometheus/profiles/ceph/manifest.yaml` records the byte size and SHA-256 digest of every external input;
-  `SHA256SUMS.tsv` pins that manifest from the Netdata proof.
+  `proof.yaml` pins that manifest from the Netdata proof.
 
 ## Reproduction and integrity
 
 - `VALIDATION-JOB.yaml` is the sanitized objective-validator input corresponding to the recommended metadata job policy.
-- `VALIDATION.md` contains the authoritative union result, producer matrix, and exact commands.
-- `SHA256SUMS.tsv` fingerprints every committed semantic and executable proof input.
+- `VALIDATION.md` explains the union result, producer matrix, and exact commands.
+- `proof.yaml` records the authoritative expected facts and fingerprints every committed semantic and executable proof input.
 - The union result requires zero generic fallback and zero unmatched series for all pinned sources. Unknown future `ceph_*`
   families remain eligible for generic fallback.
 
