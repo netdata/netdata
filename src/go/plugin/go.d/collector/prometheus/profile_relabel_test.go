@@ -308,6 +308,81 @@ func TestCollector_ProfileRelabelingCannotCreateFallbackType(t *testing.T) {
 	assert.Nil(t, collr.runtime)
 }
 
+func TestCollector_ProfileRelabelingDoesNotShareFallbackEligibilityAcrossMergedFamily(t *testing.T) {
+	tests := map[string]struct {
+		boundName    string
+		boundType    string
+		unboundFirst bool
+		configure    func(*Collector)
+		wantType     commonmodel.MetricType
+	}{
+		"configured gauge": {
+			boundName: "app_bound",
+			configure: func(c *Collector) {
+				c.FallbackType.Gauge = []string{"app_bound"}
+			},
+			wantType: commonmodel.MetricTypeGauge,
+		},
+		"configured counter": {
+			boundName:    "app_bound",
+			unboundFirst: true,
+			configure: func(c *Collector) {
+				c.FallbackType.Counter = []string{"app_bound"}
+			},
+			wantType: commonmodel.MetricTypeCounter,
+		},
+		"implicit total counter": {
+			boundName: "app_bound_total",
+			wantType:  commonmodel.MetricTypeCounter,
+		},
+		"declared gauge": {
+			boundName: "app_bound",
+			boundType: "gauge",
+			wantType:  commonmodel.MetricTypeGauge,
+		},
+		"declared counter": {
+			boundName: "app_bound",
+			boundType: "counter",
+			wantType:  commonmodel.MetricTypeCounter,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			catalog := loadTestCatalog(t, map[string]string{
+				"app": testRelabelProfilePatternYAML("app_*", "app_*", "app_.+", "app_final", "app_final"),
+			})
+			bound := fmt.Sprintf("%s{eligibility=\"bound\"} 7\n", tc.boundName)
+			unbound := "app_unbound{eligibility=\"unbound\"} 9\n"
+			if tc.unboundFirst {
+				bound, unbound = unbound, bound
+			}
+			input := bound + unbound
+			if tc.boundType != "" {
+				input = fmt.Sprintf("# TYPE %s %s\n", tc.boundName, tc.boundType) + input
+			}
+			collr, srv := newProfileRelabelCollector(t, catalog, input, "app")
+			defer srv.Close()
+			if tc.configure != nil {
+				tc.configure(collr)
+			}
+			require.NoError(t, collr.Init(context.Background()))
+
+			require.NoError(t, collr.Check(context.Background()))
+			mfs, err := collr.scrapeProfileNormalized(context.Background(), collr.runtime.normalizers, true)
+			require.NoError(t, err)
+			assert.Equal(t, 1, collr.writer.countBoundWritable(mfs), "Check must count only the pre-profile bound sample")
+
+			collectProfileRelabelOnce(t, collr)
+			got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+			assert.InDelta(t, 7, value(t, got, "app_final", metrix.Labels{"eligibility": "bound"}), 1e-9)
+			noSeries(t, got, "app_final", metrix.Labels{"eligibility": "unbound"})
+			require.Contains(t, collr.writer.handles, "app_final")
+			assert.Equal(t, tc.wantType, collr.writer.handles["app_final"].typ)
+		})
+	}
+}
+
 func TestCollector_ProfileRelabelingDispatchesDisjointFamilies(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"first":  testRelabelProfileYAML("app_*", "app_first_raw", "app_first_final"),

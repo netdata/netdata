@@ -133,13 +133,13 @@ func (w *metricFamilyWriter) countWritableWithFallback(mfs prompkg.MetricFamilie
 			continue
 		}
 
-		schema, ok := deriveMetricFamilySchema(mf, typ)
+		schema, ok := deriveMetricFamilySchema(mf, typ, allowFallback)
 		if !ok {
 			continue
 		}
 
 		for _, metric := range mf.Metrics() {
-			if metricIsWritable(metric, typ, schema) {
+			if metricIsWritable(metric, typ, schema, allowFallback) {
 				count++
 			}
 		}
@@ -170,7 +170,7 @@ func (w *metricFamilyWriter) writeMetricFamiliesWithFallback(mfs prompkg.MetricF
 			continue
 		}
 
-		handle, ok := w.ensureHandle(mf, typ)
+		handle, ok := w.ensureHandle(mf, typ, allowFallback)
 		if !ok {
 			continue
 		}
@@ -181,7 +181,7 @@ func (w *metricFamilyWriter) writeMetricFamiliesWithFallback(mfs prompkg.MetricF
 		// re-adopt the new schema after metrix evicts the descriptor. Partial drift (some canonical
 		// series still write) does refresh, keeping the live family.
 		for _, metric := range mf.Metrics() {
-			if w.observeMetric(handle, metric) {
+			if w.observeMetric(handle, metric, allowFallback) {
 				written++
 				handle.staged = true
 			}
@@ -280,7 +280,11 @@ func (w *metricFamilyWriter) resolveType(name string, declared commonmodel.Metri
 	}
 }
 
-func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmodel.MetricType) (*metricFamilyHandle, bool) {
+func (w *metricFamilyWriter) ensureHandle(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowFallback bool,
+) (*metricFamilyHandle, bool) {
 	if handle, ok := w.handles[mf.Name()]; ok {
 		if handle.typ != typ {
 			w.Debugf("skip metric family '%s': metric type drift (%s -> %s)", mf.Name(), handle.typ, typ)
@@ -289,7 +293,7 @@ func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmo
 		return handle, true
 	}
 
-	schema, ok := deriveMetricFamilySchema(mf, typ)
+	schema, ok := deriveMetricFamilySchema(mf, typ, allowFallback)
 	if !ok {
 		return nil, false
 	}
@@ -327,8 +331,8 @@ func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmo
 	return handle, true
 }
 
-func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric prompkg.Metric) bool {
-	schema, ok := deriveMetricSchema(metric, handle.typ)
+func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric prompkg.Metric, allowFallback bool) bool {
+	schema, ok := deriveMetricSchema(metric, handle.typ, allowFallback)
 	if !ok {
 		return false
 	}
@@ -341,7 +345,7 @@ func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric pr
 
 	switch handle.typ {
 	case commonmodel.MetricTypeGauge:
-		value, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge)
+		value, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge, allowFallback)
 		if !ok {
 			return false
 		}
@@ -351,7 +355,7 @@ func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric pr
 		inst.Observe(value)
 		return true
 	case commonmodel.MetricTypeCounter:
-		value, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter)
+		value, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter, allowFallback)
 		if !ok {
 			return false
 		}
