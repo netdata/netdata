@@ -121,7 +121,7 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 		return candidate, postJobFamilies, false, nil
 	}
 
-	_, finalFamilies, err := c.profileRelabelAndAssemble(postJob, candidate.normalizers, true)
+	finalFamilies, err := c.profileRelabelAndAssemble(postJob, candidate.normalizers, true)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -141,13 +141,13 @@ func (c *Collector) scrapeProfileNormalized(
 		return nil, err
 	}
 	if c.jobRelabel != nil {
-		batch, _, err = c.relabelAndAssemble(batch, c.jobRelabel, jobRelabelStage, checking)
+		batch, err = c.relabelAndValidateBatch(batch, c.jobRelabel, jobRelabelStage, checking)
 		if err != nil {
 			return nil, err
 		}
 	}
 	c.writer.bindFallbackTypes(&batch)
-	_, mfs, err := c.profileRelabelAndAssemble(batch, normalizers, checking)
+	mfs, err := c.profileRelabelAndAssemble(batch, normalizers, checking)
 	if err != nil {
 		return nil, err
 	}

@@ -8,21 +8,24 @@ func (c *Collector) profileRelabelAndAssemble(
 	batch prompkg.SampleBatch,
 	normalizers []profileNormalizer,
 	checking bool,
-) (prompkg.SampleBatch, prompkg.MetricFamilies, error) {
+) (prompkg.MetricFamilies, error) {
 	normalizerIndexByFamily := selectProfileNormalizers(batch, normalizers)
 
-	results := make([]relabelResult, 0, len(batch.Samples))
+	t := newRelabelTracking()
+	help := newHelpRemap()
+	processed := prompkg.SampleBatch{Samples: make([]prompkg.Sample, 0, len(batch.Samples))}
 	for _, raw := range batch.Samples {
 		source := helpFamilyName(raw)
 		result := relabelResult{raw: raw, sample: raw}
 		if idx, ok := normalizerIndexByFamily[source]; ok {
 			result.sample, result.drop = normalizers[idx].pipeline.Apply(raw)
 		}
-		results = append(results, result)
+		c.appendRelabelResult(&processed, t, help, profileRelabelStage, result)
 	}
+	processed.Help = help.remap(batch.Help)
 
-	processed, tracking := c.materializeRelabel(batch.Help, results, profileRelabelStage)
-	return c.assembleRelabeled(processed, tracking, profileRelabelStage, checking)
+	_, mfs, err := c.finishRelabel(processed, t, profileRelabelStage, checking, true)
+	return mfs, err
 }
 
 // selectProfileNormalizers assigns each original source family to the first

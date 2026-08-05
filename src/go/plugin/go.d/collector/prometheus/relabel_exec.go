@@ -39,10 +39,9 @@ var (
 )
 
 type relabelResult struct {
-	raw     prompkg.Sample
-	sample  prompkg.Sample
-	drop    relabel.DropInfo
-	discard bool
+	raw    prompkg.Sample
+	sample prompkg.Sample
+	drop   relabel.DropInfo
 }
 
 // relabelAndAssemble runs the job-level relabel pipeline: relabel every sample,
@@ -65,16 +64,32 @@ func (c *Collector) relabelAndAssemble(
 	checking bool,
 ) (prompkg.SampleBatch, prompkg.MetricFamilies, error) {
 	processed, tracking := c.applyPipelineRelabel(batch, pipeline, stage)
-	return c.assembleRelabeled(processed, tracking, stage, checking)
+	return c.finishRelabel(processed, tracking, stage, checking, true)
 }
 
-func (c *Collector) assembleRelabeled(
+// relabelAndValidateBatch runs relabeling and typed-family safety when the caller
+// needs the resulting sample batch but not an intermediate family assembly.
+func (c *Collector) relabelAndValidateBatch(
+	batch prompkg.SampleBatch,
+	pipeline *relabel.Pipeline,
+	stage relabelStage,
+	checking bool,
+) (prompkg.SampleBatch, error) {
+	processed, tracking := c.applyPipelineRelabel(batch, pipeline, stage)
+	processed, _, err := c.finishRelabel(processed, tracking, stage, checking, false)
+	return processed, err
+}
+
+func (c *Collector) finishRelabel(
 	processed prompkg.SampleBatch,
 	tracking *relabelTracking,
 	stage relabelStage,
 	checking bool,
+	needFamilies bool,
 ) (prompkg.SampleBatch, prompkg.MetricFamilies, error) {
-
+	if !tracking.anyTypedTouched && !needFamilies {
+		return processed, nil, nil
+	}
 	mfs, err := prompkg.Assemble(processed)
 	if err != nil {
 		return prompkg.SampleBatch{}, nil, err
@@ -87,6 +102,9 @@ func (c *Collector) assembleRelabeled(
 
 	invalid, violations := validateTypedFamilies(tracking, mfs)
 	if len(invalid) == 0 {
+		if !needFamilies {
+			mfs = nil
+		}
 		return processed, mfs, nil
 	}
 
@@ -106,6 +124,9 @@ func (c *Collector) assembleRelabeled(
 	// Closed invalid set computed in one pass, so a single re-filter + reassembly
 	// terminates: dropping samples can only remove corruption, never add it.
 	filtered := filterInvalidTypedFamilies(processed, invalid)
+	if !needFamilies {
+		return filtered, nil, nil
+	}
 	mfs, err = prompkg.Assemble(filtered)
 	return filtered, mfs, err
 }
@@ -125,27 +146,6 @@ func (c *Collector) applyPipelineRelabel(
 	out.Help = help.remap(batch.Help)
 	return out, t
 }
-
-// materializeRelabel builds the kept sample batch, HELP remap, and shared typed-
-// family provenance from relabel outcomes. Policy-discarded results are omitted
-// as complete source families and do not look like rule-level partial drops.
-func (c *Collector) materializeRelabel(
-	helpEntries []prompkg.HelpEntry,
-	results []relabelResult,
-	stage relabelStage,
-) (prompkg.SampleBatch, *relabelTracking) {
-	t := newRelabelTracking()
-	help := newHelpRemap()
-	out := prompkg.SampleBatch{Samples: make([]prompkg.Sample, 0, len(results))}
-
-	for _, result := range results {
-		c.appendRelabelResult(&out, t, help, stage, result)
-	}
-
-	out.Help = help.remap(helpEntries)
-	return out, t
-}
-
 func (c *Collector) appendRelabelResult(
 	out *prompkg.SampleBatch,
 	t *relabelTracking,
@@ -153,9 +153,6 @@ func (c *Collector) appendRelabelResult(
 	stage relabelStage,
 	result relabelResult,
 ) {
-	if result.discard {
-		return
-	}
 	raw := result.raw
 	sample := result.sample
 	rawKey, isTyped := typedFamilyKeyOf(raw)

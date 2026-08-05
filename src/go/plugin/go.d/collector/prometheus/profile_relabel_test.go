@@ -80,7 +80,7 @@ func TestCollector_ProfileRelabelingRemapsHelp(t *testing.T) {
 	require.NoError(t, err)
 
 	batch := scrapeSamples(t, "# HELP app_raw Application value.\n# TYPE app_raw gauge\napp_raw 1\n")
-	_, mfs, err := New().profileRelabelAndAssemble(batch, normalizers, true)
+	mfs, err := New().profileRelabelAndAssemble(batch, normalizers, true)
 	require.NoError(t, err)
 	renamed := mfs.Get("app_final")
 	require.NotNil(t, renamed)
