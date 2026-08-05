@@ -340,7 +340,7 @@ The path in the message reflects your Netdata library directory — `/var/lib/ne
 
 **Why this happens:** `cloud.conf` is written only when a node is actually claimed to Netdata Cloud (it stores the `claimed_id` and the ACLK settings). A node that has never been claimed has no `cloud.conf`, so the Agent logs this line and continues with internal default Cloud settings. This is expected and harmless on an unclaimed node.
 
-**Solution:** This is not a failure — do not change the log level or try to suppress the line. To confirm the node is simply unclaimed, check the connection status via `http://NODE:19999/api/v3/info` (the `cloud` section shows `Claimed: No`) or run `sudo netdatacli aclk-state` (see [Check Connection Status](#check-connection-status)). If the node was intended to be claimed, follow one of the methods under [Connect Existing Agent](#connect-existing-agent); once it is claimed, `cloud.conf` is created and the message no longer appears.
+**Solution:** This is not a failure — do not change the log level or try to suppress the line. To confirm the node is simply unclaimed, check the connection status (see [Check Connection Status](#check-connection-status)): `http://NODE:19999/api/v3/info` shows `"status": "available"` in the `cloud` section, and `sudo netdatacli aclk-state` prints `Claimed: No`. If the node was intended to be claimed, follow one of the methods under [Connect Existing Agent](#connect-existing-agent); once it is claimed, `cloud.conf` is created and the message no longer appears.
 
 #### kickstart: unsupported Netdata installation
 
