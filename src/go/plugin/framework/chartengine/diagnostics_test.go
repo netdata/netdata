@@ -159,6 +159,49 @@ groups:
 	assert.Equal(t, []string{"instance"}, rejected[0].MissingInstanceLabels)
 }
 
+func TestPlanRouteDiagnosticsExposeResolvedDimensionKeyLabel(t *testing.T) {
+	var facts []PlanRouteDiagnostic
+	engine, err := New(WithPlanRouteDiagnosticObserver(func(fact PlanRouteDiagnostic) {
+		facts = append(facts, fact)
+	}))
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+    metrics: [system.status]
+    charts:
+      - title: System status
+        context: system_status
+        units: state
+        dimensions:
+          - selector: system.status
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cycle := mustCycleController(t, store)
+	stateSet := store.Write().SnapshotMeter("system").StateSet(
+		"status",
+		metrix.WithStateSetStates("ok", "failed"),
+		metrix.WithStateSetMode(metrix.ModeEnum),
+	)
+	cycle.BeginCycle()
+	stateSet.Enable("ok")
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	_, err = buildPlan(engine, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	resolved := 0
+	for _, fact := range facts {
+		if fact.Decision != PlanRouteResolved {
+			continue
+		}
+		resolved++
+		assert.Equal(t, "system.status", fact.DimensionKeyLabel)
+	}
+	assert.Equal(t, 2, resolved)
+}
+
 func countPlanRouteDecisions(facts []PlanRouteDiagnostic, decision PlanRouteDecision) int {
 	count := 0
 	for _, fact := range facts {

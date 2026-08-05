@@ -50,6 +50,7 @@ type PlanRouteDiagnostic struct {
 	DimensionIndex          int
 	ChartID                 string
 	DimensionName           string
+	DimensionKeyLabel       string
 	InstanceIdentity        PlanInstanceIdentity
 	MissingInstanceLabels   []string
 	ExistingChartTemplateID string

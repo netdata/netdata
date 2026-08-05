@@ -60,6 +60,37 @@ Exit codes:
 - `1`: validation completed and found an objective failure.
 - `2`: command-line usage or report-output failure.
 
+## Architecture and extension points
+
+The executable is a flag/exit-code adapter over
+`internal/promprofilevalidation.Validate`. Contributor policy, deterministic
+findings, and report rendering live in that internal library. Runtime semantics
+remain with their production owners:
+
+- `pkg/prometheus` parses/assembles evidence and defines physical/logical series
+  identities plus strict duplicate detection;
+- the Prometheus collector performs selector, relabel, writer, exact-profile,
+  and store processing and emits opt-in structured pipeline facts;
+- `pkg/matcher` and collector `relabel` own bounded, cancelable witness/name-flow
+  mechanisms used by contributor policy;
+- chartengine emits opt-in route facts from its one production plan; and
+- chartemit exposes structured public-ID/context/dimension inspection from the
+  same preparation path used by application.
+
+Diagnostics are constructor options, not collector configuration. Disabled
+production paths do not allocate diagnostic records. Enabled validation bypasses
+the chart route cache so every series produces an attempt-local fact; observers
+stream or aggregate within one run and retain no process-global state.
+
+Add a new semantic fact at the production owner and expose a small structured
+diagnostic/mechanism. Add contributor severity, evidence obligations, wording,
+and report presentation in `internal/promprofilevalidation`. Do not reconstruct
+runtime acceptance, identity, naming, or wire behavior in the validator.
+
+Validation has a 30-second internal deadline bounded by the caller context.
+Matcher/relabel analyzers have deterministic state/transition/value limits and
+fail closed when those limits or context cancellation are reached.
+
 ## Safe job policy
 
 The job file accepts only settings that shape the captured dump:
@@ -113,7 +144,8 @@ For the supplied dump and job policy, a pass establishes that:
 
 - strict catalog/profile/template decoding succeeds;
 - the real collector completes `Init`, `Check`, and a committed `Collect`;
-- required chartengine runtime coverage counters exist and are valid;
+- one production chart plan emits complete structured route diagnostics for
+  every scanned writer series;
 - every current writer series is accounted for with zero generic fallback and
   zero unmatched series;
 - a second isolated real collector sequence introduces declared or derived raw
@@ -196,8 +228,8 @@ series. One explicit profile policy can pass with a warning:
 Forward compatibility combines bounded structural analysis with the separate
 raw future-input run. Wildcard name-discard and name-rewrite exceptions also
 require the current source-complete dump to exercise every bounded grammar
-branch. The report's `profile.future_metric_canary` compatibility field records
-the first raw future probe. These objective errors reject closed contribution
+branch. The report's `profile.future_raw_probe` field records the first raw
+future probe. These objective errors reject closed contribution
 policy even when the current fixture has no coverage gap:
 
 - `closed_profile_fallback`: non-empty `autogen.selector.allow`;
@@ -212,9 +244,9 @@ policy even when the current fixture has no coverage gap:
 - `closed_job_selector_allow`: a non-empty job allow list does not contain each
   positive wildcard profile term unchanged in an unconstrained expression, the
   complete profile match expression, or `*`;
-- `future_metric_canary_unavailable`: wildcard profile scope cannot produce a
+- `future_metric_witness_unavailable`: wildcard profile scope cannot produce a
   valid deterministic Prometheus-family probe;
-- `future_relabel_canary_unavailable`: one positive wildcard term in an
+- `future_relabel_witness_unavailable`: one positive wildcard term in an
   overlapping relabel block can discard or rename metrics, but its exclusions
   hide every deterministic in-scope probe or ordered relabeling prevents the
   block from processing those probes;
@@ -378,9 +410,10 @@ the tool cannot prove why the user chose a collection boundary. Dashboard focus
 alone is not a collection boundary: use hierarchy and priority rather than
 discarding distinct writer-capable diagnostics.
 
-Relabel discard warnings replay the validated ordered blocks over the captured
-samples and attribute observed drops to the exact rule. A rule with no observed
-drop still warns because one dump cannot prove its future exclusion surface.
+Relabel discard warnings consume facts emitted while the production processor
+runs the validated ordered blocks and attribute observed drops to the exact
+rule. A rule with no observed drop still warns because one dump cannot prove its
+future exclusion surface.
 Under an overlapping wildcard stock-policy scope, an otherwise permitted
 `__name__` drop or rewrite also fails unless every bounded grammar branch has
 evidence. The warning never reports observed label values.

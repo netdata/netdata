@@ -35,7 +35,7 @@ func addFutureOpennessChecks(
 		r,
 	)
 	if len(inputs) > 0 {
-		r.Profile.FutureMetricCanary = inputs[0].Name
+		r.Profile.FutureRawProbe = inputs[0].Name
 	}
 	if !valid {
 		return nil
@@ -82,7 +82,7 @@ func addFutureOpennessChecks(
 	if strings.TrimSpace(templateYAML) == "" {
 		return fmt.Errorf("future collector returned an empty chart template")
 	}
-	planned, err := prepareRoutePlan(futureReader, templateYAML, validationEmitTypeID(jobName))
+	planned, err := prepareRoutePlan(futureReader, templateYAML, collectorJobFullName(jobName))
 	if err != nil {
 		return fmt.Errorf("future chart plan: %w", err)
 	}

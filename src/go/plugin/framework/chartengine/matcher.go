@@ -188,14 +188,15 @@ func (e *Engine) resolveSeriesRoutes(
 				return nil, false, fmt.Errorf("chartengine: diagnostic instance identity diverged for chart template %q", candidate.chartTemplateID)
 			}
 			observe(PlanRouteDiagnostic{
-				Decision:         PlanRouteResolved,
-				SeriesIdentity:   identity,
-				MetricName:       name,
-				ChartTemplateID:  candidate.chartTemplateID,
-				DimensionIndex:   candidate.dimensionIndex,
-				ChartID:          chartID,
-				DimensionName:    dimName,
-				InstanceIdentity: instanceIdentity,
+				Decision:          PlanRouteResolved,
+				SeriesIdentity:    identity,
+				MetricName:        name,
+				ChartTemplateID:   candidate.chartTemplateID,
+				DimensionIndex:    candidate.dimensionIndex,
+				ChartID:           chartID,
+				DimensionName:     dimName,
+				DimensionKeyLabel: dimKeyLabel,
+				InstanceIdentity:  instanceIdentity,
 			})
 		}
 		dimensionFloat := candidate.dimension.Float || metricFloat ||

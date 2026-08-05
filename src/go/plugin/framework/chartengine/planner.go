@@ -633,6 +633,7 @@ func (ctx *planBuildContext) accumulateRoute(
 					DimensionIndex:          route.DimensionIndex,
 					ChartID:                 route.ChartID,
 					DimensionName:           route.DimensionName,
+					DimensionKeyLabel:       route.DimensionKeyLabel,
 					ExistingChartTemplateID: cs.templateID,
 					Autogen:                 route.Autogen,
 				})
@@ -659,6 +660,7 @@ func (ctx *planBuildContext) accumulateRoute(
 						DimensionIndex:          route.DimensionIndex,
 						ChartID:                 route.ChartID,
 						DimensionName:           route.DimensionName,
+						DimensionKeyLabel:       route.DimensionKeyLabel,
 						ExistingChartTemplateID: ownerTemplateID,
 						Autogen:                 route.Autogen,
 					})
@@ -754,14 +756,15 @@ func (ctx *planBuildContext) accumulateRoute(
 	}
 	if ctx.routeObserver != nil {
 		ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
-			Decision:        PlanRouteAccepted,
-			SeriesIdentity:  identity,
-			MetricName:      metricName,
-			ChartTemplateID: route.ChartTemplateID,
-			DimensionIndex:  route.DimensionIndex,
-			ChartID:         route.ChartID,
-			DimensionName:   route.DimensionName,
-			Autogen:         route.Autogen,
+			Decision:          PlanRouteAccepted,
+			SeriesIdentity:    identity,
+			MetricName:        metricName,
+			ChartTemplateID:   route.ChartTemplateID,
+			DimensionIndex:    route.DimensionIndex,
+			ChartID:           route.ChartID,
+			DimensionName:     route.DimensionName,
+			DimensionKeyLabel: route.DimensionKeyLabel,
+			Autogen:           route.Autogen,
 		})
 	}
 	return nil

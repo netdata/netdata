@@ -622,8 +622,9 @@ Profile fallback suppression is an exclusion too. Apply these binding rules:
   suppressed; only their generic charts disappear.
 
 The validator rejects closed boundaries independently of the source fixture. It
-accepts an exact profile deny only when a counterfactual planner run proves that
-removing that exact rule turns every unmatched current series into fallback.
+accepts current unmatched series under an exact profile deny only when the
+production planner's route facts identify that explicit fallback selector as
+the reason. No relaxed or counterfactual plan is used.
 
 ## Encode the design
 
@@ -767,13 +768,13 @@ A `PASS` proves, for that evidence:
   effective explicit instance identity;
 - each optional dimension-label form present in the supplied fixtures routes to
   the intended context and instance type without overlap or fallback autogen;
-- isolated planning finds no observed cross-template collision or
-  same-template instance-ID collapse;
+- one production planning pass emits complete structured route facts and finds
+  no observed cross-template collision or same-template instance-ID collapse;
 - observed per-instance dimensions are not discarded by lifecycle caps or
   planner normalization;
 - public chart emission finds no chart-ID, context, or dynamic-dimension
   normalization collision or omission;
-- required runtime coverage counters are present and valid;
+- structured route diagnostics account for every scanned writer series;
 - every chart has an explicit positive priority and priorities do not decrease
   in source order;
 - every chart exposes at least one visible dimension;

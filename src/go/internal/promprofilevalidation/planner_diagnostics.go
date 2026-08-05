@@ -64,6 +64,10 @@ func (s *planRouteSummary) observe(fact chartengine.PlanRouteDiagnostic) {
 		template.chartIDs[fact.ChartID] = struct{}{}
 		template.instanceIdentities[fact.InstanceIdentity] = struct{}{}
 		template.dimensionIndexes[fact.DimensionIndex] = struct{}{}
+		template.resolvedSeries[fact.SeriesIdentity.ID] = struct{}{}
+		if fact.DimensionKeyLabel != "" {
+			template.dimensionKeyLabels[fact.DimensionKeyLabel] = struct{}{}
+		}
 		output := planDimensionOutput{chartID: fact.ChartID, name: fact.DimensionName}
 		template.dimensionOutputs[output] = struct{}{}
 		template.dimensionIdentities[planDimensionIdentity{
@@ -122,6 +126,8 @@ type planTemplateDiagnostic struct {
 	chartIDs            map[string]struct{}
 	instanceIdentities  map[chartengine.PlanInstanceIdentity]struct{}
 	dimensionIndexes    map[int]struct{}
+	resolvedSeries      map[metrix.SeriesID]struct{}
+	dimensionKeyLabels  map[string]struct{}
 	dimensionOutputs    map[planDimensionOutput]struct{}
 	dimensionIdentities map[planDimensionIdentity]struct{}
 	droppedCharts       map[string]struct{}
@@ -138,6 +144,8 @@ func (s *planRouteSummary) template(templateID string) *planTemplateDiagnostic {
 		chartIDs:            make(map[string]struct{}),
 		instanceIdentities:  make(map[chartengine.PlanInstanceIdentity]struct{}),
 		dimensionIndexes:    make(map[int]struct{}),
+		resolvedSeries:      make(map[metrix.SeriesID]struct{}),
+		dimensionKeyLabels:  make(map[string]struct{}),
 		dimensionOutputs:    make(map[planDimensionOutput]struct{}),
 		dimensionIdentities: make(map[planDimensionIdentity]struct{}),
 		droppedCharts:       make(map[string]struct{}),
