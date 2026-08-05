@@ -14,18 +14,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
-// profileHeader is the eagerly-decoded part of a profile: everything except the
-// chart template. Template is captured as an un-decoded yaml.Node so a strict
-// decode (KnownFields) still accepts the legitimate `template:` key and rejects
-// unknown keys, without typed-decoding or validating the heavy chart tree at
-// load time.
-type profileHeader struct {
-	Match    string    `yaml:"match"`
-	App      string    `yaml:"app,omitempty"`
-	Autogen  *autogen  `yaml:"autogen,omitempty"`
-	Template yaml.Node `yaml:"template"`
+// profileDocument is the single strict top-level profile shape. Heavy fields are
+// retained as nodes and typed-decoded only when hydrated, avoiding a second
+// top-level schema that could drift as fields are added.
+type profileDocument struct {
+	Match      string    `yaml:"match"`
+	App        string    `yaml:"app,omitempty"`
+	Autogen    *autogen  `yaml:"autogen,omitempty"`
+	Relabeling yaml.Node `yaml:"relabeling,omitempty"`
+	Template   yaml.Node `yaml:"template"`
 }
 
 type autogen struct {
@@ -36,26 +36,30 @@ type autogen struct {
 // basename (Name). Match selects the profile by scraped metric names; App, when
 // set, is the application identity used as the chart-context "app" segment
 // (prometheus.<app>.…) when a job has no `app` set (by the user or service
-// discovery). The chart template is parsed and validated lazily on the first
-// Template() call — matching needs only Match, so a large stock library is
-// neither typed-decoded nor held parsed in memory until a profile is selected.
+// discovery). Heavy template and relabeling fields are parsed and validated
+// lazily on first use — matching needs only Match, so a large stock library is
+// not fully materialized until profiles are selected.
 type Profile struct {
 	Name  string
 	Match string
 	App   string
 
 	autogenSelector *metrixselector.Expr
-	lazy            *lazyTemplate
+	lazy            *lazyProfile
 }
 
-// lazyTemplate holds the deferred chart template. It is referenced by pointer so
-// Profile value copies (catalog map values, selection slices) share one
-// hydration and the sync.Once is never copied.
-type lazyTemplate struct {
-	raw  []byte
-	once sync.Once
-	tmpl charttpl.Group
-	err  error
+// lazyProfile holds deferred stock-profile fields. It is referenced by pointer so
+// Profile value copies share hydration and sync.Once values are never copied.
+type lazyProfile struct {
+	template     yaml.Node
+	templateOnce sync.Once
+	tmpl         charttpl.Group
+	templateErr  error
+
+	relabeling     yaml.Node
+	relabelingOnce sync.Once
+	blocks         []relabel.Block
+	relabelingErr  error
 }
 
 // Template parses and validates the chart template on first call and memoizes
@@ -66,13 +70,35 @@ func (p Profile) Template() (charttpl.Group, error) {
 	if p.lazy == nil {
 		return charttpl.Group{}, fmt.Errorf("profile %q: no template loaded", p.Name)
 	}
-	p.lazy.once.Do(func() {
-		p.lazy.tmpl, p.lazy.err = parseTemplate(p.Name, p.lazy.raw)
+	p.lazy.templateOnce.Do(func() {
+		p.lazy.tmpl, p.lazy.templateErr = parseTemplate(p.Name, p.lazy.template)
 	})
-	if p.lazy.err != nil {
-		return charttpl.Group{}, p.lazy.err
+	if p.lazy.templateErr != nil {
+		return charttpl.Group{}, p.lazy.templateErr
 	}
 	return p.lazy.tmpl.Clone(), nil
+}
+
+// HasRelabeling reports whether the profile document contains a relabeling key
+// without hydrating it. Present null and empty values return true so their
+// validation errors cannot silently take the no-relabel fast path.
+func (p Profile) HasRelabeling() bool {
+	return p.lazy != nil && p.lazy.relabeling.Kind != 0
+}
+
+// Relabeling hydrates and validates profile-owned relabel blocks on first use.
+// It returns an independent deep copy so callers cannot mutate catalog state.
+func (p Profile) Relabeling() ([]relabel.Block, error) {
+	if !p.HasRelabeling() {
+		return nil, nil
+	}
+	p.lazy.relabelingOnce.Do(func() {
+		p.lazy.blocks, p.lazy.relabelingErr = parseRelabeling(p.Name, p.lazy.relabeling)
+	})
+	if p.lazy.relabelingErr != nil {
+		return nil, p.lazy.relabelingErr
+	}
+	return relabel.CloneBlocks(p.lazy.blocks), nil
 }
 
 // AutogenSelector returns an independent copy of the profile-scoped fallback
@@ -97,8 +123,8 @@ func cloneSelectorExpr(expr *metrixselector.Expr) *metrixselector.Expr {
 	return &out
 }
 
-// validateHeader validates the always-loaded fields (match + app). Template
-// structure is validated separately, at hydrate time.
+// validateHeader validates the always-loaded fields. Deferred template and
+// relabeling structure is validated separately at hydration time.
 func (p *Profile) validateHeader() error {
 	if strings.TrimSpace(p.Match) == "" {
 		return fmt.Errorf("profile %q: 'match' must not be empty", p.Name)
@@ -130,35 +156,54 @@ func (p *Profile) validateHeader() error {
 	return nil
 }
 
-// parseTemplate typed-decodes and validates the chart template from the raw
-// profile bytes. Strict decoding keeps parity with the header decode (unknown
-// keys rejected). It is the deferred half of profile validation.
-func parseTemplate(name string, raw []byte) (charttpl.Group, error) {
-	var doc struct {
-		Match    string         `yaml:"match"`
-		App      string         `yaml:"app,omitempty"`
-		Autogen  *autogen       `yaml:"autogen,omitempty"`
-		Template charttpl.Group `yaml:"template"`
+// parseTemplate typed-decodes and validates the retained chart-template node.
+func parseTemplate(name string, node yaml.Node) (charttpl.Group, error) {
+	if node.Kind == 0 {
+		return charttpl.Group{}, fmt.Errorf("profile %q: 'template' is required", name)
 	}
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	if err := dec.Decode(&doc); err != nil {
+
+	var group charttpl.Group
+	if err := decodeNodeStrict(node, &group); err != nil {
 		return charttpl.Group{}, fmt.Errorf("profile %q: unmarshal 'template': %w", name, err)
 	}
 
-	if !groupHasChart(doc.Template) {
+	if !groupHasChart(group) {
 		return charttpl.Group{}, fmt.Errorf("profile %q: 'template' must contain at least one chart", name)
 	}
 
 	spec := charttpl.Spec{
 		Version: charttpl.VersionV1,
-		Groups:  []charttpl.Group{doc.Template},
+		Groups:  []charttpl.Group{group},
 	}
 	if err := spec.Validate(); err != nil {
 		return charttpl.Group{}, fmt.Errorf("profile %q: 'template': %w", name, err)
 	}
 
-	return doc.Template, nil
+	return group, nil
+}
+
+func parseRelabeling(name string, node yaml.Node) ([]relabel.Block, error) {
+	var blocks []relabel.Block
+	if err := decodeNodeStrict(node, &blocks); err != nil {
+		return nil, fmt.Errorf("profile %q: unmarshal 'relabeling': %w", name, err)
+	}
+	if len(blocks) == 0 {
+		return nil, fmt.Errorf("profile %q: 'relabeling' must not be empty", name)
+	}
+	if _, err := relabel.NewPipeline(blocks); err != nil {
+		return nil, fmt.Errorf("profile %q: invalid 'relabeling': %w", name, err)
+	}
+	return blocks, nil
+}
+
+func decodeNodeStrict(node yaml.Node, dst any) error {
+	raw, err := yaml.Marshal(&node)
+	if err != nil {
+		return err
+	}
+	dec := yaml.NewDecoder(bytes.NewReader(raw))
+	dec.KnownFields(true)
+	return dec.Decode(dst)
 }
 
 func groupHasChart(group charttpl.Group) bool {
