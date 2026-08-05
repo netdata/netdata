@@ -32,7 +32,13 @@ func init() {
 }
 
 func New() *Collector {
-	return &Collector{
+	return NewWithOptions()
+}
+
+// NewWithOptions constructs a collector with explicit non-configuration
+// dependencies. Runtime job configuration remains in Config.
+func NewWithOptions(opts ...CollectorOption) *Collector {
+	c := &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				ClientConfig: web.ClientConfig{
@@ -46,6 +52,12 @@ func New() *Collector {
 		store:              metrix.NewCollectorStore(),
 		loadProfileCatalog: promprofiles.DefaultCatalog,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
+		}
+	}
+	return c
 }
 
 type Collector struct {
