@@ -35,20 +35,26 @@ func New() *Collector {
 	return NewWithOptions()
 }
 
+// DefaultConfig returns an independent copy of the collector's runtime
+// configuration defaults.
+func DefaultConfig() Config {
+	return Config{
+		HTTPConfig: web.HTTPConfig{
+			ClientConfig: web.ClientConfig{
+				Timeout: confopt.Duration(time.Second * 10),
+			},
+		},
+		MaxTS:          2000,
+		MaxTSPerMetric: 200,
+		Profiles:       ProfilesConfig{Mode: profilesModeAuto},
+	}
+}
+
 // NewWithOptions constructs a collector with explicit non-configuration
 // dependencies. Runtime job configuration remains in Config.
 func NewWithOptions(opts ...CollectorOption) *Collector {
 	c := &Collector{
-		Config: Config{
-			HTTPConfig: web.HTTPConfig{
-				ClientConfig: web.ClientConfig{
-					Timeout: confopt.Duration(time.Second * 10),
-				},
-			},
-			MaxTS:          2000,
-			MaxTSPerMetric: 200,
-			Profiles:       ProfilesConfig{Mode: profilesModeAuto},
-		},
+		Config:             DefaultConfig(),
 		store:              metrix.NewCollectorStore(),
 		loadProfileCatalog: promprofiles.DefaultCatalog,
 	}

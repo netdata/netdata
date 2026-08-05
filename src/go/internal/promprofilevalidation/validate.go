@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package main
+package promprofilevalidation
 
 import (
 	"context"
@@ -28,24 +28,34 @@ import (
 
 const validationTimeout = 30 * time.Second
 
-func validateProfile(opts validationOptions) report {
+// Validate runs the candidate through the production parser, collector,
+// chartengine, and chart emitter plus contributor-policy checks.
+func Validate(ctx context.Context, opts Options) Report {
+	return validateProfile(ctx, opts)
+}
+
+func validateProfile(parent context.Context, opts Options) report {
 	r := newReport()
 	defer sortReport(&r)
+	if parent == nil {
+		r.addError("validation_context", "", "validation context is nil", "Validation requires a cancelable context.")
+		return r
+	}
 
-	if err := validateInputFile(opts.profilePath); err != nil {
-		r.addError("profile_input", opts.profilePath, err.Error(), "The validator must read one regular profile file.")
+	if err := validateInputFile(opts.ProfilePath); err != nil {
+		r.addError("profile_input", opts.ProfilePath, err.Error(), "The validator must read one regular profile file.")
 		return r
 	}
-	if err := validateInputFile(opts.dumpPath); err != nil {
-		r.addError("dump_input", opts.dumpPath, err.Error(), "The evidence dump must be a readable regular file.")
+	if err := validateInputFile(opts.DumpPath); err != nil {
+		r.addError("dump_input", opts.DumpPath, err.Error(), "The evidence dump must be a readable regular file.")
 		return r
 	}
-	policy, err := loadJobPolicy(opts.jobPath)
+	policy, err := loadJobPolicy(opts.JobPath)
 	if err != nil {
-		r.addError("job_policy", opts.jobPath, err.Error(), "Only the documented shaping fields are accepted, with strict YAML keys.")
+		r.addError("job_policy", opts.JobPath, err.Error(), "Only the documented shaping fields are accepted, with strict YAML keys.")
 		return r
 	}
-	if opts.jobPath == "" {
+	if opts.JobPath == "" {
 		r.addWarning(
 			"default_validation_job",
 			"",
@@ -54,9 +64,9 @@ func validateProfile(opts validationOptions) report {
 		)
 	}
 
-	isolated, cleanup, err := stageIsolatedCatalog(opts.profilePath, opts.dumpPath)
+	isolated, cleanup, err := stageIsolatedCatalog(opts.ProfilePath, opts.DumpPath)
 	if err != nil {
-		r.addError("profile_load", opts.profilePath, err.Error(), "The real strict profile catalog and template decoder must accept the candidate.")
+		r.addError("profile_load", opts.ProfilePath, err.Error(), "The real strict profile catalog and template decoder must accept the candidate.")
 		return r
 	}
 	defer cleanup()
@@ -64,7 +74,7 @@ func validateProfile(opts validationOptions) report {
 	catalog := isolated.catalog
 	profile, ok := catalog.Get(isolated.profileName)
 	if !ok {
-		r.addError("profile_catalog", opts.profilePath, "candidate missing from isolated runtime catalog", "Exact profile selection cannot succeed without the candidate.")
+		r.addError("profile_catalog", opts.ProfilePath, "candidate missing from isolated runtime catalog", "Exact profile selection cannot succeed without the candidate.")
 		return r
 	}
 	r.Profile = profileReport{Name: profile.Name, Match: profile.Match, App: profile.App}
@@ -76,17 +86,17 @@ func validateProfile(opts validationOptions) report {
 
 	authored, err := inspectAuthoredCharts(profile, &r)
 	if err != nil {
-		r.addError("profile_template", opts.profilePath, err.Error(), "Priority policy is checked on the authored profile before collector merge/defaulting.")
+		r.addError("profile_template", opts.ProfilePath, err.Error(), "Priority policy is checked on the authored profile before collector merge/defaulting.")
 		return r
 	}
 	r.Counts.AuthoredCharts = len(authored)
 
-	ctx, cancel := context.WithTimeout(context.Background(), validationTimeout)
+	ctx, cancel := context.WithTimeout(parent, validationTimeout)
 	defer cancel()
 
 	rawSamples, err := scrapeRawSamples(ctx, isolated.fileURL)
 	if err != nil {
-		r.addError("dump_parse", opts.dumpPath, err.Error(), "The real Prometheus sample parser must accept the supplied exposition before job shaping.")
+		r.addError("dump_parse", opts.DumpPath, err.Error(), "The real Prometheus sample parser must accept the supplied exposition before job shaping.")
 		return r
 	}
 	if duplicates := prompkg.FindSampleDuplicates(rawSamples); len(duplicates) > 0 {
@@ -108,14 +118,14 @@ func validateProfile(opts validationOptions) report {
 	}
 	rawFamilies, err := prompkg.Assemble(rawSamples)
 	if err != nil {
-		r.addError("dump_assemble", opts.dumpPath, err.Error(), "The production Prometheus assembler must accept the classified evidence batch.")
+		r.addError("dump_assemble", opts.DumpPath, err.Error(), "The production Prometheus assembler must accept the classified evidence batch.")
 		return r
 	}
 	r.RawFamilies, r.Counts.RawLogicalSeries = inventoryRawFamilies(rawFamilies)
 	r.Counts.RawFamilies = len(r.RawFamilies)
 	authoredTemplate, err := profile.Template()
 	if err != nil {
-		r.addError("profile_template", opts.profilePath, err.Error(), "Observed semantic prompts require the same strictly decoded authored template.")
+		r.addError("profile_template", opts.ProfilePath, err.Error(), "Observed semantic prompts require the same strictly decoded authored template.")
 		return r
 	}
 	addAuthoredProfileHeuristics(authoredTemplate, r.RawFamilies, &r)
@@ -128,13 +138,13 @@ func validateProfile(opts validationOptions) report {
 	)
 	r.Job = applyJobPolicy(coll, policy, isolated.fileURL, isolated.profileName)
 	if err := coll.Init(ctx); err != nil {
-		r.addError("collector_init", opts.jobPath, err.Error(), "Selector, relabeling, fallback typing, limits, and exact profile selection are validated by the real collector.")
+		r.addError("collector_init", opts.JobPath, err.Error(), "Selector, relabeling, fallback typing, limits, and exact profile selection are validated by the real collector.")
 		return r
 	}
 	defer coll.Cleanup(context.Background())
 	writerEligibility, err := coll.InspectWriterEligibility(rawFamilies)
 	if err != nil {
-		r.addError("writer_inspection", opts.dumpPath, err.Error(), "Selector policy review must use the initialized production writer policy.")
+		r.addError("writer_inspection", opts.DumpPath, err.Error(), "Selector policy review must use the initialized production writer policy.")
 		return r
 	}
 	writerEligibleFamilies := make(map[string]struct{})
@@ -148,10 +158,10 @@ func validateProfile(opts validationOptions) report {
 		relabelAudits := pipelineSummary.finalize()
 		addRelabelPolicyFindings(relabelAudits, &r)
 		if err := addForwardCompatibilityChecks(ctx, profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r); err != nil {
-			r.addError("forward_compatibility_analysis", opts.jobPath, err.Error(), "Static matcher and relabel analysis must complete within its deterministic work budget.")
+			r.addError("forward_compatibility_analysis", opts.JobPath, err.Error(), "Static matcher and relabel analysis must complete within its deterministic work budget.")
 			return r
 		}
-		r.addError("collector_check", opts.dumpPath, err.Error(), "The candidate must match the post-policy scrape and pass the collector startup gates.")
+		r.addError("collector_check", opts.DumpPath, err.Error(), "The candidate must match the post-policy scrape and pass the collector startup gates.")
 		return r
 	}
 
@@ -164,7 +174,7 @@ func validateProfile(opts validationOptions) report {
 	controller.BeginCycle()
 	if err := coll.Collect(ctx); err != nil {
 		controller.AbortCycle()
-		r.addError("collector_collect", opts.dumpPath, err.Error(), "The real writer pipeline must complete a collection cycle.")
+		r.addError("collector_collect", opts.DumpPath, err.Error(), "The real writer pipeline must complete a collection cycle.")
 		return r
 	}
 	if err := controller.CommitCycleSuccess(); err != nil {
@@ -174,7 +184,7 @@ func validateProfile(opts validationOptions) report {
 	relabelAudits := pipelineSummary.finalize()
 	addRelabelPolicyFindings(relabelAudits, &r)
 	if err := addForwardCompatibilityChecks(ctx, profile, policy, r.RawFamilies, rawSamples, relabelAudits, &r); err != nil {
-		r.addError("forward_compatibility_analysis", opts.jobPath, err.Error(), "Static matcher and relabel analysis must complete within its deterministic work budget.")
+		r.addError("forward_compatibility_analysis", opts.JobPath, err.Error(), "Static matcher and relabel analysis must complete within its deterministic work budget.")
 		return r
 	}
 

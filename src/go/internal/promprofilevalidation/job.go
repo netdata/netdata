@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package main
+package promprofilevalidation
 
 import (
 	"bytes"
@@ -10,40 +10,30 @@ import (
 	"os"
 	"slices"
 
-	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"gopkg.in/yaml.v3"
 )
 
-type validationOptions struct {
-	profilePath string
-	dumpPath    string
-	jobPath     string
+// Options identifies one profile, source-complete exposition dump, and
+// optional safe job-shaping policy to validate.
+type Options struct {
+	ProfilePath string
+	DumpPath    string
+	JobPath     string
 }
 
-// jobPolicy deliberately exposes only shaping settings. Endpoint, credentials,
-// TLS, and profile selection are forced by the validator so a validation run
-// cannot contact an arbitrary service or load a different profile.
-type jobPolicy struct {
-	Name           string             `yaml:"name,omitempty"`
-	Application    string             `yaml:"app,omitempty"`
-	Selector       promselector.Expr  `yaml:"selector,omitempty"`
-	Relabeling     []relabel.Block    `yaml:"relabeling,omitempty"`
-	FallbackType   fallbackTypePolicy `yaml:"fallback_type,omitempty"`
-	ExpectedPrefix string             `yaml:"expected_prefix,omitempty"`
-	MaxTS          *int               `yaml:"max_time_series,omitempty"`
-	MaxTSPerMetric *int               `yaml:"max_time_series_per_metric,omitempty"`
-}
+type jobPolicy = promcollector.Config
 
-type fallbackTypePolicy struct {
-	Gauge   []string `yaml:"gauge,omitempty"`
-	Counter []string `yaml:"counter,omitempty"`
+var allowedJobPolicyKeys = map[string]struct{}{
+	"name": {}, "app": {}, "selector": {}, "relabeling": {},
+	"fallback_type": {}, "expected_prefix": {},
+	"max_time_series": {}, "max_time_series_per_metric": {},
 }
 
 func loadJobPolicy(path string) (jobPolicy, error) {
+	policy := promcollector.DefaultConfig()
 	if path == "" {
-		return jobPolicy{}, nil
+		return policy, nil
 	}
 	if err := validateInputFile(path); err != nil {
 		return jobPolicy{}, fmt.Errorf("job policy: %w", err)
@@ -54,7 +44,9 @@ func loadJobPolicy(path string) (jobPolicy, error) {
 		return jobPolicy{}, fmt.Errorf("read job policy %q: %w", path, err)
 	}
 
-	var policy jobPolicy
+	if err := validateJobPolicyTopLevel(raw); err != nil {
+		return jobPolicy{}, fmt.Errorf("decode job policy %q: %w", path, err)
+	}
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	dec.KnownFields(true)
 	if err := dec.Decode(&policy); err != nil {
@@ -68,34 +60,50 @@ func loadJobPolicy(path string) (jobPolicy, error) {
 		return jobPolicy{}, fmt.Errorf("decode job policy %q: %w", path, err)
 	}
 
-	if policy.MaxTS != nil && *policy.MaxTS < 0 {
+	if policy.MaxTS < 0 {
 		return jobPolicy{}, fmt.Errorf("job policy: max_time_series must be non-negative")
 	}
-	if policy.MaxTSPerMetric != nil && *policy.MaxTSPerMetric < 0 {
+	if policy.MaxTSPerMetric < 0 {
 		return jobPolicy{}, fmt.Errorf("job policy: max_time_series_per_metric must be non-negative")
 	}
 	return policy, nil
 }
 
+func validateJobPolicyTopLevel(raw []byte) error {
+	var document yaml.Node
+	dec := yaml.NewDecoder(bytes.NewReader(raw))
+	if err := dec.Decode(&document); err != nil {
+		return err
+	}
+	var extra any
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("multiple YAML documents are not allowed")
+		}
+		return err
+	}
+	if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
+		return errors.New("job policy must be one YAML mapping")
+	}
+	root := document.Content[0]
+	for i := 0; i < len(root.Content); i += 2 {
+		key := root.Content[i]
+		if key.Kind != yaml.ScalarNode {
+			return fmt.Errorf("job policy key at line %d must be a scalar", key.Line)
+		}
+		if _, ok := allowedJobPolicyKeys[key.Value]; !ok {
+			return fmt.Errorf("field %s not found in capability-limited validation job policy", key.Value)
+		}
+	}
+	return nil
+}
+
 func applyJobPolicy(coll *promcollector.Collector, policy jobPolicy, fileURL, profileName string) effectiveJobReport {
-	if policy.Name == "" {
+	coll.Config = policy
+	if coll.Name == "" {
 		coll.Name = "profile_validation"
-	} else {
-		coll.Name = policy.Name
 	}
-	coll.Application = policy.Application
 	coll.URL = fileURL
-	coll.Selector = policy.Selector
-	coll.Relabeling = slices.Clone(policy.Relabeling)
-	coll.ExpectedPrefix = policy.ExpectedPrefix
-	coll.FallbackType.Gauge = slices.Clone(policy.FallbackType.Gauge)
-	coll.FallbackType.Counter = slices.Clone(policy.FallbackType.Counter)
-	if policy.MaxTS != nil {
-		coll.MaxTS = *policy.MaxTS
-	}
-	if policy.MaxTSPerMetric != nil {
-		coll.MaxTSPerMetric = *policy.MaxTSPerMetric
-	}
 	coll.Profiles = promcollector.ProfilesConfig{
 		Mode: "exact",
 		ModeExact: &promcollector.ProfilesModeConfig{

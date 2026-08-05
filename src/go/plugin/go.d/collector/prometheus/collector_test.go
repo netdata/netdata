@@ -43,6 +43,17 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
+func TestDefaultConfigMatchesNewAndReturnsIndependentValues(t *testing.T) {
+	first := DefaultConfig()
+	second := DefaultConfig()
+	assert.Equal(t, New().Config, first)
+
+	first.Profiles.Mode = "none"
+	assert.Equal(t, "auto", second.Profiles.Mode)
+	assert.Equal(t, 2000, second.MaxTS)
+	assert.Equal(t, 200, second.MaxTSPerMetric)
+}
+
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package main
+package promprofilevalidation
 
 import (
 	"encoding/json"
@@ -15,7 +15,8 @@ const (
 	verdictFail = "FAIL"
 )
 
-type report struct {
+// Report is the deterministic machine-readable result of Validate.
+type Report struct {
 	Verdict             string                               `json:"verdict"`
 	Profile             profileReport                        `json:"profile"`
 	Job                 effectiveJobReport                   `json:"job"`
@@ -36,6 +37,17 @@ type report struct {
 	Findings            []finding                            `json:"findings,omitempty"`
 	EvidenceLimits      []string                             `json:"evidence_limits,omitempty"`
 }
+
+type report = Report
+
+// Passed reports whether validation found no errors.
+func (r Report) Passed() bool { return r.Verdict == verdictPass }
+
+// WriteJSON writes the stable JSON report representation.
+func WriteJSON(w io.Writer, r Report) error { return writeJSONReport(w, r) }
+
+// WriteText writes the human-readable report representation.
+func WriteText(w io.Writer, r Report) error { return writeTextReport(w, r) }
 
 type profileReport struct {
 	Name                 string   `json:"name,omitempty"`

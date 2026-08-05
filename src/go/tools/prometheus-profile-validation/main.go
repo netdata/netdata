@@ -3,11 +3,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/netdata/netdata/go/plugins/internal/promprofilevalidation"
 )
 
 func main() {
@@ -18,11 +21,11 @@ func runCLI(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("prometheus-profile-validation", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
-	var opts validationOptions
+	var opts promprofilevalidation.Options
 	var output string
-	fs.StringVar(&opts.profilePath, "profile", "", "candidate Prometheus profile YAML")
-	fs.StringVar(&opts.dumpPath, "dump", "", "Prometheus exposition dump")
-	fs.StringVar(&opts.jobPath, "job", "", "optional validation job policy YAML")
+	fs.StringVar(&opts.ProfilePath, "profile", "", "candidate Prometheus profile YAML")
+	fs.StringVar(&opts.DumpPath, "dump", "", "Prometheus exposition dump")
+	fs.StringVar(&opts.JobPath, "job", "", "optional validation job policy YAML")
 	fs.StringVar(&output, "output", "text", "report format: text or json")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "Validate a Prometheus chart profile through Netdata's real collector and chartengine.")
@@ -43,7 +46,7 @@ func runCLI(args []string, stdout, stderr io.Writer) int {
 		fs.Usage()
 		return 2
 	}
-	if opts.profilePath == "" || opts.dumpPath == "" {
+	if opts.ProfilePath == "" || opts.DumpPath == "" {
 		fmt.Fprintln(stderr, "--profile and --dump are required")
 		fs.Usage()
 		return 2
@@ -53,18 +56,18 @@ func runCLI(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	report := validateProfile(opts)
+	report := promprofilevalidation.Validate(context.Background(), opts)
 	var err error
 	if output == "json" {
-		err = writeJSONReport(stdout, report)
+		err = promprofilevalidation.WriteJSON(stdout, report)
 	} else {
-		err = writeTextReport(stdout, report)
+		err = promprofilevalidation.WriteText(stdout, report)
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "writing report: %v\n", err)
 		return 2
 	}
-	if report.Verdict == verdictPass {
+	if report.Passed() {
 		return 0
 	}
 	return 1
