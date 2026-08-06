@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/uio.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -47,14 +46,6 @@
 #ifndef PACKET_STATISTICS
 #  define PACKET_STATISTICS 6
 #endif
-#ifndef SO_TIMESTAMPNS
-#  define SO_TIMESTAMPNS 35
-#endif
-/* SCM_TIMESTAMPNS is the cmsg_type used by the kernel to return SO_TIMESTAMPNS data. */
-#ifndef SCM_TIMESTAMPNS
-#  define SCM_TIMESTAMPNS SO_TIMESTAMPNS
-#endif
-
 /* Mirror of struct tpacket_stats from <linux/if_packet.h> — stable Linux ABI.
  * Prefixed to avoid collision if a kernel header is in scope. */
 struct netdata_tpacket_stats {
@@ -191,40 +182,17 @@ static uint64_t dns_now_us(void)
     return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)(ts.tv_nsec / 1000);
 }
 
-/* Receive one frame from fd with a per-packet kernel timestamp.
- * Uses SO_TIMESTAMPNS ancillary data so latency = response_ts - query_ts
- * measures true network RTT rather than drain-batch position.
- * Falls back to dns_now_us() if the kernel does not deliver a timestamp
- * (SO_TIMESTAMPNS not set, or not supported). */
+/* Receive one frame from fd and set *ts_us to CLOCK_MONOTONIC time.
+ * All TTL and pending-timeout checks use dns_now_us() (CLOCK_MONOTONIC), so
+ * per-packet timestamps must also use CLOCK_MONOTONIC or elapsed-time
+ * comparisons underflow. Per-packet MONOTONIC kernel timestamps would require
+ * SO_CLOCKID (Linux 5.0+) with SOF_TIMESTAMPING_SOFTWARE; left as a future
+ * improvement. */
 static ssize_t dns_recv_ts(int fd, char *buf, size_t buf_sz, uint64_t *ts_us)
 {
-    char cmsg_buf[CMSG_SPACE(sizeof(struct timespec))];
-    struct iovec  iov;
-    struct msghdr msg;
-
-    iov.iov_base = buf;
-    iov.iov_len  = buf_sz;
-
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_iov        = &iov;
-    msg.msg_iovlen     = 1;
-    msg.msg_control    = cmsg_buf;
-    msg.msg_controllen = sizeof(cmsg_buf);
-
-    ssize_t n = recvmsg(fd, &msg, MSG_DONTWAIT);
-    if (n < 0)
-        return n;
-
-    for (struct cmsghdr *cm = CMSG_FIRSTHDR(&msg); cm; cm = CMSG_NXTHDR(&msg, cm)) {
-        if (cm->cmsg_level == SOL_SOCKET && cm->cmsg_type == SCM_TIMESTAMPNS) {
-            struct timespec ts;
-            memcpy(&ts, CMSG_DATA(cm), sizeof(ts));
-            *ts_us = (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
-            return n;
-        }
-    }
-
-    *ts_us = dns_now_us();
+    ssize_t n = recv(fd, buf, buf_sz, MSG_DONTWAIT);
+    if (n >= 0)
+        *ts_us = dns_now_us();
     return n;
 }
 
@@ -800,12 +768,6 @@ static int dns_open_flow_socket(void)
                 "ebpf-go: dns: SO_RCVBUF(%d) failed (errno %d); using default\n",
                 rcvbuf, errno);
 
-    int ts_enable = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_TIMESTAMPNS, &ts_enable, sizeof(ts_enable)) < 0)
-        fprintf(stderr,
-                "ebpf-go: dns: SO_TIMESTAMPNS failed (errno %d); latency will use drain time\n",
-                errno);
-
     if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
                    &flow_filter, sizeof(flow_filter)) < 0) {
         fprintf(stderr, "ebpf-go: dns: SO_ATTACH_FILTER failed (errno %d)\n", errno);
@@ -858,12 +820,6 @@ static int dns_attach_filter(struct netdata_dns_runtime *rt, const char *prog_na
         fprintf(stderr, "ebpf-go: dns: socket() failed (errno %d)\n", errno);
         return -1;
     }
-
-    int ts_enable = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_TIMESTAMPNS, &ts_enable, sizeof(ts_enable)) < 0)
-        fprintf(stderr,
-                "ebpf-go: dns: SO_TIMESTAMPNS failed (errno %d); latency will use drain time\n",
-                errno);
 
     if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, &prog_fd, sizeof(prog_fd)) < 0) {
         fprintf(stderr, "ebpf-go: dns: SO_ATTACH_BPF failed (errno %d)\n", errno);
