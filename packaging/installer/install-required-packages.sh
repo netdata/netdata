@@ -303,7 +303,9 @@ user_picks_distribution() {
     exit 1
   fi
 
-  if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ] && [ -z "${swupd}" ] && [ -z "${brew}" ] && [ -z "${pkg}" ]; then
+  # This guard must stay in sync with the list of installers offered below: a
+  # manager that is offered but missing here makes its menu entry unreachable.
+  if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ] && [ -z "${swupd}" ] && [ -z "${zypper}" ] && [ -z "${brew}" ] && [ -z "${pkg}" ]; then
     echo >&2 "And it seems I cannot find a known package manager in this system."
     echo >&2 "Please open a github issue to help us support your system too."
     exit 1
