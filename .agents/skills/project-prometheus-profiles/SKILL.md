@@ -894,6 +894,12 @@ Choose and record one metadata disposition:
 When application-specific metadata is added or updated:
 
 - keep `metadata.yaml` as the source of truth;
+- omit job `profiles` so the example exercises the shipped default `auto` mode. The application profile and every
+  independently available support profile MUST select from their own source namespace; do not copy the proof bundle's
+  exact candidate-plus-support composition into deployment configuration. Exact proof composition isolates declared
+  dependencies, while an exact job would make every named optional support namespace mandatory;
+- omit job `app` when automatic selection provides one unambiguous application identity. Set it only for an intentional
+  override, genuine conflicting-profile disambiguation, or an endpoint for which no selected profile supplies an app;
 - distill the operator model into a brief public description of the entities,
   capabilities, and processing stages the profile organizes;
 - place that brief in the integration overview rather than copying the complete
@@ -941,7 +947,7 @@ The compact proof contains:
   paths, replay results, counts, or commands owned elsewhere;
 - `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the
   objective validator. Its deployable fields agree with the recommended
-  metadata example; `future_inputs`, when required, are validation-only;
+  metadata example, including omission of a redundant job `app`; `future_inputs`, when required, are validation-only;
 - `proof.yaml` is the discovered machine descriptor. Fixed local/external paths
   are derived from its profile; it owns explicit supporting-profile composition,
   per-case composition exceptions, source-inventory expectations, named replay
@@ -953,6 +959,11 @@ The compact proof contains:
 - `VALIDATION.md` explains how to interpret source-complete, supplemental, and
   job-policy cases without repeating their machine facts or per-profile replay
   commands.
+
+Stock artifact tests MUST reject explicit `profiles` and redundant `app` in proof-linked application metadata examples.
+They then run the source-complete fixture through that metadata job and assert the exact automatically selected profile
+set and profile-derived application context. Generic job `profiles` modes and `app` remain valid deployment controls;
+this is a stock-example authoring rule, not a runtime restriction.
 
 The external profile-evidence directory contains:
 

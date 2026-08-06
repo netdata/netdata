@@ -968,7 +968,7 @@ func configureProfileJobFromMetadata(
 	collr *Collector,
 	integrationID, profileName, jobName string,
 	supportingProfileNames ...string,
-) {
+) []string {
 	t.Helper()
 
 	var metadata struct {
@@ -1017,17 +1017,23 @@ func configureProfileJobFromMetadata(
 		break
 	}
 	require.NotNilf(t, config, "metadata integration %q has no job %q", integrationID, jobName)
-	entries := []ProfileEntryConfig{{Name: profileName}}
-	for _, name := range supportingProfileNames {
-		entries = append(entries, ProfileEntryConfig{Name: name})
-	}
-	require.Equal(t, ProfilesConfig{
-		Mode:      "exact",
-		ModeExact: &ProfilesModeConfig{Entries: entries},
-	}, config.Profiles)
+	require.Empty(t, config.Application, "stock metadata must derive app identity from the application profile")
+	require.Equal(t, ProfilesConfig{Mode: profilesModeAuto}, config.Profiles,
+		"stock metadata must exercise automatic profile selection")
 
 	config.URL = collr.URL
 	collr.Config = *config
+	return append([]string{profileName}, supportingProfileNames...)
+}
+
+func requireSelectedProfiles(t *testing.T, collr *Collector, expected ...string) {
+	t.Helper()
+	require.NotNil(t, collr.runtime)
+	actual := make([]string, 0, len(collr.runtime.profiles))
+	for _, profile := range collr.runtime.profiles {
+		actual = append(actual, profile.Name)
+	}
+	require.ElementsMatch(t, expected, actual)
 }
 
 // TestCollector_VLLMProfileAllMetrics proves the stock profile against a
@@ -1044,10 +1050,11 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 
 	collr := New()
 	collr.URL = srv.URL
-	configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm", "vllm",
+	expectedProfiles := configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm", "vllm",
 		"fastapi", "process_runtime", "python_gc")
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
+	requireSelectedProfiles(t, collr, expectedProfiles...)
 
 	cc := cycle(t, collr.MetricStore())
 	cc.BeginCycle()
@@ -1187,7 +1194,7 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 func testCollectorStockProfileAllMetrics(
 	t *testing.T,
 	fixture string,
-	configure func(*Collector),
+	configure func(*Collector) []string,
 	contextPrefix string,
 	requiredContexts map[string][]string,
 	inspectStore func(metrix.Reader),
@@ -1205,11 +1212,15 @@ func testCollectorStockProfileAllMetrics(
 	collr := New()
 	collr.URL = srv.URL
 	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	var expectedProfiles []string
 	if configure != nil {
-		configure(collr)
+		expectedProfiles = configure(collr)
 	}
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
+	if expectedProfiles != nil {
+		requireSelectedProfiles(t, collr, expectedProfiles...)
+	}
 
 	cc := cycle(t, collr.MetricStore())
 	cc.BeginCycle()
@@ -1266,8 +1277,8 @@ func TestCollector_VLLMRayProfileAllMetrics(t *testing.T) {
 	testCollectorStockProfileAllMetrics(
 		t,
 		"prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom",
-		func(collr *Collector) {
-			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm_ray", "vllm-ray")
+		func(collr *Collector) []string {
+			return configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm_ray", "vllm-ray")
 		},
 		"prometheus.vllm.",
 		map[string][]string{
@@ -1341,8 +1352,8 @@ func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
 	testCollectorStockProfileAllMetrics(
 		t,
 		"prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom",
-		func(collr *Collector) {
-			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-litellm", "litellm", "litellm",
+		func(collr *Collector) []string {
+			return configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-litellm", "litellm", "litellm",
 				"process_runtime", "python_gc")
 		},
 		"prometheus.litellm.",
@@ -1580,8 +1591,8 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 	testCollectorStockProfileAllMetrics(
 		t,
 		"prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom",
-		func(collr *Collector) {
-			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr",
+		func(collr *Collector) []string {
+			return configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr",
 				"process_runtime")
 		},
 		"prometheus.ceph.",
@@ -1923,15 +1934,17 @@ func TestCollector_CephProfileProducerVariants(t *testing.T) {
 			testCollectorStockProfileAllMetrics(
 				t,
 				test.fixture,
-				func(collr *Collector) {
-					configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", test.jobName,
+				func(collr *Collector) []string {
+					expectedProfiles := configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", test.jobName,
 						"process_runtime")
 					if test.candidateOnly {
 						collr.Profiles = ProfilesConfig{
 							Mode:      "exact",
 							ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "ceph"}}},
 						}
+						return []string{"ceph"}
 					}
+					return expectedProfiles
 				},
 				"prometheus.ceph.",
 				map[string][]string{test.context: test.dims},

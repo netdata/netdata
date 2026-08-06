@@ -23,5 +23,6 @@ selector dispositions; `proof.yaml` and replay tests own executable behavior.
 
 ## Composition boundary
 
-The profile deliberately has no `app`. The selected job supplies the application namespace, allowing the same HTTP views to
-compose with application-owned profiles while keeping application-specific chart contexts.
+The profile deliberately has no `app`. An automatically selected application profile supplies the resolved application
+namespace, allowing the same HTTP views to compose while keeping application-specific chart contexts. A standalone job
+may still set `app` when no application profile is present.

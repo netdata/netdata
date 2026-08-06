@@ -23,5 +23,6 @@ selector dispositions; `proof.yaml` and replay tests own executable behavior.
 
 ## Composition boundary
 
-The profile deliberately has no `app`. The selected job supplies the application namespace, so the same runtime views can
-compose with multiple application profiles without assigning them to a generic plugin-wide context.
+The profile deliberately has no `app`. An automatically selected application profile supplies the resolved application
+namespace, so the same runtime views can compose without receiving a generic plugin-wide context. A standalone job may
+still set `app` when no application profile is present.

@@ -7,10 +7,10 @@ profile contribution must make a deliberate catalog disposition.
 ## What each catalog controls
 
 - **Profile catalog:** `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/*.yaml`
-  controls runtime profile matching, scoped autogen policy, and chart templates.
-  The strict profile header accepts only `match`, `app`, `autogen`, and
-  `template` (`src/go/plugin/go.d/collector/prometheus/promprofiles/profile.go:19-29`,
-  `:133-161`).
+  controls runtime profile matching, app identity, profile-owned fallback and
+  relabel policy, scoped autogen policy, and chart templates. The strict
+  profile envelope is decoded by
+  `src/go/plugin/go.d/collector/prometheus/promprofiles/profile.go`.
 - **Integration catalog:** `metadata.yaml` controls public integration entries
   and generated documentation. Discovery uses the `*/metadata.yaml` pattern and
   enumerated collector roots (`integrations/_common.py:16-29`, `:96-111`,
@@ -45,13 +45,21 @@ For every stock profile:
      entry would be misleading, and record the concrete product reason.
 3. Keep collector `metadata.yaml` authoritative. Do not add documentation keys
    to the strict runtime profile envelope.
-4. Put a short operator-model brief in
+4. Omit job `profiles` from application examples so they exercise default
+   automatic selection. Do not copy proof-descriptor candidate/support
+   composition into deployment configuration; exact proof composition isolates
+   declared evidence dependencies, while an exact job makes every named support
+   namespace mandatory.
+5. Omit job `app` when automatic selection provides one unambiguous application
+   identity. Keep it only for an intentional override, genuine app conflict, or
+   an endpoint for which no selected profile supplies one.
+6. Put a short operator-model brief in
    `overview.data_collection.metrics_description`. Summarize the entities,
    capabilities, and processing stages; do not copy the complete chart/family
    ledger.
-5. Run the normal integration generators and commit the required generated
+7. Run the normal integration generators and commit the required generated
    Markdown. Do not hand-edit generated integration pages.
-6. Preserve the Prometheus taxonomy opt-out unless the runtime collector gains
+8. Preserve the Prometheus taxonomy opt-out unless the runtime collector gains
    a real stable-context contract.
 
 ## Validation
@@ -60,6 +68,9 @@ For every stock profile:
 - Regenerate the application integration page and, when the catalog gains or
   loses an entry, `src/collectors/COLLECTORS.md`.
 - Run `python3 integrations/gen_taxonomy.py --check-only`.
+- Run the source-complete collector regression through the metadata job and
+  assert the exact automatically selected application/support set plus the
+  profile-derived application context.
 - Confirm the gitignored `integrations/integrations.js`,
   `integrations/integrations.json`, and `integrations/taxonomy.json` are not
   staged or committed.

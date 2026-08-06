@@ -1,5 +1,4 @@
 name: ceph-mgr
-app: ceph
 future_inputs:
   - name: ceph_data_sync_from_future_probe
   - name: ceph_objecter_0xF00DFACE_op_active

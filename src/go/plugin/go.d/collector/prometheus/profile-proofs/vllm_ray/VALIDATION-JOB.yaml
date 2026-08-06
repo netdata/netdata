@@ -1,3 +1,2 @@
 name: vllm-ray
-app: vllm
 expected_prefix: ray_vllm_

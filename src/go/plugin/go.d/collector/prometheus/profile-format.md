@@ -384,6 +384,10 @@ chart contexts, which the Netdata UI turns into an Applications dashboard sectio
 last resort. Stock profiles set `app` and `template.context_namespace` to the profile name so contexts stay short and
 aligned; follow that convention.
 
+Stock application metadata examples omit the job `app` when their automatically selected profiles provide one
+unambiguous application identity. Set a job `app` only for an intentional override, to disambiguate selected profiles
+that declare different apps, or when no selected profile supplies an app.
+
 ## Chart template rules
 
 The `template` value is one group of Netdata's dynamic chart-template format. See the complete
@@ -468,6 +472,11 @@ the stock nor the user catalog is a configuration error in both modes. Scraped m
 profile keep their generic autogen charts unless an applicable profile `autogen.selector` rejects them. Use
 `autogen.selector` to constrain fallback charts while retaining samples; use the job's `selector` or a `relabeling`
 drop rule to discard samples.
+
+Stock application examples rely on the default `auto` mode and omit `profiles`. Their application and reusable
+support profiles must select from their own exporter signatures. Copying the proof bundle's exact
+candidate-plus-support list into the job would make every named optional support namespace mandatory. Exact selection
+remains useful while developing a user profile or when an operator deliberately wants to pin deployment policy.
 
 When selected profiles contain fallback classification or relabeling, the mode also determines policy precedence:
 `auto` uses profile-name order, `exact` uses entry order, and `combined` tries its configured entries first and then the

@@ -4578,25 +4578,19 @@ modules:
               folding:
                 enabled: false
               description: |
-                Collect the cluster-wide MGR endpoint and a local official ceph-exporter endpoint with the same exact profile
-                contract. Repeat the exporter job for every exporter endpoint. The profile preserves source labels that
-                collide with Netdata's Prometheus re-export labels under a `ceph_` prefix, retain opaque dynamic group keys, and
-                normalize only source families whose suffix grammar is unambiguous.
+                Collect the cluster-wide MGR endpoint and a local official ceph-exporter endpoint with the automatically
+                matched Ceph and process-runtime profiles. Repeat the exporter job for every exporter endpoint. The Ceph
+                profile preserves source labels that collide with Netdata's Prometheus re-export labels under a `ceph_`
+                prefix, retains opaque dynamic group keys, and normalizes only source families whose suffix grammar is
+                unambiguous.
               config: |
                 jobs:
                   - &ceph_job
                     name: ceph-mgr
                     url: http://127.0.0.1:9283/metrics
-                    app: ceph
                     expected_prefix: ceph_
                     max_time_series: 20000
                     max_time_series_per_metric: 4000
-                    profiles:
-                      mode: exact
-                      mode_exact:
-                        entries:
-                          - name: ceph
-                          - name: process_runtime
                   - <<: *ceph_job
                     name: ceph-exporter
                     url: http://127.0.0.1:9926/metrics
@@ -4669,20 +4663,14 @@ modules:
             - name: LiteLLM
               folding:
                 enabled: false
-              description: Collect the complete LiteLLM surface with application, process-runtime, and Python-GC profiles.
+              description: |
+                Collect the complete LiteLLM surface with automatically matched application, process-runtime, and Python-GC
+                profiles.
               config: |
                 jobs:
                   - name: litellm
                     url: http://127.0.0.1:4000/metrics
-                    app: litellm
                     expected_prefix: litellm_
-                    profiles:
-                      mode: exact
-                      mode_exact:
-                        entries:
-                          - name: litellm
-                          - name: process_runtime
-                          - name: python_gc
 
   - <<: *module
     meta:
@@ -4735,37 +4723,24 @@ modules:
             - name: Native vLLM
               folding:
                 enabled: false
-              description: Collect native vLLM server metrics with application, FastAPI, process-runtime, and Python-GC profiles.
+              description: |
+                Collect native vLLM server metrics with automatically matched application, FastAPI, process-runtime, and
+                Python-GC profiles.
               config: |
                 jobs:
                   - name: vllm
                     url: http://127.0.0.1:8000/metrics
-                    app: vllm
                     expected_prefix: 'vllm:'
-                    profiles:
-                      mode: exact
-                      mode_exact:
-                        entries:
-                          - name: vllm
-                          - name: fastapi
-                          - name: process_runtime
-                          - name: python_gc
             - name: vLLM on Ray
               description: |
-                Collect vLLM families from a Ray node metrics endpoint. The profile removes Ray 2.48's deprecated unsuffixed
-                compatibility gauges and vLLM's pre-canonical KV-offload duplicates. Other Ray system families remain
-                available for generic collection or another matching profile.
+                Collect vLLM families from a Ray node metrics endpoint. The automatically matched profile removes Ray 2.48's
+                deprecated unsuffixed compatibility gauges and vLLM's pre-canonical KV-offload duplicates. Other Ray system
+                families remain available for generic collection or another matching profile.
               config: |
                 jobs:
                   - name: vllm-ray
                     url: http://127.0.0.1:8080
-                    app: vllm
                     expected_prefix: ray_vllm_
-                    profiles:
-                      mode: exact
-                      mode_exact:
-                        entries:
-                          - name: vllm_ray
 
   - <<: *module
     meta:

@@ -5,6 +5,7 @@ package promprofiles
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/internal/promprofileproof"
 	"github.com/netdata/netdata/go/plugins/internal/promtestdata"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
@@ -381,9 +383,9 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 	require.NoError(t, err)
 
 	type disposition struct {
-		metadataPath         string
-		integrationID        string
-		mustReferenceProfile bool
+		metadataPath       string
+		integrationID      string
+		mustBeProofSupport bool
 	}
 	dispositions := map[string]disposition{
 		"ceph": {
@@ -391,9 +393,9 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 			integrationID: "collector-go.d.plugin-prometheus-ceph",
 		},
 		"fastapi": {
-			metadataPath:         "../metadata.yaml",
-			integrationID:        "collector-go.d.plugin-prometheus-vllm",
-			mustReferenceProfile: true,
+			metadataPath:       "../metadata.yaml",
+			integrationID:      "collector-go.d.plugin-prometheus-vllm",
+			mustBeProofSupport: true,
 		},
 		"haproxy": {
 			metadataPath:  "../../haproxy/metadata.yaml",
@@ -404,14 +406,14 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 			integrationID: "collector-go.d.plugin-prometheus-litellm",
 		},
 		"process_runtime": {
-			metadataPath:         "../metadata.yaml",
-			integrationID:        "collector-go.d.plugin-prometheus-ceph",
-			mustReferenceProfile: true,
+			metadataPath:       "../metadata.yaml",
+			integrationID:      "collector-go.d.plugin-prometheus-ceph",
+			mustBeProofSupport: true,
 		},
 		"python_gc": {
-			metadataPath:         "../metadata.yaml",
-			integrationID:        "collector-go.d.plugin-prometheus-litellm",
-			mustReferenceProfile: true,
+			metadataPath:       "../metadata.yaml",
+			integrationID:      "collector-go.d.plugin-prometheus-litellm",
+			mustBeProofSupport: true,
 		},
 		"vllm": {
 			metadataPath:  "../metadata.yaml",
@@ -421,6 +423,23 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 			metadataPath:  "../metadata.yaml",
 			integrationID: "collector-go.d.plugin-prometheus-vllm",
 		},
+	}
+	repoRoot, err := filepath.Abs("../../../../../../..")
+	require.NoError(t, err)
+	bundles, err := promprofileproof.Discover(repoRoot)
+	require.NoError(t, err)
+	proofSupports := make(map[string]map[string]bool)
+	for _, bundle := range bundles {
+		identity := bundle.Descriptor.Validation.MetadataExample
+		if identity == nil {
+			continue
+		}
+		if proofSupports[identity.IntegrationID] == nil {
+			proofSupports[identity.IntegrationID] = make(map[string]bool)
+		}
+		for _, support := range bundle.Descriptor.SupportingProfiles {
+			proofSupports[identity.IntegrationID][support.Name] = true
+		}
 	}
 
 	profiles := catalog.OrderedProfiles()
@@ -437,9 +456,10 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 		require.NoErrorf(t, err, "read metadata disposition for stock profile %q", name)
 		require.Containsf(t, string(content), "id: "+disposition.integrationID,
 			"metadata disposition for stock profile %q must reference integration %q", name, disposition.integrationID)
-		if disposition.mustReferenceProfile {
-			require.Containsf(t, string(content), "- name: "+name,
-				"metadata disposition for shared stock profile %q must select that profile", name)
+		if disposition.mustBeProofSupport {
+			require.Truef(t, proofSupports[disposition.integrationID][name],
+				"metadata disposition for shared stock profile %q must be declared by an application proof for %q",
+				name, disposition.integrationID)
 		}
 	}
 }

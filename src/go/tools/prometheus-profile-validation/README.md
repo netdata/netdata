@@ -97,7 +97,6 @@ The job file accepts only settings that shape the captured dump:
 
 ```yaml
 name: exporter
-app: exporter
 selector:
   allow: ['exporter_*']
   deny: [exporter_requests_created]
@@ -124,6 +123,11 @@ The schema has no URL, authentication, TLS, or profile-selection fields. The
 tool snapshots the dump, forces an isolated `file://` endpoint, empties ambient
 profile catalogs, and selects only the supplied candidate. Unknown job keys and
 multiple job documents fail.
+
+`app` remains an accepted deployment-shaped field for an intentional override or for disambiguating profiles that
+declare different apps. Omit it when the selected application profile already supplies the intended identity; stock
+application proof jobs follow that rule. Supporting-profile composition is declared separately by the proof descriptor
+and passed to the validator as isolated exact selection, never copied into the job policy.
 
 `future_inputs` are validator-only raw samples. `name` is required; `type` is
 optional (`gauge` by default, `counter`, or `untyped`); and `labels` is an

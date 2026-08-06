@@ -16,6 +16,7 @@ owns exact family and selector dispositions; `proof.yaml` and replay tests own e
 
 ## Composition boundary
 
-The profile deliberately has no `app`. The selected job supplies the application namespace, so the same Python GC views
-can compose with multiple application profiles without assigning them to a generic plugin-wide context. Its charts retain
-the shared `Process Runtime` family and `process_runtime` context namespace used before the selection split.
+The profile deliberately has no `app`. An automatically selected application profile supplies the resolved application
+namespace, so the same Python GC views can compose without receiving a generic plugin-wide context. A standalone job may
+still set `app` when no application profile is present. Its charts retain the shared `Process Runtime` family and
+`process_runtime` context namespace used before the selection split.

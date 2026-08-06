@@ -100,8 +100,8 @@ integrity:
     sha256: 62d286679e14c5bd89bacdc03b6094507745892c5e94e9e63b8ed5ff37fd8796
     bytes: 7052
   validation_job:
-    sha256: a0296c6021aa91692bb50b03ba061b4a73ff79baacc8c6cd93493440c8d09b65
-    bytes: 46
+    sha256: 14553e24cda6540e33a3fffaf2f0730c4a46a859b251652b70f4e328528950a3
+    bytes: 36
   validation_summary:
     sha256: a1ca148b6810b195e0033d0559e1cce35c31d01a9141743184cd938f888d05eb
     bytes: 1866

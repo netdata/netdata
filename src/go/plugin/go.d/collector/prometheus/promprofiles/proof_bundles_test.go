@@ -140,8 +140,11 @@ func assertProofJobMatchesMetadata(
 		}
 	}
 	require.NotNilf(t, metadataJob, "metadata job %q in example %q", identity.JobName, identity.ExampleName)
+	require.NotContains(t, metadataJob, "profiles",
+		"stock metadata examples must exercise automatic profile selection")
+	require.NotContains(t, metadataJob, "app",
+		"stock metadata examples must use the unambiguous app supplied by the selected application profile")
 	delete(metadataJob, "url")
-	delete(metadataJob, "profiles")
 
 	var validationJob map[string]any
 	jobPath := filepath.Join(repoRoot, filepath.FromSlash(bundle.ValidationJobPath()))
@@ -150,5 +153,5 @@ func assertProofJobMatchesMetadata(
 	require.NoError(t, yaml.Unmarshal(content, &validationJob))
 	delete(validationJob, "future_inputs")
 	require.Equal(t, metadataJob, validationJob,
-		"proof validation job must match metadata after removing endpoint/profile selection and validation-only inputs")
+		"proof validation job must match metadata after removing the endpoint and validation-only inputs")
 }

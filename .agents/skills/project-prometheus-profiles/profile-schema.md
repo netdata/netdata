@@ -142,6 +142,10 @@ template:
 - `app` is OPTIONAL and must match the profile-name syntax. The resolved job app
   becomes the application segment in contexts. Precedence is configured job
   `app`, then the first selected profile `app`, then job name.
+- Stock application metadata examples omit job `profiles` and use default
+  automatic selection. They also omit job `app` when the selected profiles
+  provide one unambiguous identity. Proof descriptors keep explicit supporting
+  profiles because isolated validation composition is evidence, not job policy.
 - `template` is REQUIRED and must contain at least one chart. Its value is a
   recursive `charttpl.Group`.
 - The file basename is profile identity. Use lowercase letters, digits, and
