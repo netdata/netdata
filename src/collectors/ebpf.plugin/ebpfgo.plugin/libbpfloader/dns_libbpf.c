@@ -614,7 +614,6 @@ static bool dns_parse_raw_packet(
         client_port = dport;
     }
 
-    dns_expire_pending(rt, now_us);
     dns_process_packet(rt, now_us, !is_resp_flag, proto, ip_version,
                        server_ip, client_ip, client_port,
                        tx_id, domain, query_type, rcode);
@@ -957,6 +956,11 @@ int netdata_dns_runtime_flow_snapshot(
         return 0;
 
     uint64_t now_us = dns_now_us();
+    /* Expire pending entries once, after all buffered packets have been
+     * drained and matched.  Calling this per-packet (inside dns_parse_raw_packet)
+     * caused false timeouts: a response buffered for < 5 s was unreachable
+     * because its pending slot was expired before dns_process_packet ran. */
+    dns_expire_pending(rt, now_us);
     int      count  = 0;
 
     /* head is the next write slot (monotonically increasing).
