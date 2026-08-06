@@ -334,6 +334,10 @@ func TestLoadFromDirs_stockFallbackTypeHydratesLazily(t *testing.T) {
 			fallbackType: "\n  gauge: ['   ']",
 			wantErr:      "'fallback_type.gauge[0]' must not be empty",
 		},
+		"padded gauge pattern": {
+			fallbackType: "\n  gauge: [' app_value ']",
+			wantErr:      "'fallback_type.gauge[0]' must not have leading or trailing whitespace",
+		},
 		"invalid counter pattern": {
 			fallbackType: "\n  counter: ['[']",
 			wantErr:      "'fallback_type.counter[0]'",

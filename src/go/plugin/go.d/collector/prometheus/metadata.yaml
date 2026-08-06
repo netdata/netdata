@@ -132,7 +132,8 @@ modules:
                 Selected profiles may provide exporter-owned `fallback_type` defaults inside their own `match` scope.
                 Job gauge rules take precedence over job counter rules, and both job rule sets take precedence over
                 every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
-                belongs in a profile.
+                belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
+                counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
 
                 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
                 - Option syntax:

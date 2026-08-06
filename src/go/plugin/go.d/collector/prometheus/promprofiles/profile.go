@@ -4,6 +4,7 @@ package promprofiles
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -34,11 +35,19 @@ type autogen struct {
 	Selector *metrixselector.Expr `yaml:"selector"`
 }
 
-// FallbackType classifies untyped scalar families selected by a profile.
-// Patterns use the same glob syntax as job-level fallback_type.
+// FallbackType is the shared job/profile policy for classifying untyped scalar
+// families. The JSON tags serve the collector's job configuration schema.
 type FallbackType struct {
 	Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
 	Counter []string `yaml:"counter,omitempty" json:"counter"`
+}
+
+// Validate enforces the shared job/profile fallback pattern contract.
+func (f FallbackType) Validate() error {
+	return errors.Join(
+		validateFallbackPatterns("gauge", f.Gauge),
+		validateFallbackPatterns("counter", f.Counter),
+	)
 }
 
 // Profile is a curated, exporter-specific chart profile. Identity is the file
@@ -251,30 +260,36 @@ func parseFallbackType(name string, raw []byte) (FallbackType, error) {
 	if doc.FallbackType == nil {
 		return FallbackType{}, fmt.Errorf("profile %q: 'fallback_type' must not be empty", name)
 	}
-	ft := cloneFallbackType(*doc.FallbackType)
+	ft := *doc.FallbackType
 	if len(ft.Gauge) == 0 && len(ft.Counter) == 0 {
-		return FallbackType{}, fmt.Errorf("profile %q: 'fallback_type' must contain at least one gauge or counter pattern", name)
+		return FallbackType{}, fmt.Errorf(
+			"profile %q: 'fallback_type' must contain at least one gauge or counter pattern",
+			name,
+		)
 	}
-	if err := validateFallbackPatterns(name, "gauge", ft.Gauge); err != nil {
-		return FallbackType{}, err
-	}
-	if err := validateFallbackPatterns(name, "counter", ft.Counter); err != nil {
-		return FallbackType{}, err
+	if err := ft.Validate(); err != nil {
+		return FallbackType{}, fmt.Errorf("profile %q: %w", name, err)
 	}
 	return ft, nil
 }
 
-func validateFallbackPatterns(name, kind string, patterns []string) error {
+func validateFallbackPatterns(kind string, patterns []string) error {
+	var errs []error
 	for i, pattern := range patterns {
 		path := fmt.Sprintf("fallback_type.%s[%d]", kind, i)
 		if strings.TrimSpace(pattern) == "" {
-			return fmt.Errorf("profile %q: '%s' must not be empty", name, path)
+			errs = append(errs, fmt.Errorf("'%s' must not be empty", path))
+			continue
+		}
+		if pattern != strings.TrimSpace(pattern) {
+			errs = append(errs, fmt.Errorf("'%s' must not have leading or trailing whitespace", path))
+			continue
 		}
 		if _, err := matcher.NewGlobMatcher(pattern); err != nil {
-			return fmt.Errorf("profile %q: '%s' pattern %q: %w", name, path, pattern, err)
+			errs = append(errs, fmt.Errorf("'%s' pattern %q: %w", path, pattern, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func decodeDocumentStrict(raw []byte, dst any) error {

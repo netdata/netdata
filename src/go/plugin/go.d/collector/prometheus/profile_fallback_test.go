@@ -16,15 +16,22 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
-func TestCollector_ProfileFallbackOnlyAppliesDuringCheckAndCollect(t *testing.T) {
+func TestCollector_ProfileFallbackOnlyUsesBoundPipeline(t *testing.T) {
+	profile := testProfileYAMLWithFallbackType("app_*", []string{"app_value"}, nil)
+	profile = strings.ReplaceAll(profile, "test_up", "app_value")
 	catalog := loadTestCatalog(t, map[string]string{
-		"app": testProfileYAMLWithFallbackType("app_*", []string{"app_value"}, nil),
+		"app": profile,
 	})
-	collr, srv := newProfileRelabelCollector(t, catalog, "app_value{id=\"one\"} 7\n", "app")
+	collr, srv := newProfileRelabelCollector(t, catalog, strings.Join([]string{
+		"app_value{id=\"one\"} 7",
+		"other_requests_total 11",
+		"",
+	}, "\n"), "app")
 	defer srv.Close()
 	require.NoError(t, collr.Init(context.Background()))
 
@@ -35,8 +42,33 @@ func TestCollector_ProfileFallbackOnlyAppliesDuringCheckAndCollect(t *testing.T)
 	collectProfileRelabelOnce(t, collr)
 	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	assert.InDelta(t, 7, value(t, got, "app_value", metrix.Labels{"id": "one"}), 1e-9)
+	assert.InDelta(t, 11, value(t, got, "other_requests_total", nil), 1e-9)
 	require.Contains(t, collr.writer.handles, "app_value")
 	assert.Equal(t, commonmodel.MetricTypeGauge, collr.writer.handles["app_value"].typ)
+	require.Contains(t, collr.writer.handles, "other_requests_total")
+	assert.Equal(t, commonmodel.MetricTypeCounter, collr.writer.handles["other_requests_total"].typ)
+
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := engine.PreparePlan(got)
+	require.NoError(t, err)
+	defer attempt.Abort()
+
+	var curatedValue *chartengine.UpdateDimensionValue
+	for _, action := range attempt.Plan().Actions {
+		update, ok := action.(chartengine.UpdateChartAction)
+		if !ok {
+			continue
+		}
+		for i := range update.Values {
+			if update.Values[i].Name == "up" {
+				curatedValue = &update.Values[i]
+			}
+		}
+	}
+	require.NotNil(t, curatedValue, "the profile-classified family must reach its curated chart dimension")
+	assert.InDelta(t, 7, curatedValue.Float64, 1e-9)
 }
 
 func TestCollector_ProfileFallbackUsesPreProfileName(t *testing.T) {

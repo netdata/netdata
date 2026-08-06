@@ -313,7 +313,7 @@
       },
       "fallback_type": {
         "title": "Untyped metrics fallback",
-        "description": "Job-level override that processes untyped metrics as Counter or Gauge instead of ignoring them. Classification uses the post-job, pre-profile metric name; profile relabeling preserves the decision but cannot create or change it. Selected profiles may provide exporter-owned defaults, but job rules take precedence.",
+        "description": "Job-level override that processes untyped metrics as Counter or Gauge instead of ignoring them. Classification uses the post-job, pre-profile metric name; profile relabeling preserves the decision but cannot create or change it. Selected profiles may provide exporter-owned defaults, but job rules take precedence. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.",
         "type": [
           "object",
           "null"
@@ -328,7 +328,8 @@
             ],
             "items": {
               "title": "Pattern",
-              "type": "string"
+              "type": "string",
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
             },
             "uniqueItems": true
           },
@@ -341,7 +342,8 @@
             ],
             "items": {
               "title": "Pattern",
-              "type": "string"
+              "type": "string",
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
             },
             "uniqueItems": true
           }

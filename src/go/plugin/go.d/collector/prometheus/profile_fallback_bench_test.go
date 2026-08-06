@@ -59,7 +59,7 @@ func BenchmarkProfileFallbackResolution(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				got, ok := w.resolveTypeWithProfileFallbacks(
+				got, ok := w.resolveType(
 					tc.metric,
 					commonmodel.MetricTypeUnknown,
 					tc.profiles,

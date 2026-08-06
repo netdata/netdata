@@ -15,6 +15,9 @@ func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("'url' can not be empty")
 	}
+	if err := c.FallbackType.Validate(); err != nil {
+		return err
+	}
 	if err := c.Profiles.validate(); err != nil {
 		return err
 	}

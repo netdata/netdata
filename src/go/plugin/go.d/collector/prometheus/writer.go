@@ -261,7 +261,7 @@ func (w *metricFamilyWriter) bindFallbackTypes(batch *prompkg.SampleBatch, profi
 			continue
 		}
 		declared := sample.FamilyType
-		typ, ok := w.resolveTypeWithProfileFallbacks(sample.Name, declared, profiles, true)
+		typ, ok := w.resolveType(sample.Name, declared, profiles, true)
 		lastName = sample.Name
 		lastDeclared = declared
 		lastResolved = typ
@@ -274,14 +274,10 @@ func (w *metricFamilyWriter) bindFallbackTypes(batch *prompkg.SampleBatch, profi
 }
 
 func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily, allowFallback bool) (commonmodel.MetricType, bool) {
-	return w.resolveType(mf.Name(), mf.Type(), allowFallback)
+	return w.resolveType(mf.Name(), mf.Type(), nil, allowFallback)
 }
 
-func (w *metricFamilyWriter) resolveType(name string, declared commonmodel.MetricType, allowFallback bool) (commonmodel.MetricType, bool) {
-	return w.resolveTypeWithProfileFallbacks(name, declared, nil, allowFallback)
-}
-
-func (w *metricFamilyWriter) resolveTypeWithProfileFallbacks(
+func (w *metricFamilyWriter) resolveType(
 	name string,
 	declared commonmodel.MetricType,
 	profiles []profileFallback,

@@ -214,9 +214,10 @@ attaches the profile to unrelated jobs.
 ### `fallback_type`
 
 `fallback_type` makes a selected profile self-contained when its exporter omits Prometheus `TYPE` metadata for scalar
-metrics. It does not apply to declared gauges, counters, histograms, summaries, state sets, or measure sets. A chart's
-`algorithm` cannot replace this classification: the collector must accept and type the sample before the chart engine
-can route it.
+metrics. Declared gauges, counters, histograms, and summaries retain their declared type. Unsupported declared types,
+such as OpenMetrics info and state-set families, remain unwritable; fallback policy cannot convert them. A chart's
+`algorithm` cannot replace classification: the collector must accept and type the sample before the chart engine can
+route it.
 
 ```yaml
 match: 'example_*'
@@ -230,8 +231,9 @@ template:
   # ...
 ```
 
-- Each item is a Go shell-style glob matched against the exact post-job, pre-profile scalar family name. Both lists are
-  optional, but at least one non-empty pattern is required when `fallback_type` is present.
+- Each item is a Go shell-style glob matched against the exact post-job, pre-profile scalar family name. Patterns must
+  not be blank or have leading or trailing whitespace. Both lists are optional, but at least one pattern is required
+  when `fallback_type` is present.
 - The profile's root `match` is an additional scope guard. A broad fallback glob such as `*` never classifies a family
   outside that selected profile's `match`.
 - Precedence is: declared Prometheus type; job `fallback_type.gauge`; job `fallback_type.counter`; the first selected
@@ -242,7 +244,8 @@ template:
 - Classification is bound before profile relabeling. A rename preserves the chosen type, but a rename cannot make an
   otherwise ineligible sample match `fallback_type` or become a counter merely by adding `_total`.
 - Use profile-owned rules for stable exporter behavior. Use job-owned `fallback_type` only for deployment-specific
-  overrides; job rules deliberately take precedence over every profile.
+  overrides; job rules deliberately take precedence over every profile. Keep job patterns narrow: a broad rule such as
+  `gauge: ['*']` overrides every profile counter classification in its scope.
 
 ### `relabeling`
 
@@ -495,8 +498,7 @@ at all (untyped without `_total` or a profile/job `fallback_type`). When fallbac
 giveaway is the metric appearing as a generic autogen chart instead of in your curated one. Whether a syntactically
 valid selector matches observed series is not validated -- neither the job check nor debug mode flags a selector that
 matches nothing -- so re-run the commands from step 1 and compare the exact series names and label keys against your
-`metrics` lists,
-selectors, and labels.
+`metrics` lists, selectors, and labels.
 
 To contribute a profile to Netdata, add it under `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`. Stock
 profiles are held to a stricter standard than user profiles: a broken stock profile is not skipped -- an invalid header,

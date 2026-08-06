@@ -282,7 +282,7 @@ app_widgets 3
 	}
 }
 
-func TestMetricFamilyWriter_resolveTypeWithProfileFallbacks(t *testing.T) {
+func TestMetricFamilyWriter_resolveType(t *testing.T) {
 	profile := func(root, gauge, counter string) profileFallback {
 		return profileFallback{
 			root:    matcher.Must(matcher.NewSimplePatternsMatcher(root)),
@@ -308,6 +308,22 @@ func TestMetricFamilyWriter_resolveTypeWithProfileFallbacks(t *testing.T) {
 			jobGauge:      "app_value",
 			profiles:      []profileFallback{profile("app_*", "app_value", "no_match")},
 			want:          commonmodel.MetricTypeCounter,
+			wantOK:        true,
+		},
+		"declared histogram wins": {
+			name:          "app_latency_bucket",
+			declared:      commonmodel.MetricTypeHistogram,
+			allowFallback: true,
+			profiles:      []profileFallback{profile("app_*", "app_latency_bucket", "no_match")},
+			want:          commonmodel.MetricTypeHistogram,
+			wantOK:        true,
+		},
+		"declared summary wins": {
+			name:          "app_latency",
+			declared:      commonmodel.MetricTypeSummary,
+			allowFallback: true,
+			profiles:      []profileFallback{profile("app_*", "app_latency", "no_match")},
+			want:          commonmodel.MetricTypeSummary,
 			wantOK:        true,
 		},
 		"job gauge wins over job counter and profile": {
@@ -386,7 +402,7 @@ func TestMetricFamilyWriter_resolveTypeWithProfileFallbacks(t *testing.T) {
 				isFallbackTypeCounter: jobCounter,
 			}}
 
-			got, ok := w.resolveTypeWithProfileFallbacks(tc.name, tc.declared, tc.profiles, tc.allowFallback)
+			got, ok := w.resolveType(tc.name, tc.declared, tc.profiles, tc.allowFallback)
 			assert.Equal(t, tc.wantOK, ok)
 			assert.Equal(t, tc.want, got)
 		})
