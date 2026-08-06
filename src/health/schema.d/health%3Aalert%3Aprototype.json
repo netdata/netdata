@@ -142,8 +142,12 @@
                     "title": "Sum"
                   },
                   {
-                    "const": "incremental_sum",
+                    "const": "incremental-sum",
                     "title": "Incremental Sum"
+                  },
+                  {
+                    "const": "incremental_sum",
+                    "title": "Incremental Sum (legacy spelling)"
                   },
                   {
                     "const": "stddev",
@@ -174,8 +178,56 @@
                     "title": "Double Exponential Smoothing"
                   },
                   {
+                    "const": "percentage-of-samples",
+                    "title": "Percentage of Samples"
+                  },
+                  {
                     "const": "countif",
-                    "title": "Count If"
+                    "title": "Count If (alias of Percentage of Samples)"
+                  },
+                  {
+                    "const": "percentage-of-time",
+                    "title": "Percentage of Time"
+                  },
+                  {
+                    "const": "number-of-flaps",
+                    "title": "Number of Flaps"
+                  },
+                  {
+                    "const": "number-of-times",
+                    "title": "Number of Times"
+                  },
+                  {
+                    "const": "extremes",
+                    "title": "Extremes"
+                  },
+                  {
+                    "const": "latest",
+                    "title": "Latest"
+                  },
+                  {
+                    "const": "avg",
+                    "title": "Average (alias)"
+                  },
+                  {
+                    "const": "mean",
+                    "title": "Average (alias)"
+                  },
+                  {
+                    "const": "coefficient-of-variation",
+                    "title": "Coefficient of Variation (alias)"
+                  },
+                  {
+                    "const": "rsd",
+                    "title": "Relative Standard Deviation (alias)"
+                  },
+                  {
+                    "const": "ema",
+                    "title": "Exponential Moving Average (alias of SES)"
+                  },
+                  {
+                    "const": "ewma",
+                    "title": "Exponential Weighted Moving Average (alias of SES)"
                   }
                 ],
                 "default": "average",
@@ -344,7 +396,13 @@
                 "if": {
                   "properties": {
                     "time_group": {
-                      "const": "countif"
+                      "enum": [
+                        "countif",
+                        "percentage-of-samples",
+                        "percentage-of-time",
+                        "number-of-flaps",
+                        "number-of-times"
+                      ]
                     }
                   }
                 },
@@ -359,7 +417,7 @@
                         },
                         {
                           "const": "=",
-                          "title": "=="
+                          "title": "="
                         },
                         {
                           "const": ">=",
@@ -378,15 +436,23 @@
                           "title": "<"
                         }
                       ],
-                      "default": "equal",
-                      "title": "Condition",
+                      "default": "=",
+                      "title": "Operator",
                       "description": ""
                     },
                     "time_group_value": {
-                      "type": "number",
+                      "type": [
+                        "number",
+                        "null"
+                      ],
                       "default": 1,
                       "title": "Value to match",
-                      "description": ""
+                      "description": "Null when the condition compares against something other than a number - a gap token or the previous sample - because it cannot be expressed here."
+                    },
+                    "time_group_options": {
+                      "type": "string",
+                      "title": "Condition",
+                      "description": "The condition, written as an operator and a value: a number (>10), a gap token (==gap, !=nan, ==null, ==empty) or the previous collected sample (<previous, <last). When set, this is authoritative and the condition/value pair above is derived from it."
                     }
                   },
                   "required": [

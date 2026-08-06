@@ -1592,6 +1592,13 @@ set(API_PLUGIN_FILES
         src/web/api/queries/extremes/extremes.h
         src/web/api/queries/latest/latest.c
         src/web/api/queries/latest/latest.h
+        src/web/api/queries/tg-expression.h
+        src/web/api/queries/percentage_of_time/percentage_of_time.c
+        src/web/api/queries/percentage_of_time/percentage_of_time.h
+        src/web/api/queries/number_of_flaps/number_of_flaps.c
+        src/web/api/queries/number_of_flaps/number_of_flaps.h
+        src/web/api/queries/number_of_times/number_of_times.c
+        src/web/api/queries/number_of_times/number_of_times.h
         src/web/api/queries/weights.c
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c

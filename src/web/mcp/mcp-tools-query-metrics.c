@@ -152,7 +152,11 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_add_array_item_string(buffer, "coefficient-of-variation");    // relative standard deviation (cv)
         buffer_json_add_array_item_string(buffer, "ema");  // exponential moving average (alias "ses" or "ewma")
         buffer_json_add_array_item_string(buffer, "des");  // double exponential smoothing
-        buffer_json_add_array_item_string(buffer, "countif");  // requires time_group_options parameter
+        buffer_json_add_array_item_string(buffer, "percentage-of-samples");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "countif");  // the historical name of percentage-of-samples, still accepted
+        buffer_json_add_array_item_string(buffer, "percentage-of-time");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "number-of-flaps");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "number-of-times");  // takes a condition
         buffer_json_add_array_item_string(buffer, "extremes");  // for each time frame, returns max for positive values and min for negative values
         buffer_json_add_array_item_string(buffer, "latest");  // for each time frame, returns the most recent collected value
         buffer_json_array_close(buffer);
@@ -166,8 +170,20 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_member_add_string(
             buffer, "description",
             "Additional options for time grouping.\n"
-            "For 'percentile', specify a percentage (0-100).\n"
-            "For 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+            "For 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\n"
+            "For 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', "
+            "'number-of-flaps' and 'number-of-times', specify a CONDITION: an operator "
+            "('>', '>=', '<', '<=', '=', '!=') followed by a value. The value is a number "
+            "(e.g. '>0'), a gap token ('==gap', '!=gap' - 'nan', 'null' and 'empty' are "
+            "synonyms - which is what makes uncollected time participate for 'percentage-of-samples', 'number-of-flaps' and 'number-of-times' ('percentage-of-time' always counts it)), or the "
+            "previous collected sample ('<previous' - 'last' is a synonym, so '<last' is the "
+            "same condition - which counts counter resets such as reboots). There are no "
+            "and/or compounds.\n"
+            "Over a window long enough to read lower-resolution data 'percentage-of-time', "
+            "'number-of-flaps' and 'number-of-times' return an estimate, and the counting ones "
+            "report at most one event per stored interval; 'percentage-of-samples' does not "
+            "estimate - it evaluates each stored point as one sample. Pass tier=0 for exact "
+            "answers.");
     }
     buffer_json_object_close(buffer); // time_group_options
 
@@ -365,15 +381,19 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         
         // Check if time_group_options is required based on time_group
         if (time_group_str && (
-            strcmp(time_group_str, "percentile") == 0 || 
-            strcmp(time_group_str, "countif") == 0)) {
+            strcmp(time_group_str, "percentile") == 0 ||
+            strcmp(time_group_str, "countif") == 0 ||
+            strcmp(time_group_str, "percentage-of-samples") == 0 ||
+            strcmp(time_group_str, "percentage-of-time") == 0 ||
+            strcmp(time_group_str, "number-of-flaps") == 0 ||
+            strcmp(time_group_str, "number-of-times") == 0)) {
             
             struct json_object *time_group_options_obj = NULL;
             if (!json_object_object_get_ex(params, "time_group_options", &time_group_options_obj) || !time_group_options_obj) {
                 if (strcmp(time_group_str, "percentile") == 0) {
                     buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='percentile'. You must specify a percentage value between 0-100 (e.g., '95' for 95th percentile).");
                 } else {
-                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='countif'. You must specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='%s'. You must specify a comparison operator and a value (e.g., '>0', '=0', '!=0', '<=10'), a gap token ('==gap'), or the previous sample ('<previous').", time_group_str);
                 }
                 return MCP_RC_BAD_REQUEST;
             }

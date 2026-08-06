@@ -16,6 +16,9 @@
 #include "trimmed_mean/trimmed_mean.h"
 #include "extremes/extremes.h"
 #include "latest/latest.h"
+#include "percentage_of_time/percentage_of_time.h"
+#include "number_of_flaps/number_of_flaps.h"
+#include "number_of_times/number_of_times.h"
 
 // ----------------------------------------------------------------------------
 
@@ -602,7 +605,10 @@ static struct {
      .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
     },
 
-    {.name = "countif",
+    // canonical name first: the name lookups return the first row
+    // matching the enum value, so 'countif' requests now echo
+    // 'percentage-of-samples'
+    {.name = "percentage-of-samples",
      .hash  = 0,
      .value = RRDR_GROUPING_COUNTIF,
      .add_flush = RRDR_GROUPING_COUNTIF,
@@ -612,6 +618,54 @@ static struct {
      .free  = tg_countif_free,
      .add   = tg_countif_add,
      .flush = tg_countif_flush,
+     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+    },
+    {.name = "countif",                   // alias on percentage-of-samples
+     .hash  = 0,
+     .value = RRDR_GROUPING_COUNTIF,
+     .add_flush = RRDR_GROUPING_COUNTIF,
+     .init = NULL,
+     .create= tg_countif_create,
+     .reset = tg_countif_reset,
+     .free  = tg_countif_free,
+     .add   = tg_countif_add,
+     .flush = tg_countif_flush,
+     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+    },
+    {.name = "percentage-of-time",
+     .hash  = 0,
+     .value = RRDR_GROUPING_PERCENTAGE_OF_TIME,
+     .add_flush = RRDR_GROUPING_PERCENTAGE_OF_TIME,
+     .init = NULL,
+     .create= tg_percentage_of_time_create,
+     .reset = tg_percentage_of_time_reset,
+     .free  = tg_percentage_of_time_free,
+     .add   = tg_percentage_of_time_add,
+     .flush = tg_percentage_of_time_flush,
+     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+    },
+    {.name = "number-of-flaps",
+     .hash  = 0,
+     .value = RRDR_GROUPING_NUMBER_OF_FLAPS,
+     .add_flush = RRDR_GROUPING_NUMBER_OF_FLAPS,
+     .init = NULL,
+     .create= tg_number_of_flaps_create,
+     .reset = tg_number_of_flaps_reset,
+     .free  = tg_number_of_flaps_free,
+     .add   = tg_number_of_flaps_add,
+     .flush = tg_number_of_flaps_flush,
+     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+    },
+    {.name = "number-of-times",
+     .hash  = 0,
+     .value = RRDR_GROUPING_NUMBER_OF_TIMES,
+     .add_flush = RRDR_GROUPING_NUMBER_OF_TIMES,
+     .init = NULL,
+     .create= tg_number_of_times_create,
+     .reset = tg_number_of_times_reset,
+     .free  = tg_number_of_times_free,
+     .add   = tg_number_of_times_add,
+     .flush = tg_number_of_times_flush,
      .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
     },
 
@@ -702,18 +756,22 @@ RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def)
     return def;
 }
 
+// the historical name of time_grouping_id2txt(): both walked the registry
+// and returned the first row matching the value. They differed only for an
+// enum value that is not in the registry, where this one used to answer
+// "unknown" - "average" is the truthful answer, because that is what
+// rrdr_set_grouping_function() actually falls back to.
 const char *time_grouping_tostring(RRDR_TIME_GROUPING group) {
-    int i;
-
-    for(i = 0; api_v1_data_groups[i].name ; i++)
-        if(unlikely(group == api_v1_data_groups[i].value))
-            return api_v1_data_groups[i].name;
-
-    return "unknown";
+    return time_grouping_id2txt(group);
 }
 
 void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
     int i, found = 0;
+
+    // only the four condition groupings ask for gaps, and they say so from
+    // their create(). Clearing it here keeps the answer tied to the
+    // grouping actually installed, including the fallback below.
+    r->time_grouping.wants_gaps = false;
     for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
         if(api_v1_data_groups[i].value == group_method) {
             r->time_grouping.create  = api_v1_data_groups[i].create;
@@ -736,6 +794,38 @@ void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
         r->time_grouping.flush   = tg_average_flush;
         r->time_grouping.tier_query_fetch = TIER_QUERY_FETCH_AVERAGE;
         r->time_grouping.add_flush = RRDR_GROUPING_AVERAGE;
+    }
+}
+
+// the four condition groupings: they reason about the stored window a
+// point stands for, so they need more than its value
+ALWAYS_INLINE_HOT_FLATTEN
+void time_grouping_add_point(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPING add_flush) {
+    switch(add_flush) {
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+            tg_percentage_of_time_add_point(r, p);
+            return;
+
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+            tg_number_of_flaps_add_point(r, p);
+            return;
+
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            tg_number_of_times_add_point(r, p);
+            return;
+
+        case RRDR_GROUPING_COUNTIF:
+            tg_countif_add_point(r, p);
+            return;
+
+        default:
+            // a gap never reaches the groupings below, and they read
+            // nothing but the value
+            if(unlikely(p->is_gap))
+                return;
+
+            time_grouping_add(r, p->value, add_flush);
+            return;
     }
 }
 
@@ -765,10 +855,6 @@ void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING a
 
         case RRDR_GROUPING_SUM:
             tg_sum_add(r, value);
-            break;
-
-        case RRDR_GROUPING_COUNTIF:
-            tg_countif_add(r, value);
             break;
 
         case RRDR_GROUPING_EXTREMES:
@@ -837,6 +923,15 @@ NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options
 
         case RRDR_GROUPING_LATEST:
             return tg_latest_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+            return tg_percentage_of_time_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+            return tg_number_of_flaps_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            return tg_number_of_times_flush(r, rrdr_value_options_ptr);
 
         case RRDR_GROUPING_TRIMMED_MEAN:
             return tg_trimmed_mean_flush(r, rrdr_value_options_ptr);

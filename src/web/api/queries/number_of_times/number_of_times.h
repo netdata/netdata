@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#ifndef NETDATA_API_QUERIES_NUMBER_OF_TIMES_H
+#define NETDATA_API_QUERIES_NUMBER_OF_TIMES_H
+
+#include "../query.h"
+#include "../rrdr.h"
+#include "../tg-expression.h"
+
+// How many samples matched - occurrence counting.
+//
+// Distinct from number-of-flaps: consecutive matches count individually,
+// so a node that rebooted twice in a row is 2 times but 1 flap. With the
+// predecessor keyword this is the uptime query - `<previous` counts the
+// times a counter went backwards, i.e. reboots - and `==previous` counts
+// the times a metric did not move at all.
+
+struct tg_number_of_times {
+    TG_EXPRESSION expr;
+    size_t times;       // emitted and zeroed by flush()
+    size_t count;       // points in this bucket, to tell empty from zero
+};
+
+static inline void tg_number_of_times_create(RRDR *r, const char *options) {
+    struct tg_number_of_times *g =
+        onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_number_of_times));
+    // the API has never rejected a malformed condition here
+    (void)tg_expression_parse(&g->expr, options);
+    r->time_grouping.data = g;
+    r->time_grouping.wants_gaps = tg_expression_wants_gaps(&g->expr);
+}
+
+// resets when the query switches dimensions
+static inline void tg_number_of_times_reset(RRDR *r) {
+    struct tg_number_of_times *g = (struct tg_number_of_times *)r->time_grouping.data;
+    g->times = 0;
+    g->count = 0;
+    tg_expression_reset(&g->expr);
+}
+
+static inline void tg_number_of_times_free(RRDR *r) {
+    onewayalloc_freez(r->internal.owa, r->time_grouping.data);
+    r->time_grouping.data = NULL;
+}
+
+static inline void tg_number_of_times_add_point(RRDR *r, const TG_POINT *p) {
+    struct tg_number_of_times *g = (struct tg_number_of_times *)r->time_grouping.data;
+
+    NETDATA_DOUBLE share = tg_expression_share(&g->expr, p);
+
+    // a repeat still fills the bucket it lands in: a wide stored point can
+    // cover a whole bucket on its own, and leaving it uncounted would flush
+    // EMPTY - "nothing here" - instead of "nothing happened here"
+    g->count += p->samples;
+
+    if(unlikely(!p->first))
+        // a wide point re-delivered to a later bucket is the SAME
+        // occurrence; counting it again would multiply it
+        return;
+
+    if(p->count > 1) {
+        // a stored window keeps no ordering, so occurrences inside it
+        // collapse to one - the count-as-1 rule
+        if(share > 0.0)
+            g->times++;
+    }
+    else if(share > 0.0)
+        // a gap stands for every sample slot it covers, not for one point
+        g->times += p->samples;
+}
+
+static inline void tg_number_of_times_add(RRDR *r, NETDATA_DOUBLE value) {
+    TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
+                   .sum = value, .duration = 1, .samples = 1,
+                   .is_gap = false, .first = true };
+    tg_number_of_times_add_point(r, &p);
+}
+
+static inline NETDATA_DOUBLE tg_number_of_times_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+    struct tg_number_of_times *g = (struct tg_number_of_times *)r->time_grouping.data;
+
+    NETDATA_DOUBLE value;
+
+    if(unlikely(!g->count)) {
+        value = 0.0;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
+    }
+    else
+        value = (NETDATA_DOUBLE)g->times;
+
+    g->times = 0;
+    g->count = 0;
+
+    // the predecessor survives the flush: a drop across a bucket boundary
+    // is still a drop
+
+    return value;
+}
+
+#endif //NETDATA_API_QUERIES_NUMBER_OF_TIMES_H

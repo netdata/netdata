@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "query-internal.h"
+#include "tg-expression.h"
 
 // ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
@@ -74,24 +75,118 @@ static NETDATA_DOUBLE query_point_grouping_value(
         }                                                               \
 } while(0)
 
-#define query_add_point_to_group(r, point, ops, add_flush)        do {  \
-    if(likely(netdata_double_isnumber((point).value))) {                \
-        if(likely(fpclassify((point).value) != FP_ZERO))                \
-            (ops)->group_points_non_zero++;                             \
-                                                                        \
-        if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
-            (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
-                                                                        \
-        NETDATA_DOUBLE grouping_value =                                    \
-            query_point_grouping_value(point, ops, add_flush);             \
-        time_grouping_add(r, grouping_value, add_flush);                   \
-                                                                        \
-        storage_point_merge_to((ops)->group_point, (point).sp);         \
-        if(!(point).added)                                              \
-            storage_point_merge_to((ops)->query_point, (point).sp);     \
-    }                                                                   \
-                                                                        \
-    (ops)->group_points_added++;                                        \
+// Feeds one delivered point into the current bucket.
+//
+// The time each point stands for is its overlap with the part of the
+// bucket not yet accounted for - a storage point wider than the bucket is
+// re-delivered with its ORIGINAL start (query_interpolate_point only trims
+// the end), so its own span would double-count. A gap carries no
+// timestamps at all, so it fills whatever the collected points left
+// uncovered, and at most one gap is materialised per bucket - hence the
+// sample count derived from the granularity, so a four-second hole at a
+// one-second cadence counts as four missing samples and not as one.
+//
+// Which groupings see a gap: percentage-of-time ALWAYS does, because its
+// denominator is the selected duration and uncollected time belongs in
+// it. The others see one only when their condition names a gap token.
+#define query_add_point_to_group(r, point, ops, add_flush, now_end_time)   do {  \
+    if(likely(!time_grouping_is_expression(add_flush))) {                   \
+        /* the common path: unchanged, and none of the accounting below */  \
+        if(likely(netdata_double_isnumber((point).value))) {                \
+            if(likely(fpclassify((point).value) != FP_ZERO))                \
+                (ops)->group_points_non_zero++;                             \
+                                                                            \
+            if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
+                (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
+                                                                            \
+            time_grouping_add(r,                                            \
+                query_point_grouping_value(point, ops, add_flush),           \
+                add_flush);                                                 \
+                                                                            \
+            storage_point_merge_to((ops)->group_point, (point).sp);         \
+            if(!(point).added)                                              \
+                storage_point_merge_to((ops)->query_point, (point).sp);     \
+        }                                                                   \
+        (ops)->group_points_added++;                                        \
+        break;                                                              \
+    }                                                                       \
+                                                                            \
+    time_t _slot_from = (now_end_time) - (ops)->view_update_every           \
+                        + (time_t)(ops)->group_covered_s;                   \
+    time_t _from, _to;                                                      \
+    bool _is_gap = !netdata_double_isnumber((point).value);                 \
+                                                                            \
+    if(unlikely((point).sp.end_time_s <= (point).sp.start_time_s)) {        \
+        /* the synthetic bucket gap (QUERY_POINT_EMPTY) carries no          \
+         * timestamps at all, so it fills what the stored points left       \
+         * uncovered; a STORED gap is a real point with a NaN value and     \
+         * keeps its own span, handled below */                             \
+        _from = _slot_from;                                                 \
+        _to = (now_end_time);                                               \
+    }                                                                       \
+    else {                                                                  \
+        _from = ((point).sp.start_time_s > _slot_from) ?                    \
+                (point).sp.start_time_s : _slot_from;                       \
+        _to = ((point).sp.end_time_s < (now_end_time)) ?                    \
+              (point).sp.end_time_s : (now_end_time);                       \
+    }                                                                       \
+                                                                            \
+    time_t _duration = (_to > _from) ? (_to - _from) : 0;                   \
+    (ops)->group_covered_s += _duration;                                    \
+                                                                            \
+    size_t _samples = 1;                                                    \
+    if(unlikely(_is_gap)) {                                                 \
+        /* a gap stands for the stored slots it covers, so it counts        \
+         * against the cadence the data is STORED at. The query grid is 1s  \
+         * for an ordinary query, which would let a gap outweigh the        \
+         * collected samples around it by the metric's update_every */      \
+        time_t _g = ((ops)->tier_ptr && (ops)->tier_ptr->db_update_every_s > 0) \
+                    ? (ops)->tier_ptr->db_update_every_s                    \
+                    : (((ops)->query_granularity > 0) ?                     \
+                       (ops)->query_granularity : 1);                       \
+        _samples = (_duration > _g) ? (size_t)(_duration / _g) : 1;         \
+    }                                                                       \
+                                                                            \
+    if(likely(!_is_gap)) {                                                  \
+        if(likely(fpclassify((point).value) != FP_ZERO))                    \
+            (ops)->group_points_non_zero++;                                 \
+                                                                            \
+        if(unlikely((point).sp.flags & SN_FLAG_RESET))                      \
+            (ops)->group_value_flags |= RRDR_VALUE_RESET;                   \
+                                                                            \
+        NETDATA_DOUBLE grouping_value =                                     \
+            query_point_grouping_value(point, ops, add_flush);              \
+        /* under anomaly-bit the value is an anomaly RATE while sp.min and \
+         * sp.max stay in the metric's own domain, so the window model      \
+         * would compare unrelated numbers - count 1 forces the stepwise    \
+         * evaluation on the delivered value */                             \
+        size_t _pcount = (point).sp.count;                                  \
+        if(unlikely((r)->internal.qt->window.options & RRDR_OPTION_ANOMALY_BIT)) \
+            _pcount = 1;                                                    \
+                                                                            \
+        TG_POINT _tgp = { .value = grouping_value,                          \
+                          .sum = (point).sp.sum,                            \
+                          .min = (point).sp.min, .max = (point).sp.max,     \
+                          .count = _pcount,                                 \
+                          .duration = _duration, .samples = _samples,       \
+                          .is_gap = false, .first = !(point).added };       \
+        time_grouping_add_point(r, &_tgp, add_flush);                       \
+                                                                            \
+        storage_point_merge_to((ops)->group_point, (point).sp);             \
+        if(!(point).added)                                                  \
+            storage_point_merge_to((ops)->query_point, (point).sp);         \
+    }                                                                       \
+    else if(unlikely((r)->time_grouping.wants_gaps && _duration > 0)) {                      \
+        /* a gap contributes neither a value nor retention: only the        \
+         * expression groupings see it, and only as "no data here" */       \
+        TG_POINT _tgg = { .value = NAN, .sum = NAN,                         \
+                          .min = NAN, .max = NAN, .count = 0,               \
+                          .duration = _duration, .samples = _samples,       \
+                          .is_gap = true, .first = true };                  \
+        time_grouping_add_point(r, &_tgg, add_flush);                       \
+    }                                                                       \
+                                                                            \
+    (ops)->group_points_added++;                                            \
 } while(0)
 
 // serve the single LATEST point from the collector's cached value
@@ -189,8 +284,17 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     size_t db_points_read_since_plan_switch = 0; (void)db_points_read_since_plan_switch;
     size_t query_is_finished_counter = 0;
 
-    // The main loop, based on the query granularity we need
-    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
+    // The main loop, based on the query granularity we need.
+    //
+    // Once storage is exhausted the loop normally gives up after a few more
+    // buckets and the caller fills the rest with EMPTY - which is right when
+    // a gap has no value to contribute. A condition that NAMES gaps is the
+    // exception: every remaining bucket is uncollected time and has to be
+    // counted as such, or "the share of the last day a node was unreachable"
+    // stops counting a few buckets after the node went away. points_wanted
+    // still bounds the walk.
+    for( ; points_added < points_wanted &&
+          (query_is_finished_counter <= 10 || r->time_grouping.wants_gaps) ;
         now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
         if(unlikely(query_plan_should_switch_plan(ops, now_end_time))) {
@@ -260,8 +364,13 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     ops->db_points_read_per_tier[ops->tier]++;
                     ops->db_total_points_read++;
 
+                    // sp2 is the one just read; sp came from the previous
+                    // plan and was made positive when it was read. Applying
+                    // it to sp again left sp2 signed, so a query with
+                    // options=absolute could keep a negative value across a
+                    // tier-plan switch.
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
-                        storage_point_make_positive(sp);
+                        storage_point_make_positive(sp2);
 
                     if(sp.start_time_s > sp2.start_time_s)
                         // the point from the previous plan is useless
@@ -350,7 +459,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 if(likely(new_point.sp.end_time_s > now_start_time)) { // likely to favor tier0
                     // this db point ends after our now_start time
 
-                    query_add_point_to_group(r, new_point, ops, add_flush);
+                    query_add_point_to_group(r, new_point, ops, add_flush, now_end_time);
                     new_point.added = true;
                 }
                 else {
@@ -458,7 +567,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 current_point = QUERY_POINT_EMPTY;
             }
 
-            query_add_point_to_group(r, current_point, ops, add_flush);
+            query_add_point_to_group(r, current_point, ops, add_flush, now_end_time);
 
             rrdr_line = rrdr_line_init(r, now_end_time, rrdr_line);
             size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
@@ -466,8 +575,11 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             // find the place to store our values
             RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_o_v_index];
 
-            // update the dimension options
-            if(likely(ops->group_points_non_zero))
+            // update the dimension options - for the expression groupings
+            // the source samples say nothing about the answer, so their
+            // visibility is decided from the flushed value below INSTEAD,
+            // never from the samples that went in
+            if(likely(ops->group_points_non_zero && !time_grouping_is_expression(add_flush)))
                 r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
             // store the specific point options
@@ -476,6 +588,14 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             // store the group value
             NETDATA_DOUBLE group_value = time_grouping_flush(r, rrdr_value_options_ptr, add_flush);
             r->v[rrdr_o_v_index] = group_value;
+
+            // The expression groupings answer a question ABOUT the samples
+            // rather than reporting them, so their visibility has to follow
+            // the ANSWER: a dimension that is nothing but gaps legitimately
+            // returns 100 for `==gap`, yet contributes no non-zero source
+            // sample and would be dropped by options=nonzero.
+            if(unlikely(time_grouping_is_expression(add_flush)) && group_value != 0.0)
+                r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
             r->ar[rrdr_o_v_index] = storage_point_anomaly_rate(ops->group_point);
 
@@ -494,6 +614,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
             points_added++;
             ops->group_points_added = 0;
+            ops->group_covered_s = 0;
             ops->group_value_flags = RRDR_VALUE_NOTHING;
             ops->group_points_non_zero = 0;
             ops->group_point = STORAGE_POINT_UNSET;

@@ -59,7 +59,7 @@ skill-verification harness questions for `verify/questions.md`; replace each
 ### Metrics / fleet SLOs
 
 - [`compare-explicit-and-room-wide-node-scope.md`](./compare-explicit-and-room-wide-node-scope.md) -- compare a fixed UUID scope with the current room-wide node scope; explains why all-room queries omit `scope.nodes` and use `selectors.nodes: ["*"]`, why a large UUID selector is redundant and expensive, and how to pass large payloads through the token-safe wrapper with `@file`.
-- [`fleet-connectivity-slo-queries.md`](./fleet-connectivity-slo-queries.md) -- single-dimension fleet percentages (percent of devices connected/streaming, percent of devices with a boolean dimension at 1 or 0) and ranking devices by percent of time a boolean dimension was 0; includes the average-of-boolean trick and the countif-through-Cloud caveat.
+- [`fleet-connectivity-slo-queries.md`](./fleet-connectivity-slo-queries.md) -- single-dimension fleet percentages (percent of devices connected/streaming, percent of devices with a boolean dimension at 1 or 0) and ranking devices by percent of time a boolean dimension was 0; includes the average-of-boolean trick and the countif storage-resolution caveat.
 
 ### Streaming / parents / vnodes
 

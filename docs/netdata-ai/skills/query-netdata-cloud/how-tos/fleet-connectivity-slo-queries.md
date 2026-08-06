@@ -78,8 +78,9 @@ is the fraction of 1s**. No `countif` needed (see gotcha 3):
    ... | jq -r '.result.data[] | [(.[0]|todate), (100 - (.[1][0]*10000|round)/100)] | @tsv'
    ```
 
-   Do NOT use `time_group: countif "=0"` through Netdata Cloud for
-   this — see gotcha 3.
+   Prefer this client-side subtraction over
+   `time_group: countif "=0"`, which needs the care described in
+   gotcha 3.
 
 4. **Rank devices by percent of time the dimension was 1 (or 0).**
    Group by node, average over the whole window into a single point,
@@ -125,20 +126,38 @@ is the fraction of 1s**. No `countif` needed (see gotcha 3):
    children than the room shows as nodes (archived duplicates after
    re-parenting), so do not expect `totals.instances` to equal the
    room node count.
-3. **`countif` through Netdata Cloud is unreliable (verified
-   2026-07-06).** On a multi-parent space, `time_group: countif` with
-   `group_by: selected` returned ~29–43% of the true value, and
-   `options: ["percentage"]` returned >100% values. Plain
-   `time_group: average` on the same data returned correct results.
-   Until the Cloud aggregation of these is fixed, use the
-   average-of-boolean trick above. (Direct agent queries are not
-   affected.)
+3. **`countif` needs care on fleet-wide queries (measured
+   2026-07-06, re-diagnosed 2026-07-25).** On a multi-parent space,
+   `time_group: countif "=0"` returned ~29–43% of the true value.
+   Two causes were involved; only the second is still live:
+   - **Row order — fixed.** Agents return rows newest-first, while
+     the multi-agent merge assumed oldest-first, so a fleet query
+     could come back with only the newest point populated and every
+     other point null, with `pa` still reporting those points as
+     fine. Netdata Cloud now normalises row order when it ingests
+     each agent response; older deployments needed `"flip"` in
+     `options` as a workaround.
+   - **Storage resolution — still applies.** `countif` tests its
+     condition against whatever is stored, and above tier 0 that is
+     a per-minute **average** (see gotcha 4). A minute that was down
+     40s of 60 stores 0.67 — not exactly 0 — so it never matches
+     `=0`; only fully-down minutes are counted and the total comes
+     out low. Request `"tier": 0` and confirm under `db.per_tier`
+     that tier 0 actually served the data.
+
+   `time_group: average` is immune to the second cause because the
+   tier stores exactly that, which is why it looked correct on the
+   same data. The average-of-boolean trick above is exact at every
+   tier and remains the recommended pattern.
+   (`options: ["percentage"]` separately returned >100%: that option
+   expresses each item as a share of the group total, which is
+   meaningless applied to values that are already percentages.)
 4. **Tier-0 retention on busy parents is short.** A parent with
    thousands of children may hold only minutes of per-second data
    (observed: ~18 minutes with ~5.6k children). Queries over longer
    windows silently use tier 1+ (per-minute averages) — fine for
-   the average-of-boolean trick, another reason `countif` (which
-   needs raw samples) is fragile here.
+   the average-of-boolean trick, and the second cause of the
+   `countif` undercount in gotcha 3.
 5. **Boolean-ness matters.** These patterns assume the dimension is
    strictly 0/1. If a collector emits other values, the average is no
    longer a ratio.

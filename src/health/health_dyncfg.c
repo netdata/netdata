@@ -111,8 +111,52 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
         default:
             break;
 
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
         case RRDR_GROUPING_COUNTIF:
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group_condition", alerts_group_condition2id, config->time_group_condition, error, flags);
+            // the expression is authoritative when present; the legacy
+            // condition/value pair above stays for older consumers
+            // optional even under JSONC_REQUIRED: every alert written
+            // before this field existed omits it
+            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "time_group_options", config->time_group_options, error, 0);
+
+            // and it has to parse, exactly as it does when the same alert
+            // arrives in a .conf file. The query API is lenient - an
+            // unreadable condition there silently compares equal to zero -
+            // but an alert that runs a condition its author did not write
+            // fires, or stays silent, for the wrong reason.
+            if(config->time_group_options) {
+                // trimmed to the same canonical form the .conf reader
+                // produces (health_parse_db_lookup): the condition is
+                // hashed into the alert's identity, so the same rule
+                // spaced differently must not become a different alert.
+                // The copy is as long as the condition written - a fixed
+                // buffer would silently truncate a long one and store a
+                // condition its author did not write.
+                const char *_written = string2str(config->time_group_options);
+                char *_copy = strdupz(_written);
+                char *_c = trim(_copy);
+                if(!_c || !*_c) {
+                    string_freez(config->time_group_options);
+                    config->time_group_options = NULL;
+                }
+                else if(strcmp(_c, _written) != 0) {
+                    string_freez(config->time_group_options);
+                    config->time_group_options = string_strdupz(_c);
+                }
+                freez(_copy);
+            }
+
+            if(config->time_group_options) {
+                TG_EXPRESSION _e;
+                if(!tg_expression_parse(&_e, string2str(config->time_group_options))) {
+                    buffer_sprintf(error, "invalid condition '%s' in '%s.time_group_options'",
+                                   string2str(config->time_group_options), path);
+                    return false;
+                }
+            }
             // fall through
 
         case RRDR_GROUPING_TRIMMED_MEAN:
@@ -120,6 +164,18 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
         case RRDR_GROUPING_PERCENTILE:
             JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "time_group_value", config->time_group_value, error, flags);
             break;
+    }
+
+    // the written expression wins: the pair it implies replaces whatever the
+    // payload carried, so an alert cannot be stored claiming one condition
+    // and running another
+    if(config->time_group_options) {
+        TG_EXPRESSION e;
+        if(tg_expression_parse(&e, string2str(config->time_group_options))) {
+            config->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
+            config->time_group_value =
+                (e.operand == TG_EXPRESSION_OPERAND_NUMBER) ? e.target : NAN;
+        }
     }
 
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error, flags);
@@ -381,6 +437,11 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                     buffer_json_member_add_string(wb, "time_group", time_grouping_id2txt(ap->config.time_group));
                     buffer_json_member_add_string(wb, "time_group_condition", alerts_group_conditions_id2txt(ap->config.time_group_condition));
                     buffer_json_member_add_double(wb, "time_group_value", ap->config.time_group_value);
+                    // only when set: this JSON is what the alert config
+                    // hash is computed over, so emitting an empty member
+                    // for every alert would change every alert's identity
+                    if(ap->config.time_group_options)
+                        buffer_json_member_add_string(wb, "time_group_options", string2str(ap->config.time_group_options));
                     buffer_json_member_add_string(wb, "dims_group", alerts_dims_grouping_id2group(ap->config.dims_group));
                     buffer_json_member_add_string(wb, "data_source", alerts_data_source_id2source(ap->config.data_source));
                     rrdr_options_to_buffer_json_array(wb, "options", RRDR_OPTIONS_REMOVE_OVERLAPPING(ap->config.options));
@@ -501,7 +562,15 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
                 break;
 
                 case RRDR_GROUPING_COUNTIF:
-                    buffer_sprintf(wb, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
+                case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+                case RRDR_GROUPING_NUMBER_OF_FLAPS:
+                case RRDR_GROUPING_NUMBER_OF_TIMES:
+                    // round-trip the condition as written, so gap tokens and
+                    // `previous` survive a config export
+                    if(nap->config.time_group_options)
+                        buffer_sprintf(wb, "(%s)", string2str(nap->config.time_group_options));
+                    else
+                        buffer_sprintf(wb, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
                 break;
 
                 default:

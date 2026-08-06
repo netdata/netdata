@@ -2,6 +2,7 @@
 
 #include "health.h"
 #include "health_internals.h"
+#include "../web/api/queries/tg-expression.h"
 
 int health_parse_delay(
         size_t line, const char *filename, char *string,
@@ -185,6 +186,8 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
     ac->before = 0;
     ac->update_every = 0;
     ac->options = 0;
+    string_freez(ac->time_group_options);
+    ac->time_group_options = NULL;
     ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
     ac->time_group_value = NAN;
 
@@ -213,76 +216,78 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
     }
 
     if(group_options) {
-        // skip leading whitespace inside parentheses
-        while(*s && isspace((uint8_t)*s)) s++;
-
-        if(*s == '!') {
-            s++;
-            if(*s == '=') s++;
-            ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
-        }
-        else if(*s == '<') {
-            s++;
-            if(*s == '>') {
-                s++;
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
-            }
-            else if(*s == '=') {
-                s++;
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL;
-            }
-            else
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
-        }
-        else if(*s == '>') {
-            s++;
-            if(*s == '=') {
-                s++;
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
-            }
-            else
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
-        }
-        else if(*s == '=' || *s == ':') {
-            // explicit equal operator (=, == or :)
-            s++;
-            if(*s == '=') s++;  // support == as well
-            ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
-        }
-
-        while(*s && isspace((uint8_t)*s)) s++;
-
-        if(*s == ')') {
-            // empty options like countif() - allowed, will use defaults
-        }
-        else if((isdigit((uint8_t)*s)) ||
-                (*s == '.' && isdigit((uint8_t)s[1])) ||
-                ((*s == '-' || *s == '+') && s[1] &&
-                 ((isdigit((uint8_t)s[1])) || (s[1] == '.' && isdigit((uint8_t)s[2]))))) {
-            // parse numeric value (including negative numbers like >=-3, or >+5, or >-.5)
-            ac->time_group_value = str2ndd(s, &s);
-            while(s && *s && isspace((uint8_t)*s)) s++;
-
-            if(!s || *s != ')') {
-                netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after number in aggregation method on '%s'",
-                                  line, filename, key);
-                return 0;
-            }
-        }
-        else if(*s) {
-            // invalid character - not a valid start of a number or ')'
-            netdata_log_error("Health configuration at line %zu of file '%s': invalid character '%c' in aggregation method options on '%s'",
-                              line, filename, *s, key);
-            return 0;
-        }
-        else {
-            // end of string without closing parenthesis
+        // Everything up to the closing parenthesis is the condition, and
+        // the shared grammar owns its meaning. Health used to re-implement
+        // that grammar and the two drifted: a bare number lost its first
+        // digit through the API but not here, and `<:`/`>:` worked through
+        // the API but not here.
+        char *close = strchr(s, ')');
+        if(!close) {
             netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after aggregation method on '%s'",
                               line, filename, key);
             return 0;
         }
 
-        s++;
+        *close = '\0';
+
+        // The condition is stored, and the alert's configuration hash is
+        // computed over it, so leading and trailing whitespace is trimmed
+        // off: writing `countif( >5 )` instead of `countif(>5)` must not
+        // make it a different alert. Whitespace INSIDE the condition is
+        // part of what was written and is kept.
+        char *expr = trim(s);
+
+        if(expr && *expr) {
+            TG_EXPRESSION e;
+            if(!tg_expression_parse(&e, expr)) {
+                netdata_log_error("Health configuration at line %zu of file '%s': invalid condition '%s' in aggregation method options on '%s'",
+                                  line, filename, expr, key);
+                return 0;
+            }
+
+            // Only the condition groupings speak this grammar. percentile
+            // and the trimmed-* pair take a plain number, so an operator or
+            // a word operand there is a mistake - accepting it would turn
+            // `percentile(gap)` into percentile 95 and `average(previous)`
+            // into a plain average, both silently.
+            if(!time_grouping_is_expression(ac->time_group)) {
+                if(e.operand != TG_EXPRESSION_OPERAND_NUMBER) {
+                    netdata_log_error("Health configuration at line %zu of file '%s': '%s' takes a number, not the condition '%s'",
+                                      line, filename, key, expr);
+                    return 0;
+                }
+
+                if(e.cmp != TG_EXPRESSION_EQUAL)
+                    // A comparison in front of the number means nothing to
+                    // these groupings, and this parser has quietly dropped
+                    // it for as long as it has accepted one. Saying so is
+                    // new; refusing the alert over it is not, because
+                    // `percentile(>=99)` has always run as percentile 99.
+                    netdata_log_error("Health configuration at line %zu of file '%s': '%s' takes a plain number - "
+                                      "the comparison in '%s' is ignored",
+                                      line, filename, key, expr);
+            }
+            else
+                // the expression itself is kept only for the groupings that
+                // run one; storing it for a numeric grouping would change
+                // the identity of every such alert, because the config hash
+                // is computed over this field
+                ac->time_group_options = string_strdupz(expr);
+
+            // the condition, however, is recorded whatever the grouping -
+            // it always has been, and it is hashed into the alert's
+            // identity, so skipping it for a numeric grouping would give
+            // every `percentile(>=99)` alert a new hash on upgrade
+            ac->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
+
+            // the legacy numeric field stays populated whenever the
+            // condition can be expressed in it, so everything that reads
+            // it keeps working
+            if(e.operand == TG_EXPRESSION_OPERAND_NUMBER)
+                ac->time_group_value = e.target;
+        }
+
+        s = close + 1;
     }
 
     switch (ac->time_group) {
@@ -290,7 +295,15 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             break;
 
         case RRDR_GROUPING_COUNTIF:
-            if(isnan(ac->time_group_value))
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            // with no condition written at all these compare equal to zero,
+            // exactly as countif always has. A condition whose operand is
+            // not a number - a gap token, the predecessor - leaves the
+            // legacy value unset on purpose: it cannot be expressed there,
+            // and the expression above is what the query actually runs.
+            if(!ac->time_group_options && isnan(ac->time_group_value))
                 ac->time_group_value = 0;
             break;
 
@@ -769,7 +782,12 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, type);
         }
         else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-            health_parse_db_lookup(line, filename, value, ac);
+            if(!health_parse_db_lookup(line, filename, value, ac))
+                // the same treatment a non-parseable calc/warn/crit gets.
+                // The parser leaves a half-read lookup behind when it gives
+                // up - no grouping value, no window - and an alert running
+                // that queries garbage; the error above says why.
+                am->enabled = false;
         }
         else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
             if(!health_parse_update_every(value, &ac->update_every))
