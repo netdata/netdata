@@ -248,7 +248,7 @@ func buildNetworkProtocolsJSON(p socketGlobalPublish, updateEvery int, expires i
 		UpdateEvery: updateEvery,
 		HasHistory:  false,
 		Help:        socketFunctionHelp,
-		Data: [][]interface{}{
+		Data: [][]any{
 			{"TCP", "IPv4+IPv6",
 				tcpReceived, tcpSent, tcpErrors,
 				tcpConnActive, uint64(0), tcpConnPassive, uint64(0),

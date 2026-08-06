@@ -131,7 +131,7 @@ func TestJSONFunctionPayloadSchema_GoldenKeys(t *testing.T) {
 		t.Fatalf("buildNetworkProtocolsJSON: %v", err)
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal([]byte(payload), &raw); err != nil {
 		t.Fatalf("unmarshal: %v\npayload: %s", err, payload)
 	}
@@ -152,7 +152,7 @@ func TestJSONFunctionPayloadSchema_GoldenKeys(t *testing.T) {
 		"ConnActive", "ConnEstablished", "ConnPassive", "ConnReset",
 		"SegsTotal", "SegsRetransmitted", "DatagramsNoPort",
 	}
-	cols, ok := raw["columns"].(map[string]interface{})
+	cols, ok := raw["columns"].(map[string]any)
 	if !ok {
 		t.Fatalf("columns is not an object: %s", payload)
 	}
@@ -164,15 +164,15 @@ func TestJSONFunctionPayloadSchema_GoldenKeys(t *testing.T) {
 
 	// Sent must come after Received in the column order — the chart
 	// definition ("Traffic") sorts by the column order.
-	if got := mustIndexString(cols["Received"].(map[string]interface{})["index"]); got != "2" {
+	if got := mustIndexString(cols["Received"].(map[string]any)["index"]); got != "2" {
 		t.Errorf("Received index = %s, want 2", got)
 	}
-	if got := mustIndexString(cols["Sent"].(map[string]interface{})["index"]); got != "3" {
+	if got := mustIndexString(cols["Sent"].(map[string]any)["index"]); got != "3" {
 		t.Errorf("Sent index = %s, want 3", got)
 	}
 }
 
-func mustIndexString(v interface{}) string {
+func mustIndexString(v any) string {
 	switch x := v.(type) {
 	case string:
 		return x
@@ -369,7 +369,7 @@ func TestBuildDNSLegacyPlan_FlavorAndSelectorInvariantToPerQuery(t *testing.T) {
 		}(),
 	}
 
-	for i := 0; i < len(cases); i++ {
+	for i := range cases {
 		perQuery := cases[i]
 		perQuery.PerQueryTracking = true
 		noPerQuery := cases[i]
@@ -462,10 +462,10 @@ func TestSocketFunctionStore_ConcurrentUpdateSnapshot(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(writers + 1)
 
-	for i := 0; i < writers; i++ {
+	for i := range writers {
 		go func(seed int) {
 			defer wg.Done()
-			for j := 0; j < writes; j++ {
+			for j := range writes {
 				store.update(socketGlobalPublish{
 					tcpDimReceivedCalls: uint64(seed*writes + j),
 					tcpDimSentCalls:     uint64(j),
@@ -476,7 +476,7 @@ func TestSocketFunctionStore_ConcurrentUpdateSnapshot(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		for j := 0; j < writers*writes; j++ {
+		for range writers * writes {
 			_, _ = store.snapshot()
 		}
 	}()

@@ -103,15 +103,9 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 
 	publish := cachestatGlobalPublish{}
 
-	total := mpa - mbd
-	if total < 0 {
-		total = 0
-	}
+	total := max(mpa-mbd, 0)
 
-	misses := apcl - apd
-	if misses < 0 {
-		misses = 0
-	}
+	misses := max(apcl-apd, 0)
 
 	hits := total - misses
 	if hits < 0 {
@@ -311,10 +305,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		}
 
 		now := time.Now()
-		usecSince := int(now.Sub(lastCollection).Microseconds())
-		if usecSince < 0 {
-			usecSince = 0
-		}
+		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
 		lastCollection = now
 		collectAndPublish(usecSince)
 	}

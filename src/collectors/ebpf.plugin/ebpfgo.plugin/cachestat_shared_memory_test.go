@@ -101,7 +101,7 @@ func TestCachestatSharedMemoryStoreNoFlagWhenCtAdvances(t *testing.T) {
 	}
 
 	// Now drive another cachestatStaleCycles-1 stale cycles — still below threshold.
-	for i := 0; i < cachestatStaleCycles-1; i++ {
+	for i := range cachestatStaleCycles - 1 {
 		stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
 		if len(stale) != 0 {
 			t.Fatalf("cycle %d after ct advance: unexpected flag", i)

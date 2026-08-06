@@ -205,10 +205,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 
 		now := time.Now()
-		usecSince := int(now.Sub(lastCollection).Microseconds())
-		if usecSince < 0 {
-			usecSince = 0
-		}
+		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
 		lastCollection = now
 		collectAndPublish(usecSince)
 	}

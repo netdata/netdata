@@ -56,7 +56,7 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 	}{
 		"ebpf type format legacy forces tracing flavor": {
 			content:    "[global]\nebpf type format = legacy\n",
-			wantFlavor: stringPtr("tracing"),
+			wantFlavor: new("tracing"),
 		},
 		"ebpf type format auto leaves flavor unchanged": {
 			content: "[global]\nebpf type format = auto\n",
@@ -66,14 +66,14 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 		},
 		"ebpf co-re tracing probe forces tracing flavor": {
 			content:    "[global]\nebpf co-re tracing = probe\n",
-			wantFlavor: stringPtr("tracing"),
+			wantFlavor: new("tracing"),
 		},
 		"ebpf co-re tracing trampoline leaves flavor unchanged": {
 			content: "[global]\nebpf co-re tracing = trampoline\n",
 		},
 		"ebpf object flavor legacy maps to tracing flavor": {
 			content:    "[global]\nebpf object flavor = legacy\n",
-			wantFlavor: stringPtr("tracing"),
+			wantFlavor: new("tracing"),
 		},
 		"ebpf load mode entry is accepted as no-op": {
 			content: "[global]\nebpf load mode = entry\n",
@@ -83,23 +83,23 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 		},
 		"ebpf object flavor buffer ring maps to buffer flavor": {
 			content:    "[global]\nebpf object flavor = buffer ring\n",
-			wantFlavor: stringPtr("buffer"),
+			wantFlavor: new("buffer"),
 		},
 		"ebpf object flavor ring buffer maps to buffer flavor": {
 			content:    "[global]\nebpf object flavor = ring-buffer\n",
-			wantFlavor: stringPtr("buffer"),
+			wantFlavor: new("buffer"),
 		},
 		"collect pid real parent sets level 0": {
 			content:      "[global]\ncollect pid = real parent\n",
-			wantPidLevel: intPtr(0),
+			wantPidLevel: new(0),
 		},
 		"collect pid parent sets level 1": {
 			content:      "[global]\ncollect pid = parent\n",
-			wantPidLevel: intPtr(1),
+			wantPidLevel: new(1),
 		},
 		"collect pid all sets level 2": {
 			content:      "[global]\ncollect pid = all\n",
-			wantPidLevel: intPtr(2),
+			wantPidLevel: new(2),
 		},
 	}
 
@@ -123,12 +123,12 @@ func TestParsePluginConfigFile(t *testing.T) {
     ebpf object flavor = arena
 `)
 
-	checkPtr(t, "UpdateEvery", cfg.UpdateEvery, intPtr(17))
-	checkPtr(t, "PidTable", cfg.PidTable, uint32Ptr(4096))
-	checkPtr(t, "MapsPerCore", cfg.MapsPerCore, boolPtr(false))
-	checkPtr(t, "BTFPath", cfg.BTFPath, stringPtr("/tmp/btf"))
-	checkPtr(t, "Lifetime", cfg.Lifetime, intPtr(123))
-	checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, stringPtr("arena"))
+	checkPtr(t, "UpdateEvery", cfg.UpdateEvery, new(17))
+	checkPtr(t, "PidTable", cfg.PidTable, new(uint32(4096)))
+	checkPtr(t, "MapsPerCore", cfg.MapsPerCore, new(false))
+	checkPtr(t, "BTFPath", cfg.BTFPath, new("/tmp/btf"))
+	checkPtr(t, "Lifetime", cfg.Lifetime, new(123))
+	checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, new("arena"))
 }
 
 // TestParsePluginConfigFileInvalidValuesAreIgnored verifies that unrecognized
@@ -222,25 +222,25 @@ func TestParsePluginConfigFileEbpfPrograms(t *testing.T) {
 	}{
 		"socket yes": {
 			content:    "[ebpf programs]\nsocket = yes\n",
-			wantSocket: boolPtr(true),
+			wantSocket: new(true),
 		},
 		"socket no": {
 			content:    "[ebpf programs]\nsocket = no\n",
-			wantSocket: boolPtr(false),
+			wantSocket: new(false),
 		},
 		"cachestat yes socket no": {
 			content:       "[ebpf programs]\ncachestat = yes\nsocket = no\n",
-			wantCachestat: boolPtr(true),
-			wantSocket:    boolPtr(false),
+			wantCachestat: new(true),
+			wantSocket:    new(false),
 		},
 		"cachestat no socket yes": {
 			content:       "[ebpf programs]\ncachestat = no\nsocket = yes\n",
-			wantCachestat: boolPtr(false),
-			wantSocket:    boolPtr(true),
+			wantCachestat: new(false),
+			wantSocket:    new(true),
 		},
 		"socket absent": {
 			content:       "[ebpf programs]\ncachestat = yes\n",
-			wantCachestat: boolPtr(true),
+			wantCachestat: new(true),
 			wantSocket:    nil,
 		},
 	}

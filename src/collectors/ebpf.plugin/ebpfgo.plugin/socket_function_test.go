@@ -109,7 +109,7 @@ func TestBuildNetworkProtocolsJSON_BPFMapping(t *testing.T) {
 	}
 }
 
-func mustUint64(v interface{}) uint64 {
+func mustUint64(v any) uint64 {
 	f, _ := v.(float64)
 	return uint64(f)
 }

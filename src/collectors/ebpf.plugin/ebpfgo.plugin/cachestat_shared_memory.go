@@ -131,15 +131,9 @@ func buildCachestatPublish(current, previous netdataCachestat, ct uint64, hasPre
 
 	publish.Dirty = mbd
 
-	total := mpa - mbd
-	if total < 0 {
-		total = 0
-	}
+	total := max(mpa-mbd, 0)
 
-	misses := apcl - apd
-	if misses < 0 {
-		misses = 0
-	}
+	misses := max(apcl-apd, 0)
 
 	hits := total - misses
 	if hits < 0 {

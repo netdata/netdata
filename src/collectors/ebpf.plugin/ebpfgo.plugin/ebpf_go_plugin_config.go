@@ -147,7 +147,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				if !ok {
 					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid cachestat %q, using default\n", path, value)
 				} else {
-					cfg.Cachestat = boolPtr(b)
+					cfg.Cachestat = new(b)
 				}
 				found = true
 			case "socket":
@@ -155,7 +155,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				if !ok {
 					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid socket %q, using default\n", path, value)
 				} else {
-					cfg.Socket = boolPtr(b)
+					cfg.Socket = new(b)
 				}
 				found = true
 			case "dns":
@@ -163,7 +163,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				if !ok {
 					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid dns %q, using default\n", path, value)
 				} else {
-					cfg.DNS = boolPtr(b)
+					cfg.DNS = new(b)
 				}
 				found = true
 			}
@@ -187,7 +187,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid update every %q, using default\n", path, value)
 			} else {
-				cfg.UpdateEvery = intPtr(n)
+				cfg.UpdateEvery = new(n)
 			}
 			found = true
 		case "apps":
@@ -195,7 +195,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if !ok {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid apps %q, using default\n", path, value)
 			} else {
-				cfg.AppsEnabled = boolPtr(b)
+				cfg.AppsEnabled = new(b)
 			}
 			found = true
 		case "cgroups":
@@ -203,7 +203,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if !ok {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid cgroups %q, using default\n", path, value)
 			} else {
-				cfg.Cgroups = boolPtr(b)
+				cfg.Cgroups = new(b)
 			}
 			found = true
 		case "pid table size":
@@ -211,7 +211,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid pid table size %q, using default\n", path, value)
 			} else {
-				cfg.PidTable = uint32Ptr(uint32(n))
+				cfg.PidTable = new(uint32(n))
 			}
 			found = true
 		case "socket monitoring table size":
@@ -219,7 +219,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid socket monitoring table size %q, using default\n", path, value)
 			} else {
-				cfg.SocketMonitoringTableSize = uint32Ptr(uint32(n))
+				cfg.SocketMonitoringTableSize = new(uint32(n))
 			}
 			found = true
 		case "udp connection table size":
@@ -227,7 +227,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid udp connection table size %q, using default\n", path, value)
 			} else {
-				cfg.UDPConnectionTableSize = uint32Ptr(uint32(n))
+				cfg.UDPConnectionTableSize = new(uint32(n))
 			}
 			found = true
 		case "maps per core":
@@ -235,18 +235,18 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if !ok {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid maps per core %q, using default\n", path, value)
 			} else {
-				cfg.MapsPerCore = boolPtr(b)
+				cfg.MapsPerCore = new(b)
 			}
 			found = true
 		case "btf path":
-			cfg.BTFPath = stringPtr(value)
+			cfg.BTFPath = new(value)
 			found = true
 		case "lifetime":
 			n, err := strconv.Atoi(value)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid lifetime %q, using default\n", path, value)
 			} else {
-				cfg.Lifetime = intPtr(n)
+				cfg.Lifetime = new(n)
 			}
 			found = true
 		case "ebpf object flavor":
@@ -254,7 +254,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if !ok {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf object flavor %q, using default\n", path, value)
 			} else {
-				cfg.ObjectFlavor = stringPtr(flavor)
+				cfg.ObjectFlavor = new(flavor)
 			}
 			found = true
 		case "ebpf load mode":
@@ -275,7 +275,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			// value is unrecognized — warn so the operator can correct a typo.
 			switch strings.ToLower(value) {
 			case "legacy":
-				cfg.ObjectFlavor = stringPtr("tracing")
+				cfg.ObjectFlavor = new("tracing")
 			case "co-re", "auto":
 				// no-op: these are the documented default choices
 			default:
@@ -289,7 +289,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			// is unrecognized — warn so the operator can correct a typo.
 			switch strings.ToLower(value) {
 			case "probe":
-				cfg.ObjectFlavor = stringPtr("tracing")
+				cfg.ObjectFlavor = new("tracing")
 			case "trampoline":
 				// no-op: default
 			default:
@@ -303,7 +303,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if level < 0 {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized collect pid %q, using default\n", path, value)
 			} else {
-				cfg.CollectPidLevel = intPtr(level)
+				cfg.CollectPidLevel = new(level)
 			}
 			found = true
 		case "per query tracking":
@@ -311,7 +311,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if !ok {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid per query tracking %q, using default\n", path, value)
 			} else {
-				cfg.PerQueryTracking = boolPtr(b)
+				cfg.PerQueryTracking = new(b)
 			}
 			found = true
 		case "flow ttl":
@@ -319,7 +319,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			if err != nil || n <= 0 {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid flow ttl %q, using default\n", path, value)
 			} else {
-				cfg.FlowTTL = intPtr(n)
+				cfg.FlowTTL = new(n)
 			}
 			found = true
 		}
@@ -383,20 +383,10 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 }
 
-func intPtr(v int) *int {
-	return &v
-}
 
-func uint32Ptr(v uint32) *uint32 {
-	return &v
-}
-
-func boolPtr(v bool) *bool {
-	return &v
-}
-
+//go:fix inline
 func stringPtr(v string) *string {
-	return &v
+	return new(v)
 }
 
 func parseConfigBool(value string) (bool, bool) {

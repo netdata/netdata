@@ -106,12 +106,10 @@ func main() {
 				cachestatWillPublish = true
 			}
 			anyStarted = true
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				runCachestatGlobalCollector(api, handle, stop, cachestatStore, ue)
 				handle.Close()
-			}()
+			})
 		}
 	}
 
@@ -144,12 +142,10 @@ func main() {
 			// this lets socket cgroup charts work independently of cachestat.
 			socketShouldPublish := store != nil && !cachestatWillPublish
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				runSocketGlobalCollector(api, handle, stop, ue, store, fnStore, socketShouldPublish)
 				handle.Close()
-			}()
+			})
 		}
 	}
 
@@ -164,12 +160,10 @@ func main() {
 		} else if handle != nil && handle.Runtime != nil {
 			anyStarted = true
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				runDNSGlobalCollector(handle, stop, ue)
 				handle.Close()
-			}()
+			})
 		}
 	}
 

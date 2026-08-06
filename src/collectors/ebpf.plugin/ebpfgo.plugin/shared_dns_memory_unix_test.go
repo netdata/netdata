@@ -15,7 +15,7 @@ func TestCopyDNSDomainAlwaysTerminates(t *testing.T) {
 	if dst[len(dst)-1] != 0 {
 		t.Fatalf("last domain byte = %d, want NUL terminator", dst[len(dst)-1])
 	}
-	for i := 0; i < len(dst)-1; i++ {
+	for i := range len(dst) - 1 {
 		if dst[i] != 'a' {
 			t.Fatalf("domain byte %d = %d, want 'a'", i, dst[i])
 		}

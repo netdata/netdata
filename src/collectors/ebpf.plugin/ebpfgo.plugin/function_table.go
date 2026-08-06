@@ -46,7 +46,7 @@ type fnTableResponse struct {
 	UpdateEvery       int                     `json:"update_every"`
 	HasHistory        bool                    `json:"has_history"`
 	Help              string                  `json:"help"`
-	Data              [][]interface{}         `json:"data"`
+	Data              [][]any                 `json:"data"`
 	Columns           map[string]fnColumnDef  `json:"columns"`
 	DefaultSortColumn string                  `json:"default_sort_column"`
 	Charts            map[string]fnChartDef   `json:"charts"`
