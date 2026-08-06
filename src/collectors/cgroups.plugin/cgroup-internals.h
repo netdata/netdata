@@ -99,6 +99,41 @@ struct memory {
     unsigned long long usage_in_bytes;
     unsigned long long msw_usage_in_bytes;
     unsigned long long failcnt;
+
+    // memory.events and memory.swap.events (cgroup v2 only)
+    // counters are hierarchical: they include events from descendant cgroups
+    // and survive the removal of the descendant that triggered them
+    ARL_BASE *arl_events;
+    ARL_ENTRY *arl_events_oom_group_kill;
+    ARL_ENTRY *arl_events_sock_throttled;
+    ARL_BASE *arl_swap_events;
+    ARL_ENTRY *arl_swap_events_high;
+
+    char *filename_events;
+    char *filename_swap_events;
+
+    bool staterr_events;
+    bool staterr_swap_events;
+
+    int updated_events;
+    int updated_swap_events;
+
+    // kernel-version dependent keys: oom_group_kill 5.17+, sock_throttled 6.19+, swap high 5.8+
+    int events_has_oom_group_kill;
+    int events_has_sock_throttled;
+    int swap_events_has_high;
+
+    unsigned long long events_low;
+    unsigned long long events_high;
+    unsigned long long events_max;
+    unsigned long long events_oom;
+    unsigned long long events_oom_kill;
+    unsigned long long events_oom_group_kill;
+    unsigned long long events_sock_throttled;
+
+    unsigned long long swap_events_high;
+    unsigned long long swap_events_max;
+    unsigned long long swap_events_fail;
 };
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
@@ -263,6 +298,9 @@ struct cgroup {
     RRDSET *st_mem_usage;
     RRDSET *st_mem_usage_limit;
     RRDSET *st_mem_failcnt;
+    RRDSET *st_mem_events;
+    RRDSET *st_mem_events_oom;
+    RRDSET *st_mem_events_swap;
 
     // Blkio
     RRDSET *st_io;
@@ -474,6 +512,9 @@ void update_mem_writeback_chart(struct cgroup *cg);
 void update_mem_activity_chart(struct cgroup *cg);
 void update_mem_pgfaults_chart(struct cgroup *cg);
 void update_mem_failcnt_chart(struct cgroup *cg);
+void update_mem_events_chart(struct cgroup *cg);
+void update_mem_events_oom_chart(struct cgroup *cg);
+void update_mem_events_swap_chart(struct cgroup *cg);
 void update_mem_usage_chart(struct cgroup *cg);
 
 void update_io_serviced_bytes_chart(struct cgroup *cg);
