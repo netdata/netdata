@@ -370,7 +370,33 @@ static struct netdata_dns_pending *dns_pending_find(
     return NULL;
 }
 
-/* Find a free slot; if table is full, evict the oldest entry. */
+/* Emit a timed-out flow record for a pending entry and clear its in_use flag.
+ * Used by both the normal expiry path and the forced-eviction path so timeout
+ * records are never silently dropped. */
+static void dns_pending_emit_timeout(struct netdata_dns_runtime *rt,
+                                     struct netdata_dns_pending *p,
+                                     uint64_t now_us)
+{
+    struct netdata_dns_flow_record *r =
+        &rt->flows.records[rt->flows.head % DNS_FLOW_RING_CAP];
+    memset(r, 0, sizeof(*r));
+    r->timestamp_us = now_us;
+    r->latency_us   = 0;
+    memcpy(r->server_ip, p->server_ip, sizeof(r->server_ip));
+    memcpy(r->client_ip, p->client_ip, sizeof(r->client_ip));
+    snprintf(r->domain, sizeof(r->domain), "%s", p->domain);
+    r->client_port = p->client_port;
+    r->query_type  = p->query_type;
+    r->rcode       = 0;
+    r->protocol    = p->protocol;
+    r->ip_version  = p->ip_version;
+    r->timed_out   = 1;
+    rt->flows.head++;
+    p->in_use = 0;
+}
+
+/* Find a free slot; if table is full, evict the oldest entry and emit a
+ * timeout record for it so the overflow is visible in the flow ring. */
 static struct netdata_dns_pending *dns_pending_alloc(
     struct netdata_dns_runtime *rt)
 {
@@ -383,7 +409,8 @@ static struct netdata_dns_pending *dns_pending_alloc(
             oldest = &rt->pending[i];
     }
 
-    /* Table full — reuse the oldest (evict without a timeout record) */
+    /* Table full — emit a timeout record before reusing the slot. */
+    dns_pending_emit_timeout(rt, oldest, dns_now_us());
     return oldest;
 }
 
@@ -397,24 +424,7 @@ static void dns_expire_pending(struct netdata_dns_runtime *rt, uint64_t now_us)
             continue;
         if (now_us - p->timestamp_us <= DNS_PENDING_TIMEOUT_US)
             continue;
-
-        struct netdata_dns_flow_record *r =
-            &rt->flows.records[rt->flows.head % DNS_FLOW_RING_CAP];
-        memset(r, 0, sizeof(*r));
-        r->timestamp_us = now_us;
-        r->latency_us   = 0;
-        memcpy(r->server_ip, p->server_ip, sizeof(r->server_ip));
-        memcpy(r->client_ip, p->client_ip, sizeof(r->client_ip));
-        snprintf(r->domain, sizeof(r->domain), "%s", p->domain);
-        r->client_port = p->client_port;
-        r->query_type  = p->query_type;
-        r->rcode       = 0;
-        r->protocol    = p->protocol;
-        r->ip_version  = p->ip_version;
-        r->timed_out   = 1;
-        rt->flows.head++;
-
-        p->in_use = 0;
+        dns_pending_emit_timeout(rt, p, now_us);
     }
 }
 
