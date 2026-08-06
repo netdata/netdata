@@ -1540,16 +1540,16 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
                      * interval to produce rates/s comparable across hosts. */
                     uint32_t d = (es.socket.socket_update_every_s > 0) ?
                                  es.socket.socket_update_every_s : 1;
-                    ebpf_bytes_sent         = es.socket.bytes_sent        / d;
-                    ebpf_bytes_received     = es.socket.bytes_received    / d;
-                    ebpf_call_tcp_sent      = es.socket.call_tcp_sent     / d;
-                    ebpf_call_tcp_received  = es.socket.call_tcp_received / d;
-                    ebpf_retransmit         = es.socket.retransmit        / d;
-                    ebpf_call_udp_sent      = es.socket.call_udp_sent     / d;
-                    ebpf_call_udp_received  = es.socket.call_udp_received / d;
-                    ebpf_call_close         = es.socket.call_close        / d;
-                    ebpf_call_tcp_v4        = es.socket.call_tcp_v4_connection / d;
-                    ebpf_call_tcp_v6        = es.socket.call_tcp_v6_connection / d;
+                    ebpf_bytes_sent         = (es.socket.bytes_sent        + d/2) / d;
+                    ebpf_bytes_received     = (es.socket.bytes_received    + d/2) / d;
+                    ebpf_call_tcp_sent      = (es.socket.call_tcp_sent     + d/2) / d;
+                    ebpf_call_tcp_received  = (es.socket.call_tcp_received + d/2) / d;
+                    ebpf_retransmit         = (es.socket.retransmit        + d/2) / d;
+                    ebpf_call_udp_sent      = (es.socket.call_udp_sent     + d/2) / d;
+                    ebpf_call_udp_received  = (es.socket.call_udp_received + d/2) / d;
+                    ebpf_call_close         = (es.socket.call_close        + d/2) / d;
+                    ebpf_call_tcp_v4        = (es.socket.call_tcp_v4_connection + d/2) / d;
+                    ebpf_call_tcp_v6        = (es.socket.call_tcp_v6_connection + d/2) / d;
                 }
             }
             buffer_json_add_array_item_uint64(wb, ebpf_bytes_sent);
@@ -1790,16 +1790,16 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
                  * interval to produce rates/s comparable across hosts. */
                 uint32_t d = (_ebpf_t.socket.socket_update_every_s > 0) ?
                              _ebpf_t.socket.socket_update_every_s : 1;
-                t->network_viewer.ebpf_bytes_sent        = _ebpf_t.socket.bytes_sent        / d;
-                t->network_viewer.ebpf_bytes_received    = _ebpf_t.socket.bytes_received    / d;
-                t->network_viewer.ebpf_call_tcp_sent     = _ebpf_t.socket.call_tcp_sent     / d;
-                t->network_viewer.ebpf_call_tcp_received = _ebpf_t.socket.call_tcp_received / d;
-                t->network_viewer.ebpf_retransmit        = _ebpf_t.socket.retransmit        / d;
-                t->network_viewer.ebpf_call_udp_sent     = _ebpf_t.socket.call_udp_sent     / d;
-                t->network_viewer.ebpf_call_udp_received = _ebpf_t.socket.call_udp_received / d;
-                t->network_viewer.ebpf_call_close        = _ebpf_t.socket.call_close        / d;
-                t->network_viewer.ebpf_call_tcp_v4_conn  = _ebpf_t.socket.call_tcp_v4_connection / d;
-                t->network_viewer.ebpf_call_tcp_v6_conn  = _ebpf_t.socket.call_tcp_v6_connection / d;
+                t->network_viewer.ebpf_bytes_sent        = (_ebpf_t.socket.bytes_sent        + d/2) / d;
+                t->network_viewer.ebpf_bytes_received    = (_ebpf_t.socket.bytes_received    + d/2) / d;
+                t->network_viewer.ebpf_call_tcp_sent     = (_ebpf_t.socket.call_tcp_sent     + d/2) / d;
+                t->network_viewer.ebpf_call_tcp_received = (_ebpf_t.socket.call_tcp_received + d/2) / d;
+                t->network_viewer.ebpf_retransmit        = (_ebpf_t.socket.retransmit        + d/2) / d;
+                t->network_viewer.ebpf_call_udp_sent     = (_ebpf_t.socket.call_udp_sent     + d/2) / d;
+                t->network_viewer.ebpf_call_udp_received = (_ebpf_t.socket.call_udp_received + d/2) / d;
+                t->network_viewer.ebpf_call_close        = (_ebpf_t.socket.call_close        + d/2) / d;
+                t->network_viewer.ebpf_call_tcp_v4_conn  = (_ebpf_t.socket.call_tcp_v4_connection + d/2) / d;
+                t->network_viewer.ebpf_call_tcp_v6_conn  = (_ebpf_t.socket.call_tcp_v6_connection + d/2) / d;
             }
             else {
                 t->network_viewer.ebpf_bytes_sent        = 0;

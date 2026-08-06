@@ -93,7 +93,7 @@ struct netdata_sock_fprog {
  * Per-query tracking limits
  * ---------------------------------------------------------------------- */
 #define DNS_PENDING_CAP         512         /* max concurrent in-flight queries  */
-#define DNS_PENDING_TIMEOUT_US  30000000ULL /* 30 s: must exceed max drain interval (20 s) */
+#define DNS_PENDING_TIMEOUT_US  5000000ULL  /* 5 s: unmatched query → timeout             */
 #define DNS_FLOW_RING_CAP       1000        /* ring capacity — matches SHM       */
 #define DNS_FLOW_TTL_US_DEFAULT (20ULL * 1000000ULL) /* 20 s default live window */
 #define DNS_DOMAIN_MAX          256
