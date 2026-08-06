@@ -13,11 +13,13 @@ import (
 )
 
 type stagedValidationInputs struct {
-	profileName string
-	fileURL     string
-	catalog     promprofiles.Catalog
-	root        string
-	dumpRaw     []byte
+	profileName  string
+	profileNames []string
+	profiles     []promprofiles.Profile
+	fileURL      string
+	catalog      promprofiles.Catalog
+	root         string
+	dumpRaw      []byte
 }
 
 func (i stagedValidationInputs) stageFutureInputs(inputs []futureInput) (string, error) {
@@ -32,28 +34,10 @@ func (i stagedValidationInputs) stageFutureInputs(inputs []futureInput) (string,
 	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String(), nil
 }
 
-func stageValidationInputs(profilePath, dumpPath string) (stagedValidationInputs, func(), error) {
-	profileAbs, err := filepath.Abs(profilePath)
-	if err != nil {
-		return stagedValidationInputs{}, nil, fmt.Errorf("resolve profile path: %w", err)
-	}
+func stageValidationInputs(profilePath string, supportingProfilePaths []string, dumpPath string) (stagedValidationInputs, func(), error) {
 	dumpAbs, err := filepath.Abs(dumpPath)
 	if err != nil {
 		return stagedValidationInputs{}, nil, fmt.Errorf("resolve dump path: %w", err)
-	}
-
-	base := filepath.Base(profileAbs)
-	name := strings.TrimSuffix(base, filepath.Ext(base))
-	if !promprofiles.IsValidProfileName(name) {
-		return stagedValidationInputs{}, nil, fmt.Errorf(
-			"profile basename %q must be lowercase letters, digits, or underscores and start with a letter",
-			name,
-		)
-	}
-
-	raw, err := os.ReadFile(profileAbs)
-	if err != nil {
-		return stagedValidationInputs{}, nil, fmt.Errorf("read profile %q: %w", profilePath, err)
 	}
 	dumpRaw, err := os.ReadFile(dumpAbs)
 	if err != nil {
@@ -75,9 +59,39 @@ func stageValidationInputs(profilePath, dumpPath string) (stagedValidationInputs
 		return fail(fmt.Errorf("create isolated catalog directory %q: %w", profilesDir, err))
 	}
 
-	stagedProfile := filepath.Join(profilesDir, name+".yaml")
-	if err := os.WriteFile(stagedProfile, raw, 0o600); err != nil {
-		return fail(fmt.Errorf("stage candidate profile: %w", err))
+	profilePaths := append([]string{profilePath}, supportingProfilePaths...)
+	profileNames := make([]string, 0, len(profilePaths))
+	seenNames := make(map[string]string, len(profilePaths))
+	for index, path := range profilePaths {
+		profileAbs, err := filepath.Abs(path)
+		if err != nil {
+			return fail(fmt.Errorf("resolve profile path %q: %w", path, err))
+		}
+		base := filepath.Base(profileAbs)
+		name := strings.TrimSuffix(base, filepath.Ext(base))
+		if !promprofiles.IsValidProfileName(name) {
+			return fail(fmt.Errorf(
+				"profile basename %q must be lowercase letters, digits, or underscores and start with a letter",
+				name,
+			))
+		}
+		if first, ok := seenNames[name]; ok {
+			return fail(fmt.Errorf("profile identity %q is duplicated by %q and %q", name, first, path))
+		}
+		seenNames[name] = path
+
+		raw, err := os.ReadFile(profileAbs)
+		if err != nil {
+			return fail(fmt.Errorf("read profile %q: %w", path, err))
+		}
+		if err := os.WriteFile(filepath.Join(profilesDir, name+".yaml"), raw, 0o600); err != nil {
+			role := "supporting"
+			if index == 0 {
+				role = "candidate"
+			}
+			return fail(fmt.Errorf("stage %s profile %q: %w", role, path, err))
+		}
+		profileNames = append(profileNames, name)
 	}
 	stagedDump := filepath.Join(root, "metrics.txt")
 	if err := os.WriteFile(stagedDump, dumpRaw, 0o600); err != nil {
@@ -94,19 +108,25 @@ func stageValidationInputs(profilePath, dumpPath string) (stagedValidationInputs
 	if err != nil {
 		return fail(fmt.Errorf("strict profile catalog preflight: %w", err))
 	}
-	profile, ok := preflight.Get(name)
-	if !ok {
-		return fail(fmt.Errorf("strict profile catalog preflight did not load %q", name))
-	}
-	if _, err := profile.Template(); err != nil {
-		return fail(fmt.Errorf("strict profile template preflight: %w", err))
+	profiles := make([]promprofiles.Profile, 0, len(profileNames))
+	for _, name := range profileNames {
+		profile, ok := preflight.Get(name)
+		if !ok {
+			return fail(fmt.Errorf("strict profile catalog preflight did not load %q", name))
+		}
+		if _, err := profile.Template(); err != nil {
+			return fail(fmt.Errorf("strict profile template preflight for %q: %w", name, err))
+		}
+		profiles = append(profiles, profile)
 	}
 
 	return stagedValidationInputs{
-		profileName: name,
-		fileURL:     (&url.URL{Scheme: "file", Path: filepath.ToSlash(stagedDump)}).String(),
-		catalog:     preflight,
-		root:        root,
-		dumpRaw:     dumpRaw,
+		profileName:  profileNames[0],
+		profileNames: profileNames,
+		profiles:     profiles,
+		fileURL:      (&url.URL{Scheme: "file", Path: filepath.ToSlash(stagedDump)}).String(),
+		catalog:      preflight,
+		root:         root,
+		dumpRaw:      dumpRaw,
 	}, cleanup, nil
 }

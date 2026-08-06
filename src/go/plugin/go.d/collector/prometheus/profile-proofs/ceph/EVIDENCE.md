@@ -35,8 +35,8 @@ descriptor-backed replay tests.
   boundaries.
 - Identities and values are synthetic and non-production. No private endpoint, credential, deployment label, or operating
   value is committed.
-- The external source inventory is the exact source-to-disposition ledger. The external manifest authenticates the inventory
-  and fixtures; `proof.yaml` pins that manifest.
+- The external source inventory is the exact source-to-disposition ledger. `proof.yaml` declares the consumed fixtures and
+  verifies the latest external directory as one complete input set.
 
 ## Limitations
 

@@ -963,7 +963,12 @@ ceph_health_status 0
 	)
 }
 
-func configureProfileJobFromMetadata(t *testing.T, collr *Collector, integrationID, profileName, jobName string) {
+func configureProfileJobFromMetadata(
+	t *testing.T,
+	collr *Collector,
+	integrationID, profileName, jobName string,
+	supportingProfileNames ...string,
+) {
 	t.Helper()
 
 	var metadata struct {
@@ -1012,9 +1017,13 @@ func configureProfileJobFromMetadata(t *testing.T, collr *Collector, integration
 		break
 	}
 	require.NotNilf(t, config, "metadata integration %q has no job %q", integrationID, jobName)
+	entries := []ProfileEntryConfig{{Name: profileName}}
+	for _, name := range supportingProfileNames {
+		entries = append(entries, ProfileEntryConfig{Name: name})
+	}
 	require.Equal(t, ProfilesConfig{
 		Mode:      "exact",
-		ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: profileName}}},
+		ModeExact: &ProfilesModeConfig{Entries: entries},
 	}, config.Profiles)
 
 	config.URL = collr.URL
@@ -1035,7 +1044,8 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 
 	collr := New()
 	collr.URL = srv.URL
-	configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm", "vllm")
+	configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm", "vllm",
+		"fastapi", "process_runtime", "python_gc")
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 
@@ -1047,16 +1057,17 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 	var sawCanonicalOffload bool
 	collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()).ForEachSeries(
 		func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
-			assert.Falsef(t, strings.HasSuffix(name, "_created"), "job selector retained generated timestamp %q", name)
+			assert.Falsef(t, strings.HasSuffix(name, "_created"), "profile relabeling retained generated timestamp %q", name)
 			assert.NotEqual(t, "process_start_time_seconds", name)
 			assert.NotEqual(t, "vllm:kv_offload_total_bytes_total", name)
 			assert.NotEqual(t, "vllm:kv_offload_total_time_total", name)
-			assert.Falsef(t, strings.HasPrefix(name, "vllm:kv_offload_size"), "job selector retained deprecated offload family %q", name)
+			assert.Falsef(t, strings.HasPrefix(name, "vllm:kv_offload_size"),
+				"profile relabeling retained deprecated offload family %q", name)
 			if name == "vllm:kv_offload_store_bytes_total" {
 				sawCanonicalOffload = true
 			}
 		})
-	assert.True(t, sawCanonicalOffload, "job selector must retain canonical CPU-offload counters")
+	assert.True(t, sawCanonicalOffload, "profile relabeling must retain canonical CPU-offload counters")
 
 	eng, err := chartengine.New()
 	require.NoError(t, err)
@@ -1077,14 +1088,14 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 
 	seenChartIDs := make(map[string]string)
 	identityCounts := map[string]int{
-		"prometheus.vllm.request_lifecycle.outcomes":             0,
-		"prometheus.vllm.kv_offloading.transfer_operations":      0,
-		"prometheus.vllm.mooncake_connector.volume.keys":         0,
-		"prometheus.vllm.diffusion_decoding.denoising_steps":     0,
-		"prometheus.vllm.websocket_service.connection_lifecycle": 0,
-		"prometheus.vllm.http_endpoints.request_outcomes":        0,
-		"prometheus.vllm.tool_parsing.invocations":               0,
-		"prometheus.vllm.runtime.process_cpu":                    0,
+		"prometheus.vllm.request_lifecycle.outcomes":              0,
+		"prometheus.vllm.kv_offloading.transfer_operations":       0,
+		"prometheus.vllm.mooncake_connector.volume.keys":          0,
+		"prometheus.vllm.diffusion_decoding.denoising_steps":      0,
+		"prometheus.vllm.websocket_service.connection_lifecycle":  0,
+		"prometheus.vllm.fastapi.http_endpoints.request_outcomes": 0,
+		"prometheus.vllm.tool_parsing.invocations":                0,
+		"prometheus.vllm.process_runtime.process_cpu":             0,
 	}
 	for _, action := range plan.Actions {
 		create, ok := action.(chartengine.CreateChartAction)
@@ -1121,7 +1132,7 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 			assert.NotContains(t, create.Labels, "model_name")
 			assert.NotContains(t, create.Labels, "engine")
 			identityCounts[create.Meta.Context]++
-		case "prometheus.vllm.http_endpoints.request_outcomes":
+		case "prometheus.vllm.fastapi.http_endpoints.request_outcomes":
 			assert.NotEmpty(t, create.Labels["handler"])
 			assert.NotEmpty(t, create.Labels["method"])
 			assert.NotContains(t, create.Labels, "model_name")
@@ -1132,7 +1143,7 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 			assert.NotEmpty(t, create.Labels["mode"])
 			assert.NotContains(t, create.Labels, "engine")
 			identityCounts[create.Meta.Context]++
-		case "prometheus.vllm.runtime.process_cpu":
+		case "prometheus.vllm.process_runtime.process_cpu":
 			assert.NotContains(t, create.Labels, "model_name")
 			assert.NotContains(t, create.Labels, "engine")
 			identityCounts[create.Meta.Context]++
@@ -1144,9 +1155,9 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 	assert.Equal(t, 2, identityCounts["prometheus.vllm.mooncake_connector.volume.keys"])
 	assert.Equal(t, 1, identityCounts["prometheus.vllm.diffusion_decoding.denoising_steps"])
 	assert.Equal(t, 1, identityCounts["prometheus.vllm.websocket_service.connection_lifecycle"])
-	assert.Equal(t, 2, identityCounts["prometheus.vllm.http_endpoints.request_outcomes"])
+	assert.Equal(t, 2, identityCounts["prometheus.vllm.fastapi.http_endpoints.request_outcomes"])
 	assert.Equal(t, 6, identityCounts["prometheus.vllm.tool_parsing.invocations"])
-	assert.Equal(t, 1, identityCounts["prometheus.vllm.runtime.process_cpu"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.process_runtime.process_cpu"])
 
 	curated := map[string][]string{
 		"prometheus.vllm.request_lifecycle.outcomes":                  {"stop", "length", "abort", "error", "repetition"},
@@ -1164,11 +1175,11 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 		"prometheus.vllm.speculative_decoding.accepted_by_position":   {"0", "1"},
 		"prometheus.vllm.diffusion_decoding.committed_tokens":         {"committed"},
 		"prometheus.vllm.websocket_service.connection_lifecycle":      {"opened", "closed"},
-		"prometheus.vllm.http_endpoints.request_outcomes":             {"2xx"},
-		"prometheus.vllm.http_service.request_measurements":           {"requests"},
+		"prometheus.vllm.fastapi.http_endpoints.request_outcomes":     {"2xx"},
+		"prometheus.vllm.fastapi.http_service.request_measurements":   {"requests"},
 		"prometheus.vllm.tool_parsing.invocations":                    {"tool_call", "no_tool_call"},
-		"prometheus.vllm.runtime.process_cpu":                         {"used"},
-		"prometheus.vllm.runtime.python_gc.collections":               {"0", "1", "2"},
+		"prometheus.vllm.process_runtime.process_cpu":                 {"used"},
+		"prometheus.vllm.process_runtime.python_gc.collections":       {"0", "1", "2"},
 	}
 	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: curated})
 }
@@ -1248,7 +1259,7 @@ func testCollectorStockProfileAllMetrics(
 }
 
 // TestCollector_VLLMRayProfileAllMetrics proves the Ray transport profile
-// against the source-derived vLLM/Ray structural union. The job selector
+// against the source-derived vLLM/Ray structural union. Profile relabeling
 // removes Ray's deprecated unsuffixed counter aliases and pre-canonical
 // KV-offload duplicates so canonical counters are represented exactly once.
 func TestCollector_VLLMRayProfileAllMetrics(t *testing.T) {
@@ -1274,14 +1285,15 @@ func TestCollector_VLLMRayProfileAllMetrics(t *testing.T) {
 		func(reader metrix.Reader) {
 			var sawCanonicalCounter bool
 			reader.ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
-				assert.NotEqual(t, "ray_vllm_request_success", name, "Ray compatibility gauge survived the job selector")
+				assert.NotEqual(t, "ray_vllm_request_success", name,
+					"Ray compatibility gauge survived profile relabeling")
 				assert.Falsef(t, strings.HasPrefix(name, "ray_vllm_kv_offload_size_"),
-					"deprecated Ray KV-offload histogram component %q survived the job selector", name)
+					"deprecated Ray KV-offload histogram component %q survived profile relabeling", name)
 				if name == "ray_vllm_request_success_total" {
 					sawCanonicalCounter = true
 				}
 			})
-			assert.True(t, sawCanonicalCounter, "Ray job selector must retain canonical _total counters")
+			assert.True(t, sawCanonicalCounter, "Ray profile relabeling must retain canonical _total counters")
 		},
 		func(plan chartengine.Plan) {
 			const byteContext = "prometheus.vllm.kv_offloading.transfer_bytes"
@@ -1330,7 +1342,8 @@ func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
 		t,
 		"prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom",
 		func(collr *Collector) {
-			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-litellm", "litellm", "litellm")
+			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-litellm", "litellm", "litellm",
+				"process_runtime", "python_gc")
 		},
 		"prometheus.litellm.",
 		map[string][]string{
@@ -1384,8 +1397,8 @@ func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
 			"prometheus.litellm.callbacks_and_inventory.user_inventory":                            {"total"},
 			"prometheus.litellm.callbacks_and_inventory.callback_logging_failures_by_callback":     {"failures"},
 			"prometheus.litellm.internal_services.internal_service_requests":                       {"redis"},
-			"prometheus.litellm.runtime.process_cpu":                                               {"used"},
-			"prometheus.litellm.runtime.python_gc.collections":                                     {"0", "1", "2"},
+			"prometheus.litellm.process_runtime.process_cpu":                                       {"used"},
+			"prometheus.litellm.process_runtime.python_gc.collections":                             {"0", "1", "2"},
 		},
 		nil,
 		func(plan chartengine.Plan) {
@@ -1568,7 +1581,8 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 		t,
 		"prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom",
 		func(collr *Collector) {
-			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr")
+			configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr",
+				"process_runtime")
 		},
 		"prometheus.ceph.",
 		map[string][]string{
@@ -1603,7 +1617,7 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 			"prometheus.ceph.storage_engine_extensions.external_block_devices.partition_space":         {"physical_size", "logical_size", "physical_available", "logical_available"},
 			"prometheus.ceph.ceph_clients.io_operations":                                               {"metadata", "read", "write"},
 			"prometheus.ceph.nvme_of.block_devices.byte_throughput":                                    {"read_bytes"},
-			"prometheus.ceph.nvme_of.gateway_runtime.process_cpu":                                      {"used"},
+			"prometheus.ceph.process_runtime.process_cpu":                                              {"used"},
 		},
 		func(reader metrix.Reader) {
 			names := make(map[string]int)
@@ -1871,33 +1885,37 @@ func TestCollector_CephProfileAllMetrics(t *testing.T) {
 // ceph-exporter emits those same sums as gauges from the daemon schema.
 func TestCollector_CephProfileProducerVariants(t *testing.T) {
 	tests := []struct {
-		fixture string
-		jobName string
-		context string
-		dims    []string
+		fixture       string
+		jobName       string
+		context       string
+		dims          []string
+		candidateOnly bool
 	}{
-		{"prometheus/profiles/ceph/fixtures/ceph_reef_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
-		{"prometheus/profiles/ceph/fixtures/ceph_squid_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
-		{"prometheus/profiles/ceph/fixtures/ceph_tentacle_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}},
+		{"prometheus/profiles/ceph/fixtures/ceph_reef_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}, true},
+		{"prometheus/profiles/ceph/fixtures/ceph_squid_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}, true},
+		{"prometheus/profiles/ceph/fixtures/ceph_tentacle_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}, true},
 		{
 			"prometheus/profiles/ceph/fixtures/ceph_reef_exporter_prio0_all_metrics.prom",
 			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
+			true,
 		},
 		{
 			"prometheus/profiles/ceph/fixtures/ceph_squid_exporter_prio0_all_metrics.prom",
 			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
+			true,
 		},
 		{
 			"prometheus/profiles/ceph/fixtures/ceph_tentacle_exporter_prio0_all_metrics.prom",
 			"ceph-exporter",
 			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
 			[]string{"kernel", "user", "idle"},
+			true,
 		},
-		{"prometheus/profiles/ceph/fixtures/ceph_nvmeof_all_metrics.prom", "ceph-exporter", "prometheus.ceph.nvme_of.block_devices.byte_throughput", []string{"read_bytes", "written_bytes"}},
+		{"prometheus/profiles/ceph/fixtures/ceph_nvmeof_all_metrics.prom", "ceph-exporter", "prometheus.ceph.nvme_of.block_devices.byte_throughput", []string{"read_bytes", "written_bytes"}, false},
 	}
 
 	for _, test := range tests {
@@ -1906,7 +1924,14 @@ func TestCollector_CephProfileProducerVariants(t *testing.T) {
 				t,
 				test.fixture,
 				func(collr *Collector) {
-					configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", test.jobName)
+					configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", test.jobName,
+						"process_runtime")
+					if test.candidateOnly {
+						collr.Profiles = ProfilesConfig{
+							Mode:      "exact",
+							ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "ceph"}}},
+						}
+					}
 				},
 				"prometheus.ceph.",
 				map[string][]string{test.context: test.dims},

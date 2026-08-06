@@ -1,19 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-version: 2
+version: 3
 profile: vllm_ray
-external_evidence:
-  revision: vllm_ray
-  manifest:
-    sha256: bd237be1419c680ea6592a551a08fb6818beadbae95dd0c24422671ee68f86f5
-    bytes: 418
 source_inventory:
   rows: 180
   source_families: 116
   authored_selectors: 142
   dispositions:
     chart: 142
-    job_excluded: 36
+    profile_excluded: 36
+    job_excluded: 0
     writer_ineligible: 2
 validation:
   metadata_example:
@@ -50,8 +46,7 @@ validation:
           dimension_collisions: 0
         errors: {}
         warnings:
-          job_deny_review: 38
-          job_policy_exclusion_summary: 1
+          profile_relabel_discard_review: 1
     - name: without-job-policy
       kind: supplemental
       fixture: fixtures/vllm_ray_all_metrics.prom
@@ -61,15 +56,15 @@ validation:
         counts:
           raw_families: 116
           raw_logical_series: 148
-          writer_series: 770
-          series_scanned: 770
+          writer_series: 698
+          series_scanned: 698
           series_autogen: 0
-          series_unmatched: 72
+          series_unmatched: 0
           authored_charts: 104
           runtime_charts: 113
           autogen_charts: 0
           chart_dimensions: 698
-          pipeline_excluded: 2
+          pipeline_excluded: 38
           pipeline_renamed: 0
           dead_charts: 0
           dead_dimensions: 0
@@ -82,20 +77,20 @@ validation:
         errors: {}
         warnings:
           default_validation_job: 1
-          profile_suppressed_series: 1
+          profile_relabel_discard_review: 1
 integrity:
   evidence:
-    sha256: 116cb5f12da171e61ac3323cac1819ac89cbc93cc44eec47333a58e6b539c605
-    bytes: 2157
+    sha256: dce7b92bba30baaaa7fe2621dff72539cd6a2d1e95ca2f959cd8e2914e8651a9
+    bytes: 2174
   operator_model:
-    sha256: fd27ac9afd38eda827c2980366f1033f9f310b371ec08ecfdecd2d82a3c27cba
-    bytes: 3827
+    sha256: d5b411fe8353a250207c6f99f875123892e518351ff31143d5460f89d50b4f53
+    bytes: 3830
   validation_job:
-    sha256: 08a6ae722e14114339b6c44e077d1ec74301d9d520db3cf604e67c619ce8d6a4
-    bytes: 1573
+    sha256: a552dea7bf3e5f4b09aaa219801279f591faea480d10d996470dc293c50d5560
+    bytes: 52
   validation_summary:
-    sha256: 97a6e907529d43de4ca9a4c0b7bab8729c0fada9c9d038437b7eae07322e0dfa
-    bytes: 1730
+    sha256: 54a6a99b9d5450b45d62e7ca52157a1e40b8a6ff3154ab4258fcfcc6aa44355f
+    bytes: 1719
   profile:
-    sha256: d6d1b53ed44ec48d81640c9d16f05b3afe40bbf69b56ddcf06008acd169db9ff
-    bytes: 49109
+    sha256: f785e471ed24e53ea183e01403e76997cb0d67c37ce4e3290c021f5e9c9b3afa
+    bytes: 46550

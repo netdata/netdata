@@ -42,7 +42,7 @@ The Ray-vLLM transport does not imply native HTTP, Python-GC, or process familie
 
 ## Alias and exclusion semantics
 
-- Ray counter-as-gauge compatibility aliases are duplicate spellings of canonical counter observations. The recommended job
+- Ray counter-as-gauge compatibility aliases are duplicate spellings of canonical counter observations. Profile relabeling
   removes the source-known aliases while retaining canonical families.
 - Pre-canonical KV-offload aliases are excluded only where source proves that canonical load/store families represent the
   same observations.
@@ -52,8 +52,8 @@ The Ray-vLLM transport does not imply native HTTP, Python-GC, or process familie
 
 ## Dashboard reconciliation
 
-The source inventory is the binding exact mapping from source family and logical component to chart, job exclusion, or writer
-limitation. It records owner, engine-replica-worker identity, observation population, relationships, units, label roles,
+The source inventory is the binding exact mapping from source family and logical component to chart, profile exclusion, or
+writer limitation. It records owner, engine-replica-worker identity, observation population, relationships, units, label roles,
 availability gates, lost questions, destinations, and source paths. This document intentionally does not repeat that
 per-family ledger.
 

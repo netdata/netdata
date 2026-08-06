@@ -10,6 +10,32 @@
 # generic fallback until their semantics can be added to the operator model.
 match: 'ceph_*'
 app: ceph
+fallback_type:
+  gauge:
+    - ceph_disk_occupation
+    - ceph_disk_occupation_human
+    - ceph_fs_metadata
+    - ceph_health_status
+    - ceph_mds_metadata
+    - ceph_mon_metadata
+    - ceph_osd_flag_nobackfill
+    - ceph_osd_flag_nodeep_scrub
+    - ceph_osd_flag_nodown
+    - ceph_osd_flag_noin
+    - ceph_osd_flag_noout
+    - ceph_osd_flag_norebalance
+    - ceph_osd_flag_norecover
+    - ceph_osd_flag_noscrub
+    - ceph_osd_flag_noup
+    - ceph_osd_in
+    - ceph_osd_metadata
+    - ceph_osd_up
+    - ceph_osd_weight
+    - ceph_pool_metadata
+    - ceph_rbd_image_metadata
+    - ceph_rbd_mirror_metadata
+    - ceph_rgw_metadata
+    - ceph_smb_metadata
 relabeling:
   - match: ceph_*
     metric_relabel_configs:
@@ -229,7 +255,6 @@ template:
                   units: objects
                   algorithm: absolute
                   type: line
-                  priority: 4000
                   dimensions:
                     - selector: 'ceph_num_objects_degraded'
                       name: degraded
@@ -253,7 +278,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4010
                   dimensions:
                     - selector: 'ceph_cluster_total_bytes'
                       name: bytes
@@ -277,7 +301,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4020
                   dimensions:
                     - selector: 'ceph_cluster_by_class_total_bytes'
                       name: bytes
@@ -302,7 +325,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4030
                   dimensions:
                     - selector: 'ceph_fs_metadata'
                       name: value
@@ -320,7 +342,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4040
                   dimensions:
                     - selector: 'ceph_mds_metadata'
                       name: value
@@ -342,7 +363,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 4050
               dimensions:
                 - selector: 'ceph_prometheus_collect_duration_seconds_count'
                   name: value
@@ -352,7 +372,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 4060
               dimensions:
                 - selector: 'ceph_prometheus_collect_duration_seconds_sum'
                   name: value
@@ -362,7 +381,6 @@ template:
               units: items
               algorithm: absolute
               type: line
-              priority: 4070
               dimensions:
                 - selector: 'ceph_cluster_osd_blocklist_count'
                   name: value
@@ -372,7 +390,6 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 4080
               dimensions:
                 - selector: 'ceph_disk_occupation'
                   name: occupation
@@ -395,7 +412,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4090
                   dimensions:
                     - selector: 'ceph_cephadm_daemon_status'
                       name: value
@@ -414,7 +430,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4100
                   dimensions:
                     - selector: 'ceph_mgr_metadata'
                       name: metadata
@@ -435,7 +450,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4110
                   dimensions:
                     - selector: 'ceph_mgr_module_can_run'
                       name: can_run
@@ -456,7 +470,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4120
                   dimensions:
                     - selector: 'ceph_mon_metadata'
                       name: metadata
@@ -479,7 +492,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4130
                   dimensions:
                     - selector: 'ceph_health_status'
                       name: value
@@ -497,7 +509,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4140
                   dimensions:
                     - selector: 'ceph_daemon_health_metrics'
                       name: value
@@ -515,7 +526,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4150
                   dimensions:
                     - selector: 'ceph_health_detail'
                       name: value
@@ -533,7 +543,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4160
                   dimensions:
                     - selector: 'ceph_healthcheck_slow_ops'
                       name: value
@@ -560,7 +569,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4170
                   dimensions:
                     - selector: 'ceph_osd_flag_nodeep_scrub'
                       name: nodeep_scrub
@@ -591,7 +599,6 @@ template:
                   units: ratio
                   algorithm: absolute
                   type: line
-                  priority: 4180
                   dimensions:
                     - selector: 'ceph_osd_full_ratio'
                       name: full_ratio
@@ -611,7 +618,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4190
                   dimensions:
                     - selector: 'ceph_osd_metadata'
                       name: value
@@ -631,7 +637,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4200
                   dimensions:
                     - selector: 'ceph_osd_in'
                       name: in
@@ -643,7 +648,6 @@ template:
                   units: weight
                   algorithm: absolute
                   type: line
-                  priority: 4201
                   dimensions:
                     - selector: 'ceph_osd_weight'
                       name: weight
@@ -662,7 +666,6 @@ template:
               units: milliseconds
               algorithm: absolute
               type: line
-              priority: 4210
               dimensions:
                 - selector: 'ceph_osd_apply_latency_ms'
                   name: apply_latency_ms
@@ -682,7 +685,6 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 4220
               dimensions:
                 - selector: 'ceph_rgw_metadata'
                   name: value
@@ -708,7 +710,6 @@ template:
                   units: PGs
                   algorithm: absolute
                   type: line
-                  priority: 4230
                   dimensions:
                     - selector: 'ceph_pg_backfill_toofull'
                       name: backfill_toofull
@@ -739,7 +740,6 @@ template:
                   units: PGs
                   algorithm: absolute
                   type: line
-                  priority: 4240
                   dimensions:
                     - selector: 'ceph_pg_active'
                       name: active
@@ -773,7 +773,6 @@ template:
                   units: PGs
                   algorithm: absolute
                   type: line
-                  priority: 4250
                   dimensions:
                     - selector: 'ceph_pg_activating'
                       name: activating
@@ -812,7 +811,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4260
                   dimensions:
                     - selector: 'ceph_osd_flag_nobackfill'
                       name: nobackfill
@@ -838,7 +836,6 @@ template:
                   units: PGs
                   algorithm: absolute
                   type: line
-                  priority: 4270
                   dimensions:
                     - selector: 'ceph_pg_degraded'
                       name: degraded
@@ -874,7 +871,6 @@ template:
                   units: PGs
                   algorithm: absolute
                   type: line
-                  priority: 4280
                   dimensions:
                     - selector: 'ceph_pg_failed_repair'
                       name: failed_repair
@@ -916,7 +912,6 @@ template:
                   units: objects
                   algorithm: absolute
                   type: line
-                  priority: 4290
                   dimensions:
                     - selector: 'ceph_pool_quota_objects'
                       name: value
@@ -926,7 +921,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4300
                   dimensions:
                     - selector: 'ceph_pool_max_avail'
                       name: max_avail
@@ -940,7 +934,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4301
                   dimensions:
                     - selector: 'ceph_pool_avail_raw'
                       name: avail_raw
@@ -954,7 +947,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4302
                   dimensions:
                     - selector: 'ceph_pool_compress_bytes_used'
                       name: compress_bytes_used
@@ -966,7 +958,6 @@ template:
                   units: percentage
                   algorithm: absolute
                   type: line
-                  priority: 4310
                   dimensions:
                     - selector: 'ceph_pool_percent_used'
                       name: value
@@ -987,7 +978,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 4320
                   dimensions:
                     - selector: 'ceph_pool_rd_bytes'
                       name: rd_bytes
@@ -999,7 +989,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4330
                   dimensions:
                     - selector: 'ceph_pool_rd'
                       name: rd
@@ -1019,7 +1008,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4340
                   dimensions:
                     - selector: 'ceph_pool_metadata'
                       name: value
@@ -1038,7 +1026,6 @@ template:
                   units: objects
                   algorithm: absolute
                   type: line
-                  priority: 4350
                   dimensions:
                     - selector: 'ceph_pool_dirty'
                       name: dirty
@@ -1063,7 +1050,6 @@ template:
                   units: bytes/s
                   algorithm: absolute
                   type: line
-                  priority: 4360
                   dimensions:
                     - selector: 'ceph_pool_recovering_bytes_per_sec'
                       name: value
@@ -1073,7 +1059,6 @@ template:
                   units: keys/s
                   algorithm: absolute
                   type: line
-                  priority: 4370
                   dimensions:
                     - selector: 'ceph_pool_recovering_keys_per_sec'
                       name: value
@@ -1083,7 +1068,6 @@ template:
                   units: objects/s
                   algorithm: absolute
                   type: line
-                  priority: 4380
                   dimensions:
                     - selector: 'ceph_pool_recovering_objects_per_sec'
                       name: value
@@ -1093,7 +1077,6 @@ template:
                   units: objects
                   algorithm: absolute
                   type: line
-                  priority: 4390
                   dimensions:
                     - selector: 'ceph_pool_num_objects_recovered'
                       name: value
@@ -1103,7 +1086,6 @@ template:
                   units: objects/s
                   algorithm: incremental
                   type: line
-                  priority: 4400
                   dimensions:
                     - selector: 'ceph_pool_objects_repaired'
                       name: value
@@ -1113,7 +1095,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4410
                   dimensions:
                     - selector: 'ceph_pool_num_bytes_recovered'
                       name: value
@@ -1137,7 +1118,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 4420
                   dimensions:
                     - selector: 'ceph_rbd_read_bytes'
                       name: read_bytes
@@ -1149,7 +1129,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4430
                   dimensions:
                     - selector: 'ceph_rbd_read_ops'
                       name: read_ops
@@ -1169,7 +1148,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4440
                   dimensions:
                     - selector: 'ceph_rbd_image_metadata'
                       name: value
@@ -1190,7 +1168,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4450
                   dimensions:
                     - selector: 'ceph_rbd_read_latency_count'
                       name: read_latency
@@ -1202,7 +1179,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4460
                   dimensions:
                     - selector: 'ceph_rbd_read_latency_sum'
                       name: read_latency
@@ -1222,7 +1198,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 4470
                   dimensions:
                     - selector: 'ceph_rbd_mirror_metadata'
                       name: value
@@ -1240,7 +1215,6 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 4480
               dimensions:
                 - selector: 'ceph_smb_metadata'
                   name: value
@@ -1277,7 +1251,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4490
                   dimensions:
                     - selector: 'ceph_bluefs_db_alloc_lat_count'
                       name: db_alloc_lat
@@ -1291,7 +1264,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4500
                   dimensions:
                     - selector: 'ceph_bluefs_db_alloc_lat_sum'
                       name: db_alloc_lat
@@ -1305,7 +1277,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4510
                   dimensions:
                     - selector: 'ceph_bluefs_alloc_unit_db'
                       name: db
@@ -1319,7 +1290,6 @@ template:
                   units: seconds
                   algorithm: absolute
                   type: line
-                  priority: 4520
                   dimensions:
                     - selector: 'ceph_bluefs_alloc_db_max_lat'
                       name: db_max_lat
@@ -1333,7 +1303,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 4530
                   dimensions:
                     - selector: 'ceph_bluefs_alloc_slow_fallback'
                       name: fallback
@@ -1357,7 +1326,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4540
                   dimensions:
                     - selector: 'ceph_bluefs_compact_lat_count'
                       name: lat
@@ -1369,7 +1337,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4550
                   dimensions:
                     - selector: 'ceph_bluefs_compact_lat_sum'
                       name: lat
@@ -1381,7 +1348,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 4560
                   dimensions:
                     - selector: 'ceph_bluefs_log_compactions'
                       name: value
@@ -1436,7 +1402,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4570
                   dimensions:
                     - selector: 'ceph_bluefs_flush_lat_count'
                       name: flush_lat
@@ -1456,7 +1421,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4580
                   dimensions:
                     - selector: 'ceph_bluefs_flush_lat_sum'
                       name: flush_lat
@@ -1476,7 +1440,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 4590
                   dimensions:
                     - selector: 'ceph_bluefs_read_bytes'
                       name: read_bytes
@@ -1510,7 +1473,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4600
                   dimensions:
                     - selector: 'ceph_bluefs_log_write_count'
                       name: log_write
@@ -1540,7 +1502,6 @@ template:
                   units: reads/s
                   algorithm: incremental
                   type: line
-                  priority: 4610
                   dimensions:
                     - selector: 'ceph_bluefs_read_zeros_candidate'
                       name: candidate
@@ -1576,7 +1537,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4620
                   dimensions:
                     - selector: 'ceph_bluefs_max_bytes_db'
                       name: db
@@ -1590,7 +1550,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 4630
                   dimensions:
                     - selector: 'ceph_bluefs_bytes_written_slow'
                       name: bytes_written_slow
@@ -1606,7 +1565,6 @@ template:
                   units: files
                   algorithm: absolute
                   type: line
-                  priority: 4640
                   dimensions:
                     - selector: 'ceph_bluefs_num_files'
                       name: value
@@ -1616,7 +1574,6 @@ template:
                   units: files/s
                   algorithm: incremental
                   type: line
-                  priority: 4650
                   dimensions:
                     - selector: 'ceph_bluefs_files_written_sst'
                       name: sst
@@ -1628,7 +1585,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4660
                   dimensions:
                     - selector: 'ceph_bluefs_db_total_bytes'
                       name: db_total_bytes
@@ -1664,7 +1620,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4670
                   dimensions:
                     - selector: 'ceph_bluestore_allocator_lat_count'
                       name: value
@@ -1674,7 +1629,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4680
                   dimensions:
                     - selector: 'ceph_bluestore_allocator_lat_sum'
                       name: value
@@ -1684,7 +1638,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4690
                   dimensions:
                     - selector: 'ceph_bluestore_alloc_unit'
                       name: alloc_unit
@@ -1694,7 +1647,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4691
                   dimensions:
                     - selector: 'ceph_bluestore_allocated'
                       name: allocated
@@ -1723,7 +1675,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4700
                   dimensions:
                     - selector: 'ceph_bluestore_compress_lat_count'
                       name: compress_lat
@@ -1737,7 +1688,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4710
                   dimensions:
                     - selector: 'ceph_bluestore_compress_lat_sum'
                       name: compress_lat
@@ -1751,7 +1701,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4720
                   dimensions:
                     - selector: 'ceph_bluestore_compress_rejected_count'
                       name: compress_rejected
@@ -1763,7 +1712,6 @@ template:
                   units: extents/s
                   algorithm: incremental
                   type: line
-                  priority: 4721
                   dimensions:
                     - selector: 'ceph_bluestore_extent_compress'
                       name: extent_compress
@@ -1773,7 +1721,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4730
                   dimensions:
                     - selector: 'ceph_bluestore_compressed'
                       name: compressed
@@ -1830,7 +1777,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4740
                   dimensions:
                     - selector: 'ceph_bluestore_read_lat_count'
                       name: read_lat
@@ -1850,7 +1796,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4750
                   dimensions:
                     - selector: 'ceph_bluestore_read_lat_sum'
                       name: read_lat
@@ -1870,7 +1815,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 4760
                   dimensions:
                     - selector: 'ceph_bluestore_issued_deferred_write_bytes'
                       name: issued_deferred_write_bytes
@@ -1892,7 +1836,6 @@ template:
                   units: reads/s
                   algorithm: incremental
                   type: line
-                  priority: 4770
                   dimensions:
                     - selector: 'ceph_bluestore_read_eio'
                       name: read_eio
@@ -1904,7 +1847,6 @@ template:
                   units: reads/s
                   algorithm: incremental
                   type: line
-                  priority: 4771
                   dimensions:
                     - selector: 'ceph_bluestore_slow_read_onode_meta_count'
                       name: slow_read_onode_meta
@@ -1916,7 +1858,6 @@ template:
                   units: waits/s
                   algorithm: incremental
                   type: line
-                  priority: 4772
                   dimensions:
                     - selector: 'ceph_bluestore_slow_aio_wait_count'
                       name: slow_aio_wait
@@ -1926,7 +1867,6 @@ template:
                   units: blobs/s
                   algorithm: incremental
                   type: line
-                  priority: 4773
                   dimensions:
                     - selector: 'ceph_bluestore_write_big_skipped_blobs'
                       name: write_big_skipped_blobs
@@ -1936,7 +1876,6 @@ template:
                   units: writes/s
                   algorithm: incremental
                   type: line
-                  priority: 4774
                   dimensions:
                     - selector: 'ceph_bluestore_write_small_skipped'
                       name: write_small_skipped
@@ -1946,7 +1885,6 @@ template:
                   units: writes/s
                   algorithm: incremental
                   type: line
-                  priority: 4780
                   dimensions:
                     - selector: 'ceph_bluestore_issued_deferred_writes'
                       name: issued_deferred_writes
@@ -1970,7 +1908,6 @@ template:
                   units: blobs/s
                   algorithm: incremental
                   type: line
-                  priority: 4781
                   dimensions:
                     - selector: 'ceph_bluestore_write_big_blobs'
                       name: write_big_blobs
@@ -1980,7 +1917,6 @@ template:
                   units: reads/s
                   algorithm: incremental
                   type: line
-                  priority: 4782
                   dimensions:
                     - selector: 'ceph_bluestore_write_penalty_read_ops'
                       name: write_penalty_read_ops
@@ -2019,7 +1955,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4790
                   dimensions:
                     - selector: 'ceph_bluestore_omap_clear_lat_count'
                       name: clear_lat
@@ -2041,7 +1976,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4800
                   dimensions:
                     - selector: 'ceph_bluestore_omap_clear_lat_sum'
                       name: clear_lat
@@ -2063,7 +1997,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 4810
                   dimensions:
                     - selector: 'ceph_bluestore_omap_setheader_bytes'
                       name: setheader_bytes
@@ -2075,7 +2008,6 @@ template:
                   units: iterators
                   algorithm: absolute
                   type: line
-                  priority: 4820
                   dimensions:
                     - selector: 'ceph_bluestore_omap_iterator_count'
                       name: iterator
@@ -2085,7 +2017,6 @@ template:
                   units: calls/s
                   algorithm: incremental
                   type: line
-                  priority: 4830
                   dimensions:
                     - selector: 'ceph_bluestore_omap_setheader_count'
                       name: setheader
@@ -2097,7 +2028,6 @@ template:
                   units: ranges/s
                   algorithm: incremental
                   type: line
-                  priority: 4831
                   dimensions:
                     - selector: 'ceph_bluestore_omap_rmkey_range_count'
                       name: rmkey_range
@@ -2107,7 +2037,6 @@ template:
                   units: keys/s
                   algorithm: incremental
                   type: line
-                  priority: 4832
                   dimensions:
                     - selector: 'ceph_bluestore_omap_rmkeys_count'
                       name: rmkeys
@@ -2136,7 +2065,6 @@ template:
                   units: blobs
                   algorithm: absolute
                   type: line
-                  priority: 4840
                   dimensions:
                     - selector: 'ceph_bluestore_onode_blobs'
                       name: onode_blobs
@@ -2148,7 +2076,6 @@ template:
                   units: extents
                   algorithm: absolute
                   type: line
-                  priority: 4841
                   dimensions:
                     - selector: 'ceph_bluestore_onode_extents'
                       name: onode_extents
@@ -2158,7 +2085,6 @@ template:
                   units: onodes
                   algorithm: absolute
                   type: line
-                  priority: 4842
                   dimensions:
                     - selector: 'ceph_bluestore_onodes'
                       name: onodes
@@ -2170,7 +2096,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 4850
                   dimensions:
                     - selector: 'ceph_bluestore_onode_reshard'
                       name: value
@@ -2180,7 +2105,6 @@ template:
                   units: lookups/s
                   algorithm: incremental
                   type: line
-                  priority: 4860
                   dimensions:
                     - selector: 'ceph_bluestore_onode_hits'
                       name: hits
@@ -2192,7 +2116,6 @@ template:
                   units: lookups/s
                   algorithm: incremental
                   type: line
-                  priority: 4861
                   dimensions:
                     - selector: 'ceph_bluestore_onode_shard_hits'
                       name: shard_hits
@@ -2225,7 +2148,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4870
                   dimensions:
                     - selector: 'ceph_bluestore_pricache:data_committed_bytes'
                       name: committed_bytes
@@ -2282,7 +2204,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4880
                   dimensions:
                     - selector: 'ceph_bluestore_pricache:kv_committed_bytes'
                       name: committed_bytes
@@ -2339,7 +2260,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4890
                   dimensions:
                     - selector: 'ceph_bluestore_pricache:kv_onode_committed_bytes'
                       name: committed_bytes
@@ -2396,7 +2316,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4900
                   dimensions:
                     - selector: 'ceph_bluestore_pricache:meta_committed_bytes'
                       name: committed_bytes
@@ -2444,7 +2363,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4910
                   dimensions:
                     - selector: 'ceph_bluestore_pricache_cache_bytes'
                       name: cache_bytes
@@ -2488,7 +2406,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 4920
                   dimensions:
                     - selector: 'ceph_bluestore_clist_lat_count'
                       name: clist_lat
@@ -2506,7 +2423,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 4930
                   dimensions:
                     - selector: 'ceph_bluestore_clist_lat_sum'
                       name: clist_lat
@@ -2524,7 +2440,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 4940
                   dimensions:
                     - selector: 'ceph_bluestore_buffer_hit_bytes'
                       name: hit_bytes
@@ -2536,7 +2451,6 @@ template:
                   units: items
                   algorithm: absolute
                   type: line
-                  priority: 4950
                   dimensions:
                     - selector: 'ceph_bluestore_buffers'
                       name: value
@@ -2546,7 +2460,6 @@ template:
                   units: blobs/s
                   algorithm: incremental
                   type: line
-                  priority: 4960
                   dimensions:
                     - selector: 'ceph_bluestore_blob_split'
                       name: blob_split
@@ -2556,7 +2469,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 4961
                   dimensions:
                     - selector: 'ceph_bluestore_gc_merged'
                       name: gc_merged
@@ -2566,7 +2478,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 4970
                   dimensions:
                     - selector: 'ceph_bluestore_slow_committed_kv_count'
                       name: value
@@ -2576,7 +2487,6 @@ template:
                   units: per mille
                   algorithm: absolute
                   type: line
-                  priority: 4980
                   dimensions:
                     - selector: 'ceph_bluestore_fragmentation_micros'
                       name: value
@@ -2586,7 +2496,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4990
                   dimensions:
                     - selector: 'ceph_bluestore_buffer_bytes'
                       name: buffer_bytes
@@ -2596,7 +2505,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 4991
                   dimensions:
                     - selector: 'ceph_bluestore_stored'
                       name: stored
@@ -2642,7 +2550,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5000
                   dimensions:
                     - selector: 'ceph_bluestore_state_aio_wait_lat_count'
                       name: state_aio_wait_lat
@@ -2678,7 +2585,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5010
                   dimensions:
                     - selector: 'ceph_bluestore_state_aio_wait_lat_sum'
                       name: state_aio_wait_lat
@@ -2714,7 +2620,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5020
                   dimensions:
                     - selector: 'ceph_bluestore_txc_count'
                       name: value
@@ -2746,7 +2651,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5030
                   dimensions:
                     - selector: 'ceph_mds_server_req_rmxattr_latency_count'
                       name: rmxattr_latency
@@ -2766,7 +2670,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5040
                   dimensions:
                     - selector: 'ceph_mds_server_req_rmxattr_latency_sum'
                       name: rmxattr_latency
@@ -2807,7 +2710,6 @@ template:
                   units: capabilities
                   algorithm: absolute
                   type: line
-                  priority: 5050
                   dimensions:
                     - selector: 'ceph_mds_caps'
                       name: value
@@ -2817,7 +2719,6 @@ template:
                   units: messages/s
                   algorithm: incremental
                   type: line
-                  priority: 5060
                   dimensions:
                     - selector: 'ceph_mds_handle_client_cap_release'
                       name: handle_client_cap_release
@@ -2831,7 +2732,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 5061
                   dimensions:
                     - selector: 'ceph_mds_server_cap_acquisition_throttle'
                       name: server_cap_acquisition_throttle
@@ -2841,7 +2741,6 @@ template:
                   units: clients/s
                   algorithm: incremental
                   type: line
-                  priority: 5062
                   dimensions:
                     - selector: 'ceph_mds_server_cap_revoke_eviction'
                       name: server_cap_revoke_eviction
@@ -2851,7 +2750,6 @@ template:
                   units: inodes
                   algorithm: absolute
                   type: line
-                  priority: 5070
                   dimensions:
                     - selector: 'ceph_mds_inodes_with_caps'
                       name: value
@@ -2861,7 +2759,6 @@ template:
                   units: inodes/s
                   algorithm: incremental
                   type: line
-                  priority: 5080
                   dimensions:
                     - selector: 'ceph_mds_handle_inode_file_caps'
                       name: value
@@ -2871,7 +2768,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5090
                   dimensions:
                     - selector: 'ceph_mds_ceph_cap_op_flush_ack'
                       name: ceph_cap_op_flush_ack
@@ -2918,7 +2814,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5100
                   dimensions:
                     - selector: 'ceph_mds_log_jlat_count'
                       name: value
@@ -2928,7 +2823,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5110
                   dimensions:
                     - selector: 'ceph_mds_log_jlat_sum'
                       name: value
@@ -2938,7 +2832,6 @@ template:
                   units: events
                   algorithm: absolute
                   type: line
-                  priority: 5120
                   dimensions:
                     - selector: 'ceph_mds_log_ev'
                       name: ev
@@ -2952,7 +2845,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5121
                   dimensions:
                     - selector: 'ceph_mds_log_evlrg'
                       name: evlrg
@@ -2962,7 +2854,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5130
                   dimensions:
                     - selector: 'ceph_mds_log_evadd'
                       name: evadd
@@ -2978,7 +2869,6 @@ template:
                   units: position
                   algorithm: absolute
                   type: line
-                  priority: 5140
                   dimensions:
                     - selector: 'ceph_mds_log_expos'
                       name: expos
@@ -2992,7 +2882,6 @@ template:
                   units: segments/s
                   algorithm: incremental
                   type: line
-                  priority: 5150
                   dimensions:
                     - selector: 'ceph_mds_log_segadd'
                       name: segadd
@@ -3006,7 +2895,6 @@ template:
                   units: segments
                   algorithm: absolute
                   type: line
-                  priority: 5160
                   dimensions:
                     - selector: 'ceph_mds_log_seg'
                       name: seg
@@ -3034,7 +2922,6 @@ template:
                   units: messages/s
                   algorithm: incremental
                   type: line
-                  priority: 5170
                   dimensions:
                     - selector: 'ceph_mds_cache_dir_handle_discover'
                       name: handle_discover
@@ -3046,7 +2933,6 @@ template:
                   units: attempts/s
                   algorithm: incremental
                   type: line
-                  priority: 5171
                   dimensions:
                     - selector: 'ceph_mds_cache_dir_try_discover'
                       name: try_discover
@@ -3056,7 +2942,6 @@ template:
                   units: directives/s
                   algorithm: incremental
                   type: line
-                  priority: 5172
                   dimensions:
                     - selector: 'ceph_mds_cache_dir_update'
                       name: update
@@ -3083,7 +2968,6 @@ template:
                   units: inodes/s
                   algorithm: incremental
                   type: line
-                  priority: 5180
                   dimensions:
                     - selector: 'ceph_mds_cache_ireq_inodestats'
                       name: inodestats
@@ -3095,7 +2979,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5190
                   dimensions:
                     - selector: 'ceph_mds_cache_ireq_exportdir'
                       name: exportdir
@@ -3113,7 +2996,6 @@ template:
                   units: scrubs/s
                   algorithm: incremental
                   type: line
-                  priority: 5200
                   dimensions:
                     - selector: 'ceph_mds_cache_ireq_enqueue_scrub'
                       name: value
@@ -3142,7 +3024,6 @@ template:
                   units: items
                   algorithm: absolute
                   type: line
-                  priority: 5210
                   dimensions:
                     - selector: 'ceph_mds_cache_num_strays'
                       name: strays
@@ -3156,7 +3037,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5220
                   dimensions:
                     - selector: 'ceph_mds_cache_strays_created'
                       name: created
@@ -3172,7 +3052,6 @@ template:
                   units: files
                   algorithm: absolute
                   type: line
-                  priority: 5230
                   dimensions:
                     - selector: 'ceph_mds_cache_num_recovering_enqueued'
                       name: enqueued
@@ -3186,7 +3065,6 @@ template:
                   units: files/s
                   algorithm: incremental
                   type: line
-                  priority: 5240
                   dimensions:
                     - selector: 'ceph_mds_cache_recovery_completed'
                       name: completed
@@ -3208,7 +3086,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5250
                   dimensions:
                     - selector: 'ceph_mds_cache_uninline_started'
                       name: started
@@ -3220,7 +3097,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5260
                   dimensions:
                     - selector: 'ceph_mds_cache_uninline_write_failed'
                       name: value
@@ -3253,7 +3129,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5270
                   dimensions:
                     - selector: 'ceph_mds_server_req_create_latency_count'
                       name: create_latency
@@ -3277,7 +3152,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5280
                   dimensions:
                     - selector: 'ceph_mds_server_req_create_latency_sum'
                       name: create_latency
@@ -3323,7 +3197,6 @@ template:
                   units: dirfrags/s
                   algorithm: incremental
                   type: line
-                  priority: 5290
                   dimensions:
                     - selector: 'ceph_mds_dir_fetch_complete'
                       name: dir_fetch_complete
@@ -3337,7 +3210,6 @@ template:
                   units: traversals/s
                   algorithm: incremental
                   type: line
-                  priority: 5291
                   dimensions:
                     - selector: 'ceph_mds_traverse'
                       name: traverse
@@ -3357,7 +3229,6 @@ template:
                   units: inodes/s
                   algorithm: incremental
                   type: line
-                  priority: 5300
                   dimensions:
                     - selector: 'ceph_mds_openino_peer_discover'
                       name: value
@@ -3367,7 +3238,6 @@ template:
                   units: keys/s
                   algorithm: incremental
                   type: line
-                  priority: 5310
                   dimensions:
                     - selector: 'ceph_mds_dir_fetch_keys'
                       name: value
@@ -3377,7 +3247,6 @@ template:
                   units: lookups/s
                   algorithm: incremental
                   type: line
-                  priority: 5320
                   dimensions:
                     - selector: 'ceph_mds_traverse_hit'
                       name: value
@@ -3387,7 +3256,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5330
                   dimensions:
                     - selector: 'ceph_mds_dir_commit'
                       name: dir_commit
@@ -3415,7 +3283,6 @@ template:
                   units: items
                   algorithm: absolute
                   type: line
-                  priority: 5340
                   dimensions:
                     - selector: 'ceph_purge_queue_pq_item_in_journal'
                       name: value
@@ -3425,7 +3292,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5350
                   dimensions:
                     - selector: 'ceph_purge_queue_pq_executed_ops'
                       name: value
@@ -3435,7 +3301,6 @@ template:
                   units: operations
                   algorithm: absolute
                   type: line
-                  priority: 5360
                   dimensions:
                     - selector: 'ceph_purge_queue_pq_executing_ops'
                       name: ops
@@ -3447,7 +3312,6 @@ template:
                   units: tasks/s
                   algorithm: incremental
                   type: line
-                  priority: 5370
                   dimensions:
                     - selector: 'ceph_purge_queue_pq_executed'
                       name: value
@@ -3457,7 +3321,6 @@ template:
                   units: tasks
                   algorithm: absolute
                   type: line
-                  priority: 5380
                   dimensions:
                     - selector: 'ceph_purge_queue_pq_executing'
                       name: executing
@@ -3480,7 +3343,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5390
                   dimensions:
                     - selector: 'ceph_mds_exported'
                       name: exported
@@ -3492,7 +3354,6 @@ template:
                   units: inodes/s
                   algorithm: incremental
                   type: line
-                  priority: 5400
                   dimensions:
                     - selector: 'ceph_mds_exported_inodes'
                       name: exported_inodes
@@ -3535,7 +3396,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5410
                   dimensions:
                     - selector: 'ceph_mds_server_req_blockdiff_latency_count'
                       name: blockdiff_latency
@@ -3567,7 +3427,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5420
                   dimensions:
                     - selector: 'ceph_mds_server_req_blockdiff_latency_sum'
                       name: blockdiff_latency
@@ -3630,7 +3489,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5430
                   dimensions:
                     - selector: 'ceph_mds_reply_latency_count'
                       name: value
@@ -3640,7 +3498,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5440
                   dimensions:
                     - selector: 'ceph_mds_reply_latency_sum'
                       name: value
@@ -3650,7 +3507,6 @@ template:
                   units: clients
                   algorithm: absolute
                   type: line
-                  priority: 5450
                   dimensions:
                     - selector: 'ceph_mds_client_metrics_num_clients'
                       name: client_metrics_num_clients
@@ -3660,7 +3516,6 @@ template:
                   units: requests
                   algorithm: absolute
                   type: line
-                  priority: 5451
                   dimensions:
                     - selector: 'ceph_mds_q'
                       name: q
@@ -3670,7 +3525,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5460
                   dimensions:
                     - selector: 'ceph_mds_reply'
                       name: reply
@@ -3682,7 +3536,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5470
                   dimensions:
                     - selector: 'ceph_mds_slow_reply'
                       name: value
@@ -3692,7 +3545,6 @@ template:
                   units: files
                   algorithm: absolute
                   type: line
-                  priority: 5480
                   dimensions:
                     - selector: 'ceph_mds_root_rfiles'
                       name: value
@@ -3702,7 +3554,6 @@ template:
                   units: inodes
                   algorithm: absolute
                   type: line
-                  priority: 5490
                   dimensions:
                     - selector: 'ceph_mds_inodes'
                       name: inodes
@@ -3720,7 +3571,6 @@ template:
                   units: inodes/s
                   algorithm: incremental
                   type: line
-                  priority: 5491
                   dimensions:
                     - selector: 'ceph_mds_inodes_expired'
                       name: expired
@@ -3730,7 +3580,6 @@ template:
                   units: load
                   algorithm: absolute
                   type: line
-                  priority: 5500
                   dimensions:
                     - selector: 'ceph_mds_load_cent'
                       name: value
@@ -3740,7 +3589,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5510
                   dimensions:
                     - selector: 'ceph_mds_forward'
                       name: forward
@@ -3760,7 +3608,6 @@ template:
                   units: snapshots
                   algorithm: absolute
                   type: line
-                  priority: 5520
                   dimensions:
                     - selector: 'ceph_mds_root_rsnaps'
                       name: value
@@ -3770,7 +3617,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 5530
                   dimensions:
                     - selector: 'ceph_mds_root_rbytes'
                       name: value
@@ -3780,7 +3626,6 @@ template:
                   units: subtrees
                   algorithm: absolute
                   type: line
-                  priority: 5540
                   dimensions:
                     - selector: 'ceph_mds_subtrees'
                       name: value
@@ -3805,7 +3650,6 @@ template:
                   units: inodes/s
                   algorithm: incremental
                   type: line
-                  priority: 5550
                   dimensions:
                     - selector: 'ceph_mds_scrub_dir_base_inodes'
                       name: dir_base_inodes
@@ -3819,7 +3663,6 @@ template:
                   units: backtraces/s
                   algorithm: incremental
                   type: line
-                  priority: 5560
                   dimensions:
                     - selector: 'ceph_mds_scrub_backtrace_fetch'
                       name: backtrace_fetch
@@ -3831,7 +3674,6 @@ template:
                   units: inotables/s
                   algorithm: incremental
                   type: line
-                  priority: 5561
                   dimensions:
                     - selector: 'ceph_mds_scrub_inotable_repaired'
                       name: inotable_repaired
@@ -3841,7 +3683,6 @@ template:
                   units: tags/s
                   algorithm: incremental
                   type: line
-                  priority: 5562
                   dimensions:
                     - selector: 'ceph_mds_scrub_set_tag'
                       name: set_tag
@@ -3851,7 +3692,6 @@ template:
                   units: dirfrags/s
                   algorithm: incremental
                   type: line
-                  priority: 5570
                   dimensions:
                     - selector: 'ceph_mds_scrub_dirfrag_rstats'
                       name: value
@@ -3878,7 +3718,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5580
                   dimensions:
                     - selector: 'ceph_mds_server_req_lssnap_latency_count'
                       name: lssnap_latency
@@ -3896,7 +3735,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5590
                   dimensions:
                     - selector: 'ceph_mds_server_req_lssnap_latency_sum'
                       name: lssnap_latency
@@ -3935,7 +3773,6 @@ template:
               units: capabilities
               algorithm: absolute
               type: line
-              priority: 5600
               dimensions:
                 - selector: 'ceph_mds_mem_cap'
                   name: value
@@ -3945,7 +3782,6 @@ template:
               units: capabilities/s
               algorithm: incremental
               type: line
-              priority: 5610
               dimensions:
                 - selector: 'ceph_mds_mem_cap_minus'
                   name: minus
@@ -3957,7 +3793,6 @@ template:
               units: dentries
               algorithm: absolute
               type: line
-              priority: 5620
               dimensions:
                 - selector: 'ceph_mds_mem_dn'
                   name: value
@@ -3967,7 +3802,6 @@ template:
               units: dentries/s
               algorithm: incremental
               type: line
-              priority: 5630
               dimensions:
                 - selector: 'ceph_mds_mem_dn_minus'
                   name: minus
@@ -3979,7 +3813,6 @@ template:
               units: directories
               algorithm: absolute
               type: line
-              priority: 5640
               dimensions:
                 - selector: 'ceph_mds_mem_dir'
                   name: value
@@ -3989,7 +3822,6 @@ template:
               units: directories/s
               algorithm: incremental
               type: line
-              priority: 5650
               dimensions:
                 - selector: 'ceph_mds_mem_dir_minus'
                   name: minus
@@ -4001,7 +3833,6 @@ template:
               units: inodes
               algorithm: absolute
               type: line
-              priority: 5660
               dimensions:
                 - selector: 'ceph_mds_mem_ino'
                   name: value
@@ -4011,7 +3842,6 @@ template:
               units: inodes/s
               algorithm: incremental
               type: line
-              priority: 5670
               dimensions:
                 - selector: 'ceph_mds_mem_ino_minus'
                   name: minus
@@ -4023,7 +3853,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 5680
               dimensions:
                 - selector: 'ceph_mds_mem_heap'
                   name: heap
@@ -4051,7 +3880,6 @@ template:
               units: seconds
               algorithm: absolute
               type: line
-              priority: 5690
               dimensions:
                 - selector: 'ceph_mds_sessions_avg_session_uptime'
                   name: value
@@ -4061,7 +3889,6 @@ template:
               units: events/s
               algorithm: incremental
               type: line
-              priority: 5700
               dimensions:
                 - selector: 'ceph_mds_sessions_session_add'
                   name: add
@@ -4073,7 +3900,6 @@ template:
               units: load
               algorithm: absolute
               type: line
-              priority: 5710
               dimensions:
                 - selector: 'ceph_mds_sessions_average_load'
                   name: average_load
@@ -4083,7 +3909,6 @@ template:
               units: load
               algorithm: absolute
               type: line
-              priority: 5711
               dimensions:
                 - selector: 'ceph_mds_sessions_total_load'
                   name: total_load
@@ -4093,7 +3918,6 @@ template:
               units: sessions/s
               algorithm: incremental
               type: line
-              priority: 5720
               dimensions:
                 - selector: 'ceph_mds_sessions_mdthresh_evicted'
                   name: value
@@ -4103,7 +3927,6 @@ template:
               units: sessions
               algorithm: absolute
               type: line
-              priority: 5730
               dimensions:
                 - selector: 'ceph_mds_sessions_session_count'
                   name: session
@@ -4139,7 +3962,6 @@ template:
               units: accesses/s
               algorithm: incremental
               type: line
-              priority: 5740
               dimensions:
                 - selector: 'ceph_mds_per_client_cap_hits'
                   name: hits
@@ -4151,7 +3973,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 5750
               dimensions:
                 - selector: 'ceph_mds_per_client_dentry_lease_hits'
                   name: hits
@@ -4163,7 +3984,6 @@ template:
               units: seconds
               algorithm: absolute
               type: line
-              priority: 5760
               dimensions:
                 - selector: 'ceph_mds_per_client_avg_read_latency'
                   name: read
@@ -4177,7 +3997,6 @@ template:
               units: files
               algorithm: absolute
               type: line
-              priority: 5770
               dimensions:
                 - selector: 'ceph_mds_per_client_opened_files'
                   name: open
@@ -4187,7 +4006,6 @@ template:
               units: inodes
               algorithm: absolute
               type: line
-              priority: 5780
               dimensions:
                 - selector: 'ceph_mds_per_client_opened_inodes'
                   name: open
@@ -4199,7 +4017,6 @@ template:
               units: capabilities
               algorithm: absolute
               type: line
-              priority: 5790
               dimensions:
                 - selector: 'ceph_mds_per_client_pinned_icaps'
                   name: pinned
@@ -4209,7 +4026,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 5800
               dimensions:
                 - selector: 'ceph_mds_per_client_total_read_ops'
                   name: read
@@ -4221,7 +4037,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 5810
               dimensions:
                 - selector: 'ceph_mds_per_client_total_read_size'
                   name: read
@@ -4290,7 +4105,6 @@ template:
                   units: measurements/s
                   algorithm: incremental
                   type: line
-                  priority: 5820
                   dimensions:
                     - selector: 'ceph_paxos_begin_bytes_count'
                       name: begin_bytes
@@ -4308,7 +4122,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 5830
                   dimensions:
                     - selector: 'ceph_paxos_begin_bytes_sum'
                       name: begin_bytes
@@ -4326,7 +4139,6 @@ template:
                   units: measurements/s
                   algorithm: incremental
                   type: line
-                  priority: 5840
                   dimensions:
                     - selector: 'ceph_paxos_begin_keys_count'
                       name: begin_keys
@@ -4344,7 +4156,6 @@ template:
                   units: keys/s
                   algorithm: incremental
                   type: line
-                  priority: 5850
                   dimensions:
                     - selector: 'ceph_paxos_begin_keys_sum'
                       name: begin_keys
@@ -4362,7 +4173,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5860
                   dimensions:
                     - selector: 'ceph_paxos_begin_latency_count'
                       name: begin_latency
@@ -4382,7 +4192,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5870
                   dimensions:
                     - selector: 'ceph_paxos_begin_latency_sum'
                       name: begin_latency
@@ -4402,7 +4211,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5880
                   dimensions:
                     - selector: 'ceph_paxos_new_pn'
                       name: new_pn
@@ -4424,7 +4232,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 5890
                   dimensions:
                     - selector: 'ceph_paxos_accept_timeout'
                       name: accept_timeout
@@ -4440,7 +4247,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 5900
                   dimensions:
                     - selector: 'ceph_paxos_begin'
                       name: begin
@@ -4454,7 +4260,6 @@ template:
                   units: values/s
                   algorithm: incremental
                   type: line
-                  priority: 5901
                   dimensions:
                     - selector: 'ceph_paxos_collect_uncommitted'
                       name: collect_uncommitted
@@ -4475,7 +4280,6 @@ template:
                   units: seconds
                   algorithm: absolute
                   type: line
-                  priority: 5910
                   dimensions:
                     - selector: 'ceph_exporter_scrape_time'
                       name: duration
@@ -4494,7 +4298,6 @@ template:
                   units: state
                   algorithm: absolute
                   type: line
-                  priority: 5920
                   dimensions:
                     - selector: 'ceph_daemon_socket_up'
                       name: reachable
@@ -4518,7 +4321,6 @@ template:
                   units: faults/s
                   algorithm: incremental
                   type: line
-                  priority: 5930
                   dimensions:
                     - selector: 'ceph_exporter_minflt_total'
                       name: minor
@@ -4530,7 +4332,6 @@ template:
                   units: threads
                   algorithm: absolute
                   type: line
-                  priority: 5940
                   dimensions:
                     - selector: 'ceph_exporter_num_threads'
                       name: threads
@@ -4540,7 +4341,6 @@ template:
                   units: percentage
                   algorithm: absolute
                   type: line
-                  priority: 5950
                   dimensions:
                     - selector: 'ceph_exporter_cpu_usage'
                       name: utilization
@@ -4550,7 +4350,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 5960
                   dimensions:
                     - selector: 'ceph_exporter_cpu_total'
                       name_from_label: mode
@@ -4560,7 +4359,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 5970
                   dimensions:
                     - selector: 'ceph_exporter_vm_size'
                       name: virtual
@@ -4581,7 +4379,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 5980
               dimensions:
                 - selector: 'ceph_mgr_cache_hit'
                   name: hit
@@ -4618,7 +4415,6 @@ template:
               units: errors/s
               algorithm: incremental
               type: line
-              priority: 5990
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_handshake_errors'
                   name: rdmadispatcher_handshake_errors
@@ -4636,7 +4432,6 @@ template:
               units: connections/s
               algorithm: incremental
               type: line
-              priority: 5991
               dimensions:
                 - selector: 'ceph_AsyncMessenger_Worker_msgr_connection_idle_timeouts'
                   name: worker_msgr_connection_idle_timeouts
@@ -4648,7 +4443,6 @@ template:
               units: queue pairs
               algorithm: absolute
               type: line
-              priority: 6000
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_active_queue_pair'
                   name: active_queue_pair
@@ -4658,7 +4452,6 @@ template:
               units: queue pairs/s
               algorithm: incremental
               type: line
-              priority: 6001
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_created_queue_pair'
                   name: created_queue_pair
@@ -4668,7 +4461,6 @@ template:
               units: chunks
               algorithm: absolute
               type: line
-              priority: 6002
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_inflight_tx_chunks'
                   name: inflight_tx_chunks
@@ -4678,7 +4470,6 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 6003
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_polling'
                   name: polling
@@ -4688,7 +4479,6 @@ template:
               units: buffers
               algorithm: absolute
               type: line
-              priority: 6004
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_rx_bufs_in_use'
                   name: rx_bufs_in_use
@@ -4700,7 +4490,6 @@ template:
               units: events/s
               algorithm: incremental
               type: line
-              priority: 6005
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_async_last_wqe_events'
                   name: async_last_wqe_events
@@ -4712,7 +4501,6 @@ template:
               units: completions/s
               algorithm: incremental
               type: line
-              priority: 6006
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_rx_total_wc'
                   name: rx_total_wc
@@ -4724,7 +4512,6 @@ template:
               units: messages/s
               algorithm: incremental
               type: line
-              priority: 6007
               dimensions:
                 - selector: 'ceph_AsyncMessenger_RDMADispatcher_rx_fin'
                   name: rx_fin
@@ -4749,7 +4536,6 @@ template:
               units: elections/s
               algorithm: incremental
               type: line
-              priority: 6010
               dimensions:
                 - selector: 'ceph_mon_election_call'
                   name: election_call
@@ -4765,7 +4551,6 @@ template:
               units: sessions
               algorithm: absolute
               type: line
-              priority: 6020
               dimensions:
                 - selector: 'ceph_mon_num_sessions'
                   name: value
@@ -4775,7 +4560,6 @@ template:
               units: sessions/s
               algorithm: incremental
               type: line
-              priority: 6030
               dimensions:
                 - selector: 'ceph_mon_session_add'
                   name: add
@@ -4859,7 +4643,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6040
               dimensions:
                 - selector: 'ceph_osd_op_before_dequeue_op_lat_count'
                   name: op_before_dequeue_op_lat
@@ -4903,7 +4686,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 6050
               dimensions:
                 - selector: 'ceph_osd_op_before_dequeue_op_lat_sum'
                   name: op_before_dequeue_op_lat
@@ -4947,7 +4729,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 6060
               dimensions:
                 - selector: 'ceph_osd_op_in_bytes'
                   name: op_in_bytes
@@ -4973,7 +4754,6 @@ template:
               units: operations
               algorithm: absolute
               type: line
-              priority: 6070
               dimensions:
                 - selector: 'ceph_osd_op_wip'
                   name: value
@@ -4983,7 +4763,6 @@ template:
               units: events/s
               algorithm: incremental
               type: line
-              priority: 6080
               dimensions:
                 - selector: 'ceph_osd_subop_push'
                   name: value
@@ -4993,7 +4772,6 @@ template:
               units: events/s
               algorithm: incremental
               type: line
-              priority: 6090
               dimensions:
                 - selector: 'ceph_osd_slow_ops_slow_ops_count'
                   name: value
@@ -5003,7 +4781,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 6100
               dimensions:
                 - selector: 'ceph_osd_op_cache_hit'
                   name: value
@@ -5013,7 +4790,6 @@ template:
               units: objects/s
               algorithm: incremental
               type: line
-              priority: 6110
               dimensions:
                 - selector: 'ceph_osd_op_delayed_degraded'
                   name: op_delayed_degraded
@@ -5027,7 +4803,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6120
               dimensions:
                 - selector: 'ceph_osd_op'
                   name: op
@@ -5082,7 +4857,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6130
               dimensions:
                 - selector: 'ceph_osd_l_osd_recovery_backfill_queue_latency_count'
                   name: backfill_queue_latency
@@ -5106,7 +4880,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 6140
               dimensions:
                 - selector: 'ceph_osd_l_osd_recovery_backfill_queue_latency_sum'
                   name: backfill_queue_latency
@@ -5130,7 +4903,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 6150
               dimensions:
                 - selector: 'ceph_osd_recovery_bytes'
                   name: value
@@ -5140,7 +4912,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6160
               dimensions:
                 - selector: 'ceph_osd_recovery_ops'
                   name: value
@@ -5211,7 +4982,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6170
               dimensions:
                 - selector: 'ceph_osd_osd_tier_flush_lat_count'
                   name: flush_lat
@@ -5225,7 +4995,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 6180
               dimensions:
                 - selector: 'ceph_osd_osd_tier_flush_lat_sum'
                   name: flush_lat
@@ -5239,7 +5008,6 @@ template:
               units: measurements/s
               algorithm: incremental
               type: line
-              priority: 6190
               dimensions:
                 - selector: 'ceph_osd_osd_map_cache_miss_low_avg_count'
                   name: value
@@ -5249,7 +5017,6 @@ template:
               units: value/s
               algorithm: incremental
               type: line
-              priority: 6200
               dimensions:
                 - selector: 'ceph_osd_osd_map_cache_miss_low_avg_sum'
                   name: value
@@ -5259,7 +5026,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 6210
               dimensions:
                 - selector: 'ceph_osd_push_out_bytes'
                   name: value
@@ -5269,7 +5035,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 6220
               dimensions:
                 - selector: 'ceph_osd_cached_crc'
                   name: cached_crc
@@ -5283,7 +5048,6 @@ template:
               units: actions/s
               algorithm: incremental
               type: line
-              priority: 6230
               dimensions:
                 - selector: 'ceph_osd_agent_evict'
                   name: agent_evict
@@ -5305,7 +5069,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6231
               dimensions:
                 - selector: 'ceph_osd_copyfrom'
                   name: copyfrom
@@ -5315,7 +5078,6 @@ template:
               units: messages/s
               algorithm: incremental
               type: line
-              priority: 6232
               dimensions:
                 - selector: 'ceph_osd_map_messages'
                   name: map_messages
@@ -5327,7 +5089,6 @@ template:
               units: epochs/s
               algorithm: incremental
               type: line
-              priority: 6233
               dimensions:
                 - selector: 'ceph_osd_map_message_epochs'
                   name: map_message_epochs
@@ -5339,7 +5100,6 @@ template:
               units: updates/s
               algorithm: incremental
               type: line
-              priority: 6234
               dimensions:
                 - selector: 'ceph_osd_osd_pg_biginfo'
                   name: osd_pg_biginfo
@@ -5351,7 +5111,6 @@ template:
               units: pushes/s
               algorithm: incremental
               type: line
-              priority: 6235
               dimensions:
                 - selector: 'ceph_osd_push'
                   name: push
@@ -5361,7 +5120,6 @@ template:
               units: suboperations/s
               algorithm: incremental
               type: line
-              priority: 6236
               dimensions:
                 - selector: 'ceph_osd_subop'
                   name: subop
@@ -5371,7 +5129,6 @@ template:
               units: attempts/s
               algorithm: incremental
               type: line
-              priority: 6240
               dimensions:
                 - selector: 'ceph_osd_tier_flush_fail'
                   name: tier_flush_fail
@@ -5383,7 +5140,6 @@ template:
               units: watches/s
               algorithm: incremental
               type: line
-              priority: 6241
               dimensions:
                 - selector: 'ceph_osd_watch_timeouts'
                   name: watch_timeouts
@@ -5393,7 +5149,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 6250
               dimensions:
                 - selector: 'ceph_osd_osd_map_bl_cache_hit'
                   name: osd_map_bl_cache_hit
@@ -5405,7 +5160,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 6251
               dimensions:
                 - selector: 'ceph_osd_osd_map_cache_hit'
                   name: osd_map_cache_hit
@@ -5419,7 +5173,6 @@ template:
               units: whiteouts/s
               algorithm: incremental
               type: line
-              priority: 6252
               dimensions:
                 - selector: 'ceph_osd_tier_whiteout'
                   name: tier_whiteout
@@ -5429,7 +5182,6 @@ template:
               units: objects/s
               algorithm: incremental
               type: line
-              priority: 6260
               dimensions:
                 - selector: 'ceph_osd_agent_skip'
                   name: agent_skip
@@ -5439,7 +5191,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 6261
               dimensions:
                 - selector: 'ceph_osd_object_ctx_cache_hit'
                   name: object_ctx_cache_hit
@@ -5451,7 +5202,6 @@ template:
               units: attempts/s
               algorithm: incremental
               type: line
-              priority: 6270
               dimensions:
                 - selector: 'ceph_osd_agent_flush'
                   name: agent_flush
@@ -5465,7 +5215,6 @@ template:
               units: pulls/s
               algorithm: incremental
               type: line
-              priority: 6271
               dimensions:
                 - selector: 'ceph_osd_pull'
                   name: pull
@@ -5475,7 +5224,6 @@ template:
               units: PGs
               algorithm: absolute
               type: line
-              priority: 6280
               dimensions:
                 - selector: 'ceph_osd_numpg'
                   name: numpg
@@ -5493,7 +5241,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 6290
               dimensions:
                 - selector: 'ceph_osd_stat_bytes'
                   name: bytes
@@ -5507,7 +5254,6 @@ template:
               units: peers
               algorithm: absolute
               type: line
-              priority: 6300
               dimensions:
                 - selector: 'ceph_osd_heartbeat_to_peers'
                   name: heartbeat_to_peers
@@ -5517,7 +5263,6 @@ template:
               units: load
               algorithm: absolute
               type: line
-              priority: 6301
               dimensions:
                 - selector: 'ceph_osd_loadavg'
                   name: loadavg
@@ -5569,7 +5314,6 @@ template:
                   units: scrubs/s
                   algorithm: incremental
                   type: line
-                  priority: 6310
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_failed_scrubs_elapsed_count'
                       name: dp_ec_failed_scrubs_elapsed
@@ -5593,7 +5337,6 @@ template:
                   units: reservations/s
                   algorithm: incremental
                   type: line
-                  priority: 6311
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_failed_reservations_elapsed_count'
                       name: dp_ec_failed_reservations_elapsed
@@ -5617,7 +5360,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 6320
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_failed_scrubs_elapsed_sum'
                       name: dp_ec_failed_scrubs_elapsed
@@ -5641,7 +5383,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 6321
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_failed_reservations_elapsed_sum'
                       name: dp_ec_failed_reservations_elapsed
@@ -5684,7 +5425,6 @@ template:
                   units: scrubs/s
                   algorithm: incremental
                   type: line
-                  priority: 6330
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_failed_scrubs'
                       name: dp_ec_failed_scrubs
@@ -5743,7 +5483,6 @@ template:
                   units: replicas
                   algorithm: absolute
                   type: line
-                  priority: 6340
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_replicas_in_reservation'
                       name: dp_ec_replicas_in_reservation
@@ -5759,7 +5498,6 @@ template:
                   units: scrubs/s
                   algorithm: incremental
                   type: line
-                  priority: 6350
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_num_scrubs_past_reservation'
                       name: dp_ec_num_scrubs_past_reservation
@@ -5775,7 +5513,6 @@ template:
                   units: reservations/s
                   algorithm: incremental
                   type: line
-                  priority: 6351
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_reservation_process_aborted'
                       name: dp_ec_reservation_process_aborted
@@ -5833,7 +5570,6 @@ template:
                   units: scrubs/s
                   algorithm: incremental
                   type: line
-                  priority: 6360
                   dimensions:
                     - selector: 'ceph_osd_failed_scrubs_ec_elapsed_count'
                       name: failed_scrubs_ec_elapsed
@@ -5849,7 +5585,6 @@ template:
                   units: reservations/s
                   algorithm: incremental
                   type: line
-                  priority: 6361
                   dimensions:
                     - selector: 'ceph_osd_scrub_ec_failed_reservations_elapsed_count'
                       name: scrub_ec_failed_reservations_elapsed
@@ -5865,7 +5600,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 6370
                   dimensions:
                     - selector: 'ceph_osd_failed_scrubs_ec_elapsed_sum'
                       name: failed_scrubs_ec_elapsed
@@ -5881,7 +5615,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 6371
                   dimensions:
                     - selector: 'ceph_osd_scrub_ec_failed_reservations_elapsed_sum'
                       name: scrub_ec_failed_reservations_elapsed
@@ -5908,7 +5641,6 @@ template:
                   units: writes/s
                   algorithm: incremental
                   type: line
-                  priority: 6380
                   dimensions:
                     - selector: 'ceph_osd_scrub_ec_io_blocked'
                       name: ec_io_blocked
@@ -5937,7 +5669,6 @@ template:
                   units: scrubs/s
                   algorithm: incremental
                   type: line
-                  priority: 6390
                   dimensions:
                     - selector: 'ceph_osd_failed_scrubs_ec'
                       name: failed_scrubs_ec
@@ -5976,7 +5707,6 @@ template:
                   units: replicas
                   algorithm: absolute
                   type: line
-                  priority: 6400
                   dimensions:
                     - selector: 'ceph_osd_scrub_ec_replicas_in_reservation'
                       name: ec_replicas_in_reservation
@@ -5988,7 +5718,6 @@ template:
                   units: scrubs/s
                   algorithm: incremental
                   type: line
-                  priority: 6410
                   dimensions:
                     - selector: 'ceph_osd_num_scrubs_past_reservation_ec'
                       name: num_scrubs_past_reservation_ec
@@ -6000,7 +5729,6 @@ template:
                   units: reservations/s
                   algorithm: incremental
                   type: line
-                  priority: 6411
                   dimensions:
                     - selector: 'ceph_osd_scrub_ec_reservation_process_aborted'
                       name: scrub_ec_reservation_process_aborted
@@ -6039,7 +5767,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 6420
                   dimensions:
                     - selector: 'ceph_osd_scrub_ec_read_bytes'
                       name: ec_read_bytes
@@ -6051,7 +5778,6 @@ template:
                   units: calls/s
                   algorithm: incremental
                   type: line
-                  priority: 6430
                   dimensions:
                     - selector: 'ceph_osd_scrub_ec_getattr_cnt'
                       name: ec_getattr_cnt
@@ -6101,7 +5827,6 @@ template:
                   units: waits/s
                   algorithm: incremental
                   type: line
-                  priority: 6440
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_locked_object'
                       name: dp_ec_locked_object
@@ -6117,7 +5842,6 @@ template:
                   units: chunks/s
                   algorithm: incremental
                   type: line
-                  priority: 6450
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_chunk_busy'
                       name: dp_ec_chunk_busy
@@ -6141,7 +5865,6 @@ template:
                   units: preemptions/s
                   algorithm: incremental
                   type: line
-                  priority: 6451
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_preemptions'
                       name: dp_ec_preemptions
@@ -6157,7 +5880,6 @@ template:
                   units: writes/s
                   algorithm: incremental
                   type: line
-                  priority: 6452
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_write_blocked_by_scrub'
                       name: dp_ec_write_blocked_by_scrub
@@ -6184,7 +5906,6 @@ template:
                   units: reservations/s
                   algorithm: incremental
                   type: line
-                  priority: 6460
                   dimensions:
                     - selector: 'ceph_osd_scrub_dp_ec_scrub_reservations_completed'
                       name: dp_ec_scrub_reservations_completed
@@ -6211,7 +5932,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 6470
                   dimensions:
                     - selector: 'ceph_osd_scrub_omapget_bytes'
                       name: omapget_bytes
@@ -6223,7 +5943,6 @@ template:
                   units: calls/s
                   algorithm: incremental
                   type: line
-                  priority: 6480
                   dimensions:
                     - selector: 'ceph_osd_scrub_omapget_cnt'
                       name: omapget_cnt
@@ -6251,7 +5970,6 @@ template:
                   units: actions/s
                   algorithm: incremental
                   type: line
-                  priority: 6490
                   dimensions:
                     - selector: 'ceph_rgw_lc_expire_current'
                       name: expire_current
@@ -6269,7 +5987,6 @@ template:
                   units: uploads/s
                   algorithm: incremental
                   type: line
-                  priority: 6500
                   dimensions:
                     - selector: 'ceph_rgw_lc_abort_mpu'
                       name: value
@@ -6289,7 +6006,6 @@ template:
                   units: VMs
                   algorithm: absolute
                   type: line
-                  priority: 6510
                   dimensions:
                     - selector: 'ceph_rgw_lua_current_vms'
                       name: value
@@ -6299,7 +6015,6 @@ template:
                   units: executions/s
                   algorithm: incremental
                   type: line
-                  priority: 6520
                   dimensions:
                     - selector: 'ceph_rgw_lua_script_ok'
                       name: success
@@ -6327,7 +6042,6 @@ template:
                   units: events
                   algorithm: absolute
                   type: line
-                  priority: 6540
                   dimensions:
                     - selector: 'ceph_rgw_pubsub_push_pending'
                       name: value
@@ -6337,7 +6051,6 @@ template:
                   units: events
                   algorithm: absolute
                   type: line
-                  priority: 6550
                   dimensions:
                     - selector: 'ceph_rgw_pubsub_events'
                       name: value
@@ -6347,7 +6060,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 6560
                   dimensions:
                     - selector: 'ceph_rgw_pubsub_event_lost'
                       name: event_lost
@@ -6363,7 +6075,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 6570
                   dimensions:
                     - selector: 'ceph_rgw_pubsub_push_failed'
                       name: push_failed
@@ -6375,7 +6086,6 @@ template:
                   units: events/s
                   algorithm: incremental
                   type: line
-                  priority: 6580
                   dimensions:
                     - selector: 'ceph_rgw_pubsub_missing_conf'
                       name: value
@@ -6417,7 +6127,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 6590
                   dimensions:
                     - selector: 'ceph_rgw_op_copy_obj_lat_count'
                       name: copy_obj_lat
@@ -6439,7 +6148,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 6600
                   dimensions:
                     - selector: 'ceph_rgw_op_copy_obj_lat_sum'
                       name: copy_obj_lat
@@ -6461,7 +6169,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 6610
                   dimensions:
                     - selector: 'ceph_rgw_op_copy_obj_bytes'
                       name: copy_obj_bytes
@@ -6477,7 +6184,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 6620
                   dimensions:
                     - selector: 'ceph_rgw_op_copy_obj_ops'
                       name: copy_obj_ops
@@ -6519,7 +6225,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 6640
                   dimensions:
                     - selector: 'ceph_rgw_get_initial_lat_count'
                       name: get_initial_lat
@@ -6531,7 +6236,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 6650
                   dimensions:
                     - selector: 'ceph_rgw_get_initial_lat_sum'
                       name: get_initial_lat
@@ -6543,7 +6247,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 6660
                   dimensions:
                     - selector: 'ceph_rgw_get_b'
                       name: get_b
@@ -6555,7 +6258,6 @@ template:
                   units: requests
                   algorithm: absolute
                   type: line
-                  priority: 6670
                   dimensions:
                     - selector: 'ceph_rgw_qactive'
                       name: qactive
@@ -6567,7 +6269,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 6680
                   dimensions:
                     - selector: 'ceph_rgw_failed_req'
                       name: value
@@ -6577,7 +6278,6 @@ template:
                   units: objects/s
                   algorithm: incremental
                   type: line
-                  priority: 6690
                   dimensions:
                     - selector: 'ceph_rgw_gc_retire_object'
                       name: value
@@ -6587,7 +6287,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 6700
                   dimensions:
                     - selector: 'ceph_rgw_get'
                       name: get
@@ -6636,7 +6335,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 6710
                   dimensions:
                     - selector: 'ceph_rgw_op_per_bucket_copy_obj_lat_count'
                       name: copy_obj_lat
@@ -6658,7 +6356,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 6720
                   dimensions:
                     - selector: 'ceph_rgw_op_per_bucket_copy_obj_lat_sum'
                       name: copy_obj_lat
@@ -6680,7 +6377,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 6730
                   dimensions:
                     - selector: 'ceph_rgw_op_per_bucket_copy_obj_bytes'
                       name: copy_obj_bytes
@@ -6696,7 +6392,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 6740
                   dimensions:
                     - selector: 'ceph_rgw_op_per_bucket_copy_obj_ops'
                       name: copy_obj_ops
@@ -6732,7 +6427,6 @@ template:
               units: entries/s
               algorithm: incremental
               type: line
-              priority: 6760
               dimensions:
                 - selector: 'ceph_rgw_d4n_cache_evictions'
                   name: value
@@ -6742,7 +6436,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 6770
               dimensions:
                 - selector: 'ceph_rgw_keystone_token_cache_hit'
                   name: hit
@@ -6754,7 +6447,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 6780
               dimensions:
                 - selector: 'ceph_rgw_cache_hit'
                   name: cache_hit
@@ -6787,7 +6479,6 @@ template:
               units: objects/s
               algorithm: incremental
               type: line
-              priority: 6790
               dimensions:
                 - selector: 'ceph_data_sync_from_zone_fetch_bytes_count'
                   name: value
@@ -6797,7 +6488,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 6800
               dimensions:
                 - selector: 'ceph_data_sync_from_zone_fetch_bytes_sum'
                   name: value
@@ -6807,7 +6497,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6810
               dimensions:
                 - selector: 'ceph_data_sync_from_zone_lock_latency_count'
                   name: lock_latency
@@ -6819,7 +6508,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 6820
               dimensions:
                 - selector: 'ceph_data_sync_from_zone_lock_latency_sum'
                   name: lock_latency
@@ -6831,7 +6519,6 @@ template:
               units: seconds
               algorithm: absolute
               type: line
-              priority: 6830
               dimensions:
                 - selector: 'ceph_rgw_sync_delta_sync_delta'
                   name: value
@@ -6841,7 +6528,6 @@ template:
               units: requests/s
               algorithm: incremental
               type: line
-              priority: 6840
               dimensions:
                 - selector: 'ceph_data_sync_from_zone_poll_errors'
                   name: value
@@ -6851,7 +6537,6 @@ template:
               units: objects/s
               algorithm: incremental
               type: line
-              priority: 6850
               dimensions:
                 - selector: 'ceph_data_sync_from_zone_fetch_errors'
                   name: errors
@@ -6872,7 +6557,6 @@ template:
               units: entries
               algorithm: absolute
               type: line
-              priority: 6860
               dimensions:
                 - selector: 'ceph_rgw_topic_persistent_topic_len'
                   name: value
@@ -6882,7 +6566,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 6870
               dimensions:
                 - selector: 'ceph_rgw_topic_persistent_topic_size'
                   name: value
@@ -6927,7 +6610,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 6880
                   dimensions:
                     - selector: 'ceph_rgw_op_per_user_copy_obj_lat_count'
                       name: copy_obj_lat
@@ -6949,7 +6631,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 6890
                   dimensions:
                     - selector: 'ceph_rgw_op_per_user_copy_obj_lat_sum'
                       name: copy_obj_lat
@@ -6971,7 +6652,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 6900
                   dimensions:
                     - selector: 'ceph_rgw_op_per_user_copy_obj_bytes'
                       name: copy_obj_bytes
@@ -6987,7 +6667,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 6910
                   dimensions:
                     - selector: 'ceph_rgw_op_per_user_copy_obj_ops'
                       name: copy_obj_ops
@@ -7086,7 +6765,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6930
               dimensions:
                 - selector: 'ceph_objecter_op_latency_count'
                   name: value
@@ -7096,7 +6774,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 6940
               dimensions:
                 - selector: 'ceph_objecter_op_latency_sum'
                   name: value
@@ -7106,7 +6783,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6950
               dimensions:
                 - selector: 'ceph_objecter_oplen_avg_count'
                   name: value
@@ -7116,7 +6792,6 @@ template:
               units: entries/s
               algorithm: incremental
               type: line
-              priority: 6960
               dimensions:
                 - selector: 'ceph_objecter_oplen_avg_sum'
                   name: value
@@ -7126,7 +6801,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 6970
               dimensions:
                 - selector: 'ceph_objecter_op_send_bytes'
                   name: value
@@ -7136,7 +6810,6 @@ template:
               units: commands
               algorithm: absolute
               type: line
-              priority: 6980
               dimensions:
                 - selector: 'ceph_objecter_command_active'
                   name: command_active
@@ -7146,7 +6819,6 @@ template:
               units: operations
               algorithm: absolute
               type: line
-              priority: 6981
               dimensions:
                 - selector: 'ceph_objecter_linger_active'
                   name: linger_active
@@ -7156,7 +6828,6 @@ template:
               units: epoch
               algorithm: absolute
               type: line
-              priority: 6982
               dimensions:
                 - selector: 'ceph_objecter_map_epoch'
                   name: map_epoch
@@ -7166,7 +6837,6 @@ template:
               units: operations
               algorithm: absolute
               type: line
-              priority: 6983
               dimensions:
                 - selector: 'ceph_objecter_op_active'
                   name: op_active
@@ -7180,7 +6850,6 @@ template:
               units: operations
               algorithm: absolute
               type: line
-              priority: 6984
               dimensions:
                 - selector: 'ceph_objecter_poolop_active'
                   name: poolop_active
@@ -7190,7 +6859,6 @@ template:
               units: requests
               algorithm: absolute
               type: line
-              priority: 6985
               dimensions:
                 - selector: 'ceph_objecter_poolstat_active'
                   name: poolstat_active
@@ -7200,7 +6868,6 @@ template:
               units: requests
               algorithm: absolute
               type: line
-              priority: 6986
               dimensions:
                 - selector: 'ceph_objecter_statfs_active'
                   name: statfs_active
@@ -7210,7 +6877,6 @@ template:
               units: commands/s
               algorithm: incremental
               type: line
-              priority: 6990
               dimensions:
                 - selector: 'ceph_objecter_command_resend'
                   name: command_resend
@@ -7222,7 +6888,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6991
               dimensions:
                 - selector: 'ceph_objecter_linger_ping'
                   name: linger_ping
@@ -7236,7 +6901,6 @@ template:
               units: maps/s
               algorithm: incremental
               type: line
-              priority: 6992
               dimensions:
                 - selector: 'ceph_objecter_map_full'
                   name: map_full
@@ -7248,7 +6912,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6993
               dimensions:
                 - selector: 'ceph_objecter_omap_del'
                   name: omap_del
@@ -7328,7 +6991,6 @@ template:
               units: reads/s
               algorithm: incremental
               type: line
-              priority: 6994
               dimensions:
                 - selector: 'ceph_objecter_replica_read_sent'
                   name: replica_read_sent
@@ -7342,7 +7004,6 @@ template:
               units: sessions/s
               algorithm: incremental
               type: line
-              priority: 6995
               dimensions:
                 - selector: 'ceph_objecter_osd_session_close'
                   name: osd_session_close
@@ -7354,7 +7015,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 6996
               dimensions:
                 - selector: 'ceph_objecter_poolop_resend'
                   name: poolop_resend
@@ -7366,7 +7026,6 @@ template:
               units: requests/s
               algorithm: incremental
               type: line
-              priority: 6997
               dimensions:
                 - selector: 'ceph_objecter_poolstat_resend'
                   name: poolstat_resend
@@ -7382,7 +7041,6 @@ template:
               units: sessions
               algorithm: absolute
               type: line
-              priority: 7000
               dimensions:
                 - selector: 'ceph_objecter_osd_laggy'
                   name: laggy
@@ -7435,7 +7093,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 7010
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_rd'
                   name: read
@@ -7447,7 +7104,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 7020
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_rd_bytes'
                   name: read
@@ -7459,7 +7115,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 7030
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_rd_latency_count'
                   name: read
@@ -7471,7 +7126,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 7040
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_rd_latency_sum'
                   name: read
@@ -7483,7 +7137,6 @@ template:
               units: seconds since epoch
               algorithm: absolute
               type: line
-              priority: 7050
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_opened_time'
                   name: opened
@@ -7495,7 +7148,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 7060
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_discard'
                   name: discard
@@ -7509,7 +7161,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 7070
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_discard_bytes'
                   name: discard
@@ -7523,7 +7174,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 7080
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_discard_latency_count'
                   name: discard
@@ -7537,7 +7187,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 7090
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_discard_latency_sum'
                   name: discard
@@ -7551,7 +7200,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 7100
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_flush'
                   name: flush
@@ -7561,7 +7209,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 7110
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_flush_latency_count'
                   name: flush
@@ -7571,7 +7218,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 7120
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_flush_latency_sum'
                   name: flush
@@ -7581,7 +7227,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 7130
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_snap_create'
                   name: create
@@ -7597,7 +7242,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 7140
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_notify'
                   name: notify
@@ -7613,7 +7257,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 7150
               dimensions:
                 - selector: 'ceph_rbd_librbd_image_readahead_bytes'
                   name: readahead
@@ -7637,7 +7280,6 @@ template:
                   units: entries/s
                   algorithm: incremental
                   type: line
-                  priority: 7160
                   dimensions:
                     - selector: 'ceph_rbd_mirror_journal_replay_latency_count'
                       name: value
@@ -7647,7 +7289,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7170
                   dimensions:
                     - selector: 'ceph_rbd_mirror_journal_replay_latency_sum'
                       name: value
@@ -7657,7 +7298,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7180
                   dimensions:
                     - selector: 'ceph_rbd_mirror_journal_replay_bytes'
                       name: value
@@ -7667,7 +7307,6 @@ template:
                   units: entries/s
                   algorithm: incremental
                   type: line
-                  priority: 7190
                   dimensions:
                     - selector: 'ceph_rbd_mirror_journal_entries'
                       name: value
@@ -7696,7 +7335,6 @@ template:
                   units: snapshots/s
                   algorithm: incremental
                   type: line
-                  priority: 7200
                   dimensions:
                     - selector: 'ceph_rbd_mirror_snapshot_image_sync_time_count'
                       name: image_sync_time
@@ -7708,7 +7346,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7210
                   dimensions:
                     - selector: 'ceph_rbd_mirror_snapshot_image_sync_time_sum'
                       name: image_sync_time
@@ -7720,7 +7357,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7220
                   dimensions:
                     - selector: 'ceph_rbd_mirror_snapshot_image_sync_bytes'
                       name: image_sync_bytes
@@ -7732,7 +7368,6 @@ template:
                   units: seconds
                   algorithm: absolute
                   type: line
-                  priority: 7230
                   dimensions:
                     - selector: 'ceph_rbd_mirror_snapshot_image_last_sync_time'
                       name: value
@@ -7742,7 +7377,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 7240
                   dimensions:
                     - selector: 'ceph_rbd_mirror_snapshot_image_last_sync_bytes'
                       name: value
@@ -7752,7 +7386,6 @@ template:
                   units: snapshots/s
                   algorithm: incremental
                   type: line
-                  priority: 7250
                   dimensions:
                     - selector: 'ceph_rbd_mirror_snapshot_image_snapshots'
                       name: image_snapshots
@@ -7764,7 +7397,6 @@ template:
                   units: seconds since epoch
                   algorithm: absolute
                   type: line
-                  priority: 7260
                   dimensions:
                     - selector: 'ceph_rbd_mirror_snapshot_image_local_timestamp'
                       name: local_timestamp
@@ -7935,7 +7567,6 @@ template:
                   units: transactions/s
                   algorithm: incremental
                   type: line
-                  priority: 7270
                   dimensions:
                     - selector: 'ceph_KStore_state_done_lat_count'
                       name: kstore_state_done_lat
@@ -7953,7 +7584,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 7271
                   dimensions:
                     - selector: 'ceph_client_lat_count'
                       name: client_lat
@@ -7963,7 +7593,6 @@ template:
                   units: state transitions/s
                   algorithm: incremental
                   type: line
-                  priority: 7272
                   dimensions:
                     - selector: 'ceph_recoverystate_perf_activating_latency_count'
                       name: recoverystate_perf_activating_latency
@@ -8033,7 +7662,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7280
                   dimensions:
                     - selector: 'ceph_KStore_state_done_lat_sum'
                       name: kstore_state_done_lat
@@ -8051,7 +7679,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7281
                   dimensions:
                     - selector: 'ceph_client_lat_sum'
                       name: client_lat
@@ -8061,7 +7688,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7282
                   dimensions:
                     - selector: 'ceph_recoverystate_perf_activating_latency_sum'
                       name: recoverystate_perf_activating_latency
@@ -8131,7 +7757,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7290
                   dimensions:
                     - selector: 'ceph_client_fsync_count'
                       name: client_fsync
@@ -8147,7 +7772,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7291
                   dimensions:
                     - selector: 'ceph_libcephsqlite_vfs_op_access_count'
                       name: libcephsqlite_vfs_op_access
@@ -8189,7 +7813,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7300
                   dimensions:
                     - selector: 'ceph_client_fsync_sum'
                       name: client_fsync
@@ -8205,7 +7828,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7301
                   dimensions:
                     - selector: 'ceph_libcephsqlite_vfs_op_access_sum'
                       name: libcephsqlite_vfs_op_access
@@ -8247,7 +7869,6 @@ template:
                   units: monitors
                   algorithm: absolute
                   type: line
-                  priority: 7310
                   dimensions:
                     - selector: 'ceph_cluster_num_mon'
                       name: num_mon
@@ -8259,7 +7880,6 @@ template:
                   units: OSDs
                   algorithm: absolute
                   type: line
-                  priority: 7311
                   dimensions:
                     - selector: 'ceph_cluster_num_osd'
                       name: num_osd
@@ -8273,7 +7893,6 @@ template:
                   units: pools
                   algorithm: absolute
                   type: line
-                  priority: 7312
                   dimensions:
                     - selector: 'ceph_cluster_num_pool'
                       name: num_pool
@@ -8283,7 +7902,6 @@ template:
                   units: epoch
                   algorithm: absolute
                   type: line
-                  priority: 7313
                   dimensions:
                     - selector: 'ceph_cluster_osd_epoch'
                       name: osd_epoch
@@ -8293,7 +7911,6 @@ template:
                   units: seconds
                   algorithm: absolute
                   type: line
-                  priority: 7320
                   dimensions:
                     - selector: 'ceph_client_mdavg'
                       name: mdavg
@@ -8307,7 +7924,6 @@ template:
                   units: invalidations/s
                   algorithm: incremental
                   type: line
-                  priority: 7330
                   dimensions:
                     - selector: 'ceph_recoverystate_perf_stats_invalidated'
                       name: value
@@ -8317,7 +7933,6 @@ template:
                   units: objects
                   algorithm: absolute
                   type: line
-                  priority: 7340
                   dimensions:
                     - selector: 'ceph_cluster_num_object'
                       name: object
@@ -8333,7 +7948,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7350
                   dimensions:
                     - selector: 'ceph_ipv4_dpdk_ip_linearize_operations'
                       name: value
@@ -8343,7 +7957,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 7360
                   dimensions:
                     - selector: 'ceph_cluster_num_bytes'
                       name: num_bytes
@@ -8359,7 +7972,6 @@ template:
                   units: PGs
                   algorithm: absolute
                   type: line
-                  priority: 7370
                   dimensions:
                     - selector: 'ceph_cluster_num_pg'
                       name: cluster_num_pg
@@ -8375,7 +7987,6 @@ template:
                   units: microseconds²/s
                   algorithm: incremental
                   type: line
-                  priority: 7371
                   dimensions:
                     - selector: 'ceph_client_mdsqsum'
                       name: client_mdsqsum
@@ -8398,7 +8009,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7372
                   dimensions:
                     - selector: 'ceph_oft_omap_total_updates'
                       name: oft_omap_total_updates
@@ -8410,7 +8020,6 @@ template:
                   units: workers
                   algorithm: absolute
                   type: line
-                  priority: 7380
                   dimensions:
                     - selector: 'ceph_cct_total_workers'
                       name: cct_total_workers
@@ -8422,7 +8031,6 @@ template:
                   units: objects
                   algorithm: absolute
                   type: line
-                  priority: 7381
                   dimensions:
                     - selector: 'ceph_oft_omap_total_objs'
                       name: oft_omap_total_objs
@@ -8432,7 +8040,6 @@ template:
                   units: entries
                   algorithm: absolute
                   type: line
-                  priority: 7382
                   dimensions:
                     - selector: 'ceph_oft_omap_total_kv_pairs'
                       name: oft_omap_total_kv_pairs
@@ -8450,7 +8057,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7390
                   dimensions:
                     - selector: 'ceph_trackedop_slow_ops_count'
                       name: value
@@ -8474,7 +8080,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7400
                   dimensions:
                     - selector: 'ceph_blk_kernel_device_bluestore_discard_op'
                       name: bluestore_discard_op
@@ -8486,7 +8091,6 @@ template:
                   units: threads
                   algorithm: absolute
                   type: line
-                  priority: 7410
                   dimensions:
                     - selector: 'ceph_blk_kernel_device_bluestore_discard_threads'
                       name: bluestore_discard_threads
@@ -8519,7 +8123,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 7420
                   dimensions:
                     - selector: 'ceph_prioritycache:full_committed_bytes'
                       name: committed_bytes
@@ -8576,7 +8179,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 7430
                   dimensions:
                     - selector: 'ceph_prioritycache:inc_committed_bytes'
                       name: committed_bytes
@@ -8633,7 +8235,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 7440
                   dimensions:
                     - selector: 'ceph_prioritycache:kv_committed_bytes'
                       name: committed_bytes
@@ -8681,7 +8282,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 7450
                   dimensions:
                     - selector: 'ceph_prioritycache_cache_bytes'
                       name: cache_bytes
@@ -8712,7 +8312,6 @@ template:
                   units: compactions
                   algorithm: absolute
                   type: line
-                  priority: 7460
                   dimensions:
                     - selector: 'ceph_rocksdb_compact_queue_len'
                       name: queue_len
@@ -8724,7 +8323,6 @@ template:
                   units: seconds
                   algorithm: absolute
                   type: line
-                  priority: 7470
                   dimensions:
                     - selector: 'ceph_rocksdb_compact_lasted'
                       name: value
@@ -8734,7 +8332,6 @@ template:
                   units: compactions/s
                   algorithm: incremental
                   type: line
-                  priority: 7480
                   dimensions:
                     - selector: 'ceph_rocksdb_compact'
                       name: compact
@@ -8746,7 +8343,6 @@ template:
                   units: merges/s
                   algorithm: incremental
                   type: line
-                  priority: 7481
                   dimensions:
                     - selector: 'ceph_rocksdb_compact_queue_merge'
                       name: queue_merge
@@ -8769,7 +8365,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7490
                   dimensions:
                     - selector: 'ceph_rocksdb_get_latency_count'
                       name: get_latency
@@ -8783,7 +8378,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7500
                   dimensions:
                     - selector: 'ceph_rocksdb_get_latency_sum'
                       name: get_latency
@@ -8812,7 +8406,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7510
                   dimensions:
                     - selector: 'ceph_rocksdb_rocksdb_write_delay_time_count'
                       name: delay_time
@@ -8828,7 +8421,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7520
                   dimensions:
                     - selector: 'ceph_rocksdb_rocksdb_write_delay_time_sum'
                       name: delay_time
@@ -8936,7 +8528,6 @@ template:
                   units: reads/s
                   algorithm: incremental
                   type: line
-                  priority: 7530
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_rd'
                       name: rd
@@ -8950,7 +8541,6 @@ template:
                   units: writes/s
                   algorithm: incremental
                   type: line
-                  priority: 7531
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_wr'
                       name: wr
@@ -8972,7 +8562,6 @@ template:
                   units: appends/s
                   algorithm: incremental
                   type: line
-                  priority: 7532
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_log_ops'
                       name: log_ops
@@ -8982,7 +8571,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7533
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_discard'
                       name: discard
@@ -9006,7 +8594,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7540
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_rd_bytes'
                       name: rd_bytes
@@ -9018,7 +8605,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7541
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_wr_bytes'
                       name: wr_bytes
@@ -9028,7 +8614,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7542
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_discard_bytes'
                       name: discard_bytes
@@ -9042,7 +8627,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7543
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_log_op_bytes_sum'
                       name: log_op_bytes_sum
@@ -9052,7 +8636,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 7550
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_rd_latency_count'
                       name: rd_latency_count
@@ -9064,7 +8647,6 @@ template:
                   units: appends/s
                   algorithm: incremental
                   type: line
-                  priority: 7551
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_log_op_bytes_count'
                       name: log_op_bytes_count
@@ -9074,7 +8656,6 @@ template:
                   units: requests/s
                   algorithm: incremental
                   type: line
-                  priority: 7552
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_req_arr_to_all_t_count'
                       name: req_arr_to_all_t_count
@@ -9102,7 +8683,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7553
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_op_alloc_t_count'
                       name: op_alloc_t_count
@@ -9126,7 +8706,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7554
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_discard_lat_count'
                       name: discard_lat_count
@@ -9144,7 +8723,6 @@ template:
                   units: transactions/s
                   algorithm: incremental
                   type: line
-                  priority: 7555
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_append_tx_lat_count'
                       name: append_tx_lat_count
@@ -9156,7 +8734,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7560
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_rd_latency_sum'
                       name: rd_latency_sum
@@ -9168,7 +8745,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7561
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_req_arr_to_all_t_sum'
                       name: req_arr_to_all_t_sum
@@ -9196,7 +8772,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7562
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_op_alloc_t_sum'
                       name: op_alloc_t_sum
@@ -9220,7 +8795,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7563
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_discard_lat_sum'
                       name: discard_lat_sum
@@ -9238,7 +8812,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7564
                   dimensions:
                     - selector: 'ceph_rbd_librbd_pwl_append_tx_lat_sum'
                       name: append_tx_lat_sum
@@ -9269,7 +8842,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7570
                   dimensions:
                     - selector: ceph_objectcacher_cache_ops_hit
                       name: hit
@@ -9280,7 +8852,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7580
                   dimensions:
                     - selector: ceph_objectcacher_cache_bytes_hit
                       name: hit
@@ -9291,7 +8862,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7590
                   dimensions:
                     - selector: ceph_objectcacher_data_read
                       name: read
@@ -9306,7 +8876,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7600
                   dimensions:
                     - selector: ceph_objectcacher_write_ops_blocked
                       name: operations
@@ -9315,7 +8884,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7610
                   dimensions:
                     - selector: ceph_objectcacher_write_bytes_blocked
                       name: bytes
@@ -9324,7 +8892,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7620
                   dimensions:
                     - selector: ceph_objectcacher_write_time_blocked
                       name: time
@@ -9344,7 +8911,6 @@ template:
                   units: callbacks
                   algorithm: absolute
                   type: line
-                  priority: 7630
                   dimensions:
                     - selector: 'ceph_finisher_queue_len'
                       name: queued
@@ -9354,7 +8920,6 @@ template:
                   units: batches/s
                   algorithm: incremental
                   type: line
-                  priority: 7640
                   dimensions:
                     - selector: 'ceph_finisher_complete_latency_count'
                       name: completed
@@ -9364,7 +8929,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7650
                   dimensions:
                     - selector: ceph_finisher_complete_latency_sum
                       name: latency
@@ -9394,7 +8958,6 @@ template:
                   units: slots
                   algorithm: absolute
                   type: line
-                  priority: 7660
                   dimensions:
                     - selector: ceph_throttle_val
                       name: val
@@ -9405,7 +8968,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7670
                   dimensions:
                     - selector: ceph_throttle_get_started
                       name: get_started
@@ -9424,7 +8986,6 @@ template:
                   units: slots/s
                   algorithm: incremental
                   type: line
-                  priority: 7680
                   dimensions:
                     - selector: 'ceph_throttle_get_sum'
                       name: get_sum
@@ -9438,7 +8999,6 @@ template:
                   units: waits/s
                   algorithm: incremental
                   type: line
-                  priority: 7690
                   dimensions:
                     - selector: 'ceph_throttle_wait_count'
                       name: waits
@@ -9448,7 +9008,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7700
                   dimensions:
                     - selector: ceph_throttle_wait_sum
                       name: wait
@@ -9467,7 +9026,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7710
                   dimensions:
                     - selector: ceph_kernel_device_discard_op
                       name: discard
@@ -9476,7 +9034,6 @@ template:
                   units: threads
                   algorithm: absolute
                   type: line
-                  priority: 7720
                   dimensions:
                     - selector: ceph_kernel_device_discard_threads
                       name: threads
@@ -9498,7 +9055,6 @@ template:
                   units: operations
                   algorithm: absolute
                   type: line
-                  priority: 7730
                   dimensions:
                     - selector: ceph_mclock_shard_mclock_immediate_queue_len
                       name: immediate
@@ -9539,7 +9095,6 @@ template:
                   units: messages/s
                   algorithm: incremental
                   type: line
-                  priority: 7740
                   dimensions:
                     - selector: ceph_async_messenger_worker_msgr_recv_messages
                       name: recv
@@ -9550,7 +9105,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7750
                   dimensions:
                     - selector: ceph_async_messenger_worker_msgr_recv_bytes
                       name: recv
@@ -9565,7 +9119,6 @@ template:
                   units: connections
                   algorithm: absolute
                   type: line
-                  priority: 7760
                   dimensions:
                     - selector: ceph_async_messenger_worker_msgr_active_connections
                       name: active
@@ -9574,7 +9127,6 @@ template:
                   units: connections/s
                   algorithm: incremental
                   type: line
-                  priority: 7770
                   dimensions:
                     - selector: ceph_async_messenger_worker_msgr_created_connections
                       name: created
@@ -9583,7 +9135,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7780
                   dimensions:
                     - selector: ceph_async_messenger_worker_msgr_running_total_time
                       name: total
@@ -9598,7 +9149,6 @@ template:
                   units: messages/s
                   algorithm: incremental
                   type: line
-                  priority: 7790
                   dimensions:
                     - selector: 'ceph_async_messenger_worker_msgr_send_messages_queue_lat_count'
                       name: send_messages_queue
@@ -9608,7 +9158,6 @@ template:
                   units: acknowledgements/s
                   algorithm: incremental
                   type: line
-                  priority: 7791
                   dimensions:
                     - selector: 'ceph_async_messenger_worker_msgr_handle_ack_lat_count'
                       name: handle_ack
@@ -9618,7 +9167,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7800
                   dimensions:
                     - selector: 'ceph_async_messenger_worker_msgr_send_messages_queue_lat_sum'
                       name: send_messages_queue
@@ -9628,7 +9176,6 @@ template:
                   units: seconds/s
                   algorithm: incremental
                   type: line
-                  priority: 7801
                   dimensions:
                     - selector: 'ceph_async_messenger_worker_msgr_handle_ack_lat_sum'
                       name: handle_ack
@@ -9654,7 +9201,6 @@ template:
                   units: errors/s
                   algorithm: incremental
                   type: line
-                  priority: 7810
                   dimensions:
                     - selector: 'ceph_async_messenger_rdma_worker_tx_no_mem'
                       name: tx_no_mem
@@ -9668,7 +9214,6 @@ template:
                   units: chunks/s
                   algorithm: incremental
                   type: line
-                  priority: 7820
                   dimensions:
                     - selector: ceph_async_messenger_rdma_worker_tx_chunks
                       name: tx
@@ -9679,7 +9224,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7830
                   dimensions:
                     - selector: ceph_async_messenger_rdma_worker_tx_bytes
                       name: tx
@@ -9690,7 +9234,6 @@ template:
                   units: connections
                   algorithm: absolute
                   type: line
-                  priority: 7840
                   dimensions:
                     - selector: ceph_async_messenger_rdma_worker_pending_sent_conns
                       name: pending
@@ -9724,7 +9267,6 @@ template:
                   units: packets/s
                   algorithm: incremental
                   type: line
-                  priority: 7850
                   dimensions:
                     - selector: ceph_dpdk_queue_dpdk_receive_packets
                       name: receive
@@ -9735,7 +9277,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7860
                   dimensions:
                     - selector: ceph_dpdk_queue_dpdk_receive_bytes
                       name: receive
@@ -9750,7 +9291,6 @@ template:
                   units: fragments/s
                   algorithm: incremental
                   type: line
-                  priority: 7870
                   dimensions:
                     - selector: 'ceph_dpdk_queue_dpdk_receive_fragments'
                       name: receive_fragments
@@ -9762,7 +9302,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7871
                   dimensions:
                     - selector: 'ceph_dpdk_queue_dpdk_receive_copy_ops'
                       name: receive_copy_ops
@@ -9778,7 +9317,6 @@ template:
                   units: errors/s
                   algorithm: incremental
                   type: line
-                  priority: 7880
                   dimensions:
                     - selector: ceph_dpdk_queue_dpdk_receive_bad_checksum_errors
                       name: bad_checksum
@@ -9789,7 +9327,6 @@ template:
                   units: packets
                   algorithm: absolute
                   type: line
-                  priority: 7890
                   dimensions:
                     - selector: ceph_dpdk_queue_dpdk_receive_last_bunch
                       name: receive
@@ -9800,7 +9337,6 @@ template:
                   units: packets
                   algorithm: absolute
                   type: line
-                  priority: 7900
                   dimensions:
                     - selector: ceph_dpdk_queue_dpdk_send_queue_length
                       name: queued
@@ -9823,7 +9359,6 @@ template:
                   units: packets/s
                   algorithm: incremental
                   type: line
-                  priority: 7910
                   dimensions:
                     - selector: ceph_dpdk_port_dpdk_device_receive_multicast_packets
                       name: received
@@ -9832,7 +9367,6 @@ template:
                   units: errors/s
                   algorithm: incremental
                   type: line
-                  priority: 7920
                   dimensions:
                     - selector: ceph_dpdk_port_dpdk_device_receive_badcrc_errors
                       name: badcrc
@@ -9847,7 +9381,6 @@ template:
                   units: errors/s
                   algorithm: incremental
                   type: line
-                  priority: 7930
                   dimensions:
                     - selector: ceph_dpdk_port_dpdk_device_send_total_errors
                       name: total
@@ -9865,7 +9398,6 @@ template:
                   units: identifier
                   algorithm: absolute
                   type: line
-                  priority: 7940
                   dimensions:
                     - selector: 'ceph_service_unique_id'
                       name: present
@@ -9891,7 +9423,6 @@ template:
                   units: operations/s
                   algorithm: incremental
                   type: line
-                  priority: 7970
                   dimensions:
                     - selector: ceph_libcephsqlite_striper_update_metadata
                       name: update_metadata
@@ -9912,7 +9443,6 @@ template:
                   units: bytes/s
                   algorithm: incremental
                   type: line
-                  priority: 7980
                   dimensions:
                     - selector: ceph_libcephsqlite_striper_shrink_bytes
                       name: bytes
@@ -9989,7 +9519,6 @@ template:
                   units: bytes
                   algorithm: absolute
                   type: line
-                  priority: 7990
                   dimensions:
                     - selector: ceph_mempool_bloom_filter_bytes
                       name: bloom_filter
@@ -10056,7 +9585,6 @@ template:
                   units: items
                   algorithm: absolute
                   type: line
-                  priority: 8000
                   dimensions:
                     - selector: ceph_mempool_bloom_filter_items
                       name: bloom_filter
@@ -10137,7 +9665,6 @@ template:
               units: filesystems
               algorithm: absolute
               type: line
-              priority: 8150
               dimensions:
                 - selector: ceph_cephfs_mirror_mirrored_filesystems
                   name: mirrored
@@ -10146,7 +9673,6 @@ template:
               units: failures/s
               algorithm: incremental
               type: line
-              priority: 8160
               dimensions:
                 - selector: ceph_cephfs_mirror_mirror_enable_failures
                   name: failures
@@ -10164,7 +9690,6 @@ template:
               units: peers
               algorithm: absolute
               type: line
-              priority: 8170
               dimensions:
                 - selector: ceph_cephfs_mirror_mirrored_filesystems_mirroring_peers
                   name: peers
@@ -10173,7 +9698,6 @@ template:
               units: directories
               algorithm: absolute
               type: line
-              priority: 8180
               dimensions:
                 - selector: ceph_cephfs_mirror_mirrored_filesystems_directory_count
                   name: directories
@@ -10200,7 +9724,6 @@ template:
               units: snapshots/s
               algorithm: incremental
               type: line
-              priority: 8190
               dimensions:
                 - selector: ceph_cephfs_mirror_peers_snaps_synced
                   name: synced
@@ -10215,7 +9738,6 @@ template:
               units: snapshots/s
               algorithm: incremental
               type: line
-              priority: 8200
               dimensions:
                 - selector: ceph_cephfs_mirror_peers_avg_sync_time_count
                   name: snapshots
@@ -10224,7 +9746,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 8210
               dimensions:
                 - selector: ceph_cephfs_mirror_peers_avg_sync_time_sum
                   name: time
@@ -10233,7 +9754,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 8220
               dimensions:
                 - selector: ceph_cephfs_mirror_peers_sync_bytes
                   name: bytes
@@ -10242,7 +9762,6 @@ template:
               units: seconds since epoch
               algorithm: absolute
               type: line
-              priority: 8230
               dimensions:
                 - selector: ceph_cephfs_mirror_peers_last_synced_start
                   name: started
@@ -10253,7 +9772,6 @@ template:
               units: seconds
               algorithm: absolute
               type: line
-              priority: 8240
               dimensions:
                 - selector: ceph_cephfs_mirror_peers_last_synced_duration
                   name: duration
@@ -10262,7 +9780,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 8250
               dimensions:
                 - selector: ceph_cephfs_mirror_peers_last_synced_bytes
                   name: bytes
@@ -10337,7 +9854,6 @@ template:
           units: requests
           algorithm: absolute
           type: line
-          priority: 8260
           dimensions:
             - selector: ceph_dmclock_admin_qlen
               name: admin
@@ -10352,7 +9868,6 @@ template:
           units: cost
           algorithm: absolute
           type: line
-          priority: 8270
           dimensions:
             - selector: ceph_dmclock_admin_cost
               name: admin
@@ -10367,7 +9882,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 8280
           dimensions:
             - selector: ceph_dmclock_admin_res
               name: admin_reservation
@@ -10390,7 +9904,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 8290
           dimensions:
             - selector: ceph_dmclock_admin_limit
               name: admin_limited
@@ -10413,7 +9926,6 @@ template:
           units: cost/s
           algorithm: incremental
           type: line
-          priority: 8300
           dimensions:
             - selector: ceph_dmclock_admin_res_cost
               name: admin_reservation
@@ -10452,7 +9964,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 8310
           dimensions:
             - selector: ceph_dmclock_admin_res_latency_count
               name: admin_reservation
@@ -10475,7 +9986,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 8320
           dimensions:
             - selector: ceph_dmclock_admin_res_latency_sum
               name: admin_reservation
@@ -10498,7 +10008,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 8330
           dimensions:
             - selector: 'ceph_dmclock_scheduler_throttle'
               name: throttled
@@ -10508,7 +10017,6 @@ template:
           units: requests
           algorithm: absolute
           type: line
-          priority: 8331
           dimensions:
             - selector: 'ceph_dmclock_scheduler_outstanding'
               name: outstanding
@@ -10536,7 +10044,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 8340
               dimensions:
                 - selector: ceph_rocksdb_binned_cache_capacity
                   name: capacity
@@ -10549,7 +10056,6 @@ template:
               units: entries
               algorithm: absolute
               type: line
-              priority: 8350
               dimensions:
                 - selector: 'ceph_rocksdb_binned_cache_elems'
                   name: items
@@ -10559,7 +10065,6 @@ template:
               units: insertions/s
               algorithm: incremental
               type: line
-              priority: 8360
               dimensions:
                 - selector: ceph_rocksdb_binned_cache_inserts
                   name: insertions
@@ -10568,7 +10073,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 8370
               dimensions:
                 - selector: ceph_rocksdb_binned_cache_lookups
                   name: lookups
@@ -10577,7 +10081,6 @@ template:
               units: lookups/s
               algorithm: incremental
               type: line
-              priority: 8380
               dimensions:
                 - selector: ceph_rocksdb_binned_cache_hits
                   name: hits
@@ -10604,7 +10107,6 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 8390
               dimensions:
                 - selector: ceph_extblkdev_fcm
                   name: fcm
@@ -10613,7 +10115,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 8400
               dimensions:
                 - selector: ceph_extblkdev_dev_phy_size
                   name: physical
@@ -10624,7 +10125,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 8410
               dimensions:
                 - selector: ceph_extblkdev_dev_phy_util
                   name: physical
@@ -10635,7 +10135,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 8420
               dimensions:
                 - selector: ceph_extblkdev_part_phy_size
                   name: physical_size
@@ -10661,7 +10160,6 @@ template:
           units: operations/s
           algorithm: incremental
           type: line
-          priority: 8430
           dimensions:
             - selector: ceph_client_mdops
               name: metadata
@@ -10693,7 +10191,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 8440
               dimensions:
                 - selector: 'ceph_nvmeof_bdev_read_bytes_total'
                   name: read_bytes
@@ -10705,7 +10202,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 8450
               dimensions:
                 - selector: 'ceph_nvmeof_bdev_reads_completed_total'
                   name: reads_completed
@@ -10717,7 +10213,6 @@ template:
               units: bytes
               algorithm: absolute
               type: line
-              priority: 8460
               dimensions:
                 - selector: 'ceph_nvmeof_bdev_capacity_bytes'
                   name: value
@@ -10727,7 +10222,6 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 8470
               dimensions:
                 - selector: 'ceph_nvmeof_bdev_metadata'
                   name: value
@@ -10737,7 +10231,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 8480
               dimensions:
                 - selector: 'ceph_nvmeof_bdev_read_seconds_total'
                   name: read_seconds
@@ -10758,7 +10251,6 @@ template:
               units: seconds
               algorithm: absolute
               type: line
-              priority: 8490
               dimensions:
                 - selector: 'ceph_nvmeof_rpc_method_seconds'
                   name: value
@@ -10768,7 +10260,6 @@ template:
               units: seconds/s
               algorithm: incremental
               type: line
-              priority: 8500
               dimensions:
                 - selector: 'ceph_nvmeof_reactor_seconds_total'
                   name: value
@@ -10787,7 +10278,6 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 8510
               dimensions:
                 - selector: 'ceph_nvmeof_host_connection_state'
                   name: value
@@ -10797,7 +10287,6 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 8520
               dimensions:
                 - selector: 'ceph_nvmeof_host_keepalive_timeout'
                   name: value
@@ -10821,7 +10310,6 @@ template:
               units: hosts
               algorithm: absolute
               type: line
-              priority: 8530
               dimensions:
                 - selector: 'ceph_nvmeof_subsystem_host_count'
                   name: value
@@ -10831,7 +10319,6 @@ template:
               units: Mbps
               algorithm: absolute
               type: line
-              priority: 8540
               dimensions:
                 - selector: 'ceph_nvmeof_subsystem_listener_iface_speed_bytes'
                   name: value
@@ -10841,7 +10328,6 @@ template:
               units: listeners
               algorithm: absolute
               type: line
-              priority: 8550
               dimensions:
                 - selector: 'ceph_nvmeof_subsystem_listener_count'
                   name: value
@@ -10851,7 +10337,6 @@ template:
               units: namespaces
               algorithm: absolute
               type: line
-              priority: 8560
               dimensions:
                 - selector: 'ceph_nvmeof_subsystem_namespace_count'
                   name: nvmeof_subsystem_namespace_count
@@ -10863,66 +10348,8 @@ template:
               units: state
               algorithm: absolute
               type: line
-              priority: 8570
               dimensions:
                 - selector: 'ceph_nvmeof_subsystem_metadata'
                   name: metadata
                 - selector: 'ceph_nvmeof_subsystem_namespace_metadata'
                   name: namespace_metadata
-
-        - family: Gateway Runtime
-          context_namespace: gateway_runtime
-          metrics:
-            - process_virtual_memory_bytes
-            - process_resident_memory_bytes
-            - process_cpu_seconds_total
-            - process_open_fds
-            - process_max_fds
-          charts:
-            - title: Process CPU Usage
-              context: process_cpu
-              units: cores
-              algorithm: incremental
-              type: line
-              priority: 8580
-              dimensions:
-                - selector: process_cpu_seconds_total
-                  name: used
-                  options:
-                    float: true
-            - title: Process Resident Memory
-              context: process_resident_memory
-              units: bytes
-              algorithm: absolute
-              type: line
-              priority: 8590
-              dimensions:
-                - selector: process_resident_memory_bytes
-                  name: resident
-            - title: Process Virtual Memory
-              context: process_virtual_memory
-              units: bytes
-              algorithm: absolute
-              type: line
-              priority: 8600
-              dimensions:
-                - selector: process_virtual_memory_bytes
-                  name: virtual
-            - title: Open File Descriptors
-              context: open_file_descriptors
-              units: fds
-              algorithm: absolute
-              type: line
-              priority: 8610
-              dimensions:
-                - selector: process_open_fds
-                  name: open
-            - title: File Descriptor Limit
-              context: file_descriptor_limit
-              units: fds
-              algorithm: absolute
-              type: line
-              priority: 8620
-              dimensions:
-                - selector: process_max_fds
-                  name: limit

@@ -86,7 +86,7 @@ func buildFutureRequirements(
 	for _, sample := range current.Samples {
 		currentNames[sample.Name] = struct{}{}
 	}
-	stages, err := validationRelabelStages(policy, profile)
+	stages, err := validationRelabelStages(policy, []promprofiles.Profile{profile})
 	if err != nil {
 		return futureRequirements{}, err
 	}

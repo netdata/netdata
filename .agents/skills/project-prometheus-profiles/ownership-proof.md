@@ -123,7 +123,7 @@ rules in `OPERATOR-MODEL.md`:
 1. Map every exact dimension selector back to its source-family ledger entry.
 2. Confirm the displayed family is owned by the entity, capability, operation, or stage recorded for that source evidence.
 3. Confirm the effective `instance_by_labels` describes the recorded entity type and retains required parent identity.
-4. Confirm chart title, context, units, algorithm intent, naming mechanism, and priority tell the same operator story.
+4. Confirm chart title, context, units, algorithm intent, and naming mechanism tell the same operator story.
 5. Re-audit every first- and second-level family using the emitted mapping, not the intended prose.
 
 A contradiction requires one of two honest outcomes:

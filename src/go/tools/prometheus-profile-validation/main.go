@@ -24,13 +24,17 @@ func runCLI(args []string, stdout, stderr io.Writer) int {
 	var opts promprofilevalidation.Options
 	var output string
 	fs.StringVar(&opts.ProfilePath, "profile", "", "candidate Prometheus profile YAML")
+	fs.Func("support-profile", "supporting Prometheus profile YAML (repeatable)", func(path string) error {
+		opts.SupportingProfilePaths = append(opts.SupportingProfilePaths, path)
+		return nil
+	})
 	fs.StringVar(&opts.DumpPath, "dump", "", "Prometheus exposition dump")
 	fs.StringVar(&opts.JobPath, "job", "", "optional validation job policy YAML")
 	fs.StringVar(&output, "output", "text", "report format: text or json")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "Validate a Prometheus chart profile through Netdata's real collector and chartengine.")
 		fmt.Fprintln(stderr)
-		fmt.Fprintf(stderr, "Usage: %s --profile PROFILE --dump METRICS [--job JOB] [--output text|json]\n", fs.Name())
+		fmt.Fprintf(stderr, "Usage: %s --profile PROFILE [--support-profile PROFILE] --dump METRICS [--job JOB] [--output text|json]\n", fs.Name())
 		fmt.Fprintln(stderr)
 		fs.PrintDefaults()
 	}

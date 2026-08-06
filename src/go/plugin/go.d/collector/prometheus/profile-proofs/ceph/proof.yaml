@@ -1,19 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-version: 2
+version: 3
 profile: ceph
-external_evidence:
-  revision: ceph
-  manifest:
-    sha256: 21ae822743e9a23a49a882e365e71fe32b0810273e0f2123a44464573359702e
-    bytes: 1704
+supporting_profiles:
+  - name: process_runtime
+    sha256: fd0c7c27a47b0d36a360444eb5d0deca82d7182bd3f4639fdfe62bd400b9c4a2
+    bytes: 1724
 source_inventory:
   rows: 1794
   source_families: 1794
   authored_selectors: 1772
   dispositions:
     chart: 1779
-    job_excluded: 10
+    profile_excluded: 10
+    job_excluded: 0
     writer_ineligible: 5
 validation:
   metadata_example:
@@ -50,14 +50,13 @@ validation:
           dimension_collisions: 0
         errors: {}
         warnings:
-          job_deny_review: 1
-          job_policy_exclusion_summary: 1
           observed_scale_gap: 4
-          profile_relabel_discard_review: 1
-          sibling_identity_mismatch: 4
+          profile_relabel_discard_review: 2
+          sibling_identity_mismatch: 3
           wildcard_instance_identity: 535
     - name: reef-mgr
       kind: supplemental
+      composition: candidate_only
       fixture: fixtures/ceph_reef_mgr_perf_all_metrics.prom
       job: validation
       expected:
@@ -69,14 +68,14 @@ validation:
           series_scanned: 2863
           series_autogen: 0
           series_unmatched: 0
-          authored_charts: 547
+          authored_charts: 542
           runtime_charts: 931
           autogen_charts: 0
           chart_dimensions: 2863
           pipeline_excluded: 10
           pipeline_renamed: 219
-          dead_charts: 40
-          dead_dimensions: 66
+          dead_charts: 35
+          dead_dimensions: 61
           dimension_losses: 0
           instance_losses: 0
           collisions: 0
@@ -84,17 +83,17 @@ validation:
           context_wire_collisions: 0
           dimension_collisions: 0
         errors:
-          dead_chart: 40
-          dead_dimension: 66
-          unproven_job_selector_deny: 1
+          dead_chart: 35
+          dead_dimension: 61
           unproven_relabel_name_rewrite: 1
         warnings:
           observed_scale_gap: 4
           profile_relabel_discard_review: 1
-          sibling_identity_mismatch: 4
+          sibling_identity_mismatch: 3
           wildcard_instance_identity: 535
     - name: reef-exporter
       kind: supplemental
+      composition: candidate_only
       fixture: fixtures/ceph_reef_exporter_prio0_all_metrics.prom
       job: validation
       expected:
@@ -106,14 +105,14 @@ validation:
           series_scanned: 2541
           series_autogen: 0
           series_unmatched: 0
-          authored_charts: 547
+          authored_charts: 542
           runtime_charts: 785
           autogen_charts: 0
           chart_dimensions: 2541
           pipeline_excluded: 1
           pipeline_renamed: 219
-          dead_charts: 85
-          dead_dimensions: 171
+          dead_charts: 80
+          dead_dimensions: 166
           dimension_losses: 0
           instance_losses: 0
           collisions: 0
@@ -121,18 +120,18 @@ validation:
           context_wire_collisions: 0
           dimension_collisions: 0
         errors:
-          dead_chart: 85
-          dead_dimension: 171
-          unproven_job_selector_deny: 1
+          dead_chart: 80
+          dead_dimension: 166
           unproven_relabel_name_discard: 1
           unproven_relabel_name_rewrite: 1
         warnings:
           observed_scale_gap: 4
           profile_relabel_discard_review: 1
-          sibling_identity_mismatch: 4
+          sibling_identity_mismatch: 3
           wildcard_instance_identity: 535
     - name: squid-mgr
       kind: supplemental
+      composition: candidate_only
       fixture: fixtures/ceph_squid_mgr_perf_all_metrics.prom
       job: validation
       expected:
@@ -144,14 +143,14 @@ validation:
           series_scanned: 2737
           series_autogen: 0
           series_unmatched: 0
-          authored_charts: 547
+          authored_charts: 542
           runtime_charts: 886
           autogen_charts: 0
           chart_dimensions: 2737
           pipeline_excluded: 10
           pipeline_renamed: 219
-          dead_charts: 83
-          dead_dimensions: 192
+          dead_charts: 78
+          dead_dimensions: 187
           dimension_losses: 0
           instance_losses: 0
           collisions: 0
@@ -159,17 +158,17 @@ validation:
           context_wire_collisions: 0
           dimension_collisions: 0
         errors:
-          dead_chart: 83
-          dead_dimension: 192
-          unproven_job_selector_deny: 1
+          dead_chart: 78
+          dead_dimension: 187
           unproven_relabel_name_rewrite: 1
         warnings:
           observed_scale_gap: 4
           profile_relabel_discard_review: 1
-          sibling_identity_mismatch: 4
+          sibling_identity_mismatch: 3
           wildcard_instance_identity: 535
     - name: squid-exporter
       kind: supplemental
+      composition: candidate_only
       fixture: fixtures/ceph_squid_exporter_prio0_all_metrics.prom
       job: validation
       expected:
@@ -181,14 +180,14 @@ validation:
           series_scanned: 2415
           series_autogen: 0
           series_unmatched: 0
-          authored_charts: 547
+          authored_charts: 542
           runtime_charts: 740
           autogen_charts: 0
           chart_dimensions: 2415
           pipeline_excluded: 1
           pipeline_renamed: 219
-          dead_charts: 128
-          dead_dimensions: 297
+          dead_charts: 123
+          dead_dimensions: 292
           dimension_losses: 0
           instance_losses: 0
           collisions: 0
@@ -196,18 +195,18 @@ validation:
           context_wire_collisions: 0
           dimension_collisions: 0
         errors:
-          dead_chart: 128
-          dead_dimension: 297
-          unproven_job_selector_deny: 1
+          dead_chart: 123
+          dead_dimension: 292
           unproven_relabel_name_discard: 1
           unproven_relabel_name_rewrite: 1
         warnings:
           observed_scale_gap: 4
           profile_relabel_discard_review: 1
-          sibling_identity_mismatch: 4
+          sibling_identity_mismatch: 3
           wildcard_instance_identity: 535
     - name: tentacle-mgr
       kind: supplemental
+      composition: candidate_only
       fixture: fixtures/ceph_tentacle_mgr_perf_all_metrics.prom
       job: validation
       expected:
@@ -219,14 +218,14 @@ validation:
           series_scanned: 2768
           series_autogen: 0
           series_unmatched: 0
-          authored_charts: 547
+          authored_charts: 542
           runtime_charts: 900
           autogen_charts: 0
           chart_dimensions: 2768
           pipeline_excluded: 10
           pipeline_renamed: 227
-          dead_charts: 70
-          dead_dimensions: 161
+          dead_charts: 65
+          dead_dimensions: 156
           dimension_losses: 0
           instance_losses: 0
           collisions: 0
@@ -234,16 +233,16 @@ validation:
           context_wire_collisions: 0
           dimension_collisions: 0
         errors:
-          dead_chart: 70
-          dead_dimension: 161
-          unproven_job_selector_deny: 1
+          dead_chart: 65
+          dead_dimension: 156
         warnings:
           observed_scale_gap: 4
           profile_relabel_discard_review: 1
-          sibling_identity_mismatch: 4
+          sibling_identity_mismatch: 3
           wildcard_instance_identity: 535
     - name: tentacle-exporter
       kind: supplemental
+      composition: candidate_only
       fixture: fixtures/ceph_tentacle_exporter_prio0_all_metrics.prom
       job: validation
       expected:
@@ -255,14 +254,14 @@ validation:
           series_scanned: 2446
           series_autogen: 0
           series_unmatched: 0
-          authored_charts: 547
+          authored_charts: 542
           runtime_charts: 754
           autogen_charts: 0
           chart_dimensions: 2446
           pipeline_excluded: 1
           pipeline_renamed: 227
-          dead_charts: 115
-          dead_dimensions: 266
+          dead_charts: 110
+          dead_dimensions: 261
           dimension_losses: 0
           instance_losses: 0
           collisions: 0
@@ -270,14 +269,13 @@ validation:
           context_wire_collisions: 0
           dimension_collisions: 0
         errors:
-          dead_chart: 115
-          dead_dimension: 266
-          unproven_job_selector_deny: 1
+          dead_chart: 110
+          dead_dimension: 261
           unproven_relabel_name_discard: 1
         warnings:
           observed_scale_gap: 4
           profile_relabel_discard_review: 1
-          sibling_identity_mismatch: 4
+          sibling_identity_mismatch: 3
           wildcard_instance_identity: 535
     - name: nvmeof
       kind: supplemental
@@ -312,10 +310,8 @@ validation:
           unproven_relabel_name_discard: 1
           unproven_relabel_name_rewrite: 15
         warnings:
-          job_deny_review: 1
-          job_policy_exclusion_summary: 1
-          profile_relabel_discard_review: 1
-          sibling_identity_mismatch: 4
+          profile_relabel_discard_review: 2
+          sibling_identity_mismatch: 3
           wildcard_instance_identity: 535
     - name: without-job-policy
       kind: supplemental
@@ -348,20 +344,20 @@ validation:
           collector_check: 1
         warnings:
           default_validation_job: 1
-          profile_relabel_discard_review: 1
+          profile_relabel_discard_review: 2
 integrity:
   evidence:
-    sha256: 2fd4988edcaf40e004d4e258bf920faa2536c2004f1a07a536de33c70b053d66
-    bytes: 2647
+    sha256: fb860c351bd8de02d656daa50da753f5502be6182a1ace44fb684640757f4d36
+    bytes: 2664
   operator_model:
     sha256: ac0536b32654388f53f2f243d02f4d1c5640758c8245b2fa934310e14e17eff4
     bytes: 7354
   validation_job:
-    sha256: 65a1cf890711853709e694c93815fc33451552390e9eda582d4b859207714226
-    bytes: 1793
+    sha256: b0e0916dc2cd3b3cbb4092b498b7c82213fdafbadfa7ca6fd61ec807b238a1f9
+    bytes: 1089
   validation_summary:
-    sha256: e005eb3c69eba5027f8385bdd594b50f5bff5fd65df9b5b7693f6a127ad45733
-    bytes: 2192
+    sha256: b952a21e37e094d708b7a77581bbc946d54f7c104fd1c43ea0e0f25f55b0d043
+    bytes: 2575
   profile:
-    sha256: ecc55a22b0fd92d156170b6603257af873579b41e737bb1adbe08c0da672ac7d
-    bytes: 469424
+    sha256: 485463878796cfc1e65338b6d717887e64bfce48aeff88e58d9a32f3a9a4d07d
+    bytes: 451020

@@ -2,8 +2,8 @@
 
 A profile is an information architecture. The YAML hierarchy becomes navigation,
 labels become identity/filtering/dimensions, chart composition determines what
-can be compared, and priority determines the reading order. Design those UX
-consequences deliberately.
+can be compared, and the UI determines presentation order. Design the profile-owned
+UX consequences deliberately.
 
 ## Contents
 
@@ -54,8 +54,7 @@ by the profile:
 - contexts are semantic chart types;
 - instances are monitored entities;
 - dimensions are bounded comparisons;
-- labels are filtering/explanatory metadata; and
-- priority is reading order.
+- labels are filtering/explanatory metadata.
 
 The profile must therefore make the relationships reusable and self-describing.
 It is not enough that one reviewer can infer a dashboard from metric names.
@@ -592,18 +591,9 @@ need unrelated scale manipulation, they probably do not belong on one axis.
 
 ## Order the operator journey
 
-Every chart needs an explicit positive priority because missing/zero becomes
-`70000`; YAML order is not runtime priority.
-
-Use both channels deliberately:
-
-- order families and charts in the file exactly as a reviewer should read the
-  dashboard;
-- assign priorities that express the intended runtime presentation;
-- prefer unique increasing priorities when there is a total order;
-- never decrease priority as the file proceeds;
-- allow a tie only when a total order is unnecessary and the fallback ordering
-  is acceptable.
+Prometheus profiles MUST omit `priority`. Every chart receives the same runtime
+default, and the UI owns presentation sorting. YAML order is useful for human
+review but does not promise runtime or UI order.
 
 At the application level, order domain capabilities by the operator's causal
 journey. Within each capability, a useful local order is health/workload →
@@ -651,8 +641,8 @@ contexts, and dimensions. Unseen future values remain a review risk.
   legend.
 - **Broad deny list:** makes validation pass by deleting diagnostic surface
   instead of designing it.
-- **Default priority everywhere:** avoids deciding the operator journey and
-  leaves order to unrelated IDs.
+- **Authored chart priority:** claims UI ordering authority the Prometheus
+  profile does not own and creates unnecessary maintenance.
 - **Titles derived mechanically from metric names:** repeat exporter syntax
   instead of explaining operational meaning.
 - **Passing the validator as definition of quality:** proves runtime behavior for
@@ -683,7 +673,7 @@ After objective validation passes, review the dashboard design:
 - Are rare failures visible beside high-volume traffic?
 - Are titles and units mathematically true?
 - Is each exclusion justified by the operator question lost?
-- Do file order and explicit priorities tell the intended operator story?
+- Is file order coherent for review without being presented as UI ordering?
 
 Warnings demand reasoning, not mechanical edits. Record why the design is
 intentional or change it when the UX consequence is wrong.

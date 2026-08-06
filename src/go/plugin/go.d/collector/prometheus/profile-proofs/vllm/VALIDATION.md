@@ -17,12 +17,11 @@ complete union.
 Inventory reconciliation compares the exact raw-family and authored-selector sets. This separates source coverage from
 operator judgment about entity identity, observation population, unit algebra, and causal dashboard placement.
 
-## Job-policy case
+## Without-job case
 
-The no-job case makes the recommended job dependency explicit. Job policy suppresses source-known creation epochs, raw
-process-start time, and duplicate pre-canonical KV-offload observations. The stock profile retains exact defensive exclusions
-inside its own namespace while leaving unknown future vLLM families open to fallback. The executable case, not this prose,
-owns the resulting behavior.
+The no-job case proves that source-known creation epochs, process-start time, and duplicate pre-canonical KV-offload
+observations are removed by their owning profiles rather than application sample job policy. Complete current coverage and
+unknown-future fallback remain intact. The executable case, not this prose, owns the resulting behavior.
 
 ## Interpretation limits
 

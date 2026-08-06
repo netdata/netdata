@@ -55,7 +55,6 @@ template:
     - title: Temperature
       context: temperature
       units: celsius
-      priority: 100
       dimensions:
         - selector: app_temperature
           name: temperature
@@ -63,7 +62,6 @@ template:
       context: requests
       units: requests/s
       algorithm: incremental
-      priority: 110
       dimensions:
         - selector: app_requests_total
           name: requests
@@ -72,7 +70,6 @@ template:
       units: observations/s
       algorithm: incremental
       type: heatmap
-      priority: 120
       dimensions:
         - selector: app_latency_seconds_bucket
           name_from_label: le
@@ -84,7 +81,6 @@ template:
       context: size
       units: observations/s
       algorithm: incremental
-      priority: 130
       dimensions:
         - selector: app_size_bytes
           name_from_label: quantile
@@ -105,7 +101,6 @@ template:
     - title: Value
       context: value
       units: values
-      priority: 100
       instances:
         by_labels: [instance]
       dimensions:
@@ -124,7 +119,6 @@ template:
     - title: Value
       context: value
       units: values
-      priority: 100
       dimensions:
         - selector: app_value
           name_from_label: state
@@ -177,11 +171,22 @@ func runValidation(t *testing.T, profile, dump, job string) validationResult {
 }
 
 func runValidationFiles(t *testing.T, profilePath, dumpPath, jobPath string) validationResult {
+	return runValidationFilesWithSupports(t, profilePath, nil, dumpPath, jobPath)
+}
+
+func runValidationFilesWithSupports(
+	t *testing.T,
+	profilePath string,
+	supportingProfilePaths []string,
+	dumpPath string,
+	jobPath string,
+) validationResult {
 	t.Helper()
 	got := Validate(context.Background(), Options{
-		ProfilePath: profilePath,
-		DumpPath:    dumpPath,
-		JobPath:     jobPath,
+		ProfilePath:            profilePath,
+		SupportingProfilePaths: supportingProfilePaths,
+		DumpPath:               dumpPath,
+		JobPath:                jobPath,
 	})
 	var stdout bytes.Buffer
 	if err := writeJSONReport(&stdout, got); err != nil {

@@ -31,8 +31,8 @@ func TestDefaultCatalog_StockProfileProofBundles(t *testing.T) {
 			assertProofJobMatchesMetadata(t, repoRoot, metadataPath, bundle)
 
 			t.Run("external evidence", func(t *testing.T) {
-				manifestPath := promtestdata.Require(t, bundle.ExternalManifestPath())
-				testdataRoot := resolvedRoot(manifestPath, bundle.ExternalManifestPath())
+				inventoryPath := promtestdata.Require(t, bundle.SourceInventoryPath())
+				testdataRoot := resolvedRoot(inventoryPath, bundle.SourceInventoryPath())
 				require.NoError(t, promprofileproof.VerifyExternal(testdataRoot, bundle))
 			})
 		})
@@ -113,6 +113,9 @@ func assertProofJobMatchesMetadata(
 	require.NoError(t, yaml.Unmarshal(content, &metadata))
 
 	identity := bundle.Descriptor.Validation.MetadataExample
+	if identity == nil {
+		return
+	}
 	var config string
 	for _, mod := range metadata.Modules {
 		if mod.Meta.ID != identity.IntegrationID {

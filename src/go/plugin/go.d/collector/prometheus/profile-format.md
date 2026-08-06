@@ -556,14 +556,10 @@ the whole catalog, and an invalid template fails every job that selects it.
 
 Compact proof documents live under
 `src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/`. Bulky generated evidence lives in
-[`netdata/testdata`](https://github.com/netdata/testdata) under `prometheus/profiles/<profile-revision>/`: the source
-inventory, sanitized exposition fixtures, and a manifest containing every file's byte size and SHA-256 digest. Land the
-testdata change before the Netdata change that references it.
-
-Netdata tests clone the latest testdata `master`; referenced paths are therefore immutable. Update evidence by adding a new
-profile revision/directory and changing the Netdata proof to its new manifest. Do not modify or delete an external path used
-by a merged Netdata commit. The manifest digest recorded in Netdata and its per-file hashes make the proof reproducible
-without a testdata commit lock.
+[`netdata/testdata`](https://github.com/netdata/testdata) under `prometheus/profiles/<profile>/`: the exact source inventory
+and sanitized exposition fixtures. Netdata tests clone latest testdata `master`; update the stable external directory and
+the corresponding proof expectations together. Historical Netdata checkouts are not guaranteed to validate against later
+testdata content.
 
 To run the complete stock-profile gate locally, clone testdata into the ignored location, then require external evidence:
 
@@ -587,5 +583,5 @@ git -C src/go/testdata switch --detach FETCH_HEAD
 
 Set `NETDATA_TESTDATA_DIR` if the checkout lives elsewhere. Ordinary tests never fetch testdata and skip only the
 external-dependent cases when the checkout root is absent. A present but incomplete or unreadable checkout fails. The
-dedicated CI workflow requires external evidence, verifies the manifest chain, and replays the objective validator for every
-stock proof.
+dedicated CI workflow requires external evidence, verifies exact external layout and inventory expectations, and replays the
+objective validator for every stock proof.

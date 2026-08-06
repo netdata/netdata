@@ -17,12 +17,11 @@ the complete union.
 Inventory reconciliation compares the exact raw-family and authored-selector sets. This separates source coverage from
 operator judgment about identity, aggregation, units, and dashboard placement.
 
-## Job-policy case
+## Without-job case
 
-The no-job case makes job-owned exclusion and fallback behavior visible. The recommended job suppresses source-known creation
-epochs, deprecated duplicates, raw timestamps that cannot be rendered honestly, and writer-ineligible routes while leaving
-unknown future LiteLLM families open to generic fallback. The exact behavior and findings are executable claims in
-`proof.yaml`.
+The no-job case proves that source-known exclusions and untyped classification no longer depend on application sample job
+policy. The application and shared profiles retain complete current coverage while leaving unknown future LiteLLM families
+open to generic fallback. The exact behavior and findings are executable claims in `proof.yaml`.
 
 ## Interpretation limits
 

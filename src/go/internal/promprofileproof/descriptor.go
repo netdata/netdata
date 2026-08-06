@@ -18,27 +18,29 @@ import (
 )
 
 const (
-	DescriptorFilename = "proof.yaml"
-	ProofRoot          = "src/go/plugin/go.d/collector/prometheus/profile-proofs"
-	StockProfileRoot   = "src/go/plugin/go.d/config/go.d/prometheus.profiles/default"
+	DescriptorFilename           = "proof.yaml"
+	ProofRoot                    = "src/go/plugin/go.d/collector/prometheus/profile-proofs"
+	StockProfileRoot             = "src/go/plugin/go.d/config/go.d/prometheus.profiles/default"
+	CaseCompositionDeclared      = "declared"
+	CaseCompositionCandidateOnly = "candidate_only"
 )
 
 type Descriptor struct {
-	Version    int                     `yaml:"version"`
-	Profile    string                  `yaml:"profile"`
-	External   ExternalEvidence        `yaml:"external_evidence"`
-	Inventory  SourceInventoryExpected `yaml:"source_inventory"`
-	Validation Validation              `yaml:"validation"`
-	Integrity  Integrity               `yaml:"integrity"`
+	Version            int                     `yaml:"version"`
+	Profile            string                  `yaml:"profile"`
+	SupportingProfiles []SupportingProfile     `yaml:"supporting_profiles,omitempty"`
+	Inventory          SourceInventoryExpected `yaml:"source_inventory"`
+	Validation         Validation              `yaml:"validation"`
+	Integrity          Integrity               `yaml:"integrity"`
 }
 
-type ExternalEvidence struct {
-	Revision string     `yaml:"revision"`
-	Manifest FileDigest `yaml:"manifest"`
+type SupportingProfile struct {
+	Name       string `yaml:"name"`
+	FileDigest `yaml:",inline"`
 }
 
 type Validation struct {
-	MetadataExample MetadataExample  `yaml:"metadata_example"`
+	MetadataExample *MetadataExample `yaml:"metadata_example,omitempty"`
 	Cases           []ValidationCase `yaml:"cases"`
 }
 
@@ -49,11 +51,12 @@ type MetadataExample struct {
 }
 
 type ValidationCase struct {
-	Name     string         `yaml:"name"`
-	Kind     string         `yaml:"kind"`
-	Fixture  string         `yaml:"fixture"`
-	Job      string         `yaml:"job"`
-	Expected ExpectedResult `yaml:"expected"`
+	Name        string         `yaml:"name"`
+	Kind        string         `yaml:"kind"`
+	Composition string         `yaml:"composition,omitempty"`
+	Fixture     string         `yaml:"fixture"`
+	Job         string         `yaml:"job"`
+	Expected    ExpectedResult `yaml:"expected"`
 }
 
 type ExpectedResult struct {
@@ -95,6 +98,7 @@ type SourceInventoryExpected struct {
 
 type InventoryDisposition struct {
 	Chart            int `yaml:"chart"`
+	ProfileExcluded  int `yaml:"profile_excluded"`
 	JobExcluded      int `yaml:"job_excluded"`
 	WriterIneligible int `yaml:"writer_ineligible"`
 }
@@ -137,6 +141,21 @@ func (b Bundle) ProfilePath() string {
 	return StockProfileRoot + "/" + b.Descriptor.Profile + ".yaml"
 }
 
+func (b Bundle) SupportingProfilePaths() []string {
+	paths := make([]string, 0, len(b.Descriptor.SupportingProfiles))
+	for _, profile := range b.Descriptor.SupportingProfiles {
+		paths = append(paths, StockProfileRoot+"/"+profile.Name+".yaml")
+	}
+	return paths
+}
+
+func (b Bundle) SupportingProfilePathsForCase(validationCase ValidationCase) []string {
+	if validationCase.Composition == CaseCompositionCandidateOnly {
+		return nil
+	}
+	return b.SupportingProfilePaths()
+}
+
 func (b Bundle) EvidencePath() string {
 	return b.ProofDirectory() + "/EVIDENCE.md"
 }
@@ -154,11 +173,7 @@ func (b Bundle) ValidationSummaryPath() string {
 }
 
 func (b Bundle) ExternalRoot() string {
-	return "prometheus/profiles/" + b.Descriptor.External.Revision
-}
-
-func (b Bundle) ExternalManifestPath() string {
-	return b.ExternalRoot() + "/manifest.yaml"
+	return "prometheus/profiles/" + b.Descriptor.Profile
 }
 
 func (b Bundle) SourceInventoryPath() string {
@@ -179,13 +194,22 @@ func (b Bundle) IntegrityEntries() []FileIntegrity {
 }
 
 func (b *Bundle) integrityTargets() []integrityTarget {
-	return []integrityTarget{
+	targets := []integrityTarget{
 		{role: "evidence", path: b.EvidencePath(), digest: &b.Descriptor.Integrity.Evidence},
 		{role: "operator_model", path: b.OperatorModelPath(), digest: &b.Descriptor.Integrity.OperatorModel},
 		{role: "validation_job", path: b.ValidationJobPath(), digest: &b.Descriptor.Integrity.ValidationJob},
 		{role: "validation_summary", path: b.ValidationSummaryPath(), digest: &b.Descriptor.Integrity.ValidationSummary},
 		{role: "profile", path: b.ProfilePath(), digest: &b.Descriptor.Integrity.Profile},
 	}
+	for index := range b.Descriptor.SupportingProfiles {
+		profile := &b.Descriptor.SupportingProfiles[index]
+		targets = append(targets, integrityTarget{
+			role:   "supporting_profile:" + profile.Name,
+			path:   StockProfileRoot + "/" + profile.Name + ".yaml",
+			digest: &profile.FileDigest,
+		})
+	}
+	return targets
 }
 
 func Discover(repoRoot string) ([]Bundle, error) {
@@ -257,8 +281,8 @@ func Load(repoRoot, path string) (Bundle, error) {
 
 func (b Bundle) validate() error {
 	descriptor := b.Descriptor
-	if descriptor.Version != 2 {
-		return fmt.Errorf("version: got %d, want 2", descriptor.Version)
+	if descriptor.Version != 3 {
+		return fmt.Errorf("version: got %d, want 3", descriptor.Version)
 	}
 	proofDirectory := b.ProofDirectory()
 	if filepath.ToSlash(filepath.Dir(proofDirectory)) != ProofRoot {
@@ -273,36 +297,43 @@ func (b Bundle) validate() error {
 	if descriptor.Profile != filepath.Base(filepath.FromSlash(proofDirectory)) {
 		return fmt.Errorf("profile %q must match proof directory %q", descriptor.Profile, proofDirectory)
 	}
+	seenSupportingProfiles := make(map[string]struct{}, len(descriptor.SupportingProfiles))
+	for index, profile := range descriptor.SupportingProfiles {
+		field := fmt.Sprintf("supporting_profiles[%d]", index)
+		if !isValidProfileName(profile.Name) {
+			return fmt.Errorf("%s.name %q must be lowercase letters, digits, or underscores and start with a letter", field, profile.Name)
+		}
+		if profile.Name == descriptor.Profile {
+			return fmt.Errorf("%s.name %q duplicates the candidate profile", field, profile.Name)
+		}
+		if _, ok := seenSupportingProfiles[profile.Name]; ok {
+			return fmt.Errorf("duplicate supporting profile name %q", profile.Name)
+		}
+		seenSupportingProfiles[profile.Name] = struct{}{}
+	}
 	for _, entry := range b.IntegrityEntries() {
 		if err := validateRelativePath(entry.Role+" path", entry.Path); err != nil {
 			return err
 		}
 	}
 
-	if descriptor.External.Revision == "" || strings.ContainsAny(descriptor.External.Revision, "/\\") {
-		return fmt.Errorf("external_evidence.revision %q must be one non-empty path segment", descriptor.External.Revision)
-	}
 	for _, item := range []struct {
 		field string
 		path  string
 	}{
-		{"external manifest path", b.ExternalManifestPath()},
 		{"source inventory path", b.SourceInventoryPath()},
 	} {
 		if err := validateRelativePath(item.field, item.path); err != nil {
 			return err
 		}
 	}
-	if err := validateDigest("external_evidence.manifest", descriptor.External.Manifest.SHA256, descriptor.External.Manifest.Bytes); err != nil {
-		return err
-	}
 	if err := validateInventoryExpected(descriptor.Inventory); err != nil {
 		return err
 	}
 
-	metadata := descriptor.Validation.MetadataExample
-	if metadata.IntegrationID == "" || metadata.ExampleName == "" || metadata.JobName == "" {
-		return errors.New("validation.metadata_example fields must not be empty")
+	if metadata := descriptor.Validation.MetadataExample; metadata != nil &&
+		(metadata.IntegrationID == "" || metadata.ExampleName == "" || metadata.JobName == "") {
+		return errors.New("validation.metadata_example fields must not be empty when declared")
 	}
 	if len(descriptor.Validation.Cases) == 0 {
 		return errors.New("validation.cases must not be empty")
@@ -327,6 +358,19 @@ func (b Bundle) validate() error {
 		case "supplemental":
 		default:
 			return fmt.Errorf("%s.kind %q must be source_complete or supplemental", field, validationCase.Kind)
+		}
+		switch validationCase.Composition {
+		case "", CaseCompositionDeclared:
+		case CaseCompositionCandidateOnly:
+			if validationCase.Kind == "source_complete" {
+				return fmt.Errorf("%s source_complete case must use declared composition", field)
+			}
+			if len(descriptor.SupportingProfiles) == 0 {
+				return fmt.Errorf("%s candidate_only composition requires at least one descriptor supporting profile", field)
+			}
+		default:
+			return fmt.Errorf("%s.composition %q must be %q or %q", field, validationCase.Composition,
+				CaseCompositionDeclared, CaseCompositionCandidateOnly)
 		}
 		switch validationCase.Job {
 		case "validation", "none":
@@ -373,6 +417,7 @@ func validateInventoryExpected(expected SourceInventoryExpected) error {
 		field string
 		value int
 	}{
+		{"dispositions.profile_excluded", expected.Dispositions.ProfileExcluded},
 		{"dispositions.job_excluded", expected.Dispositions.JobExcluded},
 		{"dispositions.writer_ineligible", expected.Dispositions.WriterIneligible},
 	} {
@@ -380,7 +425,7 @@ func validateInventoryExpected(expected SourceInventoryExpected) error {
 			return fmt.Errorf("source_inventory.%s must be non-negative", item.field)
 		}
 	}
-	if got := expected.Dispositions.Chart + expected.Dispositions.JobExcluded + expected.Dispositions.WriterIneligible; got != expected.Rows {
+	if got := expected.Dispositions.Chart + expected.Dispositions.ProfileExcluded + expected.Dispositions.JobExcluded + expected.Dispositions.WriterIneligible; got != expected.Rows {
 		return fmt.Errorf("source_inventory disposition total %d differs from rows %d", got, expected.Rows)
 	}
 	if expected.SourceFamilies > expected.Rows {
@@ -391,6 +436,18 @@ func validateInventoryExpected(expected SourceInventoryExpected) error {
 			expected.AuthoredSelectors, expected.Dispositions.Chart)
 	}
 	return nil
+}
+
+func isValidProfileName(name string) bool {
+	if name == "" || name[0] < 'a' || name[0] > 'z' {
+		return false
+	}
+	for _, char := range name[1:] {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func validateExpectedResult(field string, expected ExpectedResult) error {

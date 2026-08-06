@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 3
+profile: fastapi
+source_inventory:
+  rows: 14
+  source_families: 10
+  authored_selectors: 7
+  dispositions:
+    chart: 7
+    profile_excluded: 5
+    job_excluded: 0
+    writer_ineligible: 2
+validation:
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/fastapi_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 10
+          raw_logical_series: 18
+          writer_series: 38
+          series_scanned: 38
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 7
+          runtime_charts: 11
+          autogen_charts: 0
+          chart_dimensions: 38
+          pipeline_excluded: 7
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          generic_profile_match: 1
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 1
+integrity:
+  evidence:
+    sha256: 48149feb2c9924ae1138fc4fac0701f366630dd6135a49920b21cc0e4a6e0037
+    bytes: 1309
+  operator_model:
+    sha256: d2115a9c4266594cfbde5e163dcdb9470e8af9356ae761b7bbf8df9d64640df5
+    bytes: 1325
+  validation_job:
+    sha256: da8ba4cb761b4d50a57c3311be410bd020397be9d4a239d711860e05e46f8034
+    bytes: 27
+  validation_summary:
+    sha256: eaab6d0e83d219f97671ac54515e79358f22a6d4947e5fa1360ba2933631d90b
+    bytes: 843
+  profile:
+    sha256: bde3083141c2e05d113b8bdb14b2dbc8b2a2979b689cfe6ab436401a2ca4ef29
+    bytes: 3089

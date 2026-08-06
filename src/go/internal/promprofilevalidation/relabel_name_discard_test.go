@@ -117,7 +117,6 @@ template:
     - title: UTF-8 Metric
       context: metric
       units: value
-      priority: 100
       dimensions:
         - selector: 'my.noncompliant.metric'
           name: value

@@ -25,16 +25,20 @@ therefore diagnoses inactive charts/dimensions and may also report that a select
 that partial input. Those findings describe the evidence boundary; their exact classes and counts remain executable claims in
 `proof.yaml`.
 
+The Reef, Squid, and Tentacle producer fixtures contain no process namespace, so their cases validate the Ceph candidate
+alone. The NVMe-oF fixture includes the process namespace and retains the full declared Ceph/process-runtime composition.
+This case-level boundary avoids fabricating unrelated runtime evidence while keeping candidate dead-chart checks strict.
+
 The cases exist to ensure that release-specific wire types, dynamic-name normalization, producer exclusions, and current
 family shapes keep behaving as declared without pretending that a partial fixture is source-complete.
 
 ## Job-policy case
 
-The no-job case makes the recommended job dependency explicit. It exercises behavior without selector, fallback, or
-validation-only future-input policy, including the collector's treatment of otherwise untyped Ceph families. The expected
-behavior belongs only to `proof.yaml`.
+The no-job case makes the remaining recommended job dependency explicit. Profile-owned relabeling and fallback
+classification remain active; deployable collection limits, expected-prefix policy, and validation-only future inputs are
+absent. The expected behavior belongs only to `proof.yaml`.
 
 ## Operational boundary
 
-Live-Agent checks verify deployment transport and rollout behavior on authorized systems. They do not change the pinned
+Live-Agent checks verify deployment transport and rollout behavior on authorized systems. They do not change the declared
 source boundary, and this proof does not modify any Ceph daemon, exporter, or cluster configuration.

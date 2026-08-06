@@ -36,6 +36,12 @@ func validateProfile(parent context.Context, opts Options) Report {
 		r.addError("profile_input", opts.ProfilePath, err.Error(), "The validator must read one regular profile file.")
 		return r
 	}
+	for _, path := range opts.SupportingProfilePaths {
+		if err := validateInputFile(path); err != nil {
+			r.addError("profile_input", path, err.Error(), "Every supporting profile must be a readable regular file explicitly supplied to the validator.")
+			return r
+		}
+	}
 	if err := validateInputFile(opts.DumpPath); err != nil {
 		r.addError("dump_input", opts.DumpPath, err.Error(), "The evidence dump must be a readable regular file.")
 		return r
@@ -54,7 +60,7 @@ func validateProfile(parent context.Context, opts Options) Report {
 		)
 	}
 
-	staged, cleanup, err := stageValidationInputs(opts.ProfilePath, opts.DumpPath)
+	staged, cleanup, err := stageValidationInputs(opts.ProfilePath, opts.SupportingProfilePaths, opts.DumpPath)
 	if err != nil {
 		r.addError("profile_load", opts.ProfilePath, err.Error(), "The real strict profile catalog and template decoder must accept the candidate.")
 		return r
@@ -74,12 +80,18 @@ func validateProfile(parent context.Context, opts Options) Report {
 	}
 	addProfileMatchHeuristics(profile.Match, &r)
 
-	authored, err := inspectAuthoredCharts(profile, &r)
-	if err != nil {
-		r.addError("profile_template", opts.ProfilePath, err.Error(), "Priority policy is checked on the authored profile before collector merge/defaulting.")
-		return r
+	for index, selectedProfile := range staged.profiles {
+		authored, err := inspectAuthoredCharts(selectedProfile, &r)
+		if err != nil {
+			path := opts.ProfilePath
+			if index > 0 {
+				path = opts.SupportingProfilePaths[index-1]
+			}
+			r.addError("profile_template", path, err.Error(), "Priority policy is checked on every authored profile before collector merge/defaulting.")
+			return r
+		}
+		r.Counts.AuthoredCharts += len(authored)
 	}
-	r.Counts.AuthoredCharts = len(authored)
 
 	ctx, cancel := context.WithTimeout(parent, validationTimeout)
 	defer cancel()
@@ -121,7 +133,7 @@ func validateProfile(parent context.Context, opts Options) Report {
 	addAuthoredProfileHeuristics(authoredTemplate, r.RawFamilies, &r)
 	addObservedDistributionHeuristics(authoredTemplate, r.RawFamilies, &r)
 
-	pipelineSummary, err := newPipelineDiagnosticSummary(policy, profile, rawSamples)
+	pipelineSummary, err := newPipelineDiagnosticSummary(policy, staged.profiles, rawSamples)
 	if err != nil {
 		r.addError("profile_relabeling", opts.ProfilePath, err.Error(), "The candidate profile relabeling must decode before production diagnostics can be correlated.")
 		return r
@@ -130,7 +142,7 @@ func validateProfile(parent context.Context, opts Options) Report {
 		promcollector.WithProfileCatalog(catalog),
 		promcollector.WithPipelineDiagnosticObserver(pipelineSummary.observe),
 	)
-	r.Job = applyJobPolicy(coll, policy, staged.fileURL, staged.profileName)
+	r.Job = applyJobPolicy(coll, policy, staged.fileURL, staged.profileNames)
 	if err := coll.Init(ctx); err != nil {
 		r.addError("collector_init", opts.JobPath, err.Error(), "Selector, relabeling, fallback typing, limits, and exact profile selection are validated by the real collector.")
 		return r
@@ -355,12 +367,12 @@ func validateProfile(parent context.Context, opts Options) Report {
 		)
 	}
 	if r.Counts.SeriesUnmatched != 0 {
-		if routeSummary.allUnmatchedExplainedByProfile(profile, merged) {
+		if routeSummary.allUnmatchedExplainedByProfiles(staged.profiles, merged) {
 			r.addWarning(
 				"profile_suppressed_series",
 				"autogen.selector",
-				fmt.Sprintf("%d writer series were suppressed by the profile's explicit fallback selector", r.Counts.SeriesUnmatched),
-				"The samples remain in the collector store but intentionally create no fallback charts; the profile must document the lost operator question and cardinality or semantic reason.",
+				fmt.Sprintf("%d writer series were suppressed by selected profiles' explicit fallback selectors", r.Counts.SeriesUnmatched),
+				"The samples remain in the collector store but intentionally create no fallback charts; the owning profiles must document the lost operator question and cardinality or semantic reason.",
 			)
 		} else {
 			r.addError(

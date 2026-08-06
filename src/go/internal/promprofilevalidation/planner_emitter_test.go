@@ -36,7 +36,6 @@ template:
     - title: Mixed
       context: mixed
       units: values
-      priority: 100
       dimensions:
         - selector: app_live
           name: live
@@ -124,7 +123,6 @@ template:
       title: One
       context: one
       units: values
-      priority: 100
       dimensions:
         - selector: app_one
           name: one
@@ -132,7 +130,6 @@ template:
       title: Two
       context: two
       units: values
-      priority: 110
       dimensions:
         - selector: app_two
           name: two
@@ -157,7 +154,6 @@ template:
       title: One
       context: shared
       units: values
-      priority: 100
       dimensions:
         - selector: app_one
           name: one
@@ -165,7 +161,6 @@ template:
       title: Two
       context: "'shared"
       units: values
-      priority: 110
       dimensions:
         - selector: app_two
           name: two
@@ -212,7 +207,6 @@ template:
       title: One
       context: shared
       units: values
-      priority: 100
       dimensions:
         - selector: app_one
           name: one
@@ -220,7 +214,6 @@ template:
       title: Two
       context: shared
       units: values
-      priority: 110
       dimensions:
         - selector: app_two
           name: two
@@ -246,7 +239,6 @@ template:
       title: Value
       context: value
       units: values
-      priority: 100
       dimensions:
         - selector: app_value
           name: value
@@ -310,7 +302,6 @@ template:
     - title: Value
       context: value
       units: values
-      priority: 100
       lifecycle:
         dimensions:
           max_dims: 2
@@ -339,7 +330,6 @@ template:
     - title: Values
       context: values
       units: values
-      priority: 100
       lifecycle:
         dimensions:
           max_dims: 2
@@ -372,7 +362,6 @@ template:
     - title: Values
       context: values
       units: values
-      priority: 100
       dimensions:
         - selector: app_one
           name_from_label: state
@@ -401,14 +390,12 @@ template:
     - title: One
       context: shared
       units: values
-      priority: 100
       dimensions:
         - selector: app_one
           name: one
     - title: Two
       context: shared
       units: values
-      priority: 110
       dimensions:
         - selector: app_two
           name: two

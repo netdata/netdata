@@ -1,19 +1,25 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-version: 2
+version: 3
 profile: vllm
-external_evidence:
-  revision: vllm
-  manifest:
-    sha256: a46e6b3a38d2ddf1897943603bd712af0ae6461fc5c87f6769d4780a74f20aa8
-    bytes: 410
+supporting_profiles:
+  - name: fastapi
+    sha256: bde3083141c2e05d113b8bdb14b2dbc8b2a2979b689cfe6ab436401a2ca4ef29
+    bytes: 3089
+  - name: process_runtime
+    sha256: fd0c7c27a47b0d36a360444eb5d0deca82d7182bd3f4639fdfe62bd400b9c4a2
+    bytes: 1724
+  - name: python_gc
+    sha256: 19c27bbb8fd7375441623a92fffb619897f43513b2627ab03b269821d0e14f65
+    bytes: 1223
 source_inventory:
   rows: 253
   source_families: 183
   authored_selectors: 163
   dispositions:
     chart: 163
-    job_excluded: 85
+    profile_excluded: 85
+    job_excluded: 0
     writer_ineligible: 5
 validation:
   metadata_example:
@@ -50,27 +56,27 @@ validation:
           dimension_collisions: 0
         errors: {}
         warnings:
-          job_deny_review: 87
-          job_policy_exclusion_summary: 1
-          sibling_identity_mismatch: 1
+          duplicate_sibling_family: 1
+          profile_relabel_discard_review: 3
+          sibling_identity_mismatch: 2
     - name: without-job-policy
       kind: supplemental
       fixture: fixtures/vllm_all_metrics.prom
       job: none
       expected:
-        verdict: FAIL
+        verdict: PASS
         counts:
           raw_families: 183
           raw_logical_series: 262
-          writer_series: 925
-          series_scanned: 925
-          series_autogen: 10
-          series_unmatched: 137
+          writer_series: 778
+          series_scanned: 778
+          series_autogen: 0
+          series_unmatched: 0
           authored_charts: 124
           runtime_charts: 142
-          autogen_charts: 10
-          chart_dimensions: 788
-          pipeline_excluded: 5
+          autogen_charts: 0
+          chart_dimensions: 778
+          pipeline_excluded: 90
           pipeline_renamed: 0
           dead_charts: 0
           dead_dimensions: 0
@@ -80,25 +86,25 @@ validation:
           chart_wire_collisions: 0
           context_wire_collisions: 0
           dimension_collisions: 0
-        errors:
-          unexpected_autogen: 1
+        errors: {}
         warnings:
           default_validation_job: 1
-          profile_suppressed_series: 1
-          sibling_identity_mismatch: 1
+          duplicate_sibling_family: 1
+          profile_relabel_discard_review: 3
+          sibling_identity_mismatch: 2
 integrity:
   evidence:
-    sha256: 7418eb86cb0f32f3db68635a237c55a81d4a97bd2a6e25e5c273bb279a6aa74d
-    bytes: 2604
+    sha256: ef3c3aa288163dd63ecab40000d063252f909c98d9ee9deae3102dda3d77316c
+    bytes: 2621
   operator_model:
-    sha256: 189c07bb05cafd4cd269040cfcf49b8b56b7fe29d97454abc9b7395c1844cb11
-    bytes: 7048
+    sha256: 62d286679e14c5bd89bacdc03b6094507745892c5e94e9e63b8ed5ff37fd8796
+    bytes: 7052
   validation_job:
-    sha256: 1c0f0eee4d11f2a990347f164bfe3a5e1d5e1628621eb546e4f7ab11013b00b2
-    bytes: 3945
+    sha256: a0296c6021aa91692bb50b03ba061b4a73ff79baacc8c6cd93493440c8d09b65
+    bytes: 46
   validation_summary:
-    sha256: c2da8a19ca75ceecfd9be873db2d87cad7543004cfac04e0280cc6c587bf9d5d
-    bytes: 1917
+    sha256: a1ca148b6810b195e0033d0559e1cce35c31d01a9141743184cd938f888d05eb
+    bytes: 1866
   profile:
-    sha256: 5a97a19b3e2b504268069e4f23adca8a8aa6c2c97a114f5e2b273f6748b0149a
-    bytes: 57651
+    sha256: 43269120abb4f79457a563bd2460acf213eb17ca712a0b378caa2fa3b20629bc
+    bytes: 49098

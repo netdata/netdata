@@ -11,7 +11,7 @@ import (
 
 const validInventory = "authored_selector\temitted_metric\tsource_family\tsource_type\tsource_labels\toperator_owner\tentity_identity\tsignal_role\tobservation_population\tcross_family_relationship\tunit_algebra\tlabel_roles_and_optionality\tavailability_gate\tevidence_and_uncertainty\tdisposition\tdestination\tsource_path\n" +
 	"app_value\tapp_value\tapp_value\tgauge\t\tApp\tglobal\tstate\tvalue\tindependent\tabsolute\tnone\talways\tsource-derived\tchart\tApp / Value\towner/repo @ commit; value.go:1\n" +
-	"app_created\tapp_created\tapp_created\tgauge\t\t<excluded>\t<none>\tconfiguration\tcreation epoch\tcompanion\tnone\tnone\talways\tsource-derived\tjob-excluded\tlost creation time\towner/repo @ commit; value.go:2\n"
+	"app_created\tapp_created\tapp_created\tgauge\t\t<excluded>\t<none>\tconfiguration\tcreation epoch\tcompanion\tnone\tnone\talways\tsource-derived\tprofile-excluded\tlost creation time\towner/repo @ commit; value.go:2\n"
 
 func TestLoadSourceInventory(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "SOURCE-INVENTORY.tsv")
@@ -25,7 +25,7 @@ func TestLoadSourceInventory(t *testing.T) {
 	}
 	want := SourceInventoryExpected{
 		Rows: 2, SourceFamilies: 2, AuthoredSelectors: 1,
-		Dispositions: InventoryDisposition{Chart: 1, JobExcluded: 1},
+		Dispositions: InventoryDisposition{Chart: 1, ProfileExcluded: 1},
 	}
 	if err := got.VerifyExpected(want); err != nil {
 		t.Fatal(err)

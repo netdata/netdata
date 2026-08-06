@@ -26,35 +26,6 @@ future_inputs:
   - name: ceph_port99991_dpdk_device_receive_multicast_packets
     type: counter
   - name: ceph_service_unique_id_future_service
-selector:
-  deny:
-    - process_start_time_seconds
-fallback_type:
-  gauge:
-    - ceph_disk_occupation
-    - ceph_disk_occupation_human
-    - ceph_fs_metadata
-    - ceph_health_status
-    - ceph_mds_metadata
-    - ceph_mon_metadata
-    - ceph_osd_flag_nobackfill
-    - ceph_osd_flag_nodeep_scrub
-    - ceph_osd_flag_nodown
-    - ceph_osd_flag_noin
-    - ceph_osd_flag_noout
-    - ceph_osd_flag_norebalance
-    - ceph_osd_flag_norecover
-    - ceph_osd_flag_noscrub
-    - ceph_osd_flag_noup
-    - ceph_osd_in
-    - ceph_osd_metadata
-    - ceph_osd_up
-    - ceph_osd_weight
-    - ceph_pool_metadata
-    - ceph_rbd_image_metadata
-    - ceph_rbd_mirror_metadata
-    - ceph_rgw_metadata
-    - ceph_smb_metadata
 expected_prefix: ceph_
 max_time_series: 20000
 max_time_series_per_metric: 4000

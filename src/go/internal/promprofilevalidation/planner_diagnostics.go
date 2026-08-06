@@ -322,12 +322,22 @@ func (s *planRouteSummary) counts() (scanned, autogen, unmatched int) {
 	return scanned, autogen, unmatched
 }
 
-func (s *planRouteSummary) allUnmatchedExplainedByProfile(profile promprofiles.Profile, spec *charttpl.Spec) bool {
+func (s *planRouteSummary) allUnmatchedExplainedByProfiles(profiles []promprofiles.Profile, spec *charttpl.Spec) bool {
 	if s == nil || spec == nil || spec.Engine == nil || spec.Engine.Autogen == nil {
 		return false
 	}
-	selector := profile.AutogenSelector()
-	if selector == nil || len(selector.Deny) == 0 {
+	type expectedRule struct {
+		scope string
+		allow []string
+		deny  []string
+	}
+	var expected []expectedRule
+	for _, profile := range profiles {
+		if selector := profile.AutogenSelector(); selector != nil {
+			expected = append(expected, expectedRule{scope: profile.Match, allow: selector.Allow, deny: selector.Deny})
+		}
+	}
+	if len(expected) == 0 || len(spec.Engine.Autogen.Rules) != len(expected) {
 		return false
 	}
 
@@ -343,10 +353,11 @@ func (s *planRouteSummary) allUnmatchedExplainedByProfile(profile promprofiles.P
 			return false
 		}
 		rule := spec.Engine.Autogen.Rules[series.autogenRuleIndex]
-		if rule.Scope != profile.Match ||
-			series.autogenRuleScope != profile.Match ||
-			!slices.Equal(rule.Selector.Allow, selector.Allow) ||
-			!slices.Equal(rule.Selector.Deny, selector.Deny) {
+		want := expected[series.autogenRuleIndex]
+		if rule.Scope != want.scope ||
+			series.autogenRuleScope != want.scope ||
+			!slices.Equal(rule.Selector.Allow, want.allow) ||
+			!slices.Equal(rule.Selector.Deny, want.deny) {
 			return false
 		}
 	}

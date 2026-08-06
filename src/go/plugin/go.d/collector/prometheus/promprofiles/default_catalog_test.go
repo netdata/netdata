@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/internal/promtestdata"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 var exactPrometheusMetricNamePattern = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
@@ -76,11 +77,11 @@ func TestDefaultCatalog_AllStockProfilesHydrate(t *testing.T) {
 	}
 }
 
-// TestDefaultCatalog_VLLMRayDeniesEveryCompatibilityGauge derives Ray 2.48's
-// unsuffixed compatibility gauges from the source-union fixture. The profile
-// also suppresses vLLM's deprecated pre-canonical KV-offload families so every
-// operation is represented exactly once.
-func TestDefaultCatalog_VLLMRayDeniesEveryCompatibilityGauge(t *testing.T) {
+// TestDefaultCatalog_VLLMRayDropsEveryCompatibilityGauge derives Ray 2.48's
+// unsuffixed compatibility gauges from the source-union fixture. Profile-owned
+// relabeling also drops vLLM's deprecated pre-canonical KV-offload families so
+// every operation is represented exactly once.
+func TestDefaultCatalog_VLLMRayDropsEveryCompatibilityGauge(t *testing.T) {
 	types := readPrometheusTypes(t, "prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom")
 
 	var aliases []string
@@ -93,7 +94,9 @@ func TestDefaultCatalog_VLLMRayDeniesEveryCompatibilityGauge(t *testing.T) {
 	require.Len(t, aliases, 33)
 
 	denials := append(aliases,
-		"ray_vllm_kv_offload_size",
+		"ray_vllm_kv_offload_size_bucket",
+		"ray_vllm_kv_offload_size_count",
+		"ray_vllm_kv_offload_size_sum",
 		"ray_vllm_kv_offload_total_bytes_total",
 		"ray_vllm_kv_offload_total_time_total",
 	)
@@ -103,12 +106,10 @@ func TestDefaultCatalog_VLLMRayDeniesEveryCompatibilityGauge(t *testing.T) {
 	require.NoError(t, err)
 	profile, ok := catalog.Get("vllm_ray")
 	require.True(t, ok)
-	selector := profile.AutogenSelector()
-	require.NotNil(t, selector)
-	require.Equal(t, denials, selector.Deny)
+	require.Equal(t, denials, exactProfileRelabelDropMatches(t, profile))
 }
 
-func TestDefaultCatalog_GeneratedEpochDenialsMatchSourceUnion(t *testing.T) {
+func TestDefaultCatalog_GeneratedEpochDropsMatchSourceUnion(t *testing.T) {
 	tests := map[string]struct {
 		fixture string
 		prefix  string
@@ -131,19 +132,37 @@ func TestDefaultCatalog_GeneratedEpochDenialsMatchSourceUnion(t *testing.T) {
 
 			profile, ok := catalog.Get(profileName)
 			require.True(t, ok)
-			selector := profile.AutogenSelector()
-			require.NotNil(t, selector)
-			var deniedCreated []string
-			for _, name := range selector.Deny {
+			var droppedCreated []string
+			for _, name := range exactProfileRelabelDropMatches(t, profile) {
 				if strings.HasSuffix(name, "_created") {
-					deniedCreated = append(deniedCreated, name)
+					droppedCreated = append(droppedCreated, name)
 				}
 			}
-			slices.Sort(deniedCreated)
-			require.Equal(t, sourceCreated, deniedCreated,
-				"stock profile generated-epoch denials must exactly track the external source union")
+			slices.Sort(droppedCreated)
+			require.Equal(t, sourceCreated, droppedCreated,
+				"stock profile generated-epoch drops must exactly track the external source union")
 		})
 	}
+}
+
+func exactProfileRelabelDropMatches(t *testing.T, profile Profile) []string {
+	t.Helper()
+
+	blocks, err := profile.Relabeling()
+	require.NoError(t, err)
+	var names []string
+	for _, block := range blocks {
+		if len(block.MetricRelabelConfigs) != 1 || block.MetricRelabelConfigs[0].WithDefaults().Action != relabel.Drop {
+			continue
+		}
+		for _, name := range strings.Fields(block.Match) {
+			require.Truef(t, isExactPrometheusMetricName(name),
+				"profile %q drop-only relabel scope %q must contain exact metric names", profile.Name, name)
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names
 }
 
 func readPrometheusTypes(t *testing.T, relativePath string) map[string]string {
@@ -167,11 +186,14 @@ func readPrometheusTypes(t *testing.T, relativePath string) map[string]string {
 
 func TestDefaultCatalog_AllStockProfilesPreserveUnknownFutureFamilies(t *testing.T) {
 	want := map[string]string{
-		"ceph":     "ceph_netdata_future_metric",
-		"haproxy":  "haproxy_netdata_future_metric",
-		"litellm":  "litellm_netdata_future_metric",
-		"vllm":     "vllm:netdata_future_metric",
-		"vllm_ray": "ray_vllm_netdata_future_metric",
+		"ceph":            "ceph_netdata_future_metric",
+		"fastapi":         "http_requests_netdata_future_metric",
+		"haproxy":         "haproxy_netdata_future_metric",
+		"litellm":         "litellm_netdata_future_metric",
+		"process_runtime": "process_netdata_future_metric",
+		"python_gc":       "python_gc_netdata_future_metric",
+		"vllm":            "vllm:netdata_future_metric",
+		"vllm_ray":        "ray_vllm_netdata_future_metric",
 	}
 	catalog, err := LoadFromDefaultDirs()
 	require.NoError(t, err)
@@ -359,13 +381,19 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 	require.NoError(t, err)
 
 	type disposition struct {
-		metadataPath  string
-		integrationID string
+		metadataPath         string
+		integrationID        string
+		mustReferenceProfile bool
 	}
 	dispositions := map[string]disposition{
 		"ceph": {
 			metadataPath:  "../metadata.yaml",
 			integrationID: "collector-go.d.plugin-prometheus-ceph",
+		},
+		"fastapi": {
+			metadataPath:         "../metadata.yaml",
+			integrationID:        "collector-go.d.plugin-prometheus-vllm",
+			mustReferenceProfile: true,
 		},
 		"haproxy": {
 			metadataPath:  "../../haproxy/metadata.yaml",
@@ -374,6 +402,16 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 		"litellm": {
 			metadataPath:  "../metadata.yaml",
 			integrationID: "collector-go.d.plugin-prometheus-litellm",
+		},
+		"process_runtime": {
+			metadataPath:         "../metadata.yaml",
+			integrationID:        "collector-go.d.plugin-prometheus-ceph",
+			mustReferenceProfile: true,
+		},
+		"python_gc": {
+			metadataPath:         "../metadata.yaml",
+			integrationID:        "collector-go.d.plugin-prometheus-litellm",
+			mustReferenceProfile: true,
 		},
 		"vllm": {
 			metadataPath:  "../metadata.yaml",
@@ -399,5 +437,9 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 		require.NoErrorf(t, err, "read metadata disposition for stock profile %q", name)
 		require.Containsf(t, string(content), "id: "+disposition.integrationID,
 			"metadata disposition for stock profile %q must reference integration %q", name, disposition.integrationID)
+		if disposition.mustReferenceProfile {
+			require.Containsf(t, string(content), "- name: "+name,
+				"metadata disposition for shared stock profile %q must select that profile", name)
+		}
 	}
 }

@@ -17,15 +17,14 @@ emits the complete union.
 Inventory reconciliation compares the exact raw-family and authored-selector sets. This distinguishes source coverage from
 the human decision to keep replica and worker labels as identity while treating bounded outcomes as dimensions.
 
-## Job-policy case
+## Without-job case
 
-The no-job case makes duplicate-suppression behavior explicit. The recommended job removes source-known Ray counter-as-gauge
-compatibility aliases and pre-canonical KV-offload duplicates while retaining canonical observations. Unknown future
-Ray-vLLM families remain open to fallback. The executable case, not this prose, owns the resulting verdict, counts, and
-findings.
+The no-job case proves that the profile removes source-known Ray counter-as-gauge compatibility aliases and pre-canonical
+KV-offload duplicates while retaining canonical observations. No application sample job policy is required, and unknown
+future Ray-vLLM families remain open to fallback. The executable case, not this prose, owns the resulting behavior.
 
 ## Interpretation limits
 
 - Information gauges rejected by the writer retain their lost configuration questions in the semantic inventory.
 - The fixture proves a source-derived transport contract, not live Ray enablement or one deployment's cardinality.
-- A future authorized Ray rollout can add operational evidence without changing the pinned source-completeness boundary.
+- A future authorized Ray rollout can add operational evidence without changing the declared source-completeness boundary.

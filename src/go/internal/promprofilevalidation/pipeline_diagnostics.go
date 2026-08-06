@@ -28,21 +28,27 @@ type validationRelabelStage struct {
 
 func validationRelabelStages(
 	policy jobPolicy,
-	profile promprofiles.Profile,
+	profiles []promprofiles.Profile,
 ) ([]validationRelabelStage, error) {
-	profileBlocks, err := profile.Relabeling()
-	if err != nil {
-		return nil, err
-	}
-	return []validationRelabelStage{
-		{stage: promcollector.PipelineRelabelStageJob, blocks: policy.Relabeling},
-		{
+	stages := []validationRelabelStage{{
+		stage:  promcollector.PipelineRelabelStageJob,
+		blocks: policy.Relabeling,
+	}}
+	offset := len(policy.Relabeling)
+	for _, profile := range profiles {
+		profileBlocks, err := profile.Relabeling()
+		if err != nil {
+			return nil, fmt.Errorf("profile %q relabeling: %w", profile.Name, err)
+		}
+		stages = append(stages, validationRelabelStage{
 			stage:   promcollector.PipelineRelabelStageProfile,
 			profile: profile.Name,
 			blocks:  profileBlocks,
-			offset:  len(policy.Relabeling),
-		},
-	}, nil
+			offset:  offset,
+		})
+		offset += len(profileBlocks)
+	}
+	return stages, nil
 }
 
 type pipelineBlockSampleKey struct {
@@ -78,16 +84,15 @@ type pipelineDiagnosticSummary struct {
 	destinations         map[pipelineDestinationOccurrence]map[pipelineDestinationOccurrence]struct{}
 	typedRejects         map[string]struct{}
 	selectedProfiles     map[string]struct{}
-	profileName          string
 	profileRelabelBlocks int
 }
 
 func newPipelineDiagnosticSummary(
 	policy jobPolicy,
-	profile promprofiles.Profile,
+	profiles []promprofiles.Profile,
 	batch prompkg.SampleBatch,
 ) (*pipelineDiagnosticSummary, error) {
-	stages, err := validationRelabelStages(policy, profile)
+	stages, err := validationRelabelStages(policy, profiles)
 	if err != nil {
 		return nil, err
 	}
@@ -104,23 +109,26 @@ func newPipelineDiagnosticSummary(
 				rawSamples:        make(map[prompkg.RawSampleIdentity]struct{}),
 			},
 		},
-		blockInputLabels:     make(map[pipelineBlockSampleKey]map[string]struct{}),
-		sourcesByFamily:      make(map[string]map[prompkg.SampleSeriesIdentity]struct{}),
-		writerAccepted:       make(map[pipelineDestinationOccurrence]struct{}),
-		writerFamilyRejects:  make(map[string]promcollector.PipelineReason),
-		writerSeriesRejects:  make(map[pipelineDestinationOccurrence]promcollector.PipelineReason),
-		selectorRejected:     make(map[prompkg.RawSampleIdentity]struct{}),
-		rawAccepted:          make(map[prompkg.RawSampleIdentity]struct{}),
-		originsByRaw:         make(map[prompkg.RawSampleIdentity]pipelineDestinationOccurrence),
-		originsBySource:      make(map[prompkg.SampleSeriesIdentity]map[pipelineDestinationOccurrence]struct{}),
-		relabelDropped:       make(map[pipelineDestinationOccurrence]map[pipelineRelabelLocation]promcollector.PipelineDiagnostic),
-		blockEntries:         make(map[pipelineDestinationOccurrence]map[pipelineRelabelLocation]string),
-		rulesEvaluated:       make(map[pipelineDestinationOccurrence]map[pipelineRuleKey]promcollector.PipelineDiagnostic),
-		destinations:         make(map[pipelineDestinationOccurrence]map[pipelineDestinationOccurrence]struct{}),
-		typedRejects:         make(map[string]struct{}),
-		selectedProfiles:     make(map[string]struct{}),
-		profileName:          profile.Name,
-		profileRelabelBlocks: len(stages[1].blocks),
+		blockInputLabels:    make(map[pipelineBlockSampleKey]map[string]struct{}),
+		sourcesByFamily:     make(map[string]map[prompkg.SampleSeriesIdentity]struct{}),
+		writerAccepted:      make(map[pipelineDestinationOccurrence]struct{}),
+		writerFamilyRejects: make(map[string]promcollector.PipelineReason),
+		writerSeriesRejects: make(map[pipelineDestinationOccurrence]promcollector.PipelineReason),
+		selectorRejected:    make(map[prompkg.RawSampleIdentity]struct{}),
+		rawAccepted:         make(map[prompkg.RawSampleIdentity]struct{}),
+		originsByRaw:        make(map[prompkg.RawSampleIdentity]pipelineDestinationOccurrence),
+		originsBySource:     make(map[prompkg.SampleSeriesIdentity]map[pipelineDestinationOccurrence]struct{}),
+		relabelDropped:      make(map[pipelineDestinationOccurrence]map[pipelineRelabelLocation]promcollector.PipelineDiagnostic),
+		blockEntries:        make(map[pipelineDestinationOccurrence]map[pipelineRelabelLocation]string),
+		rulesEvaluated:      make(map[pipelineDestinationOccurrence]map[pipelineRuleKey]promcollector.PipelineDiagnostic),
+		destinations:        make(map[pipelineDestinationOccurrence]map[pipelineDestinationOccurrence]struct{}),
+		typedRejects:        make(map[string]struct{}),
+		selectedProfiles:    make(map[string]struct{}),
+	}
+	for _, stage := range stages {
+		if stage.stage == promcollector.PipelineRelabelStageProfile {
+			summary.profileRelabelBlocks += len(stage.blocks)
+		}
 	}
 
 	addAudits := func(stage promcollector.PipelineRelabelStage, profileName string, blocks []relabel.Block) {
@@ -194,9 +202,6 @@ func (s *pipelineDiagnosticSummary) observe(fact promcollector.PipelineDiagnosti
 		}
 		origins[occurrence] = struct{}{}
 	case promcollector.PipelineRelabelBlockEntered:
-		if fact.RelabelStage == promcollector.PipelineRelabelStageProfile && fact.ProfileName != s.profileName {
-			return
-		}
 		occurrence := diagnosticOccurrence(fact)
 		location := diagnosticLocation(fact)
 		entries := s.blockEntries[occurrence]
@@ -221,9 +226,6 @@ func (s *pipelineDiagnosticSummary) observe(fact promcollector.PipelineDiagnosti
 			labels[name] = struct{}{}
 		}
 	case promcollector.PipelineRelabelRuleEvaluated:
-		if fact.RelabelStage == promcollector.PipelineRelabelStageProfile && fact.ProfileName != s.profileName {
-			return
-		}
 		occurrence := diagnosticOccurrence(fact)
 		location := diagnosticLocation(fact)
 		rules := s.rulesEvaluated[occurrence]
@@ -248,9 +250,6 @@ func (s *pipelineDiagnosticSummary) observe(fact promcollector.PipelineDiagnosti
 			audit.rawSamples[fact.RawIdentity] = struct{}{}
 		}
 	case promcollector.PipelineRelabelDropped:
-		if fact.RelabelStage == promcollector.PipelineRelabelStageProfile && fact.ProfileName != s.profileName {
-			return
-		}
 		occurrence := diagnosticOccurrence(fact)
 		location := diagnosticLocation(fact)
 		drops := s.relabelDropped[occurrence]
@@ -267,9 +266,6 @@ func (s *pipelineDiagnosticSummary) observe(fact promcollector.PipelineDiagnosti
 			drops.rawSamples[fact.RawIdentity] = struct{}{}
 		}
 	case promcollector.PipelineRelabelOutput:
-		if fact.RelabelStage == promcollector.PipelineRelabelStageProfile && fact.ProfileName != s.profileName {
-			return
-		}
 		source := diagnosticOccurrence(fact)
 		destination := pipelineDestinationOccurrence{
 			series: fact.Destination,

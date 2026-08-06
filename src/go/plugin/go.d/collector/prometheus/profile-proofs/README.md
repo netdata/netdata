@@ -4,7 +4,7 @@
 
 This directory contains compact proofs for stock Prometheus profiles whose supported source surface cannot be established
 from one live endpoint. Bulky machine-readable evidence lives in [`netdata/testdata`](https://github.com/netdata/testdata)
-under `prometheus/profiles/<revision>/`.
+under `prometheus/profiles/<profile>/`.
 
 ## Single-owner artifact contract
 
@@ -16,17 +16,23 @@ under `prometheus/profiles/<revision>/`.
   fixtures, verdicts, counts, findings, or per-profile commands.
 - `VALIDATION-JOB.yaml` is the sanitized structured job-policy input. Its deployable fields mirror the recommended metadata
   example without endpoint, authentication, or profile-selection settings. Optional `future_inputs` are validation-only.
-- `proof.yaml` is the machine assertion oracle. It owns the external revision and manifest digest, source-inventory
-  expectations, metadata example/job identity, named replay cases, expected verdicts/counts/findings, and local integrity
-  digests. Fixed paths are derived from profile/revision and are not repeated in the descriptor.
+- `proof.yaml` is the machine assertion oracle. It owns supporting-profile composition, per-case composition exceptions,
+  source-inventory expectations, metadata example/job identity, named replay cases, expected verdicts/counts/findings, and
+  local integrity digests. Fixed local and latest-testdata paths are derived from the profile and are not repeated in the
+  descriptor.
 - External `SOURCE-INVENTORY.tsv` is the binding exact source-family/selector ledger. Each row records provenance, semantic
-  classification, and its chart, job-exclusion, or writer-ineligible disposition.
-- External `fixtures/*.prom` are sanitized replay inputs. External `manifest.yaml` authenticates the complete immutable
-  evidence directory.
+  classification, and its chart, profile/job exclusion, or writer-ineligible disposition.
+- External `fixtures/*.prom` are sanitized replay inputs. The descriptor declares every consumed fixture, and verification
+  rejects missing, extra, symlinked, or non-regular files in the external profile directory.
 
 Tests discover `proof.yaml`; there is no separate registry. Replay checks every declared case, compares all expected machine
 facts and finding codes, verifies inventory totals, and reconciles exact raw-family and authored-selector sets for the single
 source-complete case.
+
+Every case uses the candidate plus all descriptor-declared supporting profiles by default. The source-complete case MUST
+retain that full composition. A supplemental partial-producer fixture that intentionally contains none of a support
+profile's namespace MAY declare `composition: candidate_only`; strict dead-chart and coverage checks still apply to the
+candidate, while the absent support is not staged artificially.
 
 ## Evidence boundary
 
@@ -43,11 +49,11 @@ future exporter additions.
 ## External testdata contract
 
 - Tests use the latest `netdata/testdata` `master`, cloned into the ignored `src/go/testdata` directory. Netdata stores no
-  testdata commit lock.
-- A referenced external path is immutable. Evidence changes MUST add a new revision directory and update `proof.yaml`; they
-  MUST NOT rewrite or delete a path referenced by a merged Netdata commit.
-- Latest `master` is the transport. The pinned manifest digest, immutable paths, and per-file digests are the reproducibility
-  boundary.
+  testdata commit or content lock.
+- Each profile uses one stable `prometheus/profiles/<profile>/` directory. Update that directory and the corresponding
+  Netdata proof expectations together when exporter coverage or validation behavior changes.
+- Historical Netdata checkouts are not guaranteed to validate against later testdata master content. Exact replay and
+  source-inventory reconciliation are the drift boundary for the current validator.
 - Ordinary tests do not access the network. External-dependent tests skip when the checkout is absent; required CI sets
   `NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1`, so missing or invalid evidence fails.
 
@@ -88,5 +94,5 @@ After deliberate changes to proof artifacts, refresh integrity metadata:
 .agents/skills/project-prometheus-profiles/scripts/proof-bundle.py refresh
 ```
 
-`refresh` verifies the external manifest and source-inventory expectations, then rewrites only descriptor integrity metadata.
+`refresh` verifies external directory layout and source-inventory expectations, then rewrites only local integrity metadata.
 It does not run the validator or accept changed expected behavior.

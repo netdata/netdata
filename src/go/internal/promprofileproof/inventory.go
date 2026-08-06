@@ -97,6 +97,8 @@ func LoadSourceInventory(path string) (SourceInventory, error) {
 		case "chart":
 			inventory.Dispositions.Chart++
 			inventory.AuthoredSelectors[record[inventoryAuthoredSelectorColumn]] = struct{}{}
+		case "profile-excluded":
+			inventory.Dispositions.ProfileExcluded++
 		case "job-excluded":
 			inventory.Dispositions.JobExcluded++
 		case "writer-ineligible":
@@ -128,6 +130,7 @@ func (i SourceInventory) VerifyExpected(expected SourceInventoryExpected) error 
 		{"source_families", actual.SourceFamilies, expected.SourceFamilies},
 		{"authored_selectors", actual.AuthoredSelectors, expected.AuthoredSelectors},
 		{"dispositions.chart", actual.Dispositions.Chart, expected.Dispositions.Chart},
+		{"dispositions.profile_excluded", actual.Dispositions.ProfileExcluded, expected.Dispositions.ProfileExcluded},
 		{"dispositions.job_excluded", actual.Dispositions.JobExcluded, expected.Dispositions.JobExcluded},
 		{"dispositions.writer_ineligible", actual.Dispositions.WriterIneligible, expected.Dispositions.WriterIneligible},
 	} {

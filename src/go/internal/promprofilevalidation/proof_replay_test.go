@@ -30,13 +30,18 @@ func TestStockProfileProofsReplay(t *testing.T) {
 			for _, validationCase := range bundle.Descriptor.Validation.Cases {
 				t.Run(validationCase.Name, func(t *testing.T) {
 					profilePath := filepath.Join(repoRoot, filepath.FromSlash(bundle.ProfilePath()))
+					caseSupportPaths := bundle.SupportingProfilePathsForCase(validationCase)
+					supportingProfilePaths := make([]string, 0, len(caseSupportPaths))
+					for _, path := range caseSupportPaths {
+						supportingProfilePaths = append(supportingProfilePaths, filepath.Join(repoRoot, filepath.FromSlash(path)))
+					}
 					dumpPath := promtestdata.Require(t, bundle.FixturePath(validationCase))
 					jobPath := ""
 					if validationCase.Job == "validation" {
 						jobPath = filepath.Join(repoRoot, filepath.FromSlash(bundle.ValidationJobPath()))
 					}
 
-					result := runValidationFiles(t, profilePath, dumpPath, jobPath)
+					result := runValidationFilesWithSupports(t, profilePath, supportingProfilePaths, dumpPath, jobPath)
 					assertExpectedResult(t, bundle, validationCase, result)
 					if validationCase.Kind == "source_complete" {
 						assertSourceCompleteInventory(t, bundle, result.report)

@@ -30,9 +30,9 @@ it produces a warning because collector defaults may not match deployment.
 Stock-profile fixtures and generated source inventories live in
 [`netdata/testdata`](https://github.com/netdata/testdata). Clone its latest
 `master` into the ignored `src/go/testdata` directory, or set
-`NETDATA_TESTDATA_DIR` to another checkout. Referenced evidence paths are
-immutable; their manifest size and SHA-256 are pinned by the compact proof in
-Netdata, and the external manifest pins every evidence file.
+`NETDATA_TESTDATA_DIR` to another checkout. Each profile uses one stable external
+directory; update latest testdata and the corresponding Netdata proof expectations
+together.
 For an existing default checkout, shallow-fetch `origin master` and detach at
 the fetched tip before replay. Local feature branches remain unchanged.
 
@@ -51,8 +51,8 @@ NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
 ```
 
 `go run ./tools/prometheus-profile-proof verify --repo-root ../..` verifies the
-discovered stock-proof descriptors, strict source-inventory expectations, and
-the complete local/external integrity chain.
+discovered stock-proof descriptors, local integrity, exact external directory
+contents, and strict source-inventory expectations.
 
 Exit codes:
 
@@ -187,8 +187,7 @@ For the supplied dump and job policy, a pass establishes that:
   and effective contexts do not normalize to empty;
 - observed dynamic dimension names do not collapse into duplicate emitted wire
   IDs or sanitize to an omitted empty ID;
-- every chart declares an explicit positive priority and priorities do not
-  decrease in source order;
+- every chart omits explicit priority so all use the common runtime default;
 - every chart has at least one visible dimension;
 - histogram bucket charts use observation-rate units and incremental semantics;
   and
@@ -341,7 +340,7 @@ policy even when the current fixture has no coverage gap:
 `authored_mapping` reports the effective profile in source order:
 
 - composed displayed family;
-- title, context, units, authored algorithm intent, type, and priority;
+- title, context, units, authored algorithm intent, and type;
 - effective `instances.by_labels` after inheritance; and
 - exact dimension selectors, static/dynamic naming mechanisms, and visibility.
 
@@ -365,7 +364,6 @@ Warnings identify designs that deserve explanation but can be correct:
 - profile `match` expressions that also accept common `go_*`, `http_*`,
   `process_*`, or `python_*` families and can therefore auto-select on an
   unrelated endpoint;
-- duplicate priorities, whose runtime placement falls back to chart-ID order;
 - open-ended `instances.by_labels: ['*']` identity;
 - repeated non-empty sibling family names, which compose the same displayed
   navigation path instead of distinct semantic branches;
@@ -398,8 +396,8 @@ Warnings identify designs that deserve explanation but can be correct:
   least 20x and may flatten the smaller signal.
 
 The validator does not turn these heuristics into policy. For example, sibling
-families can intentionally represent different entity levels, a leaf can mark
-an intentional filter boundary, and tied priorities can be deliberate.
+families can intentionally represent different entity levels, and a leaf can
+mark an intentional filter boundary.
 Identity findings report effective label keys only; they cannot determine the
 application's entity types or invent a missing label. A label can be
 intentionally aggregated, but its lost comparison/filtering and expected
@@ -409,7 +407,7 @@ ordinary request rate usually does not.
 The exclusion summary prevents a mechanically clean report from hiding a
 shrinking denominator among many per-rule warnings. It remains advisory because
 the tool cannot prove why the user chose a collection boundary. Dashboard focus
-alone is not a collection boundary: use hierarchy and priority rather than
+alone is not a collection boundary: use hierarchy and coherent chart composition rather than
 discarding distinct writer-capable diagnostics.
 
 Relabel discard warnings consume facts emitted while the production processor

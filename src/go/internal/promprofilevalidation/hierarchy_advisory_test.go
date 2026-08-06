@@ -143,7 +143,6 @@ template:
         - title: Node Value
           context: node_value
           units: values
-          priority: 100
           instances:
             by_labels: [node]
           dimensions:
@@ -155,7 +154,6 @@ template:
         - title: Global Value
           context: global_value
           units: values
-          priority: 110
           dimensions:
             - selector: app_global_value
               name: value
@@ -184,7 +182,6 @@ template:
         - title: One
           context: one
           units: values
-          priority: 100
           dimensions:
             - selector: app_one
               name: one
@@ -194,7 +191,6 @@ template:
         - title: Two
           context: two
           units: values
-          priority: 110
           dimensions:
             - selector: app_two
               name: two
@@ -220,14 +216,12 @@ template:
     - title: Global Value
       context: global_value
       units: values
-      priority: 100
       dimensions:
         - selector: app_global_value
           name: value
     - title: Server Value
       context: server_value
       units: values
-      priority: 110
       instances:
         by_labels: [server]
       dimensions:
@@ -260,7 +254,6 @@ template:
       family: Servers
       context: server_value
       units: values
-      priority: 100
       dimensions:
         - selector: app_server_value
           name: value
@@ -268,7 +261,6 @@ template:
       family: Databases
       context: database_value
       units: values
-      priority: 110
       instances:
         by_labels: [database]
       dimensions:
@@ -303,7 +295,6 @@ template:
     - title: Database Value
       context: database_value
       units: values
-      priority: 100
       instances:
         by_labels: ['*', '!server']
       dimensions:
@@ -340,7 +331,6 @@ template:
         - title: Database Value
           context: database_value
           units: values
-          priority: 100
           dimensions:
             - selector: app_database_value
               name: value
@@ -370,7 +360,6 @@ template:
     - title: Server Value
       context: server_value
       units: values
-      priority: 100
       dimensions:
         - selector: app_server_value
           name: value
@@ -384,7 +373,6 @@ template:
         - title: Database Value
           context: database_value
           units: values
-          priority: 110
           dimensions:
             - selector: app_database_value
               name: value
@@ -398,7 +386,6 @@ template:
             - title: Table Value
               context: table_value
               units: values
-              priority: 120
               dimensions:
                 - selector: app_table_value
                   name: value
@@ -434,7 +421,6 @@ template:
           context: reads
           units: operations/s
           algorithm: incremental
-          priority: 100
           dimensions:
             - selector: app_reads
               name: reads
@@ -445,7 +431,6 @@ template:
           context: writes
           units: operations/s
           algorithm: incremental
-          priority: 110
           dimensions:
             - selector: app_writes
               name: writes

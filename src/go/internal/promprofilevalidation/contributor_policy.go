@@ -139,7 +139,7 @@ func addForwardCompatibilityChecks(
 			"When a recommended job has an allow list, copy profile.match, copy each positive wildcard term unchanged into an unconstrained allow expression, or use '*'. Synthetic probes alone cannot prove an allowlist is open to every future name.",
 		)
 	}
-	stages, err := validationRelabelStages(policy, profile)
+	stages, err := validationRelabelStages(policy, []promprofiles.Profile{profile})
 	if err != nil {
 		return err
 	}

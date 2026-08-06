@@ -69,7 +69,6 @@ template:
       units: items
       algorithm: absolute
       type: line
-      priority: 100
       dimensions:
         - selector: app_capacity_bucket
           name: capacity
@@ -102,7 +101,6 @@ template:
     - title: Invisible
       context: invisible
       units: items
-      priority: 100
       dimensions:
         - selector: app_current
           name: current
@@ -129,7 +127,6 @@ template:
     - title: Current and Capacity
       context: current_capacity
       units: items
-      priority: 100
       dimensions:
         - selector: app_current
           name: current
@@ -157,7 +154,6 @@ template:
     - title: Current and Capacity
       context: current_capacity
       units: items
-      priority: 100
       dimensions:
         - selector: app_current
           name: current
@@ -188,7 +184,6 @@ template:
       context: waiting
       units: requests
       type: stacked
-      priority: 100
       dimensions:
         - selector: app_waiting
           name_from_label: reason
@@ -216,7 +211,6 @@ template:
       units: bytes/s
       algorithm: incremental
       type: area
-      priority: 100
       dimensions:
         - selector: app_read_bytes_total
           name: read
@@ -251,7 +245,6 @@ template:
       context: resident_memory
       units: MiB
       type: area
-      priority: 100
       dimensions:
         - selector: app_resident_memory_bytes
           name: resident

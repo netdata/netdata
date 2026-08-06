@@ -17,9 +17,10 @@ import (
 // Options identifies one profile, source-complete exposition dump, and
 // optional safe job-shaping policy to validate.
 type Options struct {
-	ProfilePath string
-	DumpPath    string
-	JobPath     string
+	ProfilePath            string
+	SupportingProfilePaths []string
+	DumpPath               string
+	JobPath                string
 }
 
 type jobPolicy struct {
@@ -105,16 +106,20 @@ func validateJobPolicyTopLevel(raw []byte) error {
 	return nil
 }
 
-func applyJobPolicy(coll *promcollector.Collector, policy jobPolicy, fileURL, profileName string) effectiveJobReport {
+func applyJobPolicy(coll *promcollector.Collector, policy jobPolicy, fileURL string, profileNames []string) effectiveJobReport {
 	coll.Config = policy.Config
 	if coll.Name == "" {
 		coll.Name = "profile_validation"
 	}
 	coll.URL = fileURL
+	entries := make([]promcollector.ProfileEntryConfig, 0, len(profileNames))
+	for _, name := range profileNames {
+		entries = append(entries, promcollector.ProfileEntryConfig{Name: name})
+	}
 	coll.Profiles = promcollector.ProfilesConfig{
 		Mode: "exact",
 		ModeExact: &promcollector.ProfilesModeConfig{
-			Entries: []promcollector.ProfileEntryConfig{{Name: profileName}},
+			Entries: entries,
 		},
 	}
 

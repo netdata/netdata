@@ -39,7 +39,6 @@ template:
     - title: Availability
       context: availability
       units: state
-      priority: 100
       dimensions:
         - selector: exporter_up
           name: up
@@ -193,7 +192,7 @@ make a stale or excluded family look intentionally covered.
 ## Charts control presentation and identity
 
 Required chart fields are `title`, `context`, `units`, and at least one
-`dimension`. This skill additionally requires an explicit positive `priority`.
+`dimension`. Stock Prometheus profiles MUST omit `priority`.
 
 Optional fields include:
 
@@ -220,14 +219,12 @@ algorithm makes compilation possible.
 Priority behavior:
 
 - omitted or non-positive priority becomes `70000`;
-- YAML position does not become runtime priority;
-- the planner materializes chart IDs in sorted ID order, not profile order.
+- every Prometheus chart intentionally uses that same runtime value;
+- YAML position does not become runtime or UI presentation order;
+- UI sorting is outside the profile contract.
 
-Therefore every chart needs an explicit positive priority. Keep source order
-aligned with intended presentation and never decrease priority as the profile
-proceeds. Unique increasing values are usually the clearest total order, while
-intentional ties remain a design choice because runtime placement then falls
-back to chart-ID ordering.
+Therefore omit `priority`. Keep source order coherent for review without
+claiming that it controls presentation.
 
 Presentation rules checked by the profile-validation tool:
 

@@ -99,8 +99,8 @@ The authored dashboard follows the causal order above. Within each owner, state/
 exact observation counts, and accumulated sums. Core engine, endpoint, parser, connector-operation, and global service
 surfaces use their separately proven identities rather than one universal label key.
 
-The source inventory is the binding exact mapping from source family and logical component to chart, job exclusion, or writer
-limitation. It also records availability gates, lost questions, and source paths. This document intentionally does not repeat
+The source inventory is the binding exact mapping from source family and logical component to chart, profile exclusion, or
+writer limitation. It also records availability gates, lost questions, and source paths. This document intentionally does not repeat
 that per-family ledger.
 
 ## Forward compatibility

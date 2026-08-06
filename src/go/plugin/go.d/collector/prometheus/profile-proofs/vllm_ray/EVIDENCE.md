@@ -29,8 +29,8 @@ descriptor-backed replay tests.
 - The committed fixture is a sanitized source-derived structural union. No live Ray deployment was used or claimed.
 - The fixture combines mutually optional vLLM capabilities and Ray alias behavior with synthetic, non-production identities
   and values.
-- The external source inventory is the exact source-to-disposition ledger. The external manifest authenticates the inventory
-  and fixture; `proof.yaml` pins that manifest.
+- The external source inventory is the exact source-to-disposition ledger. `proof.yaml` declares the consumed fixture and
+  verifies the latest external directory as one complete input set.
 
 ## Limitations
 

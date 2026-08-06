@@ -21,7 +21,7 @@ good result; neither is a beautiful design that the runtime cannot materialize.
 A request to create a profile delegates routine research and dashboard-design
 judgment to the author. Complete the profile, job policy, reasoning summary, and
 validation without asking the user to choose ordinary family names, chart
-boundaries, identities, or priorities. Ask only when evidence cannot resolve a
+boundaries, or identities. Ask only when evidence cannot resolve a
 real product boundary, the requested evidence is unavailable, or the next step
 would change a production system. Otherwise, stopping for confirmation defeats
 the purpose of using model judgment.
@@ -251,8 +251,10 @@ A Netdata profile must encode those relationships into the metrics metadata:
 - `instances.by_labels` defines the complete unique key for each monitored
   entity instance;
 - dimensions define bounded aspects compared on one chart;
-- promoted ownership and descriptive labels provide filterable metadata; and
-- priority defines the reading order.
+- promoted ownership and descriptive labels provide filterable metadata.
+
+Prometheus profiles do not own chart sorting. They omit `priority`; every chart
+receives the same runtime default and the UI chooses its presentation order.
 
 The complete instance key can include an ownership path without changing the
 semantic leaf type. For example, `{database, table}` may identify one table when
@@ -346,7 +348,7 @@ information architecture accidentally.
 After YAML authoring, reconcile every selector against the validator's generated
 `authored_mapping` and record the exact mapping once in `SOURCE-INVENTORY.tsv`.
 An intended hierarchy in prose is not evidence that the emitted family,
-identity, units, and priority implement it. See `ownership-proof.md` for the
+identity, and units implement it. See `ownership-proof.md` for the
 required source evidence, conflict reasoning, and executable reconciliation.
 
 ### Group diagnostic roles under their owner
@@ -495,7 +497,7 @@ acceptable only when at least one of these cases is evidenced:
 Writer-rejected families are pipeline limitations, not successful job
 exclusions. “Dashboard focus,” “deep-dive metric,” “too many charts,”
 correlation with another signal, or making validation pass are not exclusion
-cases. Achieve focus with hierarchy and priority; filtering changes the
+cases. Achieve focus with hierarchy and coherent chart composition; filtering changes the
 evidence available for troubleshooting.
 
 Treat redundancy as a claim that needs proof, not as a visual resemblance:
@@ -645,21 +647,14 @@ ground truth.
 
 Required authoring policy:
 
-- Every chart MUST have an explicit positive `priority`.
-- YAML family/chart order MUST mirror intended dashboard presentation order.
-- Explicit priorities MUST NOT decrease as the profile is read in YAML order.
+- Every chart MUST omit `priority`. All Prometheus charts receive the same
+  runtime default; sorting is a UI concern outside the profile contract.
 - Discrete work/event, count, state, and time charts MUST use `line`.
   `area`/`stacked` MAY be used only when fill represents physical volume,
   space, bandwidth, or I/O rather than merely categories that add to a total.
-- Prefer unique, increasing priorities when the dashboard has a total order.
-  A deliberate tie is valid when a total order is unnecessary, but it deserves
-  review because runtime placement then falls back to unrelated chart IDs.
 
-Why: omitted or zero priorities all become `70000`; the planner does not derive
-priority from YAML order. Explicit values force the author to decide the
-operator journey. Matching source and presentation order makes that reasoning
-reviewable; decreasing priorities contradict the journey expressed by the
-file.
+YAML family/chart order SHOULD remain coherent for human review, but it MUST
+NOT be described as runtime or UI presentation order.
 
 Coverage and chart composition are separate decisions. A complete profile MUST
 account for every current writer-surviving flattened bucket, count, sum,
@@ -788,8 +783,7 @@ A `PASS` proves, for that evidence:
 - public chart emission finds no chart-ID, context, or dynamic-dimension
   normalization collision or omission;
 - structured route diagnostics account for every scanned writer series;
-- every chart has an explicit positive priority and priorities do not decrease
-  in source order;
+- every chart omits explicit priority;
 - every chart exposes at least one visible dimension;
 - histogram bucket charts use incremental observation-rate semantics; and
 - unambiguously non-volume charts do not use filled presentation.
@@ -805,7 +799,7 @@ metric-name normalization is reconciled by logical identity and reported under
 `pipeline_renamed`, never as source loss.
 The `authored_mapping` section lists the actual source-ordered
 selector-to-displayed-family mapping, including effective inherited instance
-identity, units, algorithm intent, naming mechanisms, and priority. It is the
+identity, units, algorithm intent, and naming mechanisms. It is the
 objective input to the operator-ownership reconciliation; it does not score
 whether the chosen application model is good.
 A pipeline-policy exclusion summary shows how much otherwise writer-capable evidence
@@ -874,7 +868,7 @@ Review the rendered design, not merely the YAML:
   actually preserves X, rather than aggregating it away?
 - Does each exclusion identify the lost operator question, authoritative
   semantic evidence, and deployment scope over which the loss is safe?
-- Are presentation order and priorities deliberately generic-to-detailed?
+- Is source order coherent for review without claiming control over UI sorting?
 
 If the validator and semantic design conflict, diagnose the runtime fact first.
 Do not weaken an objective gate to preserve an attractive but non-materializing
@@ -932,13 +926,11 @@ For a stock profile in this repository, split the durable proof by artifact clas
 - Commit compact, human-reviewable proof under
   `src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/`.
 - Commit bulky sanitized fixtures and the generated source inventory to
-  `netdata/testdata` under `prometheus/profiles/<profile-revision>/`.
-- Treat every referenced `netdata/testdata` path as immutable. Evidence changes
-  MUST add a new profile revision/directory; they MUST NOT rewrite or delete a
-  path used by a merged Netdata commit.
-- Use latest `netdata/testdata` `master`. Do not add a commit lock to Netdata.
-  The compact proof's manifest digest plus the external manifest's per-file
-  sizes and SHA-256 hashes provide the reproducibility boundary.
+  `netdata/testdata` under the stable `prometheus/profiles/<profile>/` path.
+- Use latest `netdata/testdata` `master`. Do not add a commit/content lock or
+  versioned evidence directories to Netdata. Update external evidence and its
+  Netdata proof expectations together; historical checkouts are not guaranteed
+  to validate against later testdata content.
 
 The compact proof contains:
 
@@ -951,9 +943,13 @@ The compact proof contains:
   objective validator. Its deployable fields agree with the recommended
   metadata example; `future_inputs`, when required, are validation-only;
 - `proof.yaml` is the discovered machine descriptor. Fixed local/external paths
-  are derived from its profile/revision; it owns source-inventory expectations,
-  named replay cases, expected verdicts/counts/findings, metadata example/job
-  identity, and integrity digests; and
+  are derived from its profile; it owns explicit supporting-profile composition,
+  per-case composition exceptions, source-inventory expectations, named replay
+  cases, expected verdicts/counts/findings, metadata example/job identity, and
+  local integrity digests. Source-complete replay MUST use the candidate plus all
+  declared supports. A supplemental fixture that intentionally contains none of
+  a support profile's namespace MAY use `composition: candidate_only`; strict
+  candidate coverage/dead-chart checks still apply; and
 - `VALIDATION.md` explains how to interpret source-complete, supplemental, and
   job-policy cases without repeating their machine facts or per-profile replay
   commands.
@@ -961,9 +957,7 @@ The compact proof contains:
 The external profile-evidence directory contains:
 
 - `SOURCE-INVENTORY.tsv`, the exact source-family/selector ledger;
-- `fixtures/*.prom`, the sanitized source-complete exposition inputs; and
-- `manifest.yaml`, which records the path, kind, byte size, and SHA-256 digest
-  of every external evidence file.
+- `fixtures/*.prom`, the sanitized descriptor-declared exposition inputs.
 
 For local replay, clone the latest external data from the Netdata repository
 root:
@@ -983,9 +977,9 @@ git -C src/go/testdata switch --detach FETCH_HEAD
 testdata checkout. Ordinary tests MUST NOT fetch network data and MAY skip only
 external-dependent coverage when the checkout root is absent. A present but
 incomplete or unreadable checkout MUST fail. Dedicated CI MUST set
-`NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1`, verify the external manifest chain,
-and replay the objective validator for every stock proof so missing evidence
-fails rather than skips.
+`NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1`, verify exact external layout and
+inventory expectations, and replay the objective validator for every stock
+proof so missing evidence fails rather than skips.
 
 Use the descriptor-backed launcher from the repository root:
 
@@ -995,9 +989,10 @@ Use the descriptor-backed launcher from the repository root:
 .agents/skills/project-prometheus-profiles/scripts/proof-bundle.py refresh
 ```
 
-`refresh` verifies the external inventory/manifest contract and updates only
-integrity digests and byte counts. It MUST be run after the exact replay and
-deliberate validation-case update; it does not approve changed behavior.
+`refresh` verifies the latest external layout/inventory contract and updates
+only local integrity digests and byte counts. It MUST be run after the exact
+replay and deliberate validation-case update; it does not approve changed
+behavior.
 
 Do not substitute transient local report JSON, an uncommitted scratch document,
 or a private observed scrape for this reviewable stock proof. Raw reports MAY

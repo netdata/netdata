@@ -57,7 +57,7 @@ func addFutureOpennessChecks(
 		)
 	}
 
-	pipeline, err := newPipelineDiagnosticSummary(policy, profile, futureBatch)
+	pipeline, err := newPipelineDiagnosticSummary(policy, staged.profiles, futureBatch)
 	if err != nil {
 		return fmt.Errorf("prepare future pipeline diagnostics: %w", err)
 	}
@@ -65,7 +65,7 @@ func addFutureOpennessChecks(
 		prometheus.WithProfileCatalog(staged.catalog),
 		prometheus.WithPipelineDiagnosticObserver(pipeline.observe),
 	)
-	applyJobPolicy(coll, policy, futureURL, staged.profileName)
+	applyJobPolicy(coll, policy, futureURL, staged.profileNames)
 	if err := coll.Init(ctx); err != nil {
 		return fmt.Errorf("future collector init: %w", err)
 	}
@@ -73,8 +73,10 @@ func addFutureOpennessChecks(
 	if err := coll.Check(ctx); err != nil {
 		return fmt.Errorf("future collector check: %w", err)
 	}
-	if _, selected := pipeline.selectedProfiles[profile.Name]; !selected {
-		return fmt.Errorf("future collector did not select exact profile %q", profile.Name)
+	for _, name := range staged.profileNames {
+		if _, selected := pipeline.selectedProfiles[name]; !selected {
+			return fmt.Errorf("future collector did not select exact profile %q", name)
+		}
 	}
 	if err := collectAndCommit(ctx, coll); err != nil {
 		return fmt.Errorf("future collector cycle: %w", err)

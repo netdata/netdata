@@ -2,50 +2,53 @@
 # Source contracts: vllm-project/vllm @ dc818c198d3ff50a16f38eba567da006478239c8
 # and ray-project/ray @ 03491225d59a1ffde99c3628969ccf456be13efd (ray-2.48.0).
 # Ray prefixes vLLM instruments, adds replica/worker identity, and emits 33 deprecated
-# unsuffixed counter gauges by default; those aliases are denied to prevent duplicates.
-# Known compatibility aliases are excluded exactly; unknown future ray_vllm families
-# remain eligible for generic fallback.
+# unsuffixed counter gauges by default; profile relabeling drops those aliases to
+# prevent duplicates. Known compatibility aliases are excluded exactly; unknown
+# future ray_vllm families remain eligible for generic fallback.
 match: ray_vllm_*
 app: vllm
-autogen:
-  selector:
-    deny:
-      - ray_vllm_corrupted_requests
-      - ray_vllm_diffusion_num_canvas_positions
-      - ray_vllm_diffusion_num_committed_tokens
-      - ray_vllm_diffusion_num_denoising_steps
-      - ray_vllm_external_prefix_cache_hits
-      - ray_vllm_external_prefix_cache_queries
-      - ray_vllm_generation_tokens
-      - ray_vllm_hf3fs_num_failed_load
-      - ray_vllm_hf3fs_num_failed_save
-      - ray_vllm_kv_offload_allocation_failure
-      - ray_vllm_kv_offload_load_bytes
-      - ray_vllm_kv_offload_load_time
-      - ray_vllm_kv_offload_size
-      - ray_vllm_kv_offload_store_bytes
-      - ray_vllm_kv_offload_store_time
-      - ray_vllm_kv_offload_stores_skipped
-      - ray_vllm_kv_offload_total_bytes
-      - ray_vllm_kv_offload_total_bytes_total
-      - ray_vllm_kv_offload_total_time
-      - ray_vllm_kv_offload_total_time_total
-      - ray_vllm_mm_cache_hits
-      - ray_vllm_mm_cache_queries
-      - ray_vllm_nixl_num_failed_notifications
-      - ray_vllm_nixl_num_failed_transfers
-      - ray_vllm_nixl_num_kv_expired_reqs
-      - ray_vllm_num_preemptions
-      - ray_vllm_prefix_cache_hits
-      - ray_vllm_prefix_cache_queries
-      - ray_vllm_prompt_tokens
-      - ray_vllm_prompt_tokens_by_source
-      - ray_vllm_prompt_tokens_cached
-      - ray_vllm_request_success
-      - ray_vllm_spec_decode_num_accepted_tokens
-      - ray_vllm_spec_decode_num_accepted_tokens_per_pos
-      - ray_vllm_spec_decode_num_draft_tokens
-      - ray_vllm_spec_decode_num_drafts
+relabeling:
+  - match: >-
+      ray_vllm_corrupted_requests
+      ray_vllm_diffusion_num_canvas_positions
+      ray_vllm_diffusion_num_committed_tokens
+      ray_vllm_diffusion_num_denoising_steps
+      ray_vllm_external_prefix_cache_hits
+      ray_vllm_external_prefix_cache_queries
+      ray_vllm_generation_tokens
+      ray_vllm_hf3fs_num_failed_load
+      ray_vllm_hf3fs_num_failed_save
+      ray_vllm_kv_offload_allocation_failure
+      ray_vllm_kv_offload_load_bytes
+      ray_vllm_kv_offload_load_time
+      ray_vllm_kv_offload_size_bucket
+      ray_vllm_kv_offload_size_count
+      ray_vllm_kv_offload_size_sum
+      ray_vllm_kv_offload_store_bytes
+      ray_vllm_kv_offload_store_time
+      ray_vllm_kv_offload_stores_skipped
+      ray_vllm_kv_offload_total_bytes
+      ray_vllm_kv_offload_total_bytes_total
+      ray_vllm_kv_offload_total_time
+      ray_vllm_kv_offload_total_time_total
+      ray_vllm_mm_cache_hits
+      ray_vllm_mm_cache_queries
+      ray_vllm_nixl_num_failed_notifications
+      ray_vllm_nixl_num_failed_transfers
+      ray_vllm_nixl_num_kv_expired_reqs
+      ray_vllm_num_preemptions
+      ray_vllm_prefix_cache_hits
+      ray_vllm_prefix_cache_queries
+      ray_vllm_prompt_tokens
+      ray_vllm_prompt_tokens_by_source
+      ray_vllm_prompt_tokens_cached
+      ray_vllm_request_success
+      ray_vllm_spec_decode_num_accepted_tokens
+      ray_vllm_spec_decode_num_accepted_tokens_per_pos
+      ray_vllm_spec_decode_num_draft_tokens
+      ray_vllm_spec_decode_num_drafts
+    metric_relabel_configs:
+      - action: drop
 template:
   family: vLLM
   context_namespace: vllm
@@ -83,7 +86,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1000
           dimensions:
             - selector: ray_vllm_request_success_total
               name_from_label: finished_reason
@@ -92,7 +94,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1005
           dimensions:
             - selector: ray_vllm_corrupted_requests_total
               name: corrupted
@@ -101,7 +102,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1010
           dimensions:
             - selector: ray_vllm_time_to_first_token_seconds_bucket
         - title: End-to-End Request Latency
@@ -109,7 +109,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1020
           dimensions:
             - selector: ray_vllm_e2e_request_latency_seconds_bucket
         - title: Lifecycle Request Measurements
@@ -117,7 +116,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1030
           dimensions:
             - selector: ray_vllm_time_to_first_token_seconds_count
               name: first_token
@@ -128,7 +126,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1040
           dimensions:
             - selector: ray_vllm_time_to_first_token_seconds_sum
               name: requests
@@ -137,7 +134,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1050
           dimensions:
             - selector: ray_vllm_e2e_request_latency_seconds_sum
               name: requests
@@ -146,7 +142,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1060
           dimensions:
             - selector: ray_vllm_request_params_n_bucket
         - title: Requested Sequence Volume
@@ -154,7 +149,6 @@ template:
           units: sequences/s
           algorithm: incremental
           type: line
-          priority: 1070
           dimensions:
             - selector: ray_vllm_request_params_n_sum
               name: sequences
@@ -163,7 +157,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1080
           dimensions:
             - selector: ray_vllm_request_params_max_tokens_bucket
         - title: Requested Token Limits Sum
@@ -171,7 +164,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1090
           dimensions:
             - selector: ray_vllm_request_params_max_tokens_sum
               name: token_limits
@@ -180,7 +172,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1100
           dimensions:
             - selector: ray_vllm_request_max_num_generation_tokens_bucket
         - title: Maximum Generated Tokens Sum
@@ -188,7 +179,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1110
           dimensions:
             - selector: ray_vllm_request_max_num_generation_tokens_sum
               name: maximums
@@ -197,7 +187,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1120
           dimensions:
             - selector: ray_vllm_request_params_n_count
               name: requested_sequences
@@ -229,7 +218,6 @@ template:
           units: requests
           algorithm: absolute
           type: line
-          priority: 1130
           dimensions:
             - selector: ray_vllm_num_requests_running
               name: running
@@ -240,7 +228,6 @@ template:
           units: requests
           algorithm: absolute
           type: line
-          priority: 1140
           dimensions:
             - selector: ray_vllm_num_requests_waiting_by_reason
               name_from_label: reason
@@ -249,7 +236,6 @@ template:
           units: preemptions/s
           algorithm: incremental
           type: line
-          priority: 1150
           dimensions:
             - selector: ray_vllm_num_preemptions_total
               name: preemptions
@@ -258,7 +244,6 @@ template:
           units: state
           algorithm: absolute
           type: line
-          priority: 1160
           dimensions:
             - selector: ray_vllm_engine_sleep_state
               name_from_label: sleep_state
@@ -267,7 +252,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1170
           dimensions:
             - selector: ray_vllm_request_queue_time_seconds_bucket
         - title: Queued Request Measurements
@@ -275,7 +259,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1180
           dimensions:
             - selector: ray_vllm_request_queue_time_seconds_count
               name: requests
@@ -284,7 +267,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1190
           dimensions:
             - selector: ray_vllm_request_queue_time_seconds_sum
               name: requests
@@ -316,7 +298,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1200
           dimensions:
             - selector: ray_vllm_prompt_tokens_total
               name: processed
@@ -325,7 +306,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1210
           dimensions:
             - selector: ray_vllm_prompt_tokens_by_source_total
               name_from_label: source
@@ -334,7 +314,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1220
           dimensions:
             - selector: ray_vllm_prompt_tokens_cached_total
               name: cached
@@ -343,7 +322,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1230
           dimensions:
             - selector: ray_vllm_request_prompt_tokens_bucket
         - title: Prefill Time
@@ -351,7 +329,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1240
           dimensions:
             - selector: ray_vllm_request_prefill_time_seconds_bucket
         - title: Computed KV Tokens
@@ -359,7 +336,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1250
           dimensions:
             - selector: ray_vllm_request_prefill_kv_computed_tokens_bucket
         - title: Prefill Request Measurements
@@ -367,7 +343,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1260
           dimensions:
             - selector: ray_vllm_request_prompt_tokens_count
               name: prompt_size
@@ -380,7 +355,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1270
           dimensions:
             - selector: ray_vllm_request_prompt_tokens_sum
               name: prompt_tokens
@@ -389,7 +363,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1280
           dimensions:
             - selector: ray_vllm_request_prefill_kv_computed_tokens_sum
               name: computed_tokens
@@ -398,7 +371,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1290
           dimensions:
             - selector: ray_vllm_request_prefill_time_seconds_sum
               name: requests
@@ -431,7 +403,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1300
           dimensions:
             - selector: ray_vllm_generation_tokens_total
               name: generated
@@ -440,7 +411,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1310
           dimensions:
             - selector: ray_vllm_request_generation_tokens_bucket
         - title: Decode Time
@@ -448,7 +418,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1320
           dimensions:
             - selector: ray_vllm_request_decode_time_seconds_bucket
         - title: Inter-Token Latency
@@ -456,7 +425,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1330
           dimensions:
             - selector: ray_vllm_inter_token_latency_seconds_bucket
         - title: Mean Output-Token Time
@@ -464,7 +432,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1340
           dimensions:
             - selector: ray_vllm_request_time_per_output_token_seconds_bucket
         - title: Decode Request Measurements
@@ -472,7 +439,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1350
           dimensions:
             - selector: ray_vllm_request_generation_tokens_count
               name: output_size
@@ -485,7 +451,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1360
           dimensions:
             - selector: ray_vllm_request_generation_tokens_sum
               name: output_tokens
@@ -494,7 +459,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1370
           dimensions:
             - selector: ray_vllm_request_decode_time_seconds_sum
               name: requests
@@ -503,7 +467,6 @@ template:
           units: intervals/s
           algorithm: incremental
           type: line
-          priority: 1380
           dimensions:
             - selector: ray_vllm_inter_token_latency_seconds_count
               name: intervals
@@ -512,7 +475,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 1390
           dimensions:
             - selector: ray_vllm_inter_token_latency_seconds_sum
               name: intervals
@@ -521,7 +483,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 1400
           dimensions:
             - selector: ray_vllm_request_time_per_output_token_seconds_sum
               name: request_means
@@ -550,7 +511,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1410
           dimensions:
             - selector: ray_vllm_request_inference_time_seconds_bucket
         - title: Inference Request Measurements
@@ -558,7 +518,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1420
           dimensions:
             - selector: ray_vllm_request_inference_time_seconds_count
               name: requests
@@ -567,7 +526,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1430
           dimensions:
             - selector: ray_vllm_request_inference_time_seconds_sum
               name: requests
@@ -576,7 +534,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1440
           dimensions:
             - selector: ray_vllm_iteration_tokens_total_bucket
         - title: Engine Steps
@@ -584,7 +541,6 @@ template:
           units: steps/s
           algorithm: incremental
           type: line
-          priority: 1450
           dimensions:
             - selector: ray_vllm_iteration_tokens_total_count
               name: steps
@@ -593,7 +549,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1460
           dimensions:
             - selector: ray_vllm_iteration_tokens_total_sum
               name: tokens
@@ -602,7 +557,6 @@ template:
           units: GFLOP/s/GPU
           algorithm: incremental
           type: line
-          priority: 1470
           dimensions:
             - selector: ray_vllm_estimated_flops_per_gpu_total
               name: compute
@@ -614,7 +568,6 @@ template:
           units: GB/s/GPU
           algorithm: incremental
           type: line
-          priority: 1480
           dimensions:
             - selector: ray_vllm_estimated_read_bytes_per_gpu_total
               name: read
@@ -649,7 +602,6 @@ template:
           units: percentage
           algorithm: absolute
           type: line
-          priority: 1490
           dimensions:
             - selector: ray_vllm_kv_cache_usage_perc
               name: used
@@ -661,7 +613,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1500
           dimensions:
             - selector: ray_vllm_prefix_cache_queries_total
               name: queries
@@ -672,7 +623,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1510
           dimensions:
             - selector: ray_vllm_external_prefix_cache_queries_total
               name: queries
@@ -683,7 +633,6 @@ template:
           units: items/s
           algorithm: incremental
           type: line
-          priority: 1520
           dimensions:
             - selector: ray_vllm_mm_cache_queries_total
               name: queries
@@ -714,7 +663,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1530
           dimensions:
             - selector: ray_vllm_kv_block_lifetime_seconds_bucket
         - title: KV Block Idle Time Before Eviction
@@ -722,7 +670,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1540
           dimensions:
             - selector: ray_vllm_kv_block_idle_before_evict_seconds_bucket
         - title: KV Block Reuse Gap
@@ -730,7 +677,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1550
           dimensions:
             - selector: ray_vllm_kv_block_reuse_gap_seconds_bucket
         - title: KV Residency Measurements
@@ -738,7 +684,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: line
-          priority: 1560
           dimensions:
             - selector: ray_vllm_kv_block_lifetime_seconds_count
               name: lifetimes
@@ -751,7 +696,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 1570
           dimensions:
             - selector: ray_vllm_kv_block_lifetime_seconds_sum
               name: lifetime
@@ -809,7 +753,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1580
           dimensions:
             - selector: ray_vllm_kv_offload_load_size_bucket
         - title: KV Offload Store Size
@@ -817,7 +760,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1590
           dimensions:
             - selector: ray_vllm_kv_offload_store_size_bucket
         - title: KV Offload Transfer Operations
@@ -825,7 +767,6 @@ template:
           units: operations/s
           algorithm: incremental
           type: line
-          priority: 1600
           dimensions:
             - selector: ray_vllm_kv_offload_load_size_count
               name: loads
@@ -836,7 +777,6 @@ template:
           units: bytes/s
           algorithm: incremental
           type: line
-          priority: 1610
           dimensions:
             - selector: ray_vllm_kv_offload_load_bytes_total
               name: loaded
@@ -851,7 +791,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1620
           dimensions:
             - selector: ray_vllm_kv_offload_load_time_total
               name: loads
@@ -862,7 +801,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1630
           dimensions:
             - selector: ray_vllm_kv_offload_lookup_sync_delay_seconds_bucket
         - title: KV Offload Asynchronous Lookup Delay
@@ -870,7 +808,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1640
           dimensions:
             - selector: ray_vllm_kv_offload_lookup_async_delay_seconds_bucket
         - title: KV Offload Lookup Measurements
@@ -878,7 +815,6 @@ template:
           units: lookups/s
           algorithm: incremental
           type: line
-          priority: 1650
           dimensions:
             - selector: ray_vllm_kv_offload_lookup_sync_delay_seconds_count
               name: synchronous
@@ -889,7 +825,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 1660
           dimensions:
             - selector: ray_vllm_kv_offload_lookup_sync_delay_seconds_sum
               name: synchronous
@@ -900,7 +835,6 @@ template:
           units: percentage
           algorithm: absolute
           type: line
-          priority: 1670
           dimensions:
             - selector: ray_vllm_kv_offload_cpu_cache_usage_perc
               name: total
@@ -922,7 +856,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1680
           dimensions:
             - selector: ray_vllm_kv_offload_cpu_allocation_size_bucket
         - title: CPU KV Allocation Measurements
@@ -930,7 +863,6 @@ template:
           units: allocations/s
           algorithm: incremental
           type: line
-          priority: 1690
           dimensions:
             - selector: ray_vllm_kv_offload_cpu_allocation_size_count
               name: allocations
@@ -939,7 +871,6 @@ template:
           units: blocks/s
           algorithm: incremental
           type: line
-          priority: 1700
           dimensions:
             - selector: ray_vllm_kv_offload_cpu_allocation_size_sum
               name: blocks
@@ -948,7 +879,6 @@ template:
           units: events/s
           algorithm: incremental
           type: line
-          priority: 1710
           dimensions:
             - selector: ray_vllm_kv_offload_allocation_failure_total
               name: allocation_failures
@@ -959,7 +889,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1720
           dimensions:
             - selector: ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_bucket
         - title: Tiered KV Offload Asynchronous Lookup Delay
@@ -967,7 +896,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1730
           dimensions:
             - selector: ray_vllm_kv_offload_tiering_lookup_async_delay_seconds_bucket
         - title: Tiered KV Offload Lookup Measurements
@@ -975,7 +903,6 @@ template:
           units: lookups/s
           algorithm: incremental
           type: line
-          priority: 1740
           dimensions:
             - selector: ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_count
               name: synchronous
@@ -986,7 +913,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 1750
           dimensions:
             - selector: ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_sum
               name: synchronous
@@ -1023,7 +949,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1760
           dimensions:
             - selector: ray_vllm_nixl_xfer_time_seconds_bucket
         - title: NIXL Transfer Post Time
@@ -1031,7 +956,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1770
           dimensions:
             - selector: ray_vllm_nixl_post_time_seconds_bucket
         - title: NIXL Transfer Size
@@ -1039,7 +963,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1780
           dimensions:
             - selector: ray_vllm_nixl_bytes_transferred_bucket
         - title: NIXL Transfer Descriptors
@@ -1047,7 +970,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1790
           dimensions:
             - selector: ray_vllm_nixl_num_descriptors_bucket
         - title: NIXL Transfer Measurements
@@ -1055,7 +977,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: line
-          priority: 1800
           dimensions:
             - selector: ray_vllm_nixl_xfer_time_seconds_count
               name: transfers
@@ -1070,7 +991,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1810
           dimensions:
             - selector: ray_vllm_nixl_xfer_time_seconds_sum
               name: transfer
@@ -1081,7 +1001,6 @@ template:
           units: bytes/s
           algorithm: incremental
           type: line
-          priority: 1820
           dimensions:
             - selector: ray_vllm_nixl_bytes_transferred_sum
               name: transferred
@@ -1090,7 +1009,6 @@ template:
           units: descriptors/s
           algorithm: incremental
           type: line
-          priority: 1830
           dimensions:
             - selector: ray_vllm_nixl_num_descriptors_sum
               name: descriptors
@@ -1099,7 +1017,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 1840
           dimensions:
             - selector: ray_vllm_nixl_num_failed_transfers_total
               name: transfers
@@ -1110,7 +1027,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 1850
           dimensions:
             - selector: ray_vllm_nixl_num_kv_expired_reqs_total
               name: expired
@@ -1138,7 +1054,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1860
           dimensions:
             - selector: ray_vllm_hf3fs_save_duration_seconds_bucket
         - title: HF3FS Load Duration
@@ -1146,7 +1061,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 1870
           dimensions:
             - selector: ray_vllm_hf3fs_load_duration_seconds_bucket
         - title: HF3FS Transfer Measurements
@@ -1154,7 +1068,6 @@ template:
           units: operations/s
           algorithm: incremental
           type: line
-          priority: 1880
           dimensions:
             - selector: ray_vllm_hf3fs_save_duration_seconds_count
               name: saves
@@ -1165,7 +1078,6 @@ template:
           units: in-flight
           algorithm: incremental
           type: line
-          priority: 1890
           dimensions:
             - selector: ray_vllm_hf3fs_save_duration_seconds_sum
               name: saves
@@ -1176,7 +1088,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 1900
           dimensions:
             - selector: ray_vllm_hf3fs_num_failed_save_total
               name: saves
@@ -1207,7 +1118,6 @@ template:
               units: observations/s
               algorithm: incremental
               type: heatmap
-              priority: 1910
               dimensions:
                 - selector: ray_vllm_mooncake_store_operation_time_seconds_bucket
             - title: Mooncake Store Operation Measurements
@@ -1215,7 +1125,6 @@ template:
               units: operations/s
               algorithm: incremental
               type: line
-              priority: 1920
               dimensions:
                 - selector: ray_vllm_mooncake_store_operation_time_seconds_count
                   name: timed
@@ -1226,7 +1135,6 @@ template:
               units: in-flight
               algorithm: incremental
               type: line
-              priority: 1930
               dimensions:
                 - selector: ray_vllm_mooncake_store_operation_time_seconds_sum
                   name: operations
@@ -1250,7 +1158,6 @@ template:
               units: keys/s
               algorithm: incremental
               type: line
-              priority: 1940
               dimensions:
                 - selector: ray_vllm_mooncake_store_operation_keys_total
                   name_from_label: status
@@ -1259,7 +1166,6 @@ template:
               units: bytes/s
               algorithm: incremental
               type: line
-              priority: 1950
               dimensions:
                 - selector: ray_vllm_mooncake_store_operation_bytes_total
                   name_from_label: status
@@ -1268,7 +1174,6 @@ template:
               units: keys/s
               algorithm: incremental
               type: line
-              priority: 1960
               dimensions:
                 - selector: ray_vllm_mooncake_store_operation_failed_keys_total
                   name_from_label: status
@@ -1296,7 +1201,6 @@ template:
           units: drafts/s
           algorithm: incremental
           type: line
-          priority: 1970
           dimensions:
             - selector: ray_vllm_spec_decode_num_drafts_total
               name: drafts
@@ -1305,7 +1209,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1980
           dimensions:
             - selector: ray_vllm_spec_decode_num_draft_tokens_total
               name: proposed
@@ -1316,7 +1219,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 1990
           dimensions:
             - selector: ray_vllm_spec_decode_num_accepted_tokens_per_pos_total
               name_from_label: position
@@ -1343,7 +1245,6 @@ template:
           units: steps/s
           algorithm: incremental
           type: line
-          priority: 2000
           dimensions:
             - selector: ray_vllm_diffusion_num_denoising_steps_total
               name: steps
@@ -1352,7 +1253,6 @@ template:
           units: positions/s
           algorithm: incremental
           type: line
-          priority: 2010
           dimensions:
             - selector: ray_vllm_diffusion_num_canvas_positions_total
               name: positions
@@ -1361,7 +1261,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2020
           dimensions:
             - selector: ray_vllm_diffusion_num_committed_tokens_total
               name: committed

@@ -3,6 +3,7 @@
 package promprofilevalidation
 
 import (
+	"context"
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -51,7 +52,7 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 	if first.DisplayedFamily != "Example" ||
 		first.Title != "Temperature" ||
 		first.Type != "line" ||
-		first.Priority != 100 ||
+		first.Priority != 0 ||
 		!slices.Equal(first.InstanceByLabels, []string{"instance"}) {
 		t.Fatalf("unexpected first authored mapping: %#v", first)
 	}
@@ -63,10 +64,10 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 	if result.report.AuthoredMapping[2].Dimensions[0].NameFromLabel != "le" {
 		t.Fatalf("authored mapping lost dynamic naming mechanism: %#v", result.report.AuthoredMapping[2].Dimensions)
 	}
-	if result.report.AuthoredMapping[1].Priority != 110 ||
-		result.report.AuthoredMapping[2].Priority != 120 ||
-		result.report.AuthoredMapping[3].Priority != 130 {
-		t.Fatalf("authored mapping lost source order: %#v", result.report.AuthoredMapping)
+	for _, chart := range result.report.AuthoredMapping {
+		if chart.Priority != 0 {
+			t.Fatalf("authored chart unexpectedly declares priority: %#v", chart)
+		}
 	}
 	if !hasFinding(result.report, "default_validation_job", "warning") {
 		t.Fatalf("missing warning that the deployable job policy was not validated: %#v", result.report.Findings)
@@ -94,7 +95,7 @@ func TestStageIsolatedCatalogDoesNotMutateProcessDiscovery(t *testing.T) {
 	wantUserConfigDir := buildinfo.UserConfigDir
 	wantStockConfigDir := buildinfo.StockConfigDir
 
-	staged, cleanup, err := stageValidationInputs(profilePath, dumpPath)
+	staged, cleanup, err := stageValidationInputs(profilePath, nil, dumpPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,6 +109,141 @@ func TestStageIsolatedCatalogDoesNotMutateProcessDiscovery(t *testing.T) {
 		buildinfo.UserConfigDir != wantUserConfigDir ||
 		buildinfo.StockConfigDir != wantStockConfigDir {
 		t.Fatalf("isolated catalog staging mutated process discovery globals")
+	}
+}
+
+func TestValidateProfileComposesExplicitSupportingProfiles(t *testing.T) {
+	dir := t.TempDir()
+	profilePath := filepath.Join(dir, "candidate.yaml")
+	supportPath := filepath.Join(dir, "runtime.yaml")
+	dumpPath := filepath.Join(dir, "metrics.prom")
+	for path, content := range map[string]string{
+		profilePath: `
+match: app_*
+app: app
+template:
+  family: App
+  metrics: [app_value]
+  charts:
+    - title: App Value
+      context: app_value
+      units: values
+      dimensions:
+        - selector: app_value
+          name: value
+`,
+		supportPath: `
+match: runtime_*
+template:
+  family: Runtime
+  metrics: [runtime_value]
+  charts:
+    - title: Runtime Value
+      context: runtime_value
+      units: values
+      dimensions:
+        - selector: runtime_value
+          name: value
+`,
+		dumpPath: "# TYPE app_value gauge\napp_value 1\n# TYPE runtime_value gauge\nruntime_value 2\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	report := Validate(context.Background(), Options{
+		ProfilePath:            profilePath,
+		SupportingProfilePaths: []string{supportPath},
+		DumpPath:               dumpPath,
+	})
+	if !report.Passed() {
+		t.Fatalf("explicit profile composition failed: %#v", report.Findings)
+	}
+	if report.Counts.AuthoredCharts != 2 || report.Counts.CuratedCharts != 2 {
+		t.Fatalf("composed chart counts: got %#v, want two authored and curated charts", report.Counts)
+	}
+	if len(report.AuthoredMapping) != 2 {
+		t.Fatalf("composed authored mapping count: got %d, want 2", len(report.AuthoredMapping))
+	}
+	if report.AuthoredMapping[0].DisplayedFamily != "App" || report.AuthoredMapping[1].DisplayedFamily != "Runtime" {
+		t.Fatalf("supporting profile did not preserve exact composition order: %#v", report.AuthoredMapping)
+	}
+}
+
+func TestValidateProfileAcceptsSupportingProfileFallbackSuppression(t *testing.T) {
+	dir := t.TempDir()
+	profilePath := filepath.Join(dir, "candidate.yaml")
+	supportPath := filepath.Join(dir, "runtime.yaml")
+	dumpPath := filepath.Join(dir, "metrics.prom")
+	for path, content := range map[string]string{
+		profilePath: `
+match: app_*
+template:
+  family: App
+  metrics: [app_value]
+  charts:
+    - title: App Value
+      context: app_value
+      units: values
+      dimensions: [{selector: app_value, name: value}]
+`,
+		supportPath: `
+match: runtime_*
+autogen:
+  selector:
+    deny: [runtime_extra]
+template:
+  family: Runtime
+  metrics: [runtime_value]
+  charts:
+    - title: Runtime Value
+      context: runtime_value
+      units: values
+      dimensions: [{selector: runtime_value, name: value}]
+`,
+		dumpPath: "# TYPE app_value gauge\napp_value 1\n# TYPE runtime_value gauge\nruntime_value 2\n# TYPE runtime_extra gauge\nruntime_extra 3\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result := runValidationFilesWithSupports(t, profilePath, []string{supportPath}, dumpPath, "")
+	if result.exitCode != 0 {
+		t.Fatalf("supporting-profile fallback suppression should pass\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "profile_suppressed_series", "warning") {
+		t.Fatalf("missing profile_suppressed_series warning in %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileRejectsDuplicateSupportingProfileIdentity(t *testing.T) {
+	dir := t.TempDir()
+	profilePath := filepath.Join(dir, "candidate.yaml")
+	supportDir := filepath.Join(dir, "support")
+	if err := os.MkdirAll(supportDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	supportPath := filepath.Join(supportDir, "candidate.yaml")
+	dumpPath := filepath.Join(dir, "metrics.prom")
+	for path, content := range map[string]string{
+		profilePath: validProfile,
+		supportPath: validProfile,
+		dumpPath:    validDump,
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	report := Validate(context.Background(), Options{
+		ProfilePath:            profilePath,
+		SupportingProfilePaths: []string{supportPath},
+		DumpPath:               dumpPath,
+	})
+	if report.Passed() || !hasFinding(report, "profile_load", "error") {
+		t.Fatalf("duplicate profile identity was not rejected: %#v", report.Findings)
 	}
 }
 
@@ -239,7 +375,6 @@ template:
     - title: Temperature
       context: temperature
       units: celsius
-      priority: 100
       dimensions:
         - selector: app_temperature
           name: temperature
@@ -445,7 +580,6 @@ template:
     - title: Value
       context: value
       units: values
-      priority: 100
       dimensions:
         - selector: app_value
           name: value
@@ -476,7 +610,6 @@ template:
       context: http_requests
       units: requests/s
       algorithm: incremental
-      priority: 100
       dimensions:
         - selector: app_http_requests
           name_from_label: status
@@ -514,7 +647,6 @@ template:
       context: http_requests
       units: requests/s
       algorithm: incremental
-      priority: 100
       instances:
         by_labels: [server, "!server", "*"]
       dimensions:
@@ -547,7 +679,6 @@ template:
     - title: Live
       context: live
       units: values
-      priority: 100
       dimensions:
         - selector: app_live
           name: live

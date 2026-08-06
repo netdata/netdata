@@ -6,32 +6,15 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
-
-type evidenceManifest struct {
-	Version       int                    `yaml:"version"`
-	Profile       string                 `yaml:"profile"`
-	EvidenceClass string                 `yaml:"evidence_class"`
-	Sanitized     bool                   `yaml:"sanitized"`
-	Files         []evidenceManifestFile `yaml:"files"`
-}
-
-type evidenceManifestFile struct {
-	Path   string `yaml:"path"`
-	Kind   string `yaml:"kind"`
-	SHA256 string `yaml:"sha256"`
-	Bytes  int64  `yaml:"bytes"`
-}
 
 func Verify(repoRoot, testdataRoot string, bundle Bundle) error {
 	if err := VerifyLocal(repoRoot, bundle); err != nil {
@@ -53,13 +36,8 @@ func VerifyLocal(repoRoot string, bundle Bundle) error {
 }
 
 func VerifyExternal(testdataRoot string, bundle Bundle) error {
-	manifest := bundle.Descriptor.External.Manifest
-	manifestPath := filepath.Join(testdataRoot, filepath.FromSlash(bundle.ExternalManifestPath()))
-	if err := verifyFile(manifestPath, manifest.SHA256, manifest.Bytes); err != nil {
-		return fmt.Errorf("external manifest %q: %w", bundle.ExternalManifestPath(), err)
-	}
-	if err := verifyEvidenceManifest(manifestPath, bundle); err != nil {
-		return fmt.Errorf("external manifest %q: %w", bundle.ExternalManifestPath(), err)
+	if err := verifyExternalLayout(testdataRoot, bundle); err != nil {
+		return err
 	}
 	return verifySourceInventory(testdataRoot, bundle)
 }
@@ -75,20 +53,12 @@ func Refresh(repoRoot, testdataRoot string, bundle Bundle) (Bundle, error) {
 		}
 		*target.digest = FileDigest{SHA256: digest, Bytes: size}
 	}
-	manifest := &bundle.Descriptor.External.Manifest
-	manifestPath := filepath.Join(testdataRoot, filepath.FromSlash(bundle.ExternalManifestPath()))
-	if err := verifyEvidenceManifest(manifestPath, bundle); err != nil {
-		return Bundle{}, fmt.Errorf("external manifest %q: %w", bundle.ExternalManifestPath(), err)
+	if err := verifyExternalLayout(testdataRoot, bundle); err != nil {
+		return Bundle{}, err
 	}
 	if err := verifySourceInventory(testdataRoot, bundle); err != nil {
 		return Bundle{}, err
 	}
-	digest, size, err := digestFile(manifestPath)
-	if err != nil {
-		return Bundle{}, fmt.Errorf("external manifest %q: %w", bundle.ExternalManifestPath(), err)
-	}
-	manifest.SHA256 = digest
-	manifest.Bytes = size
 	if err := bundle.validate(); err != nil {
 		return Bundle{}, fmt.Errorf("refreshed descriptor: %w", err)
 	}
@@ -200,97 +170,23 @@ func EvidenceDirectories(bundles []Bundle) []string {
 	return directories
 }
 
-func verifyEvidenceManifest(path string, bundle Bundle) error {
-	descriptor := bundle.Descriptor
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var manifest evidenceManifest
-	decoder := yaml.NewDecoder(bytes.NewReader(content))
-	decoder.KnownFields(true)
-	if err := decoder.Decode(&manifest); err != nil {
-		return fmt.Errorf("decode: %w", err)
-	}
-	var extra any
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return errors.New("must contain exactly one YAML document")
-		}
-		return fmt.Errorf("decode trailing content: %w", err)
-	}
-	if manifest.Version != 1 {
-		return fmt.Errorf("version: got %d, want 1", manifest.Version)
-	}
-	if manifest.Profile != descriptor.Profile {
-		return fmt.Errorf("profile: got %q, want %q", manifest.Profile, descriptor.Profile)
-	}
-	if manifest.EvidenceClass != "source-derived-synthetic" {
-		return fmt.Errorf("evidence_class: got %q, want source-derived-synthetic", manifest.EvidenceClass)
-	}
-	if !manifest.Sanitized {
-		return errors.New("sanitized must be true")
-	}
-	if len(manifest.Files) == 0 {
-		return errors.New("files must not be empty")
-	}
-
-	root := filepath.Dir(path)
-	seen := make(map[string]bool, len(manifest.Files))
-	declaredPaths := make([]string, 0, len(manifest.Files))
-	foundInventory := false
-	foundFixtures := make(map[string]bool, len(descriptor.Validation.Cases))
-	for _, validationCase := range descriptor.Validation.Cases {
-		foundFixtures[validationCase.Fixture] = false
-	}
-	for index, file := range manifest.Files {
-		field := fmt.Sprintf("files[%d]", index)
-		if err := validateRelativePath(field+".path", file.Path); err != nil {
-			return err
-		}
-		if seen[file.Path] {
-			return fmt.Errorf("duplicate evidence path %q", file.Path)
-		}
-		seen[file.Path] = true
-		declaredPaths = append(declaredPaths, file.Path)
-		if err := validateDigest(field, file.SHA256, file.Bytes); err != nil {
-			return err
-		}
-		switch file.Kind {
-		case "source_inventory":
-			if file.Path != "SOURCE-INVENTORY.tsv" {
-				return fmt.Errorf("source inventory %q must be SOURCE-INVENTORY.tsv", file.Path)
-			}
-			foundInventory = true
-		case "prometheus_exposition":
-			if !strings.HasPrefix(file.Path, "fixtures/") || !strings.HasSuffix(file.Path, ".prom") {
-				return fmt.Errorf("Prometheus exposition %q must be a fixtures/*.prom file", file.Path)
-			}
-			if _, ok := foundFixtures[file.Path]; ok {
-				foundFixtures[file.Path] = true
-			}
-		default:
-			return fmt.Errorf("unsupported evidence kind %q for %q", file.Kind, file.Path)
-		}
-		if err := verifyFile(filepath.Join(root, filepath.FromSlash(file.Path)), file.SHA256, file.Bytes); err != nil {
-			return fmt.Errorf("evidence file %q: %w", file.Path, err)
+func verifyExternalLayout(testdataRoot string, bundle Bundle) error {
+	root := filepath.Join(testdataRoot, filepath.FromSlash(bundle.ExternalRoot()))
+	want := []string{"SOURCE-INVENTORY.tsv"}
+	seen := map[string]bool{"SOURCE-INVENTORY.tsv": true}
+	for _, validationCase := range bundle.Descriptor.Validation.Cases {
+		if !seen[validationCase.Fixture] {
+			seen[validationCase.Fixture] = true
+			want = append(want, validationCase.Fixture)
 		}
 	}
-	if !foundInventory {
-		return fmt.Errorf("descriptor source inventory %q is not declared", bundle.SourceInventoryPath())
-	}
-	for fixture, found := range foundFixtures {
-		if !found {
-			return fmt.Errorf("descriptor validation fixture %q is not declared", bundle.ExternalRoot()+"/"+fixture)
-		}
-	}
-	slices.Sort(declaredPaths)
+	slices.Sort(want)
 	actualPaths, err := evidenceFiles(root)
 	if err != nil {
-		return err
+		return fmt.Errorf("read external evidence directory %q: %w", bundle.ExternalRoot(), err)
 	}
-	if !slices.Equal(declaredPaths, actualPaths) {
-		return fmt.Errorf("declared evidence files differ from directory: got %v, want %v", declaredPaths, actualPaths)
+	if !slices.Equal(actualPaths, want) {
+		return fmt.Errorf("external evidence files differ from descriptor: got %v, want %v", actualPaths, want)
 	}
 	return nil
 }
@@ -319,9 +215,7 @@ func evidenceFiles(root string) ([]string, error) {
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("evidence path %q is not a regular file", relative)
 		}
-		if relative != "manifest.yaml" {
-			paths = append(paths, relative)
-		}
+		paths = append(paths, relative)
 		return nil
 	})
 	if err != nil {

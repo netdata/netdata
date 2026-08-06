@@ -45,7 +45,7 @@ add source-only families. A committed fixture MUST:
 - preserve histogram buckets, summary quantiles, state labels, and bounded enumerations from source;
 - use valid Prometheus exposition and internally consistent distribution samples;
 - include enough distinct identities/dimensions to exercise instance construction and normalization;
-- identify source-only optional families and their gates in a provenance header or adjacent evidence manifest;
+- identify source-only optional families and their gates in the proof's evidence record and source inventory;
 - contain no credentials, private endpoints, customer/user identifiers, prompts,
   request content, or copied operational values.
 
@@ -90,11 +90,10 @@ production validation.
 
 ## Record provenance
 
-The fixture or adjacent manifest MUST record:
+The proof's `EVIDENCE.md` and exact `SOURCE-INVENTORY.tsv` ledger MUST record:
 
 - application/exporter and supported revisions;
 - source paths used for registrations and update callsites;
 - documentation and upstream fixture sources;
 - which families were observed versus source-derived;
-- whether the fixture is a realizable configuration or a structural union;
-- the exact fixture hash used for validation.
+- whether the fixture is a realizable configuration or a structural union.

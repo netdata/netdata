@@ -8,90 +8,91 @@
 # Known generated timestamps and deprecated aliases are excluded exactly; unknown future LiteLLM families remain generic.
 match: 'litellm_*'
 app: litellm
-autogen:
-  selector:
-    deny:
-      - 'litellm_auth_failed_requests_created'
-      - 'litellm_auth_latency_created'
-      - 'litellm_auth_total_requests_created'
-      - 'litellm_batch_write_to_db_failed_requests_created'
-      - 'litellm_batch_write_to_db_latency_created'
-      - 'litellm_batch_write_to_db_total_requests_created'
-      - 'litellm_cache_hits_metric_created'
-      - 'litellm_cache_misses_metric_created'
-      - 'litellm_cached_tokens_metric_created'
-      - 'litellm_callback_logging_failures_metric_created'
-      - 'litellm_check_batch_cost_errors_created'
-      - 'litellm_check_batch_cost_jobs_processed_created'
-      - 'litellm_deployment_cooled_down_created'
-      - 'litellm_deployment_failed_fallbacks_created'
-      - 'litellm_deployment_failure_responses_created'
-      - 'litellm_deployment_latency_per_output_token_created'
-      - 'litellm_deployment_success_responses_created'
-      - 'litellm_deployment_successful_fallbacks_created'
-      - 'litellm_deployment_total_requests_created'
-      - 'litellm_guardrail_errors_created'
-      - 'litellm_guardrail_latency_seconds_created'
-      - 'litellm_guardrail_requests_created'
-      - 'litellm_images_generated_metric_created'
-      - 'litellm_input_audio_tokens_metric_created'
-      - 'litellm_input_cache_creation_tokens_metric_created'
-      - 'litellm_input_cached_tokens_metric_created'
-      - 'litellm_input_tokens_metric_created'
-      - 'litellm_llm_api_failed_requests_metric_created'
-      - 'litellm_llm_api_latency_metric_created'
-      - 'litellm_llm_api_time_to_first_token_metric_created'
-      - 'litellm_managed_batch_created_created'
-      - 'litellm_managed_batch_duration_seconds_created'
-      - 'litellm_managed_file_created_created'
-      - 'litellm_managed_file_deleted_created'
-      - 'litellm_mcp_tool_call_spend_metric_created'
-      - 'litellm_mcp_tool_calls_created'
-      - 'litellm_output_audio_tokens_metric_created'
-      - 'litellm_output_reasoning_tokens_metric_created'
-      - 'litellm_output_tokens_metric_created'
-      - 'litellm_overhead_latency_metric_created'
-      - 'litellm_overhead_with_guardrails_latency_metric_created'
-      - 'litellm_postgres_failed_requests_created'
-      - 'litellm_postgres_latency_created'
-      - 'litellm_postgres_total_requests_created'
-      - 'litellm_provider_cache_creation_input_tokens_metric_created'
-      - 'litellm_provider_cache_read_input_tokens_metric_created'
-      - 'litellm_proxy_failed_requests_metric_created'
-      - 'litellm_proxy_pre_call_failed_requests_created'
-      - 'litellm_proxy_pre_call_latency_created'
-      - 'litellm_proxy_pre_call_total_requests_created'
-      - 'litellm_proxy_total_requests_metric_created'
-      - 'litellm_redis_daily_org_spend_update_queue_failed_requests_created'
-      - 'litellm_redis_daily_org_spend_update_queue_latency_created'
-      - 'litellm_redis_daily_org_spend_update_queue_total_requests_created'
-      - 'litellm_redis_daily_tag_spend_update_queue_failed_requests_created'
-      - 'litellm_redis_daily_tag_spend_update_queue_latency_created'
-      - 'litellm_redis_daily_tag_spend_update_queue_total_requests_created'
-      - 'litellm_redis_daily_team_spend_update_queue_failed_requests_created'
-      - 'litellm_redis_daily_team_spend_update_queue_latency_created'
-      - 'litellm_redis_daily_team_spend_update_queue_total_requests_created'
-      - 'litellm_redis_failed_requests_created'
-      - 'litellm_redis_latency_created'
-      - 'litellm_redis_total_requests_created'
-      - 'litellm_request_queue_time_seconds_created'
-      - 'litellm_request_total_latency_metric_created'
-      - 'litellm_requests_metric_created'
-      - 'litellm_reset_budget_job_failed_requests_created'
-      - 'litellm_reset_budget_job_latency_created'
-      - 'litellm_reset_budget_job_total_requests_created'
-      - 'litellm_router_failed_requests_created'
-      - 'litellm_router_latency_created'
-      - 'litellm_router_total_requests_created'
-      - 'litellm_self_failed_requests_created'
-      - 'litellm_self_latency_created'
-      - 'litellm_self_total_requests_created'
-      - 'litellm_spend_metric_created'
-      - 'litellm_total_tokens_metric_created'
-      - 'litellm_video_duration_seconds_metric_created'
-      - 'litellm_requests_metric_total'
-      - 'litellm_llm_api_failed_requests_metric_total'
-      - 'litellm_check_batch_cost_last_run_timestamp'
+relabeling:
+  - match: >-
+      litellm_auth_failed_requests_created
+      litellm_auth_latency_created
+      litellm_auth_total_requests_created
+      litellm_batch_write_to_db_failed_requests_created
+      litellm_batch_write_to_db_latency_created
+      litellm_batch_write_to_db_total_requests_created
+      litellm_cache_hits_metric_created
+      litellm_cache_misses_metric_created
+      litellm_cached_tokens_metric_created
+      litellm_callback_logging_failures_metric_created
+      litellm_check_batch_cost_errors_created
+      litellm_check_batch_cost_jobs_processed_created
+      litellm_deployment_cooled_down_created
+      litellm_deployment_failed_fallbacks_created
+      litellm_deployment_failure_responses_created
+      litellm_deployment_latency_per_output_token_created
+      litellm_deployment_success_responses_created
+      litellm_deployment_successful_fallbacks_created
+      litellm_deployment_total_requests_created
+      litellm_guardrail_errors_created
+      litellm_guardrail_latency_seconds_created
+      litellm_guardrail_requests_created
+      litellm_images_generated_metric_created
+      litellm_input_audio_tokens_metric_created
+      litellm_input_cache_creation_tokens_metric_created
+      litellm_input_cached_tokens_metric_created
+      litellm_input_tokens_metric_created
+      litellm_llm_api_failed_requests_metric_created
+      litellm_llm_api_latency_metric_created
+      litellm_llm_api_time_to_first_token_metric_created
+      litellm_managed_batch_created_created
+      litellm_managed_batch_duration_seconds_created
+      litellm_managed_file_created_created
+      litellm_managed_file_deleted_created
+      litellm_mcp_tool_call_spend_metric_created
+      litellm_mcp_tool_calls_created
+      litellm_output_audio_tokens_metric_created
+      litellm_output_reasoning_tokens_metric_created
+      litellm_output_tokens_metric_created
+      litellm_overhead_latency_metric_created
+      litellm_overhead_with_guardrails_latency_metric_created
+      litellm_postgres_failed_requests_created
+      litellm_postgres_latency_created
+      litellm_postgres_total_requests_created
+      litellm_provider_cache_creation_input_tokens_metric_created
+      litellm_provider_cache_read_input_tokens_metric_created
+      litellm_proxy_failed_requests_metric_created
+      litellm_proxy_pre_call_failed_requests_created
+      litellm_proxy_pre_call_latency_created
+      litellm_proxy_pre_call_total_requests_created
+      litellm_proxy_total_requests_metric_created
+      litellm_redis_daily_org_spend_update_queue_failed_requests_created
+      litellm_redis_daily_org_spend_update_queue_latency_created
+      litellm_redis_daily_org_spend_update_queue_total_requests_created
+      litellm_redis_daily_tag_spend_update_queue_failed_requests_created
+      litellm_redis_daily_tag_spend_update_queue_latency_created
+      litellm_redis_daily_tag_spend_update_queue_total_requests_created
+      litellm_redis_daily_team_spend_update_queue_failed_requests_created
+      litellm_redis_daily_team_spend_update_queue_latency_created
+      litellm_redis_daily_team_spend_update_queue_total_requests_created
+      litellm_redis_failed_requests_created
+      litellm_redis_latency_created
+      litellm_redis_total_requests_created
+      litellm_request_queue_time_seconds_created
+      litellm_request_total_latency_metric_created
+      litellm_requests_metric_created
+      litellm_reset_budget_job_failed_requests_created
+      litellm_reset_budget_job_latency_created
+      litellm_reset_budget_job_total_requests_created
+      litellm_router_failed_requests_created
+      litellm_router_latency_created
+      litellm_router_total_requests_created
+      litellm_self_failed_requests_created
+      litellm_self_latency_created
+      litellm_self_total_requests_created
+      litellm_spend_metric_created
+      litellm_total_tokens_metric_created
+      litellm_video_duration_seconds_metric_created
+      litellm_requests_metric_total
+      litellm_llm_api_failed_requests_metric_total
+      litellm_check_batch_cost_last_run_timestamp
+    metric_relabel_configs:
+      - action: drop
 template:
   family: LiteLLM
   context_namespace: litellm
@@ -120,7 +121,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2000
           dimensions:
             - selector: 'litellm_proxy_total_requests_metric_total{status_code=~".*[^[:space:]].*"}'
               name_from_label: status_code
@@ -132,7 +132,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2005
           dimensions:
             - selector: 'litellm_proxy_total_requests_metric_total{stream=~".*[^[:space:]].*"}'
               name_from_label: stream
@@ -144,7 +143,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2010
           dimensions:
             - selector: 'litellm_proxy_failed_requests_metric_total{exception_status=~".*[^[:space:]].*"}'
               name_from_label: exception_status
@@ -156,7 +154,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2011
           dimensions:
             - selector: 'litellm_proxy_failed_requests_metric_total{rate_limit_category=~".*[^[:space:]].*"}'
               name_from_label: rate_limit_category
@@ -168,7 +165,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2012
           dimensions:
             - selector: 'litellm_proxy_failed_requests_metric_total{rate_limit_type=~".*[^[:space:]].*"}'
               name_from_label: rate_limit_type
@@ -180,7 +176,6 @@ template:
           units: requests
           algorithm: absolute
           type: line
-          priority: 2020
           dimensions:
             - selector: 'litellm_in_flight_requests'
               name: requests
@@ -190,7 +185,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2030
           dimensions:
             - selector: 'litellm_request_queue_time_seconds_bucket'
 
@@ -199,7 +193,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2040
           dimensions:
             - selector: 'litellm_request_total_latency_metric_bucket'
 
@@ -208,7 +201,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2050
           dimensions:
             - selector: 'litellm_overhead_latency_metric_bucket'
 
@@ -217,7 +209,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2060
           dimensions:
             - selector: 'litellm_overhead_with_guardrails_latency_metric_bucket'
 
@@ -226,7 +217,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2070
           dimensions:
             - selector: 'litellm_request_queue_time_seconds_count'
               name: queue
@@ -239,7 +229,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2071
           dimensions:
             - selector: 'litellm_request_total_latency_metric_count{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
               name_from_label: service_tier
@@ -251,7 +240,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2080
           dimensions:
             - selector: 'litellm_overhead_latency_metric_count'
               name: overhead
@@ -263,7 +251,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2090
           dimensions:
             - selector: 'litellm_request_queue_time_seconds_sum'
               name: queue
@@ -276,7 +263,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2091
           dimensions:
             - selector: 'litellm_request_total_latency_metric_sum{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
               name_from_label: service_tier
@@ -288,7 +274,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2100
           dimensions:
             - selector: 'litellm_overhead_latency_metric_sum'
               name: overhead
@@ -301,7 +286,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2110
           instances:
             by_labels: [api_provider, model_id]
           dimensions:
@@ -316,7 +300,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2120
           instances:
             by_labels: [api_provider, model_id]
           dimensions:
@@ -331,7 +314,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2130
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -343,7 +325,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2140
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -355,7 +336,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2150
           instances:
             by_labels: [api_provider, litellm_model_name]
           dimensions:
@@ -367,7 +347,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2160
           instances:
             by_labels: [api_provider, litellm_model_name]
           dimensions:
@@ -379,7 +358,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2170
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -394,7 +372,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2180
           instances:
             by_labels: [api_provider, litellm_model_name]
           dimensions:
@@ -409,7 +386,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2190
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -424,7 +400,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2200
           instances:
             by_labels: [api_provider, litellm_model_name]
           dimensions:
@@ -439,7 +414,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2210
           instances:
             by_labels: [route]
           dimensions:
@@ -454,7 +428,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2220
           instances:
             by_labels: [route]
           dimensions:
@@ -486,7 +459,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2230
           dimensions:
             - selector: 'litellm_deployment_total_requests_total'
               name: requests
@@ -498,7 +470,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2240
           dimensions:
             - selector: 'litellm_deployment_failure_responses_total{exception_status=~".*[^[:space:]].*"}'
               name_from_label: exception_status
@@ -510,7 +481,6 @@ template:
           units: fallbacks/s
           algorithm: incremental
           type: line
-          priority: 2250
           dimensions:
             - selector: 'litellm_deployment_successful_fallbacks_total'
               name: successful
@@ -522,7 +492,6 @@ template:
           units: cooldowns/s
           algorithm: incremental
           type: line
-          priority: 2260
           dimensions:
             - selector: 'litellm_deployment_cooled_down_total{exception_status=~".*[^[:space:]].*"}'
               name_from_label: exception_status
@@ -535,7 +504,6 @@ template:
           units: state
           algorithm: absolute
           type: line
-          priority: 2270
           instances:
             by_labels: ['*']
           dimensions:
@@ -548,7 +516,6 @@ template:
           units: requests/min
           algorithm: absolute
           type: line
-          priority: 2280
           instances:
             by_labels: ['*']
           dimensions:
@@ -561,7 +528,6 @@ template:
           units: tokens/min
           algorithm: absolute
           type: line
-          priority: 2290
           instances:
             by_labels: ['*']
           dimensions:
@@ -574,7 +540,6 @@ template:
           units: requests
           algorithm: absolute
           type: line
-          priority: 2300
           instances:
             by_labels: ['*']
           dimensions:
@@ -587,7 +552,6 @@ template:
           units: tokens
           algorithm: absolute
           type: line
-          priority: 2310
           instances:
             by_labels: ['*']
           dimensions:
@@ -599,7 +563,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2320
           dimensions:
             - selector: 'litellm_deployment_latency_per_output_token_bucket'
 
@@ -608,7 +571,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2330
           dimensions:
             - selector: 'litellm_deployment_latency_per_output_token_count'
               name: requests
@@ -618,7 +580,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2340
           dimensions:
             - selector: 'litellm_deployment_latency_per_output_token_sum'
               name: time
@@ -629,7 +590,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2350
           instances:
             by_labels: [model_id]
           dimensions:
@@ -644,7 +604,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 2360
           instances:
             by_labels: [model_id]
           dimensions:
@@ -659,7 +618,6 @@ template:
           units: cooldowns/s
           algorithm: incremental
           type: line
-          priority: 2370
           instances:
             by_labels: [model_id]
           dimensions:
@@ -674,7 +632,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2380
           instances:
             by_labels: [model_id]
           dimensions:
@@ -686,7 +643,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2390
           instances:
             by_labels: [model_id]
           dimensions:
@@ -699,7 +655,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2400
           instances:
             by_labels: [model_id]
           dimensions:
@@ -712,7 +667,6 @@ template:
           units: fallbacks/s
           algorithm: incremental
           type: line
-          priority: 2410
           instances:
             by_labels: [requested_model, fallback_model, model_id]
           dimensions:
@@ -736,7 +690,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2420
           dimensions:
             - selector: 'litellm_llm_api_latency_metric_bucket'
 
@@ -745,7 +698,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2430
           dimensions:
             - selector: 'litellm_llm_api_time_to_first_token_metric_bucket'
 
@@ -754,7 +706,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2440
           dimensions:
             - selector: 'litellm_llm_api_latency_metric_count'
               name: api_latency
@@ -767,7 +718,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2441
           dimensions:
             - selector: 'litellm_llm_api_latency_metric_count{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
               name_from_label: service_tier
@@ -780,7 +730,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2442
           dimensions:
             - selector: 'litellm_llm_api_time_to_first_token_metric_count{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
               name_from_label: service_tier
@@ -792,7 +741,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2450
           dimensions:
             - selector: 'litellm_llm_api_latency_metric_sum'
               name: api_latency
@@ -805,7 +753,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2451
           dimensions:
             - selector: 'litellm_llm_api_latency_metric_sum{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
               name_from_label: service_tier
@@ -818,7 +765,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2452
           dimensions:
             - selector: 'litellm_llm_api_time_to_first_token_metric_sum{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
               name_from_label: service_tier
@@ -831,7 +777,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2460
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -843,7 +788,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2470
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -855,7 +799,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 2480
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -870,7 +813,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2490
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -897,7 +839,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2500
           dimensions:
             - selector: 'litellm_input_tokens_metric_total'
               name: input
@@ -911,7 +852,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2510
           dimensions:
             - selector: 'litellm_input_audio_tokens_metric_total'
               name: input_audio
@@ -925,7 +865,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2520
           dimensions:
             - selector: 'litellm_spend_metric_total'
               name: spend
@@ -936,7 +875,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2521
           dimensions:
             - selector: 'litellm_spend_metric_total{service_tier=~"^([^N[:space:]][^[:space:]]*|N|N[^o[:space:]][^[:space:]]*|No|No[^n[:space:]][^[:space:]]*|Non|Non[^e[:space:]][^[:space:]]*|None[^[:space:]]+)$"}'
               name_from_label: service_tier
@@ -948,7 +886,6 @@ template:
           units: images/s
           algorithm: incremental
           type: line
-          priority: 2530
           dimensions:
             - selector: 'litellm_images_generated_metric_total'
               name: images
@@ -958,7 +895,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2540
           dimensions:
             - selector: 'litellm_video_duration_seconds_metric_total'
               name: duration
@@ -969,7 +905,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2550
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -986,7 +921,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2560
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1003,7 +937,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2570
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1016,7 +949,6 @@ template:
           units: images/s
           algorithm: incremental
           type: line
-          priority: 2580
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1029,7 +961,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2590
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1042,7 +973,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2600
           instances:
             by_labels: [hashed_api_key]
           dimensions:
@@ -1059,7 +989,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2610
           instances:
             by_labels: [hashed_api_key]
           dimensions:
@@ -1072,7 +1001,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2620
           instances:
             by_labels: [team]
           dimensions:
@@ -1089,7 +1017,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2630
           instances:
             by_labels: [team]
           dimensions:
@@ -1102,7 +1029,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2640
           instances:
             by_labels: [user]
           dimensions:
@@ -1119,7 +1045,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2650
           instances:
             by_labels: [user]
           dimensions:
@@ -1132,7 +1057,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2660
           instances:
             by_labels: [org_id]
           dimensions:
@@ -1149,7 +1073,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2670
           instances:
             by_labels: [org_id]
           dimensions:
@@ -1162,7 +1085,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2680
           instances:
             by_labels: [end_user]
           dimensions:
@@ -1179,7 +1101,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2690
           instances:
             by_labels: [end_user]
           dimensions:
@@ -1192,7 +1113,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2700
           instances:
             by_labels: [requested_model]
           dimensions:
@@ -1209,7 +1129,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 2710
           instances:
             by_labels: [requested_model]
           dimensions:
@@ -1232,7 +1151,6 @@ template:
           units: lookups/s
           algorithm: incremental
           type: line
-          priority: 2720
           dimensions:
             - selector: 'litellm_cache_hits_metric_total'
               name: hits
@@ -1244,7 +1162,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2730
           dimensions:
             - selector: 'litellm_cached_tokens_metric_total'
               name: served
@@ -1254,7 +1171,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2740
           dimensions:
             - selector: 'litellm_input_cache_creation_tokens_metric_total'
               name: input_cache_created
@@ -1266,7 +1182,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2750
           dimensions:
             - selector: 'litellm_provider_cache_creation_input_tokens_metric_total'
               name: provider_cache_created
@@ -1279,7 +1194,6 @@ template:
           units: lookups/s
           algorithm: incremental
           type: line
-          priority: 2760
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1294,7 +1208,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2770
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1307,7 +1220,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2780
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1322,7 +1234,6 @@ template:
           units: tokens/s
           algorithm: incremental
           type: line
-          priority: 2790
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1357,7 +1268,6 @@ template:
           units: USD
           algorithm: absolute
           type: line
-          priority: 2800
           instances:
             by_labels: ['*']
           dimensions:
@@ -1372,7 +1282,6 @@ template:
           units: USD
           algorithm: absolute
           type: line
-          priority: 2810
           instances:
             by_labels: ['*']
           dimensions:
@@ -1387,7 +1296,6 @@ template:
           units: USD
           algorithm: absolute
           type: line
-          priority: 2820
           instances:
             by_labels: ['*']
           dimensions:
@@ -1402,7 +1310,6 @@ template:
           units: USD
           algorithm: absolute
           type: line
-          priority: 2830
           instances:
             by_labels: ['*']
           dimensions:
@@ -1417,7 +1324,6 @@ template:
           units: USD
           algorithm: absolute
           type: line
-          priority: 2840
           instances:
             by_labels: ['*']
           dimensions:
@@ -1430,7 +1336,6 @@ template:
           units: hours
           algorithm: absolute
           type: line
-          priority: 2850
           instances:
             by_labels: ['*']
           dimensions:
@@ -1443,7 +1348,6 @@ template:
           units: hours
           algorithm: absolute
           type: line
-          priority: 2860
           instances:
             by_labels: ['*']
           dimensions:
@@ -1456,7 +1360,6 @@ template:
           units: hours
           algorithm: absolute
           type: line
-          priority: 2870
           instances:
             by_labels: ['*']
           dimensions:
@@ -1469,7 +1372,6 @@ template:
           units: hours
           algorithm: absolute
           type: line
-          priority: 2880
           instances:
             by_labels: ['*']
           dimensions:
@@ -1482,7 +1384,6 @@ template:
           units: requests
           algorithm: absolute
           type: line
-          priority: 2890
           instances:
             by_labels: ['*']
           dimensions:
@@ -1495,7 +1396,6 @@ template:
           units: tokens
           algorithm: absolute
           type: line
-          priority: 2900
           instances:
             by_labels: ['*']
           dimensions:
@@ -1508,7 +1408,6 @@ template:
           units: users
           algorithm: absolute
           type: line
-          priority: 2910
           instances:
             by_labels: ['*']
           dimensions:
@@ -1529,7 +1428,6 @@ template:
           units: invocations/s
           algorithm: incremental
           type: line
-          priority: 2920
           dimensions:
             - selector: 'litellm_guardrail_requests_total'
               name_from_label: status
@@ -1539,7 +1437,6 @@ template:
           units: errors/s
           algorithm: incremental
           type: line
-          priority: 2930
           dimensions:
             - selector: 'litellm_guardrail_errors_total'
               name_from_label: error_type
@@ -1549,7 +1446,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2940
           dimensions:
             - selector: 'litellm_guardrail_latency_seconds_bucket'
 
@@ -1558,7 +1454,6 @@ template:
           units: invocations/s
           algorithm: incremental
           type: line
-          priority: 2950
           dimensions:
             - selector: 'litellm_guardrail_latency_seconds_count'
               name_from_label: status
@@ -1568,7 +1463,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 2960
           dimensions:
             - selector: 'litellm_guardrail_latency_seconds_sum'
               name: time
@@ -1579,7 +1473,6 @@ template:
           units: invocations/s
           algorithm: incremental
           type: line
-          priority: 2970
           instances:
             by_labels: [guardrail_name, hook_type]
           dimensions:
@@ -1592,7 +1485,6 @@ template:
           units: errors/s
           algorithm: incremental
           type: line
-          priority: 2980
           instances:
             by_labels: [guardrail_name, hook_type]
           dimensions:
@@ -1605,7 +1497,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 2990
           instances:
             by_labels: [guardrail_name, hook_type]
           dimensions:
@@ -1617,7 +1508,6 @@ template:
           units: invocations/s
           algorithm: incremental
           type: line
-          priority: 3000
           instances:
             by_labels: [guardrail_name, hook_type]
           dimensions:
@@ -1630,7 +1520,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 3010
           instances:
             by_labels: [guardrail_name, hook_type]
           dimensions:
@@ -1648,7 +1537,6 @@ template:
           units: calls/s
           algorithm: incremental
           type: line
-          priority: 3020
           dimensions:
             - selector: 'litellm_mcp_tool_calls_total'
               name: calls
@@ -1658,7 +1546,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 3030
           dimensions:
             - selector: 'litellm_mcp_tool_call_spend_metric_total'
               name: spend
@@ -1669,7 +1556,6 @@ template:
           units: calls/s
           algorithm: incremental
           type: line
-          priority: 3040
           instances:
             by_labels: [mcp_server_name, mcp_tool_name]
           dimensions:
@@ -1682,7 +1568,6 @@ template:
           units: USD/s
           algorithm: incremental
           type: line
-          priority: 3050
           instances:
             by_labels: [mcp_server_name, mcp_tool_name]
           dimensions:
@@ -1708,7 +1593,6 @@ template:
           units: batches/s
           algorithm: incremental
           type: line
-          priority: 3060
           dimensions:
             - selector: 'litellm_managed_batch_created_total'
               name: created
@@ -1718,7 +1602,6 @@ template:
           units: batches/s
           algorithm: incremental
           type: line
-          priority: 3070
           dimensions:
             - selector: 'litellm_check_batch_cost_jobs_processed_total'
               name: cost_tracked
@@ -1730,7 +1613,6 @@ template:
           units: errors/s
           algorithm: incremental
           type: line
-          priority: 3080
           dimensions:
             - selector: 'litellm_check_batch_cost_errors_total'
               name_from_label: error_type
@@ -1741,7 +1623,6 @@ template:
           units: batches
           algorithm: absolute
           type: line
-          priority: 3090
           instances:
             by_labels: ['*']
           dimensions:
@@ -1753,7 +1634,6 @@ template:
           units: files/s
           algorithm: incremental
           type: line
-          priority: 3100
           dimensions:
             - selector: 'litellm_managed_file_created_total'
               name: created
@@ -1763,7 +1643,6 @@ template:
           units: files/s
           algorithm: incremental
           type: line
-          priority: 3110
           dimensions:
             - selector: 'litellm_managed_file_deleted_total'
               name_from_label: result
@@ -1774,7 +1653,6 @@ template:
           units: bytes
           algorithm: absolute
           type: line
-          priority: 3120
           instances:
             by_labels: ['*']
           dimensions:
@@ -1786,7 +1664,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3130
           dimensions:
             - selector: 'litellm_managed_batch_duration_seconds_bucket'
 
@@ -1795,7 +1672,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 3140
           dimensions:
             - selector: 'litellm_managed_batch_duration_seconds_sum'
               name: duration
@@ -1806,7 +1682,6 @@ template:
           units: batches/s
           algorithm: incremental
           type: line
-          priority: 3150
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1819,7 +1694,6 @@ template:
           units: batches/s
           algorithm: incremental
           type: line
-          priority: 3160
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1834,7 +1708,6 @@ template:
           units: files/s
           algorithm: incremental
           type: line
-          priority: 3170
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1847,7 +1720,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3180
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1859,7 +1731,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 3190
           instances:
             by_labels: [api_provider, model]
           dimensions:
@@ -1880,7 +1751,6 @@ template:
           units: users
           algorithm: absolute
           type: line
-          priority: 3200
           instances:
             by_labels: ['*']
           dimensions:
@@ -1895,7 +1765,6 @@ template:
           units: teams
           algorithm: absolute
           type: line
-          priority: 3210
           instances:
             by_labels: ['*']
           dimensions:
@@ -1907,7 +1776,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 3220
           dimensions:
             - selector: 'litellm_callback_logging_failures_metric_total'
               name: failures
@@ -1918,7 +1786,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 3230
           instances:
             by_labels: [callback_name]
           dimensions:
@@ -1999,7 +1866,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 3240
           dimensions:
             - selector: 'litellm_auth_total_requests_total'
               name: auth
@@ -2029,7 +1895,6 @@ template:
           units: failures/s
           algorithm: incremental
           type: line
-          priority: 3250
           dimensions:
             - selector: 'litellm_auth_failed_requests_total'
               name: auth
@@ -2059,7 +1924,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3260
           dimensions:
             - selector: 'litellm_auth_latency_bucket'
 
@@ -2068,7 +1932,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3270
           dimensions:
             - selector: 'litellm_proxy_pre_call_latency_bucket'
 
@@ -2077,7 +1940,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3280
           dimensions:
             - selector: 'litellm_router_latency_bucket'
 
@@ -2086,7 +1948,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3290
           dimensions:
             - selector: 'litellm_postgres_latency_bucket'
 
@@ -2095,7 +1956,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3300
           dimensions:
             - selector: 'litellm_redis_latency_bucket'
 
@@ -2104,7 +1964,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3310
           dimensions:
             - selector: 'litellm_batch_write_to_db_latency_bucket'
 
@@ -2113,7 +1972,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3320
           dimensions:
             - selector: 'litellm_reset_budget_job_latency_bucket'
 
@@ -2122,7 +1980,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3330
           dimensions:
             - selector: 'litellm_self_latency_bucket'
 
@@ -2131,7 +1988,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3340
           dimensions:
             - selector: 'litellm_redis_daily_org_spend_update_queue_latency_bucket'
 
@@ -2140,7 +1996,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3350
           dimensions:
             - selector: 'litellm_redis_daily_tag_spend_update_queue_latency_bucket'
 
@@ -2149,7 +2004,6 @@ template:
           units: observations/s
           algorithm: incremental
           type: heatmap
-          priority: 3360
           dimensions:
             - selector: 'litellm_redis_daily_team_spend_update_queue_latency_bucket'
 
@@ -2158,7 +2012,6 @@ template:
           units: requests/s
           algorithm: incremental
           type: line
-          priority: 3370
           dimensions:
             - selector: 'litellm_auth_latency_count'
               name: auth
@@ -2188,7 +2041,6 @@ template:
           units: seconds/s
           algorithm: incremental
           type: line
-          priority: 3380
           dimensions:
             - selector: 'litellm_auth_latency_sum'
               name: auth
@@ -2219,7 +2071,6 @@ template:
           units: items
           algorithm: absolute
           type: line
-          priority: 3390
           instances:
             by_labels: ['*', '!in_memory_daily_spend_update_queue', '!in_memory_spend_update_queue', '!redis_daily_agent_spend_update_queue', '!redis_daily_end_user_spend_update_queue',
                         '!redis_daily_spend_update_queue', '!redis_spend_update_queue']
@@ -2243,7 +2094,6 @@ template:
           units: locks
           algorithm: absolute
           type: line
-          priority: 3400
           # Unlike the constant service/queue labels above, this value identifies
           # the dynamic <cronjob>:<pod> lock and must remain in chart identity.
           instances:
@@ -2251,102 +2101,3 @@ template:
           dimensions:
             - selector: 'litellm_pod_lock_manager_size'
               name: locks
-
-    - family: Runtime
-      context_namespace: runtime
-      metrics:
-        - process_virtual_memory_bytes
-        - process_resident_memory_bytes
-        - process_cpu_seconds_total
-        - process_open_fds
-        - process_max_fds
-      charts:
-        - title: Process CPU Usage
-          context: process_cpu
-          units: cores
-          algorithm: incremental
-          type: line
-          priority: 3410
-          dimensions:
-            - selector: process_cpu_seconds_total
-              name: used
-              options:
-                float: true
-
-        - title: Process Resident Memory
-          context: process_resident_memory
-          units: bytes
-          algorithm: absolute
-          type: line
-          priority: 3420
-          dimensions:
-            - selector: process_resident_memory_bytes
-              name: resident
-
-        - title: Process Virtual Memory
-          context: process_virtual_memory
-          units: bytes
-          algorithm: absolute
-          type: line
-          priority: 3430
-          dimensions:
-            - selector: process_virtual_memory_bytes
-              name: virtual
-
-        - title: Open File Descriptors
-          context: open_file_descriptors
-          units: fds
-          algorithm: absolute
-          type: line
-          priority: 3440
-          dimensions:
-            - selector: process_open_fds
-              name: open
-
-        - title: File Descriptor Limit
-          context: file_descriptor_limit
-          units: fds
-          algorithm: absolute
-          type: line
-          priority: 3450
-          dimensions:
-            - selector: process_max_fds
-              name: limit
-
-      groups:
-        - family: Python GC
-          context_namespace: python_gc
-          metrics:
-            - python_gc_objects_collected_total
-            - python_gc_objects_uncollectable_total
-            - python_gc_collections_total
-          charts:
-            - title: Collected Objects
-              context: collected_objects
-              units: objects/s
-              algorithm: incremental
-              type: line
-              priority: 3460
-              dimensions:
-                - selector: python_gc_objects_collected_total
-                  name_from_label: generation
-
-            - title: Uncollectable Objects
-              context: uncollectable_objects
-              units: objects/s
-              algorithm: incremental
-              type: line
-              priority: 3470
-              dimensions:
-                - selector: python_gc_objects_uncollectable_total
-                  name_from_label: generation
-
-            - title: Collections
-              context: collections
-              units: collections/s
-              algorithm: incremental
-              type: line
-              priority: 3480
-              dimensions:
-                - selector: python_gc_collections_total
-                  name_from_label: generation

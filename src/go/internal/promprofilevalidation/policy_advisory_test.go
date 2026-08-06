@@ -8,44 +8,22 @@ import (
 	"testing"
 )
 
-func TestValidateProfileRequiresExplicitPositivePriority(t *testing.T) {
-	profile := strings.Replace(validProfile, "      priority: 110\n", "", 1)
+func TestValidateProfileRejectsExplicitPriority(t *testing.T) {
+	profile := strings.Replace(validProfile, "    - title: Temperature\n", "    - title: Temperature\n      priority: 100\n", 1)
 	result := runValidation(t, profile, validDump, "")
-	requireFinding(t, result, "priority_missing")
+	requireFinding(t, result, "priority_forbidden")
 }
 
-func TestValidateProfileKeepsLastValidPriorityAfterMissingPriority(t *testing.T) {
-	profile := replaceOnce(t, validProfile, "      priority: 110\n", "")
-	profile = replaceOnce(t, profile, "      priority: 120\n", "      priority: 90\n")
-	result := runValidation(t, profile, validDump, "")
-
-	requireFinding(t, result, "priority_missing")
-	requireFinding(t, result, "priority_source_order")
-	for _, finding := range result.report.Findings {
-		if finding.Code == "priority_source_order" && !strings.Contains(finding.Message, "does not follow 100") {
-			t.Fatalf("descending priority did not stay anchored to the last valid priority: %#v", finding)
+func TestValidateProfileUsesOneRuntimePriorityWhenPrioritiesAreOmitted(t *testing.T) {
+	result := runValidation(t, validProfile, validDump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("omitted priorities must pass\nreport:\n%s", result.stdout)
+	}
+	for _, chart := range result.report.Charts {
+		if chart.Priority != 70000 {
+			t.Fatalf("runtime chart priority: got %d, want 70000: %#v", chart.Priority, chart)
 		}
 	}
-}
-
-func TestValidateProfileKeepsPriorityTiesAsReviewWarnings(t *testing.T) {
-	profile := strings.Replace(validProfile, "      priority: 110\n", "      priority: 100\n", 1)
-	result := runValidation(t, profile, validDump, "")
-	if result.exitCode != 0 {
-		t.Fatalf("priority ties preserve author judgment\nreport:\n%s", result.stdout)
-	}
-	if !hasFinding(result.report, "priority_duplicate", "warning") {
-		t.Fatalf("missing priority tie review prompt: %#v", result.report.Findings)
-	}
-	if hasFinding(result.report, "priority_source_order", "error") {
-		t.Fatalf("a tie is not descending source order: %#v", result.report.Findings)
-	}
-}
-
-func TestValidateProfileRejectsDescendingPrioritySourceOrder(t *testing.T) {
-	profile := strings.Replace(validProfile, "      priority: 110\n", "      priority: 90\n", 1)
-	result := runValidation(t, profile, validDump, "")
-	requireFinding(t, result, "priority_source_order")
 }
 
 func TestValidateProfileReportsObservedDenyImpactWithoutLeakingLabels(t *testing.T) {

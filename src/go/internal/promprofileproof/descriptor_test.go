@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"gopkg.in/yaml.v3"
 )
 
 func TestDescriptorRoundTripAndIntegrity(t *testing.T) {
@@ -23,6 +21,7 @@ func TestDescriptorRoundTripAndIntegrity(t *testing.T) {
 		"src/go/plugin/go.d/collector/prometheus/profile-proofs/app/VALIDATION-JOB.yaml": "app: app\n",
 		"src/go/plugin/go.d/collector/prometheus/profile-proofs/app/VALIDATION.md":       "validation\n",
 		"src/go/plugin/go.d/config/go.d/prometheus.profiles/default/app.yaml":            "match: app_*\n",
+		"src/go/plugin/go.d/config/go.d/prometheus.profiles/default/runtime.yaml":        "match: runtime_*\n",
 	}
 	for path, content := range localContents {
 		mustWriteFile(t, filepath.Join(repoRoot, filepath.FromSlash(path)), content)
@@ -31,44 +30,21 @@ func TestDescriptorRoundTripAndIntegrity(t *testing.T) {
 	externalRoot := filepath.Join(testdataRoot, "prometheus", "profiles", "app")
 	mustWriteFile(t, filepath.Join(externalRoot, "SOURCE-INVENTORY.tsv"), validInventory)
 	mustWriteFile(t, filepath.Join(externalRoot, "fixtures", "app.prom"), "# TYPE app_value gauge\napp_value 1\n")
-	inventoryDigest, inventoryBytes, err := digestFile(filepath.Join(externalRoot, "SOURCE-INVENTORY.tsv"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixtureDigest, fixtureBytes, err := digestFile(filepath.Join(externalRoot, "fixtures", "app.prom"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifestContent, err := yaml.Marshal(evidenceManifest{
-		Version:       1,
-		Profile:       "app",
-		EvidenceClass: "source-derived-synthetic",
-		Sanitized:     true,
-		Files: []evidenceManifestFile{
-			{Path: "SOURCE-INVENTORY.tsv", Kind: "source_inventory", SHA256: inventoryDigest, Bytes: inventoryBytes},
-			{Path: "fixtures/app.prom", Kind: "prometheus_exposition", SHA256: fixtureDigest, Bytes: fixtureBytes},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustWriteFile(t, filepath.Join(externalRoot, "manifest.yaml"), string(manifestContent))
 
 	bundle := Bundle{
 		Path: ProofRoot + "/app/" + DescriptorFilename,
 		Descriptor: Descriptor{
-			Version: 2,
+			Version: 3,
 			Profile: "app",
-			External: ExternalEvidence{
-				Revision: "app",
-				Manifest: FileDigest{SHA256: strings.Repeat("0", 64)},
-			},
+			SupportingProfiles: []SupportingProfile{{
+				Name: "runtime", FileDigest: FileDigest{SHA256: strings.Repeat("0", 64)},
+			}},
 			Inventory: SourceInventoryExpected{
 				Rows: 2, SourceFamilies: 2, AuthoredSelectors: 1,
-				Dispositions: InventoryDisposition{Chart: 1, JobExcluded: 1},
+				Dispositions: InventoryDisposition{Chart: 1, ProfileExcluded: 1},
 			},
 			Validation: Validation{
-				MetadataExample: MetadataExample{
+				MetadataExample: &MetadataExample{
 					IntegrationID: "collector-app", ExampleName: "App", JobName: "app",
 				},
 				Cases: []ValidationCase{{
@@ -111,11 +87,22 @@ func TestDescriptorRoundTripAndIntegrity(t *testing.T) {
 	if len(bundles) != 1 {
 		t.Fatalf("discovered %d bundles, want 1", len(bundles))
 	}
+	if got := bundles[0].SupportingProfilePaths(); len(got) != 1 || got[0] != StockProfileRoot+"/runtime.yaml" {
+		t.Fatalf("supporting profile paths: got %v", got)
+	}
 	if err := Verify(repoRoot, testdataRoot, bundles[0]); err != nil {
 		t.Fatal(err)
 	}
 	if got := EvidenceDirectories(bundles); len(got) != 1 || got[0] != "prometheus/profiles/app" {
 		t.Fatalf("evidence directories: got %v", got)
+	}
+	externalExtraPath := filepath.Join(externalRoot, "EXTRA.txt")
+	mustWriteFile(t, externalExtraPath, "extra\n")
+	if err := VerifyExternal(testdataRoot, bundles[0]); err == nil || !strings.Contains(err.Error(), "differ from descriptor") {
+		t.Fatalf("VerifyExternal with undeclared evidence file: got %v", err)
+	}
+	if err := os.Remove(externalExtraPath); err != nil {
+		t.Fatal(err)
 	}
 
 	extraPath := filepath.Join(proofDirectory, "EXTRA.md")
@@ -152,14 +139,13 @@ func TestDiscoverRejectsMissingAndUnknownDescriptors(t *testing.T) {
 	})
 }
 
-func TestLoadDescriptorV2NamedCasesAndInventory(t *testing.T) {
+func TestLoadDescriptorV3NamedCasesAndInventory(t *testing.T) {
 	repoRoot := t.TempDir()
 	path := filepath.Join(repoRoot, filepath.FromSlash(ProofRoot), "app", DescriptorFilename)
-	mustWriteFile(t, path, `version: 2
+	mustWriteFile(t, path, `version: 3
 profile: app
-external_evidence:
-  revision: app
-  manifest:
+supporting_profiles:
+  - name: runtime
     sha256: 0000000000000000000000000000000000000000000000000000000000000000
     bytes: 0
 source_inventory:
@@ -168,6 +154,7 @@ source_inventory:
   authored_selectors: 1
   dispositions:
     chart: 1
+    profile_excluded: 0
     job_excluded: 0
     writer_ineligible: 0
 validation:
@@ -217,8 +204,11 @@ integrity:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bundle.Descriptor.Version != 2 {
-		t.Fatalf("version: got %d, want 2", bundle.Descriptor.Version)
+	if bundle.Descriptor.Version != 3 {
+		t.Fatalf("version: got %d, want 3", bundle.Descriptor.Version)
+	}
+	if len(bundle.Descriptor.SupportingProfiles) != 1 || bundle.Descriptor.SupportingProfiles[0].Name != "runtime" {
+		t.Fatalf("supporting profiles: got %#v", bundle.Descriptor.SupportingProfiles)
 	}
 }
 
@@ -253,6 +243,105 @@ func TestValidateExpectedResultRejectsInvalidFindingCounts(t *testing.T) {
 	}
 	if err := validateExpectedResult("expected", expected); err == nil || !strings.Contains(err.Error(), "positive counts") {
 		t.Fatalf("validateExpectedResult: got %v, want invalid-finding-count error", err)
+	}
+}
+
+func TestSupportingProfilePathsForCase(t *testing.T) {
+	bundle := validBundleForCaseComposition()
+	want := []string{StockProfileRoot + "/runtime.yaml"}
+
+	for _, validationCase := range []ValidationCase{
+		{},
+		{Composition: CaseCompositionDeclared},
+	} {
+		got := bundle.SupportingProfilePathsForCase(validationCase)
+		if len(got) != len(want) || got[0] != want[0] {
+			t.Fatalf("declared composition paths: got %v, want %v", got, want)
+		}
+	}
+	if got := bundle.SupportingProfilePathsForCase(ValidationCase{Composition: CaseCompositionCandidateOnly}); len(got) != 0 {
+		t.Fatalf("candidate-only composition paths: got %v, want none", got)
+	}
+}
+
+func TestValidateCaseComposition(t *testing.T) {
+	t.Run("supplemental candidate only", func(t *testing.T) {
+		bundle := validBundleForCaseComposition()
+		bundle.Descriptor.Validation.Cases = append(bundle.Descriptor.Validation.Cases, ValidationCase{
+			Name: "partial", Kind: "supplemental", Composition: CaseCompositionCandidateOnly,
+			Fixture: "fixtures/partial.prom", Job: "validation", Expected: validExpectedResult(),
+		})
+		if err := bundle.validate(); err != nil {
+			t.Fatalf("validate: got %v, want success", err)
+		}
+	})
+
+	t.Run("unknown", func(t *testing.T) {
+		bundle := validBundleForCaseComposition()
+		bundle.Descriptor.Validation.Cases[0].Composition = "partial"
+		if err := bundle.validate(); err == nil || !strings.Contains(err.Error(), "composition") {
+			t.Fatalf("validate: got %v, want composition error", err)
+		}
+	})
+
+	t.Run("source complete candidate only", func(t *testing.T) {
+		bundle := validBundleForCaseComposition()
+		bundle.Descriptor.Validation.Cases[0].Composition = CaseCompositionCandidateOnly
+		if err := bundle.validate(); err == nil || !strings.Contains(err.Error(), "source_complete") {
+			t.Fatalf("validate: got %v, want source_complete composition error", err)
+		}
+	})
+
+	t.Run("candidate only without supports", func(t *testing.T) {
+		bundle := validBundleForCaseComposition()
+		bundle.Descriptor.SupportingProfiles = nil
+		bundle.Descriptor.Validation.Cases = append(bundle.Descriptor.Validation.Cases, ValidationCase{
+			Name: "partial", Kind: "supplemental", Composition: CaseCompositionCandidateOnly,
+			Fixture: "fixtures/partial.prom", Job: "validation", Expected: validExpectedResult(),
+		})
+		if err := bundle.validate(); err == nil || !strings.Contains(err.Error(), "supporting profile") {
+			t.Fatalf("validate: got %v, want supporting-profile error", err)
+		}
+	})
+}
+
+func validBundleForCaseComposition() Bundle {
+	return Bundle{
+		Path: ProofRoot + "/app/" + DescriptorFilename,
+		Descriptor: Descriptor{
+			Version: 3,
+			Profile: "app",
+			SupportingProfiles: []SupportingProfile{{
+				Name: "runtime", FileDigest: FileDigest{SHA256: strings.Repeat("0", 64)},
+			}},
+			Inventory: SourceInventoryExpected{
+				Rows: 1, SourceFamilies: 1, AuthoredSelectors: 1,
+				Dispositions: InventoryDisposition{Chart: 1},
+			},
+			Validation: Validation{Cases: []ValidationCase{{
+				Name: "source-complete", Kind: "source_complete", Fixture: "fixtures/app.prom", Job: "validation",
+				Expected: validExpectedResult(),
+			}}},
+			Integrity: Integrity{
+				Evidence:          FileDigest{SHA256: strings.Repeat("0", 64)},
+				OperatorModel:     FileDigest{SHA256: strings.Repeat("0", 64)},
+				ValidationJob:     FileDigest{SHA256: strings.Repeat("0", 64)},
+				ValidationSummary: FileDigest{SHA256: strings.Repeat("0", 64)},
+				Profile:           FileDigest{SHA256: strings.Repeat("0", 64)},
+			},
+		},
+	}
+}
+
+func validExpectedResult() ExpectedResult {
+	return ExpectedResult{
+		Verdict: "PASS",
+		Counts: ExpectedCounts{
+			RawFamilies: 1, RawLogicalSeries: 1, WriterSeries: 1,
+			SeriesScanned: 1, AuthoredCharts: 1, RuntimeCharts: 1, ChartDimensions: 1,
+		},
+		Errors:   map[string]int{},
+		Warnings: map[string]int{},
 	}
 }
 
