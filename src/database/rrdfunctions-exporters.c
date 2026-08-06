@@ -218,9 +218,12 @@ DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
 }
 
 // Folds one more string into a running digest. Seeding each call with the previous digest is what
-// keeps the field boundary part of the result: "ab" then "c" cannot fold to the same value as "a"
-// then "bc", because the first call already sees different input, so no separator byte or length
-// prefix is needed. NULL folds like "" - the proto sends nothing for either.
+// keeps the field boundary part of the result: "ab" then "c" does not fold to the same value as "a"
+// then "bc", because the first call already digests different input - so no separator byte or length
+// prefix is needed (the same 64-bit collision caveat as below applies).
+//
+// NULL folds like "": claim_id is the only field digested here that can actually be NULL, and the
+// proto omits it, which is indistinguishable on the wire from an empty one.
 static inline XXH64_hash_t manifest_hash_str(XXH64_hash_t seed, const char *s) {
     if(!s) s = "";
     return XXH3_64bits_withSeed(s, strlen(s), seed);
@@ -248,7 +251,9 @@ uint64_t manifest_dict_hash(DICTIONARY *dict, const char *node_id, const char *c
         struct rrd_function_manifest_entry *e;
         dfe_start_read(dict, e) {
             // padding-free by construction (three uint32_t), so the bytes hashed are only the
-            // values - a member of a different width would need explicit packing
+            // values - a member of a different width would need explicit packing. uint32_t is also
+            // wide enough for access: node_manifest.cc pins HTTP_ACCESS_ALL to contiguous bits from
+            // 0, so a value that would truncate here fails that build first.
             struct {
                 uint32_t access;
                 uint32_t priority;
