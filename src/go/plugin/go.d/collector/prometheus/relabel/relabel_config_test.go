@@ -156,6 +156,21 @@ func TestConfig_explicitEmptyRoundTrip(t *testing.T) {
 	}
 }
 
+func TestConfig_clonePreservesDefaultRegexOmission(t *testing.T) {
+	var original Config
+	require.NoError(t, yaml.Unmarshal([]byte("action: drop\n"), &original))
+	cloned := original.clone()
+	require.NotSame(t, original.Regex.Regexp, cloned.Regex.Regexp)
+
+	for name, cfg := range map[string]Config{"original": original, "clone": cloned} {
+		t.Run(name, func(t *testing.T) {
+			b, err := yaml.Marshal(cfg)
+			require.NoError(t, err)
+			assert.NotContains(t, string(b), "regex:")
+		})
+	}
+}
+
 // TestConfig_unmarshalThenNew confirms an unmarshaled rule validates and applies.
 func TestConfig_unmarshalThenNew(t *testing.T) {
 	var cfg Config

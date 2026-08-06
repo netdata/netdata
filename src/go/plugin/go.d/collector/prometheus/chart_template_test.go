@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -188,6 +189,40 @@ http_request_duration_seconds_count 4
 	assert.Equal(t, "heatmap", string(created[0].Meta.Type))
 	assert.NotContains(t, created[0].ChartID, "_sum")
 	assert.NotContains(t, created[0].ChartID, "_count")
+}
+
+func TestBuildMergedChartTemplateCrossNamespaceRenameLeavesProfileAutogenScope(t *testing.T) {
+	profile := testRelabelProfilePatternYAML("app_*", "app_raw", "app_raw", "other_final", "app_never")
+	profile = strings.Replace(profile, "template:\n", `autogen:
+  selector:
+    deny: ["*"]
+template:
+`, 1)
+	catalog := loadTestCatalog(t, map[string]string{"app": profile})
+	collector, srv := newProfileRelabelCollector(t, catalog, "# TYPE app_raw gauge\napp_raw 1\n", "app")
+	defer srv.Close()
+	require.NoError(t, collector.Init(context.Background()))
+	require.NoError(t, collector.Check(context.Background()))
+	collectProfileRelabelOnce(t, collector)
+
+	reader := collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	assert.InDelta(t, 1, value(t, reader, "other_final", nil), 1e-9)
+
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(collector.ChartTemplateYAML()), 1))
+	attempt, err := engine.PreparePlan(reader)
+	require.NoError(t, err)
+	defer attempt.Abort()
+
+	var created []chartengine.CreateChartAction
+	for _, action := range attempt.Plan().Actions {
+		if create, ok := action.(chartengine.CreateChartAction); ok {
+			created = append(created, create)
+		}
+	}
+	require.Len(t, created, 1)
+	assert.Equal(t, "prometheus.other_final", created[0].Meta.Context)
 }
 
 func TestBuildMergedChartTemplateAggregatesProjectedPrometheusSeries(t *testing.T) {

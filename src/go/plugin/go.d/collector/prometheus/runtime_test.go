@@ -219,6 +219,49 @@ func Test_combinedSelectProfiles(t *testing.T) {
 	}
 }
 
+func Test_profilesInNormalizationOrder(t *testing.T) {
+	profiles := func(names ...string) []promprofiles.Profile {
+		out := make([]promprofiles.Profile, len(names))
+		for i, name := range names {
+			out[i] = promprofiles.Profile{Name: name}
+		}
+		return out
+	}
+
+	tests := map[string]struct {
+		profiles []promprofiles.Profile
+		config   ProfilesConfig
+		want     []string
+	}{
+		"auto sorts by normalized profile name": {
+			profiles: profiles("zeta", "alpha", "beta"),
+			config:   ProfilesConfig{Mode: profilesModeAuto},
+			want:     []string{"alpha", "beta", "zeta"},
+		},
+		"exact preserves configured selection order": {
+			profiles: profiles("zeta", "alpha", "beta"),
+			config: ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesModeConfig{
+				Entries: profileEntries("zeta", "alpha", "beta"),
+			}},
+			want: []string{"zeta", "alpha", "beta"},
+		},
+		"combined puts entries first and sorts the auto remainder": {
+			profiles: profiles("beta", "alpha", "zeta", "gamma"),
+			config: ProfilesConfig{Mode: profilesModeCombined, ModeCombined: &ProfilesModeConfig{
+				Entries: profileEntries("zeta", "alpha"),
+			}},
+			want: []string{"zeta", "alpha", "beta", "gamma"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := profilesInNormalizationOrder(tc.profiles, tc.config)
+			assert.Equal(t, tc.want, profileNames(got))
+		})
+	}
+}
+
 // testMetricFamilies builds a MetricFamilies whose only meaningful content is the
 // set of family names (selection matches on the keys).
 func testMetricFamilies(names ...string) prometheus.MetricFamilies {
@@ -245,13 +288,22 @@ func profileNames(profiles []promprofiles.Profile) []string {
 // stock catalog.
 func loadTestCatalog(t *testing.T, profiles map[string]string) promprofiles.Catalog {
 	t.Helper()
+	return loadTestCatalogFromOrderedDirs(t, profiles)
+}
 
-	dir := t.TempDir()
-	for name, data := range profiles {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(data), 0o600))
+func loadTestCatalogFromOrderedDirs(t *testing.T, profileSets ...map[string]string) promprofiles.Catalog {
+	t.Helper()
+
+	var specs []promprofiles.DirSpec
+	for _, profiles := range profileSets {
+		dir := t.TempDir()
+		for name, data := range profiles {
+			require.NoError(t, os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(data), 0o600))
+		}
+		specs = append(specs, promprofiles.DirSpec{Path: dir, IsStock: true})
 	}
 
-	catalog, err := promprofiles.LoadFromDirs([]promprofiles.DirSpec{{Path: dir, IsStock: true}})
+	catalog, err := promprofiles.LoadFromDirs(specs)
 	require.NoError(t, err)
 	return catalog
 }

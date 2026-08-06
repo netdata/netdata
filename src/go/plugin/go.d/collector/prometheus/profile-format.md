@@ -5,9 +5,10 @@ renders one chart per scraped metric (autogeneration). A profile replaces that f
 a designed dashboard menu: named sections, per-instance charts, meaningful dimensions, units, and heatmaps. You are not
 limited to the stock library -- you can author a profile for your own application's metrics too.
 
-This page documents the profile file format. The job-level
-[metric relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) option, which reshapes scraped metrics
-before profiles and charts see them, is documented separately.
+This page documents the profile file format. Profiles may also provide
+[metric relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) that normalizes an exporter's metrics
+after the profile is selected and before its chart template sees them. Jobs use the same rule format for
+operator-specific filtering and normalization before profile selection.
 
 Profiles reshape metrics an existing job already scrapes --
 [set up the Prometheus collector job](/src/go/plugin/go.d/collector/prometheus/integrations/prometheus_endpoint.md)
@@ -28,10 +29,10 @@ because the catalog is cached for the plugin's lifetime.
 
 ## Complete example
 
-A profile is a YAML file with two required top-level keys (`match` and `template`) plus optional `app` and `autogen`
-policy. `match` selects the profile by scraped metric names, `app` names the application the charts belong to,
-`autogen.selector` controls fallback charts within the profile's match scope, and `template` defines the curated
-charts. Everything below `template` is Netdata's
+A profile is a YAML file with two required top-level keys (`match` and `template`) plus optional `app`, `relabeling`,
+and `autogen` policy. `match` selects the profile by scraped metric names, `app` names the application the charts
+belong to, `relabeling` normalizes matching metrics after selection, `autogen.selector` controls fallback charts
+within the profile's match scope, and `template` defines the curated charts. Everything below `template` is Netdata's
 [Chart Template Format](/src/go/plugin/framework/charttpl/README.md); inline comments explain each field.
 
 ```yaml
@@ -42,6 +43,15 @@ app: example                # optional. Application identity: charts appear unde
                             # the prometheus.<app>.* contexts and the app's own
                             # Applications section in the UI, unless the job
                             # config sets its own `app`.
+
+relabeling:                 # optional. Normalize this exporter's metrics after
+                            # profile selection and before template routing.
+  - match: example_legacy_http_requests_total
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: example_legacy_http_requests_total
+        target_label: __name__
+        replacement: example_http_requests_total
 
 autogen:                    # optional. Controls fallback charts inside this
   selector:                 # profile's match scope after authored routing fails.
@@ -127,24 +137,27 @@ template:
 
 ## How profiles work
 
-At runtime the collector uses profiles in four steps:
+At runtime the collector uses profiles in six ordered steps:
 
 1. **Scrape** -- the job scrapes the endpoint. The `selector` job option filters unwanted series
-   ([selector syntax](/src/go/pkg/prometheus/selector/README.md)), and
-   [relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) rewrites metric names and labels. Profiles
-   and charts only ever see the result.
-2. **Selection** -- once, at job autodetection, each profile's `match` is tested against the scraped metric family
+   ([selector syntax](/src/go/pkg/prometheus/selector/README.md)).
+2. **Job normalization** -- the job's
+   [relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) rewrites names and labels. Histogram and
+   summary integrity is checked before continuing.
+3. **Selection** -- once, at job autodetection, each profile's `match` is tested against the post-job metric family
    names, per the job's `profiles.mode` (see
    [Selecting profiles in job configuration](#selecting-profiles-in-job-configuration)). The selection is cached until
-   the job restarts.
-3. **App resolution** -- the job's `app` option wins; when unset, the first selected profile that declares an `app`
+   the job restarts. Profile-owned relabeling cannot select its own profile because it runs after this step.
+4. **Profile normalization** -- each source family is processed by the first applicable selected profile's `relabeling`.
+   Later profiles do not process that family. The resulting typed-family integrity is checked again.
+5. **App resolution** -- the job's `app` option wins; when unset, the first selected profile that declares an `app`
    provides it; the job name is the last resort. If selected profiles declare different apps, the first (in selection
    order) wins and the rest are logged -- set the job's `app` to disambiguate.
-4. **Charts** -- the selected profiles' templates are merged on top of the autogeneration base. Every series first gets
+6. **Charts** -- the selected profiles' templates are merged on top of the autogeneration base. Every series first gets
    a chance to route to every authored template dimension. If no route matches, each selected profile's
-   `autogen.selector` is evaluated only when that profile's `match` applies to the source family. Every applicable
-   selector must accept the series; one rejection suppresses fallback, independent of profile order. If no selector
-   applies, the series keeps its generic autogen chart. A selector never removes samples from the metric store.
+   `autogen.selector` is evaluated only when that profile's `match` applies to the final post-profile family. Every
+   applicable selector must accept the series; one rejection suppresses fallback, independent of profile order. If no
+   selector applies, the series keeps its generic autogen chart. A selector never removes samples from the metric store.
 
 Chart contexts compose as `prometheus.<app>.<template context_namespace>.<chart context>` -- in the example above,
 `prometheus.example.example.http_requests`. When the resolved app equals the profile's `context_namespace` (the common
@@ -154,12 +167,13 @@ contexts.
 
 ## Top-level fields
 
-| Field      | Required | Description                                                                                                                                            |
-|:-----------|:--------:|:--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `match`    |   yes    | [Netdata simple pattern](/src/libnetdata/simple_pattern/README.md) tested against scraped metric family names. One hit makes the profile applicable.  |
-| `app`      |    no    | Application identity used as the `app` segment of chart contexts when the job does not set one. Must match `^[a-z][a-z0-9_]*$`.                       |
-| `autogen`  |    no    | Fallback-chart policy. `autogen.selector` constrains generic charts inside this profile's `match` scope while retaining samples.                    |
-| `template` |   yes    | Chart template group defining the curated charts. At least one chart.                                                                                 |
+| Field        | Required | Description                                                                                                                                           |
+|:-------------|:--------:|:------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `match`      |   yes    | [Netdata simple pattern](/src/libnetdata/simple_pattern/README.md) tested against post-job metric family names. One hit makes the profile applicable. |
+| `app`        |    no    | Application identity used as the `app` segment of chart contexts when the job does not set one. Must match `^[a-z][a-z0-9_]*$`.                      |
+| `relabeling` |    no    | Profile-owned metric normalization, applied automatically after selection and before charts.                                                         |
+| `autogen`    |    no    | Fallback-chart policy. `autogen.selector` constrains generic charts inside this profile's `match` scope while retaining samples.                     |
+| `template`   |   yes    | Chart template group defining the curated charts. At least one chart.                                                                                |
 
 The filename must match `^[a-z][a-z0-9_]*$` (plus the `.yaml` or `.yml` extension): lowercase, starting with a letter,
 using only letters, digits, and underscores -- `my_app.yaml`, not `my-app.yaml` or `MyApp.yaml`. The basename is the
@@ -177,6 +191,8 @@ profile name used everywhere else -- in `profiles.mode_exact`/`mode_combined` en
   [Chart template rules](#chart-template-rules) and [the relabeling block `match`](/src/go/plugin/go.d/collector/prometheus/relabel/README.md#match).)
 - It sees the names **after** the job's `selector` and `relabeling` have been applied, so a rename can bring an
   endpoint's metrics into (or out of) a profile's match.
+- It sees names **before** this profile's own `relabeling`. A profile cannot rename an otherwise non-matching metric
+  into its own selection scope; use job relabeling when normalization is required to select the profile itself.
 - Syntax is a Netdata [simple pattern](/src/libnetdata/simple_pattern/README.md): a space-separated list of globs where
   `*` matches any sequence, `?` matches any single character, and a leading `!` negates a term.
 
@@ -184,11 +200,57 @@ Keep the pattern narrow -- anchored to the exporter's metric prefix, such as `ha
 every catalog profile whose `match` hits at least one scraped metric family is selected, so an over-broad pattern
 attaches the profile to unrelated jobs.
 
+### `relabeling`
+
+`relabeling` stores normalization required by the exporter profile itself. It uses the exact same ordered block and
+rule format as job-level [metric relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md), including the
+full action set. Use it when the profile's template needs a stable metric or label shape across exporter versions. Use
+job-level relabeling for deployment-specific policy, filtering, or normalization needed before profile selection.
+
+```yaml
+match: 'example_*'
+relabeling:
+  - match: example_requests
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: example_requests
+        target_label: __name__
+        replacement: example_http_requests_total
+template:
+  # Select example_http_requests_total here.
+  # ...
+```
+
+Profile relabeling uses first-applicable precedence over the shared metric stream:
+
+- It runs only for selected profiles and cannot affect profile selection.
+- A profile is applicable to an original source family when its root `match` covers the base family name and at least
+  one of its relabeling blocks matches an original physical series name. Rule results and output names do not affect
+  this decision.
+- The first applicable profile processes every series in that source family through its complete pipeline. Later
+  profile pipelines do not see the family, including names produced by the first pipeline.
+- Normalizer precedence is profile-name order in `auto`; configured entry order in `exact`; and configured entries
+  first followed by remaining auto-selected profiles in profile-name order in `combined`.
+- All selected templates consume the same final stream. A first profile's name or label changes are therefore visible
+  to every selected profile; profiles do not receive private copies of the source metrics.
+- The root `match` constrains source applicability, not output names. Profile authors are responsible for making the
+  produced names and labels agree with every selected template that consumes them.
+- If a produced family no longer matches the profile's root `match`, that profile's `autogen.selector` no longer applies
+  to it either. An uncovered output family therefore keeps generic autogen unless another applicable profile scope
+  rejects it.
+- Histogram and summary integrity is validated independently after job and profile relabeling. Partial component
+  renames/drops, structural `le`/`quantile` changes, splits, and merges are rejected during checking and contained by
+  dropping the corrupted family if they first appear at runtime.
+
+Untyped fallback classification is decided from the post-job, pre-profile name. A profile rename preserves that
+decision, but cannot create a counter merely by adding `_total` or make a final name match `fallback_type`. This keeps
+operator-owned type policy independent of profile naming.
+
 ### `autogen.selector`
 
 `autogen.selector` uses the existing metric selector `allow`/`deny` shape to control fallback charts. It runs only
 after no authored chart-template dimension matched the flattened series, and only when this profile's `match` applies
-to the resolved source family.
+to the final post-profile family that reaches the chart engine.
 
 - `allow` alone keeps fallback only for selected series.
 - `deny` alone keeps fallback for everything except selected series.
@@ -196,7 +258,7 @@ to the resolved source family.
 - At least one non-empty `allow` or `deny` entry is required. Empty `autogen`, null or empty `selector`, both lists
   absent or empty, whitespace-only entries, and invalid selector expressions are rejected.
 - Each entry accepts the same metric-name and label expression syntax as other metric selectors. The selector receives
-  the source family as `__name__` plus all current series labels.
+  the final post-profile family as `__name__` plus the relabeled series' current labels.
 - When multiple selected profile scopes apply, every applicable selector must accept the series. One rejection
   suppresses fallback, and profile order cannot change the result. Profiles without `autogen.selector` add no rule.
 - Histograms and summaries use their base family as `__name__`: `foo_bucket`, `foo_sum`, and `foo_count` all evaluate
@@ -314,6 +376,11 @@ the stock nor the user catalog is a configuration error in both modes. Scraped m
 profile keep their generic autogen charts unless an applicable profile `autogen.selector` rejects them. Use
 `autogen.selector` to constrain fallback charts while retaining samples; use the job's `selector` or a `relabeling`
 drop rule to discard samples.
+
+When selected profiles contain relabeling, the mode also determines normalizer precedence: `auto` uses profile-name
+order, `exact` uses entry order, and `combined` tries its configured entries first and then the remaining auto-selected
+profiles in profile-name order. This precedence affects normalization only; profile selection, app fallback, and template
+composition retain their existing behavior.
 
 `profiles`, `relabeling`, `selector`, `fallback_type`, and `app` are all job options in `go.d/prometheus.conf` -- edit
 it with `sudo ./edit-config go.d/prometheus.conf` from your
