@@ -633,23 +633,16 @@ require_cmd() {
   return 1
 }
 
-# netdata-installer.sh uses find for its chmod/chown steps, so every tree must
-# have an entry here. A tree that falls through to the default WARNING has those
-# steps silently skipped, so keep this covering every value assigned to ${tree}.
+# netdata-installer.sh uses find for its chmod/chown steps, so this must resolve
+# on every tree. The package is 'findutils' everywhere except Gentoo-derived
+# trees, so only the exceptions are listed.
 declare -A pkg_find=(
   ['alpine']="NOTREQUIRED" # busybox find covers the -type/-name/-a/-exec uses
-  ['arch']="findutils"
-  ['centos']="findutils"
-  ['clearlinux']="findutils"
-  ['debian']="findutils"
   ['gentoo']="sys-apps/findutils"
-  ['ol']="findutils"
-  ['rhel']="findutils"
   ['sabayon']="sys-apps/findutils"
-  ['suse']="findutils"
   ['macos']="NOTREQUIRED"
   ['freebsd']="NOTREQUIRED"
-  ['default']="WARNING|"
+  ['default']="findutils"
 )
 
 declare -A pkg_awk=(
