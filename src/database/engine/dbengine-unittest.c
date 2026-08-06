@@ -595,8 +595,10 @@ static int dbengine_platform_test_empty_directory(const char *path, size_t tier)
             continue;
         }
 
+        char child_path[RRDENG_PATH_MAX];
         char filename[RRDENG_PATH_MAX];
-        snprintfz(filename, sizeof(filename), "%s/%s", path, entry.name);
+        snprintfz(child_path, sizeof(child_path), "%s/%s", path, entry.name);
+        os_translate_path(filename, child_path, sizeof(filename));
 
         uv_fs_t unlink_req;
         ret = uv_fs_unlink(NULL, &unlink_req, filename, NULL);
