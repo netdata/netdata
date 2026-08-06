@@ -221,8 +221,10 @@ format's [`relabeling` section](/src/go/plugin/go.d/collector/prometheus/profile
 guidance. A family renamed outside the profile's root `match` also leaves that profile's `autogen.selector` scope, so an
 uncovered output keeps generic autogen unless another applicable profile scope rejects it.
 
-Untyped fallback type is bound from the post-job, pre-profile name. Profile relabeling preserves that decision but
-cannot create one by adding `_total` or renaming a final metric into a configured `fallback_type` pattern.
+Untyped fallback type is bound from the post-job, pre-profile name using declared, job, selected-profile, and implicit
+`_total` precedence. Profile relabeling preserves that decision but cannot create one by adding `_total` or renaming a
+final metric into a job/profile `fallback_type` pattern. See the profile format's
+[`fallback_type` section](/src/go/plugin/go.d/collector/prometheus/profile-format.md#fallback_type) for the full order.
 
 ## Examples
 

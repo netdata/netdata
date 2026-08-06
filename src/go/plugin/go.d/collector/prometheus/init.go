@@ -40,7 +40,7 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 	return prometheus.New(httpClient, req), nil
 }
 
-func (c *Collector) initFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
+func compileFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
 	if len(expr) == 0 {
 		return matcher.FALSE(), nil
 	}

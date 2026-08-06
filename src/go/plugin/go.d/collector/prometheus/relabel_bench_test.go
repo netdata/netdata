@@ -129,9 +129,9 @@ func BenchmarkRelabelScrapeModes(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			var normalizers []profileNormalizer
+			runtime := &promRuntime{}
 			if tc.profileRules {
-				normalizers = []profileNormalizer{benchmarkProfileNormalizer(b, "*", "*", "profile_stage")}
+				runtime.normalizers = []profileNormalizer{benchmarkProfileNormalizer(b, "*", "*", "profile_stage")}
 			}
 
 			b.ReportAllocs()
@@ -139,10 +139,10 @@ func BenchmarkRelabelScrapeModes(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
 				var err error
-				if len(normalizers) == 0 {
+				if !runtime.hasProfileSamplePolicy() {
 					_, err = collr.scrape(context.Background(), false)
 				} else {
-					_, err = collr.scrapeProfileNormalized(context.Background(), normalizers, false)
+					_, err = collr.scrapeProfilePipeline(context.Background(), runtime, false)
 				}
 				if err != nil {
 					b.Fatal(err)

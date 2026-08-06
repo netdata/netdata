@@ -24,10 +24,10 @@ func (c *Collector) collect(ctx context.Context) error {
 		typesBound bool
 		err        error
 	)
-	if len(runtime.normalizers) == 0 {
+	if !runtime.hasProfileSamplePolicy() {
 		mfs, err = c.scrape(ctx, false)
 	} else {
-		mfs, err = c.scrapeProfileNormalized(ctx, runtime.normalizers, false)
+		mfs, err = c.scrapeProfilePipeline(ctx, runtime, false)
 		typesBound = true
 	}
 	if err != nil {
@@ -112,19 +112,19 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 		return nil, nil, false, err
 	}
 	normalizationOrder := profilesInNormalizationOrder(candidate.profiles, c.Profiles)
+	candidate.fallbacks, err = compileProfileFallbacks(normalizationOrder)
+	if err != nil {
+		return nil, nil, false, err
+	}
 	candidate.normalizers, err = compileProfileNormalizers(normalizationOrder)
 	if err != nil {
 		return nil, nil, false, err
 	}
-	if len(candidate.normalizers) == 0 {
+	if !candidate.hasProfileSamplePolicy() {
 		return candidate, postJobFamilies, false, nil
 	}
 
-	// Bind job-owned fallback policy on post-job names before profile
-	// normalization. Jobs without an active normalizer keep normal type
-	// resolution on the assembled families.
-	c.writer.bindFallbackTypes(&postJob)
-	finalFamilies, err := c.profileRelabelAndAssemble(postJob, candidate.normalizers, true)
+	finalFamilies, err := c.applyProfilePipeline(postJob, candidate, true)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -134,9 +134,9 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 	return candidate, finalFamilies, true, nil
 }
 
-func (c *Collector) scrapeProfileNormalized(
+func (c *Collector) scrapeProfilePipeline(
 	ctx context.Context,
-	normalizers []profileNormalizer,
+	runtime *promRuntime,
 	checking bool,
 ) (prometheus.MetricFamilies, error) {
 	batch, err := c.prom.ScrapeSamples(ctx)
@@ -149,8 +149,7 @@ func (c *Collector) scrapeProfileNormalized(
 			return nil, err
 		}
 	}
-	c.writer.bindFallbackTypes(&batch)
-	mfs, err := c.profileRelabelAndAssemble(batch, normalizers, checking)
+	mfs, err := c.applyProfilePipeline(batch, runtime, checking)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +157,21 @@ func (c *Collector) scrapeProfileNormalized(
 		return nil, err
 	}
 	return mfs, nil
+}
+
+func (c *Collector) applyProfilePipeline(
+	batch prometheus.SampleBatch,
+	runtime *promRuntime,
+	checking bool,
+) (prometheus.MetricFamilies, error) {
+	// Bind all source-name fallback decisions before profile relabeling. The
+	// bound writer deliberately refuses destination-name fallback so a profile
+	// rename cannot create eligibility or share it with an unbound sibling.
+	c.writer.bindFallbackTypes(&batch, runtime.fallbacks)
+	if len(runtime.normalizers) == 0 {
+		return prometheus.Assemble(batch)
+	}
+	return c.profileRelabelAndAssemble(batch, runtime.normalizers, checking)
 }
 
 // scrape fetches the endpoint and enforces the empty-scrape contract: an empty scrape is

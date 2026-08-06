@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	commonmodel "github.com/prometheus/common/model"
+
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
@@ -18,8 +20,63 @@ import (
 // (autogen, or autogen merged with the selected profiles' curated groups).
 type promRuntime struct {
 	profiles      []promprofiles.Profile
+	fallbacks     []profileFallback
 	normalizers   []profileNormalizer
 	chartTemplate string
+}
+
+func (r *promRuntime) hasProfileSamplePolicy() bool {
+	return r != nil && (len(r.fallbacks) > 0 || len(r.normalizers) > 0)
+}
+
+type profileFallback struct {
+	root    matcher.Matcher
+	gauge   matcher.Matcher
+	counter matcher.Matcher
+}
+
+func compileProfileFallbacks(profiles []promprofiles.Profile) ([]profileFallback, error) {
+	var fallbacks []profileFallback
+	for _, profile := range profiles {
+		if !profile.HasFallbackType() {
+			continue
+		}
+		fallbackType, err := profile.FallbackType()
+		if err != nil {
+			return nil, err
+		}
+		root, err := compileProfileRoot(profile)
+		if err != nil {
+			return nil, err
+		}
+		gauge, err := compileFallbackTypeMatcher(fallbackType.Gauge)
+		if err != nil {
+			return nil, fmt.Errorf("profile %q: compile fallback_type.gauge: %w", profile.Name, err)
+		}
+		counter, err := compileFallbackTypeMatcher(fallbackType.Counter)
+		if err != nil {
+			return nil, fmt.Errorf("profile %q: compile fallback_type.counter: %w", profile.Name, err)
+		}
+		fallbacks = append(fallbacks, profileFallback{
+			root:    root,
+			gauge:   gauge,
+			counter: counter,
+		})
+	}
+	return fallbacks, nil
+}
+
+func (f profileFallback) resolve(name string) (commonmodel.MetricType, bool) {
+	if !f.root.MatchString(name) {
+		return "", false
+	}
+	if f.gauge.MatchString(name) {
+		return commonmodel.MetricTypeGauge, true
+	}
+	if f.counter.MatchString(name) {
+		return commonmodel.MetricTypeCounter, true
+	}
+	return "", false
 }
 
 type profileNormalizer struct {
@@ -41,13 +98,21 @@ func compileProfileNormalizers(profiles []promprofiles.Profile) ([]profileNormal
 		if err != nil {
 			return nil, fmt.Errorf("profile %q: compile relabeling: %w", profile.Name, err)
 		}
-		root, err := matcher.NewSimplePatternsMatcher(profile.Match)
+		root, err := compileProfileRoot(profile)
 		if err != nil {
-			return nil, fmt.Errorf("profile %q: invalid match %q: %w", profile.Name, profile.Match, err)
+			return nil, err
 		}
 		normalizers = append(normalizers, profileNormalizer{root: root, pipeline: pipeline})
 	}
 	return normalizers, nil
+}
+
+func compileProfileRoot(profile promprofiles.Profile) (matcher.Matcher, error) {
+	root, err := matcher.NewSimplePatternsMatcher(profile.Match)
+	if err != nil {
+		return nil, fmt.Errorf("profile %q: invalid match %q: %w", profile.Name, profile.Match, err)
+	}
+	return root, nil
 }
 
 // resolveApp is the chart-context "app" segment — the per-job identity the UI

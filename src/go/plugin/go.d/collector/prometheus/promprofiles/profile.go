@@ -21,16 +21,24 @@ import (
 // types vary by decode: yaml.Node for the cheap header pass and concrete types
 // for one lazy hydration. Decoding the complete raw document each time preserves
 // YAML anchors referenced across top-level fields without duplicating this list.
-type profileDocument[R, T any] struct {
-	Match      string   `yaml:"match"`
-	App        string   `yaml:"app,omitempty"`
-	Autogen    *autogen `yaml:"autogen,omitempty"`
-	Relabeling R        `yaml:"relabeling,omitempty"`
-	Template   T        `yaml:"template"`
+type profileDocument[F, R, T any] struct {
+	Match        string   `yaml:"match"`
+	App          string   `yaml:"app,omitempty"`
+	Autogen      *autogen `yaml:"autogen,omitempty"`
+	FallbackType F        `yaml:"fallback_type,omitempty"`
+	Relabeling   R        `yaml:"relabeling,omitempty"`
+	Template     T        `yaml:"template"`
 }
 
 type autogen struct {
 	Selector *metrixselector.Expr `yaml:"selector"`
+}
+
+// FallbackType classifies untyped scalar families selected by a profile.
+// Patterns use the same glob syntax as job-level fallback_type.
+type FallbackType struct {
+	Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
+	Counter []string `yaml:"counter,omitempty" json:"counter"`
 }
 
 // Profile is a curated, exporter-specific chart profile. Identity is the file
@@ -52,8 +60,13 @@ type Profile struct {
 // lazyProfile holds deferred stock-profile fields. It is referenced by pointer so
 // Profile value copies share hydration and sync.Once values are never copied.
 type lazyProfile struct {
-	raw           []byte
-	hasRelabeling bool
+	raw             []byte
+	hasFallbackType bool
+	hasRelabeling   bool
+
+	fallbackTypeOnce sync.Once
+	fallbackType     FallbackType
+	fallbackTypeErr  error
 
 	templateOnce sync.Once
 	tmpl         charttpl.Group
@@ -62,6 +75,29 @@ type lazyProfile struct {
 	relabelingOnce sync.Once
 	blocks         []relabel.Block
 	relabelingErr  error
+}
+
+// HasFallbackType reports whether the profile document contains a fallback_type
+// key without hydrating it. Present null and empty values return true so their
+// validation errors cannot silently take the no-policy fast path.
+func (p Profile) HasFallbackType() bool {
+	return p.lazy != nil && p.lazy.hasFallbackType
+}
+
+// FallbackType hydrates and validates profile-owned untyped scalar
+// classification on first use. It returns an independent copy so callers cannot
+// mutate catalog state.
+func (p Profile) FallbackType() (FallbackType, error) {
+	if !p.HasFallbackType() {
+		return FallbackType{}, nil
+	}
+	p.lazy.fallbackTypeOnce.Do(func() {
+		p.lazy.fallbackType, p.lazy.fallbackTypeErr = parseFallbackType(p.Name, p.lazy.raw)
+	})
+	if p.lazy.fallbackTypeErr != nil {
+		return FallbackType{}, p.lazy.fallbackTypeErr
+	}
+	return cloneFallbackType(p.lazy.fallbackType), nil
 }
 
 // Template parses and validates the chart template on first call and memoizes
@@ -125,8 +161,15 @@ func cloneSelectorExpr(expr *metrixselector.Expr) *metrixselector.Expr {
 	return &out
 }
 
-// validateHeader validates the always-loaded fields. Deferred template and
-// relabeling structure is validated separately at hydration time.
+func cloneFallbackType(ft FallbackType) FallbackType {
+	return FallbackType{
+		Gauge:   slices.Clone(ft.Gauge),
+		Counter: slices.Clone(ft.Counter),
+	}
+}
+
+// validateHeader validates the always-loaded fields. Deferred fallback,
+// relabeling, and template structure is validated separately at hydration time.
 func (p *Profile) validateHeader() error {
 	if strings.TrimSpace(p.Match) == "" {
 		return fmt.Errorf("profile %q: 'match' must not be empty", p.Name)
@@ -161,7 +204,7 @@ func (p *Profile) validateHeader() error {
 // parseTemplate typed-decodes and validates the chart template from the complete
 // document so aliases may reference anchors declared in another top-level field.
 func parseTemplate(name string, raw []byte) (charttpl.Group, error) {
-	var doc profileDocument[yaml.Node, *charttpl.Group]
+	var doc profileDocument[yaml.Node, yaml.Node, *charttpl.Group]
 	if err := decodeDocumentStrict(raw, &doc); err != nil {
 		return charttpl.Group{}, fmt.Errorf("profile %q: unmarshal 'template': %w", name, err)
 	}
@@ -186,7 +229,7 @@ func parseTemplate(name string, raw []byte) (charttpl.Group, error) {
 }
 
 func parseRelabeling(name string, raw []byte) ([]relabel.Block, error) {
-	var doc profileDocument[[]relabel.Block, yaml.Node]
+	var doc profileDocument[yaml.Node, []relabel.Block, yaml.Node]
 	if err := decodeDocumentStrict(raw, &doc); err != nil {
 		return nil, fmt.Errorf("profile %q: unmarshal 'relabeling': %w", name, err)
 	}
@@ -198,6 +241,40 @@ func parseRelabeling(name string, raw []byte) ([]relabel.Block, error) {
 		return nil, fmt.Errorf("profile %q: invalid 'relabeling': %w", name, err)
 	}
 	return blocks, nil
+}
+
+func parseFallbackType(name string, raw []byte) (FallbackType, error) {
+	var doc profileDocument[*FallbackType, yaml.Node, yaml.Node]
+	if err := decodeDocumentStrict(raw, &doc); err != nil {
+		return FallbackType{}, fmt.Errorf("profile %q: unmarshal 'fallback_type': %w", name, err)
+	}
+	if doc.FallbackType == nil {
+		return FallbackType{}, fmt.Errorf("profile %q: 'fallback_type' must not be empty", name)
+	}
+	ft := cloneFallbackType(*doc.FallbackType)
+	if len(ft.Gauge) == 0 && len(ft.Counter) == 0 {
+		return FallbackType{}, fmt.Errorf("profile %q: 'fallback_type' must contain at least one gauge or counter pattern", name)
+	}
+	if err := validateFallbackPatterns(name, "gauge", ft.Gauge); err != nil {
+		return FallbackType{}, err
+	}
+	if err := validateFallbackPatterns(name, "counter", ft.Counter); err != nil {
+		return FallbackType{}, err
+	}
+	return ft, nil
+}
+
+func validateFallbackPatterns(name, kind string, patterns []string) error {
+	for i, pattern := range patterns {
+		path := fmt.Sprintf("fallback_type.%s[%d]", kind, i)
+		if strings.TrimSpace(pattern) == "" {
+			return fmt.Errorf("profile %q: '%s' must not be empty", name, path)
+		}
+		if _, err := matcher.NewGlobMatcher(pattern); err != nil {
+			return fmt.Errorf("profile %q: '%s' pattern %q: %w", name, path, pattern, err)
+		}
+	}
+	return nil
 }
 
 func decodeDocumentStrict(raw []byte, dst any) error {

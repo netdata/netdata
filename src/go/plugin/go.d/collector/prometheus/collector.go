@@ -85,11 +85,11 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.jobRelabel = pipeline
 
-	gaugeFallback, err := c.initFallbackTypeMatcher(c.FallbackType.Gauge)
+	gaugeFallback, err := compileFallbackTypeMatcher(c.FallbackType.Gauge)
 	if err != nil {
 		return fmt.Errorf("init gauge fallback type matcher: %v", err)
 	}
-	counterFallback, err := c.initFallbackTypeMatcher(c.FallbackType.Counter)
+	counterFallback, err := compileFallbackTypeMatcher(c.FallbackType.Counter)
 	if err != nil {
 		return fmt.Errorf("init counter fallback type matcher: %v", err)
 	}
