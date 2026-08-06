@@ -114,24 +114,32 @@ func newMetricFamilyWriter(store metrix.CollectorStore, policy metricFamilyWrite
 // countWritable reports how many series across all families could be written. Used at Check to
 // confirm the endpoint exposes usable metrics, before any cycle has run.
 func (w *metricFamilyWriter) countWritable(mfs prompkg.MetricFamilies) int {
+	return w.countWritableWithFallback(mfs, true)
+}
+
+func (w *metricFamilyWriter) countBoundWritable(mfs prompkg.MetricFamilies) int {
+	return w.countWritableWithFallback(mfs, false)
+}
+
+func (w *metricFamilyWriter) countWritableWithFallback(mfs prompkg.MetricFamilies, allowFallback bool) int {
 	count := 0
 	for _, mf := range mfs {
 		if w.skipMetricFamily(mf) {
 			continue
 		}
 
-		typ, ok := w.resolveFamilyType(mf)
+		typ, ok := w.resolveFamilyType(mf, allowFallback)
 		if !ok {
 			continue
 		}
 
-		schema, ok := deriveMetricFamilySchema(mf, typ)
+		schema, ok := deriveMetricFamilySchema(mf, typ, allowFallback)
 		if !ok {
 			continue
 		}
 
 		for _, metric := range mf.Metrics() {
-			if metricIsWritable(metric, typ, schema) {
+			if metricIsWritable(metric, typ, schema, allowFallback) {
 				count++
 			}
 		}
@@ -140,6 +148,14 @@ func (w *metricFamilyWriter) countWritable(mfs prompkg.MetricFamilies) int {
 }
 
 func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int {
+	return w.writeMetricFamiliesWithFallback(mfs, true)
+}
+
+func (w *metricFamilyWriter) writeBoundMetricFamilies(mfs prompkg.MetricFamilies) int {
+	return w.writeMetricFamiliesWithFallback(mfs, false)
+}
+
+func (w *metricFamilyWriter) writeMetricFamiliesWithFallback(mfs prompkg.MetricFamilies, allowFallback bool) int {
 	w.cycle++
 	w.reconcileHandles()
 
@@ -149,12 +165,12 @@ func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int
 			continue
 		}
 
-		typ, ok := w.resolveFamilyType(mf)
+		typ, ok := w.resolveFamilyType(mf, allowFallback)
 		if !ok {
 			continue
 		}
 
-		handle, ok := w.ensureHandle(mf, typ)
+		handle, ok := w.ensureHandle(mf, typ, allowFallback)
 		if !ok {
 			continue
 		}
@@ -165,7 +181,7 @@ func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int
 		// re-adopt the new schema after metrix evicts the descriptor. Partial drift (some canonical
 		// series still write) does refresh, keeping the live family.
 		for _, metric := range mf.Metrics() {
-			if w.observeMetric(handle, metric) {
+			if w.observeMetric(handle, metric, allowFallback) {
 				written++
 				handle.staged = true
 			}
@@ -228,18 +244,34 @@ func (w *metricFamilyWriter) skipMetricFamily(mf *prompkg.MetricFamily) bool {
 	return false
 }
 
-func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily) (commonmodel.MetricType, bool) {
-	switch mf.Type() {
+func (w *metricFamilyWriter) bindFallbackTypes(batch *prompkg.SampleBatch) {
+	for i := range batch.Samples {
+		sample := &batch.Samples[i]
+		if typ, ok := w.resolveType(sample.Name, sample.FamilyType, true); ok {
+			sample.FamilyType = typ
+		}
+	}
+}
+
+func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily, allowFallback bool) (commonmodel.MetricType, bool) {
+	return w.resolveType(mf.Name(), mf.Type(), allowFallback)
+}
+
+func (w *metricFamilyWriter) resolveType(name string, declared commonmodel.MetricType, allowFallback bool) (commonmodel.MetricType, bool) {
+	switch declared {
 	case commonmodel.MetricTypeGauge,
 		commonmodel.MetricTypeCounter,
 		commonmodel.MetricTypeSummary,
 		commonmodel.MetricTypeHistogram:
-		return mf.Type(), true
+		return declared, true
 	case commonmodel.MetricTypeUnknown:
-		if w.policy.isFallbackTypeGauge.MatchString(mf.Name()) {
+		if !allowFallback {
+			return "", false
+		}
+		if w.policy.isFallbackTypeGauge.MatchString(name) {
 			return commonmodel.MetricTypeGauge, true
 		}
-		if w.policy.isFallbackTypeCounter.MatchString(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
+		if w.policy.isFallbackTypeCounter.MatchString(name) || strings.HasSuffix(name, "_total") {
 			return commonmodel.MetricTypeCounter, true
 		}
 		return "", false
@@ -248,7 +280,11 @@ func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily) (common
 	}
 }
 
-func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmodel.MetricType) (*metricFamilyHandle, bool) {
+func (w *metricFamilyWriter) ensureHandle(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowFallback bool,
+) (*metricFamilyHandle, bool) {
 	if handle, ok := w.handles[mf.Name()]; ok {
 		if handle.typ != typ {
 			w.Debugf("skip metric family '%s': metric type drift (%s -> %s)", mf.Name(), handle.typ, typ)
@@ -257,7 +293,7 @@ func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmo
 		return handle, true
 	}
 
-	schema, ok := deriveMetricFamilySchema(mf, typ)
+	schema, ok := deriveMetricFamilySchema(mf, typ, allowFallback)
 	if !ok {
 		return nil, false
 	}
@@ -295,8 +331,8 @@ func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmo
 	return handle, true
 }
 
-func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric prompkg.Metric) bool {
-	schema, ok := deriveMetricSchema(metric, handle.typ)
+func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric prompkg.Metric, allowFallback bool) bool {
+	schema, ok := deriveMetricSchema(metric, handle.typ, allowFallback)
 	if !ok {
 		return false
 	}
@@ -309,7 +345,7 @@ func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric pr
 
 	switch handle.typ {
 	case commonmodel.MetricTypeGauge:
-		value, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge)
+		value, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge, allowFallback)
 		if !ok {
 			return false
 		}
@@ -319,7 +355,7 @@ func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric pr
 		inst.Observe(value)
 		return true
 	case commonmodel.MetricTypeCounter:
-		value, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter)
+		value, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter, allowFallback)
 		if !ok {
 			return false
 		}

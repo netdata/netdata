@@ -179,11 +179,11 @@ airdrop-sharing: sharingd
 
 #### Windows process fields
 
-| Field   | Description                                                      | Example                                                 |
-|---------|------------------------------------------------------------------|---------------------------------------------------------|
-| comm    | Performance Monitor instance name (may include instance numbers) | `chrome#12`                                             |
-| cmdline | Full path to the executable (without command line arguments)     | `C:\Program Files\Google\Chrome\Application\chrome.exe` |
-| name    | Friendly name from file description or service display name      | `Google Chrome`                                         |
+| Field   | Description                                                      | Example                                                                   |
+|---------|------------------------------------------------------------------|---------------------------------------------------------------------------|
+| comm    | Performance Monitor instance name (may include instance numbers) | `chrome#12`                                                               |
+| cmdline | Full command line including executable path and arguments        | `"C:\Program Files\Google\Chrome\Application\chrome.exe" --type=renderer` |
+| name    | Friendly name from file description or service display name      | `Google Chrome`                                                           |
 
 > On Windows:
 > - All pattern types (exact, prefix, suffix, substring) also match against the **name** field
@@ -202,20 +202,21 @@ You can use asterisks (`*`) to create patterns:
 > - **Netdata v2.5.2 and earlier**: Windows patterns match against `comm` and `cmdline` fields
 > - **Netdata v2.5.3 and later**: Windows patterns match against `comm`, `cmdline`, and `name` (friendly name) fields
 
-| Mode      | Pattern     | Description                            | Unix-like                 | Windows           |
-|-----------|-------------|----------------------------------------|---------------------------|-------------------|
-| exact     | `firefox`   | Matches **comm** exactly               | ✓ Yes                     | ✓ Yes             |
-| prefix    | `firefox*`  | Matches **comm** starting with firefox | ✓ Yes                     | ✓ Yes             |
-| suffix    | `*fox`      | Matches **comm** ending with fox       | ✓ Yes                     | ✓ Yes             |
-| substring | `*firefox*` | Searches within **cmdline**            | ✓ Yes (full command line) | ✓ Yes (full path) |
+| Mode      | Pattern     | Description                            | Unix-like                 | Windows                                  |
+|-----------|-------------|----------------------------------------|---------------------------|------------------------------------------|
+| exact     | `firefox`   | Matches **comm** exactly               | ✓ Yes                     | ✓ Yes                                    |
+| prefix    | `firefox*`  | Matches **comm** starting with firefox | ✓ Yes                     | ✓ Yes                                    |
+| suffix    | `*fox`      | Matches **comm** ending with fox       | ✓ Yes                     | ✓ Yes                                    |
+| substring | `*firefox*` | Searches within **cmdline**            | ✓ Yes (full command line) | ✓ Yes (full command line with arguments) |
 
 **Note on substring matching (`*pattern*`):**
 
 - On Unix-like systems: Searches within the full command line including arguments
-- On Windows: Searches within the full executable path (e.g., `C:\Program Files\Mozilla Firefox\firefox.exe`)
+- On Windows: Searches within the full command line including arguments (e.g., `"C:\Program Files\Mozilla Firefox\firefox.exe" -ProfileManager`)
 
 - Asterisks can be placed anywhere within pattern (e.g., `fi*fox`) without affecting the matching criteria (**comm** or **cmdline**).
 - To include process names with spaces, enclose them in quotes (single or double), like this: `'Plex Media Serv'` or `"my other process"`.
+- **Substring patterns that contain spaces** — such as a pattern matching part of a command line including arguments — must be enclosed in quotes too; otherwise the spaces split the pattern into separate entries. For example, `'*my_app.exe --mode production*'` is one substring pattern, while the unquoted `*my_app.exe --mode production*` is read as three separate patterns (`*my_app.exe`, `--mode`, `production*`).
 - To include processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`.
 - To include processes with double quotes, enclose them in single quotes: `'process with this " double quote'`.
 - The order of the entries in the configuration list is crucial. The first matching entry will be used, so it's important to follow a top-down hierarchy. Processes that don't match any entry will inherit the group from their parent processes.
@@ -283,7 +284,7 @@ You can use the Netdata `processes` function to verify that your `apps_groups.co
 
 3. **Troubleshooting tips**:
     - If a process shows the wrong Category, check the exact process name in the function output
-    - On Windows, remember that the `name` field is used for default categories but NOT for pattern matching
+    - On Windows, the `name` field is used for both default categories and pattern matching (alongside `comm` and `cmdline`)
     - Remember that the first matching pattern wins - check your pattern order
     - For inherited groups, verify the parent process has the correct Category
 

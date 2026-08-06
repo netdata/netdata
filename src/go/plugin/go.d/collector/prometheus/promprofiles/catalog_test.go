@@ -94,6 +94,19 @@ template:
 `, match)
 }
 
+func profileYAMLWithRelabeling(match, relabeling string) string {
+	return strings.Replace(profileYAML(match), "template:\n", "relabeling:\n"+relabeling+"template:\n", 1)
+}
+
+const validRelabeling = `  - match: "app_*"
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "app_(.*)"
+        target_label: __name__
+        replacement: "app_normalized_${1}"
+        action: replace
+`
+
 func loadCatalog(t *testing.T, files ...fileSpec) (Catalog, error) {
 	t.Helper()
 
@@ -197,6 +210,61 @@ func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 	}
 }
 
+func TestProfileTemplateHydrationPreservesCrossFieldYAMLAnchors(t *testing.T) {
+	content := `match: &metric app_metric
+template:
+  family: test
+  metrics: [*metric]
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: *metric
+          name: value
+`
+
+	cat, err := loadCatalog(t, fileSpec{name: "app.yaml", content: content})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	_, err = profile.Template()
+	require.NoError(t, err)
+}
+
+func TestProfileRelabelHydrationPreservesCrossFieldYAMLAnchors(t *testing.T) {
+	content := `match: app_*
+app: &target app_normalized
+relabeling:
+  - match: app_raw
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_raw
+        target_label: __name__
+        replacement: *target
+template:
+  family: test
+  metrics: [app_normalized]
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: app_normalized
+          name: value
+`
+
+	cat, err := loadCatalog(t, fileSpec{name: "app.yaml", content: content})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	blocks, err := profile.Relabeling()
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+	require.Len(t, blocks[0].MetricRelabelConfigs, 1)
+	assert.Equal(t, "app_normalized", blocks[0].MetricRelabelConfigs[0].Replacement)
+}
+
 func TestProfileAutogenSelectorOwnership(t *testing.T) {
 	cat, err := loadCatalog(t, fileSpec{
 		stock: true,
@@ -286,6 +354,168 @@ func TestLoadFromDirs_userBadTemplateSkippedStockSurvives(t *testing.T) {
 	tmpl, err := got[0].Template()
 	require.NoError(t, err, "the surviving stock template must hydrate")
 	assert.NotEmpty(t, tmpl.Charts)
+}
+
+func TestLoadFromDirs_stockRelabelingHydratesLazily(t *testing.T) {
+	tests := map[string]struct {
+		relabeling string
+		wantBlocks int
+		wantErr    string
+	}{
+		"valid": {
+			relabeling: validRelabeling,
+			wantBlocks: 1,
+		},
+		"null": {
+			relabeling: "  null\n",
+			wantErr:    "'relabeling' must not be empty",
+		},
+		"empty": {
+			relabeling: "  []\n",
+			wantErr:    "'relabeling' must not be empty",
+		},
+		"invalid block field": {
+			relabeling: strings.Replace(validRelabeling, "    metric_relabel_configs:", "    unknown: true\n    metric_relabel_configs:", 1),
+			wantErr:    "field unknown not found",
+		},
+		"invalid rule field": {
+			relabeling: strings.Replace(validRelabeling, "        action: replace", "        unknown: true\n        action: replace", 1),
+			wantErr:    "field unknown not found",
+		},
+		"invalid rule": {
+			relabeling: strings.Replace(validRelabeling, "action: replace", "action: bogus", 1),
+			wantErr:    "unknown relabel action",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cat, err := loadCatalog(t, fileSpec{
+				stock:   true,
+				name:    "app.yaml",
+				content: profileYAMLWithRelabeling("app_*", tc.relabeling),
+			})
+			require.NoError(t, err, "stock relabeling must remain lazy")
+
+			p, ok := cat.Get("app")
+			require.True(t, ok)
+			assert.True(t, p.HasRelabeling(), "a present relabeling key must be visible without hydration")
+
+			blocks, err1 := p.Relabeling()
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err1, tc.wantErr)
+				_, err2 := p.Relabeling()
+				assert.Equal(t, err1, err2, "the hydration error must be memoized")
+				return
+			}
+			require.NoError(t, err1)
+			assert.Len(t, blocks, tc.wantBlocks)
+
+			tmpl, err := p.Template()
+			require.NoError(t, err, "relabeling must not break template hydration")
+			assert.NotEmpty(t, tmpl.Charts)
+		})
+	}
+}
+
+func TestProfile_RelabelingAbsent(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: profileYAML("app_*")})
+	require.NoError(t, err)
+	p, ok := cat.Get("app")
+	require.True(t, ok)
+
+	assert.False(t, p.HasRelabeling())
+	blocks, err := p.Relabeling()
+	require.NoError(t, err)
+	assert.Nil(t, blocks)
+}
+
+func TestLoadFromDirs_userBadRelabelingSkippedStockSurvives(t *testing.T) {
+	bad := strings.Replace(validRelabeling, "action: replace", "action: bogus", 1)
+	cat, err := loadCatalog(t,
+		fileSpec{stock: true, name: "app.yaml", content: profileYAML("stock_*")},
+		fileSpec{stock: false, name: "app.yaml", content: profileYAMLWithRelabeling("user_*", bad)},
+	)
+	require.NoError(t, err)
+
+	p, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, "stock_*", p.Match)
+	assert.False(t, p.HasRelabeling())
+}
+
+func TestProfile_RelabelingReturnsIndependentCopies(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{
+		stock:   true,
+		name:    "app.yaml",
+		content: profileYAMLWithRelabeling("app_*", validRelabeling),
+	})
+	require.NoError(t, err)
+
+	assertIndependent := func(t *testing.T, p Profile) {
+		t.Helper()
+		first, err := p.Relabeling()
+		require.NoError(t, err)
+		require.Len(t, first, 1)
+		require.Len(t, first[0].MetricRelabelConfigs, 1)
+		firstRegex := first[0].MetricRelabelConfigs[0].Regex.Regexp
+		first[0].Match = "changed_*"
+		first[0].MetricRelabelConfigs[0].SourceLabels[0] = "changed"
+		firstRegex.Longest()
+
+		second, err := p.Relabeling()
+		require.NoError(t, err)
+		require.Len(t, second, 1)
+		assert.Equal(t, "app_*", second[0].Match)
+		assert.Equal(t, []string{"__name__"}, second[0].MetricRelabelConfigs[0].SourceLabels)
+		assert.NotSame(t, firstRegex, second[0].MetricRelabelConfigs[0].Regex.Regexp)
+	}
+
+	fromGet, ok := cat.Get("app")
+	require.True(t, ok)
+	assertIndependent(t, fromGet)
+
+	ordered := cat.OrderedProfiles()
+	require.Len(t, ordered, 1)
+	assertIndependent(t, ordered[0])
+
+	resolved, err := cat.Resolve([]string{"app"})
+	require.NoError(t, err)
+	require.Len(t, resolved, 1)
+	assertIndependent(t, resolved[0])
+}
+
+func TestProfile_RelabelingConcurrent(t *testing.T) {
+	for name, relabeling := range map[string]string{
+		"success": validRelabeling,
+		"error":   strings.Replace(validRelabeling, "action: replace", "action: bogus", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			cat, err := loadCatalog(t, fileSpec{
+				stock:   true,
+				name:    "app.yaml",
+				content: profileYAMLWithRelabeling("app_*", relabeling),
+			})
+			require.NoError(t, err)
+			p, ok := cat.Get("app")
+			require.True(t, ok)
+
+			var wg sync.WaitGroup
+			for range 16 {
+				wg.Go(func() {
+					blocks, err := p.Relabeling()
+					if name == "error" {
+						assert.Error(t, err)
+						assert.Nil(t, blocks)
+					} else {
+						assert.NoError(t, err)
+						assert.Len(t, blocks, 1)
+					}
+				})
+			}
+			wg.Wait()
+		})
+	}
 }
 
 // TestProfile_TemplateConcurrent exercises concurrent hydration of a shared

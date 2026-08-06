@@ -38,7 +38,7 @@
       },
       "expected_prefix": {
         "title": "Expected prefix",
-        "description": "If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint.",
+        "description": "If set, the job's check passes only when at least one post-job, pre-profile metric name starts with this prefix. Guards against scraping an unexpected endpoint; profile-owned relabeling cannot satisfy it.",
         "type": "string"
       },
       "app": {
@@ -89,7 +89,7 @@
       },
       "relabeling": {
         "title": "Metric relabeling",
-        "description": "Prometheus-compatible metric relabeling applied before charts are built. Each block scopes its rules to the metrics whose name matches `match`. See the [relabeling reference](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/prometheus/relabel#readme) for the full syntax and examples.",
+        "description": "Job-owned Prometheus-compatible metric relabeling, applied after `selector` and before profile selection. Each block scopes its rules to metrics whose name matches `match`. Profiles may own the same block format for exporter normalization after selection. See the [relabeling reference](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/prometheus/relabel#readme) for ordering, syntax, and examples.",
         "type": [
           "array",
           "null"
@@ -182,7 +182,7 @@
       },
       "profiles": {
         "title": "Profiles",
-        "description": "Curated, exporter-specific chart profiles. `auto` (default) selects every profile whose match hits a scraped metric; `exact` selects only the named profiles (each must match); `combined` is auto plus the named profiles; `none` disables profiles (generic autogen charts only). A selected profile may use profile-root `autogen.selector` to constrain fallback charts inside its own `match` scope while retaining samples; all applicable selectors must accept a series.",
+        "description": "Curated, exporter-specific chart profiles. `auto` (default) selects every profile whose match hits a post-job metric; `exact` selects only the named profiles (each must match); `combined` is auto plus the named profiles; `none` disables profiles (generic autogen charts only). After selection, a profile may apply profile-owned `relabeling` before charts and use `autogen.selector` to constrain fallback charts inside its own `match` scope. Each source family is normalized only by the first applicable profile: profile-name order in `auto`, entry order in `exact`, and configured entries followed by remaining name-ordered auto profiles in `combined`. All selected templates consume the shared final metric stream.",
         "type": "object",
         "properties": {
           "mode": {
@@ -226,7 +226,7 @@
                     "properties": {
                       "entries": {
                         "title": "Profile entries",
-                        "description": "Profiles to select. Each must match at least one scraped metric or the job fails its check.",
+                        "description": "Profiles to select, in profile-normalizer precedence order. Each must match at least one scraped metric or the job fails its check.",
                         "type": "array",
                         "minItems": 1,
                         "items": {
@@ -265,7 +265,7 @@
                     "properties": {
                       "entries": {
                         "title": "Profile entries",
-                        "description": "Profiles to select in addition to the auto-selected ones.",
+                        "description": "Profiles to select in addition to the auto-selected ones. Their entry order defines profile-normalizer precedence before remaining auto profiles.",
                         "type": "array",
                         "minItems": 1,
                         "items": {
@@ -299,21 +299,21 @@
       },
       "max_time_series": {
         "title": "Time series limit",
-        "description": "If an endpoint returns more time series than this limit, the data is not processed. Set to 0 for no limit.",
+        "description": "If the final output after job and profile relabeling contains more time series than this limit, the data is not processed. Set to 0 for no limit.",
         "type": "integer",
         "minimum": 0,
         "default": 2000
       },
       "max_time_series_per_metric": {
         "title": "Time series per metric limit",
-        "description": "Metrics with more time series than this limit are skipped. Set to 0 for no limit.",
+        "description": "Final metric families with more time series than this limit are skipped. Set to 0 for no limit.",
         "type": "integer",
         "minimum": 0,
         "default": 200
       },
       "fallback_type": {
         "title": "Untyped metrics fallback",
-        "description": "Process Untyped metrics as Counter or Gauge instead of ignoring them.",
+        "description": "Process untyped metrics as Counter or Gauge instead of ignoring them. Classification uses the post-job, pre-profile metric name; profile relabeling preserves the decision but cannot create or change it.",
         "type": [
           "object",
           "null"

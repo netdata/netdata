@@ -14,11 +14,30 @@ import (
 // store cycle (begin/commit) is driven by the framework around Collect, so this only
 // writes observations and returns an error to abort the cycle.
 func (c *Collector) collect(ctx context.Context) error {
-	mfs, err := c.scrape(ctx, false)
+	runtime := c.runtime
+	if runtime == nil {
+		return fmt.Errorf("prometheus collector runtime is unavailable: successful Check is required before Collect")
+	}
+
+	var (
+		mfs        prometheus.MetricFamilies
+		typesBound bool
+		err        error
+	)
+	if len(runtime.normalizers) == 0 {
+		mfs, err = c.scrape(ctx, false)
+	} else {
+		mfs, err = c.scrapeProfileNormalized(ctx, runtime.normalizers, false)
+		typesBound = true
+	}
 	if err != nil {
 		return err
 	}
-	c.writer.writeMetricFamilies(mfs)
+	if typesBound {
+		c.writer.writeBoundMetricFamilies(mfs)
+	} else {
+		c.writer.writeMetricFamilies(mfs)
+	}
 	return nil
 }
 
@@ -26,25 +45,119 @@ func (c *Collector) collect(ctx context.Context) error {
 // the expected-prefix guard and the total time-series limit. Unlike V1 these are read-only
 // (V1 mutated Config to make them one-shot); they run only at Check, i.e. autodetection.
 func (c *Collector) check(ctx context.Context) error {
-	mfs, err := c.scrape(ctx, true)
+	candidate, mfs, typesBound, err := c.checkRuntimeCandidate(ctx)
 	if err != nil {
 		return err
-	}
-	if c.ExpectedPrefix != "" && !hasPrefix(mfs, c.ExpectedPrefix) {
-		return fmt.Errorf("'%s' metrics have no expected prefix (%s)", c.URL, c.ExpectedPrefix)
 	}
 	if c.MaxTS > 0 {
 		if n := calcMetrics(mfs); n > c.MaxTS {
 			return fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
 		}
 	}
-	if c.writer.countWritable(mfs) == 0 {
+	var writable int
+	if typesBound {
+		writable = c.writer.countBoundWritable(mfs)
+	} else {
+		writable = c.writer.countWritable(mfs)
+	}
+	if writable == 0 {
 		return fmt.Errorf("endpoint '%s' exposes no usable metrics", c.URL)
 	}
-	if err := c.ensureChartTemplate(mfs); err != nil {
+	tmpl, err := buildMergedChartTemplate(c.resolveApp(candidate.profiles), candidate.profiles)
+	if err != nil {
 		return err
 	}
+	candidate.chartTemplate = tmpl
+	c.runtime = candidate
 	return nil
+}
+
+func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, prometheus.MetricFamilies, bool, error) {
+	candidate := &promRuntime{}
+	if c.Profiles.effectiveMode() == profilesModeNone {
+		mfs, err := c.scrape(ctx, true)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if err := c.validateExpectedPrefix(mfs); err != nil {
+			return nil, nil, false, err
+		}
+		return candidate, mfs, false, nil
+	}
+
+	batch, err := c.prom.ScrapeSamples(ctx)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	postJob := batch
+	var postJobFamilies prometheus.MetricFamilies
+	if c.jobRelabel == nil {
+		postJobFamilies, err = prometheus.Assemble(postJob)
+	} else {
+		postJob, postJobFamilies, err = c.relabelAndAssemble(postJob, c.jobRelabel, jobRelabelStage, true)
+	}
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if err := c.validateNonEmpty(postJobFamilies); err != nil {
+		return nil, nil, false, err
+	}
+	if err := c.validateExpectedPrefix(postJobFamilies); err != nil {
+		return nil, nil, false, err
+	}
+
+	candidate.profiles, err = c.selectProfiles(postJobFamilies)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	normalizationOrder := profilesInNormalizationOrder(candidate.profiles, c.Profiles)
+	candidate.normalizers, err = compileProfileNormalizers(normalizationOrder)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if len(candidate.normalizers) == 0 {
+		return candidate, postJobFamilies, false, nil
+	}
+
+	// Bind job-owned fallback policy on post-job names before profile
+	// normalization. Jobs without an active normalizer keep normal type
+	// resolution on the assembled families.
+	c.writer.bindFallbackTypes(&postJob)
+	finalFamilies, err := c.profileRelabelAndAssemble(postJob, candidate.normalizers, true)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if err := c.validateNonEmpty(finalFamilies); err != nil {
+		return nil, nil, false, err
+	}
+	return candidate, finalFamilies, true, nil
+}
+
+func (c *Collector) scrapeProfileNormalized(
+	ctx context.Context,
+	normalizers []profileNormalizer,
+	checking bool,
+) (prometheus.MetricFamilies, error) {
+	batch, err := c.prom.ScrapeSamples(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if c.jobRelabel != nil {
+		batch, err = c.relabelAndValidateBatch(batch, c.jobRelabel, jobRelabelStage, checking)
+		if err != nil {
+			return nil, err
+		}
+	}
+	c.writer.bindFallbackTypes(&batch)
+	mfs, err := c.profileRelabelAndAssemble(batch, normalizers, checking)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.validateNonEmpty(mfs); err != nil {
+		return nil, err
+	}
+	return mfs, nil
 }
 
 // scrape fetches the endpoint and enforces the empty-scrape contract: an empty scrape is
@@ -55,10 +168,24 @@ func (c *Collector) scrape(ctx context.Context, checking bool) (prometheus.Metri
 	if err != nil {
 		return nil, err
 	}
-	if mfs.Len() == 0 {
-		return nil, fmt.Errorf("endpoint '%s' returned 0 metric families", c.URL)
+	if err := c.validateNonEmpty(mfs); err != nil {
+		return nil, err
 	}
 	return mfs, nil
+}
+
+func (c *Collector) validateNonEmpty(mfs prometheus.MetricFamilies) error {
+	if mfs.Len() == 0 {
+		return fmt.Errorf("endpoint '%s' returned 0 metric families", c.URL)
+	}
+	return nil
+}
+
+func (c *Collector) validateExpectedPrefix(mfs prometheus.MetricFamilies) error {
+	if c.ExpectedPrefix != "" && !hasPrefix(mfs, c.ExpectedPrefix) {
+		return fmt.Errorf("'%s' metrics have no expected prefix (%s)", c.URL, c.ExpectedPrefix)
+	}
+	return nil
 }
 
 // scrapeMetricFamilies fetches and assembles. With no relabel rules it uses the direct,
@@ -66,7 +193,7 @@ func (c *Collector) scrape(ctx context.Context, checking bool) (prometheus.Metri
 // classified sample stream and runs the relabel pipeline (relabel, assemble, curate typed
 // families) in relabelAndAssemble.
 func (c *Collector) scrapeMetricFamilies(ctx context.Context, checking bool) (prometheus.MetricFamilies, error) {
-	if len(c.relabelBlocks) == 0 {
+	if c.jobRelabel == nil {
 		return c.prom.ScrapeContext(ctx)
 	}
 
@@ -74,7 +201,8 @@ func (c *Collector) scrapeMetricFamilies(ctx context.Context, checking bool) (pr
 	if err != nil {
 		return nil, err
 	}
-	return c.relabelAndAssemble(batch, checking)
+	_, mfs, err := c.relabelAndAssemble(batch, c.jobRelabel, jobRelabelStage, checking)
+	return mfs, err
 }
 
 func hasPrefix(mfs prometheus.MetricFamilies, prefix string) bool {

@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 // promRuntime is the per-job state built once at Check and reused afterwards:
@@ -17,31 +18,36 @@ import (
 // (autogen, or autogen merged with the selected profiles' curated groups).
 type promRuntime struct {
 	profiles      []promprofiles.Profile
+	normalizers   []profileNormalizer
 	chartTemplate string
 }
 
-// ensureChartTemplate selects the profiles that apply to this job against the
-// scraped families and builds the per-job chart template, caching both on the
-// runtime on the first Check. Later cycles reuse it; Cleanup (job restart)
-// clears it so the next Check rebuilds. Building at Check (not Init) is what
-// lets selection depend on what the endpoint actually exposes.
-func (c *Collector) ensureChartTemplate(mfs prometheus.MetricFamilies) error {
-	if c.runtime != nil {
-		return nil
-	}
+type profileNormalizer struct {
+	root     matcher.Matcher
+	pipeline *relabel.Pipeline
+}
 
-	profiles, err := c.selectProfiles(mfs)
-	if err != nil {
-		return err
+func compileProfileNormalizers(profiles []promprofiles.Profile) ([]profileNormalizer, error) {
+	var normalizers []profileNormalizer
+	for _, profile := range profiles {
+		if !profile.HasRelabeling() {
+			continue
+		}
+		blocks, err := profile.Relabeling()
+		if err != nil {
+			return nil, err
+		}
+		pipeline, err := relabel.NewPipeline(blocks)
+		if err != nil {
+			return nil, fmt.Errorf("profile %q: compile relabeling: %w", profile.Name, err)
+		}
+		root, err := matcher.NewSimplePatternsMatcher(profile.Match)
+		if err != nil {
+			return nil, fmt.Errorf("profile %q: invalid match %q: %w", profile.Name, profile.Match, err)
+		}
+		normalizers = append(normalizers, profileNormalizer{root: root, pipeline: pipeline})
 	}
-
-	tmpl, err := buildMergedChartTemplate(c.resolveApp(profiles), profiles)
-	if err != nil {
-		return err
-	}
-
-	c.runtime = &promRuntime{profiles: profiles, chartTemplate: tmpl}
-	return nil
+	return normalizers, nil
 }
 
 // resolveApp is the chart-context "app" segment — the per-job identity the UI
@@ -168,6 +174,40 @@ func combinedSelectProfiles(catalog promprofiles.Catalog, names []string, mfs pr
 		out = append(out, p)
 	}
 	return out, nil
+}
+
+// profilesInNormalizationOrder preserves the selected profile order used by
+// chart/app composition while deriving the separate precedence used for sample
+// normalization.
+func profilesInNormalizationOrder(profiles []promprofiles.Profile, config ProfilesConfig) []promprofiles.Profile {
+	if len(profiles) < 2 || config.effectiveMode() == profilesModeExact {
+		return profiles
+	}
+
+	remaining := make(map[string]promprofiles.Profile, len(profiles))
+	for _, profile := range profiles {
+		remaining[promprofiles.NormalizeProfileKey(profile.Name)] = profile
+	}
+
+	ordered := make([]promprofiles.Profile, 0, len(profiles))
+	if config.effectiveMode() == profilesModeCombined {
+		for _, name := range entryNames(config.ModeCombined) {
+			key := promprofiles.NormalizeProfileKey(name)
+			if profile, ok := remaining[key]; ok {
+				ordered = append(ordered, profile)
+				delete(remaining, key)
+			}
+		}
+	}
+
+	rest := make([]promprofiles.Profile, 0, len(remaining))
+	for _, profile := range remaining {
+		rest = append(rest, profile)
+	}
+	sort.Slice(rest, func(i, j int) bool {
+		return promprofiles.NormalizeProfileKey(rest[i].Name) < promprofiles.NormalizeProfileKey(rest[j].Name)
+	})
+	return append(ordered, rest...)
 }
 
 // profileMatchesFamilies reports whether the profile's match pattern hits at

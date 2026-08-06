@@ -45,6 +45,25 @@ To install a Netdata Parent:
 
    Claiming the Parent lets Netdata Cloud query it, and registers all connected Children to Netdata Cloud automatically. See the [Connect Agent to Cloud guide](/src/claim/README.md) for instructions.
 
+<details>
+<summary><strong>Deploying a Parent with Docker</strong></summary><br/>
+
+A Netdata Parent uses the standard [`netdata/netdata`](/packaging/docker/README.md) Docker image—a Parent is simply a regular Agent whose `stream.conf` is configured to receive metrics, so no separate image or flag is required.
+
+Deploy the container with the `docker run` command from the [Docker installation guide](/packaging/docker/README.md). The persistent volumes (`netdataconfig`, `netdatalib`, `netdatacache`) created by that command keep the Parent's configuration and metrics retention across container restarts.
+
+To configure `stream.conf` inside the running container:
+
+```bash
+docker exec -it netdata bash
+cd /etc/netdata && ./edit-config stream.conf
+```
+
+Set the `[API_KEY]` section as described in [Configuring Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/configuration.md), then apply the change with `docker restart netdata`.
+
+<br/>
+</details>
+
 ## Key Features
 
 :::important
