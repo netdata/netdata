@@ -256,8 +256,8 @@ find_etc_any_release() {
     release2lsb_release "/etc/redhat-release" && return 0
   fi
 
-  if [ -f "/etc/SuSe-release" ]; then
-    release2lsb_release "/etc/SuSe-release" && return 0
+  if [ -f "/etc/SuSE-release" ]; then
+    release2lsb_release "/etc/SuSE-release" && return 0
   fi
 
   return 1
@@ -303,7 +303,7 @@ user_picks_distribution() {
     exit 1
   fi
 
-  if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ] && [ -z "${swupd}" ]; then
+  if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ] && [ -z "${swupd}" ] && [ -z "${brew}" ] && [ -z "${pkg}" ]; then
     echo >&2 "And it seems I cannot find a known package manager in this system."
     echo >&2 "Please open a github issue to help us support your system too."
     exit 1
@@ -322,6 +322,7 @@ user_picks_distribution() {
   [ -n "${apk}" ] && echo >&2 " - Alpine Linux based (installer is: apk)" && opts="apk ${opts}"
   [ -n "${swupd}" ] && echo >&2 " - Clear Linux based (installer is: swupd)" && opts="swupd ${opts}"
   [ -n "${brew}" ] && echo >&2 " - macOS based (installer is: brew)" && opts="brew ${opts}"
+  [ -n "${pkg}" ] && echo >&2 " - FreeBSD based (installer is: pkg)" && opts="pkg ${opts}"
   # XXX: This is being removed in another PR.
   echo >&2
 
@@ -583,7 +584,7 @@ check_package_manager() {
     swupd)
       [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${swupd}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_swupd"
-      tree="clear-linux"
+      tree="clearlinux"
       detection="user-input"
       return 0
       ;;
@@ -594,6 +595,14 @@ check_package_manager() {
       tree="macos"
       detection="user-input"
 
+      return 0
+      ;;
+
+    pkg)
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${pkg}" ] && echo >&2 "${1} is not available." && return 1
+      package_installer="install_pkg"
+      tree="freebsd"
+      detection="user-input"
       return 0
       ;;
 
@@ -622,12 +631,20 @@ require_cmd() {
   return 1
 }
 
+# netdata-installer.sh uses find for its chmod/chown steps, so every tree must
+# have an entry here. A tree that falls through to the default WARNING has those
+# steps silently skipped, so keep this covering every value assigned to ${tree}.
 declare -A pkg_find=(
-  ['gentoo']="sys-apps/findutils"
-  ['fedora']="findutils"
-  ['clearlinux']="findutils"
-  ['rhel']="findutils"
+  ['alpine']="NOTREQUIRED" # busybox find covers the -type/-name/-a/-exec uses
+  ['arch']="findutils"
   ['centos']="findutils"
+  ['clearlinux']="findutils"
+  ['debian']="findutils"
+  ['gentoo']="sys-apps/findutils"
+  ['ol']="findutils"
+  ['rhel']="findutils"
+  ['sabayon']="sys-apps/findutils"
+  ['suse']="findutils"
   ['macos']="NOTREQUIRED"
   ['freebsd']="NOTREQUIRED"
   ['default']="WARNING|"
@@ -888,7 +905,8 @@ declare -A pkg_libmnl_dev=(
   ['suse']="libmnl-devel"
   ['clearlinux']="devpkg-libmnl"
   ['macos']="NOTREQUIRED"
-  ['default']=""
+  ['freebsd']="NOTREQUIRED" # libmnl is netlink, Linux-only
+  ['default']="WARNING|"
 )
 
 declare -A pkg_lm_sensors=(
@@ -969,61 +987,6 @@ declare -A pkg_python=(
   # Exceptions
   ['macos']="WARNING|"
   ['centos-8']="python2"
-)
-
-declare -A pkg_python_pip=(
-  ['alpine']="py-pip"
-  ['gentoo']="dev-python/pip"
-  ['sabayon']="dev-python/pip"
-  ['clearlinux']="python-basic"
-  ['macos']="WARNING|"
-  ['default']="python-pip"
-)
-
-declare -A pkg_python3_pip=(
-  ['alpine']="py3-pip"
-  ['arch']="python-pip"
-  ['gentoo']="dev-python/pip"
-  ['sabayon']="dev-python/pip"
-  ['clearlinux']="python3-basic"
-  ['macos']="NOTREQUIRED"
-  ['default']="python3-pip"
-)
-
-declare -A pkg_python_requests=(
-  ['alpine']="py-requests"
-  ['arch']="python2-requests"
-  ['centos']="python-requests"
-  ['debian']="python-requests"
-  ['gentoo']="dev-python/requests"
-  ['sabayon']="dev-python/requests"
-  ['rhel']="python-requests"
-  ['suse']="python-requests"
-  ['clearlinux']="python-extras"
-  ['macos']="WARNING|"
-  ['default']="python-requests"
-  ['alpine-3.1.4']="WARNING|"
-  ['alpine-3.2.3']="WARNING|"
-)
-
-declare -A pkg_python3_requests=(
-  ['alpine']="py3-requests"
-  ['arch']="python-requests"
-  ['centos']="WARNING|"
-  ['debian']="WARNING|"
-  ['gentoo']="dev-python/requests"
-  ['sabayon']="dev-python/requests"
-  ['rhel']="WARNING|"
-  ['suse']="WARNING|"
-  ['clearlinux']="python-extras"
-  ['macos']="WARNING|"
-  ['default']="WARNING|"
-
-  ['centos-7']="python36-requests"
-  ['centos-8']="python3-requests"
-  ['rhel-7']="python36-requests"
-  ['rhel-8']="python3-requests"
-  ['ol-8']="python3-requests"
 )
 
 declare -A pkg_lz4=(
@@ -1530,7 +1493,8 @@ validate_tree_ol() {
     echo " > Checking for CodeReady Builder ..."
     if ! run ${sudo} dnf repolist | grep -q codeready; then
       if prompt "CodeReady Builder not found, shall I install it?"; then
-        cat > /etc/yum.repos.d/ol8_codeready.repo <<-EOF
+        # shellcheck disable=2086
+        run ${sudo} tee /etc/yum.repos.d/ol8_codeready.repo > /dev/null <<-EOF
 	[ol8_codeready_builder]
 	name=Oracle Linux \$releasever CodeReady Builder (\$basearch)
 	baseurl=http://yum.oracle.com/repo/OracleLinux/OL8/codeready/builder/\$basearch
@@ -2108,10 +2072,12 @@ if [ -z "${package_installer}" ] || [ -z "${tree}" ]; then
   if [ -z "${package_installer}" ]; then
     detect_package_manager_from_distribution "${distribution}"
   fi
-
-  # Validate package manager trees
-  validate_package_trees
 fi
+
+# Validate package manager trees. This has to run for a tree selected with
+# 'installer <name>' too, otherwise that path skips the repository enablement
+# (EPEL, PowerTools/CRB, CodeReady Builder) the packages below depend on.
+validate_package_trees
 
 [ "${detection}" = "/etc/os-release" ] && cat << EOF
 
