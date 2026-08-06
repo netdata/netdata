@@ -395,11 +395,11 @@ the collector behavior of each Prometheus type.
 
 ## Design the collection policy with the profile
 
-The profile cannot drop raw metrics. The effective dashboard is the combination
-of:
+The effective dashboard is the combination of:
 
 - job `selector` filtering;
 - ordered job `relabeling`;
+- first-applicable profile `relabeling` after profile selection;
 - job `fallback_type`;
 - the selected profile;
 - writer rules and limits.
@@ -412,8 +412,12 @@ Choose the least surprising mechanism:
   into an unconstrained allow expression, copy the complete match expression,
   or use `*`. Finite synthetic names and label-constrained allow expressions do
   not prove namespace coverage.
-- Use relabeling when series or labels must be transformed, normalized, or
-  dropped by ordered Prometheus-compatible rules. Contributed jobs MUST NOT use
+- Use profile relabeling for exporter-owned normalization required by the
+  profile's chart contract. Use job relabeling for deployment-owned policy or
+  normalization required before profile selection. Both stages use ordered
+  Prometheus-compatible rules and share one final metric stream; the first
+  applicable selected profile normalizer owns each original source family.
+  Contributed job and profile pipelines MUST NOT use
   sample-filtering `keep` or `keepequal`; express known exclusions with bounded
   `drop` or `dropequal` rules under exact known metric scopes. Label-dependent
   sample discard MUST be scoped by an exact known metric block. A wildcard
@@ -452,11 +456,14 @@ Choose the least surprising mechanism:
 Inventory source label names across every observed and synthetic fixture.
 Netdata's Prometheus re-export adds `instance`, `family`, `chart`, and
 `dimension`; a source label with one of those names would otherwise produce a
-duplicate label downstream. Preserve its value with an ordered job relabel:
+duplicate label downstream. Preserve its value with ordered profile relabeling:
 copy it to an application-specific name with `labelmap`, then remove only the
-original with `labeldrop`. The fixture MUST retain the authoritative source
-name—renaming fixture evidence hides the deployment requirement instead of
-proving the delivered job policy.
+original with `labeldrop`. Exporter-owned protection belongs in profile
+relabeling so every job selecting the profile receives it; use job relabeling
+only when the transformation is deployment-specific or required before profile
+selection. The fixture MUST retain the authoritative source name—renaming
+fixture evidence hides the requirement instead of proving the delivered
+pipeline.
 
 Keep exclusions conservative and explain the lost diagnostic capability.
 Typical justified policy exclusions include creation timestamps or frozen
@@ -527,7 +534,8 @@ Profile fallback suppression is an exclusion too. Apply these binding rules:
   `_sum` series that are actually emitted.
 - A job selector deny MUST name exact exposition metric names present in the
   source-complete sample inventory. A dynamic alias grammar MUST use a bounded,
-  source-proven relabel `drop` rule instead.
+  source-proven profile relabel `drop` rule instead, unless the exclusion is
+  deployment-specific or required before profile selection.
   A non-empty job allow list MUST structurally cover every
   positive wildcard term in `profile.match`. The full job policy MUST also admit
   every derived or explicitly declared raw future input needed to cover relevant
@@ -728,11 +736,11 @@ future_inputs:
 - `type` is optional: `gauge` (default), `counter`, or `untyped`.
 - `labels` is an optional string map and MUST NOT contain `__name__`.
 - A job may declare at most 256 unique raw identities and one type per family.
-- Use invented, non-sensitive values. These samples enter before job selection
-  and relabeling; do not write post-relabel names here.
-- Declare probes whenever reachable relabel rules can write metric names. For a
-  name-preserving job, the validator derives bounded witnesses from positive
-  wildcard profile/relabel terms.
+- Use invented, non-sensitive values. These samples enter before the job
+  selector and both relabel stages; do not write post-relabel names here.
+- Declare probes whenever reachable job or profile relabel rules can write
+  metric names. For a name-preserving combined pipeline, the validator derives
+  bounded witnesses from positive wildcard profile/relabel terms.
 
 Run the gate on the exact profile, source-complete fixture, and structured job
 policy being delivered. Re-run after every edit. Keep separate observed-dump
@@ -747,8 +755,8 @@ A `PASS` proves, for that evidence:
 - every current writer series is accounted for with zero autogen and zero
   unmatched;
 - a separate real collector run introduces declared or derived raw future
-  inputs before job selection/relabeling, covers every positive profile term and
-  relevant relabel branch, and cannot satisfy current coverage;
+  inputs before the job selector, covers every positive profile term and
+  relevant job/profile relabel branch, and cannot satisfy current coverage;
 - every future input reaches the writer and selected profile without collapsing
   with current/future identities; it remains generic unless a bounded
   contributor-approved alias normalization legitimately routes it to an
@@ -760,8 +768,9 @@ A `PASS` proves, for that evidence:
   and fixture-evidenced; every applicable future-affecting wildcard block has a
   deterministic in-scope probe for each positive wildcard term and the ordered
   pipeline actually applies that block to the probe;
-- the profile has no fallback allowlist or open-ended fallback deny, and the job
-  has no sample-filtering `keep`/`keepequal` relabel action; every exact
+- the profile has no fallback allowlist or open-ended fallback deny, and neither
+  the contributed job nor profile relabel pipeline has a sample-filtering
+  `keep`/`keepequal` action; every exact
   profile/job/relabel exclusion has source-complete evidence;
 - every authored chart and dimension materializes;
 - every selected writer series carries the labels required by the chart's
@@ -795,7 +804,7 @@ selector-to-displayed-family mapping, including effective inherited instance
 identity, units, algorithm intent, naming mechanisms, and priority. It is the
 objective input to the operator-ownership reconciliation; it does not score
 whether the chosen application model is good.
-A job-policy exclusion summary shows how much otherwise writer-capable evidence
+A pipeline-policy exclusion summary shows how much otherwise writer-capable evidence
 was removed before coverage was measured. A `PASS` over a deliberately reduced
 denominator is mechanically valid but is not a complete dashboard unless every
 exclusion satisfies the policy above.
@@ -803,7 +812,7 @@ exclusion satisfies the policy above.
 Warnings are prompts for model review, not policy decisions. They include
 exact explicitly suppressed fallback series, generic auto-selection signatures,
 observed labels with no authored role,
-the job-policy exclusion summary, observed per-rule allow/deny impact, unused
+the pipeline-policy exclusion summary, observed per-rule allow/deny impact, unused
 metric declarations, authored/runtime heatmap divergence, ambiguous or
 physical-rate filled charts, repeated sibling family paths, mixed leaf identity,
 parent identity loss, sibling identity mismatch, bounded `drop`/`dropequal`

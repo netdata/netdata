@@ -57,7 +57,10 @@ func addFutureOpennessChecks(
 		)
 	}
 
-	pipeline := newPipelineDiagnosticSummary(policy, futureBatch)
+	pipeline, err := newPipelineDiagnosticSummary(policy, profile, futureBatch)
+	if err != nil {
+		return fmt.Errorf("prepare future pipeline diagnostics: %w", err)
+	}
 	coll := prometheus.NewWithOptions(
 		prometheus.WithProfileCatalog(staged.catalog),
 		prometheus.WithPipelineDiagnosticObserver(pipeline.observe),

@@ -121,17 +121,17 @@ func TestFutureInputEncodingRoundTripsThroughProductionParser(t *testing.T) {
 }
 
 func TestPositiveWildcardScopesPreserveOrderedSimplePatternBranches(t *testing.T) {
-	scopes := positiveWildcardScopes("match", `!app_a* app_[bc]?*`, -1)
+	scopes := positiveWildcardScopes("match", `!app_a* app_[bc]?*`, pipelineRelabelLocation{block: -1})
 	if len(scopes) != 1 {
 		t.Fatalf("expected one positive wildcard scope, got %#v", scopes)
 	}
 	if got, want := scopes[0].scopeExpr, `!app_a* app_[bc]?*`; got != want {
 		t.Fatalf("scope expression: got %q, want %q", got, want)
 	}
-	if got := positiveWildcardScopes("match", `app_\*`, -1); len(got) != 0 {
+	if got := positiveWildcardScopes("match", `app_\*`, pipelineRelabelLocation{block: -1}); len(got) != 0 {
 		t.Fatalf("escaped glob metacharacter created a wildcard scope: %#v", got)
 	}
-	if got := positiveWildcardScopes("match", `app_* service_*`, -1); len(got) != 2 {
+	if got := positiveWildcardScopes("match", `app_* service_*`, pipelineRelabelLocation{block: -1}); len(got) != 2 {
 		t.Fatalf("every positive wildcard term needs a scope: %#v", got)
 	}
 }
@@ -177,6 +177,64 @@ relabeling:
 `
 	result := runValidation(t, validProfile, dump, job)
 	requireFinding(t, result, "future_inputs_required")
+}
+
+func TestNamespaceChangingProfileRequiresExplicitRawFutureInputs(t *testing.T) {
+	profile := replaceOnce(t, validProfile, "app: app\n", `app: app
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+`)
+	dump := validDump + "# TYPE app_worker_current_temperature gauge\napp_worker_current_temperature{instance=\"node-b\"} 43\n"
+
+	result := runValidation(t, profile, dump, "")
+	requireFinding(t, result, "future_inputs_required")
+}
+
+func TestProfileRelabelingFutureProbeTraversesTwoStageDiagnostics(t *testing.T) {
+	profile := replaceOnce(t, validProfile, "app: app\n", `app: app
+relabeling:
+  - match: app_worker_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: worker
+        replacement: ${1}
+      - source_labels: [__name__]
+        regex: app_worker_(.+)_(temperature)
+        target_label: __name__
+        replacement: app_${2}
+`)
+	dump := validDump + "# TYPE app_worker_current_temperature gauge\napp_worker_current_temperature{instance=\"node-b\"} 43\n"
+	job := `
+future_inputs:
+  - name: app_worker_future_temperature
+    labels:
+      instance: node-c
+relabeling:
+  - match: app_*
+    metric_relabel_configs:
+      - source_labels: [instance]
+        regex: (.+)
+        target_label: source_instance
+        replacement: ${1}
+`
+
+	result := runValidation(t, profile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("profile relabeling future proof failed\nreport:\n%s", result.stdout)
+	}
+	if result.report.Counts.PipelineRenamed != 1 {
+		t.Fatalf("profile rename provenance was not reconciled: %#v", result.report.PipelineRenamed)
+	}
 }
 
 func TestFutureInputsMustCoverEveryProfileWildcardTerm(t *testing.T) {

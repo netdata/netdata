@@ -15,8 +15,8 @@
 ## Authoritative structural-union result
 
 - `proof.yaml` is the authoritative machine-checked PASS verdict and complete objective count record.
-- The exclusion ledger dispositions are 10 recommended-job exclusions and 5 writer-ineligible information families.
-- Job-relabel normalization is reconciled by logical identity to charted canonical writer families rather than counted as
+- The exclusion ledger dispositions are 10 configured exclusions and 5 writer-ineligible information families.
+- Profile-owned normalization is reconciled by logical identity to charted canonical writer families rather than counted as
   source loss.
 - Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
 - `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv` maps all 1,779 charted source-family routes and 1,772
@@ -40,7 +40,7 @@ surface has zero autogen and zero unmatched series.
 
 ## Policy and producer checks
 
-- MGR raw RGW source-zone aliases are removed by one source-proven bounded `drop` grammar; the nine stable normalized RGW
+- MGR raw RGW source-zone aliases are removed by one source-proven profile-owned bounded `drop` grammar; the nine stable normalized RGW
   families remain charted, and unknown future `ceph_data_sync_from_*` suffixes remain eligible for generic fallback.
 - Official source labels named `instance`, `family`, `chart`, or `dimension` are preserved under a `ceph_` prefix before
   Netdata adds its own Prometheus re-export labels; source-faithful fixtures retain the original exporter label names.

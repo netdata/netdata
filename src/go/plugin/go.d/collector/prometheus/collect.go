@@ -92,7 +92,7 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 
 	postJob := batch
 	var postJobFamilies prometheus.MetricFamilies
-	if c.jobRelabel == nil {
+	if c.jobRelabel == nil && c.pipelineObserver == nil {
 		postJobFamilies, err = prometheus.Assemble(postJob)
 	} else {
 		postJob, postJobFamilies, err = c.relabelAndAssemble(postJob, c.jobRelabel, jobRelabelStage, true)
@@ -149,7 +149,7 @@ func (c *Collector) scrapeProfilePipeline(
 	if err != nil {
 		return nil, err
 	}
-	if c.jobRelabel != nil {
+	if c.jobRelabel != nil || c.pipelineObserver != nil {
 		batch, err = c.relabelAndValidateBatch(batch, c.jobRelabel, jobRelabelStage, checking)
 		if err != nil {
 			return nil, err

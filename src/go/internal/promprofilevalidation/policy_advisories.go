@@ -8,6 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	promrelabel "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
@@ -179,8 +180,10 @@ type relabelDiscardAudit struct {
 }
 
 type relabelDiscardRuleKey struct {
-	block int
-	rule  int
+	stage   promcollector.PipelineRelabelStage
+	profile string
+	block   int
+	rule    int
 }
 
 type relabelNameRewriteAudit struct {
@@ -195,7 +198,7 @@ type relabelIdentityCollapseAudit struct {
 }
 
 type relabelInvalidNameDropAudit struct {
-	blocks            map[int]struct{}
+	blocks            map[pipelineRelabelLocation]struct{}
 	families          map[string]struct{}
 	logicalIdentities map[prompkg.SampleSeriesIdentity]struct{}
 	rawSamples        map[prompkg.RawSampleIdentity]struct{}
@@ -216,6 +219,7 @@ func (p pipelineProvenance) sourceDestinations(source prompkg.SampleSeriesIdenti
 type relabelPolicyAudits struct {
 	discards         map[relabelDiscardRuleKey]*relabelDiscardAudit
 	nameRewrites     map[relabelDiscardRuleKey]*relabelNameRewriteAudit
+	blockInputs      map[pipelineRelabelLocation]map[string]struct{}
 	identityCollapse relabelIdentityCollapseAudit
 	invalidNameDrops relabelInvalidNameDropAudit
 	provenance       pipelineProvenance

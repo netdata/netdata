@@ -121,7 +121,11 @@ func validateProfile(parent context.Context, opts Options) Report {
 	addAuthoredProfileHeuristics(authoredTemplate, r.RawFamilies, &r)
 	addObservedDistributionHeuristics(authoredTemplate, r.RawFamilies, &r)
 
-	pipelineSummary := newPipelineDiagnosticSummary(policy, rawSamples)
+	pipelineSummary, err := newPipelineDiagnosticSummary(policy, profile, rawSamples)
+	if err != nil {
+		r.addError("profile_relabeling", opts.ProfilePath, err.Error(), "The candidate profile relabeling must decode before production diagnostics can be correlated.")
+		return r
+	}
 	coll := promcollector.NewWithOptions(
 		promcollector.WithProfileCatalog(catalog),
 		promcollector.WithPipelineDiagnosticObserver(pipelineSummary.observe),
@@ -347,7 +351,7 @@ func validateProfile(parent context.Context, opts Options) Report {
 			"unexpected_autogen",
 			"",
 			fmt.Sprintf("%d series produced %d fallback charts", r.Counts.SeriesAutogen, r.Counts.AutogenCharts),
-			"The source-complete fixture must curate every series that survives the job/writer pipeline. Generic fallback preserves unknown future metrics; it does not excuse a current-source coverage gap.",
+			"The source-complete fixture must curate every series that survives the collector/writer pipeline. Generic fallback preserves unknown future metrics; it does not excuse a current-source coverage gap.",
 		)
 	}
 	if r.Counts.SeriesUnmatched != 0 {

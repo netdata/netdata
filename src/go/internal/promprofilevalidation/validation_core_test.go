@@ -564,7 +564,7 @@ fallback_type:
 		t.Fatalf("expected PASS with intentional job-policy exclusion\nreport:\n%s", result.stdout)
 	}
 	if len(result.report.PipelineExcluded) != 1 ||
-		result.report.PipelineExcluded[0].Category != "not_materialized_after_job_policy_or_writer" {
+		result.report.PipelineExcluded[0].Category != "not_materialized_after_pipeline_policy_or_writer" {
 		t.Fatalf("selector denial was misattributed: %#v", result.report.PipelineExcluded)
 	}
 }
@@ -607,7 +607,7 @@ relabeling:
 	}
 	excluded := result.report.PipelineExcluded[0]
 	if excluded.Name != "app_raw_value" ||
-		excluded.Category != "partially_not_materialized_after_job_policy_or_writer" ||
+		excluded.Category != "partially_not_materialized_after_pipeline_policy_or_writer" ||
 		excluded.RawLogicalSeries != 2 ||
 		excluded.WriterSourceSeries != 1 {
 		t.Fatalf("unexpected partial renamed-family exclusion: %#v", excluded)

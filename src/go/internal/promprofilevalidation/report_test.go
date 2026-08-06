@@ -55,7 +55,7 @@ func TestWriteTextReportSeparatesPipelineLossFromRenames(t *testing.T) {
 	r.PipelineExcluded = []pipelineExcludedReport{{
 		Name:               "app_dropped",
 		Type:               "gauge",
-		Category:           "not_materialized_after_job_policy_or_writer",
+		Category:           "not_materialized_after_pipeline_policy_or_writer",
 		RawLogicalSeries:   1,
 		WriterSourceSeries: 0,
 	}}
@@ -72,7 +72,7 @@ func TestWriteTextReportSeparatesPipelineLossFromRenames(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Pipeline: excluded_families=1, renamed_families=1",
-		"app_dropped: not_materialized_after_job_policy_or_writer",
+		"app_dropped: not_materialized_after_pipeline_policy_or_writer",
 		"app_worker_alpha_temperature -> app_temperature",
 		"normalized_and_materialized=1",
 	} {

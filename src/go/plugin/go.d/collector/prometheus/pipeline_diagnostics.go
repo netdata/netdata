@@ -34,6 +34,14 @@ const (
 	PipelineProfileSelected      PipelineDecision = "profile_selected"
 )
 
+// PipelineRelabelStage identifies the owner of one relabel-pipeline fact.
+type PipelineRelabelStage string
+
+const (
+	PipelineRelabelStageJob     PipelineRelabelStage = "job"
+	PipelineRelabelStageProfile PipelineRelabelStage = "profile"
+)
+
 // PipelineReason is a stable production reason for a rejected pipeline item.
 type PipelineReason string
 
@@ -71,6 +79,7 @@ type PipelineDiagnostic struct {
 	RelabelRuleMatched  bool
 	RelabelRuleDropped  bool
 	RelabelDrop         relabel.DropInfo
+	RelabelStage        PipelineRelabelStage
 	RejectedSeriesCount int
 	ProfileName         string
 }

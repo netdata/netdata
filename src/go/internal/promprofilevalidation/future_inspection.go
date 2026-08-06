@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 )
 
@@ -56,9 +57,9 @@ func probeAllowsAuthoredRouting(
 		if !requirement.allowsAuthoredRouting {
 			continue
 		}
-		fact, evaluated := pipeline.rulesEvaluated[rawIdentity][pipelineRuleKey{
-			block: requirement.blockIndex, rule: requirement.ruleIndex,
-		}]
+		fact, evaluated := pipeline.ruleForRaw(rawIdentity, pipelineRuleKey{
+			location: requirement.location, rule: requirement.ruleIndex,
+		})
 		if evaluated && fact.RelabelRuleMatched {
 			return true
 		}
@@ -110,16 +111,22 @@ func inspectFutureOpenness(
 				"The staged exposition and production parser must preserve every declared or derived raw probe.",
 			)
 		}
-		drop, dropped := pipeline.relabelDropped[rawIdentity]
+		drop, dropped := pipeline.relabelDropForRaw(rawIdentity)
 		if dropped {
+			owner := "job"
+			code := "future_metric_blocked_by_job_relabel"
+			if drop.RelabelStage == promcollector.PipelineRelabelStageProfile {
+				owner = fmt.Sprintf("profile %q", drop.ProfileName)
+				code = "future_metric_blocked_by_profile_relabel"
+			}
 			r.addError(
-				"future_metric_blocked_by_job_relabel", path,
-				fmt.Sprintf("raw future metric %q is dropped by relabeling block %d rule %d (%s)", input.Name, drop.BlockIndex, drop.RuleIndex, drop.RelabelDrop.Reason),
+				code, path,
+				fmt.Sprintf("raw future metric %q is dropped by %s relabeling block %d rule %d (%s)", input.Name, owner, drop.BlockIndex, drop.RuleIndex, drop.RelabelDrop.Reason),
 				"Recommended relabeling must leave unknown future exporter metrics open unless the exclusion is exact, bounded, and current-source-proven.",
 			)
 		}
 
-		destinations := pipeline.destinationsByRaw[rawIdentity]
+		destinations := pipeline.finalDestinationsForRaw(rawIdentity)
 		if rawAccepted && !dropped && len(destinations) == 0 {
 			r.addError(
 				"future_metric_missing_after_relabel", path,
@@ -247,7 +254,7 @@ func inspectFutureOpenness(
 			if !probe.open {
 				continue
 			}
-			entry, entered := pipeline.blockEntries[probe.rawIdentity][scope.blockIndex]
+			entry, entered := pipeline.blockEntryForRaw(probe.rawIdentity, scope.location)
 			if entered && scopeMatcher.MatchString(entry) {
 				matched = true
 				break
@@ -268,16 +275,16 @@ func inspectFutureOpenness(
 			if !probe.open {
 				continue
 			}
-			fact, evaluated := pipeline.rulesEvaluated[probe.rawIdentity][pipelineRuleKey{
-				block: requirement.blockIndex, rule: requirement.ruleIndex,
-			}]
+			fact, evaluated := pipeline.ruleForRaw(probe.rawIdentity, pipelineRuleKey{
+				location: requirement.location, rule: requirement.ruleIndex,
+			})
 			if evaluated && (!requirement.requireHit || fact.RelabelRuleMatched) {
 				covered = true
 				break
 			}
 		}
 		if !covered {
-			path := fmt.Sprintf("relabeling[%d].metric_relabel_configs[%d]", requirement.blockIndex, requirement.ruleIndex)
+			path := relabelRulePath(requirement.location.stage, requirement.location.block, requirement.ruleIndex)
 			r.addError(
 				"future_relabel_branch_uncovered", path,
 				"no open future probe exercises this reachable rename/drop-capable relabel rule",

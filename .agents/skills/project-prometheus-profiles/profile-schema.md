@@ -23,6 +23,14 @@ standalone chart-template spec.
 match: 'exporter_*'
 app: exporter
 
+relabeling:
+  - match: exporter_legacy_requests_total
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: exporter_legacy_requests_total
+        target_label: __name__
+        replacement: exporter_requests_total
+
 template:
   family: Exporter
   context_namespace: exporter
@@ -42,6 +50,10 @@ template:
   a coverage declaration or dimension selector.
 - `match` also scopes `autogen.selector` per source family. A contributed stock
   profile MUST remain open to every unknown future family in that scope.
+- `relabeling` is OPTIONAL exporter-owned normalization. It runs after profile
+  selection and before template routing. The first applicable selected profile
+  normalizer owns each original source family; all selected templates consume
+  the resulting shared stream.
 - The runtime format supports `autogen.selector.allow`, but contributed profiles
   MUST NOT use it: an allowlist suppresses every unknown family outside the
   list. This syntax remains available only for deployment-owned user policy.
@@ -57,8 +69,9 @@ template:
   future family remains generic without masking current profile incompleteness.
 - Recommended-job selector denies MUST name exact exposition metric names
   present in the source-complete sample inventory.
-  Dynamic source-proven alias grammars belong in bounded relabel `drop` rules;
-  inverse `keep`/`keepequal` filters are forbidden for stock profile jobs. A
+  Dynamic source-proven alias grammars belong in bounded profile or job relabel
+  `drop` rules; inverse `keep`/`keepequal` filters are forbidden for contributed
+  profile and job pipelines. A
   non-empty job allow list MUST copy every positive wildcard
   term from `profile.match` into an unconstrained expression, copy the complete
   match expression, or use `*`; finite canaries and label constraints are not
@@ -375,7 +388,8 @@ dashboard-design judgment rather than a blanket uniqueness error.
 
 ## Unsupported shortcuts
 
-The current profile schema has no profile-level `drop:` and no computed
-`average` dimension. Use job selector/relabeling for exclusion. Chart only
-values the collector actually writes; do not document or emit speculative
-schema keys.
+The profile schema has no separate top-level `drop:` shorthand and no computed
+`average` dimension. Use profile `relabeling` for exporter-owned exclusions
+after selection; use the job selector or job relabeling for deployment policy
+or exclusion needed before selection. Chart only values the collector actually
+writes; do not document or emit speculative schema keys.

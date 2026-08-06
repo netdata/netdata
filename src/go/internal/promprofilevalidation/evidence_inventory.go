@@ -97,7 +97,8 @@ func reconcileRawFamilies(
 ) ([]pipelineExcludedReport, []pipelineRenamedReport) {
 	var excluded []pipelineExcludedReport
 	var renamed []pipelineRenamedReport
-	ambiguousJobPolicy := len(job.SelectorAllow) > 0 || len(job.SelectorDeny) > 0 || job.RelabelBlocks > 0
+	ambiguousPipelinePolicy := len(job.SelectorAllow) > 0 || len(job.SelectorDeny) > 0 ||
+		job.RelabelBlocks > 0 || pipeline.profileRelabelBlocks > 0
 	for _, family := range raw {
 		writerSeries := 0
 		renamedSeries := 0
@@ -134,14 +135,14 @@ func reconcileRawFamilies(
 		if writerSeries >= family.Series {
 			continue
 		}
-		category := "not_materialized_after_job_policy_or_writer"
+		category := "not_materialized_after_pipeline_policy_or_writer"
 		if writerSeries > 0 {
-			if ambiguousJobPolicy {
-				category = "partially_not_materialized_after_job_policy_or_writer"
+			if ambiguousPipelinePolicy {
+				category = "partially_not_materialized_after_pipeline_policy_or_writer"
 			} else {
 				category = "writer_partially_materialized_family"
 			}
-		} else if !ambiguousJobPolicy {
+		} else if !ambiguousPipelinePolicy {
 			switch {
 			case family.Shape == "info_suffix":
 				category = "writer_policy_skips_info_suffix"

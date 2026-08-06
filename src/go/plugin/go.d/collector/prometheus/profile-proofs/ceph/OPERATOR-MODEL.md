@@ -163,14 +163,14 @@ catalog regression locks critical counter-as-current, gauge-as-cumulative, snaps
 ## Binding exclusions
 
 - Raw `ceph_data_sync_from_<zone>_*` MGR aliases: ceph-exporter normalizes the same source metrics to the stable
-  `ceph_data_sync_from_zone_*` families (`src/exporter/DaemonMetricCollector.cc:467-470`). The recommended job excludes the
+  `ceph_data_sync_from_zone_*` families (`src/exporter/DaemonMetricCollector.cc:467-470`). Profile relabeling excludes the
   nine stable names from the alias block and drops only the source-proven raw suffix grammar to prevent duplicate
   observations; the stable metrics remain charted and unknown suffixes remain forward-open.
 - `process_start_time_seconds`: raw NVMe-oF process-start epoch cannot be transformed into age. Process CPU, memory, and file
   descriptors remain charted.
 - Five information families are rejected by the writer contract: three NVMe-oF metadata families, `python_info`, and
   `ceph_osd_osd_pg_info`. Their labels and lost metadata questions remain recorded in the source ledger.
-- Address-bearing objecter families are **not excluded**. Job relabeling moves the address into `objecter_address`, renames the
+- Address-bearing objecter families are **not excluded**. Profile relabeling moves the address into `objecter_address`, renames the
   finite operation suffix to a stable canonical family, and the profile charts the result with complete identity.
 - No family is excluded because it overlaps the native Ceph collector or because of the meaning of an exported label.
 
@@ -184,7 +184,7 @@ catalog regression locks critical counter-as-current, gauge-as-cumulative, snaps
 ## Reconciliation ledger
 
 - `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv` is the binding per-family and exact-selector semantic ledger.
-- It accounts for **1,794 source families** in 1,794 rows: **1,779 charted source-family routes**, **10 recommended-job
+- It accounts for **1,794 source families** in 1,794 rows: **1,779 charted source-family routes**, **10 configured
   exclusions**, and **5 writer-ineligible information families**.
 - The profile contains **547 authored charts** and **1,772 unique authored selectors**. The structural union materializes
   **981 chart instances** and **2,937 dimensions**.

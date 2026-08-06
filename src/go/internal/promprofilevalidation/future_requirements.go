@@ -24,14 +24,14 @@ const (
 )
 
 type futureScopeRequirement struct {
-	path       string
-	pattern    string
-	scopeExpr  string
-	blockIndex int
+	path      string
+	pattern   string
+	scopeExpr string
+	location  pipelineRelabelLocation
 }
 
 type futureRuleRequirement struct {
-	blockIndex            int
+	location              pipelineRelabelLocation
 	ruleIndex             int
 	requireHit            bool
 	allowsAuthoredRouting bool
@@ -78,7 +78,7 @@ func buildFutureRequirements(
 	}
 
 	requirements := futureRequirements{
-		profileScopes: positiveWildcardScopes("match", profile.Match, -1),
+		profileScopes: positiveWildcardScopes("match", profile.Match, pipelineRelabelLocation{block: -1}),
 		matcher:       matcherAnalyzer,
 	}
 	authoredMetricNames := profileAuthoredMetricNames(profile)
@@ -86,114 +86,121 @@ func buildFutureRequirements(
 	for _, sample := range current.Samples {
 		currentNames[sample.Name] = struct{}{}
 	}
+	stages, err := validationRelabelStages(policy, profile)
+	if err != nil {
+		return futureRequirements{}, err
+	}
 	var priorMutations []promcollector.RelabelNameMutation
-	for blockIndex, block := range policy.Relabeling {
-		profileOverlap, err := simplePatternScopesMayOverlap(matcherAnalyzer, profile.Match, block.Match)
-		if err != nil {
-			return futureRequirements{}, err
-		}
-		mutationReachable, err := flowAnalyzer.MutationsMayReach(priorMutations, block.Match, false)
-		if err != nil {
-			return futureRequirements{}, err
-		}
-
-		blockRelevant := profileOverlap || mutationReachable
-		nameWrites := make(map[int]futureNameWrite)
-		for ruleIndex, rule := range block.MetricRelabelConfigs {
-			rule = rule.WithDefaults()
-			writesName, err := relabelAnalyzer.RuleMayWriteLabel(rule, promlabels.MetricName)
+	for _, stage := range stages {
+		for blockIndex, block := range stage.blocks {
+			location := pipelineRelabelLocation{stage: stage.stage, profile: stage.profile, block: blockIndex}
+			profileOverlap, err := simplePatternScopesMayOverlap(matcherAnalyzer, profile.Match, block.Match)
 			if err != nil {
 				return futureRequirements{}, err
 			}
-			if !writesName {
-				continue
-			}
-			futureReach, err := nameWriteCanReachFuture(relabelAnalyzer, rule, currentNames)
+			mutationReachable, err := flowAnalyzer.MutationsMayReach(priorMutations, block.Match, false)
 			if err != nil {
 				return futureRequirements{}, err
 			}
 
-			outputOverlapsProfile := true
-			if relabel.EffectiveAction(rule) == relabel.Replace {
-				outputPattern, possible, err := relabelAnalyzer.ReplacementGlob(rule.Regex, rule.Replacement)
-				if err != nil {
-					return futureRequirements{}, err
-				}
-				outputOverlapsProfile = possible
-				if possible {
-					outputOverlapsProfile, err = simplePatternScopesMayOverlap(
-						matcherAnalyzer, profile.Match, outputPattern,
-					)
-					if err != nil {
-						return futureRequirements{}, err
-					}
-				}
-			}
-			nameWrites[ruleIndex] = futureNameWrite{rule: rule, futureReach: futureReach}
-			blockRelevant = blockRelevant || (futureReach && outputOverlapsProfile)
-		}
-
-		blockScopes := positiveWildcardScopes(
-			fmt.Sprintf("relabeling[%d].match", blockIndex), block.Match, blockIndex,
-		)
-		futureCapable := len(blockScopes) > 0 || mutationReachable
-		affectsRouting, err := relabelAnalyzer.RulesMayAffectFutureRouting(block.MetricRelabelConfigs)
-		if err != nil {
-			return futureRequirements{}, err
-		}
-		if blockRelevant && futureCapable && affectsRouting {
-			requirements.blockScopes = append(requirements.blockScopes, blockScopes...)
+			blockRelevant := profileOverlap || mutationReachable
+			nameWrites := make(map[int]futureNameWrite)
 			for ruleIndex, rule := range block.MetricRelabelConfigs {
 				rule = rule.WithDefaults()
-				action := relabel.EffectiveAction(rule)
 				writesName, err := relabelAnalyzer.RuleMayWriteLabel(rule, promlabels.MetricName)
 				if err != nil {
 					return futureRequirements{}, err
 				}
-				switch action {
-				case relabel.Drop, relabel.DropEqual, relabel.Keep, relabel.KeepEqual:
-					requirements.rules = append(requirements.rules, futureRuleRequirement{
-						blockIndex: blockIndex, ruleIndex: ruleIndex,
-					})
-				default:
-					if writesName && nameWrites[ruleIndex].futureReach {
-						allowsAuthoredRouting := false
-						if action == relabel.Replace {
-							grammar, bounded, err := analyzeBoundedMetricNameRewriteGrammar(
-								relabelAnalyzer, rule, action,
-							)
-							if err != nil {
-								return futureRequirements{}, err
-							}
-							outputs, finite, err := relabelAnalyzer.ReplacementOutputs(rule.Regex, rule.Replacement)
-							if err != nil {
-								return futureRequirements{}, err
-							}
-							allowsAuthoredRouting = bounded && finite &&
-								len(grammar.nonCanonicalRewriteOutputs(outputs, authoredMetricNames)) == 0
+				if !writesName {
+					continue
+				}
+				futureReach, err := nameWriteCanReachFuture(relabelAnalyzer, rule, currentNames)
+				if err != nil {
+					return futureRequirements{}, err
+				}
+
+				outputOverlapsProfile := true
+				if relabel.EffectiveAction(rule) == relabel.Replace {
+					outputPattern, possible, err := relabelAnalyzer.ReplacementGlob(rule.Regex, rule.Replacement)
+					if err != nil {
+						return futureRequirements{}, err
+					}
+					outputOverlapsProfile = possible
+					if possible {
+						outputOverlapsProfile, err = simplePatternScopesMayOverlap(
+							matcherAnalyzer, profile.Match, outputPattern,
+						)
+						if err != nil {
+							return futureRequirements{}, err
 						}
-						requirements.rules = append(requirements.rules, futureRuleRequirement{
-							blockIndex:            blockIndex,
-							ruleIndex:             ruleIndex,
-							requireHit:            true,
-							allowsAuthoredRouting: allowsAuthoredRouting,
-						})
-						requirements.requiresExplicit = true
 					}
 				}
+				nameWrites[ruleIndex] = futureNameWrite{rule: rule, futureReach: futureReach}
+				blockRelevant = blockRelevant || (futureReach && outputOverlapsProfile)
 			}
-		}
 
-		for _, ruleIndex := range slices.Sorted(maps.Keys(nameWrites)) {
-			write := nameWrites[ruleIndex]
-			if !write.futureReach {
-				continue
-			}
-			effect, err := flowAnalyzer.Mutation(write.rule, relabel.RuleNameDerivedOnly(write.rule))
+			blockScopes := positiveWildcardScopes(
+				relabelBlockPath(stage.stage, blockIndex)+".match", block.Match, location,
+			)
+			futureCapable := len(blockScopes) > 0 || mutationReachable
+			affectsRouting, err := relabelAnalyzer.RulesMayAffectFutureRouting(block.MetricRelabelConfigs)
 			if err != nil {
 				return futureRequirements{}, err
 			}
-			priorMutations = append(priorMutations, effect)
+			if blockRelevant && futureCapable && affectsRouting {
+				requirements.blockScopes = append(requirements.blockScopes, blockScopes...)
+				for ruleIndex, rule := range block.MetricRelabelConfigs {
+					rule = rule.WithDefaults()
+					action := relabel.EffectiveAction(rule)
+					writesName, err := relabelAnalyzer.RuleMayWriteLabel(rule, promlabels.MetricName)
+					if err != nil {
+						return futureRequirements{}, err
+					}
+					switch action {
+					case relabel.Drop, relabel.DropEqual, relabel.Keep, relabel.KeepEqual:
+						requirements.rules = append(requirements.rules, futureRuleRequirement{
+							location: location, ruleIndex: ruleIndex,
+						})
+					default:
+						if writesName && nameWrites[ruleIndex].futureReach {
+							allowsAuthoredRouting := false
+							if action == relabel.Replace {
+								grammar, bounded, err := analyzeBoundedMetricNameRewriteGrammar(
+									relabelAnalyzer, rule, action,
+								)
+								if err != nil {
+									return futureRequirements{}, err
+								}
+								outputs, finite, err := relabelAnalyzer.ReplacementOutputs(rule.Regex, rule.Replacement)
+								if err != nil {
+									return futureRequirements{}, err
+								}
+								allowsAuthoredRouting = bounded && finite &&
+									len(grammar.nonCanonicalRewriteOutputs(outputs, authoredMetricNames)) == 0
+							}
+							requirements.rules = append(requirements.rules, futureRuleRequirement{
+								location:              location,
+								ruleIndex:             ruleIndex,
+								requireHit:            true,
+								allowsAuthoredRouting: allowsAuthoredRouting,
+							})
+							requirements.requiresExplicit = true
+						}
+					}
+				}
+			}
+
+			for _, ruleIndex := range slices.Sorted(maps.Keys(nameWrites)) {
+				write := nameWrites[ruleIndex]
+				if !write.futureReach {
+					continue
+				}
+				effect, err := flowAnalyzer.Mutation(write.rule, relabel.RuleNameDerivedOnly(write.rule))
+				if err != nil {
+					return futureRequirements{}, err
+				}
+				priorMutations = append(priorMutations, effect)
+			}
 		}
 	}
 	return requirements, nil
@@ -221,7 +228,7 @@ func nameWriteCanReachFuture(
 	return false, nil
 }
 
-func positiveWildcardScopes(path, expr string, blockIndex int) []futureScopeRequirement {
+func positiveWildcardScopes(path, expr string, location pipelineRelabelLocation) []futureScopeRequirement {
 	var requirements []futureScopeRequirement
 	var earlier []string
 	for term := range strings.FieldsSeq(expr) {
@@ -234,7 +241,7 @@ func positiveWildcardScopes(path, expr string, blockIndex int) []futureScopeRequ
 			}
 			parts = append(parts, pattern)
 			requirements = append(requirements, futureScopeRequirement{
-				path: path, pattern: pattern, scopeExpr: strings.Join(parts, " "), blockIndex: blockIndex,
+				path: path, pattern: pattern, scopeExpr: strings.Join(parts, " "), location: location,
 			})
 		}
 		earlier = append(earlier, pattern)

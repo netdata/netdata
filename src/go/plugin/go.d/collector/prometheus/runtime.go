@@ -80,6 +80,7 @@ func (f profileFallback) resolve(name string) (commonmodel.MetricType, bool) {
 }
 
 type profileNormalizer struct {
+	name     string
 	root     matcher.Matcher
 	pipeline *relabel.Pipeline
 }
@@ -102,7 +103,7 @@ func compileProfileNormalizers(profiles []promprofiles.Profile) ([]profileNormal
 		if err != nil {
 			return nil, err
 		}
-		normalizers = append(normalizers, profileNormalizer{root: root, pipeline: pipeline})
+		normalizers = append(normalizers, profileNormalizer{name: profile.Name, root: root, pipeline: pipeline})
 	}
 	return normalizers, nil
 }

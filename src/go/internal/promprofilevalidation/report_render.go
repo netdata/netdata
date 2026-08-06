@@ -58,7 +58,7 @@ func writeTextReport(w io.Writer, r Report) error {
 	)
 
 	if len(r.PipelineExcluded) > 0 {
-		fmt.Fprintln(&b, "\nRaw families wholly or partly absent after the real job/writer pipeline:")
+		fmt.Fprintln(&b, "\nRaw families wholly or partly absent after the real collector/writer pipeline:")
 		for _, item := range r.PipelineExcluded {
 			shape := ""
 			if item.Shape != "" {
@@ -76,7 +76,7 @@ func writeTextReport(w io.Writer, r Report) error {
 		}
 	}
 	if len(r.PipelineRenamed) > 0 {
-		fmt.Fprintln(&b, "\nRaw families successfully normalized by job relabeling:")
+		fmt.Fprintln(&b, "\nRaw families successfully normalized by job/profile relabeling:")
 		for _, item := range r.PipelineRenamed {
 			fmt.Fprintf(
 				&b,

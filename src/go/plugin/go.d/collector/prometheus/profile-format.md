@@ -335,8 +335,8 @@ template:
 > validator enforces this policy separately from its strict zero-fallback check
 > over current source-complete evidence.
 
-Recommended jobs shipped with stock profiles follow the same forward-open
-rule. Under a wildcard relabel block, a sample-discarding rule may use only a
+Stock profile and recommended-job relabeling follow the same forward-open rule.
+Under a wildcard relabel block, a sample-discarding rule may use only a
 `__name__` `drop` that enumerates finite exact names or one non-empty internal
 entity key between finite exporter prefixes and finite terminal metric
 suffixes. Every finite exact name or prefix/suffix branch must be exercised by
@@ -345,8 +345,9 @@ the source-complete fixture. Open-ended terminal regexes, wildcard
 discard are not accepted stock-authoring patterns; runtime support remains
 available for user-owned jobs.
 
-Exact recommended-job denies and exact relabel-block metric names must also be
-present in the source-complete fixture. Every exact-scope discard rule must drop
+Exact recommended-job selector denies and exact profile/job relabel-block metric
+names must also be present in the source-complete fixture. Every exact-scope
+discard rule must drop
 at least one fixture sample at its real ordered pipeline position. A wildcard
 name-derived rewrite follows the bounded drop grammar and fixture-evidence rule;
 an internal-key rewrite cannot reference its dynamic capture, and every finite

@@ -130,13 +130,13 @@ optional (`gauge` by default, `counter`, or `untyped`); and `labels` is an
 optional string map that cannot contain `__name__`. Names and label names use
 the production Prometheus UTF-8 rules. A job may declare at most 256 unique raw
 identities and one type per family. Use invented, non-sensitive labels. These
-samples enter before selector and relabel processing, so do not declare
-post-relabel names.
+samples enter before job selector processing and both job and profile
+relabeling, so do not declare post-relabel names.
 
 The validator derives bounded raw witnesses when metric-name identity is
-preserved. If a reachable relabel rule can write metric names, explicit
-`future_inputs` are required because arbitrary relabeling cannot be inverted
-soundly.
+preserved. If a reachable job or profile relabel rule can write metric names,
+explicit `future_inputs` are required because arbitrary relabeling cannot be
+inverted soundly.
 
 ## What `PASS` establishes
 
@@ -149,8 +149,8 @@ For the supplied dump and job policy, a pass establishes that:
 - every current writer series is accounted for with zero generic fallback and
   zero unmatched series;
 - a second isolated real collector sequence introduces declared or derived raw
-  future probes before selector/relabel processing; future results cannot
-  satisfy current coverage;
+  future probes before the job selector and job/profile relabeling; future
+  results cannot satisfy current coverage;
 - every positive wildcard profile term and future-relevant relabel scope/rule
   has a probe that actually traverses the production selector, relabeler,
   assembler, writer, exact profile selection, and planner;
@@ -162,12 +162,12 @@ For the supplied dump and job policy, a pass establishes that:
   source-fixture-evidenced metric-name grammar without prior label-derived
   metric-name mutation; wildcard metric-name rewrites are derived only from the
   original name and use a bounded, source-fixture-evidenced input grammar;
-- the profile has no fallback allowlist or open-ended fallback deny, and the
-  job has no sample-filtering `keep` or `keepequal` relabel action; exact
-  profile/job/relabel exclusions have the required source-complete evidence; a
-  selector containing `{...}` is label-constrained policy rather than an exact
-  metric name;
-- the complete recommended relabel pipeline preserves every observed
+- the profile has no fallback allowlist or open-ended fallback deny, and neither
+  job nor profile relabeling has a sample-filtering `keep` or `keepequal`
+  action; exact profile/job/relabel exclusions have the required
+  source-complete evidence; a selector containing `{...}` is label-constrained
+  policy rather than an exact metric name;
+- the complete job-then-profile relabel pipeline preserves every observed
   writer-admissible logical identity after normal histogram/summary component
   assembly; distinct source identities do not converge on the same final
   metric name and labels;
@@ -202,7 +202,7 @@ Changing the entity boundary or overriding identity can be correct; inventing a
 label that the series does not carry is not.
 
 `pipeline_excluded` records raw source families that are wholly or partly absent
-after job policy and writer processing. Each record carries the raw and
+after job/profile policy and writer processing. Each record carries the raw and
 materialized logical-series counts; `counts.pipeline_excluded` is the number of
 family records, not the sum of lost logical identities. Relabel-renamed families
 are reconciled by logical identity against their final writer names, so
@@ -262,6 +262,8 @@ policy even when the current fixture has no coverage gap:
 - `future_metric_blocked_by_job_selector`: the recommended job rejects it;
 - `future_metric_blocked_by_job_relabel`: an otherwise applicable relabel rule
   drops it;
+- `future_metric_blocked_by_profile_relabel`: the selected candidate profile's
+  relabeling drops it;
 - `future_metric_rejected_by_writer`: the production writer rejects its final
   family or series identity;
 - `future_metric_routed_to_authored_metric`: relabeling maps a primary future
@@ -273,7 +275,7 @@ policy even when the current fixture has no coverage gap:
 - `future_run_changed_current_evidence`: adding raw future probes changes or
   removes a current writer identity/value;
 - `observed_relabel_identity_collapse`: after normal histogram/summary
-  component assembly, the complete recommended relabel pipeline maps multiple
+  component assembly, the complete job-then-profile relabel pipeline maps multiple
   observed writer-admissible source identities onto the same final metric name
   and labels. Relabeling retains one value for that final identity; it does not
   aggregate the collapsed sources. Writer-rejected samples such as non-finite
@@ -379,7 +381,7 @@ Warnings identify designs that deserve explanation but can be correct:
   effective job selector before profile coverage is measured;
 - each allow list's observed exclusion of otherwise writer-capable families;
 - each deny expression's observed impact on otherwise writer-capable families;
-- every sample-discarding relabel rule, including its observed
+- every sample-discarding job or profile relabel rule, including its observed
   logical-identity impact or the absence of matching evidence; `keep` and
   `keepequal` additionally fail contributor validation because they are closed
   inverse filters;

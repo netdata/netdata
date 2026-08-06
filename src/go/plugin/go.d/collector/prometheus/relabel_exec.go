@@ -28,13 +28,18 @@ const (
 )
 
 type relabelStage struct {
-	name       string
-	limiterKey string
+	name            string
+	limiterKey      string
+	diagnosticStage PipelineRelabelStage
 }
 
 var (
-	jobRelabelStage     = relabelStage{name: "job relabeling", limiterKey: "job-relabel-typed-family-corruption"}
-	profileRelabelStage = relabelStage{name: "profile relabeling", limiterKey: "profile-relabel-typed-family-corruption"}
+	jobRelabelStage = relabelStage{
+		name: "job relabeling", limiterKey: "job-relabel-typed-family-corruption", diagnosticStage: PipelineRelabelStageJob,
+	}
+	profileRelabelStage = relabelStage{
+		name: "profile relabeling", limiterKey: "profile-relabel-typed-family-corruption", diagnosticStage: PipelineRelabelStageProfile,
+	}
 )
 
 type relabelResult struct {
@@ -108,9 +113,10 @@ func (c *Collector) finishRelabel(
 	}
 	for key := range invalid {
 		c.observePipeline(PipelineDiagnostic{
-			Decision:   PipelineTypedFamilyRejected,
-			Reason:     PipelineReasonTypedFamilyCorruption,
-			MetricName: key.name,
+			Decision:     PipelineTypedFamilyRejected,
+			Reason:       PipelineReasonTypedFamilyCorruption,
+			MetricName:   key.name,
+			RelabelStage: stage.diagnosticStage,
 		})
 	}
 
@@ -146,7 +152,7 @@ func (c *Collector) applyPipelineRelabel(
 	help := newHelpRemap()
 	out := prompkg.SampleBatch{Samples: make([]prompkg.Sample, 0, len(batch.Samples))}
 	for _, raw := range batch.Samples {
-		sample, drop := c.applyObservedPipeline(raw, pipeline, true, true)
+		sample, drop := c.applyObservedPipeline(raw, pipeline, stage, "", true)
 		c.appendRelabelResult(&out, t, help, stage, relabelResult{raw: raw, sample: sample, drop: drop})
 	}
 	out.Help = help.remap(batch.Help)
@@ -156,8 +162,9 @@ func (c *Collector) applyPipelineRelabel(
 func (c *Collector) applyObservedPipeline(
 	raw prompkg.Sample,
 	pipeline *relabel.Pipeline,
+	stage relabelStage,
+	profileName string,
 	observeRaw bool,
-	observeRules bool,
 ) (prompkg.Sample, relabel.DropInfo) {
 	if c.pipelineObserver == nil {
 		if pipeline == nil {
@@ -168,12 +175,19 @@ func (c *Collector) applyObservedPipeline(
 
 	source := prompkg.IdentifySampleSeries(raw)
 	rawIdentity := prompkg.IdentifyRawSample(raw.Name, raw.Labels)
+	valueIdentity := PipelineValueIdentity{}
+	scalarValue := raw.Kind == prompkg.SampleKindScalar
+	if scalarValue {
+		valueIdentity = pipelineScalarValueIdentity(raw.Value)
+	}
 	if observeRaw {
 		c.observePipeline(PipelineDiagnostic{
-			Decision:    PipelineRawAccepted,
-			RawIdentity: rawIdentity,
-			Source:      source,
-			MetricName:  raw.Name,
+			Decision:      PipelineRawAccepted,
+			RawIdentity:   rawIdentity,
+			Source:        source,
+			ValueIdentity: valueIdentity,
+			ScalarValue:   scalarValue,
+			MetricName:    raw.Name,
 		})
 	}
 
@@ -181,7 +195,7 @@ func (c *Collector) applyObservedPipeline(
 	drop := relabel.DropInfo{}
 	dropMetricName := sample.Name
 	dropBlockIndex := -1
-	if pipeline != nil && observeRules {
+	if pipeline != nil {
 		sample, drop = pipeline.ApplyWithObserver(
 			raw,
 			func(fact relabel.BlockDiagnostic) {
@@ -190,9 +204,13 @@ func (c *Collector) applyObservedPipeline(
 					Decision:        PipelineRelabelBlockEntered,
 					RawIdentity:     rawIdentity,
 					Source:          source,
+					ValueIdentity:   valueIdentity,
+					ScalarValue:     scalarValue,
 					InputMetricName: fact.InputMetricName,
 					InputLabelNames: fact.InputLabelNames,
 					BlockIndex:      fact.BlockIndex,
+					RelabelStage:    stage.diagnosticStage,
+					ProfileName:     profileName,
 				})
 			},
 			func(blockIndex int, fact relabel.RuleDiagnostic) {
@@ -201,6 +219,8 @@ func (c *Collector) applyObservedPipeline(
 					Decision:           PipelineRelabelRuleEvaluated,
 					RawIdentity:        rawIdentity,
 					Source:             source,
+					ValueIdentity:      valueIdentity,
+					ScalarValue:        scalarValue,
 					InputMetricName:    fact.InputMetricName,
 					OutputMetricName:   fact.OutputMetricName,
 					BlockIndex:         blockIndex,
@@ -208,39 +228,41 @@ func (c *Collector) applyObservedPipeline(
 					RelabelAction:      fact.Action,
 					RelabelRuleMatched: fact.Matched,
 					RelabelRuleDropped: fact.Dropped,
+					RelabelStage:       stage.diagnosticStage,
+					ProfileName:        profileName,
 				})
 			},
 		)
-	} else if pipeline != nil {
-		sample, drop = pipeline.Apply(raw)
 	}
 	if drop.Dropped() {
-		if observeRules {
-			c.observePipeline(PipelineDiagnostic{
-				Decision:      PipelineRelabelDropped,
-				RawIdentity:   rawIdentity,
-				Source:        source,
-				MetricName:    dropMetricName,
-				BlockIndex:    dropBlockIndex,
-				RuleIndex:     drop.RuleIndex,
-				RelabelAction: drop.Action,
-				RelabelDrop:   drop,
-			})
-		}
+		c.observePipeline(PipelineDiagnostic{
+			Decision:      PipelineRelabelDropped,
+			RawIdentity:   rawIdentity,
+			Source:        source,
+			ValueIdentity: valueIdentity,
+			ScalarValue:   scalarValue,
+			MetricName:    dropMetricName,
+			BlockIndex:    dropBlockIndex,
+			RuleIndex:     drop.RuleIndex,
+			RelabelAction: drop.Action,
+			RelabelDrop:   drop,
+			RelabelStage:  stage.diagnosticStage,
+			ProfileName:   profileName,
+		})
 		return sample, drop
 	}
 
 	fact := PipelineDiagnostic{
-		Decision:    PipelineRelabelOutput,
-		RawIdentity: rawIdentity,
-		Source:      source,
-		Destination: prompkg.IdentifySampleSeries(sample),
-		MetricName:  sample.Name,
+		Decision:     PipelineRelabelOutput,
+		RawIdentity:  rawIdentity,
+		Source:       source,
+		Destination:  prompkg.IdentifySampleSeries(sample),
+		MetricName:   sample.Name,
+		RelabelStage: stage.diagnosticStage,
+		ProfileName:  profileName,
 	}
-	if sample.Kind == prompkg.SampleKindScalar {
-		fact.ValueIdentity = pipelineScalarValueIdentity(sample.Value)
-		fact.ScalarValue = true
-	}
+	fact.ValueIdentity = valueIdentity
+	fact.ScalarValue = scalarValue
 	c.observePipeline(fact)
 	return sample, relabel.DropInfo{}
 }

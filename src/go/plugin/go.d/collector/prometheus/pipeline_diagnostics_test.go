@@ -258,6 +258,56 @@ ignored 1
 	}
 }
 
+func TestPipelineDiagnosticsDistinguishJobAndProfileRelabeling(t *testing.T) {
+	catalog := loadTestCatalog(t, map[string]string{
+		"candidate": testRelabelProfileYAML("app_*", "app_raw", "app_final"),
+	})
+	dumpPath := filepath.Join(t.TempDir(), "metrics.txt")
+	require.NoError(t, os.WriteFile(dumpPath, []byte("# TYPE source_raw gauge\nsource_raw 7\n"), 0o600))
+
+	var facts []PipelineDiagnostic
+	collector := NewWithOptions(
+		WithProfileCatalog(catalog),
+		WithPipelineDiagnosticObserver(func(fact PipelineDiagnostic) { facts = append(facts, fact) }),
+	)
+	collector.URL = "file://" + dumpPath
+	collector.Relabeling = []relabel.Block{{
+		Match: "source_*",
+		MetricRelabelConfigs: []relabel.Config{{
+			SourceLabels: []string{"__name__"},
+			Regex:        relabel.MustNewRegexp("source_raw"),
+			TargetLabel:  "__name__",
+			Replacement:  "app_raw",
+			Action:       relabel.Replace,
+		}},
+	}}
+	collector.Profiles = ProfilesConfig{
+		Mode:      profilesModeExact,
+		ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "candidate"}}},
+	}
+
+	ctx := context.Background()
+	require.NoError(t, collector.Init(ctx))
+	defer collector.Cleanup(ctx)
+	require.NoError(t, collector.Check(ctx))
+
+	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
+		return fact.Decision == PipelineRelabelOutput &&
+			fact.RelabelStage == PipelineRelabelStageJob && fact.ProfileName == "" &&
+			fact.Source.Family == "source_raw" && fact.Destination.Family == "app_raw"
+	})
+	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
+		return fact.Decision == PipelineRelabelRuleEvaluated &&
+			fact.RelabelStage == PipelineRelabelStageProfile && fact.ProfileName == "candidate" &&
+			fact.InputMetricName == "app_raw" && fact.OutputMetricName == "app_final"
+	})
+	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
+		return fact.Decision == PipelineRelabelOutput &&
+			fact.RelabelStage == PipelineRelabelStageProfile && fact.ProfileName == "candidate" &&
+			fact.Source.Family == "app_raw" && fact.Destination.Family == "app_final"
+	})
+}
+
 func assertPipelineFact(t *testing.T, facts []PipelineDiagnostic, matches func(PipelineDiagnostic) bool) {
 	t.Helper()
 	for _, fact := range facts {
