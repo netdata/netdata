@@ -142,6 +142,16 @@ static int dbengine_accounting_helpers_unittest(void) {
         errors++;
     }
 
+    ctx_fileno_initialize_from_scan(&ctx, 12, 12); // an invalid pair is queued for asynchronous deletion
+    ctx_last_fileno_set(&ctx, 0); // all scanned pairs were invalid, so no active pair remains
+    unsigned replacement_fileno = ctx_next_fileno_reserve(&ctx);
+    if(replacement_fileno != 13) {
+        fprintf(stderr,
+                "DBENGINE METRIC: all-invalid scan filename reservation failed, expected replacement 13 got %u\n",
+                replacement_fileno);
+        errors++;
+    }
+
 #ifndef NETDATA_INTERNAL_CHECKS
     errors += mrg_unittest_expect_counter_sub(&ctx, 3, 9, false, 0, "underflow saturation");
 #endif

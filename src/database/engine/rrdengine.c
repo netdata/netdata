@@ -1278,6 +1278,7 @@ static void *extent_write_tp_worker(
         ret = extent_write_to_datafile(datafile, &iov, xt_io_descr->pos);
         if (likely(ret >= 0)) {
             ctx_current_disk_space_increase(ctx, xt_io_descr->real_io_size);
+            datafile_accounted_size_add(datafile, xt_io_descr->real_io_size);
             ctx_io_write_op_bytes(ctx, xt_io_descr->real_io_size);
 
             // journalfile_v1_extent_write() always releases the WAL
@@ -1896,8 +1897,8 @@ void datafile_delete(
     netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
     journal_file = datafile->journalfile;
-    datafile_bytes = datafile->pos;
-    journal_file_bytes = journalfile_current_size(journal_file);
+    datafile_bytes = datafile_accounted_size_get(datafile);
+    journal_file_bytes = journalfile_accounted_size_get(journal_file);
     size_t journal_v2_bytes = journalfile_v2_data_size_get(journal_file);
     if (journalfile_v2_data_available(journal_file))
         expected_journal_files |= JOURNALFILE_DELETED_V2;

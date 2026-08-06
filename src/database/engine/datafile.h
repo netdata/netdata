@@ -50,7 +50,8 @@ struct rrdengine_datafile {
     unsigned tier;
     unsigned fileno;
     uv_file file;
-    uint64_t pos;
+    uint64_t pos;                // reservation cursor used for extent placement
+    uint64_t accounted_size;     // bytes contributed to current_disk_space
     netdata_rwlock_t extent_rwlock;
     struct rrdengine_instance *ctx;
     struct rrdengine_journalfile *journalfile;
@@ -90,6 +91,19 @@ bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
 void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func);
 #define datafile_release(df, reason) datafile_release_with_trace(df, reason, __FUNCTION__)
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
+
+static inline uint64_t datafile_accounted_size_get(struct rrdengine_datafile *datafile) {
+    spinlock_lock(&datafile->writers.spinlock);
+    uint64_t accounted_size = datafile->accounted_size;
+    spinlock_unlock(&datafile->writers.spinlock);
+    return accounted_size;
+}
+
+static inline void datafile_accounted_size_add(struct rrdengine_datafile *datafile, uint64_t bytes) {
+    spinlock_lock(&datafile->writers.spinlock);
+    datafile->accounted_size += bytes;
+    spinlock_unlock(&datafile->writers.spinlock);
+}
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);

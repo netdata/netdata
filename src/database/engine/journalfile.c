@@ -42,6 +42,7 @@ int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine
     }
 
     ctx_current_disk_space_increase(ctx, wal->buf_size);
+    journalfile_accounted_size_add(journalfile, wal->buf_size);
     ctx_io_write_op_bytes(ctx, wal->buf_size);
 
 done:
@@ -664,7 +665,7 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
     int ret;
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
-    size_t journal_v1_bytes = journalfile_current_size(journalfile);
+    size_t journal_v1_bytes = journalfile_accounted_size_get(journalfile);
     size_t journal_v2_bytes = journalfile_v2_data_size_get(journalfile);
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
@@ -742,6 +743,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 
     __atomic_add_fetch(&ctx->stats.journalfile_creations, 1, __ATOMIC_RELAXED);
     journalfile->unsafe.pos = sizeof(*superblock);
+    journalfile->unsafe.accounted_size = sizeof(*superblock);
     ctx_io_write_op_bytes(ctx, sizeof(*superblock));
 
     return 0;
@@ -1876,12 +1878,14 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     if(loaded_v2) {
         journalfile->unsafe.pos = file_size;
+        journalfile->unsafe.accounted_size = file_size;
         error = 0;
         goto cleanup;
     }
 
     file_size = ALIGN_BYTES_FLOOR(file_size);
     journalfile->unsafe.pos = file_size;
+    journalfile->unsafe.accounted_size = file_size;
     journalfile->file = file;
 
     ret = journalfile_check_superblock(file);

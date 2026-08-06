@@ -52,7 +52,8 @@ struct rrdengine_journalfile {
 
     struct {
         SPINLOCK spinlock;
-        uint64_t pos;
+        uint64_t pos;             // reservation cursor used for journal placement
+        uint64_t accounted_size;  // bytes contributed to current_disk_space
     } unsafe;
 
     uv_file file;
@@ -64,6 +65,19 @@ static inline uint64_t journalfile_current_size(struct rrdengine_journalfile *jo
     uint64_t size = journalfile->unsafe.pos;
     spinlock_unlock(&journalfile->unsafe.spinlock);
     return size;
+}
+
+static inline uint64_t journalfile_accounted_size_get(struct rrdengine_journalfile *journalfile) {
+    spinlock_lock(&journalfile->unsafe.spinlock);
+    uint64_t accounted_size = journalfile->unsafe.accounted_size;
+    spinlock_unlock(&journalfile->unsafe.spinlock);
+    return accounted_size;
+}
+
+static inline void journalfile_accounted_size_add(struct rrdengine_journalfile *journalfile, uint64_t bytes) {
+    spinlock_lock(&journalfile->unsafe.spinlock);
+    journalfile->unsafe.accounted_size += bytes;
+    spinlock_unlock(&journalfile->unsafe.spinlock);
 }
 
 // Journal v2 structures

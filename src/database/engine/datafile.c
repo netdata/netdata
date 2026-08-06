@@ -226,7 +226,7 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile, bool accounted
     generate_datafilepath(datafile, path, sizeof(path));
 
     CLOSE_FILE(ctx, path,  datafile->file, ret);
-    ret = rrdeng_file_deletion_schedule(ctx, path, accounted ? datafile->pos : 0, true);
+    ret = rrdeng_file_deletion_schedule(ctx, path, accounted ? datafile_accounted_size_get(datafile) : 0, true);
 
     return ret;
 }
@@ -280,6 +280,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     __atomic_add_fetch(&ctx->stats.datafile_creations, 1, __ATOMIC_RELAXED);
     datafile->pos = sizeof(*superblock);
+    datafile->accounted_size = sizeof(*superblock);
     ctx_io_write_op_bytes(ctx, sizeof(*superblock));
 
     return 0;
@@ -347,6 +348,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
 
     datafile->file = file;
     datafile->pos = file_size;
+    datafile->accounted_size = file_size;
 
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: data file \"%s\" initialized (size:%" PRIu64 ").", path, file_size);
 
@@ -531,7 +533,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             continue;
         }
 
-        ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
+        ctx_current_disk_space_increase(ctx, datafile->accounted_size + journalfile_accounted_size_get(journalfile));
         datafile_list_insert(ctx, datafile);
     }
 
@@ -569,7 +571,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
            "DBENGINE: tier %d: created " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf).",
            ctx->config.tier, datafile->tier, datafile->fileno);
 
-    ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
+    ctx_current_disk_space_increase(ctx, datafile->accounted_size + journalfile_accounted_size_get(journalfile));
     datafile_list_insert(ctx, datafile);
     ctx_last_fileno_set(ctx, fileno);
 
@@ -598,7 +600,6 @@ int init_data_files(struct rrdengine_instance *ctx)
     } else if (0 == ret) {
         netdata_log_info("DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
         ctx_last_fileno_set(ctx, 0);
-        ctx_next_fileno_set(ctx, 0);
         ret = create_new_datafile_pair(ctx);
         if (ret) {
             netdata_log_error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);
