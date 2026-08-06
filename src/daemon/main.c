@@ -510,6 +510,7 @@ int netdata_main(int argc, char **argv) {
                             if (mcp_execute_function_access_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
+                            if (inicfg_unittest()) return 1;
                             if (statistical_unittest()) return 1;
                             if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;

@@ -226,4 +226,6 @@ time_t inicfg_set_duration_seconds(struct config *root, const char *section, con
 
 time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *section, const char *name, unsigned default_value_seconds);
 
+int inicfg_unittest(void);
+
 #endif // LIBNETDATA_INICFG_H
