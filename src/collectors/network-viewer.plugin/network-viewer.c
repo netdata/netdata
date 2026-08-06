@@ -8,8 +8,8 @@
 //                                   (on Linux, network-protocols is served by
 //                                   ebpfgo.plugin via its stdin dispatcher;
 //                                   adding a Linux registration here would
-//                                   collide at runtime. The guard below turns
-//                                   such an attempt into a compile error.)
+//                                   collide at runtime. The guard below
+//                                   excludes the Linux registration at compile time.)
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "network-viewer-apps-lookup-client.h"

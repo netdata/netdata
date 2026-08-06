@@ -117,11 +117,15 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
         ctx->shm_eexist_backoff = true;
         return false;
     }
-    /* Mark created before any further steps; close() unlinks on any failure path. */
+    /* Mark created before any further steps so the next replace_generation call
+     * knows to unlink the name even if we return early. */
     ctx->shm_name_created = true;
     /* Transfer ownership to real UID so consumers can verify the producer. */
-    if (fchown(ctx->shm_fd, getuid(), getgid()) != 0)
+    if (fchown(ctx->shm_fd, getuid(), getgid()) != 0) {
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
         return false;
+    }
 
     /* Write publisher_pid BEFORE ftruncate.  pwrite extends the empty fd to
      * sizeof(publisher_pid) bytes with our PID at offset 0; ftruncate then
@@ -133,16 +137,24 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     {
         uint32_t mypid = (uint32_t)getpid();
         if (pwrite(ctx->shm_fd, &mypid, sizeof(mypid),
-                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid))
+                   (off_t)offsetof(struct ebpfgo_shm_header, publisher_pid)) != (ssize_t)sizeof(mypid)) {
+            close(ctx->shm_fd);
+            ctx->shm_fd = -1;
             return false;
+        }
     }
 
-    if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
+    if (ftruncate(ctx->shm_fd, (off_t)length) != 0) {
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
         return false;
+    }
 
     ctx->mapping = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->mapping == MAP_FAILED) {
         ctx->mapping = NULL;
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
         return false;
     }
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;

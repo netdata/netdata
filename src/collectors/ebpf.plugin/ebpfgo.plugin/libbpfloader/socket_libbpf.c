@@ -871,8 +871,8 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
 #if defined(LIBBPF_MAJOR_VERSION)
     /* Buffer flavor: drain the ring-buffer accumulator and return its contents.
      * One ring_buffer__consume() drains all events queued since the last call.
-     * The accumulator is reset after each snapshot so callers receive per-cycle
-     * deltas, matching the base-flavor's per-interval behavior. */
+     * The accumulator is NOT reset: it holds monotonically increasing per-PID
+     * totals; Go's UpdateSocketApps computes per-cycle deltas by subtraction. */
     if (rt->rb) {
         ring_buffer__consume(rt->rb);
 
