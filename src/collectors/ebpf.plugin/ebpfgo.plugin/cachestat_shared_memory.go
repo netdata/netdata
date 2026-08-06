@@ -144,7 +144,10 @@ func buildCachestatPublish(current, previous netdataCachestat, ct uint64, hasPre
 	if total > 0 {
 		publish.Ratio = int64((float64(hits) / float64(total)) * 100)
 	} else {
-		publish.Ratio = 0
+		// No page-cache activity this interval; 100 = full hit rate (nothing missed).
+		// Matches the idle-path convention in apps_ebpf_shared_memory.c and
+		// cgroup_ebpfgo_cachestat.c so SHM consumers stay consistent.
+		publish.Ratio = 100
 	}
 
 	publish.Hit = hits

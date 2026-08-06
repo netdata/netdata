@@ -1536,16 +1536,20 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
                 struct ebpf_pid_stat es;
                 have_es = network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid, &es);
                 if(have_es) {
-                    ebpf_bytes_sent         = es.socket.bytes_sent;
-                    ebpf_bytes_received     = es.socket.bytes_received;
-                    ebpf_call_tcp_sent      = es.socket.call_tcp_sent;
-                    ebpf_call_tcp_received  = es.socket.call_tcp_received;
-                    ebpf_retransmit         = es.socket.retransmit;
-                    ebpf_call_udp_sent      = es.socket.call_udp_sent;
-                    ebpf_call_udp_received  = es.socket.call_udp_received;
-                    ebpf_call_close         = es.socket.call_close;
-                    ebpf_call_tcp_v4        = es.socket.call_tcp_v4_connection;
-                    ebpf_call_tcp_v6        = es.socket.call_tcp_v6_connection;
+                    /* SHM values are per-interval deltas; divide by the collection
+                     * interval to produce rates/s comparable across hosts. */
+                    uint32_t d = (es.socket.socket_update_every_s > 0) ?
+                                 es.socket.socket_update_every_s : 1;
+                    ebpf_bytes_sent         = es.socket.bytes_sent        / d;
+                    ebpf_bytes_received     = es.socket.bytes_received    / d;
+                    ebpf_call_tcp_sent      = es.socket.call_tcp_sent     / d;
+                    ebpf_call_tcp_received  = es.socket.call_tcp_received / d;
+                    ebpf_retransmit         = es.socket.retransmit        / d;
+                    ebpf_call_udp_sent      = es.socket.call_udp_sent     / d;
+                    ebpf_call_udp_received  = es.socket.call_udp_received / d;
+                    ebpf_call_close         = es.socket.call_close        / d;
+                    ebpf_call_tcp_v4        = es.socket.call_tcp_v4_connection / d;
+                    ebpf_call_tcp_v6        = es.socket.call_tcp_v6_connection / d;
                 }
             }
             buffer_json_add_array_item_uint64(wb, ebpf_bytes_sent);
@@ -1782,16 +1786,20 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
             struct ebpf_pid_stat _ebpf_t;
             t->network_viewer.ebpf_valid = network_viewer_ebpf_shared_memory_lookup((pid_t)t->pid, &_ebpf_t);
             if(t->network_viewer.ebpf_valid) {
-                t->network_viewer.ebpf_bytes_sent        = _ebpf_t.socket.bytes_sent;
-                t->network_viewer.ebpf_bytes_received    = _ebpf_t.socket.bytes_received;
-                t->network_viewer.ebpf_call_tcp_sent     = _ebpf_t.socket.call_tcp_sent;
-                t->network_viewer.ebpf_call_tcp_received = _ebpf_t.socket.call_tcp_received;
-                t->network_viewer.ebpf_retransmit        = _ebpf_t.socket.retransmit;
-                t->network_viewer.ebpf_call_udp_sent     = _ebpf_t.socket.call_udp_sent;
-                t->network_viewer.ebpf_call_udp_received = _ebpf_t.socket.call_udp_received;
-                t->network_viewer.ebpf_call_close        = _ebpf_t.socket.call_close;
-                t->network_viewer.ebpf_call_tcp_v4_conn  = _ebpf_t.socket.call_tcp_v4_connection;
-                t->network_viewer.ebpf_call_tcp_v6_conn  = _ebpf_t.socket.call_tcp_v6_connection;
+                /* SHM values are per-interval deltas; divide by the collection
+                 * interval to produce rates/s comparable across hosts. */
+                uint32_t d = (_ebpf_t.socket.socket_update_every_s > 0) ?
+                             _ebpf_t.socket.socket_update_every_s : 1;
+                t->network_viewer.ebpf_bytes_sent        = _ebpf_t.socket.bytes_sent        / d;
+                t->network_viewer.ebpf_bytes_received    = _ebpf_t.socket.bytes_received    / d;
+                t->network_viewer.ebpf_call_tcp_sent     = _ebpf_t.socket.call_tcp_sent     / d;
+                t->network_viewer.ebpf_call_tcp_received = _ebpf_t.socket.call_tcp_received / d;
+                t->network_viewer.ebpf_retransmit        = _ebpf_t.socket.retransmit        / d;
+                t->network_viewer.ebpf_call_udp_sent     = _ebpf_t.socket.call_udp_sent     / d;
+                t->network_viewer.ebpf_call_udp_received = _ebpf_t.socket.call_udp_received / d;
+                t->network_viewer.ebpf_call_close        = _ebpf_t.socket.call_close        / d;
+                t->network_viewer.ebpf_call_tcp_v4_conn  = _ebpf_t.socket.call_tcp_v4_connection / d;
+                t->network_viewer.ebpf_call_tcp_v6_conn  = _ebpf_t.socket.call_tcp_v6_connection / d;
             }
             else {
                 t->network_viewer.ebpf_bytes_sent        = 0;
@@ -6284,16 +6292,16 @@ static BUFFER *network_viewer_result(char *function) {
                 RRDF_FIELD_SORT_DESCENDING, NULL,                                  \
                 RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,                   \
                 RRDF_FIELD_OPTS_NONE, NULL)
-            NV_EBPF_FIELD("eBPFBytesSent",  "eBPF TCP Bytes Sent by PID",       "bytes");
-            NV_EBPF_FIELD("eBPFBytesRecv",  "eBPF TCP Bytes Received by PID",   "bytes");
-            NV_EBPF_FIELD("eBPFTCPSent",    "eBPF TCP Send Calls by PID",       "calls");
-            NV_EBPF_FIELD("eBPFTCPRecv",    "eBPF TCP Receive Calls by PID",    "calls");
-            NV_EBPF_FIELD("eBPFRetransmit", "eBPF TCP Retransmissions by PID",  "calls");
-            NV_EBPF_FIELD("eBPFUDPSent",    "eBPF UDP Send Calls by PID",       "calls");
-            NV_EBPF_FIELD("eBPFUDPRecv",    "eBPF UDP Receive Calls by PID",    "calls");
-            NV_EBPF_FIELD("eBPFClose",      "eBPF TCP Close Calls by PID",      "calls");
-            NV_EBPF_FIELD("eBPFConnV4",     "eBPF IPv4 TCP Connections by PID", "connections");
-            NV_EBPF_FIELD("eBPFConnV6",     "eBPF IPv6 TCP Connections by PID", "connections");
+            NV_EBPF_FIELD("eBPFBytesSent",  "eBPF TCP Bytes Sent by PID",       "bytes/s");
+            NV_EBPF_FIELD("eBPFBytesRecv",  "eBPF TCP Bytes Received by PID",   "bytes/s");
+            NV_EBPF_FIELD("eBPFTCPSent",    "eBPF TCP Send Calls by PID",       "calls/s");
+            NV_EBPF_FIELD("eBPFTCPRecv",    "eBPF TCP Receive Calls by PID",    "calls/s");
+            NV_EBPF_FIELD("eBPFRetransmit", "eBPF TCP Retransmissions by PID",  "calls/s");
+            NV_EBPF_FIELD("eBPFUDPSent",    "eBPF UDP Send Calls by PID",       "calls/s");
+            NV_EBPF_FIELD("eBPFUDPRecv",    "eBPF UDP Receive Calls by PID",    "calls/s");
+            NV_EBPF_FIELD("eBPFClose",      "eBPF TCP Close Calls by PID",      "calls/s");
+            NV_EBPF_FIELD("eBPFConnV4",     "eBPF IPv4 TCP Connections by PID", "connections/s");
+            NV_EBPF_FIELD("eBPFConnV6",     "eBPF IPv6 TCP Connections by PID", "connections/s");
 #undef NV_EBPF_FIELD
 
             // Count

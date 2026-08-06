@@ -36,7 +36,10 @@ func TestBuildCachestatPublish(t *testing.T) {
 	}
 }
 
-func TestBuildCachestatPublishIdleRatioIsZero(t *testing.T) {
+func TestBuildCachestatPublishIdleRatioIs100(t *testing.T) {
+	// When current == previous there is no page-cache activity this interval
+	// (total == 0).  Ratio must be 100 to match the idle-path convention in
+	// apps_ebpf_shared_memory.c and cgroup_ebpfgo_cachestat.c.
 	current := netdataCachestat{
 		AddToPageCacheLru:  100,
 		MarkPageAccessed:   100,
@@ -46,8 +49,8 @@ func TestBuildCachestatPublishIdleRatioIsZero(t *testing.T) {
 	previous := current
 
 	got := buildCachestatPublish(current, previous, 1234, true)
-	if got.Ratio != 0 {
-		t.Fatalf("idle ratio = %d, want 0", got.Ratio)
+	if got.Ratio != 100 {
+		t.Fatalf("idle ratio = %d, want 100", got.Ratio)
 	}
 }
 

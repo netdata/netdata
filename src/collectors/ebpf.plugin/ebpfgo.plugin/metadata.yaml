@@ -106,6 +106,14 @@ modules:
               description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
               default_value: yes
               required: false
+            - name: btf path
+              description: Override the default BTF source directory. The collector checks this path for a vmlinux BTF file used by CO-RE loading.
+              default_value: /sys/kernel/btf
+              required: false
+            - name: collect pid
+              description: "Controls which PIDs are stored in the BPF hash tables. `real parent` stores only the real parent PID (lowest overhead); `parent` stores the immediate parent PID; `all` stores every PID used by the process (highest overhead)."
+              default_value: real parent
+              required: false
             - name: lifetime
               description: Set default lifetime for thread when enabled by cloud.
               default_value: 300
@@ -216,7 +224,7 @@ modules:
         options:
           description: |
             The `dns` option in section `[ebpf programs]` controls whether the module is loaded.
-            Per-module overrides (`update every`, `ebpf object flavor`) belong in `ebpf.d/dns.conf`.
+            Per-module overrides (`update every`, `ebpf object flavor`, `per query tracking`, `flow ttl`) belong in `ebpf.d/dns.conf`.
           folding:
             title: "Config options"
             enabled: true
@@ -232,6 +240,14 @@ modules:
             - name: ebpf object flavor
               description: "Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
               default_value: buffer
+              required: false
+            - name: per query tracking
+              description: "Enable per-DNS-query latency tracking. When enabled (`yes`), the collector records the time between each DNS request and its matching response, producing per-query latency metrics in addition to aggregate query-count and error-rate metrics. Required for the `dns-queries` Function consumed by `network-viewer.plugin`."
+              default_value: "yes"
+              required: false
+            - name: flow ttl
+              description: "DNS flow record lifetime in seconds. Must equal `NV_DNS_UPDATE_EVERY` (20) in `network-viewer.c`: a value greater than 20 causes double-counting and a value less than 20 causes silent record loss in the `dns-queries` Function. Also, `update every` must not exceed this value or records expire in the kernel ring before collection."
+              default_value: 20
               required: false
         examples:
           folding:
@@ -331,7 +347,7 @@ modules:
         options:
           description: |
             The `socket` option in section `[ebpf programs]` controls whether the module is loaded.
-            Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object flavor`) belong in `ebpf.d/socket.conf`.
+            Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object flavor`, `pid table size`, `socket monitoring table size`, `udp connection table size`) belong in `ebpf.d/socket.conf`.
           folding:
             title: "Config options"
             enabled: true
@@ -356,6 +372,18 @@ modules:
               description: "Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
               default_value: buffer
               required: false
+            - name: pid table size
+              description: Maximum number of PIDs tracked in the per-PID SHM segment shared with `apps.plugin` and `cgroups.plugin`. Increase on hosts with more than 32768 concurrent monitored processes.
+              default_value: 32768
+              required: false
+            - name: socket monitoring table size
+              description: Maximum number of connections tracked in the `tbl_nd_socket` BPF hash map (per-PID TCP/UDP bandwidth). Increase on hosts with many concurrent connections; each entry consumes kernel BPF map memory.
+              default_value: 16384
+              required: false
+            - name: udp connection table size
+              description: Maximum number of UDP connections tracked in the `tbl_nv_udp` BPF hash map. Increase on hosts with high UDP connection rates.
+              default_value: 4096
+              required: false
         examples:
           folding:
             enabled: true
@@ -375,9 +403,13 @@ modules:
         network-viewer. Per-cgroup and per-service socket activity is exported through the
         eBPFGo shared-memory path consumed by `cgroups.plugin`.
 
-        > **Migration note** — Per-app charts published by prior versions of `ebpf.plugin` are not
-        > republished. The following are permanently removed; use the `network-protocols` function in
-        > network-viewer as a replacement.
+        > **Migration note** — Per-host and per-app charts published by prior versions of `ebpf.plugin`
+        > are not republished. The following are permanently removed; use the `network-protocols` function
+        > in network-viewer as a replacement.
+        >
+        > Removed per-host charts: `ip.inbound_conn`, `ip.tcp_outbound_conn`, `ip.tcp_functions`,
+        > `ip.total_tcp_bandwidth`, `ip.tcp_error`, `ip.tcp_retransmit`, `ip.udp_functions`,
+        > `ip.total_udp_bandwidth`, `ip.udp_error`.
         >
         > Removed per-app charts: `app.ebpf_call_tcp_v4_connection`, `app.ebpf_call_tcp_v6_connection`,
         > `app.ebpf_sock_total_bandwidth`, `app.ebpf_call_tcp_sendmsg`, `app.ebpf_call_tcp_cleanup_rbuf`,
