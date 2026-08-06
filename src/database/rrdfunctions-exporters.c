@@ -217,63 +217,58 @@ DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
     return dst;
 }
 
-// 64-bit FNV-1a over length-prefixed bytes. The length prefix keeps "ab"+"c" and "a"+"bc"
-// from hashing alike when fields are concatenated.
-static inline uint64_t manifest_fnv1a_str(uint64_t h, const char *s) {
+// Folds one more string into a running digest. Seeding each call with the previous digest is what
+// keeps the field boundary part of the result: "ab" then "c" cannot fold to the same value as "a"
+// then "bc", because the first call already sees different input, so no separator byte or length
+// prefix is needed. NULL folds like "" - the proto sends nothing for either.
+static inline XXH64_hash_t manifest_hash_str(XXH64_hash_t seed, const char *s) {
     if(!s) s = "";
-    uint32_t len = (uint32_t)strlen(s);
-    for(size_t i = 0; i < sizeof(len); i++) {
-        h ^= (uint8_t)(len >> (i * 8));
-        h *= 1099511628211ULL;
-    }
-    for(const uint8_t *p = (const uint8_t *)s; *p; p++) {
-        h ^= *p;
-        h *= 1099511628211ULL;
-    }
-    return h;
-}
-
-static inline uint64_t manifest_fnv1a_u64(uint64_t h, uint64_t v) {
-    for(size_t i = 0; i < sizeof(v); i++) {
-        h ^= (uint8_t)(v >> (i * 8));
-        h *= 1099511628211ULL;
-    }
-    return h;
+    return XXH3_64bits_withSeed(s, strlen(s), seed);
 }
 
 uint64_t manifest_dict_hash(DICTIONARY *dict, const char *node_id, const char *claim_id) {
     // The identity of the node is part of the content: the cloud keys the manifest by node_id,
     // so the same function list under a different node_id is a different manifest and must send.
-    uint64_t ids = 14695981039346656037ULL;
-    ids = manifest_fnv1a_str(ids, node_id);
-    ids = manifest_fnv1a_str(ids, claim_id);
+    XXH64_hash_t ids = manifest_hash_str(0, node_id);
+    ids = manifest_hash_str(ids, claim_id);
 
-    // Per-entry hashes are XOR-combined, so the result does not depend on dictionary
-    // traversal order. Entry names are dictionary keys (unique), so no two entries can
-    // cancel each other out.
+    // Per-entry digests are XOR-combined, so the result does not depend on dictionary traversal
+    // order. Every digest starts from the entry's name, which is a dictionary key and therefore
+    // unique, so two entries can only cancel out under XOR by colliding in 64 bits - not by
+    // construction. At ~2^-64 that is accepted here: this is change detection, not security.
     //
-    // Two fields are hashed as stored rather than as transmitted: tags (the proto splits them on
-    // whitespace, so re-spacing the same tags looks like a change here) and access (bits with no
-    // proto counterpart in http_access_map[] are dropped by the proto but hashed here). Both err
-    // toward one extra publish, never toward a missed one - which is the only safe direction.
-    uint64_t entries = 0;
+    // Two fields are digested as stored rather than as transmitted. tags: the proto splits them on
+    // whitespace, so re-spacing the same tags looks like a change here. access: the proto maps each
+    // bit through http_access_map[], so a bit missing from that map would be transmitted as nothing
+    // while still counting here - today its static_asserts make such a bit fail the build, so this
+    // is a guard against a future divergence, not a live one. Both err toward one extra publish,
+    // never toward a missed one - which is the only safe direction.
+    XXH64_hash_t entries = 0;
     if(dict) {
         struct rrd_function_manifest_entry *e;
         dfe_start_read(dict, e) {
-            uint64_t h = 14695981039346656037ULL;
-            h = manifest_fnv1a_str(h, e_dfe.name);
-            h = manifest_fnv1a_str(h, e->help);
-            h = manifest_fnv1a_str(h, e->tags);
-            h = manifest_fnv1a_u64(h, (uint64_t)e->access);
-            // hash the value the proto transmits: a non-positive priority is published as
-            // the default (see generate_update_node_instance_manifest_message())
-            h = manifest_fnv1a_u64(h, (uint64_t)(e->priority > 0 ? (uint32_t)e->priority
-                                                                  : RRDFUNCTIONS_PRIORITY_DEFAULT));
-            h = manifest_fnv1a_u64(h, (uint64_t)e->version);
+            // padding-free by construction (three uint32_t), so the bytes hashed are only the
+            // values - a member of a different width would need explicit packing
+            struct {
+                uint32_t access;
+                uint32_t priority;
+                uint32_t version;
+            } numbers = {
+                .access = (uint32_t)e->access,
+                // the value the proto transmits: a non-positive priority is published as the
+                // default (see generate_update_node_instance_manifest_message())
+                .priority = e->priority > 0 ? (uint32_t)e->priority : RRDFUNCTIONS_PRIORITY_DEFAULT,
+                .version = e->version,
+            };
+
+            XXH64_hash_t h = manifest_hash_str(0, e_dfe.name);
+            h = manifest_hash_str(h, e->help);
+            h = manifest_hash_str(h, e->tags);
+            h = XXH3_64bits_withSeed(&numbers, sizeof(numbers), h);
             entries ^= h;
         }
         dfe_done(e);
     }
 
-    return ids ^ (entries * 1099511628211ULL);
+    return XXH3_64bits_withSeed(&entries, sizeof(entries), ids);
 }

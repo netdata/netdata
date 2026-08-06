@@ -75,8 +75,8 @@ typedef struct aclk_sync_cfg_t {
     // serialized by alert_push_running), read nowhere else - no atomics needed.
     //
     // Scoped to the ACLK session it was published in, because publishing is fire-and-forget: the
-    // message can still be dropped after the send call (no mqtt client left when the query
-    // executes, full command queue, shutdown) and nothing acks it. A new session therefore
+    // message can still be dropped after the send call - no mqtt client left by the time the query
+    // executes, or shutdown reached before it ran - and nothing acks it. A new session therefore
     // re-publishes once, which is also what a cloud that lost the manifest needs.
     //
     // callocz() starts the session at 0 and aclk_session_load() is never 0 here (connecting stores

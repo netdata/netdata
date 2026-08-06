@@ -1390,6 +1390,13 @@ void aclk_arm_node_manifest(RRDHOST *host)
     // publishes a borrowed RRDHOST pointer to another thread (a wider window on a longer-lived
     // object) and blocks the caller in push_cmd() when the command pool is full, sometimes while
     // holding the host functions lock.
+    //
+    // One caller does NOT reach the host any of those ways: aclk_arm_node_manifest_all_hosts()
+    // walks rrdhost_root_index. That walk only yields hosts still indexed when it reaches them, so
+    // step 1 bounds it - but the index links the host without owning it, so the walk's reference
+    // does not stop rrdhost_free_unlinked() from freeing a host it already unlinked. That caller
+    // therefore carries the same pre-existing teardown exposure as the alert-push scan, which
+    // dereferences hosts from the same index (see build_node_manifest() in sqlite_aclk_node.c).
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (!aclk_host_config)
         return;
@@ -1398,13 +1405,17 @@ void aclk_arm_node_manifest(RRDHOST *host)
 }
 
 // Re-arms the manifest of every host. Called when the cloud asks the agent to re-announce its node
-// instances, which it does after connecting - so this is the one manifest request per ACLK session.
+// instances (the SendNodeInstances message), which it does after connecting - so this is where the
+// manifest gets its request for a new ACLK session. How often the cloud repeats that ask within one
+// session is server-side behaviour this repository cannot verify, so treat "once per session" as an
+// assumption, not a guarantee; the suppression below is what makes repeats cheap either way.
 //
 // It is needed because publishing is never acked: what the previous session sent may have been
-// dropped after the send call (no mqtt client left when the query executed, full command queue,
-// shutdown), and the cloud may have lost it. build_node_manifest() scopes its suppression to one
-// session for exactly this reason, so the pair guarantees one manifest per host per session and no
-// more. A redundant arm costs one manifest build plus hash - the content hash drops the publish.
+// dropped after the send call - no mqtt client left by the time the query executed, or shutdown
+// reached before it ran - and the cloud may have lost it. build_node_manifest() scopes its
+// suppression to one session for exactly this reason, so the pair publishes one manifest per host
+// per session. A redundant arm costs one manifest build (rrd_rdlock plus a dictionary of string
+// copies) and one hash; the content hash then drops the publish.
 void aclk_arm_node_manifest_all_hosts(void)
 {
     RRDHOST *host;
