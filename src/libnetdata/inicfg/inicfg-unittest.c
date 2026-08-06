@@ -56,7 +56,12 @@ static const inicfg_test_case_t test_cases[] = {
 
 // writes content to a fresh temporary file; filename receives the path created
 static bool inicfg_unittest_write_file(char *filename, size_t filename_size, const char *content) {
+    // TMPDIR is the POSIX spelling; TEMP and TMP are the Windows ones and are
+    // always set there, which matters because the native Windows build has no
+    // /tmp. /tmp is the last resort: POSIX guarantees it, Windows never reaches it.
     const char *tmp = getenv("TMPDIR");
+    if(!tmp || !*tmp) tmp = getenv("TEMP");
+    if(!tmp || !*tmp) tmp = getenv("TMP");
     if(!tmp || !*tmp) tmp = "/tmp";
 
     snprintfz(filename, filename_size, "%s/netdata-inicfg-unittest.XXXXXX", tmp);
