@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"testing"
 
+	commonmodel "github.com/prometheus/common/model"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -276,6 +278,133 @@ app_widgets 3
 			require.NoError(t, cc.CommitCycleSuccess())
 
 			tc.assert(t, store.Read(metrix.ReadFlatten()), written)
+		})
+	}
+}
+
+func TestMetricFamilyWriter_resolveType(t *testing.T) {
+	profile := func(root, gauge, counter string) profileFallback {
+		return profileFallback{
+			root:    matcher.Must(matcher.NewSimplePatternsMatcher(root)),
+			gauge:   matcher.Must(matcher.NewGlobMatcher(gauge)),
+			counter: matcher.Must(matcher.NewGlobMatcher(counter)),
+		}
+	}
+
+	tests := map[string]struct {
+		name          string
+		declared      commonmodel.MetricType
+		allowFallback bool
+		jobGauge      string
+		jobCounter    string
+		profiles      []profileFallback
+		want          commonmodel.MetricType
+		wantOK        bool
+	}{
+		"declared type wins": {
+			name:          "app_value",
+			declared:      commonmodel.MetricTypeCounter,
+			allowFallback: true,
+			jobGauge:      "app_value",
+			profiles:      []profileFallback{profile("app_*", "app_value", "no_match")},
+			want:          commonmodel.MetricTypeCounter,
+			wantOK:        true,
+		},
+		"declared histogram wins": {
+			name:          "app_latency_bucket",
+			declared:      commonmodel.MetricTypeHistogram,
+			allowFallback: true,
+			profiles:      []profileFallback{profile("app_*", "app_latency_bucket", "no_match")},
+			want:          commonmodel.MetricTypeHistogram,
+			wantOK:        true,
+		},
+		"declared summary wins": {
+			name:          "app_latency",
+			declared:      commonmodel.MetricTypeSummary,
+			allowFallback: true,
+			profiles:      []profileFallback{profile("app_*", "app_latency", "no_match")},
+			want:          commonmodel.MetricTypeSummary,
+			wantOK:        true,
+		},
+		"job gauge wins over job counter and profile": {
+			name:          "app_value",
+			declared:      commonmodel.MetricTypeUnknown,
+			allowFallback: true,
+			jobGauge:      "app_value",
+			jobCounter:    "app_value",
+			profiles:      []profileFallback{profile("app_*", "no_match", "app_value")},
+			want:          commonmodel.MetricTypeGauge,
+			wantOK:        true,
+		},
+		"job counter wins over profile gauge": {
+			name:          "app_value",
+			declared:      commonmodel.MetricTypeUnknown,
+			allowFallback: true,
+			jobCounter:    "app_value",
+			profiles:      []profileFallback{profile("app_*", "app_value", "no_match")},
+			want:          commonmodel.MetricTypeCounter,
+			wantOK:        true,
+		},
+		"first matching profile wins": {
+			name:          "app_value",
+			declared:      commonmodel.MetricTypeUnknown,
+			allowFallback: true,
+			profiles: []profileFallback{
+				profile("app_*", "app_value", "no_match"),
+				profile("app_*", "no_match", "app_value"),
+			},
+			want:   commonmodel.MetricTypeGauge,
+			wantOK: true,
+		},
+		"profile gauge wins over its counter": {
+			name:          "app_value",
+			declared:      commonmodel.MetricTypeUnknown,
+			allowFallback: true,
+			profiles:      []profileFallback{profile("app_*", "app_value", "app_value")},
+			want:          commonmodel.MetricTypeGauge,
+			wantOK:        true,
+		},
+		"profile wins over implicit total": {
+			name:          "app_value_total",
+			declared:      commonmodel.MetricTypeUnknown,
+			allowFallback: true,
+			profiles:      []profileFallback{profile("app_*", "app_value_total", "no_match")},
+			want:          commonmodel.MetricTypeGauge,
+			wantOK:        true,
+		},
+		"profile root constrains fallback patterns": {
+			name:          "other_value",
+			declared:      commonmodel.MetricTypeUnknown,
+			allowFallback: true,
+			profiles:      []profileFallback{profile("app_*", "*", "no_match")},
+		},
+		"fallback disabled rejects unknown type": {
+			name:          "app_value_total",
+			declared:      commonmodel.MetricTypeUnknown,
+			allowFallback: false,
+			jobGauge:      "app_value_total",
+			profiles:      []profileFallback{profile("app_*", "app_value_total", "no_match")},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			jobGauge := matcher.FALSE()
+			if tc.jobGauge != "" {
+				jobGauge = matcher.Must(matcher.NewGlobMatcher(tc.jobGauge))
+			}
+			jobCounter := matcher.FALSE()
+			if tc.jobCounter != "" {
+				jobCounter = matcher.Must(matcher.NewGlobMatcher(tc.jobCounter))
+			}
+			w := metricFamilyWriter{policy: metricFamilyWriterPolicy{
+				isFallbackTypeGauge:   jobGauge,
+				isFallbackTypeCounter: jobCounter,
+			}}
+
+			got, ok := w.resolveType(tc.name, tc.declared, tc.profiles, tc.allowFallback)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

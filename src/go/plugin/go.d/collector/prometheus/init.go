@@ -15,6 +15,9 @@ func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("'url' can not be empty")
 	}
+	if err := c.FallbackType.Validate(); err != nil {
+		return err
+	}
 	if err := c.Profiles.validate(); err != nil {
 		return err
 	}
@@ -40,7 +43,7 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 	return prometheus.New(httpClient, req), nil
 }
 
-func (c *Collector) initFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
+func compileFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
 	if len(expr) == 0 {
 		return matcher.FALSE(), nil
 	}

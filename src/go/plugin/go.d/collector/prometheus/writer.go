@@ -244,20 +244,45 @@ func (w *metricFamilyWriter) skipMetricFamily(mf *prompkg.MetricFamily) bool {
 	return false
 }
 
-func (w *metricFamilyWriter) bindFallbackTypes(batch *prompkg.SampleBatch) {
+func (w *metricFamilyWriter) bindFallbackTypes(batch *prompkg.SampleBatch, profiles []profileFallback) {
+	var (
+		lastName     string
+		lastDeclared commonmodel.MetricType
+		lastResolved commonmodel.MetricType
+		lastOK       bool
+		lastValid    bool
+	)
 	for i := range batch.Samples {
 		sample := &batch.Samples[i]
-		if typ, ok := w.resolveType(sample.Name, sample.FamilyType, true); ok {
+		if lastValid && sample.Name == lastName && sample.FamilyType == lastDeclared {
+			if lastOK {
+				sample.FamilyType = lastResolved
+			}
+			continue
+		}
+		declared := sample.FamilyType
+		typ, ok := w.resolveType(sample.Name, declared, profiles, true)
+		lastName = sample.Name
+		lastDeclared = declared
+		lastResolved = typ
+		lastOK = ok
+		lastValid = true
+		if ok {
 			sample.FamilyType = typ
 		}
 	}
 }
 
 func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily, allowFallback bool) (commonmodel.MetricType, bool) {
-	return w.resolveType(mf.Name(), mf.Type(), allowFallback)
+	return w.resolveType(mf.Name(), mf.Type(), nil, allowFallback)
 }
 
-func (w *metricFamilyWriter) resolveType(name string, declared commonmodel.MetricType, allowFallback bool) (commonmodel.MetricType, bool) {
+func (w *metricFamilyWriter) resolveType(
+	name string,
+	declared commonmodel.MetricType,
+	profiles []profileFallback,
+	allowFallback bool,
+) (commonmodel.MetricType, bool) {
 	switch declared {
 	case commonmodel.MetricTypeGauge,
 		commonmodel.MetricTypeCounter,
@@ -271,7 +296,15 @@ func (w *metricFamilyWriter) resolveType(name string, declared commonmodel.Metri
 		if w.policy.isFallbackTypeGauge.MatchString(name) {
 			return commonmodel.MetricTypeGauge, true
 		}
-		if w.policy.isFallbackTypeCounter.MatchString(name) || strings.HasSuffix(name, "_total") {
+		if w.policy.isFallbackTypeCounter.MatchString(name) {
+			return commonmodel.MetricTypeCounter, true
+		}
+		for _, profile := range profiles {
+			if typ, ok := profile.resolve(name); ok {
+				return typ, true
+			}
+		}
+		if strings.HasSuffix(name, "_total") {
 			return commonmodel.MetricTypeCounter, true
 		}
 		return "", false

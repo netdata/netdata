@@ -369,7 +369,7 @@ func TestCollector_ProfileRelabelingDoesNotShareFallbackEligibilityAcrossMergedF
 			require.NoError(t, collr.Init(context.Background()))
 
 			require.NoError(t, collr.Check(context.Background()))
-			mfs, err := collr.scrapeProfileNormalized(context.Background(), collr.runtime.normalizers, true)
+			mfs, err := collr.scrapeProfilePipeline(context.Background(), collr.runtime, true)
 			require.NoError(t, err)
 			assert.Equal(t, 1, collr.writer.countBoundWritable(mfs), "Check must count only the pre-profile bound sample")
 
@@ -716,6 +716,9 @@ func TestCollector_ProfileRelabelingScrapeDispatch(t *testing.T) {
 	relabelCatalog := loadTestCatalog(t, map[string]string{
 		"app": testRelabelProfileYAML("app_*", "app_raw", "app_final"),
 	})
+	fallbackCatalog := loadTestCatalog(t, map[string]string{
+		"app": testProfileYAMLWithFallbackType("app_*", []string{"app_raw"}, nil),
+	})
 
 	tests := map[string]struct {
 		prepare         func(*Collector)
@@ -754,6 +757,14 @@ func TestCollector_ProfileRelabelingScrapeDispatch(t *testing.T) {
 			},
 			hasCatalog:      true,
 			catalog:         relabelCatalog,
+			wantSampleCalls: 2,
+		},
+		"selected profile fallback uses samples": {
+			prepare: func(c *Collector) {
+				c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesModeConfig{Entries: profileEntries("app")}}
+			},
+			hasCatalog:      true,
+			catalog:         fallbackCatalog,
 			wantSampleCalls: 2,
 		},
 	}

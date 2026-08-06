@@ -26,5 +26,7 @@ func TestDefaultCatalog_AllStockProfilesHydrate(t *testing.T) {
 		require.NoErrorf(t, err, "stock profile %q template must be valid", p.Name)
 		_, err = p.Relabeling()
 		require.NoErrorf(t, err, "stock profile %q relabeling must be valid", p.Name)
+		_, err = p.FallbackType()
+		require.NoErrorf(t, err, "stock profile %q fallback_type must be valid", p.Name)
 	}
 }

@@ -98,6 +98,17 @@ func profileYAMLWithRelabeling(match, relabeling string) string {
 	return strings.Replace(profileYAML(match), "template:\n", "relabeling:\n"+relabeling+"template:\n", 1)
 }
 
+func profileYAMLWithFallbackType(match, fallbackType string) string {
+	return strings.Replace(profileYAML(match), "template:\n", "fallback_type:"+fallbackType+"\ntemplate:\n", 1)
+}
+
+const validFallbackType = `
+  gauge:
+    - app_value
+  counter:
+    - app_requests
+`
+
 const validRelabeling = `  - match: "app_*"
     metric_relabel_configs:
       - source_labels: [__name__]
@@ -125,7 +136,7 @@ func loadCatalog(t *testing.T, files ...fileSpec) (Catalog, error) {
 
 // TestLoadFromDirs_headerDecodeAndValidation covers the strict header decode and
 // header-level validation that Prometheus applies at load time (the lazy design
-// keeps these eager while deferring only the chart template).
+// keeps these eager while deferring profile-owned policies and the chart template).
 func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 	tests := map[string]struct {
 		content string
@@ -263,6 +274,193 @@ template:
 	require.Len(t, blocks, 1)
 	require.Len(t, blocks[0].MetricRelabelConfigs, 1)
 	assert.Equal(t, "app_normalized", blocks[0].MetricRelabelConfigs[0].Replacement)
+}
+
+func TestProfileFallbackHydrationPreservesCrossFieldYAMLAnchors(t *testing.T) {
+	content := `match: &metric app_value
+fallback_type:
+  gauge: [*metric]
+template:
+  family: test
+  metrics: [*metric]
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: *metric
+          name: value
+`
+
+	cat, err := loadCatalog(t, fileSpec{name: "app.yaml", content: content})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	fallbackType, err := profile.FallbackType()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"app_value"}, fallbackType.Gauge)
+}
+
+func TestLoadFromDirs_stockFallbackTypeHydratesLazily(t *testing.T) {
+	tests := map[string]struct {
+		fallbackType string
+		want         FallbackType
+		wantErr      string
+	}{
+		"valid": {
+			fallbackType: validFallbackType,
+			want: FallbackType{
+				Gauge:   []string{"app_value"},
+				Counter: []string{"app_requests"},
+			},
+		},
+		"null": {
+			fallbackType: " null",
+			wantErr:      "'fallback_type' must not be empty",
+		},
+		"empty object": {
+			fallbackType: " {}",
+			wantErr:      "'fallback_type' must contain at least one gauge or counter pattern",
+		},
+		"empty lists": {
+			fallbackType: "\n  gauge: []\n  counter: []",
+			wantErr:      "'fallback_type' must contain at least one gauge or counter pattern",
+		},
+		"unknown field": {
+			fallbackType: "\n  unknown: true",
+			wantErr:      "field unknown not found",
+		},
+		"blank gauge pattern": {
+			fallbackType: "\n  gauge: ['   ']",
+			wantErr:      "'fallback_type.gauge[0]' must not be empty",
+		},
+		"padded gauge pattern": {
+			fallbackType: "\n  gauge: [' app_value ']",
+			wantErr:      "'fallback_type.gauge[0]' must not have leading or trailing whitespace",
+		},
+		"invalid counter pattern": {
+			fallbackType: "\n  counter: ['[']",
+			wantErr:      "'fallback_type.counter[0]'",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cat, err := loadCatalog(t, fileSpec{
+				stock:   true,
+				name:    "app.yaml",
+				content: profileYAMLWithFallbackType("app_*", tc.fallbackType),
+			})
+			require.NoError(t, err, "stock fallback policy must remain lazy")
+
+			p, ok := cat.Get("app")
+			require.True(t, ok)
+			assert.True(t, p.HasFallbackType(), "a present fallback_type key must be visible without hydration")
+
+			got, err1 := p.FallbackType()
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err1, tc.wantErr)
+				_, err2 := p.FallbackType()
+				assert.Equal(t, err1, err2, "the hydration error must be memoized")
+				return
+			}
+			require.NoError(t, err1)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestProfile_FallbackTypeAbsent(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: profileYAML("app_*")})
+	require.NoError(t, err)
+	p, ok := cat.Get("app")
+	require.True(t, ok)
+
+	assert.False(t, p.HasFallbackType())
+	got, err := p.FallbackType()
+	require.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+func TestLoadFromDirs_userBadFallbackTypeSkippedStockSurvives(t *testing.T) {
+	cat, err := loadCatalog(t,
+		fileSpec{stock: true, name: "app.yaml", content: profileYAML("stock_*")},
+		fileSpec{stock: false, name: "app.yaml", content: profileYAMLWithFallbackType("user_*", " {}")},
+	)
+	require.NoError(t, err)
+
+	p, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, "stock_*", p.Match)
+	assert.False(t, p.HasFallbackType())
+}
+
+func TestProfile_FallbackTypeReturnsIndependentCopies(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{
+		stock:   true,
+		name:    "app.yaml",
+		content: profileYAMLWithFallbackType("app_*", validFallbackType),
+	})
+	require.NoError(t, err)
+
+	assertIndependent := func(t *testing.T, p Profile) {
+		t.Helper()
+		first, err := p.FallbackType()
+		require.NoError(t, err)
+		first.Gauge[0] = "changed"
+		first.Counter[0] = "changed"
+
+		second, err := p.FallbackType()
+		require.NoError(t, err)
+		assert.Equal(t, []string{"app_value"}, second.Gauge)
+		assert.Equal(t, []string{"app_requests"}, second.Counter)
+	}
+
+	fromGet, ok := cat.Get("app")
+	require.True(t, ok)
+	assertIndependent(t, fromGet)
+
+	ordered := cat.OrderedProfiles()
+	require.Len(t, ordered, 1)
+	assertIndependent(t, ordered[0])
+
+	resolved, err := cat.Resolve([]string{"app"})
+	require.NoError(t, err)
+	require.Len(t, resolved, 1)
+	assertIndependent(t, resolved[0])
+}
+
+func TestProfile_FallbackTypeConcurrent(t *testing.T) {
+	for name, fallbackType := range map[string]string{
+		"success": validFallbackType,
+		"error":   "\n  gauge: ['[']",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cat, err := loadCatalog(t, fileSpec{
+				stock:   true,
+				name:    "app.yaml",
+				content: profileYAMLWithFallbackType("app_*", fallbackType),
+			})
+			require.NoError(t, err)
+			p, ok := cat.Get("app")
+			require.True(t, ok)
+
+			var wg sync.WaitGroup
+			for range 16 {
+				wg.Go(func() {
+					got, err := p.FallbackType()
+					if name == "error" {
+						assert.Error(t, err)
+						assert.Empty(t, got)
+					} else {
+						assert.NoError(t, err)
+						assert.Equal(t, []string{"app_value"}, got.Gauge)
+					}
+				})
+			}
+			wg.Wait()
+		})
+	}
 }
 
 func TestProfileAutogenSelectorOwnership(t *testing.T) {

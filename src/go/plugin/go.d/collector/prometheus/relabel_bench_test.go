@@ -81,40 +81,54 @@ func BenchmarkRelabelExecutor(b *testing.B) {
 }
 
 // BenchmarkRelabelScrapeModes measures the complete steady-state fetch and parse
-// path for each supported stage combination. Unlike BenchmarkRelabelExecutor,
-// this includes the direct parser versus buffered-sample parser difference.
-// The same 2026-08-05 run measured:
+// path for every job/profile relabel and profile fallback combination. Unlike
+// BenchmarkRelabelExecutor, this includes the direct parser versus buffered-sample
+// parser difference. The fixture adds one untyped scalar to benchExposition so the
+// fallback cases exercise classification as well as the bound-sample dispatch.
+// A three-run 2026-08-06 developer-laptop sample (Apple M4 Pro), not a CI gate:
 //
-//	no_rules                 96251 ns/op    46839 B/op    584 allocs/op
-//	job_rules               206978 ns/op   216616 B/op   1695 allocs/op
-//	profile_rules           240713 ns/op   288084 B/op   1794 allocs/op
-//	job_and_profile_rules   363555 ns/op   416780 B/op   2743 allocs/op
+//	mode                              ns/op         B/op       allocs/op
+//	no_rules                         93.4-95.7 us   46.9 KB     586
+//	job_rules                       210.6-242.7 us  217.6-217.9 KB  1706
+//	fallback_rules                  141.8-148.1 us  144.0-144.3 KB  1212
+//	profile_rules                   243.8-245.1 us  217.9-218.2 KB  1707-1708
+//	job_and_fallback_rules          258.5-263.4 us  260.7-261.2 KB  2139-2140
+//	job_and_profile_rules           337.3-340.0 us  347.1-347.3 KB  2664
+//	fallback_and_profile_rules      234.7-237.3 us  216.4-216.7 KB  1706
+//	job_fallback_and_profile_rules  335.1-337.0 us  346.3-346.5 KB  2663
 //
-// A three-run comparison against the pre-feature master snapshot, using this
-// same fetch/parse fixture, found no material existing-path regression:
+// An earlier three-run comparison against the pre-feature master snapshot used
+// benchExposition without the extra untyped scalar and found no material
+// existing-path regression. Those historical numbers are not directly comparable
+// to the 166-series table above:
 //
 //	mode        pre-feature master                              current branch
 //	no_rules    93.2-94.3 us, 46.8-46.9 KB, 584 allocs/op       93.5-95.9 us, 46.8-47.0 KB, 584 allocs/op
 //	job_rules   208-239 us, 217.3-217.6 KB, 1696-1697 allocs    212-243 us, 217.4-217.9 KB, 1696-1697 allocs
 //
-// Profile-only and combined modes did not exist before this feature, so their
-// pre-change result is not applicable; the absolute opt-in costs are above.
+// Profile-policy modes had no pre-feature equivalent; their absolute opt-in costs
+// are reported above.
 func BenchmarkRelabelScrapeModes(b *testing.B) {
-	exposition := benchExposition()
+	exposition := benchExposition() + "app_untyped_value 1\n"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(exposition))
 	}))
 	b.Cleanup(srv.Close)
 
 	tests := []struct {
-		name         string
-		jobRules     bool
-		profileRules bool
+		name          string
+		jobRules      bool
+		fallbackRules bool
+		profileRules  bool
 	}{
 		{name: "no_rules"},
 		{name: "job_rules", jobRules: true},
+		{name: "fallback_rules", fallbackRules: true},
 		{name: "profile_rules", profileRules: true},
+		{name: "job_and_fallback_rules", jobRules: true, fallbackRules: true},
 		{name: "job_and_profile_rules", jobRules: true, profileRules: true},
+		{name: "fallback_and_profile_rules", fallbackRules: true, profileRules: true},
+		{name: "job_fallback_and_profile_rules", jobRules: true, fallbackRules: true, profileRules: true},
 	}
 
 	for _, tc := range tests {
@@ -129,9 +143,16 @@ func BenchmarkRelabelScrapeModes(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			var normalizers []profileNormalizer
+			runtime := &promRuntime{}
+			if tc.fallbackRules {
+				runtime.fallbacks = []profileFallback{{
+					root:    matcher.Must(matcher.NewSimplePatternsMatcher("app_*")),
+					gauge:   matcher.Must(matcher.NewGlobMatcher("app_untyped_value")),
+					counter: matcher.FALSE(),
+				}}
+			}
 			if tc.profileRules {
-				normalizers = []profileNormalizer{benchmarkProfileNormalizer(b, "*", "*", "profile_stage")}
+				runtime.normalizers = []profileNormalizer{benchmarkProfileNormalizer(b, "*", "*", "profile_stage")}
 			}
 
 			b.ReportAllocs()
@@ -139,10 +160,10 @@ func BenchmarkRelabelScrapeModes(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
 				var err error
-				if len(normalizers) == 0 {
+				if !runtime.hasProfileSamplePolicy() {
 					_, err = collr.scrape(context.Background(), false)
 				} else {
-					_, err = collr.scrapeProfileNormalized(context.Background(), normalizers, false)
+					_, err = collr.scrapeProfilePipeline(context.Background(), runtime, false)
 				}
 				if err != nil {
 					b.Fatal(err)

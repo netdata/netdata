@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
@@ -99,6 +100,20 @@ func TestCollector_Init(t *testing.T) {
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
 				Relabeling: []relabel.Block{{Match: "app_*"}},
+			},
+		},
+		"fallback type blank pattern": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:   web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				FallbackType: promprofiles.FallbackType{Gauge: []string{"   "}},
+			},
+		},
+		"fallback type padded pattern": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:   web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				FallbackType: promprofiles.FallbackType{Counter: []string{" app_requests "}},
 			},
 		},
 		"profiles mode none": {

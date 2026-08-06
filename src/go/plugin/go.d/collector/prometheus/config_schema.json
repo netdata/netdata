@@ -182,7 +182,7 @@
       },
       "profiles": {
         "title": "Profiles",
-        "description": "Curated, exporter-specific chart profiles. `auto` (default) selects every profile whose match hits a post-job metric; `exact` selects only the named profiles (each must match); `combined` is auto plus the named profiles; `none` disables profiles (generic autogen charts only). After selection, a profile may apply profile-owned `relabeling` before charts and use `autogen.selector` to constrain fallback charts inside its own `match` scope. Each source family is normalized only by the first applicable profile: profile-name order in `auto`, entry order in `exact`, and configured entries followed by remaining name-ordered auto profiles in `combined`. All selected templates consume the shared final metric stream.",
+        "description": "Curated, exporter-specific chart profiles. `auto` (default) selects every profile whose match hits a post-job metric; `exact` selects only the named profiles (each must match); `combined` is auto plus the named profiles; `none` disables profiles (generic autogen charts only). After selection, a profile may classify untyped scalar families with profile-owned `fallback_type`, apply `relabeling` before charts, and use `autogen.selector` to constrain fallback charts inside its own `match` scope. Conflicting fallback and normalization policies follow profile-name order in `auto`, entry order in `exact`, and configured entries followed by remaining name-ordered auto profiles in `combined`. Job fallback policy takes precedence. All selected templates consume the shared final metric stream.",
         "type": "object",
         "properties": {
           "mode": {
@@ -313,7 +313,7 @@
       },
       "fallback_type": {
         "title": "Untyped metrics fallback",
-        "description": "Process untyped metrics as Counter or Gauge instead of ignoring them. Classification uses the post-job, pre-profile metric name; profile relabeling preserves the decision but cannot create or change it.",
+        "description": "Job-level override that processes untyped metrics as Counter or Gauge instead of ignoring them. Classification uses the post-job, pre-profile metric name; profile relabeling preserves the decision but cannot create or change it. Selected profiles may provide exporter-owned defaults, but job rules take precedence. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.",
         "type": [
           "object",
           "null"
@@ -328,7 +328,8 @@
             ],
             "items": {
               "title": "Pattern",
-              "type": "string"
+              "type": "string",
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
             },
             "uniqueItems": true
           },
@@ -341,7 +342,8 @@
             ],
             "items": {
               "title": "Pattern",
-              "type": "string"
+              "type": "string",
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
             },
             "uniqueItems": true
           }

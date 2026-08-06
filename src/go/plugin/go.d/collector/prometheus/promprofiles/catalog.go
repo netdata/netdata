@@ -73,11 +73,11 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 }
 
 // decodeProfile strict-decodes the one top-level profile document, retaining
-// immutable raw bytes and a cheap relabel-presence signal for lazy stock
-// hydration. User profiles hydrate both fields eagerly so a broken override is
-// skipped and valid stock survives.
+// immutable raw bytes and cheap fallback/relabel-presence signals for lazy stock
+// hydration. User profiles hydrate all deferred fields eagerly so a broken
+// override is skipped and valid stock survives.
 func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) {
-	var doc profileDocument[yaml.Node, yaml.Node]
+	var doc profileDocument[yaml.Node, yaml.Node, yaml.Node]
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&doc); err != nil {
@@ -90,8 +90,9 @@ func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) 
 		App:             doc.App,
 		autogenSelector: nil,
 		lazy: &lazyProfile{
-			raw:           bytes.Clone(data),
-			hasRelabeling: doc.Relabeling.Kind != 0,
+			raw:             bytes.Clone(data),
+			hasFallbackType: doc.FallbackType.Kind != 0,
+			hasRelabeling:   doc.Relabeling.Kind != 0,
 		},
 	}
 	if doc.Autogen != nil {
@@ -105,8 +106,9 @@ func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) 
 	}
 	if !isStock {
 		_, templateErr := p.Template()
+		_, fallbackTypeErr := p.FallbackType()
 		_, relabelingErr := p.Relabeling()
-		if err := errors.Join(templateErr, relabelingErr); err != nil {
+		if err := errors.Join(templateErr, fallbackTypeErr, relabelingErr); err != nil {
 			return Profile{}, err
 		}
 	}
