@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -45,6 +46,13 @@
 #endif
 #ifndef PACKET_STATISTICS
 #  define PACKET_STATISTICS 6
+#endif
+#ifndef SO_TIMESTAMPNS
+#  define SO_TIMESTAMPNS 35
+#endif
+/* SCM_TIMESTAMPNS is the cmsg_type used by the kernel to return SO_TIMESTAMPNS data. */
+#ifndef SCM_TIMESTAMPNS
+#  define SCM_TIMESTAMPNS SO_TIMESTAMPNS
 #endif
 
 /* Mirror of struct tpacket_stats from <linux/if_packet.h> — stable Linux ABI.
@@ -94,7 +102,7 @@ struct netdata_sock_fprog {
  * Per-query tracking limits
  * ---------------------------------------------------------------------- */
 #define DNS_PENDING_CAP         512         /* max concurrent in-flight queries  */
-#define DNS_PENDING_TIMEOUT_US  5000000ULL  /* 5 s: unmatched query → timeout    */
+#define DNS_PENDING_TIMEOUT_US  30000000ULL /* 30 s: must exceed max drain interval (20 s) */
 #define DNS_FLOW_RING_CAP       1000        /* ring capacity — matches SHM       */
 #define DNS_FLOW_TTL_US_DEFAULT (20ULL * 1000000ULL) /* 20 s default live window */
 #define DNS_DOMAIN_MAX          256
@@ -181,6 +189,43 @@ static uint64_t dns_now_us(void)
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)(ts.tv_nsec / 1000);
+}
+
+/* Receive one frame from fd with a per-packet kernel timestamp.
+ * Uses SO_TIMESTAMPNS ancillary data so latency = response_ts - query_ts
+ * measures true network RTT rather than drain-batch position.
+ * Falls back to dns_now_us() if the kernel does not deliver a timestamp
+ * (SO_TIMESTAMPNS not set, or not supported). */
+static ssize_t dns_recv_ts(int fd, char *buf, size_t buf_sz, uint64_t *ts_us)
+{
+    char cmsg_buf[CMSG_SPACE(sizeof(struct timespec))];
+    struct iovec  iov;
+    struct msghdr msg;
+
+    iov.iov_base = buf;
+    iov.iov_len  = buf_sz;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_iov        = &iov;
+    msg.msg_iovlen     = 1;
+    msg.msg_control    = cmsg_buf;
+    msg.msg_controllen = sizeof(cmsg_buf);
+
+    ssize_t n = recvmsg(fd, &msg, MSG_DONTWAIT);
+    if (n < 0)
+        return n;
+
+    for (struct cmsghdr *cm = CMSG_FIRSTHDR(&msg); cm; cm = CMSG_NXTHDR(&msg, cm)) {
+        if (cm->cmsg_level == SOL_SOCKET && cm->cmsg_type == SCM_TIMESTAMPNS) {
+            struct timespec ts;
+            memcpy(&ts, CMSG_DATA(cm), sizeof(ts));
+            *ts_us = (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
+            return n;
+        }
+    }
+
+    *ts_us = dns_now_us();
+    return n;
 }
 
 /* -------------------------------------------------------------------------
@@ -615,13 +660,13 @@ static bool dns_parse_raw_packet(
  * ---------------------------------------------------------------------- */
 static void dns_drain_socket(struct netdata_dns_runtime *rt)
 {
-    char    buf[DNS_PACKET_BUF];
-    ssize_t n;
-    uint64_t now_us = dns_now_us();
-    int drained = 0;
+    char     buf[DNS_PACKET_BUF];
+    ssize_t  n;
+    uint64_t now_us;
+    int      drained = 0;
 
     while (drained < DNS_MAX_DRAIN_PACKETS &&
-           (n = recv(rt->sock_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0) {
+           (n = dns_recv_ts(rt->sock_fd, buf, sizeof(buf), &now_us)) > 0) {
         dns_parse_raw_packet(rt, buf, n, now_us, NULL, NULL, NULL);
         drained++;
     }
@@ -635,13 +680,13 @@ static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
     if (rt->flow_fd < 0)
         return;
 
-    char    buf[DNS_PACKET_BUF];
-    ssize_t n;
-    uint64_t now_us = dns_now_us();
-    int drained = 0;
+    char     buf[DNS_PACKET_BUF];
+    ssize_t  n;
+    uint64_t now_us;
+    int      drained = 0;
 
     while (drained < DNS_MAX_DRAIN_PACKETS &&
-           (n = recv(rt->flow_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0) {
+           (n = dns_recv_ts(rt->flow_fd, buf, sizeof(buf), &now_us)) > 0) {
         dns_parse_raw_packet(rt, buf, n, now_us, NULL, NULL, NULL);
         drained++;
     }
@@ -755,6 +800,12 @@ static int dns_open_flow_socket(void)
                 "ebpf-go: dns: SO_RCVBUF(%d) failed (errno %d); using default\n",
                 rcvbuf, errno);
 
+    int ts_enable = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_TIMESTAMPNS, &ts_enable, sizeof(ts_enable)) < 0)
+        fprintf(stderr,
+                "ebpf-go: dns: SO_TIMESTAMPNS failed (errno %d); latency will use drain time\n",
+                errno);
+
     if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
                    &flow_filter, sizeof(flow_filter)) < 0) {
         fprintf(stderr, "ebpf-go: dns: SO_ATTACH_FILTER failed (errno %d)\n", errno);
@@ -807,6 +858,12 @@ static int dns_attach_filter(struct netdata_dns_runtime *rt, const char *prog_na
         fprintf(stderr, "ebpf-go: dns: socket() failed (errno %d)\n", errno);
         return -1;
     }
+
+    int ts_enable = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_TIMESTAMPNS, &ts_enable, sizeof(ts_enable)) < 0)
+        fprintf(stderr,
+                "ebpf-go: dns: SO_TIMESTAMPNS failed (errno %d); latency will use drain time\n",
+                errno);
 
     if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, &prog_fd, sizeof(prog_fd)) < 0) {
         fprintf(stderr, "ebpf-go: dns: SO_ATTACH_BPF failed (errno %d)\n", errno);
