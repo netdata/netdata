@@ -622,6 +622,7 @@ int dbengine_platform_unittest(void)
     size_t test_root_length = sizeof(test_root);
     uv_thread_t watchdog_thread;
     bool watchdog_started = false;
+    bool init_completion_initialized[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     bool init_thread_created[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     bool init_thread_joined[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     bool dbengine_initialized[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
@@ -668,9 +669,12 @@ int dbengine_platform_unittest(void)
 
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
         completion_init(&init[tier].completed);
+        init_completion_initialized[tier] = true;
         init[tier].start = &start;
         if (uv_thread_create(&init[tier].thread, dbengine_platform_test_init_tier, &init[tier]) != 0) {
             fprintf(stderr, "DBENGINE platform unittest: cannot create tier %zu initialization thread\n", tier);
+            completion_destroy(&init[tier].completed);
+            init_completion_initialized[tier] = false;
             errors++;
             goto cleanup_watchdog;
         }
@@ -685,13 +689,14 @@ int dbengine_platform_unittest(void)
             goto cleanup_watchdog;
         }
 
-        completion_destroy(&init[tier].completed);
         if (uv_thread_join(&init[tier].thread) != 0) {
             fprintf(stderr, "DBENGINE platform unittest: cannot join tier %zu initialization thread\n", tier);
             errors++;
             goto cleanup_watchdog;
         }
         init_thread_joined[tier] = true;
+        completion_destroy(&init[tier].completed);
+        init_completion_initialized[tier] = false;
 
         if (init[tier].ret != 0) {
             fprintf(stderr, "DBENGINE platform unittest: tier %zu initialization failed (%d)\n", tier, init[tier].ret);
@@ -711,13 +716,24 @@ int dbengine_platform_unittest(void)
 cleanup_watchdog:
     __atomic_store_n(&start, true, __ATOMIC_RELEASE);
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
-        if (!init_thread_created[tier] || init_thread_joined[tier])
+        if (!init_thread_created[tier]) {
+            if (init_completion_initialized[tier]) {
+                completion_destroy(&init[tier].completed);
+                init_completion_initialized[tier] = false;
+            }
+            continue;
+        }
+
+        if (init_thread_joined[tier])
             continue;
 
         if (uv_thread_join(&init[tier].thread) != 0)
             errors++;
         else {
-            completion_destroy(&init[tier].completed);
+            if (init_completion_initialized[tier]) {
+                completion_destroy(&init[tier].completed);
+                init_completion_initialized[tier] = false;
+            }
             init_thread_joined[tier] = true;
             dbengine_initialized[tier] = init[tier].ret == 0;
         }
