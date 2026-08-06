@@ -101,9 +101,9 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Filters** | [selector](#option-filters-selector) | Time series selector (filter). |  | no |
 | **Limits** | max_time_series | Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed. | 2000 | no |
 |  | max_time_series_per_metric | Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped. | 200 | no |
-| **Customization** | [fallback_type](#option-customization-fallback-type) | Fallback type rules for untyped metrics. |  | no |
+| **Customization** | [fallback_type](#option-customization-fallback-type) | Job-level fallback type overrides for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Job-owned Prometheus-compatible metric relabeling, applied before profile selection. |  | no |
-|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional profile-owned normalization and scoped fallback-chart policy; disable profiles with mode `none`. | auto | no |
+|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, normalization, and scoped fallback-chart policy; disable profiles with mode `none`. | auto | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -144,9 +144,15 @@ selector:
 <a id="option-customization-fallback-type"></a>
 ##### fallback_type
 
-This option allows you to process Untyped metrics as Counter or Gauge instead of ignoring them.
+This job option allows you to process untyped metrics as Counter or Gauge instead of ignoring them.
 Classification uses the post-job, pre-profile metric name. Profile relabeling preserves the selected
 type but cannot create or change it by renaming the final metric.
+
+Selected profiles may provide exporter-owned `fallback_type` defaults inside their own `match` scope.
+Job gauge rules take precedence over job counter rules, and both job rule sets take precedence over
+every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
+belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
+counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
 
 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
 - Option syntax:
@@ -206,8 +212,10 @@ to author your own. `profiles.mode` selects them:
 - `combined`: `auto` plus the profiles named in `mode_combined.entries`.
 - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
 
-Selection uses post-job, pre-profile family names. A selected profile may carry `relabeling` blocks
-that normalize matching source families automatically before chart routing. Each original family is
+Selection uses post-job, pre-profile family names. A selected profile may carry `fallback_type` rules
+that classify untyped scalar families inside its `match` scope and `relabeling` blocks that normalize
+matching source families automatically before chart routing. Job fallback policy takes precedence;
+conflicting profile rules use the same ordering as normalization. Each original family is
 processed only by the first applicable profile normalizer: profile-name order in `auto`, configured
 entry order in `exact`, and configured entries followed by remaining auto profiles in name order in
 `combined`. Later profile pipelines do not see the family. All selected templates consume the same
