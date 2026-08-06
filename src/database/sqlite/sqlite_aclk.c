@@ -353,6 +353,9 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
         case SEND_NODE_INSTANCES:
             worker_is_busy(UV_EVENT_SEND_NODE_INSTANCES);
             aclk_send_node_instances();
+            // the cloud asks for the node instances after connecting, so this is also where the
+            // manifest gets its one request per ACLK session - see aclk_arm_node_manifest_all_hosts()
+            aclk_arm_node_manifest_all_hosts();
             ok_to_send = false;
             break;
         case ALERT_START_STREAMING:
@@ -1392,4 +1395,22 @@ void aclk_arm_node_manifest(RRDHOST *host)
         return;
 
     aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+}
+
+// Re-arms the manifest of every host. Called when the cloud asks the agent to re-announce its node
+// instances, which it does after connecting - so this is the one manifest request per ACLK session.
+//
+// It is needed because publishing is never acked: what the previous session sent may have been
+// dropped after the send call (no mqtt client left when the query executed, full command queue,
+// shutdown), and the cloud may have lost it. build_node_manifest() scopes its suppression to one
+// session for exactly this reason, so the pair guarantees one manifest per host per session and no
+// more. A redundant arm costs one manifest build plus hash - the content hash drops the publish.
+void aclk_arm_node_manifest_all_hosts(void)
+{
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host)
+    {
+        aclk_arm_node_manifest(host);
+    }
+    dfe_done(host);
 }

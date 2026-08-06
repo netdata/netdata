@@ -59,7 +59,8 @@ static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UU
 }
 
 // node_id is the caller's validated snapshot, not the shared buffer - see aclk_node_id_snapshot().
-static void build_node_manifest(RRDHOST *host, char *node_id)
+// aclk_host_config is the caller's, already loaded and non-NULL for this host.
+static void build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config, char *node_id)
 {
     struct update_node_instance_manifest manifest;
 
@@ -79,13 +80,32 @@ static void build_node_manifest(RRDHOST *host, char *node_id)
     manifest.functions = host_functions_to_manifest_dict(host);
     rrd_rdunlock();
 
-    aclk_update_node_instance_manifest(&manifest);
+    // Suppress publishing a manifest identical to the one already published in this ACLK session.
+    // Arming is event-driven and content-blind - a no-op function re-registration (plugin restart,
+    // child reconnect), every node-info send and every cloud node-id reply all arm a send - so this
+    // chokepoint compares content instead. The hash covers everything generate_..._message()
+    // transmits, including the node_id it is keyed under at the cloud, but not updated_at.
+    //
+    // Deliberately NOT suppressed: the first manifest of a config, the first manifest of every ACLK
+    // session (see node_manifest_sent_session - a send is only an attempt, it is never acked), and
+    // empty manifests - an empty list is meaningful to the cloud ("this node has no functions"),
+    // not an absence of information.
+    usec_t session = aclk_session_load();
+    uint64_t hash = manifest_dict_hash(manifest.functions, node_id, manifest.claim_id);
+    bool suppressed = aclk_host_config->node_manifest_sent_session == session &&
+                      aclk_host_config->node_manifest_sent_hash == hash;
+
+    if (!suppressed) {
+        aclk_update_node_instance_manifest(&manifest);
+        aclk_host_config->node_manifest_sent_session = session;
+        aclk_host_config->node_manifest_sent_hash = hash;
+    }
 
     dictionary_destroy(manifest.functions);
 
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
-           "ACLK RES [%s (%s)]: NODE MANIFEST SENT",
-        node_id, rrdhost_hostname(host));
+           "ACLK RES [%s (%s)]: NODE MANIFEST %s",
+        node_id, rrdhost_hostname(host), suppressed ? "SUPPRESSED (unchanged)" : "SENT");
 }
 
 static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_completion)
@@ -338,7 +358,7 @@ void aclk_check_node_info_collectors_and_manifest(void)
         if (manifest_pending && pp_queue_empty && node_manifest_send_time &&
             nd_time_t_add_compare(node_manifest_send_time, 30, now) < 0 &&
             aclk_send_timestamp_claim(&aclk_host_config->node_manifest_send_time, node_manifest_send_time)) {
-            build_node_manifest(host, manifest_node_id);
+            build_node_manifest(host, aclk_host_config, manifest_node_id);
             internal_error(true, "ACLK SYNC: Sending node manifest for %s", rrdhost_hostname(host));
         }
     }

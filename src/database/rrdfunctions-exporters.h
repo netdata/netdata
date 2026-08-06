@@ -34,4 +34,11 @@ struct rrd_function_manifest_entry {
 // are released by a delete callback registered on the dictionary.
 DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host);
 
+// Content hash of a manifest dictionary plus the node identity it will be published under.
+// Covers exactly the fields generate_update_node_instance_manifest_message() transmits
+// (name, help, tags, access, priority, version) plus node_id/claim_id - updated_at is
+// excluded because it changes on every build. Used to suppress publishing a manifest
+// identical to the one already sent. Change detection only, not security-sensitive.
+uint64_t manifest_dict_hash(DICTIONARY *dict, const char *node_id, const char *claim_id);
+
 #endif //NETDATA_RRDFUNCTIONS_EXPORTERS_H

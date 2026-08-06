@@ -216,3 +216,64 @@ DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
 
     return dst;
 }
+
+// 64-bit FNV-1a over length-prefixed bytes. The length prefix keeps "ab"+"c" and "a"+"bc"
+// from hashing alike when fields are concatenated.
+static inline uint64_t manifest_fnv1a_str(uint64_t h, const char *s) {
+    if(!s) s = "";
+    uint32_t len = (uint32_t)strlen(s);
+    for(size_t i = 0; i < sizeof(len); i++) {
+        h ^= (uint8_t)(len >> (i * 8));
+        h *= 1099511628211ULL;
+    }
+    for(const uint8_t *p = (const uint8_t *)s; *p; p++) {
+        h ^= *p;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static inline uint64_t manifest_fnv1a_u64(uint64_t h, uint64_t v) {
+    for(size_t i = 0; i < sizeof(v); i++) {
+        h ^= (uint8_t)(v >> (i * 8));
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+uint64_t manifest_dict_hash(DICTIONARY *dict, const char *node_id, const char *claim_id) {
+    // The identity of the node is part of the content: the cloud keys the manifest by node_id,
+    // so the same function list under a different node_id is a different manifest and must send.
+    uint64_t ids = 14695981039346656037ULL;
+    ids = manifest_fnv1a_str(ids, node_id);
+    ids = manifest_fnv1a_str(ids, claim_id);
+
+    // Per-entry hashes are XOR-combined, so the result does not depend on dictionary
+    // traversal order. Entry names are dictionary keys (unique), so no two entries can
+    // cancel each other out.
+    //
+    // Two fields are hashed as stored rather than as transmitted: tags (the proto splits them on
+    // whitespace, so re-spacing the same tags looks like a change here) and access (bits with no
+    // proto counterpart in http_access_map[] are dropped by the proto but hashed here). Both err
+    // toward one extra publish, never toward a missed one - which is the only safe direction.
+    uint64_t entries = 0;
+    if(dict) {
+        struct rrd_function_manifest_entry *e;
+        dfe_start_read(dict, e) {
+            uint64_t h = 14695981039346656037ULL;
+            h = manifest_fnv1a_str(h, e_dfe.name);
+            h = manifest_fnv1a_str(h, e->help);
+            h = manifest_fnv1a_str(h, e->tags);
+            h = manifest_fnv1a_u64(h, (uint64_t)e->access);
+            // hash the value the proto transmits: a non-positive priority is published as
+            // the default (see generate_update_node_instance_manifest_message())
+            h = manifest_fnv1a_u64(h, (uint64_t)(e->priority > 0 ? (uint32_t)e->priority
+                                                                  : RRDFUNCTIONS_PRIORITY_DEFAULT));
+            h = manifest_fnv1a_u64(h, (uint64_t)e->version);
+            entries ^= h;
+        }
+        dfe_done(e);
+    }
+
+    return ids ^ (entries * 1099511628211ULL);
+}

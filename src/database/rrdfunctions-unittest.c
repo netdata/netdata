@@ -268,6 +268,137 @@ int rrdfunctions_manifest_unittest(void) {
     for(size_t i = 0; i < _countof(fns); i++)
         rrd_function_del(host, NULL, fns[i].name, false, true);
 
+    // 4. The suppression hash. build_node_manifest() publishes only when manifest_dict_hash()
+    //    differs from the last sent hash, so the hash must be: deterministic for identical
+    //    content, independent of dictionary traversal order, and sensitive to every transmitted
+    //    field including the node_id and claim_id the manifest is keyed under at the cloud. Local
+    //    standalone dictionaries keep this independent of whatever live functions localhost has.
+    //    The other half of the suppression - scoping the record to one ACLK session - lives in
+    //    build_node_manifest(), not in the hash, so it is not covered here.
+    {
+        int hash_errors_before = errors;
+        const char *node1 = "11111111-2222-3333-4444-555555555555";
+        const char *node2 = "66666666-7777-8888-9999-aaaaaaaaaaaa";
+        const char *claim = "bbbbbbbb-cccc-dddd-eeee-ffffffffffff";
+
+        struct rrd_function_manifest_entry e1 = { .help = "help one", .tags = "top",
+                                                  .access = HTTP_ACCESS_ANONYMOUS_DATA, .priority = 0, .version = 1 };
+        struct rrd_function_manifest_entry e2 = { .help = "help two", .tags = "logs",
+                                                  .access = HTTP_ACCESS_SAME_SPACE, .priority = 50, .version = 2 };
+
+        DICTIONARY *a = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+        DICTIONARY *b = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+        dictionary_set(a, "fn-one", &e1, sizeof(e1));
+        dictionary_set(a, "fn-two", &e2, sizeof(e2));
+        // same content, opposite insertion order
+        dictionary_set(b, "fn-two", &e2, sizeof(e2));
+        dictionary_set(b, "fn-one", &e1, sizeof(e1));
+
+        uint64_t ha = manifest_dict_hash(a, node1, claim);
+        uint64_t hb = manifest_dict_hash(b, node1, claim);
+        if(ha != hb) {
+            fprintf(stderr, "  FAILED hash: identical content in different insertion order hashed differently\n");
+            errors++;
+        }
+
+        // every transmitted field must change the hash - one mutation of e1 per field, applied to
+        // b's "fn-one" and reverted, so each case is compared against the unchanged content hash
+        struct rrd_function_manifest_entry m_help = e1;     m_help.help = "help one modified";
+        struct rrd_function_manifest_entry m_tags = e1;     m_tags.tags = "top other";
+        struct rrd_function_manifest_entry m_access = e1;   m_access.access = HTTP_ACCESS_SIGNED_ID;
+        struct rrd_function_manifest_entry m_priority = e1; m_priority.priority = 42;
+        struct rrd_function_manifest_entry m_version = e1;  m_version.version = 2;
+
+        struct {
+            const char *field;
+            struct rrd_function_manifest_entry *mutated;
+        } mutations[] = {
+            { "help",     &m_help },
+            { "tags",     &m_tags },
+            { "access",   &m_access },
+            { "priority", &m_priority },
+            { "version",  &m_version },
+        };
+
+        for(size_t i = 0; i < _countof(mutations); i++) {
+            dictionary_set(b, "fn-one", mutations[i].mutated, sizeof(e1));
+            if(manifest_dict_hash(b, node1, claim) == ha) {
+                fprintf(stderr, "  FAILED hash: modified %s did not change the hash\n", mutations[i].field);
+                errors++;
+            }
+            dictionary_set(b, "fn-one", &e1, sizeof(e1));
+        }
+
+        // removing a function must change the hash. The entry count is not hashed on its own -
+        // per-entry hashes are XOR-combined - so this pins that a dropped entry is still visible.
+        dictionary_del(b, "fn-two");
+        if(manifest_dict_hash(b, node1, claim) == ha) {
+            fprintf(stderr, "  FAILED hash: removing a function did not change the hash\n");
+            errors++;
+        }
+        dictionary_set(b, "fn-two", &e2, sizeof(e2));
+        if(manifest_dict_hash(b, node1, claim) != ha) {
+            fprintf(stderr, "  FAILED hash: restoring a removed function did not restore the hash\n");
+            errors++;
+        }
+
+        // a non-positive priority is transmitted as the default - hashing the raw value would
+        // see a "change" the cloud never sees, so both must hash identically
+        struct rrd_function_manifest_entry e1p = e1;
+        e1p.priority = -5;
+        dictionary_set(b, "fn-one", &e1p, sizeof(e1p));
+        if(manifest_dict_hash(b, node1, claim) != ha) {
+            fprintf(stderr, "  FAILED hash: negative priority hashed differently from the transmitted default\n");
+            errors++;
+        }
+        dictionary_set(b, "fn-one", &e1, sizeof(e1));
+
+        // same functions under a different node_id is a different manifest at the cloud
+        if(manifest_dict_hash(a, node2, claim) == ha) {
+            fprintf(stderr, "  FAILED hash: node_id change did not change the hash\n");
+            errors++;
+        }
+
+        // the claim_id is transmitted too, and a re-claim must re-publish
+        if(manifest_dict_hash(a, node1, "cccccccc-dddd-eeee-ffff-000000000000") == ha) {
+            fprintf(stderr, "  FAILED hash: claim_id change did not change the hash\n");
+            errors++;
+        }
+
+        // an empty manifest is still content (means "no functions" to the cloud) and must
+        // differ from a non-empty one; an absent dict hashes like an empty one
+        DICTIONARY *empty = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+        if(manifest_dict_hash(empty, node1, claim) == ha) {
+            fprintf(stderr, "  FAILED hash: empty manifest hashed like a non-empty one\n");
+            errors++;
+        }
+        if(manifest_dict_hash(NULL, node1, claim) != manifest_dict_hash(empty, node1, claim)) {
+            fprintf(stderr, "  FAILED hash: NULL dict and empty dict hashed differently\n");
+            errors++;
+        }
+
+        // field concatenation ambiguity: "ab"+"c" must not hash like "a"+"bc"
+        DICTIONARY *c1 = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+        DICTIONARY *c2 = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+        struct rrd_function_manifest_entry x1 = { .help = "ab", .tags = "c", .access = 0, .priority = 1, .version = 1 };
+        struct rrd_function_manifest_entry x2 = { .help = "a",  .tags = "bc", .access = 0, .priority = 1, .version = 1 };
+        dictionary_set(c1, "fn", &x1, sizeof(x1));
+        dictionary_set(c2, "fn", &x2, sizeof(x2));
+        if(manifest_dict_hash(c1, node1, claim) == manifest_dict_hash(c2, node1, claim)) {
+            fprintf(stderr, "  FAILED hash: field concatenation ambiguity\n");
+            errors++;
+        }
+
+        if(errors == hash_errors_before)
+            fprintf(stderr, "  OK hash: determinism, order independence, field, node_id and claim_id sensitivity\n");
+
+        dictionary_destroy(a);
+        dictionary_destroy(b);
+        dictionary_destroy(empty);
+        dictionary_destroy(c1);
+        dictionary_destroy(c2);
+    }
+
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
 

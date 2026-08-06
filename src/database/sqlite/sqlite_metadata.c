@@ -303,6 +303,17 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         // which a worker that already snapshotted the OLD node_id would then claim - publishing the
         // stale id and consuming the only pending request. Replacing the deadline instead makes that
         // worker's claim CAS fail, so it re-snapshots and sends the new id on a later pass.
+        //
+        // Deliberately NOT gated on host->node_id having actually changed. Two reasons:
+        //   1. host->node_id is not the id this publishes - the aclk config string is, and a child
+        //      can have the two disagree (command-nodeid.c assigns host->node_id from the parent
+        //      without ever touching the config), so "host->node_id unchanged" does not mean the
+        //      transmitted id is unchanged.
+        //   2. The cloud re-sends CreateNodeInstanceResult with the same node_id on every node-info
+        //      round, which makes this a second chance to re-publish a manifest the cloud never
+        //      received (aclk_arm_node_manifest_all_hosts() is the guaranteed once-per-session one).
+        // Redundant publishes are dropped by the content-hash check in build_node_manifest(); the
+        // cost kept here is one manifest build plus hash per cloud reply.
         aclk_send_timestamp_set(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
     }
 

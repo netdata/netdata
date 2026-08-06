@@ -69,6 +69,20 @@ typedef struct aclk_sync_cfg_t {
                                                    // the alert-push worker
     SPINLOCK node_id_spinlock;
     char node_id[UUID_STR_LEN];
+
+    // What was last published for this config, so build_node_manifest() can drop an identical
+    // manifest. Written only by the alert-push worker (the single build_node_manifest() caller,
+    // serialized by alert_push_running), read nowhere else - no atomics needed.
+    //
+    // Scoped to the ACLK session it was published in, because publishing is fire-and-forget: the
+    // message can still be dropped after the send call (no mqtt client left when the query
+    // executes, full command queue, shutdown) and nothing acks it. A new session therefore
+    // re-publishes once, which is also what a cloud that lost the manifest needs.
+    //
+    // callocz() starts the session at 0 and aclk_session_load() is never 0 here (connecting stores
+    // a timestamp before the scan can run at all), so the first manifest of a config always sends.
+    usec_t node_manifest_sent_session; // aclk_session_load() when the last manifest was published
+    uint64_t node_manifest_sent_hash;  // manifest_dict_hash() of the last published manifest
 } aclk_sync_cfg_t;
 
 static inline void aclk_node_id_copy(aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])
@@ -185,5 +199,6 @@ void schedule_node_state_update(RRDHOST *host, uint64_t delay);
 void unregister_node(const char *machine_guid);
 void aclk_queue_node_info(RRDHOST *host, bool immediate);
 void aclk_arm_node_manifest(RRDHOST *host);
+void aclk_arm_node_manifest_all_hosts(void);
 
 #endif //NETDATA_SQLITE_ACLK_H
