@@ -25,15 +25,14 @@ func TestDefaultCatalog_StockProfileProofBundles(t *testing.T) {
 
 	metadataPath := filepath.Join(repoRoot, "src/go/plugin/go.d/collector/prometheus/metadata.yaml")
 	for _, bundle := range bundles {
-		descriptor := bundle.Descriptor
-		t.Run(descriptor.Profile.Name, func(t *testing.T) {
+		t.Run(bundle.Descriptor.Profile, func(t *testing.T) {
 			require.NoError(t, promprofileproof.VerifyLocal(repoRoot, bundle))
 			assertProofInputLFAttributes(t, repoRoot, bundle)
-			assertProofJobMatchesMetadata(t, repoRoot, metadataPath, descriptor)
+			assertProofJobMatchesMetadata(t, repoRoot, metadataPath, bundle)
 
 			t.Run("external evidence", func(t *testing.T) {
-				manifestPath := promtestdata.Require(t, descriptor.External.Manifest.Path)
-				testdataRoot := resolvedRoot(manifestPath, descriptor.External.Manifest.Path)
+				manifestPath := promtestdata.Require(t, bundle.ExternalManifestPath())
+				testdataRoot := resolvedRoot(manifestPath, bundle.ExternalManifestPath())
 				require.NoError(t, promprofileproof.VerifyExternal(testdataRoot, bundle))
 			})
 		})
@@ -63,7 +62,7 @@ func assertProofInputLFAttributes(t *testing.T, repoRoot string, bundle promprof
 	}
 
 	paths := []string{".gitattributes", bundle.Path}
-	for _, entry := range bundle.Descriptor.Integrity {
+	for _, entry := range bundle.IntegrityEntries() {
 		paths = append(paths, entry.Path)
 	}
 	args := []string{"-C", repoRoot, "check-attr", "-z", "eol", "--"}
@@ -86,7 +85,7 @@ func assertProofJobMatchesMetadata(
 	t *testing.T,
 	repoRoot string,
 	metadataPath string,
-	descriptor promprofileproof.Descriptor,
+	bundle promprofileproof.Bundle,
 ) {
 	t.Helper()
 
@@ -113,7 +112,7 @@ func assertProofJobMatchesMetadata(
 	require.NoError(t, err)
 	require.NoError(t, yaml.Unmarshal(content, &metadata))
 
-	identity := descriptor.Validation.MetadataExample
+	identity := bundle.Descriptor.Validation.MetadataExample
 	var config string
 	for _, mod := range metadata.Modules {
 		if mod.Meta.ID != identity.IntegrationID {
@@ -142,7 +141,7 @@ func assertProofJobMatchesMetadata(
 	delete(metadataJob, "profiles")
 
 	var validationJob map[string]any
-	jobPath := filepath.Join(repoRoot, filepath.FromSlash(descriptor.Validation.Job))
+	jobPath := filepath.Join(repoRoot, filepath.FromSlash(bundle.ValidationJobPath()))
 	content, err = os.ReadFile(jobPath)
 	require.NoError(t, err)
 	require.NoError(t, yaml.Unmarshal(content, &validationJob))

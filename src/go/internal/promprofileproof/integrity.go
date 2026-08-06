@@ -44,7 +44,7 @@ func VerifyLocal(repoRoot string, bundle Bundle) error {
 	if err := verifyLocalLayout(repoRoot, bundle); err != nil {
 		return err
 	}
-	for _, entry := range bundle.Descriptor.Integrity {
+	for _, entry := range bundle.IntegrityEntries() {
 		if err := verifyFile(filepath.Join(repoRoot, filepath.FromSlash(entry.Path)), entry.SHA256, entry.Bytes); err != nil {
 			return fmt.Errorf("local artifact %q: %w", entry.Path, err)
 		}
@@ -54,37 +54,38 @@ func VerifyLocal(repoRoot string, bundle Bundle) error {
 
 func VerifyExternal(testdataRoot string, bundle Bundle) error {
 	manifest := bundle.Descriptor.External.Manifest
-	manifestPath := filepath.Join(testdataRoot, filepath.FromSlash(manifest.Path))
+	manifestPath := filepath.Join(testdataRoot, filepath.FromSlash(bundle.ExternalManifestPath()))
 	if err := verifyFile(manifestPath, manifest.SHA256, manifest.Bytes); err != nil {
-		return fmt.Errorf("external manifest %q: %w", manifest.Path, err)
+		return fmt.Errorf("external manifest %q: %w", bundle.ExternalManifestPath(), err)
 	}
-	if err := verifyEvidenceManifest(manifestPath, bundle.Descriptor); err != nil {
-		return fmt.Errorf("external manifest %q: %w", manifest.Path, err)
+	if err := verifyEvidenceManifest(manifestPath, bundle); err != nil {
+		return fmt.Errorf("external manifest %q: %w", bundle.ExternalManifestPath(), err)
 	}
-	return nil
+	return verifySourceInventory(testdataRoot, bundle)
 }
 
 func Refresh(repoRoot, testdataRoot string, bundle Bundle) (Bundle, error) {
 	if err := verifyLocalLayout(repoRoot, bundle); err != nil {
 		return Bundle{}, err
 	}
-	for index := range bundle.Descriptor.Integrity {
-		entry := &bundle.Descriptor.Integrity[index]
-		digest, size, err := digestFile(filepath.Join(repoRoot, filepath.FromSlash(entry.Path)))
+	for _, target := range bundle.integrityTargets() {
+		digest, size, err := digestFile(filepath.Join(repoRoot, filepath.FromSlash(target.path)))
 		if err != nil {
-			return Bundle{}, fmt.Errorf("local artifact %q: %w", entry.Path, err)
+			return Bundle{}, fmt.Errorf("local artifact %q: %w", target.path, err)
 		}
-		entry.SHA256 = digest
-		entry.Bytes = size
+		*target.digest = FileDigest{SHA256: digest, Bytes: size}
 	}
 	manifest := &bundle.Descriptor.External.Manifest
-	manifestPath := filepath.Join(testdataRoot, filepath.FromSlash(manifest.Path))
-	if err := verifyEvidenceManifest(manifestPath, bundle.Descriptor); err != nil {
-		return Bundle{}, fmt.Errorf("external manifest %q: %w", manifest.Path, err)
+	manifestPath := filepath.Join(testdataRoot, filepath.FromSlash(bundle.ExternalManifestPath()))
+	if err := verifyEvidenceManifest(manifestPath, bundle); err != nil {
+		return Bundle{}, fmt.Errorf("external manifest %q: %w", bundle.ExternalManifestPath(), err)
+	}
+	if err := verifySourceInventory(testdataRoot, bundle); err != nil {
+		return Bundle{}, err
 	}
 	digest, size, err := digestFile(manifestPath)
 	if err != nil {
-		return Bundle{}, fmt.Errorf("external manifest %q: %w", manifest.Path, err)
+		return Bundle{}, fmt.Errorf("external manifest %q: %w", bundle.ExternalManifestPath(), err)
 	}
 	manifest.SHA256 = digest
 	manifest.Bytes = size
@@ -94,10 +95,22 @@ func Refresh(repoRoot, testdataRoot string, bundle Bundle) (Bundle, error) {
 	return bundle, nil
 }
 
+func verifySourceInventory(testdataRoot string, bundle Bundle) error {
+	path := filepath.Join(testdataRoot, filepath.FromSlash(bundle.SourceInventoryPath()))
+	inventory, err := LoadSourceInventory(path)
+	if err != nil {
+		return fmt.Errorf("external source inventory %q: %w", bundle.SourceInventoryPath(), err)
+	}
+	if err := inventory.VerifyExpected(bundle.Descriptor.Inventory); err != nil {
+		return fmt.Errorf("external source inventory %q: %w", bundle.SourceInventoryPath(), err)
+	}
+	return nil
+}
+
 func verifyLocalLayout(repoRoot string, bundle Bundle) error {
 	directory := filepath.ToSlash(filepath.Dir(bundle.Path))
 	want := []string{bundle.Path}
-	for _, entry := range bundle.Descriptor.Integrity {
+	for _, entry := range bundle.IntegrityEntries() {
 		if filepath.ToSlash(filepath.Dir(filepath.FromSlash(entry.Path))) == directory {
 			want = append(want, entry.Path)
 		}
@@ -177,7 +190,7 @@ func EvidenceDirectories(bundles []Bundle) []string {
 	directories := make([]string, 0, len(bundles))
 	seen := make(map[string]bool, len(bundles))
 	for _, bundle := range bundles {
-		directory := filepath.ToSlash(filepath.Dir(bundle.Descriptor.External.Manifest.Path))
+		directory := bundle.ExternalRoot()
 		if !seen[directory] {
 			seen[directory] = true
 			directories = append(directories, directory)
@@ -187,7 +200,8 @@ func EvidenceDirectories(bundles []Bundle) []string {
 	return directories
 }
 
-func verifyEvidenceManifest(path string, descriptor Descriptor) error {
+func verifyEvidenceManifest(path string, bundle Bundle) error {
+	descriptor := bundle.Descriptor
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -208,8 +222,8 @@ func verifyEvidenceManifest(path string, descriptor Descriptor) error {
 	if manifest.Version != 1 {
 		return fmt.Errorf("version: got %d, want 1", manifest.Version)
 	}
-	if manifest.Profile != descriptor.Profile.Name {
-		return fmt.Errorf("profile: got %q, want %q", manifest.Profile, descriptor.Profile.Name)
+	if manifest.Profile != descriptor.Profile {
+		return fmt.Errorf("profile: got %q, want %q", manifest.Profile, descriptor.Profile)
 	}
 	if manifest.EvidenceClass != "source-derived-synthetic" {
 		return fmt.Errorf("evidence_class: got %q, want source-derived-synthetic", manifest.EvidenceClass)
@@ -222,13 +236,13 @@ func verifyEvidenceManifest(path string, descriptor Descriptor) error {
 	}
 
 	root := filepath.Dir(path)
-	rootPrefix := filepath.ToSlash(filepath.Dir(descriptor.External.Manifest.Path)) + "/"
-	wantInventory := strings.TrimPrefix(descriptor.External.SourceInventory, rootPrefix)
-	wantFixture := strings.TrimPrefix(descriptor.External.Fixture, rootPrefix)
 	seen := make(map[string]bool, len(manifest.Files))
 	declaredPaths := make([]string, 0, len(manifest.Files))
 	foundInventory := false
-	foundFixture := false
+	foundFixtures := make(map[string]bool, len(descriptor.Validation.Cases))
+	for _, validationCase := range descriptor.Validation.Cases {
+		foundFixtures[validationCase.Fixture] = false
+	}
 	for index, file := range manifest.Files {
 		field := fmt.Sprintf("files[%d]", index)
 		if err := validateRelativePath(field+".path", file.Path); err != nil {
@@ -247,12 +261,14 @@ func verifyEvidenceManifest(path string, descriptor Descriptor) error {
 			if file.Path != "SOURCE-INVENTORY.tsv" {
 				return fmt.Errorf("source inventory %q must be SOURCE-INVENTORY.tsv", file.Path)
 			}
-			foundInventory = file.Path == wantInventory
+			foundInventory = true
 		case "prometheus_exposition":
 			if !strings.HasPrefix(file.Path, "fixtures/") || !strings.HasSuffix(file.Path, ".prom") {
 				return fmt.Errorf("Prometheus exposition %q must be a fixtures/*.prom file", file.Path)
 			}
-			foundFixture = foundFixture || file.Path == wantFixture
+			if _, ok := foundFixtures[file.Path]; ok {
+				foundFixtures[file.Path] = true
+			}
 		default:
 			return fmt.Errorf("unsupported evidence kind %q for %q", file.Kind, file.Path)
 		}
@@ -261,10 +277,12 @@ func verifyEvidenceManifest(path string, descriptor Descriptor) error {
 		}
 	}
 	if !foundInventory {
-		return fmt.Errorf("descriptor source inventory %q is not declared", descriptor.External.SourceInventory)
+		return fmt.Errorf("descriptor source inventory %q is not declared", bundle.SourceInventoryPath())
 	}
-	if !foundFixture {
-		return fmt.Errorf("descriptor validation fixture %q is not declared", descriptor.External.Fixture)
+	for fixture, found := range foundFixtures {
+		if !found {
+			return fmt.Errorf("descriptor validation fixture %q is not declared", bundle.ExternalRoot()+"/"+fixture)
+		}
 	}
 	slices.Sort(declaredPaths)
 	actualPaths, err := evidenceFiles(root)

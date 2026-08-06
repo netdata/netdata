@@ -1,54 +1,108 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-version: 1
-profile:
-  name: litellm
-  path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml
-proof:
-  evidence: src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/EVIDENCE.md
-  operator_model: src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/OPERATOR-MODEL.md
-  validation_summary: src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION.md
+version: 2
+profile: litellm
 external_evidence:
   revision: litellm
   manifest:
-    path: prometheus/profiles/litellm/manifest.yaml
     sha256: 5b743c3810ec81a4b391a24d4c3e30066108901e3f522812205d7071ef12ec1a
     bytes: 416
-  source_inventory: prometheus/profiles/litellm/SOURCE-INVENTORY.tsv
-  fixture: prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom
+source_inventory:
+  rows: 356
+  source_families: 201
+  authored_selectors: 273
+  dispositions:
+    chart: 273
+    job_excluded: 82
+    writer_ineligible: 1
 validation:
-  job: src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml
   metadata_example:
     integration_id: collector-go.d.plugin-prometheus-litellm
     example_name: LiteLLM
     job_name: litellm
-  expected:
-    verdict: PASS
-    raw_families: 201
-    raw_logical_series: 322
-    writer_series: 710
-    series_scanned: 710
-    series_autogen: 0
-    series_unmatched: 0
-    authored_charts: 159
-    runtime_charts: 231
-    autogen_charts: 0
-    chart_dimensions: 975
-    pipeline_excluded: 83
-    pipeline_renamed: 0
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/litellm_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 201
+          raw_logical_series: 322
+          writer_series: 710
+          series_scanned: 710
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 159
+          runtime_charts: 231
+          autogen_charts: 0
+          chart_dimensions: 975
+          pipeline_excluded: 83
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          job_deny_review: 82
+          job_policy_exclusion_summary: 1
+          observed_label_aggregation: 70
+          sibling_identity_mismatch: 1
+          wildcard_instance_identity: 23
+    - name: without-job-policy
+      kind: supplemental
+      fixture: fixtures/litellm_all_metrics.prom
+      job: none
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 201
+          raw_logical_series: 322
+          writer_series: 826
+          series_scanned: 826
+          series_autogen: 1
+          series_unmatched: 115
+          authored_charts: 159
+          runtime_charts: 231
+          autogen_charts: 1
+          chart_dimensions: 976
+          pipeline_excluded: 1
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          unexpected_autogen: 1
+        warnings:
+          default_validation_job: 1
+          observed_label_aggregation: 70
+          profile_suppressed_series: 1
+          sibling_identity_mismatch: 1
+          wildcard_instance_identity: 23
 integrity:
-  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/EVIDENCE.md
-    sha256: 096453f0af084dbb416cc4ff36297ec5ce832f0b7967dd5ad98ca6ce8bd5d297
-    bytes: 3578
-  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/OPERATOR-MODEL.md
-    sha256: 23fc59fa280129b41d91a216ff283942803292821d4921d557ef1fe51e485e74
-    bytes: 11822
-  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml
+  evidence:
+    sha256: 36757c6b02096ccc4f7aa1c3728a690f2bbe051044d432565f8fad4dc0947c30
+    bytes: 2551
+  operator_model:
+    sha256: 582d9d07c162e66c45b1988283accf6655f2047a62d1eab7e89c0a67d978ee25
+    bytes: 5338
+  validation_job:
     sha256: 534bba3e2d68d4a646c86dc80046580cd30894bad8a9ef78fc20f413612bcbca
     bytes: 4140
-  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION.md
-    sha256: fa8953028ce1b3a126923f39ab3dd3849a7707a16f7d1b8fd9f58f19d422cb38
-    bytes: 3937
-  - path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml
+  validation_summary:
+    sha256: a4b93d98fd4616e741f15ff3302514e8d65ed982cfcb17ce9dc5afdedbfd253f
+    bytes: 1769
+  profile:
     sha256: 779f0e5ad557efce527d72c3c0d85a7ae2d4f64bf87139881f595237336a1169
     bytes: 92502

@@ -74,8 +74,10 @@ design are proved. Do not describe or deliver a candidate as complete while any
 of these proofs fails:
 
 - **Operator-model proof:** `OPERATOR-MODEL.md` records source-backed
-  entities/containment, modules/capabilities, and operations/processing stages
-  before YAML, then reconciles those decisions against the emitted profile.
+  entities/containment, modules/capabilities, operations/processing stages,
+  identity, population, and unit decisions before YAML. The external source
+  inventory records the exact per-family mapping; replay tests reconcile it
+  against the emitted profile.
 - **Holistic-surface proof:** the declared version/configuration support scope
   accounts for every source-defined writer-capable family, including optional
   capabilities absent from the available deployment.
@@ -303,9 +305,11 @@ value. Do not infer the role from the label name alone.
 ### Classify the evidence against that model
 
 Create `OPERATOR-MODEL.md` in the deliverable directory **before** profile YAML.
-Classify every in-scope writer-capable family before grouping it, whether
-observed or source-derived. The document's layout is up to the author, but these
-evidence fields are mandatory:
+Use it to define the reusable domain model and classification rules. Classify
+every in-scope writer-capable family before grouping it, whether observed or
+source-derived, and record the exact per-family result once in
+`SOURCE-INVENTORY.tsv`; do not copy that ledger into Markdown. These inventory
+fields are mandatory:
 
 - **Owner:** the entity, module/capability, or operation/stage this signal
   explains.
@@ -340,10 +344,10 @@ traceable and prevents metric names, suffixes, and units from becoming the
 information architecture accidentally.
 
 After YAML authoring, reconcile every selector against the validator's generated
-`authored_mapping`. An intended hierarchy in prose is not evidence that the
-emitted family, identity, units, and priority actually implement it. See
-`ownership-proof.md` for the required source evidence, conflict reasoning, and
-selector-level reconciliation.
+`authored_mapping` and record the exact mapping once in `SOURCE-INVENTORY.tsv`.
+An intended hierarchy in prose is not evidence that the emitted family,
+identity, units, and priority implement it. See `ownership-proof.md` for the
+required source evidence, conflict reasoning, and executable reconciliation.
 
 ### Group diagnostic roles under their owner
 
@@ -834,8 +838,9 @@ boundary.
 
 Review the rendered design, not merely the YAML:
 
-- Does every `authored_mapping` selector agree with its source-family owner,
-  identity, population, unit algebra, and destination in `OPERATOR-MODEL.md`?
+- Does every `authored_mapping` selector agree with its exact source-inventory
+  owner, identity, population, unit algebra, and destination, and do those rows
+  follow the reusable decisions in `OPERATOR-MODEL.md`?
 - Does the first screen answer the most urgent operator questions?
 - Does the family tree express the entities/containment, modules/capabilities,
   and operations/processing stages that operators actually use?
@@ -911,12 +916,12 @@ Deliver:
 
 - the profile YAML;
 - the recommended structured job policy (or exact changes to an existing job);
-- `OPERATOR-MODEL.md`, including the post-authoring selector-level
-  reconciliation against `authored_mapping`;
-- an evidence manifest identifying versions, source/documentation revisions,
+- `OPERATOR-MODEL.md`, containing the reusable semantic model without a copied
+  per-family ledger;
+- an evidence record identifying versions, source/documentation revisions,
   feature gates, observed versus synthetic families, and fixture provenance;
-- sanitized source-complete fixture(s), validation inputs/hashes, and the
-  authoritative `PASS` summary;
+- sanitized source-complete fixture(s), validation inputs/hashes, and
+  descriptor-declared replay cases;
 - separate observed-runtime and source-derived-synthetic validation claims;
 - the stock integration metadata/generated-doc disposition when applicable;
 - explicit unresolved evidence limitations; known source-defined optional
@@ -937,19 +942,21 @@ For a stock profile in this repository, split the durable proof by artifact clas
 
 The compact proof contains:
 
-- `OPERATOR-MODEL.md` contains the operator model and selector-level
-  reconciliation;
+- `OPERATOR-MODEL.md` contains only the human semantic model: operator domains,
+  entity identity, causal order, population/unit rules, and exclusion reasons;
 - `EVIDENCE.md` records versions, source and documentation revisions, feature
-  gates, evidence boundaries, external fixture/inventory paths, provenance, and
-  exact reproduction steps;
+  gates, evidence construction, provenance, and limitations. It does not repeat
+  paths, replay results, counts, or commands owned elsewhere;
 - `VALIDATION-JOB.yaml` is the sanitized structured job-policy input used by the
   objective validator. Its deployable fields agree with the recommended
   metadata example; `future_inputs`, when required, are validation-only;
-- `proof.yaml` is the discovered machine descriptor for profile/proof paths,
-  metadata example/job identity, external evidence, expected verdict/counts,
-  and integrity digests; and
-- `VALIDATION.md` explains the PASS result and evidence boundary without acting
-  as the machine assertion oracle.
+- `proof.yaml` is the discovered machine descriptor. Fixed local/external paths
+  are derived from its profile/revision; it owns source-inventory expectations,
+  named replay cases, expected verdicts/counts/findings, metadata example/job
+  identity, and integrity digests; and
+- `VALIDATION.md` explains how to interpret source-complete, supplemental, and
+  job-policy cases without repeating their machine facts or per-profile replay
+  commands.
 
 The external profile-evidence directory contains:
 
@@ -988,14 +995,14 @@ Use the descriptor-backed launcher from the repository root:
 .agents/skills/project-prometheus-profiles/scripts/proof-bundle.py refresh
 ```
 
-`refresh` updates only integrity digests and byte counts. It MUST be run after
-the exact validator replay and deliberate `validation.expected` update; it does
-not approve changed behavior.
+`refresh` verifies the external inventory/manifest contract and updates only
+integrity digests and byte counts. It MUST be run after the exact replay and
+deliberate validation-case update; it does not approve changed behavior.
 
 Do not substitute transient local report JSON, an uncommitted scratch document,
 or a private observed scrape for this reviewable stock proof. Raw reports MAY
-remain local when the committed inputs, hashes, commands, counts, and semantic
-ledger reproduce the same conclusion.
+remain local because `proof.yaml`, the external inventory/fixtures, and the
+replay tests own the executable claims.
 
 Do not install or reload production configuration merely because authoring
 passed. Installation is a separate operational change:

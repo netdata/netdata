@@ -1,70 +1,33 @@
 <!-- markdownlint-disable MD013 MD043 -->
 
-# LiteLLM Prometheus profile validation
+# LiteLLM profile validation interpretation
 
-## Bounded source scope
+## Responsibility
 
-- Observed application: LiteLLM 1.92.0.
-- Structural-union source: `BerriAI/litellm @ 23de7a15d9d40006ee596e617475ba101d60c5e9`.
-- Current-source comparison: `BerriAI/litellm @ de706a35a6f1e9cb8c3cb527271df0b76a69f410`.
-- Single-process runtime registry: `prometheus/client_python` 0.24.1 @
-  `f417f6ea8f058165a1934e368fed245e91aafc14`.
-- The committed fixture is a sanitized structural union of mutually optional callback, configuration, label, multiprocess, and
-  single-process runtime shapes. It is not one realizable endpoint.
+This document explains how to interpret the declared validation cases. `proof.yaml` owns every fixture selection, job mode,
+expected verdict, count, and finding-code count. The common replay test owns execution and exact source-inventory
+reconciliation; this file intentionally repeats none of those machine facts.
 
-## Authoritative structural-union result
+## Source-complete case
 
-- `proof.yaml` is the authoritative machine-checked PASS verdict and complete objective count record.
-- The exclusion ledger dispositions are 82 job-excluded routes and 1 writer-ineligible information route.
-- Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
-- `src/go/testdata/prometheus/profiles/litellm/SOURCE-INVENTORY.tsv` has 356 rows and maps all 273 exact authored selector routes; unresolved
-  families/selectors **0**.
+The source-complete fixture combines mutually optional callbacks, labels, runtime modes, and application features. Its case
+tests the declared source boundary through the recommended job and profile; it does not claim that one LiteLLM endpoint emits
+the complete union.
 
-## Recommended-job requirement
+Inventory reconciliation compares the exact raw-family and authored-selector sets. This separates source coverage from
+operator judgment about identity, aggregation, units, and dashboard placement.
 
-The no-job structural run is deliberately **FAIL**, not completion evidence: it produces one generic process-start epoch
-chart and leaves alias/created writer series outside authored curation. The recommended job excludes the exact generated
-`_created` names in the declared source union, `process_start_time_seconds`, two deprecated request/failure aliases, and the
-batch-cost raw timestamp. Process CPU, memory, file descriptors, and Python GC remain charted in single-process mode.
+## Job-policy case
 
-## Forward compatibility
+The no-job case makes job-owned exclusion and fallback behavior visible. The recommended job suppresses source-known creation
+epochs, deprecated duplicates, raw timestamps that cannot be rendered honestly, and writer-ineligible routes while leaving
+unknown future LiteLLM families open to generic fallback. The exact behavior and findings are executable claims in
+`proof.yaml`.
 
-- The source-complete fixture has zero generic fallback and zero unmatched series.
-- The explicit deny list defensively suppresses generated epochs, deprecated aliases, and the raw batch-cost timestamp when
-  job policy does not.
-- Unknown future `litellm_*` families remain generically visible until source evidence can assign identity, unit,
-  population, owner, and a curated destination.
+## Interpretation limits
 
-## Identity and aggregation checks
-
-- Additive service views remain complete when optional labels are absent; optional breakdown routes require their entity labels.
-- Complementary nonblank/blank routes keep one context and use `unclassified` for proven optional bounded dimensions.
-- Point-in-time gauges preserve their complete emitted identity, including multiprocess `pid` and deployment-defined labels.
-- Runtime validation proves no instance/dimension collision or lifecycle-cap loss across the structural union.
-
-## Runtime evidence boundary
-
-The private observed scrape predates the final 159-chart profile and proves only the enabled local surface. It remains
-local-only historical evidence, not the authoritative completion verdict. Live deployment validation is an operational
-rollout check, not part of this source-completeness claim.
-
-## Reproducible artifacts
-
-- Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml`.
-- Fixture: `src/go/testdata/prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom`.
-- Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml`.
-- Semantic proof: `OPERATOR-MODEL.md` and
-  `src/go/testdata/prometheus/profiles/litellm/SOURCE-INVENTORY.tsv`.
-- Evidence provenance: `EVIDENCE.md`.
-- External evidence manifest: `src/go/testdata/prometheus/profiles/litellm/manifest.yaml`.
-- Machine descriptor and integrity metadata: `proof.yaml`.
-
-From `src/go`, reproduce the authoritative result with:
-
-```sh
-go run ./tools/prometheus-profile-validation \
-  --profile plugin/go.d/config/go.d/prometheus.profiles/default/litellm.yaml \
-  --dump testdata/prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom \
-  --job plugin/go.d/collector/prometheus/profile-proofs/litellm/VALIDATION-JOB.yaml \
-  --output text
-```
+- Optional breakdowns may disappear when an operator filters their identity labels; the coarser additive view remains the
+  intended complete view.
+- Point-in-time gauges preserve their emitted identity rather than borrowing counter aggregation rules.
+- The private scrape proves transport and one enabled subset only. Live deployment checks are operational rollout evidence,
+  not a replacement for the source-complete case.

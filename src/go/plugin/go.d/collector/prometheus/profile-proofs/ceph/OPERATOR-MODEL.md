@@ -2,17 +2,11 @@
 
 # Ceph Prometheus operator model
 
-## Evidence boundary
+## Responsibility
 
-- **Reef:** `ceph/ceph @ efac5a54607c13fa50d4822e50242b86e6e446df` (18.2.8).
-- **Squid:** `ceph/ceph @ abc7aa7f2701e5d46878fd5e6bb7e2955f1a395a` (19.2.5).
-- **Tentacle:** `ceph/ceph @ 0fcffee29411e3a38036764817b6e1afc59741cc` (20.2.2).
-- **NVMe-oF gateway:** `ceph/ceph-nvmeof @ c79b6f44bd2288f7ec5c48e3cc47f6e566573d3f`.
-- **Official surfaces:** cluster-wide MGR Prometheus, host-local ceph-exporter with priority-0 counters, and NVMe-oF.
-- **Synthetic exposition:** the committed fixture is the structural union of mutually optional releases, daemon roles,
-  modules, transports, and runtime configurations. It is intentionally not one realizable scrape.
-- **Native collector boundary:** the Ceph Dashboard REST collector is a different source. Overlap with it does not remove any
-  official exporter family from this profile.
+This document owns human semantic decisions: operator domains, entity identity, causal order, population lifecycle, unit
+interpretation, and the reasons for exclusions. `EVIDENCE.md` owns provenance. The external source inventory owns exact
+family/selector dispositions. `proof.yaml` and replay tests own all machine-verifiable behavior and counts.
 
 ## Entity and capability map
 
@@ -32,21 +26,21 @@ Ceph cluster
 
 ## Operator owners and causal order
 
-1. **Cluster health and capacity:** service impact, usable/raw capacity, OSD state, pools, PG state, recovery, and backfill.
-2. **Control plane:** MON/MGR/cephadm state and work that can block convergence or orchestration.
-3. **OSD client I/O:** client work, latency, queues, throttles, and failure/retry outcomes.
-4. **OSD recovery and scrubbing:** repair/recovery work, reservations, outcomes, and release-specific scrub phases.
-5. **Storage engine:** BlueStore, BlueFS, RocksDB, block devices, compaction, allocation, cache, I/O, and space pressure.
-6. **CephFS/MDS:** requests, clients, sessions, metadata cache, journal, memory, and purge queue.
-7. **RBD and RBD Mirror:** per-image I/O, persistent write log, object cache, and replication progress/outcomes.
-8. **RGW:** operations, latency/bytes, cache, lifecycle, notification/topic queues, and multisite synchronization.
-9. **NVMe-oF:** gateway/reactor state, host connectivity, subsystem inventory/limits, namespace/listener topology, and bdev I/O.
-10. **Shared runtime:** mClock shards, messenger workers, RDMA/DPDK paths, finishers, throttles, memory pools, and exporters.
+1. Cluster health and capacity: service impact, raw/usable capacity, OSD state, pools, PG state, recovery, and backfill.
+2. Control plane: MON, MGR, and cephadm work that can block convergence or orchestration.
+3. OSD client I/O: workload, latency, queues, throttles, failures, and retries.
+4. Recovery and scrubbing: repair work, reservations, outcomes, and release-specific scrub phases.
+5. Storage engine: BlueStore, BlueFS, RocksDB, block devices, compaction, allocation, cache, I/O, and space pressure.
+6. CephFS/MDS: requests, clients, sessions, metadata cache, journal, memory, and purge queue.
+7. RBD and RBD Mirror: per-image I/O, persistent write log, object cache, and replication progress/outcomes.
+8. RGW: operations, latency/bytes, cache, lifecycle, notifications, topics, and multisite synchronization.
+9. NVMe-oF: gateway/reactor state, host connectivity, subsystem inventory, namespace/listener topology, and bdev I/O.
+10. Shared runtime: schedulers, messenger workers, RDMA/DPDK, finishers, throttles, memory pools, and exporters.
 
-The dashboard starts with service impact and convergence, follows user-facing services, then descends into storage-engine and
-runtime causes.
+Navigation starts with service impact and convergence, follows user-facing services, then descends into storage-engine and
+runtime causes. Signals remain with the component that can explain them instead of being grouped globally by unit or type.
 
-## Identity lattice
+## Identity model
 
 ```text
 cluster:             {}
@@ -57,139 +51,68 @@ MDS client surface:  {ceph_daemon, mds_filesystem_key, remaining emitted labels}
 RBD image:           {ceph_daemon, librbd_image_key, remaining emitted labels}
 RBD PWL:             {ceph_daemon, librbd_pwl_key, remaining emitted labels}
 runtime component:   {ceph_daemon, normalized component identity, remaining emitted labels}
-RGW gateway/entity:  {instance_id, emitted user/bucket/topic/zone labels}
+RGW entity:          {instance_id, emitted user/bucket/topic/zone labels}
 NVMe-oF entity:      {gateway labels, nqn/host/device labels as emitted}
 ```
 
 - MGR and ceph-exporter label sets differ by family and remain extensible.
-- Every source-defined identity axis is preserved. Pools, daemons, images, users, buckets, gateways, devices, workers, and
-  runtime components are not silently merged.
-- The recommended job preserves exporter labels named `instance`, `family`, `chart`, or `dimension` under the corresponding
-  `ceph_` name before Netdata adds its own Prometheus re-export labels. This changes only the collision-prone label key, not
-  the source identity value or entity boundary.
-- Open-ended instance identity remains at compatibility boundaries where the official endpoints have no one fixed label
-  contract. This can create many chart instances; it is preferable to combining unrelated entities.
-- Metric-name identities are converted into labels before curation whenever the source grammar has an unambiguous suffix.
+- Source-defined ownership axes are preserved; daemons, pools, images, gateways, users, devices, and workers are not silently
+  merged.
+- Collision-prone source label keys are preserved under Ceph-specific keys before Netdata adds its own re-export labels.
+- Open-ended identity is retained where official endpoints have no fixed label contract. Higher chart cardinality is safer
+  than combining unrelated entities.
 
-## Source-defined dynamic name grammars
+## Profile-owned name normalization
 
-The job policy turns embedded identities into stable labels and canonical metric names. The non-greedy identity capture is
-required because suffixes overlap (`rd`/`hit_rd`/`part_hit_rd`, `get`/`get_sum`, and `lock`/`unlock`).
+Ceph embeds identity in several metric-family names. Profile relabeling, not the job, extracts that identity and maps only
+source-proven finite suffix branches to stable canonical families before profile selection. Non-greedy identity capture is
+required where operation suffixes overlap.
 
-| Source surface | Source evidence (Tentacle commit above) | Normalized identity |
-|---|---|---|
-| CephFS client metrics | `src/mds/MetricAggregator.cc:164` | `mds_filesystem_key` |
-| librbd ImageCtx | `src/librbd/ImageCtx.cc:198` | `librbd_image_key` |
-| librbd persistent write log | `src/librbd/cache/pwl/AbstractWriteLog.cc:105-240,621` | `librbd_pwl_key` |
-| ObjectCacher | `src/osdc/ObjectCacher.cc:725-751` | `objectcacher_key` |
-| Objecter address group | `src/osdc/Objecter.cc` | `objecter_address` |
-| RocksDB BinnedLRU cache | `src/kv/rocksdb_cache/BinnedLRUCache.{cc,h}` | `rocksdb_cache_key` |
-| Finisher | `src/common/Finisher.cc:29-38` | `finisher_key` |
-| Throttle | `src/common/Throttle.cc:56-72` | `throttle_key` |
-| arbitrary KernelDevice name | `src/blk/kernel/KernelDevice.cc:101-110` | `kernel_device_key` |
-| mClock shard | `src/osd/scheduler/mClockScheduler.cc:100-113` | `mclock_shard` |
-| AsyncMessenger worker | `src/msg/async/Stack.h:261-291` | `messenger_worker` |
-| RDMA worker | `src/msg/async/rdma/RDMAStack.cc:664-681` | `rdma_worker` |
-| DPDK queue and port | `src/msg/async/dpdk/DPDK.cc:628-675`; `src/msg/async/dpdk/DPDK.h:817-835` | `dpdk_queue`, `dpdk_port` |
-| configured service identity | `src/common/ceph_context.cc:979-987` | `service_unique_id` |
+The normalized identity classes include CephFS clients, RBD images and persistent write logs, objecter addresses, cache and
+device names, finishers, throttles, scheduler shards, messenger/RDMA workers, DPDK queues/ports, and configured service IDs.
+Finite source registries such as mempools and fixed in-tree logger names remain directly curated; broad relabeling would risk
+capturing unrelated families.
 
-Three finite source surfaces do **not** use broad relabeling:
+Raw RGW source-zone aliases are a special duplicate surface. The profile drops only the source-proven raw suffix grammar and
+retains the stable normalized families. Unknown suffixes are not silently classified as known duplicates.
 
-- Mempool names are the in-tree enum expanded to `_bytes` and `_items` at `src/common/ceph_context.cc:953-975`; all 60
-  resulting families are curated directly.
-- SimpleRADOSStriper accepts a logger name, but the shipped call site fixes it to `libcephsqlite_striper` at
-  `src/libcephsqlite.cc:129`; its eight families are curated directly from `src/SimpleRADOSStriper.cc:68-78`.
-- PriorityCache accepts constructor names, but the three target releases have only the `prioritycache` and
-  `bluestore-pricache` in-tree manager call sites (`src/mon/OSDMonitor.cc:1034` and
-  `src/os/bluestore/BlueStore.cc:5491`). Those finite families remain directly curated. A generic suffix relabel would
-  incorrectly capture unrelated names such as `mempool_ec_extent_cache_bytes`.
+## Release and producer semantics
 
-## Release and endpoint contracts
-
-- One profile covers Reef, Squid, and Tentacle MGR and ceph-exporter endpoints plus the official NVMe-oF gateway.
-- Ceph 19 and Ceph 20 scrub families remain separate causal branches because their contracts differ materially.
-- Daemon long-running-average `_sum` values are cumulative. MGR declares them as counters while ceph-exporter declares the
-  same daemon-schema sums as gauges; the profile deliberately uses incremental semantics on both wire variants.
-- Priority-0 daemon counters and optional ceph-exporter process metrics are in scope.
-- CephFS/MDS, CephFS Mirror, RBD, RBD Mirror, RGW multisite/topic/cache and dmClock scheduling, SMB, RDMA,
-  DPDK, RocksDB BinnedLRU, external block devices, Ceph client I/O, and NVMe-oF remain in scope even when absent from the
-  lab deployments.
-- The official NVMe-oF gateway uses `prometheus-client` 0.19.0. Its exporter explicitly unregisters Python GC, so the profile
-  curates the remaining process runtime and does not fabricate GC families.
-- The NVMe-oF producer's `ceph_nvmeof_subsystem_listener_iface_speed_bytes` suffix is misleading. The implementation reads
-  `/sys/class/net/<device>/speed` and exports that integer without conversion, so the profile presents the actual `Mbps`
-  source unit rather than inventing bytes per second.
-- Untyped fallback is limited to the 24 exact official MGR families observed in these releases; it is not a broad `ceph_*`
+- MGR and ceph-exporter can expose the same daemon schema with different Prometheus wire types. Long-running-average sums are
+  cumulative in source and therefore remain incremental in both variants.
+- Release-specific scrub and optional-daemon surfaces remain distinct causal branches where their contracts differ.
+- NVMe-oF process/platform metrics are part of the gateway surface; Python GC is not fabricated because that producer
+  unregisters it.
+- The NVMe-oF listener speed family has a misleading bytes suffix. Its implementation reads the kernel interface speed value,
+  so the chart uses the source's Mbps meaning.
+- Untyped fallback is restricted to exact official MGR families whose source lifecycle is known; it is not a namespace-wide
   type guess.
 
 ## Population and unit rules
 
-- **Source lifecycle owns the algorithm.** Registration type, Prometheus wire type, suffix, HELP text, and one scrape are
-  supporting evidence; the initialization, every update callsite, reset, and destruction path establish whether the raw value
-  is a current population, cumulative work, or a snapshot total.
-- Source-cumulative work and long-running-average sums use incremental algorithms so the Agent performs rate calculation and
-  reset detection. The profile never pre-differentiates or implements reset logic.
-- Source-current state, capacity, queue depth, inventory, last-seen timestamps, and instantaneous resource values use absolute
-  algorithms, even when Ceph registers the source as a counter.
-- Source update behavior overrides misleading wire types: CephFS `last_synced_bytes` is declared as a counter but set to the
-  last sync's size; BinnedLRU activity and client operations are declared as gauges but source-cumulative. Their chart
-  algorithms follow those update sites.
-- Same-unit families share a chart only when they answer one causal question for one owner and measure the same population.
-- Operation counts do not share an axis with bytes or objects produced by those operations.
-- `_count` and `_sum` pairs retain separate unit algebra.
-- Client `mdsqsum`, `readsqsum`, and `writesqsum` are cumulative Welford sum-of-squares values in nanoseconds squared. They use
-  incremental semantics and a `1e6` divisor, producing `microseconds²/s` as exact, portable floating-point dimensions. The
-  chosen scale fits the profile's Go `int` divisor on supported 32-bit Agent builds.
+- Source lifecycle owns the algorithm. Registration type, wire type, suffix, HELP text, and one scrape are supporting
+  evidence; initialization, updates, resets, and destruction determine whether a value is current state, cumulative work, or
+  a snapshot.
+- Cumulative work uses incremental algorithms. Current state, capacity, inventory, queue depth, and instantaneous resources
+  use absolute algorithms even when Ceph registers them as counters.
+- Gauge-as-cumulative and counter-as-current exceptions remain intentional when update callsites prove those lifecycles.
+- Same-unit families share a chart only when they answer one causal question for one owner and population.
+- Operation counts do not share an axis with bytes or objects produced by those operations. Histogram/count/sum roles retain
+  their distinct unit algebra.
+- Client Welford sum-of-squares values are cumulative nanoseconds squared. They use incremental semantics and a portable
+  conversion to `microseconds²/s`; the Agent performs rate calculation and reset handling.
 
-## Source-lifecycle audit evidence
+## Exclusion semantics
 
-The complete chart inventory was audited against the bounded source revisions above. Representative same-class proofs show why
-wire type alone cannot determine the Netdata algorithm or unit:
-
-| Population | Registration and update evidence | Profile result |
-|---|---|---|
-| BlueFS zero-filled reads | Reef `src/os/bluestore/BlueFS.cc:402-404,839,851,905,916` registers and increments the totals; Squid and Tentacle preserve that lifecycle. | incremental `reads/s` |
-| BlueStore OMAP iterators | Reef `src/os/bluestore/BlueStore.cc:4445,4455,5294`; Squid `:5518,5528,6456`; Tentacle `:6519` register a counter but increment on iterator construction and decrement on destruction. | absolute current `iterators` |
-| BlueStore GC merged bytes | Reef `src/os/bluestore/BlueStore.cc:5288,16359`; Squid `:6450,17347`; Tentacle `:6513,17598` add each merged extent length. | incremental `bytes/s` |
-| MDS expired inodes | Reef `src/mds/MDSRank.cc:3512` registers the value and `src/mds/MDCache.cc:7088` increments it; Squid and Tentacle preserve that cumulative lifecycle. | incremental `inodes/s` |
-| MDS large journal events | Squid `src/mds/MDLog.cc:87,441`; Tentacle `:88,535` register and increment one event per enlargement. | incremental `events/s` |
-| RDMA worker state | Reef `src/msg/async/rdma/RDMAStack.cc:47-50,68,254,292,311,340,354,584,602,634,648` sets, increments, and decrements active QPs, inflight sends, polling state, and receive buffers as current populations. | absolute exact state units |
-| Ceph client sum of squares | Reef `src/client/Client.cc:634-640,771-783,791-802,810-821` reads the prior Welford accumulator and stores the updated cumulative nanoseconds² total. | incremental `microseconds²/s`, divisor `1e6` |
-
-The same audit covered every multi-dimensional chart and every source/type mismatch across cluster, pool, BlueFS/BlueStore,
-CephFS/MDS, OSD/recovery/scrubbing, messenger/RDMA/DPDK, RGW, Objecter, RBD/PWL, shared runtime, and NVMe-oF families. The
-catalog regression locks critical counter-as-current, gauge-as-cumulative, snapshot-total, and unit-conversion cases.
-
-## Binding exclusions
-
-- Raw `ceph_data_sync_from_<zone>_*` MGR aliases: ceph-exporter normalizes the same source metrics to the stable
-  `ceph_data_sync_from_zone_*` families (`src/exporter/DaemonMetricCollector.cc:467-470`). Profile relabeling excludes the
-  nine stable names from the alias block and drops only the source-proven raw suffix grammar to prevent duplicate
-  observations; the stable metrics remain charted and unknown suffixes remain forward-open.
-- `process_start_time_seconds`: raw NVMe-oF process-start epoch cannot be transformed into age. Process CPU, memory, and file
-  descriptors remain charted.
-- Five information families are rejected by the writer contract: three NVMe-oF metadata families, `python_info`, and
-  `ceph_osd_osd_pg_info`. Their labels and lost metadata questions remain recorded in the source ledger.
-- Address-bearing objecter families are **not excluded**. Profile relabeling moves the address into `objecter_address`, renames the
-  finite operation suffix to a stable canonical family, and the profile charts the result with complete identity.
-- No family is excluded because it overlaps the native Ceph collector or because of the meaning of an exported label.
+- Raw process-start epoch cannot be transformed into age, so it is excluded while CPU, memory, and file descriptors remain.
+- Writer-ineligible information families retain their lost metadata questions in the source inventory rather than being
+  presented as numeric state.
+- Duplicate aliases are excluded only when source proves the canonical family represents the same observation.
+- Address-bearing objecter families are not discarded: the profile extracts their address identity and charts the finite
+  operation branches.
+- No family is excluded merely because a native Ceph collector overlaps its subject.
 
 ## Forward compatibility
 
-- The source-complete fixture has zero generic fallback and zero unmatched series.
-- Exact known exclusions cover only source-proven duplicates or ineligible families.
-- Unknown future `ceph_*` families remain generically visible until source evidence can assign identity, unit, population,
-  ownership, and a curated destination.
-
-## Reconciliation ledger
-
-- `src/go/testdata/prometheus/profiles/ceph/SOURCE-INVENTORY.tsv` is the binding per-family and exact-selector semantic ledger.
-- It accounts for **1,794 source families** in 1,794 rows: **1,779 charted source-family routes**, **10 configured
-  exclusions**, and **5 writer-ineligible information families**.
-- The profile contains **547 authored charts** and **1,772 unique authored selectors**. The structural union materializes
-  **981 chart instances** and **2,937 dimensions**.
-- Every row records operator owner, entity identity, signal role, observation population, cross-family relationship, unit
-  algebra, label roles and optionality, availability gate, evidence limitation, disposition, destination, and source path.
-- Separate producer fixtures prove Reef/Squid/Tentacle MGR versus ceph-exporter contracts and the NVMe-oF registry without
-  pretending that their union is one realizable endpoint.
-- Unresolved source families and authored selectors: **0**.
+Exact exclusions and normalizations cover source-proven names or grammars only. Unknown future `ceph_*` families remain
+eligible for generic fallback until evidence can assign ownership, identity, population, units, and a curated destination.

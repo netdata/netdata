@@ -1,45 +1,39 @@
 <!-- markdownlint-disable MD013 MD043 -->
 
-# vLLM Ray profile evidence manifest
+# vLLM Ray profile evidence record
+
+## Responsibility
+
+This document records upstream provenance, fixture-construction boundaries, and evidence limitations. It does not own
+validator verdicts, counts, findings, file paths, or integrity facts; those are declared in `proof.yaml` and checked by the
+descriptor-backed replay tests.
 
 ## Supported source boundary
 
 - vLLM metric contract: `vllm-project/vllm @ dc818c198d3ff50a16f38eba567da006478239c8`.
 - Ray transport contract: `ray-project/ray @ 03491225d59a1ffde99c3628969ccf456be13efd` (Ray 2.48.0).
-- Primary evidence: vLLM registration paths listed in the native vLLM proof plus Ray
-  `src/ray/stats/metric_exporter.cc` and the Ray metrics-export contract at the pinned revisions.
-- Upstream vLLM documentation revision: `docs/design/metrics.md` and `docs/usage/metrics.md` at the pinned vLLM revision.
+- Primary contracts: the vLLM registration paths cited by the native profile evidence plus Ray
+  `src/ray/stats/metric_exporter.cc` and the Ray metrics-export implementation at the pinned revisions.
+- vLLM documentation contract: `docs/design/metrics.md` and `docs/usage/metrics.md` at the pinned revision.
 
-## Feature and configuration gates
+## Availability boundary
 
-- Ray adds `ReplicaId`, `WorkerId`, `SessionName`, `Version`, and `Component` transport labels to enabled vLLM families.
-- `RAY_EXPORT_COUNTER_AS_GAUGE=0` disables Ray 2.48's unsuffixed counter-as-gauge compatibility aliases. The default-enabled
-  aliases are exact duplicate observations and are excluded by `VALIDATION-JOB.yaml`.
-- Native vLLM feature and connector gates still determine which underlying families exist.
-- The Ray node endpoint may contain unrelated Ray system families; the validation job admits the complete `ray_vllm_*`
-  namespace rather than closing it to current names.
+- Ray adds replica, worker, session, version, and component labels to enabled vLLM families.
+- `RAY_EXPORT_COUNTER_AS_GAUGE` controls compatibility aliases for counters; the aliases represent the same observations as
+  canonical counter families.
+- Native vLLM capability and connector gates still determine the underlying family surface.
+- A Ray node endpoint may also expose unrelated Ray system families; this profile owns only the Ray-vLLM namespace.
 
-## Evidence classes and fixture provenance
+## Fixture provenance
 
-- `src/go/testdata/prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom` is a sanitized source-derived structural
-  union. No live Ray deployment was used or is claimed.
-- The fixture preserves Ray replica/worker identity and includes mutually optional vLLM features plus the source-proven alias
-  behavior with placeholder values.
-- `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv` binds every declared family/component to source, owner,
-  identity, population, unit algebra, availability gate, disposition, and authored destination.
-- `src/go/testdata/prometheus/profiles/vllm_ray/manifest.yaml` records the byte size and SHA-256 digest of every external
-  input; `proof.yaml` pins that manifest from the Netdata proof.
+- The committed fixture is a sanitized source-derived structural union. No live Ray deployment was used or claimed.
+- The fixture combines mutually optional vLLM capabilities and Ray alias behavior with synthetic, non-production identities
+  and values.
+- The external source inventory is the exact source-to-disposition ledger. The external manifest authenticates the inventory
+  and fixture; `proof.yaml` pins that manifest.
 
-## Reproduction and integrity
-
-- `VALIDATION-JOB.yaml` is the sanitized objective-validator input corresponding to the recommended metadata job policy.
-- `VALIDATION.md` explains the result and exact command.
-- `proof.yaml` records the authoritative expected facts and fingerprints every committed semantic and executable proof input.
-- The result requires zero generic fallback and zero unmatched series for the declared source union. Unknown future
-  `ray_vllm_*` families remain eligible for generic fallback.
-
-## Explicit limitations
+## Limitations
 
 - The structural union is not one realizable Ray endpoint.
-- Local runtime evidence covers native vLLM only; Ray-specific live enablement, values, cadence, and cardinality are unobserved.
-- Live-Agent behavior is validated separately during an authorized rollout and cannot replace source-completeness evidence.
+- Local runtime evidence covers native vLLM only; Ray-specific enablement, values, cadence, and cardinality remain unobserved.
+- Live-Agent validation is a separate authorized rollout check and cannot replace or narrow source-completeness evidence.

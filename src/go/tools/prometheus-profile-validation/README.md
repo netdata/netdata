@@ -41,18 +41,18 @@ git -C src/go/testdata fetch --depth=1 origin master
 git -C src/go/testdata switch --detach FETCH_HEAD
 ```
 
-The dedicated test replays every stock proof and fails when external evidence
-is unavailable:
+The dedicated replay compares every declared verdict, count, error/warning
+finding code, and source-complete inventory set. Required mode fails when
+external evidence is unavailable:
 
 ```text
 NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
-  ./internal/promprofilevalidation \
-  ./plugin/go.d/collector/prometheus/promprofiles
+  ./internal/promprofilevalidation -run TestStockProfileProofsReplay
 ```
 
 `go run ./tools/prometheus-profile-proof verify --repo-root ../..` verifies the
-discovered stock-proof descriptors and their complete local/external integrity
-chain.
+discovered stock-proof descriptors, strict source-inventory expectations, and
+the complete local/external integrity chain.
 
 Exit codes:
 

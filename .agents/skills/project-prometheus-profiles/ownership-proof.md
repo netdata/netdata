@@ -13,7 +13,8 @@ reasoning that flat metric exposition cannot express:
 - why each signal belongs at one place in the dashboard rather than another.
 
 Without this proof, an author can describe a good application model and then accidentally emit a profile organized by metric
-type, signal role, or unit. A completed checklist does not expose that contradiction. Selector-level traceability does.
+type, signal role, or unit. A completed checklist does not expose that contradiction. The exact source inventory and replay
+reconciliation do.
 
 ## Model the domain before sorting metrics
 
@@ -49,10 +50,10 @@ disappear from the operator model without explanation.
 ## Account for every writer-capable family
 
 For every in-scope source family the writer could retain before the proposed job
-policy removes it, make these facts explicit. Include source-defined optional
-families absent from the observed deployment. The layout may be a table,
-structured bullets, or another readable form; the evidence fields are mandatory,
-not the formatting.
+policy removes it, make these facts explicit in `SOURCE-INVENTORY.tsv`. Include
+source-defined optional families absent from the observed deployment. The exact
+ledger belongs there once; `OPERATOR-MODEL.md` states the reusable domain rules
+and MUST NOT copy the rows.
 
 - **Source family:** Exact family name and Prometheus type/shape.
 - **Owner:** Closest entity, capability/module, operation, stage, or deliberate service/runtime boundary that explains the
@@ -112,10 +113,12 @@ After authoring, run the objective validator in text or JSON mode. Its
 inherited instance identity, and remains in YAML source order.
 
 Reconcile the source-complete synthetic `authored_mapping` first so optional
-selectors are included. Then compare observed runtime evidence separately and
-preserve which selectors, labels, and feature gates were actually seen.
+selectors are included. The proof replay MUST compare its exact selector set
+with `SOURCE-INVENTORY.tsv`. Then compare observed runtime evidence separately
+and preserve which selectors, labels, and feature gates were actually seen.
 
-Compare every mapping entry with `OPERATOR-MODEL.md`:
+Compare every mapping entry with the exact source inventory and the reusable
+rules in `OPERATOR-MODEL.md`:
 
 1. Map every exact dimension selector back to its source-family ledger entry.
 2. Confirm the displayed family is owned by the entity, capability, operation, or stage recorded for that source evidence.
@@ -129,4 +132,5 @@ A contradiction requires one of two honest outcomes:
 - revise the proof with new source-backed reasoning and re-evaluate all affected families.
 
 Do not rationalize a metric-form taxonomy after authoring. Do not declare completion from checked boxes, a hand-written chart
-summary, or validator `PASS` alone. Completion requires selector-level agreement between the proof and the emitted mapping.
+summary, or validator `PASS` alone. Completion requires executable selector-level agreement between the source inventory and
+the emitted mapping.

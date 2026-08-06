@@ -24,42 +24,22 @@ const (
 )
 
 type Descriptor struct {
-	Version    int              `yaml:"version"`
-	Profile    Profile          `yaml:"profile"`
-	Proof      ProofDocuments   `yaml:"proof"`
-	External   ExternalEvidence `yaml:"external_evidence"`
-	Validation Validation       `yaml:"validation"`
-	Integrity  []FileIntegrity  `yaml:"integrity"`
-}
-
-type Profile struct {
-	Name string `yaml:"name"`
-	Path string `yaml:"path"`
-}
-
-type ProofDocuments struct {
-	Evidence          string `yaml:"evidence"`
-	OperatorModel     string `yaml:"operator_model"`
-	ValidationSummary string `yaml:"validation_summary"`
+	Version    int                     `yaml:"version"`
+	Profile    string                  `yaml:"profile"`
+	External   ExternalEvidence        `yaml:"external_evidence"`
+	Inventory  SourceInventoryExpected `yaml:"source_inventory"`
+	Validation Validation              `yaml:"validation"`
+	Integrity  Integrity               `yaml:"integrity"`
 }
 
 type ExternalEvidence struct {
-	Revision        string           `yaml:"revision"`
-	Manifest        ExternalManifest `yaml:"manifest"`
-	SourceInventory string           `yaml:"source_inventory"`
-	Fixture         string           `yaml:"fixture"`
-}
-
-type ExternalManifest struct {
-	Path   string `yaml:"path"`
-	SHA256 string `yaml:"sha256"`
-	Bytes  int64  `yaml:"bytes"`
+	Revision string     `yaml:"revision"`
+	Manifest FileDigest `yaml:"manifest"`
 }
 
 type Validation struct {
-	Job             string          `yaml:"job"`
-	MetadataExample MetadataExample `yaml:"metadata_example"`
-	Expected        ExpectedFacts   `yaml:"expected"`
+	MetadataExample MetadataExample  `yaml:"metadata_example"`
+	Cases           []ValidationCase `yaml:"cases"`
 }
 
 type MetadataExample struct {
@@ -68,31 +48,144 @@ type MetadataExample struct {
 	JobName       string `yaml:"job_name"`
 }
 
-type ExpectedFacts struct {
-	Verdict          string `yaml:"verdict"`
-	RawFamilies      int    `yaml:"raw_families"`
-	RawLogicalSeries int    `yaml:"raw_logical_series"`
-	WriterSeries     int    `yaml:"writer_series"`
-	SeriesScanned    int    `yaml:"series_scanned"`
-	SeriesAutogen    int    `yaml:"series_autogen"`
-	SeriesUnmatched  int    `yaml:"series_unmatched"`
-	AuthoredCharts   int    `yaml:"authored_charts"`
-	RuntimeCharts    int    `yaml:"runtime_charts"`
-	AutogenCharts    int    `yaml:"autogen_charts"`
-	ChartDimensions  int    `yaml:"chart_dimensions"`
-	PipelineExcluded int    `yaml:"pipeline_excluded"`
-	PipelineRenamed  int    `yaml:"pipeline_renamed"`
+type ValidationCase struct {
+	Name     string         `yaml:"name"`
+	Kind     string         `yaml:"kind"`
+	Fixture  string         `yaml:"fixture"`
+	Job      string         `yaml:"job"`
+	Expected ExpectedResult `yaml:"expected"`
+}
+
+type ExpectedResult struct {
+	Verdict  string         `yaml:"verdict"`
+	Counts   ExpectedCounts `yaml:"counts"`
+	Errors   map[string]int `yaml:"errors"`
+	Warnings map[string]int `yaml:"warnings"`
+}
+
+type ExpectedCounts struct {
+	RawFamilies         int `yaml:"raw_families"`
+	RawLogicalSeries    int `yaml:"raw_logical_series"`
+	WriterSeries        int `yaml:"writer_series"`
+	SeriesScanned       int `yaml:"series_scanned"`
+	SeriesAutogen       int `yaml:"series_autogen"`
+	SeriesUnmatched     int `yaml:"series_unmatched"`
+	AuthoredCharts      int `yaml:"authored_charts"`
+	RuntimeCharts       int `yaml:"runtime_charts"`
+	AutogenCharts       int `yaml:"autogen_charts"`
+	ChartDimensions     int `yaml:"chart_dimensions"`
+	PipelineExcluded    int `yaml:"pipeline_excluded"`
+	PipelineRenamed     int `yaml:"pipeline_renamed"`
+	DeadCharts          int `yaml:"dead_charts"`
+	DeadDimensions      int `yaml:"dead_dimensions"`
+	DimensionLosses     int `yaml:"dimension_losses"`
+	InstanceLosses      int `yaml:"instance_losses"`
+	Collisions          int `yaml:"collisions"`
+	ChartWireCollisions int `yaml:"chart_wire_collisions"`
+	ContextCollisions   int `yaml:"context_wire_collisions"`
+	DimensionCollisions int `yaml:"dimension_collisions"`
+}
+
+type SourceInventoryExpected struct {
+	Rows              int                  `yaml:"rows"`
+	SourceFamilies    int                  `yaml:"source_families"`
+	AuthoredSelectors int                  `yaml:"authored_selectors"`
+	Dispositions      InventoryDisposition `yaml:"dispositions"`
+}
+
+type InventoryDisposition struct {
+	Chart            int `yaml:"chart"`
+	JobExcluded      int `yaml:"job_excluded"`
+	WriterIneligible int `yaml:"writer_ineligible"`
+}
+
+type FileDigest struct {
+	SHA256 string `yaml:"sha256"`
+	Bytes  int64  `yaml:"bytes"`
+}
+
+type Integrity struct {
+	Evidence          FileDigest `yaml:"evidence"`
+	OperatorModel     FileDigest `yaml:"operator_model"`
+	ValidationJob     FileDigest `yaml:"validation_job"`
+	ValidationSummary FileDigest `yaml:"validation_summary"`
+	Profile           FileDigest `yaml:"profile"`
 }
 
 type FileIntegrity struct {
-	Path   string `yaml:"path"`
-	SHA256 string `yaml:"sha256"`
-	Bytes  int64  `yaml:"bytes"`
+	Role string
+	Path string
+	FileDigest
+}
+
+type integrityTarget struct {
+	role   string
+	path   string
+	digest *FileDigest
 }
 
 type Bundle struct {
 	Path       string
 	Descriptor Descriptor
+}
+
+func (b Bundle) ProofDirectory() string {
+	return filepath.ToSlash(filepath.Dir(filepath.FromSlash(b.Path)))
+}
+
+func (b Bundle) ProfilePath() string {
+	return StockProfileRoot + "/" + b.Descriptor.Profile + ".yaml"
+}
+
+func (b Bundle) EvidencePath() string {
+	return b.ProofDirectory() + "/EVIDENCE.md"
+}
+
+func (b Bundle) OperatorModelPath() string {
+	return b.ProofDirectory() + "/OPERATOR-MODEL.md"
+}
+
+func (b Bundle) ValidationJobPath() string {
+	return b.ProofDirectory() + "/VALIDATION-JOB.yaml"
+}
+
+func (b Bundle) ValidationSummaryPath() string {
+	return b.ProofDirectory() + "/VALIDATION.md"
+}
+
+func (b Bundle) ExternalRoot() string {
+	return "prometheus/profiles/" + b.Descriptor.External.Revision
+}
+
+func (b Bundle) ExternalManifestPath() string {
+	return b.ExternalRoot() + "/manifest.yaml"
+}
+
+func (b Bundle) SourceInventoryPath() string {
+	return b.ExternalRoot() + "/SOURCE-INVENTORY.tsv"
+}
+
+func (b Bundle) FixturePath(validationCase ValidationCase) string {
+	return b.ExternalRoot() + "/" + validationCase.Fixture
+}
+
+func (b Bundle) IntegrityEntries() []FileIntegrity {
+	targets := (&b).integrityTargets()
+	entries := make([]FileIntegrity, 0, len(targets))
+	for _, target := range targets {
+		entries = append(entries, FileIntegrity{Role: target.role, Path: target.path, FileDigest: *target.digest})
+	}
+	return entries
+}
+
+func (b *Bundle) integrityTargets() []integrityTarget {
+	return []integrityTarget{
+		{role: "evidence", path: b.EvidencePath(), digest: &b.Descriptor.Integrity.Evidence},
+		{role: "operator_model", path: b.OperatorModelPath(), digest: &b.Descriptor.Integrity.OperatorModel},
+		{role: "validation_job", path: b.ValidationJobPath(), digest: &b.Descriptor.Integrity.ValidationJob},
+		{role: "validation_summary", path: b.ValidationSummaryPath(), digest: &b.Descriptor.Integrity.ValidationSummary},
+		{role: "profile", path: b.ProfilePath(), digest: &b.Descriptor.Integrity.Profile},
+	}
 }
 
 func Discover(repoRoot string) ([]Bundle, error) {
@@ -118,22 +211,16 @@ func Discover(repoRoot string) ([]Bundle, error) {
 		return nil, errors.New("no Prometheus profile proof descriptors found")
 	}
 	slices.SortFunc(bundles, func(left, right Bundle) int {
-		return strings.Compare(left.Descriptor.Profile.Name, right.Descriptor.Profile.Name)
+		return strings.Compare(left.Descriptor.Profile, right.Descriptor.Profile)
 	})
 
 	seenNames := make(map[string]string, len(bundles))
-	seenProfiles := make(map[string]string, len(bundles))
 	for _, bundle := range bundles {
-		name := bundle.Descriptor.Profile.Name
+		name := bundle.Descriptor.Profile
 		if previous := seenNames[name]; previous != "" {
 			return nil, fmt.Errorf("duplicate profile name %q in %q and %q", name, previous, bundle.Path)
 		}
 		seenNames[name] = bundle.Path
-		profilePath := bundle.Descriptor.Profile.Path
-		if previous := seenProfiles[profilePath]; previous != "" {
-			return nil, fmt.Errorf("duplicate profile path %q in %q and %q", profilePath, previous, bundle.Path)
-		}
-		seenProfiles[profilePath] = bundle.Path
 	}
 	return bundles, nil
 }
@@ -170,88 +257,37 @@ func Load(repoRoot, path string) (Bundle, error) {
 
 func (b Bundle) validate() error {
 	descriptor := b.Descriptor
-	if descriptor.Version != 1 {
-		return fmt.Errorf("version: got %d, want 1", descriptor.Version)
+	if descriptor.Version != 2 {
+		return fmt.Errorf("version: got %d, want 2", descriptor.Version)
 	}
-	proofDirectory := filepath.ToSlash(filepath.Dir(b.Path))
+	proofDirectory := b.ProofDirectory()
 	if filepath.ToSlash(filepath.Dir(proofDirectory)) != ProofRoot {
 		return fmt.Errorf("descriptor path %q is not directly below %q", b.Path, ProofRoot)
 	}
 	if filepath.Base(b.Path) != DescriptorFilename {
 		return fmt.Errorf("descriptor path %q must end in %q", b.Path, DescriptorFilename)
 	}
-	if descriptor.Profile.Name == "" {
-		return errors.New("profile.name must not be empty")
+	if descriptor.Profile == "" {
+		return errors.New("profile must not be empty")
 	}
-	if descriptor.Profile.Name != filepath.Base(filepath.FromSlash(proofDirectory)) {
-		return fmt.Errorf("profile.name %q must match proof directory %q", descriptor.Profile.Name, proofDirectory)
+	if descriptor.Profile != filepath.Base(filepath.FromSlash(proofDirectory)) {
+		return fmt.Errorf("profile %q must match proof directory %q", descriptor.Profile, proofDirectory)
 	}
-
-	localPaths := []struct {
-		field string
-		path  string
-	}{
-		{"profile.path", descriptor.Profile.Path},
-		{"proof.evidence", descriptor.Proof.Evidence},
-		{"proof.operator_model", descriptor.Proof.OperatorModel},
-		{"proof.validation_summary", descriptor.Proof.ValidationSummary},
-		{"validation.job", descriptor.Validation.Job},
-	}
-	for _, candidate := range localPaths {
-		if err := validateRelativePath(candidate.field, candidate.path); err != nil {
+	for _, entry := range b.IntegrityEntries() {
+		if err := validateRelativePath(entry.Role+" path", entry.Path); err != nil {
 			return err
 		}
-	}
-	for _, candidate := range localPaths[1:] {
-		if filepath.ToSlash(filepath.Dir(filepath.FromSlash(candidate.path))) != proofDirectory {
-			return fmt.Errorf("%s %q must be in proof directory %q", candidate.field, candidate.path, proofDirectory)
-		}
-	}
-	for _, item := range []struct {
-		field string
-		got   string
-		want  string
-	}{
-		{"proof.evidence", descriptor.Proof.Evidence, proofDirectory + "/EVIDENCE.md"},
-		{"proof.operator_model", descriptor.Proof.OperatorModel, proofDirectory + "/OPERATOR-MODEL.md"},
-		{"proof.validation_summary", descriptor.Proof.ValidationSummary, proofDirectory + "/VALIDATION.md"},
-		{"validation.job", descriptor.Validation.Job, proofDirectory + "/VALIDATION-JOB.yaml"},
-	} {
-		if item.got != item.want {
-			return fmt.Errorf("%s %q must be %q", item.field, item.got, item.want)
-		}
-	}
-	if filepath.Base(filepath.FromSlash(descriptor.Profile.Path)) != descriptor.Profile.Name+".yaml" {
-		return fmt.Errorf("profile.path %q must name %q", descriptor.Profile.Path, descriptor.Profile.Name+".yaml")
-	}
-	if filepath.ToSlash(filepath.Dir(filepath.FromSlash(descriptor.Profile.Path))) != StockProfileRoot {
-		return fmt.Errorf("profile.path %q must be directly below %q", descriptor.Profile.Path, StockProfileRoot)
 	}
 
 	if descriptor.External.Revision == "" || strings.ContainsAny(descriptor.External.Revision, "/\\") {
 		return fmt.Errorf("external_evidence.revision %q must be one non-empty path segment", descriptor.External.Revision)
 	}
-	externalRoot := "prometheus/profiles/" + descriptor.External.Revision
-	if descriptor.External.Manifest.Path != externalRoot+"/manifest.yaml" {
-		return fmt.Errorf("external_evidence.manifest.path %q must be %q",
-			descriptor.External.Manifest.Path, externalRoot+"/manifest.yaml")
-	}
-	if descriptor.External.SourceInventory != externalRoot+"/SOURCE-INVENTORY.tsv" {
-		return fmt.Errorf("external_evidence.source_inventory %q must be %q",
-			descriptor.External.SourceInventory, externalRoot+"/SOURCE-INVENTORY.tsv")
-	}
-	if !strings.HasPrefix(descriptor.External.Fixture, externalRoot+"/fixtures/") ||
-		!strings.HasSuffix(descriptor.External.Fixture, ".prom") {
-		return fmt.Errorf("external_evidence.fixture %q must be a .prom file under %q",
-			descriptor.External.Fixture, externalRoot+"/fixtures")
-	}
 	for _, item := range []struct {
 		field string
 		path  string
 	}{
-		{"external_evidence.manifest.path", descriptor.External.Manifest.Path},
-		{"external_evidence.source_inventory", descriptor.External.SourceInventory},
-		{"external_evidence.fixture", descriptor.External.Fixture},
+		{"external manifest path", b.ExternalManifestPath()},
+		{"source inventory path", b.SourceInventoryPath()},
 	} {
 		if err := validateRelativePath(item.field, item.path); err != nil {
 			return err
@@ -260,72 +296,165 @@ func (b Bundle) validate() error {
 	if err := validateDigest("external_evidence.manifest", descriptor.External.Manifest.SHA256, descriptor.External.Manifest.Bytes); err != nil {
 		return err
 	}
+	if err := validateInventoryExpected(descriptor.Inventory); err != nil {
+		return err
+	}
 
 	metadata := descriptor.Validation.MetadataExample
 	if metadata.IntegrationID == "" || metadata.ExampleName == "" || metadata.JobName == "" {
 		return errors.New("validation.metadata_example fields must not be empty")
 	}
-	expected := descriptor.Validation.Expected
-	if expected.Verdict != "PASS" {
-		return fmt.Errorf("validation.expected.verdict %q must be PASS", expected.Verdict)
+	if len(descriptor.Validation.Cases) == 0 {
+		return errors.New("validation.cases must not be empty")
 	}
-	for _, item := range []struct {
-		field string
-		value int
-	}{
-		{"raw_families", expected.RawFamilies},
-		{"raw_logical_series", expected.RawLogicalSeries},
-		{"writer_series", expected.WriterSeries},
-		{"series_scanned", expected.SeriesScanned},
-		{"authored_charts", expected.AuthoredCharts},
-		{"runtime_charts", expected.RuntimeCharts},
-		{"chart_dimensions", expected.ChartDimensions},
-	} {
-		if item.value <= 0 {
-			return fmt.Errorf("validation.expected.%s must be positive", item.field)
+	seenCases := make(map[string]bool, len(descriptor.Validation.Cases))
+	sourceComplete := 0
+	for index, validationCase := range descriptor.Validation.Cases {
+		field := fmt.Sprintf("validation.cases[%d]", index)
+		if validationCase.Name == "" {
+			return fmt.Errorf("%s.name must not be empty", field)
+		}
+		if seenCases[validationCase.Name] {
+			return fmt.Errorf("duplicate validation case name %q", validationCase.Name)
+		}
+		seenCases[validationCase.Name] = true
+		switch validationCase.Kind {
+		case "source_complete":
+			sourceComplete++
+			if validationCase.Expected.Verdict != "PASS" {
+				return fmt.Errorf("%s source_complete case must expect PASS", field)
+			}
+		case "supplemental":
+		default:
+			return fmt.Errorf("%s.kind %q must be source_complete or supplemental", field, validationCase.Kind)
+		}
+		switch validationCase.Job {
+		case "validation", "none":
+		default:
+			return fmt.Errorf("%s.job %q must be validation or none", field, validationCase.Job)
+		}
+		if err := validateRelativePath(field+".fixture", validationCase.Fixture); err != nil {
+			return err
+		}
+		if !strings.HasPrefix(validationCase.Fixture, "fixtures/") || !strings.HasSuffix(validationCase.Fixture, ".prom") {
+			return fmt.Errorf("%s.fixture %q must be a fixtures/*.prom path", field, validationCase.Fixture)
+		}
+		if err := validateExpectedResult(field+".expected", validationCase.Expected); err != nil {
+			return err
 		}
 	}
-	for _, item := range []struct {
-		field string
-		value int
-	}{
-		{"series_autogen", expected.SeriesAutogen},
-		{"series_unmatched", expected.SeriesUnmatched},
-		{"autogen_charts", expected.AutogenCharts},
-		{"pipeline_excluded", expected.PipelineExcluded},
-		{"pipeline_renamed", expected.PipelineRenamed},
-	} {
-		if item.value < 0 {
-			return fmt.Errorf("validation.expected.%s must be non-negative", item.field)
-		}
+	if sourceComplete != 1 {
+		return fmt.Errorf("validation.cases must contain exactly one source_complete case, got %d", sourceComplete)
 	}
 
-	wantIntegrityPaths := make([]string, 0, len(localPaths))
-	for _, candidate := range localPaths {
-		wantIntegrityPaths = append(wantIntegrityPaths, candidate.path)
-	}
-	slices.Sort(wantIntegrityPaths)
-	gotIntegrityPaths := make([]string, 0, len(descriptor.Integrity))
-	seenIntegrity := make(map[string]bool, len(descriptor.Integrity))
-	for index, entry := range descriptor.Integrity {
-		if err := validateRelativePath(fmt.Sprintf("integrity[%d].path", index), entry.Path); err != nil {
+	for _, entry := range b.IntegrityEntries() {
+		if err := validateDigest("integrity."+entry.Role, entry.SHA256, entry.Bytes); err != nil {
 			return err
 		}
-		if seenIntegrity[entry.Path] {
-			return fmt.Errorf("duplicate integrity path %q", entry.Path)
-		}
-		seenIntegrity[entry.Path] = true
-		if err := validateDigest(fmt.Sprintf("integrity[%d]", index), entry.SHA256, entry.Bytes); err != nil {
-			return err
-		}
-		gotIntegrityPaths = append(gotIntegrityPaths, entry.Path)
 	}
-	if !slices.IsSorted(gotIntegrityPaths) {
-		return errors.New("integrity entries must be sorted by path")
+	return nil
+}
+
+func validateInventoryExpected(expected SourceInventoryExpected) error {
+	for _, item := range []struct {
+		field string
+		value int
+	}{
+		{"rows", expected.Rows},
+		{"source_families", expected.SourceFamilies},
+		{"authored_selectors", expected.AuthoredSelectors},
+		{"dispositions.chart", expected.Dispositions.Chart},
+	} {
+		if item.value <= 0 {
+			return fmt.Errorf("source_inventory.%s must be positive", item.field)
+		}
 	}
-	if !slices.Equal(gotIntegrityPaths, wantIntegrityPaths) {
-		return fmt.Errorf("integrity paths differ from descriptor inputs: got %v, want %v",
-			gotIntegrityPaths, wantIntegrityPaths)
+	for _, item := range []struct {
+		field string
+		value int
+	}{
+		{"dispositions.job_excluded", expected.Dispositions.JobExcluded},
+		{"dispositions.writer_ineligible", expected.Dispositions.WriterIneligible},
+	} {
+		if item.value < 0 {
+			return fmt.Errorf("source_inventory.%s must be non-negative", item.field)
+		}
+	}
+	if got := expected.Dispositions.Chart + expected.Dispositions.JobExcluded + expected.Dispositions.WriterIneligible; got != expected.Rows {
+		return fmt.Errorf("source_inventory disposition total %d differs from rows %d", got, expected.Rows)
+	}
+	if expected.SourceFamilies > expected.Rows {
+		return fmt.Errorf("source_inventory.source_families %d exceeds rows %d", expected.SourceFamilies, expected.Rows)
+	}
+	if expected.AuthoredSelectors > expected.Dispositions.Chart {
+		return fmt.Errorf("source_inventory.authored_selectors %d exceeds chart dispositions %d",
+			expected.AuthoredSelectors, expected.Dispositions.Chart)
+	}
+	return nil
+}
+
+func validateExpectedResult(field string, expected ExpectedResult) error {
+	if expected.Verdict != "PASS" && expected.Verdict != "FAIL" {
+		return fmt.Errorf("%s.verdict %q must be PASS or FAIL", field, expected.Verdict)
+	}
+	values := []struct {
+		name  string
+		value int
+	}{
+		{"raw_families", expected.Counts.RawFamilies},
+		{"raw_logical_series", expected.Counts.RawLogicalSeries},
+		{"writer_series", expected.Counts.WriterSeries},
+		{"series_scanned", expected.Counts.SeriesScanned},
+		{"series_autogen", expected.Counts.SeriesAutogen},
+		{"series_unmatched", expected.Counts.SeriesUnmatched},
+		{"authored_charts", expected.Counts.AuthoredCharts},
+		{"runtime_charts", expected.Counts.RuntimeCharts},
+		{"autogen_charts", expected.Counts.AutogenCharts},
+		{"chart_dimensions", expected.Counts.ChartDimensions},
+		{"pipeline_excluded", expected.Counts.PipelineExcluded},
+		{"pipeline_renamed", expected.Counts.PipelineRenamed},
+		{"dead_charts", expected.Counts.DeadCharts},
+		{"dead_dimensions", expected.Counts.DeadDimensions},
+		{"dimension_losses", expected.Counts.DimensionLosses},
+		{"instance_losses", expected.Counts.InstanceLosses},
+		{"collisions", expected.Counts.Collisions},
+		{"chart_wire_collisions", expected.Counts.ChartWireCollisions},
+		{"context_wire_collisions", expected.Counts.ContextCollisions},
+		{"dimension_collisions", expected.Counts.DimensionCollisions},
+	}
+	for _, item := range values {
+		if item.value < 0 {
+			return fmt.Errorf("%s.counts.%s must be non-negative", field, item.name)
+		}
+	}
+	if expected.Counts.RawFamilies == 0 || expected.Counts.AuthoredCharts == 0 {
+		return fmt.Errorf("%s counts must include positive raw_families and authored_charts", field)
+	}
+	if err := validateFindingCounts(field+".errors", expected.Errors); err != nil {
+		return err
+	}
+	if err := validateFindingCounts(field+".warnings", expected.Warnings); err != nil {
+		return err
+	}
+	if expected.Verdict == "PASS" && len(expected.Errors) != 0 {
+		return fmt.Errorf("%s PASS case must not expect errors", field)
+	}
+	if expected.Verdict == "FAIL" && len(expected.Errors) == 0 {
+		return fmt.Errorf("%s FAIL case must expect at least one error", field)
+	}
+	return nil
+}
+
+func validateFindingCounts(field string, findings map[string]int) error {
+	codes := make([]string, 0, len(findings))
+	for code := range findings {
+		codes = append(codes, code)
+	}
+	slices.Sort(codes)
+	for _, code := range codes {
+		if code == "" || findings[code] <= 0 {
+			return fmt.Errorf("%s must contain non-empty codes with positive counts", field)
+		}
 	}
 	return nil
 }

@@ -1,54 +1,367 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-version: 1
-profile:
-  name: ceph
-  path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml
-proof:
-  evidence: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/EVIDENCE.md
-  operator_model: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/OPERATOR-MODEL.md
-  validation_summary: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION.md
+version: 2
+profile: ceph
 external_evidence:
   revision: ceph
   manifest:
-    path: prometheus/profiles/ceph/manifest.yaml
     sha256: 21ae822743e9a23a49a882e365e71fe32b0810273e0f2123a44464573359702e
     bytes: 1704
-  source_inventory: prometheus/profiles/ceph/SOURCE-INVENTORY.tsv
-  fixture: prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom
+source_inventory:
+  rows: 1794
+  source_families: 1794
+  authored_selectors: 1772
+  dispositions:
+    chart: 1779
+    job_excluded: 10
+    writer_ineligible: 5
 validation:
-  job: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml
   metadata_example:
     integration_id: collector-go.d.plugin-prometheus-ceph
     example_name: Ceph MGR and ceph-exporter
     job_name: ceph-mgr
-  expected:
-    verdict: PASS
-    raw_families: 1794
-    raw_logical_series: 2952
-    writer_series: 2937
-    series_scanned: 2937
-    series_autogen: 0
-    series_unmatched: 0
-    authored_charts: 547
-    runtime_charts: 981
-    autogen_charts: 0
-    chart_dimensions: 2937
-    pipeline_excluded: 15
-    pipeline_renamed: 227
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/ceph_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 1794
+          raw_logical_series: 2952
+          writer_series: 2937
+          series_scanned: 2937
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 981
+          autogen_charts: 0
+          chart_dimensions: 2937
+          pipeline_excluded: 15
+          pipeline_renamed: 227
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          job_deny_review: 1
+          job_policy_exclusion_summary: 1
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 4
+          wildcard_instance_identity: 535
+    - name: reef-mgr
+      kind: supplemental
+      fixture: fixtures/ceph_reef_mgr_perf_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1723
+          raw_logical_series: 2873
+          writer_series: 2863
+          series_scanned: 2863
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 931
+          autogen_charts: 0
+          chart_dimensions: 2863
+          pipeline_excluded: 10
+          pipeline_renamed: 219
+          dead_charts: 40
+          dead_dimensions: 66
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 40
+          dead_dimension: 66
+          unproven_job_selector_deny: 1
+          unproven_relabel_name_rewrite: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 4
+          wildcard_instance_identity: 535
+    - name: reef-exporter
+      kind: supplemental
+      fixture: fixtures/ceph_reef_exporter_prio0_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1609
+          raw_logical_series: 2542
+          writer_series: 2541
+          series_scanned: 2541
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 785
+          autogen_charts: 0
+          chart_dimensions: 2541
+          pipeline_excluded: 1
+          pipeline_renamed: 219
+          dead_charts: 85
+          dead_dimensions: 171
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 85
+          dead_dimension: 171
+          unproven_job_selector_deny: 1
+          unproven_relabel_name_discard: 1
+          unproven_relabel_name_rewrite: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 4
+          wildcard_instance_identity: 535
+    - name: squid-mgr
+      kind: supplemental
+      fixture: fixtures/ceph_squid_mgr_perf_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1597
+          raw_logical_series: 2747
+          writer_series: 2737
+          series_scanned: 2737
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 886
+          autogen_charts: 0
+          chart_dimensions: 2737
+          pipeline_excluded: 10
+          pipeline_renamed: 219
+          dead_charts: 83
+          dead_dimensions: 192
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 83
+          dead_dimension: 192
+          unproven_job_selector_deny: 1
+          unproven_relabel_name_rewrite: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 4
+          wildcard_instance_identity: 535
+    - name: squid-exporter
+      kind: supplemental
+      fixture: fixtures/ceph_squid_exporter_prio0_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1483
+          raw_logical_series: 2416
+          writer_series: 2415
+          series_scanned: 2415
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 740
+          autogen_charts: 0
+          chart_dimensions: 2415
+          pipeline_excluded: 1
+          pipeline_renamed: 219
+          dead_charts: 128
+          dead_dimensions: 297
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 128
+          dead_dimension: 297
+          unproven_job_selector_deny: 1
+          unproven_relabel_name_discard: 1
+          unproven_relabel_name_rewrite: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 4
+          wildcard_instance_identity: 535
+    - name: tentacle-mgr
+      kind: supplemental
+      fixture: fixtures/ceph_tentacle_mgr_perf_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1628
+          raw_logical_series: 2778
+          writer_series: 2768
+          series_scanned: 2768
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 900
+          autogen_charts: 0
+          chart_dimensions: 2768
+          pipeline_excluded: 10
+          pipeline_renamed: 227
+          dead_charts: 70
+          dead_dimensions: 161
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 70
+          dead_dimension: 161
+          unproven_job_selector_deny: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 4
+          wildcard_instance_identity: 535
+    - name: tentacle-exporter
+      kind: supplemental
+      fixture: fixtures/ceph_tentacle_exporter_prio0_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1514
+          raw_logical_series: 2447
+          writer_series: 2446
+          series_scanned: 2446
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 754
+          autogen_charts: 0
+          chart_dimensions: 2446
+          pipeline_excluded: 1
+          pipeline_renamed: 227
+          dead_charts: 115
+          dead_dimensions: 266
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 115
+          dead_dimension: 266
+          unproven_job_selector_deny: 1
+          unproven_relabel_name_discard: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 4
+          wildcard_instance_identity: 535
+    - name: nvmeof
+      kind: supplemental
+      fixture: fixtures/ceph_nvmeof_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 29
+          raw_logical_series: 29
+          writer_series: 24
+          series_scanned: 24
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 21
+          autogen_charts: 0
+          chart_dimensions: 24
+          pipeline_excluded: 5
+          pipeline_renamed: 0
+          dead_charts: 528
+          dead_dimensions: 1748
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 528
+          dead_dimension: 1748
+          unproven_relabel_name_discard: 1
+          unproven_relabel_name_rewrite: 15
+        warnings:
+          job_deny_review: 1
+          job_policy_exclusion_summary: 1
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 4
+          wildcard_instance_identity: 535
+    - name: without-job-policy
+      kind: supplemental
+      fixture: fixtures/ceph_all_metrics.prom
+      job: none
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1794
+          raw_logical_series: 2952
+          writer_series: 0
+          series_scanned: 0
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 0
+          autogen_charts: 0
+          chart_dimensions: 0
+          pipeline_excluded: 0
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          collector_check: 1
+        warnings:
+          default_validation_job: 1
+          profile_relabel_discard_review: 1
 integrity:
-  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/EVIDENCE.md
-    sha256: bab5dee206c271c3f19792e95826662d69ce84976f1c6f61252c39287d6de5b3
-    bytes: 3960
-  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/OPERATOR-MODEL.md
-    sha256: 7f0fa38bc25d0987c5199023415df9cce5435ee561fbd65edbdbc9ef3f675148
-    bytes: 14666
-  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION-JOB.yaml
+  evidence:
+    sha256: 2fd4988edcaf40e004d4e258bf920faa2536c2004f1a07a536de33c70b053d66
+    bytes: 2647
+  operator_model:
+    sha256: ac0536b32654388f53f2f243d02f4d1c5640758c8245b2fa934310e14e17eff4
+    bytes: 7354
+  validation_job:
     sha256: 65a1cf890711853709e694c93815fc33451552390e9eda582d4b859207714226
     bytes: 1793
-  - path: src/go/plugin/go.d/collector/prometheus/profile-proofs/ceph/VALIDATION.md
-    sha256: 58c8bcd88f897ef7d04a6fccb988c612e2eeba4ec1a7012faa30a56dfe31b4cd
-    bytes: 6244
-  - path: src/go/plugin/go.d/config/go.d/prometheus.profiles/default/ceph.yaml
+  validation_summary:
+    sha256: e005eb3c69eba5027f8385bdd594b50f5bff5fd65df9b5b7693f6a127ad45733
+    bytes: 2192
+  profile:
     sha256: ecc55a22b0fd92d156170b6603257af873579b41e737bb1adbe08c0da672ac7d
     bytes: 469424

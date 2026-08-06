@@ -1,58 +1,31 @@
 <!-- markdownlint-disable MD013 MD043 -->
 
-# vLLM Ray Prometheus profile validation
+# vLLM Ray profile validation interpretation
 
-## Bounded source scope
+## Responsibility
 
-- vLLM: `vllm-project/vllm @ dc818c198d3ff50a16f38eba567da006478239c8`.
-- Ray transport: `ray-project/ray @ 03491225d59a1ffde99c3628969ccf456be13efd` (Ray 2.48.0).
-- The committed fixture is source-derived synthetic evidence, not a live Ray observation.
+This document explains how to interpret the declared validation cases. `proof.yaml` owns every fixture selection, job mode,
+expected verdict, count, and finding-code count. The common replay test owns execution and exact source-inventory
+reconciliation; this file intentionally repeats none of those machine facts.
 
-## Authoritative structural-union result
+## Source-complete case
 
-- `proof.yaml` is the authoritative machine-checked PASS verdict and complete objective count record.
-- The exclusion ledger dispositions are 36 job-excluded compatibility/duplicate routes and 2 writer-ineligible information
-  routes.
-- Generic fallback, unmatched series, dead charts/dimensions, materialization loss, and collisions: **0**.
-- `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv` maps all 142 exact authored selector routes; unresolved
-  families/selectors **0**.
+The source-complete fixture combines optional native vLLM capabilities with Ray transport labels and compatibility behavior.
+Its case tests the declared source boundary through the recommended job and profile; it does not claim that one Ray endpoint
+emits the complete union.
 
-## Alias contract
+Inventory reconciliation compares the exact raw-family and authored-selector sets. This distinguishes source coverage from
+the human decision to keep replica and worker labels as identity while treating bounded outcomes as dimensions.
 
-Ray 2.48 exports unsuffixed counter-as-gauge compatibility aliases by default; `RAY_EXPORT_COUNTER_AS_GAUGE=0` disables them.
-The recommended job denies the 33 aliases and the exact pre-canonical KV-offload exposition names recorded in
-`VALIDATION-JOB.yaml`, retaining canonical `_total` and load/store families. This loses only deprecated spellings, not distinct
-observations; unknown future names remain outside the exact deny list.
+## Job-policy case
 
-## Forward compatibility
+The no-job case makes duplicate-suppression behavior explicit. The recommended job removes source-known Ray counter-as-gauge
+compatibility aliases and pre-canonical KV-offload duplicates while retaining canonical observations. Unknown future
+Ray-vLLM families remain open to fallback. The executable case, not this prose, owns the resulting verdict, counts, and
+findings.
 
-- The source-complete fixture has zero generic fallback and zero unmatched series.
-- The explicit deny list defensively suppresses compatibility gauges and pre-canonical aliases when job policy does not.
-- Unknown future `ray_vllm_*` families remain generically visible until source evidence can assign identity, unit,
-  population, owner, and a curated destination.
+## Interpretation limits
 
-## Runtime evidence boundary
-
-The local service uses the native vLLM transport. Ray-specific runtime enablement is unobserved and is not claimed. The
-source-complete synthetic PASS proves the contract; live Ray evidence can be added when such an endpoint is available.
-
-## Reproducible artifacts
-
-- Profile: `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml`.
-- Fixture: `src/go/testdata/prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom`.
-- Job input: `src/go/plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml`.
-- Semantic proof: `OPERATOR-MODEL.md` and
-  `src/go/testdata/prometheus/profiles/vllm_ray/SOURCE-INVENTORY.tsv`.
-- Evidence provenance: `EVIDENCE.md`.
-- External evidence manifest: `src/go/testdata/prometheus/profiles/vllm_ray/manifest.yaml`.
-- Machine descriptor and integrity metadata: `proof.yaml`.
-
-From `src/go`, reproduce the authoritative result with:
-
-```sh
-go run ./tools/prometheus-profile-validation \
-  --profile plugin/go.d/config/go.d/prometheus.profiles/default/vllm_ray.yaml \
-  --dump testdata/prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom \
-  --job plugin/go.d/collector/prometheus/profile-proofs/vllm_ray/VALIDATION-JOB.yaml \
-  --output text
-```
+- Information gauges rejected by the writer retain their lost configuration questions in the semantic inventory.
+- The fixture proves a source-derived transport contract, not live Ray enablement or one deployment's cardinality.
+- A future authorized Ray rollout can add operational evidence without changing the pinned source-completeness boundary.
