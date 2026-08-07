@@ -222,6 +222,23 @@ func TestCollector_Check(t *testing.T) {
 				return collr, srv.Close
 			},
 		},
+		"success if endpoint exposes only a summary without quantiles": {
+			wantFail: false,
+			prepare: func() (collr *Collector, cleanup func()) {
+				srv := httptest.NewServer(http.HandlerFunc(
+					func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = w.Write([]byte(`
+# TYPE app_payload_bytes summary
+app_payload_bytes_sum 12.5
+app_payload_bytes_count 4
+`))
+					}))
+				collr = New()
+				collr.URL = srv.URL
+
+				return collr, srv.Close
+			},
+		},
 		"fail if the total num of metrics exceeds the limit": {
 			wantFail: true,
 			prepare: func() (collr *Collector, cleanup func()) {
@@ -390,6 +407,21 @@ test_latency_count 42
 				assert.InDelta(t, 0.5, value(t, fr, "test_latency", metrix.Labels{"quantile": "0.99"}), 1e-9)
 				assert.InDelta(t, 12.5, value(t, fr, "test_latency_sum", nil), 1e-9)
 				assert.InDelta(t, 42, value(t, fr, "test_latency_count", nil), 1e-9)
+			},
+		},
+		"summary without quantiles flattens to sum and count": {
+			prepare: New,
+			input: `
+# TYPE test_payload_bytes summary
+test_payload_bytes_sum{handler="/v1/items"} 12.5
+test_payload_bytes_count{handler="/v1/items"} 4
+`,
+			want: func(t *testing.T, fr metrix.Reader) {
+				labels := metrix.Labels{"handler": "/v1/items"}
+				assert.InDelta(t, 12.5, value(t, fr, "test_payload_bytes_sum", labels), 1e-9)
+				assert.InDelta(t, 4, value(t, fr, "test_payload_bytes_count", labels), 1e-9)
+				_, ok := fr.Value("test_payload_bytes", labels)
+				assert.False(t, ok, "a quantile-free summary must not fabricate a base quantile series")
 			},
 		},
 		"histogram flattens to buckets, sum and count": {

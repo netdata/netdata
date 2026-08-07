@@ -128,13 +128,14 @@ func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType, allowU
 }
 
 func toSummaryPoint(summary *prompkg.Summary) (metrix.SummaryPoint, bool) {
-	if summary == nil || len(summary.Quantiles()) == 0 {
+	if summary == nil || !summary.HasCountAndSum() {
 		return metrix.SummaryPoint{}, false
 	}
 	// A Prometheus summary leaves every quantile NaN for an empty observation window. Skip the
 	// whole summary so a chart is not created until it has a real value (consistent with the
-	// scalar NaN-skip); writing resumes once any quantile is observed.
-	if summary.IsNaN() {
+	// scalar NaN-skip); writing resumes once any quantile is observed. A summary without
+	// configured quantiles still carries valid count and sum values, so this check does not apply.
+	if summary.AllQuantilesNaN() {
 		return metrix.SummaryPoint{}, false
 	}
 	if !isFinite(summary.Count()) || !isFinite(summary.Sum()) || summary.Count() < 0 {
@@ -213,8 +214,11 @@ func toHistogramPoint(histogram *prompkg.Histogram) (metrix.HistogramPoint, bool
 }
 
 func summaryQuantiles(summary *prompkg.Summary) ([]float64, bool) {
-	if summary == nil || len(summary.Quantiles()) == 0 {
+	if summary == nil {
 		return nil, false
+	}
+	if len(summary.Quantiles()) == 0 {
+		return nil, true
 	}
 
 	qs := make([]float64, 0, len(summary.Quantiles()))

@@ -338,6 +338,11 @@ func TestResolveAutogenRouteRuleSemantics(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, test.want, ok)
 			assert.Equal(t, test.want, len(routes) > 0)
+			if test.want {
+				require.Len(t, routes, 1)
+				assert.Equal(t, program.AlgorithmAuto, routes[0].Algorithm)
+				assert.Equal(t, program.AlgorithmAuto, routes[0].Meta.Algorithm)
+			}
 		})
 	}
 }
@@ -349,10 +354,9 @@ func runTestBuildScalarAutogenRoute(t *testing.T) {
 		meta       metrix.SeriesMeta
 		wantID     string
 		wantDim    string
-		wantAlg    program.Algorithm
 		wantUnits  string
 	}{
-		"counter metric uses incremental algorithm and static dimension": {
+		"counter metric uses counter units and static dimension": {
 			metricName: "svc.requests_total",
 			labels: map[string]string{
 				"instance": "db1",
@@ -361,10 +365,9 @@ func runTestBuildScalarAutogenRoute(t *testing.T) {
 			meta:      metrix.SeriesMeta{Kind: metrix.MetricKindCounter},
 			wantID:    "svc.requests_total-instance=db1-job=mysql",
 			wantDim:   "requests_total",
-			wantAlg:   program.AlgorithmIncremental,
 			wantUnits: "events/s",
 		},
-		"gauge metric uses absolute algorithm": {
+		"gauge metric uses gauge units": {
 			metricName: "svc.temperature_celsius",
 			labels: map[string]string{
 				"instance": "db1",
@@ -372,7 +375,6 @@ func runTestBuildScalarAutogenRoute(t *testing.T) {
 			meta:      metrix.SeriesMeta{Kind: metrix.MetricKindGauge},
 			wantID:    "svc.temperature_celsius-instance=db1",
 			wantDim:   "temperature_celsius",
-			wantAlg:   program.AlgorithmAbsolute,
 			wantUnits: "celsius",
 		},
 	}
@@ -391,7 +393,6 @@ func runTestBuildScalarAutogenRoute(t *testing.T) {
 
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
-			assert.Equal(t, tc.wantAlg, route.algorithm)
 			assert.Equal(t, tc.wantUnits, route.units)
 			assert.True(t, route.staticDimension)
 		})
@@ -437,7 +438,6 @@ func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
 			assert.Equal(t, metrix.HistogramBucketLabel, route.dimensionKeyLabel)
-			assert.Equal(t, program.AlgorithmIncremental, route.algorithm)
 			assert.Equal(t, program.ChartTypeHeatmap, route.chartType)
 			assert.False(t, route.staticDimension)
 		})
@@ -452,7 +452,7 @@ func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 		wantDim    string
 		wantUnits  string
 	}{
-		"summary quantile excludes quantile label and keeps absolute algorithm": {
+		"summary quantile excludes quantile label": {
 			metricName: "svc.request_duration_seconds",
 			labels: map[string]string{
 				"instance": "db1",
@@ -486,7 +486,6 @@ func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 			assert.Equal(t, tc.wantDim, route.dimensionName)
 			assert.Equal(t, tc.wantUnits, route.units)
 			assert.Equal(t, metrix.SummaryQuantileLabel, route.dimensionKeyLabel)
-			assert.Equal(t, program.AlgorithmAbsolute, route.algorithm)
 			assert.False(t, route.staticDimension)
 		})
 	}
@@ -532,7 +531,6 @@ func runTestBuildStateSetAutogenRoute(t *testing.T) {
 			assert.Equal(t, tc.wantDim, route.dimensionName)
 			assert.Equal(t, "service_status", route.dimensionKeyLabel)
 			assert.Equal(t, "state", route.units)
-			assert.Equal(t, program.AlgorithmAbsolute, route.algorithm)
 			assert.False(t, route.staticDimension)
 		})
 	}
@@ -546,10 +544,9 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 		wantOK     bool
 		wantID     string
 		wantDim    string
-		wantAlg    program.Algorithm
 		wantUnits  string
 	}{
-		"MeasureSet gauge uses synthetic field label and absolute algorithm": {
+		"MeasureSet gauge uses synthetic field label and gauge units": {
 			metricName: "service_latency_seconds_value",
 			labels: map[string]string{
 				"instance":                  "db1",
@@ -563,10 +560,9 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			wantOK:    true,
 			wantID:    "service_latency_seconds-instance=db1",
 			wantDim:   "value",
-			wantAlg:   program.AlgorithmAbsolute,
 			wantUnits: "seconds",
 		},
-		"MeasureSet counter uses synthetic field label and incremental algorithm": {
+		"MeasureSet counter uses synthetic field label and counter units": {
 			metricName: "svc_requests_total_ok",
 			labels: map[string]string{
 				"instance":                  "db1",
@@ -580,7 +576,6 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			wantOK:    true,
 			wantID:    "svc_requests_total-instance=db1",
 			wantDim:   "ok",
-			wantAlg:   program.AlgorithmIncremental,
 			wantUnits: "requests/s",
 		},
 		"MeasureSet ignores unrelated matching labels and uses reserved field label": {
@@ -598,7 +593,6 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			wantOK:    true,
 			wantID:    "svc_requests_total-instance=db1-svc_requests=total_ok",
 			wantDim:   "ok",
-			wantAlg:   program.AlgorithmIncremental,
 			wantUnits: "requests/s",
 		},
 		"MeasureSet without reserved field label does not route": {
@@ -652,7 +646,6 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
-			assert.Equal(t, tc.wantAlg, route.algorithm)
 			assert.Equal(t, tc.wantUnits, route.units)
 			assert.Equal(t, metrix.MeasureSetFieldLabel, route.dimensionKeyLabel)
 			assert.False(t, route.staticDimension)

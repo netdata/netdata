@@ -907,6 +907,11 @@
 - Docs: Fix Windows cmdline matching to include command-line arguments ([#23335](https://github.com/netdata/netdata/issues/23335))
 - Explicitly trigger daemon-reload in RPM packages when needed. ([#23300](https://github.com/netdata/netdata/issues/23300))
 - Fix: update time format to use int64_t for consistency in logging ([#23397](https://github.com/netdata/netdata/issues/23397))
+- Feat(go.d/prometheus): add profile-owned metric relabeling ([#23405](https://github.com/netdata/netdata/issues/23405))
+- Regenerate integrations docs ([#23407](https://github.com/netdata/netdata/issues/23407))
+- Sanitize kickstart.sh arguments that might be evaulated in privileged contexts. ([#23223](https://github.com/netdata/netdata/issues/23223))
+- Feat(go.d/prometheus): add profile-owned fallback types ([#23410](https://github.com/netdata/netdata/issues/23410))
+- Regenerate integrations docs ([#23411](https://github.com/netdata/netdata/issues/23411))
 
 ## [2.10.0] - 2026-04-09
 

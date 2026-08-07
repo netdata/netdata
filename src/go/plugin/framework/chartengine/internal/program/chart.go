@@ -11,6 +11,8 @@ import (
 type Algorithm string
 
 const (
+	// AlgorithmAuto defers the default until runtime series kind is available.
+	AlgorithmAuto Algorithm = ""
 	// AlgorithmAbsolute sends direct values.
 	AlgorithmAbsolute Algorithm = "absolute"
 	// AlgorithmIncremental sends monotonic totals (Netdata computes rates/deltas).
@@ -41,7 +43,8 @@ type Chart struct {
 	Dimensions []Dimension
 }
 
-// ChartMeta carries user-facing chart metadata after normalization/defaulting.
+// ChartMeta carries normalized chart metadata. Algorithm records the configured
+// chart policy; AlgorithmAuto means dimensions use their runtime series kinds.
 type ChartMeta struct {
 	Title     string
 	Family    string
@@ -82,7 +85,9 @@ func validateChart(chart Chart) error {
 	if chart.Meta.Units == "" {
 		errs = append(errs, fmt.Errorf("units is required"))
 	}
-	if chart.Meta.Algorithm != AlgorithmAbsolute && chart.Meta.Algorithm != AlgorithmIncremental {
+	if chart.Meta.Algorithm != AlgorithmAuto &&
+		chart.Meta.Algorithm != AlgorithmAbsolute &&
+		chart.Meta.Algorithm != AlgorithmIncremental {
 		errs = append(errs, fmt.Errorf("invalid algorithm %q", chart.Meta.Algorithm))
 	}
 	switch chart.Meta.Type {

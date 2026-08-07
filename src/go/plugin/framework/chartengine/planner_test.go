@@ -485,6 +485,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanAutogenUsesMetricMetadataForHistogram":               {run: runTestBuildPlanAutogenUsesMetricMetadataForHistogram},
 		"BuildPlanAutogenUsesMetricFloatMetadataForScalar":             {run: runTestBuildPlanAutogenUsesMetricFloatMetadataForScalar},
 		"BuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles": {run: runTestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles},
+		"BuildPlanAutogenUsesMetricMetadataForSummaryQuantile":         {run: runTestBuildPlanAutogenUsesMetricMetadataForSummaryQuantile},
 		"BuildPlanTemplatePrecedenceOverAutogen":                       {run: runTestBuildPlanTemplatePrecedenceOverAutogen},
 		"BuildPlanAutogenStrictOverflowDrop":                           {run: runTestBuildPlanAutogenStrictOverflowDrop},
 		"BuildPlanAutogenUsesFlattenMetadataForHistogramBuckets":       {run: runTestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets},
@@ -1631,6 +1632,50 @@ groups:
 	assert.Equal(t, "ms/s", sum.Meta.Units)
 }
 
+func runTestBuildPlanAutogenUsesMetricMetadataForSummaryQuantile(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	s := store.Write().SnapshotMeter("svc").Summary(
+		"query_duration_ms",
+		metrix.WithSummaryQuantiles(0.5),
+		metrix.WithUnit("ms"),
+	)
+
+	cc.BeginCycle()
+	s.ObservePoint(metrix.SummaryPoint{
+		Count:     4,
+		Sum:       8,
+		Quantiles: []metrix.QuantilePoint{{Quantile: 0.5, Value: 1.5}},
+	})
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	quantiles := findCreateChartActionByID(plan, "svc.query_duration_ms")
+	require.NotNil(t, quantiles)
+	assert.Equal(t, "ms", quantiles.Meta.Units)
+	assert.Equal(t, program.AlgorithmAuto, quantiles.Meta.Algorithm)
+
+	for _, action := range plan.Actions {
+		dim, ok := action.(CreateDimensionAction)
+		if ok && dim.ChartID == "svc.query_duration_ms" {
+			assert.Equal(t, program.AlgorithmAbsolute, dim.Algorithm)
+			return
+		}
+	}
+	t.Fatal("summary quantile dimension was not created")
+}
+
 func runTestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
 	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
@@ -1904,7 +1949,7 @@ groups:
 	assert.Equal(t, "svc.queue_depth-queue=main", create.ChartID)
 	assert.Equal(t, "svc.queue_depth", create.Meta.Context)
 	assert.Equal(t, "depth", create.Meta.Units)
-	assert.Equal(t, program.AlgorithmAbsolute, create.Meta.Algorithm)
+	assert.Equal(t, program.AlgorithmAuto, create.Meta.Algorithm)
 
 	update := findUpdateAction(plan)
 	require.NotNil(t, update)

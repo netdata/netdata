@@ -63,6 +63,110 @@ app_latency_count 10
 				assert.InDelta(t, 10, value(t, fr, "app_latency_count", nil), 1e-9)
 			},
 		},
+		"summary without quantiles writes sum and count": {
+			exposition: `
+# TYPE app_payload_bytes summary
+app_payload_bytes_sum{route="/v1/items"} 12.5
+app_payload_bytes_count{route="/v1/items"} 4
+app_payload_bytes_sum{route="/v2/items"} 7.5
+app_payload_bytes_count{route="/v2/items"} 2
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 2, written)
+				for _, expected := range []struct {
+					route string
+					sum   float64
+					count float64
+				}{
+					{route: "/v1/items", sum: 12.5, count: 4},
+					{route: "/v2/items", sum: 7.5, count: 2},
+				} {
+					labels := metrix.Labels{"route": expected.route}
+					assert.InDelta(t, expected.sum, value(t, fr, "app_payload_bytes_sum", labels), 1e-9)
+					assert.InDelta(t, expected.count, value(t, fr, "app_payload_bytes_count", labels), 1e-9)
+					_, ok := fr.Value("app_payload_bytes", labels)
+					assert.False(t, ok, "a quantile-free summary must not fabricate a base quantile series")
+				}
+			},
+		},
+		"summary without quantiles writes a zero-observation point": {
+			exposition: `
+# TYPE app_payload_bytes summary
+app_payload_bytes_sum 0
+app_payload_bytes_count 0
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 1, written)
+				assert.InDelta(t, 0, value(t, fr, "app_payload_bytes_sum", nil), 1e-9)
+				assert.InDelta(t, 0, value(t, fr, "app_payload_bytes_count", nil), 1e-9)
+			},
+		},
+		"summary without count is skipped": {
+			exposition: `
+# TYPE app_payload_bytes summary
+app_payload_bytes_sum 0
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 0, written, "a missing count must not be fabricated as zero")
+				_, ok := fr.Value("app_payload_bytes_sum", nil)
+				assert.False(t, ok)
+			},
+		},
+		"summary without sum is skipped": {
+			exposition: `
+# TYPE app_payload_bytes summary
+app_payload_bytes_count 0
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 0, written, "a missing sum must not be fabricated as zero")
+				_, ok := fr.Value("app_payload_bytes_count", nil)
+				assert.False(t, ok)
+			},
+		},
+		"summary with quantiles but without count is skipped": {
+			exposition: `
+# TYPE app_latency summary
+app_latency{quantile="0.5"} 0.25
+app_latency_sum 0.25
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 0, written, "a partial summary must not fabricate count")
+				_, ok := fr.Value("app_latency", metrix.Labels{"quantile": "0.5"})
+				assert.False(t, ok)
+			},
+		},
+		"summary with quantiles but without sum is skipped": {
+			exposition: `
+# TYPE app_latency summary
+app_latency{quantile="0.5"} 0.25
+app_latency_count 1
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 0, written, "a partial summary must not fabricate sum")
+				_, ok := fr.Value("app_latency", metrix.Labels{"quantile": "0.5"})
+				assert.False(t, ok)
+			},
+		},
+		"summary without quantiles with negative count is skipped": {
+			exposition: `
+# TYPE app_payload_bytes summary
+app_payload_bytes_sum 0
+app_payload_bytes_count -1
+`,
+			assert: func(t *testing.T, _ metrix.Reader, written int) {
+				assert.Equal(t, 0, written)
+			},
+		},
+		"summary without quantiles with infinite sum is skipped": {
+			exposition: `
+# TYPE app_payload_bytes summary
+app_payload_bytes_sum +Inf
+app_payload_bytes_count 1
+`,
+			assert: func(t *testing.T, _ metrix.Reader, written int) {
+				assert.Equal(t, 0, written)
+			},
+		},
 		"summary with all-NaN quantiles (empty window) is skipped": {
 			exposition: `
 # TYPE app_latency summary
@@ -454,6 +558,17 @@ app_a{x="2"} 2
 app_b_info{v="x"} 1
 `)
 		assert.Equal(t, 2, w.countWritable(mfs))
+	})
+
+	t.Run("countWritable accepts a summary without quantiles", func(t *testing.T) {
+		store := metrix.NewCollectorStore()
+		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
+		mfs := scrape(t, `
+# TYPE app_payload_bytes summary
+app_payload_bytes_sum 12.5
+app_payload_bytes_count 4
+`)
+		assert.Equal(t, 1, w.countWritable(mfs))
 	})
 
 	t.Run("metric type drift skips the family after the type changes", func(t *testing.T) {

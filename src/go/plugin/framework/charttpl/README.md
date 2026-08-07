@@ -24,8 +24,9 @@ Each collector has a single `charts.yaml` file that describes all its charts.
 When a collector runs, the chart engine:
 
 1. Reads the collector's `charts.yaml` file.
-2. Compiles it into an immutable program (validates, resolves defaults, infers algorithms).
-3. On each collection cycle, matches incoming metrics against dimension selectors.
+2. Compiles it into an immutable program (validates and resolves static defaults).
+3. On each collection cycle, matches incoming metrics against dimension selectors and resolves omitted algorithms from
+   runtime metric kinds.
 4. Creates chart instances dynamically based on instance identity labels.
 5. Updates dimension values every cycle; removes stale instances based on lifecycle policy.
 
@@ -40,13 +41,13 @@ When a collector runs, the chart engine:
               └──────────┬──────────┘
                          v
               ┌─────────────────────┐
-              │  Compile (engine)   │  selector parsing, algorithm inference,
+              │  Compile (engine)   │  selector parsing, static defaults,
               │                     │  context/family/ID composition
               └──────────┬──────────┘
                          v
               ┌─────────────────────┐
-              │  Runtime (per cycle)│  match series → create/update/remove
-              │                     │  charts and dimensions
+              │  Runtime (per cycle)│  match series → resolve algorithms →
+              │                     │  create/update/remove charts and dimensions
               └─────────────────────┘
 ```
 
@@ -551,7 +552,7 @@ charts:
 | `family`          | string        | no       |                        | Optional chart-level family leaf, appended to the group family.              |
 | `context`         | string        | **yes**  |                        | Chart context leaf. Combined with context namespaces.                        |
 | `units`           | string        | **yes**  |                        | Chart units (e.g., `queries/s`, `bytes`, `percentage`).                      |
-| `algorithm`       | string        | no       | inferred from metrics  | `absolute` or `incremental`. If omitted, inferred from metric suffixes.      |
+| `algorithm`       | string        | no       | runtime metric kind    | `absolute` or `incremental`. If omitted, resolved per dimension from the matched series kind. |
 | `aggregation`     | string        | no       | `sum`                  | Reducer applied to every dimension in the chart.                             |
 | `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`. Histogram bucket charts are forced to `heatmap`. |
 | `priority`        | int           | no       | `70000`                | Chart ordering priority in the dashboard (`0` = use engine default `70000`). |
@@ -565,12 +566,9 @@ ID. Promoted labels are non-identity metadata. When their effective intersection
 existing chart with a complete replacement label set; it does not recreate the chart or its dimensions.
 
 > [!TIP]
-> When `algorithm` is omitted, the engine infers it from metric name suffixes. You only need to set it explicitly when the suffix doesn't match the intended behavior (e.g., a gauge metric named `*_total`).
-
-| Suffix                                    | Inferred algorithm |
-|-------------------------------------------|--------------------|
-| `*_total`, `*_count`, `*_sum`, `*_bucket` | `incremental`      |
-| Everything else                           | `absolute`         |
+> Omit `algorithm` for the normal case. The engine uses `incremental` for a matched runtime counter and `absolute` for a
+> gauge or any other kind, regardless of the metric name. Set it explicitly only when every dimension in the chart must
+> intentionally override its runtime kind.
 
 Histogram `_bucket` dimensions receive non-overlapping range bucket totals from
 `metrix.ReadFlatten()`. The `le` label remains the bucket upper bound, but the
@@ -578,7 +576,15 @@ value is no longer cumulative with earlier buckets. Histogram bucket dimensions
 are named by the bare `le` value and ordered numerically, with `+Inf` last.
 
 > [!WARNING]
-> If a chart's dimensions mix counter-like metrics (e.g., `requests_total`) with gauge-like metrics (e.g., `temperature`) and `algorithm` is omitted, the engine fails with a compile error: _"algorithm inference is ambiguous for mixed metric kinds; set algorithm explicitly"_. Set `algorithm` on the chart to resolve this.
+> Different runtime kinds may share a chart when they render as distinct dimensions. If several series collapse into the
+> same rendered dimension, omit `algorithm` only when those series have the same runtime kind. Otherwise set an explicit
+> chart algorithm so the aggregated dimension has one intentional wire interpretation. Chartengine does not diagnose a
+> violation at runtime; authoring validation and real-path tests must reject it rather than depend on first-observed
+> metadata.
+
+The runtime kind of a live metric identity must remain stable while its dimension is materialized. Changing the kind does
+not redefine an existing Netdata dimension; its creation-time wire algorithm remains until the dimension expires and is
+recreated.
 
 **Example: MySQL queries — incremental counters displayed as rates**
 
@@ -1119,15 +1125,16 @@ All rules below produce semantic validation errors unless noted:
 | Every autogen rule selector requires at least one non-empty valid `allow`/`deny` entry  | semantic                        |
 | Unknown YAML fields                                                                     | decode error (strict unmarshal) |
 
-## Compiler-Derived Behavior
+## Engine-Derived Behavior
 
 > [!NOTE]
-> These behaviors are applied by `chartengine` during compilation, not by the template parser. You don't need to configure them — they happen automatically, but knowing about them helps you write simpler templates.
+> These behaviors are applied by `chartengine` during compilation or runtime planning, not by the template parser. You
+> don't need to configure them, but knowing about them helps you write simpler templates.
 
 | Input                                   | Derived behavior                                                                         |
 |-----------------------------------------|------------------------------------------------------------------------------------------|
 | Missing `chart.id`                      | `id` derived from `context` (`.` replaced with `_`).                                     |
-| Missing `chart.algorithm`               | Inferred from metric suffixes (`*_total`, `*_count`, `*_sum`, `*_bucket` = incremental). |
+| Missing `chart.algorithm`               | Resolved per rendered dimension from runtime series kind: counter = `incremental`; every other kind = `absolute`. |
 | `chart.priority = 0`                    | Treated as `70000` (engine default).                                                     |
 | Group family hierarchy + `chart.family` | Composed into `/`-separated chart family.                                                |
 | `options.multiplier = 0`                | Treated as `1`.                                                                          |
