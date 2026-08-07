@@ -2,6 +2,7 @@
 
 #include "rrd.h"
 #include "rrdfunctions-internals.h"
+#include "sqlite/sqlite_aclk_node.h"
 
 // ----------------------------------------------------------------------------
 // Regression test for GHSA-6628-vxm3-4g8g.
@@ -397,6 +398,208 @@ int rrdfunctions_manifest_unittest(void) {
         dictionary_destroy(empty);
         dictionary_destroy(c1);
         dictionary_destroy(c2);
+    }
+
+    fprintf(stderr, "%s() %s (%d error%s)\n\n",
+            __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
+
+    return errors;
+}
+
+// ----------------------------------------------------------------------------
+// The node-manifest pacer (MANIFEST_PACER in sqlite_aclk_node.h).
+//
+// aclk_check_node_info_collectors_and_manifest() publishes at most
+// MAX_NODE_MANIFESTS_PER_SCAN manifests per pass, and picks WHICH due hosts get those slots by
+// oldest deadline rather than by position in rrdhost_root_index. Both halves matter and neither is
+// observable from the message stream: the budget keeps a fleet-wide arm (every ACLK reconnect) from
+// publishing an entire parent's hosts in one second, and the earliest-deadline-first cutoff is what
+// stops hosts late in the index from being starved forever by hosts ahead of them that keep
+// re-arming - with B slots per pass and a W second window, plain index order can only ever reach
+// the first B*W hosts.
+//
+// This pins the pacer directly, because the scan it lives in needs a live fleet and an ACLK
+// connection to exercise.
+int rrdfunctions_manifest_pacer_unittest(void) {
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    int errors = 0;
+
+    // 1. The deferred set keeps the OLDEST deadlines, and the cutoff is the newest of those - so
+    //    "deadline <= cutoff" admits exactly the set that was tracked, and nothing newer.
+    {
+        int before = errors;
+        MANIFEST_PACER p = { 0 };
+        manifest_pacer_begin(&p);
+
+        // more entries than the pacer can track, deliberately out of order
+        for(size_t i = 0; i < MAX_NODE_MANIFESTS_PER_SCAN * 3; i++) {
+            // 0, 59, 1, 58, 2, 57 ... interleaves ascending and descending
+            time_t d = (i % 2) ? (time_t)(MAX_NODE_MANIFESTS_PER_SCAN * 3 - i) : (time_t)(i + 1);
+            manifest_pacer_defer(&p, d);
+        }
+
+        if(p.deferred != MAX_NODE_MANIFESTS_PER_SCAN) {
+            fprintf(stderr, "  FAILED pacer: tracked %zu deadlines, expected %d\n",
+                    p.deferred, MAX_NODE_MANIFESTS_PER_SCAN);
+            errors++;
+        }
+
+        for(size_t i = 1; i < p.deferred; i++) {
+            if(p.deadlines[i - 1] > p.deadlines[i]) {
+                fprintf(stderr, "  FAILED pacer: deferred deadlines are not sorted oldest first\n");
+                errors++;
+                break;
+            }
+        }
+
+        manifest_pacer_end(&p);
+        if(p.cutoff != p.deadlines[MAX_NODE_MANIFESTS_PER_SCAN - 1]) {
+            fprintf(stderr, "  FAILED pacer: cutoff is not the newest of the tracked oldest set\n");
+            errors++;
+        }
+
+        // the tracked set must be the globally oldest ones seen, not the first ones seen
+        for(size_t i = 0; i < p.deferred; i++) {
+            if(p.deadlines[i] > (time_t)MAX_NODE_MANIFESTS_PER_SCAN) {
+                fprintf(stderr, "  FAILED pacer: a newer deadline displaced an older one\n");
+                errors++;
+                break;
+            }
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK pacer: deferred set keeps the oldest deadlines, cutoff derived from them\n");
+    }
+
+    // 2. A pass that leaves nothing waiting must clear the cutoff. Without this an old cutoff would
+    //    outlive the backlog that produced it and keep excluding hosts that are legitimately due.
+    {
+        int before = errors;
+        MANIFEST_PACER p = { 0 };
+
+        manifest_pacer_begin(&p);
+        manifest_pacer_defer(&p, 100);
+        manifest_pacer_end(&p);
+        if(p.cutoff != 100) {
+            fprintf(stderr, "  FAILED pacer: cutoff not carried from a pass that deferred work\n");
+            errors++;
+        }
+
+        manifest_pacer_begin(&p);   // nothing deferred this pass
+        manifest_pacer_end(&p);
+        if(p.cutoff != 0) {
+            fprintf(stderr, "  FAILED pacer: cutoff not cleared after a pass with nothing waiting\n");
+            errors++;
+        }
+        if(!manifest_pacer_admit(&p, 999999)) {
+            fprintf(stderr, "  FAILED pacer: a cleared cutoff must admit any deadline\n");
+            errors++;
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK pacer: cutoff clears when a pass leaves nothing waiting\n");
+    }
+
+    // 3. The budget caps a pass, and only actual publishes are charged - a claimed-but-suppressed
+    //    manifest must not consume a slot belonging to the hosts behind it.
+    {
+        int before = errors;
+        MANIFEST_PACER p = { 0 };
+        manifest_pacer_begin(&p);
+
+        for(int i = 0; i < MAX_NODE_MANIFESTS_PER_SCAN; i++) {
+            if(!manifest_pacer_admit(&p, 100)) {
+                fprintf(stderr, "  FAILED pacer: budget exhausted after %d of %d publishes\n",
+                        i, MAX_NODE_MANIFESTS_PER_SCAN);
+                errors++;
+                break;
+            }
+            manifest_pacer_published(&p);
+        }
+
+        if(manifest_pacer_admit(&p, 100)) {
+            fprintf(stderr, "  FAILED pacer: budget did not cap the pass\n");
+            errors++;
+        }
+
+        manifest_pacer_begin(&p);
+        for(int i = 0; i < MAX_NODE_MANIFESTS_PER_SCAN * 5; i++)
+            (void)manifest_pacer_admit(&p, 100);   // admitted and claimed, but every one suppressed
+        if(!manifest_pacer_admit(&p, 100)) {
+            fprintf(stderr, "  FAILED pacer: suppressed manifests consumed the send budget\n");
+            errors++;
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK pacer: budget caps a pass and charges only real publishes\n");
+    }
+
+    // 4. Liveness: a host late in the index with an OLD deadline must be served promptly even when
+    //    the hosts ahead of it are permanently oversubscribed. This is the case plain index order
+    //    cannot serve at all: 1200 hot hosts each needing service once per window is ~40 hosts/pass
+    //    of demand against a budget of 20, so an index-ordered scan never reaches index 1200+.
+    {
+        int before = errors;
+        const size_t hot = 1200, cold = 100, hosts = hot + cold;
+
+        time_t *deadline = mallocz(hosts * sizeof(time_t));
+        bool *published = callocz(hosts, sizeof(bool));
+
+        // the cold tail is armed strictly earlier, so oldest-first must reach it before any hot host
+        for(size_t i = 0; i < hot; i++) deadline[i] = 5;
+        for(size_t i = hot; i < hosts; i++) deadline[i] = 1;
+
+        MANIFEST_PACER p = { 0 };
+        size_t cold_published = 0, passes = 0;
+        const size_t max_passes = 20;
+
+        for(time_t now = 36; cold_published < cold && passes < max_passes; now++, passes++) {
+            manifest_pacer_begin(&p);
+            size_t published_this_pass = 0;
+
+            for(size_t i = 0; i < hosts; i++) {
+                if(!deadline[i] || nd_time_t_add_compare(deadline[i], NODE_MANIFEST_WINDOW_S, now) >= 0)
+                    continue;   // unarmed or still inside the coalescing window
+
+                if(manifest_pacer_admit(&p, deadline[i])) {
+                    if(!published[i]) {
+                        published[i] = true;
+                        if(i >= hot) cold_published++;
+                    }
+                    manifest_pacer_published(&p);
+                    published_this_pass++;
+                    // a hot host re-arms immediately, refreshing its deadline to now
+                    deadline[i] = (i < hot) ? now : 0;
+                }
+                else
+                    manifest_pacer_defer(&p, deadline[i]);
+            }
+
+            manifest_pacer_end(&p);
+
+            if(published_this_pass > MAX_NODE_MANIFESTS_PER_SCAN) {
+                fprintf(stderr, "  FAILED pacer: %zu manifests in one pass, budget is %d\n",
+                        published_this_pass, MAX_NODE_MANIFESTS_PER_SCAN);
+                errors++;
+                break;
+            }
+        }
+
+        if(cold_published != cold) {
+            fprintf(stderr,
+                    "  FAILED pacer: only %zu of %zu starved hosts served in %zu passes"
+                    " - the oldest deadline is not winning\n",
+                    cold_published, cold, passes);
+            errors++;
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK pacer: oldest-deadline hosts served in %zu passes despite %zu"
+                            " oversubscribed hosts ahead of them\n", passes, hot);
+
+        freez(deadline);
+        freez(published);
     }
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
