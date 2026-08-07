@@ -1,0 +1,2 @@
+name: vllm-ray
+expected_prefix: ray_vllm_

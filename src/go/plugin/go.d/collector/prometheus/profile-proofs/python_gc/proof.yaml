@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 3
+profile: python_gc
+source_inventory:
+  rows: 3
+  source_families: 3
+  authored_selectors: 3
+  dispositions:
+    chart: 3
+    profile_excluded: 0
+    job_excluded: 0
+    writer_ineligible: 0
+validation:
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/python_gc_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 3
+          raw_logical_series: 9
+          writer_series: 9
+          series_scanned: 9
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 3
+          runtime_charts: 3
+          autogen_charts: 0
+          chart_dimensions: 9
+          pipeline_excluded: 0
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          generic_profile_match: 1
+integrity:
+  evidence:
+    sha256: 79c06e5ef2e85a7d10378cca6d50d3522852b1c3661eb714c6e587ed5bc76ed0
+    bytes: 1264
+  operator_model:
+    sha256: 371da6cc5403ee107571e11336abd3ad7cf886304c84d8e78f99c7394b1c4c47
+    bytes: 1146
+  validation_job:
+    sha256: 92c78c622ebfee86bd78d8a7000bf2b7477822051134f5655b702732dd22b5c7
+    bytes: 31
+  validation_summary:
+    sha256: 7a0692f599add853500bc9f5aaf35d3d99e78407581edc69d7f07338ad9a4b34
+    bytes: 758
+  profile:
+    sha256: 19c27bbb8fd7375441623a92fffb619897f43513b2627ab03b269821d0e14f65
+    bytes: 1223

@@ -43,7 +43,9 @@ transforms one series in a few steps:
 4. **Write** -- `replace` writes the expanded `replacement` (with `regex` capture groups: `$1`, or `${name}`) into
    `target_label`; use `__name__` to rename the metric. `lowercase`/`uppercase`/`hashmod` also write `target_label`, but
    without `replacement` expansion. The keep/drop actions write nothing, and the label-name actions operate on label
-   names directly, never on `target_label` -- see [Actions](#actions).
+   names directly, never on `target_label`. A `labelmap` replacement that
+   expands to `__name__` is the exception: it copies the matching application
+   label's value into the metric name -- see [Actions](#actions).
 
 Two different matchers are at play -- don't confuse them: a block's `match` is a **glob** (simple pattern) over the
 metric name, while a rule's `regex` is an **anchored regular expression** over the joined label values.
@@ -157,11 +159,15 @@ Inside a block, `metric_relabel_configs` is a list of rules applied **in order**
 | `lowercase` | Set `target_label` to the lowercased joined input. See [example](#normalize-label-case).                                                                                                                |
 | `uppercase` | Set `target_label` to the uppercased joined input. See [example](#normalize-label-case).                                                                                                                |
 
-> **Differs from Prometheus.** The label-name actions `labelmap`, `labeldrop`, and `labelkeep` act on labels only --
-> they never touch the metric name (`__name__`). In Prometheus, `__name__` is visible to these three actions; a ported
-> rule that relied on that (a `labelkeep` whose regex omits `__name__`, a blanket `labeldrop`, a `labelmap` over the
-> metric name) silently leaves the metric name untouched in Netdata. To rename a metric, use a `replace` rule with
-> `target_label: __name__`.
+> **Differs from Prometheus.** The label-name actions never process the metric
+> name (`__name__`) as an input label. A ported `labelkeep` whose regex omits
+> `__name__`, a blanket `labeldrop`, or a `labelmap` over the metric name
+> therefore leaves the metric name untouched in Netdata. However, `labelmap`
+> ignores `source_labels` and can still write the metric name when its
+> replacement expands to `__name__`; the new name is the value of the matching
+> application label. Prefer an explicit `replace` rule with
+> `source_labels: [__name__]` and `target_label: __name__` for deliberate
+> metric renaming.
 
 ## How relabeling runs
 

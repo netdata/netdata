@@ -26,6 +26,7 @@ type metricFamilyWriterPolicy struct {
 	maxTSPerMetric        int
 	isFallbackTypeGauge   matcher.Matcher
 	isFallbackTypeCounter matcher.Matcher
+	observePipeline       PipelineDiagnosticObserver
 }
 
 type metricFamilyWriter struct {
@@ -133,8 +134,8 @@ func (w *metricFamilyWriter) countWritableWithFallback(mfs prompkg.MetricFamilie
 			continue
 		}
 
-		schema, ok := deriveMetricFamilySchema(mf, typ, allowFallback)
-		if !ok {
+		schema, reason := deriveMetricFamilySchema(mf, typ, allowFallback)
+		if reason != "" {
 			continue
 		}
 
@@ -161,17 +162,41 @@ func (w *metricFamilyWriter) writeMetricFamiliesWithFallback(mfs prompkg.MetricF
 
 	written := 0
 	for _, mf := range mfs {
-		if w.skipMetricFamily(mf) {
+		if reason := w.metricFamilySkipReason(mf); reason != "" {
+			if w.policy.observePipeline != nil {
+				w.observePipeline(PipelineDiagnostic{
+					Decision:            PipelineWriterFamilyRejected,
+					Reason:              reason,
+					MetricName:          mf.Name(),
+					RejectedSeriesCount: len(mf.Metrics()),
+				})
+			}
 			continue
 		}
 
 		typ, ok := w.resolveFamilyType(mf, allowFallback)
 		if !ok {
+			if w.policy.observePipeline != nil {
+				w.observePipeline(PipelineDiagnostic{
+					Decision:            PipelineWriterFamilyRejected,
+					Reason:              PipelineReasonUnsupportedType,
+					MetricName:          mf.Name(),
+					RejectedSeriesCount: len(mf.Metrics()),
+				})
+			}
 			continue
 		}
 
-		handle, ok := w.ensureHandle(mf, typ, allowFallback)
-		if !ok {
+		handle, reason := w.ensureHandle(mf, typ, allowFallback)
+		if reason != "" {
+			if w.policy.observePipeline != nil {
+				w.observePipeline(PipelineDiagnostic{
+					Decision:            PipelineWriterFamilyRejected,
+					Reason:              reason,
+					MetricName:          mf.Name(),
+					RejectedSeriesCount: len(mf.Metrics()),
+				})
+			}
 			continue
 		}
 
@@ -181,9 +206,35 @@ func (w *metricFamilyWriter) writeMetricFamiliesWithFallback(mfs prompkg.MetricF
 		// re-adopt the new schema after metrix evicts the descriptor. Partial drift (some canonical
 		// series still write) does refresh, keeping the live family.
 		for _, metric := range mf.Metrics() {
-			if w.observeMetric(handle, metric, allowFallback) {
+			var valueIdentity PipelineValueIdentity
+			scalarValue := false
+			if w.policy.observePipeline != nil {
+				if value, ok := metricScalarRawValue(metric, typ, allowFallback); ok {
+					valueIdentity = pipelineScalarValueIdentity(value)
+					scalarValue = true
+				}
+			}
+			if reason := w.observeMetric(handle, metric, allowFallback); reason == "" {
 				written++
 				handle.staged = true
+				if w.policy.observePipeline != nil {
+					w.observePipeline(PipelineDiagnostic{
+						Decision:      PipelineWriterSeriesAccepted,
+						Destination:   prompkg.IdentifySeries(mf.Name(), metric.Labels(), ""),
+						ValueIdentity: valueIdentity,
+						ScalarValue:   scalarValue,
+						MetricName:    mf.Name(),
+					})
+				}
+			} else if w.policy.observePipeline != nil {
+				w.observePipeline(PipelineDiagnostic{
+					Decision:      PipelineWriterSeriesRejected,
+					Reason:        reason,
+					Destination:   prompkg.IdentifySeries(mf.Name(), metric.Labels(), ""),
+					ValueIdentity: valueIdentity,
+					ScalarValue:   scalarValue,
+					MetricName:    mf.Name(),
+				})
 			}
 		}
 	}
@@ -233,15 +284,19 @@ func (w *metricFamilyWriter) reconcileHandles() {
 }
 
 func (w *metricFamilyWriter) skipMetricFamily(mf *prompkg.MetricFamily) bool {
+	return w.metricFamilySkipReason(mf) != ""
+}
+
+func (w *metricFamilyWriter) metricFamilySkipReason(mf *prompkg.MetricFamily) PipelineReason {
 	if strings.HasSuffix(mf.Name(), "_info") {
-		return true
+		return PipelineReasonInfoFamily
 	}
 	if w.policy.maxTSPerMetric > 0 && len(mf.Metrics()) > w.policy.maxTSPerMetric {
 		w.Debugf("metric '%s' num of time series (%d) > limit (%d), skipping it",
 			mf.Name(), len(mf.Metrics()), w.policy.maxTSPerMetric)
-		return true
+		return PipelineReasonSeriesLimit
 	}
-	return false
+	return ""
 }
 
 func (w *metricFamilyWriter) bindFallbackTypes(batch *prompkg.SampleBatch, profiles []profileFallback) {
@@ -317,18 +372,18 @@ func (w *metricFamilyWriter) ensureHandle(
 	mf *prompkg.MetricFamily,
 	typ commonmodel.MetricType,
 	allowFallback bool,
-) (*metricFamilyHandle, bool) {
+) (*metricFamilyHandle, PipelineReason) {
 	if handle, ok := w.handles[mf.Name()]; ok {
 		if handle.typ != typ {
 			w.Debugf("skip metric family '%s': metric type drift (%s -> %s)", mf.Name(), handle.typ, typ)
-			return nil, false
+			return nil, PipelineReasonFamilyTypeDrift
 		}
-		return handle, true
+		return handle, ""
 	}
 
-	schema, ok := deriveMetricFamilySchema(mf, typ, allowFallback)
-	if !ok {
-		return nil, false
+	schema, reason := deriveMetricFamilySchema(mf, typ, allowFallback)
+	if reason != "" {
+		return nil, reason
 	}
 
 	opts := []metrix.InstrumentOption{
@@ -361,17 +416,23 @@ func (w *metricFamilyWriter) ensureHandle(
 	}
 
 	w.handles[mf.Name()] = handle
-	return handle, true
+	return handle, ""
 }
 
-func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric prompkg.Metric, allowFallback bool) bool {
-	schema, ok := deriveMetricSchema(metric, handle.typ, allowFallback)
-	if !ok {
-		return false
-	}
-	if !slices.Equal(handle.summaryQuantiles, schema.summaryQuantiles) || !slices.Equal(handle.histogramBounds, schema.histogramBounds) {
+func (w *metricFamilyWriter) observeMetric(
+	handle *metricFamilyHandle,
+	metric prompkg.Metric,
+	allowFallback bool,
+) PipelineReason {
+	if reason := metricSchemaRejectionReason(metric, handle.typ, metricFamilySchema{
+		summaryQuantiles: handle.summaryQuantiles,
+		histogramBounds:  handle.histogramBounds,
+	}, allowFallback); reason != "" {
+		if reason != PipelineReasonDistributionSchemaDrift {
+			return reason
+		}
 		w.Debugf("skip a series of metric '%s': distribution schema drift", handle.name)
-		return false
+		return reason
 	}
 
 	sig := w.seriesSig(metric)
@@ -380,46 +441,53 @@ func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric pr
 	case commonmodel.MetricTypeGauge:
 		value, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge, allowFallback)
 		if !ok {
-			return false
+			return PipelineReasonInvalidSeriesValue
 		}
 		inst := getOrCreateInstrument(handle.gauges, sig, w.cycle, func() metrix.SnapshotGauge {
 			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Gauge(handle.name, handle.opts...)
 		})
 		inst.Observe(value)
-		return true
+		return ""
 	case commonmodel.MetricTypeCounter:
 		value, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter, allowFallback)
 		if !ok {
-			return false
+			return PipelineReasonInvalidSeriesValue
 		}
 		inst := getOrCreateInstrument(handle.counters, sig, w.cycle, func() metrix.SnapshotCounter {
 			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Counter(handle.name, handle.opts...)
 		})
 		inst.ObserveTotal(value)
-		return true
+		return ""
 	case commonmodel.MetricTypeSummary:
 		point, ok := toSummaryPoint(metric.Summary())
 		if !ok {
-			return false
+			return PipelineReasonInvalidSeriesValue
 		}
 		inst := getOrCreateInstrument(handle.summaries, sig, w.cycle, func() metrix.SnapshotSummary {
 			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Summary(handle.name, handle.opts...)
 		})
 		inst.ObservePoint(point)
-		return true
+		return ""
 	case commonmodel.MetricTypeHistogram:
 		point, ok := toHistogramPoint(metric.Histogram())
 		if !ok {
-			return false
+			return PipelineReasonInvalidSeriesValue
 		}
 		inst := getOrCreateInstrument(handle.histograms, sig, w.cycle, func() metrix.SnapshotHistogram {
 			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Histogram(handle.name, handle.opts...)
 		})
 		inst.ObservePoint(point)
-		return true
+		return ""
 	default:
-		return false
+		return PipelineReasonUnsupportedType
 	}
+}
+
+func (w *metricFamilyWriter) observePipeline(fact PipelineDiagnostic) {
+	if w == nil || w.policy.observePipeline == nil {
+		return
+	}
+	w.policy.observePipeline(fact)
 }
 
 // getOrCreateInstrument returns the cached instrument handle for a series signature, creating and

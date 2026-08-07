@@ -181,14 +181,16 @@ type chartState struct {
 }
 
 type planBuildContext struct {
-	out         *Plan
-	reader      metrix.Reader
-	collectMeta metrix.CollectMeta
-	buildCycle  uint64
-	prog        *program.Program
-	cache       *routeCache
-	index       matchIndex
-	flat        metrix.Reader
+	out               *Plan
+	reader            metrix.Reader
+	collectMeta       metrix.CollectMeta
+	buildCycle        uint64
+	prog              *program.Program
+	cache             *routeCache
+	routeCacheEnabled bool
+	routeObserver     func(PlanRouteDiagnostic)
+	index             matchIndex
+	flat              metrix.Reader
 
 	seenInfer        map[string]struct{}
 	chartsByID       map[string]*chartState
@@ -283,17 +285,25 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	}
 	sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 
-	// Route-cache lifecycle follows metrix snapshot membership.
-	phaseStartedAt = time.Now()
-	retainStats := ctx.cache.RetainSeen(ctx.collectMeta.LastSuccessSeq)
-	sample.phaseRetainSeconds = time.Since(phaseStartedAt).Seconds()
-	sample.routeCacheEntries = retainStats.EntriesAfter
-	sample.routeCacheRetained = retainStats.EntriesAfter
-	sample.routeCachePruned = retainStats.Pruned
-	sample.routeCacheFullDrop = retainStats.FullDrop
+	// Route-cache lifecycle follows metrix snapshot membership. Diagnostic plans
+	// bypass it completely so repeated attempts retain complete route facts.
+	if ctx.routeCacheEnabled {
+		phaseStartedAt = time.Now()
+		retainStats := ctx.cache.RetainSeen(ctx.collectMeta.LastSuccessSeq)
+		sample.phaseRetainSeconds = time.Since(phaseStartedAt).Seconds()
+		sample.routeCacheEntries = retainStats.EntriesAfter
+		sample.routeCacheRetained = retainStats.EntriesAfter
+		sample.routeCachePruned = retainStats.Pruned
+		sample.routeCacheFullDrop = retainStats.FullDrop
+	}
 
 	phaseStartedAt = time.Now()
-	removeByCapDims, removeByCapCharts := enforceLifecycleCaps(ctx.collectMeta.LastSuccessSeq, ctx.chartsByID, ctx.materialized)
+	removeByCapDims, removeByCapCharts := enforceLifecycleCapsWithObserver(
+		ctx.collectMeta.LastSuccessSeq,
+		ctx.chartsByID,
+		ctx.materialized,
+		ctx.routeObserver,
+	)
 	sample.phaseLifecycleCapsSec = time.Since(phaseStartedAt).Seconds()
 	sample.lifecycleRemovedDimensionByCap = len(removeByCapDims)
 	sample.lifecycleRemovedChartByCap = len(removeByCapCharts)
@@ -420,20 +430,22 @@ func (e *Engine) preparePlanBuildContext(
 	chartsCap := max(e.state.hints.chartsByID, len(materialized.charts))
 	seenInferCap := e.state.hints.seenInfer
 	return &planBuildContext{
-		out:              out,
-		reader:           reader,
-		collectMeta:      collectMeta,
-		buildCycle:       buildCycle,
-		prog:             prog,
-		cache:            cache,
-		index:            index,
-		flat:             reader,
-		seenInfer:        make(map[string]struct{}, seenInferCap),
-		chartsByID:       make(map[string]*chartState, chartsCap),
-		chartOwners:      chartOwners,
-		dimCapHints:      dimCapHints,
-		materialized:     materialized,
-		materializedByID: materialized.charts,
+		out:               out,
+		reader:            reader,
+		collectMeta:       collectMeta,
+		buildCycle:        buildCycle,
+		prog:              prog,
+		cache:             cache,
+		routeCacheEnabled: e.state.cfg.routeObserver == nil,
+		routeObserver:     e.state.cfg.routeObserver,
+		index:             index,
+		flat:              reader,
+		seenInfer:         make(map[string]struct{}, seenInferCap),
+		chartsByID:        make(map[string]*chartState, chartsCap),
+		chartOwners:       chartOwners,
+		dimCapHints:       dimCapHints,
+		materialized:      materialized,
+		materializedByID:  materialized.charts,
 	}, nil
 }
 
@@ -462,20 +474,44 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
 			if trackStats {
 				ctx.seriesFilteredBySeq++
-				ctx.cache.MarkSeenIfPresent(identity, buildSeq)
+				if ctx.routeCacheEnabled {
+					ctx.cache.MarkSeenIfPresent(identity, buildSeq)
+				}
+				if ctx.routeObserver != nil {
+					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+						Decision:       PlanRouteSeriesFilteredBySequence,
+						SeriesIdentity: identity,
+						MetricName:     name,
+					})
+				}
 			}
 			return
 		}
 		if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
 			if trackStats {
 				ctx.seriesFilteredBySel++
-				ctx.cache.MarkSeenIfPresent(identity, buildSeq)
+				if ctx.routeCacheEnabled {
+					ctx.cache.MarkSeenIfPresent(identity, buildSeq)
+				}
+				if ctx.routeObserver != nil {
+					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+						Decision:       PlanRouteSeriesFilteredBySelector,
+						SeriesIdentity: identity,
+						MetricName:     name,
+					})
+				}
 			}
 			return
 		}
 
+		observer := ctx.routeObserver
+		if !trackStats {
+			observer = nil
+		}
 		routes, hit, err := e.resolveSeriesRoutes(
 			ctx.cache,
+			ctx.routeCacheEnabled,
+			observer,
 			identity,
 			name,
 			labels,
@@ -489,7 +525,7 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			firstErr = err
 			return
 		}
-		if trackStats {
+		if trackStats && ctx.routeCacheEnabled {
 			if hit {
 				e.addRouteCacheHit()
 				ctx.routeCacheHits++
@@ -499,7 +535,7 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			}
 		}
 		if len(routes) == 0 {
-			autoRoutes, ok, err := e.resolveAutogenRoute(ctx.reader, name, labels, meta)
+			autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
 			if err != nil {
 				firstErr = err
 				return
@@ -513,6 +549,20 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			} else {
 				if trackStats {
 					ctx.seriesUnmatched++
+					if ctx.routeObserver != nil {
+						ruleScope := ""
+						if ruleIndex >= 0 && ruleIndex < len(e.state.cfg.autogen.Rules) {
+							ruleScope = e.state.cfg.autogen.Rules[ruleIndex].Scope
+						}
+						ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+							Decision:         PlanRouteUnmatched,
+							Reason:           reason,
+							SeriesIdentity:   identity,
+							MetricName:       name,
+							AutogenRuleIndex: ruleIndex,
+							AutogenRuleScope: ruleScope,
+						})
+					}
 				}
 				return
 			}
@@ -532,7 +582,7 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 				}
 				continue
 			}
-			if err := ctx.accumulateRoute(ctx.index, route, identity, meta, labels, v); err != nil {
+			if err := ctx.accumulateRoute(ctx.index, route, identity, name, meta, labels, v); err != nil {
 				firstErr = err
 				return
 			}
@@ -558,6 +608,7 @@ func (ctx *planBuildContext) accumulateRoute(
 	index matchIndex,
 	route routeBinding,
 	identity metrix.SeriesIdentity,
+	metricName string,
 	seriesMeta metrix.SeriesMeta,
 	labels metrix.LabelView,
 	value metrix.SampleValue,
@@ -566,6 +617,7 @@ func (ctx *planBuildContext) accumulateRoute(
 	if exists && cs.templateID != route.ChartTemplateID {
 		if !route.Autogen && isAutogenTemplateID(cs.templateID) {
 			// Template wins over autogen on chart-id collision.
+			ctx.observeAutogenDisplacement(route, identity, metricName, cs.templateID)
 			ctx.chartOwners[route.ChartID] = route.ChartTemplateID
 			delete(ctx.chartsByID, route.ChartID)
 			cs = nil
@@ -573,6 +625,20 @@ func (ctx *planBuildContext) accumulateRoute(
 		} else {
 			// Cross-template rendered-id collision.
 			// Existing owner keeps chart-id ownership.
+			if ctx.routeObserver != nil {
+				ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+					Decision:                PlanRouteCollisionRejected,
+					SeriesIdentity:          identity,
+					MetricName:              metricName,
+					ChartTemplateID:         route.ChartTemplateID,
+					DimensionIndex:          route.DimensionIndex,
+					ChartID:                 route.ChartID,
+					DimensionName:           route.DimensionName,
+					DimensionKeyLabel:       route.DimensionKeyLabel,
+					ExistingChartTemplateID: cs.templateID,
+					Autogen:                 route.Autogen,
+				})
+			}
 			return nil
 		}
 	}
@@ -581,11 +647,26 @@ func (ctx *planBuildContext) accumulateRoute(
 		if ownerExists && ownerTemplateID != route.ChartTemplateID {
 			if !route.Autogen && isAutogenTemplateID(ownerTemplateID) {
 				// Template wins over autogen on chart-id collision.
+				ctx.observeAutogenDisplacement(route, identity, metricName, ownerTemplateID)
 				ctx.chartOwners[route.ChartID] = route.ChartTemplateID
 				delete(ctx.chartsByID, route.ChartID)
 			} else {
 				// Cross-template rendered-id collision.
 				// Existing owner keeps chart-id ownership.
+				if ctx.routeObserver != nil {
+					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+						Decision:                PlanRouteCollisionRejected,
+						SeriesIdentity:          identity,
+						MetricName:              metricName,
+						ChartTemplateID:         route.ChartTemplateID,
+						DimensionIndex:          route.DimensionIndex,
+						ChartID:                 route.ChartID,
+						DimensionName:           route.DimensionName,
+						DimensionKeyLabel:       route.DimensionKeyLabel,
+						ExistingChartTemplateID: ownerTemplateID,
+						Autogen:                 route.Autogen,
+					})
+				}
 				return nil
 			}
 		}
@@ -674,6 +755,19 @@ func (ctx *planBuildContext) accumulateRoute(
 				Name:            route.DimensionName,
 			})
 		}
+	}
+	if ctx.routeObserver != nil {
+		ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+			Decision:          PlanRouteAccepted,
+			SeriesIdentity:    identity,
+			MetricName:        metricName,
+			ChartTemplateID:   route.ChartTemplateID,
+			DimensionIndex:    route.DimensionIndex,
+			ChartID:           route.ChartID,
+			DimensionName:     route.DimensionName,
+			DimensionKeyLabel: route.DimensionKeyLabel,
+			Autogen:           route.Autogen,
+		})
 	}
 	return nil
 }

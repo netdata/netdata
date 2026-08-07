@@ -78,30 +78,40 @@ func (e *Engine) resolveAutogenRoute(
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 ) ([]routeBinding, bool, error) {
+	routes, ok, _, _, err := e.resolveAutogenRouteWithReason(reader, metricName, labels, meta)
+	return routes, ok, err
+}
+
+func (e *Engine) resolveAutogenRouteWithReason(
+	reader metrix.Reader,
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+) ([]routeBinding, bool, PlanRouteReason, int, error) {
 	if e == nil {
-		return nil, false, fmt.Errorf("chartengine: nil engine")
+		return nil, false, "", -1, fmt.Errorf("chartengine: nil engine")
 	}
 	policy := e.state.cfg.autogen
 	if !policy.Enabled {
-		return nil, false, nil
+		return nil, false, PlanRouteReasonAutogenDisabled, -1, nil
 	}
 
 	source, ok := resolveAutogenSource(metricName, labels, meta)
 	if !ok {
-		return nil, false, nil
+		return nil, false, PlanRouteReasonAutogenSourceUnsupported, -1, nil
 	}
-	if !autogenRulesSelect(e.state.cfg.autogenRules, source.familyName, labels) {
-		return nil, false, nil
+	if ruleIndex, rejected := firstRejectingAutogenRule(e.state.cfg.autogenRules, source.familyName, labels); rejected {
+		return nil, false, PlanRouteReasonAutogenRuleRejected, ruleIndex, nil
 	}
 
 	namespace := e.state.cfg.autogenContextNamespace
 
 	route, ok, err := buildAutogenRoute(source, labels, meta, policy, e.state.cfg.autogenTypeID)
 	if err != nil {
-		return nil, false, err
+		return nil, false, "", -1, err
 	}
 	if !ok {
-		return nil, false, nil
+		return nil, false, PlanRouteReasonAutogenBuildRejected, -1, nil
 	}
 	if metricMeta, ok := autogenMetricMeta(reader, source); ok {
 		route = applyAutogenMetricMeta(route, metricMeta, meta)
@@ -137,16 +147,21 @@ func (e *Engine) resolveAutogenRoute(
 			},
 			Lifecycle: autogenLifecyclePolicy(policy),
 		},
-	}, true, nil
+	}, true, "", -1, nil
 }
 
 func autogenRulesSelect(rules []charttpl.ValidatedAutogenRule, metricName string, labels metrix.LabelView) bool {
-	for _, rule := range rules {
+	_, rejected := firstRejectingAutogenRule(rules, metricName, labels)
+	return !rejected
+}
+
+func firstRejectingAutogenRule(rules []charttpl.ValidatedAutogenRule, metricName string, labels metrix.LabelView) (int, bool) {
+	for i, rule := range rules {
 		if rule.ScopeMatches(metricName) && !rule.Selects(metricName, labels) {
-			return false
+			return i, true
 		}
 	}
-	return true
+	return -1, false
 }
 
 func buildAutogenRoute(

@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 3
+profile: process_runtime
+source_inventory:
+  rows: 7
+  source_families: 7
+  authored_selectors: 5
+  dispositions:
+    chart: 5
+    profile_excluded: 1
+    job_excluded: 0
+    writer_ineligible: 1
+validation:
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/process_runtime_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 7
+          raw_logical_series: 7
+          writer_series: 5
+          series_scanned: 5
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 5
+          runtime_charts: 5
+          autogen_charts: 0
+          chart_dimensions: 5
+          pipeline_excluded: 2
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          generic_profile_match: 1
+          profile_relabel_discard_review: 1
+integrity:
+  evidence:
+    sha256: a2f1d7ad1d7f1f2d251ce7d6c17927c8773bc981b9c18770321eb9051a453cdd
+    bytes: 1348
+  operator_model:
+    sha256: 68d0cffe42069b8798906bd8228e563002ea5480386cb83c516ad7971908008e
+    bytes: 1384
+  validation_job:
+    sha256: 636e853df831c2494edd3b81f772c6b2267d0f5ff8b55f761d6653130b3cf223
+    bytes: 43
+  validation_summary:
+    sha256: 14590c2eb05d1e22e085d995edd037340cb7c69244d426850c89b5d049826f77
+    bytes: 836
+  profile:
+    sha256: fd0c7c27a47b0d36a360444eb5d0deca82d7182bd3f4639fdfe62bd400b9c4a2
+    bytes: 1724

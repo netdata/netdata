@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 3
+profile: vllm_ray
+source_inventory:
+  rows: 180
+  source_families: 116
+  authored_selectors: 142
+  dispositions:
+    chart: 142
+    profile_excluded: 36
+    job_excluded: 0
+    writer_ineligible: 2
+validation:
+  metadata_example:
+    integration_id: collector-go.d.plugin-prometheus-vllm
+    example_name: vLLM on Ray
+    job_name: vllm-ray
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/vllm_ray_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 116
+          raw_logical_series: 148
+          writer_series: 698
+          series_scanned: 698
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 104
+          runtime_charts: 113
+          autogen_charts: 0
+          chart_dimensions: 698
+          pipeline_excluded: 38
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          profile_relabel_discard_review: 1
+    - name: without-job-policy
+      kind: supplemental
+      fixture: fixtures/vllm_ray_all_metrics.prom
+      job: none
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 116
+          raw_logical_series: 148
+          writer_series: 698
+          series_scanned: 698
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 104
+          runtime_charts: 113
+          autogen_charts: 0
+          chart_dimensions: 698
+          pipeline_excluded: 38
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          default_validation_job: 1
+          profile_relabel_discard_review: 1
+integrity:
+  evidence:
+    sha256: dce7b92bba30baaaa7fe2621dff72539cd6a2d1e95ca2f959cd8e2914e8651a9
+    bytes: 2174
+  operator_model:
+    sha256: d5b411fe8353a250207c6f99f875123892e518351ff31143d5460f89d50b4f53
+    bytes: 3830
+  validation_job:
+    sha256: 01424ba148f0b09c05a69ea46610e60461e4a0a7dadabd37a130fc1e08e6d1cd
+    bytes: 42
+  validation_summary:
+    sha256: 54a6a99b9d5450b45d62e7ca52157a1e40b8a6ff3154ab4258fcfcc6aa44355f
+    bytes: 1719
+  profile:
+    sha256: f785e471ed24e53ea183e01403e76997cb0d67c37ce4e3290c021f5e9c9b3afa
+    bytes: 46550

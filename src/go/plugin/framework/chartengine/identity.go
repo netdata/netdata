@@ -3,6 +3,8 @@
 package chartengine
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"sort"
 	"strings"
 
@@ -53,6 +55,43 @@ func renderChartInstanceID(identity program.ChartIdentity, labels map[string]str
 
 func renderChartInstanceIDFromView(identity program.ChartIdentity, labels metrix.LabelView) (string, bool, error) {
 	return renderChartInstanceIDWithAccessor(identity, labelViewAccessor{view: labels})
+}
+
+var globalPlanInstanceIdentity = PlanInstanceIdentity(sha256.Sum256(nil))
+
+func diagnosticChartInstanceIdentity(identity program.ChartIdentity, labels metrix.LabelView) (PlanInstanceIdentity, bool, error) {
+	if len(identity.InstanceByLabels) == 0 {
+		return globalPlanInstanceIdentity, true, nil
+	}
+	values, ok, err := resolveInstanceLabelValues(identity, labelViewAccessor{view: labels})
+	if err != nil || !ok {
+		return PlanInstanceIdentity{}, ok, err
+	}
+
+	hash := sha256.New()
+	var size [8]byte
+	for _, item := range values {
+		binary.LittleEndian.PutUint64(size[:], uint64(len(item.Key)))
+		_, _ = hash.Write(size[:])
+		_, _ = hash.Write([]byte(item.Key))
+		binary.LittleEndian.PutUint64(size[:], uint64(len(item.Value)))
+		_, _ = hash.Write(size[:])
+		_, _ = hash.Write([]byte(item.Value))
+	}
+	var out PlanInstanceIdentity
+	_ = hash.Sum(out[:0])
+	return out, true, nil
+}
+
+func missingChartInstanceLabels(identity program.ChartIdentity, labels metrix.LabelView) []string {
+	plan := compileInstanceLabelPlan(identity)
+	var missing []string
+	for _, key := range plan.explicitKeys {
+		if _, ok := labels.Get(key); !ok {
+			missing = append(missing, key)
+		}
+	}
+	return missing
 }
 
 func renderChartInstanceIDWithAccessor(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {

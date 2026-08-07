@@ -1,0 +1,363 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 3
+profile: ceph
+supporting_profiles:
+  - name: process_runtime
+    sha256: fd0c7c27a47b0d36a360444eb5d0deca82d7182bd3f4639fdfe62bd400b9c4a2
+    bytes: 1724
+source_inventory:
+  rows: 1794
+  source_families: 1794
+  authored_selectors: 1772
+  dispositions:
+    chart: 1779
+    profile_excluded: 10
+    job_excluded: 0
+    writer_ineligible: 5
+validation:
+  metadata_example:
+    integration_id: collector-go.d.plugin-prometheus-ceph
+    example_name: Ceph MGR and ceph-exporter
+    job_name: ceph-mgr
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/ceph_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 1794
+          raw_logical_series: 2952
+          writer_series: 2937
+          series_scanned: 2937
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 981
+          autogen_charts: 0
+          chart_dimensions: 2937
+          pipeline_excluded: 15
+          pipeline_renamed: 227
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 2
+          sibling_identity_mismatch: 3
+          wildcard_instance_identity: 535
+    - name: reef-mgr
+      kind: supplemental
+      composition: candidate_only
+      fixture: fixtures/ceph_reef_mgr_perf_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1723
+          raw_logical_series: 2873
+          writer_series: 2863
+          series_scanned: 2863
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 542
+          runtime_charts: 931
+          autogen_charts: 0
+          chart_dimensions: 2863
+          pipeline_excluded: 10
+          pipeline_renamed: 219
+          dead_charts: 35
+          dead_dimensions: 61
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 35
+          dead_dimension: 61
+          unproven_relabel_name_rewrite: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 3
+          wildcard_instance_identity: 535
+    - name: reef-exporter
+      kind: supplemental
+      composition: candidate_only
+      fixture: fixtures/ceph_reef_exporter_prio0_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1609
+          raw_logical_series: 2542
+          writer_series: 2541
+          series_scanned: 2541
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 542
+          runtime_charts: 785
+          autogen_charts: 0
+          chart_dimensions: 2541
+          pipeline_excluded: 1
+          pipeline_renamed: 219
+          dead_charts: 80
+          dead_dimensions: 166
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 80
+          dead_dimension: 166
+          unproven_relabel_name_discard: 1
+          unproven_relabel_name_rewrite: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 3
+          wildcard_instance_identity: 535
+    - name: squid-mgr
+      kind: supplemental
+      composition: candidate_only
+      fixture: fixtures/ceph_squid_mgr_perf_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1597
+          raw_logical_series: 2747
+          writer_series: 2737
+          series_scanned: 2737
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 542
+          runtime_charts: 886
+          autogen_charts: 0
+          chart_dimensions: 2737
+          pipeline_excluded: 10
+          pipeline_renamed: 219
+          dead_charts: 78
+          dead_dimensions: 187
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 78
+          dead_dimension: 187
+          unproven_relabel_name_rewrite: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 3
+          wildcard_instance_identity: 535
+    - name: squid-exporter
+      kind: supplemental
+      composition: candidate_only
+      fixture: fixtures/ceph_squid_exporter_prio0_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1483
+          raw_logical_series: 2416
+          writer_series: 2415
+          series_scanned: 2415
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 542
+          runtime_charts: 740
+          autogen_charts: 0
+          chart_dimensions: 2415
+          pipeline_excluded: 1
+          pipeline_renamed: 219
+          dead_charts: 123
+          dead_dimensions: 292
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 123
+          dead_dimension: 292
+          unproven_relabel_name_discard: 1
+          unproven_relabel_name_rewrite: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 3
+          wildcard_instance_identity: 535
+    - name: tentacle-mgr
+      kind: supplemental
+      composition: candidate_only
+      fixture: fixtures/ceph_tentacle_mgr_perf_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1628
+          raw_logical_series: 2778
+          writer_series: 2768
+          series_scanned: 2768
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 542
+          runtime_charts: 900
+          autogen_charts: 0
+          chart_dimensions: 2768
+          pipeline_excluded: 10
+          pipeline_renamed: 227
+          dead_charts: 65
+          dead_dimensions: 156
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 65
+          dead_dimension: 156
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 3
+          wildcard_instance_identity: 535
+    - name: tentacle-exporter
+      kind: supplemental
+      composition: candidate_only
+      fixture: fixtures/ceph_tentacle_exporter_prio0_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1514
+          raw_logical_series: 2447
+          writer_series: 2446
+          series_scanned: 2446
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 542
+          runtime_charts: 754
+          autogen_charts: 0
+          chart_dimensions: 2446
+          pipeline_excluded: 1
+          pipeline_renamed: 227
+          dead_charts: 110
+          dead_dimensions: 261
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 110
+          dead_dimension: 261
+          unproven_relabel_name_discard: 1
+        warnings:
+          observed_scale_gap: 4
+          profile_relabel_discard_review: 1
+          sibling_identity_mismatch: 3
+          wildcard_instance_identity: 535
+    - name: nvmeof
+      kind: supplemental
+      fixture: fixtures/ceph_nvmeof_all_metrics.prom
+      job: validation
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 29
+          raw_logical_series: 29
+          writer_series: 24
+          series_scanned: 24
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 21
+          autogen_charts: 0
+          chart_dimensions: 24
+          pipeline_excluded: 5
+          pipeline_renamed: 0
+          dead_charts: 528
+          dead_dimensions: 1748
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          dead_chart: 528
+          dead_dimension: 1748
+          unproven_relabel_name_discard: 1
+          unproven_relabel_name_rewrite: 15
+        warnings:
+          profile_relabel_discard_review: 2
+          sibling_identity_mismatch: 3
+          wildcard_instance_identity: 535
+    - name: without-job-policy
+      kind: supplemental
+      fixture: fixtures/ceph_all_metrics.prom
+      job: none
+      expected:
+        verdict: FAIL
+        counts:
+          raw_families: 1794
+          raw_logical_series: 2952
+          writer_series: 0
+          series_scanned: 0
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 547
+          runtime_charts: 0
+          autogen_charts: 0
+          chart_dimensions: 0
+          pipeline_excluded: 0
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors:
+          collector_check: 1
+        warnings:
+          default_validation_job: 1
+          profile_relabel_discard_review: 2
+integrity:
+  evidence:
+    sha256: fb860c351bd8de02d656daa50da753f5502be6182a1ace44fb684640757f4d36
+    bytes: 2664
+  operator_model:
+    sha256: ac0536b32654388f53f2f243d02f4d1c5640758c8245b2fa934310e14e17eff4
+    bytes: 7354
+  validation_job:
+    sha256: 72be3c7de809ef02a4dcb30421e4cc2af3886977e5e2ee5edced0914dc5e0f59
+    bytes: 1079
+  validation_summary:
+    sha256: b952a21e37e094d708b7a77581bbc946d54f7c104fd1c43ea0e0f25f55b0d043
+    bytes: 2575
+  profile:
+    sha256: 485463878796cfc1e65338b6d717887e64bfce48aeff88e58d9a32f3a9a4d07d
+    bytes: 451020

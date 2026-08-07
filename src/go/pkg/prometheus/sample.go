@@ -43,6 +43,15 @@ type Sample struct {
 	FamilyType model.MetricType
 }
 
+// LabelsWithName returns a detached selector-compatible label set containing
+// __name__ followed by the sample labels.
+func (s Sample) LabelsWithName() labels.Labels {
+	out := make(labels.Labels, 0, len(s.Labels)+1)
+	out = append(out, labels.Label{Name: labels.MetricName, Value: s.Name})
+	out = append(out, s.Labels...)
+	return out
+}
+
 // HelpEntry is a family's HELP text, keyed by family name, carried alongside a
 // SampleBatch (HELP is parsed per family, before assembly).
 type HelpEntry struct {

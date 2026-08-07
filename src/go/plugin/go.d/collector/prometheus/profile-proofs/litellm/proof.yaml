@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 3
+profile: litellm
+supporting_profiles:
+  - name: process_runtime
+    sha256: fd0c7c27a47b0d36a360444eb5d0deca82d7182bd3f4639fdfe62bd400b9c4a2
+    bytes: 1724
+  - name: python_gc
+    sha256: 19c27bbb8fd7375441623a92fffb619897f43513b2627ab03b269821d0e14f65
+    bytes: 1223
+source_inventory:
+  rows: 356
+  source_families: 201
+  authored_selectors: 273
+  dispositions:
+    chart: 273
+    profile_excluded: 82
+    job_excluded: 0
+    writer_ineligible: 1
+validation:
+  metadata_example:
+    integration_id: collector-go.d.plugin-prometheus-litellm
+    example_name: LiteLLM
+    job_name: litellm
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/litellm_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 201
+          raw_logical_series: 322
+          writer_series: 710
+          series_scanned: 710
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 159
+          runtime_charts: 231
+          autogen_charts: 0
+          chart_dimensions: 975
+          pipeline_excluded: 83
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          duplicate_sibling_family: 1
+          observed_label_aggregation: 70
+          profile_relabel_discard_review: 2
+          sibling_identity_mismatch: 1
+          wildcard_instance_identity: 23
+    - name: without-job-policy
+      kind: supplemental
+      fixture: fixtures/litellm_all_metrics.prom
+      job: none
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 201
+          raw_logical_series: 322
+          writer_series: 710
+          series_scanned: 710
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 159
+          runtime_charts: 231
+          autogen_charts: 0
+          chart_dimensions: 975
+          pipeline_excluded: 83
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          default_validation_job: 1
+          duplicate_sibling_family: 1
+          observed_label_aggregation: 70
+          profile_relabel_discard_review: 2
+          sibling_identity_mismatch: 1
+          wildcard_instance_identity: 23
+integrity:
+  evidence:
+    sha256: 33329515c9179289c19d6c1f7152d29405c4ecd5950774d6afe04c78e86bc642
+    bytes: 2568
+  operator_model:
+    sha256: 582d9d07c162e66c45b1988283accf6655f2047a62d1eab7e89c0a67d978ee25
+    bytes: 5338
+  validation_job:
+    sha256: 4de9e36d872b89c5a7324fb5c3ec2196ee79176b1b3b4478437c98df94382b36
+    bytes: 40
+  validation_summary:
+    sha256: 4cf435867583eec28a7c6f6c83e4da40af0550cdd2b03644e1c635ab1ec6a0ed
+    bytes: 1734
+  profile:
+    sha256: 675942d026075ab359eaeb4981fee85cca56f85352c1f550653562abcec02b3e
+    bytes: 85503

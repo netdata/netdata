@@ -26,7 +26,9 @@ git checkout d7791e6838 -- .codacy.yml      # restore the pre-exclusion .codacy.
 .agents/skills/codacy-audit/scripts/analyze-local.sh --tool markdownlint
 ```
 
-Expected: a JSON dump under `<repo>/.local/audits/codacy/local-markdownlint-<ts>.json`. The CLI returns non-zero when findings exist (this is normal; the script tolerates it).
+Expected: a JSON dump under
+`<repo>/.local/audits/codacy/local-markdownlint-<timestamp>-<pid>-<random>.json`. With the default zero issue threshold,
+the CLI returns status 102 when findings exist; the wrapper accepts that specific complete-analysis status.
 
 ## Step 3 -- count findings
 
@@ -68,6 +70,9 @@ Expected: zero rows in the excluded trees.
 
 ## Troubleshooting
 
-- **Docker pull is slow on first run**: `codacy/codacy-analysis-cli:latest` is a few hundred MB. Subsequent runs use the warm cache.
+- **Docker pull is slow on first run**: the wrapper's digest-pinned 7.10.1 image is a few hundred MB. Subsequent runs use
+  the warm cache.
 - **Different count than 864**: tool-version drift between the bundled `codacy-analysis-cli` and Codacy Cloud is normal. ~10% tolerance is fine. Anything wider warrants checking the CLI version vs Cloud's reported version.
-- **CLI exits with non-zero**: that's expected when findings are present. The script suppresses this; the JSON dump is still valid.
+- **CLI exits with non-zero**: status 102 is expected when findings are present.
+  The wrapper accepts that status only after validating the report; all other
+  nonzero statuses fail the run.

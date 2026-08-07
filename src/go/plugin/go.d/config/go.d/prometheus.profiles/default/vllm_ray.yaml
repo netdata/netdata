@@ -1,0 +1,1271 @@
+# vLLM Ray metrics transport profile.
+# Source contracts: vllm-project/vllm @ dc818c198d3ff50a16f38eba567da006478239c8
+# and ray-project/ray @ 03491225d59a1ffde99c3628969ccf456be13efd (ray-2.48.0).
+# Ray prefixes vLLM instruments, adds replica/worker identity, and emits 33 deprecated
+# unsuffixed counter gauges by default; profile relabeling drops those aliases to
+# prevent duplicates. Known compatibility aliases are excluded exactly; unknown
+# future ray_vllm families remain eligible for generic fallback.
+match: ray_vllm_*
+app: vllm
+relabeling:
+  - match: >-
+      ray_vllm_corrupted_requests
+      ray_vllm_diffusion_num_canvas_positions
+      ray_vllm_diffusion_num_committed_tokens
+      ray_vllm_diffusion_num_denoising_steps
+      ray_vllm_external_prefix_cache_hits
+      ray_vllm_external_prefix_cache_queries
+      ray_vllm_generation_tokens
+      ray_vllm_hf3fs_num_failed_load
+      ray_vllm_hf3fs_num_failed_save
+      ray_vllm_kv_offload_allocation_failure
+      ray_vllm_kv_offload_load_bytes
+      ray_vllm_kv_offload_load_time
+      ray_vllm_kv_offload_size_bucket
+      ray_vllm_kv_offload_size_count
+      ray_vllm_kv_offload_size_sum
+      ray_vllm_kv_offload_store_bytes
+      ray_vllm_kv_offload_store_time
+      ray_vllm_kv_offload_stores_skipped
+      ray_vllm_kv_offload_total_bytes
+      ray_vllm_kv_offload_total_bytes_total
+      ray_vllm_kv_offload_total_time
+      ray_vllm_kv_offload_total_time_total
+      ray_vllm_mm_cache_hits
+      ray_vllm_mm_cache_queries
+      ray_vllm_nixl_num_failed_notifications
+      ray_vllm_nixl_num_failed_transfers
+      ray_vllm_nixl_num_kv_expired_reqs
+      ray_vllm_num_preemptions
+      ray_vllm_prefix_cache_hits
+      ray_vllm_prefix_cache_queries
+      ray_vllm_prompt_tokens
+      ray_vllm_prompt_tokens_by_source
+      ray_vllm_prompt_tokens_cached
+      ray_vllm_request_success
+      ray_vllm_spec_decode_num_accepted_tokens
+      ray_vllm_spec_decode_num_accepted_tokens_per_pos
+      ray_vllm_spec_decode_num_draft_tokens
+      ray_vllm_spec_decode_num_drafts
+    metric_relabel_configs:
+      - action: drop
+template:
+  family: vLLM
+  context_namespace: vllm
+  groups:
+    - family: Request Lifecycle
+      context_namespace: request_lifecycle
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_request_success_total
+        - ray_vllm_corrupted_requests_total
+        - ray_vllm_time_to_first_token_seconds_bucket
+        - ray_vllm_time_to_first_token_seconds_count
+        - ray_vllm_time_to_first_token_seconds_sum
+        - ray_vllm_e2e_request_latency_seconds_bucket
+        - ray_vllm_e2e_request_latency_seconds_count
+        - ray_vllm_e2e_request_latency_seconds_sum
+        - ray_vllm_request_params_n_bucket
+        - ray_vllm_request_params_n_count
+        - ray_vllm_request_params_n_sum
+        - ray_vllm_request_params_max_tokens_bucket
+        - ray_vllm_request_params_max_tokens_count
+        - ray_vllm_request_params_max_tokens_sum
+        - ray_vllm_request_max_num_generation_tokens_bucket
+        - ray_vllm_request_max_num_generation_tokens_count
+        - ray_vllm_request_max_num_generation_tokens_sum
+      charts:
+        - title: Request Outcomes
+          context: outcomes
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_success_total
+              name_from_label: finished_reason
+        - title: Corrupted Requests
+          context: corrupted_requests
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_corrupted_requests_total
+              name: corrupted
+        - title: Time to First Token
+          context: time_to_first_token
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_time_to_first_token_seconds_bucket
+        - title: End-to-End Request Latency
+          context: end_to_end_latency
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_e2e_request_latency_seconds_bucket
+        - title: Lifecycle Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_time_to_first_token_seconds_count
+              name: first_token
+            - selector: ray_vllm_e2e_request_latency_seconds_count
+              name: completed
+        - title: Pre-Response Concurrency
+          context: pre_response_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_time_to_first_token_seconds_sum
+              name: requests
+        - title: End-to-End Request Concurrency
+          context: end_to_end_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_e2e_request_latency_seconds_sum
+              name: requests
+        - title: Requested Sequences
+          context: requested_sequences
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_params_n_bucket
+        - title: Requested Sequence Volume
+          context: requested_sequence_volume
+          units: sequences/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_params_n_sum
+              name: sequences
+        - title: Requested Token Limit
+          context: requested_token_limit
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_params_max_tokens_bucket
+        - title: Requested Token Limits Sum
+          context: requested_token_limits_sum
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_params_max_tokens_sum
+              name: token_limits
+        - title: Maximum Generated Tokens
+          context: maximum_generated_tokens
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_max_num_generation_tokens_bucket
+        - title: Maximum Generated Tokens Sum
+          context: maximum_generated_tokens_sum
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_max_num_generation_tokens_sum
+              name: maximums
+        - title: Parent Request Measurements
+          context: parent_request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_params_n_count
+              name: requested_sequences
+            - selector: ray_vllm_request_params_max_tokens_count
+              name: token_limit
+            - selector: ray_vllm_request_max_num_generation_tokens_count
+              name: maximum_generated
+    - family: Scheduler
+      context_namespace: scheduler
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_num_requests_running
+        - ray_vllm_num_requests_waiting
+        - ray_vllm_num_requests_waiting_by_reason
+        - ray_vllm_num_preemptions_total
+        - ray_vllm_engine_sleep_state
+        - ray_vllm_request_queue_time_seconds_bucket
+        - ray_vllm_request_queue_time_seconds_count
+        - ray_vllm_request_queue_time_seconds_sum
+      charts:
+        - title: Request State
+          context: request_state
+          units: requests
+          algorithm: absolute
+          type: line
+          dimensions:
+            - selector: ray_vllm_num_requests_running
+              name: running
+            - selector: ray_vllm_num_requests_waiting
+              name: waiting
+        - title: Waiting Requests by Reason
+          context: waiting_by_reason
+          units: requests
+          algorithm: absolute
+          type: line
+          dimensions:
+            - selector: ray_vllm_num_requests_waiting_by_reason
+              name_from_label: reason
+        - title: Request Preemptions
+          context: preemptions
+          units: preemptions/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_num_preemptions_total
+              name: preemptions
+        - title: Engine Sleep State
+          context: sleep_state
+          units: state
+          algorithm: absolute
+          type: line
+          dimensions:
+            - selector: ray_vllm_engine_sleep_state
+              name_from_label: sleep_state
+        - title: Request Queue Time
+          context: queue_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_queue_time_seconds_bucket
+        - title: Queued Request Measurements
+          context: queued_request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_queue_time_seconds_count
+              name: requests
+        - title: Queue Concurrency
+          context: queue_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_queue_time_seconds_sum
+              name: requests
+    - family: Prefill
+      context_namespace: prefill
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_prompt_tokens_total
+        - ray_vllm_prompt_tokens_by_source_total
+        - ray_vllm_prompt_tokens_cached_total
+        - ray_vllm_request_prompt_tokens_bucket
+        - ray_vllm_request_prompt_tokens_count
+        - ray_vllm_request_prompt_tokens_sum
+        - ray_vllm_request_prefill_time_seconds_bucket
+        - ray_vllm_request_prefill_time_seconds_count
+        - ray_vllm_request_prefill_time_seconds_sum
+        - ray_vllm_request_prefill_kv_computed_tokens_bucket
+        - ray_vllm_request_prefill_kv_computed_tokens_count
+        - ray_vllm_request_prefill_kv_computed_tokens_sum
+      charts:
+        - title: Processed Prompt Tokens
+          context: prompt_throughput
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_prompt_tokens_total
+              name: processed
+        - title: Prompt Tokens by Source
+          context: prompt_tokens_by_source
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_prompt_tokens_by_source_total
+              name_from_label: source
+        - title: Cached Prompt Tokens
+          context: cached_prompt_throughput
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_prompt_tokens_cached_total
+              name: cached
+        - title: Prompt Size
+          context: prompt_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_prompt_tokens_bucket
+        - title: Prefill Time
+          context: prefill_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_prefill_time_seconds_bucket
+        - title: Computed KV Tokens
+          context: computed_kv_tokens
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_prefill_kv_computed_tokens_bucket
+        - title: Prefill Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_prompt_tokens_count
+              name: prompt_size
+            - selector: ray_vllm_request_prefill_time_seconds_count
+              name: prefill_time
+            - selector: ray_vllm_request_prefill_kv_computed_tokens_count
+              name: computed_kv
+        - title: Completed Request Prompt Volume
+          context: completed_request_prompt_volume
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_prompt_tokens_sum
+              name: prompt_tokens
+        - title: Computed KV Token Volume
+          context: computed_kv_token_volume
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_prefill_kv_computed_tokens_sum
+              name: computed_tokens
+        - title: Prefill Concurrency
+          context: concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_prefill_time_seconds_sum
+              name: requests
+    - family: Decode
+      context_namespace: decode
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_generation_tokens_total
+        - ray_vllm_request_generation_tokens_bucket
+        - ray_vllm_request_generation_tokens_count
+        - ray_vllm_request_generation_tokens_sum
+        - ray_vllm_request_decode_time_seconds_bucket
+        - ray_vllm_request_decode_time_seconds_count
+        - ray_vllm_request_decode_time_seconds_sum
+        - ray_vllm_inter_token_latency_seconds_bucket
+        - ray_vllm_inter_token_latency_seconds_count
+        - ray_vllm_inter_token_latency_seconds_sum
+        - ray_vllm_request_time_per_output_token_seconds_bucket
+        - ray_vllm_request_time_per_output_token_seconds_count
+        - ray_vllm_request_time_per_output_token_seconds_sum
+      charts:
+        - title: Generated Tokens
+          context: generation_throughput
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_generation_tokens_total
+              name: generated
+        - title: Output Size
+          context: output_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_generation_tokens_bucket
+        - title: Decode Time
+          context: decode_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_decode_time_seconds_bucket
+        - title: Inter-Token Latency
+          context: inter_token_latency
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_inter_token_latency_seconds_bucket
+        - title: Mean Output-Token Time
+          context: mean_output_token_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_time_per_output_token_seconds_bucket
+        - title: Decode Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_generation_tokens_count
+              name: output_size
+            - selector: ray_vllm_request_decode_time_seconds_count
+              name: decode_time
+            - selector: ray_vllm_request_time_per_output_token_seconds_count
+              name: mean_token_time
+        - title: Output Token Volume
+          context: output_token_volume
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_generation_tokens_sum
+              name: output_tokens
+        - title: Decode Concurrency
+          context: concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_decode_time_seconds_sum
+              name: requests
+        - title: Inter-Token Intervals
+          context: inter_token_intervals
+          units: intervals/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_inter_token_latency_seconds_count
+              name: intervals
+        - title: Inter-Token Interval Time
+          context: inter_token_interval_time
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_inter_token_latency_seconds_sum
+              name: intervals
+        - title: Accumulated Mean Output-Token Time
+          context: accumulated_mean_output_token_time
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_time_per_output_token_seconds_sum
+              name: request_means
+    - family: Engine Execution
+      context_namespace: engine_execution
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_request_inference_time_seconds_bucket
+        - ray_vllm_request_inference_time_seconds_count
+        - ray_vllm_request_inference_time_seconds_sum
+        - ray_vllm_iteration_tokens_total_bucket
+        - ray_vllm_iteration_tokens_total_count
+        - ray_vllm_iteration_tokens_total_sum
+        - ray_vllm_estimated_flops_per_gpu_total
+        - ray_vllm_estimated_read_bytes_per_gpu_total
+        - ray_vllm_estimated_write_bytes_per_gpu_total
+      charts:
+        - title: Inference Time
+          context: inference_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_request_inference_time_seconds_bucket
+        - title: Inference Request Measurements
+          context: request_measurements
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_inference_time_seconds_count
+              name: requests
+        - title: Inference Concurrency
+          context: concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_request_inference_time_seconds_sum
+              name: requests
+        - title: Tokens per Engine Step
+          context: tokens_per_step
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_iteration_tokens_total_bucket
+        - title: Engine Steps
+          context: engine_steps
+          units: steps/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_iteration_tokens_total_count
+              name: steps
+        - title: Engine Step Token Volume
+          context: step_token_volume
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_iteration_tokens_total_sum
+              name: tokens
+        - title: Estimated Compute per GPU
+          context: estimated_compute
+          units: GFLOP/s/GPU
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_estimated_flops_per_gpu_total
+              name: compute
+              options:
+                divisor: 1000000000
+                float: true
+        - title: Estimated Memory Bandwidth per GPU
+          context: estimated_memory_bandwidth
+          units: GB/s/GPU
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_estimated_read_bytes_per_gpu_total
+              name: read
+              options:
+                divisor: 1000000000
+                float: true
+            - selector: ray_vllm_estimated_write_bytes_per_gpu_total
+              name: write
+              options:
+                divisor: 1000000000
+                float: true
+    - family: KV Cache
+      context_namespace: kv_cache
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_kv_cache_usage_perc
+        - ray_vllm_prefix_cache_queries_total
+        - ray_vllm_prefix_cache_hits_total
+        - ray_vllm_external_prefix_cache_queries_total
+        - ray_vllm_external_prefix_cache_hits_total
+        - ray_vllm_mm_cache_queries_total
+        - ray_vllm_mm_cache_hits_total
+      charts:
+        - title: KV Cache Usage
+          context: usage
+          units: percentage
+          algorithm: absolute
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_cache_usage_perc
+              name: used
+              options:
+                multiplier: 100
+                float: true
+        - title: Local Prefix Cache
+          context: local_prefix
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_prefix_cache_queries_total
+              name: queries
+            - selector: ray_vllm_prefix_cache_hits_total
+              name: hits
+        - title: External Prefix Cache
+          context: external_prefix
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_external_prefix_cache_queries_total
+              name: queries
+            - selector: ray_vllm_external_prefix_cache_hits_total
+              name: hits
+        - title: Multimodal Cache
+          context: multimodal
+          units: items/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_mm_cache_queries_total
+              name: queries
+            - selector: ray_vllm_mm_cache_hits_total
+              name: hits
+    - family: KV Cache Residency
+      context_namespace: kv_cache_residency
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_kv_block_lifetime_seconds_bucket
+        - ray_vllm_kv_block_lifetime_seconds_count
+        - ray_vllm_kv_block_lifetime_seconds_sum
+        - ray_vllm_kv_block_idle_before_evict_seconds_bucket
+        - ray_vllm_kv_block_idle_before_evict_seconds_count
+        - ray_vllm_kv_block_idle_before_evict_seconds_sum
+        - ray_vllm_kv_block_reuse_gap_seconds_bucket
+        - ray_vllm_kv_block_reuse_gap_seconds_count
+        - ray_vllm_kv_block_reuse_gap_seconds_sum
+      charts:
+        - title: KV Block Lifetime
+          context: block_lifetime
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_block_lifetime_seconds_bucket
+        - title: KV Block Idle Time Before Eviction
+          context: idle_before_eviction
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_block_idle_before_evict_seconds_bucket
+        - title: KV Block Reuse Gap
+          context: reuse_gap
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_block_reuse_gap_seconds_bucket
+        - title: KV Residency Measurements
+          context: measurements
+          units: observations/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_block_lifetime_seconds_count
+              name: lifetimes
+            - selector: ray_vllm_kv_block_idle_before_evict_seconds_count
+              name: idle_periods
+            - selector: ray_vllm_kv_block_reuse_gap_seconds_count
+              name: reuse_gaps
+        - title: Accumulated KV Residency Time
+          context: accumulated_time
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_block_lifetime_seconds_sum
+              name: lifetime
+            - selector: ray_vllm_kv_block_idle_before_evict_seconds_sum
+              name: idle_before_eviction
+            - selector: ray_vllm_kv_block_reuse_gap_seconds_sum
+              name: reuse_gap
+    - family: KV Offloading
+      context_namespace: kv_offloading
+      chart_defaults:
+        label_promotion:
+          - Version
+          - SessionName
+          - Component
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_kv_offload_load_bytes_total
+        - ray_vllm_kv_offload_load_time_total
+        - ray_vllm_kv_offload_load_size_bucket
+        - ray_vllm_kv_offload_load_size_count
+        - ray_vllm_kv_offload_load_size_sum
+        - ray_vllm_kv_offload_store_bytes_total
+        - ray_vllm_kv_offload_store_time_total
+        - ray_vllm_kv_offload_store_size_bucket
+        - ray_vllm_kv_offload_store_size_count
+        - ray_vllm_kv_offload_store_size_sum
+        - ray_vllm_kv_offload_lookup_sync_delay_seconds_bucket
+        - ray_vllm_kv_offload_lookup_sync_delay_seconds_count
+        - ray_vllm_kv_offload_lookup_sync_delay_seconds_sum
+        - ray_vllm_kv_offload_lookup_async_delay_seconds_bucket
+        - ray_vllm_kv_offload_lookup_async_delay_seconds_count
+        - ray_vllm_kv_offload_lookup_async_delay_seconds_sum
+        - ray_vllm_kv_offload_allocation_failure_total
+        - ray_vllm_kv_offload_cpu_cache_usage_perc
+        - ray_vllm_kv_offload_cpu_cache_write_usage_perc
+        - ray_vllm_kv_offload_cpu_cache_read_usage_perc
+        - ray_vllm_kv_offload_cpu_allocation_size_bucket
+        - ray_vllm_kv_offload_cpu_allocation_size_count
+        - ray_vllm_kv_offload_cpu_allocation_size_sum
+        - ray_vllm_kv_offload_stores_skipped_total
+        - ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_bucket
+        - ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_count
+        - ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_sum
+        - ray_vllm_kv_offload_tiering_lookup_async_delay_seconds_bucket
+        - ray_vllm_kv_offload_tiering_lookup_async_delay_seconds_count
+        - ray_vllm_kv_offload_tiering_lookup_async_delay_seconds_sum
+      charts:
+        - title: KV Offload Load Size
+          context: load_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_offload_load_size_bucket
+        - title: KV Offload Store Size
+          context: store_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_offload_store_size_bucket
+        - title: KV Offload Transfer Operations
+          context: transfer_operations
+          units: operations/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_load_size_count
+              name: loads
+            - selector: ray_vllm_kv_offload_store_size_count
+              name: stores
+        - title: KV Offload Transfer Byte Accounting
+          context: transfer_bytes
+          units: bytes/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_load_bytes_total
+              name: loaded
+            - selector: ray_vllm_kv_offload_load_size_sum
+              name: loaded_observed
+            - selector: ray_vllm_kv_offload_store_bytes_total
+              name: stored
+            - selector: ray_vllm_kv_offload_store_size_sum
+              name: stored_observed
+        - title: KV Offload Transfer Concurrency
+          context: transfer_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_load_time_total
+              name: loads
+            - selector: ray_vllm_kv_offload_store_time_total
+              name: stores
+        - title: KV Offload Synchronous Lookup Delay
+          context: lookup_sync_delay
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_offload_lookup_sync_delay_seconds_bucket
+        - title: KV Offload Asynchronous Lookup Delay
+          context: lookup_async_delay
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_offload_lookup_async_delay_seconds_bucket
+        - title: KV Offload Lookup Measurements
+          context: lookup_measurements
+          units: lookups/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_lookup_sync_delay_seconds_count
+              name: synchronous
+            - selector: ray_vllm_kv_offload_lookup_async_delay_seconds_count
+              name: asynchronous
+        - title: KV Offload Lookup Delay Accumulation
+          context: lookup_delay_accumulation
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_lookup_sync_delay_seconds_sum
+              name: synchronous
+            - selector: ray_vllm_kv_offload_lookup_async_delay_seconds_sum
+              name: asynchronous
+        - title: CPU KV Cache Usage
+          context: cpu_cache_usage
+          units: percentage
+          algorithm: absolute
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_cpu_cache_usage_perc
+              name: total
+              options:
+                multiplier: 100
+                float: true
+            - selector: ray_vllm_kv_offload_cpu_cache_write_usage_perc
+              name: writes
+              options:
+                multiplier: 100
+                float: true
+            - selector: ray_vllm_kv_offload_cpu_cache_read_usage_perc
+              name: reads
+              options:
+                multiplier: 100
+                float: true
+        - title: CPU KV Allocation Size
+          context: cpu_allocation_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_offload_cpu_allocation_size_bucket
+        - title: CPU KV Allocation Measurements
+          context: cpu_allocation_measurements
+          units: allocations/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_cpu_allocation_size_count
+              name: allocations
+        - title: CPU KV Allocation Volume
+          context: cpu_allocation_volume
+          units: blocks/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_cpu_allocation_size_sum
+              name: blocks
+        - title: KV Offload Admission Outcomes
+          context: admission_outcomes
+          units: events/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_allocation_failure_total
+              name: allocation_failures
+            - selector: ray_vllm_kv_offload_stores_skipped_total
+              name: stores_skipped
+        - title: Tiered KV Offload Synchronous Lookup Delay
+          context: tiering_lookup_sync_delay
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_bucket
+        - title: Tiered KV Offload Asynchronous Lookup Delay
+          context: tiering_lookup_async_delay
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_kv_offload_tiering_lookup_async_delay_seconds_bucket
+        - title: Tiered KV Offload Lookup Measurements
+          context: tiering_lookup_measurements
+          units: lookups/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_count
+              name: synchronous
+            - selector: ray_vllm_kv_offload_tiering_lookup_async_delay_seconds_count
+              name: asynchronous
+        - title: Tiered KV Offload Lookup Delay Accumulation
+          context: tiering_lookup_delay_accumulation
+          units: seconds/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_kv_offload_tiering_lookup_sync_delay_seconds_sum
+              name: synchronous
+            - selector: ray_vllm_kv_offload_tiering_lookup_async_delay_seconds_sum
+              name: asynchronous
+    - family: NIXL Connector
+      context_namespace: nixl_connector
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_nixl_xfer_time_seconds_bucket
+        - ray_vllm_nixl_xfer_time_seconds_count
+        - ray_vllm_nixl_xfer_time_seconds_sum
+        - ray_vllm_nixl_post_time_seconds_bucket
+        - ray_vllm_nixl_post_time_seconds_count
+        - ray_vllm_nixl_post_time_seconds_sum
+        - ray_vllm_nixl_bytes_transferred_bucket
+        - ray_vllm_nixl_bytes_transferred_count
+        - ray_vllm_nixl_bytes_transferred_sum
+        - ray_vllm_nixl_num_descriptors_bucket
+        - ray_vllm_nixl_num_descriptors_count
+        - ray_vllm_nixl_num_descriptors_sum
+        - ray_vllm_nixl_num_failed_transfers_total
+        - ray_vllm_nixl_num_failed_notifications_total
+        - ray_vllm_nixl_num_kv_expired_reqs_total
+      charts:
+        - title: NIXL Transfer Duration
+          context: transfer_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_nixl_xfer_time_seconds_bucket
+        - title: NIXL Transfer Post Time
+          context: post_time
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_nixl_post_time_seconds_bucket
+        - title: NIXL Transfer Size
+          context: transfer_size
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_nixl_bytes_transferred_bucket
+        - title: NIXL Transfer Descriptors
+          context: transfer_descriptors
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_nixl_num_descriptors_bucket
+        - title: NIXL Transfer Measurements
+          context: transfer_measurements
+          units: observations/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_nixl_xfer_time_seconds_count
+              name: transfers
+            - selector: ray_vllm_nixl_post_time_seconds_count
+              name: posts
+            - selector: ray_vllm_nixl_bytes_transferred_count
+              name: sized_transfers
+            - selector: ray_vllm_nixl_num_descriptors_count
+              name: descriptor_sets
+        - title: NIXL Transfer Concurrency
+          context: transfer_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_nixl_xfer_time_seconds_sum
+              name: transfer
+            - selector: ray_vllm_nixl_post_time_seconds_sum
+              name: post
+        - title: NIXL Transfer Throughput
+          context: transfer_throughput
+          units: bytes/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_nixl_bytes_transferred_sum
+              name: transferred
+        - title: NIXL Descriptor Throughput
+          context: descriptor_throughput
+          units: descriptors/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_nixl_num_descriptors_sum
+              name: descriptors
+        - title: NIXL Failures
+          context: failures
+          units: failures/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_nixl_num_failed_transfers_total
+              name: transfers
+            - selector: ray_vllm_nixl_num_failed_notifications_total
+              name: notifications
+        - title: NIXL Requests with Expired KV
+          context: expired_requests
+          units: requests/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_nixl_num_kv_expired_reqs_total
+              name: expired
+    - family: HF3FS Connector
+      context_namespace: hf3fs_connector
+      chart_defaults:
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_hf3fs_save_duration_seconds_bucket
+        - ray_vllm_hf3fs_save_duration_seconds_count
+        - ray_vllm_hf3fs_save_duration_seconds_sum
+        - ray_vllm_hf3fs_load_duration_seconds_bucket
+        - ray_vllm_hf3fs_load_duration_seconds_count
+        - ray_vllm_hf3fs_load_duration_seconds_sum
+        - ray_vllm_hf3fs_num_failed_save_total
+        - ray_vllm_hf3fs_num_failed_load_total
+      charts:
+        - title: HF3FS Save Duration
+          context: save_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_hf3fs_save_duration_seconds_bucket
+        - title: HF3FS Load Duration
+          context: load_duration
+          units: observations/s
+          algorithm: incremental
+          type: heatmap
+          dimensions:
+            - selector: ray_vllm_hf3fs_load_duration_seconds_bucket
+        - title: HF3FS Transfer Measurements
+          context: transfer_measurements
+          units: operations/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_hf3fs_save_duration_seconds_count
+              name: saves
+            - selector: ray_vllm_hf3fs_load_duration_seconds_count
+              name: loads
+        - title: HF3FS Transfer Concurrency
+          context: transfer_concurrency
+          units: in-flight
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_hf3fs_save_duration_seconds_sum
+              name: saves
+            - selector: ray_vllm_hf3fs_load_duration_seconds_sum
+              name: loads
+        - title: HF3FS Transfer Failures
+          context: failures
+          units: failures/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_hf3fs_num_failed_save_total
+              name: saves
+            - selector: ray_vllm_hf3fs_num_failed_load_total
+              name: loads
+    - family: Mooncake Connector
+      context_namespace: mooncake_connector
+      groups:
+        - family: Operation Timing
+          context_namespace: timing
+          chart_defaults:
+            instances:
+              by_labels:
+                - model_name
+                - engine
+                - operation
+                - status
+                - ReplicaId
+                - WorkerId
+          metrics:
+            - ray_vllm_mooncake_store_operation_time_seconds_bucket
+            - ray_vllm_mooncake_store_operation_time_seconds_count
+            - ray_vllm_mooncake_store_operation_time_seconds_sum
+            - ray_vllm_mooncake_store_operation_total
+          charts:
+            - title: Mooncake Store Operation Time
+              context: duration
+              units: observations/s
+              algorithm: incremental
+              type: heatmap
+              dimensions:
+                - selector: ray_vllm_mooncake_store_operation_time_seconds_bucket
+            - title: Mooncake Store Operation Measurements
+              context: measurements
+              units: operations/s
+              algorithm: incremental
+              type: line
+              dimensions:
+                - selector: ray_vllm_mooncake_store_operation_time_seconds_count
+                  name: timed
+                - selector: ray_vllm_mooncake_store_operation_total
+                  name: calls
+            - title: Mooncake Store Operation Concurrency
+              context: concurrency
+              units: in-flight
+              algorithm: incremental
+              type: line
+              dimensions:
+                - selector: ray_vllm_mooncake_store_operation_time_seconds_sum
+                  name: operations
+        - family: Operation Volume
+          context_namespace: volume
+          chart_defaults:
+            instances:
+              by_labels:
+                - model_name
+                - engine
+                - operation
+                - ReplicaId
+                - WorkerId
+          metrics:
+            - ray_vllm_mooncake_store_operation_keys_total
+            - ray_vllm_mooncake_store_operation_bytes_total
+            - ray_vllm_mooncake_store_operation_failed_keys_total
+          charts:
+            - title: Mooncake Store Key Throughput
+              context: keys
+              units: keys/s
+              algorithm: incremental
+              type: line
+              dimensions:
+                - selector: ray_vllm_mooncake_store_operation_keys_total
+                  name_from_label: status
+            - title: Mooncake Store Byte Throughput
+              context: bytes
+              units: bytes/s
+              algorithm: incremental
+              type: line
+              dimensions:
+                - selector: ray_vllm_mooncake_store_operation_bytes_total
+                  name_from_label: status
+            - title: Mooncake Store Failed Keys
+              context: failed_keys
+              units: keys/s
+              algorithm: incremental
+              type: line
+              dimensions:
+                - selector: ray_vllm_mooncake_store_operation_failed_keys_total
+                  name_from_label: status
+    - family: Speculative Decoding
+      context_namespace: speculative_decoding
+      chart_defaults:
+        label_promotion:
+          - Version
+          - SessionName
+          - Component
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_spec_decode_num_drafts_total
+        - ray_vllm_spec_decode_num_draft_tokens_total
+        - ray_vllm_spec_decode_num_accepted_tokens_total
+        - ray_vllm_spec_decode_num_accepted_tokens_per_pos_total
+      charts:
+        - title: Drafts
+          context: drafts
+          units: drafts/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_spec_decode_num_drafts_total
+              name: drafts
+        - title: Draft Token Outcomes
+          context: token_outcomes
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_spec_decode_num_draft_tokens_total
+              name: proposed
+            - selector: ray_vllm_spec_decode_num_accepted_tokens_total
+              name: accepted
+        - title: Accepted Tokens by Position
+          context: accepted_by_position
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_spec_decode_num_accepted_tokens_per_pos_total
+              name_from_label: position
+    - family: Diffusion Decoding
+      context_namespace: diffusion_decoding
+      chart_defaults:
+        label_promotion:
+          - Version
+          - SessionName
+          - Component
+        instances:
+          by_labels:
+            - model_name
+            - engine
+            - ReplicaId
+            - WorkerId
+      metrics:
+        - ray_vllm_diffusion_num_denoising_steps_total
+        - ray_vllm_diffusion_num_canvas_positions_total
+        - ray_vllm_diffusion_num_committed_tokens_total
+      charts:
+        - title: Diffusion Denoising Steps
+          context: denoising_steps
+          units: steps/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_diffusion_num_denoising_steps_total
+              name: steps
+        - title: Diffusion Canvas Positions
+          context: canvas_positions
+          units: positions/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_diffusion_num_canvas_positions_total
+              name: positions
+        - title: Diffusion Committed Tokens
+          context: committed_tokens
+          units: tokens/s
+          algorithm: incremental
+          type: line
+          dimensions:
+            - selector: ray_vllm_diffusion_num_committed_tokens_total
+              name: committed
+  chart_defaults:
+    label_promotion:
+      - Version
+      - SessionName
+      - Component

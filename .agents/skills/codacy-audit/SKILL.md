@@ -59,18 +59,35 @@ All values live in `<repo>/.env` (gitignored). See `<repo>/.agents/ENV.md` for s
 | Script | Purpose |
 |---|---|
 | `_lib.sh` | Helpers (`codacyaudit_*` prefix). Token-safe; ships `codacyaudit_selftest_no_token_leak`. |
-| `analyze-local.sh` | Run `codacy-analysis-cli` locally; auto-pick local-binary or docker; write JSON dump under `.local/audits/codacy/`. |
+| `analyze-local.sh` | Run `codacy-analysis-cli` locally; auto-pick local-binary or docker; write a JSON or SARIF report under `.local/audits/codacy/`. |
 | `pr-issues.sh` | Fetch all Codacy issues for a PR via the v3 API; cluster summary on stdout; full JSON dump on disk. |
+
+The wrapper's closed JSON/SARIF contract has a mock-runner regression suite:
+
+```bash
+bash .agents/skills/codacy-audit/tests/analyze-local_test.sh
+```
+
+Local analysis requires `jq` plus either Docker or the pinned local
+`codacy-analysis-cli`. The wrapper preflights `jq` before it initializes an
+output file or starts the analyzer, so a missing report validator cannot waste a
+completed analysis or be misreported as malformed analyzer output.
 
 ## Workflow -- pre-push prevention
 
 ```
 $ .agents/skills/codacy-audit/scripts/analyze-local.sh
 [analyze-local] runner=docker format=json dir=<repo>
-[analyze-local] wrote 0 finding(s) to <repo>/.local/audits/codacy/local-<ts>.json
+[analyze-local] wrote 0 issue(s), 0 duplication clone(s), 0 file error(s), and 0 file-metric record(s) to <repo>/.local/audits/codacy/local-<timestamp>-<pid>-<random>.json
 ```
 
-Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR will be green (modulo Codacy server-side patterns the local CLI doesn't bundle). If it returns findings, fix them locally first.
+Run this before `git push`. A report with zero issues, zero duplication clones, and zero file errors is clean local
+evidence (modulo Codacy server-side patterns the local CLI does not bundle). Fix issues and duplication clones locally. A
+`FileError` makes the wrapper fail because the analysis is incomplete; `FileMetrics` records are informational.
+The wrapper also enables the CLI's `--fail-if-incomplete` contract and accepts
+only status 0 (complete within the issue threshold) or 102 (complete with
+findings above the default zero threshold). Status 101 means at least one tool
+failed and is rejected even if another tool emitted syntactically valid output.
 
 Operational gotcha: when the Dockerized Codacy CLI fails before a tool can emit
 results, the output file may have a `.json` suffix but contain tool-runner logs
@@ -79,11 +96,75 @@ dump as finding evidence. If GitHub check-run annotations are empty too, use
 `pr-issues.sh` with `CODACY_TOKEN`; without that token, record the evidence gap
 and re-check after the next push.
 
+The repository wrapper prevents the common Docker-socket variant of this
+failure. The outer CLI launches child analyzer containers through the host
+Docker daemon, so a config created only in the CLI container's private `/tmp`
+does not exist in the host path namespace; Docker creates a directory at the
+missing bind source and the analyzer reports `read /.codacyrc: is a directory`.
+`analyze-local.sh` gives Java a same-path host-backed temporary directory and
+rejects malformed or wrong-shape JSON/SARIF instead of printing a false-success
+path. JSON must be the CLI's result array, where each item is exactly one supported
+`Issue`, `DuplicationClone`, `FileError`, or `FileMetrics` wrapper with its required
+payload shape. SARIF must declare version 2.1.0 and contain a `runs` array. If that
+exact error recurs, verify the runner still mounts its configured Java temp
+directory at the same absolute path before changing analyzer policy.
+`JAVA_TOOL_OPTIONS` must retain literal quotes around that path because Java
+reparses the environment value; shell-quoting the Docker argument alone does not
+protect checkout paths containing spaces.
+
+For SARIF, a valid top-level envelope alone is not trustworthy. The wrapper pins
+the Docker runner to the current supported stable CLI, 7.10.1, by its immutable
+Linux/amd64 manifest digest and rejects a local binary that does not report that
+exact version when `--runner local` is explicit. In automatic mode, an
+incompatible local binary falls back to the digest-pinned Docker runner when it
+is available. Its closed contract also requires every run to carry its tool
+driver and rules, result records with valid
+rule references and physical locations, exactly one successful invocation, and
+referenced artifacts. The wrapper validates those nested records and
+cross-references before reporting success. The CLI has one known producer quirk:
+in mixed security/non-security runs, non-security result indexes address the
+non-security rule subset even though the driver publishes security rules first.
+That hidden partition cannot be reconstructed from the serialized rule category,
+which the CLI itself treats as unreliable. The validator therefore keeps every
+index in range but uses the existing unique rule ID as the authoritative
+reference.
+
+An explicit output path must resolve to a writable regular file or a
+not-yet-created file whose parent directory already exists. The wrapper rejects
+directories, must successfully truncate the destination before the analyzer
+starts, and requires a non-empty readable regular file afterward. This prevents
+a failed redirection from reusing a stale report.
+
+The Docker image version and digest, accepted local-binary version, closed
+JSON/SARIF validator, and mock matrix are one compatibility unit. When Codacy
+publishes a new stable CLI, verify its upstream result model, image digest, and
+real output first, then
+update all four together. Do not use a moving image tag or make unknown wrappers
+implicitly successful merely to tolerate version drift.
+
+When the local CLI emits valid JSON, its top-level shape is an array of tagged
+result wrappers, not the Codacy v3 API's `.data[].commitIssue` shape. Issue
+findings live under `.Issue` (for example `.Issue.filename` and
+`.Issue.patternId.value`); duplication results, file errors, and file metrics
+use their corresponding wrapper names. Do not reuse Cloud-API filters on local
+analyzer dumps.
+
 One common local cause is gitignored generated output with restrictive file
 permissions. For example, if local scratch output under `.local/` contains files
 not readable by the Docker container, Codacy logs `Could not read file` messages
 and the saved `.json` dump is plain text. Fix or move the local generated output
 before trusting local analyzer output.
+
+A restrictive workstation `umask` can also make regenerated **tracked** files
+mode `0600` and their generated output directory mode `0700`, even though Git
+still records the files' normal non-executable mode.
+`gen_docs_integrations.py` and `gen_doc_collector_page.py` can therefore leave
+generated Markdown unreadable or untraversable to Codacy's container user.
+Before rerunning the local analyzer, enumerate generated directories that lack
+world-execute permission and tracked files that lack world-read permission, then
+add only those local access bits; verify that `git status` reports no mode/content
+drift. Do not disable the analyzer or treat its resulting plain-text `.json` as
+a pass.
 
 Operational gotcha: the public Codacy v3 analysis endpoint can expose PR issue
 details even when GitHub check-run annotations are empty and no `CODACY_TOKEN`
@@ -103,6 +184,23 @@ after a new push. If `pr-issues.sh` still reports findings but the Codacy
 check-run for the current head SHA is green, inspect `.commitIssue.commitInfo.sha`
 in the dump. Findings anchored to an older commit are stale cache and should not
 be treated as current-head blockers.
+
+Generated integration Markdown under `**/integrations/*.md` is excluded in
+`.codacy.yml`. Those files are overwritten by `integrations/gen_docs_integrations.py`
+and intentionally contain HTML badges, details blocks, generated image markup,
+and template-controlled spacing that conflict with the repository's markdownlint
+rules. Validate `metadata.yaml`, generator source, generated-doc reproducibility,
+and Learn ingestion instead; never hand-edit generated pages to clear Codacy.
+
+Operational gotcha: Codacy Cloud can enable markdownlint `MD043` with an empty
+required heading sequence. It reports one finding per new Markdown file as
+`Expected: [None]; Actual: # ...`, even though a structured document correctly
+needs headings. Do not delete the headings. Follow the repository's existing
+suppression pattern by placing `<!-- markdownlint-disable ... MD043 -->` or
+`<!-- markdownlint-disable-file ... MD043 -->` before the first heading; a
+directive after the heading is too late to suppress that finding. If the document
+participates in an integrity manifest, refresh its hash and byte count after
+moving the directive. See `how-tos/resolve-md043-none-heading-findings.md`.
 
 To restrict to a single tool (matches what Codacy reported on a CI run):
 

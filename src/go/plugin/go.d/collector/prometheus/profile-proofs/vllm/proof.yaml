@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: 3
+profile: vllm
+supporting_profiles:
+  - name: fastapi
+    sha256: bde3083141c2e05d113b8bdb14b2dbc8b2a2979b689cfe6ab436401a2ca4ef29
+    bytes: 3089
+  - name: process_runtime
+    sha256: fd0c7c27a47b0d36a360444eb5d0deca82d7182bd3f4639fdfe62bd400b9c4a2
+    bytes: 1724
+  - name: python_gc
+    sha256: 19c27bbb8fd7375441623a92fffb619897f43513b2627ab03b269821d0e14f65
+    bytes: 1223
+source_inventory:
+  rows: 253
+  source_families: 183
+  authored_selectors: 163
+  dispositions:
+    chart: 163
+    profile_excluded: 85
+    job_excluded: 0
+    writer_ineligible: 5
+validation:
+  metadata_example:
+    integration_id: collector-go.d.plugin-prometheus-vllm
+    example_name: Native vLLM
+    job_name: vllm
+  cases:
+    - name: source-complete
+      kind: source_complete
+      fixture: fixtures/vllm_all_metrics.prom
+      job: validation
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 183
+          raw_logical_series: 262
+          writer_series: 778
+          series_scanned: 778
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 124
+          runtime_charts: 142
+          autogen_charts: 0
+          chart_dimensions: 778
+          pipeline_excluded: 90
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          duplicate_sibling_family: 1
+          profile_relabel_discard_review: 3
+          sibling_identity_mismatch: 2
+    - name: without-job-policy
+      kind: supplemental
+      fixture: fixtures/vllm_all_metrics.prom
+      job: none
+      expected:
+        verdict: PASS
+        counts:
+          raw_families: 183
+          raw_logical_series: 262
+          writer_series: 778
+          series_scanned: 778
+          series_autogen: 0
+          series_unmatched: 0
+          authored_charts: 124
+          runtime_charts: 142
+          autogen_charts: 0
+          chart_dimensions: 778
+          pipeline_excluded: 90
+          pipeline_renamed: 0
+          dead_charts: 0
+          dead_dimensions: 0
+          dimension_losses: 0
+          instance_losses: 0
+          collisions: 0
+          chart_wire_collisions: 0
+          context_wire_collisions: 0
+          dimension_collisions: 0
+        errors: {}
+        warnings:
+          default_validation_job: 1
+          duplicate_sibling_family: 1
+          profile_relabel_discard_review: 3
+          sibling_identity_mismatch: 2
+integrity:
+  evidence:
+    sha256: ef3c3aa288163dd63ecab40000d063252f909c98d9ee9deae3102dda3d77316c
+    bytes: 2621
+  operator_model:
+    sha256: 62d286679e14c5bd89bacdc03b6094507745892c5e94e9e63b8ed5ff37fd8796
+    bytes: 7052
+  validation_job:
+    sha256: 14553e24cda6540e33a3fffaf2f0730c4a46a859b251652b70f4e328528950a3
+    bytes: 36
+  validation_summary:
+    sha256: a1ca148b6810b195e0033d0559e1cce35c31d01a9141743184cd938f888d05eb
+    bytes: 1866
+  profile:
+    sha256: 43269120abb4f79457a563bd2460acf213eb17ca712a0b378caa2fa3b20629bc
+    bytes: 49098

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/internal/promtestdata"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -21,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -39,6 +41,17 @@ func Test_testDataIsValid(t *testing.T) {
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+}
+
+func TestDefaultConfigMatchesNewAndReturnsIndependentValues(t *testing.T) {
+	first := DefaultConfig()
+	second := DefaultConfig()
+	assert.Equal(t, New().Config, first)
+
+	first.Profiles.Mode = "none"
+	assert.Equal(t, "auto", second.Profiles.Mode)
+	assert.Equal(t, 2000, second.MaxTS)
+	assert.Equal(t, 200, second.MaxTSPerMetric)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -630,6 +643,16 @@ test_gauge_metric{label1="value1"} 11
 	}
 }
 
+func requireAutogenOnlyRuntime(t *testing.T, collr *Collector) {
+	t.Helper()
+
+	require.NotNil(t, collr.runtime)
+	require.Empty(t, collr.runtime.profiles, "profiles.mode none must not retain a selected profile")
+	want, err := buildMergedChartTemplate(collr.resolveApp(nil), nil)
+	require.NoError(t, err)
+	require.Equal(t, want, collr.runtime.chartTemplate, "profiles.mode none must use the pure autogen template")
+}
+
 // TestCollector_HAProxyProfile exercises the full profile path against the stock
 // haproxy profile: selection (auto/exact/combined select it; none falls back to
 // autogen) and the curated charts rendering under the per-app namespace, including
@@ -739,6 +762,9 @@ haproxy_backend_response_time_average_seconds{proxy="app"} 0.05
 			cc.BeginCycle()
 			require.NoError(t, collr.Collect(context.Background()))
 			require.NoError(t, cc.CommitCycleSuccess())
+			if tc.profiles.effectiveMode() == profilesModeNone {
+				requireAutogenOnlyRuntime(t, collr)
+			}
 
 			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: tc.want})
 		})
@@ -818,6 +844,1115 @@ func TestCollector_HAProxyProfileAllMetrics(t *testing.T) {
 		"prometheus.haproxy.sticktable_entries":        {"used", "size"},
 	}
 	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: curated})
+}
+
+func testCollectorStockProfileModes(
+	t *testing.T,
+	profileName string,
+	input string,
+	curated map[string][]string,
+	autogen map[string][]string,
+) {
+	t.Helper()
+
+	tests := []struct {
+		name     string
+		profiles ProfilesConfig
+		want     map[string][]string
+	}{
+		{
+			name:     "auto mode selects " + profileName,
+			profiles: ProfilesConfig{Mode: "auto"},
+			want:     curated,
+		},
+		{
+			name:     "exact mode selects " + profileName,
+			profiles: ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: profileName}}}},
+			want:     curated,
+		},
+		{
+			name:     "combined mode selects " + profileName,
+			profiles: ProfilesConfig{Mode: "combined", ModeCombined: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: profileName}}}},
+			want:     curated,
+		},
+		{
+			name:     "none mode falls back to autogen",
+			profiles: ProfilesConfig{Mode: "none"},
+			want:     autogen,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(input)) }))
+			defer srv.Close()
+
+			collr := New()
+			collr.URL = srv.URL
+			collr.Profiles = tc.profiles
+			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
+
+			cc := cycle(t, collr.MetricStore())
+			cc.BeginCycle()
+			require.NoError(t, collr.Collect(context.Background()))
+			require.NoError(t, cc.CommitCycleSuccess())
+			if tc.profiles.effectiveMode() == profilesModeNone {
+				requireAutogenOnlyRuntime(t, collr)
+			}
+
+			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: tc.want})
+		})
+	}
+}
+
+func TestCollector_VLLMProfile(t *testing.T) {
+	const input = `
+# TYPE vllm:num_requests_running gauge
+vllm:num_requests_running{engine="0",model_name="example-model"} 1
+`
+	testCollectorStockProfileModes(
+		t,
+		"vllm",
+		input,
+		map[string][]string{"prometheus.vllm.scheduler.request_state": {"running"}},
+		map[string][]string{"prometheus.vllm:num_requests_running": {"vllm:num_requests_running"}},
+	)
+}
+
+func TestCollector_VLLMRayProfile(t *testing.T) {
+	const input = `
+# TYPE ray_vllm_num_requests_running gauge
+ray_vllm_num_requests_running{Component="core_worker",ReplicaId="replica-a",SessionName="session-a",Version="2.48.0",WorkerId="worker-a",engine="0",model_name="example-model"} 1
+`
+	testCollectorStockProfileModes(
+		t,
+		"vllm_ray",
+		input,
+		map[string][]string{"prometheus.vllm.scheduler.request_state": {"running"}},
+		map[string][]string{"prometheus.ray_vllm_num_requests_running": {"ray_vllm_num_requests_running"}},
+	)
+}
+
+func TestCollector_LiteLLMProfile(t *testing.T) {
+	const input = `
+# TYPE litellm_in_flight_requests gauge
+litellm_in_flight_requests 1
+`
+	testCollectorStockProfileModes(
+		t,
+		"litellm",
+		input,
+		map[string][]string{"prometheus.litellm.gateway.in_flight_requests": {"requests"}},
+		map[string][]string{"prometheus.litellm_in_flight_requests": {"litellm_in_flight_requests"}},
+	)
+}
+
+func TestCollector_CephProfile(t *testing.T) {
+	const input = `
+# TYPE ceph_health_status gauge
+ceph_health_status 0
+`
+	testCollectorStockProfileModes(
+		t,
+		"ceph",
+		input,
+		map[string][]string{"prometheus.ceph.cluster_mgr.health.cluster_status.state": {"value"}},
+		map[string][]string{"prometheus.ceph_health_status": {"ceph_health_status"}},
+	)
+}
+
+func configureProfileJobFromMetadata(
+	t *testing.T,
+	collr *Collector,
+	integrationID, profileName, jobName string,
+	supportingProfileNames ...string,
+) []string {
+	t.Helper()
+
+	var metadata struct {
+		Modules []struct {
+			Meta struct {
+				ID string `yaml:"id"`
+			} `yaml:"meta"`
+			Setup struct {
+				Configuration struct {
+					Examples struct {
+						List []struct {
+							Config string `yaml:"config"`
+						} `yaml:"list"`
+					} `yaml:"examples"`
+				} `yaml:"configuration"`
+			} `yaml:"setup"`
+		} `yaml:"modules"`
+	}
+	content, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(content, &metadata))
+
+	var config *Config
+	for _, module := range metadata.Modules {
+		if module.Meta.ID != integrationID {
+			continue
+		}
+		require.NotEmpty(t, module.Setup.Configuration.Examples.List)
+		for _, item := range module.Setup.Configuration.Examples.List {
+			var example struct {
+				Jobs []yaml.Node `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(item.Config), &example))
+			for idx := range example.Jobs {
+				candidate := New().Config
+				require.NoError(t, example.Jobs[idx].Decode(&candidate))
+				if candidate.Name == jobName {
+					config = &candidate
+					break
+				}
+			}
+			if config != nil {
+				break
+			}
+		}
+		break
+	}
+	require.NotNilf(t, config, "metadata integration %q has no job %q", integrationID, jobName)
+	require.Empty(t, config.Application, "stock metadata must derive app identity from the application profile")
+	require.Equal(t, ProfilesConfig{Mode: profilesModeAuto}, config.Profiles,
+		"stock metadata must exercise automatic profile selection")
+
+	config.URL = collr.URL
+	collr.Config = *config
+	return append([]string{profileName}, supportingProfileNames...)
+}
+
+func requireSelectedProfiles(t *testing.T, collr *Collector, expected ...string) {
+	t.Helper()
+	require.NotNil(t, collr.runtime)
+	actual := make([]string, 0, len(collr.runtime.profiles))
+	for _, profile := range collr.runtime.profiles {
+		actual = append(actual, profile.Name)
+	}
+	require.ElementsMatch(t, expected, actual)
+}
+
+// TestCollector_VLLMProfileAllMetrics proves the stock profile against a
+// sanitized structural union, including optional and mutually exclusive
+// source-defined surfaces and each distinct entity identity.
+func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
+	fixture := promtestdata.Require(t, "prometheus/profiles/vllm/fixtures/vllm_all_metrics.prom")
+	input, err := os.ReadFile(fixture)
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(input) }))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	expectedProfiles := configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm", "vllm",
+		"fastapi", "process_runtime", "python_gc")
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	requireSelectedProfiles(t, collr, expectedProfiles...)
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	var sawCanonicalOffload bool
+	collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()).ForEachSeries(
+		func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
+			assert.Falsef(t, strings.HasSuffix(name, "_created"), "profile relabeling retained generated timestamp %q", name)
+			assert.NotEqual(t, "process_start_time_seconds", name)
+			assert.NotEqual(t, "vllm:kv_offload_total_bytes_total", name)
+			assert.NotEqual(t, "vllm:kv_offload_total_time_total", name)
+			assert.Falsef(t, strings.HasPrefix(name, "vllm:kv_offload_size"),
+				"profile relabeling retained deprecated offload family %q", name)
+			if name == "vllm:kv_offload_store_bytes_total" {
+				sawCanonicalOffload = true
+			}
+		})
+	assert.True(t, sawCanonicalOffload, "profile relabeling must retain canonical CPU-offload counters")
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+	runtimeReader := eng.RuntimeStore().Read(metrix.ReadRaw())
+	for _, metric := range []string{"series_autogen_matched_total", "series_unmatched_total"} {
+		name := "netdata.go.plugin.framework.chartengine." + metric
+		value, ok := runtimeReader.Value(name, nil)
+		require.Truef(t, ok, "chartengine runtime metric %q is missing", name)
+		assert.Zerof(t, value, "source-complete stock fixture must leave %s at zero", metric)
+	}
+
+	seenChartIDs := make(map[string]string)
+	identityCounts := map[string]int{
+		"prometheus.vllm.request_lifecycle.outcomes":              0,
+		"prometheus.vllm.kv_offloading.transfer_operations":       0,
+		"prometheus.vllm.mooncake_connector.volume.keys":          0,
+		"prometheus.vllm.diffusion_decoding.denoising_steps":      0,
+		"prometheus.vllm.websocket_service.connection_lifecycle":  0,
+		"prometheus.vllm.fastapi.http_endpoints.request_outcomes": 0,
+		"prometheus.vllm.tool_parsing.invocations":                0,
+		"prometheus.vllm.process_runtime.process_cpu":             0,
+	}
+	for _, action := range plan.Actions {
+		create, ok := action.(chartengine.CreateChartAction)
+		if !ok {
+			continue
+		}
+		if prev, dup := seenChartIDs[create.ChartID]; dup {
+			t.Fatalf("chart-ID collision %q: contexts %q and %q", create.ChartID, prev, create.Meta.Context)
+		}
+		seenChartIDs[create.ChartID] = create.Meta.Context
+		assert.Truef(t, strings.HasPrefix(create.Meta.Context, "prometheus.vllm."),
+			"context %q (chart %q) is missing the prometheus.vllm. app segment", create.Meta.Context, create.ChartID)
+
+		switch create.Meta.Context {
+		case "prometheus.vllm.request_lifecycle.outcomes":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.Equal(t, "0", create.Labels["engine"])
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.kv_offloading.transfer_operations":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.Equal(t, "0", create.Labels["engine"])
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.mooncake_connector.volume.keys":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.Equal(t, "0", create.Labels["engine"])
+			assert.NotEmpty(t, create.Labels["operation"])
+			assert.NotContains(t, create.Labels, "status")
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.diffusion_decoding.denoising_steps":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.Equal(t, "0", create.Labels["engine"])
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.websocket_service.connection_lifecycle":
+			assert.NotContains(t, create.Labels, "model_name")
+			assert.NotContains(t, create.Labels, "engine")
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.fastapi.http_endpoints.request_outcomes":
+			assert.NotEmpty(t, create.Labels["handler"])
+			assert.NotEmpty(t, create.Labels["method"])
+			assert.NotContains(t, create.Labels, "model_name")
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.tool_parsing.invocations":
+			assert.Equal(t, "example-model", create.Labels["model_name"])
+			assert.NotEmpty(t, create.Labels["request_type"])
+			assert.NotEmpty(t, create.Labels["mode"])
+			assert.NotContains(t, create.Labels, "engine")
+			identityCounts[create.Meta.Context]++
+		case "prometheus.vllm.process_runtime.process_cpu":
+			assert.NotContains(t, create.Labels, "model_name")
+			assert.NotContains(t, create.Labels, "engine")
+			identityCounts[create.Meta.Context]++
+		}
+	}
+	assert.NotEmpty(t, seenChartIDs)
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.request_lifecycle.outcomes"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.kv_offloading.transfer_operations"])
+	assert.Equal(t, 2, identityCounts["prometheus.vllm.mooncake_connector.volume.keys"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.diffusion_decoding.denoising_steps"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.websocket_service.connection_lifecycle"])
+	assert.Equal(t, 2, identityCounts["prometheus.vllm.fastapi.http_endpoints.request_outcomes"])
+	assert.Equal(t, 6, identityCounts["prometheus.vllm.tool_parsing.invocations"])
+	assert.Equal(t, 1, identityCounts["prometheus.vllm.process_runtime.process_cpu"])
+
+	curated := map[string][]string{
+		"prometheus.vllm.request_lifecycle.outcomes":                  {"stop", "length", "abort", "error", "repetition"},
+		"prometheus.vllm.request_lifecycle.corrupted_requests":        {"corrupted"},
+		"prometheus.vllm.scheduler.waiting_by_reason":                 {"capacity", "deferred"},
+		"prometheus.vllm.prefill.prompt_tokens_by_source":             {"local_compute", "local_cache_hit", "external_kv_transfer"},
+		"prometheus.vllm.decode.inter_token_intervals":                {"intervals"},
+		"prometheus.vllm.engine_execution.estimated_memory_bandwidth": {"read", "write"},
+		"prometheus.vllm.kv_cache.local_prefix":                       {"queries", "hits"},
+		"prometheus.vllm.kv_cache_residency.measurements":             {"lifetimes", "idle_periods", "reuse_gaps"},
+		"prometheus.vllm.kv_offloading.cpu_cache_usage":               {"total", "writes", "reads"},
+		"prometheus.vllm.nixl_connector.failures":                     {"transfers", "notifications"},
+		"prometheus.vllm.hf3fs_connector.failures":                    {"saves", "loads"},
+		"prometheus.vllm.mooncake_connector.volume.keys":              {"ok", "error"},
+		"prometheus.vllm.speculative_decoding.accepted_by_position":   {"0", "1"},
+		"prometheus.vllm.diffusion_decoding.committed_tokens":         {"committed"},
+		"prometheus.vllm.websocket_service.connection_lifecycle":      {"opened", "closed"},
+		"prometheus.vllm.fastapi.http_endpoints.request_outcomes":     {"2xx"},
+		"prometheus.vllm.fastapi.http_service.request_measurements":   {"requests"},
+		"prometheus.vllm.tool_parsing.invocations":                    {"tool_call", "no_tool_call"},
+		"prometheus.vllm.process_runtime.process_cpu":                 {"used"},
+		"prometheus.vllm.process_runtime.python_gc.collections":       {"0", "1", "2"},
+	}
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: curated})
+}
+
+func testCollectorStockProfileAllMetrics(
+	t *testing.T,
+	fixture string,
+	configure func(*Collector) []string,
+	contextPrefix string,
+	requiredContexts map[string][]string,
+	inspectStore func(metrix.Reader),
+	inspectPlan func(chartengine.Plan),
+) {
+	t.Helper()
+
+	input, err := os.ReadFile(promtestdata.Require(t, fixture))
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(input) }))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	var expectedProfiles []string
+	if configure != nil {
+		expectedProfiles = configure(collr)
+	}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	if expectedProfiles != nil {
+		requireSelectedProfiles(t, collr, expectedProfiles...)
+	}
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+	reader := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	if inspectStore != nil {
+		inspectStore(reader)
+	}
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+
+	attempt, err := eng.PreparePlan(reader)
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+	runtimeReader := eng.RuntimeStore().Read(metrix.ReadRaw())
+	for _, metric := range []string{"series_autogen_matched_total", "series_unmatched_total"} {
+		name := "netdata.go.plugin.framework.chartengine." + metric
+		value, ok := runtimeReader.Value(name, nil)
+		require.Truef(t, ok, "chartengine runtime metric %q is missing", name)
+		assert.Zerof(t, value, "source-complete stock fixture must leave %s at zero", metric)
+	}
+
+	seenChartIDs := make(map[string]string)
+	for _, action := range plan.Actions {
+		create, ok := action.(chartengine.CreateChartAction)
+		if !ok {
+			continue
+		}
+		if prev, dup := seenChartIDs[create.ChartID]; dup {
+			t.Fatalf("chart-ID collision %q: contexts %q and %q", create.ChartID, prev, create.Meta.Context)
+		}
+		seenChartIDs[create.ChartID] = create.Meta.Context
+		assert.Truef(t, strings.HasPrefix(create.Meta.Context, contextPrefix),
+			"context %q (chart %q) is missing prefix %q", create.Meta.Context, create.ChartID, contextPrefix)
+	}
+	assert.NotEmpty(t, seenChartIDs)
+	if inspectPlan != nil {
+		inspectPlan(plan)
+	}
+
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: requiredContexts})
+}
+
+// TestCollector_VLLMRayProfileAllMetrics proves the Ray transport profile
+// against the source-derived vLLM/Ray structural union. Profile relabeling
+// removes Ray's deprecated unsuffixed counter aliases and pre-canonical
+// KV-offload duplicates so canonical counters are represented exactly once.
+func TestCollector_VLLMRayProfileAllMetrics(t *testing.T) {
+	testCollectorStockProfileAllMetrics(
+		t,
+		"prometheus/profiles/vllm_ray/fixtures/vllm_ray_all_metrics.prom",
+		func(collr *Collector) []string {
+			return configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm_ray", "vllm-ray")
+		},
+		"prometheus.vllm.",
+		map[string][]string{
+			"prometheus.vllm.scheduler.request_state":                   {"running", "waiting"},
+			"prometheus.vllm.request_lifecycle.outcomes":                {"stop", "length", "abort", "error", "repetition"},
+			"prometheus.vllm.kv_offloading.transfer_bytes":              {"loaded", "loaded_observed", "stored", "stored_observed"},
+			"prometheus.vllm.kv_offloading.admission_outcomes":          {"allocation_failures", "stores_skipped"},
+			"prometheus.vllm.speculative_decoding.token_outcomes":       {"proposed", "accepted"},
+			"prometheus.vllm.speculative_decoding.accepted_by_position": {"0", "1"},
+			"prometheus.vllm.diffusion_decoding.committed_tokens":       {"committed"},
+			"prometheus.vllm.nixl_connector.failures":                   {"transfers", "notifications"},
+			"prometheus.vllm.hf3fs_connector.failures":                  {"saves", "loads"},
+			"prometheus.vllm.mooncake_connector.volume.failed_keys":     {"ok", "error"},
+		},
+		func(reader metrix.Reader) {
+			var sawCanonicalCounter bool
+			reader.ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
+				assert.NotEqual(t, "ray_vllm_request_success", name,
+					"Ray compatibility gauge survived profile relabeling")
+				assert.Falsef(t, strings.HasPrefix(name, "ray_vllm_kv_offload_size_"),
+					"deprecated Ray KV-offload histogram component %q survived profile relabeling", name)
+				if name == "ray_vllm_request_success_total" {
+					sawCanonicalCounter = true
+				}
+			})
+			assert.True(t, sawCanonicalCounter, "Ray profile relabeling must retain canonical _total counters")
+		},
+		func(plan chartengine.Plan) {
+			const byteContext = "prometheus.vllm.kv_offloading.transfer_bytes"
+			var byteCharts []chartengine.CreateChartAction
+			updates := make(map[string]chartengine.UpdateChartAction)
+			for _, action := range plan.Actions {
+				switch action := action.(type) {
+				case chartengine.CreateChartAction:
+					if action.Meta.Context == byteContext {
+						byteCharts = append(byteCharts, action)
+					}
+				case chartengine.UpdateChartAction:
+					updates[action.ChartID] = action
+				}
+			}
+
+			require.Len(t, byteCharts, 1)
+			for _, chart := range byteCharts {
+				assert.Equal(t, "example-model", chart.Labels["model_name"])
+				assert.Equal(t, "0", chart.Labels["engine"])
+				assert.Equal(t, "replica-a", chart.Labels["ReplicaId"])
+				assert.Equal(t, "worker-a", chart.Labels["WorkerId"])
+				assert.Equal(t, "2.48.0", chart.Labels["Version"])
+				assert.Equal(t, "session-a", chart.Labels["SessionName"])
+				assert.Equal(t, "core_worker", chart.Labels["Component"])
+
+				values := make(map[string]float64)
+				for _, value := range updates[chart.ChartID].Values {
+					if value.IsFloat {
+						values[value.Name] = value.Float64
+					} else {
+						values[value.Name] = float64(value.Int64)
+					}
+				}
+				require.Len(t, values, 4)
+				for _, name := range []string{"loaded", "loaded_observed", "stored", "stored_observed"} {
+					assert.Positivef(t, values[name], "dimension %q must carry the synthetic fixture value", name)
+				}
+			}
+		},
+	)
+}
+
+func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
+	testCollectorStockProfileAllMetrics(
+		t,
+		"prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom",
+		func(collr *Collector) []string {
+			return configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-litellm", "litellm", "litellm",
+				"process_runtime", "python_gc")
+		},
+		"prometheus.litellm.",
+		map[string][]string{
+			"prometheus.litellm.gateway.in_flight_requests":                                        {"requests"},
+			"prometheus.litellm.gateway.client_responses_by_status":                                {"200", "unclassified"},
+			"prometheus.litellm.gateway.client_responses_by_stream_mode":                           {"True", "False", "unclassified"},
+			"prometheus.litellm.gateway.client_failures_by_status":                                 {"429", "unclassified"},
+			"prometheus.litellm.gateway.client_failures_by_rate_limit_category":                    {"vendor_rate_limit", "litellm_rate_limit", "unclassified"},
+			"prometheus.litellm.gateway.client_failures_by_rate_limit_type":                        {"requests", "tokens", "unclassified"},
+			"prometheus.litellm.gateway.request_total_latency_measurements_by_service_tier":        {"priority", "unclassified"},
+			"prometheus.litellm.gateway.accumulated_request_total_latency_by_service_tier":         {"priority", "unclassified"},
+			"prometheus.litellm.gateway.client_responses_by_status_by_provider_deployment":         {"200", "unclassified"},
+			"prometheus.litellm.gateway.client_failures_by_status_by_provider_deployment":          {"429", "unclassified"},
+			"prometheus.litellm.gateway.client_responses_by_status_by_route":                       {"200", "unclassified"},
+			"prometheus.litellm.gateway.client_failures_by_status_by_route":                        {"429", "unclassified"},
+			"prometheus.litellm.routing_and_deployments.deployment_state":                          {"state"},
+			"prometheus.litellm.routing_and_deployments.deployment_failures_by_status":             {"429", "unclassified"},
+			"prometheus.litellm.routing_and_deployments.deployment_cooldowns_by_status":            {"429", "unclassified"},
+			"prometheus.litellm.routing_and_deployments.deployment_request_workload_by_deployment": {"requests"},
+			"prometheus.litellm.routing_and_deployments.deployment_failures_by_status_by_deployment": {
+				"429", "unclassified",
+			},
+			"prometheus.litellm.routing_and_deployments.deployment_cooldowns_by_status_by_deployment": {
+				"429", "unclassified",
+			},
+			"prometheus.litellm.provider_api.accumulated_provider_latency":                      {"api_latency"},
+			"prometheus.litellm.provider_api.provider_api_latency_measurements_by_service_tier": {"priority", "unclassified"},
+			"prometheus.litellm.provider_api.provider_time_to_first_token_measurements_by_service_tier": {
+				"priority", "unclassified",
+			},
+			"prometheus.litellm.provider_api.accumulated_provider_api_latency_by_service_tier": {
+				"priority", "unclassified",
+			},
+			"prometheus.litellm.provider_api.accumulated_provider_time_to_first_token_by_service_tier": {
+				"priority", "unclassified",
+			},
+			"prometheus.litellm.provider_api.accumulated_provider_latency_by_provider_model":       {"api_latency"},
+			"prometheus.litellm.usage_and_cost.request_token_throughput":                           {"total"},
+			"prometheus.litellm.usage_and_cost.llm_spend_by_service_tier":                          {"priority", "unclassified"},
+			"prometheus.litellm.usage_and_cost.request_token_throughput_by_api_key":                {"total"},
+			"prometheus.litellm.usage_and_cost.llm_spend_by_team":                                  {"spend"},
+			"prometheus.litellm.caching.cache_outcomes":                                            {"hits"},
+			"prometheus.litellm.caching.cache_outcomes_by_provider_model":                          {"hits"},
+			"prometheus.litellm.governance.team_budget":                                            {"team_remaining"},
+			"prometheus.litellm.guardrails.guardrail_invocations_by_status":                        {"success", "failure"},
+			"prometheus.litellm.guardrails.guardrail_invocations_by_status_by_guardrail_hook":      {"success", "failure"},
+			"prometheus.litellm.mcp_gateway.mcp_tool_calls":                                        {"calls"},
+			"prometheus.litellm.mcp_gateway.mcp_tool_calls_by_server_tool":                         {"calls"},
+			"prometheus.litellm.managed_batch_and_files.managed_batches_created":                   {"created"},
+			"prometheus.litellm.managed_batch_and_files.managed_batches_created_by_provider_model": {"created"},
+			"prometheus.litellm.callbacks_and_inventory.user_inventory":                            {"total"},
+			"prometheus.litellm.callbacks_and_inventory.callback_logging_failures_by_callback":     {"failures"},
+			"prometheus.litellm.internal_services.internal_service_requests":                       {"redis"},
+			"prometheus.litellm.process_runtime.process_cpu":                                       {"used"},
+			"prometheus.litellm.process_runtime.python_gc.collections":                             {"0", "1", "2"},
+		},
+		nil,
+		func(plan chartengine.Plan) {
+			const (
+				totalContext                          = "prometheus.litellm.gateway.client_responses_by_status"
+				streamContext                         = "prometheus.litellm.gateway.client_responses_by_stream_mode"
+				rateLimitCategoryContext              = "prometheus.litellm.gateway.client_failures_by_rate_limit_category"
+				rateLimitTypeContext                  = "prometheus.litellm.gateway.client_failures_by_rate_limit_type"
+				requestTierContext                    = "prometheus.litellm.gateway.request_total_latency_measurements_by_service_tier"
+				providerTierContext                   = "prometheus.litellm.provider_api.provider_api_latency_measurements_by_service_tier"
+				spendTierContext                      = "prometheus.litellm.usage_and_cost.llm_spend_by_service_tier"
+				deploymentContext                     = "prometheus.litellm.gateway.client_responses_by_status_by_provider_deployment"
+				routeContext                          = "prometheus.litellm.gateway.client_responses_by_status_by_route"
+				providerModelContext                  = "prometheus.litellm.usage_and_cost.request_token_throughput_by_provider_model"
+				clientFailureContext                  = "prometheus.litellm.gateway.client_failures_by_status"
+				providerDeploymentFailureContext      = "prometheus.litellm.gateway.client_failures_by_status_by_provider_deployment"
+				routeFailureContext                   = "prometheus.litellm.gateway.client_failures_by_status_by_route"
+				deploymentFailureContext              = "prometheus.litellm.routing_and_deployments.deployment_failures_by_status"
+				deploymentCooldownContext             = "prometheus.litellm.routing_and_deployments.deployment_cooldowns_by_status"
+				deploymentFailureByDeploymentContext  = "prometheus.litellm.routing_and_deployments.deployment_failures_by_status_by_deployment"
+				deploymentCooldownByDeploymentContext = "prometheus.litellm.routing_and_deployments." +
+					"deployment_cooldowns_by_status_by_deployment"
+				requestTierSumContext      = "prometheus.litellm.gateway.accumulated_request_total_latency_by_service_tier"
+				providerTTFTTierContext    = "prometheus.litellm.provider_api.provider_time_to_first_token_measurements_by_service_tier"
+				providerTierSumContext     = "prometheus.litellm.provider_api.accumulated_provider_api_latency_by_service_tier"
+				providerTTFTTierSumContext = "prometheus.litellm.provider_api.accumulated_provider_time_to_first_token_by_service_tier"
+			)
+
+			contexts := make(map[string]string)
+			creates := make(map[string][]chartengine.CreateChartAction)
+			updates := make(map[string]chartengine.UpdateChartAction)
+			for _, action := range plan.Actions {
+				switch action := action.(type) {
+				case chartengine.CreateChartAction:
+					contexts[action.ChartID] = action.Meta.Context
+					creates[action.Meta.Context] = append(creates[action.Meta.Context], action)
+				case chartengine.UpdateChartAction:
+					updates[action.ChartID] = action
+				}
+			}
+
+			value := func(chartID, dimension string) float64 {
+				t.Helper()
+				for _, v := range updates[chartID].Values {
+					if v.Name == dimension {
+						if v.IsFloat {
+							return v.Float64
+						}
+						return float64(v.Int64)
+					}
+				}
+				t.Fatalf("dimension %q not found in chart %q (%s)", dimension, chartID, contexts[chartID])
+				return 0
+			}
+			contextValue := func(context, dimension string) float64 {
+				t.Helper()
+				var total float64
+				for _, chart := range creates[context] {
+					for _, v := range updates[chart.ChartID].Values {
+						if v.Name != dimension {
+							continue
+						}
+						if v.IsFloat {
+							total += v.Float64
+						} else {
+							total += float64(v.Int64)
+						}
+					}
+				}
+				return total
+			}
+
+			require.Len(t, creates[totalContext], 1)
+			assert.Equal(t, float64(15), value(creates[totalContext][0].ChartID, "200"))
+			assert.Equal(t, float64(11), value(creates[totalContext][0].ChartID, "unclassified"))
+
+			require.Len(t, creates[streamContext], 1)
+			assert.Equal(t, float64(3), value(creates[streamContext][0].ChartID, "True"))
+			assert.Equal(t, float64(4), value(creates[streamContext][0].ChartID, "False"))
+			assert.Equal(t, float64(23), value(creates[streamContext][0].ChartID, "unclassified"))
+
+			require.Len(t, creates[rateLimitCategoryContext], 1)
+			assert.Equal(t, float64(3), value(creates[rateLimitCategoryContext][0].ChartID, "vendor_rate_limit"))
+			assert.Equal(t, float64(2), value(creates[rateLimitCategoryContext][0].ChartID, "litellm_rate_limit"))
+			assert.Equal(t, float64(15), value(creates[rateLimitCategoryContext][0].ChartID, "unclassified"))
+
+			require.Len(t, creates[rateLimitTypeContext], 1)
+			assert.Equal(t, float64(3), value(creates[rateLimitTypeContext][0].ChartID, "requests"))
+			assert.Equal(t, float64(2), value(creates[rateLimitTypeContext][0].ChartID, "tokens"))
+			assert.Equal(t, float64(15), value(creates[rateLimitTypeContext][0].ChartID, "unclassified"))
+
+			for context, want := range map[string]map[string]float64{
+				clientFailureContext:                  {"429": 5, "500": 4, "unclassified": 11},
+				providerDeploymentFailureContext:      {"429": 3, "500": 4, "unclassified": 11},
+				routeFailureContext:                   {"429": 3, "500": 4, "unclassified": 11},
+				deploymentFailureContext:              {"429": 3, "500": 4, "unclassified": 11},
+				deploymentCooldownContext:             {"429": 3, "500": 4, "unclassified": 11},
+				deploymentFailureByDeploymentContext:  {"429": 3, "500": 4, "unclassified": 11},
+				deploymentCooldownByDeploymentContext: {"429": 3, "500": 4, "unclassified": 11},
+				requestTierContext:                    {"priority": 2, "unclassified": 4},
+				requestTierSumContext:                 {"priority": 1.3, "unclassified": 6.1},
+				providerTierContext:                   {"priority": 2, "unclassified": 4},
+				providerTTFTTierContext:               {"priority": 2, "unclassified": 4},
+				providerTierSumContext:                {"priority": 1.3, "unclassified": 6.1},
+				providerTTFTTierSumContext:            {"priority": 1.3, "unclassified": 6.1},
+				spendTierContext:                      {"priority": 3, "unclassified": 9},
+			} {
+				require.NotEmpty(t, creates[context])
+				for dimension, expected := range want {
+					assert.InDelta(t, expected, contextValue(context, dimension), 1e-9,
+						"context %q dimension %q", context, dimension)
+				}
+			}
+
+			require.Len(t, creates[deploymentContext], 2)
+			foundDeployment := false
+			for _, create := range creates[deploymentContext] {
+				if create.Labels["api_provider"] == "provider-a" && create.Labels["model_id"] == "model-id-a" {
+					foundDeployment = true
+					assert.Equal(t, float64(8), value(create.ChartID, "200"))
+					assert.Equal(t, float64(11), value(create.ChartID, "unclassified"))
+				}
+			}
+			assert.True(t, foundDeployment)
+
+			require.Len(t, creates[routeContext], 2)
+			foundRoute := false
+			for _, create := range creates[routeContext] {
+				if create.Labels["route"] == "/v1/chat/completions" {
+					foundRoute = true
+					assert.Equal(t, float64(8), value(create.ChartID, "200"))
+					assert.Equal(t, float64(11), value(create.ChartID, "unclassified"))
+				}
+			}
+			assert.True(t, foundRoute)
+
+			require.Len(t, creates[providerModelContext], 1)
+			assert.Equal(t, "provider-model-a", creates[providerModelContext][0].Labels["model"])
+			assert.Equal(t, float64(8), value(creates[providerModelContext][0].ChartID, "total"))
+
+			for context, want := range map[string]int{
+				"prometheus.litellm.routing_and_deployments.deployment_state":            2,
+				"prometheus.litellm.routing_and_deployments.provider_remaining_requests": 3,
+				"prometheus.litellm.governance.api_key_budget":                           2,
+				"prometheus.litellm.governance.user_budget":                              3,
+				"prometheus.litellm.managed_batch_and_files.managed_file_size":           2,
+			} {
+				require.Len(t, creates[context], want)
+				for _, create := range creates[context] {
+					assert.NotEmptyf(t, create.Labels["pid"], "context %q must retain multiprocess identity", context)
+				}
+			}
+
+			providerHeadroom := creates["prometheus.litellm.routing_and_deployments.provider_remaining_requests"]
+			seenCustomGaugeIdentity := map[string]bool{}
+			for _, create := range providerHeadroom {
+				if create.Labels["pid"] == "1001" {
+					seenCustomGaugeIdentity[create.Labels["metadata_project"]+"/"+create.Labels["tag_prod"]] = true
+				}
+			}
+			assert.Equal(t, map[string]bool{"project-a/true": true, "project-b/false": true}, seenCustomGaugeIdentity)
+
+			seenUserBudgetIdentity := map[string]bool{}
+			for _, create := range creates["prometheus.litellm.governance.user_budget"] {
+				seenUserBudgetIdentity[create.Labels["user_email"]+"/"+create.Labels["user_alias"]] = true
+			}
+			assert.True(t, seenUserBudgetIdentity["user-a@example.com/user-alias-a"])
+			assert.True(t, seenUserBudgetIdentity["user-b@example.com/user-alias-b"])
+
+			for chartID, context := range contexts {
+				assert.Falsef(t, strings.HasPrefix(context, "prometheus.litellm.litellm_"),
+					"chart %q unexpectedly used generic fallback context %q", chartID, context)
+			}
+		},
+	)
+}
+
+func TestCollector_CephProfileAllMetrics(t *testing.T) {
+	testCollectorStockProfileAllMetrics(
+		t,
+		"prometheus/profiles/ceph/fixtures/ceph_all_metrics.prom",
+		func(collr *Collector) []string {
+			return configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr",
+				"process_runtime")
+		},
+		"prometheus.ceph.",
+		map[string][]string{
+			"prometheus.ceph.cluster_mgr.health.cluster_status.state":                                       {"value"},
+			"prometheus.ceph.cluster_mgr.pools.capacity_and_quotas.raw_space":                               {"bytes_used"},
+			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_availability.state":       {"reachable"},
+			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time":       {"kernel", "user", "idle"},
+			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.memory":         {"virtual", "resident"},
+			"prometheus.ceph.daemon_exporters.manager_daemons.lookup_outcomes":                              {"hit", "miss"},
+			"prometheus.ceph.daemon_exporters.bluefs.space_and_files.file_work":                             {"sst", "wal"},
+			"prometheus.ceph.daemon_exporters.object_gateway.operations.requests":                           {"get_obj_ops"},
+			"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_19.outcomes.scrub_work":                    {"dp_repl_failed_scrubs"},
+			"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_20.outcomes.scrub_work":                    {"failed_scrubs_replicated"},
+			"prometheus.ceph.daemon_exporters.cephfs_mds.request_handling_and_state.operations":             {"request"},
+			"prometheus.ceph.daemon_exporters.cephfs_mds_sessions.session_state":                            {"session", "sessions_open", "sessions_stale"},
+			"prometheus.ceph.daemon_exporters.cephfs_mds_clients.capability_outcomes":                       {"hits", "misses"},
+			"prometheus.ceph.daemon_exporters.rbd_client_images.io_operations":                              {"read", "write"},
+			"prometheus.ceph.daemon_exporters.rbd_mirror.journal.byte_throughput":                           {"value"},
+			"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.reads": {"rd", "hit_rd", "part_hit_rd"},
+			"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.writes": {
+				"wr", "wr_def", "wr_def_lanes", "wr_def_log", "wr_def_buf", "wr_overlap", "wr_q_barrier",
+			},
+			"prometheus.ceph.daemon_exporters.runtime_and_client_components.object_caches.cache_outcomes": {
+				"hit", "miss",
+			},
+			"prometheus.ceph.daemon_exporters.runtime_and_client_components.finishers.queue_depth":     {"queued"},
+			"prometheus.ceph.daemon_exporters.runtime_and_client_components.mclock_shards.queue_depth": {"immediate", "client", "recovery", "best_effort", "all_type"},
+			"prometheus.ceph.daemon_exporters.runtime_and_client_components.memory_pools.memory_use":   {"osd", "ec_extent_cache"},
+			"prometheus.ceph.cephfs_mirror.peers.snapshot_outcomes":                                    {"synced", "failed"},
+			"prometheus.ceph.object_gateway_scheduling.queue_depth":                                    {"admin", "auth", "data", "metadata"},
+			"prometheus.ceph.storage_engine_extensions.rocksdb_binned_cache.lookup_outcomes":           {"hits", "misses"},
+			"prometheus.ceph.storage_engine_extensions.external_block_devices.partition_space":         {"physical_size", "logical_size", "physical_available", "logical_available"},
+			"prometheus.ceph.ceph_clients.io_operations":                                               {"metadata", "read", "write"},
+			"prometheus.ceph.nvme_of.block_devices.byte_throughput":                                    {"read_bytes"},
+			"prometheus.ceph.process_runtime.process_cpu":                                              {"used"},
+		},
+		func(reader metrix.Reader) {
+			names := make(map[string]int)
+			reader.ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
+				names[name]++
+			})
+			var mds, image, pwl, rawPWL, rawDynamic, objecter int
+			for name, count := range names {
+				switch {
+				case strings.HasPrefix(name, "ceph_mds_per_client_"):
+					mds += count
+				case strings.HasPrefix(name, "ceph_rbd_librbd_image_"):
+					image += count
+				case strings.HasPrefix(name, "ceph_rbd_librbd_pwl_"):
+					pwl += count
+				case strings.HasPrefix(name, "ceph_librbd_pwl_"):
+					rawPWL += count
+				case strings.HasPrefix(name, "ceph_mds_client_metrics_filesystem_key_") ||
+					strings.HasPrefix(name, "ceph_librbd_image_key_"):
+					rawDynamic += count
+				case strings.HasPrefix(name, "ceph_objecter_0x"):
+					objecter += count
+				}
+			}
+			assert.Equal(t, 15, mds)
+			assert.Equal(t, 34, image)
+			assert.Equal(t, 81, pwl)
+			assert.Zero(t, rawPWL)
+			assert.Zero(t, rawDynamic)
+			assert.Zero(t, objecter, "dynamic objecter families must be normalized before profile routing")
+		},
+		func(plan chartengine.Plan) {
+			contexts := make(map[string][]chartengine.CreateChartAction)
+			dimensions := make(map[string]map[string]chartengine.CreateDimensionAction)
+			reservedSourceLabelPreserved := map[string]bool{
+				"cluster_mgr": false,
+				"nvme_of":     false,
+			}
+			var pwlFallback, objecterCharts, rawRGWAliasCharts int
+			for _, action := range plan.Actions {
+				switch action := action.(type) {
+				case chartengine.CreateChartAction:
+					contexts[action.Meta.Context] = append(contexts[action.Meta.Context], action)
+					assert.NotContains(t, action.Labels, "instance",
+						"source instance must be renamed before Netdata adds its re-export instance label")
+					if action.Labels["ceph_instance"] != "" {
+						switch {
+						case strings.HasPrefix(action.Meta.Context, "prometheus.ceph.cluster_mgr."):
+							reservedSourceLabelPreserved["cluster_mgr"] = true
+						case strings.HasPrefix(action.Meta.Context, "prometheus.ceph.nvme_of."):
+							reservedSourceLabelPreserved["nvme_of"] = true
+						}
+					}
+					if strings.Contains(action.Meta.Context, ".ceph_librbd_pwl_") {
+						pwlFallback++
+					}
+					if strings.Contains(action.Meta.Context, ".ceph_objecter_0x") {
+						objecterCharts++
+					}
+					if strings.Contains(action.Meta.Context, ".ceph_data_sync_from_zone_a_") {
+						rawRGWAliasCharts++
+					}
+				case chartengine.CreateDimensionAction:
+					if dimensions[action.ChartMeta.Context] == nil {
+						dimensions[action.ChartMeta.Context] = make(map[string]chartengine.CreateDimensionAction)
+					}
+					dimensions[action.ChartMeta.Context][action.Name] = action
+				}
+			}
+			assert.Zero(t, pwlFallback, "normalized PWL families must use curated charts")
+			assert.Zero(t, objecterCharts, "dynamic objecter families must use the curated canonical context")
+			assert.Zero(t, rawRGWAliasCharts, "MGR raw RGW source-zone aliases must not duplicate normalized families")
+			assert.Equal(t, map[string]bool{"cluster_mgr": true, "nvme_of": true}, reservedSourceLabelPreserved,
+				"official source instance labels must remain available under ceph_instance")
+
+			type semanticExpectation struct {
+				units     string
+				algorithm chartengine.Algorithm
+				dimension string
+				divisor   int
+				float     bool
+			}
+			wantSemantics := map[string]semanticExpectation{
+				"prometheus.ceph.cluster_mgr.osd_capacity_and_state.osd_state.weight": {"weight", chartengine.AlgorithmAbsolute, "weight", 0, false},
+				"prometheus.ceph.cluster_mgr.pools.capacity_and_quotas.logical_space": {"bytes", chartengine.AlgorithmAbsolute, "stored", 0, false},
+				"prometheus.ceph.cluster_mgr.pools.capacity_and_quotas.raw_space":     {"bytes", chartengine.AlgorithmAbsolute, "stored_raw", 0, false},
+				"prometheus.ceph.cluster_mgr.pools.capacity_and_quotas.compression_space": {
+					"bytes", chartengine.AlgorithmAbsolute, "compress_under_bytes", 0, false,
+				},
+				"prometheus.ceph.daemon_exporters.bluefs.i_o_and_files.zero_read_outcomes": {"reads/s", chartengine.AlgorithmIncremental, "errors", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.allocation.allocation_unit":    {"bytes", chartengine.AlgorithmAbsolute, "alloc_unit", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.allocation.allocated_space":    {"bytes", chartengine.AlgorithmAbsolute, "allocated", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.compression_and_checksums.compressed_extents": {
+					"extents/s", chartengine.AlgorithmIncremental, "extent_compress", 0, false,
+				},
+				"prometheus.ceph.daemon_exporters.bluestore.i_o.skipped_blobs":    {"blobs/s", chartengine.AlgorithmIncremental, "write_big_skipped_blobs", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.i_o.slow_aio_waits":   {"waits/s", chartengine.AlgorithmIncremental, "slow_aio_wait", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.i_o.write_operations": {"writes/s", chartengine.AlgorithmIncremental, "write_big", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.i_o.written_blobs":    {"blobs/s", chartengine.AlgorithmIncremental, "write_big_blobs", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.i_o.penalty_reads":    {"reads/s", chartengine.AlgorithmIncremental, "write_penalty_read_ops", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.omap.open_iterators":  {"iterators", chartengine.AlgorithmAbsolute, "iterator", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.omap.mutation_calls":  {"calls/s", chartengine.AlgorithmIncremental, "setheader", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.omap.key_mutations":   {"keys/s", chartengine.AlgorithmIncremental, "setkeys_records", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.onode_cache.blob_state": {
+					"blobs", chartengine.AlgorithmAbsolute, "onode_spanning_blobs", 0, false,
+				},
+				"prometheus.ceph.daemon_exporters.bluestore.onode_cache.extent_state":          {"extents", chartengine.AlgorithmAbsolute, "onode_extents", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.onode_cache.shard_lookup_outcomes": {"lookups/s", chartengine.AlgorithmIncremental, "shard_misses", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.space_and_core_state.blob_splits":  {"blobs/s", chartengine.AlgorithmIncremental, "blob_split", 0, false},
+				"prometheus.ceph.daemon_exporters.bluestore.space_and_core_state.gc_merge_throughput": {
+					"bytes/s", chartengine.AlgorithmIncremental, "gc_merged", 0, false,
+				},
+				"prometheus.ceph.daemon_exporters.bluestore.space_and_core_state.buffer_cache_residency":  {"bytes", chartengine.AlgorithmAbsolute, "buffer_bytes", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.capabilities.capability_messages":            {"messages/s", chartengine.AlgorithmIncremental, "handle_client_caps", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.capabilities.throttled_requests":             {"requests/s", chartengine.AlgorithmIncremental, "server_cap_acquisition_throttle", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.capabilities.evicted_clients":                {"clients/s", chartengine.AlgorithmIncremental, "server_cap_revoke_eviction", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.journal.large_events":                        {"events/s", chartengine.AlgorithmIncremental, "evlrg", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.metadata_cache_directory.discovery_messages": {"messages/s", chartengine.AlgorithmIncremental, "send_discover", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.metadata_cache_directory.discovery_attempts": {"attempts/s", chartengine.AlgorithmIncremental, "try_discover", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.metadata_cache_directory.replication_directives": {
+					"directives/s", chartengine.AlgorithmIncremental, "update_receipt", 0, false,
+				},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.namespace_traversal.dirfrag_lifecycle":                            {"dirfrags/s", chartengine.AlgorithmIncremental, "dir_split", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.namespace_traversal.traversals":                                   {"traversals/s", chartengine.AlgorithmIncremental, "traverse", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.request_handling_and_state.connected_clients":                     {"clients", chartengine.AlgorithmAbsolute, "client_metrics_num_clients", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.request_handling_and_state.queued_requests":                       {"requests", chartengine.AlgorithmAbsolute, "q", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.request_handling_and_state.expired_inodes":                        {"inodes/s", chartengine.AlgorithmIncremental, "expired", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.scrubbing.scrubbed_inodes":                                        {"inodes/s", chartengine.AlgorithmIncremental, "file_inodes", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.scrubbing.backtrace_work":                                         {"backtraces/s", chartengine.AlgorithmIncremental, "backtrace_repaired", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.scrubbing.repaired_inotables":                                     {"inotables/s", chartengine.AlgorithmIncremental, "inotable_repaired", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds.scrubbing.dirfrag_rstat_updates":                                  {"dirfrags/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds_sessions.average_load":                                            {"load", chartengine.AlgorithmAbsolute, "average_load", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds_sessions.metadata_threshold_evictions":                            {"sessions/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds_clients.capability_outcomes":                                      {"accesses/s", chartengine.AlgorithmIncremental, "hits", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds_clients.dentry_lease_outcomes":                                    {"lookups/s", chartengine.AlgorithmIncremental, "misses", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds_clients.reported_io_operations":                                   {"operations/s", chartengine.AlgorithmIncremental, "read", 0, false},
+				"prometheus.ceph.daemon_exporters.cephfs_mds_clients.reported_io_volume":                                       {"bytes/s", chartengine.AlgorithmIncremental, "write", 0, false},
+				"prometheus.ceph.daemon_exporters.control_plane.paxos.collected_uncommitted_values":                            {"values/s", chartengine.AlgorithmIncremental, "collect_uncommitted", 0, false},
+				"prometheus.ceph.daemon_exporters.messenger.rdma_errors":                                                       {"errors/s", chartengine.AlgorithmIncremental, "rdmadispatcher_handshake_errors", 0, false},
+				"prometheus.ceph.daemon_exporters.messenger.connection_timeouts":                                               {"connections/s", chartengine.AlgorithmIncremental, "worker_msgr_connection_ready_timeouts", 0, false},
+				"prometheus.ceph.daemon_exporters.messenger.active_queue_pairs":                                                {"queue pairs", chartengine.AlgorithmAbsolute, "active_queue_pair", 0, false},
+				"prometheus.ceph.daemon_exporters.messenger.receive_buffers":                                                   {"buffers", chartengine.AlgorithmAbsolute, "rx_bufs_in_use", 0, false},
+				"prometheus.ceph.daemon_exporters.messenger.work_completions":                                                  {"completions/s", chartengine.AlgorithmIncremental, "tx_total_wc", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_runtime.crc_lookup_outcomes":                                             {"lookups/s", chartengine.AlgorithmIncremental, "missed_crc", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_runtime.tier_agent_actions":                                              {"actions/s", chartengine.AlgorithmIncremental, "tier_promote", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_runtime.map_messages":                                                    {"messages/s", chartengine.AlgorithmIncremental, "messages_delayed_for_map", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_runtime.map_epochs":                                                      {"epochs/s", chartengine.AlgorithmIncremental, "map_message_epoch_dups", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_runtime.object_context_cache_lookup_outcomes":                            {"lookups/s", chartengine.AlgorithmIncremental, "object_ctx_cache", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_runtime.heartbeat_peers":                                                 {"peers", chartengine.AlgorithmAbsolute, "heartbeat_to_peers", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_runtime.load_average":                                                    {"load", chartengine.AlgorithmAbsolute, "loadavg", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_19.elapsed_time.scrub_latency_measurements":               {"scrubs/s", chartengine.AlgorithmIncremental, "dp_ec_failed_scrubs_elapsed", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_19.elapsed_time.reservation_latency_measurements":         {"reservations/s", chartengine.AlgorithmIncremental, "dp_ec_failed_reservations_elapsed", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_19.reservations.replicas_in_reservation":                  {"replicas", chartengine.AlgorithmAbsolute, "dp_ec_replicas_in_reservation", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_19.reservations.reservation_process_outcomes":             {"reservations/s", chartengine.AlgorithmIncremental, "dp_ec_reservation_process_failure", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_20.interference_and_scheduling.client_write_interference": {"writes/s", chartengine.AlgorithmIncremental, "ec_io_blocked", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_ceph_20.scrub_work.scrub_calls":                                {"calls/s", chartengine.AlgorithmIncremental, "ec_getattr_cnt", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_common_work.interference_and_scheduling.object_lock_waits":     {"waits/s", chartengine.AlgorithmIncremental, "dp_ec_locked_object", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_common_work.interference_and_scheduling.chunk_selection_outcomes": {
+					"chunks/s", chartengine.AlgorithmIncremental, "dp_ec_chunk_selected", 0, false,
+				},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_common_work.interference_and_scheduling.preemptions":           {"preemptions/s", chartengine.AlgorithmIncremental, "dp_ec_preemptions", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_common_work.interference_and_scheduling.blocked_client_writes": {"writes/s", chartengine.AlgorithmIncremental, "dp_ec_write_blocked_by_scrub", 0, false},
+				"prometheus.ceph.daemon_exporters.osd_scrubbing_common_work.reservations.completed_reservations":               {"reservations/s", chartengine.AlgorithmIncremental, "dp_ec_scrub_reservations_completed", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.lifecycle.lifecycle_actions":                                  {"actions/s", chartengine.AlgorithmIncremental, "expire_current", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.lifecycle.aborted_multipart_uploads":                          {"uploads/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.lua.current_vms":                                              {"VMs", chartengine.AlgorithmAbsolute, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.lua.script_executions":                                        {"executions/s", chartengine.AlgorithmIncremental, "failure", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.notifications.pending_events":                                 {"events", chartengine.AlgorithmAbsolute, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.notifications.missing_configurations":                         {"events/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.operations.requests":                                          {"requests/s", chartengine.AlgorithmIncremental, "copy_obj_ops", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.requests_and_queue.current_requests":                          {"requests", chartengine.AlgorithmAbsolute, "qactive", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway.requests_and_queue.failed_requests":                           {"requests/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway_cache.d4n_cache_evictions":                                    {"entries/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway_cache.keystone_lookup_outcomes":                               {"lookups/s", chartengine.AlgorithmIncremental, "miss", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway_multisite.replicated_objects":                                 {"objects/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.object_gateway_multisite.replication_log_request_errors":                     {"requests/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.objecter.active_commands":                                                    {"commands", chartengine.AlgorithmAbsolute, "command_active", 0, false},
+				"prometheus.ceph.daemon_exporters.objecter.map_epoch":                                                          {"epoch", chartengine.AlgorithmAbsolute, "map_epoch", 0, false},
+				"prometheus.ceph.daemon_exporters.objecter.operation_vector_entries":                                           {"entries/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.objecter.commands":                                                           {"commands/s", chartengine.AlgorithmIncremental, "command_send", 0, false},
+				"prometheus.ceph.daemon_exporters.objecter.replica_reads":                                                      {"reads/s", chartengine.AlgorithmIncremental, "replica_read_completed", 0, false},
+				"prometheus.ceph.daemon_exporters.objecter.osd_sessions":                                                       {"sessions/s", chartengine.AlgorithmIncremental, "osd_session_open", 0, false},
+				"prometheus.ceph.daemon_exporters.objecter.stat_requests":                                                      {"requests/s", chartengine.AlgorithmIncremental, "statfs_send", 0, false},
+				"prometheus.ceph.daemon_exporters.rbd_mirror.journal.latency_measurements":                                     {"entries/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.rbd_mirror.journal.journal_entries":                                          {"entries/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.rbd_mirror.snapshot_replication.latency_measurements":                        {"snapshots/s", chartengine.AlgorithmIncremental, "sync_time", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.kstore_latency_measurements":                           {"transactions/s", chartengine.AlgorithmIncremental, "kstore_state_done_lat", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.client_latency_measurements":                           {"requests/s", chartengine.AlgorithmIncremental, "client_lat", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.recovery_state_latency_measurements":                   {"state transitions/s", chartengine.AlgorithmIncremental, "recoverystate_perf_active_latency", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.sqlite_vfs_latency_measurements":                       {"operations/s", chartengine.AlgorithmIncremental, "libcephsqlite_vfs_op_open", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.monitor_state":                                         {"monitors", chartengine.AlgorithmAbsolute, "cluster_num_mon_quorum", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.pg_state":                                              {"PGs", chartengine.AlgorithmAbsolute, "cluster_num_pg_active_clean", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.worker_state":                                          {"workers", chartengine.AlgorithmAbsolute, "cct_unhealthy_workers", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.oft_omap_mutations":                                    {"operations/s", chartengine.AlgorithmIncremental, "oft_omap_total_removes", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime.shared_daemon.client_latency_sqsum": {
+					"microseconds²/s", chartengine.AlgorithmIncremental, "client_mdsqsum", 1000000, true,
+				},
+				"prometheus.ceph.daemon_exporters.runtime.slow_operations.slow_operations": {"operations/s", chartengine.AlgorithmIncremental, "value", 0, false},
+				"prometheus.ceph.daemon_exporters.storage_engine.rocksdb_compaction.compactions": {
+					"compactions/s", chartengine.AlgorithmIncremental, "completed", 0, false,
+				},
+				"prometheus.ceph.daemon_exporters.storage_engine.rocksdb_compaction.queue_merges":                                             {"merges/s", chartengine.AlgorithmIncremental, "queue_merge", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.reads":                               {"reads/s", chartengine.AlgorithmIncremental, "rd", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.writes":                              {"writes/s", chartengine.AlgorithmIncremental, "wr_def_lanes", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.log_appends":                         {"appends/s", chartengine.AlgorithmIncremental, "log_ops", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.log_append_size_measurements":        {"appends/s", chartengine.AlgorithmIncremental, "log_op_bytes_count", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.write_latency_measurements":          {"requests/s", chartengine.AlgorithmIncremental, "wr_latency_count", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.log_operation_latency_measurements":  {"operations/s", chartengine.AlgorithmIncremental, "op_alloc_t_count", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.data_operation_latency_measurements": {"operations/s", chartengine.AlgorithmIncremental, "discard_lat_count", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.transaction_latency_measurements":    {"transactions/s", chartengine.AlgorithmIncremental, "append_tx_lat_count", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.finishers.queue_depth":                                        {"callbacks", chartengine.AlgorithmAbsolute, "queued", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.finishers.completions":                                        {"batches/s", chartengine.AlgorithmIncremental, "completed", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.throttles.slot_throughput":                                    {"slots/s", chartengine.AlgorithmIncremental, "get_sum", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.throttles.wait_measurements":                                  {"waits/s", chartengine.AlgorithmIncremental, "waits", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.messenger_workers.send_queue_latency_measurements":            {"messages/s", chartengine.AlgorithmIncremental, "send_messages_queue", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.messenger_workers.ack_latency_measurements":                   {"acknowledgements/s", chartengine.AlgorithmIncremental, "handle_ack", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.rdma_workers.transfer_errors":                                 {"errors/s", chartengine.AlgorithmIncremental, "tx_failed_post", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.dpdk_queues.packet_fragments":                                 {"fragments/s", chartengine.AlgorithmIncremental, "receive_fragments", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.dpdk_queues.copy_linearize_operations":                        {"operations/s", chartengine.AlgorithmIncremental, "receive_copy_ops", 0, false},
+				"prometheus.ceph.daemon_exporters.runtime_and_client_components.service_identity.identity_metadata":                           {"identifier", chartengine.AlgorithmAbsolute, "present", 0, false},
+				"prometheus.ceph.object_gateway_scheduling.throttled_requests":                                                                {"requests/s", chartengine.AlgorithmIncremental, "throttled", 0, false},
+				"prometheus.ceph.object_gateway_scheduling.outstanding_requests":                                                              {"requests", chartengine.AlgorithmAbsolute, "outstanding", 0, false},
+				"prometheus.ceph.storage_engine_extensions.rocksdb_binned_cache.entries":                                                      {"entries", chartengine.AlgorithmAbsolute, "items", 0, false},
+			}
+			for context, want := range wantSemantics {
+				require.NotEmptyf(t, contexts[context], "semantic regression context %q did not materialize", context)
+				for _, create := range contexts[context] {
+					assert.Equalf(t, want.units, create.Meta.Units, "context %q units", context)
+				}
+				dim, ok := dimensions[context][want.dimension]
+				require.Truef(t, ok, "semantic regression dimension %q/%q did not materialize", context, want.dimension)
+				assert.Equalf(t, want.algorithm, dim.Algorithm, "context %q dimension %q algorithm", context, want.dimension)
+				if want.divisor != 0 || want.float {
+					assert.Equalf(t, want.divisor, dim.Divisor, "context %q dimension %q divisor", context, want.dimension)
+					assert.Equalf(t, want.float, dim.Float, "context %q dimension %q float mode", context, want.dimension)
+				}
+			}
+
+			require.Len(t, contexts["prometheus.ceph.daemon_exporters.rbd_mirror.journal.byte_throughput"], 2)
+			require.Len(t, contexts["prometheus.ceph.daemon_exporters.cephfs_mds_clients.capability_outcomes"], 1)
+			mdsChart := contexts["prometheus.ceph.daemon_exporters.cephfs_mds_clients.capability_outcomes"][0]
+			assert.Equal(t, "filesystem_key_a", mdsChart.Labels["mds_filesystem_key"])
+			assert.NotContains(t, mdsChart.Labels, "fs_name")
+
+			require.Len(t, contexts["prometheus.ceph.daemon_exporters.rbd_client_images.io_operations"], 1)
+			imageChart := contexts["prometheus.ceph.daemon_exporters.rbd_client_images.io_operations"][0]
+			assert.Equal(t, "image_key_a_pool_a_image_a", imageChart.Labels["librbd_image_key"])
+
+			require.Len(t, contexts["prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.reads"], 1)
+			pwlChart := contexts["prometheus.ceph.daemon_exporters.runtime_and_client_components.rbd_persistent_write_log.reads"][0]
+			assert.Equal(t, "image_key_a_pool_a_image_a", pwlChart.Labels["librbd_pwl_key"])
+
+			require.Len(t, contexts["prometheus.ceph.daemon_exporters.runtime_and_client_components.finishers.queue_depth"], 2)
+			finisherKeys := make(map[string]bool)
+			for _, chart := range contexts["prometheus.ceph.daemon_exporters.runtime_and_client_components.finishers.queue_depth"] {
+				finisherKeys[chart.Labels["finisher_key"]] = true
+			}
+			assert.Equal(t, map[string]bool{"fixture_a": true, "fixture_a_0x1000": true}, finisherKeys)
+		},
+	)
+}
+
+// TestCollector_CephProfileProducerVariants keeps the distinct official wire
+// contracts executable. MGR emits long-running-average sums as counters, while
+// ceph-exporter emits those same sums as gauges from the daemon schema.
+func TestCollector_CephProfileProducerVariants(t *testing.T) {
+	tests := []struct {
+		fixture       string
+		jobName       string
+		context       string
+		dims          []string
+		candidateOnly bool
+	}{
+		{"prometheus/profiles/ceph/fixtures/ceph_reef_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}, true},
+		{"prometheus/profiles/ceph/fixtures/ceph_squid_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}, true},
+		{"prometheus/profiles/ceph/fixtures/ceph_tentacle_mgr_perf_all_metrics.prom", "ceph-mgr", "prometheus.ceph.cluster_mgr.health.cluster_status.state", []string{"value"}, true},
+		{
+			"prometheus/profiles/ceph/fixtures/ceph_reef_exporter_prio0_all_metrics.prom",
+			"ceph-exporter",
+			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
+			[]string{"kernel", "user", "idle"},
+			true,
+		},
+		{
+			"prometheus/profiles/ceph/fixtures/ceph_squid_exporter_prio0_all_metrics.prom",
+			"ceph-exporter",
+			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
+			[]string{"kernel", "user", "idle"},
+			true,
+		},
+		{
+			"prometheus/profiles/ceph/fixtures/ceph_tentacle_exporter_prio0_all_metrics.prom",
+			"ceph-exporter",
+			"prometheus.ceph.daemon_exporters.exporter_and_process_runtime.daemon_processes.cpu_time",
+			[]string{"kernel", "user", "idle"},
+			true,
+		},
+		{"prometheus/profiles/ceph/fixtures/ceph_nvmeof_all_metrics.prom", "ceph-exporter", "prometheus.ceph.nvme_of.block_devices.byte_throughput", []string{"read_bytes", "written_bytes"}, false},
+	}
+
+	for _, test := range tests {
+		t.Run(filepath.Base(test.fixture), func(t *testing.T) {
+			testCollectorStockProfileAllMetrics(
+				t,
+				test.fixture,
+				func(collr *Collector) []string {
+					expectedProfiles := configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-ceph", "ceph", test.jobName,
+						"process_runtime")
+					if test.candidateOnly {
+						collr.Profiles = ProfilesConfig{
+							Mode:      "exact",
+							ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "ceph"}}},
+						}
+						return []string{"ceph"}
+					}
+					return expectedProfiles
+				},
+				"prometheus.ceph.",
+				map[string][]string{test.context: test.dims},
+				nil,
+				nil,
+			)
+		})
+	}
 }
 
 // TestCollector_ProfileSelectionErrors covers the exact/combined contract: a named
