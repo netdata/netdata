@@ -585,8 +585,9 @@ Profile validation invariants (`profile.go`) — these are load-bearing:
   dimension has no label and is excluded). Chart-instance identity is built solely
   from `by_labels`; a missing label would silently merge distinct AWS resources
   onto one chart instance.
-- Every chart must declare `algorithm: absolute` (CloudWatch aggregates are not
-  cumulative counters; this also blocks incremental suffix inference).
+- Every chart must declare `algorithm: absolute`. CloudWatch aggregates are
+  absolute per-period values, and the explicit declaration makes that profile
+  invariant reviewable and enforced independently of runtime metric metadata.
 - `template.metrics` must be empty — the collector owns the visible-series list
   and fills it at build time.
 - `rate: true` requires a `sum` or `sample_count` statistic (the per-second value

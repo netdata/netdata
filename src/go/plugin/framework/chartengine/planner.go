@@ -532,6 +532,7 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 				}
 				continue
 			}
+			route = finalizeRouteAlgorithm(route, meta.Kind)
 			if err := ctx.accumulateRoute(ctx.index, route, identity, meta, labels, v); err != nil {
 				firstErr = err
 				return
