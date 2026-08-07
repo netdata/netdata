@@ -813,6 +813,7 @@ bool apps_ebpf_shared_memory_refresh(void);
 bool apps_ebpf_sync_pid_stat(struct pid_stat *p);
 void apps_ebpf_accumulate_cachestat(void);
 bool apps_ebpf_cachestat_is_available(void);
+bool apps_ebpf_cachestat_data_ready(void);
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------

@@ -116,9 +116,10 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 	if total > 0 {
 		publish.Ratio = int64((float64(hits) / float64(total)) * 100)
 	} else {
-		// No page accesses this cycle: ratio is undefined, not 100 %.
-		// Emit 0 so idle periods don't fabricate a perfect hit rate.
-		publish.Ratio = 0
+		// No page-cache activity this interval; 100 = full hit rate (nothing missed).
+		// Matches the idle-path convention in cachestat_shared_memory.go,
+		// apps_ebpf_shared_memory.c, and cgroup_ebpfgo_cachestat.c.
+		publish.Ratio = 100
 	}
 
 	s.cumDirty += mbd

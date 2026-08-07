@@ -72,7 +72,10 @@ struct netdata_tpacket_stats {
 #define DNS_DIRECTION_QUERY    1u
 #define DNS_DIRECTION_RESPONSE 0u
 
-/* DNS ports to monitor (decision 2-B: 53 standard + 5353 mDNS). */
+/* DNS ports to monitor for aggregate counting.  5353 (mDNS) is included for
+ * aggregate stats only; per-query pending tracking is skipped for it because
+ * mDNS queries are sent to a multicast group while responses come from the
+ * responder's unicast IP — server_ip can never match on lookup. */
 static const uint16_t dns_monitored_ports[] = {53, 5353};
 #define DNS_PORT_COUNT (sizeof(dns_monitored_ports) / sizeof(dns_monitored_ports[0]))
 
@@ -624,9 +627,16 @@ static bool dns_parse_raw_packet(
         client_port = dport;
     }
 
-    dns_process_packet(rt, now_us, !is_resp_flag, proto, ip_version,
-                       server_ip, client_ip, client_port,
-                       tx_id, domain, query_type, rcode);
+    /* Skip per-query pending tracking for mDNS (port 5353): queries are sent
+     * to a multicast group; responses arrive from the responder's unicast IP,
+     * so server_ip can never match in dns_pending_find.  Without this guard
+     * every mDNS query expires as a false Timeout row.  Aggregate counts are
+     * unaffected — they are credited via the out_* flags and return value. */
+    uint16_t server_port = is_resp_flag ? sport : dport;
+    if (server_port != 5353)
+        dns_process_packet(rt, now_us, !is_resp_flag, proto, ip_version,
+                           server_ip, client_ip, client_port,
+                           tx_id, domain, query_type, rcode);
 
     return true;
 }

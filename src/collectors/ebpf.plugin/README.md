@@ -796,6 +796,11 @@ attaches kprobes or fentry/fexit trampolines to `tcp_sendmsg`, `tcp_cleanup_rbuf
 > Per-cgroup and per-service equivalents (`cgroup.net_*`, `systemd.service.net_*`) are **not
 > removed** — they are now emitted by `cgroups.plugin` via the shared-memory bridge to
 > `ebpfgo.plugin`. On-demand function output does not support alerting or metric retention.
+>
+> The `network-sockets-tracing` on-demand Function (which provided per-connection byte
+> accounting and hostname resolution drilldowns) is **permanently removed** and has no direct
+> replacement. The `network-protocols` function exposes aggregate per-PID socket metrics;
+> per-connection drilldowns are a known gap in this release.
 
 ### Apps
 

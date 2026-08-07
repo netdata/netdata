@@ -11,11 +11,17 @@ static netdata_ebpfgo_shared_pid_memory_t apps_ebpf_shared_memory_ctx = {
     .sem = SEM_FAILED,
 };
 
-/* Set to true once the SHM refresh succeeds AND the publisher has stamped
- * EBPFGO_SHM_FLAG_CACHESTAT; never reset.  Guards chart creation so that
- * no cachestat charts appear when the Go plugin is disabled, not yet
- * started, or running with only socket enabled (no cachestat data). */
+/* Sticky flag: set once the SHM refresh succeeds and the publisher has stamped
+ * EBPFGO_SHM_FLAG_CACHESTAT; never reset.  Guards chart creation so that no
+ * cachestat charts appear when the Go plugin is disabled, not yet started, or
+ * running with only socket enabled (no cachestat data). */
 static bool apps_ebpf_cachestat_available = false;
+
+/* Per-cycle flag: set each cycle to the refresh() return value.  Prevents
+ * stale data emission when the producer dies after its first successful
+ * publish — the sticky flag above keeps charts alive, but SET calls must
+ * be gated on a current-cycle refresh succeeding. */
+static bool apps_ebpf_last_refresh_ok = false;
 
 static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previous)
 {
@@ -97,7 +103,13 @@ bool apps_ebpf_shared_memory_refresh(void)
         NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
     if (ok && (netdata_ebpfgo_shared_pid_memory_flags(&apps_ebpf_shared_memory_ctx) & EBPFGO_SHM_FLAG_CACHESTAT))
         apps_ebpf_cachestat_available = true;
+    apps_ebpf_last_refresh_ok = ok;
     return ok;
+}
+
+bool apps_ebpf_cachestat_data_ready(void)
+{
+    return apps_ebpf_cachestat_available && apps_ebpf_last_refresh_ok;
 }
 
 bool apps_ebpf_cachestat_is_available(void)

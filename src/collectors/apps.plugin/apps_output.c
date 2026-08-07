@@ -121,7 +121,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_END();
 
 #if defined(OS_LINUX)
-        if (apps_ebpf_cachestat_is_available())
+        if (apps_ebpf_cachestat_data_ready())
             send_cachestat_data_to_netdata(w, type, dt);
 #endif
 
