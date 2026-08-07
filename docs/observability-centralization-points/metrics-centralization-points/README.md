@@ -41,9 +41,13 @@ To install a Netdata Parent:
 
    See [Configuring Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for detailed configuration instructions.
 
-3. Connect your Parent to Netdata Cloud.
+3. Access your Parent's dashboard.
 
-   Claiming the Parent lets Netdata Cloud query it, and registers all connected Children to Netdata Cloud automatically. See the [Connect Agent to Cloud guide](/src/claim/README.md) for instructions.
+   Once your Parent is receiving metrics from your Children, open its built-in dashboard at `http://parent-ip:19999` to view metrics, custom dashboards, and alerts for every connected Child. Non-sensitive functions (mount points, network interfaces, containers, etc.) work anonymously too; [sensitive functions](/docs/netdata-oss-limitations.md) like processes or network connections require signing in to Netdata Cloud. For secure remote access without exposing port 19999 directly, see the [reverse proxy guides](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md).
+
+4. Connect your Parent to Netdata Cloud.
+
+   Claiming the Parent lets Netdata Cloud query it and registers all connected Children to Netdata Cloud automatically, adding a unified view across multiple Parents, mobile alert notifications ([paid plans](/docs/netdata-cloud/view-plan-and-billing.md)), and deduplication of alert notifications when more than one Parent evaluates the same Child. See the [Connect Agent to Cloud guide](/src/claim/README.md) for instructions.
 
 <details>
 <summary><strong>Deploying a Parent with Docker</strong></summary><br/>
