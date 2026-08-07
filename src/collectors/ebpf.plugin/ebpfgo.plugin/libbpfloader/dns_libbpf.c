@@ -627,12 +627,10 @@ static bool dns_parse_raw_packet(
         client_port = dport;
     }
 
-    /* Skip per-query pending tracking for mDNS (port 5353): queries are sent
-     * to a multicast group; responses arrive from the responder's unicast IP,
-     * so server_ip can never match in dns_pending_find.  Without this guard
-     * every mDNS query expires as a false Timeout row.  Aggregate packet
-     * counts are unaffected — they are handled kernel-side by the BPF
-     * program via the dns_ports map (see dns_init_ports_map). */
+    /* Skip per-query tracking for mDNS (port 5353): queries are sent to a
+     * multicast group but responses arrive from the responder's unicast IP,
+     * so server_ip can never match in dns_pending_find.  mDNS traffic is
+     * therefore absent from dns-queries output. */
     uint16_t server_port = is_resp_flag ? sport : dport;
     if (server_port != 5353)
         dns_process_packet(rt, now_us, !is_resp_flag, proto, ip_version,

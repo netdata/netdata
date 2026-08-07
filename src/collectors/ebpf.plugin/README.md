@@ -291,7 +291,7 @@ To configure an eBPF thread:
     - `oomkill.conf`: Configuration for the `oomkill` thread.
     - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
     - `shm.conf`: Configuration for the `shm` thread.
-    - `socket.conf`: Configuration for the `ebpfgo.plugin` socket program (the C socket thread was removed). Controls BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options.
+    - `socket.conf`: Configuration for the `ebpfgo.plugin` socket program (the C socket thread was removed). Controls BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options. The legacy `network.conf` keys `bandwidth table size` (was dead config — never read by C code), `collect pid` (no per-apps-plugin equivalent in the new SHM design), and `lifetime` (the C socket thread's function lifetime) have no socket.conf equivalent and are silently ignored if present.
     - `softirq.conf`: Configuration for the `softirq` thread.
     - `swap.conf`: Configuration for the `swap` thread.
     - `sync.conf`: Configuration for the `sync` thread.

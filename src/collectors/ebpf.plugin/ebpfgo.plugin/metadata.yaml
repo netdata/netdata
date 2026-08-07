@@ -242,7 +242,7 @@ modules:
               default_value: buffer
               required: false
             - name: per query tracking
-              description: "Enable per-DNS-query latency tracking. When enabled (`yes`), the collector records the time between each DNS request and its matching response, producing per-query latency metrics in addition to aggregate query-count and error-rate metrics. Required for the `dns-queries` Function consumed by `network-viewer.plugin`."
+              description: "Enable per-DNS-query latency tracking. When enabled (`yes`), the collector records the time between each DNS request and its matching response, producing per-query latency metrics. Required for the `dns-queries` Function consumed by `network-viewer.plugin`."
               default_value: "yes"
               required: false
             - name: flow ttl
