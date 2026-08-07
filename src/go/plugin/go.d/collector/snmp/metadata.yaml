@@ -569,7 +569,8 @@ modules:
                       version: 2
             - name: Virtual node with labels
               description: |
-                Since `create_vnode` defaults to `true`, each SNMP job automatically creates a Virtual Node for its device—no separate vnode definition file is needed. Add entries under `vnode.labels` to attach your own node labels, such as grouping devices by site or rack. SNMP also adds device labels (for example `vendor` and `sys_object_id`) automatically; your labels are merged on top. Omit `guid` to have it generated from the device address.
+                Since `create_vnode` defaults to `true`, each SNMP job automatically creates a Virtual Node for its device. No separate vnode definition file is needed.
+                Add entries under `vnode.labels` to attach your own node labels, such as grouping devices by site or rack. SNMP also adds device labels (for example `vendor` and `sys_object_id`) automatically; your labels are merged on top. Omit `guid` to have it generated from the device address.
               config: |
                 jobs:
                   - name: core-switch
