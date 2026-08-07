@@ -9,20 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <time.h>
-
-/* Minimum gap between repeated pid-hash-table-full log lines (microseconds).
- * Matches errorLogInterval in error_log.go so the C-side rate limit is
- * consistent with the Go-side one used for all other error sites. */
-#define SOCKET_PID_HT_LOG_INTERVAL_USEC (60ULL * 1000000ULL)
-
-static uint64_t socket_now_usec(void)
-{
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
-        return 0;
-    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
-}
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -77,6 +63,10 @@ typedef struct {
 /* Run the dead-PID eviction pass every this many collection cycles to amortise
  * the per-PID kill() overhead on hosts with many active network processes. */
 #define SOCKET_ACC_EVICT_INTERVAL 4
+
+/* Minimum power-of-two capacity for the per-connection last-seen snapshot table.
+ * 2× this value is the actual allocation, keeping load factor at or below 50%. */
+#define SOCKET_CONN_SNAP_MIN (1u << 14u)
 
 /* -------------------------------------------------------------------------
  * tbl_nd_socket per-PID aggregation types
@@ -152,11 +142,26 @@ struct netdata_socket_per_pid_entry {
     uint64_t call_tcp_v6_connection;
 };
 
-/* Per-PID hash table for accumulation during a snapshot cycle.
- * Open-addressing with linear probing; PID 0 = empty slot.
- * The minimum size is 16384; if nd_socket_size is larger, the table grows to
- * the next power of two at or above nd_socket_size to prevent silent PID drops. */
-#define SOCKET_PID_HT_MIN (1u << 14u) /* 16384 — default/minimum */
+/* Per-connection last-seen snapshot for base-flavor delta accumulation.
+ * Open-addressing, linear probe; in_use == 0 marks an empty slot.
+ * Deletions use the shift-back algorithm — no tombstones — so the invariant
+ * "empty == end of probe chain" holds throughout the table's lifetime.
+ * Table is always at ≤50% load so UINT32_MAX from conn_snap_upsert never fires. */
+typedef struct {
+    netdata_socket_bpf_key_t key;
+    uint64_t bytes_sent;
+    uint64_t bytes_received;
+    uint32_t call_tcp_sent;
+    uint32_t call_tcp_received;
+    uint32_t retransmit;
+    uint32_t call_udp_sent;
+    uint32_t call_udp_received;
+    uint32_t call_close;
+    uint32_t call_tcp_v4_connection;
+    uint32_t call_tcp_v6_connection;
+    uint8_t  in_use;
+    uint8_t  _pad[3];
+} socket_conn_snapshot_t;
 
 enum netdata_ebpf_socket_runtime_kind {
     NETDATA_SOCKET_RUNTIME_LEGACY = 0,
@@ -184,37 +189,38 @@ struct netdata_ebpf_socket_runtime {
     netdata_socket_bpf_value_t *percpu_nd_socket;
     int                         percpu_nd_socket_cap;
 
-    /* Flat hash-table for per-PID accumulation during a snapshot cycle.
-     * Allocated once in prepare(); reused every cycle (zeroed at start).
-     * pid_ht_size is a power of two >= 2×SOCKET_PID_HT_MIN and >= 2×nd_socket_size
-     * to keep the open-addressing load factor at or below ~50%. */
-    struct netdata_socket_per_pid_entry *pid_ht;
-    uint32_t                             pid_ht_size;
-    uint32_t                             pid_ht_mask;
-    uint32_t                             pid_ht_drops; /* PIDs dropped when table full (per cycle) */
-    uint64_t                             pid_ht_drops_last_log_usec; /* last time the drops warning was emitted */
-
     /* Compact sorted output array from last per-PID snapshot (reused). */
     struct netdata_socket_per_pid_entry *per_pid_entries;
     int                                  per_pid_count;
     int                                  per_pid_cap;
 
     /* Deferred-delete buffer for tbl_nd_socket stale entries (reused every cycle).
-     * Sized at pid_ht_size/2 = max(nd_socket_size, SOCKET_PID_HT_MIN), which
-     * matches the BPF map capacity and guarantees no entry is silently skipped. */
+     * Sized to max(nd_socket_size, SOCKET_CONN_SNAP_MIN) so every stale entry
+     * can be collected in a single pass without silent overflow. */
     netdata_socket_bpf_key_t *nd_del_keys;
     uint32_t                   nd_del_cap;
 
-#if defined(LIBBPF_MAJOR_VERSION)
-    /* Ring-buffer accumulator for the buffer flavor (socket_events map).
-     * rb is non-NULL when the loaded object is the buffer flavor. */
-    struct ring_buffer *rb;
-    struct netdata_socket_per_pid_entry *acc; /* dense per-PID accumulator array */
+    /* Per-connection last-seen snapshot (base flavor only).
+     * Each cycle: delta = current − last_seen is folded into rt->acc so the
+     * accumulator is monotonically increasing, matching the buffer-flavor contract. */
+    socket_conn_snapshot_t *conn_snap;
+    uint32_t                conn_snap_sz;  /* power-of-two capacity */
+
+    /* Dense per-PID accumulator — shared by buffer flavor and base flavor.
+     * Buffer flavor: fed by ring-buffer events.
+     * Base flavor: fed by per-cycle conn_snap deltas.
+     * Never reset between calls; Go computes per-interval deltas by subtraction. */
+    struct netdata_socket_per_pid_entry *acc;
     uint32_t acc_cap;
     uint32_t acc_count;
     uint32_t acc_evict_counter; /* cycles since last dead-PID eviction pass */
-    uint32_t *acc_htable;    /* PID → (acc_index + 1); 0 = empty slot */
-    uint32_t acc_htable_sz;  /* power-of-two capacity */
+    uint32_t *acc_htable;       /* PID → (acc_index + 1); 0 = empty slot */
+    uint32_t acc_htable_sz;     /* power-of-two capacity */
+
+#if defined(LIBBPF_MAJOR_VERSION)
+    /* Ring-buffer handle — non-NULL only when the loaded object is buffer flavor.
+     * NULL on base/arena flavor objects or builds without modern libbpf. */
+    struct ring_buffer *rb;
 #endif
 };
 
@@ -413,12 +419,8 @@ static uint32_t next_pow2_u32(uint32_t n)
 }
 
 /* -------------------------------------------------------------------------
- * Ring-buffer accumulator (buffer flavor — socket_events)
- * ring_buffer__new is unavailable in old libbpf (0.0.9 / CentOS 7);
- * guard the whole path so old builds compile cleanly on base-flavor objects.
+ * Per-PID accumulator helpers (shared by buffer and base flavors)
  * ---------------------------------------------------------------------- */
-
-#if defined(LIBBPF_MAJOR_VERSION)
 
 static uint32_t socket_acc_htable_slot(uint32_t pid, uint32_t cap)
 {
@@ -480,6 +482,69 @@ socket_acc_find_or_add(struct netdata_ebpf_socket_runtime *rt, uint32_t pid)
     return entry;
 }
 
+/* -------------------------------------------------------------------------
+ * Per-connection last-seen snapshot helpers (base flavor)
+ * ---------------------------------------------------------------------- */
+
+/* FNV-1a hash over the 40-byte connection key. */
+static uint32_t conn_snap_hash(const netdata_socket_bpf_key_t *k, uint32_t sz)
+{
+    const uint8_t *b = (const uint8_t *)k;
+    uint32_t h = 2166136261u;
+    for (size_t i = 0; i < sizeof(*k); i++) {
+        h ^= b[i];
+        h *= 16777619u;
+    }
+    return h & (sz - 1u);
+}
+
+/* Find or allocate a slot for key.  Returns UINT32_MAX if table is full
+ * (should never happen at ≤50% load).  New slots have in_use == 0. */
+static uint32_t conn_snap_upsert(socket_conn_snapshot_t *snap, uint32_t sz,
+                                  const netdata_socket_bpf_key_t *key)
+{
+    if (!snap || sz == 0)
+        return UINT32_MAX;
+    uint32_t h = conn_snap_hash(key, sz);
+    for (uint32_t i = 0; i < sz; i++) {
+        uint32_t s = (h + i) & (sz - 1u);
+        if (!snap[s].in_use) {
+            snap[s].key = *key;
+            return s;
+        }
+        if (memcmp(&snap[s].key, key, sizeof(*key)) == 0)
+            return s;
+    }
+    return UINT32_MAX;
+}
+
+/* Remove the entry at slot i using shift-back to keep all probe chains
+ * contiguous.  Maintains the invariant: empty slot == end of chain. */
+static void conn_snap_delete_at(socket_conn_snapshot_t *snap, uint32_t sz, uint32_t i)
+{
+    snap[i].in_use = 0;
+    uint32_t j = (i + 1u) & (sz - 1u);
+    while (snap[j].in_use) {
+        uint32_t nat = conn_snap_hash(&snap[j].key, sz);
+        uint32_t di  = (i - nat + sz) & (sz - 1u);
+        uint32_t dj  = (j - nat + sz) & (sz - 1u);
+        if (di <= dj) {
+            snap[i] = snap[j];
+            snap[j].in_use = 0;
+            i = j;
+        }
+        j = (j + 1u) & (sz - 1u);
+    }
+}
+
+/* -------------------------------------------------------------------------
+ * Ring-buffer accumulator (buffer flavor — socket_events)
+ * ring_buffer__new is unavailable in old libbpf (0.0.9 / CentOS 7);
+ * guard only the ring-buffer-specific code so old builds compile cleanly.
+ * ---------------------------------------------------------------------- */
+
+#if defined(LIBBPF_MAJOR_VERSION)
+
 static int socket_rb_callback(void *ctx, void *data, size_t data_sz)
 {
     if (data_sz < sizeof(netdata_socket_rb_event_t))
@@ -534,13 +599,6 @@ static void socket_destroy_ring_buffer(struct netdata_ebpf_socket_runtime *rt)
         ring_buffer__free(rt->rb);
         rt->rb = NULL;
     }
-    freez(rt->acc);
-    freez(rt->acc_htable);
-    rt->acc           = NULL;
-    rt->acc_htable    = NULL;
-    rt->acc_cap       = 0;
-    rt->acc_count     = 0;
-    rt->acc_htable_sz = 0;
 }
 
 #endif /* LIBBPF_MAJOR_VERSION */
@@ -620,22 +678,21 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
         return -1;
     rt->percpu_nd_socket_cap = lports_ncpu;
 
-    /* PID hash-table: 2× the expected entry count for ~50% max load factor,
-     * keeping open-addressing probe chains short and preventing silent drops.
-     * Guard against 2× overflow before calling next_pow2_u32. */
-    uint32_t ht_base = nd_socket_size > SOCKET_PID_HT_MIN ? nd_socket_size : SOCKET_PID_HT_MIN;
-    if (ht_base > 0x40000000u)
+    /* Per-connection last-seen snapshot and deferred-delete buffer: sized at
+     * 2× max(nd_socket_size, SOCKET_CONN_SNAP_MIN) for ~50% load factor.
+     * Guard against overflow before calling next_pow2_u32. */
+    uint32_t snap_base = nd_socket_size > SOCKET_CONN_SNAP_MIN ? nd_socket_size : SOCKET_CONN_SNAP_MIN;
+    if (snap_base > 0x40000000u)
         return -1;
-    uint32_t ht_size = next_pow2_u32(ht_base * 2u);
-    rt->pid_ht_size = ht_size;
-    rt->pid_ht_mask = ht_size - 1u;
-    rt->pid_ht = callocz(ht_size, sizeof(*rt->pid_ht));
-    if (!rt->pid_ht)
+    uint32_t snap_sz = next_pow2_u32(snap_base * 2u);
+    rt->conn_snap_sz = snap_sz;
+    rt->conn_snap = callocz(snap_sz, sizeof(*rt->conn_snap));
+    if (!rt->conn_snap)
         return -1;
 
     /* Deferred-delete buffer: sized to the BPF map capacity so every stale
      * entry can be collected in a single pass with no silent overflow. */
-    rt->nd_del_cap  = ht_size / 2u;  /* = ht_base >= nd_socket_size */
+    rt->nd_del_cap  = snap_sz / 2u;  /* = snap_base >= nd_socket_size */
     rt->nd_del_keys = callocz(rt->nd_del_cap, sizeof(*rt->nd_del_keys));
     if (!rt->nd_del_keys)
         return -1;
@@ -646,9 +703,8 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     if (!rt->per_pid_entries)
         return -1;
 
-#if defined(LIBBPF_MAJOR_VERSION)
-    /* Ring-buffer accumulator: pre-allocated here so close() can always free
-     * them regardless of flavor.  Unused on base/arena flavor (rb stays NULL). */
+    /* Per-PID accumulator: used by both buffer flavor (via ring-buffer events)
+     * and base flavor (via conn_snap deltas).  Never reset between calls. */
     rt->acc_cap = 256u;
     rt->acc = callocz((size_t)rt->acc_cap, sizeof(*rt->acc));
     if (!rt->acc)
@@ -657,7 +713,6 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     rt->acc_htable = callocz((size_t)rt->acc_htable_sz, sizeof(*rt->acc_htable));
     if (!rt->acc_htable)
         return -1;
-#endif
 
     return 0;
 }
@@ -797,8 +852,9 @@ void netdata_socket_runtime_close(struct netdata_ebpf_socket_runtime *rt)
     freez(rt->percpu_nd_socket);
     rt->percpu_nd_socket = NULL;
 
-    freez(rt->pid_ht);
-    rt->pid_ht = NULL;
+    freez(rt->conn_snap);
+    rt->conn_snap    = NULL;
+    rt->conn_snap_sz = 0;
 
     freez(rt->nd_del_keys);
     rt->nd_del_keys = NULL;
@@ -808,6 +864,14 @@ void netdata_socket_runtime_close(struct netdata_ebpf_socket_runtime *rt)
     rt->per_pid_entries = NULL;
     rt->per_pid_count = 0;
     rt->per_pid_cap   = 0;
+
+    freez(rt->acc);
+    freez(rt->acc_htable);
+    rt->acc           = NULL;
+    rt->acc_htable    = NULL;
+    rt->acc_cap       = 0;
+    rt->acc_count     = 0;
+    rt->acc_htable_sz = 0;
 
 #if defined(LIBBPF_MAJOR_VERSION)
     socket_destroy_ring_buffer(rt);
@@ -830,36 +894,8 @@ static int pid_ht_compare(const void *a, const void *b)
     return (pa > pb) - (pa < pb);
 }
 
-/* Accumulate one BPF value into the per-PID hash table.
- * Returns true on success, false when the table is full (PID dropped). */
-static bool pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
-                               uint32_t pid,
-                               const netdata_socket_bpf_value_t *v,
-                               uint32_t ht_size, uint32_t ht_mask)
-{
-    /* Knuth multiplicative hash, output masked to ht_mask bits. */
-    uint32_t slot = (pid * 2654435761u) & ht_mask;
-    for (uint32_t i = 0; i < ht_size; i++) {
-        uint32_t s = (slot + i) & ht_mask;
-        if (ht[s].pid == 0 || ht[s].pid == pid) {
-            ht[s].pid = pid;  /* claim if empty; no-op if already ours */
-            ht[s].bytes_sent            += v->tcp.tcp_bytes_sent;
-            ht[s].bytes_received        += v->tcp.tcp_bytes_received;
-            ht[s].call_tcp_sent         += v->tcp.call_tcp_sent;
-            ht[s].call_tcp_received     += v->tcp.call_tcp_received;
-            ht[s].retransmit            += v->tcp.retransmit;
-            ht[s].call_udp_sent         += v->udp.call_udp_sent;
-            ht[s].call_udp_received     += v->udp.call_udp_received;
-            ht[s].call_close            += v->tcp.close;
-            ht[s].call_tcp_v4_connection += v->tcp.ipv4_connect;
-            ht[s].call_tcp_v6_connection += v->tcp.ipv6_connect;
-            return true;
-        }
-    }
-    return false; /* table full */
-}
-
-/* Read tbl_nd_socket, aggregate per PID, and store a sorted result array.
+/* Read tbl_nd_socket, accumulate per-connection deltas into rt->acc, and store
+ * a sorted result array.
  * Returns pointer to the sorted array (owned by rt), count via *out_count.
  * Returns NULL on error. */
 const struct netdata_socket_per_pid_entry *
@@ -918,7 +954,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     }
 #endif
 
-    if (!rt->pid_ht)
+    if (!rt->conn_snap)
         return NULL;
 
     struct bpf_map *ndmap = bpf_object__find_map_by_name(rt->obj, "tbl_nd_socket");
@@ -946,25 +982,14 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     enum bpf_map_type ndtype = bpf_map__type(ndmap);
     int ndcount = (ndtype == BPF_MAP_TYPE_PERCPU_HASH) ? rt->percpu_nd_socket_cap : 1;
 
-    /* Zero the hash table for this cycle; reset per-cycle drop counter. */
-    memset(rt->pid_ht, 0, rt->pid_ht_size * sizeof(*rt->pid_ht));
-    rt->pid_ht_drops = 0;
-
-    /* Iterate all connection entries and accumulate per PID.
-     *
-     * Deletions are deferred to after the loop.  BPF_MAP_TYPE_HASH requires
-     * the predecessor key passed to bpf_map_get_next_key to still exist in
-     * the map: htab_get_next_key falls back to find_first_elem when the
-     * predecessor is missing, restarting iteration from the first bucket and
-     * causing already-visited entries to be visited again — double-counting
-     * their values into the per-PID accumulator. */
+    /* Iterate all connection entries, compute per-connection deltas, and fold
+     * them into rt->acc.  Deletions are deferred to after the loop — deleting
+     * the predecessor key mid-iteration causes htab_get_next_key to restart
+     * from the first bucket and double-count already-visited entries. */
     netdata_socket_bpf_key_t key = {}, next = {};
     netdata_socket_bpf_value_t *vbuf = rt->percpu_nd_socket;
     bool first_nditer = true;
 
-    /* Deferred-delete buffer: pre-allocated at prepare() time to the BPF map
-     * capacity, so all stale entries are captured without a fixed-cap silent
-     * drop that could leave the map full and reject new flows. */
     netdata_socket_bpf_key_t *del_keys = rt->nd_del_keys;
     uint32_t ndel = 0;
     struct {
@@ -975,16 +1000,13 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
 
     while (bpf_map_get_next_key(ndfd, first_nditer ? NULL : &key, &next) == 0) {
         first_nditer = false;
-        /* Advance the predecessor before any 'continue' so get_next_key
-         * always receives a key that exists in the map. */
         key = next;
 
         if (next.pid == 0 || bpf_map_lookup_elem(ndfd, &next, vbuf) != 0)
             continue;
 
-        /* Defer deletion of unbound entries (both addresses are all-zero).
-         * These are never routable, accumulate indefinitely in a plain hash
-         * map, and consume capacity.  Mirrors ebpf_socket.c:1860-1862. */
+        /* Defer deletion of unbound entries (both addresses all-zero).
+         * Mirrors ebpf_socket.c:1860-1862. */
         static const uint8_t zero16[16] = {0};
         if (memcmp(next.saddr, zero16, 16) == 0 && memcmp(next.daddr, zero16, 16) == 0) {
             if (ndel < rt->nd_del_cap)
@@ -992,13 +1014,8 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
             continue;
         }
 
-        /* Defer deletion of entries for dead PIDs.  tbl_nd_socket is a plain
-         * percpu hash — neither the BPF program nor userspace deletes entries,
-         * so closed connections accumulate until the map hits its capacity
-         * limit and bpf_map_update_elem starts returning E2BIG for all new
-         * flows.  kill(pid, 0) == -1/ESRCH confirms the process is gone;
-         * EPERM means alive but not ours, so we keep those.
-         * Mirrors ebpf_socket.c:1930. */
+        /* Liveness check: kill(ESRCH) confirms the process is gone.
+         * EPERM means alive but unpermitted — keep those entries. */
         bool dead_pid = false;
         bool cached_pid = false;
         for (uint32_t i = 0; i < SOCKET_PID_LIVENESS_CACHE; i++) {
@@ -1010,82 +1027,127 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         }
         if (!cached_pid) {
             dead_pid = kill((pid_t)next.pid, 0) != 0 && errno == ESRCH;
-            live_cache[live_cache_next].pid = next.pid;
+            live_cache[live_cache_next].pid  = next.pid;
             live_cache[live_cache_next].dead = dead_pid;
             live_cache_next = (live_cache_next + 1u) % SOCKET_PID_LIVENESS_CACHE;
         }
 
-        if (dead_pid) {
+        /* Aggregate per-CPU values into a single entry. */
+        netdata_socket_bpf_value_t agg;
+        if (ndcount == 1) {
+            agg = *vbuf;
+        } else {
+            memset(&agg, 0, sizeof(agg));
+            for (int c = 0; c < ndcount; c++) {
+                agg.tcp.tcp_bytes_sent     += vbuf[c].tcp.tcp_bytes_sent;
+                agg.tcp.tcp_bytes_received += vbuf[c].tcp.tcp_bytes_received;
+                agg.tcp.call_tcp_sent      += vbuf[c].tcp.call_tcp_sent;
+                agg.tcp.call_tcp_received  += vbuf[c].tcp.call_tcp_received;
+                agg.tcp.retransmit         += vbuf[c].tcp.retransmit;
+                agg.udp.call_udp_sent      += vbuf[c].udp.call_udp_sent;
+                agg.udp.call_udp_received  += vbuf[c].udp.call_udp_received;
+                agg.tcp.close              += vbuf[c].tcp.close;
+                agg.tcp.ipv4_connect       += vbuf[c].tcp.ipv4_connect;
+                agg.tcp.ipv6_connect       += vbuf[c].tcp.ipv6_connect;
+            }
+        }
+
+        /* A connection is discarded when it is closing (tcp.close > 0) or its
+         * process is gone.  We fold the final delta first so totals in rt->acc
+         * never decrease — the Go consumer computes per-interval deltas by
+         * subtraction and clamps to zero, so any decrease becomes a lost event. */
+        bool discard = dead_pid || (agg.tcp.close > 0);
+
+        /* Find or allocate a last-seen slot.  New entries (callocz) are all-zero,
+         * so delta = current − 0 = current, which matches the first-seen semantic
+         * in the buffer-flavor path (first ring event adds the full counter value). */
+        uint32_t cs_slot = conn_snap_upsert(rt->conn_snap, rt->conn_snap_sz, &next);
+        socket_conn_snapshot_t *cs = (cs_slot != UINT32_MAX) ? &rt->conn_snap[cs_slot] : NULL;
+
+        struct netdata_socket_per_pid_entry *acc_e = socket_acc_find_or_add(rt, next.pid);
+        if (acc_e) {
+            uint64_t pb_sent = cs ? cs->bytes_sent              : 0ULL;
+            uint64_t pb_recv = cs ? cs->bytes_received          : 0ULL;
+            uint32_t pt_sent = cs ? cs->call_tcp_sent           : 0u;
+            uint32_t pt_recv = cs ? cs->call_tcp_received       : 0u;
+            uint32_t p_retr  = cs ? cs->retransmit              : 0u;
+            uint32_t pu_sent = cs ? cs->call_udp_sent           : 0u;
+            uint32_t pu_recv = cs ? cs->call_udp_received       : 0u;
+            uint32_t p_cls   = cs ? cs->call_close              : 0u;
+            uint32_t p_v4    = cs ? cs->call_tcp_v4_connection  : 0u;
+            uint32_t p_v6    = cs ? cs->call_tcp_v6_connection  : 0u;
+
+#define D64(c, p) ((c) >= (p) ? (c) - (p) : 0ULL)
+#define D32(c, p) ((uint32_t)(c) >= (uint32_t)(p) \
+                   ? (uint64_t)((uint32_t)(c) - (uint32_t)(p)) : 0ULL)
+            acc_e->bytes_sent             += D64(agg.tcp.tcp_bytes_sent,    pb_sent);
+            acc_e->bytes_received         += D64(agg.tcp.tcp_bytes_received, pb_recv);
+            acc_e->call_tcp_sent          += D32(agg.tcp.call_tcp_sent,     pt_sent);
+            acc_e->call_tcp_received      += D32(agg.tcp.call_tcp_received,  pt_recv);
+            acc_e->retransmit             += D32(agg.tcp.retransmit,         p_retr);
+            acc_e->call_udp_sent          += D32(agg.udp.call_udp_sent,     pu_sent);
+            acc_e->call_udp_received      += D32(agg.udp.call_udp_received,  pu_recv);
+            acc_e->call_close             += D32(agg.tcp.close,             p_cls);
+            acc_e->call_tcp_v4_connection += D32(agg.tcp.ipv4_connect,      p_v4);
+            acc_e->call_tcp_v6_connection += D32(agg.tcp.ipv6_connect,      p_v6);
+#undef D64
+#undef D32
+        }
+
+        if (discard) {
+            if (cs)
+                conn_snap_delete_at(rt->conn_snap, rt->conn_snap_sz, cs_slot);
             if (ndel < rt->nd_del_cap)
                 del_keys[ndel++] = next;
-            continue;
+        } else if (cs) {
+            cs->bytes_sent             = agg.tcp.tcp_bytes_sent;
+            cs->bytes_received         = agg.tcp.tcp_bytes_received;
+            cs->call_tcp_sent          = agg.tcp.call_tcp_sent;
+            cs->call_tcp_received      = agg.tcp.call_tcp_received;
+            cs->retransmit             = agg.tcp.retransmit;
+            cs->call_udp_sent          = agg.udp.call_udp_sent;
+            cs->call_udp_received      = agg.udp.call_udp_received;
+            cs->call_close             = agg.tcp.close;
+            cs->call_tcp_v4_connection = agg.tcp.ipv4_connect;
+            cs->call_tcp_v6_connection = agg.tcp.ipv6_connect;
+            cs->in_use = 1;
         }
-
-        bool closed_connection = false;
-        if (ndcount == 1) {
-            if (!pid_ht_accumulate(rt->pid_ht, next.pid, vbuf, rt->pid_ht_size, rt->pid_ht_mask))
-                rt->pid_ht_drops++;
-            closed_connection = vbuf->tcp.close > 0;
-        } else {
-            /* PERCPU_HASH: sum per-CPU values into a temporary entry. */
-            netdata_socket_bpf_value_t agg = {0};
-            for (int c = 0; c < ndcount; c++) {
-                agg.tcp.tcp_bytes_sent      += vbuf[c].tcp.tcp_bytes_sent;
-                agg.tcp.tcp_bytes_received  += vbuf[c].tcp.tcp_bytes_received;
-                agg.tcp.call_tcp_sent       += vbuf[c].tcp.call_tcp_sent;
-                agg.tcp.call_tcp_received   += vbuf[c].tcp.call_tcp_received;
-                agg.tcp.retransmit          += vbuf[c].tcp.retransmit;
-                agg.udp.call_udp_sent       += vbuf[c].udp.call_udp_sent;
-                agg.udp.call_udp_received   += vbuf[c].udp.call_udp_received;
-                agg.tcp.close               += vbuf[c].tcp.close;
-                agg.tcp.ipv4_connect        += vbuf[c].tcp.ipv4_connect;
-                agg.tcp.ipv6_connect        += vbuf[c].tcp.ipv6_connect;
-            }
-            if (!pid_ht_accumulate(rt->pid_ht, next.pid, &agg, rt->pid_ht_size, rt->pid_ht_mask))
-                rt->pid_ht_drops++;
-            closed_connection = agg.tcp.close > 0;
-        }
-
-        if (closed_connection && ndel < rt->nd_del_cap)
-            del_keys[ndel++] = next;
     }
 
     /* Apply deferred deletions now that traversal is complete. */
     for (uint32_t i = 0; i < ndel; i++)
         bpf_map_delete_elem(ndfd, &del_keys[i]);
 
-    if (rt->pid_ht_drops > 0) {
-        uint64_t now = socket_now_usec();
-        if (now == 0 || rt->pid_ht_drops_last_log_usec == 0 ||
-            now - rt->pid_ht_drops_last_log_usec >= SOCKET_PID_HT_LOG_INTERVAL_USEC) {
-            fprintf(stderr,
-                    "ebpf-go.plugin: socket: pid hash table full, %u connection entries dropped this cycle\n",
-                    rt->pid_ht_drops);
-            rt->pid_ht_drops_last_log_usec = now;
+    /* Evict dead PIDs from the accumulator every SOCKET_ACC_EVICT_INTERVAL cycles
+     * to amortise the per-PID kill() cost.  Mirrors the buffer-flavor eviction. */
+    rt->acc_evict_counter = (rt->acc_evict_counter + 1u) % SOCKET_ACC_EVICT_INTERVAL;
+    if (rt->acc_evict_counter == 0u) {
+        uint32_t live = 0;
+        for (uint32_t i = 0; i < rt->acc_count; i++) {
+            if (kill((pid_t)rt->acc[i].pid, 0) == 0 || errno == EPERM) {
+                if (live != i)
+                    rt->acc[live] = rt->acc[i];
+                live++;
+            }
         }
+        rt->acc_count = live;
     }
 
-    /* Compact non-empty hash-table entries into the sorted output array. */
-    int count = 0;
-    for (uint32_t i = 0; i < rt->pid_ht_size; i++) {
-        if (rt->pid_ht[i].pid == 0)
-            continue;
+    if (rt->acc_count > 1u)
+        qsort(rt->acc, (size_t)rt->acc_count, sizeof(*rt->acc), pid_ht_compare);
 
-        /* Grow output array if needed. */
-        if (count >= rt->per_pid_cap) {
-            int newcap = rt->per_pid_cap * 2;
-            rt->per_pid_entries = reallocz(rt->per_pid_entries,
-                                           (size_t)newcap * sizeof(*rt->per_pid_entries));
-            rt->per_pid_cap = newcap;
-        }
-
-        rt->per_pid_entries[count++] = rt->pid_ht[i];
+    if ((int)rt->acc_count > rt->per_pid_cap) {
+        rt->per_pid_entries = reallocz(rt->per_pid_entries,
+                                       (size_t)rt->acc_count * sizeof(*rt->per_pid_entries));
+        rt->per_pid_cap = (int)rt->acc_count;
     }
+    if (rt->acc_count > 0u)
+        memcpy(rt->per_pid_entries, rt->acc,
+               (size_t)rt->acc_count * sizeof(*rt->per_pid_entries));
+    rt->per_pid_count = (int)rt->acc_count;
+    *out_count = (int)rt->acc_count;
 
-    if (count > 1)
-        qsort(rt->per_pid_entries, (size_t)count, sizeof(*rt->per_pid_entries), pid_ht_compare);
-
-    rt->per_pid_count = count;
-    *out_count = count;
+    /* Rebuild htable after qsort + eviction reordered rt->acc. */
+    socket_acc_htable_rebuild(rt);
     return rt->per_pid_entries;
 }
