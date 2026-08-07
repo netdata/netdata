@@ -50,19 +50,19 @@ static void replicate_log_request(struct replication_request_details *r, const c
     nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
 #endif
                    "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' child sent: "
-                   "db from %ld to %ld%s, wall clock time %ld, "
-                   "last request from %ld to %ld, "
+                   "db from %" PRId64 " to %" PRId64 "%s, wall clock time %" PRId64 ", "
+                   "last request from %" PRId64 " to %" PRId64 ", "
                    "issue: %s - "
-                   "sending replication request from %ld to %ld, start streaming %s",
+                   "sending replication request from %" PRId64 " to %" PRId64 ", start streaming %s",
                    rrdhost_hostname(r->st->rrdhost), rrdset_id(r->st),
-                   r->child_db.first_entry_t,
-                   r->child_db.last_entry_t, r->child_db.fixed_last_entry ? " (fixed)" : "",
-                   r->child_db.wall_clock_time,
-                   r->last_request.after,
-                   r->last_request.before,
+                   (int64_t)r->child_db.first_entry_t,
+                   (int64_t)r->child_db.last_entry_t, r->child_db.fixed_last_entry ? " (fixed)" : "",
+                   (int64_t)r->child_db.wall_clock_time,
+                   (int64_t)r->last_request.after,
+                   (int64_t)r->last_request.before,
                    msg,
-                   r->wanted.after,
-                   r->wanted.before,
+                   (int64_t)r->wanted.after,
+                   (int64_t)r->wanted.before,
                    r->wanted.start_streaming ? "true" : "false");
 }
 
@@ -87,19 +87,20 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
         log_date(wanted_before_buf, LOG_DATE_LENGTH, r->wanted.before);
 
     internal_error(true,
-                   "STREAM SND REPLAY: 'host:%s/chart:%s' sending replication request %ld [%s] to %ld [%s], start streaming '%s': %s: "
-                   "last[%ld - %ld] child[%ld - %ld, now %ld %s] local[%ld - %ld, now %ld] gap[%ld - %ld %s] %s"
+                   "STREAM SND REPLAY: 'host:%s/chart:%s' sending replication request %" PRId64 " [%s] to %" PRId64 " [%s], start streaming '%s': %s: "
+                   "last[%" PRId64 " - %" PRId64 "] child[%" PRId64 " - %" PRId64 ", now %" PRId64 " %s] "
+                   "local[%" PRId64 " - %" PRId64 ", now %" PRId64 "] gap[%" PRId64 " - %" PRId64 " %s] %s"
                    , rrdhost_hostname(r->host), rrdset_id(r->st)
-                       , r->wanted.after, wanted_after_buf
-                   , r->wanted.before, wanted_before_buf
+                       , (int64_t)r->wanted.after, wanted_after_buf
+                   , (int64_t)r->wanted.before, wanted_before_buf
                    , r->wanted.start_streaming ? "YES" : "NO"
                    , msg
-                   , r->last_request.after, r->last_request.before
-                   , r->child_db.first_entry_t, r->child_db.last_entry_t
-                   , r->child_db.wall_clock_time, (r->child_db.wall_clock_time == r->local_db.wall_clock_time) ? "SAME" : (r->child_db.wall_clock_time < r->local_db.wall_clock_time) ? "BEHIND" : "AHEAD"
-                   , r->local_db.first_entry_t, r->local_db.last_entry_t
-                   , r->local_db.wall_clock_time
-                   , r->gap.from, r->gap.to
+                   , (int64_t)r->last_request.after, (int64_t)r->last_request.before
+                   , (int64_t)r->child_db.first_entry_t, (int64_t)r->child_db.last_entry_t
+                   , (int64_t)r->child_db.wall_clock_time, (r->child_db.wall_clock_time == r->local_db.wall_clock_time) ? "SAME" : (r->child_db.wall_clock_time < r->local_db.wall_clock_time) ? "BEHIND" : "AHEAD"
+                   , (int64_t)r->local_db.first_entry_t, (int64_t)r->local_db.last_entry_t
+                   , (int64_t)r->local_db.wall_clock_time
+                   , (int64_t)r->gap.from, (int64_t)r->gap.to
                    , (r->gap.from == r->wanted.after) ? "FULL" : "PARTIAL"
                    , (st->replay.after != 0 || st->replay.before != 0) ? "OVERLAPPING" : ""
     );

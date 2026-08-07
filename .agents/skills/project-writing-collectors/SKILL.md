@@ -395,10 +395,21 @@ The generic Prometheus scraper (`src/go/plugin/go.d/collector/prometheus/`) auto
 Operator controls (profiles documented in `src/go/plugin/go.d/collector/prometheus/profile-format.md`, relabeling in
 `src/go/plugin/go.d/collector/prometheus/relabel/README.md`):
 
-- **Scoping**: the time-series `selector` job option (allow/deny on metric name and label values, syntax in `src/go/pkg/prometheus/selector/README.md`) and `fallback_type` glob patterns for untyped metrics.
-- **Shaping**: the job-level `relabeling` option (Prometheus-compatible `metric_relabel_configs`; it replaced
-  the removed `label_prefix`) renames metrics and rewrites labels before charts are built. **Chart profiles**
-  (`match`/`app`/`autogen.selector`/`template` YAMLs, stock under
+- **Scoping**: the time-series `selector` job option (allow/deny on metric name and label values, syntax in
+  `src/go/pkg/prometheus/selector/README.md`) and `fallback_type` glob patterns for untyped metrics.
+- **Shaping**: job-level `relabeling` is operator policy and runs before profile selection. Profile-root `relabeling`
+  uses the same Prometheus-compatible block/rule format after selection and owns stable exporter normalization required
+  by that profile's charts. Do not duplicate profile-required normalization as an optional job recipe.
+- **Ordering**: the fixed namespace lifecycle is `selector -> job relabeling/safety -> fallback type + profile
+  selection -> selected profile relabeling/safety -> final gates -> charts`. A profile cannot normalize itself into
+  selection. Untyped classification is bound before profile relabeling, so a final rename cannot create or change it.
+- **Profile precedence**: selected profiles share one final metric stream. For each original source family, only the
+  first applicable selected profile's complete pipeline runs; later profiles do not see that family or names produced by
+  the first pipeline. Precedence is profile-name order in `auto`, configured entry order in `exact`, and configured
+  entries followed by the remaining name-ordered auto profiles in `combined`. Root `match` and block matchers classify
+  original source names; rule results and output names do not affect dispatch. All selected templates consume the final
+  names and labels, so authors must account for cross-profile interactions.
+- **Charts**: chart profiles (`match`/`app`/`relabeling`/`autogen.selector`/`template` YAMLs, stock under
   `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`, user under
   `/etc/netdata/go.d/prometheus.profiles/`) ship curated per-exporter dashboards — the Prometheus analog of
   statsd `synthetic_charts`. Metrics not covered by an authored profile chart keep their autogen charts unless an
@@ -435,8 +446,9 @@ A collector is *production-quality* when it satisfies all of:
 8. For remote targets: is vnode wiring done?
 9. For SNMP: did I extend a profile rather than hardcode OIDs?
 10. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
-11. For Prometheus scraping: are selectors and relabeling rules correct? Are untyped metrics handled? Should the
-    exporter get a stock chart profile (`profile-format.md`), and should that profile suppress unmatched fallback
+11. For Prometheus scraping: are selectors and job relabeling correct? Is exporter-required normalization owned by the
+    profile instead of duplicated in job examples? Are untyped metrics handled before profile normalization? Should
+    the exporter get a stock chart profile (`profile-format.md`), and should that profile suppress unmatched fallback
     charts with a scoped `autogen.selector` while retaining their samples?
 12. For cross-plugin enrichment: am I using netipc?
 13. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?

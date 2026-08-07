@@ -121,6 +121,18 @@ type Config struct {
 	sourceLabelsSet bool
 }
 
+func (c Config) clone() Config {
+	out := c
+	if c.SourceLabels != nil {
+		out.SourceLabels = make([]string, len(c.SourceLabels))
+		copy(out.SourceLabels, c.SourceLabels)
+	}
+	if c.Regex.Regexp != nil {
+		out.Regex.Regexp = c.Regex.Regexp.Copy()
+	}
+	return out
+}
+
 // UnmarshalYAML loads a rule from YAML, starting from the rule defaults and
 // recording which optional fields the document set (so an explicit empty
 // separator/replacement/source_labels survives withDefaults). Validation happens
@@ -313,6 +325,7 @@ func normalizeAndValidateConfigs(cfgs []Config) ([]Config, error) {
 	compiled := make([]Config, 0, len(cfgs))
 	for i, cfg := range cfgs {
 		cfg = withDefaults(cfg)
+		cfg = cfg.clone()
 		if err := cfg.validate(); err != nil {
 			return nil, fmt.Errorf("rule %d: %w", i, err)
 		}
@@ -450,7 +463,7 @@ func (re Regexp) MarshalJSON() ([]byte, error) {
 // IsZero reports whether the regex is unset or the shared default "(.*)", so
 // omitempty drops it from marshaled output.
 func (re Regexp) IsZero() bool {
-	return re.Regexp == nil || re.Regexp == defaultConfig.Regex.Regexp
+	return re.Regexp == nil || re.original == defaultConfig.Regex.original
 }
 
 // Apply runs the rules against one sample. It returns the (possibly mutated)

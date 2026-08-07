@@ -900,6 +900,13 @@
 - Fix listen backlog and add backlog listener test for spawn server ([#23380](https://github.com/netdata/netdata/issues/23380))
 - Docs(mcp): describe the account URL field in MCP Connections ([#23393](https://github.com/netdata/netdata/issues/23393))
 - Fix(vnode): ensure exclusive ownership of local vnodes during streaming ([#23388](https://github.com/netdata/netdata/issues/23388))
+- Docs: Explain why group-by choices yield different chart numbers ([#23331](https://github.com/netdata/netdata/issues/23331))
+- Docs: Add room-removal error to remove-node troubleshooting ([#23329](https://github.com/netdata/netdata/issues/23329))
+- Docs: Add Docker parent deployment guidance to centralization README ([#23337](https://github.com/netdata/netdata/issues/23337))
+- Docs: Add agent start step to macOS Homebrew install section ([#23332](https://github.com/netdata/netdata/issues/23332))
+- Docs: Fix Windows cmdline matching to include command-line arguments ([#23335](https://github.com/netdata/netdata/issues/23335))
+- Explicitly trigger daemon-reload in RPM packages when needed. ([#23300](https://github.com/netdata/netdata/issues/23300))
+- Fix: update time format to use int64_t for consistency in logging ([#23397](https://github.com/netdata/netdata/issues/23397))
 
 ## [2.10.0] - 2026-04-09
 

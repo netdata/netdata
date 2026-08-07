@@ -74,7 +74,7 @@ modules:
               required: false
               group: Target
             - name: expected_prefix
-              description: If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint.
+              description: If set, the job's check passes only when at least one post-job, pre-profile metric name starts with this prefix. Guards against scraping an unexpected endpoint; profile-owned relabeling cannot satisfy it.
               default_value: ""
               required: false
               group: Target
@@ -108,24 +108,32 @@ modules:
                 ```
 
             - name: max_time_series
-              description: Global time series limit. If an endpoint returns more time series than this, the data is not processed.
+              description: Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed.
               default_value: 2000
               required: false
               group: Limits
 
             - name: max_time_series_per_metric
-              description: Per-metric time series limit. Metrics with more time series than this are skipped.
+              description: Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped.
               default_value: 200
               required: false
               group: Limits
 
             - name: fallback_type
-              description: Fallback type rules for untyped metrics.
+              description: Job-level fallback type overrides for untyped metrics.
               default_value: ""
               required: false
               group: Customization
               detailed_description: |
-                This option allows you to process Untyped metrics as Counter or Gauge instead of ignoring them.
+                This job option allows you to process untyped metrics as Counter or Gauge instead of ignoring them.
+                Classification uses the post-job, pre-profile metric name. Profile relabeling preserves the selected
+                type but cannot create or change it by renaming the final metric.
+
+                Selected profiles may provide exporter-owned `fallback_type` defaults inside their own `match` scope.
+                Job gauge rules take precedence over job counter rules, and both job rule sets take precedence over
+                every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
+                belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
+                counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
 
                 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
                 - Option syntax:
@@ -141,13 +149,14 @@ modules:
                 ```
 
             - name: relabeling
-              description: Prometheus-compatible metric relabeling, applied before charts are built.
+              description: Job-owned Prometheus-compatible metric relabeling, applied before profile selection.
               default_value: ""
               required: false
               group: Customization
               detailed_description: |
-                A list of relabeling blocks. Each block applies a list of Prometheus `metric_relabel_configs` rules to
-                the metrics whose name matches `match`. See the
+                A list of job-owned relabeling blocks, applied after `selector` and before profile selection. Each block
+                applies a list of Prometheus `metric_relabel_configs` rules to the metrics whose name matches `match`.
+                Profiles may own the same block format for exporter normalization after selection. See the
                 [relabeling reference](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) for
                 the full action set and more examples.
 
@@ -173,7 +182,7 @@ modules:
                 ```
 
             - name: profiles
-              description: Curated, exporter-specific chart profiles. Profiles may constrain unmatched fallback charts with scoped `autogen.selector` rules; disable profiles with mode `none`.
+              description: Curated, exporter-specific chart profiles with optional untyped classification, normalization, and scoped fallback-chart policy; disable profiles with mode `none`.
               default_value: auto
               required: false
               group: Customization
@@ -187,6 +196,15 @@ modules:
                   check).
                 - `combined`: `auto` plus the profiles named in `mode_combined.entries`.
                 - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
+
+                Selection uses post-job, pre-profile family names. A selected profile may carry `fallback_type` rules
+                that classify untyped scalar families inside its `match` scope and `relabeling` blocks that normalize
+                matching source families automatically before chart routing. Job fallback policy takes precedence;
+                conflicting profile rules use the same ordering as normalization. Each original family is
+                processed only by the first applicable profile normalizer: profile-name order in `auto`, configured
+                entry order in `exact`, and configured entries followed by remaining auto profiles in name order in
+                `combined`. Later profile pipelines do not see the family. All selected templates consume the same
+                final names and labels; the collector does not create a private metric stream per profile.
 
                 Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the
                 other block are ignored. Metrics not covered by an authored profile chart keep their generic autogen

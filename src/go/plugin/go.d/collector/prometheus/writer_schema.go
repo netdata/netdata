@@ -21,9 +21,13 @@ type metricFamilySchema struct {
 	histogramBounds  []float64
 }
 
-func deriveMetricFamilySchema(mf *prompkg.MetricFamily, typ commonmodel.MetricType) (metricFamilySchema, bool) {
+func deriveMetricFamilySchema(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, bool) {
 	for _, metric := range mf.Metrics() {
-		schema, ok := deriveMetricSchema(metric, typ)
+		schema, ok := deriveMetricSchema(metric, typ, allowUntypedFallback)
 		if ok {
 			return schema, true
 		}
@@ -32,16 +36,20 @@ func deriveMetricFamilySchema(mf *prompkg.MetricFamily, typ commonmodel.MetricTy
 	return metricFamilySchema{}, false
 }
 
-func deriveMetricSchema(metric prompkg.Metric, typ commonmodel.MetricType) (metricFamilySchema, bool) {
+func deriveMetricSchema(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, bool) {
 	var schema metricFamilySchema
 
 	switch typ {
 	case commonmodel.MetricTypeGauge:
-		if _, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge); !ok {
+		if _, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge, allowUntypedFallback); !ok {
 			return metricFamilySchema{}, false
 		}
 	case commonmodel.MetricTypeCounter:
-		if _, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter); !ok {
+		if _, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter, allowUntypedFallback); !ok {
 			return metricFamilySchema{}, false
 		}
 	case commonmodel.MetricTypeSummary:
@@ -80,8 +88,13 @@ func deriveMetricSchema(metric prompkg.Metric, typ commonmodel.MetricType) (metr
 // metricIsWritable reports whether a series can be written under the family's canonical schema.
 // Only the distribution schema must match (metrix keys hist/summary schema by metric name); label
 // keys may differ between series and are written per-series.
-func metricIsWritable(metric prompkg.Metric, typ commonmodel.MetricType, schema metricFamilySchema) bool {
-	metricSchema, ok := deriveMetricSchema(metric, typ)
+func metricIsWritable(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	schema metricFamilySchema,
+	allowUntypedFallback bool,
+) bool {
+	metricSchema, ok := deriveMetricSchema(metric, typ, allowUntypedFallback)
 	if !ok {
 		return false
 	}
@@ -89,7 +102,7 @@ func metricIsWritable(metric prompkg.Metric, typ commonmodel.MetricType, schema 
 		slices.Equal(schema.histogramBounds, metricSchema.histogramBounds)
 }
 
-func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType) (float64, bool) {
+func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType, allowUntypedFallback bool) (float64, bool) {
 	switch typ {
 	case commonmodel.MetricTypeGauge:
 		if gauge := metric.Gauge(); gauge != nil && isFinite(gauge.Value()) {
@@ -101,9 +114,12 @@ func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType) (float
 		}
 	}
 
-	// Untyped fallthrough: a family resolved to gauge/counter via fallback_type carries its value in
-	// Untyped() (a real typed gauge/counter already returned from the switch). This is the only way a
-	// gauge/counter-typed family reaches here.
+	// Ordinary family-level fallback resolves after assembly, so its value remains in Untyped(). The
+	// profile-normalized path binds eligible samples before relabeling; bound mode must reject an
+	// ineligible untyped sample merged into the same final family as a bound gauge/counter sample.
+	if !allowUntypedFallback {
+		return 0, false
+	}
 	if untyped := metric.Untyped(); untyped != nil && isFinite(untyped.Value()) {
 		return untyped.Value(), true
 	}

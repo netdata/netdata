@@ -2,7 +2,9 @@
 
 Use this when a collector's metrics, chart contexts, configuration,
 alerts, or generated docs change. The goal is to keep runtime behavior,
-metadata, taxonomy, docs, and CI validation in one coherent PR.
+metadata, taxonomy, source documentation, and CI validation coherent. Generated
+integration pages may ship in the source PR or through the automatic post-merge
+regeneration PR.
 
 ## 0. Read first
 
@@ -75,7 +77,7 @@ Keep these synchronized when the corresponding behavior changes:
 - `config_schema.json` for dynamic configuration;
 - stock `.conf` for user-visible defaults;
 - `health.d/*.conf` and `metadata.yaml.modules[].alerts[]`;
-- generated docs via the integrations pipeline.
+- generated docs through the explicitly selected same-PR or post-merge route.
 
 Do not hand-edit generated `integrations/<slug>.md` files.
 
@@ -88,12 +90,17 @@ python3 integrations/gen_integrations.py
 python3 integrations/gen_taxonomy.py --check-only
 python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
 python3 -m unittest integrations.tests.test_taxonomy
+# When committing generated docs in this PR:
 python3 integrations/gen_docs_integrations.py -c go.d.plugin/<module>
 python3 integrations/gen_doc_collector_page.py
 python3 integrations/gen_doc_secrets_page.py
 # If service-discovery rules or sdext metadata changed:
 python3 integrations/gen_doc_service_discovery_page.py
 ```
+
+Skip the three generated-doc commands when the source PR explicitly selects the
+automatic post-merge regeneration route. `check-markdown.yml` and
+`generate-integrations.yml` run them in CI.
 
 Use the repo-local `.venv/bin/python` when one exists for the current
 worktree. If your local base branch is not `master`, adjust the `--pr-diff`
@@ -113,7 +120,9 @@ git status --porcelain |
   rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true
 ```
 
-Commit source changes, generated docs, and taxonomy updates together.
+Commit source and taxonomy changes together. Either commit regenerated docs in
+the same PR or state that `generate-integrations.yml` will open the post-merge
+regeneration PR; do not leave the delivery route implicit.
 Do not commit gitignored runtime artifacts such as
 `integrations/integrations.js`, `integrations/integrations.json`, or
 `integrations/taxonomy.json`.
