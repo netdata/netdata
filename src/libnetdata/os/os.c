@@ -191,9 +191,10 @@ int os_windows_path_translation_unittest(void) {
         fprintf(stderr, "  FAILED runtime prefix derivation from relocated executable\n");
         return 1;
     }
+
+    nd_windows_set_install_prefix_for_unittest(relocated_prefix);
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        CLEAN_CHAR_P *translated = os_translate_windows_path_fallback(
-            cases[i].input, cases[i].use_package_prefix ? relocated_prefix : NULL);
+        CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(cases[i].input);
         const char *expected_prefix = cases[i].use_package_prefix ? "D:\\Relocated Netdata" : "";
         CLEAN_CHAR_P *expected = mallocz(strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1);
         if (cases[i].use_package_prefix)
@@ -212,6 +213,7 @@ int os_windows_path_translation_unittest(void) {
             errors++;
         }
     }
+    nd_windows_set_install_prefix_for_unittest(NULL);
 
     fprintf(stderr, "%s() %s\n", __FUNCTION__, errors ? "FAILED" : "passed");
     return errors;

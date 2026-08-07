@@ -45,6 +45,9 @@ char *nd_windows_detect_install_prefix(void);
 // from an executable path. This does not validate the package layout.
 char *nd_windows_install_prefix_from_executable_path(const char *executable_path);
 
+// Overrides runtime prefix discovery only for the in-process Windows unit test.
+void nd_windows_set_install_prefix_for_unittest(const char *install_prefix);
+
 // Derive the install prefix from the running binary path and override all
 // netdata_configured_* directory globals to their correct installed locations.
 // Must be called before netdata_main() so that config loading and chdir()

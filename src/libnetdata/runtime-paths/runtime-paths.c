@@ -10,6 +10,8 @@
 // Windows: derive runtime install prefix from binary location
 
 #if defined(OS_WINDOWS)
+static char *windows_install_prefix_unittest_override = NULL;
+
 char *nd_windows_install_prefix_from_executable_path(const char *executable_path) {
     if (!executable_path)
         return NULL;
@@ -72,6 +74,9 @@ char *nd_windows_detect_install_prefix(void) {
     static volatile int initialized = 0;
     static char *install_prefix = NULL;
 
+    if (windows_install_prefix_unittest_override)
+        return strdupz(windows_install_prefix_unittest_override);
+
     if (__atomic_load_n(&initialized, __ATOMIC_ACQUIRE) != 2) {
         int expected = 0;
         if (__atomic_compare_exchange_n(&initialized, &expected, 1, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
@@ -85,6 +90,11 @@ char *nd_windows_detect_install_prefix(void) {
     }
 
     return install_prefix ? strdupz(install_prefix) : NULL;
+}
+
+void nd_windows_set_install_prefix_for_unittest(const char *install_prefix) {
+    freez(windows_install_prefix_unittest_override);
+    windows_install_prefix_unittest_override = install_prefix ? strdupz(install_prefix) : NULL;
 }
 
 void nd_windows_detect_prefix_and_override_paths(void) {
