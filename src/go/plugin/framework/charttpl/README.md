@@ -578,7 +578,13 @@ are named by the bare `le` value and ordered numerically, with `+Inf` last.
 > [!WARNING]
 > Different runtime kinds may share a chart when they render as distinct dimensions. If several series collapse into the
 > same rendered dimension, omit `algorithm` only when those series have the same runtime kind. Otherwise set an explicit
-> chart algorithm so the aggregated dimension has one intentional wire interpretation.
+> chart algorithm so the aggregated dimension has one intentional wire interpretation. Chartengine does not diagnose a
+> violation at runtime; authoring validation and real-path tests must reject it rather than depend on first-observed
+> metadata.
+
+The runtime kind of a live metric identity must remain stable while its dimension is materialized. Changing the kind does
+not redefine an existing Netdata dimension; its creation-time wire algorithm remains until the dimension expires and is
+recreated.
 
 **Example: MySQL queries — incremental counters displayed as rates**
 

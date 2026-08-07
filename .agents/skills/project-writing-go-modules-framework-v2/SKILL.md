@@ -115,9 +115,14 @@ source files for evidence.
   dimension in that chart. This is also REQUIRED when differently typed series
   are deliberately aggregated into the same rendered dimension; otherwise,
   contributors to one rendered dimension MUST have the same runtime kind.
+  Chartengine does not diagnose violations at runtime, so real-path collector
+  tests MUST enforce this authoring rule.
 - Mixed counter and gauge dimensions MAY share one authored chart when they
   render as distinct dimensions; each omitted algorithm is resolved from that
   dimension's matched series kind.
+- A live metric identity MUST keep a stable runtime kind while its dimension is
+  materialized. A kind change does not redefine an existing Netdata dimension;
+  its creation-time wire algorithm remains until expiry and recreation.
 - Histogram bucket charts use range bucket values from `metrix.ReadFlatten()`
   and chartengine forces them to `heatmap`. Bucket dimensions are named by the
   bare `le` upper-bound value and ordered numerically with `+Inf` last. Do NOT

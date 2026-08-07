@@ -86,7 +86,11 @@ groups:
 			require.NoError(t, err)
 			dim := findOnlyCreateDimension(t, plan)
 			assert.Equal(t, tc.want, dim.Algorithm)
-			assert.Equal(t, tc.want, dim.ChartMeta.Algorithm)
+			wantPolicy := program.AlgorithmAuto
+			if tc.algorithm != "" {
+				wantPolicy = program.Algorithm(tc.algorithm)
+			}
+			assert.Equal(t, wantPolicy, dim.ChartMeta.Algorithm)
 		})
 	}
 }
@@ -169,6 +173,7 @@ groups:
 	for _, action := range plan.Actions {
 		if dim, ok := action.(CreateDimensionAction); ok {
 			got[dim.Name] = dim.Algorithm
+			assert.Equal(t, program.AlgorithmAuto, dim.ChartMeta.Algorithm)
 		}
 	}
 	assert.Equal(t, map[string]program.Algorithm{

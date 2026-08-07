@@ -43,8 +43,8 @@ type Chart struct {
 	Dimensions []Dimension
 }
 
-// ChartMeta carries normalized chart metadata. AlgorithmAuto is valid only
-// until a route is finalized against runtime series metadata.
+// ChartMeta carries normalized chart metadata. Algorithm records the configured
+// chart policy; AlgorithmAuto means dimensions use their runtime series kinds.
 type ChartMeta struct {
 	Title     string
 	Family    string

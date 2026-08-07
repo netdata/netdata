@@ -159,9 +159,10 @@ format's [aggregation section](../charttpl/README.md#aggregation) for semantics 
 
 ### Algorithm Resolution
 
-- An omitted authored `algorithm` remains unresolved in the immutable program and route cache.
-- After route lookup, the planner resolves the local route copy from the current `SeriesMeta.Kind`: counters use
-  `incremental`; gauges and every other or unknown kind use `absolute`.
+- An omitted authored `algorithm` remains `AlgorithmAuto` in the immutable program, route cache, and chart-level action
+  metadata.
+- After route lookup, the planner resolves the local route's dimension algorithm from the current `SeriesMeta.Kind`:
+  counters use `incremental`; gauges and every other or unknown kind use `absolute`.
 - An explicit authored `absolute` or `incremental` value overrides the runtime kind for every dimension in that chart.
 - Authored and autogen routes use the same runtime resolver. Metric-name suffixes do not determine chart algorithms.
 - Flattened structured families use their emitted scalar `Kind`. `SourceKind` and `FlattenRole` still control chart shape
@@ -169,10 +170,14 @@ format's [aggregation section](../charttpl/README.md#aggregation) for semantics 
   gauges; MeasureSet fields follow their declared semantics.
 - Different kinds may coexist in distinct rendered dimensions. Series aggregated into one rendered dimension must have
   the same kind when the chart omits `algorithm`; use an explicit chart algorithm for an intentional mixed-kind collapse.
+  Chartengine does not diagnose a violation at runtime, so authoring validation and real-path tests must enforce this rule;
+  the resulting dimension metadata is otherwise unspecified.
+- A live metric identity must keep the same kind while its dimension is materialized. Kind changes are resolved for route
+  planning, but an existing Netdata dimension keeps its creation-time wire algorithm until it expires and is recreated.
 
 Route-cache entries are immutable discovery results. Algorithm resolution happens after cache lookup, so a cached route
 cannot retain the effective algorithm from an earlier series kind. Only concrete algorithms reach accumulated dimension
-state and emitted actions.
+state and dimension actions; chart-level metadata retains the configured policy.
 
 ## Lifecycle Defaults and Policy
 

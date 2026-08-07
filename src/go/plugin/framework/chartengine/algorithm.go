@@ -19,6 +19,5 @@ func resolveRuntimeAlgorithm(configured program.Algorithm, kind metrix.MetricKin
 
 func finalizeRouteAlgorithm(route routeBinding, kind metrix.MetricKind) routeBinding {
 	route.Algorithm = resolveRuntimeAlgorithm(route.Algorithm, kind)
-	route.Meta.Algorithm = route.Algorithm
 	return route
 }
