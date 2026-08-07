@@ -499,7 +499,8 @@ static uint32_t conn_snap_hash(const netdata_socket_bpf_key_t *k, uint32_t sz)
 }
 
 /* Find or allocate a slot for key.  Returns UINT32_MAX if table is full
- * (should never happen at ≤50% load).  New slots have in_use == 0. */
+ * (should never happen at ≤50% load).  New and recycled slots are fully
+ * zeroed so callers always see in_use==0 and zero counter fields. */
 static uint32_t conn_snap_upsert(socket_conn_snapshot_t *snap, uint32_t sz,
                                   const netdata_socket_bpf_key_t *key)
 {
@@ -509,6 +510,9 @@ static uint32_t conn_snap_upsert(socket_conn_snapshot_t *snap, uint32_t sz,
     for (uint32_t i = 0; i < sz; i++) {
         uint32_t s = (h + i) & (sz - 1u);
         if (!snap[s].in_use) {
+            /* Zero all fields so recycled slots never carry stale counters
+             * into the next connection's first-interval delta. */
+            memset(&snap[s], 0, sizeof(snap[s]));
             snap[s].key = *key;
             return s;
         }
@@ -522,7 +526,7 @@ static uint32_t conn_snap_upsert(socket_conn_snapshot_t *snap, uint32_t sz,
  * contiguous.  Maintains the invariant: empty slot == end of chain. */
 static void conn_snap_delete_at(socket_conn_snapshot_t *snap, uint32_t sz, uint32_t i)
 {
-    snap[i].in_use = 0;
+    memset(&snap[i], 0, sizeof(snap[i]));   /* zero gap: key, counters, in_use */
     uint32_t j = (i + 1u) & (sz - 1u);
     while (snap[j].in_use) {
         uint32_t nat = conn_snap_hash(&snap[j].key, sz);
@@ -530,7 +534,7 @@ static void conn_snap_delete_at(socket_conn_snapshot_t *snap, uint32_t sz, uint3
         uint32_t dj  = (j - nat + sz) & (sz - 1u);
         if (di <= dj) {
             snap[i] = snap[j];
-            snap[j].in_use = 0;
+            memset(&snap[j], 0, sizeof(snap[j])); /* zero vacated slot fully */
             i = j;
         }
         j = (j + 1u) & (sz - 1u);
@@ -1058,9 +1062,9 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
          * subtraction and clamps to zero, so any decrease becomes a lost event. */
         bool discard = dead_pid || (agg.tcp.close > 0);
 
-        /* Find or allocate a last-seen slot.  New entries (callocz) are all-zero,
-         * so delta = current − 0 = current, which matches the first-seen semantic
-         * in the buffer-flavor path (first ring event adds the full counter value). */
+        /* Find or allocate a last-seen slot.  conn_snap_upsert zeroes all counter
+         * fields for new and recycled slots, so delta = current − 0 = current on
+         * first use, matching the buffer-flavor first-ring-event semantic. */
         uint32_t cs_slot = conn_snap_upsert(rt->conn_snap, rt->conn_snap_sz, &next);
         socket_conn_snapshot_t *cs = (cs_slot != UINT32_MAX) ? &rt->conn_snap[cs_slot] : NULL;
 
@@ -1078,11 +1082,11 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
             uint32_t p_v6    = cs ? cs->call_tcp_v6_connection  : 0u;
 
 #define D64(c, p) ((c) >= (p) ? (c) - (p) : 0ULL)
-/* Wrap-aware delta for uint32 BPF counters.  Unsigned modular subtraction
- * gives the correct result even when the counter wraps past UINT32_MAX —
- * valid as long as the true delta fits in uint32 (guaranteed for any sane
- * collection interval). */
-#define D32(c, p) ((uint64_t)(uint32_t)((uint32_t)(c) - (uint32_t)(p)))
+/* Clamp-on-decrease, matching D64, socketDelta, and socketIntervalDelta policy.
+ * Any apparent decrease (stale prev, counter reset) produces 0, not a huge
+ * wrap-around value that would explode user charts. */
+#define D32(c, p) ((uint32_t)(c) >= (uint32_t)(p) \
+                   ? (uint64_t)((uint32_t)(c) - (uint32_t)(p)) : 0ULL)
             acc_e->bytes_sent             += D64(agg.tcp.tcp_bytes_sent,    pb_sent);
             acc_e->bytes_received         += D64(agg.tcp.tcp_bytes_received, pb_recv);
             acc_e->call_tcp_sent          += D32(agg.tcp.call_tcp_sent,     pt_sent);
