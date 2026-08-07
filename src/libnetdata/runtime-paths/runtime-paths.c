@@ -61,8 +61,8 @@ static char *nd_windows_detect_install_prefix_once(void) {
 
     // Validate that the expected config directory exists under this prefix
     // before committing to the override.
-    // sonar:disable c:S5813 — install_prefix comes from os_get_process_path(); bounded by FILENAME_MAX.
-    size_t test_path_size = strlen(install_prefix) + sizeof("/etc/netdata");
+    // NOSONAR (c:S5813) — install_prefix comes from os_get_process_path(); bounded by FILENAME_MAX.
+    size_t test_path_size = strlen(install_prefix) + sizeof("/etc/netdata"); // NOSONAR (c:S5813)
     CLEAN_CHAR_P *test_path = mallocz(test_path_size);
     snprintfz(test_path, test_path_size, "%s/etc/netdata", install_prefix);
     if (!nd_windows_directory_exists(test_path))
@@ -139,12 +139,13 @@ void nd_windows_detect_prefix_and_override_paths(void) {
     // in the Windows-compatible C:/... form.  os_run_dir() calls stat()
     // directly without POSIX translation, so the path must be in a form
     // that UCRT64's CRT handles natively (C:/... works; /c/... does not).
-    // sonar:disable c:S5813 — install_prefix is bounded by FILENAME_MAX; not user-controlled.
-    CLEAN_CHAR_P *run_parent = mallocz(strlen(install_prefix) + sizeof("/run"));
-    CLEAN_CHAR_P *run_dir = mallocz(strlen(install_prefix) + sizeof("/run/netdata"));
+    // NOSONAR (c:S5813) — install_prefix is bounded by FILENAME_MAX; not user-controlled.
+    CLEAN_CHAR_P *run_parent = mallocz(strlen(install_prefix) + sizeof("/run")); // NOSONAR (c:S5813)
+    CLEAN_CHAR_P *run_dir = mallocz(strlen(install_prefix) + sizeof("/run/netdata")); // NOSONAR (c:S5813)
+    // NOSONAR (c:S5813) — same justification as the mallocz lines above.
     snprintfz(run_parent, strlen(install_prefix) + sizeof("/run"), "%s/run", install_prefix);
+    // NOSONAR (c:S5813) — same justification as the mallocz lines above.
     snprintfz(run_dir, strlen(install_prefix) + sizeof("/run/netdata"), "%s/run/netdata", install_prefix);
-    // sonar:enable c:S5813
     (void)mkdir(run_parent, 0755);
     (void)mkdir(run_dir,    0755);
     nd_setenv("NETDATA_RUN_DIR", run_dir, 1);

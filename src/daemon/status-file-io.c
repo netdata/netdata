@@ -166,13 +166,13 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     flags |= O_NOFOLLOW;
 #endif
 
-    int fd = open(temp, flags | O_CREAT | O_EXCL, 0664);
+    int fd = open(temp, flags | O_CREAT | O_EXCL, 0660);
     bool reuse = false;
     if (fd == -1) {
         if (errno != EEXIST)
             return false;
         // File exists from a prior interrupted save; truncate it.
-        fd = open(temp, flags, 0664);
+        fd = open(temp, flags, 0660);
         if (fd == -1)
             return false;
         reuse = true;

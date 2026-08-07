@@ -41,7 +41,7 @@ const char *os_type = "windows";
 static char *os_translate_windows_path_fallback(const char *src, const char *package_prefix) {
     size_t src_len = strnlen(src, OS_WINDOWS_PATH_TRANSLATION_MAX);
     bool package_relative_posix_path = package_prefix != NULL;
-    // sonar:disable c:S5813 — package_prefix is NULL-tested above; not user-controlled.
+    // NOSONAR (c:S5813) — package_prefix is NULL-tested on the previous line; strlen is bounded by the caller's contract.
     size_t prefix_len = package_relative_posix_path ? strlen(package_prefix) : 0;
     size_t converted_size = prefix_len + src_len + 3;
     char *converted_path = mallocz(converted_size);
@@ -197,15 +197,16 @@ int os_windows_path_translation_unittest(void) {
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
         CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(cases[i].input);
         const char *expected_prefix = cases[i].use_package_prefix ? "D:\\Relocated Netdata" : "";
-        // sonar:disable c:S5813 — expected_prefix and cases[i].expected_suffix are constant string literals; bounded.
-        CLEAN_CHAR_P *expected = mallocz(strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1);
+        // NOSONAR (c:S5813) — expected_prefix and cases[i].expected_suffix are constant string literals; lengths are bounded.
+        CLEAN_CHAR_P *expected = mallocz(strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1); // NOSONAR (c:S5813)
         if (cases[i].use_package_prefix)
+            // NOSONAR (c:S5813) — see justification on the mallocz line above.
             snprintfz(expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
                       "%s%s", expected_prefix, cases[i].expected_suffix);
         else
+            // NOSONAR (c:S5813) — see justification on the mallocz line above.
             snprintfz(expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
                       "%s", cases[i].expected_suffix);
-        // sonar:enable c:S5813
 
         for (char *p = expected; *p; p++)
             if (*p == '/') *p = '\\';
