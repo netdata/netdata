@@ -484,6 +484,7 @@ int netdata_main(int argc, char **argv) {
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
 #ifdef OS_WINDOWS
+                            if (os_windows_path_translation_unittest()) return 1;
                             if (unit_test_windows_virt_normalize()) return 1;
                             if (unit_test_windows_virt_resolution()) return 1;
                             if (unit_test_windows_container()) return 1;
