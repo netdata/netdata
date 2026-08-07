@@ -388,7 +388,8 @@ The generic Prometheus scraper (`src/go/plugin/go.d/collector/prometheus/`) auto
 - metric name → chart ID + dimension ID
 - Prometheus labels → Netdata chart labels
 - type (`counter`, `gauge`, `histogram`, `summary`) → chart type and dimension algorithm
-- histograms and summaries explode into 3 charts each (buckets/quantiles, `_sum`, `_count`)
+- histograms produce bucket, `_sum`, and `_count` charts; summaries always produce `_sum` and `_count`, plus a
+  quantile chart when quantiles exist
 - recognized suffixes: `_total` (counter), `_bucket` + `le` label (histogram), `_sum`, `_count`, `quantile` label (summary), `_info` (skipped)
 - unit suffixes drive the units string: `_seconds`, `_bytes`, `_hertz`
 
