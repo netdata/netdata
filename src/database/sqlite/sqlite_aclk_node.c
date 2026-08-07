@@ -243,6 +243,10 @@ static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
     *snapshot = hostname;
 }
 
+// The coalescing window of the node manifest: how long an armed request waits before it may be
+// published, so a burst of function registrations becomes one message.
+#define NODE_MANIFEST_WINDOW_S (30)
+
 // How many manifests one scan pass may publish. The manifest is the only one of the three messages
 // this function sends that can be armed for the whole fleet at a single instant
 // (aclk_arm_node_manifest_all_hosts(), on every SendNodeInstances), and a new ACLK session never
@@ -251,19 +255,63 @@ static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
 // deadline to meet: the manifest is informational and fire-and-forget.
 //
 // Hosts over the budget are NOT consumed - the claim CAS below is only attempted once a slot is
-// available - so they stay armed and go out on a later tick. Draining is FIFO and cannot starve a
-// host late in the index: a claim zeroes the timestamp, and a re-arm restarts the 30s window, so a
-// host that just sent cannot become due again before the rest of the index has been offered a slot.
+// available - so they stay armed and go out on a later pass.
 //
 // The number is a pacing choice, not a derived limit: what it protects is the mqtt write buffer on
 // a slow uplink and cloud-side ingestion of simultaneous manifests from every reconnecting parent,
-// neither of which is measurable from this repository. At this budget a 2000-host parent covers its
-// whole fleet in ~100s.
+// neither of which is measurable from this repository. It is deliberately independent of fleet
+// size; a budget scaled to the host count (N/window per pass) would keep every host reachable but
+// would also make the sustained message rate grow without limit, which is what this exists to stop.
 //
 // Deliberately NOT applied to node info and node collectors above: their pacing is pre-existing
 // cloud-visible behaviour, and changing it is not this feature's decision to make. A reconnect
 // bursts all three message types; this budget bounds the one introduced here.
 #define MAX_NODE_MANIFESTS_PER_SCAN (20)
+
+// Which due hosts get the budget. Granting it in index order does NOT drain fairly: a host that
+// keeps re-arming refreshes its deadline to near-now every time it is served, so with B slots per
+// pass and a W second window only the first B*W hosts of the index are ever reachable - past that,
+// hosts at the head keep coming due and keep winning, and the tail is never served at all. The
+// index is walked in insertion order, so that tail is the same hosts on every pass, and a scan that
+// takes longer than the timer period (the pass is skipped while alert_push_running) lowers B*W
+// further.
+//
+// So the oldest deadline wins instead of the lowest index. A host that is not served only gets
+// older, so its position strictly improves every pass until it is inside the budget, whatever the
+// fleet size - while the budget itself stays fixed.
+//
+// The cutoff is carried from the previous pass, because the deadlines that decide it are only known
+// once the walk that collects them has finished. It is the oldest deadline the previous pass left
+// UNSERVED (of the MAX_NODE_MANIFESTS_PER_SCAN oldest such), which is exactly the set the next pass
+// should admit; deadlines only age, so a pass of lag cannot reorder them. Zero means unrestricted -
+// no due host went unserved, so there is nothing to prioritize - and is also the initial value, so
+// the first pass behaves as a plain budget. An armed deadline is never itself 0, so the sentinel is
+// unambiguous.
+//
+// Only the alert-push worker reaches this, serialized by alert_push_running - the same reason
+// node_manifest_sent_hash needs no synchronization.
+static time_t manifest_serve_cutoff = 0;
+
+// Keeps the `size` oldest deadlines seen, sorted oldest first.
+static void manifest_deadline_track(time_t *deadlines, size_t *used, size_t size, time_t deadline)
+{
+    size_t i = *used;
+
+    if (i == size) {
+        if (deadline >= deadlines[size - 1])
+            return; // newer than everything tracked - not among the oldest
+        i = size - 1; // evict the newest of the tracked set
+    }
+    else
+        (*used)++;
+
+    while (i > 0 && deadlines[i - 1] > deadline) {
+        deadlines[i] = deadlines[i - 1];
+        i--;
+    }
+
+    deadlines[i] = deadline;
+}
 
 void aclk_check_node_info_collectors_and_manifest(void)
 {
@@ -273,6 +321,9 @@ void aclk_check_node_info_collectors_and_manifest(void)
         return;
 
     size_t manifests_sent = 0;
+    time_t manifest_deadlines[MAX_NODE_MANIFESTS_PER_SCAN];
+    size_t manifest_deadlines_used = 0;
+
     size_t context_loading = 0;
     size_t replicating_rcv = 0;
     size_t replicating_snd = 0;
@@ -382,21 +433,36 @@ void aclk_check_node_info_collectors_and_manifest(void)
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
         }
 
-        // the budget is tested before the claim, so a host denied a slot keeps its armed request
-        // instead of having it consumed and dropped; it is charged only when a message really went
-        // out, so a run of suppressed (unchanged) manifests cannot exhaust the budget for the hosts
-        // behind them
         node_manifest_send_time = aclk_send_timestamp_get(&aclk_host_config->node_manifest_send_time);
-        if (manifest_pending && pp_queue_empty && node_manifest_send_time &&
-            manifests_sent < MAX_NODE_MANIFESTS_PER_SCAN &&
-            nd_time_t_add_compare(node_manifest_send_time, 30, now) < 0 &&
+        bool manifest_due = manifest_pending && pp_queue_empty && node_manifest_send_time &&
+                            nd_time_t_add_compare(node_manifest_send_time, NODE_MANIFEST_WINDOW_S, now) < 0;
+
+        // The budget and the cutoff are both tested before the claim, so a host denied a slot keeps
+        // its armed request instead of having it consumed and dropped. The budget is charged only
+        // when a message really went out, so a run of suppressed (unchanged) manifests cannot
+        // exhaust it for the hosts behind them - but a suppressed host still consumed its claim, so
+        // it counts as served and is not carried into the cutoff below.
+        bool manifest_served = false;
+        if (manifest_due && manifests_sent < MAX_NODE_MANIFESTS_PER_SCAN &&
+            (!manifest_serve_cutoff || node_manifest_send_time <= manifest_serve_cutoff) &&
             aclk_send_timestamp_claim(&aclk_host_config->node_manifest_send_time, node_manifest_send_time)) {
-            if (build_node_manifest(host, aclk_host_config, manifest_node_id))
+            manifest_served = true;
+
+            if (build_node_manifest(host, aclk_host_config, manifest_node_id)) {
                 manifests_sent++;
-            internal_error(true, "ACLK SYNC: Sending node manifest for %s", rrdhost_hostname(host));
+                internal_error(true, "ACLK SYNC: Sending node manifest for %s", rrdhost_hostname(host));
+            }
         }
+
+        if (manifest_due && !manifest_served)
+            manifest_deadline_track(
+                manifest_deadlines, &manifest_deadlines_used, MAX_NODE_MANIFESTS_PER_SCAN, node_manifest_send_time);
     }
     dfe_done(host);
+
+    // Hand the next pass the oldest deadline this one could not serve, so those hosts are admitted
+    // ahead of any host that re-arms in the meantime. Nothing left waiting means no restriction.
+    manifest_serve_cutoff = manifest_deadlines_used ? manifest_deadlines[manifest_deadlines_used - 1] : 0;
 
     if (context_loading || replicating_rcv || replicating_snd || context_pp) {
 #ifdef REPLICATION_TRACKING
