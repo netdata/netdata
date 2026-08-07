@@ -292,31 +292,38 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
     }
 
     if (likely(aclk_host_config)) {
-        aclk_node_id_set(aclk_host_config, *node_id);
+        bool node_id_changed = aclk_node_id_set(aclk_host_config, *node_id);
 
         // The manifest is keyed by node_id at the cloud, and no function-registry event fires when
         // the node_id itself changes - so without this a host that gets (or changes) its node_id
         // keeps a manifest filed under the previous id until some unrelated function is registered.
         //
-        // This SETS the deadline rather than arming it, because a request armed before this change
-        // does not satisfy one made after it: aclk_arm_node_manifest() keeps the earlier deadline,
-        // which a worker that already snapshotted the OLD node_id would then claim - publishing the
-        // stale id and consuming the only pending request. Replacing the deadline instead makes that
-        // worker's claim CAS fail, so it re-snapshots and sends the new id on a later pass.
+        // A CHANGED id SETS the deadline rather than arming it, because a request armed before the
+        // change does not satisfy one made after it: aclk_arm_node_manifest() keeps the earlier
+        // deadline, which a worker that already snapshotted the OLD node_id would then claim -
+        // publishing the stale id and consuming the only pending request. Replacing the deadline
+        // instead makes that worker's claim CAS fail, so it re-snapshots and sends the new id on a
+        // later pass.
         //
-        // Deliberately NOT gated on host->node_id having actually changed. The reason that stands on
-        // its own: host->node_id is not the id this publishes - the aclk config string is, and a
-        // child can have the two disagree (command-nodeid.c assigns host->node_id from the parent
-        // without ever touching the config), so "host->node_id unchanged" does not mean the
-        // transmitted id is unchanged.
+        // The test is on the string aclk_node_id_set() stores, NOT on host->node_id: host->node_id
+        // is not the id this publishes - the aclk config string is, and a child can have the two
+        // disagree (command-nodeid.c assigns host->node_id from the parent without ever touching the
+        // config), so "host->node_id unchanged" does not mean the transmitted id is unchanged.
         //
-        // Secondary, and resting on an assumption: if the cloud re-sends CreateNodeInstanceResult
-        // with the same node_id on later node-info rounds - server-side behaviour this repository
-        // cannot verify - then this is also a second chance to re-publish a manifest the cloud never
-        // received. aclk_arm_node_manifest_all_hosts() is the path that does not depend on that.
-        // Redundant publishes are dropped by the content-hash check in build_node_manifest(); the
-        // cost kept here is one manifest build plus hash per cloud reply.
-        aclk_send_timestamp_set(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+        // An UNCHANGED id only arms. There is no stale snapshot to invalidate, and setting would
+        // push an already-pending deadline out: if the cloud re-sends CreateNodeInstanceResult more
+        // often than the coalescing window - server-side behaviour this repository cannot verify -
+        // repeated sets would keep the window from ever elapsing and strand the manifest entirely.
+        // Arming still gives an unarmed host its request (create_aclk_config() stores the node_id it
+        // is given, so the first call for a new config reports unchanged and this is the path that
+        // arms it - the redundancy create_aclk_config() documents), and a request that survives to
+        // publish is a second chance for a manifest the cloud never received. Redundant publishes
+        // are dropped by the content-hash check in build_node_manifest(); the cost kept here is one
+        // manifest build plus hash per cloud reply.
+        if (node_id_changed)
+            aclk_send_timestamp_set(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+        else
+            aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
     }
 
     stream_receiver_send_node_and_claim_id_to_child(host);

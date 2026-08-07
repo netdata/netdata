@@ -93,11 +93,21 @@ static inline void aclk_node_id_copy(aclk_sync_cfg_t *aclk_host_config, char dst
     dst[UUID_STR_LEN - 1] = '\0';
 }
 
-static inline void aclk_node_id_set(aclk_sync_cfg_t *aclk_host_config, const nd_uuid_t node_id)
+// Returns whether the stored string actually changed. That is the id the manifest is transmitted
+// and keyed under at the cloud, so it - not host->node_id - is what tells a caller whether an
+// already-pending manifest has been invalidated.
+static inline bool aclk_node_id_set(aclk_sync_cfg_t *aclk_host_config, const nd_uuid_t node_id)
 {
+    char node_id_str[UUID_STR_LEN];
+    uuid_unparse_lower(node_id, node_id_str);
+
     spinlock_lock(&aclk_host_config->node_id_spinlock);
-    uuid_unparse_lower(node_id, aclk_host_config->node_id);
+    bool changed = memcmp(aclk_host_config->node_id, node_id_str, UUID_STR_LEN) != 0;
+    if (changed)
+        memcpy(aclk_host_config->node_id, node_id_str, UUID_STR_LEN);
     spinlock_unlock(&aclk_host_config->node_id_spinlock);
+
+    return changed;
 }
 
 static inline time_t aclk_send_timestamp_get(const aclk_send_timestamp_t *send_time)

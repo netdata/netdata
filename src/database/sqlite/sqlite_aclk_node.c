@@ -60,7 +60,10 @@ static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UU
 
 // node_id is the caller's validated snapshot, not the shared buffer - see aclk_node_id_snapshot().
 // aclk_host_config is the caller's, already loaded and non-NULL for this host.
-static void build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config, char *node_id)
+//
+// Returns whether a manifest was actually published, so the caller's per-scan budget is spent on
+// messages rather than on suppressed builds - see MAX_NODE_MANIFESTS_PER_SCAN.
+static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config, char *node_id)
 {
     struct update_node_instance_manifest manifest;
 
@@ -106,6 +109,8 @@ static void build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
            "ACLK RES [%s (%s)]: NODE MANIFEST %s",
         node_id, rrdhost_hostname(host), suppressed ? "SUPPRESSED (unchanged)" : "SENT");
+
+    return !suppressed;
 }
 
 static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_completion)
@@ -238,6 +243,28 @@ static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
     *snapshot = hostname;
 }
 
+// How many manifests one scan pass may publish. The manifest is the only one of the three messages
+// this function sends that can be armed for the whole fleet at a single instant
+// (aclk_arm_node_manifest_all_hosts(), on every SendNodeInstances), and a new ACLK session never
+// suppresses the first manifest of a host - so without a budget one reconnect makes every host due
+// in the same tick, and a large parent publishes its entire fleet in one second. That burst has no
+// deadline to meet: the manifest is informational and fire-and-forget.
+//
+// Hosts over the budget are NOT consumed - the claim CAS below is only attempted once a slot is
+// available - so they stay armed and go out on a later tick. Draining is FIFO and cannot starve a
+// host late in the index: a claim zeroes the timestamp, and a re-arm restarts the 30s window, so a
+// host that just sent cannot become due again before the rest of the index has been offered a slot.
+//
+// The number is a pacing choice, not a derived limit: what it protects is the mqtt write buffer on
+// a slow uplink and cloud-side ingestion of simultaneous manifests from every reconnecting parent,
+// neither of which is measurable from this repository. At this budget a 2000-host parent covers its
+// whole fleet in ~100s.
+//
+// Deliberately NOT applied to node info and node collectors above: their pacing is pre-existing
+// cloud-visible behaviour, and changing it is not this feature's decision to make. A reconnect
+// bursts all three message types; this budget bounds the one introduced here.
+#define MAX_NODE_MANIFESTS_PER_SCAN (20)
+
 void aclk_check_node_info_collectors_and_manifest(void)
 {
     RRDHOST *host;
@@ -245,6 +272,7 @@ void aclk_check_node_info_collectors_and_manifest(void)
     if (unlikely(!aclk_online_for_nodes()))
         return;
 
+    size_t manifests_sent = 0;
     size_t context_loading = 0;
     size_t replicating_rcv = 0;
     size_t replicating_snd = 0;
@@ -354,11 +382,17 @@ void aclk_check_node_info_collectors_and_manifest(void)
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
         }
 
+        // the budget is tested before the claim, so a host denied a slot keeps its armed request
+        // instead of having it consumed and dropped; it is charged only when a message really went
+        // out, so a run of suppressed (unchanged) manifests cannot exhaust the budget for the hosts
+        // behind them
         node_manifest_send_time = aclk_send_timestamp_get(&aclk_host_config->node_manifest_send_time);
         if (manifest_pending && pp_queue_empty && node_manifest_send_time &&
+            manifests_sent < MAX_NODE_MANIFESTS_PER_SCAN &&
             nd_time_t_add_compare(node_manifest_send_time, 30, now) < 0 &&
             aclk_send_timestamp_claim(&aclk_host_config->node_manifest_send_time, node_manifest_send_time)) {
-            build_node_manifest(host, aclk_host_config, manifest_node_id);
+            if (build_node_manifest(host, aclk_host_config, manifest_node_id))
+                manifests_sent++;
             internal_error(true, "ACLK SYNC: Sending node manifest for %s", rrdhost_hostname(host));
         }
     }
