@@ -68,14 +68,25 @@ app_latency_count 10
 # TYPE app_payload_bytes summary
 app_payload_bytes_sum{route="/v1/items"} 12.5
 app_payload_bytes_count{route="/v1/items"} 4
+app_payload_bytes_sum{route="/v2/items"} 7.5
+app_payload_bytes_count{route="/v2/items"} 2
 `,
 			assert: func(t *testing.T, fr metrix.Reader, written int) {
-				labels := metrix.Labels{"route": "/v1/items"}
-				assert.Equal(t, 1, written)
-				assert.InDelta(t, 12.5, value(t, fr, "app_payload_bytes_sum", labels), 1e-9)
-				assert.InDelta(t, 4, value(t, fr, "app_payload_bytes_count", labels), 1e-9)
-				_, ok := fr.Value("app_payload_bytes", labels)
-				assert.False(t, ok, "a quantile-free summary must not fabricate a base quantile series")
+				assert.Equal(t, 2, written)
+				for _, expected := range []struct {
+					route string
+					sum   float64
+					count float64
+				}{
+					{route: "/v1/items", sum: 12.5, count: 4},
+					{route: "/v2/items", sum: 7.5, count: 2},
+				} {
+					labels := metrix.Labels{"route": expected.route}
+					assert.InDelta(t, expected.sum, value(t, fr, "app_payload_bytes_sum", labels), 1e-9)
+					assert.InDelta(t, expected.count, value(t, fr, "app_payload_bytes_count", labels), 1e-9)
+					_, ok := fr.Value("app_payload_bytes", labels)
+					assert.False(t, ok, "a quantile-free summary must not fabricate a base quantile series")
+				}
 			},
 		},
 		"summary without quantiles writes a zero-observation point": {
@@ -109,6 +120,30 @@ app_payload_bytes_count 0
 			assert: func(t *testing.T, fr metrix.Reader, written int) {
 				assert.Equal(t, 0, written, "a missing sum must not be fabricated as zero")
 				_, ok := fr.Value("app_payload_bytes_count", nil)
+				assert.False(t, ok)
+			},
+		},
+		"summary with quantiles but without count is skipped": {
+			exposition: `
+# TYPE app_latency summary
+app_latency{quantile="0.5"} 0.25
+app_latency_sum 0.25
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 0, written, "a partial summary must not fabricate count")
+				_, ok := fr.Value("app_latency", metrix.Labels{"quantile": "0.5"})
+				assert.False(t, ok)
+			},
+		},
+		"summary with quantiles but without sum is skipped": {
+			exposition: `
+# TYPE app_latency summary
+app_latency{quantile="0.5"} 0.25
+app_latency_count 1
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 0, written, "a partial summary must not fabricate sum")
+				_, ok := fr.Value("app_latency", metrix.Labels{"quantile": "0.5"})
 				assert.False(t, ok)
 			},
 		},

@@ -135,7 +135,7 @@ func toSummaryPoint(summary *prompkg.Summary) (metrix.SummaryPoint, bool) {
 	// whole summary so a chart is not created until it has a real value (consistent with the
 	// scalar NaN-skip); writing resumes once any quantile is observed. A summary without
 	// configured quantiles still carries valid count and sum values, so this check does not apply.
-	if len(summary.Quantiles()) > 0 && summary.IsNaN() {
+	if summary.AllQuantilesNaN() {
 		return metrix.SummaryPoint{}, false
 	}
 	if !isFinite(summary.Count()) || !isFinite(summary.Sum()) || summary.Count() < 0 {

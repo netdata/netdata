@@ -113,11 +113,10 @@ func (s Summary) Quantiles() []Quantile { return s.quantiles }
 // HasCountAndSum reports whether both required summary components were present in the assembled sample stream.
 func (s Summary) HasCountAndSum() bool { return s.hasCount && s.hasSum }
 
-// IsNaN reports whether every quantile value is NaN, which a Prometheus summary emits for an
-// empty observation window. A summary with no quantiles also reports true; this predicate does
-// not inspect the count and sum values that may still form a valid summary point.
-func (s Summary) IsNaN() bool {
-	return !slices.ContainsFunc(s.quantiles, func(q Quantile) bool { return !math.IsNaN(q.value) })
+// AllQuantilesNaN reports whether the summary has quantiles and every quantile value is NaN.
+func (s Summary) AllQuantilesNaN() bool {
+	return len(s.quantiles) > 0 &&
+		!slices.ContainsFunc(s.quantiles, func(q Quantile) bool { return !math.IsNaN(q.value) })
 }
 
 func (q Quantile) Quantile() float64 { return q.quantile }

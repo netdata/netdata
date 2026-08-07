@@ -350,7 +350,7 @@ func TestSummary_Quantiles(t *testing.T) {
 	)
 }
 
-func TestSummary_IsNaN(t *testing.T) {
+func TestSummary_AllQuantilesNaN(t *testing.T) {
 	tests := map[string]struct {
 		summary Summary
 		want    bool
@@ -361,7 +361,7 @@ func TestSummary_IsNaN(t *testing.T) {
 		},
 		"no quantiles": {
 			summary: Summary{},
-			want:    true,
+			want:    false,
 		},
 		"mix of NaN and real quantiles": {
 			summary: Summary{quantiles: []Quantile{{quantile: 0.5, value: math.NaN()}, {quantile: 0.9, value: 0.4}}},
@@ -375,7 +375,7 @@ func TestSummary_IsNaN(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, test.want, test.summary.IsNaN())
+			assert.Equal(t, test.want, test.summary.AllQuantilesNaN())
 		})
 	}
 }
