@@ -318,6 +318,31 @@ func TestSummary_Count(t *testing.T) {
 	assert.Equal(t, Summary{count: 1}.Count(), 1.0)
 }
 
+func TestSummary_HasCountAndSum(t *testing.T) {
+	tests := map[string]struct {
+		summary Summary
+		want    bool
+	}{
+		"both present": {
+			summary: Summary{hasCount: true, hasSum: true},
+			want:    true,
+		},
+		"only count present": {
+			summary: Summary{hasCount: true},
+		},
+		"only sum present": {
+			summary: Summary{hasSum: true},
+		},
+		"neither present": {},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, test.summary.HasCountAndSum())
+		})
+	}
+}
+
 func TestSummary_Quantiles(t *testing.T) {
 	assert.Equal(t,
 		Summary{quantiles: []Quantile{{quantile: 0.1, value: 1}}}.Quantiles(),

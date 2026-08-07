@@ -36,6 +36,8 @@ type (
 	Summary struct {
 		sum       float64
 		count     float64
+		hasSum    bool
+		hasCount  bool
 		quantiles []Quantile
 	}
 	Quantile struct {
@@ -108,9 +110,12 @@ func (s Summary) Count() float64        { return s.count }
 func (s Summary) Sum() float64          { return s.sum }
 func (s Summary) Quantiles() []Quantile { return s.quantiles }
 
+// HasCountAndSum reports whether both required summary components were present in the assembled sample stream.
+func (s Summary) HasCountAndSum() bool { return s.hasCount && s.hasSum }
+
 // IsNaN reports whether every quantile value is NaN, which a Prometheus summary emits for an
-// empty observation window (a summary with no quantiles also reports true). Callers skip such
-// a summary so a chart is not created until it carries a real value.
+// empty observation window. A summary with no quantiles also reports true; this predicate does
+// not inspect the count and sum values that may still form a valid summary point.
 func (s Summary) IsNaN() bool {
 	return !slices.ContainsFunc(s.quantiles, func(q Quantile) bool { return !math.IsNaN(q.value) })
 }
