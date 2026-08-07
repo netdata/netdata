@@ -41,7 +41,7 @@ To install a Netdata Parent:
 
    See [Configuring Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for detailed configuration instructions.
 
-Once your Parent is receiving metrics from your Children, open the Parent's built-in web dashboard at `http://PARENT-IP:19999` to access all centralized data. This local dashboard provides full access to metrics, dashboards, alerts, and Functions for every connected Child — no Netdata Cloud connection required.
+Once your Parent is receiving metrics from your Children, open the Parent's built-in web dashboard at `http://PARENT-IP:19999` to access all centralized data. This local dashboard provides full access to metrics, dashboards, alerts, and Functions for every connected Child — no Netdata Cloud connection required. For secure remote access to the dashboard without exposing port 19999 directly, see the [reverse proxy guides](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md).
 
 3. (Optional) Connect your Parent to Netdata Cloud.
 
