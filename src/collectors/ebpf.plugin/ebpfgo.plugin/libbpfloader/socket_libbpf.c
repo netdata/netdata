@@ -1078,8 +1078,11 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
             uint32_t p_v6    = cs ? cs->call_tcp_v6_connection  : 0u;
 
 #define D64(c, p) ((c) >= (p) ? (c) - (p) : 0ULL)
-#define D32(c, p) ((uint32_t)(c) >= (uint32_t)(p) \
-                   ? (uint64_t)((uint32_t)(c) - (uint32_t)(p)) : 0ULL)
+/* Wrap-aware delta for uint32 BPF counters.  Unsigned modular subtraction
+ * gives the correct result even when the counter wraps past UINT32_MAX —
+ * valid as long as the true delta fits in uint32 (guaranteed for any sane
+ * collection interval). */
+#define D32(c, p) ((uint64_t)(uint32_t)((uint32_t)(c) - (uint32_t)(p)))
             acc_e->bytes_sent             += D64(agg.tcp.tcp_bytes_sent,    pb_sent);
             acc_e->bytes_received         += D64(agg.tcp.tcp_bytes_received, pb_recv);
             acc_e->call_tcp_sent          += D32(agg.tcp.call_tcp_sent,     pt_sent);
