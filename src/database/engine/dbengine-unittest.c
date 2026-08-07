@@ -628,7 +628,7 @@ int dbengine_platform_unittest(void)
     bool init_thread_created[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     bool init_thread_joined[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     bool dbengine_initialized[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
-    volatile bool start = false;
+    bool start = false;  // synchronization is via __atomic_load_n / __atomic_store_n; volatile is redundant.
     int errors = 0;
 
     if (uv_os_tmpdir(test_root, &test_root_length) != 0 || !test_root_length) {

@@ -156,29 +156,30 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     memcpy(&temp[pos], tid_str, tid_len); pos += tid_len;
     temp[pos] = '\0';
 
-    // Reuse a regular temporary file left by an interrupted save; create absent names exclusively.
-    struct stat before;
-    bool reuse = lstat(temp, &before) == 0;
-    if(reuse && !S_ISREG(before.st_mode))
-        return false;
-
-    if(!reuse && errno != ENOENT)
-        return false;
-
+    // Reuse a regular temporary file left by an interrupted save; create absent names
+    // exclusively. Open with O_CREAT|O_EXCL first so the create-or-exist decision is
+    // atomic; this avoids the lstat-before-open TOCTOU window (c:S5847). O_NOFOLLOW
+    // rejects symlinks at open time, so the post-open fstat cannot be tricked into
+    // accepting a non-regular file.
     int flags = O_WRONLY | O_NONBLOCK;
 #ifdef O_NOFOLLOW
     flags |= O_NOFOLLOW;
 #endif
-    if(!reuse)
-        flags |= O_CREAT | O_EXCL;
 
-    int fd = open(temp, flags, 0664);
-    if (fd == -1)
-        return false;
+    int fd = open(temp, flags | O_CREAT | O_EXCL, 0664);
+    bool reuse = false;
+    if (fd == -1) {
+        if (errno != EEXIST)
+            return false;
+        // File exists from a prior interrupted save; truncate it.
+        fd = open(temp, flags, 0664);
+        if (fd == -1)
+            return false;
+        reuse = true;
+    }
 
     struct stat after;
-    if(fstat(fd, &after) != 0 || !S_ISREG(after.st_mode) ||
-       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+    if(fstat(fd, &after) != 0 || !S_ISREG(after.st_mode)) {
         close(fd);
         return false;
     }
@@ -228,14 +229,20 @@ static bool status_file_io_save_this(const char *directory, const char *filename
 
     /* Rename temp file to target file */
 #if defined(OS_WINDOWS)
-    // POSIX rename() atomically replaces an existing destination; Windows rename()
-    // fails with EEXIST instead.  Unlink first to get the same replace semantics.
-    unlink(final);
-#endif
+    // On Windows, POSIX rename() fails with EEXIST if the destination exists. Use
+    // MoveFileExW with MOVEFILE_REPLACE_EXISTING for an atomic replace; this
+    // eliminates the unlink-then-rename TOCTOU window (c:S5847). The same pattern
+    // is used in src/daemon/machine-guid.c for the GUID publication file.
+    if (!MoveFileExW(temp, final, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        unlink(temp);
+        return false;
+    }
+#else
     if (rename(temp, final) != 0) {
         unlink(temp);
         return false;
     }
+#endif
 
     return true;
 }

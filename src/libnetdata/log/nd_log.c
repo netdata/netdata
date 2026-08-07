@@ -242,6 +242,9 @@ static void nd_logger_unset_all_thread_fields(void) {
 static void nd_logger_merge_log_stack_to_thread_fields(void) {
     for(size_t c = 0; c < thread_log_stack_next ;c++) {
         struct log_stack_entry *lgs = thread_log_stack_base[c];
+        // Guard against null entries; see c:S2259. The thread_log_stack_base
+        // table is sized to thread_log_stack_next and may contain unset slots
+        // (e.g. on first call from a thread that has not yet pushed a stack).
         if(unlikely(!lgs))
             continue;
 
