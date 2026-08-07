@@ -1238,22 +1238,49 @@ static bool extent_move_to_new_datafile(struct rrdengine_instance *ctx, struct e
     return true;
 }
 
-static int extent_write_to_datafile(struct rrdengine_datafile *datafile, uv_buf_t *iov, uint64_t pos) {
+static int rrdeng_uv_fs_write(uv_file file, const uv_buf_t *iov, int64_t offset, void *data __maybe_unused) {
     uv_fs_t request;
+    int ret = uv_fs_write(NULL, &request, file, iov, 1, offset, NULL);
+    uv_fs_req_cleanup(&request);
+    return ret;
+}
 
-    int retries = 10;
-    int ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &request, datafile->file, iov, 1, (int64_t)pos, NULL);
-        uv_fs_req_cleanup(&request);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+int rrdeng_write_full(uv_file file, const uv_buf_t *iov, int64_t offset, size_t *bytes_written,
+                      RRDENG_WRITE_OPERATION operation, void *operation_data, unsigned retries) {
+    if (!iov || !bytes_written || !iov->base)
+        return UV_EINVAL;
+
+    *bytes_written = 0;
+    if (!operation)
+        operation = rrdeng_uv_fs_write;
+
+    while (*bytes_written < iov->len) {
+        uv_buf_t remaining = uv_buf_init((char *)iov->base + *bytes_written, iov->len - *bytes_written);
+        int ret = UV_EIO;
+        unsigned attempts = retries;
+
+        while (attempts--) {
+            ret = operation(file, &remaining, offset + (int64_t)*bytes_written, operation_data);
+            if (ret >= 0 || ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
                 break;
             sleep_usec(300 * USEC_PER_MS);
         }
+
+        if (ret <= 0)
+            return ret ? ret : UV_EIO;
+
+        if ((size_t)ret > remaining.len)
+            return UV_EIO;
+
+        *bytes_written += (size_t)ret;
     }
 
-    return ret;
+    return 0;
+}
+
+static int extent_write_to_datafile(struct rrdengine_datafile *datafile, uv_buf_t *iov, uint64_t pos,
+                                    size_t *bytes_written) {
+    return rrdeng_write_full(datafile->file, iov, (int64_t)pos, bytes_written, NULL, NULL, 10);
 }
 
 static void *extent_write_tp_worker(
@@ -1275,12 +1302,15 @@ static void *extent_write_tp_worker(
         worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
         struct rrdengine_datafile *datafile = xt_io_descr->datafile;
 
-        ret = extent_write_to_datafile(datafile, &iov, xt_io_descr->pos);
-        if (likely(ret >= 0)) {
-            ctx_current_disk_space_increase(ctx, xt_io_descr->real_io_size);
-            datafile_accounted_size_add(datafile, xt_io_descr->real_io_size);
-            ctx_io_write_op_bytes(ctx, xt_io_descr->real_io_size);
+        size_t bytes_written;
+        ret = extent_write_to_datafile(datafile, &iov, xt_io_descr->pos, &bytes_written);
+        if (bytes_written) {
+            ctx_current_disk_space_increase(ctx, bytes_written);
+            datafile_accounted_size_add(datafile, bytes_written);
+            ctx_io_write_op_bytes(ctx, bytes_written);
+        }
 
+        if (likely(ret >= 0)) {
             // journalfile_v1_extent_write() always releases the WAL
             ret = journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
             xt_io_descr->wal = NULL;

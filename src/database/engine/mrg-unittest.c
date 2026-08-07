@@ -112,8 +112,67 @@ static int mrg_unittest_expect_counter_sub(
     return 1;
 }
 
+struct write_full_unittest_state {
+    const int *results;
+    size_t results_count;
+    size_t calls;
+    int64_t offsets[4];
+    size_t lengths[4];
+};
+
+static int write_full_unittest_operation(uv_file file __maybe_unused, const uv_buf_t *iov, int64_t offset, void *data) {
+    struct write_full_unittest_state *state = data;
+    if(state->calls < _countof(state->offsets)) {
+        state->offsets[state->calls] = offset;
+        state->lengths[state->calls] = iov->len;
+    }
+
+    if(state->calls >= state->results_count)
+        return UV_EIO;
+
+    return state->results[state->calls++];
+}
+
+static int rrdeng_write_full_unittest(void) {
+    char buffer[8] = { 0 };
+    uv_buf_t iov = uv_buf_init(buffer, sizeof(buffer));
+    size_t written = 0;
+    int errors = 0;
+
+    const int partial_then_complete[] = { 3, 5 };
+    struct write_full_unittest_state complete = { .results = partial_then_complete, .results_count = 2 };
+    int ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &complete, 1);
+    if(ret != 0 || written != sizeof(buffer) || complete.calls != 2 ||
+       complete.offsets[0] != 100 || complete.lengths[0] != sizeof(buffer) ||
+       complete.offsets[1] != 103 || complete.lengths[1] != sizeof(buffer) - 3) {
+        fprintf(stderr, "DBENGINE: full write did not retry the unwritten suffix\n");
+        errors++;
+    }
+
+    const int partial_then_error[] = { 3, UV_EIO };
+    struct write_full_unittest_state failed = { .results = partial_then_error, .results_count = 2 };
+    written = 0;
+    ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &failed, 1);
+    if(ret != UV_EIO || written != 3 || failed.calls != 2) {
+        fprintf(stderr, "DBENGINE: partial write failure was not reported\n");
+        errors++;
+    }
+
+    const int zero_progress[] = { 0 };
+    struct write_full_unittest_state zero = { .results = zero_progress, .results_count = 1 };
+    written = 0;
+    ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &zero, 1);
+    if(ret != UV_EIO || written != 0 || zero.calls != 1) {
+        fprintf(stderr, "DBENGINE: zero-byte write was not reported as failure\n");
+        errors++;
+    }
+
+    return errors;
+}
+
 static int dbengine_accounting_helpers_unittest(void) {
     int errors = 0;
+    errors += rrdeng_write_full_unittest();
     struct rrdengine_instance ctx = {0};
     ctx.config.tier = 1;
 

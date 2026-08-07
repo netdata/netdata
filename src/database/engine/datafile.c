@@ -234,7 +234,6 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile, bool accounted
 int create_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     uv_file file;
     int ret, fd;
     struct rrdeng_df_sb *superblock = NULL;
@@ -257,17 +256,8 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
-    int retries = 10;
-    ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
-        uv_fs_req_cleanup(&req);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
-                break;
-            sleep_usec(300 * USEC_PER_MS);
-        }
-    }
+    size_t bytes_written;
+    ret = rrdeng_write_full(file, &iov, 0, &bytes_written, NULL, NULL, 10);
 
     posix_memalign_freez(superblock);
     if (ret < 0) {

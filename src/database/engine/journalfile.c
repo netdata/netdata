@@ -7,7 +7,6 @@ time_t dbengine_journal_v2_unmount_time = 120;
 /* Careful to always call this before creating a new journal file */
 int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal)
 {
-    uv_fs_t request;
     struct rrdengine_journalfile *journalfile = datafile->journalfile;
     uv_buf_t iov;
 
@@ -24,26 +23,20 @@ int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine
 
     iov = uv_buf_init(wal->buf, wal->buf_size);
 
-    int retries = 10;
-    int ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &request, journalfile->file, &iov, 1, (int64_t)journalfile_position, NULL);
-        uv_fs_req_cleanup(&request);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
-                break;
-            sleep_usec(300 * USEC_PER_MS);
-        }
+    size_t bytes_written;
+    int ret = rrdeng_write_full(journalfile->file, &iov, (int64_t)journalfile_position,
+                                &bytes_written, NULL, NULL, 10);
+
+    if (bytes_written) {
+        ctx_current_disk_space_increase(ctx, bytes_written);
+        journalfile_accounted_size_add(journalfile, bytes_written);
+        ctx_io_write_op_bytes(ctx, bytes_written);
     }
 
     if (unlikely(ret < 0)) {
         ctx_io_error(ctx);
         goto done;
     }
-
-    ctx_current_disk_space_increase(ctx, wal->buf_size);
-    journalfile_accounted_size_add(journalfile, wal->buf_size);
-    ctx_io_write_op_bytes(ctx, wal->buf_size);
 
 done:
     wal_release(wal);
@@ -697,7 +690,6 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     uv_file file;
     int ret, fd;
     struct rrdeng_jf_sb *superblock = NULL;
@@ -719,17 +711,8 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
-    int retries = 10;
-    ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
-        uv_fs_req_cleanup(&req);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
-                break;
-            sleep_usec(300 * USEC_PER_MS);
-        }
-    }
+    size_t bytes_written;
+    ret = rrdeng_write_full(file, &iov, 0, &bytes_written, NULL, NULL, 10);
 
     posix_memalign_freez(superblock);
 
