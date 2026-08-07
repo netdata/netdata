@@ -592,7 +592,6 @@ ALWAYS_INLINE STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query
     size_t slot = h->slot;
 
     STORAGE_POINT sp;
-    sp.count = 1;
 
     time_t this_timestamp = h->next_timestamp;
     h->next_timestamp += h->dt;
@@ -617,9 +616,12 @@ ALWAYS_INLINE STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query
     h->slot = slot;
     h->slot_timestamp += h->dt;
 
-    sp.anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
     sp.flags = (n & SN_USER_FLAGS);
     sp.min = sp.max = sp.sum = unpack_storage_number(n);
+    bool exists = does_storage_number_exist(n);
+    sp.count = exists ? 1 : 0;
+    sp.anomaly_count = exists && is_storage_number_anomalous(n) ? 1 : 0;
+    sp.gap_count = exists ? 0 : 1;
 
     return sp;
 }

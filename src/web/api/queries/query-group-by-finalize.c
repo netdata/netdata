@@ -7,9 +7,26 @@
 #define HGBC_PARTIAL_FLAG (1U << 31)
 #define HGBC_COUNT_MASK   (~HGBC_PARTIAL_FLAG)
 
-void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
-                                         RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
-                                         STORAGE_POINT *query_points, size_t pass __maybe_unused) {
+static bool group_by_pass_propagates_raw_contributor_counts(const QUERY_TARGET *qt, size_t pass) {
+    // Raw count is an Agent-Cloud contract and needs an explicit capability before it can change.
+    if(query_target_aggregatable(qt))
+        return false;
+
+    for(size_t p = 0; p <= pass; p++) {
+        RRDR_GROUP_BY_FUNCTION aggregation = qt->request.group_by[p].aggregation;
+        if(aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE ||
+           aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE ||
+           (qt->request.group_by[p].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE))
+            return false;
+    }
+
+    return true;
+}
+
+static ALWAYS_INLINE void rrd2rrdr_group_by_add_metric_internal(
+    RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
+    RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
+    STORAGE_POINT *query_points, bool propagate_raw_contributor_counts) {
     if(!r_tmp || r_dst == r_tmp || !(r_tmp->od[d_tmp] & RRDR_DIMENSION_QUERIED))
         return;
 
@@ -75,7 +92,7 @@ void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t
             *co &= ~RRDR_VALUE_EMPTY;
             *co |= (o_tmp & (RRDR_VALUE_RESET | RRDR_VALUE_PARTIAL));
             *ar += ar_tmp;
-            (*gbc)++;
+            *gbc += propagate_raw_contributor_counts ? r_tmp->gbc[idx_tmp] : 1;
         }
         else if(r_dst->hgbc) {
             // count the hidden (denominator) contributions too, so that
@@ -88,6 +105,21 @@ void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t
                 r_dst->hgbc[idx_dst] |= HGBC_PARTIAL_FLAG;
         }
     }
+}
+
+void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
+                                  RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
+                                  STORAGE_POINT *query_points, size_t pass __maybe_unused) {
+    rrd2rrdr_group_by_add_metric_internal(
+        r_dst, d_dst, r_tmp, d_tmp, group_by_aggregate_function, query_points, false);
+}
+
+NEVER_INLINE
+static void rrd2rrdr_group_by_add_metric_with_raw_contributor_counts(
+    RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
+    RRDR_GROUP_BY_FUNCTION group_by_aggregate_function, STORAGE_POINT *query_points) {
+    rrd2rrdr_group_by_add_metric_internal(
+        r_dst, d_dst, r_tmp, d_tmp, group_by_aggregate_function, query_points, true);
 }
 
 // stamp RRDR_VALUE_PARTIAL on every point that received fewer contributions
@@ -113,45 +145,6 @@ static void rrd2rrdr_group_by_stamp_partial(RRDR *r, const uint32_t *expected_gb
                (hgbc & HGBC_PARTIAL_FLAG))
                 r->o[idx] |= RRDR_VALUE_PARTIAL;
         }
-    }
-}
-
-void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
-    time_t trimmable_after = r->partial_data_trimming.expected_after;
-
-    // find the point just before the trimmable ones
-    ssize_t i = (ssize_t)r->n - 1;
-    for( ; i >= 0 ;i--) {
-        if (r->t[i] < trimmable_after)
-            break;
-    }
-
-    if(unlikely(i < 0))
-        return;
-
-    // internal_error(true, "Found trimmable index %zd (from 0 to %zu)", i, r->n - 1);
-
-    size_t last_row_gbc = 0;
-    for (; i < (ssize_t)r->n; i++) {
-        size_t row_gbc = 0;
-        for (size_t d = 0; d < r->d; d++) {
-            if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
-                continue;
-
-            row_gbc += r->gbc[ i * r->d + d ];
-        }
-
-        // internal_error(true, "GBC of index %zd is %zu", i, row_gbc);
-
-        if (unlikely(r->t[i] >= trimmable_after && (row_gbc < last_row_gbc || !row_gbc))) {
-            // discard the rest of the points
-            // internal_error(true, "Discarding points %zd to %zu", i, r->n - 1);
-            r->partial_data_trimming.trimmed_after = r->t[i];
-            r->rows = i;
-            break;
-        }
-        else
-            last_row_gbc = row_gbc;
     }
 }
 
@@ -295,11 +288,12 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     RRDR *last_r = r_tmp->group_by.r;
 
     // how many sources are expected to contribute to every point of each
-    // dimension, in the units gbc counts at each pass: metrics at the first
-    // pass, prior-pass groups at later passes; dgbc cannot be this comparand
-    // - it counts metrics at every pass, including the hidden ones - so
-    // complete data would flag PARTIAL; the split between expected_gbc and
-    // expected_hgbc mirrors the routing rule of
+    // dimension, in the units gbc uses at that pass: metrics at the first
+    // pass; raw metrics in eligible later passes; prior-pass groups at held
+    // boundaries and on the raw wire. dgbc is used only by the eligible
+    // non-raw result path; the predicate rejects both the raw wire and paths
+    // with hidden percentage contributors.
+    // The split between expected_gbc and expected_hgbc mirrors the routing rule of
     // rrd2rrdr_group_by_add_metric(): hidden sources feed the percentage
     // denominator (vh) and are counted by hgbc, never by gbc
     ONEWAYALLOC *owa = last_r->internal.owa;
@@ -323,6 +317,7 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     size_t pass = 0;
     while(r) {
         pass++;
+        bool propagate_raw_contributor_counts = group_by_pass_propagates_raw_contributor_counts(qt, pass);
         onewayalloc_freez(owa, expected_gbc);
         onewayalloc_freez(owa, expected_hgbc);
         expected_gbc = onewayalloc_callocz(owa, r->d, sizeof(*expected_gbc));
@@ -332,11 +327,16 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
             if((last_r->od[d] & RRDR_DIMENSION_HIDDEN) && r->vh)
                 expected_hgbc[last_r->dgbs[d]]++;
             else
-                expected_gbc[last_r->dgbs[d]]++;
+                expected_gbc[last_r->dgbs[d]] += propagate_raw_contributor_counts ? last_r->dgbc[d] : 1;
 
-            rrd2rrdr_group_by_add_metric(r, last_r->dgbs[d], last_r, d,
-                                         qt->request.group_by[pass].aggregation,
-                                         &last_r->dqp[d], pass);
+            if(propagate_raw_contributor_counts)
+                rrd2rrdr_group_by_add_metric_with_raw_contributor_counts(
+                    r, last_r->dgbs[d], last_r, d,
+                    qt->request.group_by[pass].aggregation, &last_r->dqp[d]);
+            else
+                rrd2rrdr_group_by_add_metric(
+                    r, last_r->dgbs[d], last_r, d,
+                    qt->request.group_by[pass].aggregation, &last_r->dqp[d], pass);
         }
         rrd2rrdr_group_by_stamp_partial(r, expected_gbc, expected_hgbc);
         rrdr2rrdr_group_by_calculate_percentage_of_group(r);
@@ -367,9 +367,6 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
         if(qt->request.group_by[g].group_by != RRDR_GROUP_BY_NONE)
             aggregation = qt->request.group_by[g].aggregation;
-
-    if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
-        rrdr2rrdr_group_by_partial_trimming(r);
 
     // for every aggregation except AVERAGE the plotted value is already the
     // final group aggregate (the percentage, the sum, the min, the max), so

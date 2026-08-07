@@ -785,6 +785,8 @@ ALWAYS_INLINE_HOT void rrdeng_load_metric_init(
     handle->ctx = ctx;
     handle->metric = metric;
     handle->priority = priority;
+    size_t tier_grouping = get_tier_grouping(ctx->config.tier);
+    handle->pgdc.slots_per_point = tier_grouping > UINT32_MAX ? UINT32_MAX : (uint32_t)tier_grouping;
 
     // IMPORTANT!
     // It is crucial not to exceed the db boundaries, because dbengine
@@ -837,9 +839,11 @@ static ALWAYS_INLINE_HOT bool rrdeng_load_page_next(struct storage_engine_query_
 
     if (likely(handle->page)) {
         // we have a page to release
+        // The next page may have a different cadence, so search strictly after the last returned timestamp.
+        handle->now_s = pgc_page_end_time_s(handle->page) + 1;
         pgc_page_release(main_cache, handle->page);
         handle->page = NULL;
-        pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
+        pgdc_reset(&handle->pgdc, NULL, UINT32_MAX, handle->pgdc.slots_per_point);
     }
 
     if (unlikely(handle->now_s > seqh->end_time_s))
@@ -894,7 +898,8 @@ static ALWAYS_INLINE_HOT bool rrdeng_load_page_next(struct storage_engine_query_
     handle->position = position;
     handle->dt_s = page_update_every_s;
 
-    pgdc_reset(&handle->pgdc, pgc_page_data(handle->page), handle->position);
+    pgdc_reset(
+        &handle->pgdc, pgc_page_data(handle->page), handle->position, handle->pgdc.slots_per_point);
 
     return true;
 }
@@ -907,7 +912,8 @@ ALWAYS_INLINE_HOT STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_qu
     STORAGE_POINT sp;
 
     if (unlikely(handle->now_s > seqh->end_time_s)) {
-        storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
+        storage_point_empty_slots(
+            sp, handle->now_s - handle->dt_s, handle->now_s, handle->pgdc.slots_per_point);
         goto prepare_for_next_iteration;
     }
 
@@ -916,7 +922,8 @@ ALWAYS_INLINE_HOT STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_qu
 
         if (!rrdeng_load_page_next(seqh, false)) {
             handle->now_s = seqh->end_time_s;
-            storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
+            storage_point_empty_slots(
+                sp, handle->now_s - handle->dt_s, handle->now_s, handle->pgdc.slots_per_point);
             goto prepare_for_next_iteration;
         }
     }
@@ -950,7 +957,7 @@ ALWAYS_INLINE void rrdeng_load_metric_finalize(struct storage_engine_query_handl
 
     if (handle->page) {
         pgc_page_release(main_cache, handle->page);
-        pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
+        pgdc_reset(&handle->pgdc, NULL, UINT32_MAX, handle->pgdc.slots_per_point);
     }
 
     if(handle->pdc) {

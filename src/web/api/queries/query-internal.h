@@ -13,11 +13,18 @@
 typedef struct query_point {
     STORAGE_POINT sp;
     NETDATA_DOUBLE value;
+    uint8_t tier;
     bool added;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
 #endif
 } QUERY_POINT;
+
+typedef struct query_row_evidence {
+    uint32_t count;
+    uint32_t anomaly_count;
+    uint32_t gap_count;
+} QUERY_ROW_EVIDENCE;
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define QUERY_POINT_EMPTY (QUERY_POINT){ \
@@ -47,10 +54,13 @@ typedef struct query_engine_ops {
     time_t view_update_every;
     time_t query_granularity;
     TIER_QUERY_FETCH tier_query_fetch;
+    QUERY_POINT_MODE point_mode;
 
     // query planer
     size_t current_plan;
     time_t current_plan_expire_time;
+    time_t result_plan_expire_time;
+    time_t plan_switch_time_offset;
     time_t plan_expanded_after;
     time_t plan_expanded_before;
 
@@ -62,7 +72,7 @@ typedef struct query_engine_ops {
     // aggregating points over time
     size_t group_points_non_zero;
     size_t group_points_added;
-    STORAGE_POINT group_point;          // aggregates min, max, sum, count, anomaly count for each group point
+    QUERY_ROW_EVIDENCE group_point;     // aggregates sample, anomaly, and gap evidence for each result row
     STORAGE_POINT query_point;          // aggregates min, max, sum, count, anomaly count across the whole query
     RRDR_VALUE_FLAGS group_value_flags;
 
@@ -94,6 +104,7 @@ typedef struct query_engine_ops_cache {
 
 // query planner
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
+#define query_result_plan_should_switch_plan(ops, now) ((now) >= (ops)->result_plan_expire_time)
 bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time);
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops);
 QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id);
@@ -121,7 +132,6 @@ int rrdlabels_traversal_cb_to_group_by_label_key(const char *name, const char *v
 void rrd2rrdr_set_timestamps(RRDR *r);
 RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt);
 void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r);
-void rrdr2rrdr_group_by_partial_trimming(RRDR *r);
 void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
                                   RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
                                   STORAGE_POINT *query_points, size_t pass);

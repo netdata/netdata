@@ -12,10 +12,17 @@ extern "C" {
 
 typedef enum tier_query_fetch {
     TIER_QUERY_FETCH_SUM,
+    TIER_QUERY_FETCH_RATE_SUM,
     TIER_QUERY_FETCH_MIN,
     TIER_QUERY_FETCH_MAX,
     TIER_QUERY_FETCH_AVERAGE
 } TIER_QUERY_FETCH;
+
+typedef enum query_point_mode {
+    QUERY_POINT_MODE_LINEAR,
+    QUERY_POINT_MODE_HOLD,
+    QUERY_POINT_MODE_TOTAL,
+} QUERY_POINT_MODE;
 
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
 
@@ -104,6 +111,7 @@ typedef struct rrdresult {
         NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 
         TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
+        QUERY_POINT_MODE point_mode;
 
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE

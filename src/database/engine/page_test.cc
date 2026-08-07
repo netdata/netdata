@@ -26,6 +26,12 @@ bool operator==(const STORAGE_POINT lhs, const STORAGE_POINT rhs) {
     if (lhs.count != rhs.count)
         return false;
 
+    if (lhs.gap_count != rhs.gap_count)
+        return false;
+
+    if (lhs.anomaly_count != rhs.anomaly_count)
+        return false;
+
     if (lhs.flags != rhs.flags)
         return false;
 
@@ -35,6 +41,189 @@ bool operator==(const STORAGE_POINT lhs, const STORAGE_POINT rhs) {
 // TODO: use value-parameterized tests
 // http://google.github.io/googletest/advanced.html#value-parameterized-tests
 static uint8_t page_type = PAGE_GORILLA_METRICS;
+
+static STORAGE_POINT numeric_point(
+    time_t start_time_s,
+    time_t end_time_s,
+    NETDATA_DOUBLE min,
+    NETDATA_DOUBLE max,
+    NETDATA_DOUBLE sum,
+    uint32_t count,
+    uint32_t gap_count,
+    uint32_t anomaly_count,
+    SN_FLAGS flags = SN_FLAG_NONE) {
+    STORAGE_POINT sp = STORAGE_POINT_UNSET;
+    sp.min = min;
+    sp.max = max;
+    sp.sum = sum;
+    sp.start_time_s = start_time_s;
+    sp.end_time_s = end_time_s;
+    sp.count = count;
+    sp.anomaly_count = anomaly_count;
+    sp.flags = flags;
+    sp.gap_count = gap_count;
+    return sp;
+}
+
+TEST(StoragePoint, StateContractAndSize) {
+#if UINTPTR_MAX == UINT64_MAX
+    EXPECT_EQ(sizeof(STORAGE_POINT), 56u);
+    EXPECT_EQ(sizeof(PGDC), 80u);
+#endif
+
+    PGDC cursor;
+    pgdc_reset(&cursor, nullptr, UINT32_MAX, 0);
+    EXPECT_EQ(cursor.slots_per_point, 1u);
+    pgdc_reset(&cursor, nullptr, UINT32_MAX, 65536);
+    EXPECT_EQ(cursor.slots_per_point, 65536u);
+
+    STORAGE_POINT sp = STORAGE_POINT_UNSET;
+    EXPECT_TRUE(storage_point_is_unset(sp));
+    EXPECT_FALSE(storage_point_has_value(sp));
+    EXPECT_FALSE(storage_point_is_gap(sp));
+    EXPECT_FALSE(storage_point_is_partial(sp));
+    EXPECT_EQ(storage_point_slots(sp), 0u);
+
+    storage_point_empty(sp, 10, 20);
+    EXPECT_FALSE(storage_point_is_unset(sp));
+    EXPECT_FALSE(storage_point_has_value(sp));
+    EXPECT_TRUE(storage_point_is_gap(sp));
+    EXPECT_FALSE(storage_point_is_partial(sp));
+    EXPECT_EQ(sp.count, 0u);
+    EXPECT_EQ(sp.gap_count, 1u);
+    EXPECT_EQ(storage_point_slots(sp), 1u);
+
+    sp = numeric_point(10, 20, 1, 2, 3, 2, 0, 1);
+    EXPECT_TRUE(storage_point_has_value(sp));
+    EXPECT_TRUE(storage_point_is_complete(sp));
+    EXPECT_FALSE(storage_point_is_partial(sp));
+    EXPECT_EQ(storage_point_slots(sp), 2u);
+
+    sp.gap_count = 3;
+    EXPECT_TRUE(storage_point_has_value(sp));
+    EXPECT_FALSE(storage_point_is_complete(sp));
+    EXPECT_TRUE(storage_point_is_partial(sp));
+    EXPECT_EQ(storage_point_slots(sp), 5u);
+}
+
+TEST(StoragePoint, MergePreservesGapEvidenceInEitherOrder) {
+    STORAGE_POINT gap;
+    storage_point_empty(gap, 0, 10);
+    STORAGE_POINT numeric = numeric_point(10, 20, 2, 5, 7, 2, 1, 1, SN_FLAG_RESET);
+
+    STORAGE_POINT gap_first = gap;
+    storage_point_merge_to(gap_first, numeric);
+    EXPECT_EQ(gap_first.start_time_s, 0);
+    EXPECT_EQ(gap_first.end_time_s, 20);
+    EXPECT_EQ(gap_first.min, 2);
+    EXPECT_EQ(gap_first.max, 5);
+    EXPECT_EQ(gap_first.sum, 7);
+    EXPECT_EQ(gap_first.count, 2u);
+    EXPECT_EQ(gap_first.gap_count, 2u);
+    EXPECT_EQ(gap_first.anomaly_count, 1u);
+    EXPECT_TRUE(gap_first.flags & SN_FLAG_RESET);
+    EXPECT_TRUE(storage_point_is_partial(gap_first));
+
+    STORAGE_POINT numeric_first = numeric;
+    storage_point_merge_to(numeric_first, gap);
+    EXPECT_EQ(numeric_first, gap_first);
+
+    STORAGE_POINT second_gap;
+    storage_point_empty(second_gap, 20, 30);
+    storage_point_merge_to(gap, second_gap);
+    EXPECT_TRUE(storage_point_is_gap(gap));
+    EXPECT_EQ(gap.start_time_s, 0);
+    EXPECT_EQ(gap.end_time_s, 30);
+    EXPECT_EQ(gap.gap_count, 2u);
+}
+
+TEST(StoragePoint, AddPreservesGapEvidence) {
+    STORAGE_POINT dst = numeric_point(0, 10, 2, 5, 7, 2, 1, 1);
+    STORAGE_POINT src = numeric_point(10, 20, 3, 7, 11, 3, 2, 2);
+    storage_point_add_to(dst, src);
+
+    EXPECT_EQ(dst.start_time_s, 0);
+    EXPECT_EQ(dst.end_time_s, 20);
+    EXPECT_EQ(dst.min, 5);
+    EXPECT_EQ(dst.max, 12);
+    EXPECT_EQ(dst.sum, 18);
+    EXPECT_EQ(dst.count, 5u);
+    EXPECT_EQ(dst.gap_count, 3u);
+    EXPECT_EQ(dst.anomaly_count, 3u);
+    EXPECT_TRUE(storage_point_is_partial(dst));
+
+    STORAGE_POINT gap;
+    storage_point_empty(gap, 20, 30);
+    storage_point_add_to(dst, gap);
+    EXPECT_EQ(dst.sum, 18);
+    EXPECT_EQ(dst.count, 5u);
+    EXPECT_EQ(dst.gap_count, 4u);
+}
+
+TEST(PGD, DecodesTier0PointStatesExactly) {
+    PGD *pg = pgd_create(RRDENG_PAGE_TYPE_GORILLA_32BIT, 2);
+    pgd_append_point(pg, 1, 42, 42, 42, 1, 0, SN_FLAG_NOT_ANOMALOUS, 0);
+    pgd_append_point(pg, 2, NAN, NAN, NAN, 0, 0, SN_FLAG_NONE, 1);
+
+    PGDC cursor;
+    pgdc_reset(&cursor, pg, 0, 1);
+
+    STORAGE_POINT sp = STORAGE_POINT_UNSET;
+    sp.start_time_s = 0;
+    sp.end_time_s = 1;
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 0, &sp));
+    EXPECT_TRUE(storage_point_is_complete(sp));
+    EXPECT_EQ(sp.count, 1u);
+    EXPECT_EQ(sp.gap_count, 0u);
+
+    sp.start_time_s = 1;
+    sp.end_time_s = 2;
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 1, &sp));
+    EXPECT_TRUE(storage_point_is_gap(sp));
+    EXPECT_EQ(sp.count, 0u);
+    EXPECT_EQ(sp.gap_count, 1u);
+
+    pgd_free(pg);
+}
+
+TEST(PGD, ReconstructsLegacyTierGapCount) {
+    PGD *pg = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 3);
+    pgd_append_point(pg, 60, 400, 10, 10, 40, 0, SN_FLAG_NOT_ANOMALOUS, 0);
+    pgd_append_point(pg, 120, 800, 10, 10, 80, 0, SN_FLAG_NOT_ANOMALOUS, 1);
+    pgd_append_point(pg, 180, NAN, NAN, NAN, 1, 0, SN_FLAG_NONE, 2);
+
+    PGDC cursor;
+    pgdc_reset(&cursor, pg, 0, 60);
+
+    STORAGE_POINT sp = STORAGE_POINT_UNSET;
+    sp.start_time_s = 0;
+    sp.end_time_s = 60;
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 0, &sp));
+    EXPECT_TRUE(storage_point_is_partial(sp));
+    EXPECT_EQ(sp.count, 40u);
+    EXPECT_EQ(sp.gap_count, 20u);
+
+    sp.start_time_s = 60;
+    sp.end_time_s = 120;
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 1, &sp));
+    EXPECT_TRUE(storage_point_is_complete(sp));
+    EXPECT_EQ(sp.count, 80u);
+    EXPECT_EQ(sp.gap_count, 0u);
+
+    sp.start_time_s = 120;
+    sp.end_time_s = 180;
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 2, &sp));
+    EXPECT_TRUE(storage_point_is_gap(sp));
+    EXPECT_EQ(sp.count, 0u);
+    EXPECT_EQ(sp.gap_count, 60u);
+
+    pgdc_reset(&cursor, pg, 2, 65536);
+    EXPECT_TRUE(pgdc_get_next_point(&cursor, 2, &sp));
+    EXPECT_TRUE(storage_point_is_gap(sp));
+    EXPECT_EQ(sp.gap_count, 65536u);
+
+    pgd_free(pg);
+}
 
 static size_t slots_for_page(size_t n) {
     switch (page_type) {
@@ -58,7 +247,7 @@ TEST(PGD, EmptyOrNull) {
     EXPECT_EQ(pgd_memory_footprint(pg), 0);
     EXPECT_EQ(pgd_disk_footprint(pg), 0);
 
-    pgdc_reset(&cursor, pg, 0);
+    pgdc_reset(&cursor, pg, 0, 1);
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 0, &sp));
 
     pgd_free(pg);
@@ -71,7 +260,7 @@ TEST(PGD, EmptyOrNull) {
     EXPECT_EQ(pgd_disk_footprint(pg), 0);
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 0, &sp));
 
-    pgdc_reset(&cursor, pg, 0);
+    pgdc_reset(&cursor, pg, 0, 1);
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 0, &sp));
 
     pgd_free(pg);
@@ -108,7 +297,7 @@ TEST(PGD, CursorFullPage) {
 
     for (size_t i = 0; i != 2; i++) {
         PGDC cursor;
-        pgdc_reset(&cursor, pg, 0);
+        pgdc_reset(&cursor, pg, 0, 1);
 
         STORAGE_POINT sp;
         for (size_t slot = 0; slot != slots; slot++) {
@@ -126,7 +315,7 @@ TEST(PGD, CursorFullPage) {
 
     for (size_t i = 0; i != 2; i++) {
         PGDC cursor;
-        pgdc_reset(&cursor, pg, slots / 2);
+        pgdc_reset(&cursor, pg, slots / 2, 1);
 
         STORAGE_POINT sp;
         for (size_t slot = slots / 2; slot != slots; slot++) {
@@ -145,7 +334,7 @@ TEST(PGD, CursorFullPage) {
     // out of bounds seek
     {
         PGDC cursor;
-        pgdc_reset(&cursor, pg, 2 * slots);
+        pgdc_reset(&cursor, pg, 2 * slots, 1);
 
         STORAGE_POINT sp;
         EXPECT_FALSE(pgdc_get_next_point(&cursor, 2 * slots, &sp));
@@ -165,7 +354,7 @@ TEST(PGD, CursorHalfPage) {
     for (size_t slot = 0; slot != slots / 2; slot++)
         pgd_append_point(pg, slot, slot, 0, 0, 1, 1, SN_DEFAULT_FLAGS, slot);
 
-    pgdc_reset(&cursor, pg, 0);
+    pgdc_reset(&cursor, pg, 0, 1);
 
     for (size_t slot = 0; slot != slots / 2; slot++) {
         EXPECT_TRUE(pgdc_get_next_point(&cursor, slot, &sp));
@@ -181,7 +370,7 @@ TEST(PGD, CursorHalfPage) {
     // reset pgdc to the end of the page, we should not be getting more
     // points even if the page has grown in between.
 
-    pgdc_reset(&cursor, pg, slots / 2);
+    pgdc_reset(&cursor, pg, slots / 2, 1);
 
     for (size_t slot = slots / 2; slot != slots; slot++)
         pgd_append_point(pg, slot, slot, 0, 0, 1, 1, SN_DEFAULT_FLAGS, slot);
@@ -356,8 +545,8 @@ TEST(PGD, Roundtrip) {
         PGDC cursor_collector;
         PGDC cursor_disk;
 
-        pgdc_reset(&cursor_collector, pg_collector, i * 1024);
-        pgdc_reset(&cursor_disk, pg_disk, i * 1024);
+        pgdc_reset(&cursor_collector, pg_collector, i * 1024, 1);
+        pgdc_reset(&cursor_disk, pg_disk, i * 1024, 1);
 
         STORAGE_POINT sp_collector = {};
         STORAGE_POINT sp_disk = {};
@@ -418,7 +607,7 @@ TEST(PGD, StopCorruptGorillaDiskEntriesAtEncodedBits) {
     EXPECT_EQ(pgd_slots_used(pg_disk), 2);
 
     PGDC cursor;
-    pgdc_reset(&cursor, pg_disk, 0);
+    pgdc_reset(&cursor, pg_disk, 0, 1);
 
     STORAGE_POINT sp = {};
     EXPECT_TRUE(pgdc_get_next_point(&cursor, 0, &sp));
