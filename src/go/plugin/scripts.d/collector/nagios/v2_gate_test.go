@@ -389,6 +389,36 @@ func TestV2Gate_AutogenPerfdataContextSingleNamespaced(t *testing.T) {
 	require.True(t, found, "expected an autogen create-chart action for the perfdata measureset")
 }
 
+func TestV2Gate_ExecutionCPUUsesGaugeAlgorithm(t *testing.T) {
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(New().ChartTemplateYAML()), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := gateCycleController(t, store)
+	cc.BeginCycle()
+	meter := store.Write().SnapshotMeter("")
+	labels := meter.LabelSet(metrix.Label{Key: "nagios_job", Value: "check_disk"})
+	meter.Gauge("job.execution_cpu_total", metrix.WithFloat(true)).Observe(0.5, labels)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	reader := store.Read(metrix.ReadFlatten())
+	assertSeriesKind(t, reader, "job.execution_cpu_total", metrix.Labels{"nagios_job": "check_disk"}, metrix.MetricKindGauge)
+	plan, err := prepareCommittedPlan(engine, reader)
+	require.NoError(t, err)
+
+	var found bool
+	for _, action := range plan.Actions {
+		dim, ok := action.(chartengine.CreateDimensionAction)
+		if !ok || dim.ChartMeta.Context != "nagios.job.execution_cpu" {
+			continue
+		}
+		found = true
+		assert.Equal(t, chartengine.AlgorithmAbsolute, dim.Algorithm)
+	}
+	require.True(t, found, "expected the authored execution CPU dimension")
+}
+
 func countActions[T any](actions []chartengine.EngineAction) int {
 	n := 0
 	for _, action := range actions {

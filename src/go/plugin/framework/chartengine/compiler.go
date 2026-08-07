@@ -97,7 +97,6 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 	selectorKeySet := make(map[string]struct{})
 	dynamicDimensionKeys := make(map[string]struct{})
 
-	metricKinds := make(map[string]bool)
 	for i := range chart.Dimensions {
 		compiledDim, err := compileDimension(chart.Dimensions[i], chart.Aggregation, scope.metrics)
 		if err != nil {
@@ -111,12 +110,9 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 		for _, key := range compiledDim.dynamicLabelKeys {
 			dynamicDimensionKeys[key] = struct{}{}
 		}
-		for _, kind := range compiledDim.metricKinds {
-			metricKinds[kind] = true
-		}
 	}
 
-	algorithm, err := resolveAlgorithm(chart.Algorithm, metricKinds)
+	algorithm, err := compileAlgorithm(chart.Algorithm)
 	if err != nil {
 		return program.Chart{}, err
 	}
@@ -191,7 +187,6 @@ type compiledDimension struct {
 	dimension        program.Dimension
 	selectorKeys     []string
 	dynamicLabelKeys []string
-	metricKinds      []string
 }
 
 func compileDimension(
@@ -235,7 +230,6 @@ func compileDimension(
 		dynamicLabelKeys = append(dynamicLabelKeys, nameFromLabel)
 	}
 
-	metricKinds := metricKindsFromNames(meta.MetricNames)
 	options := compileDimensionOptions(dim.Options)
 	aggregation, err := compileAggregation(chartAggregation)
 	if err != nil {
@@ -262,7 +256,6 @@ func compileDimension(
 		},
 		selectorKeys:     append([]string(nil), meta.ConstrainedLabelKeys...),
 		dynamicLabelKeys: normalizeUnique(dynamicLabelKeys),
-		metricKinds:      metricKinds,
 	}, nil
 }
 
@@ -307,30 +300,18 @@ func compileDimensionOptions(in *charttpl.DimensionOptions) compiledDimensionOpt
 	return out
 }
 
-func resolveAlgorithm(raw string, metricKinds map[string]bool) (program.Algorithm, error) {
+func compileAlgorithm(raw string) (program.Algorithm, error) {
 	normalized := strings.TrimSpace(raw)
-	if normalized != "" {
-		switch normalized {
-		case string(program.AlgorithmAbsolute):
-			return program.AlgorithmAbsolute, nil
-		case string(program.AlgorithmIncremental):
-			return program.AlgorithmIncremental, nil
-		default:
-			return "", fmt.Errorf("invalid algorithm %q", raw)
-		}
-	}
-
-	// Inference baseline:
-	// - counter-like selectors => incremental
-	// - gauge-like selectors => absolute
-	// - mixed inferred kinds must be explicit.
-	if metricKinds["counter_like"] && metricKinds["gauge_like"] {
-		return "", fmt.Errorf("algorithm inference is ambiguous for mixed metric kinds; set algorithm explicitly")
-	}
-	if metricKinds["counter_like"] {
+	switch normalized {
+	case "":
+		return program.AlgorithmAuto, nil
+	case string(program.AlgorithmAbsolute):
+		return program.AlgorithmAbsolute, nil
+	case string(program.AlgorithmIncremental):
 		return program.AlgorithmIncremental, nil
+	default:
+		return program.AlgorithmAuto, fmt.Errorf("invalid algorithm %q", raw)
 	}
-	return program.AlgorithmAbsolute, nil
 }
 
 func resolveChartType(raw string) (program.ChartType, error) {
@@ -389,25 +370,6 @@ func compileInstanceByLabels(instances *charttpl.Instances) ([]program.InstanceL
 		}
 	}
 	return out, nil
-}
-
-func metricKindsFromNames(names []string) []string {
-	seen := make(map[string]struct{})
-	for _, name := range names {
-		switch {
-		case strings.HasSuffix(name, "_total"):
-			seen["counter_like"] = struct{}{}
-		case strings.HasSuffix(name, "_count"):
-			seen["counter_like"] = struct{}{}
-		case strings.HasSuffix(name, "_sum"):
-			seen["counter_like"] = struct{}{}
-		case strings.HasSuffix(name, "_bucket"):
-			seen["counter_like"] = struct{}{}
-		default:
-			seen["gauge_like"] = struct{}{}
-		}
-	}
-	return mapKeysSorted(seen)
 }
 
 func supportsRuntimeInferredDimension(meta metrixselector.Meta) bool {

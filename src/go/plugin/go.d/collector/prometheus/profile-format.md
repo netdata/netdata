@@ -358,8 +358,10 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
   composed context, keeping chart identities aligned with contexts -- every stock profile relies on that. Keep every
   chart's `context` unique within the profile -- when the same measurement exists at several scopes, prefix the context
   with the scope (`process_requests`, `frontend_requests`, `backend_requests`).
-- **`algorithm` is optional.** When omitted, the engine infers it from the metric (see the Chart Template Format); the
-  examples here set it explicitly for readability.
+- **`algorithm` is optional.** When omitted, the engine uses the collected series type for each rendered dimension:
+  counters are incremental and gauges are absolute, regardless of metric name. The examples here set it explicitly for
+  readability. Use an explicit chart algorithm for an intentional type override or when differently typed series are
+  deliberately aggregated into the same rendered dimension.
 - **Dimension selectors address scraped series by their exposition names**, after `selector` filtering and relabeling.
   This is the opposite surface from the profile's `match`: a histogram dimension selector must use the suffixed name
   (`foo_bucket`), and one written with the family name (`foo`) matches nothing -- the curated chart silently never
