@@ -25,7 +25,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
+        metrics_description: "Monitor Linux page cache events giving users a general vision about how the kernel is manipulating files."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include:
@@ -71,11 +71,11 @@ modules:
             enabled: true
           list:
             - name: update every
-              description: Data collection frequency. When Netdata provides a pluginsd interval, the collector follows it and uses this value only as a fallback.
+              description: Data collection frequency. This configuration value takes precedence over the runtime interval passed by pluginsd.
               default_value: 10
               required: false
             - name: ebpf load mode
-              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              description: "Legacy compatibility option. eBPFGo accepts `entry`; `return` is not supported and is ignored with a warning."
               default_value: entry
               required: false
             - name: apps
@@ -91,7 +91,7 @@ modules:
               default_value: 32768
               required: false
             - name: ebpf object flavor
-              description: "Select the cachestat object flavor to load. Available values are `buffer`, `arena`, and `tracing`. The default is `buffer`, and the collector falls back to `tracing` when the requested flavor is not available on the system."
+              description: "Select the cachestat object flavor to load. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The default is `buffer`, and the collector falls back when the requested flavor is not available on the system."
               default_value: buffer
               required: false
             - name: ebpf type format
@@ -105,6 +105,14 @@ modules:
             - name: maps per core
               description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
               default_value: yes
+              required: false
+            - name: btf path
+              description: Override the default BTF source directory. The collector checks this path for a vmlinux BTF file used by CO-RE loading.
+              default_value: /sys/kernel/btf
+              required: false
+            - name: collect pid
+              description: "Controls which PIDs are stored in the BPF hash tables. `real parent` stores only the real parent PID (lowest overhead); `parent` stores the immediate parent PID; `all` stores every PID used by the process (highest overhead)."
+              default_value: real parent
               required: false
             - name: lifetime
               description: Set default lifetime for thread when enabled by cloud.
@@ -154,3 +162,292 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
+  - meta:
+      plugin_name: ebpf-go.plugin
+      module_name: dns
+      monitored_instance:
+        name: eBPF DNS
+        link: "https://kernel.org/"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "ebpf.jpg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - DNS
+        - mDNS
+        - Network monitoring
+        - eBPF
+    overview:
+      data_collection:
+        metrics_description: "Monitor DNS query and response traffic at the kernel level, broken down by transport protocol (UDP/TCP) and IP family (IPv4/IPv6). Data is exposed through the on-demand `dns-queries` function consumed by the network-viewer."
+        method_description: "Attach a BPF socket filter to a raw AF_PACKET socket to capture and count DNS packets on port 53 (standard DNS) and port 5353 (mDNS). The filter runs entirely in the kernel; only per-packet counters are copied to userspace."
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: "The plugin needs setuid because it loads data inside the kernel. Netdata sets the necessary permissions during installation."
+      default_behavior:
+        auto_detection:
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and selects the best available BPF object flavor (arena, buffer, or base) for the running kernel."
+        limits:
+          description: ""
+        performance_impact:
+          description: "The BPF socket filter runs in the kernel for every received Ethernet frame. Overhead is proportional to DNS traffic volume and is negligible on typical hosts."
+    setup:
+      prerequisites:
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different according to the preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well defined pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
+      configuration:
+        file:
+          name: "ebpf.d.conf"
+          description: "Primary configuration file for ebpf-go.plugin. Enable the dns module in the `[ebpf programs]` section. The module also accepts the legacy `ebpf.d/dns.conf` overlay for per-module overrides."
+        options:
+          description: |
+            The `dns` option in section `[ebpf programs]` controls whether the module is loaded.
+            Per-module overrides (`update every`, `ebpf object flavor`, `per query tracking`, `flow ttl`) belong in `ebpf.d/dns.conf`.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: dns
+              description: Enable (`yes`) or disable (`no`) the DNS monitoring module.
+              default_value: "no"
+              required: false
+            - name: update every
+              description: Data collection frequency in seconds.
+              default_value: 10
+              required: false
+            - name: ebpf object flavor
+              description: "Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
+              default_value: buffer
+              required: false
+            - name: per query tracking
+              description: "Enable per-DNS-query latency tracking. When enabled (`yes`), the collector records the time between each DNS request and its matching response, producing per-query latency metrics. Required for the `dns-queries` Function consumed by `network-viewer.plugin`."
+              default_value: "yes"
+              required: false
+            - name: flow ttl
+              description: "DNS flow record lifetime in seconds. Must equal `NV_DNS_UPDATE_EVERY` (20) in `network-viewer.c`: a value greater than 20 causes double-counting and a value less than 20 causes silent record loss in the `dns-queries` Function. Also, `update every` must not exceed this value or records expire in the kernel ring before collection."
+              default_value: 20
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        The DNS module does not publish standalone Netdata charts. It writes DNS flow data
+        to a POSIX shared-memory segment; the `network-viewer.plugin` reads that segment
+        and registers the `dns-queries` on-demand function (FUNCTIONGLOBAL).
+
+        The function returns a table with **one row per DNS query/response transaction**
+        (not an aggregate). Each row represents one captured DNS exchange from the ring
+        buffer maintained by `ebpf-go.plugin`.
+
+        ### `dns-queries` function columns
+
+        | Column | Description |
+        |:-------|:------------|
+        | Domain | Queried domain name |
+        | QueryType | DNS query type (A, AAAA, MX, etc.) |
+        | Transport | Transport protocol (UDP or TCP) |
+        | IPFamily | IP family (IPv4 or IPv6) |
+        | ServerIP | DNS server IP address |
+        | Latency | Query-to-response latency (seconds) |
+        | Status | Query completion status (OK or Timeout) |
+        | RCode | DNS response code (NOERROR, NXDOMAIN, SERVFAIL, etc.) |
+      availability: []
+      scopes: []
+  - meta:
+      plugin_name: ebpf-go.plugin
+      module_name: socket
+      monitored_instance:
+        name: eBPF Socket
+        link: "https://kernel.org/"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "ebpf.jpg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - TCP
+        - UDP
+        - Network monitoring
+        - eBPF
+    overview:
+      data_collection:
+        metrics_description: "Monitor TCP and UDP function calls, bandwidth, errors, and connection counts. Data is exposed through the on-demand `network-protocols` function consumed by the network-viewer."
+        method_description: "Attach kprobe or fentry/fexit trampolines to the kernel functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, `tcp_connect` (IPv4 and IPv6), `tcp_close`, `udp_sendmsg`, and `udp_recvmsg`. Per-cycle deltas and byte counts are computed in userspace from the BPF map snapshots."
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: "The plugin needs setuid because it loads data inside the kernel. Netdata sets the necessary permissions during installation."
+      default_behavior:
+        auto_detection:
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached."
+        limits:
+          description: ""
+        performance_impact:
+          description: "This thread adds overhead every time a monitored kernel TCP or UDP function is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
+    setup:
+      prerequisites:
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different according to the preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well defined pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
+      configuration:
+        file:
+          name: "ebpf.d.conf"
+          description: "Primary configuration file for ebpf-go.plugin. Enable the socket module in the `[ebpf programs]` section. Per-module overrides belong in `ebpf.d/socket.conf`."
+        options:
+          description: |
+            The `socket` option in section `[ebpf programs]` controls whether the module is loaded.
+            Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object flavor`, `pid table size`, `socket monitoring table size`, `udp connection table size`) belong in `ebpf.d/socket.conf`.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: socket
+              description: Enable (`yes`) or disable (`no`) the socket monitoring module.
+              default_value: "no"
+              required: false
+            - name: update every
+              description: Data collection frequency in seconds.
+              default_value: 10
+              required: false
+            - name: maps per core
+              description: When enabled (`yes`), the plugin allocates one BPF hash table per CPU core instead of a single shared table. Improves throughput on multi-core systems; ignored on kernels older than 4.15.
+              default_value: "yes"
+              required: false
+            - name: btf path
+              description: Path to the directory containing BTF files used for CO-RE (Compile Once, Run Everywhere) loading.
+              default_value: /sys/kernel/btf
+              required: false
+            - name: ebpf object flavor
+              description: "Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel."
+              default_value: buffer
+              required: false
+            - name: pid table size
+              description: Maximum number of PIDs tracked in the per-PID SHM segment shared with `apps.plugin` and `cgroups.plugin`. Increase on hosts with more than 32768 concurrent monitored processes.
+              default_value: 32768
+              required: false
+            - name: socket monitoring table size
+              description: Maximum number of connections tracked in the `tbl_nd_socket` BPF hash map (per-PID TCP/UDP bandwidth). Increase on hosts with many concurrent connections; each entry consumes kernel BPF map memory.
+              default_value: 16384
+              required: false
+            - name: udp connection table size
+              description: Maximum number of UDP connections tracked in the `tbl_nv_udp` BPF hash map. Increase on hosts with high UDP connection rates.
+              default_value: 4096
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        This module attaches to kernel TCP/UDP functions and publishes host-level TCP/UDP activity
+        through the on-demand `network-protocols` function (FUNCTIONGLOBAL) consumed by the
+        network-viewer. Per-cgroup and per-service socket activity is exported through the
+        eBPFGo shared-memory path consumed by `cgroups.plugin`.
+
+        > **Migration note** — Per-host and per-app charts published by prior versions of `ebpf.plugin`
+        > are not republished. The following are permanently removed; use the `network-protocols` function
+        > in network-viewer as a replacement.
+        >
+        > Removed per-host charts: `ip.inbound_conn`, `ip.tcp_outbound_conn`, `ip.tcp_functions`,
+        > `ip.total_tcp_bandwidth`, `ip.tcp_error`, `ip.tcp_retransmit`, `ip.udp_functions`,
+        > `ip.total_udp_bandwidth`, `ip.udp_error`.
+        >
+        > Removed per-app charts: `app.ebpf_call_tcp_v4_connection`, `app.ebpf_call_tcp_v6_connection`,
+        > `app.ebpf_sock_total_bandwidth`, `app.ebpf_call_tcp_sendmsg`, `app.ebpf_call_tcp_cleanup_rbuf`,
+        > `app.ebpf_call_tcp_retransmit`, `app.ebpf_call_udp_sendmsg`, `app.ebpf_call_udp_recvmsg`.
+        >
+        > **Configuration changes from `network.conf`** — The `network.conf` file has been replaced by
+        > `socket.conf`. The following defaults changed silently:
+        >
+        > - `maps per core` changed from `no` to `yes`. Per-core BPF maps use more memory but reduce
+        >   contention on multi-core systems. To restore the previous behaviour add `maps per core = no`
+        >   to `socket.conf`.
+        > - `ebpf co-re tracing` changed from `probe` (kprobe/legacy BPF) to `trampoline` (auto-detected).
+        >   To force kprobes add `ebpf co-re tracing = probe` to `socket.conf`.
+        > - The `[network connections]` and `[service name]` sections from `network.conf` have no
+        >   equivalent in `socket.conf` and are not read; any per-port service name overrides are lost.
+
+        ### `network-protocols` function columns
+
+        The `network-protocols` function returns a table with one row per transport protocol and the
+        following columns:
+
+        | Column | Description |
+        |:-------|:------------|
+        | Transport | Protocol name (TCP or UDP) |
+        | Family | IP family (IPv4+IPv6 combined) |
+        | Received | Segments or datagrams received per second |
+        | Sent | Segments or datagrams sent per second |
+        | Errors | Send/receive errors per second |
+        | ConnActive | Active connections opened per second |
+        | ConnEstablished | Currently established connections |
+        | ConnPassive | Passive connections opened per second |
+        | ConnReset | Reset connections per second |
+        | SegsTotal | Total segments per second |
+        | SegsRetransmitted | Retransmitted segments per second |
+        | DatagramsNoPort | Datagrams with no destination port per second |
+      availability: []
+      scopes:
+        - name: global
+          description: "All data is delivered through the on-demand `network-protocols` function consumed by network-viewer; no traditional Netdata charts are published for this scope."
+          labels: []
+          metrics: []

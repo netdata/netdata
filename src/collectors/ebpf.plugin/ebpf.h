@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 #include <dlfcn.h>
@@ -27,7 +28,6 @@
 #include "libnetdata/netipc/netipc_netdata.h"
 
 #include "ebpf_apps.h"
-#include "ebpf_functions.h"
 #include "ebpf_cgroup.h"
 
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
@@ -45,7 +45,6 @@ extern size_t ebpf_hash_table_pids_count;
 #include "process.skel.h"
 #include "shm.skel.h"
 #include "sync.skel.h"
-#include "socket.skel.h"
 #include "swap.skel.h"
 #include "vfs.skel.h"
 
@@ -56,7 +55,6 @@ extern struct hardirq_bpf *hardirq_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
 extern struct mdflush_bpf *mdflush_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
-extern struct socket_bpf *socket_bpf_obj;
 extern struct swap_bpf *swap_bpf_obj;
 extern struct vfs_bpf *vfs_bpf_obj;
 extern struct process_bpf *process_bpf_obj;
@@ -110,13 +108,9 @@ typedef struct netdata_ebpf_judy_pid {
 
 typedef struct netdata_ebpf_judy_pid_stats {
     char *cmdline;
-
-    // Index for Socket timestamp
-    struct {                     // support for multiple indexing engines
-        Pvoid_t JudyLArray;      // the hash table
-        RW_SPINLOCK rw_spinlock; // protect the index
-    } socket_stats;
 } netdata_ebpf_judy_pid_stats_t;
+
+#define NETDATA_EBPF_PID_STATS_ARAL_TABLE_NAME "ebpf_pid_stats"
 
 extern ebpf_module_t ebpf_modules[];
 extern bool ebpf_program_loaded_any;
@@ -184,7 +178,6 @@ enum ebpf_algorithms_list { NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_
 
 // Threads
 void ebpf_process_thread(void *ptr);
-void ebpf_socket_thread(void *ptr);
 
 // Common variables
 extern netdata_mutex_t lock;
@@ -290,7 +283,6 @@ extern const char *btf_path;
 // Socket functions and variables
 // Common functions
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
 
 // BPF teardown callbacks — called by main thread after all module threads have been joined
 void ebpf_unload_legacy_bpf(ebpf_module_t *em); // legacy-only modules: process, disk, softirq, oomkill, mdflush
@@ -316,10 +308,6 @@ void ebpf_read_global_table_stats(
     uint32_t end);
 void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
 netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
-
-void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
-void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
-void ebpf_read_local_addresses_unsafe();
 
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
@@ -390,7 +378,7 @@ static inline bool ebpf_module_thread_has_valid_state(ebpf_module_t *em)
 {
     enum ebpf_threads_status enabled = ebpf_module_enabled_get(em);
 
-    if (likely(enabled == NETDATA_THREAD_EBPF_RUNNING || enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
+    if (likely(enabled == NETDATA_THREAD_EBPF_RUNNING))
         return true;
 
     collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)enabled);

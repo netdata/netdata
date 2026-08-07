@@ -46,7 +46,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 		want []structFieldExpectation
 	}{
 		"pid-stat": {
-			typ: reflect.TypeOf(ebpfPidStat{}),
+			typ: reflect.TypeFor[ebpfPidStat](),
 			want: []structFieldExpectation{
 				{name: "pid", kind: reflect.Uint32, typ: "uint32"},
 				{name: "comm", kind: reflect.Array, typ: "[96]uint8", len: EBPF_MAX_COMPARE_NAME + 1},
@@ -62,7 +62,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 			},
 		},
 		"cachestat": {
-			typ: reflect.TypeOf(netdataPublishCachestat{}),
+			typ: reflect.TypeFor[netdataPublishCachestat](),
 			want: []structFieldExpectation{
 				{name: "Ct", kind: reflect.Uint64, typ: "uint64"},
 				{name: "Ratio", kind: reflect.Int64, typ: "int64"},
@@ -74,7 +74,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 			},
 		},
 		"dcstat": {
-			typ: reflect.TypeOf(netdataPublishDCStat{}),
+			typ: reflect.TypeFor[netdataPublishDCStat](),
 			want: []structFieldExpectation{
 				{name: "Ct", kind: reflect.Uint64, typ: "uint64"},
 				{name: "Ratio", kind: reflect.Int64, typ: "int64"},
@@ -84,7 +84,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 			},
 		},
 		"fdstat": {
-			typ: reflect.TypeOf(netdataPublishFDStat{}),
+			typ: reflect.TypeFor[netdataPublishFDStat](),
 			want: []structFieldExpectation{
 				{name: "Ct", kind: reflect.Uint64, typ: "uint64"},
 				{name: "OpenCall", kind: reflect.Uint32, typ: "uint32"},
@@ -94,7 +94,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 			},
 		},
 		"process": {
-			typ: reflect.TypeOf(ebpfProcessStat{}),
+			typ: reflect.TypeFor[ebpfProcessStat](),
 			want: []structFieldExpectation{
 				{name: "Ct", kind: reflect.Uint64, typ: "uint64"},
 				{name: "Uid", kind: reflect.Uint32, typ: "uint32"},
@@ -110,7 +110,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 			},
 		},
 		"shm": {
-			typ: reflect.TypeOf(netdataPublishSHM{}),
+			typ: reflect.TypeFor[netdataPublishSHM](),
 			want: []structFieldExpectation{
 				{name: "Ct", kind: reflect.Uint64, typ: "uint64"},
 				{name: "Get", kind: reflect.Uint32, typ: "uint32"},
@@ -120,7 +120,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 			},
 		},
 		"swap": {
-			typ: reflect.TypeOf(netdataPublishSwap{}),
+			typ: reflect.TypeFor[netdataPublishSwap](),
 			want: []structFieldExpectation{
 				{name: "Ct", kind: reflect.Uint64, typ: "uint64"},
 				{name: "Read", kind: reflect.Uint32, typ: "uint32"},
@@ -128,7 +128,7 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 			},
 		},
 		"socket": {
-			typ: reflect.TypeOf(ebpfSocketPublishApps{}),
+			typ: reflect.TypeFor[ebpfSocketPublishApps](),
 			want: []structFieldExpectation{
 				{name: "BytesSent", kind: reflect.Uint64, typ: "uint64"},
 				{name: "BytesReceived", kind: reflect.Uint64, typ: "uint64"},
@@ -140,10 +140,11 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 				{name: "CallClose", kind: reflect.Uint64, typ: "uint64"},
 				{name: "CallTCPV4Connection", kind: reflect.Uint64, typ: "uint64"},
 				{name: "CallTCPV6Connection", kind: reflect.Uint64, typ: "uint64"},
+				{name: "UpdateEverySec", kind: reflect.Uint32, typ: "uint32"},
 			},
 		},
 		"vfs": {
-			typ: reflect.TypeOf(netdataPublishVFS{}),
+			typ: reflect.TypeFor[netdataPublishVFS](),
 			want: []structFieldExpectation{
 				{name: "Ct", kind: reflect.Uint64, typ: "uint64"},
 				{name: "WriteCall", kind: reflect.Uint32, typ: "uint32"},

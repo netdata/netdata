@@ -388,7 +388,7 @@ static void ebpf_parse_cgroup_netipc_data(void)
     if (err != NIPC_OK) {
         if (++refresh_fail_count % 10 == 1)
             collector_error(
-                "EBPF CGROUP: netipc cgroups-snapshot call failed err=%d (%d consecutive failures)",
+                "EBPF CGROUP: netipc cgroups-snapshot call failed err=%u (%d consecutive failures)",
                 err,
                 refresh_fail_count);
         return;
@@ -408,7 +408,7 @@ static void ebpf_parse_cgroup_netipc_data(void)
         if (err != NIPC_OK) {
             if (++refresh_fail_count % 10 == 1)
                 collector_error(
-                    "EBPF CGROUP: netipc cgroups-snapshot item decode failed index=%u err=%d "
+                    "EBPF CGROUP: netipc cgroups-snapshot item decode failed index=%u err=%u "
                     "(%d consecutive failures)",
                     i,
                     err,

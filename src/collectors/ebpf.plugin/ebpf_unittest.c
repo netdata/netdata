@@ -10,7 +10,6 @@
 #include <netinet/in.h>
 #include "libbpf_api/ebpf_library.h"
 #include "ebpf.h"
-#include "ebpf_socket.h"
 
 extern uint32_t integration_with_collectors;
 extern int running_on_kernel;
@@ -174,76 +173,6 @@ static void test_ebpf_write_chart_obsolete(void)
 }
 
 /**
- * Test ebpf_clean_ip_structure
- *
- * Tests the ebpf_clean_ip_structure function to ensure it correctly
- * frees allocated IP list structures and clears the list pointer.
- */
-static void test_ebpf_clean_ip_structure(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_clean_ip_structure ===\n");
-
-    ebpf_network_viewer_ip_list_t *list = NULL;
-    ebpf_network_viewer_ip_list_t *item1, *item2;
-
-    item1 = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
-    item1->value = strdupz("192.168.1.1");
-    item1->ver = AF_INET;
-    item1->next = NULL;
-
-    item2 = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
-    item2->value = strdupz("10.0.0.1");
-    item2->ver = AF_INET;
-    item2->next = NULL;
-
-    list = item1;
-    item1->next = item2;
-
-    EBPF_UT_ASSERT(list != NULL, "List should not be NULL before cleaning");
-    EBPF_UT_ASSERT(list->next != NULL, "List should have two items before cleaning");
-
-    ebpf_clean_ip_structure(&list);
-
-    EBPF_UT_ASSERT(list == NULL, "List should be NULL after cleaning");
-}
-
-/**
- * Test ebpf_clean_port_structure
- *
- * Tests the ebpf_clean_port_structure function to ensure it correctly
- * frees allocated port list structures and clears the list pointer.
- */
-static void test_ebpf_clean_port_structure(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_clean_port_structure ===\n");
-
-    ebpf_network_viewer_port_list_t *list = NULL;
-    ebpf_network_viewer_port_list_t *item1, *item2;
-
-    item1 = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    item1->value = strdupz("80");
-    item1->first = htons(80);
-    item1->last = htons(80);
-    item1->next = NULL;
-
-    item2 = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    item2->value = strdupz("443");
-    item2->first = htons(443);
-    item2->last = htons(443);
-    item2->next = NULL;
-
-    list = item1;
-    item1->next = item2;
-
-    EBPF_UT_ASSERT(list != NULL, "Port list should not be NULL before cleaning");
-    EBPF_UT_ASSERT(list->next != NULL, "Port list should have two items before cleaning");
-
-    ebpf_clean_port_structure(&list);
-
-    EBPF_UT_ASSERT(list == NULL, "Port list should be NULL after cleaning");
-}
-
-/**
  * Test ebpf_how_to_load
  *
  * Tests the ebpf_how_to_load function to ensure it correctly parses
@@ -322,15 +251,25 @@ static void test_ebpf_set_ipc_value(void)
         integration_with_collectors == NETDATA_EBPF_INTEGRATION_SHM,
         "Integration should be NETDATA_EBPF_INTEGRATION_SHM");
 
-    ebpf_set_ipc_value("socket");
-    EBPF_UT_ASSERT(
-        integration_with_collectors == NETDATA_EBPF_INTEGRATION_SOCKET,
-        "Integration should be NETDATA_EBPF_INTEGRATION_SOCKET");
-
     ebpf_set_ipc_value("disabled");
     EBPF_UT_ASSERT(
         integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED,
         "Integration should be NETDATA_EBPF_INTEGRATION_DISABLED");
+
+    ebpf_set_ipc_value("shm");
+    EBPF_UT_ASSERT(
+        integration_with_collectors == NETDATA_EBPF_INTEGRATION_SHM,
+        "Integration should be NETDATA_EBPF_INTEGRATION_SHM before removed socket fallback");
+
+    ebpf_set_ipc_value("socket");
+    EBPF_UT_ASSERT(
+        integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED,
+        "Removed socket integration should be treated as disabled");
+
+    ebpf_set_ipc_value("shm");
+    EBPF_UT_ASSERT(
+        integration_with_collectors == NETDATA_EBPF_INTEGRATION_SHM,
+        "Integration should be NETDATA_EBPF_INTEGRATION_SHM before invalid fallback");
 
     ebpf_set_ipc_value("invalid");
     EBPF_UT_ASSERT(
@@ -449,112 +388,6 @@ static void test_ebpf_global_labels(void)
     EBPF_UT_ASSERT(pio[0].dimension == dim[0], "pio[0].dimension should be dim[0]");
     EBPF_UT_ASSERT(pio[1].dimension == dim[1], "pio[1].dimension should be dim[1]");
     EBPF_UT_ASSERT(pio[2].dimension == dim[2], "pio[2].dimension should be dim[2]");
-}
-
-/**
- * Test ebpf_parse_ports basic
- *
- * Tests the ebpf_parse_ports function with basic port numbers
- * to ensure it correctly parses and creates port list entries.
- */
-static void test_ebpf_parse_ports_basic(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_parse_ports (basic) ===\n");
-
-    network_viewer_opt.included_port = NULL;
-    network_viewer_opt.excluded_port = NULL;
-
-    static const char input[] = "80 443";
-    ebpf_parse_ports(input);
-
-    EBPF_UT_ASSERT(network_viewer_opt.included_port != NULL, "Port list should not be NULL after parsing '80 443'");
-    EBPF_UT_ASSERT(strcmp(input, "80 443") == 0, "Port parser should not modify its input");
-
-    size_t entries = 0;
-    for (ebpf_network_viewer_port_list_t *entry = network_viewer_opt.included_port; entry; entry = entry->next)
-        entries++;
-    EBPF_UT_ASSERT(entries == 2, "Port parser should create one entry for each input token");
-
-    ebpf_clean_port_structure(&network_viewer_opt.included_port);
-    network_viewer_opt.included_port = NULL;
-}
-
-/**
- * Test ebpf_parse_ports with range
- *
- * Tests the ebpf_parse_ports function with port ranges
- * to ensure it correctly parses and creates port range entries.
- */
-static void test_ebpf_parse_ports_with_range(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_parse_ports with range ===\n");
-
-    network_viewer_opt.included_port = NULL;
-
-    ebpf_parse_ports("8000-9000");
-
-    EBPF_UT_ASSERT(network_viewer_opt.included_port != NULL, "Port list should not be NULL after parsing range");
-
-    if (network_viewer_opt.included_port) {
-        uint16_t first = ntohs(network_viewer_opt.included_port->first);
-        uint16_t last = ntohs(network_viewer_opt.included_port->last);
-        EBPF_UT_ASSERT(first == 8000, "First port should be 8000");
-        EBPF_UT_ASSERT(last == 9000, "Last port should be 9000");
-    }
-
-    ebpf_clean_port_structure(&network_viewer_opt.included_port);
-    network_viewer_opt.included_port = NULL;
-}
-
-/**
- * Test ebpf_parse_ips_unsafe basic
- *
- * Tests the ebpf_parse_ips_unsafe function with basic IPv4 addresses
- * to ensure it correctly parses and creates IP list entries.
- */
-static void test_ebpf_parse_ips_basic(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_parse_ips_unsafe (basic) ===\n");
-
-    network_viewer_opt.included_ips = NULL;
-
-    static const char input[] = "192.168.1.1 10.0.0.1";
-    ebpf_parse_ips_unsafe(input);
-
-    EBPF_UT_ASSERT(network_viewer_opt.included_ips != NULL, "IP list should not be NULL after parsing IP");
-    EBPF_UT_ASSERT(strcmp(input, "192.168.1.1 10.0.0.1") == 0, "IP parser should not modify its input");
-
-    if (network_viewer_opt.included_ips) {
-        EBPF_UT_ASSERT(network_viewer_opt.included_ips->ver == AF_INET, "IP should be IPv4");
-    }
-
-    size_t entries = 0;
-    for (ebpf_network_viewer_ip_list_t *entry = network_viewer_opt.included_ips; entry; entry = entry->next)
-        entries++;
-    EBPF_UT_ASSERT(entries == 2, "IP parser should create one entry for each input token");
-
-    ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
-    network_viewer_opt.included_ips = NULL;
-}
-
-/**
- * Test ebpf_parse_ips_unsafe with CIDR
- *
- * Tests the ebpf_parse_ips_unsafe function with CIDR notation
- * to ensure it correctly parses and creates IP range entries.
- */
-static void test_ebpf_parse_ips_with_cidr(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_parse_ips_unsafe with CIDR ===\n");
-
-    network_viewer_opt.included_ips = NULL;
-
-    ebpf_parse_ips_unsafe("192.168.0.0/24");
-
-    EBPF_UT_ASSERT(network_viewer_opt.included_ips != NULL, "IP list should not be NULL after parsing CIDR");
-
-    ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
-    network_viewer_opt.included_ips = NULL;
 }
 
 /**
@@ -711,72 +544,6 @@ static void test_ebpf_enable_chart(void)
 }
 
 /**
- * Test parse_network_viewer_section with NULL
- *
- * Tests the parse_network_viewer_section function with empty config
- * to ensure it sets appropriate default values.
- */
-static void test_parse_network_viewer_section_null(void)
-{
-    fprintf(stderr, "\n=== Testing parse_network_viewer_section (NULL) ===\n");
-
-    struct config cfg;
-    memset(&cfg, 0, sizeof(cfg));
-
-    parse_network_viewer_section(&cfg);
-
-    EBPF_UT_ASSERT(
-        network_viewer_opt.hostname_resolution_enabled == CONFIG_BOOLEAN_NO,
-        "Hostname resolution should be disabled by default");
-}
-
-/**
- * Test parse_network_viewer_section preserves configuration values
- *
- * Tests that repeated parsing consumes all list entries without changing the
- * configuration strings retained by inicfg.
- */
-static void test_parse_network_viewer_section_preserves_config(void)
-{
-    fprintf(stderr, "\n=== Testing parse_network_viewer_section preserves config ===\n");
-
-    struct config cfg = APPCONFIG_INITIALIZER;
-    static const char ports[] = "80 443";
-    static const char ips[] = "192.168.1.1 10.0.0.1";
-
-    inicfg_set(&cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, ports);
-    inicfg_set(&cfg, EBPF_NETWORK_VIEWER_SECTION, "ips", ips);
-
-    for (size_t pass = 0; pass < 2; pass++) {
-        parse_network_viewer_section(&cfg);
-
-        EBPF_UT_ASSERT(
-            strcmp(inicfg_get(&cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, NULL), ports) == 0,
-            "Network viewer parsing should preserve the configured port list");
-        EBPF_UT_ASSERT(
-            strcmp(inicfg_get(&cfg, EBPF_NETWORK_VIEWER_SECTION, "ips", NULL), ips) == 0,
-            "Network viewer parsing should preserve the configured IP list");
-
-        size_t port_entries = 0;
-        for (ebpf_network_viewer_port_list_t *entry = network_viewer_opt.included_port; entry; entry = entry->next)
-            port_entries++;
-        EBPF_UT_ASSERT(port_entries == 2, "Each parse should consume every configured port token");
-
-        size_t ip_entries = 0;
-        for (ebpf_network_viewer_ip_list_t *entry = network_viewer_opt.included_ips; entry; entry = entry->next)
-            ip_entries++;
-        EBPF_UT_ASSERT(ip_entries == 2, "Each parse should consume every configured IP token");
-
-        ebpf_clean_port_structure(&network_viewer_opt.included_port);
-        ebpf_clean_port_structure(&network_viewer_opt.excluded_port);
-        ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
-        ebpf_clean_ip_structure(&network_viewer_opt.excluded_ips);
-    }
-
-    inicfg_free(&cfg);
-}
-
-/**
  * Test ebpf_load_collector_config
  *
  * Tests the ebpf_load_collector_config function with non-existent path
@@ -803,8 +570,6 @@ void ebpf_library_run_unittests(void)
     test_ebpf_write_global_dimension();
     test_ebpf_write_chart_cmd();
     test_ebpf_write_chart_obsolete();
-    test_ebpf_clean_ip_structure();
-    test_ebpf_clean_port_structure();
     test_ebpf_how_to_load();
     test_ebpf_set_apps_mode();
     test_ebpf_set_thread_mode();
@@ -815,18 +580,12 @@ void ebpf_library_run_unittests(void)
     test_write_io_chart();
     test_write_histogram_chart();
     test_ebpf_global_labels();
-    test_ebpf_parse_ports_basic();
-    test_ebpf_parse_ports_with_range();
-    test_ebpf_parse_ips_basic();
-    test_ebpf_parse_ips_with_cidr();
     test_ebpf_print_help();
     test_write_count_chart();
     test_write_err_chart();
     test_ebpf_create_global_dimension();
     test_ebpf_enable_specific_chart();
     test_ebpf_enable_chart();
-    test_parse_network_viewer_section_null();
-    test_parse_network_viewer_section_preserves_config();
     test_ebpf_load_collector_config();
 
     fprintf(stderr, "\n");
