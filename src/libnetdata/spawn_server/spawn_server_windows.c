@@ -22,9 +22,8 @@ static void update_cygpath_env(void) {
     if(done) return;
     done = true;
 
-    char win_path[MAX_PATH];
-
 #if defined(__CYGWIN__) || defined(__MSYS__)
+    char win_path[MAX_PATH];
     // Convert Cygwin root path to Windows path
     errno_clear();
     if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path)) != 0) {
@@ -34,12 +33,10 @@ static void update_cygpath_env(void) {
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "Cygwin/MSYS2 base path set to '%s'", win_path);
 #else
-    // On UCRT64 there is no Cygwin layer. NETDATA_WINDOWS_PATH_PREFIX is the
-    // Windows installation directory (e.g. "C:\Program Files\Netdata") where
-    // MSYS2 is bundled, baked in at build time via cmake config.h.
-    strncpyz(win_path, NETDATA_WINDOWS_PATH_PREFIX, sizeof(win_path));
-    nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Windows install prefix set to '%s'", win_path);
+    CLEAN_CHAR_P *runtime_prefix = nd_windows_detect_install_prefix();
+    const char *install_prefix = runtime_prefix ? runtime_prefix : NETDATA_WINDOWS_PATH_PREFIX;
+    nd_setenv("NETDATA_CYGWIN_BASE_PATH", install_prefix, 1);
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Windows install prefix set to '%s'", install_prefix);
 #endif
 }
 

@@ -341,7 +341,7 @@ typedef struct wal {
 
 typedef int (*RRDENG_WRITE_OPERATION)(uv_file file, const uv_buf_t *iov, int64_t offset, void *data);
 
-// Returns 0 only after every byte in iov has been written; bytes_written receives the persisted prefix on failure.
+// Returns 0 only after every byte in iov has been written; bytes_written receives the written prefix on failure.
 int rrdeng_write_full(uv_file file, const uv_buf_t *iov, int64_t offset, size_t *bytes_written,
                       RRDENG_WRITE_OPERATION operation, void *operation_data, unsigned retries);
 

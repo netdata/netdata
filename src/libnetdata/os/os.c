@@ -38,44 +38,18 @@ const char *os_type = "windows";
 
 #define OS_WINDOWS_PATH_TRANSLATION_MAX 8191
 
-char *os_translate_msys_to_windows_path(const char *src) {
-    if (!src)
-        return strdupz("");
-
-    if (!*src)
-        return strdupz("");
-
-    if (src[0] == '/') {
-#if defined(__CYGWIN__) || defined(__MSYS__)
-        ssize_t converted_size = cygwin_conv_path(CCP_POSIX_TO_WIN_A, src, NULL, 0);
-        if (converted_size > 0) {
-            char *converted_path = mallocz((size_t)converted_size);
-            if (cygwin_conv_path(CCP_POSIX_TO_WIN_A, src, converted_path, (size_t)converted_size) == 0)
-                return converted_path;
-
-            freez(converted_path);
-        }
-#endif
-    }
-
+static char *os_translate_windows_path_fallback(const char *src, const char *package_prefix) {
     size_t src_len = strnlen(src, OS_WINDOWS_PATH_TRANSLATION_MAX);
-    bool package_relative_posix_path = false;
-#if !defined(__CYGWIN__) && !defined(__MSYS__)
-    package_relative_posix_path = src[0] == '/' &&
-        !(src_len >= 2 && isalpha((unsigned char)src[1]) && (src_len == 2 || src[2] == '/')) &&
-        !(src_len >= 2 && src[1] == '/');
-#endif
-    size_t prefix_len = package_relative_posix_path ? strlen(NETDATA_WINDOWS_PATH_PREFIX) : 0;
+    bool package_relative_posix_path = package_prefix != NULL;
+    size_t prefix_len = package_relative_posix_path ? strlen(package_prefix) : 0;
     size_t converted_size = prefix_len + src_len + 3;
     char *converted_path = mallocz(converted_size);
     size_t i = 0;
     size_t j = 0;
 
     if (package_relative_posix_path) {
-        // UCRT64 has no POSIX mount table. Packaged paths such as /usr/share/netdata/web
-        // are relative to the installation prefix, not the current drive root.
         for (; j < prefix_len; j++)
-            converted_path[j] = (NETDATA_WINDOWS_PATH_PREFIX[j] == '/') ? '\\' : NETDATA_WINDOWS_PATH_PREFIX[j];
+            converted_path[j] = (package_prefix[j] == '/') ? '\\' : package_prefix[j];
     }
     else if (src_len >= 2 && isalpha((unsigned char)src[0]) && src[1] == ':') {
         converted_path[j++] = (char)toupper((unsigned char)src[0]);
@@ -109,6 +83,43 @@ char *os_translate_msys_to_windows_path(const char *src) {
 
     converted_path[j] = '\0';
     return converted_path;
+}
+
+char *os_translate_msys_to_windows_path(const char *src) {
+    if (!src)
+        return strdupz("");
+
+    if (!*src)
+        return strdupz("");
+
+    if (src[0] == '/') {
+#if defined(__CYGWIN__) || defined(__MSYS__)
+        ssize_t converted_size = cygwin_conv_path(CCP_POSIX_TO_WIN_A, src, NULL, 0);
+        if (converted_size > 0) {
+            char *converted_path = mallocz((size_t)converted_size);
+            if (cygwin_conv_path(CCP_POSIX_TO_WIN_A, src, converted_path, (size_t)converted_size) == 0)
+                return converted_path;
+
+            freez(converted_path);
+        }
+#endif
+    }
+
+    const char *package_prefix = NULL;
+#if !defined(__CYGWIN__) && !defined(__MSYS__)
+    size_t src_len = strnlen(src, OS_WINDOWS_PATH_TRANSLATION_MAX);
+    bool package_relative_posix_path = src[0] == '/' &&
+        !(src_len >= 2 && isalpha((unsigned char)src[1]) && (src_len == 2 || src[2] == '/')) &&
+        !(src_len >= 2 && src[1] == '/');
+    CLEAN_CHAR_P *runtime_prefix = NULL;
+    if (package_relative_posix_path) {
+        // UCRT64 has no POSIX mount table, so package paths are relative to
+        // the installed prefix instead of the current drive root.
+        runtime_prefix = nd_windows_detect_install_prefix();
+        package_prefix = runtime_prefix ? runtime_prefix : NETDATA_WINDOWS_PATH_PREFIX;
+    }
+#endif
+    return os_translate_windows_path_fallback(src, package_prefix);
 }
 
 wchar_t *os_translate_msys_to_windows_pathW(const char *src) {
@@ -174,13 +185,23 @@ int os_windows_path_translation_unittest(void) {
     };
 
     int errors = 0;
+    CLEAN_CHAR_P *relocated_prefix = nd_windows_install_prefix_from_executable_path(
+        "D:\\Relocated Netdata\\usr\\bin\\netdata.exe");
+    if (!relocated_prefix || strcmp(relocated_prefix, "D:/Relocated Netdata") != 0) {
+        fprintf(stderr, "  FAILED runtime prefix derivation from relocated executable\n");
+        return 1;
+    }
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(cases[i].input);
-        char expected[FILENAME_MAX + 1];
+        CLEAN_CHAR_P *translated = os_translate_windows_path_fallback(
+            cases[i].input, cases[i].use_package_prefix ? relocated_prefix : NULL);
+        const char *expected_prefix = cases[i].use_package_prefix ? "D:\\Relocated Netdata" : "";
+        CLEAN_CHAR_P *expected = mallocz(strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1);
         if (cases[i].use_package_prefix)
-            snprintfz(expected, sizeof(expected), "%s%s", NETDATA_WINDOWS_PATH_PREFIX, cases[i].expected_suffix);
+            snprintfz(expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
+                      "%s%s", expected_prefix, cases[i].expected_suffix);
         else
-            snprintfz(expected, sizeof(expected), "%s", cases[i].expected_suffix);
+            snprintfz(expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
+                      "%s", cases[i].expected_suffix);
 
         for (char *p = expected; *p; p++)
             if (*p == '/') *p = '\\';

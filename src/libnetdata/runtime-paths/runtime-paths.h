@@ -37,6 +37,14 @@ void nd_runtime_paths_load_directories_from_inicfg(void);
 void nd_runtime_paths_load_hostname_from_inicfg(void);
 
 #if defined(OS_WINDOWS)
+// Returns a newly allocated install prefix derived from the running binary when
+// it has the expected package layout, or NULL when discovery is not safe.
+char *nd_windows_detect_install_prefix(void);
+
+// Returns a newly allocated prefix after stripping the final three components
+// from an executable path. This does not validate the package layout.
+char *nd_windows_install_prefix_from_executable_path(const char *executable_path);
+
 // Derive the install prefix from the running binary path and override all
 // netdata_configured_* directory globals to their correct installed locations.
 // Must be called before netdata_main() so that config loading and chdir()

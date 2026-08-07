@@ -1247,10 +1247,13 @@ static int rrdeng_uv_fs_write(uv_file file, const uv_buf_t *iov, int64_t offset,
 
 int rrdeng_write_full(uv_file file, const uv_buf_t *iov, int64_t offset, size_t *bytes_written,
                       RRDENG_WRITE_OPERATION operation, void *operation_data, unsigned retries) {
-    if (!iov || !bytes_written || !iov->base)
+    if (!bytes_written)
         return UV_EINVAL;
 
     *bytes_written = 0;
+    if (!iov || !iov->base)
+        return UV_EINVAL;
+
     if (!operation)
         operation = rrdeng_uv_fs_write;
 
@@ -1261,7 +1264,7 @@ int rrdeng_write_full(uv_file file, const uv_buf_t *iov, int64_t offset, size_t 
 
         while (attempts--) {
             ret = operation(file, &remaining, offset + (int64_t)*bytes_written, operation_data);
-            if (ret >= 0 || ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+            if (ret >= 0 || ret == UV_ENOSPC || ret == UV_EBADF || ret == UV_EACCES || ret == UV_EROFS || ret == UV_EINVAL)
                 break;
             sleep_usec(300 * USEC_PER_MS);
         }

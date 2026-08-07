@@ -116,16 +116,18 @@ struct write_full_unittest_state {
     const int *results;
     size_t results_count;
     size_t calls;
+    size_t invocations;
     int64_t offsets[4];
     size_t lengths[4];
 };
 
 static int write_full_unittest_operation(uv_file file __maybe_unused, const uv_buf_t *iov, int64_t offset, void *data) {
     struct write_full_unittest_state *state = data;
-    if(state->calls < _countof(state->offsets)) {
-        state->offsets[state->calls] = offset;
-        state->lengths[state->calls] = iov->len;
+    if(state->invocations < _countof(state->offsets)) {
+        state->offsets[state->invocations] = offset;
+        state->lengths[state->invocations] = iov->len;
     }
+    state->invocations++;
 
     if(state->calls >= state->results_count)
         return UV_EIO;
@@ -139,9 +141,24 @@ static int rrdeng_write_full_unittest(void) {
     size_t written = 0;
     int errors = 0;
 
+    written = SIZE_MAX;
+    int ret = rrdeng_write_full(-1, NULL, 100, &written, write_full_unittest_operation, NULL, 1);
+    if(ret != UV_EINVAL || written != 0) {
+        fprintf(stderr, "DBENGINE: invalid NULL iov did not clear written bytes\n");
+        errors++;
+    }
+
+    uv_buf_t null_base_iov = { .base = NULL, .len = sizeof(buffer) };
+    written = SIZE_MAX;
+    ret = rrdeng_write_full(-1, &null_base_iov, 100, &written, write_full_unittest_operation, NULL, 1);
+    if(ret != UV_EINVAL || written != 0) {
+        fprintf(stderr, "DBENGINE: invalid NULL iov base did not clear written bytes\n");
+        errors++;
+    }
+
     const int partial_then_complete[] = { 3, 5 };
     struct write_full_unittest_state complete = { .results = partial_then_complete, .results_count = 2 };
-    int ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &complete, 1);
+    ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &complete, 1);
     if(ret != 0 || written != sizeof(buffer) || complete.calls != 2 ||
        complete.offsets[0] != 100 || complete.lengths[0] != sizeof(buffer) ||
        complete.offsets[1] != 103 || complete.lengths[1] != sizeof(buffer) - 3) {
@@ -165,6 +182,17 @@ static int rrdeng_write_full_unittest(void) {
     if(ret != UV_EIO || written != 0 || zero.calls != 1) {
         fprintf(stderr, "DBENGINE: zero-byte write was not reported as failure\n");
         errors++;
+    }
+
+    static const int permanent_errors[] = { UV_ENOSPC, UV_EBADF, UV_EACCES, UV_EROFS, UV_EINVAL };
+    for(size_t i = 0; i < sizeof(permanent_errors) / sizeof(permanent_errors[0]); i++) {
+        struct write_full_unittest_state permanent = { .results = &permanent_errors[i], .results_count = 1 };
+        written = 0;
+        ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &permanent, 3);
+        if(ret != permanent_errors[i] || written != 0 || permanent.invocations != 1) {
+            fprintf(stderr, "DBENGINE: permanent write error %d was retried or changed\n", permanent_errors[i]);
+            errors++;
+        }
     }
 
     return errors;
