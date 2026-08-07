@@ -476,7 +476,7 @@ modules:
               required: false
             - name: vnode.labels
               group: Virtual node
-              description: Additional key-value pairs to associate with the Virtual Node.
+              description: Additional key-value pairs to associate with the Virtual Node. These merge with the labels SNMP automatically detects from the device (such as `vendor` and `sys_object_id`); a key you set here overrides the matching auto-detected label.
               default_value: ""
               required: false
         examples:
@@ -570,7 +570,7 @@ modules:
             - name: Additional node labels
               description: |
                 Since `create_vnode` defaults to `true`, each SNMP job automatically creates a Virtual Node for its device. No separate vnode definition file is needed.
-                Add entries under `vnode.labels` to attach your own node labels, such as grouping devices by site or rack. SNMP also adds device labels (for example `vendor` and `sys_object_id`) automatically; your labels are merged on top. Omit `guid` to have it generated from the device address.
+                Add entries under `vnode.labels` to attach your own labels, such as grouping devices by site or rack. These merge with the labels SNMP automatically detects from the device (for example `vendor` and `sys_object_id`); a label key you set overrides the matching auto-detected one.
               config: |
                 jobs:
                   - name: core-switch
@@ -579,7 +579,6 @@ modules:
                     community: public
                     options:
                       version: 2
-                    create_vnode: true
                     vnode:
                       labels:
                         site: dc1
