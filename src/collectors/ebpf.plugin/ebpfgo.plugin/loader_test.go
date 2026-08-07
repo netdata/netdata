@@ -347,6 +347,42 @@ func TestBuildLoadPlan(t *testing.T) {
 	}
 }
 
+func TestBuildFallbackPlansRHFGenericAlternates(t *testing.T) {
+	primary := LoadPlan{
+		KernelVersion: 331264,
+		IsRHF:         2308,
+		Selector:      7,
+		Flavor:        ObjectFlavorBuffer,
+		ObjectPath:    filepath.Join(defaultPluginsDir(), "ebpf.d", "pnetdata_ebpf_socket_buffer.5.14.rhf.o"),
+		LoadMode:      LoadCore,
+		ProgramMode:   LoadTrampoline,
+	}
+
+	plans := buildFallbackPlans(primary, defaultPluginsDir(), primary.IsRHF, "socket", socketMaxBaseSelector)
+
+	wantPaths := []string{
+		"pnetdata_ebpf_socket_buffer.5.14.rhf.o",
+		"pnetdata_ebpf_socket_buffer.5.14.o",
+		"pnetdata_ebpf_socket.5.14.rhf.o",
+		"pnetdata_ebpf_socket.5.14.o",
+	}
+	if len(plans) != len(wantPaths) {
+		t.Fatalf("buildFallbackPlans() returned %d plans, want %d: %#v", len(plans), len(wantPaths), plans)
+	}
+
+	for i, want := range wantPaths {
+		wantPath := filepath.Join(defaultPluginsDir(), "ebpf.d", want)
+		if plans[i].ObjectPath != wantPath {
+			t.Fatalf("plan[%d].ObjectPath = %q, want %q", i, plans[i].ObjectPath, wantPath)
+		}
+	}
+
+	if plans[0].IsRHF != primary.IsRHF || plans[1].IsRHF != -1 || plans[2].IsRHF != primary.IsRHF ||
+		plans[3].IsRHF != -1 {
+		t.Fatalf("unexpected RHF fallback sequence: %#v", []int{plans[0].IsRHF, plans[1].IsRHF, plans[2].IsRHF, plans[3].IsRHF})
+	}
+}
+
 func TestKernelRejected(t *testing.T) {
 	dir := t.TempDir()
 	reject := filepath.Join(dir, "reject.txt")

@@ -48,6 +48,7 @@ build_modules = list(modules)
 # go.mod.
 EXTRA_LINUX_MODULES = [
     REPO_ROOT / 'src' / 'collectors' / 'cgroups.plugin' / 'cgroup-name',
+    REPO_ROOT / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin',
 ]
 
 for moddir in EXTRA_LINUX_MODULES:

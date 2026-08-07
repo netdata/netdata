@@ -18,6 +18,7 @@ METADATA_PATTERN = '*/metadata.yaml'
 COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'metadata.yaml', False),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
@@ -36,6 +37,9 @@ TAXONOMY_SOURCES = [
     *COLLECTOR_SOURCES,
     *FLOWS_SOURCES,
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'taxonomy.yaml', False),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'taxonomy.yaml', False),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'dns' / 'taxonomy.yaml', False),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'socket' / 'taxonomy.yaml', False),
 ]
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)

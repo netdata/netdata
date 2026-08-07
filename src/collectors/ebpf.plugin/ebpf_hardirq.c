@@ -188,27 +188,6 @@ void ebpf_hardirq_release(int irq)
  *
  *****************************************************************/
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        "hardirq_latency",
-        "",
-        "Hardware IRQ latency",
-        EBPF_COMMON_UNITS_MILLISECONDS,
-        "interrupts",
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX,
-        NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
-        em->update_every);
-}
 
 /**
  * Hardirq Exit
@@ -223,16 +202,6 @@ static void hardirq_cleanup(void *pptr)
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
-
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-
-        if (hardirq_safe_clean)
-            ebpf_obsolete_hardirq_global(em);
-
-        netdata_mutex_unlock(&lock);
-        fflush(stdout);
-    }
 
     if (!hardirq_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);

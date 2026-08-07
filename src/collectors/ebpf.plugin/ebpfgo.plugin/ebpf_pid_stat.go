@@ -83,6 +83,7 @@ type ebpfSocketPublishApps struct {
 	CallClose           uint64
 	CallTCPV4Connection uint64
 	CallTCPV6Connection uint64
+	UpdateEverySec      uint32
 }
 
 type netdataPublishVFS struct {
