@@ -165,4 +165,4 @@ Netdata works on macOS, albeit with some limitations.
 
 - The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
 - You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).
-- The OpenTelemetry plugin (`otel-plugin`) is built by default when a Rust toolchain is available, so a macOS node can also ingest OTLP metrics, logs, and traces.
+- The OpenTelemetry plugin (`otel-plugin`) is built by default when a Rust toolchain is available, so a macOS node can also ingest OTLP metrics and logs.
