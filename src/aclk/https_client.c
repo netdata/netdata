@@ -845,11 +845,19 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         goto exit_sock;
     }
 
+#if defined(OS_WINDOWS)
+    if (!netdata_ssl_load_windows_ca_certs(ctx->ssl_ctx)) {
+        rc = HTTPS_CLIENT_RESP_NO_SSL_VERIFY_PATHS;
+        netdata_log_error("ACLK: failed to load CA certs from Windows Certificate Store");
+        goto exit_CTX;
+    }
+#else
     if (!SSL_CTX_set_default_verify_paths(ctx->ssl_ctx)) {
         rc = HTTPS_CLIENT_RESP_NO_SSL_VERIFY_PATHS;
         netdata_log_error("ACLK: error setting default verify paths");
         goto exit_CTX;
     }
+#endif
     SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
 
     ctx->ssl = SSL_new(ctx->ssl_ctx);
@@ -925,7 +933,7 @@ exit_SSL:
 exit_CTX:
     SSL_CTX_free(ctx->ssl_ctx);
 exit_sock:
-    close(ctx->sock);
+    sock_close(ctx->sock);
 exit_buf_rx:
     rbuf_free(ctx->buf_rx);
 exit_req_ctx:

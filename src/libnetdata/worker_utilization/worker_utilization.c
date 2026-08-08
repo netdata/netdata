@@ -386,19 +386,25 @@ void worker_utilization_cleanup(void) {
         }
         
         // Free the array itself
+#ifndef OS_WINDOWS
         JudyLFreeArray(&workers_globals.worker_strings_JudyL, PJE0);
+#endif
         workers_globals.worker_strings_JudyL = NULL;
     }
     
     // We don't need to free worker or workname structs here as they should
     // be freed by worker_unregister, but we should free the tracking arrays
     if (workers_globals.workers_JudyL) {
+#ifndef OS_WINDOWS
         JudyLFreeArray(&workers_globals.workers_JudyL, PJE0);
+#endif
         workers_globals.workers_JudyL = NULL;
     }
-    
+
     if (workers_globals.worknames_JudyL) {
+#ifndef OS_WINDOWS
         JudyLFreeArray(&workers_globals.worknames_JudyL, PJE0);
+#endif
         workers_globals.worknames_JudyL = NULL;
     }
 #endif
@@ -457,7 +463,9 @@ void worker_utilization_cleanup(void) {
 #endif
         
         // Free the JudyHS array
+#ifndef OS_WINDOWS
         JudyHSFreeArray(&workers_globals.worknames_JudyHS, PJE0);
+#endif
         workers_globals.worknames_JudyHS = NULL;
         
 #ifdef FSANITIZE_ADDRESS

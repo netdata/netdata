@@ -27,17 +27,6 @@ extern unsigned rrdeng_pages_per_extent;
 #define BLOCK_TO_OFFSET(block) ((uint64_t)(block) << 12)
 #define OFFSET_TO_BLOCK(ofs) ((uint64_t)(ofs) >> 12)
 
-#define UNLINK_FILE(ctx, path, ret_var)                                                                                \
-    do {                                                                                                               \
-        uv_fs_t _req;                                                                                                  \
-        (ret_var) = uv_fs_unlink(NULL, &(_req), (path), NULL);                                                         \
-        if ((ret_var) < 0) {                                                                                           \
-            netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", (path), uv_strerror(ret_var));                     \
-            ctx_fs_error(ctx);                                                                                         \
-        }                                                                                                              \
-        uv_fs_req_cleanup(&(_req));                                                                                   \
-    } while (0)
-
 #define CLOSE_FILE(ctx, path, file, ret_var)                                                                           \
     do {                                                                                                               \
         uv_fs_t _req;                                                                                                  \
@@ -51,6 +40,7 @@ extern unsigned rrdeng_pages_per_extent;
 
 /* Forward declarations */
 struct rrdengine_instance;
+struct rrdeng_file_deletion;
 struct rrdeng_cmd;
 
 #define MAX_PAGES_PER_EXTENT (109) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
@@ -349,6 +339,12 @@ typedef struct wal {
     } cache;
 } WAL;
 
+typedef int (*RRDENG_WRITE_OPERATION)(uv_file file, const uv_buf_t *iov, int64_t offset, void *data);
+
+// Returns 0 only after every byte in iov has been written; bytes_written receives the written prefix on failure.
+int rrdeng_write_full(uv_file file, const uv_buf_t *iov, int64_t offset, size_t *bytes_written,
+                      RRDENG_WRITE_OPERATION operation, void *operation_data, unsigned retries);
+
 WAL *wal_get(struct rrdengine_instance *ctx, unsigned size);
 void wal_release(WAL *wal);
 
@@ -411,6 +407,8 @@ typedef struct tier_config_prototype {
 } TIER_CONFIG_PROTOTYPE;
 
 struct rrdengine_instance {
+    bool dynamically_allocated;
+
     TIER_CONFIG_PROTOTYPE config;
 
     struct {
@@ -428,12 +426,14 @@ struct rrdengine_instance {
 
     struct {
         PAD64(unsigned) last_fileno;                       // newest index of datafile and journalfile
+        PAD64(unsigned) next_fileno;                       // reserves failed-creation paths until queued cleanup completes
         PAD64(unsigned) last_flush_fileno;                 // newest index of datafile received data
 
         PAD64(size_t) collectors_running;
         PAD64(size_t) collectors_running_duplicate;
         PAD64(size_t) inflight_queries;                    // the number of queries currently running
         PAD64(uint64_t) current_disk_space;                // the current disk space size used
+        PAD64(uint64_t) pending_deletion_bytes;             // bytes scheduled for deletion but not yet removed
 
         PAD64(uint64_t) transaction_id;                    // the transaction id of the next extent flushing
 
@@ -458,11 +458,23 @@ struct rrdengine_instance {
     } loading;
 
     struct rrdengine_statistics stats;
+
+    struct {
+        SPINLOCK spinlock;
+        struct rrdeng_file_deletion *head;
+        struct rrdeng_file_deletion *tail;
+        bool running;
+        size_t pending;
+    } deletion;
 };
 
 #define ctx_current_disk_space_get(ctx) __atomic_load_n(&(ctx)->atomic.current_disk_space, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_increase(ctx, size) __atomic_add_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_decrease(ctx, size) __atomic_sub_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
+#define ctx_pending_deletion_bytes_get(ctx) __atomic_load_n(&(ctx)->atomic.pending_deletion_bytes, __ATOMIC_RELAXED)
+
+int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *path, size_t bytes, bool datafile);
+void rrdeng_file_deletion_drain(struct rrdengine_instance *ctx);
 
 static inline void ctx_io_read_op_bytes(struct rrdengine_instance *ctx, size_t bytes) {
     __atomic_add_fetch(&ctx->stats.io_read_bytes, bytes, __ATOMIC_RELAXED);
@@ -585,7 +597,13 @@ static inline void rrdeng_reset_accounting_if_fresh(struct rrdengine_instance *c
 }
 
 #define ctx_last_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_fileno, __ATOMIC_RELAXED)
-#define ctx_last_fileno_increment(ctx) __atomic_add_fetch(&(ctx)->atomic.last_fileno, 1, __ATOMIC_RELAXED)
+#define ctx_last_fileno_set(ctx, fileno) __atomic_store_n(&(ctx)->atomic.last_fileno, fileno, __ATOMIC_RELAXED)
+#define ctx_next_fileno_set(ctx, fileno) __atomic_store_n(&(ctx)->atomic.next_fileno, fileno, __ATOMIC_RELAXED)
+#define ctx_next_fileno_reserve(ctx) __atomic_add_fetch(&(ctx)->atomic.next_fileno, 1, __ATOMIC_RELAXED)
+static inline void ctx_fileno_initialize_from_scan(struct rrdengine_instance *ctx, unsigned last_fileno, unsigned max_seen_fileno) {
+    ctx_last_fileno_set(ctx, last_fileno);
+    ctx_next_fileno_set(ctx, max_seen_fileno);
+}
 
 #define ctx_last_flush_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_flush_fileno, __ATOMIC_RELAXED)
 static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, unsigned fileno) {

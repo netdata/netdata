@@ -171,7 +171,9 @@ void netdata_integration_cleanup_shm()
     }
 
     // Values are stored inline (no heap allocation), just free the Judy array
+#ifndef OS_WINDOWS
     (void)JudyLFreeArray(&ebpf_ipc_JudyL, PJE0);
+#endif
     ebpf_ipc_JudyL = NULL;
 
     if (shm_fd_ebpf_integration > 0) {

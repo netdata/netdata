@@ -186,7 +186,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     }
     run = true;
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
-
     nd_log_limits_unlimited();
     netdata_log_exit_reason();
 
@@ -230,9 +229,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
 
 #ifdef ENABLE_DBENGINE
-    if(!abnormal && dbengine_enabled)
+    if(!abnormal && dbengine_enabled) {
         // flush all dirty pages now that all collectors and streaming completed
         rrdeng_flush_everything_and_wait(false, false, true);
+    }
 #endif
 
     service_wait_exit(SERVICE_REPLICATION, 5 * USEC_PER_SEC);
@@ -335,9 +335,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // have unlinked the pipe on close. For other exit paths the command
     // thread keeps running and we must clean it up here. ENOENT just means
     // libuv beat us to removing it.
+    // On Windows, the pipe is a Named Pipe (\\.\pipe\...) — a kernel object,
+    // not a filesystem path. Windows cleans it up automatically when the last
+    // handle closes; unlink()/DeleteFile() on a pipe path always fails.
+#if !defined(OS_WINDOWS)
     const char *pipe = daemon_pipename();
     if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
         netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
+#endif
 
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 

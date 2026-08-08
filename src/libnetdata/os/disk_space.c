@@ -52,15 +52,34 @@ OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
 OS_SYSTEM_DISK_SPACE os_disk_space(const char *path_utf8) {
     OS_SYSTEM_DISK_SPACE space = OS_SYSTEM_DISK_SPACE_EMPTY;
 
-    ssize_t wpath_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, path_utf8, NULL, 0);
-    if(wpath_size < 0)
-        return space;
+    wchar_t *wpath = NULL;
 
-    wchar_t *wpath = mallocz(wpath_size);
-    if(cygwin_conv_path(CCP_POSIX_TO_WIN_W, path_utf8, wpath, wpath_size) != 0) {
-        freez(wpath);
-        return space;
+#if defined(__CYGWIN__) || defined(__MSYS__)
+    ssize_t wpath_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, path_utf8, NULL, 0);
+    if(wpath_size > 0) {
+        wpath = mallocz(wpath_size);
+        if(cygwin_conv_path(CCP_POSIX_TO_WIN_W, path_utf8, wpath, wpath_size) != 0) {
+            freez(wpath);
+            wpath = NULL;
+        }
     }
+#else
+    // UCRT64: convert POSIX path to Windows ANSI first, then to wide char
+    {
+        CLEAN_CHAR_P *ansi_path = os_translate_msys_to_windows_path(path_utf8);
+        int wsize = MultiByteToWideChar(CP_UTF8, 0, ansi_path, -1, NULL, 0);
+        if(wsize > 0) {
+            wpath = mallocz((size_t)wsize * sizeof(wchar_t));
+            if(MultiByteToWideChar(CP_UTF8, 0, ansi_path, -1, wpath, wsize) <= 0) {
+                freez(wpath);
+                wpath = NULL;
+            }
+        }
+    }
+#endif
+
+    if(!wpath)
+        return space;
 
     // Use the wide-character version of GetDiskFreeSpaceEx.
     ULARGE_INTEGER freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes;

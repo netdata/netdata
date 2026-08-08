@@ -394,6 +394,14 @@ void socket_listen_main_static_threaded_worker(void *ptr) {
     worker_private->initializing = false;
     spinlock_unlock(&worker_private->spinlock);
     worker_register("WEB");
+
+    // Always-on confirmation so a "dashboard empty" symptom on Windows gives a
+    // visible fingerprint in the daemon log for each WEB[i] worker that
+    // actually entered the poll loop. Without this the absence of any WEB
+    // log line is hard to distinguish from a worker that never started.
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "WEB: worker %u entered static-threaded poll loop, max_sockets=%zu, listen_socket_count=%zu",
+           worker_private->id, worker_private->max_sockets, api_sockets.opened);
     worker_register_job_name(WORKER_JOB_ADD_CONNECTION, "connect");
     worker_register_job_name(WORKER_JOB_DEL_COLLECTION, "disconnect");
     worker_register_job_name(WORKER_JOB_ADD_FILE, "file start");
@@ -421,6 +429,18 @@ void socket_listen_main_static_threaded_worker(void *ptr) {
                 , ptr // timer_data
                 , worker_private->max_sockets
     );
+
+    // poll_events() exited. Distinguish a clean shutdown (SERVICE_WEB_SERVER
+    // no longer running) from an unexpected exit that would leave the
+    // dashboard unreachable without explanation.
+    if(web_server_should_stop())
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "WEB: worker %u exited poll loop cleanly (service shutdown).", worker_private->id);
+    else
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "WEB: worker %u exited poll loop UNEXPECTEDLY while service is still running. "
+               "The web server listener has died -- the dashboard will not refresh.",
+               worker_private->id);
 }
 
 

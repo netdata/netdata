@@ -62,10 +62,12 @@ void os_get_system_HZ(void);
 static char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1);
 
 #if defined(OS_WINDOWS)
+// On UCRT64, package-relative POSIX paths are resolved below NETDATA_WINDOWS_PATH_PREFIX.
 char *os_translate_path(char *dst, const char *src, size_t dst_size);
 char *os_translate_msys_to_windows_path(const char *src);
 // Returns newly allocated UTF-16 storage for Win32 wide-character APIs; caller must freez().
 wchar_t *os_translate_msys_to_windows_pathW(const char *src);
+int os_windows_path_translation_unittest(void);
 // Returns newly allocated POSIX-style storage; caller must free.
 char *os_translate_windows_to_msys_path(const char *src);
 #else
