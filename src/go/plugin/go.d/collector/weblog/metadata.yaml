@@ -297,7 +297,19 @@ modules:
           folding:
             title: Config
             enabled: true
-          list: []
+          list:
+            - name: Single NGINX access log
+              description: Monitor one NGINX access log file. The default format is auto-detected, so no parser configuration is needed.
+              config: |
+                jobs:
+                  - name: nginx
+                    path: /var/log/nginx/access.log
+            - name: Single Apache access log
+              description: Monitor one Apache access log file. Adjust the path for your distribution (/var/log/apache2/access.log or /var/log/httpd/access_log).
+              config: |
+                jobs:
+                  - name: apache
+                    path: /var/log/apache2/access.log
     troubleshooting:
       problems:
         list:
