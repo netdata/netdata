@@ -4,12 +4,16 @@ package netlistensd
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
@@ -94,6 +98,19 @@ func TestDiscovererTest(t *testing.T) {
 
 		require.Error(t, err)
 		require.Equal(t, "local listener inspection returned invalid data", err.Error())
+	})
+
+	t.Run("classifies a missing helper as a public unavailability error", func(t *testing.T) {
+		d, err := NewDiscoverer(Config{})
+		require.NoError(t, err)
+		d.ll = localListenersFunc(func(context.Context) ([]byte, error) {
+			return nil, fmt.Errorf("%w ('/plugins.d/local-listeners')", errLocalListenersNotInstalled)
+		})
+
+		err = d.Test(t.Context())
+
+		require.ErrorIs(t, err, errLocalListenersNotInstalled)
+		require.Equal(t, "local network listener inspection is not available on this system", err.Error())
 	})
 
 	t.Run("classifies configured helper timeout", func(t *testing.T) {
@@ -244,6 +261,48 @@ func TestDiscoverLocalListenersCancellationAndTimeoutClassification(t *testing.T
 		require.EqualValues(t, 1, d.successRuns)
 		require.EqualValues(t, 6, d.timeoutRuns)
 	})
+}
+
+func TestDiscoverStopsQuietlyWhenHelperIsNotInstalled(t *testing.T) {
+	var buf safeBuffer
+
+	d, err := NewDiscoverer(Config{})
+	require.NoError(t, err)
+	d.Logger = logger.NewWithWriter(&buf)
+	d.ll = localListenersFunc(func(context.Context) ([]byte, error) {
+		return nil, fmt.Errorf("%w ('/plugins.d/local-listeners')", errLocalListenersNotInstalled)
+	})
+
+	done := make(chan struct{})
+	go func() { defer close(done); d.Discover(t.Context(), make(chan []model.TargetGroup, 1)) }()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second * 5):
+		t.Fatal("Discover did not return after the helper was reported as not installed")
+	}
+
+	out := strings.ToLower(buf.String())
+	require.Contains(t, out, "level=info")
+	require.Contains(t, out, "discovery is disabled")
+	require.NotContains(t, out, "level=error")
+}
+
+type safeBuffer struct {
+	mux sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *safeBuffer) Write(p []byte) (int, error) {
+	b.mux.Lock()
+	defer b.mux.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *safeBuffer) String() string {
+	b.mux.Lock()
+	defer b.mux.Unlock()
+	return b.buf.String()
 }
 
 type localListenersFunc func(context.Context) ([]byte, error)
