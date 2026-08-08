@@ -105,6 +105,8 @@ func (d *Discoverer) Test(ctx context.Context) error {
 	switch {
 	case errors.Is(err, errLocalListenerInspectionCanceled):
 		return err
+	case errors.Is(err, errLocalListenersNotInstalled):
+		return dyncfg.NewPublicError("local network listener inspection is not available on this system", err)
 	case errors.Is(err, context.DeadlineExceeded):
 		return dyncfg.NewPublicError("local listener inspection did not complete before the timeout", err)
 	case errors.Is(err, errInvalidLocalListenerData):
@@ -122,7 +124,7 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 	close(d.started)
 
 	if err := d.discoverLocalListeners(ctx, in); err != nil {
-		d.Error(err)
+		d.logDiscoveryExit(err)
 		return
 	}
 
@@ -139,11 +141,22 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 			return
 		case <-tk.C:
 			if err := d.discoverLocalListeners(ctx, in); err != nil {
-				d.Error(err)
+				d.logDiscoveryExit(err)
 				return
 			}
 		}
 	}
+}
+
+// logDiscoveryExit reports why this instance is stopping. A missing
+// local-listeners helper is the expected state on platforms where it is not
+// built, so it is not an error.
+func (d *Discoverer) logDiscoveryExit(err error) {
+	if errors.Is(err, errLocalListenersNotInstalled) {
+		d.Infof("local network listener inspection is not available on this system, discovery is disabled: %v", err)
+		return
+	}
+	d.Error(err)
 }
 
 func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []model.TargetGroup) error {
