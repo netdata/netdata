@@ -1,0 +1,366 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Redfish collector configuration.",
+    "type": "object",
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    },
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Endpoint metric and LogService polling interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates the collector output with an existing Virtual Node.",
+        "type": "string"
+      },
+      "url": {
+        "title": "ServiceRoot URL",
+        "description": "HTTP or HTTPS origin, optionally ending in /redfish/v1/.",
+        "type": "string",
+        "format": "uri"
+      },
+      "node_mode": {
+        "title": "Node mode",
+        "description": "Use local to emit on the collecting node, or system_vnodes to create deterministic ComputerSystem HostScopes.",
+        "type": "string",
+        "enum": ["local", "system_vnodes"]
+      },
+      "system_uri": {
+        "title": "ComputerSystem URI",
+        "description": "Optional exact same-origin ComputerSystem resource URI.",
+        "type": "string"
+      },
+      "auth_method": {
+        "title": "Authentication method",
+        "type": "string",
+        "enum": ["auto", "session", "basic", "none"],
+        "default": "auto"
+      },
+      "username": {
+        "title": "Username",
+        "type": "string",
+        "sensitive": true
+      },
+      "password": {
+        "title": "Password",
+        "type": "string",
+        "sensitive": true
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "HTTP request timeout in seconds.",
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "default": 15
+      },
+      "retries": {
+        "title": "GET retries",
+        "description": "Additional attempts for eligible transient GET failures.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 2
+      },
+      "max_concurrent_requests": {
+        "title": "Maximum concurrent requests",
+        "type": "integer",
+        "minimum": 1,
+        "default": 3
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "HTTP or HTTPS proxy URL. Empty uses environment proxy settings.",
+        "type": "string",
+        "sensitive": true
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS client certificate",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS client key",
+        "type": "string",
+        "sensitive": true
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "type": "boolean",
+        "default": false
+      },
+      "collect": {
+        "title": "Collection families",
+        "description": "Simple pattern selecting base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware families. Base is always collected.",
+        "type": "string",
+        "default": "*"
+      },
+      "charts": {
+        "title": "Charts",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "aggregates": {
+            "title": "Aggregate charts",
+            "type": "boolean",
+            "default": true
+          },
+          "details": {
+            "title": "Detailed component charts",
+            "type": "boolean",
+            "default": true
+          },
+          "max_detailed_components_per_family": {
+            "title": "Detailed component cap",
+            "description": "Maximum distinct components per logical owner and component family. Zero means unlimited.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 100
+          }
+        }
+      },
+      "alarms": {
+        "title": "Alarms",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "evaluate_thresholds": {
+            "title": "Evaluate source thresholds",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "host_scope_overrides": {
+        "title": "HostScope overrides",
+        "description": "Optional ComputerSystem identity overrides used only when node_mode is system_vnodes.",
+        "type": ["array", "null"],
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resource_uri": {
+              "title": "Resource URI",
+              "type": "string",
+              "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            },
+            "guid": {
+              "title": "GUID",
+              "type": "string"
+            },
+            "hostname": {
+              "title": "Hostname",
+              "type": "string"
+            }
+          },
+          "required": ["resource_uri"],
+          "anyOf": [
+            {
+              "properties": {
+                "guid": {
+                  "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                }
+              },
+              "required": ["guid"]
+            },
+            {
+              "properties": {
+                "hostname": {
+                  "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                }
+              },
+              "required": ["hostname"]
+            }
+          ]
+        }
+      },
+      "logs": {
+        "title": "LogService",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enable LogService polling",
+            "type": "boolean",
+            "default": true
+          },
+          "backend": {
+            "title": "Log backend",
+            "description": "Exact redfish_logs job name, limited to 256 UTF-8 bytes after surrounding whitespace is trimmed. Omit to use default.",
+            "type": "string",
+            "minLength": 1,
+            "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+          },
+          "service_selector": {
+            "title": "LogService selector",
+            "type": "string",
+            "default": "*"
+          },
+          "max_services": {
+            "title": "Maximum selected LogServices",
+            "type": "integer",
+            "minimum": 1,
+            "default": 256
+          },
+          "full_reconciliation_every": {
+            "title": "Full reconciliation interval",
+            "description": "Seconds between complete source reconciliations. Zero disables periodic reconciliation.",
+            "type": "number",
+            "minimum": 0,
+            "default": 1800
+          },
+          "cursor": {
+            "title": "Cursor",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "orphan_retention": {
+                "title": "Orphan cursor retention",
+                "description": "Seconds to retain inactive cursor records. Zero retains indefinitely.",
+                "type": "number",
+                "minimum": 0,
+                "default": 2592000
+              }
+            }
+          }
+        }
+      }
+    },
+    "required": ["url", "node_mode"],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "node_mode": {"const": "local"}
+          },
+          "required": ["node_mode"]
+        },
+        "then": {
+          "properties": {
+            "host_scope_overrides": {"maxItems": 0}
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "auth_method": {"const": "none"}
+          },
+          "required": ["auth_method"]
+        },
+        "then": {
+          "properties": {
+            "username": {
+              "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+            },
+            "password": {"maxLength": 0}
+          }
+        },
+        "else": {
+          "properties": {
+            "username": {
+              "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            },
+            "password": {"minLength": 1}
+          },
+          "required": ["username", "password"]
+        }
+      },
+      {
+        "oneOf": [
+          {
+            "properties": {
+              "tls_cert": {
+                "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+              },
+              "tls_key": {
+                "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+              }
+            }
+          },
+          {
+            "properties": {
+              "tls_cert": {
+                "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+              },
+              "tls_key": {
+                "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+              }
+            },
+            "required": ["tls_cert", "tls_key"]
+          }
+        ]
+      }
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Collection",
+          "fields": ["update_every", "autodetection_retry", "collect"]
+        },
+        {
+          "title": "Target",
+          "fields": ["url", "system_uri"]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": ["node_mode", "vnode", "host_scope_overrides"]
+        },
+        {
+          "title": "Authentication",
+          "fields": ["auth_method", "username", "password"]
+        },
+        {
+          "title": "HTTP",
+          "fields": ["timeout", "retries", "max_concurrent_requests", "proxy_url"]
+        },
+        {
+          "title": "TLS",
+          "fields": ["tls_ca", "tls_cert", "tls_key", "tls_skip_verify"]
+        },
+        {
+          "title": "Cardinality",
+          "fields": ["charts"]
+        },
+        {
+          "title": "Alerts",
+          "fields": ["alarms"]
+        },
+        {
+          "title": "Logs",
+          "fields": ["logs"]
+        }
+      ]
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "tls_key": {
+      "ui:widget": "password"
+    },
+    "proxy_url": {
+      "ui:widget": "password"
+    }
+  }
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/httpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/k8ssd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/netlistensd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/redfishsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/snmpsd"
 )
 
@@ -20,6 +21,7 @@ const (
 	discovererDocker       = "docker"
 	discovererHTTP         = "http"
 	discovererK8s          = "k8s"
+	discovererRedfish      = "redfish"
 	discovererSNMP         = "snmp"
 )
 
@@ -48,6 +50,12 @@ func Registry(includeDocker bool) sd.Registry {
 			schemaSNMP,
 			parseJSONConfig[snmpsd.Config],
 			newSNMPDiscoverers,
+		),
+		sd.NewDescriptor(
+			discovererRedfish,
+			schemaRedfish,
+			parseJSONConfig[redfishsd.Config],
+			newRedfishDiscoverers,
 		),
 	}
 	if includeDocker {
@@ -117,6 +125,15 @@ func newK8sDiscoverers(cfgs []k8ssd.Config, source string) ([]model.Discoverer, 
 func newSNMPDiscoverers(cfg snmpsd.Config, source string) ([]model.Discoverer, error) {
 	cfg.Source = source
 	d, err := snmpsd.NewDiscoverer(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return []model.Discoverer{d}, nil
+}
+
+func newRedfishDiscoverers(cfg redfishsd.Config, source string) ([]model.Discoverer, error) {
+	cfg.Source = source
+	d, err := redfishsd.NewDiscoverer(cfg)
 	if err != nil {
 		return nil, err
 	}

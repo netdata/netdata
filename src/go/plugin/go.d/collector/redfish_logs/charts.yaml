@@ -1,0 +1,138 @@
+version: v1
+groups:
+  - family: Collection
+    groups:
+      - family: log_backend
+        context_namespace: redfish
+        metrics:
+          - log_backend_files_active
+          - log_backend_files_archived
+          - log_backend_pipeline_committed_total
+          - log_backend_pipeline_duplicate_suppressed_total
+          - log_backend_pipeline_received_total
+          - log_backend_pipeline_write_failed_total
+          - log_backend_producers_active
+          - log_backend_retention_bytes_deleted
+          - log_backend_retention_files_deleted
+          - log_backend_state
+          - log_backend_storage_target_bytes
+          - log_backend_storage_used_bytes
+          - log_backend_sync_duration_seconds
+        chart_defaults:
+          label_promotion:
+            - backend_name
+            - backend_key
+          instances:
+            by_labels:
+              - backend_key
+        charts:
+          - id: redfish_log_backend_files
+            title: Redfish Log Backend Files
+            context: log_backend.files
+            units: files
+            algorithm: absolute
+            type: stacked
+            priority: 5870
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: log_backend_files_active
+                name: active
+              - selector: log_backend_files_archived
+                name: archived
+          - id: redfish_log_backend_pipeline
+            title: Redfish Log Backend Pipeline
+            context: log_backend.pipeline
+            units: entries/s
+            algorithm: incremental
+            type: stacked
+            priority: 5880
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: log_backend_pipeline_received_total
+                name: received
+              - selector: log_backend_pipeline_committed_total
+                name: committed
+              - selector: log_backend_pipeline_duplicate_suppressed_total
+                name: duplicate_suppressed
+              - selector: log_backend_pipeline_write_failed_total
+                name: write_failed
+          - id: redfish_log_backend_producers
+            title: Redfish Log Backend Producers
+            context: log_backend.producers
+            units: producers
+            algorithm: absolute
+            type: line
+            priority: 5890
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: log_backend_producers_active
+                name: active
+          - id: redfish_log_backend_retention_bytes
+            title: Redfish Log Backend Retention Bytes
+            context: log_backend.retention_bytes
+            units: bytes/s
+            algorithm: incremental
+            type: line
+            priority: 5900
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: log_backend_retention_bytes_deleted
+                name: deleted
+          - id: redfish_log_backend_retention_files
+            title: Redfish Log Backend Retention Files
+            context: log_backend.retention_files
+            units: files/s
+            algorithm: incremental
+            type: line
+            priority: 5910
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: log_backend_retention_files_deleted
+                name: deleted
+          - id: redfish_log_backend_state
+            title: Redfish Log Backend State
+            context: log_backend.state
+            units: state
+            algorithm: absolute
+            type: stacked
+            priority: 5920
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: log_backend_state{log_backend_state="ready"}
+                name: ready
+              - selector: log_backend_state{log_backend_state="unavailable"}
+                name: unavailable
+          - id: redfish_log_backend_storage
+            title: Redfish Log Backend Storage
+            context: log_backend.storage
+            units: bytes
+            algorithm: absolute
+            type: stacked
+            priority: 5930
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: log_backend_storage_used_bytes
+                name: used
+              - selector: log_backend_storage_target_bytes
+                name: target
+          - id: redfish_log_backend_sync_duration
+            title: Redfish Log Backend Sync Duration
+            context: log_backend.sync_duration
+            units: seconds
+            algorithm: absolute
+            type: line
+            priority: 5940
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: log_backend_sync_duration_seconds
+                name: duration
+                options:
+                  float: true
