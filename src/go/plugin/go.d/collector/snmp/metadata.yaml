@@ -474,11 +474,39 @@ modules:
               description: The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.
               default_value: ""
               required: false
+              detailed_description: |
+                The node name shown for an SNMP device in Netdata Cloud is a hostname, and it is **not** derived from `sysObjectID`. `sysObjectID` is only stored as the `sys_object_id` label, used for device identification, vendor/profile selection, and filtering — it never sets the node name.
+
+                At setup, the node name is chosen by taking the first non-empty value from:
+
+                1. `vnode.hostname` (this option) — if you set it, it takes precedence.
+                2. The device's SNMP `sysName`.
+                3. The fallback `snmp-device`.
+
+                So changing a label (including `sys_object_id`) never renames the node. To rename the node, set `vnode.hostname`.
+
+                At setup the collector also auto-populates these labels from SNMP sysInfo: `sys_object_id`, `name`, `description`, `contact`, `location`, `vendor` (from the device vendor, or organization if the vendor is unavailable), `type` (category), and `model`. Any key set in `vnode.labels` overrides the auto-detected label with the same key, and extra keys are added as new labels:
+
+                ```yaml
+                jobs:
+                  - name: core-switch
+                    hostname: 192.0.2.1
+                    community: public
+                    options:
+                      version: 2
+                    vnode:
+                      hostname: core-switch-floor3   # becomes the node name in Netdata Cloud
+                      labels:
+                        location: "Floor 3 - Rack 12"  # overrides the auto-detected location label
+                        owner: netops                  # additional custom label
+                ```
             - name: vnode.labels
               group: Virtual node
               description: Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence.
               default_value: ""
               required: false
+              detailed_description: |
+                At setup the collector auto-populates labels from SNMP sysInfo (`sys_object_id`, `name`, `description`, `contact`, `location`, `vendor`, `type`, `model`). Any key set here overrides the matching auto-detected label, and additional keys are added as new labels. Labels do not affect the node name — see `vnode.hostname` for how the node name is determined.
         examples:
           folding:
             title: Config
