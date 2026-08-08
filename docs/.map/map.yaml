@@ -970,6 +970,9 @@ sidebar:
               - meta:
                   label: OpenCode
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/opencode.md
+              - meta:
+                  label: Devin
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/devin.md
           - meta:
               label: MCP Connections
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-connections.md
