@@ -254,7 +254,7 @@ ng-index = { path = "ng-index" }
 # reqwest-rustls-tls is load-bearing: without a TLS backend, reqwest rejects
 # every https:// URL in-process (S3/STS never reachable). Guarded by
 # file-lifecycle's TLS-capability test.
-opendal = { version = "0.57", default-features = false, features = [
+opendal = { version = "0.58", default-features = false, features = [
   "services-fs",
   "services-s3",
   "executors-tokio",
