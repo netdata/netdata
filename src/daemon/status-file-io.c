@@ -230,10 +230,10 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     /* Rename temp file to target file */
 #if defined(OS_WINDOWS)
     // On Windows, POSIX rename() fails with EEXIST if the destination exists. Use
-    // MoveFileExW with MOVEFILE_REPLACE_EXISTING for an atomic replace; this
+    // MoveFileExA with MOVEFILE_REPLACE_EXISTING for an atomic replace; this
     // eliminates the unlink-then-rename TOCTOU window (c:S5847). The same pattern
     // is used in src/daemon/machine-guid.c for the GUID publication file.
-    if (!MoveFileExW(temp, final, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    if (!MoveFileExA(temp, final, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
         unlink(temp);
         return false;
     }
