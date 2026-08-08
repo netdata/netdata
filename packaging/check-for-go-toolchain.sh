@@ -43,13 +43,62 @@ check_go_version() {
   return 1
 }
 
+# Report the machine type of the *userland* we are building for.
+#
+# `uname -m` reports the kernel's architecture, which is not the same thing: a
+# 32-bit userland on a 64-bit kernel (i386 on x86_64, armhf on aarch64 - the
+# default on 32-bit Raspberry Pi OS) reports the 64-bit kernel type. Installing a
+# 64-bit Go toolchain there makes cgo build for the wrong architecture.
+userland_machine() {
+  ULM_KERNEL_MACHINE="$(uname -m)"
+
+  # Userland word size. getconf is not present everywhere (notably minimal musl
+  # systems), so fall back to the ELF class byte of our own interpreter:
+  # byte 4 of the ELF header is 1 for 32-bit objects and 2 for 64-bit ones.
+  ULM_BITS=''
+  if command -v getconf > /dev/null 2>&1; then
+    ULM_BITS="$(getconf LONG_BIT 2>/dev/null)"
+  fi
+
+  if [ -z "${ULM_BITS}" ] && [ -r /proc/self/exe ] && command -v od > /dev/null 2>&1; then
+    case "$(od -An -t x1 -j 4 -N 1 /proc/self/exe 2>/dev/null | tr -d ' \n')" in
+      01) ULM_BITS=32 ;;
+      02) ULM_BITS=64 ;;
+    esac
+  fi
+
+  # Unknown word size: keep the historical behaviour rather than guess.
+  if [ "${ULM_BITS}" != "32" ]; then
+    printf '%s\n' "${ULM_KERNEL_MACHINE}"
+    return 0
+  fi
+
+  # 32-bit userland: map 64-bit kernel types to their 32-bit counterparts.
+  case "${ULM_KERNEL_MACHINE}" in
+    x86_64|amd64) printf '%s\n' i686 ;;
+    aarch64|arm64) printf '%s\n' armv7l ;;
+    *) printf '%s\n' "${ULM_KERNEL_MACHINE}" ;;
+  esac
+}
+
 install_go_toolchain() {
   GOLANG_ARCHIVE_NAME="${GOLANG_TEMP_PATH}/golang.tar.gz"
   GOLANG_CHECKSUM_FILE="${GOLANG_TEMP_PATH}/golang.sha256sums"
 
+  # The toolchain we download has to *run* here, so this is the host userland,
+  # spelled the way Linux `uname -m` spells it; only the Linux branch below
+  # consults it. FreeBSD keeps `uname -m` because its case labels
+  # (386/amd64/arm/arm64) are a different vocabulary.
+  #
+  # Deliberately not derived from GOARCH: that is Go's *output* target, and
+  # honouring it here would install a toolchain the builder cannot execute
+  # whenever someone genuinely cross-builds. Once a runnable toolchain exists,
+  # GOARCH does its job unaided.
+  GOLANG_HOST_MACHINE="$(userland_machine)"
+
   case "$(uname -s)" in
     Linux)
-      case "$(uname -m)" in
+      case "${GOLANG_HOST_MACHINE}" in
         i?86)
           GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.26.5.linux-386.tar.gz"
           GOLANG_ARCHIVE_CHECKSUM="88c162b204e6eefcc32499453b492e80209f4a4c78c33092636901c540fb0d05"
@@ -79,7 +128,7 @@ install_go_toolchain() {
           GOLANG_ARCHIVE_CHECKSUM="09ce3c504c0323968b75a717244dca4f25cd4cf0443e5ff6bc0bfa74add89fa7"
           ;;
         *)
-          GOLANG_FAILURE_REASON="Linux $(uname -m) platform is not supported out-of-box by Go, you must install a toolchain for it yourself."
+          GOLANG_FAILURE_REASON="Linux ${GOLANG_HOST_MACHINE} platform is not supported out-of-box by Go, you must install a toolchain for it yourself."
           return 1
           ;;
       esac
