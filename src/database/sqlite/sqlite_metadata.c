@@ -283,10 +283,48 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
 
     uuid_copy(host->node_id.uuid, *node_id);
 
-    if (unlikely(!aclk_host_config))
+    if (unlikely(!aclk_host_config)) {
         create_aclk_config(host, &host->host_id.uuid, node_id);
-    else
-        uuid_unparse_lower(*node_id, aclk_host_config->node_id);
+        // re-load: create_aclk_config() returns without writing node_id when it loses the publish
+        // CAS to a concurrent creator, and that creator may have built the config while
+        // host->node_id was still null - leaving the string empty for good
+        aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    }
+
+    if (likely(aclk_host_config)) {
+        bool node_id_changed = aclk_node_id_set(aclk_host_config, *node_id);
+
+        // The manifest is keyed by node_id at the cloud, and no function-registry event fires when
+        // the node_id itself changes - so without this a host that gets (or changes) its node_id
+        // keeps a manifest filed under the previous id until some unrelated function is registered.
+        //
+        // A CHANGED id SETS the deadline rather than arming it, because a request armed before the
+        // change does not satisfy one made after it: aclk_arm_node_manifest() keeps the earlier
+        // deadline, which a worker that already snapshotted the OLD node_id would then claim -
+        // publishing the stale id and consuming the only pending request. Replacing the deadline
+        // instead makes that worker's claim CAS fail, so it re-snapshots and sends the new id on a
+        // later pass.
+        //
+        // The test is on the string aclk_node_id_set() stores, NOT on host->node_id: host->node_id
+        // is not the id this publishes - the aclk config string is, and a child can have the two
+        // disagree (command-nodeid.c assigns host->node_id from the parent without ever touching the
+        // config), so "host->node_id unchanged" does not mean the transmitted id is unchanged.
+        //
+        // An UNCHANGED id only arms. There is no stale snapshot to invalidate, and setting would
+        // push an already-pending deadline out: if the cloud re-sends CreateNodeInstanceResult more
+        // often than the coalescing window - server-side behaviour this repository cannot verify -
+        // repeated sets would keep the window from ever elapsing and strand the manifest entirely.
+        // Arming still gives an unarmed host its request (create_aclk_config() stores the node_id it
+        // is given, so the first call for a new config reports unchanged and this is the path that
+        // arms it - the redundancy create_aclk_config() documents), and a request that survives to
+        // publish is a second chance for a manifest the cloud never received. Redundant publishes
+        // are dropped by the content-hash check in build_node_manifest(); the cost kept here is one
+        // manifest build plus hash per cloud reply.
+        if (node_id_changed)
+            aclk_send_timestamp_set(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+        else
+            aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+    }
 
     stream_receiver_send_node_and_claim_id_to_child(host);
     stream_path_node_id_updated(host);

@@ -864,6 +864,11 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     host->exporting_flags = NULL;
 
     rrd_functions_host_destroy(host);
+
+    // an archived host keeps its aclk config, so it is still reached by the manifest send loop -
+    // tell it the function list is now empty (arming is a single atomic CAS, safe under rrd_wrlock)
+    aclk_arm_node_manifest(host);
+
     rrdvariables_destroy(host->rrdvars);
     host->rrdvars = NULL;
 

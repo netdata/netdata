@@ -11,6 +11,7 @@
 #include "nodeinstance/connection/v1/connection.pb.h"
 #include "nodeinstance/create/v1/creation.pb.h"
 #include "nodeinstance/info/v1/info.pb.h"
+#include "nodeinstance/manifest/v1/manifest.pb.h"
 #include "context/v1/stream.pb.h"
 #include "context/v1/context.pb.h"
 #include "agent/v1/cmds.pb.h"
@@ -32,6 +33,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new nodeinstance::create::v1::CreateNodeInstance;
     if (!strcmp(msgname, "UpdateNodeInfo"))
         return new nodeinstance::info::v1::UpdateNodeInfo;
+    if (!strcmp(msgname, "UpdateNodeInstanceManifest"))
+        return new nodeinstance::manifest::v1::UpdateNodeInstanceManifest;
     if (!strcmp(msgname, "AlarmCheckpoint"))
         return new alarms::v1::AlarmCheckpoint;
     if (!strcmp(msgname, "ProvideAlarmConfiguration"))
