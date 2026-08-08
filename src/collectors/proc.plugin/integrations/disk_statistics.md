@@ -59,18 +59,99 @@ No action required.
 
 #### Options
 
+You can also add a per-disk section `[plugin:proc:/proc/diskstats:DEVICE]` (for example `[plugin:proc:/proc/diskstats:sda]`) with `enable = no` to turn off all metrics for a single disk.
+
+<details open><summary>Config options</summary>
 
 
-There are no configuration options.
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| exclude disks | Do not show metrics for disks whose name matches this netdata simple pattern. Prefix a name with `!` to keep that disk instead, so `!sda !sdb *` monitors only `sda` and `sdb` and excludes everything else. | loop* ram* | no |
+| enable new disks detected at runtime | Add metrics for disks that appear after Netdata starts. | yes | no |
+| performance metrics for physical disks | Enable performance metrics for block devices classified as physical disks. Accepts `auto`, `yes`, or `no`. | auto | no |
+| performance metrics for virtual disks | Enable performance metrics for block devices classified as virtual disks (such as RAID or device-mapper). Accepts `auto`, `yes`, or `no`. | auto | no |
+| performance metrics for partitions | Enable performance metrics for disk partitions. Accepts `auto`, `yes`, or `no`. | no | no |
+| performance metrics for disks with major N | Enable or disable performance metrics for every disk sharing a kernel major number, where `N` is the major number. For example `performance metrics for disks with major 7 = no` disables all loop devices. Find the major number for a device in the first column of `/proc/diskstats`. | yes | no |
+| bandwidth for all disks | Disk I/O bandwidth chart. Accepts `auto`, `yes`, or `no`. | auto | no |
+| operations for all disks | Disk completed I/O operations chart. Accepts `auto`, `yes`, or `no`. | auto | no |
+| merged operations for all disks | Disk merged I/O operations chart. Accepts `auto`, `yes`, or `no`. | auto | no |
+| i/o time for all disks | Disk total I/O time chart. Accepts `auto`, `yes`, or `no`. | auto | no |
+| queued operations for all disks | Disk currently queued I/O operations chart. Accepts `auto`, `yes`, or `no`. | auto | no |
+| utilization percentage for all disks | Disk utilization time chart. Accepts `auto`, `yes`, or `no`. | auto | no |
+| extended operations for all disks | Disk extended I/O operations (discards, flushes) charts. Accepts `auto`, `yes`, or `no`. | auto | no |
+| backlog for all disks | Disk backlog chart. Accepts `auto`, `yes`, or `no`. | auto | no |
+| bcache for all disks | bcache charts for bcache-backed devices. Accepts `auto`, `yes`, or `no`. | auto | no |
+| name disks by id | Name disks using stable IDs from `/dev/disk/by-id` instead of kernel device names. Use with the `preferred disk ids` simple pattern to choose which IDs take precedence. | no | no |
+
+
+</details>
 
 
 
 #### via File
 
-There is no configuration file.
+The configuration file name for this integration is `netdata.conf`.
+Configuration for this specific integration is located in the `plugin:proc:/proc/diskstats` section within that file.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config netdata.conf
+```
 
 ##### Examples
-There are no configuration examples.
+
+###### Monitor only specific disks
+
+Use a simple pattern negation in `exclude disks` to keep only the named disks and exclude everything else. This replaces the default `loop* ram*` exclusion.
+
+<details open><summary>Config examples</summary>
+
+```yaml
+[plugin:proc:/proc/diskstats]
+    exclude disks = !sda !sdb *
+
+```
+</details>
+
+###### Disable an individual disk
+
+Turn off all metrics for a single disk using its per-disk section.
+
+<details open><summary>Config examples</summary>
+
+```yaml
+[plugin:proc:/proc/diskstats:sda]
+    enable = no
+
+```
+</details>
+
+###### Disable all devices of one type
+
+Disable performance metrics for every device sharing a kernel major number (for example all loop devices, which use major 7).
+
+<details open><summary>Config examples</summary>
+
+```yaml
+[plugin:proc:/proc/diskstats]
+    performance metrics for disks with major 7 = no
+
+```
+</details>
 
 
 
