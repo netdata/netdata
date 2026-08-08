@@ -1,5 +1,5 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/integrations/ebpf_dns.md"
 meta_yaml: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/metadata.yaml"
 sidebar_label: "eBPF DNS"
 learn_status: "Published"
@@ -75,7 +75,7 @@ Now follow steps:
 #### Options
 
 The `dns` option in section `[ebpf programs]` controls whether the module is loaded.
-Per-module overrides (`update every`, `ebpf object flavor`) belong in `ebpf.d/dns.conf`.
+Per-module overrides (`update every`, `ebpf object flavor`, `per query tracking`, `flow ttl`) belong in `ebpf.d/dns.conf`.
 
 
 <details open><summary>Config options</summary>
@@ -87,6 +87,8 @@ Per-module overrides (`update every`, `ebpf object flavor`) belong in `ebpf.d/dn
 | dns | Enable (`yes`) or disable (`no`) the DNS monitoring module. | no | no |
 | update every | Data collection frequency in seconds. | 10 | no |
 | ebpf object flavor | Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel. | buffer | no |
+| per query tracking | Enable per-DNS-query latency tracking. When enabled (`yes`), the collector records the time between each DNS request and its matching response, producing per-query latency metrics. Required for the `dns-queries` Function consumed by `network-viewer.plugin`. | yes | no |
+| flow ttl | DNS flow record lifetime in seconds. Must equal `NV_DNS_UPDATE_EVERY` (20) in `network-viewer.c`: a value greater than 20 causes double-counting and a value less than 20 causes silent record loss in the `dns-queries` Function. Also, `update every` must not exceed this value or records expire in the kernel ring before collection. | 20 | no |
 
 
 </details>
