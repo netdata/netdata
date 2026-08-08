@@ -328,6 +328,20 @@ Use the exact command the dialog shows — it fills in the correct path for your
 2. Copy the new UUID.
 3. Paste it with the correct Space token and Rooms, then submit once. Do not re-submit the old value or retry from a second tab — each failed attempt invalidates the current UUID again.
 
+#### `sudo: command not found` when running the verification command
+
+**Applies to:** [Method 1: Via UI](#method-1-via-ui-recommended).
+
+**Problem:** Running the verification command returns `sudo: command not found`. This is common on systems that do not ship `sudo` by default — Proxmox VE is a frequent example — as well as on minimal installs and in any session where you are already logged in as `root`.
+
+**Solution:** The `sudo` prefix only escalates privileges; it is not needed when you are already `root`. Drop `sudo` and run `cat` directly:
+
+```bash
+cat /var/lib/netdata/netdata_random_session_id
+```
+
+The `docker exec` and Windows (`more`) variants in the dialog do not use `sudo`, so they are unaffected.
+
 #### kickstart: unsupported Netdata installation
 
 **Problem:** If you run the kickstart script and get the following error `Existing install appears to be handled manually or through the system package manager.` you most probably installed Netdata using an unsupported package.
