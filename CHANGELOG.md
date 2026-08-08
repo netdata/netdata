@@ -912,6 +912,13 @@
 - Sanitize kickstart.sh arguments that might be evaulated in privileged contexts. ([#23223](https://github.com/netdata/netdata/issues/23223))
 - Feat(go.d/prometheus): add profile-owned fallback types ([#23410](https://github.com/netdata/netdata/issues/23410))
 - Regenerate integrations docs ([#23411](https://github.com/netdata/netdata/issues/23411))
+- Docs: Explain cloudflared tunnel origin must be http not https ([#23345](https://github.com/netdata/netdata/issues/23345))
+- Docs: Clarify Netdata Cloud is optional for Parent dashboard access ([#23339](https://github.com/netdata/netdata/issues/23339))
+- Fix(go.d/chartengine): resolve authored algorithms from runtime metric kinds ([#23414](https://github.com/netdata/netdata/issues/23414))
+- Docs: Add SNMP vnode.labels example to snmp collector README ([#23347](https://github.com/netdata/netdata/issues/23347))
+- Regenerate integrations docs ([#23418](https://github.com/netdata/netdata/issues/23418))
+- Fix(go.d/prometheus): support summaries without quantiles ([#23419](https://github.com/netdata/netdata/issues/23419))
+- Integration between eBPF and network viewer plugins ([#22715](https://github.com/netdata/netdata/issues/22715))
 
 ## [2.10.0] - 2026-04-09
 
