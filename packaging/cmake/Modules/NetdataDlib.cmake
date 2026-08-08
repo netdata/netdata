@@ -47,7 +47,7 @@ function(netdata_bundle_dlib)
 
   FetchContent_MakeAvailable_NoInstall(dlib)
 
-  message(STATUS "Finished preparing vendored copy of JSON-C")
+  message(STATUS "Finished preparing vendored copy of dlib")
 endfunction()
 
 function(netdata_add_dlib_to_target _target)
