@@ -1022,6 +1022,16 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("run dir");
 
     {
+        // Tell the resolver which uid we will drop to, before it looks at
+        // anything: the /tmp fallback is created as root on the first run and
+        // then chowned to that uid, so on restart it must still be recognized
+        // as ours instead of as some third account's directory.
+        if(user && *user) {
+            struct passwd *pw = getpwnam(user);
+            if(pw)
+                os_run_dir_set_target_uid(pw->pw_uid);
+        }
+
         const char *run_dir = os_run_dir(true);
         if(!run_dir) {
             netdata_log_error("Cannot get/create a run directory.");

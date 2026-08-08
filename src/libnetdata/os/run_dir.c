@@ -5,8 +5,52 @@
 
 static char *cached_run_dir = NULL;
 static bool cached_run_dir_available = false;
+static bool cached_run_dir_writable = false; // the cached answer satisfied a writable request
+
+// A read-only answer that has already been handed out, superseded by a writable
+// one. Retained, not freed: callers are allowed to keep the pointer they got,
+// which used to live for the whole process. At most one string per process.
+static char *superseded_run_dir = NULL;
+
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
+// A process that cannot get a run directory usually keeps asking. Nothing retries
+// on a timer, but spawn_popen_run_argv() re-creates the spawn server on every
+// popen() for as long as it has none, and every attempt walks the same candidates
+// and refuses them for the same reasons. The explanation is worth printing once;
+// printing it per popen() buries the rest of the log.
+// Deliberately not a cached failure: the candidates are re-examined, so a run
+// directory that appears later is still picked up. Only the reporting stops.
+// Advisory: a race can duplicate or drop a line, never change what is returned.
+static bool run_dir_report_errors = true;
+
+#define run_dir_log_error(...) do {                                             \
+        if (run_dir_report_errors)                                              \
+            netdata_log_error(__VA_ARGS__);                                     \
+    } while(0)
+
+static uid_t target_uid = (uid_t)-1;
+
+void os_run_dir_set_target_uid(uid_t uid) {
+    __atomic_store_n(&target_uid, uid, __ATOMIC_RELEASE);
+}
+
+// The accounts a run directory may belong to without it being somebody else's:
+// root, whoever we are now, and the uid we are about to become. getuid() is
+// checked as well as geteuid() because the setuid-root plugins (apps.plugin,
+// network-viewer.plugin, ...) run with euid 0 and the netdata uid as their real
+// uid, and must accept the same run dir the daemon created.
+static inline bool run_dir_owner_is_ours(uid_t owner) {
+    if (owner == 0 || owner == geteuid() || owner == getuid())
+        return true;
+
+    uid_t target = __atomic_load_n(&target_uid, __ATOMIC_ACQUIRE);
+    return target != (uid_t)-1 && owner == target;
+}
+
+// Parent-directory check. Follows symlinks intentionally: parents such as
+// /var/run are frequently a symlink to /run on modern systems, so rejecting a
+// symlinked parent would break the /var/run branch everywhere.
 static inline bool is_dir_accessible(const char *dir, bool rw) {
     struct stat st;
     if (stat(dir, &st) == -1)
@@ -22,30 +66,189 @@ static inline bool is_dir_accessible(const char *dir, bool rw) {
     return true;
 }
 
+// Run-directory (leaf) check. netdata binds its sockets here and chowns it while
+// still running as root, so this directory must not be one another local user
+// controls. Unlike the parent check above it uses lstat(),
+// so intermediate symlinks (/var/run -> /run) still resolve, but a symlink at
+// the final component is refused.
+//
+// rw distinguishes the two callers, because they are exposed to different things.
+// With rw the agent is about to create, chown and bind here while still root, so
+// the full rule applies. Without rw the caller only reads or connects to what is
+// already there - netdatacli looking for netdata.pipe, a plugin looking for a
+// socket - and the rules about who else could replace the directory do not apply
+// to it, because it is not what they protect: see the read-only cut below.
+bool os_run_dir_is_safe(const char *candidate, bool rw) {
+    // Trimmed here, not just in the callers: with a trailing slash the kernel
+    // resolves the final component as a directory, so lstat() would report a
+    // planted symlink's target and every check below would pass.
+    char dir[FILENAME_MAX + 1];
+    if (!os_dir_path_trim(candidate, dir, sizeof(dir)))
+        return false;
+
+    struct stat st;
+    if (lstat(dir, &st) == -1)
+        // nothing is there (yet) - silent, the caller tries the next candidate or
+        // creates it
+        return false;
+
+    // The check that stops a pre-created /tmp/netdata -> /etc from becoming our run
+    // dir. Kept separate from the !S_ISDIR case below, which it implies, so each
+    // refusal can say which one it was: a refusal here relocates the agent to the
+    // next candidate (typically /tmp/netdata), and an operator who symlinked the run
+    // directory on purpose would otherwise have nothing to go on.
+    if (S_ISLNK(st.st_mode)) {
+        run_dir_log_error(
+            "Refusing run directory '%s': it is a symbolic link. Point NETDATA_RUN_DIR at the "
+            "directory itself, or bind-mount it there.", dir);
+        return false;
+    }
+
+    if (!S_ISDIR(st.st_mode)) {
+        run_dir_log_error("Refusing run directory '%s': not a directory", dir);
+        return false;
+    }
+
+    // silent: "we cannot use this one" is a normal outcome while probing the
+    // built-in candidates, not a misconfiguration
+    if (access(dir, rw ? W_OK : R_OK) == -1)
+        return false;
+
+    // Everything above applies to every caller: whatever it does next, it must not
+    // be pointed at another directory by a symlink planted at this name.
+
+#if defined(OS_WINDOWS)
+    // Nothing below applies here, for either caller. Windows has no POSIX
+    // ownership: Cygwin synthesizes st_uid from the NTFS ACL (there is no uid 0)
+    // and never reports a sticky bit unless one was set explicitly, so those checks
+    // would refuse every candidate and leave the agent with no run dir at all.
+    // There is also no privilege drop here, so there is nothing for them to
+    // protect.
+    return true;
+#else
+    // Everything below is about who may replace this directory while we act on it
+    // as root, so it is the writable caller's question alone. A read-only caller
+    // creates nothing, chowns nothing and binds nothing - it opens what is already
+    // there, and the socket's own mode decides whether it may talk to the agent.
+    // Answering it anyway had a cost and no benefit:
+    //  - it broke ordinary non-root installs. A run directory under a parent owned
+    //    by the netdata user (a source install, NETDATA_RUN_DIR=~netdata/run) is
+    //    UNSAFE to a client running as root, so netdatacli could not find an agent
+    //    that was running perfectly well.
+    //  - the sticky case below already concedes the same threat for read-only
+    //    callers: a /tmp/netdata planted by a third account passes it. Refusing the
+    //    strictly safer shapes while allowing that one is not a policy.
+    if (!rw)
+        return true;
+
+    // The leaf's own mode matters as much as its parent's: everything netdata
+    // puts here (the spawn server sockets, netdata.pipe) is created and used
+    // while still root, so a directory every local user can write into lets any
+    // of them pre-plant or swap those names. This is what refuses
+    // NETDATA_RUN_DIR=/tmp, which the parent check alone accepts (/tmp's parent
+    // is root-owned and exclusive).
+    // Group-write is deliberately still accepted: the shipped systemd unit
+    // creates /run/netdata with RuntimeDirectoryMode=0775 and re-applies it on
+    // every start, so refusing S_IWGRP would leave the default install with no
+    // run directory at all.
+    if (st.st_mode & S_IWOTH) {
+        run_dir_log_error(
+            "Refusing run directory '%s': mode %04o lets any local user write into it",
+            dir, (unsigned int)(st.st_mode & 07777));
+        return false;
+    }
+
+    switch (os_dir_parent_trust(dir)) {
+        case OS_DIR_PARENT_EXCLUSIVE:
+            // Nobody else can create an entry here, so whoever owns the
+            // directory, we are the ones who put it there. Its ownership is
+            // therefore not our business - it legitimately differs per install:
+            // tmpfiles.d creates /run/netdata owned by the netdata user, while
+            // systemd's RuntimeDirectory= with User=root makes it root:netdata.
+            return true;
+
+        case OS_DIR_PARENT_STICKY:
+            // The /tmp fallback. Anyone can create entries here, but sticky
+            // means only the owner of an entry can rename or delete it, so
+            // requiring the directory to be ours keeps every third account out.
+            // "Ours" has to include the uid we will drop to, because the first
+            // run creates this directory as root and then chowns it - and that
+            // is also the limit of what this predicate can promise: a process
+            // already running as that uid owns the entry, so it can still swap
+            // the directory between here and the privileged use that follows
+            // (the temporary spawn server binds its socket here long before
+            // become_user()). What protects that use is performing it through a
+            // descriptor - os_open_dir_privileged() and fchown() - not this
+            // check.
+            if (run_dir_owner_is_ours(st.st_uid))
+                return true;
+
+            run_dir_log_error(
+                "Refusing run directory '%s': owned by uid %u, inside a world-writable parent",
+                dir, (unsigned int)st.st_uid);
+            return false;
+
+        case OS_DIR_PARENT_UNKNOWN:
+            run_dir_log_error("Refusing run directory '%s': cannot examine its parent directory", dir);
+            return false;
+
+        default:
+            // Not "anyone": name what is actually wrong, because the two shapes
+            // that land here have different fixes. The parent either belongs to
+            // another account - including the account we are about to become, which
+            // is the whole point of checking while we are still root - or is
+            // writable by others without the sticky bit that would stop them
+            // renaming what is inside it.
+            run_dir_log_error(
+                "Refusing run directory '%s': its parent directory is not exclusively ours, so "
+                "another account can replace this directory while we are still root. Set "
+                "NETDATA_RUN_DIR to a directory whose parent is owned by root and is not writable "
+                "by group or others.",
+                dir);
+            return false;
+    }
+#endif
+}
+
 static inline bool netdata_dir_in_parent(const char *parent, char *out_path, size_t out_path_len, bool rw) {
     int ret = snprintf(out_path, out_path_len, "%s/netdata", parent);
     if (ret < 0 || (size_t)ret >= out_path_len)
         return false;
 
-    if (is_dir_accessible(out_path, rw))
+    if (os_run_dir_is_safe(out_path, rw))
         return true;
 
-    if (!is_dir_accessible(parent, rw))
+    // a read-only resolution reports what exists; it does not create anything
+    if (!rw || !is_dir_accessible(parent, rw))
         return false;
 
     if (mkdir(out_path, 0755) == -1 && errno != EEXIST)
         return false;
 
-    return is_dir_accessible(out_path, rw);
+    // Re-validate after mkdir(): on EEXIST the directory is one we did not
+    // create, so it could be a symlink or a directory planted by another user.
+    return os_run_dir_is_safe(out_path, rw);
 }
 
 static char *detect_run_dir(bool rw) {
     char path[FILENAME_MAX + 1];
 
+    // An operator-supplied run dir (e.g. a mounted tmpfs in a hardened,
+    // read-only-/run container) is honored, but gets the same validation as
+    // every other branch, since it is chowned as root. For a writable resolution
+    // that includes its parent: pointing this at a directory inside a tree the
+    // netdata account owns is refused while we are still root, because that
+    // account could swap it under us. Its parent has to be root-owned too.
     const char *env_dir = getenv("NETDATA_RUN_DIR");
     if (env_dir && *env_dir) {
-        if (is_dir_accessible(env_dir, rw))
-            return strdupz(env_dir);
+        // trim first: a trailing slash makes the kernel resolve the final
+        // component as a directory, which would defeat the symlink checks
+        if (os_dir_path_trim(env_dir, path, sizeof(path)) && os_run_dir_is_safe(path, rw))
+            return strdupz(path);
+
+        // an operator asked for this directory explicitly - never fall through
+        // to the built-in branches without saying why
+        run_dir_log_error("Ignoring NETDATA_RUN_DIR='%s': not a usable run directory", env_dir);
     }
 
 #if defined(OS_LINUX)
@@ -96,16 +299,20 @@ static char *detect_run_dir(bool rw) {
 //    }
 //#endif
 
-    // Fallback to /tmp/netdata - force creation if needed
+    // Fallback to /tmp/netdata - force creation if needed.
+    // /tmp is world-writable, so this is the branch an unprivileged user can
+    // plant. os_run_dir_is_safe() requires the directory to be ours and /tmp to be
+    // sticky, so a planted one is refused instead of adopted.
     if (!is_dir_accessible("/tmp", rw)) {
         // Try to create /tmp with standard permissions (including sticky bit)
         if (rw && mkdir("/tmp", 01777) == -1 && errno != EEXIST)
             return NULL;
     }
 
-    snprintfz(path, sizeof(path), "/tmp/netdata");
-    if (rw && mkdir(path, 0755) == -1 && errno != EEXIST)
-        return NULL;
+    if (netdata_dir_in_parent("/tmp", path, sizeof(path), rw))
+        goto success;
+
+    return NULL;
 
 success:
     // Set the environment variable for child processes
@@ -116,20 +323,56 @@ success:
 }
 
 const char *os_run_dir(bool rw) {
-    // Fast path - return cached directory if available
-    if(__atomic_load_n(&cached_run_dir_available, __ATOMIC_ACQUIRE))
-        return cached_run_dir;
+    // Fast path - reuse the cached directory only when it answers this request.
+    // cached_run_dir_writable implies cached_run_dir_available, so the writable
+    // flag is the whole test for rw callers.
+    if(__atomic_load_n(rw ? &cached_run_dir_writable : &cached_run_dir_available, __ATOMIC_ACQUIRE))
+        return __atomic_load_n(&cached_run_dir, __ATOMIC_ACQUIRE);
 
     spinlock_lock(&spinlock);
 
     // Check again under lock in case another thread set it
     char *run_dir = cached_run_dir;
-    if(!run_dir) {
-        run_dir = detect_run_dir(rw);
-        cached_run_dir = run_dir;
 
-        if(run_dir)
+    // A read-only resolution reports what already exists: it creates nothing and
+    // only asks for R_OK. So it can settle on a directory we cannot write into
+    // (a read-only /run bind mount, a root-owned /run/netdata when we are not
+    // root), or on the /tmp fallback while /run/netdata simply does not exist
+    // yet. Handing that answer to the first writable caller would make its
+    // bind()/mkdir() fail on a directory nobody validated for writing - and it
+    // would also skip the nd_setenv() that tells our children where the run dir
+    // is. Detect again instead.
+    if(!run_dir || (rw && !cached_run_dir_writable)) {
+        char *found = detect_run_dir(rw);
+
+        if(found && run_dir) {
+            if(strcmp(run_dir, found) == 0) {
+                // same directory, only its validation got stronger - keep the
+                // pointer callers already have
+                freez(found);
+                found = run_dir;
+            }
+            else
+                superseded_run_dir = run_dir;
+        }
+
+        if(found) {
+            // published before the flags, so a reader that sees a flag sees this
+            __atomic_store_n(&cached_run_dir, found, __ATOMIC_RELEASE);
+            if(rw)
+                __atomic_store_n(&cached_run_dir_writable, true, __ATOMIC_RELEASE);
             __atomic_store_n(&cached_run_dir_available, true, __ATOMIC_RELEASE);
+        }
+        else
+            // Every candidate has just been walked and refused, and each refusal
+            // has said why. A caller that comes back gets the same walk and the
+            // same reasons, so stop repeating them - see run_dir_report_errors.
+            run_dir_report_errors = false;
+
+        // When no writable directory exists, the read-only answer stays cached
+        // for the read-only callers, but this caller gets nothing: it asked for a
+        // directory it can write into, and there is none.
+        run_dir = found;
     }
 
     spinlock_unlock(&spinlock);
