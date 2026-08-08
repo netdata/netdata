@@ -1,0 +1,229 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: rasdaemon
+      monitored_instance:
+        name: "RAS Daemon"
+        link: "https://github.com/mchehab/rasdaemon"
+        categories:
+          - data-collection.hardware-and-sensors
+        icon_filename: "microchip.svg"
+      keywords:
+        - rasdaemon
+        - ras
+        - ecc
+        - edac
+        - memory
+        - dimm
+        - mce
+        - pcie
+        - aer
+        - hardware
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor hardware reliability errors recorded by rasdaemon, including ECC memory errors per DIMM, PCIe Advanced Error Reporting events, Machine Check Exceptions, and kernel memory failures.
+          Correctable ECC errors concentrating on a single memory module are an early warning of impending DIMM failure, and uncorrectable errors indicate data corruption has already occurred.
+        method_description: |
+          Executes `ras-mc-ctl --summary` and parses its output. rasdaemon records RAS events from the kernel tracing subsystem into a SQLite database, which persists across reboots, so the counts cover the full recorded history rather than only the current boot.
+          The database is installed world-readable, so no elevated privileges are required.
+          Memory errors are reported per physical DIMM using the motherboard's silkscreen labels (for example `DDR4_A1`) when a DIMM label database is installed for the board.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          None. `ras-mc-ctl` is executed unprivileged; rasdaemon's event database is installed world-readable.
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector is enabled automatically when the `ras-mc-ctl` executable is found in `PATH` or in the standard system directories.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            One short-lived `ras-mc-ctl` process is spawned per collection interval (10 seconds by default).
+    setup:
+      prerequisites:
+        list:
+          - title: Install rasdaemon
+            description: |
+              Install the `rasdaemon` package for your distribution and enable the service so that RAS events are recorded:
+
+              ```bash
+              sudo systemctl enable --now rasdaemon
+              ```
+
+          - title: Install DIMM labels (optional but recommended)
+            description: |
+              Without a DIMM label database, memory errors are reported against anonymous EDAC identifiers rather than the physical slot names printed on the motherboard.
+              Most distributions register labels automatically at boot via `ras-mc-ctl --register-labels`.
+              If your motherboard is not yet covered, labels can be contributed upstream to rasdaemon.
+      configuration:
+        file:
+          name: "go.d/rasdaemon.conf"
+        options:
+          description: |
+            The following options can be defined globally or per job.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: Timeout for executing `ras-mc-ctl`, in seconds.
+              default_value: 10
+              required: false
+            - name: binary_path
+              description: Path to the `ras-mc-ctl` binary. Leave empty to search `PATH` and the standard system directories.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: "Config"
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: rasdaemon
+            - name: Custom binary location
+              description: Use a `ras-mc-ctl` installed outside the standard system directories.
+              config: |
+                jobs:
+                  - name: rasdaemon
+                    binary_path: /opt/rasdaemon/sbin/ras-mc-ctl
+    troubleshooting:
+      problems:
+        list:
+          - title: No data is collected
+            description: |
+              Confirm that `ras-mc-ctl --summary` runs successfully as the `netdata` user:
+
+              ```bash
+              sudo -u netdata ras-mc-ctl --summary
+              ```
+
+              If it exits with an error mentioning a missing table, rasdaemon has not recorded any events yet, or was built without SQLite support. Ensure the `rasdaemon` service is running and that `/var/lib/rasdaemon/ras-mc_event.db` exists and is readable.
+          - title: Memory errors are not attributed to a DIMM slot
+            description: |
+              This means no DIMM label database is installed for your motherboard. Check with:
+
+              ```bash
+              ras-mc-ctl --mainboard
+              ras-mc-ctl --print-labels
+              ```
+
+              Labels for unsupported boards can be contributed upstream to rasdaemon.
+    alerts:
+      - name: rasdaemon_memory_uncorrectable_errors
+        metric: rasdaemon.memory_errors
+        info: "uncorrectable memory errors detected in the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rasdaemon.conf
+      - name: rasdaemon_memory_correctable_errors
+        metric: rasdaemon.memory_errors
+        info: "correctable memory errors detected in the last hour"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rasdaemon.conf
+      - name: rasdaemon_dimm_correctable_errors
+        metric: rasdaemon.dimm_errors
+        info: "correctable memory errors on a single DIMM in the last hour"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rasdaemon.conf
+      - name: rasdaemon_dimm_uncorrectable_errors
+        metric: rasdaemon.dimm_errors
+        info: "uncorrectable memory errors on a single DIMM in the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rasdaemon.conf
+      - name: rasdaemon_pcie_aer_fatal_errors
+        metric: rasdaemon.pcie_aer_errors
+        info: "uncorrectable PCIe Advanced Error Reporting events in the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rasdaemon.conf
+      - name: rasdaemon_pcie_aer_correctable_errors
+        metric: rasdaemon.pcie_aer_errors
+        info: "correctable PCIe Advanced Error Reporting events in the last hour"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rasdaemon.conf
+      - name: rasdaemon_mce_records
+        metric: rasdaemon.mce_records
+        info: "Machine Check Exceptions recorded in the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rasdaemon.conf
+      - name: rasdaemon_memory_failure_events
+        metric: rasdaemon.memory_failure_events
+        info: "kernel memory failure events in the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rasdaemon.conf
+    metrics:
+      folding:
+        title: "Metrics"
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the whole monitored host."
+          labels: []
+          metrics:
+            - name: rasdaemon.memory_errors
+              description: Memory errors by severity
+              unit: errors/s
+              chart_type: stacked
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+                - name: fatal
+                - name: other
+            - name: rasdaemon.pcie_aer_errors
+              description: PCIe Advanced Error Reporting events by severity
+              unit: errors/s
+              chart_type: stacked
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+                - name: fatal
+                - name: other
+            - name: rasdaemon.mce_records
+              description: Machine Check Exception records
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: records
+            - name: rasdaemon.memory_failure_events
+              description: Kernel memory failure events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: events
+            - name: rasdaemon.other_errors
+              description: Other RAS events by class
+              unit: events/s
+              chart_type: stacked
+              dimensions:
+                - name: extlog
+                - name: devlink
+                - name: disk
+                - name: cxl
+                - name: arm
+                - name: signal
+        - name: dimm
+          description: "These metrics refer to a physical memory module."
+          labels:
+            - name: dimm
+              description: DIMM label, using the motherboard's slot name when a label database is installed.
+          metrics:
+            - name: rasdaemon.dimm_errors
+              description: Memory errors per DIMM
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+                - name: fatal
+                - name: other
