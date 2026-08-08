@@ -21,7 +21,7 @@ should give you clues as to why the collector isn't working.
 - Switch to the `netdata` user.
 
   ```bash
-  sudo -u netdata -s
+  sudo su -s /bin/bash netdata
   ```
 
 [% if entry.meta.plugin_name == 'go.d.plugin' %]
