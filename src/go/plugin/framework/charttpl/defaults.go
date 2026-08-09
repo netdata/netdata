@@ -77,6 +77,7 @@ func cloneInstances(in *Instances) *Instances {
 		return nil
 	}
 	return &Instances{
-		ByLabels: append([]string(nil), in.ByLabels...),
+		ByLabels:         append([]string(nil), in.ByLabels...),
+		OptionalByLabels: append([]string(nil), in.OptionalByLabels...),
 	}
 }

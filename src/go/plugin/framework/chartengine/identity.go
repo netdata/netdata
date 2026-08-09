@@ -115,17 +115,37 @@ func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) 
 }
 
 func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAccessor) ([]instanceLabelValue, bool, error) {
-	if len(identity.InstanceByLabels) == 0 {
+	if len(identity.InstanceByLabels) == 0 && len(identity.OptionalByLabels) == 0 {
 		return nil, true, nil
 	}
 
 	plan := compileInstanceLabelPlan(identity)
-	out := make([]instanceLabelValue, 0, len(plan.explicitKeys))
+	out, _, ok := resolveInstanceLabelValuesWithPlan(plan, labels, nil, nil)
+	return out, ok, nil
+}
+
+func resolveInstanceLabelValuesWithPlan(
+	plan compiledInstanceLabelPlan,
+	labels labelAccessor,
+	out []instanceLabelValue,
+	includeAllScratch []string,
+) ([]instanceLabelValue, []string, bool) {
+	out = out[:0]
 	for _, key := range plan.explicitKeys {
 		value, ok := labels.Get(key)
 		if !ok {
 			// Explicit instance key is required to materialize one instance.
-			return nil, false, nil
+			return out[:0], includeAllScratch[:0], false
+		}
+		out = append(out, instanceLabelValue{
+			Key:   key,
+			Value: value,
+		})
+	}
+	for _, key := range plan.optionalKeys {
+		value, ok := labels.Get(key)
+		if !ok || strings.TrimSpace(value) == "" {
+			continue
 		}
 		out = append(out, instanceLabelValue{
 			Key:   key,
@@ -134,7 +154,7 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 	}
 
 	if plan.includeAll {
-		all := make([]string, 0)
+		all := includeAllScratch[:0]
 		labels.Range(func(key, _ string) bool {
 			if _, excluded := plan.excludeSet[key]; excluded {
 				return true
@@ -149,15 +169,16 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 		for _, key := range all {
 			value, ok := labels.Get(key)
 			if !ok {
-				return nil, false, nil
+				return out[:0], all[:0], false
 			}
 			out = append(out, instanceLabelValue{
 				Key:   key,
 				Value: value,
 			})
 		}
+		includeAllScratch = all
 	}
-	return out, true, nil
+	return out, includeAllScratch, true
 }
 
 var chartIDLabelValueSanitizer = strings.NewReplacer(

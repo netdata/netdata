@@ -281,13 +281,37 @@
     "instances": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "by_labels"
+      "anyOf": [
+        {
+          "required": [
+            "by_labels"
+          ],
+          "properties": {
+            "by_labels": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "optional_by_labels"
+          ],
+          "properties": {
+            "optional_by_labels": {
+              "minItems": 1
+            }
+          }
+        }
       ],
       "properties": {
         "by_labels": {
           "type": "array",
-          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "optional_by_labels": {
+          "type": "array",
           "items": {
             "type": "string"
           }

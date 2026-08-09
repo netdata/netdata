@@ -89,6 +89,68 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 			},
 			wantOK: false,
 		},
+		"optional instance label absent keeps base chart": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{
+				"service": "api",
+			},
+			wantID: "worker_cpu",
+			wantOK: true,
+		},
+		"optional instance label blank keeps base chart": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{
+				"pid": "  ",
+			},
+			wantID: "worker_cpu",
+			wantOK: true,
+		},
+		"optional instance label present appends suffix": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{
+				"pid": "1234",
+			},
+			wantID: "worker_cpu_1234",
+			wantOK: true,
+		},
+		"required values precede optional values": {
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{Raw: "worker_cpu"},
+				InstanceByLabels: []program.InstanceLabelSelector{
+					{Key: "deployment"},
+				},
+				OptionalByLabels: []string{"worker", "pid"},
+			},
+			labels: map[string]string{
+				"deployment": "api",
+				"worker":     "blue",
+				"pid":        "1234",
+			},
+			wantID: "worker_cpu_api_blue_1234",
+			wantOK: true,
+		},
+		"optional value does not satisfy a missing required label": {
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{Raw: "worker_cpu"},
+				InstanceByLabels: []program.InstanceLabelSelector{
+					{Key: "deployment"},
+				},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{
+				"pid": "1234",
+			},
+			wantOK: false,
+		},
 	}
 
 	for name, tc := range tests {
@@ -207,6 +269,50 @@ func TestRenderChartInstanceIDExcludeWinsRegardlessOfTokenOrder(t *testing.T) {
 			require.NoError(t, err)
 			assert.True(t, ok)
 			assert.Equal(t, tc.wantID, got)
+		})
+	}
+}
+
+var benchmarkRenderedChartInstanceID string
+
+func BenchmarkRenderChartInstanceID(b *testing.B) {
+	tests := map[string]struct {
+		identity program.ChartIdentity
+		labels   map[string]string
+	}{
+		"required_present": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				InstanceByLabels: []program.InstanceLabelSelector{{Key: "pid"}},
+			},
+			labels: map[string]string{"pid": "1234"},
+		},
+		"optional_present": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{"pid": "1234"},
+		},
+		"optional_absent": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{"service": "api"},
+		},
+	}
+
+	for name, tc := range tests {
+		b.Run(name, func(b *testing.B) {
+			b.ReportAllocs()
+			for range b.N {
+				got, ok, err := renderChartInstanceID(tc.identity, tc.labels)
+				if err != nil || !ok {
+					b.Fatalf("render chart identity: ok=%v err=%v", ok, err)
+				}
+				benchmarkRenderedChartInstanceID = got
+			}
 		})
 	}
 }

@@ -471,6 +471,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanLifecycleChartExpiry":                                {run: runTestBuildPlanLifecycleChartExpiry},
 		"BuildPlanLifecycleNoRemovalOnFailedCycle":                     {run: runTestBuildPlanLifecycleNoRemovalOnFailedCycle},
 		"BuildPlanRendersChartIDsFromInstances":                        {run: runTestBuildPlanRendersChartIDsFromInstances},
+		"BuildPlanRendersOptionalInstanceLabels":                       {run: runTestBuildPlanRendersOptionalInstanceLabels},
 		"BuildPlanEnforcesMaxInstancesDeterministically":               {run: runTestBuildPlanEnforcesMaxInstancesDeterministically},
 		"BuildPlanEnforcesMaxDimsDeterministically":                    {run: runTestBuildPlanEnforcesMaxDimsDeterministically},
 		"BuildPlanComputesChartLabelsIntersectionAndExclusions":        {run: runTestBuildPlanComputesChartLabelsIntersectionAndExclusions},
@@ -878,6 +879,80 @@ groups:
 	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionUpdateChart}, actionKinds(plan2.Actions))
+}
+
+func runTestBuildPlanRendersOptionalInstanceLabels(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Workers
+    metrics:
+      - worker_cpu_seconds
+    charts:
+      - id: worker_cpu
+        title: Worker CPU
+        context: worker_cpu
+        units: seconds
+        aggregation: sum
+        instances:
+          optional_by_labels: [pid]
+        lifecycle:
+          expire_after_cycles: 1
+        dimensions:
+          - selector: worker_cpu_seconds
+            name: cpu
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	cpu := sm.Gauge("worker_cpu_seconds")
+	blankPID := sm.LabelSet(metrix.Label{Key: "pid", Value: "  "})
+	workerPID := sm.LabelSet(metrix.Label{Key: "pid", Value: "1234"})
+
+	cc.BeginCycle()
+	cpu.Observe(1)
+	cpu.Observe(2, blankPID)
+	cpu.Observe(3, workerPID)
+	_ = cc.CommitCycleSuccess()
+
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{
+		ActionCreateChart, ActionCreateDimension, ActionUpdateChart,
+		ActionCreateChart, ActionCreateDimension, ActionUpdateChart,
+	}, actionKinds(plan1.Actions))
+
+	createLabels := make(map[string]map[string]string)
+	updates := make(map[string]float64)
+	for _, action := range plan1.Actions {
+		switch action := action.(type) {
+		case CreateChartAction:
+			createLabels[action.ChartID] = action.Labels
+		case UpdateChartAction:
+			require.Len(t, action.Values, 1)
+			updates[action.ChartID] = action.Values[0].Float64
+		}
+	}
+	assert.NotContains(t, createLabels["worker_cpu"], "pid")
+	assert.Equal(t, "1234", createLabels["worker_cpu_1234"]["pid"])
+	assert.Equal(t, float64(3), updates["worker_cpu"])
+	assert.Equal(t, float64(3), updates["worker_cpu_1234"])
+
+	cc.BeginCycle()
+	cpu.Observe(4, workerPID)
+	_ = cc.CommitCycleSuccess()
+
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionRemoveChart}, actionKinds(plan2.Actions))
+	update := findUpdateAction(plan2)
+	require.NotNil(t, update)
+	assert.Equal(t, "worker_cpu_1234", update.ChartID)
 }
 
 func runTestBuildPlanEnforcesMaxInstancesDeterministically(t *testing.T) {
