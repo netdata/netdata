@@ -919,6 +919,8 @@
 - Regenerate integrations docs ([#23418](https://github.com/netdata/netdata/issues/23418))
 - Fix(go.d/prometheus): support summaries without quantiles ([#23419](https://github.com/netdata/netdata/issues/23419))
 - Integration between eBPF and network viewer plugins ([#22715](https://github.com/netdata/netdata/issues/22715))
+- Build(deps): bump actions/setup-go from 6 to 7 ([#23285](https://github.com/netdata/netdata/issues/23285))
+- Build(deps): bump cryptography from 48.0.1 to 50.0.0 in /packaging/tools/automation/mcp ([#23394](https://github.com/netdata/netdata/issues/23394))
 
 ## [2.10.0] - 2026-04-09
 
