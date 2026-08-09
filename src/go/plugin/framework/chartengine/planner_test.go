@@ -473,6 +473,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanRendersChartIDsFromInstances":                        {run: runTestBuildPlanRendersChartIDsFromInstances},
 		"BuildPlanRendersOptionalInstanceLabels":                       {run: runTestBuildPlanRendersOptionalInstanceLabels},
 		"BuildPlanKeepsPartialOptionalIdentitiesDistinct":              {run: runTestBuildPlanKeepsPartialOptionalIdentitiesDistinct},
+		"BuildPlanIntersectsUnlabeledContributor":                      {run: runTestBuildPlanIntersectsUnlabeledContributor},
 		"BuildPlanEnforcesMaxInstancesDeterministically":               {run: runTestBuildPlanEnforcesMaxInstancesDeterministically},
 		"BuildPlanEnforcesMaxDimsDeterministically":                    {run: runTestBuildPlanEnforcesMaxDimsDeterministically},
 		"BuildPlanComputesChartLabelsIntersectionAndExclusions":        {run: runTestBuildPlanComputesChartLabelsIntersectionAndExclusions},
@@ -1011,6 +1012,70 @@ groups:
 	assert.Equal(t, map[string]string{"pid": "blue"}, createLabels["worker_cpu_pid_blue"])
 	assert.Equal(t, float64(1), updates["worker_cpu_worker_blue"])
 	assert.Equal(t, float64(2), updates["worker_cpu_pid_blue"])
+}
+
+func runTestBuildPlanIntersectsUnlabeledContributor(t *testing.T) {
+	tests := map[string]struct {
+		instances      string
+		labelPromotion string
+	}{
+		"static with automatic promotion": {},
+		"static with explicit promotion": {
+			labelPromotion: "        label_promotion: [region]\n",
+		},
+		"optional base with automatic promotion": {
+			instances: "        instances:\n          optional_by_labels: [pid]\n",
+		},
+		"optional base with explicit promotion": {
+			instances:      "        instances:\n          optional_by_labels: [pid]\n",
+			labelPromotion: "        label_promotion: [region]\n",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			e, err := New()
+			require.NoError(t, err)
+
+			yaml := `
+version: v1
+groups:
+  - family: Workers
+    metrics: [worker_cpu_seconds]
+    charts:
+      - id: worker_cpu
+        title: Worker CPU
+        context: worker_cpu
+        units: seconds
+        aggregation: sum
+` + tc.instances + tc.labelPromotion + `        dimensions:
+          - selector: worker_cpu_seconds
+            name: cpu
+`
+			require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+			store := metrix.NewCollectorStore()
+			cc := mustCycleController(t, store)
+			sm := store.Write().SnapshotMeter("")
+			cpu := sm.Gauge("worker_cpu_seconds")
+			region := sm.LabelSet(metrix.Label{Key: "region", Value: "eu"})
+
+			cc.BeginCycle()
+			cpu.Observe(1)
+			cpu.Observe(2, region)
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+			create := findCreateChartAction(plan)
+			require.NotNil(t, create)
+			assert.Empty(t, create.Labels)
+			update := findUpdateAction(plan)
+			require.NotNil(t, update)
+			require.Len(t, update.Values, 1)
+			assert.Equal(t, float64(3), update.Values[0].Float64)
+		})
+	}
 }
 
 func runTestBuildPlanEnforcesMaxInstancesDeterministically(t *testing.T) {

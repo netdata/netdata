@@ -671,6 +671,9 @@ Required values form the chart-ID suffix first, in declaration order. Each prese
 contributes its label key followed by its value, also in declaration order. Optional keys with missing or whitespace-only
 values do not affect the chart ID and are not emitted as chart identity labels.
 
+Chart-ID suffixes use the existing sanitized underscore-joined representation; they are not a reversible serialization.
+Authors should avoid optional identity values deliberately shaped like another configured key/value suffix segment.
+
 **Example: One chart per host**
 
 ```yaml

@@ -89,9 +89,17 @@ groups:
 		labels = append(labels, metrix.Label{Key: fmt.Sprintf("unrelated_%03d", i), Value: fmt.Sprintf("value_%03d", i)})
 	}
 	view := labelSliceView{items: labels}
-	identity := metrix.SeriesIdentity{ID: "bench-series", Hash64: 1}
 	meta := metrix.SeriesMeta{Kind: metrix.MetricKindGauge}
 	index := engine.state.matchIndex
+
+	const identityBatchSize = 1024
+	identities := make([]metrix.SeriesIdentity, identityBatchSize)
+	for i := range identities {
+		identities[i] = metrix.SeriesIdentity{
+			ID:     metrix.SeriesID(fmt.Sprintf("bench-series-%04d", i)),
+			Hash64: uint64(i) + 1,
+		}
+	}
 	cache := newRouteCache()
 
 	b.ReportAllocs()
@@ -99,17 +107,22 @@ groups:
 	b.ReportMetric(float64(sourceLabelCount), "source_labels/op")
 	b.ResetTimer()
 	for i := range b.N {
-		revision := uint64(i) + 1
+		if i > 0 && i%identityBatchSize == 0 {
+			b.StopTimer()
+			cache = newRouteCache()
+			b.StartTimer()
+		}
+		buildSeq := uint64(i/identityBatchSize) + 1
 		routes, cached, err := engine.resolveSeriesRoutes(
 			cache,
-			identity,
+			identities[i%identityBatchSize],
 			"bench_metric",
 			view,
 			meta,
 			reader,
 			index,
-			revision,
-			revision,
+			1,
+			buildSeq,
 		)
 		if err != nil {
 			b.Fatalf("resolve cold route: %v", err)
