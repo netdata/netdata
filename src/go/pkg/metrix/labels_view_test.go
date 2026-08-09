@@ -20,12 +20,12 @@ func TestLabelViewGetUsesCanonicalKeyOrder(t *testing.T) {
 		wantValue string
 		wantOK    bool
 	}{
-		"first":             {key: "alpha", wantValue: "one", wantOK: true},
-		"middle":            {key: "middle", wantValue: "two", wantOK: true},
-		"last":              {key: "zulu", wantValue: "three", wantOK: true},
-		"missing before":    {key: "aardvark"},
-		"missing between":   {key: "beta"},
-		"missing after":     {key: "zzzz"},
+		"first":              {key: "alpha", wantValue: "one", wantOK: true},
+		"middle":             {key: "middle", wantValue: "two", wantOK: true},
+		"last":               {key: "zulu", wantValue: "three", wantOK: true},
+		"missing before":     {key: "aardvark"},
+		"missing between":    {key: "beta"},
+		"missing after":      {key: "zzzz"},
 		"missing from empty": {key: "alpha"},
 	}
 
