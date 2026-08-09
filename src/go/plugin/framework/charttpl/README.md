@@ -667,9 +667,9 @@ use strict `!label_key` syntax; `! host` is invalid.
 required/excluded keys, and cannot be combined with `by_labels: ["*"]`. An `instances` object must contain at least one
 required or optional key.
 
-Required values form the chart-ID suffix first, in declaration order. Present nonblank optional values follow in their
-declaration order. Optional keys with missing or whitespace-only values do not affect the chart ID and are not emitted as
-chart identity labels.
+Required values form the chart-ID suffix first, in declaration order. Each present nonblank optional identity then
+contributes its label key followed by its value, also in declaration order. Optional keys with missing or whitespace-only
+values do not affect the chart ID and are not emitted as chart identity labels.
 
 **Example: One chart per host**
 
@@ -702,8 +702,9 @@ instances:
 ```
 
 A single-process source without `pid` uses the base chart ID. A multiprocess source with `pid="1234"` uses the
-`<base>_1234` chart and attaches `pid=1234` as an identity label. If both shapes occur in one snapshot, they route to the
-base and per-PID charts respectively; chartengine does not duplicate either series into a second aggregate view.
+`<base>_pid_1234` chart and attaches `pid=1234` as an identity label. Including the key keeps partially present
+multi-optional identities distinct. If both source shapes occur in one snapshot, they route to the base and per-PID
+charts respectively; chartengine does not duplicate either series into a second aggregate view.
 
 Use optional identity only for a bounded, sufficiently stable axis that is useful to operators. It still multiplies chart
 cardinality by the number of observed values. If an optional label appears, disappears, or changes, that is an identity

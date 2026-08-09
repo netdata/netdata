@@ -227,6 +227,8 @@ source files for evidence.
   provides that view.
 - Optional-label presence or value transitions create a new chart while the old chart follows normal lifecycle expiry.
   A template MUST choose lifecycle limits appropriate for the source's observed churn.
+- A present optional identity contributes both its key and value to the chart-ID suffix (for example,
+  `pid="1234"` becomes `_pid_1234`); missing or blank optional identities contribute nothing.
 - `label_promotion` defines non-identity chart metadata. Chartengine reconciles
   its effective intersection across every routed contributor, including an
   empty source-label set, and emits a complete replacement only when it changes.

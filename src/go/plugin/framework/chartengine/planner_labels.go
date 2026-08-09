@@ -33,9 +33,8 @@ type chartLabelAccumulator struct {
 	selected               map[string]string
 	initialized            bool
 
-	instanceKeys      map[string]struct{}
-	resolvedScratch   []instanceLabelValue
-	includeAllScratch []string
+	instanceKeys    map[string]struct{}
+	resolvedScratch []instanceLabelValue
 }
 
 type chartLabelMembership struct {
@@ -106,7 +105,6 @@ func newChartLabelAccumulator(policy *chartLabelPolicy) *chartLabelAccumulator {
 		selected:               make(map[string]string, len(policy.promoteKeys)),
 		instanceKeys:           make(map[string]struct{}, len(plan.explicitKeys)+len(plan.optionalKeys)),
 		resolvedScratch:        make([]instanceLabelValue, 0, len(plan.explicitKeys)+len(plan.optionalKeys)),
-		includeAllScratch:      make([]string, 0, len(plan.explicitKeys)),
 	}
 }
 
@@ -119,7 +117,6 @@ func (a *chartLabelAccumulator) reset() {
 	clear(a.selected)
 	clear(a.instanceKeys)
 	a.resolvedScratch = a.resolvedScratch[:0]
-	a.includeAllScratch = a.includeAllScratch[:0]
 	a.initialized = false
 }
 
@@ -383,14 +380,12 @@ func (a *chartLabelAccumulator) resolveInstanceLabelsForObserve(labels metrix.La
 		a.instanceKeys[key] = struct{}{}
 	}
 
-	resolved, extra, ok := resolveInstanceLabelValuesWithPlan(
+	resolved, ok := resolveInstanceLabelValuesWithPlan(
 		a.policy.instancePlan,
 		labelViewAccessor{view: labels},
 		a.resolvedScratch,
-		a.includeAllScratch,
 	)
 	a.resolvedScratch = resolved
-	a.includeAllScratch = extra
 	if !ok {
 		return false
 	}

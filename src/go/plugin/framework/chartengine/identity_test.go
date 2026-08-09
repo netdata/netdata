@@ -3,8 +3,10 @@
 package chartengine
 
 import (
+	"sort"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,7 +121,29 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 			labels: map[string]string{
 				"pid": "1234",
 			},
-			wantID: "worker_cpu_1234",
+			wantID: "worker_cpu_pid_1234",
+			wantOK: true,
+		},
+		"partially present optional worker keeps key in suffix": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"worker", "pid"},
+			},
+			labels: map[string]string{
+				"worker": "blue",
+			},
+			wantID: "worker_cpu_worker_blue",
+			wantOK: true,
+		},
+		"partially present optional pid keeps key in suffix": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"worker", "pid"},
+			},
+			labels: map[string]string{
+				"pid": "blue",
+			},
+			wantID: "worker_cpu_pid_blue",
 			wantOK: true,
 		},
 		"required values precede optional values": {
@@ -135,7 +159,7 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 				"worker":     "blue",
 				"pid":        "1234",
 			},
-			wantID: "worker_cpu_api_blue_1234",
+			wantID: "worker_cpu_api_worker_blue_pid_1234",
 			wantOK: true,
 		},
 		"optional value does not satisfy a missing required label": {
@@ -305,9 +329,17 @@ func BenchmarkRenderChartInstanceID(b *testing.B) {
 
 	for name, tc := range tests {
 		b.Run(name, func(b *testing.B) {
+			labels := make([]metrix.Label, 0, len(tc.labels))
+			for key, value := range tc.labels {
+				labels = append(labels, metrix.Label{Key: key, Value: value})
+			}
+			sort.Slice(labels, func(i, j int) bool { return labels[i].Key < labels[j].Key })
+			view := labelSliceView{items: labels}
+			plan := compileInstanceLabelPlan(tc.identity)
+
 			b.ReportAllocs()
 			for range b.N {
-				got, ok, err := renderChartInstanceID(tc.identity, tc.labels)
+				got, ok, err := renderChartInstanceIDFromViewWithPlan(tc.identity, plan, view)
 				if err != nil || !ok {
 					b.Fatalf("render chart identity: ok=%v err=%v", ok, err)
 				}
