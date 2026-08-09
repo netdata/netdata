@@ -106,7 +106,7 @@ source files for evidence.
   one-active-state values.
 - Metric names MUST be stable and selected by `charts.yaml`.
 - In `charts.yaml`, use `version: v1`, `context_namespace`, `instances.by_labels`,
-  and `label_promotion` where their operator-facing behavior is needed.
+  `instances.optional_by_labels`, and `label_promotion` where their operator-facing behavior is needed.
 - Charts SHOULD omit `algorithm` for normal type-driven behavior. At runtime,
   chartengine maps `metrix` counters to `incremental` dimensions and gauges or
   other kinds to `absolute`, including dynamically built `charttpl.Chart`
@@ -130,9 +130,9 @@ source files for evidence.
   option for V2 charts.
 - Put multipliers, divisors, hidden flags, and float formatting in the chart
   template, not ad hoc chart-emission code.
-- When `instances.by_labels` omits labels so multiple source series can map to
-  one rendered dimension, the effective `aggregation` MUST match the metric
-  meaning. Set it on the chart; it applies to every dimension. Absence means
+- When instance identity omits labels—either because `instances.by_labels` does not select them or an
+  `instances.optional_by_labels` key is absent—multiple source series can map to one rendered dimension. The effective
+  `aggregation` MUST match the metric meaning. Set it on the chart; it applies to every dimension. Absence means
   `sum`; available reducers are `sum`, `min`, `max`, and unweighted `avg`
   (`avg` forces floating-point emission). Use separate charts when metrics need
   different reducers. Metric kind is not enough to infer this policy: gauges
@@ -218,9 +218,17 @@ source files for evidence.
 
 ## Chart Label Identity
 
-- Labels used by `instances.by_labels` or a dimension `name_from_label` define
-  chart or dimension identity. Changing one creates a new chart or dimension;
-  collectors MUST NOT use identity churn merely to refresh metadata.
+- Labels used by `instances.by_labels`, a present nonblank `instances.optional_by_labels` key, or a dimension
+  `name_from_label` define chart or dimension identity. Changing one creates a new chart or dimension; collectors MUST
+  NOT use identity churn merely to refresh metadata.
+- Use `instances.optional_by_labels` only when a source conditionally exposes a bounded, sufficiently stable,
+  operator-useful identity axis. Missing and blank values are omitted; present values create refined instances. Authors
+  MUST assess value count and churn, and MUST NOT create a duplicate aggregate chart when NIDL/query aggregation already
+  provides that view.
+- Optional-label presence or value transitions create a new chart while the old chart follows normal lifecycle expiry.
+  A template MUST choose lifecycle limits appropriate for the source's observed churn.
+- A present optional identity contributes both its key and value to the chart-ID suffix (for example,
+  `pid="1234"` becomes `_pid_1234`); missing or blank optional identities contribute nothing.
 - `label_promotion` defines non-identity chart metadata. Chartengine reconciles
   its effective intersection across every routed contributor, including an
   empty source-label set, and emits a complete replacement only when it changes.

@@ -3,7 +3,6 @@
 package chartengine
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -15,6 +14,7 @@ const collectJobLabel = "_collect_job"
 type compiledInstanceLabelPlan struct {
 	explicitKeys []string
 	explicitSet  map[string]struct{}
+	optionalKeys []string
 	excludeSet   map[string]struct{}
 	includeAll   bool
 }
@@ -33,9 +33,8 @@ type chartLabelAccumulator struct {
 	selected               map[string]string
 	initialized            bool
 
-	instanceKeys      map[string]struct{}
-	resolvedScratch   []instanceLabelValue
-	includeAllScratch []string
+	instanceKeys    map[string]struct{}
+	resolvedScratch []instanceLabelValue
 }
 
 type chartLabelMembership struct {
@@ -102,11 +101,10 @@ func newChartLabelAccumulator(policy *chartLabelPolicy) *chartLabelAccumulator {
 	return &chartLabelAccumulator{
 		policy:                 policy,
 		dimensionKeyExclusions: make(map[string]struct{}),
-		instance:               make(map[string]string, len(plan.explicitKeys)),
+		instance:               make(map[string]string, len(plan.explicitKeys)+len(plan.optionalKeys)),
 		selected:               make(map[string]string, len(policy.promoteKeys)),
-		instanceKeys:           make(map[string]struct{}, len(plan.explicitKeys)),
-		resolvedScratch:        make([]instanceLabelValue, 0, len(plan.explicitKeys)),
-		includeAllScratch:      make([]string, 0, len(plan.explicitKeys)),
+		instanceKeys:           make(map[string]struct{}, len(plan.explicitKeys)+len(plan.optionalKeys)),
+		resolvedScratch:        make([]instanceLabelValue, 0, len(plan.explicitKeys)+len(plan.optionalKeys)),
 	}
 }
 
@@ -119,7 +117,6 @@ func (a *chartLabelAccumulator) reset() {
 	clear(a.selected)
 	clear(a.instanceKeys)
 	a.resolvedScratch = a.resolvedScratch[:0]
-	a.includeAllScratch = a.includeAllScratch[:0]
 	a.initialized = false
 }
 
@@ -227,6 +224,7 @@ func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLa
 	plan := compiledInstanceLabelPlan{
 		explicitKeys: make([]string, 0, len(identity.InstanceByLabels)),
 		explicitSet:  make(map[string]struct{}, len(identity.InstanceByLabels)),
+		optionalKeys: make([]string, 0, len(identity.OptionalByLabels)),
 		excludeSet:   make(map[string]struct{}),
 	}
 
@@ -258,6 +256,8 @@ func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLa
 		plan.explicitKeys = append(plan.explicitKeys, key)
 		plan.explicitSet[key] = struct{}{}
 	}
+
+	plan.optionalKeys = append(plan.optionalKeys, identity.OptionalByLabels...)
 	return plan
 }
 
@@ -374,46 +374,25 @@ func (a *chartLabelAccumulator) addInstanceKey(key, value string) {
 
 func (a *chartLabelAccumulator) resolveInstanceLabelsForObserve(labels metrix.LabelView) bool {
 	a.resetInstanceKeys()
-
-	resolved := a.resolvedScratch[:0]
-	for _, key := range a.policy.instancePlan.explicitKeys {
-		value, ok := labels.Get(key)
-		if !ok {
-			a.resolvedScratch = resolved[:0]
-			return false
-		}
-		resolved = append(resolved, instanceLabelValue{Key: key, Value: value})
+	for _, key := range a.policy.instancePlan.optionalKeys {
+		// Optional keys are identity-reserved even when their current value is
+		// blank, so automatic promotion cannot leak a blank identity label.
+		a.instanceKeys[key] = struct{}{}
 	}
 
-	if a.policy.instancePlan.includeAll {
-		extra := a.includeAllScratch[:0]
-		labels.Range(func(key, _ string) bool {
-			if _, excluded := a.policy.instancePlan.excludeSet[key]; excluded {
-				return true
-			}
-			if _, already := a.policy.instancePlan.explicitSet[key]; already {
-				return true
-			}
-			extra = append(extra, key)
-			return true
-		})
-		sort.Strings(extra)
-		for _, key := range extra {
-			value, ok := labels.Get(key)
-			if !ok {
-				a.resolvedScratch = resolved[:0]
-				a.includeAllScratch = extra[:0]
-				return false
-			}
-			resolved = append(resolved, instanceLabelValue{Key: key, Value: value})
-		}
-		a.includeAllScratch = extra
+	resolved, ok := resolveInstanceLabelValuesWithPlan(
+		a.policy.instancePlan,
+		labelViewAccessor{view: labels},
+		a.resolvedScratch,
+	)
+	a.resolvedScratch = resolved
+	if !ok {
+		return false
 	}
 
 	for _, item := range resolved {
 		a.addInstanceKey(item.Key, item.Value)
 	}
-	a.resolvedScratch = resolved
 	return true
 }
 

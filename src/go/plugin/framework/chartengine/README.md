@@ -166,6 +166,21 @@ format's [aggregation section](../charttpl/README.md#aggregation) for semantics 
 - A changed intersection emits a complete replacement label set through `UpdateChartLabelsAction`; chart identity and
   dimensions are not recreated.
 
+### Instance Identity Resolution
+
+- `instances.by_labels` defines required identity. A missing explicit label rejects that series from the chart.
+- `instances.optional_by_labels` defines declaration-ordered explicit keys that participate only when their value is
+  present and nonblank. Missing or blank optional values retain the base/required chart identity.
+- Required values render before optional key/value pairs in the chart-ID suffix. For example, present `pid="1234"`
+  contributes `_pid_1234`. Every participating key is emitted as an identity chart label.
+- Optional identity is resolved independently for each series. Present and absent source shapes can therefore materialize
+  refined and base chart instances in the same plan; a series is routed once, never copied into an aggregate view.
+- Presence/value changes are ordinary identity changes. Existing lifecycle policy expires the old chart; the engine keeps
+  no migration or alias state.
+- Explicit required/optional resolution reuses one compiled per-template plan and uses binary search over canonical
+  sorted source labels on a route-cache miss. The existing `by_labels: ["*"]` path scans and sorts visible labels;
+  wildcard identity cannot be combined with optional keys.
+
 ### Algorithm Resolution
 
 - An omitted authored `algorithm` remains `AlgorithmAuto` in the immutable program, route cache, and chart-level action

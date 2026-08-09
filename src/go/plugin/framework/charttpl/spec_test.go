@@ -120,6 +120,7 @@ groups:
         chart_defaults:
           instances:
             by_labels: [resource_uid, region]
+            optional_by_labels: [pid]
         charts:
           - title: Queries
             context: queries
@@ -149,6 +150,7 @@ groups:
 				assert.Equal(t, []string{"resource_name", "region"}, child.Charts[0].LabelPromoted)
 				require.NotNil(t, child.Charts[0].Instances)
 				assert.Equal(t, []string{"resource_uid", "region"}, child.Charts[0].Instances.ByLabels)
+				assert.Equal(t, []string{"pid"}, child.Charts[0].Instances.OptionalByLabels)
 
 				leaf := child.Groups[0]
 				require.Len(t, leaf.Charts, 1)
@@ -156,6 +158,7 @@ groups:
 				assert.Empty(t, leaf.Charts[0].LabelPromoted)
 				require.NotNil(t, leaf.Charts[0].Instances)
 				assert.Equal(t, []string{"region"}, leaf.Charts[0].Instances.ByLabels)
+				assert.Empty(t, leaf.Charts[0].Instances.OptionalByLabels)
 			},
 		},
 		"rejects unknown yaml field via strict unmarshal": {
@@ -459,6 +462,73 @@ func TestConfigSchemaAutogenRuleEmptyValues(t *testing.T) {
 
 			err = schema.Validate(instance)
 			if test.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestConfigSchemaOptionalInstanceLabels(t *testing.T) {
+	var schemaDoc any
+	require.NoError(t, json.Unmarshal([]byte(ConfigSchemaJSON), &schemaDoc))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("charttpl.schema.json", schemaDoc))
+	schema, err := compiler.Compile("charttpl.schema.json")
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		instances map[string]any
+		wantErr   bool
+	}{
+		"required only": {
+			instances: map[string]any{"by_labels": []any{"deployment"}},
+		},
+		"optional only": {
+			instances: map[string]any{"optional_by_labels": []any{"pid"}},
+		},
+		"required and optional": {
+			instances: map[string]any{
+				"by_labels":          []any{"deployment"},
+				"optional_by_labels": []any{"pid"},
+			},
+		},
+		"empty required with optional": {
+			instances: map[string]any{
+				"by_labels":          []any{},
+				"optional_by_labels": []any{"pid"},
+			},
+		},
+		"empty instances": {
+			instances: map[string]any{},
+			wantErr:   true,
+		},
+		"empty required only": {
+			instances: map[string]any{"by_labels": []any{}},
+			wantErr:   true,
+		},
+		"empty optional only": {
+			instances: map[string]any{"optional_by_labels": []any{}},
+			wantErr:   true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := validationSpec()
+			raw, err := json.Marshal(spec)
+			require.NoError(t, err)
+			var instance map[string]any
+			require.NoError(t, json.Unmarshal(raw, &instance))
+			groups := instance["groups"].([]any)
+			group := groups[0].(map[string]any)
+			charts := group["charts"].([]any)
+			chart := charts[0].(map[string]any)
+			chart["instances"] = tc.instances
+
+			err = schema.Validate(instance)
+			if tc.wantErr {
 				require.Error(t, err)
 				return
 			}

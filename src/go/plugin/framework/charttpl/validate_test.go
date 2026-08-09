@@ -1076,6 +1076,66 @@ func TestSpecValidateChartAggregation(t *testing.T) {
 	assert.ErrorContains(t, err, "must be one of [sum min max avg]")
 }
 
+func TestSpecValidateOptionalInstanceLabels(t *testing.T) {
+	tests := map[string]struct {
+		instances *Instances
+		wantErr   string
+	}{
+		"accepts optional-only identity": {
+			instances: &Instances{OptionalByLabels: []string{"pid"}},
+		},
+		"accepts required and optional identity": {
+			instances: &Instances{ByLabels: []string{"deployment"}, OptionalByLabels: []string{"pid"}},
+		},
+		"rejects empty instances": {
+			instances: &Instances{},
+			wantErr:   "instances",
+		},
+		"rejects empty optional key": {
+			instances: &Instances{OptionalByLabels: []string{" "}},
+			wantErr:   "optional_by_labels[0]",
+		},
+		"rejects optional wildcard": {
+			instances: &Instances{OptionalByLabels: []string{"*"}},
+			wantErr:   "optional_by_labels[0]",
+		},
+		"rejects optional exclusion": {
+			instances: &Instances{OptionalByLabels: []string{"!pid"}},
+			wantErr:   "optional_by_labels[0]",
+		},
+		"rejects duplicate optional key": {
+			instances: &Instances{OptionalByLabels: []string{"pid", " pid "}},
+			wantErr:   "duplicate label key",
+		},
+		"rejects required and optional overlap": {
+			instances: &Instances{ByLabels: []string{"pid"}, OptionalByLabels: []string{"pid"}},
+			wantErr:   "conflicts with instances.by_labels",
+		},
+		"rejects excluded optional key": {
+			instances: &Instances{ByLabels: []string{"deployment", "!pid"}, OptionalByLabels: []string{"pid"}},
+			wantErr:   "conflicts with instances.by_labels",
+		},
+		"rejects optional keys with wildcard identity": {
+			instances: &Instances{ByLabels: []string{"*"}, OptionalByLabels: []string{"pid"}},
+			wantErr:   "cannot be combined with instances.by_labels wildcard",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := validationSpec()
+			spec.Groups[0].Charts[0].Instances = tc.instances
+			err := spec.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
 func validationSpec() Spec {
 	return Spec{
 		Version: VersionV1,

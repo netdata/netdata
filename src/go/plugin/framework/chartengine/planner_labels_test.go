@@ -139,6 +139,38 @@ func TestChartLabelAccumulatorIntersectsEmptyLabelSet(t *testing.T) {
 	}
 }
 
+func TestChartLabelAccumulatorOptionalIdentityLabels(t *testing.T) {
+	tests := map[string]struct {
+		labels map[string]string
+		want   map[string]string
+	}{
+		"absent optional label": {
+			labels: map[string]string{"region": "eu"},
+			want:   map[string]string{"region": "eu"},
+		},
+		"blank optional label is omitted": {
+			labels: map[string]string{"pid": "  ", "region": "eu"},
+			want:   map[string]string{"region": "eu"},
+		},
+		"present optional label is identity": {
+			labels: map[string]string{"pid": "1234", "region": "eu"},
+			want:   map[string]string{"pid": "1234", "region": "eu"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			chart := program.Chart{
+				Identity: program.ChartIdentity{OptionalByLabels: []string{"pid"}},
+				Labels:   program.LabelPolicy{Mode: program.PromotionModeAutoIntersection},
+			}
+			acc := newChartLabelAccumulator(compileChartLabelPolicy(chart))
+			require.NoError(t, acc.observe(sortedLabelView(tc.labels), ""))
+			assert.Equal(t, tc.want, acc.materialize())
+		})
+	}
+}
+
 func TestCompileInstanceLabelPlanExcludeWinsRegardlessOfTokenOrder(t *testing.T) {
 	tests := map[string]struct {
 		selectors []program.InstanceLabelSelector

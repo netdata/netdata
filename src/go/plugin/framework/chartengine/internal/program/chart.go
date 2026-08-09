@@ -65,6 +65,9 @@ type ChartIdentity struct {
 
 	// InstanceByLabels contains resolved explicit identity selectors (if used).
 	InstanceByLabels []InstanceLabelSelector
+	// OptionalByLabels contains declaration-ordered identity keys that
+	// participate only when their runtime value is nonblank.
+	OptionalByLabels []string
 
 	// ContextNamespace holds normalized namespace fragments that participate in
 	// derived context/id building in namespace-based authoring mode.
@@ -95,7 +98,7 @@ func validateChart(chart Chart) error {
 	default:
 		errs = append(errs, fmt.Errorf("invalid chart type %q", chart.Meta.Type))
 	}
-	if err := validateInstanceLabelSelectors(chart.Identity.InstanceByLabels); err != nil {
+	if err := validateInstanceLabelPolicy(chart.Identity.InstanceByLabels, chart.Identity.OptionalByLabels); err != nil {
 		errs = append(errs, fmt.Errorf("identity: %w", err))
 	}
 	if err := validateLabelPolicy(chart.Labels); err != nil {
@@ -134,6 +137,7 @@ func (i ChartIdentity) clone() ChartIdentity {
 	for _, selector := range i.InstanceByLabels {
 		out.InstanceByLabels = append(out.InstanceByLabels, selector.clone())
 	}
+	out.OptionalByLabels = append([]string(nil), i.OptionalByLabels...)
 	out.ContextNamespace = append([]string(nil), i.ContextNamespace...)
 	return out
 }

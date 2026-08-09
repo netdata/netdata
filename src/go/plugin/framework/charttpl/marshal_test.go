@@ -35,6 +35,17 @@ func TestSpecMarshalTemplate(t *testing.T) {
 				assert.NotContains(t, out, "type:")
 			},
 		},
+		"emits optional-only instance identity without empty by_labels": {
+			spec: func() Spec {
+				spec := validationSpec()
+				spec.Groups[0].Charts[0].Instances = &Instances{OptionalByLabels: []string{"pid"}}
+				return spec
+			}(),
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, "optional_by_labels:")
+				assert.NotContains(t, out, "by_labels: []")
+			},
+		},
 		"errors when groups missing": {
 			spec:    Spec{Version: VersionV1},
 			wantErr: true,

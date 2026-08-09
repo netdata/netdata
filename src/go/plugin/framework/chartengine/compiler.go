@@ -136,9 +136,9 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 		return program.Chart{}, fmt.Errorf("id: %w", err)
 	}
 
-	instanceByLabels, err := compileInstanceByLabels(chart.Instances)
+	instanceLabels, err := compileInstanceLabels(chart.Instances)
 	if err != nil {
-		return program.Chart{}, fmt.Errorf("instances.by_labels: %w", err)
+		return program.Chart{}, fmt.Errorf("instances: %w", err)
 	}
 
 	labelMode := program.PromotionModeAutoIntersection
@@ -149,9 +149,10 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 
 	identity := program.ChartIdentity{
 		IDTemplate:       idTemplate,
-		InstanceByLabels: instanceByLabels,
+		InstanceByLabels: instanceLabels.required,
+		OptionalByLabels: instanceLabels.optional,
 		ContextNamespace: append([]string(nil), scope.contextParts...),
-		Static:           len(instanceByLabels) == 0,
+		Static:           len(instanceLabels.required) == 0 && len(instanceLabels.optional) == 0,
 	}
 	metaFamily := composeFamily(scope.familyParts, chart.Family)
 
@@ -349,25 +350,38 @@ func compileLifecycle(in *charttpl.Lifecycle) program.LifecyclePolicy {
 	return out
 }
 
-func compileInstanceByLabels(instances *charttpl.Instances) ([]program.InstanceLabelSelector, error) {
+type compiledInstanceLabels struct {
+	required []program.InstanceLabelSelector
+	optional []string
+}
+
+func compileInstanceLabels(instances *charttpl.Instances) (compiledInstanceLabels, error) {
 	if instances == nil {
-		return nil, nil
+		return compiledInstanceLabels{}, nil
 	}
-	out := make([]program.InstanceLabelSelector, 0, len(instances.ByLabels))
+
+	out := compiledInstanceLabels{
+		required: make([]program.InstanceLabelSelector, 0, len(instances.ByLabels)),
+		optional: make([]string, 0, len(instances.OptionalByLabels)),
+	}
 	for _, token := range instances.ByLabels {
 		t := strings.TrimSpace(token)
 		switch {
 		case t == "*":
-			out = append(out, program.InstanceLabelSelector{IncludeAll: true})
+			out.required = append(out.required, program.InstanceLabelSelector{IncludeAll: true})
 		case strings.HasPrefix(t, "!"):
 			key := strings.TrimSpace(strings.TrimPrefix(t, "!"))
 			if key == "" {
-				return nil, fmt.Errorf("exclude token must include label key")
+				return compiledInstanceLabels{}, fmt.Errorf("by_labels: exclude token must include label key")
 			}
-			out = append(out, program.InstanceLabelSelector{Exclude: true, Key: key})
+			out.required = append(out.required, program.InstanceLabelSelector{Exclude: true, Key: key})
 		default:
-			out = append(out, program.InstanceLabelSelector{Key: t})
+			out.required = append(out.required, program.InstanceLabelSelector{Key: t})
 		}
+	}
+
+	for _, raw := range instances.OptionalByLabels {
+		out.optional = append(out.optional, strings.TrimSpace(raw))
 	}
 	return out, nil
 }
