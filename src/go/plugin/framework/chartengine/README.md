@@ -157,6 +157,15 @@ Authored charts can set one reducer for all their dimensions. Supported values a
 `absolute`/`incremental` chart processing. Autogen routes retain their existing sum behavior. See the chart-template
 format's [aggregation section](../charttpl/README.md#aggregation) for semantics and metric-type constraints.
 
+### Chart Label Intersection
+
+- Promoted non-identity labels are common metadata: a key/value survives only when it is present with the same value on
+  every routed contributor to the chart.
+- An unlabeled contributor participates as an empty label set. If it shares a chart with labeled contributors, no
+  promoted non-identity label can describe the entire chart.
+- A changed intersection emits a complete replacement label set through `UpdateChartLabelsAction`; chart identity and
+  dimensions are not recreated.
+
 ### Algorithm Resolution
 
 - An omitted authored `algorithm` remains `AlgorithmAuto` in the immutable program, route cache, and chart-level action

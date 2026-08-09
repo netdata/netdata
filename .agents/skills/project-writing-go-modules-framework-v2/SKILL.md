@@ -222,8 +222,8 @@ source files for evidence.
   chart or dimension identity. Changing one creates a new chart or dimension;
   collectors MUST NOT use identity churn merely to refresh metadata.
 - `label_promotion` defines non-identity chart metadata. Chartengine reconciles
-  its effective intersection on existing charts and emits a complete
-  replacement only when it changes.
+  its effective intersection across every routed contributor, including an
+  empty source-label set, and emits a complete replacement only when it changes.
 - Collectors MUST continue publishing numeric samples at their required cadence.
   A label-only replacement updates chart metadata; it is not a substitute for
   numeric sample-and-hold output.
