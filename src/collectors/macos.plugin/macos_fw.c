@@ -174,7 +174,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
     /* Get ports and services for drive statistics. */
     if (unlikely(IOMainPort(bootstrap_port, &main_port))) {
-        collector_error("MACOS: IOMainPort() failed");
+        collector_error("MACOS: IOMainPort()/IOMasterPort() failed");
         do_io = 0;
         collector_error("DISABLED: system.io");
     /* Get the list of all drive objects. */
