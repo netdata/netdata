@@ -27,12 +27,11 @@ type chartLabelPolicy struct {
 }
 
 type chartLabelAccumulator struct {
-	policy                    *chartLabelPolicy
-	dimensionKeyExclusions    map[string]struct{}
-	instance                  map[string]string
-	selected                  map[string]string
-	initialized               bool
-	promotedIntersectionEmpty bool
+	policy                 *chartLabelPolicy
+	dimensionKeyExclusions map[string]struct{}
+	instance               map[string]string
+	selected               map[string]string
+	initialized            bool
 
 	instanceKeys      map[string]struct{}
 	resolvedScratch   []instanceLabelValue
@@ -122,7 +121,6 @@ func (a *chartLabelAccumulator) reset() {
 	a.resolvedScratch = a.resolvedScratch[:0]
 	a.includeAllScratch = a.includeAllScratch[:0]
 	a.initialized = false
-	a.promotedIntersectionEmpty = false
 }
 
 func newChartLabelTracker(previous *materializedChartPresentation) chartLabelTracker {
@@ -273,22 +271,16 @@ func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLab
 	}
 
 	if labels.Len() == 0 {
-		a.resetInstanceKeys()
 		if len(a.policy.instancePlan.explicitKeys) > 0 {
 			return nil
 		}
-		// Retain the workspace map so an empty witness stays O(1); materialization
-		// ignores it until the accumulator is reset.
-		a.promotedIntersectionEmpty = true
+		clear(a.selected)
 		a.initialized = true
 		return nil
 	}
 
 	ok := a.resolveInstanceLabelsForObserve(labels)
 	if !ok {
-		return nil
-	}
-	if a.promotedIntersectionEmpty {
 		return nil
 	}
 
@@ -434,18 +426,14 @@ func (a *chartLabelAccumulator) materialize() map[string]string {
 	if a == nil {
 		return nil
 	}
-	selected := a.selected
-	if a.promotedIntersectionEmpty {
-		selected = nil
-	}
-	out := make(map[string]string, len(a.instance)+len(selected))
+	out := make(map[string]string, len(a.instance)+len(a.selected))
 	for key, value := range a.instance {
 		if strings.TrimSpace(key) == "" {
 			continue
 		}
 		out[key] = value
 	}
-	for key, value := range selected {
+	for key, value := range a.selected {
 		if strings.TrimSpace(key) == "" {
 			continue
 		}
@@ -460,22 +448,17 @@ func (a *chartLabelAccumulator) materializedEquals(values map[string]string) boo
 		return len(values) == 0
 	}
 
-	selected := a.selected
-	if a.promotedIntersectionEmpty {
-		selected = nil
-	}
-
 	count := 0
 	for key := range a.instance {
 		if strings.TrimSpace(key) == "" || key == collectJobLabel {
 			continue
 		}
-		if _, overridden := selected[key]; overridden {
+		if _, overridden := a.selected[key]; overridden {
 			continue
 		}
 		count++
 	}
-	for key := range selected {
+	for key := range a.selected {
 		if strings.TrimSpace(key) == "" || key == collectJobLabel {
 			continue
 		}
@@ -486,7 +469,7 @@ func (a *chartLabelAccumulator) materializedEquals(values map[string]string) boo
 	}
 
 	for key, want := range values {
-		got, ok := selected[key]
+		got, ok := a.selected[key]
 		if !ok {
 			got, ok = a.instance[key]
 		}
