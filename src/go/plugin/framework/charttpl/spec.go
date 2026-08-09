@@ -94,7 +94,8 @@ type Chart struct {
 
 // Instances defines chart instance identity labels.
 type Instances struct {
-	ByLabels []string `yaml:"by_labels" json:"by_labels"`
+	ByLabels         []string `yaml:"by_labels,omitempty" json:"by_labels,omitempty"`
+	OptionalByLabels []string `yaml:"optional_by_labels,omitempty" json:"optional_by_labels,omitempty"`
 }
 
 // Lifecycle controls chart and dimension cardinality/expiry limits.

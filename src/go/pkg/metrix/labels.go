@@ -20,10 +20,9 @@ type labelView struct {
 func (v labelView) Len() int { return len(v.items) }
 
 func (v labelView) Get(key string) (string, bool) {
-	for _, l := range v.items {
-		if l.Key == key {
-			return l.Value, true
-		}
+	i := sort.Search(len(v.items), func(i int) bool { return v.items[i].Key >= key })
+	if i < len(v.items) && v.items[i].Key == key {
+		return v.items[i].Value, true
 	}
 	return "", false
 }

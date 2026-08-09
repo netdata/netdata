@@ -20,13 +20,9 @@ type labelSliceView struct {
 }
 
 func (v labelSliceView) Get(key string) (string, bool) {
-	for _, item := range v.items {
-		if item.Key == key {
-			return item.Value, true
-		}
-		if item.Key > key {
-			break
-		}
+	i := sort.Search(len(v.items), func(i int) bool { return v.items[i].Key >= key })
+	if i < len(v.items) && v.items[i].Key == key {
+		return v.items[i].Value, true
 	}
 	return "", false
 }

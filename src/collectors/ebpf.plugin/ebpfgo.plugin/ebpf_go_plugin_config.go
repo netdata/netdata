@@ -383,7 +383,6 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 }
 
-
 //go:fix inline
 func stringPtr(v string) *string {
 	return new(v)

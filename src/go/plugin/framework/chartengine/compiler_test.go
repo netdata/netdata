@@ -370,6 +370,40 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, program.AlgorithmAuto, charts[0].Meta.Algorithm)
 			},
 		},
+		"compile required and optional instance labels": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Workers",
+						Metrics: []string{"worker_cpu_seconds"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Worker CPU",
+								Context: "worker_cpu",
+								Units:   "seconds",
+								Instances: &charttpl.Instances{
+									ByLabels:         []string{"deployment"},
+									OptionalByLabels: []string{"pid"},
+								},
+								Dimensions: []charttpl.Dimension{
+									{Selector: "worker_cpu_seconds", Name: "cpu"},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.False(t, charts[0].Identity.Static)
+				require.Len(t, charts[0].Identity.InstanceByLabels, 1)
+				assert.Equal(t, "deployment", charts[0].Identity.InstanceByLabels[0].Key)
+				assert.Equal(t, []string{"pid"}, charts[0].Identity.OptionalByLabels)
+			},
+		},
 		"infer stateset dimension naming from runtime series metadata": {
 			rev: 8,
 			spec: charttpl.Spec{

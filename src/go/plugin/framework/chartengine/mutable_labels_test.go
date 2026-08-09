@@ -71,6 +71,91 @@ func TestBuildPlanUpdatesMutableNonIdentityLabels(t *testing.T) {
 	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(unchanged.Actions))
 }
 
+func TestBuildPlanIntersectsUnlabeledContributor(t *testing.T) {
+	tests := map[string]string{
+		"automatic promotion": "",
+		"explicit promotion":  "        label_promotion: [region]\n",
+	}
+
+	for name, labelPromotion := range tests {
+		t.Run(name, func(t *testing.T) {
+			engine, err := New(WithRuntimeStore(nil))
+			require.NoError(t, err)
+			require.NoError(t, engine.LoadYAML([]byte("version: v1\n"+
+				"groups:\n"+
+				"  - family: Requests\n"+
+				"    metrics: [requests_success_total, requests_failed_total]\n"+
+				"    charts:\n"+
+				"      - id: requests\n"+
+				"        title: Requests\n"+
+				"        context: requests\n"+
+				"        units: requests/s\n"+
+				labelPromotion+
+				"        dimensions:\n"+
+				"          - selector: requests_success_total\n"+
+				"            name: successful\n"+
+				"          - selector: requests_failed_total\n"+
+				"            name: failed\n"), 1))
+
+			store := metrix.NewCollectorStore()
+			cycle := mustCycleController(t, store)
+			meter := store.Write().SnapshotMeter("")
+			successful := meter.Counter("requests_success_total")
+			failed := meter.Counter("requests_failed_total")
+			regionEU := meter.LabelSet(metrix.Label{Key: "region", Value: "eu"})
+
+			cycle.BeginCycle()
+			successful.ObserveTotal(10, regionEU)
+			require.NoError(t, cycle.CommitCycleSuccess())
+
+			initial, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+			create := findCreateChartAction(initial)
+			require.NotNil(t, create)
+			assert.Equal(t, map[string]string{"region": "eu"}, create.Labels)
+
+			cycle.BeginCycle()
+			successful.ObserveTotal(11, regionEU)
+			failed.ObserveTotal(2)
+			require.NoError(t, cycle.CommitCycleSuccess())
+
+			withUnlabeled, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+			assert.NotContains(t, actionKinds(withUnlabeled.Actions), ActionCreateChart)
+			labelsRemoved := findUpdateChartLabelsAction(withUnlabeled)
+			require.NotNil(t, labelsRemoved)
+			assert.Empty(t, labelsRemoved.Labels)
+			update := findUpdateAction(withUnlabeled)
+			require.NotNil(t, update)
+			require.Len(t, update.Values, 2)
+			assert.Equal(t, map[string]float64{
+				"failed":     2,
+				"successful": 11,
+			}, updateValuesByName(update.Values))
+
+			cycle.BeginCycle()
+			successful.ObserveTotal(12, regionEU)
+			require.NoError(t, cycle.CommitCycleSuccess())
+
+			withoutUnlabeled, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+			assert.NotContains(t, actionKinds(withoutUnlabeled.Actions), ActionCreateChart)
+			assert.NotContains(t, actionKinds(withoutUnlabeled.Actions), ActionCreateDimension)
+			labelsRestored := findUpdateChartLabelsAction(withoutUnlabeled)
+			require.NotNil(t, labelsRestored)
+			assert.Equal(t, map[string]string{"region": "eu"}, labelsRestored.Labels)
+		})
+	}
+}
+
+func updateValuesByName(values []UpdateDimensionValue) map[string]float64 {
+	out := make(map[string]float64, len(values))
+	for _, value := range values {
+		out[value.Name] = value.Float64
+	}
+	return out
+}
+
 func TestBuildPlanIdentityLabelChangeCreatesNewChart(t *testing.T) {
 	engine, store, cycle, meter, gauge := newMutableLabelsTestState(t)
 

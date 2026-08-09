@@ -124,7 +124,11 @@ func (e *Engine) resolveSeriesRoutes(
 		if !ok {
 			return nil, false, fmt.Errorf("chartengine: route references unknown chart template %q", candidate.chartTemplateID)
 		}
-		chartID, ok, err := renderChartInstanceIDFromView(chart.Identity, labels)
+		labelPolicy, ok := index.labelPolicies[candidate.chartTemplateID]
+		if !ok {
+			return nil, false, fmt.Errorf("chartengine: route references unknown label policy %q", candidate.chartTemplateID)
+		}
+		chartID, ok, err := renderChartInstanceIDFromViewWithPlan(chart.Identity, labelPolicy.instancePlan, labels)
 		if err != nil {
 			return nil, false, err
 		}
