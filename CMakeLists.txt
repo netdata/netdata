@@ -107,9 +107,10 @@ int main(void) { OSLogStore *store = nil; return store != nil; }
     endif()
   endif()
 
-  # The oldest macOS this source tree is expected to build against. Collectors that need a
-  # newer SDK guard themselves at the source level and degrade to unavailable, so raising an
-  # SDK requirement must be a deliberate change to this value rather than an accident.
+  # The oldest macOS this source tree is expected to run on (the deployment target floor,
+  # not an SDK version). Collectors that need a newer SDK guard themselves at the source
+  # level and degrade to unavailable, so raising this floor must be a deliberate change to
+  # this value rather than an accident.
   set(NETDATA_MACOS_MINIMUM_VERSION "10.6")
 
   # Only validated when the deployment target is explicit; an unset target means the
