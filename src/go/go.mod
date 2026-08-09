@@ -93,7 +93,7 @@ require (
 	github.com/moby/moby/client v0.5.1
 	github.com/netdata/systemd-journal-sdk/go v0.8.0
 	github.com/oschwald/maxminddb-golang v1.13.1
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	go.mongodb.org/mongo-driver/v2 v2.8.0
 	golang.org/x/sys v0.47.0
 	gopkg.in/yaml.v3 v3.0.1
