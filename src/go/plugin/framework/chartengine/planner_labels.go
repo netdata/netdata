@@ -262,7 +262,7 @@ func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLa
 }
 
 func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLabel string) error {
-	if a == nil || labels.Len() == 0 {
+	if a == nil {
 		return nil
 	}
 
@@ -272,6 +272,11 @@ func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLab
 
 	ok := a.resolveInstanceLabelsForObserve(labels)
 	if !ok {
+		return nil
+	}
+	if labels.Len() == 0 {
+		clear(a.selected)
+		a.initialized = true
 		return nil
 	}
 

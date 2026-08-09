@@ -562,8 +562,10 @@ charts:
 | `dimensions`      | array         | **yes**  |                        | At least one dimension required (see [dimensions](#6-dimensions)).           |
 
 Chart and dimension identity labels are immutable routing inputs: changing one creates a new chart or dimension
-ID. Promoted labels are non-identity metadata. When their effective intersection changes, chartengine updates the
-existing chart with a complete replacement label set; it does not recreate the chart or its dimensions.
+ID. Promoted labels are non-identity metadata. They are the intersection across every routed contributor to the chart,
+including contributors with no source labels. Therefore, one unlabeled contributor makes the promoted intersection empty.
+When the effective intersection changes, chartengine updates the existing chart with a complete replacement label set;
+it does not recreate the chart or its dimensions.
 
 > [!TIP]
 > Omit `algorithm` for the normal case. The engine uses `incremental` for a matched runtime counter and `absolute` for a
