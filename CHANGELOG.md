@@ -921,6 +921,16 @@
 - Integration between eBPF and network viewer plugins ([#22715](https://github.com/netdata/netdata/issues/22715))
 - Build(deps): bump actions/setup-go from 6 to 7 ([#23285](https://github.com/netdata/netdata/issues/23285))
 - Build(deps): bump cryptography from 48.0.1 to 50.0.0 in /packaging/tools/automation/mcp ([#23394](https://github.com/netdata/netdata/issues/23394))
+- Fix(ci): repair go-tests for ebpfgo.plugin ([#23422](https://github.com/netdata/netdata/issues/23422))
+- Fix(go.d/chartengine): intersect unlabeled contributors ([#23424](https://github.com/netdata/netdata/issues/23424))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.33 to 1.32.35 in /src/go ([#23427](https://github.com/netdata/netdata/issues/23427))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.21.0 to 9.22.0 in /src/go ([#23428](https://github.com/netdata/netdata/issues/23428))
+- Build(deps): bump github.com/santhosh-tekuri/jsonschema/v6 from 6.0.2 to 6.0.3 in /src/go ([#23430](https://github.com/netdata/netdata/issues/23430))
+- Feat(go.d/chartengine): support optional instance labels ([#23425](https://github.com/netdata/netdata/issues/23425))
+- Build(deps): bump github.com/gohugoio/hashstructure from 0.6.0 to 1.0.0 in /src/go ([#23435](https://github.com/netdata/netdata/issues/23435))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.35.2 to 1.35.4 in /src/go ([#23431](https://github.com/netdata/netdata/issues/23431))
+- Build(deps): bump github.com/klauspost/compress from 1.19.1 to 1.19.2 in /src/go ([#23433](https://github.com/netdata/netdata/issues/23433))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.66.1 to 1.66.3 in /src/go ([#23434](https://github.com/netdata/netdata/issues/23434))
 
 ## [2.10.0] - 2026-04-09
 
