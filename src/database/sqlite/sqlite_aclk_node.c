@@ -59,8 +59,8 @@ static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UU
 }
 
 // Undoes the record build_node_manifest() made for a manifest that never went out. Runs under the
-// rrd read lock - see rrdhost_apply_by_machine_guid_trylock() - so everything it does is one atomic
-// CAS and one atomic arm, which is all it may do while that lock is held.
+// rrd read lock - see rrdhost_apply_by_machine_guid() - so everything it does is one atomic CAS and
+// one atomic arm, which is all it may do while that lock is held.
 static void manifest_publication_apply(RRDHOST *host, void *data)
 {
     const struct aclk_manifest_publication *publication = data;
@@ -69,11 +69,21 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
     if (!aclk_host_config)
         return;
 
-    // Clear the record only while it is still THIS publication's. A manifest enqueued after it
-    // supersedes it - the cloud needs that newer content, not this dropped older one - so its key
-    // must survive. The CAS is what makes the outcomes order-insensitive: publications for one host
-    // can be in flight together and complete in any order, and whichever key is current is by
-    // definition the newest one enqueued.
+    // Clear the record only while it still holds the key this publication carried. A manifest
+    // enqueued after this one records a different key and so survives, which is what makes the
+    // outcomes order-insensitive: publications for one host can be in flight together and complete
+    // in any order without a later one losing its record to an earlier drop.
+    //
+    // The key identifies CONTENT, not a particular enqueue, so this is not a per-enqueue token: if
+    // the content is published, then changed, then changed back, all while the first publication is
+    // still in flight, the later enqueue records the same key and a drop of that first one clears it.
+    // The cost is bounded and is the direction this design accepts everywhere else - a record cleared
+    // to 0 can only cause another publish, never a suppression, so the next build re-sends unchanged
+    // content once and stops. Making the clear exact would mean carrying a per-enqueue token
+    // alongside the key, and a (token, key) pair cannot be stored or cleared in one atomic operation
+    // - it needs a lock on a path that is lock-free today, and packing a generation into this word
+    // instead would shrink the content hash, trading a redundant publish for a worse collision risk
+    // in the direction that loses updates.
     uint64_t expected = publication->key;
     (void)__atomic_compare_exchange_n(
         &aclk_host_config->node_manifest_sent_key, &expected, 0, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
@@ -99,16 +109,22 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
 //
 // The host is resolved rather than carried as a pointer, because the host and its config can be
 // freed between the enqueue and the outcome; and it is resolved through
-// rrdhost_apply_by_machine_guid_trylock() rather than any find-then-dereference helper, because only
+// rrdhost_apply_by_machine_guid() rather than any find-then-dereference helper, because only
 // the former holds the host allocated while the callback runs.
 //
-// That helper never blocks, and this path must not need it to. One of the drop sites below runs on
-// the ACLK sync event loop, and a host teardown can be holding rrd_wrlock() while blocked on that
-// same loop inside destroy_aclk_config() - so waiting for the read lock here would wedge the agent.
-// Losing that race leaves the dropped manifest's key recorded as if it had been sent, so that content
-// is not re-sent until it changes again or the ACLK session does - the original defect, now narrowed
-// to a dropped publication that also loses this race. The dominant drop causes are an offline or
-// disconnecting mqtt client, and those bring a new session with them, which changes every key anyway.
+// Whether it may wait for the read lock depends on the thread, so it is decided per call. Every
+// mqtt-level drop - an offline or disconnecting client, a full mqtt buffer, a payload the server
+// refuses - is reported from an ACLK query worker, and a payload that fails to generate is reported
+// from the alert-push worker; both may block, so for them the clear below always happens. Only the
+// event loop must not wait: a host teardown can be blocked on it inside destroy_aclk_config() while
+// holding rrd_wrlock(), so waiting there would wedge the agent. It reaches this path when it drops a
+// query it could not park (a Judy allocation failure) or when it drains queries at shutdown.
+//
+// On the event loop, then, a lost race leaves the dropped manifest's key recorded as if it had been
+// sent, so that content is not re-sent until it changes again or the ACLK session does. That is the
+// original defect of this SOW, reduced to: an allocation failure that drops a manifest, on the one
+// thread that cannot wait, while a teardown happens to hold rrd_wrlock(). At shutdown it is moot -
+// the next start is a new session, and every key carries the session.
 //
 // Resolved by machine_guid, NOT by the node_id this manifest was keyed under at the cloud, even
 // though the node_id is what identifies the message. host->node_id and the ACLK config's node_id are
@@ -128,8 +144,9 @@ void aclk_node_manifest_publish_result(const struct aclk_manifest_publication *p
     if (publication->published)
         return;
 
-    (void)rrdhost_apply_by_machine_guid_trylock(
-        publication->machine_guid, manifest_publication_apply, (void *)publication);
+    (void)rrdhost_apply_by_machine_guid(
+        publication->machine_guid, manifest_publication_apply, (void *)publication,
+        !aclk_sync_on_event_loop_thread());
 }
 
 // node_id is the caller's validated snapshot, not the shared buffer - see aclk_node_id_snapshot().

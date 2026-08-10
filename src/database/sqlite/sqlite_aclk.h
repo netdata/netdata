@@ -209,6 +209,10 @@ static inline void aclk_alert_streaming_set(aclk_sync_cfg_t *aclk_host_config, b
 
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
 void destroy_aclk_config(RRDHOST *host);
+
+// true when the caller runs on the ACLK sync event loop, which must never wait for a lock a host
+// teardown may hold while blocked on that loop - see the definition
+bool aclk_sync_on_event_loop_thread(void);
 void aclk_synchronization_init(void);
 void aclk_synchronization_shutdown(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
