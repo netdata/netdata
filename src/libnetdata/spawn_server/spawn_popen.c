@@ -103,13 +103,66 @@ POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...) {
     return pi;
 }
 
+#if defined(OS_WINDOWS)
+// The shell ships inside the package. It is addressed as a package-relative
+// POSIX path so os_translate_msys_to_windows_path() anchors it to the detected
+// install prefix: CreateProcess() then receives an absolute path and never
+// falls back to the Windows search order (application directory, current
+// directory, System32, PATH) to resolve an unqualified name. netdata runs as
+// LocalSystem, so resolving a program by bare name would let anyone who can
+// write to a directory on the machine PATH choose what SYSTEM executes.
+#define NETDATA_WINDOWS_SHELL_PACKAGE_PATH "/usr/bin/sh.exe"
+
+// The only script plugin we can run on Windows: it is the one with an
+// interpreter we know how to locate.
+#define NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN "python.d.plugin"
+
+static const char *windows_path_basename(const char *path) {
+    const char *base = path;
+
+    for(const char *p = path; *p ; p++)
+        if(*p == '/' || *p == '\\')
+            base = p + 1;
+
+    return base;
+}
+
+// Absolute path of the bundled shell, or NULL when the package ships none.
+// Resolved once: the answer cannot change while the agent runs.
+static const char *windows_bundled_shell(void) {
+    static const char *shell_path = NULL;
+    static bool resolved = false;
+    static SPINLOCK shell_lock = SPINLOCK_INITIALIZER;
+
+    spinlock_lock(&shell_lock);
+    if(!resolved) {
+        CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(NETDATA_WINDOWS_SHELL_PACKAGE_PATH);
+
+        if(translated && *translated && access(translated, R_OK) == 0)
+            shell_path = strdupz(translated);
+        else
+            // Warn once per agent lifetime: every shell script that follows is
+            // skipped, and repeating this per spawn would only add noise.
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "SPAWN: no shell found at '%s' - shell scripts (alarm-notify.sh and friends) will not run",
+                   (translated && *translated) ? translated : NETDATA_WINDOWS_SHELL_PACKAGE_PATH);
+
+        resolved = true;
+    }
+    spinlock_unlock(&shell_lock);
+
+    return shell_path;
+}
+#endif
+
 POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
     if(!cmd || !*cmd) return NULL;
 
 #if defined(OS_WINDOWS)
-    // Windows has no /bin/sh. If the command starts with "exec ", strip it and
-    // exec the plugin directly. Plugins on Windows carry a .plugin.exe suffix.
-    // Script plugins (e.g. python.d.plugin) are handled by finding their interpreter.
+    // If the command starts with "exec ", strip it and exec the program
+    // directly. Native plugins on Windows carry a .plugin.exe suffix; script
+    // plugins are handled by finding their interpreter. Everything else falls
+    // through to the bundled shell below.
     if(strncmp(cmd, "exec ", 5) == 0) {
         // cmd is built by netdata internally (max ~16 KiB), but bound the
         // scan so a malformed input cannot request an unbounded VLA.
@@ -125,9 +178,7 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
         char *exec = get_word(words, num_words, 0);
         char *prog = get_word(words, num_words, 1);
         if (strcmp(exec, "exec") == 0 && prog) {
-            if (strendswith(prog, ".plugin.exe") &&
-                !strendswith(prog, "charts.d.plugin.exe") &&
-                !strendswith(prog, "ioping.plugin.exe")) {
+            if (strendswith(prog, ".plugin.exe")) {
                 // Native .exe plugin — exec directly, no shell needed.
                 const char *argv[num_words]; // remove exec, add NULL terminator
 
@@ -139,8 +190,8 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                 return spawn_popen_run_argv(argv);
             }
 
-            if (strendswith(prog, ".plugin") && !strendswith(prog, ".plugin.exe")) {
-                // Script plugin (e.g. python.d.plugin) — needs a Python interpreter.
+            if (strcmp(windows_path_basename(prog), NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN) == 0) {
+                // python.d.plugin — needs a Python interpreter.
                 // Parse args first: a -p<interpreter> option works even when Python is
                 // absent from PATH, matching the Linux bash wrapper that strips -p before
                 // exec'ing Python.  The PATH search (and its early-return guard) is only
@@ -198,14 +249,28 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                 argv[2 + filt_count] = NULL;
                 return spawn_popen_run_argv(argv);
             }
+
+            if (strendswith(prog, ".plugin")) {
+                // Any other script plugin: there is no interpreter contract for
+                // it on Windows (ioping.plugin is bash, not Python), so running
+                // it under the wrong interpreter would only produce noise.
+                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                       "SPAWN: skipping '%s' — only %s is supported as a script plugin on Windows",
+                       prog, NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN);
+                return NULL;
+            }
         }
     }
 #endif
 
+#if defined(OS_WINDOWS)
+    const char *shell = windows_bundled_shell();
+    if(!shell) return NULL;
+#endif
+
     const char *argv[] = {
 #if defined(OS_WINDOWS)
-        // Windows has no /bin/sh; use sh.exe from PATH (MSYS2, Git Bash, etc.)
-        "sh",
+        shell,
 #else
         "/bin/sh",
 #endif
