@@ -58,11 +58,116 @@ static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UU
     return uuid_parse(dst, parsed) == 0 && !uuid_is_null(parsed);
 }
 
+// Hands out the per-enqueue token that identifies one manifest publication. Monotonic and never
+// reused, so it identifies an ENQUEUE, which the content key cannot: identical content produces an
+// identical key, and content that is published, changed, and changed back records the same key twice.
+// Never returns 0, which node_manifest_sent_token uses to mean "nothing outstanding".
+static uint64_t manifest_publication_token_next(void)
+{
+    static uint64_t seq = 0;
+    return __atomic_add_fetch(&seq, 1, __ATOMIC_RELAXED);
+}
+
+// Undoes the record build_node_manifest() made for a manifest that never went out. Runs under the
+// rrd read lock - see rrdhost_apply_by_machine_guid() - so everything it does is one atomic CAS and
+// one atomic arm, which is all it may do while that lock is held.
+static void manifest_publication_apply(RRDHOST *host, void *data)
+{
+    const struct aclk_manifest_publication *publication = data;
+
+    aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!aclk_host_config)
+        return;
+
+    // Invalidate the record only while it is still THIS enqueue's, which is what the token is for:
+    // the CAS fails if a later manifest has been enqueued since, whatever its content, so publications
+    // for one host can be in flight together and complete in any order without a later one losing its
+    // record to an earlier drop - including when the later one carries identical content and therefore
+    // an identical key.
+    //
+    // Clearing the token, not the key, is what makes this a single atomic operation. The key stays as
+    // it was; a 0 token is what stops it from suppressing anything (see build_node_manifest()), so the
+    // pair never has to be written together and cannot be observed half-updated.
+    uint64_t expected = publication->token;
+    if (!__atomic_compare_exchange_n(
+            &aclk_host_config->node_manifest_sent_token, &expected, 0, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED))
+        return; // a later manifest owns the record - it is the one the cloud needs, and it will report itself
+
+    // Re-arm with now, not with the deadline this send was claimed from: a failure that repeats for
+    // the same payload (a manifest the server refuses as too big) would otherwise come due on every
+    // pass and take a pacer slot each time, while arming with now retries one coalescing window
+    // later. aclk_send_timestamp_arm() only ever lowers a pending deadline, so a request armed
+    // meanwhile keeps its earlier one.
+    aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+}
+
+// Applies the outcome of a publication. Runs on the ACLK query worker that executed the send, or on
+// whichever thread dropped the query before it got that far.
+//
+// Only a DROP does anything. A publication that reached the mqtt layer is already accounted for: the
+// key was recorded when the manifest was enqueued, which is what the suppression in
+// build_node_manifest() must compare against. Recording it here instead would compare builds against
+// the last CONFIRMED manifest rather than the last SENT one, and those differ for as long as a
+// publication is in flight - long enough for a content revert inside that window to be suppressed
+// against a key the in-flight message is about to replace, leaving the cloud with content the node no
+// longer has and nothing armed to correct it.
+//
+// The host is resolved rather than carried as a pointer, because the host and its config can be
+// freed between the enqueue and the outcome; and it is resolved through
+// rrdhost_apply_by_machine_guid() rather than any find-then-dereference helper, because only
+// the former holds the host allocated while the callback runs.
+//
+// Whether it may wait for the read lock depends on the thread, so it is decided per call. Every
+// mqtt-level drop - an offline or disconnecting client, a full mqtt buffer, a payload the server
+// refuses - is reported from an ACLK query worker, and a payload that fails to generate is reported
+// from the alert-push worker; both may block, so for them the clear below always happens. Only the
+// event loop must not wait: a host teardown can be blocked on it inside destroy_aclk_config() while
+// holding rrd_wrlock(), so waiting there would wedge the agent. It reaches this path when it drops a
+// query it could not park (a Judy allocation failure) or when it drains queries at shutdown.
+//
+// On the event loop, then, a lost race leaves the dropped manifest's key recorded as if it had been
+// sent, so that content is not re-sent until it changes again or the ACLK session does. That is the
+// original defect of this SOW, reduced to: an allocation failure that drops a manifest, on the one
+// thread that cannot wait, while a teardown happens to hold rrd_wrlock(). At shutdown it is moot -
+// the next start is a new session, and every key carries the session.
+//
+// Resolved by machine_guid, NOT by the node_id this manifest was keyed under at the cloud, even
+// though the node_id is what identifies the message. host->node_id and the ACLK config's node_id are
+// allowed to disagree - command-nodeid.c assigns host->node_id from the parent without touching the
+// config, and set_host_node_id() documents the divergence - so a node_id lookup can miss the host
+// whose config must be written, or find a different one. Missing it would leave a dropped manifest
+// recorded as sent; finding the wrong host would invalidate a record that host is still relying on -
+// harmless beyond a redundant publish, since only its token can be cleared and only when the CAS
+// matches. machine_guid is immutable for the host's lifetime, and is also rrdhost_root_index's key,
+// so the lookup is exact.
+//
+// The two drop sites that run before the query is handed off - a payload that failed to generate,
+// and a sync queue that is not accepting - reach this from inside
+// aclk_check_node_info_collectors_and_manifest()'s walk, which holds no rrd lock in its body:
+// build_node_manifest() releases rrd_rdlock() before enqueueing.
+void aclk_node_manifest_publish_result(const struct aclk_manifest_publication *publication)
+{
+    if (publication->published)
+        return;
+
+    (void)rrdhost_apply_by_machine_guid(
+        publication->machine_guid, manifest_publication_apply, (void *)publication,
+        !aclk_sync_on_event_loop_thread());
+}
+
 // node_id is the caller's validated snapshot, not the shared buffer - see aclk_node_id_snapshot().
 // aclk_host_config is the caller's, already loaded and non-NULL for this host.
 //
-// Returns whether a manifest was actually published, so the caller's per-scan budget is spent on
-// messages rather than on suppressed builds - see MAX_NODE_MANIFESTS_PER_SCAN.
+// Returns whether a manifest was enqueued for publication, so the caller's per-scan budget is spent
+// on messages rather than on suppressed builds - see MAX_NODE_MANIFESTS_PER_SCAN.
+//
+// The budget counts what this pass ENQUEUES, not what reaches the mqtt layer, because the publication
+// completes asynchronously and the pass cannot wait for it. A message dropped between here and the
+// mqtt layer therefore still spends a slot. That is deliberate: the alternative is reporting the
+// queue-accept status back through aclk_execute_query() to every caller of QUEUE_IF_PAYLOAD_PRESENT,
+// and the only paths it would recover a slot on are ACLK sync not accepting work and a payload that
+// failed to generate - both of which cost at most this pass's remaining slots, and both of which
+// re-arm, so the effect is under-scheduling by one window, never a lost manifest.
 static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config, char *node_id)
 {
     struct update_node_instance_manifest manifest;
@@ -89,19 +194,39 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     // chokepoint compares content instead. The hash covers everything generate_..._message()
     // transmits, including the node_id it is keyed under at the cloud, but not updated_at.
     //
+    // The comparison is against the newest manifest SENT, not the newest confirmed delivered, which
+    // is why the key is recorded here rather than by the publication. A publication is asynchronous,
+    // so "confirmed" lags "sent" by however long the query takes; comparing against it would let a
+    // content revert inside that window be suppressed against a key the in-flight message is about to
+    // replace, leaving the cloud with content the node no longer has. A message that is then dropped
+    // clears this record instead (aclk_node_manifest_publish_result()), so nothing stays suppressed on
+    // the strength of a manifest that never went out.
+    //
+    // A 0 token means nothing is outstanding for this config - it has published nothing yet, or its
+    // last manifest was dropped and invalidated - so the key beside it must not suppress anything.
+    //
     // Deliberately NOT suppressed: the first manifest of a config, the first manifest of every ACLK
-    // session (see node_manifest_sent_session - a send is only an attempt, it is never acked), and
+    // session (the session is folded into the key, because a publication is still never acked), and
     // empty manifests - an empty list is meaningful to the cloud ("this node has no functions"),
     // not an absence of information.
-    usec_t session = aclk_session_load();
-    uint64_t hash = manifest_dict_hash(manifest.functions, node_id, manifest.claim_id);
-    bool suppressed = aclk_host_config->node_manifest_sent_session == session &&
-                      aclk_host_config->node_manifest_sent_hash == hash;
+    uint64_t key = manifest_publication_key(
+        manifest_dict_hash(manifest.functions, node_id, manifest.claim_id), aclk_session_load());
+    bool suppressed = __atomic_load_n(&aclk_host_config->node_manifest_sent_token, __ATOMIC_ACQUIRE) != 0 &&
+                      __atomic_load_n(&aclk_host_config->node_manifest_sent_key, __ATOMIC_ACQUIRE) == key;
 
     if (!suppressed) {
-        aclk_update_node_instance_manifest(&manifest);
-        aclk_host_config->node_manifest_sent_session = session;
-        aclk_host_config->node_manifest_sent_hash = hash;
+        // Record BEFORE enqueueing, never after: a query can be dropped SYNCHRONOUSLY inside the call
+        // below (a payload that fails to generate), and its invalidating CAS would then run against a
+        // token this build has not stored yet - it would fail, and the store that followed would leave
+        // the dropped manifest recorded as outstanding.
+        //
+        // Key first, then token: the token is what licenses the key to suppress, so publishing it last
+        // means no reader can act on a key that is not yet in place. Both are written only here, by the
+        // one serialized scan pass; the drop path only ever clears the token.
+        uint64_t token = manifest_publication_token_next();
+        __atomic_store_n(&aclk_host_config->node_manifest_sent_key, key, __ATOMIC_RELEASE);
+        __atomic_store_n(&aclk_host_config->node_manifest_sent_token, token, __ATOMIC_RELEASE);
+        aclk_update_node_instance_manifest(&manifest, host->machine_guid, key, token);
     }
 
     dictionary_destroy(manifest.functions);
@@ -247,8 +372,12 @@ static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
 // sqlite_aclk_node.h so it can be unit tested; see MANIFEST_PACER there for why it exists.
 //
 // Only the alert-push worker reaches this, serialized by alert_push_running, and libuv's threadpool
-// hand-off gives each pass a happens-before edge on the previous one - the same reason
-// node_manifest_sent_hash needs no synchronization.
+// hand-off gives each pass a happens-before edge on the previous one, so the pacer itself needs no
+// synchronization. The publication record does: this worker stores both node_manifest_sent_key and
+// node_manifest_sent_token, and the token alone is cleared - by whichever thread reports that a
+// manifest was dropped, which is an ACLK query worker for anything the mqtt layer rejected, this
+// same worker for a drop inside the enqueue call, or the ACLK sync event loop for a query it could
+// not park and for the shutdown drain.
 static MANIFEST_PACER manifest_pacer = { 0 };
 
 void aclk_check_node_info_collectors_and_manifest(void)
@@ -375,9 +504,11 @@ void aclk_check_node_info_collectors_and_manifest(void)
 
         // The budget and the cutoff are both tested before the claim, so a host denied a slot keeps
         // its armed request instead of having it consumed and dropped. The budget is charged only
-        // when a message really went out, so a run of suppressed (unchanged) manifests cannot
+        // when a message was really enqueued, so a run of suppressed (unchanged) manifests cannot
         // exhaust it for the hosts behind them - but a suppressed host still consumed its claim, so
-        // it counts as served and is not carried into the cutoff below.
+        // it counts as served and is not carried into the cutoff below. A manifest dropped after
+        // this point still spent its slot: the budget paces what this pass hands to the mqtt layer,
+        // and the retry comes back through a re-arm on a later pass.
         bool manifest_served = false;
         if (manifest_due && manifest_pacer_admit(&manifest_pacer, node_manifest_send_time) &&
             aclk_send_timestamp_claim(&aclk_host_config->node_manifest_send_time, node_manifest_send_time)) {

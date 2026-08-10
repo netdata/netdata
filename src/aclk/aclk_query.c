@@ -213,15 +213,24 @@ cleanup:
     return retval;
 }
 
+// Returns 0 when the message was handed to the mqtt layer, non-zero when it was dropped. The payload
+// is consumed either way.
+//
+// Callers that keep state describing what the cloud has been told MUST reconcile it with this result.
+// The node manifest does that by recording the state as it enqueues and undoing the record when this
+// reports a drop - see build_node_manifest() and aclk_node_manifest_publish_result(). Recording only
+// on success would be wrong for it: the record is what suppresses later identical builds, and it has
+// to be in place for as long as the message is in flight.
 int send_bin_msg(mqtt_wss_client client, aclk_query_t *query)
 {
     // this will be simplified when legacy support is removed
-    aclk_send_bin_message_subtopic_pid(
+    int rc = aclk_send_bin_message_subtopic_pid(
         client,
         query->data.bin_payload.payload,
         query->data.bin_payload.size,
         query->data.bin_payload.topic,
-        query->data.bin_payload.msg_name);
+        query->data.bin_payload.msg_name,
+        NULL);
     query->data.bin_payload.payload = NULL;
-    return 0;
+    return rc;
 }

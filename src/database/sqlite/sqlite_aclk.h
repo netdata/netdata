@@ -70,19 +70,37 @@ typedef struct aclk_sync_cfg_t {
     SPINLOCK node_id_spinlock;
     char node_id[UUID_STR_LEN];
 
-    // What was last published for this config, so build_node_manifest() can drop an identical
-    // manifest. Written only by the alert-push worker (the single build_node_manifest() caller,
-    // serialized by alert_push_running), read nowhere else - no atomics needed.
+    // The newest manifest SENT for this config, so build_node_manifest() can drop an identical one.
     //
-    // Scoped to the ACLK session it was published in, because publishing is fire-and-forget: the
-    // message can still be dropped after the send call - no mqtt client left by the time the query
-    // executes, or shutdown reached before it ran - and nothing acks it. A new session therefore
-    // re-publishes once, which is also what a cloud that lost the manifest needs.
+    // "Sent" and not "delivered", deliberately. Both fields are written when the manifest is handed to
+    // the ACLK queue, because that is the state a later build must compare against: publication is
+    // asynchronous, so a record holding only confirmed publications lags reality for as long as a
+    // message is in flight, and a build inside that window compares against content the in-flight
+    // message is about to replace. A dropped message invalidates the record instead
+    // (aclk_node_manifest_publish_result()), so an unsent manifest never keeps suppressing later
+    // builds - that was the original defect here.
     //
-    // callocz() starts the session at 0 and aclk_session_load() is never 0 here (connecting stores
-    // a timestamp before the scan can run at all), so the first manifest of a config always sends.
-    usec_t node_manifest_sent_session; // aclk_session_load() when the last manifest was published
-    uint64_t node_manifest_sent_hash;  // manifest_dict_hash() of the last published manifest
+    // Atomic, because the writers are on different threads. Both fields are STORED only by the scan
+    // pass in build_node_manifest() (the alert-push worker, one pass at a time), while the token alone
+    // is CLEARED by whichever thread reports a drop - an ACLK query worker for anything the mqtt layer
+    // rejected, the alert-push worker for a drop that happens inside the enqueue call, or the ACLK sync
+    // event loop for a query it could not park and for the shutdown drain.
+    //
+    // The split is what keeps the CROSS-THREAD update a single atomic operation: a drop writes only
+    // the token, so it never has to update the pair. The pair IS written together - by the scan pass,
+    // as two stores - which leaves a window where the key is the new one and the token is still the
+    // previous one. Nothing reads the pair in that window: the scan pass is its only reader and is
+    // serialized against itself, and the drop path reads neither field, it only CASes the token.
+    //
+    // The token identifies an ENQUEUE, which the key cannot - identical content yields an identical
+    // key - so invalidating by token cannot clear a record a later manifest has taken over, whatever
+    // its content. A 0 token means nothing is outstanding, which is what callocz() leaves and what a
+    // drop restores, so the first manifest of a config always sends.
+    //
+    // The key folds the ACLK session into the content hash because publishing is never acked - a new
+    // session re-sends once, which is also what a cloud that lost the manifest needs.
+    uint64_t node_manifest_sent_key;   // manifest_publication_key() of the newest manifest enqueued
+    uint64_t node_manifest_sent_token; // its per-enqueue token; 0 when nothing is outstanding
 } aclk_sync_cfg_t;
 
 static inline void aclk_node_id_copy(aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])
@@ -202,6 +220,10 @@ static inline void aclk_alert_streaming_set(aclk_sync_cfg_t *aclk_host_config, b
 
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
 void destroy_aclk_config(RRDHOST *host);
+
+// true when the caller runs on the ACLK sync event loop, which must never wait for a lock a host
+// teardown may hold while blocked on that loop - see the definition
+bool aclk_sync_on_event_loop_thread(void);
 void aclk_synchronization_init(void);
 void aclk_synchronization_shutdown(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);

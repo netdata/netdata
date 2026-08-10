@@ -11,6 +11,18 @@ void send_node_update_with_wait(RRDHOST *host, int live, int queryable);
 // published, so a burst of function registrations becomes one message.
 #define NODE_MANIFEST_WINDOW_S (30)
 
+// Folds the ACLK session into the manifest content hash, so one value describes everything that must
+// force a re-publish. A collision would suppress a manifest the cloud never received, at the same
+// ~2^-64 manifest_dict_hash() already accepts for the content itself. Here (rather than beside its
+// caller) so it can be unit tested.
+//
+// Every value including 0 is a valid key: what marks a config as having nothing outstanding is
+// node_manifest_sent_token being 0, not the key, so this needs no reserved value.
+static inline uint64_t manifest_publication_key(uint64_t hash, usec_t session)
+{
+    return XXH3_64bits_withSeed(&session, sizeof(session), hash);
+}
+
 // How many manifests one scan pass may publish. The manifest is the only one of the three messages
 // aclk_check_node_info_collectors_and_manifest() sends that can be armed for the whole fleet at a
 // single instant (aclk_arm_node_manifest_all_hosts(), on every SendNodeInstances), and a new ACLK
@@ -70,7 +82,7 @@ static inline bool manifest_pacer_admit(const MANIFEST_PACER *pacer, time_t dead
     return pacer->published < MAX_NODE_MANIFESTS_PER_SCAN && (!pacer->cutoff || deadline <= pacer->cutoff);
 }
 
-// Charges the budget. Called only when a message really went out, so a run of suppressed
+// Charges the budget. Called only when a message was really enqueued, so a run of suppressed
 // (unchanged) manifests cannot exhaust the budget for the hosts behind them.
 static inline void manifest_pacer_published(MANIFEST_PACER *pacer)
 {

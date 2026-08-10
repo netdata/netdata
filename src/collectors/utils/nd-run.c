@@ -1,3 +1,7 @@
+// config.h must come first: it defines _GNU_SOURCE, which the system headers
+// below need to declare setresuid()/setresgid().
+#include "config.h"
+
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -7,13 +11,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
-
 #ifdef HAVE_CAPABILITY
 #include <sys/capability.h>
 #endif
 
+#ifdef __APPLE__
+#include <crt_externs.h>
+#define environ (*_NSGetEnviron())
+#else
+extern char **environ;
+#endif
+
 #define FALLBACK_USER "nobody"
+
+// USER, LOGNAME, HOME, SHELL, LC_ALL, PATH, PWD, TZ, TZDIR, TMPDIR, NULL
+#define MAX_ENV_VARS 16
+
+// The environment we hand to the child. It must be static: environ has to stay
+// valid until execvp() replaces the process image.
+static char *new_environ[MAX_ENV_VARS];
+static size_t new_environ_entries = 0;
 
 void show_help() {
     fprintf(stdout, "\n");
@@ -32,8 +49,13 @@ void show_help() {
     #endif
 }
 
-static void fatal(const char *msg) {
+static _Noreturn void fatal(const char *msg) {
     perror(msg);
+    exit(EXIT_FAILURE);
+}
+
+static _Noreturn void fatal_msg(const char *msg) {
+    fprintf(stderr, "nd-run: %s\n", msg);
     exit(EXIT_FAILURE);
 }
 
@@ -61,81 +83,52 @@ static void clear_caps() {
 }
 #endif
 
-static void set_env_var(const char *name, const char *value) {
-    // Set an environment variable if the specified value is not a NULL pointer.
-    char buf[64];
+static void add_env_var(const char *name, const char *value) {
+    // Append "name=value" to the environment we are building for the child.
+    // Variables that are not set are skipped.
 
     if (value == NULL) {
         return;
     }
 
-    if (setenv(name, value, 1) != 0) {
-        snprintf(buf, 64, "setenv %s", name);
-        perror(buf);
+    if (new_environ_entries + 1 >= MAX_ENV_VARS) {
+        fatal_msg("too many environment variables");
     }
+
+    size_t size = strlen(name) + 1 + strlen(value) + 1;
+    char *entry = malloc(size);
+    if (entry == NULL) {
+        fatal("malloc");
+    }
+
+    snprintf(entry, size, "%s=%s", name, value);
+
+    new_environ[new_environ_entries++] = entry;
+    new_environ[new_environ_entries] = NULL;
 }
 
-static void clean_environment(struct passwd *pw) {
-    // Explicitly scrub the environment, only passing on a few things
-    // we know are needed to make things work correctly.
+static void build_environment(struct passwd *pw) {
+    // Build a minimal environment for the child from scratch, only passing on
+    // a few things we know are needed to make things work correctly.
+    //
+    // We never modify our own environment: getenv() keeps returning valid
+    // pointers into the original environment block until main() replaces
+    // environ, right before execvp(). Clearing the environment in place is not
+    // portable - clearenv() does not exist everywhere, and setting environ to
+    // NULL makes setenv() dereference a NULL environment array on macOS.
 
-    // First, save copies of the environment variables we want to keep.
-    // We must copy them before clearing the environment, as getenv()
-    // returns pointers into the environment block which will be invalidated.
-    char *saved_path = NULL;
-    char *saved_tz = NULL;
-    char *saved_tzdir = NULL;
-    char *saved_tmpdir = NULL;
-    char *saved_pwd = NULL;
+    const char *tmpdir = getenv("TMPDIR");
 
-    const char *tmp;
-    if ((tmp = getenv("PATH")) != NULL) {
-        saved_path = strdup(tmp);
-        if (!saved_path) fatal("strdup PATH");
-    }
-    if ((tmp = getenv("TZ")) != NULL) {
-        saved_tz = strdup(tmp);
-        if (!saved_tz) fatal("strdup TZ");
-    }
-    if ((tmp = getenv("TZDIR")) != NULL) {
-        saved_tzdir = strdup(tmp);
-        if (!saved_tzdir) fatal("strdup TZDIR");
-    }
-    if ((tmp = getenv("TMPDIR")) != NULL) {
-        saved_tmpdir = strdup(tmp);
-        if (!saved_tmpdir) fatal("strdup TMPDIR");
-    }
-    if ((tmp = getenv("PWD")) != NULL) {
-        saved_pwd = strdup(tmp);
-        if (!saved_pwd) fatal("strdup PWD");
-    }
-
-    // Now clear the environment
-    #ifdef HAVE_CLEARENV
-    clearenv();
-    #else
-    extern char **environ;
-    environ = NULL;
-    #endif
-
-    // Set the new environment with our saved values
-    set_env_var("USER", pw->pw_name);
-    set_env_var("LOGNAME", pw->pw_name);
-    set_env_var("HOME", pw->pw_dir);
-    set_env_var("SHELL", "/bin/sh"); // Ignore user default shell
-    set_env_var("LC_ALL", "C"); // Force C locale
-    set_env_var("PATH", saved_path);
-    set_env_var("PWD", saved_pwd);
-    set_env_var("TZ", saved_tz);
-    set_env_var("TZDIR", saved_tzdir);
-    set_env_var("TMPDIR", (saved_tmpdir == NULL) ? "/tmp" : saved_tmpdir); // Use a sane default for TMPDIR if it wasn't set.
-
-    // Free the saved copies
-    free(saved_path);
-    free(saved_tz);
-    free(saved_tzdir);
-    free(saved_tmpdir);
-    free(saved_pwd);
+    add_env_var("USER", pw->pw_name);
+    add_env_var("LOGNAME", pw->pw_name);
+    add_env_var("HOME", pw->pw_dir);
+    add_env_var("SHELL", "/bin/sh"); // Ignore user default shell
+    add_env_var("LC_ALL", "C"); // Force C locale
+    add_env_var("PATH", getenv("PATH"));
+    add_env_var("PWD", getenv("PWD"));
+    add_env_var("TZ", getenv("TZ"));
+    add_env_var("TZDIR", getenv("TZDIR"));
+    add_env_var("TMPDIR", (tmpdir == NULL) ? "/tmp" : tmpdir); // Use a sane default for TMPDIR if it wasn't set.
 }
 
 int main(int argc, char *argv[]) {
@@ -202,9 +195,20 @@ int main(int argc, char *argv[]) {
         clear_caps();
     #endif
 
-    clean_environment(pw);
+    build_environment(pw);
+
+    // Replace the environment wholesale. From here on we must not call
+    // setenv()/putenv()/unsetenv(): libc may try to realloc() or free() an
+    // environment block it did not allocate. Reading it is fine - execvp()
+    // itself reads PATH from it.
+    environ = new_environ;
 
     // Exec the requested command (replaces the current process on success)
     execvp(argv[1], &argv[1]);
-    fatal("execvp"); // Only reached on error
+
+    // Only reached on error. Use the exit codes every exec wrapper uses, so
+    // that callers can tell an exec failure apart from the command exiting 1.
+    int err = errno;
+    perror("execvp");
+    return (err == ENOENT) ? 127 : 126;
 }
