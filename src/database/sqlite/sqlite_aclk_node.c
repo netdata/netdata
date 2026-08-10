@@ -58,8 +58,9 @@ static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UU
     return uuid_parse(dst, parsed) == 0 && !uuid_is_null(parsed);
 }
 
-// Runs under the rrd read lock - see rrdhost_apply_by_machine_guid_trylock(). Everything it does is
-// an atomic load, store, or CAS, which is all it may do while that lock is held.
+// Undoes the record build_node_manifest() made for a manifest that never went out. Runs under the
+// rrd read lock - see rrdhost_apply_by_machine_guid_trylock() - so everything it does is one atomic
+// CAS and one atomic arm, which is all it may do while that lock is held.
 static void manifest_publication_apply(RRDHOST *host, void *data)
 {
     const struct aclk_manifest_publication *publication = data;
@@ -68,22 +69,33 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
     if (!aclk_host_config)
         return;
 
-    if (publication->published) {
-        __atomic_store_n(&aclk_host_config->node_manifest_sent_key, publication->key, __ATOMIC_RELEASE);
-        return;
-    }
+    // Clear the record only while it is still THIS publication's. A manifest enqueued after it
+    // supersedes it - the cloud needs that newer content, not this dropped older one - so its key
+    // must survive. The CAS is what makes the outcomes order-insensitive: publications for one host
+    // can be in flight together and complete in any order, and whichever key is current is by
+    // definition the newest one enqueued.
+    uint64_t expected = publication->key;
+    (void)__atomic_compare_exchange_n(
+        &aclk_host_config->node_manifest_sent_key, &expected, 0, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
 
-    // Dropped on the way out, so the cloud never saw this manifest and nothing may be recorded for
-    // it. Re-arm with now, not with the deadline this send was claimed from: a failure that repeats
-    // for the same payload (a manifest the server refuses as too big) would otherwise come due on
-    // every pass and take a pacer slot each time, while arming with now retries one coalescing
-    // window later. aclk_send_timestamp_arm() only ever lowers a pending deadline, so a request
-    // armed meanwhile keeps its earlier one.
+    // Re-arm with now, not with the deadline this send was claimed from: a failure that repeats for
+    // the same payload (a manifest the server refuses as too big) would otherwise come due on every
+    // pass and take a pacer slot each time, while arming with now retries one coalescing window
+    // later. aclk_send_timestamp_arm() only ever lowers a pending deadline, so a request armed
+    // meanwhile keeps its earlier one.
     aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
 }
 
-// Applies the outcome of a publication to the host config. Runs on the ACLK query worker that
-// executed the send, or on whichever thread dropped the query before it got that far.
+// Applies the outcome of a publication. Runs on the ACLK query worker that executed the send, or on
+// whichever thread dropped the query before it got that far.
+//
+// Only a DROP does anything. A publication that reached the mqtt layer is already accounted for: the
+// key was recorded when the manifest was enqueued, which is what the suppression in
+// build_node_manifest() must compare against. Recording it here instead would compare builds against
+// the last CONFIRMED manifest rather than the last SENT one, and those differ for as long as a
+// publication is in flight - long enough for a content revert inside that window to be suppressed
+// against a key the in-flight message is about to replace, leaving the cloud with content the node no
+// longer has and nothing armed to correct it.
 //
 // The host is resolved rather than carried as a pointer, because the host and its config can be
 // freed between the enqueue and the outcome; and it is resolved through
@@ -93,18 +105,19 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
 // That helper never blocks, and this path must not need it to. One of the drop sites below runs on
 // the ACLK sync event loop, and a host teardown can be holding rrd_wrlock() while blocked on that
 // same loop inside destroy_aclk_config() - so waiting for the read lock here would wedge the agent.
-// Losing that race is harmless in both directions: nothing is recorded, so no manifest is ever
-// suppressed unpublished, and the request is simply left for the next arming event. Correctness
-// depends only on the key never being recorded for a message that did not go out.
+// Losing that race leaves the dropped manifest's key recorded as if it had been sent, so that content
+// is not re-sent until it changes again or the ACLK session does - the original defect, now narrowed
+// to a dropped publication that also loses this race. The dominant drop causes are an offline or
+// disconnecting mqtt client, and those bring a new session with them, which changes every key anyway.
 //
 // Resolved by machine_guid, NOT by the node_id this manifest was keyed under at the cloud, even
 // though the node_id is what identifies the message. host->node_id and the ACLK config's node_id are
 // allowed to disagree - command-nodeid.c assigns host->node_id from the parent without touching the
 // config, and set_host_node_id() documents the divergence - so a node_id lookup can miss the host
-// whose config must be written, or find a different one. Missing it would leave the send neither
-// recorded nor re-armed; finding the wrong host would record a manifest that host never published,
-// which is exactly the lost update this whole path exists to prevent. machine_guid is immutable for
-// the host's lifetime, and is also rrdhost_root_index's key, so the lookup is exact.
+// whose config must be written, or find a different one. Missing it would leave a dropped manifest
+// recorded as sent; finding the wrong host would clear a key that host is still relying on, forcing a
+// redundant publish. machine_guid is immutable for the host's lifetime, and is also
+// rrdhost_root_index's key, so the lookup is exact.
 //
 // The two drop sites that run before the query is handed off - a payload that failed to generate,
 // and a sync queue that is not accepting - reach this from inside
@@ -112,6 +125,9 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
 // build_node_manifest() releases rrd_rdlock() before enqueueing.
 void aclk_node_manifest_publish_result(const struct aclk_manifest_publication *publication)
 {
+    if (publication->published)
+        return;
+
     (void)rrdhost_apply_by_machine_guid_trylock(
         publication->machine_guid, manifest_publication_apply, (void *)publication);
 }
@@ -155,11 +171,16 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     // chokepoint compares content instead. The hash covers everything generate_..._message()
     // transmits, including the node_id it is keyed under at the cloud, but not updated_at.
     //
-    // The key is recorded by the publication itself, not here: this function only enqueues, and a
-    // message that is dropped below it must not suppress anything (see node_manifest_sent_key and
-    // aclk_node_manifest_publish_result()). A stored 0 means nothing has been published for this
-    // config yet, and manifest_publication_key() never returns 0, so that comparison is unambiguous
-    // without a separate guard.
+    // The comparison is against the newest manifest SENT, not the newest confirmed delivered, which
+    // is why the key is recorded here rather than by the publication. A publication is asynchronous,
+    // so "confirmed" lags "sent" by however long the query takes; comparing against it would let a
+    // content revert inside that window be suppressed against a key the in-flight message is about to
+    // replace, leaving the cloud with content the node no longer has. A message that is then dropped
+    // clears this record instead (aclk_node_manifest_publish_result()), so nothing stays suppressed on
+    // the strength of a manifest that never went out.
+    //
+    // A stored 0 means nothing is recorded for this config, and manifest_publication_key() never
+    // returns 0, so that comparison is unambiguous without a separate guard.
     //
     // Deliberately NOT suppressed: the first manifest of a config, the first manifest of every ACLK
     // session (the session is folded into the key, because a publication is still never acked), and
@@ -169,8 +190,15 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
         manifest_dict_hash(manifest.functions, node_id, manifest.claim_id), aclk_session_load());
     bool suppressed = __atomic_load_n(&aclk_host_config->node_manifest_sent_key, __ATOMIC_ACQUIRE) == key;
 
-    if (!suppressed)
+    if (!suppressed) {
+        // Record BEFORE enqueueing, never after: the drop path clears this field with a CAS on this
+        // exact key, and a query that is dropped synchronously (a payload that fails to generate)
+        // completes inside the call below. Storing afterwards would let that CAS run first, find the
+        // old value, change nothing - and then this store would leave the dropped manifest recorded
+        // as sent.
+        __atomic_store_n(&aclk_host_config->node_manifest_sent_key, key, __ATOMIC_RELEASE);
         aclk_update_node_instance_manifest(&manifest, host->machine_guid, key);
+    }
 
     dictionary_destroy(manifest.functions);
 
@@ -316,7 +344,8 @@ static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
 //
 // Only the alert-push worker reaches this, serialized by alert_push_running, and libuv's threadpool
 // hand-off gives each pass a happens-before edge on the previous one, so the pacer itself needs no
-// synchronization. node_manifest_sent_key does, because the ACLK query workers write it.
+// synchronization. node_manifest_sent_key does: this worker stores it, and the ACLK query workers
+// clear it when a manifest turns out to have been dropped.
 static MANIFEST_PACER manifest_pacer = { 0 };
 
 void aclk_check_node_info_collectors_and_manifest(void)

@@ -41,10 +41,10 @@ struct aclk_bin_payload {
     const char *msg_name;
 };
 
-// UPDATE_NODE_MANIFEST only: what the host config should record once this message is really
-// published. The producer cannot record it itself - it only enqueues, and the message can still be
-// dropped below it - and recording an unpublished manifest suppresses every later identical build
-// for the rest of the ACLK session. See aclk_node_manifest_publish_result().
+// UPDATE_NODE_MANIFEST only: what the host config recorded when this message was enqueued, so the
+// record can be undone if the message never reaches the mqtt layer. Without that, an unsent manifest
+// keeps suppressing every later identical build for the rest of the ACLK session.
+// See aclk_node_manifest_publish_result().
 //
 // The host is identified by machine_guid, not by the node_id the manifest is keyed under at the
 // cloud: node_id is mutable and host->node_id can disagree with the ACLK config's copy, so it does

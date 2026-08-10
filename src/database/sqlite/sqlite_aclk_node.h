@@ -16,7 +16,7 @@ void send_node_update_with_wait(RRDHOST *host, int live, int queryable);
 // suppress a manifest that was never published, at the same ~2^-64 manifest_dict_hash() already
 // accepts for the content itself. Here (rather than beside its caller) so it can be unit tested.
 //
-// Never returns 0, because 0 is node_manifest_sent_key's "nothing published yet" sentinel. A payload
+// Never returns 0, because 0 is node_manifest_sent_key's "nothing recorded" sentinel. A payload
 // whose digest happened to be 0 would otherwise never compare equal to the stored key, so it would
 // republish on every arm for the rest of the session instead of once. Mapping it to 1 costs nothing:
 // it only makes two digests out of 2^64 share a key, which is the collision the note above already

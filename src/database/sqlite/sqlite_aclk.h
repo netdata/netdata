@@ -70,23 +70,26 @@ typedef struct aclk_sync_cfg_t {
     SPINLOCK node_id_spinlock;
     char node_id[UUID_STR_LEN];
 
-    // What was last published for this config, so build_node_manifest() can drop an identical
-    // manifest. Atomic: written by whichever ACLK query worker published the message, read by the
-    // alert-push worker that builds the next one.
+    // The newest manifest SENT for this config, so build_node_manifest() can drop an identical one.
+    // Atomic: stored by the alert-push worker as it enqueues, cleared by whichever ACLK query worker
+    // finds that the message was dropped, read by the next build.
     //
-    // It is only ever written for a message that reached the mqtt layer. Recording it at build time
-    // would make a dropped manifest - no mqtt client left by the time the query ran, an offline
-    // client, a full mqtt buffer - suppress every later identical build for the rest of the
-    // session, which is a lost update the cloud cannot ask for. A drop re-arms the request instead
-    // (aclk_node_manifest_publish_result()).
+    // "Sent" and not "delivered", deliberately. It is stored when the manifest is handed to the ACLK
+    // queue, because that is the state a later build must compare against: publication is
+    // asynchronous, so a field holding only confirmed publications lags reality for as long as a
+    // message is in flight, and a build inside that window compares against a key the in-flight
+    // message is about to replace. A dropped message clears it again
+    // (aclk_node_manifest_publish_result()), so an unsent manifest never keeps suppressing later
+    // builds - that was the original defect here, and the clear is a CAS on the key it stored, so a
+    // newer manifest enqueued meanwhile keeps its own.
     //
-    // One value rather than a (session, hash) pair so the stamp is a single atomic store: a torn
-    // pair could match a build that neither half came from, and suppress a manifest that was never
-    // published. It folds the ACLK session into the content hash because publishing is still
-    // unacked - a new session re-publishes once, which is also what a cloud that lost the manifest
-    // needs. callocz() starts it at 0 and manifest_publication_key() never returns 0, so 0
-    // unambiguously means "nothing published yet" and the first manifest of a config always sends.
-    uint64_t node_manifest_sent_key; // manifest_publication_key() of the last published manifest
+    // One value rather than a (session, hash) pair so both the store and the clear are single atomic
+    // operations: a torn pair could match a build that neither half came from, and suppress a
+    // manifest that was never sent. It folds the ACLK session into the content hash because
+    // publishing is never acked - a new session re-sends once, which is also what a cloud that lost
+    // the manifest needs. callocz() starts it at 0 and manifest_publication_key() never returns 0, so
+    // 0 unambiguously means "nothing recorded" and the first manifest of a config always sends.
+    uint64_t node_manifest_sent_key; // manifest_publication_key() of the newest manifest enqueued
 } aclk_sync_cfg_t;
 
 static inline void aclk_node_id_copy(aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])

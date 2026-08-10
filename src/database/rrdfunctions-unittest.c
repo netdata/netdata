@@ -276,9 +276,9 @@ int rrdfunctions_manifest_unittest(void) {
     //    standalone dictionaries keep this independent of whatever live functions localhost has.
     //    The other half of the suppression - scoping the record to one ACLK session - is folded
     //    into the same value by manifest_publication_key(), covered at the end of this block.
-    //    What is NOT covered here is which side records it: the key is written only by a
-    //    publication that reached the mqtt layer (aclk_node_manifest_publish_result()). That
-    //    write-back is itself pure atomics on the host's ACLK config, so it does NOT need a live
+    //    What is NOT covered here is the recording side: build_node_manifest() stores the key as it
+    //    enqueues, and aclk_node_manifest_publish_result() clears it again if the message was
+    //    dropped. That clear is pure atomics on the host's ACLK config, so it does NOT need a live
     //    ACLK connection to exercise - it needs a host with a config, which this test has. It is
     //    untested; see the SOW for the tracked gap.
     {
