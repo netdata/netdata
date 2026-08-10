@@ -35,38 +35,47 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
     return ret;
 }
 
-// Runs `cb` on the host with this machine_guid, under rrd_rdlock(), so the host stays allocated for
-// the duration of the callback.
+// Runs `cb` on the host with this machine_guid while holding the rrd read lock, so the host and
+// everything hanging off it stay allocated for the duration of the callback. For callers that hold
+// no reference to the host and cannot afford to block for it.
 //
-// rrd_rdlock() - NOT the host index lock - is what provides that. The index lock does not:
-// dict_item_del() takes only the index write lock, and for an item a traversal is referencing it
-// merely flags it deleted and returns without waiting (dictionary-item.h). rrdhost_root_index is
+// The rrd read lock - NOT the host index lock - is what provides the lifetime. The index lock does
+// not: dict_item_del() takes only the index write lock, and for an item a traversal is referencing
+// it merely flags it deleted and returns without waiting (dictionary-item.h). rrdhost_root_index is
 // also DICT_OPTION_VALUE_LINK_DONT_CLONE with no delete callback, so the dictionary never owns the
-// RRDHOST and freez(host) is not serialized by it at all. What every host teardown does hold is
-// rrd_wrlock(): rrdhost_free___while_having_rrd_wrlock() and rrdhost_free_all() unlink and free
-// under it.
+// RRDHOST and freez(host) is not serialized by it at all.
 //
-// Residual exposure, pre-existing and shared with the rest of this subsystem:
-// rrdhost_free___consume_metadata_lifetime_writelock() drops rrd_wrlock() before calling
-// rrdhost_free_unlinked(), so a host being freed by that path is not covered here either. That is
-// the same exposure build_node_info(), build_node_collectors() and build_node_manifest() already
-// carry when they dereference a host under rrd_rdlock() (see sqlite_aclk_node.c).
+// What makes the rrd read lock sufficient is that every teardown removes the host from
+// rrdhost_root_index under rrd_wrlock() before freeing it
+// (rrdhost_unlink___while_having_rrd_wrlock(), then rrdhost_free_unlinked()). So a lookup performed
+// while holding this read lock either happens before the unlink - and then the read lock blocks the
+// writer from unlinking and freeing until `cb` returns - or after it, and finds nothing. That covers
+// rrdhost_free___consume_metadata_lifetime_writelock() too, which frees with no lock held: by the
+// time it gets there the host is already out of the index, so it can no longer be found here.
+//
+// TRYLOCK, deliberately: this must never block. A host teardown calls destroy_aclk_config() while
+// holding rrd_wrlock(), which blocks on the ACLK sync event loop - and that same event loop can
+// reach this function when it drops a query. Waiting for the read lock would close that cycle and
+// wedge the agent with rrd_wrlock() held. Losing the race instead skips the callback, so callers
+// MUST treat "not applied" as a normal outcome and MUST NOT rely on it for correctness.
 //
 // Keyed by machine_guid, which is immutable for the host's lifetime and is this index's key, so the
 // lookup is exact. Do NOT key such a callback on node_id: host->node_id and the ACLK config's
 // node_id can disagree (command-nodeid.c assigns host->node_id from the parent without touching the
 // config), so a node_id resolves to the wrong host or to none.
 //
-// `cb` runs with rrd_rdlock() held: keep it short, and do not take a lock from it that an
+// `cb` runs with the rrd read lock held: keep it short, and do not take a lock from it that an
 // rrd_wrlock() holder may be waiting behind.
 //
-// Returns whether a host matched.
-bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data) {
+// Returns whether `cb` ran - false both when no host matched and when the lock was unavailable.
+bool rrdhost_apply_by_machine_guid_trylock(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data) {
 
     if (unlikely(!machine_guid || !*machine_guid || !cb))
         return false;
 
-    rrd_rdlock();
+    if (rrd_tryrdlock() != 0)
+        return false;
+
     RRDHOST *host = rrdhost_find_by_guid(machine_guid);
     if (host)
         cb(host, data);

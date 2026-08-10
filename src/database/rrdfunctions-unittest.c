@@ -277,8 +277,10 @@ int rrdfunctions_manifest_unittest(void) {
     //    The other half of the suppression - scoping the record to one ACLK session - is folded
     //    into the same value by manifest_publication_key(), covered at the end of this block.
     //    What is NOT covered here is which side records it: the key is written only by a
-    //    publication that reached the mqtt layer (aclk_node_manifest_publish_result()), which needs
-    //    a live ACLK connection to exercise.
+    //    publication that reached the mqtt layer (aclk_node_manifest_publish_result()). That
+    //    write-back is itself pure atomics on the host's ACLK config, so it does NOT need a live
+    //    ACLK connection to exercise - it needs a host with a config, which this test has. It is
+    //    untested; see the SOW for the tracked gap.
     {
         int hash_errors_before = errors;
         const char *node1 = "11111111-2222-3333-4444-555555555555";
@@ -394,12 +396,11 @@ int rrdfunctions_manifest_unittest(void) {
         }
 
         // the ACLK session is folded into the same 64-bit value, so that one atomic store carries
-        // the whole suppression key (see node_manifest_sent_key)
+        // the whole suppression key (see node_manifest_sent_key). Determinism for identical inputs is
+        // not asserted: the key is a pure function of them, so such a check cannot fail. The
+        // never-returns-0 sentinel invariant is not asserted either - it would need a digest preimage
+        // of 0, which cannot be constructed here; manifest_publication_key() enforces it directly.
         usec_t s1 = 1700000000000000ULL, s2 = 1700000000000001ULL;
-        if(manifest_publication_key(ha, s1) != manifest_publication_key(ha, s1)) {
-            fprintf(stderr, "  FAILED key: identical content and session produced different keys\n");
-            errors++;
-        }
         if(manifest_publication_key(ha, s1) == manifest_publication_key(ha, s2)) {
             fprintf(stderr, "  FAILED key: a new ACLK session did not change the key\n");
             errors++;

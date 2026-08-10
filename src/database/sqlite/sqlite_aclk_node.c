@@ -58,8 +58,8 @@ static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UU
     return uuid_parse(dst, parsed) == 0 && !uuid_is_null(parsed);
 }
 
-// Runs under rrd_rdlock() - see rrdhost_apply_by_machine_guid(). Everything it does is an atomic
-// load, store, or CAS, which is all it may do while that lock is held.
+// Runs under the rrd read lock - see rrdhost_apply_by_machine_guid_trylock(). Everything it does is
+// an atomic load, store, or CAS, which is all it may do while that lock is held.
 static void manifest_publication_apply(RRDHOST *host, void *data)
 {
     const struct aclk_manifest_publication *publication = data;
@@ -87,8 +87,15 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
 //
 // The host is resolved rather than carried as a pointer, because the host and its config can be
 // freed between the enqueue and the outcome; and it is resolved through
-// rrdhost_apply_by_machine_guid() rather than any find-then-dereference helper, because only the
-// former holds the host allocated while the callback runs.
+// rrdhost_apply_by_machine_guid_trylock() rather than any find-then-dereference helper, because only
+// the former holds the host allocated while the callback runs.
+//
+// That helper never blocks, and this path must not need it to. One of the drop sites below runs on
+// the ACLK sync event loop, and a host teardown can be holding rrd_wrlock() while blocked on that
+// same loop inside destroy_aclk_config() - so waiting for the read lock here would wedge the agent.
+// Losing that race is harmless in both directions: nothing is recorded, so no manifest is ever
+// suppressed unpublished, and the request is simply left for the next arming event. Correctness
+// depends only on the key never being recorded for a message that did not go out.
 //
 // Resolved by machine_guid, NOT by the node_id this manifest was keyed under at the cloud, even
 // though the node_id is what identifies the message. host->node_id and the ACLK config's node_id are
@@ -105,16 +112,23 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
 // build_node_manifest() releases rrd_rdlock() before enqueueing.
 void aclk_node_manifest_publish_result(const struct aclk_manifest_publication *publication)
 {
-    (void)rrdhost_apply_by_machine_guid(publication->machine_guid, manifest_publication_apply, (void *)publication);
+    (void)rrdhost_apply_by_machine_guid_trylock(
+        publication->machine_guid, manifest_publication_apply, (void *)publication);
 }
 
 // node_id is the caller's validated snapshot, not the shared buffer - see aclk_node_id_snapshot().
 // aclk_host_config is the caller's, already loaded and non-NULL for this host.
 //
 // Returns whether a manifest was enqueued for publication, so the caller's per-scan budget is spent
-// on messages rather than on suppressed builds - see MAX_NODE_MANIFESTS_PER_SCAN. The budget paces
-// what this pass hands to the mqtt layer, so it is charged here rather than on the publication that
-// follows asynchronously.
+// on messages rather than on suppressed builds - see MAX_NODE_MANIFESTS_PER_SCAN.
+//
+// The budget counts what this pass ENQUEUES, not what reaches the mqtt layer, because the publication
+// completes asynchronously and the pass cannot wait for it. A message dropped between here and the
+// mqtt layer therefore still spends a slot. That is deliberate: the alternative is reporting the
+// queue-accept status back through aclk_execute_query() to every caller of QUEUE_IF_PAYLOAD_PRESENT,
+// and the only paths it would recover a slot on are ACLK sync not accepting work and a payload that
+// failed to generate - both of which cost at most this pass's remaining slots, and both of which
+// re-arm, so the effect is under-scheduling by one window, never a lost manifest.
 static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config, char *node_id)
 {
     struct update_node_instance_manifest manifest;
@@ -143,9 +157,9 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     //
     // The key is recorded by the publication itself, not here: this function only enqueues, and a
     // message that is dropped below it must not suppress anything (see node_manifest_sent_key and
-    // aclk_node_manifest_publish_result()). A key of 0 means nothing has been published for this
-    // config yet, so a content that happens to hash to 0 publishes once more than needed - the
-    // direction that costs a message rather than losing one.
+    // aclk_node_manifest_publish_result()). A stored 0 means nothing has been published for this
+    // config yet, and manifest_publication_key() never returns 0, so that comparison is unambiguous
+    // without a separate guard.
     //
     // Deliberately NOT suppressed: the first manifest of a config, the first manifest of every ACLK
     // session (the session is folded into the key, because a publication is still never acked), and
@@ -153,7 +167,7 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     // not an absence of information.
     uint64_t key = manifest_publication_key(
         manifest_dict_hash(manifest.functions, node_id, manifest.claim_id), aclk_session_load());
-    bool suppressed = key && __atomic_load_n(&aclk_host_config->node_manifest_sent_key, __ATOMIC_ACQUIRE) == key;
+    bool suppressed = __atomic_load_n(&aclk_host_config->node_manifest_sent_key, __ATOMIC_ACQUIRE) == key;
 
     if (!suppressed)
         aclk_update_node_instance_manifest(&manifest, host->machine_guid, key);
@@ -429,9 +443,11 @@ void aclk_check_node_info_collectors_and_manifest(void)
 
         // The budget and the cutoff are both tested before the claim, so a host denied a slot keeps
         // its armed request instead of having it consumed and dropped. The budget is charged only
-        // when a message really went out, so a run of suppressed (unchanged) manifests cannot
+        // when a message was really enqueued, so a run of suppressed (unchanged) manifests cannot
         // exhaust it for the hosts behind them - but a suppressed host still consumed its claim, so
-        // it counts as served and is not carried into the cutoff below.
+        // it counts as served and is not carried into the cutoff below. A manifest dropped after
+        // this point still spent its slot: the budget paces what this pass hands to the mqtt layer,
+        // and the retry comes back through a re-arm on a later pass.
         bool manifest_served = false;
         if (manifest_due && manifest_pacer_admit(&manifest_pacer, node_manifest_send_time) &&
             aclk_send_timestamp_claim(&aclk_host_config->node_manifest_send_time, node_manifest_send_time)) {

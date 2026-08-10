@@ -84,7 +84,8 @@ typedef struct aclk_sync_cfg_t {
     // pair could match a build that neither half came from, and suppress a manifest that was never
     // published. It folds the ACLK session into the content hash because publishing is still
     // unacked - a new session re-publishes once, which is also what a cloud that lost the manifest
-    // needs. callocz() starts it at 0, so the first manifest of a config always sends.
+    // needs. callocz() starts it at 0 and manifest_publication_key() never returns 0, so 0
+    // unambiguously means "nothing published yet" and the first manifest of a config always sends.
     uint64_t node_manifest_sent_key; // manifest_publication_key() of the last published manifest
 } aclk_sync_cfg_t;
 
