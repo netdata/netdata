@@ -40,7 +40,7 @@ Each discovery cycle, the discoverer:
 
 - Only **local** listeners are visible. Discovering services on other hosts requires another discoverer (`http`, `snmp`, `k8s`, or a custom one).
 - The discoverer needs to **read kernel socket information**. On Linux this works for processes owned by other users only when Netdata can read the appropriate `/proc/<pid>/net` files; the Netdata installer configures this via the `local-listeners` setuid helper.
-- The bundled `local-listeners` helper is currently built for Linux. A missing or non-executable helper makes both normal discovery and the DynCfg operational test fail.
+- The bundled `local-listeners` helper is currently built for Linux. When the helper is not installed, discovery is disabled cleanly — the discoverer logs a single `INFO` line and exits, and the DynCfg operational test reports that local network listener inspection is not available on this system. A helper that is present but not executable is a real failure: both normal discovery and the operational test fail.
 - **Containerised services in `host` networking** appear as listeners and are picked up here, not by the Docker discoverer. Services in private container networks must be discovered by the Docker discoverer instead.
 - The discoverer does not introspect process runtime — anything beyond port/`comm`/`cmdline` (e.g. config-file path, version, runtime URL prefix) must be inferred via service rules or known by convention.
 
@@ -255,7 +255,7 @@ Watch the agent log for `discoverer=net_listeners` messages. With systemd:
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep "discoverer=net_listeners"
 ```
 
-On a healthy host you should see periodic scan activity. If the log shows `local-listeners` exec failures, the helper binary is missing or not executable.
+On a healthy host you should see periodic scan activity. If the log shows `local-listeners` exec failures, the helper binary is present but not executable — check its permissions. If instead the log shows a single `INFO` line saying local network listener inspection is not available and discovery is disabled, the helper is not installed on this system and no scan is attempted.
 
 
 ### Confirm the local-listeners helper sees your service
