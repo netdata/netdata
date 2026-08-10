@@ -213,7 +213,6 @@ type Epoch struct {
 	metricRulesByOut  map[string]*profileMetricRule
 	metricChartsByID  map[string]*profileMetricChart
 	stock             *stockProfileStore
-	profiles          []ProfileInfo
 
 	// Validation overlays exist only on a staged epoch. They let one bundle
 	// validate against already-published definitions and parsed lazy
@@ -227,9 +226,7 @@ type Epoch struct {
 	validationStockProfile string
 }
 
-// NewEpoch returns an empty epoch for callers that assemble static profile
-// definitions before the runtime-ownership migration is complete.
-func NewEpoch() *Epoch {
+func newEpoch() *Epoch {
 	return &Epoch{
 		trapsByOID:        make(map[string]*TrapDef),
 		namesByTrapName:   make(map[string]*TrapDef),
@@ -237,48 +234,6 @@ func NewEpoch() *Epoch {
 		metricRulesByOut:  make(map[string]*profileMetricRule),
 		metricChartsByID:  make(map[string]*profileMetricChart),
 	}
-}
-
-// AddTraps validates and adds static trap definitions to an unpublished epoch.
-func (idx *Epoch) AddTraps(traps []*TrapDef) error { return idx.addTraps(traps) }
-
-// AddMetricDefinitions validates and adds manually assembled static metric
-// definitions to an unpublished epoch. Definitions accumulated by earlier
-// calls are one logical bundle for this temporary compatibility API.
-func (idx *Epoch) AddMetricDefinitions(rules []MetricRule, charts []MetricChart) error {
-	return idx.addProfileMetrics(rules, charts, true)
-}
-
-// PrepareTrap compiles one manually assembled trap definition.
-func PrepareTrap(td *TrapDef) error {
-	if td == nil {
-		return errors.New("trap definition is nil")
-	}
-	fileVarbinds := make(map[string]VarbindDef, len(td.SharedVarbinds))
-	for _, vb := range td.SharedVarbinds {
-		if vb != nil && vb.RawName != "" {
-			fileVarbinds[vb.RawName] = *vb
-		}
-	}
-	if td.SharedVarbinds == nil {
-		td.SharedVarbinds = buildSharedVarbinds(td, fileVarbinds)
-	}
-	return compileTrapTemplates(td, fileVarbinds)
-}
-
-// ProfileInfo describes one effective extensionless profile identity.
-type ProfileInfo struct {
-	Name    string
-	Path    string
-	IsStock bool
-}
-
-// Profiles returns the effective profile inventory sorted by identity.
-func (idx *Epoch) Profiles() []ProfileInfo {
-	if idx == nil {
-		return nil
-	}
-	return append([]ProfileInfo(nil), idx.profiles...)
 }
 
 // Lookup returns the TrapDef for a given numeric OID, or nil if not found.
@@ -399,8 +354,6 @@ type MetricDefinitions struct {
 }
 
 // Definitions returns the selected static metric definitions and their charts.
-// A nil ruleNames slice returns the complete snapshot for the temporary manual
-// assembly bridge; runtime callers pass their explicit selection.
 func (idx *Epoch) Definitions(ruleNames []string) (MetricDefinitions, error) {
 	if idx == nil {
 		return MetricDefinitions{}, errors.New("profile index not available")
@@ -410,29 +363,20 @@ func (idx *Epoch) Definitions(ruleNames []string) (MetricDefinitions, error) {
 	}
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
-	if ruleNames != nil {
-		defs := MetricDefinitions{
-			RulesByName: make(map[string]*MetricRule, len(ruleNames)),
-			ChartsByID:  make(map[string]*MetricChart, len(ruleNames)),
-		}
-		for _, name := range ruleNames {
-			rule := idx.metricRulesByName[name]
-			if rule == nil {
-				continue
-			}
-			defs.RulesByName[name] = rule
-			if chart := idx.metricChartsByID[rule.Output.Chart]; chart != nil {
-				defs.ChartsByID[chart.ID] = chart
-			}
-		}
-		return defs, nil
-	}
 	defs := MetricDefinitions{
-		RulesByName: make(map[string]*MetricRule, len(idx.metricRulesByName)),
-		ChartsByID:  make(map[string]*MetricChart, len(idx.metricChartsByID)),
+		RulesByName: make(map[string]*MetricRule, len(ruleNames)),
+		ChartsByID:  make(map[string]*MetricChart, len(ruleNames)),
 	}
-	maps.Copy(defs.RulesByName, idx.metricRulesByName)
-	maps.Copy(defs.ChartsByID, idx.metricChartsByID)
+	for _, name := range ruleNames {
+		rule := idx.metricRulesByName[name]
+		if rule == nil {
+			continue
+		}
+		defs.RulesByName[name] = rule
+		if chart := idx.metricChartsByID[rule.Output.Chart]; chart != nil {
+			defs.ChartsByID[chart.ID] = chart
+		}
+	}
 	return defs, nil
 }
 
@@ -491,9 +435,9 @@ func validateTrapDef(td *TrapDef, fileVarbinds map[string]VarbindDef) error {
 		return fmt.Errorf("%s: trap entry %s: invalid status %q (must be current, deprecated, mandatory, obsolete, or optional)", src, td.OID, td.Status)
 	}
 
-	for _, name := range td.DedupKeyVarbinds {
-		if name == "" {
-			continue
+	for i, name := range td.DedupKeyVarbinds {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("%s: trap entry %s: dedup_key_varbinds[%d] must not be empty", src, td.OID, i)
 		}
 		if _, ok := fileVarbinds[name]; !ok {
 			return fmt.Errorf("%s: trap entry %s: dedup_key_varbind %q not found in file-scoped varbinds table", src, td.OID, name)

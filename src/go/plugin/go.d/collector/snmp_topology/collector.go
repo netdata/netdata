@@ -19,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
@@ -26,23 +27,26 @@ import (
 var configSchema string
 
 // Register registers the SNMP topology collector with shared SNMP-family state.
-func Register(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) {
-	collectorapi.Register("snmp_topology", newCreator(deviceStore, trapEnrichment))
+func Register(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) {
+	collectorapi.Register("snmp_topology", newCreator(deviceStore, trapEnrichment, reverseDNS))
 }
 
-func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) collectorapi.Creator {
+func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) collectorapi.Creator {
 	if deviceStore == nil {
 		panic("snmp_topology Register requires a non-nil device store")
 	}
 	if trapEnrichment == nil {
 		panic("snmp_topology Register requires a non-nil trap enrichment handle")
 	}
+	if reverseDNS == nil {
+		panic("snmp_topology Register requires a non-nil reverse DNS resolver")
+	}
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		CreateV2:        func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment) },
+		CreateV2:        func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment, reverseDNS) },
 		Config:          func() any { return &Config{} },
 		InstancePolicy:  collectorapi.InstancePolicySingle,
 		SharedFunctions: topologyMethods,
@@ -51,22 +55,25 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentH
 }
 
 // New returns an SNMP topology collector using the provided SNMP-family state.
-func New(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) *Collector {
-	return newCollector(deviceStore, trapEnrichment)
+func New(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) *Collector {
+	return newCollector(deviceStore, trapEnrichment, reverseDNS)
 }
 
-func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) *Collector {
+func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) *Collector {
 	if deviceStore == nil {
 		panic("snmp_topology New requires a non-nil device store")
 	}
 	if trapEnrichment == nil {
 		panic("snmp_topology New requires a non-nil trap enrichment handle")
 	}
+	if reverseDNS == nil {
+		panic("snmp_topology New requires a non-nil reverse DNS resolver")
+	}
 	metricStore := metrix.NewCollectorStore()
 	return &Collector{
 		deviceCaches:        make(map[string]*topologyCache),
 		deviceLastCollected: make(map[string]time.Time),
-		topologyRegistry:    newTopologyRegistry(),
+		topologyRegistry:    newTopologyRegistryWithResolver(reverseDNS),
 		deviceSource:        deviceStore,
 		trapEnrichment:      trapEnrichment,
 		newSnmpClient:       gosnmp.NewHandler,

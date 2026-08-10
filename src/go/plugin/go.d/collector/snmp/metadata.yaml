@@ -476,7 +476,7 @@ modules:
               required: false
             - name: vnode.labels
               group: Virtual node
-              description: Additional key-value pairs to associate with the Virtual Node.
+              description: Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence.
               default_value: ""
               required: false
         examples:
@@ -567,6 +567,22 @@ modules:
                       - cisco-asr
                     options:
                       version: 2
+            - name: Additional node labels
+              description: |
+                Because `create_vnode` defaults to true, each SNMP job automatically creates a Virtual Node for its device — no separate vnode definition file is needed.
+                Use `vnode.labels` to attach your own labels, for example to group devices by site or rack. These are merged with the labels SNMP detects automatically from the device (such as `vendor` and `sys_object_id`). If a key you set matches an auto-detected label, your value takes precedence.
+              config: |
+                jobs:
+                  - name: core-switch
+                    update_every: 10
+                    hostname: 192.0.2.20
+                    community: public
+                    options:
+                      version: 2
+                    vnode:
+                      labels:
+                        site: dc1
+                        rack: a12
     alerts:
       - name: snmp_license_expiring
         metric: snmp.license.remaining_time

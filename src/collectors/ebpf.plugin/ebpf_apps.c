@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ebpf.h"
-#include "ebpf_socket.h"
 #include "ebpf_apps.h"
 
 // ----------------------------------------------------------------------------
@@ -803,17 +802,6 @@ void ebpf_del_pid_entry(pid_t pid)
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
     if (pid_ptr) {
-        if (pid_ptr->socket_stats.JudyLArray) {
-            Word_t local_socket = 0;
-            Pvoid_t *socket_value;
-            bool first_socket = true;
-            while (
-                (socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_socket, &first_socket))) {
-                netdata_socket_plus_t *socket_clean = *socket_value;
-                aral_freez(aral_socket_table, socket_clean);
-            }
-            JudyLFreeArray(&pid_ptr->socket_stats.JudyLArray, PJE0);
-        }
         aral_freez(ebpf_judy_pid.pid_table, pid_ptr);
         JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
     }

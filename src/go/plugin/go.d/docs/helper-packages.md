@@ -32,6 +32,7 @@ already owns the behavior.
 | Command execution | `src/go/plugin/go.d/pkg/ndexec` |
 | Log-file readers/parsers | `src/go/plugin/go.d/pkg/logs` |
 | IP range parsing | `src/go/plugin/go.d/pkg/iprange` |
+| Shared reverse-DNS lookup/cache | `src/go/plugin/go.d/pkg/reversedns` |
 | SQL query/scan helpers | `src/go/plugin/go.d/pkg/sqlquery` |
 | Cloud auth config/credentials | `src/go/plugin/go.d/pkg/cloudauth` |
 | Profile-catalog loading (YAML profiles, stock/user dirs) | `src/go/plugin/go.d/pkg/profilecatalog` |
@@ -320,6 +321,27 @@ Why:
 Do NOT put matching logic in this package; it is a catalog + loader, not a matcher. Keep the profile schema, its
 decode/validate, the `defaultDirSpecs` directory resolution (location-specific), and specialized queries in the
 collector's own profile package. A collector may wrap `profilecatalog.Catalog[P]` when it needs specialized queries.
+
+## Reverse DNS
+
+Use `src/go/plugin/go.d/pkg/reversedns` when multiple collectors or jobs need PTR data from one bounded process-owned
+cache.
+
+Choose the API by caller behavior:
+
+- `Lookup` is cache-only and performs no DNS I/O.
+- `Schedule` is best-effort and non-blocking; use it from per-item hot paths.
+- `Resolve` waits for a cached or coalesced lookup; use it from background warmers and other blocking paths.
+
+The resolver canonicalizes mapped IPv4 addresses, normalizes PTR names deterministically, caches positive and negative
+results with separate TTLs, coalesces work by address, and bounds both active lookups and retained entries. Blocking
+`Resolve` work receives admission priority over new `Schedule` work. Its segmented retention policy protects repeatedly
+used positive entries from one-pass source scans.
+
+Create the resolver at the composition root and inject the same pointer into its consumers. Collectors borrow it: they
+MUST NOT close, sweep, or replace it during per-job lifecycle. Keep collector-specific address eligibility, candidate
+selection, display precedence, and audit mapping in collector-owned adapters rather than adding those policies to the
+generic package.
 
 ## Legacy V1 Helpers
 

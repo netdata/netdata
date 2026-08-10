@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
@@ -64,7 +65,7 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: false,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{
+				Relabeling: []relabel.Block{{
 					Match:                "app_*",
 					MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}},
 				}},
@@ -74,7 +75,7 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{
+				Relabeling: []relabel.Block{{
 					Match:                "[a-",
 					MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}},
 				}},
@@ -84,21 +85,35 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{{Action: "bogus"}}}},
+				Relabeling: []relabel.Block{{Match: "*", MetricRelabelConfigs: []relabel.Config{{Action: "bogus"}}}},
 			},
 		},
 		"relabeling block with no match": {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}}}},
+				Relabeling: []relabel.Block{{MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}}}},
 			},
 		},
 		"relabeling block with no rules": {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Relabeling: []RelabelBlock{{Match: "app_*"}},
+				Relabeling: []relabel.Block{{Match: "app_*"}},
+			},
+		},
+		"fallback type blank pattern": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:   web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				FallbackType: promprofiles.FallbackType{Gauge: []string{"   "}},
+			},
+		},
+		"fallback type padded pattern": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:   web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				FallbackType: promprofiles.FallbackType{Counter: []string{" app_requests "}},
 			},
 		},
 		"profiles mode none": {
@@ -200,6 +215,23 @@ func TestCollector_Check(t *testing.T) {
 				srv := httptest.NewServer(http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
 						_, _ = w.Write([]byte(`test_counter_no_meta_metric_1_total{label1="value1"} 11`))
+					}))
+				collr = New()
+				collr.URL = srv.URL
+
+				return collr, srv.Close
+			},
+		},
+		"success if endpoint exposes only a summary without quantiles": {
+			wantFail: false,
+			prepare: func() (collr *Collector, cleanup func()) {
+				srv := httptest.NewServer(http.HandlerFunc(
+					func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = w.Write([]byte(`
+# TYPE app_payload_bytes summary
+app_payload_bytes_sum 12.5
+app_payload_bytes_count 4
+`))
 					}))
 				collr = New()
 				collr.URL = srv.URL
@@ -334,16 +366,17 @@ test_counter_no_meta_metric_1_total{label1="value2"} 11
 	}
 }
 
-// TestCollector_Collect drives the real V2 collector (Init, then a framework-style store
-// cycle around Collect) and asserts the metrics it wrote into the metrix store, by metric
+// TestCollector_Collect drives the real V2 collector (Init → Check, then a framework-style
+// store cycle around Collect) and asserts the metrics it wrote into the metrix store, by metric
 // name + flattened labels. Per-type correctness is exercised exhaustively in writer_test.go;
 // this checks the collector's end-to-end wiring (client/selector/fallback built in Init →
 // scrape → writer → store) plus the config-driven behaviors.
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Collector
-		input   string
-		want    func(t *testing.T, fr metrix.Reader)
+		prepare    func() *Collector
+		checkInput string
+		input      string
+		want       func(t *testing.T, fr metrix.Reader)
 	}{
 		"gauge and counter values": {
 			prepare: New,
@@ -374,6 +407,21 @@ test_latency_count 42
 				assert.InDelta(t, 0.5, value(t, fr, "test_latency", metrix.Labels{"quantile": "0.99"}), 1e-9)
 				assert.InDelta(t, 12.5, value(t, fr, "test_latency_sum", nil), 1e-9)
 				assert.InDelta(t, 42, value(t, fr, "test_latency_count", nil), 1e-9)
+			},
+		},
+		"summary without quantiles flattens to sum and count": {
+			prepare: New,
+			input: `
+# TYPE test_payload_bytes summary
+test_payload_bytes_sum{handler="/v1/items"} 12.5
+test_payload_bytes_count{handler="/v1/items"} 4
+`,
+			want: func(t *testing.T, fr metrix.Reader) {
+				labels := metrix.Labels{"handler": "/v1/items"}
+				assert.InDelta(t, 12.5, value(t, fr, "test_payload_bytes_sum", labels), 1e-9)
+				assert.InDelta(t, 4, value(t, fr, "test_payload_bytes_count", labels), 1e-9)
+				_, ok := fr.Value("test_payload_bytes", labels)
+				assert.False(t, ok, "a quantile-free summary must not fabricate a base quantile series")
 			},
 		},
 		"histogram flattens to buckets, sum and count": {
@@ -453,6 +501,10 @@ test_metric_info{version="1.2.3"} 1
 test_gauge_metric{label1="value1"} 11
 test_gauge_metric{label1="value2"} 12
 `,
+			checkInput: `
+# TYPE test_gauge_metric gauge
+test_gauge_metric{label1="value1"} 11
+`,
 			want: func(t *testing.T, fr metrix.Reader) {
 				_, ok := fr.Value("test_gauge_metric", metrix.Labels{"label1": "value1"})
 				assert.False(t, ok, "a family over the per-metric series limit must be skipped entirely")
@@ -461,7 +513,7 @@ test_gauge_metric{label1="value2"} 12
 		"relabel applies before assembly (drop + rename via __name__)": {
 			prepare: func() *Collector {
 				c := New()
-				c.Relabeling = []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{
+				c.Relabeling = []relabel.Block{{Match: "*", MetricRelabelConfigs: []relabel.Config{
 					{
 						SourceLabels: []string{"__name__"},
 						Regex:        relabel.MustNewRegexp("test_drop_me"),
@@ -496,7 +548,7 @@ test_drop_me{label1="value1"} 22
 		"relabel rewrites a regular label (copy via Replace)": {
 			prepare: func() *Collector {
 				c := New()
-				c.Relabeling = []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{
+				c.Relabeling = []relabel.Block{{Match: "*", MetricRelabelConfigs: []relabel.Config{
 					{
 						SourceLabels: []string{"method"},
 						Regex:        relabel.MustNewRegexp("(.+)"),
@@ -520,15 +572,21 @@ test_requests_total{method="get"} 5
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			currentInput := tc.checkInput
+			if currentInput == "" {
+				currentInput = tc.input
+			}
 			srv := httptest.NewServer(http.HandlerFunc(
-				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.input)) }))
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(currentInput)) }))
 			defer srv.Close()
 
 			collr := tc.prepare()
 			collr.URL = srv.URL
 			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
+			currentInput = tc.input
 
-			// Drive Collect exactly as the framework does: one store cycle around it.
+			// Drive Collect exactly as the framework does after successful Check.
 			cc := cycle(t, collr.MetricStore())
 			cc.BeginCycle()
 			require.NoError(t, collr.Collect(context.Background()))

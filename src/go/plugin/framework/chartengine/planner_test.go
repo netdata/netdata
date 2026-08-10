@@ -471,6 +471,9 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanLifecycleChartExpiry":                                {run: runTestBuildPlanLifecycleChartExpiry},
 		"BuildPlanLifecycleNoRemovalOnFailedCycle":                     {run: runTestBuildPlanLifecycleNoRemovalOnFailedCycle},
 		"BuildPlanRendersChartIDsFromInstances":                        {run: runTestBuildPlanRendersChartIDsFromInstances},
+		"BuildPlanRendersOptionalInstanceLabels":                       {run: runTestBuildPlanRendersOptionalInstanceLabels},
+		"BuildPlanKeepsPartialOptionalIdentitiesDistinct":              {run: runTestBuildPlanKeepsPartialOptionalIdentitiesDistinct},
+		"BuildPlanIntersectsUnlabeledContributor":                      {run: runTestBuildPlanIntersectsUnlabeledContributor},
 		"BuildPlanEnforcesMaxInstancesDeterministically":               {run: runTestBuildPlanEnforcesMaxInstancesDeterministically},
 		"BuildPlanEnforcesMaxDimsDeterministically":                    {run: runTestBuildPlanEnforcesMaxDimsDeterministically},
 		"BuildPlanComputesChartLabelsIntersectionAndExclusions":        {run: runTestBuildPlanComputesChartLabelsIntersectionAndExclusions},
@@ -485,6 +488,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanAutogenUsesMetricMetadataForHistogram":               {run: runTestBuildPlanAutogenUsesMetricMetadataForHistogram},
 		"BuildPlanAutogenUsesMetricFloatMetadataForScalar":             {run: runTestBuildPlanAutogenUsesMetricFloatMetadataForScalar},
 		"BuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles": {run: runTestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles},
+		"BuildPlanAutogenUsesMetricMetadataForSummaryQuantile":         {run: runTestBuildPlanAutogenUsesMetricMetadataForSummaryQuantile},
 		"BuildPlanTemplatePrecedenceOverAutogen":                       {run: runTestBuildPlanTemplatePrecedenceOverAutogen},
 		"BuildPlanAutogenStrictOverflowDrop":                           {run: runTestBuildPlanAutogenStrictOverflowDrop},
 		"BuildPlanAutogenUsesFlattenMetadataForHistogramBuckets":       {run: runTestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets},
@@ -877,6 +881,201 @@ groups:
 	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionUpdateChart}, actionKinds(plan2.Actions))
+}
+
+func runTestBuildPlanRendersOptionalInstanceLabels(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Workers
+    metrics:
+      - worker_cpu_seconds
+    charts:
+      - id: worker_cpu
+        title: Worker CPU
+        context: worker_cpu
+        units: seconds
+        aggregation: sum
+        instances:
+          optional_by_labels: [pid]
+        lifecycle:
+          expire_after_cycles: 1
+        dimensions:
+          - selector: worker_cpu_seconds
+            name: cpu
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	cpu := sm.Gauge("worker_cpu_seconds")
+	blankPID := sm.LabelSet(metrix.Label{Key: "pid", Value: "  "})
+	workerPID := sm.LabelSet(metrix.Label{Key: "pid", Value: "1234"})
+
+	cc.BeginCycle()
+	cpu.Observe(1)
+	cpu.Observe(2, blankPID)
+	cpu.Observe(3, workerPID)
+	_ = cc.CommitCycleSuccess()
+
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{
+		ActionCreateChart, ActionCreateDimension, ActionUpdateChart,
+		ActionCreateChart, ActionCreateDimension, ActionUpdateChart,
+	}, actionKinds(plan1.Actions))
+
+	createLabels := make(map[string]map[string]string)
+	updates := make(map[string]float64)
+	for _, action := range plan1.Actions {
+		switch action := action.(type) {
+		case CreateChartAction:
+			createLabels[action.ChartID] = action.Labels
+		case UpdateChartAction:
+			require.Len(t, action.Values, 1)
+			updates[action.ChartID] = action.Values[0].Float64
+		}
+	}
+	assert.NotContains(t, createLabels["worker_cpu"], "pid")
+	assert.Equal(t, "1234", createLabels["worker_cpu_pid_1234"]["pid"])
+	assert.Equal(t, float64(3), updates["worker_cpu"])
+	assert.Equal(t, float64(3), updates["worker_cpu_pid_1234"])
+
+	cc.BeginCycle()
+	cpu.Observe(4, workerPID)
+	_ = cc.CommitCycleSuccess()
+
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionRemoveChart}, actionKinds(plan2.Actions))
+	update := findUpdateAction(plan2)
+	require.NotNil(t, update)
+	assert.Equal(t, "worker_cpu_pid_1234", update.ChartID)
+}
+
+func runTestBuildPlanKeepsPartialOptionalIdentitiesDistinct(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Workers
+    metrics: [worker_cpu_seconds]
+    charts:
+      - id: worker_cpu
+        title: Worker CPU
+        context: worker_cpu
+        units: seconds
+        aggregation: sum
+        instances:
+          optional_by_labels: [worker, pid]
+        dimensions:
+          - selector: worker_cpu_seconds
+            name: cpu
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	cpu := sm.Gauge("worker_cpu_seconds")
+	worker := sm.LabelSet(metrix.Label{Key: "worker", Value: "blue"})
+	pid := sm.LabelSet(metrix.Label{Key: "pid", Value: "blue"})
+
+	cc.BeginCycle()
+	cpu.Observe(1, worker)
+	cpu.Observe(2, pid)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	createLabels := make(map[string]map[string]string)
+	updates := make(map[string]float64)
+	for _, action := range plan.Actions {
+		switch action := action.(type) {
+		case CreateChartAction:
+			createLabels[action.ChartID] = action.Labels
+		case UpdateChartAction:
+			require.Len(t, action.Values, 1)
+			updates[action.ChartID] = action.Values[0].Float64
+		}
+	}
+
+	require.Len(t, createLabels, 2)
+	assert.Equal(t, map[string]string{"worker": "blue"}, createLabels["worker_cpu_worker_blue"])
+	assert.Equal(t, map[string]string{"pid": "blue"}, createLabels["worker_cpu_pid_blue"])
+	assert.Equal(t, float64(1), updates["worker_cpu_worker_blue"])
+	assert.Equal(t, float64(2), updates["worker_cpu_pid_blue"])
+}
+
+func runTestBuildPlanIntersectsUnlabeledContributor(t *testing.T) {
+	tests := map[string]struct {
+		instances      string
+		labelPromotion string
+	}{
+		"static with automatic promotion": {},
+		"static with explicit promotion": {
+			labelPromotion: "        label_promotion: [region]\n",
+		},
+		"optional base with automatic promotion": {
+			instances: "        instances:\n          optional_by_labels: [pid]\n",
+		},
+		"optional base with explicit promotion": {
+			instances:      "        instances:\n          optional_by_labels: [pid]\n",
+			labelPromotion: "        label_promotion: [region]\n",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			e, err := New()
+			require.NoError(t, err)
+
+			yaml := `
+version: v1
+groups:
+  - family: Workers
+    metrics: [worker_cpu_seconds]
+    charts:
+      - id: worker_cpu
+        title: Worker CPU
+        context: worker_cpu
+        units: seconds
+        aggregation: sum
+` + tc.instances + tc.labelPromotion + `        dimensions:
+          - selector: worker_cpu_seconds
+            name: cpu
+`
+			require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+			store := metrix.NewCollectorStore()
+			cc := mustCycleController(t, store)
+			sm := store.Write().SnapshotMeter("")
+			cpu := sm.Gauge("worker_cpu_seconds")
+			region := sm.LabelSet(metrix.Label{Key: "region", Value: "eu"})
+
+			cc.BeginCycle()
+			cpu.Observe(1)
+			cpu.Observe(2, region)
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+			create := findCreateChartAction(plan)
+			require.NotNil(t, create)
+			assert.Empty(t, create.Labels)
+			update := findUpdateAction(plan)
+			require.NotNil(t, update)
+			require.Len(t, update.Values, 1)
+			assert.Equal(t, float64(3), update.Values[0].Float64)
+		})
+	}
 }
 
 func runTestBuildPlanEnforcesMaxInstancesDeterministically(t *testing.T) {
@@ -1631,6 +1830,50 @@ groups:
 	assert.Equal(t, "ms/s", sum.Meta.Units)
 }
 
+func runTestBuildPlanAutogenUsesMetricMetadataForSummaryQuantile(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	s := store.Write().SnapshotMeter("svc").Summary(
+		"query_duration_ms",
+		metrix.WithSummaryQuantiles(0.5),
+		metrix.WithUnit("ms"),
+	)
+
+	cc.BeginCycle()
+	s.ObservePoint(metrix.SummaryPoint{
+		Count:     4,
+		Sum:       8,
+		Quantiles: []metrix.QuantilePoint{{Quantile: 0.5, Value: 1.5}},
+	})
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	quantiles := findCreateChartActionByID(plan, "svc.query_duration_ms")
+	require.NotNil(t, quantiles)
+	assert.Equal(t, "ms", quantiles.Meta.Units)
+	assert.Equal(t, program.AlgorithmAuto, quantiles.Meta.Algorithm)
+
+	for _, action := range plan.Actions {
+		dim, ok := action.(CreateDimensionAction)
+		if ok && dim.ChartID == "svc.query_duration_ms" {
+			assert.Equal(t, program.AlgorithmAbsolute, dim.Algorithm)
+			return
+		}
+	}
+	t.Fatal("summary quantile dimension was not created")
+}
+
 func runTestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
 	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
@@ -1904,7 +2147,7 @@ groups:
 	assert.Equal(t, "svc.queue_depth-queue=main", create.ChartID)
 	assert.Equal(t, "svc.queue_depth", create.Meta.Context)
 	assert.Equal(t, "depth", create.Meta.Units)
-	assert.Equal(t, program.AlgorithmAbsolute, create.Meta.Algorithm)
+	assert.Equal(t, program.AlgorithmAuto, create.Meta.Algorithm)
 
 	update := findUpdateAction(plan)
 	require.NotNil(t, update)

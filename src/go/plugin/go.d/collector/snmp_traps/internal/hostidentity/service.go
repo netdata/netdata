@@ -23,11 +23,11 @@ type LoadConfig struct {
 
 type ConfigSource func() LoadConfig
 
-type Loader func(LoadConfig) (Provider, error)
+type loader func(LoadConfig) (Provider, error)
 
 type Service struct {
 	configSource ConfigSource
-	loader       Loader
+	loader       loader
 
 	cached struct {
 		once     sync.Once
@@ -37,10 +37,10 @@ type Service struct {
 }
 
 func New(configSource ConfigSource) *Service {
-	return NewWithLoader(configSource, load)
+	return newWithLoader(configSource, load)
 }
 
-func NewWithLoader(configSource ConfigSource, loader Loader) *Service {
+func newWithLoader(configSource ConfigSource, loader loader) *Service {
 	if configSource == nil {
 		panic("hostidentity: nil config source")
 	}

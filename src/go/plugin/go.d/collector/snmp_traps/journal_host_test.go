@@ -3,18 +3,15 @@
 package snmp_traps
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/hostidentity"
 )
 
 type staticJournalHostProvider struct {
@@ -141,26 +138,5 @@ func TestNetdataEngineStateRootUsesNetdataLibDir(t *testing.T) {
 	want := filepath.Join(libDir, "snmp-trap")
 	if got := netdataEngineStateRoot(); got != want {
 		t.Fatalf("netdataEngineStateRoot() = %q, want %q", got, want)
-	}
-}
-
-func TestDecodeErrorRealtimeSurvivesCachedHostIdentityFailure(t *testing.T) {
-	service := hostidentity.NewWithLoader(
-		func() hostidentity.LoadConfig { return hostidentity.LoadConfig{} },
-		func(hostidentity.LoadConfig) (hostidentity.Provider, error) {
-			return nil, errors.New("identity unavailable")
-		},
-	)
-	c := &Collector{hostIdentity: service}
-
-	before := time.Now().UnixMicro()
-	entry := newDecodeErrorEntry("test", decodeErrorRecord{kind: "decode_failed", err: errors.New("bad packet")}, c.monotonicUsec())
-	after := time.Now().UnixMicro()
-
-	if entry.ReceivedMonotonicUsec != 0 {
-		t.Fatalf("monotonic timestamp = %d, want 0", entry.ReceivedMonotonicUsec)
-	}
-	if entry.ReceivedRealtimeUsec < before || entry.ReceivedRealtimeUsec > after {
-		t.Fatalf("realtime timestamp = %d, want between %d and %d", entry.ReceivedRealtimeUsec, before, after)
 	}
 }

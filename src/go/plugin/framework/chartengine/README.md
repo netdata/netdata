@@ -157,6 +157,52 @@ Authored charts can set one reducer for all their dimensions. Supported values a
 `absolute`/`incremental` chart processing. Autogen routes retain their existing sum behavior. See the chart-template
 format's [aggregation section](../charttpl/README.md#aggregation) for semantics and metric-type constraints.
 
+### Chart Label Intersection
+
+- Promoted non-identity labels are common metadata: a key/value survives only when it is present with the same value on
+  every routed contributor to the chart.
+- An unlabeled contributor participates as an empty label set. If it shares a chart with labeled contributors, no
+  promoted non-identity label can describe the entire chart.
+- A changed intersection emits a complete replacement label set through `UpdateChartLabelsAction`; chart identity and
+  dimensions are not recreated.
+
+### Instance Identity Resolution
+
+- `instances.by_labels` defines required identity. A missing explicit label rejects that series from the chart.
+- `instances.optional_by_labels` defines declaration-ordered explicit keys that participate only when their value is
+  present and nonblank. Missing or blank optional values retain the base/required chart identity.
+- Required values render before optional key/value pairs in the chart-ID suffix. For example, present `pid="1234"`
+  contributes `_pid_1234`. Every participating key is emitted as an identity chart label.
+- Optional identity is resolved independently for each series. Present and absent source shapes can therefore materialize
+  refined and base chart instances in the same plan; a series is routed once, never copied into an aggregate view.
+- Presence/value changes are ordinary identity changes. Existing lifecycle policy expires the old chart; the engine keeps
+  no migration or alias state.
+- Explicit required/optional resolution reuses one compiled per-template plan and uses binary search over canonical
+  sorted source labels on a route-cache miss. The existing `by_labels: ["*"]` path scans and sorts visible labels;
+  wildcard identity cannot be combined with optional keys.
+
+### Algorithm Resolution
+
+- An omitted authored `algorithm` remains `AlgorithmAuto` in the immutable program, route cache, and chart-level action
+  metadata.
+- After route lookup, the planner resolves the local route's dimension algorithm from the current `SeriesMeta.Kind`:
+  counters use `incremental`; gauges and every other or unknown kind use `absolute`.
+- An explicit authored `absolute` or `incremental` value overrides the runtime kind for every dimension in that chart.
+- Authored and autogen routes use the same runtime resolver. Metric-name suffixes do not determine chart algorithms.
+- Flattened structured families use their emitted scalar `Kind`. `SourceKind` and `FlattenRole` still control chart shape
+  and identity: histogram buckets/count/sum and summary count/sum are counters; summary quantiles and StateSet states are
+  gauges; MeasureSet fields follow their declared semantics.
+- Different kinds may coexist in distinct rendered dimensions. Series aggregated into one rendered dimension must have
+  the same kind when the chart omits `algorithm`; use an explicit chart algorithm for an intentional mixed-kind collapse.
+  Chartengine does not diagnose a violation at runtime, so authoring validation and real-path tests must enforce this rule;
+  the resulting dimension metadata is otherwise unspecified.
+- A live metric identity must keep the same kind while its dimension is materialized. Kind changes are resolved for route
+  planning, but an existing Netdata dimension keeps its creation-time wire algorithm until it expires and is recreated.
+
+Route-cache entries are immutable discovery results. Algorithm resolution happens after cache lookup, so a cached route
+cannot retain the effective algorithm from an earlier series kind. Only concrete algorithms reach accumulated dimension
+state and dimension actions; chart-level metadata retains the configured policy.
+
 ## Lifecycle Defaults and Policy
 
 Default lifecycle policy when template omits lifecycle:

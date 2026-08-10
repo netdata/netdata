@@ -24,8 +24,9 @@ Each collector has a single `charts.yaml` file that describes all its charts.
 When a collector runs, the chart engine:
 
 1. Reads the collector's `charts.yaml` file.
-2. Compiles it into an immutable program (validates, resolves defaults, infers algorithms).
-3. On each collection cycle, matches incoming metrics against dimension selectors.
+2. Compiles it into an immutable program (validates and resolves static defaults).
+3. On each collection cycle, matches incoming metrics against dimension selectors and resolves omitted algorithms from
+   runtime metric kinds.
 4. Creates chart instances dynamically based on instance identity labels.
 5. Updates dimension values every cycle; removes stale instances based on lifecycle policy.
 
@@ -40,13 +41,13 @@ When a collector runs, the chart engine:
               └──────────┬──────────┘
                          v
               ┌─────────────────────┐
-              │  Compile (engine)   │  selector parsing, algorithm inference,
+              │  Compile (engine)   │  selector parsing, static defaults,
               │                     │  context/family/ID composition
               └──────────┬──────────┘
                          v
               ┌─────────────────────┐
-              │  Runtime (per cycle)│  match series → create/update/remove
-              │                     │  charts and dimensions
+              │  Runtime (per cycle)│  match series → resolve algorithms →
+              │                     │  create/update/remove charts and dimensions
               └─────────────────────┘
 ```
 
@@ -402,6 +403,7 @@ groups:
       label_promotion: [<label>, ...]
       instances:
         by_labels: [<label>, ...]
+        optional_by_labels: [<label>, ...]
     charts:
       - <chart definition>
     groups:
@@ -534,6 +536,7 @@ charts:
     label_promotion: [<label>, ...]
     instances:
       by_labels: [<label>, ...]
+      optional_by_labels: [<label>, ...]
     lifecycle:
       max_instances: <int>
       expire_after_cycles: <int>
@@ -551,7 +554,7 @@ charts:
 | `family`          | string        | no       |                        | Optional chart-level family leaf, appended to the group family.              |
 | `context`         | string        | **yes**  |                        | Chart context leaf. Combined with context namespaces.                        |
 | `units`           | string        | **yes**  |                        | Chart units (e.g., `queries/s`, `bytes`, `percentage`).                      |
-| `algorithm`       | string        | no       | inferred from metrics  | `absolute` or `incremental`. If omitted, inferred from metric suffixes.      |
+| `algorithm`       | string        | no       | runtime metric kind    | `absolute` or `incremental`. If omitted, resolved per dimension from the matched series kind. |
 | `aggregation`     | string        | no       | `sum`                  | Reducer applied to every dimension in the chart.                             |
 | `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`. Histogram bucket charts are forced to `heatmap`. |
 | `priority`        | int           | no       | `70000`                | Chart ordering priority in the dashboard (`0` = use engine default `70000`). |
@@ -561,16 +564,15 @@ charts:
 | `dimensions`      | array         | **yes**  |                        | At least one dimension required (see [dimensions](#6-dimensions)).           |
 
 Chart and dimension identity labels are immutable routing inputs: changing one creates a new chart or dimension
-ID. Promoted labels are non-identity metadata. When their effective intersection changes, chartengine updates the
-existing chart with a complete replacement label set; it does not recreate the chart or its dimensions.
+ID. Promoted labels are non-identity metadata. They are the intersection across every routed contributor to the chart,
+including contributors with no source labels. Therefore, one unlabeled contributor makes the promoted intersection empty.
+When the effective intersection changes, chartengine updates the existing chart with a complete replacement label set;
+it does not recreate the chart or its dimensions.
 
 > [!TIP]
-> When `algorithm` is omitted, the engine infers it from metric name suffixes. You only need to set it explicitly when the suffix doesn't match the intended behavior (e.g., a gauge metric named `*_total`).
-
-| Suffix                                    | Inferred algorithm |
-|-------------------------------------------|--------------------|
-| `*_total`, `*_count`, `*_sum`, `*_bucket` | `incremental`      |
-| Everything else                           | `absolute`         |
+> Omit `algorithm` for the normal case. The engine uses `incremental` for a matched runtime counter and `absolute` for a
+> gauge or any other kind, regardless of the metric name. Set it explicitly only when every dimension in the chart must
+> intentionally override its runtime kind.
 
 Histogram `_bucket` dimensions receive non-overlapping range bucket totals from
 `metrix.ReadFlatten()`. The `le` label remains the bucket upper bound, but the
@@ -578,7 +580,15 @@ value is no longer cumulative with earlier buckets. Histogram bucket dimensions
 are named by the bare `le` value and ordered numerically, with `+Inf` last.
 
 > [!WARNING]
-> If a chart's dimensions mix counter-like metrics (e.g., `requests_total`) with gauge-like metrics (e.g., `temperature`) and `algorithm` is omitted, the engine fails with a compile error: _"algorithm inference is ambiguous for mixed metric kinds; set algorithm explicitly"_. Set `algorithm` on the chart to resolve this.
+> Different runtime kinds may share a chart when they render as distinct dimensions. If several series collapse into the
+> same rendered dimension, omit `algorithm` only when those series have the same runtime kind. Otherwise set an explicit
+> chart algorithm so the aggregated dimension has one intentional wire interpretation. Chartengine does not diagnose a
+> violation at runtime; authoring validation and real-path tests must reject it rather than depend on first-observed
+> metadata.
+
+The runtime kind of a live metric identity must remain stable while its dimension is materialized. Changing the kind does
+not redefine an existing Netdata dimension; its creation-time wire algorithm remains until the dimension expires and is
+recreated.
 
 **Example: MySQL queries — incremental counters displayed as rates**
 
@@ -623,15 +633,25 @@ charts:
 
 #### instances
 
-Instance identity determines how series are grouped into chart instances. When multiple series share the same instance identity label values, they appear as dimensions on the same chart instance.
+Instance identity determines how series are grouped into chart instances. When multiple series share the same instance
+identity label values, they appear as dimensions on the same chart instance.
 
 > [!TIP]
-> Without `instances`, there is one chart instance (all matching series land on the same chart). With `instances`, the engine creates one chart instance per unique combination of the specified label values.
+> Without `instances`, there is one chart instance (all matching series land on the same chart). With `instances`, the
+> engine creates one chart instance per unique combination of the selected required and present optional label values.
 
 ```yaml
 instances:
-  by_labels: [host]
+  by_labels: [deployment]
+  optional_by_labels: [pid]
 ```
+
+| Field                | Meaning                                                                                         |
+|----------------------|-------------------------------------------------------------------------------------------------|
+| `by_labels`          | Required identity selectors. A series missing an explicit required label does not route.        |
+| `optional_by_labels` | Explicit identity keys used only when the series has a nonblank value; missing/blank is omitted. |
+
+`by_labels` supports this selector grammar:
 
 | Token        | Meaning                                                       |
 |--------------|---------------------------------------------------------------|
@@ -639,8 +659,20 @@ instances:
 | `*`          | Include all labels.                                           |
 | `!label_key` | Exclude this label (use with `*` to include all _except_...). |
 
-Excludes are order-independent and always win. For example, both `["host", "!host"]` and `["!host", "host"]` exclude `host`.
-When `instances` is set, `by_labels` must include at least one positive selector: `*` or `label_key`. Exclude tokens use strict `!label_key` syntax; `! host` is invalid.
+Excludes are order-independent and always win. For example, both `["host", "!host"]` and `["!host", "host"]` exclude
+`host`. When `by_labels` is non-empty, it must include at least one positive selector: `*` or `label_key`. Exclude tokens
+use strict `!label_key` syntax; `! host` is invalid.
+
+`optional_by_labels` accepts explicit label keys only—no `*` or `!label_key`. Optional keys cannot duplicate or overlap
+required/excluded keys, and cannot be combined with `by_labels: ["*"]`. An `instances` object must contain at least one
+required or optional key.
+
+Required values form the chart-ID suffix first, in declaration order. Each present nonblank optional identity then
+contributes its label key followed by its value, also in declaration order. Optional keys with missing or whitespace-only
+values do not affect the chart ID and are not emitted as chart identity labels.
+
+Chart-ID suffixes use the existing sanitized underscore-joined representation; they are not a reversible serialization.
+Authors should avoid optional identity values deliberately shaped like another configured key/value suffix segment.
 
 **Example: One chart per host**
 
@@ -664,6 +696,22 @@ instances:
 instances:
   by_labels: ["*", "!_collect_job"]
 ```
+
+**Example: Per-worker only when the exporter exposes a worker identity**
+
+```yaml
+instances:
+  optional_by_labels: [pid]
+```
+
+A single-process source without `pid` uses the base chart ID. A multiprocess source with `pid="1234"` uses the
+`<base>_pid_1234` chart and attaches `pid=1234` as an identity label. Including the key keeps partially present
+multi-optional identities distinct. If both source shapes occur in one snapshot, they route to the base and per-PID
+charts respectively; chartengine does not duplicate either series into a second aggregate view.
+
+Use optional identity only for a bounded, sufficiently stable axis that is useful to operators. It still multiplies chart
+cardinality by the number of observed values. If an optional label appears, disappears, or changes, that is an identity
+change: the new chart is created and the old chart follows the configured lifecycle expiry.
 
 #### lifecycle
 
@@ -720,7 +768,8 @@ dimensions:
 
 Aggregation applies when multiple source series map to the same rendered chart ID and dimension name during one
 successful collection snapshot. This commonly happens when `instances.by_labels` intentionally omits high-cardinality
-labels. The source series keep their full identity in `metrix`; only their chart output is reduced.
+labels, or when an `instances.optional_by_labels` key is absent. The source series keep their full identity in `metrix`;
+only their chart output is reduced.
 
 | Value | Meaning                                  | Typical use                                                |
 |-------|------------------------------------------|------------------------------------------------------------|
@@ -743,8 +792,8 @@ limits, or averages. Authors must choose from the metric's meaning. Additional c
 - Reduction happens before Netdata applies the dimension multiplier/divisor and chart algorithm. An overall negative
   multiplier/divisor scale reverses the displayed ordering of `min` and `max`. Non-sum reduction of cumulative counter
   totals can produce misleading deltas when source membership changes.
-- `instances.by_labels` controls emitted chart cardinality; `aggregation` only selects the value for collisions created by
-  that projection. Every source series is still collected, stored, and routed.
+- `instances.by_labels` and `instances.optional_by_labels` control emitted chart cardinality; `aggregation` only selects
+  the value for collisions created by that projection. Every source series is still collected, stored, and routed.
 
 #### selectors
 
@@ -1108,10 +1157,12 @@ All rules below produce semantic validation errors unless noted:
 | `name` and `name_from_label` are mutually exclusive                                     | semantic                        |
 | `name` and `name_from_label` must not be whitespace-only                                | semantic                        |
 | Duplicate dimension `name` values within the same chart are rejected                    | semantic                        |
-| `instances.by_labels` must contain at least one token when `instances` is set           | semantic                        |
+| `instances` must contain at least one required or optional label                        | semantic                        |
 | `instances.by_labels` exclude token must use `!label_key` syntax                         | semantic                        |
 | `instances.by_labels` must include at least one positive selector (`*` or `label_key`)   | semantic                        |
 | `instances.by_labels` tokens must not be duplicated                                     | semantic                        |
+| `instances.optional_by_labels` accepts unique explicit label keys only                  | semantic                        |
+| Optional keys must not overlap required/excluded keys or accompany `by_labels: ["*"]`    | semantic                        |
 | `label_promotion[]` entries must not be empty or whitespace-only                        | semantic                        |
 | Lifecycle numeric fields must be `>= 0`                                                 | semantic                        |
 | `engine.autogen.max_type_id_len` must be `0` or `>= 4`                                  | semantic                        |
@@ -1119,15 +1170,16 @@ All rules below produce semantic validation errors unless noted:
 | Every autogen rule selector requires at least one non-empty valid `allow`/`deny` entry  | semantic                        |
 | Unknown YAML fields                                                                     | decode error (strict unmarshal) |
 
-## Compiler-Derived Behavior
+## Engine-Derived Behavior
 
 > [!NOTE]
-> These behaviors are applied by `chartengine` during compilation, not by the template parser. You don't need to configure them — they happen automatically, but knowing about them helps you write simpler templates.
+> These behaviors are applied by `chartengine` during compilation or runtime planning, not by the template parser. You
+> don't need to configure them, but knowing about them helps you write simpler templates.
 
 | Input                                   | Derived behavior                                                                         |
 |-----------------------------------------|------------------------------------------------------------------------------------------|
 | Missing `chart.id`                      | `id` derived from `context` (`.` replaced with `_`).                                     |
-| Missing `chart.algorithm`               | Inferred from metric suffixes (`*_total`, `*_count`, `*_sum`, `*_bucket` = incremental). |
+| Missing `chart.algorithm`               | Resolved per rendered dimension from runtime series kind: counter = `incremental`; every other kind = `absolute`. |
 | `chart.priority = 0`                    | Treated as `70000` (engine default).                                                     |
 | Group family hierarchy + `chart.family` | Composed into `/`-separated chart family.                                                |
 | `options.multiplier = 0`                | Treated as `1`.                                                                          |

@@ -70,6 +70,8 @@ my_summary{label1="value1",quantile="0.5"} 0.5
 							summary: &Summary{
 								sum:       10,
 								count:     2,
+								hasSum:    true,
+								hasCount:  true,
 								quantiles: []Quantile{{quantile: 0.5, value: 0.5}},
 							},
 						},
@@ -280,8 +282,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -292,8 +296,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -304,8 +310,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -316,8 +324,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -334,8 +344,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -346,8 +358,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -358,8 +372,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -370,8 +386,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -605,8 +623,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -617,8 +637,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -629,8 +651,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -641,8 +665,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -659,8 +685,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -671,8 +699,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -683,8 +713,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -695,8 +727,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -922,8 +956,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -934,8 +970,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -946,8 +984,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -958,8 +998,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -976,8 +1018,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -988,8 +1032,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1000,8 +1046,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1012,8 +1060,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1227,8 +1277,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -1239,8 +1291,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -1251,8 +1305,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -1263,8 +1319,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -1281,8 +1339,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1293,8 +1353,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1305,8 +1367,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1317,8 +1381,10 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1454,6 +1520,58 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestPromTextParser_summaryComponentPresenceResets(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{
+			name: "both components present",
+			input: `# TYPE request_size summary
+request_size_sum 0
+request_size_count 0
+`,
+			want: true,
+		},
+		{
+			name: "count absent after both were present",
+			input: `# TYPE request_size summary
+request_size_sum 0
+`,
+		},
+		{
+			name: "both components present again",
+			input: `# TYPE request_size summary
+request_size_sum 0
+request_size_count 0
+`,
+			want: true,
+		},
+		{
+			name: "sum absent after both were present",
+			input: `# TYPE request_size summary
+request_size_count 0
+`,
+		},
+	}
+
+	var p promTextParser
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mfs, err := p.parseToMetricFamilies([]byte(test.input))
+			require.NoError(t, err)
+
+			mf := mfs.GetSummary("request_size")
+			require.NotNil(t, mf)
+			require.Len(t, mf.Metrics(), 1)
+			summary := mf.Metrics()[0].Summary()
+			require.NotNil(t, summary)
+			assert.Equal(t, test.want, summary.HasCountAndSum())
 		})
 	}
 }

@@ -25,15 +25,19 @@ flowchart LR
     Init["collector/init.go"]
     Store["ddsnmp.DeviceStore"]
     TrapHandle["TrapEnrichmentHandle"]
+    ReverseDNS["reversedns.Resolver"]
     SNMP["snmp collector"]
     Topology["snmp_topology collector"]
     Traps["snmp_traps collector"]
 
     Init --> Store
     Init --> TrapHandle
+    Init --> ReverseDNS
     Init --> SNMP
     Init --> Topology
     Init --> Traps
+    ReverseDNS --> Topology
+    ReverseDNS --> Traps
     SNMP -->|"registers devices"| Store
     Store -->|"device connection state"| Topology
     Topology -->|"trap topology enrichment"| TrapHandle
@@ -45,6 +49,7 @@ collector/init.go
   creates shared SNMP-family state:
     ddsnmp.DeviceStore
     snmp_topology.TrapEnrichmentHandle
+    pkg/reversedns.Resolver
 
   registers:
     snmp          -> writes device connection state
@@ -303,10 +308,12 @@ The Function returns `503` while no usable topology snapshot exists yet.
 
 Reverse DNS is cache-backed and non-blocking on the Function path:
 
-- Function rendering uses a registry-owned cache-only resolver.
+- `collector/init.go` owns one bounded resolver shared by `snmp_topology` and `snmp_traps`; neither collector closes or
+  sweeps it.
+- Function rendering uses only the shared resolver's cache-only `Lookup` path.
 - The same display-name code records IPs it tried to resolve.
-- `Run(ctx)` warms those candidates asynchronously after refresh snapshots and
-  after Function requests enqueue newly observed candidates.
+- A topology-owned warmer uses blocking, coalesced `Resolve` calls with at most four local workers and 1,024 candidates
+  after refresh snapshots and after Function requests enqueue newly observed candidates.
 - DNS failures, timeouts, and cache misses fall through to the existing
   sysName, hostname, IP, and MAC display-name order.
 

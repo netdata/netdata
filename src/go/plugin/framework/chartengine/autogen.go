@@ -22,7 +22,6 @@ type autogenRoute struct {
 	title             string
 	dimensionName     string
 	dimensionKeyLabel string
-	algorithm         program.Algorithm
 	units             string
 	chartType         program.ChartType
 	family            string
@@ -118,7 +117,7 @@ func (e *Engine) resolveAutogenRoute(
 			DimensionIndex:    0,
 			DimensionName:     route.dimensionName,
 			DimensionKeyLabel: route.dimensionKeyLabel,
-			Algorithm:         route.algorithm,
+			Algorithm:         program.AlgorithmAuto,
 			Hidden:            false,
 			Multiplier:        1,
 			Divisor:           1,
@@ -131,7 +130,7 @@ func (e *Engine) resolveAutogenRoute(
 				Family:    route.family,
 				Context:   getAutogenChartContext(namespace, route.contextName),
 				Units:     route.units,
-				Algorithm: route.algorithm,
+				Algorithm: program.AlgorithmAuto,
 				Type:      route.chartType,
 				Priority:  route.priority,
 			},
@@ -250,7 +249,8 @@ func applyAutogenMetricMeta(route autogenRoute, meta metrix.MetricMeta, seriesMe
 		route.priority = meta.ChartPriority
 	}
 	if unit := strings.TrimSpace(meta.Unit); unit != "" && allowAutogenUnitOverride(seriesMeta) {
-		route.units = normalizeAutogenUnitByAlgorithm(unit, route.algorithm)
+		effectiveAlgorithm := resolveRuntimeAlgorithm(program.AlgorithmAuto, seriesMeta.Kind)
+		route.units = normalizeAutogenUnitByAlgorithm(unit, effectiveAlgorithm)
 		route.chartType = chartTypeFromUnits(route.units)
 	}
 	route.float = meta.Float
@@ -339,7 +339,6 @@ func buildHistogramBucketAutogenRoute(
 		chartName:         baseName,
 		dimensionName:     upperBound,
 		dimensionKeyLabel: metrix.HistogramBucketLabel,
-		algorithm:         program.AlgorithmIncremental,
 		units:             "observations/s",
 		chartType:         program.ChartTypeHeatmap,
 		family:            getAutogenChartFamily(baseName),
@@ -395,7 +394,6 @@ func buildSummaryQuantileAutogenRoute(
 		chartName:         source.familyName,
 		dimensionName:     "quantile_" + quantile,
 		dimensionKeyLabel: metrix.SummaryQuantileLabel,
-		algorithm:         program.AlgorithmAbsolute,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
 		family:            getAutogenChartFamily(source.familyName),
@@ -446,7 +444,6 @@ func buildCounterComponentAutogenRoute(
 		chartID:         chartID,
 		chartName:       baseName,
 		dimensionName:   autogenDimensionName(chartName),
-		algorithm:       program.AlgorithmIncremental,
 		units:           units,
 		chartType:       chartTypeFromUnits(units),
 		family:          getAutogenChartFamily(baseName),
@@ -480,7 +477,6 @@ func buildStateSetAutogenRoute(
 		chartName:         source.familyName,
 		dimensionName:     state,
 		dimensionKeyLabel: source.familyName,
-		algorithm:         program.AlgorithmAbsolute,
 		units:             "state",
 		chartType:         program.ChartTypeLine,
 		family:            getAutogenChartFamily(source.familyName),
@@ -508,10 +504,8 @@ func buildMeasureSetAutogenRoute(
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
 	}
-	algorithm := program.AlgorithmAbsolute
 	units := getAutogenGaugeUnits(source.familyName)
 	if meta.Kind == metrix.MetricKindCounter {
-		algorithm = program.AlgorithmIncremental
 		units = getAutogenCounterUnits(source.familyName)
 	}
 	return autogenRoute{
@@ -519,7 +513,6 @@ func buildMeasureSetAutogenRoute(
 		chartName:         source.familyName,
 		dimensionName:     source.measureField,
 		dimensionKeyLabel: metrix.MeasureSetFieldLabel,
-		algorithm:         algorithm,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
 		family:            getAutogenChartFamily(source.familyName),
@@ -564,17 +557,14 @@ func buildScalarAutogenRoute(
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
 	}
-	algorithm := program.AlgorithmAbsolute
 	units := getAutogenGaugeUnits(metricName)
 	if meta.Kind == metrix.MetricKindCounter {
-		algorithm = program.AlgorithmIncremental
 		units = getAutogenCounterUnits(metricName)
 	}
 	return autogenRoute{
 		chartID:         chartID,
 		chartName:       metricName,
 		dimensionName:   autogenDimensionName(metricName),
-		algorithm:       algorithm,
 		units:           units,
 		chartType:       chartTypeFromUnits(units),
 		family:          getAutogenChartFamily(metricName),

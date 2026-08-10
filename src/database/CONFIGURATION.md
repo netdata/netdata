@@ -67,7 +67,7 @@ You can change these limits using [`edit-config`](/docs/netdata-agent/configurat
 
 ### Update Every and Tier Granularity
 
-`[db].update every` sets the base data collection interval. Tier 0 stores data at this interval, and every higher tier derives its granularity by multiplying from the tier below it. The per-tier multiplier is `dbengine tier X update every iterations` (`60` by default for each tier above 0), so the effective resolution of a tier is `update every` multiplied by every multiplier below it:
+`[db].update every` sets the base data collection interval. It accepts whole-second values in the 1–3600 seconds range; values outside this range are clamped to the nearest bound. Tier 0 stores data at this interval, and every higher tier derives its granularity by multiplying from the tier below it. The per-tier multiplier is `dbengine tier X update every iterations` (`60` by default for each tier above 0), so the effective resolution of a tier is `update every` multiplied by every multiplier below it:
 
 | `update every` | Tier 0 | Tier 1 (`×60`) | Tier 2 (`×60×60`) |
 |:--------------:|:------:|:--------------:|:-----------------:|

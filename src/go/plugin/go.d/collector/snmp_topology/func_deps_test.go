@@ -44,14 +44,17 @@ func TestFuncDepsAdapterSnapshotUsesCachedReverseDNSWithoutLiveLookup(t *testing
 	clock := newReverseDNSTestClock()
 	var liveCalls atomic.Int64
 	registry := newTopologyRegistry()
-	registry.reverseDNS = newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	dns := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now: clock.Now,
 		lookup: func(context.Context, string) ([]string, error) {
 			liveCalls.Add(1)
-			return []string{"unexpected.example.test"}, nil
+			return []string{"switch-a.example.test"}, nil
 		},
 	})
-	registry.reverseDNS.store("10.0.0.10", "switch-a.example.test", clock.Now().Add(time.Hour))
+	dns.warm(context.Background(), []string{"10.0.0.10"})
+	liveCalls.Store(0)
+	registry.reverseDNS = dns.resolver
+	registry.reverseDNSWarmer = dns.topologyReverseDNSWarmer
 
 	cache := newTopologyCache()
 	seedPublishedEndpointSnapshot(cache)
@@ -68,7 +71,7 @@ func TestFuncDepsAdapterSnapshotEnqueuesReverseDNSWarmCandidates(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	warmed := make(chan string, 4)
 	registry := newTopologyRegistry()
-	registry.reverseDNS = newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	dns := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:         clock.Now,
 		timeout:     time.Second,
 		positiveTTL: time.Hour,
@@ -79,6 +82,8 @@ func TestFuncDepsAdapterSnapshotEnqueuesReverseDNSWarmCandidates(t *testing.T) {
 			return []string{ip + ".example.test"}, nil
 		},
 	})
+	registry.reverseDNS = dns.resolver
+	registry.reverseDNSWarmer = dns.topologyReverseDNSWarmer
 	registry.setReverseDNSWarmContext(context.Background())
 
 	cache := newTopologyCache()

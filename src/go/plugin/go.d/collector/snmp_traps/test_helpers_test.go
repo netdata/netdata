@@ -3,202 +3,30 @@
 package snmp_traps
 
 import (
-	"net"
-	"net/netip"
-	"testing"
-
-	"github.com/gosnmp/gosnmp"
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/enrichment/netdataadapter"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
-func readSinglePcapUDPPacket(t *testing.T, fixture string) pcapUDPPacket {
-	t.Helper()
-
-	packets := readPcapUDPPackets(t, fixture)
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet in %s, got %d", fixture, len(packets))
-	}
-	return packets[0]
-}
-
-func readColdStartUDPPacket(t *testing.T) pcapUDPPacket {
-	t.Helper()
-	return readSinglePcapUDPPacket(t, "testdata/v2c_coldstart.pcap.hex")
-}
-
-func testColdStartTrap(category, severity, description string) *TrapDef {
-	return &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    category,
-		Severity:    severity,
-		Description: description,
-	}
-}
-
-func setSingleTestTrap(t *testing.T, trap *TrapDef) {
-	t.Helper()
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
-}
-
-func newTestV2Collector(jobName string, writer output.Writer, prefixes []netip.Prefix, communities []string) *Collector {
-	return &Collector{
-		Config:       Config{Name: jobName},
-		trapWriter:   writer,
-		journalHost:  newTestJournalHostProvider(),
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(prefixes, communities),
-		profileIndex: currentTestProfileIndex,
-	}
-}
-
-func newDefaultTestV2Collector(writer output.Writer) *Collector {
-	return newTestV2Collector("test", writer, nil, []string{"public"})
-}
+const testEngineIDHex = "80001f888077dfe44faa700258"
 
 func newTestSNMPTrapsCollector() *Collector {
-	c := New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle())
-	if currentTestCatalogManager != nil {
-		c.profileCatalog = currentTestCatalogManager
-	}
+	return New(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+}
+
+func newTestSNMPTrapsCollectorWithCatalog(manager *catalog.Manager) *Collector {
+	c := newTestSNMPTrapsCollector()
+	c.services.catalog = manager
 	return c
 }
 
-type testTrapTopologyEnricher func(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment
-
-func (f testTrapTopologyEnricher) EnrichmentForSource(ip, trapIfIndex string) *snmptopology.TrapTopologyEnrichment {
-	return f(ip, trapIfIndex)
+func newTestReverseDNSResolver() *reversedns.Resolver {
+	return reversedns.New(reversedns.Config{})
 }
 
-func newTestTrapEnrichmentCollector(topologyEnricher trapTopologyEnricher) (*Collector, *ddsnmp.DeviceStore) {
-	store := ddsnmp.NewDeviceStore()
-	return &Collector{
-		deviceLookup:     store,
-		topologyEnricher: topologyEnricher,
-	}, store
-}
-
-func withCleanJobMetrics(t *testing.T, jobName string) *perJobMetrics {
-	t.Helper()
-	removeJobMetrics(jobName)
-	t.Cleanup(func() { removeJobMetrics(jobName) })
-	return getJobMetrics(jobName)
-}
-
-func collectJobMetricsForTest(t *testing.T, jobName string) metrix.CollectorStore {
-	t.Helper()
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	if !ok {
-		t.Fatal("collector store does not expose cycle control")
-	}
-	managed.CycleController().BeginCycle()
-	collectMetrics(store, jobName)
-	if err := managed.CycleController().CommitCycleSuccess(); err != nil {
-		t.Fatalf("commit collect cycle: %v", err)
-	}
-	return store
-}
-
-func newDedupTestV2Collector(t *testing.T, jobName string, writer output.Writer) (*Collector, *perJobMetrics) {
-	t.Helper()
-
-	metrics := withCleanJobMetrics(t, jobName)
-	metrics.setDedupEnabled(true)
-	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-	c.Dedup = DedupConfig{Enabled: true}
-	c.metrics = metrics
-	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, "", c.monotonicUsec)
-	return c, metrics
-}
-
-func defaultDynamicUser() USMUserConfig {
-	return USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-}
-
-func testNoAuthV3User(engineID string) USMUserConfig {
-	return USMUserConfig{
-		Username:  "testuser",
-		EngineID:  engineID,
-		AuthProto: "none",
-		PrivProto: "none",
-	}
-}
-
-func newTestV3SecurityTable(t *testing.T, users ...USMUserConfig) *gosnmp.SnmpV3SecurityParametersTable {
-	t.Helper()
-
-	secTable, err := buildSnmpV3SecurityTable(users)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	return secTable
-}
-
-func registerTestLocalEngineID(
-	t *testing.T,
-	secTable *gosnmp.SnmpV3SecurityParametersTable,
-	lid *LocalEngineID,
-	users ...USMUserConfig,
-) {
-	t.Helper()
-
-	if err := registerUSMUsersWithLocalEngineID(secTable, users, lid.Bytes()); err != nil {
-		t.Fatalf("registerUSMUsersWithLocalEngineID failed: %v", err)
-	}
-}
-
-func newTestV3Collector(
-	jobName string,
-	writer output.Writer,
-	secTable *gosnmp.SnmpV3SecurityParametersTable,
-	engineIDs map[string]struct{},
-) *Collector {
-	return &Collector{
-		Config:      Config{Name: jobName},
-		trapWriter:  writer,
-		journalHost: newTestJournalHostProvider(),
-		versions:    map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:   NewAllowlist(nil, nil),
-		v3SecTable:  secTable,
-		engineIDs:   engineIDs,
-	}
-}
-
-func newDynamicEngineIDTestCollector(
-	t *testing.T,
-	jobName string,
-	data []byte,
-	configure func(*Collector),
-) (*Collector, *mockTrapWriter, *net.UDPAddr) {
-	t.Helper()
-
-	removeJobMetrics(jobName)
-	t.Cleanup(func() { removeJobMetrics(jobName) })
-
-	user := defaultDynamicUser()
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{user}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		Config:             Config{Name: jobName, USMUsers: []USMUserConfig{user}},
-		trapWriter:         writer,
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-	}
-	if configure != nil {
-		configure(c)
-	}
-	c.dynamicEngineIDReg = newDynamicEngineIDRegistry(secTable, c.dynamicEngineIDMax, nil, []USMUserConfig{user})
-
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
-	return c, writer, peer
+func newTestTrapEnricher(store *ddsnmp.DeviceStore, topology enrichment.TopologyLookup, dns enrichment.ReverseDNS) *enrichment.Enricher {
+	return enrichment.New(netdataadapter.RegistryLookup(store), topology, dns)
 }

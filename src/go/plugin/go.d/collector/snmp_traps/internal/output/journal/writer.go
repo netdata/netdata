@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	DefaultQueueCapacity      = 10000
+	defaultQueueCapacity      = 10000
 	defaultFlushInterval      = 1 * time.Second
 	maxRetentionSweepInterval = 1 * time.Hour
 	minRetentionSweepInterval = 1 * time.Second
@@ -23,12 +23,19 @@ const (
 var errWriterStopped = errors.New("trap writer has stopped")
 
 type Options struct {
-	QueueCapacity int
-	Report        output.OutcomeReporter
+	Report output.OutcomeReporter
+}
+
+type journalSink interface {
+	writeRaw([][]byte, int, int64, int64) error
+	sync() error
+	sweepRetention() error
+	close() error
+	binaryFieldCount() uint64
 }
 
 type Writer struct {
-	journal    *sdkWriter
+	sink       journalSink
 	queue      chan *model.TrapEntry
 	flushCh    chan chan error
 	doneCh     chan struct{}
@@ -57,25 +64,27 @@ func Prepare(dir string, cfg Config, host hostidentity.Provider, opts Options) (
 	if err != nil {
 		return nil, err
 	}
-	return newWriter(j, opts), nil
+	return newWriter(j, cfg, defaultQueueCapacity, opts.Report), nil
 }
 
-func newWriter(j *sdkWriter, opts Options) *Writer {
-	capacity := opts.QueueCapacity
+func newWriter(sink journalSink, cfg Config, capacity int, report output.OutcomeReporter) *Writer {
+	if sink == nil {
+		panic("journal: nil sink")
+	}
 	if capacity <= 0 {
-		capacity = DefaultQueueCapacity
+		capacity = defaultQueueCapacity
 	}
 	return &Writer{
-		journal: j,
-		queue:   make(chan *model.TrapEntry, capacity),
+		sink:  sink,
+		queue: make(chan *model.TrapEntry, capacity),
 		// Keep unbuffered: Flush must handshake with a live worker, not queue a
 		// request that Close can strand after the worker exits.
 		flushCh:                make(chan chan error),
 		doneCh:                 make(chan struct{}),
 		flushInterval:          defaultFlushInterval,
-		retentionSweepInterval: journalRetentionSweepInterval(j),
+		retentionSweepInterval: journalRetentionSweepInterval(cfg),
 		lastRetentionSweep:     time.Now(),
-		report:                 opts.Report,
+		report:                 report,
 	}
 }
 
@@ -169,55 +178,45 @@ func (tw *Writer) worker() {
 }
 
 func (tw *Writer) writeOne(entry *model.TrapEntry) error {
-	if tw.journal == nil {
-		// Test/benchmark sink mode; production Init always supplies a journal.
-		return nil
-	}
 	payloads, binaryEncodedFields, err := tw.serializer.serialize(entry)
 	if err != nil {
 		return err
 	}
-	return tw.journal.writeRaw(payloads, binaryEncodedFields, entry.ReceivedRealtimeUsec, entry.ReceivedMonotonicUsec)
+	return tw.sink.writeRaw(payloads, binaryEncodedFields, entry.ReceivedRealtimeUsec, entry.ReceivedMonotonicUsec)
 }
 
 func (tw *Writer) sync() error {
-	if tw.journal == nil {
-		return nil
-	}
-	return tw.journal.sync()
+	return tw.sink.sync()
 }
 
-func journalRetentionSweepInterval(j *sdkWriter) time.Duration {
-	if j == nil {
-		return 0
-	}
-	if j.cfg.MaxDuration <= 0 {
-		if j.cfg.MaxSize == 0 {
+func journalRetentionSweepInterval(cfg Config) time.Duration {
+	if cfg.MaxDuration <= 0 {
+		if cfg.MaxSize == 0 {
 			return 0
 		}
 		interval := maxRetentionSweepInterval
-		if j.cfg.RotateDur > 0 && j.cfg.RotateDur < interval {
-			interval = j.cfg.RotateDur
+		if cfg.RotateDur > 0 && cfg.RotateDur < interval {
+			interval = cfg.RotateDur
 		}
 		return interval
 	}
 
-	interval := min(max(j.cfg.MaxDuration/2, minRetentionSweepInterval), maxRetentionSweepInterval)
-	if j.cfg.RotateDur > 0 && j.cfg.RotateDur < interval {
-		interval = j.cfg.RotateDur
+	interval := min(max(cfg.MaxDuration/2, minRetentionSweepInterval), maxRetentionSweepInterval)
+	if cfg.RotateDur > 0 && cfg.RotateDur < interval {
+		interval = cfg.RotateDur
 	}
 	return interval
 }
 
 func (tw *Writer) maybeSweepRetention(now time.Time) error {
-	if tw.journal == nil || tw.retentionSweepInterval <= 0 {
+	if tw.retentionSweepInterval <= 0 {
 		return nil
 	}
 	if now.Sub(tw.lastRetentionSweep) < tw.retentionSweepInterval {
 		return nil
 	}
 	tw.lastRetentionSweep = now
-	return tw.journal.sweepRetention()
+	return tw.sink.sweepRetention()
 }
 
 func (tw *Writer) drainForFlush(flushPending *bool) error {
@@ -243,12 +242,10 @@ func (tw *Writer) drainRemaining(pending bool) {
 			tw.setFailure(err)
 			continue
 		}
-		if tw.journal != nil {
-			pending = true
-		}
+		pending = true
 	}
-	if pending && tw.journal != nil {
-		if err := tw.journal.sync(); err != nil {
+	if pending {
+		if err := tw.sink.sync(); err != nil {
 			tw.setFailure(err)
 		}
 	}
@@ -295,10 +292,7 @@ func (tw *Writer) Write(entry *model.TrapEntry) error {
 }
 
 func (tw *Writer) BinaryEncodedFields() uint64 {
-	if tw.journal == nil {
-		return 0
-	}
-	return tw.journal.binaryFieldCount()
+	return tw.sink.binaryFieldCount()
 }
 
 func (tw *Writer) Flush() error {
@@ -352,10 +346,7 @@ func (tw *Writer) Close() error {
 	tw.queueMu.Unlock()
 
 	if !started {
-		if tw.journal == nil {
-			return nil
-		}
-		if err := tw.journal.close(); err != nil {
+		if err := tw.sink.close(); err != nil {
 			tw.setFailure(err)
 			return err
 		}
@@ -367,24 +358,15 @@ func (tw *Writer) Close() error {
 	workerErr := tw.failedErr
 	tw.failedMu.Unlock()
 
-	if tw.journal != nil {
-		if err := tw.journal.close(); err != nil {
-			tw.setFailure(err)
-			if workerErr != nil {
-				return errors.Join(workerErr, err)
-			}
-			return err
+	if err := tw.sink.close(); err != nil {
+		tw.setFailure(err)
+		if workerErr != nil {
+			return errors.Join(workerErr, err)
 		}
+		return err
 	}
 
 	return workerErr
-}
-
-func (tw *Writer) Directory() string {
-	if tw.journal == nil {
-		return ""
-	}
-	return tw.journal.directory()
 }
 
 func (tw *Writer) setFailure(err error) {

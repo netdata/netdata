@@ -2,10 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -91,33 +88,12 @@ var cachestatGlobalCharts = []cachestatGlobalChart{
 }
 
 var cachestatGlobalChartsOnce sync.Once
-var cachestatStdoutMutex sync.Mutex
 
-// cachestatErrorLogInterval is the minimum gap between repeated stderr
-// messages from a single error site.  A persistent failure (e.g. unhealthy
-// BPF map) would otherwise emit one line per collection cycle, flooding
-// the operator log; 60 s strikes a balance between visibility and noise.
-const cachestatErrorLogInterval = 60 * time.Second
-
-var (
-	cachestatErrorMu      sync.Mutex
-	cachestatErrorLastLog = map[string]time.Time{}
-)
-
-// rateLimitedStderr writes msg to stderr the first time and at most once per
-// cachestatErrorLogInterval.  The site key identifies the error site; use a
-// short stable string per call site.
-func rateLimitedStderr(site, msg string) {
-	cachestatErrorMu.Lock()
-	defer cachestatErrorMu.Unlock()
-
-	now := time.Now()
-	if last, ok := cachestatErrorLastLog[site]; ok && now.Sub(last) < cachestatErrorLogInterval {
-		return
-	}
-	cachestatErrorLastLog[site] = now
-	fmt.Fprint(os.Stderr, msg)
-}
+// pluginOutputMu serializes all writes to the pluginsd stdout stream.
+// Cachestat's multi-call sequences (BEGIN/SET/END) and the socket
+// function handler's FUNCRESULT writes share a single api; without
+// this lock they can interleave and corrupt the protocol stream.
+var pluginOutputMu sync.Mutex
 
 func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachestatGlobalPublish, bool) {
 	mpa := diffCounters(current.MarkPageAccessed, s.prev.MarkPageAccessed)
@@ -127,15 +103,9 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 
 	publish := cachestatGlobalPublish{}
 
-	total := mpa - mbd
-	if total < 0 {
-		total = 0
-	}
+	total := max(mpa-mbd, 0)
 
-	misses := apcl - apd
-	if misses < 0 {
-		misses = 0
-	}
+	misses := max(apcl-apd, 0)
 
 	hits := total - misses
 	if hits < 0 {
@@ -146,6 +116,9 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 	if total > 0 {
 		publish.Ratio = int64((float64(hits) / float64(total)) * 100)
 	} else {
+		// No page-cache activity this interval; 100 = full hit rate (nothing missed).
+		// Matches the idle-path convention in cachestat_shared_memory.go,
+		// apps_ebpf_shared_memory.c, and cgroup_ebpfgo_cachestat.c.
 		publish.Ratio = 100
 	}
 
@@ -172,8 +145,8 @@ func diffCounters(current, previous uint64) int64 {
 
 func createCachestatGlobalCharts(api *netdataapi.API, updateEvery int) {
 	cachestatGlobalChartsOnce.Do(func() {
-		cachestatStdoutMutex.Lock()
-		defer cachestatStdoutMutex.Unlock()
+		pluginOutputMu.Lock()
+		defer pluginOutputMu.Unlock()
 
 		if api != nil {
 			api.HOST("")
@@ -216,8 +189,8 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 		return
 	}
 
-	cachestatStdoutMutex.Lock()
-	defer cachestatStdoutMutex.Unlock()
+	pluginOutputMu.Lock()
+	defer pluginOutputMu.Unlock()
 
 	for _, item := range []struct {
 		chart string
@@ -256,8 +229,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
-			rateLimitedStderr("cachestat.snapshot",
-				fmt.Sprintf("ebpf-go.plugin: cachestat snapshot failed: %v\n", err))
+			logPluginErr("cachestat.snapshot", "cachestat", "snapshot", err)
 		} else {
 			publish, ok := state.Update(cachestatGlobalCounters{
 				MarkPageAccessed:   snapshot.MarkPageAccessed,
@@ -273,7 +245,9 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
 		if store != nil {
 			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
-			if err == nil {
+			if err != nil {
+				logPluginErr("cachestat.snapshot", "cachestat", "snapshot-apps", err)
+			} else {
 				staleCandidates := store.UpdateApps(apps)
 				if len(staleCandidates) > 0 {
 					// Authoritative liveness check matching the C-version
@@ -302,18 +276,16 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 				// cost.  The handle is mutated under the loop's single-
 				// goroutine guarantee so no extra lock is needed.
 				if handle.SharedMemory == nil {
-					publisher, perr := NewSharedPidMemoryPublisher(handle.PidTableSize)
+					publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
 					if perr != nil {
-						rateLimitedStderr("cachestat.shm_open",
-							fmt.Sprintf("ebpf-go.plugin: cachestat shared memory open failed: %v\n", perr))
+						logPluginErr("cachestat.shm_open", "cachestat", "shared memory open", perr)
 					} else {
 						handle.SharedMemory = publisher
 					}
 				}
 				if handle.SharedMemory != nil {
 					if err := store.Publish(handle.SharedMemory); err != nil {
-						rateLimitedStderr("cachestat.publish",
-							fmt.Sprintf("ebpf-go.plugin: cachestat shared memory publish failed: %v\n", err))
+						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", err)
 					}
 				}
 			}
@@ -334,49 +306,8 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		}
 
 		now := time.Now()
-		usecSince := int(now.Sub(lastCollection).Microseconds())
-		if usecSince < 0 {
-			usecSince = 0
-		}
+		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
 		lastCollection = now
 		collectAndPublish(usecSince)
 	}
-}
-
-func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
-	if handle == nil || handle.Runtime == nil {
-		return
-	}
-
-	updateEvery := updateEveryArg
-	if updateEvery <= 0 {
-		updateEvery = handle.UpdateEvery
-	}
-	if updateEvery <= 0 {
-		updateEvery = cachestatDefaultUpdateEvery
-	}
-	handle.UpdateEvery = updateEvery
-	api := netdataapi.New(os.Stdout)
-
-	stop := make(chan struct{})
-
-	// Lightweight signal handler: no CGO, stays on an existing M.
-	go func() {
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-		<-sigCh
-		signal.Stop(sigCh)
-		close(stop)
-	}()
-
-	// Both global metrics and per-PID SHM run in a single goroutine so that
-	// sequential CGO calls share one OS thread instead of requiring two.
-	var store *cachestatSharedMemoryStore
-	if handle.AppsEnabled || handle.CgroupsEnabled {
-		store = NewCachestatSharedMemoryStore()
-	}
-
-	runCachestatGlobalCollector(api, handle, stop, store, updateEvery)
-
-	handle.Close()
 }

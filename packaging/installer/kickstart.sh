@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0522
+# Next unused error code: F0524
 
 # ======================================================================
 # Constants
@@ -390,6 +390,29 @@ trap 'trap_handler 15 0' TERM
 
 # ======================================================================
 # Utility functions
+
+# Check if a URL is valid, and ensure it uses one of the specified protocols.
+is_valid_url() {
+  printf "%s\n" "${1}" | grep -qE "^(${2})://([^@\/:[:space:]]+(:[^@\/:[:space:]]*)?@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(:[0-9]{1,5})?(/[-A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=]*)?$" || return 1
+}
+
+sanitize_string() {
+  v="${1}"
+  r="$(printf '%s\n' "${1}" | tr -cd "[:alnum:] ._=-")"
+  [ "${v}" = "${r}" ] || warning "Unsafe characters found in string, sanitized to ${r}"
+  echo "${r}"
+}
+
+sanitize_path() {
+  v="${1}"
+  _path_unsafe=";&'\"|\\<>()\n\$*?\`{}[]"
+  if [ -z "${_path_replace}" ]; then
+    _path_replace="$(printf "%$(printf "%s" "${_path_unsafe}" | wc -m)s" | tr " " "_")"
+  fi
+  r="$(printf '%s\n' "$1" | tr "${_path_unsafe}" "${_path_replace}")"
+  [ "${v}" = "${r}" ] || warning "Unsafe characters found in path, sanitized to ${r}"
+  echo "${r}"
+}
 
 canonical_path() {
   OLDPWD="$(pwd)"
@@ -1397,6 +1420,10 @@ is_netdata_running() {
 }
 
 write_claim_config() {
+  old_pwd="${PWD}"
+  set_tmpdir
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
+
   if [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
     config_path="/etc/netdata"
     netdatacli="$(command -v netdatacli)"
@@ -1412,6 +1439,7 @@ write_claim_config() {
   fi
 
   claim_config="${config_path}/claim.conf"
+  claim_config_tmp="$(mktemp "${tmpdir}/claim.conf.XXXXXX")"
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to write claiming configuration to ${claim_config}"
@@ -1420,24 +1448,22 @@ write_claim_config() {
 
   progress "Writing claiming configuration to ${claim_config}"
 
-  config="[global]"
-  config="${config}\n    url = ${NETDATA_CLAIM_URL}"
-  config="${config}\n    token = ${NETDATA_CLAIM_TOKEN}"
+  printf "[global]\n" > "${claim_config_tmp}" || return 1
+  printf "    url = %s\n" "${NETDATA_CLAIM_URL}" >> "${claim_config_tmp}" || return 1
+  printf "    token = %s\n" "${NETDATA_CLAIM_TOKEN}" >> "${claim_config_tmp}" || return 1
   if [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
-      config="${config}\n    rooms = ${NETDATA_CLAIM_ROOMS}"
+    printf "    rooms = %s\n" "${NETDATA_CLAIM_ROOMS}" >> "${claim_config_tmp}" || return 1
   fi
   if [ -n "${NETDATA_CLAIM_PROXY}" ]; then
-      config="${config}\n    proxy = ${NETDATA_CLAIM_PROXY}"
+    printf "    proxy = %s\n" "${NETDATA_CLAIM_PROXY}" >> "${claim_config_tmp}" || return 1
   fi
   if [ -n "${NETDATA_CLAIM_INSECURE}" ]; then
-      config="${config}\n    insecure = ${NETDATA_CLAIM_INSECURE}"
+    printf "    insecure = %s\n" "${NETDATA_CLAIM_INSECURE}" >> "${claim_config_tmp}" || return 1
   fi
 
-  run_as_root touch "${claim_config}.tmp" || return 1
-  run_as_root chmod 0640 "${claim_config}.tmp" || return 1
-  run_as_root chown ":${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config}.tmp" || return 1
-  run_as_root sh -c "printf '${config}\\n' > \"${claim_config}.tmp\"" || return 1
-  run_as_root mv -f "${claim_config}.tmp" "${claim_config}" || return 1
+  run_as_root chown "root:${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config_tmp}" || return 1
+  run_as_root chmod 0640 "${claim_config_tmp}" || return 1
+  run_as_root mv -f "${claim_config_tmp}" "${claim_config}" || return 1
 
   if [ -z "${NETDATA_CLAIM_NORELOAD}" ]; then
     if [ -n "${netdatacli}" ]; then
@@ -2705,11 +2731,19 @@ parse_args() {
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
         ;;
       "--install-prefix")
-        INSTALL_PREFIX="${2}"
+        p="$(sanitize_path "${2}")"
+        if [ "${p}" != "${2}" ]; then
+          fatal "Unsafe characters detected in install prefix" F0525
+        fi
+        INSTALL_PREFIX="${p}"
         shift 1
         ;;
       "--old-install-prefix")
-        OLD_INSTALL_PREFIX="${2}"
+        p="$(sanitize_path "${2}")"
+        if [ "${p}" != "${2}" ]; then
+          fatal "Unsafe characters detected in old install prefix" F0526
+        fi
+        OLD_INSTALL_PREFIX="${p}"
         shift 1
         ;;
       "--install-major-version")
@@ -2754,15 +2788,23 @@ parse_args() {
       "--claim-"*)
         optname="$(echo "${1}" | cut -d '-' -f 4-)"
         case "${optname}" in
-          token) NETDATA_CLAIM_TOKEN="${2}"; shift 1 ;;
-          rooms) NETDATA_CLAIM_ROOMS="${2}"; shift 1 ;;
-          url) NETDATA_CLAIM_URL="${2}"; shift 1 ;;
-          proxy) NETDATA_CLAIM_PROXY="${2}"; shift 1 ;;
+          url)
+            is_valid_url "${2}" "http|https" || fatal "${2} is not a valid claim URL" F0522
+            NETDATA_CLAIM_URL="${2}"
+            shift 1
+            ;;
+          proxy)
+            is_valid_url "${2}" "http|https|socks|socks5" || fatal "${2} is not a valid claim proxy URL" F0523
+            NETDATA_CLAIM_PROXY="${2}"
+            shift 1
+            ;;
+          token) NETDATA_CLAIM_TOKEN="$(sanitize_string "${2}")"; shift 1 ;;
+          rooms) NETDATA_CLAIM_ROOMS="$(sanitize_string "${2}")"; shift 1 ;;
           noproxy) NETDATA_CLAIM_PROXY="none" ;;
           insecure) NETDATA_CLAIM_INSECURE=yes ;;
           noreload) NETDATA_CLAIM_NORELOAD=1 ;;
           id|user|hostname)
-            NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=${2}"
+            NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=$(sanitize_string "${2}")"
             shift 1
             ;;
           verbose|daemon-not-running) NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}" ;;
@@ -2770,17 +2812,17 @@ parse_args() {
         esac
         ;;
       "--local-build-options")
-        LOCAL_BUILD_OPTIONS="${LOCAL_BUILD_OPTIONS} ${2}"
+        LOCAL_BUILD_OPTIONS="${LOCAL_BUILD_OPTIONS} $(sanitize_string "${2}")"
         shift 1
         ;;
       "--static-install-options")
-        STATIC_INSTALL_OPTIONS="${STATIC_INSTALL_OPTIONS} ${2}"
+        STATIC_INSTALL_OPTIONS="${STATIC_INSTALL_OPTIONS} $(sanitize_string "${2}")"
         shift 1
         ;;
       "--prepare-offline-install-source")
         if [ -n "${2}" ]; then
           set_action 'prepare-offline'
-          OFFLINE_TARGET="${2}"
+          OFFLINE_TARGET="$(sanitize_string "${2}")"
           shift 1
         else
           fatal "A target directory must be specified with the --prepare-offline-install-source option." F0500

@@ -149,11 +149,16 @@ When reviewing a PR that touches a collector, verify:
    `agent_notification` is a special case: the README itself
    is the generated artifact (no `integrations/` subdir).
 
-6. **`integrations/<slug>.md` regenerated.** The author
-   should have run the pipeline locally and committed the
-   updated `.md` file. `check-markdown.yml` will re-run the
-   pipeline in CI; if the author's commit and CI's regen
-   diverge, the PR fails.
+6. **Generated integration documentation has an explicit delivery route.** The
+   author MUST run the metadata pipeline locally for source validation, then
+   choose and document one route:
+   - regenerate and commit `integrations/<slug>.md` in the source PR; or
+   - leave committed generated pages unchanged so `generate-integrations.yml`
+     opens the follow-up regeneration PR after the source reaches `master`.
+
+   `check-markdown.yml` regenerates pages before Learn link validation but does
+   not assert a clean Git diff. Earlier guidance incorrectly claimed that an
+   uncommitted regeneration diff failed the source PR.
 
 7. **Umbrella pages.** If the diff added or removed a
    collector, `src/collectors/COLLECTORS.md` should reflect
@@ -205,10 +210,12 @@ For now, the consistency rule is a review-time policy.
 ## Anti-patterns to flag in review
 
 - "I only changed the code; the docs can be a follow-up PR."
-  -> No. Affected collector consistency artifacts move in one PR.
+  -> No for source artifacts. Metadata, schema, stock config, alerts, taxonomy,
+  and hand-written docs move with the behavior. Only generated integration
+  pages may use the documented automatic post-merge route.
 - "The integration page on Learn doesn't show my new option."
-  -> Author forgot to update `metadata.yaml` AND regenerate
-  `integrations/<slug>.md`.
+  -> Verify that `metadata.yaml` changed and that either the source PR committed
+  `integrations/<slug>.md` or the post-merge regeneration PR completed.
 - "I edited `integrations/<slug>.md` directly to fix a
   description." -> No. That file is generated. Edit
   `metadata.yaml` and regenerate.

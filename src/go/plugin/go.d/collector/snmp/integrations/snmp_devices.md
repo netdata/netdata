@@ -208,7 +208,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
 |  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
-|  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
+|  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence. |  | no |
 
 <a id="option-snmpv3-user-level"></a>
 ##### user.level
@@ -406,6 +406,30 @@ jobs:
       - cisco-asr
     options:
       version: 2
+
+```
+</details>
+
+###### Additional node labels
+
+Because `create_vnode` defaults to true, each SNMP job automatically creates a Virtual Node for its device — no separate vnode definition file is needed.
+Use `vnode.labels` to attach your own labels, for example to group devices by site or rack. These are merged with the labels SNMP detects automatically from the device (such as `vendor` and `sys_object_id`). If a key you set matches an auto-detected label, your value takes precedence.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: core-switch
+    update_every: 10
+    hostname: 192.0.2.20
+    community: public
+    options:
+      version: 2
+    vnode:
+      labels:
+        site: dc1
+        rack: a12
 
 ```
 </details>

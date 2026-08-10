@@ -7,9 +7,12 @@ import (
 	"sort"
 	"strings"
 
+	commonmodel "github.com/prometheus/common/model"
+
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 // promRuntime is the per-job state built once at Check and reused afterwards:
@@ -17,31 +20,99 @@ import (
 // (autogen, or autogen merged with the selected profiles' curated groups).
 type promRuntime struct {
 	profiles      []promprofiles.Profile
+	fallbacks     []profileFallback
+	normalizers   []profileNormalizer
 	chartTemplate string
 }
 
-// ensureChartTemplate selects the profiles that apply to this job against the
-// scraped families and builds the per-job chart template, caching both on the
-// runtime on the first Check. Later cycles reuse it; Cleanup (job restart)
-// clears it so the next Check rebuilds. Building at Check (not Init) is what
-// lets selection depend on what the endpoint actually exposes.
-func (c *Collector) ensureChartTemplate(mfs prometheus.MetricFamilies) error {
-	if c.runtime != nil {
-		return nil
-	}
+func (r *promRuntime) hasProfileSamplePolicy() bool {
+	return r != nil && (len(r.fallbacks) > 0 || len(r.normalizers) > 0)
+}
 
-	profiles, err := c.selectProfiles(mfs)
+type profileFallback struct {
+	root    matcher.Matcher
+	gauge   matcher.Matcher
+	counter matcher.Matcher
+}
+
+func compileProfileFallbacks(profiles []promprofiles.Profile) ([]profileFallback, error) {
+	var fallbacks []profileFallback
+	for _, profile := range profiles {
+		if !profile.HasFallbackType() {
+			continue
+		}
+		fallbackType, err := profile.FallbackType()
+		if err != nil {
+			return nil, err
+		}
+		root, err := compileProfileRoot(profile)
+		if err != nil {
+			return nil, err
+		}
+		gauge, err := compileFallbackTypeMatcher(fallbackType.Gauge)
+		if err != nil {
+			return nil, fmt.Errorf("profile %q: compile fallback_type.gauge: %w", profile.Name, err)
+		}
+		counter, err := compileFallbackTypeMatcher(fallbackType.Counter)
+		if err != nil {
+			return nil, fmt.Errorf("profile %q: compile fallback_type.counter: %w", profile.Name, err)
+		}
+		fallbacks = append(fallbacks, profileFallback{
+			root:    root,
+			gauge:   gauge,
+			counter: counter,
+		})
+	}
+	return fallbacks, nil
+}
+
+func (f profileFallback) resolve(name string) (commonmodel.MetricType, bool) {
+	if !f.root.MatchString(name) {
+		return "", false
+	}
+	if f.gauge.MatchString(name) {
+		return commonmodel.MetricTypeGauge, true
+	}
+	if f.counter.MatchString(name) {
+		return commonmodel.MetricTypeCounter, true
+	}
+	return "", false
+}
+
+type profileNormalizer struct {
+	root     matcher.Matcher
+	pipeline *relabel.Pipeline
+}
+
+func compileProfileNormalizers(profiles []promprofiles.Profile) ([]profileNormalizer, error) {
+	var normalizers []profileNormalizer
+	for _, profile := range profiles {
+		if !profile.HasRelabeling() {
+			continue
+		}
+		blocks, err := profile.Relabeling()
+		if err != nil {
+			return nil, err
+		}
+		pipeline, err := relabel.NewPipeline(blocks)
+		if err != nil {
+			return nil, fmt.Errorf("profile %q: compile relabeling: %w", profile.Name, err)
+		}
+		root, err := compileProfileRoot(profile)
+		if err != nil {
+			return nil, err
+		}
+		normalizers = append(normalizers, profileNormalizer{root: root, pipeline: pipeline})
+	}
+	return normalizers, nil
+}
+
+func compileProfileRoot(profile promprofiles.Profile) (matcher.Matcher, error) {
+	root, err := matcher.NewSimplePatternsMatcher(profile.Match)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("profile %q: invalid match %q: %w", profile.Name, profile.Match, err)
 	}
-
-	tmpl, err := buildMergedChartTemplate(c.resolveApp(profiles), profiles)
-	if err != nil {
-		return err
-	}
-
-	c.runtime = &promRuntime{profiles: profiles, chartTemplate: tmpl}
-	return nil
+	return root, nil
 }
 
 // resolveApp is the chart-context "app" segment — the per-job identity the UI
@@ -168,6 +239,40 @@ func combinedSelectProfiles(catalog promprofiles.Catalog, names []string, mfs pr
 		out = append(out, p)
 	}
 	return out, nil
+}
+
+// profilesInNormalizationOrder preserves the selected profile order used by
+// chart/app composition while deriving the separate precedence used for sample
+// normalization.
+func profilesInNormalizationOrder(profiles []promprofiles.Profile, config ProfilesConfig) []promprofiles.Profile {
+	if len(profiles) < 2 || config.effectiveMode() == profilesModeExact {
+		return profiles
+	}
+
+	remaining := make(map[string]promprofiles.Profile, len(profiles))
+	for _, profile := range profiles {
+		remaining[promprofiles.NormalizeProfileKey(profile.Name)] = profile
+	}
+
+	ordered := make([]promprofiles.Profile, 0, len(profiles))
+	if config.effectiveMode() == profilesModeCombined {
+		for _, name := range entryNames(config.ModeCombined) {
+			key := promprofiles.NormalizeProfileKey(name)
+			if profile, ok := remaining[key]; ok {
+				ordered = append(ordered, profile)
+				delete(remaining, key)
+			}
+		}
+	}
+
+	rest := make([]promprofiles.Profile, 0, len(remaining))
+	for _, profile := range remaining {
+		rest = append(rest, profile)
+	}
+	sort.Slice(rest, func(i, j int) bool {
+		return promprofiles.NormalizeProfileKey(rest[i].Name) < promprofiles.NormalizeProfileKey(rest[j].Name)
+	})
+	return append(ordered, rest...)
 }
 
 // profileMatchesFamilies reports whether the profile's match pattern hits at

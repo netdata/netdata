@@ -25,7 +25,11 @@ func TestNewProgramScenarios(t *testing.T) {
 			version: "v1",
 			metrics: []string{"windows_tx_total", "windows_rx_total", "windows_tx_total"},
 			charts: []Chart{
-				sampleChart("win.nic.traffic"),
+				func() Chart {
+					chart := sampleChart("win.nic.traffic")
+					chart.Identity.OptionalByLabels = []string{"pid"}
+					return chart
+				}(),
 			},
 			assert: func(t *testing.T, p *Program) {
 				t.Helper()
@@ -39,9 +43,11 @@ func TestNewProgramScenarios(t *testing.T) {
 
 				// Mutate returned chart copy and ensure Program internals are unaffected.
 				gotCharts[0].Meta.Title = "mutated-title"
+				gotCharts[0].Identity.OptionalByLabels[0] = "mutated-label"
 				again, ok := p.Chart("win.nic.traffic")
 				require.True(t, ok, "Chart() did not return existing template id")
 				assert.Equal(t, "Network traffic", again.Meta.Title)
+				assert.Equal(t, []string{"pid"}, again.Identity.OptionalByLabels)
 			},
 		},
 		"rejects duplicate chart template IDs": {
@@ -188,6 +194,41 @@ func TestValidateInstanceLabelSelectorsReportsJoinedErrors(t *testing.T) {
 	assert.ErrorContains(t, err, "instance selector[0]: exclude selector key must be trimmed")
 	assert.ErrorContains(t, err, "instance selector[1]: selector is empty")
 	assert.ErrorContains(t, err, "instance selectors must include at least one positive selector")
+}
+
+func TestValidateInstanceLabelPolicyRejectsOptionalConflicts(t *testing.T) {
+	tests := map[string]struct {
+		required []InstanceLabelSelector
+		optional []string
+		wantErr  string
+	}{
+		"wildcard": {
+			required: []InstanceLabelSelector{{IncludeAll: true}},
+			optional: []string{"pid"},
+			wantErr:  "cannot be combined with include-all",
+		},
+		"required overlap": {
+			required: []InstanceLabelSelector{{Key: "pid"}},
+			optional: []string{"pid"},
+			wantErr:  "conflicts with required selectors",
+		},
+		"duplicate": {
+			optional: []string{"pid", "pid"},
+			wantErr:  "duplicate key",
+		},
+		"magic token": {
+			optional: []string{"!pid"},
+			wantErr:  "key must be explicit",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := validateInstanceLabelPolicy(tc.required, tc.optional)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
 }
 
 func TestValidateDimensionReportsJoinedErrors(t *testing.T) {

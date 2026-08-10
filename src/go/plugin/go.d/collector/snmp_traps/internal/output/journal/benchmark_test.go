@@ -10,8 +10,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
 )
 
-func BenchmarkTrapWriterWrite(b *testing.B) {
-	writer := newWriter(nil, Options{QueueCapacity: 1 << 20})
+func BenchmarkTrapWriterSerializeAndWrite(b *testing.B) {
+	writer := newWriter(discardJournalSink{}, Config{}, 1<<20, nil)
 	if err := writer.Start(); err != nil {
 		b.Fatal(err)
 	}
@@ -21,17 +21,23 @@ func BenchmarkTrapWriterWrite(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		writeWithBackpressure(b, writer, entry)
 	}
+	if err := writer.Flush(); err != nil {
+		b.Fatalf("flush: %v", err)
+	}
 	b.StopTimer()
 	b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "entries/s")
-	_ = writer.Close()
+	if err := writer.Close(); err != nil {
+		b.Fatalf("close: %v", err)
+	}
 }
 
 func BenchmarkJournalTrapWriterDrain(b *testing.B) {
-	sdk, err := newTestSDKWriter(b.TempDir(), Config{RotateSize: 200 * bytesPerMB})
+	cfg := Config{RotateSize: 200 * bytesPerMB}
+	sdk, err := newTestSDKWriter(b.TempDir(), cfg)
 	if err != nil {
 		b.Fatalf("open SDK journal: %v", err)
 	}
-	writer := newWriter(sdk, Options{QueueCapacity: 1 << 20})
+	writer := newWriter(sdk, cfg, 1<<20, nil)
 	if err := writer.Start(); err != nil {
 		b.Fatal(err)
 	}

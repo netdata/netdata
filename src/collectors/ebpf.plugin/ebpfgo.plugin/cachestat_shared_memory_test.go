@@ -36,6 +36,24 @@ func TestBuildCachestatPublish(t *testing.T) {
 	}
 }
 
+func TestBuildCachestatPublishIdleRatioIs100(t *testing.T) {
+	// When current == previous there is no page-cache activity this interval
+	// (total == 0).  Ratio must be 100 to match the idle-path convention in
+	// apps_ebpf_shared_memory.c and cgroup_ebpfgo_cachestat.c.
+	current := netdataCachestat{
+		AddToPageCacheLru:  100,
+		MarkPageAccessed:   100,
+		AccountPageDirtied: 20,
+		MarkBufferDirty:    20,
+	}
+	previous := current
+
+	got := buildCachestatPublish(current, previous, 1234, true)
+	if got.Ratio != 100 {
+		t.Fatalf("idle ratio = %d, want 100", got.Ratio)
+	}
+}
+
 func TestCachestatSharedMemoryStoreFlagsStaleAfterStaleCycles(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
 	app := libbpfloader.CachestatAppSnapshot{Pid: 42, Ppid: 1, Ct: 100, MarkPageAccessed: 10}
@@ -86,7 +104,7 @@ func TestCachestatSharedMemoryStoreNoFlagWhenCtAdvances(t *testing.T) {
 	}
 
 	// Now drive another cachestatStaleCycles-1 stale cycles — still below threshold.
-	for i := 0; i < cachestatStaleCycles-1; i++ {
+	for i := range cachestatStaleCycles - 1 {
 		stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
 		if len(stale) != 0 {
 			t.Fatalf("cycle %d after ct advance: unexpected flag", i)
@@ -148,6 +166,140 @@ func TestCachestatSharedMemoryStoreUpdateApps(t *testing.T) {
 
 	if got[0].cachestat.Prev != (netdataCachestat{}) || got[1].cachestat.Prev != (netdataCachestat{}) {
 		t.Fatalf("Snapshot() previous counters on first update should be zero")
+	}
+}
+
+func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsMergedSocketData(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
+		{Pid: 10, Ppid: 1, Ct: 100},
+		{Pid: 20, Ppid: 1, Ct: 200},
+	})
+	// Cycle 1: establish raw-counter baseline so cycle 2 produces a delta.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 10, BytesSent: 0, BytesReceived: 0, CallTCPSent: 0},
+	}, 10)
+	// Cycle 2: delta = cycle2 value - cycle1 value = 1000, 2000, 3.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 10, BytesSent: 1000, BytesReceived: 2000, CallTCPSent: 3},
+	}, 10)
+
+	withSocket := store.Snapshot()
+	if len(withSocket) != 2 {
+		t.Fatalf("Snapshot() len = %d, want 2", len(withSocket))
+	}
+	if withSocket[0].pid != 10 || withSocket[0].socket.BytesSent != 1000 {
+		t.Fatalf("Snapshot()[0] socket data = %+v, want bytes_sent=1000 for PID 10", withSocket[0].socket)
+	}
+
+	store.UpdateSocketApps(nil, 0)
+
+	cleared := store.Snapshot()
+	if len(cleared) != 2 {
+		t.Fatalf("Snapshot() len after clear = %d, want 2", len(cleared))
+	}
+	for _, entry := range cleared {
+		if entry.socket != (ebpfSocketPublishApps{}) {
+			t.Fatalf("PID %d socket data after clear = %+v, want zero", entry.pid, entry.socket)
+		}
+	}
+	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
+		t.Fatal("UpdateSocketApps(nil) unexpectedly cleared an already active socket flag")
+	}
+}
+
+func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsSocketOnlyEntries(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 30, BytesSent: 3000, CallUDPSent: 4},
+		{PID: 10, BytesReceived: 1000, CallTCPReceived: 2},
+	}, 10)
+
+	withSocket := store.Snapshot()
+	if len(withSocket) != 2 {
+		t.Fatalf("Snapshot() len = %d, want 2", len(withSocket))
+	}
+	if withSocket[0].pid != 10 || withSocket[1].pid != 30 {
+		t.Fatalf("Snapshot() pids = %d,%d, want 10,30", withSocket[0].pid, withSocket[1].pid)
+	}
+
+	store.UpdateSocketApps(nil, 0)
+
+	cleared := store.Snapshot()
+	if len(cleared) != 0 {
+		t.Fatalf("Snapshot() len after socket-only clear = %d, want 0", len(cleared))
+	}
+	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
+		t.Fatal("UpdateSocketApps(nil) unexpectedly cleared an already active socket flag")
+	}
+}
+
+// TestCachestatSharedMemoryStoreSolePublisherEvictsExitedPIDs verifies that
+// when socket is the sole publisher (no cachestat entries), each call to
+// UpdateSocketApps rebuilds entries from the current snapshot rather than
+// accumulating entries for PIDs that are no longer in the snapshot.
+//
+// Regression: the old "len(s.entries) == 0" guard took the merge path from
+// cycle 2 onward, causing exited PIDs to remain in s.entries forever.
+func TestCachestatSharedMemoryStoreSolePublisherEjectsExitedPIDs(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+
+	// Cycle 1: PIDs 10 and 20 are active.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 10, BytesSent: 100},
+		{PID: 20, BytesSent: 200},
+	}, 10)
+	snap1 := store.Snapshot()
+	if len(snap1) != 2 {
+		t.Fatalf("cycle 1: Snapshot() len = %d, want 2", len(snap1))
+	}
+
+	// Cycle 2: PID 10 has exited; PID 30 is new.
+	// PID 20: delta = 201 - 200 = 1.  PID 30: new PID, first cycle suppressed to 0.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 20, BytesSent: 201},
+		{PID: 30, BytesSent: 300},
+	}, 10)
+	snap2 := store.Snapshot()
+	if len(snap2) != 2 {
+		t.Fatalf("cycle 2: Snapshot() len = %d, want 2 (exited PID 10 must be evicted)", len(snap2))
+	}
+	if snap2[0].pid != 20 || snap2[1].pid != 30 {
+		t.Fatalf("cycle 2: Snapshot() pids = %d,%d, want 20,30", snap2[0].pid, snap2[1].pid)
+	}
+	if snap2[0].socket.BytesSent != 1 {
+		t.Fatalf("cycle 2: PID 20 BytesSent = %d, want 1 (delta from 200 to 201)", snap2[0].socket.BytesSent)
+	}
+
+	// Cycle 3: PID 20 exits too; only PID 30 remains.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 30, BytesSent: 301},
+	}, 10)
+	snap3 := store.Snapshot()
+	if len(snap3) != 1 {
+		t.Fatalf("cycle 3: Snapshot() len = %d, want 1 (exited PID 20 must be evicted)", len(snap3))
+	}
+	if snap3[0].pid != 30 {
+		t.Fatalf("cycle 3: Snapshot() pid = %d, want 30", snap3[0].pid)
+	}
+}
+
+func TestCachestatSharedMemoryStoreEmptySocketSnapshotPreservesBaseline(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 10, BytesSent: 100}}, 5)
+	store.UpdateSocketApps(nil, 0)
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 10, BytesSent: 150}}, 5)
+
+	snap := store.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	if snap[0].socket.BytesSent != 50 {
+		t.Fatalf("PID 10 BytesSent = %d, want 50 after empty-map interval", snap[0].socket.BytesSent)
+	}
+	if snap[0].socket.UpdateEverySec != 5 {
+		t.Fatalf("PID 10 UpdateEverySec = %d, want 5", snap[0].socket.UpdateEverySec)
 	}
 }
 

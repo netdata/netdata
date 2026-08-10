@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -59,8 +58,8 @@ app_lat_count{inst="b"} 5
 ` + relabelSibling
 )
 
-// TestCollector_relabelTypedFamilyIntegrity drives the real collector (Init → Check,
-// Init → Collect) and asserts that relabeling which would silently corrupt a
+// TestCollector_relabelTypedFamilyIntegrity drives the real collector (Init → Check →
+// Collect) and asserts that relabeling which would silently corrupt a
 // histogram/summary is a hard error under Check and a drop-and-reassemble under
 // Collect, while clean relabeling and the unrelated sibling are preserved.
 func TestCollector_relabelTypedFamilyIntegrity(t *testing.T) {
@@ -163,19 +162,21 @@ func TestCollector_relabelTypedFamilyIntegrity(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			currentInput := tc.input
 			srv := httptest.NewServer(http.HandlerFunc(
-				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.input)) }))
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(currentInput)) }))
 			defer srv.Close()
 
 			newCollr := func() *Collector {
 				c := New()
 				c.URL = srv.URL
-				c.Relabeling = []RelabelBlock{{Match: "*", MetricRelabelConfigs: tc.rules}}
+				c.Relabeling = []relabel.Block{{Match: "*", MetricRelabelConfigs: tc.rules}}
 				require.NoError(t, c.Init(context.Background()))
 				return c
 			}
 
 			// Check: corruption fails autodetection.
+			currentInput = tc.input
 			checkErr := newCollr().Check(context.Background())
 			if tc.wantCheckErr {
 				assert.Error(t, checkErr)
@@ -183,8 +184,12 @@ func TestCollector_relabelTypedFamilyIntegrity(t *testing.T) {
 				assert.NoError(t, checkErr)
 			}
 
-			// Collect: corruption is dropped, survivors written.
+			// Runtime behavior is tested only after a successful Check, then an
+			// exporter-shape drift introduces the corrupt family.
+			currentInput = "# TYPE startup gauge\nstartup 1\n"
 			collr := newCollr()
+			require.NoError(t, collr.Check(context.Background()))
+			currentInput = tc.input
 			cc := cycle(t, collr.MetricStore())
 			cc.BeginCycle()
 			require.NoError(t, collr.Collect(context.Background()))
@@ -206,11 +211,14 @@ app_lat_sum 2.5
 app_lat_count 6
 `)
 
-	proc, err := relabel.New(renameMetric("app_lat(.*)", "renamed_lat${1}"))
+	pipeline, err := relabel.NewPipeline([]relabel.Block{{
+		Match:                "*",
+		MetricRelabelConfigs: renameMetric("app_lat(.*)", "renamed_lat${1}"),
+	}})
 	require.NoError(t, err)
-	c := &Collector{relabelBlocks: []relabelBlock{{match: matcher.TRUE(), proc: proc}}}
+	c := &Collector{jobRelabel: pipeline}
 
-	mfs, err := c.relabelAndAssemble(batch, false)
+	_, mfs, err := c.relabelAndAssemble(batch, c.jobRelabel, jobRelabelStage, false)
 	require.NoError(t, err)
 
 	renamed := mfs.GetHistogram("renamed_lat")
@@ -234,11 +242,12 @@ other_requests_total{code="200"} 9
 
 	collr := New()
 	collr.URL = srv.URL
-	collr.Relabeling = []RelabelBlock{{
+	collr.Relabeling = []relabel.Block{{
 		Match:                "app_*",
 		MetricRelabelConfigs: setLabel([]string{"code"}, "(.+)", "verb", "${1}"),
 	}}
 	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	cc := cycle(t, collr.MetricStore())
 	cc.BeginCycle()

@@ -706,17 +706,19 @@ Why it matters:
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/metrics.go` collects receiver
-  pipeline, events, severities, errors, and dedup metrics with `job_name`.
+- `src/go/plugin/go.d/collector/snmp_traps/internal/telemetry/job.go` collects
+  receiver pipeline, events, severities, errors, and dedup metrics with
+  `job_name` through an explicit per-job handle.
 - `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, and `TRAP_ENRICHMENT` preserve the
   source evidence used for log filtering and audit.
 - `src/go/plugin/go.d/collector/snmp_traps/config.go:26` through `:28` defines
   trusted relay configuration.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:732` through `:736`
-  warns that catch-all trusted relays let every peer override source identity
-  via `snmpTrapAddress.0`.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:578` through `:587`
-  handles INFORM responses and increments `inform_response_failed`.
+- The root `Collector.warnCatchAllTrustedRelays` composition warning explains
+  that catch-all trusted relays let every peer override source identity via
+  `snmpTrapAddress.0`.
+- `internal/jobruntime.Job` handles receiver events, including INFORM response
+  failures, and records `inform_response_failed` through the retained telemetry
+  handle.
 
 ## Explicit Non-Goals
 
@@ -1561,8 +1563,9 @@ Compilation path:
 - Developer-only debug dumps of the compiled spec are allowed only outside
   public request paths and must never become the source served by
   `ChartTemplateYAML()`.
-- Compilation happens when the trap profile metric catalog is built or refreshed,
-  not on every collection cycle.
+- Static definitions are validated and retained by the shared catalog epoch. Each
+  listener job compiles its explicitly selected rules and generated chart template
+  once during `Init()`, not on every collection cycle.
 - `profile_metrics.include` validation uses the compiled metric rule catalog.
 
 Chart conflict rules:
@@ -1603,8 +1606,8 @@ Lifecycle:
 - State tables must be synchronized; race-free state updates are a required
   implementation property.
 - Multi-endpoint listener jobs can deliver trap metric updates concurrently.
-  `profileMetricRuntime.mu` serializes state and series mutations within the
-  job.
+  The mutex owned by `internal/profilemetrics.Runtime` serializes state and
+  series mutations within the job.
 - State tables are in-memory only. After Agent restart, trap-derived state is
   unknown until new traps arrive; the implementation must not claim a persisted
   clear state unless a clear trap was observed after restart.
@@ -1665,17 +1668,10 @@ design explicitly changes it:
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:625` through `:631`
-  returns early for dedup-suppressed traps.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:633` through `:640`
-  returns early for write failures.
-- `src/go/plugin/go.d/collector/snmp_traps/collector.go:644` through `:654`
-  updates profile, event, and severity metrics after successful write.
-- Phase A profile metric tests verify no profile metric is emitted for write
-  failures and dedup-suppressed traps. Pre-Phase-A
-  `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go:818`
-  through `:831` and `:962` through `:985` covered the removed job-level
-  operator metric runtime.
+- `src/go/plugin/go.d/collector/snmp_traps/internal/jobruntime/pipeline.go` returns early for dedup-suppressed traps and
+  authoritative write failures, then updates profile, event, and severity metrics only after a successful write.
+- `src/go/plugin/go.d/collector/snmp_traps/internal/jobruntime/profile_metrics_integration_test.go` verifies that profile
+  metrics are not emitted after authoritative write failures or for dedup-suppressed traps.
 
 ### Composition And Override Semantics
 
@@ -1784,7 +1780,7 @@ Profile validation must reject:
   approved bounded enum or boolean representation;
 - `value_from_varbind` targeting known sensitive varbinds;
 - `output.metric` values that collide with built-in metrics emitted by
-  `metrics.go`;
+  `internal/telemetry/job.go`;
 - `output.dimension` values that do not match the chart dimension name selecting
   the rule's `output.metric`.
 

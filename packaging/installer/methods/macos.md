@@ -83,11 +83,15 @@ Homebrew will place your Netdata configuration directory at `/opt/homebrew/etc/n
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/opt/homebrew/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
 
+### Start the Netdata Agent
+
+Homebrew installs Netdata but does not start the Agent automatically, so the local dashboard at `http://localhost:19999` is not available until you start it yourself. See [macOS (Homebrew)](/docs/netdata-agent/start-stop-restart.md#macos-homebrew) for the `brew services` commands to start, stop, restart, and check the status of the Agent.
+
 ### Connect a Homebrew-installed Agent to Netdata Cloud
 
 The easiest way to connect a Homebrew-installed Netdata Agent to Netdata Cloud is via the local dashboard UI, as described in [Method 1: Via UI](/src/claim/README.md#method-1-via-ui-recommended):
 
-1. Open the local dashboard in your browser at `http://localhost:19999` (or the Agent's IP address at port 19999).
+1. Open the local dashboard in your browser at `http://localhost:19999` (or the Agent's IP address at port 19999). The Agent must be running first; if you haven't started it yet, see [Start the Netdata Agent](#start-the-netdata-agent) above.
 2. Sign in to your Netdata Cloud account.
 3. Click the **Connect** button and follow the on-screen instructions.
 

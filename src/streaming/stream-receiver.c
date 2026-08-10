@@ -1074,10 +1074,10 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
                 size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %ld seconds - closing connection - "
+                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %" PRId64 " seconds - closing connection - "
                    "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, timeout_s,
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, (int64_t)timeout_s,
                    stats.bytes_sent, stats.sends, duration, pending, stats.buffer_ratio);
 
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT);
@@ -1245,6 +1245,20 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
         return RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
     }
 
+    // A vnode has exactly one writer: the local collector that defines it.
+    //
+    // stream_receiver_accept_connection() already rejects locally collected vnodes, but that check
+    // runs before the socket takeover and this attach - the connection can spend seconds in between
+    // (stale-receiver wait, host creation, first response). Meanwhile the collector may claim the
+    // vnode: it sets RRDHOST_FLAG_VIRTUAL_HOST and then evicts any attached receiver under this
+    // same lock (pluginsd_host_claim_as_local_vnode()). Re-checking the flag here is what makes the
+    // two paths mutually exclusive: either we attach first and the collector evicts us, or the
+    // collector claims first and we are refused. Without it, we would become a second writer.
+    if (rrdhost_is_virtual(host)) {
+        rrdhost_receiver_unlock(host);
+        return RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL;
+    }
+
     if (!host->receiver) {
         object_state_activate_if_not_activated(&host->state_id);
 
@@ -1332,6 +1346,10 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
                     rrdcalc_child_disconnected(host);
 
                 stream_parents_host_reset(host, reason);
+
+                // object_state_deactivate() above made this child's functions unavailable
+                // without removing them, so nothing else refreshes the cloud manifest
+                aclk_arm_node_manifest(host);
             }
             rrdhost_receiver_lock(host);
 

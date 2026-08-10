@@ -153,3 +153,84 @@ profile changes require an Agent restart or recreation of every trap job.
 Invalid operator profiles fail the next job creation; invalid lazy stock
 profiles fail their first matching lookup and increment profile-load-failure
 metrics.
+
+## 8. Receiver boundary and synchronous handoff (authoritative)
+
+Runtime ownership is split at protocol acceptance:
+
+- `internal/receiver` owns the immutable per-job reception policy, endpoint
+  sockets, reusable receive buffers, source/version/community admission,
+  BER/SNMP decode, SNMPv3 USM and engine state, dynamic engine-ID handling,
+  INFORM responses, and per-source rate limiting.
+- `internal/dedup` owns normalized dedup policy, fingerprint/cache state,
+  admission and rollback, summary scheduling/rendering, and synchronous final
+  callback completion. It receives model entries plus already-selected key
+  names and returns typed decisions; it does not import catalog, output, or
+  telemetry packages.
+- `internal/telemetry` owns the retained built-in per-job counters and their
+  `metrix` emission. Event paths and collection retain one explicit job handle;
+  registry lookup and locking are lifecycle-only.
+- `internal/jobruntime` owns one job's resources and lifecycle/transaction
+  orchestration. After receiver acceptance, it sequences catalog lookup,
+  overrides, attribution/enrichment, template rendering, dedup admission,
+  authoritative output commitment, profile-metric updates, and built-in metric
+  updates.
+- The root collector owns public config DTOs and normalization, framework
+  methods/assets, and composition of shared plugin services into the immutable
+  job policy and explicit dependencies.
+- Runtime receiver outcomes use one event callback. The receiver package does
+  not depend on collector telemetry, logging, profile, or output packages.
+- `Receiver.Bind()` returns non-fatal bind-time events as explicit values.
+  `jobruntime.Job` attaches the job telemetry handle before handling them;
+  runtime events continue through the receiver callback.
+
+Each endpoint owns one receive goroutine and one reusable datagram buffer. The
+receive loop invokes the `jobruntime.Job` packet workflow synchronously before
+reusing that buffer. There is no receiver queue, channel, or intermediate worker between the
+socket read and packet handling. Output backends retain their own bounded queues
+under the `internal/output.Writer` contract.
+
+Initialization is staged so failed jobs do not leak sockets or newly created
+SNMPv3 state:
+
+1. Root validates public config and builds the immutable job and component
+   policies.
+2. `jobruntime.Job` acquires the catalog lease and constructs profile metrics
+   when enabled.
+3. Prepare the journal backend when enabled; no receiver socket is bound yet.
+4. Construct the receiver and bind every endpoint; any bind failure closes
+   earlier sockets and the prepared journal backend.
+5. Prepare receiver-local SNMPv3 state when v3 is enabled.
+6. Attach the per-job telemetry handle, then handle the receiver's returned
+   bind-time events so degraded default receive-buffer requests are counted.
+7. Prepare the OTLP backend, compose the output coordinator and deduper, then
+   start the prepared output backends.
+8. Publish the fully constructed collector state, start deduplication when
+   enabled, commit prepared v3 state, and start endpoint receive loops last.
+
+Failures after v3 preparation but before receiver start detach an attached
+telemetry handle, roll back only state created by that attempt, and close all
+bound sockets. Cleanup closes receive loops first, synchronously completes the
+deduper's final summary callback, closes output, releases the catalog lease, and
+detaches telemetry last. Borrowed shared enrichment dependencies remain alive.
+
+## 9. Enrichment and reverse-DNS ownership (authoritative)
+
+The SNMP-family composition root creates shared enrichment dependencies once:
+
+- `ddsnmp.DeviceStore` carries SNMP polling identity.
+- `snmp_topology.TrapEnrichmentHandle` carries topology device/interface/neighbor context.
+- `pkg/reversedns.Resolver` is the one process-owned PTR cache and lookup scheduler used by topology and traps.
+
+Each trap creator builds one immutable `internal/enrichment.Enricher` from Netdata-specific value adapters under
+`internal/enrichment/netdataadapter`. All listener jobs created by that creator share the enricher, while each job keeps
+its own `reverse_dns.enabled` bit. Job initialization and cleanup MUST NOT create, close, sweep, or clear the borrowed
+resolver.
+
+The packet path performs only cache-only `Lookup` plus best-effort non-blocking `Schedule`. A cold row is written with
+reverse-DNS audit status `pending`; it is not backfilled when the PTR lookup later completes. Topology keeps live DNS I/O
+in its bounded background warmer and uses only cache hits while rendering Function responses.
+
+The generic resolver owns address canonicalization, deterministic PTR selection, positive/negative TTLs, per-address
+coalescing, bounded admission, and scan-resistant retention. Collector adapters retain source eligibility, display-name
+precedence, public audit-state mapping, and all registry/topology DTO projection.

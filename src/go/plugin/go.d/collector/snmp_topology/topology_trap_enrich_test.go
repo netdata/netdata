@@ -139,6 +139,8 @@ func TestTrapEnrichmentHandleForSourceUsesPublishedRegistry(t *testing.T) {
 	require.Equal(t, "matched", enrich.DeviceStatus)
 	require.Equal(t, "Gi0/11", enrich.Interface)
 	require.Equal(t, []string{"dist-c"}, enrich.Neighbors)
+	enrich.Neighbors[0] = "caller-owned"
+	require.Equal(t, []string{"dist-c"}, handle.EnrichmentForSource("192.0.2.20", "11").Neighbors)
 
 	mapped := handle.EnrichmentForSource("::ffff:192.0.2.20", "11")
 	require.NotNil(t, mapped)

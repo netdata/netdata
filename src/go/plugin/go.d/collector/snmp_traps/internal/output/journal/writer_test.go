@@ -18,9 +18,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type discardJournalSink struct{}
+
+func (discardJournalSink) writeRaw([][]byte, int, int64, int64) error { return nil }
+func (discardJournalSink) sync() error                                { return nil }
+func (discardJournalSink) sweepRetention() error                      { return nil }
+func (discardJournalSink) close() error                               { return nil }
+func (discardJournalSink) binaryFieldCount() uint64                   { return 0 }
+
 func TestWriterConcurrentWriteCloseDoesNotPanic(t *testing.T) {
 	for range 50 {
-		writer := newWriter(nil, Options{QueueCapacity: 2})
+		writer := newWriter(discardJournalSink{}, Config{}, 2, nil)
 		require.NoError(t, writer.Start())
 		start := make(chan struct{})
 		done := make(chan struct{})
@@ -30,7 +38,7 @@ func TestWriterConcurrentWriteCloseDoesNotPanic(t *testing.T) {
 			wg.Go(func() {
 				<-start
 				for {
-					err := writer.Write(&model.TrapEntry{JobName: "local", Message: "trap"})
+					err := writer.Write(testTrapEntry())
 					if errors.Is(err, output.ErrClosed) {
 						return
 					}
@@ -59,7 +67,7 @@ func TestWriterConcurrentWriteCloseDoesNotPanic(t *testing.T) {
 }
 
 func TestWriterPreparedLifecycle(t *testing.T) {
-	writer := newWriter(nil, Options{QueueCapacity: 1})
+	writer := newWriter(discardJournalSink{}, Config{}, 1, nil)
 	require.ErrorIs(t, writer.Write(&model.TrapEntry{}), output.ErrNotStarted)
 	require.ErrorIs(t, writer.Flush(), output.ErrNotStarted)
 	require.NoError(t, writer.Close())
@@ -93,10 +101,10 @@ func TestRetentionSweepInterval(t *testing.T) {
 		},
 	}
 
-	assert.Zero(t, journalRetentionSweepInterval(nil))
+	assert.Zero(t, journalRetentionSweepInterval(Config{}))
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, journalRetentionSweepInterval(&sdkWriter{cfg: tc.cfg}))
+			assert.Equal(t, tc.want, journalRetentionSweepInterval(tc.cfg))
 		})
 	}
 }
@@ -104,9 +112,11 @@ func TestRetentionSweepInterval(t *testing.T) {
 func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 	journaltest.RequireJournalctl(t)
 
-	sdk, err := newTestSDKWriter(t.TempDir(), Config{RotateSize: 200 * bytesPerMB})
+	dir := t.TempDir()
+	cfg := Config{RotateSize: 200 * bytesPerMB}
+	sdk, err := newTestSDKWriter(dir, cfg)
 	require.NoError(t, err)
-	writer := newWriter(sdk, Options{QueueCapacity: 1 << 10})
+	writer := newWriter(sdk, cfg, 1<<10, nil)
 	writer.flushInterval = 100 * time.Millisecond
 	require.NoError(t, writer.Start())
 
@@ -115,12 +125,11 @@ func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 		require.NoError(t, writer.Write(testTrapEntry()))
 	}
 
-	journalDir := writer.Directory()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var count int
 	for ctx.Err() == nil {
-		count = journalctlRowCount(ctx, journalDir, "TRAP_CATEGORY=security", "TRAP_OID")
+		count = journalctlRowCount(ctx, dir, "TRAP_CATEGORY=security", "TRAP_OID")
 		if count >= want {
 			break
 		}
@@ -131,7 +140,7 @@ func TestWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel2()
-	require.GreaterOrEqual(t, journalctlRowCount(ctx2, journalDir, "TRAP_CATEGORY=security", "TRAP_OID"), want)
+	require.GreaterOrEqual(t, journalctlRowCount(ctx2, dir, "TRAP_CATEGORY=security", "TRAP_OID"), want)
 }
 
 func testTrapEntry() *model.TrapEntry {
