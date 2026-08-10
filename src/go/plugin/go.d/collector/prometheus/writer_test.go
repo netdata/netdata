@@ -265,13 +265,23 @@ app_latency_count 1
 				assert.Equal(t, 0, written, "summary with an infinite quantile value must be skipped")
 			},
 		},
-		"skips _info family": {
+		"skips gauge _info family": {
 			exposition: `
 # TYPE app_build_info gauge
 app_build_info{version="1.2.3"} 1
 `,
 			assert: func(t *testing.T, fr metrix.Reader, written int) {
-				assert.Equal(t, 0, written, "_info family must be skipped entirely")
+				assert.Equal(t, 0, written, "gauge _info family must be skipped entirely")
+			},
+		},
+		"writes typed counter ending in _info": {
+			exposition: `
+# TYPE app_pg_info counter
+app_pg_info 42
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 1, written)
+				assert.InDelta(t, 42, value(t, fr, "app_pg_info", nil), 1e-9)
 			},
 		},
 		"skips family exceeding maxTSPerMetric": {
@@ -547,7 +557,7 @@ func mustMeta(t *testing.T, fr metrix.Reader, name string) metrix.MetricMeta {
 }
 
 func TestMetricFamilyWriterEdgeCases(t *testing.T) {
-	t.Run("countWritable counts writable series and skips _info", func(t *testing.T) {
+	t.Run("countWritable counts typed counter and skips gauge _info", func(t *testing.T) {
 		store := metrix.NewCollectorStore()
 		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
 		mfs := scrape(t, `
@@ -556,8 +566,10 @@ app_a{x="1"} 1
 app_a{x="2"} 2
 # TYPE app_b_info gauge
 app_b_info{v="x"} 1
+# TYPE app_pg_info counter
+app_pg_info 3
 `)
-		assert.Equal(t, 2, w.countWritable(mfs))
+		assert.Equal(t, 3, w.countWritable(mfs))
 	})
 
 	t.Run("countWritable accepts a summary without quantiles", func(t *testing.T) {
