@@ -54,6 +54,7 @@
                 <ComponentRef Id="NetdataEtcHealth" />
                 <ComponentRef Id="NetdataEtcPython" />
                 <ComponentRef Id="NetdataEtcStatsd" />
+                <ComponentRef Id="NetdataEtcCustomPlugins" />
                 <ComponentGroupRef Id="WevtComponents" />
                 <FeatureGroupRef Id="NetdataDriver" />
                 <ComponentRef Id="NetdataService" />
@@ -82,6 +83,7 @@
                             <Directory Id="ETCDIRNETDATAHEALTH" Name="health.d" />
                             <Directory Id="ETCDIRNETDATAPYTHON" Name="python.d" />
                             <Directory Id="ETCDIRNETDATASTATSD" Name="statsd.d" />
+                            <Directory Id="ETCDIRNETDATACUSTOMPLUGINS" Name="custom-plugins.d" />
                         </Directory>
                     </Directory>
                     <Directory Id="DEVDIR" Name="dev">
@@ -250,6 +252,10 @@
             </Component>
 
             <Component Id="NetdataEtcStatsd" Directory="ETCDIRNETDATASTATSD" Guid="5f53221b-691f-4026-8396-52c6b2ac025f">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataEtcCustomPlugins" Directory="ETCDIRNETDATACUSTOMPLUGINS" Guid="9cddfb75-cf4b-4825-8b1e-662a1a4e5ca7">
                 <CreateFolder />
             </Component>
 
