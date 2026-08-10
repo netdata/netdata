@@ -476,18 +476,21 @@ test_drop{label1="value1"} 22
 				assert.False(t, ok, "a metric not matched by the selector must be dropped")
 			},
 		},
-		"_info family is skipped": {
+		"gauge _info family is skipped and counter is kept": {
 			prepare: New,
 			input: `
 # TYPE test_metric gauge
 test_metric{label1="value1"} 11
 # TYPE test_metric_info gauge
 test_metric_info{version="1.2.3"} 1
+# TYPE test_pg_info counter
+test_pg_info 7
 `,
 			want: func(t *testing.T, fr metrix.Reader) {
 				assert.InDelta(t, 11, value(t, fr, "test_metric", metrix.Labels{"label1": "value1"}), 1e-9)
 				_, ok := fr.Value("test_metric_info", metrix.Labels{"version": "1.2.3"})
-				assert.False(t, ok, "an _info family must be skipped")
+				assert.False(t, ok, "a gauge _info family must be skipped")
+				assert.InDelta(t, 7, value(t, fr, "test_pg_info", nil), 1e-9)
 			},
 		},
 		"per-metric series limit skips the family": {

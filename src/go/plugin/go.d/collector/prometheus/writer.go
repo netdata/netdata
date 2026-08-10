@@ -233,7 +233,8 @@ func (w *metricFamilyWriter) reconcileHandles() {
 }
 
 func (w *metricFamilyWriter) skipMetricFamily(mf *prompkg.MetricFamily) bool {
-	if strings.HasSuffix(mf.Name(), "_info") {
+	// Info exposition is gauge-valued; preserve an explicit non-gauge type when an exporter reuses the suffix.
+	if mf.Type() == commonmodel.MetricTypeGauge && strings.HasSuffix(mf.Name(), "_info") {
 		return true
 	}
 	if w.policy.maxTSPerMetric > 0 && len(mf.Metrics()) > w.policy.maxTSPerMetric {
