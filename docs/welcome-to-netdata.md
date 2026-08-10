@@ -255,9 +255,9 @@ For Netdata, scalability is inherent to the architecture, not an add-on. Designe
 
 Netdata thrives as part of a vibrant open-source community with 1.5 million downloads per day. The platform integrates seamlessly with existing tools and standards:
 
-- **Metrics collection**: Ingests metrics via all open standards (OpenTelemetry in final release stage)
+- **Metrics collection**: Ingests metrics through open standards, including OpenTelemetry OTLP/gRPC
 - **Metrics export**: Exports metrics to all open standards and commonly used time-series databases (Prometheus, Graphite, InfluxDB, OpenTSDB, and more)
-- **Logs**: Uses battle tested systemd journal files for storing logs, providing maximum interoperability
+- **Logs**: Explores systemd journal sources and indexed OpenTelemetry logs through the same Logs interface
 - **Alert routing**: Delivers notifications to PagerDuty, Slack, email, webhooks, and 20+ platforms
 - **AI integration**: Supports AI assistants via Model Context Protocol (MCP) — available via Netdata Cloud (infrastructure-wide) and on every Agent/Parent (local access)
 - **Visualization**: Works with Grafana through native datasource plugin
