@@ -106,6 +106,18 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
+    if(rdcf->options != new_rdcf->options) {
+        // options are derived from the name and the tags (get_function_options());
+        // keeping them in sync with the swapped tags is what makes a re-registration
+        // with the "hidden" tag actually restrict the function
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed options",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
+        SWAP(rdcf->options, new_rdcf->options);
+        changed = true;
+    }
+
     if(rdcf->timeout != new_rdcf->timeout) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: function '%s' of host '%s' changed timeout (from %d to %d)",
@@ -242,13 +254,30 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     CLEAN_CHAR_P *key = mallocz(key_size);
     rrd_functions_sanitize(key, name, key_size);
 
+    // text_sanitize() wipes a result that is entirely underscores, so a name like "__" sanitizes
+    // to "". Such a name is unusable (it could never be looked up) and it would also defeat the
+    // "__" prefix check in is_function_restricted() below, so refuse it outright.
+    if(unlikely(!*key)) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "FUNCTIONS: refusing to register function '%s' on host '%s': the name sanitizes to an empty string",
+               name, rrdhost_hostname(host));
+        return;
+    }
+
+    // Classify from the sanitized key, not the raw name: the key is what the dictionary is
+    // indexed by, so classifying the raw name lets " config" land on the "config" key without
+    // the DYNCFG option, which would hand a dyncfg-reserved entry to a regular function.
+    // Captured before the insert because the conflict callback swaps options with the
+    // previous value, leaving tmp.options holding the old one.
+    RRD_FUNCTION_OPTIONS options = get_function_options(st, key, tags);
+
     struct rrd_host_function tmp = {
         .collector = NULL,
         .sync = sync,
         .timeout = timeout,
         .version = version,
         .priority = priority,
-        .options = get_function_options(st, name, tags),
+        .options = options,
         .access = access,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
@@ -263,6 +292,14 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_acquired_item_release(host->functions, item);
+
+    // Refresh the cloud function manifest. Only DYNCFG is excluded: it is derived from the
+    // key, so such an entry can never enter or leave the manifest. RESTRICTED comes from the
+    // tags and can be added by a re-registration, which drops the function OUT of the
+    // manifest - that transition has to be reported too, so it must not be filtered here.
+    // Placed after the insert so the arm always follows the change it reports.
+    if(!(options & RRD_FUNCTION_DYNCFG))
+        aclk_arm_node_manifest(host);
 }
 
 bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_streaming, bool internal) {
@@ -296,6 +333,10 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     // (stream_sender_send_global_rrdhost_functions skips RRD_FUNCTION_DYNCFG),
     // so their removals must not be streamed either. Capture this before releasing.
     bool is_dyncfg = (rdcf->options & RRD_FUNCTION_DYNCFG);
+
+    // whether this function is part of the cloud manifest; captured here because
+    // rdcf is released (and may be freed) before we can queue the manifest refresh
+    bool in_manifest = !(rdcf->options & (RRD_FUNCTION_DYNCFG | RRD_FUNCTION_RESTRICTED));
 
     // The FUNCTION_DEL protocol command (from external plugins or streaming
     // children) must never remove dyncfg config functions; those are owned and
@@ -332,6 +373,10 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_garbage_collect(host->functions);
+
+    // after the delete, so the arm always follows the change it reports
+    if(in_manifest)
+        aclk_arm_node_manifest(host);
 
     return true;
 }

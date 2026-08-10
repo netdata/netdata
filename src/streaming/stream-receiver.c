@@ -1346,6 +1346,10 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
                     rrdcalc_child_disconnected(host);
 
                 stream_parents_host_reset(host, reason);
+
+                // object_state_deactivate() above made this child's functions unavailable
+                // without removing them, so nothing else refreshes the cloud manifest
+                aclk_arm_node_manifest(host);
             }
             rrdhost_receiver_lock(host);
 

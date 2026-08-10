@@ -2375,6 +2375,7 @@ set(ACLK_PROTO_DEFS
         src/aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
         src/aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
         src/aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/manifest/v1/manifest.proto
         src/aclk/aclk-schemas/proto/context/v1/context.proto
         src/aclk/aclk-schemas/proto/context/v1/stream.proto
         src/aclk/aclk-schemas/proto/agent/v1/cmds.proto
@@ -2407,6 +2408,8 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/alarm_config.h
         src/aclk/schema-wrappers/node_info.cc
         src/aclk/schema-wrappers/node_info.h
+        src/aclk/schema-wrappers/node_manifest.cc
+        src/aclk/schema-wrappers/node_manifest.h
         src/aclk/schema-wrappers/capability.cc
         src/aclk/schema-wrappers/capability.h
         src/aclk/schema-wrappers/proto_2_json.cc

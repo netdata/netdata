@@ -812,13 +812,15 @@ void aclk_send_alert_configuration(char *config_hash)
     if (unlikely(!aclk_host_config))
         return;
 
+    char node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, node_id);
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
         "ACLK REQ [%s (%s)]: Request to send alert config %s.",
-        aclk_host_config->node_id,
+        node_id,
         aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A",
         config_hash);
 
-    aclk_push_alert_config(aclk_host_config->node_id, config_hash);
+    aclk_push_alert_config(node_id, config_hash);
 }
 
 #define SQL_SELECT_ALERT_CONFIG                                                                                        \
@@ -839,6 +841,9 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
         freez(node_id);
         return;
     }
+
+    char current_node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, current_node_id);
 
     nd_uuid_t hash_uuid;
     if (uuid_parse(config_hash, hash_uuid)) {
@@ -924,7 +929,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
 
     if (likely(p_alarm_config.cfg_hash)) {
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK RES [%s (%s)]: Sent alert config %s.",
-            aclk_host_config->node_id,
+            current_node_id,
             aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
         alert_hash_mark_sent(&hash_uuid);
@@ -933,7 +938,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
     }
     else
         nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK STA [%s (%s)]: Alert config for %s not found.",
-            aclk_host_config->node_id,
+            current_node_id,
             aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A", config_hash);
 
 done:
@@ -971,13 +976,16 @@ done:
 
 static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_config, uint64_t cloud_version)
 {
+    char node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, node_id);
+
     if (cloud_version == 1) {
         nd_log(
             NDLS_ACCESS,
             NDLP_NOTICE,
             "Cloud requested to skip alert version verification for host \"%s\", node \"%s\"",
             rrdhost_hostname(aclk_host_config->host),
-            aclk_host_config->node_id);
+            node_id);
         return;
     }
 
@@ -988,7 +996,7 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
             NDLP_NOTICE,
             "Scheduling alert snapshot for host \"%s\", node \"%s\" (version: cloud %llu, local %llu)",
             rrdhost_hostname(aclk_host_config->host),
-            aclk_host_config->node_id,
+            node_id,
             (long long unsigned)cloud_version,
             (long long unsigned)local_version);
 
@@ -1001,7 +1009,7 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
             NDLP_DEBUG,
             "Alert check on \"%s\", node \"%s\" (version: cloud %llu, local %llu)",
             rrdhost_hostname(aclk_host_config->host),
-            aclk_host_config->node_id,
+            node_id,
             (unsigned long long)cloud_version,
             (unsigned long long)local_version);
     aclk_host_config->checkpoint_count++;
@@ -1064,6 +1072,9 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     if (unlikely(!claim_id_is_set(claim_id)))
         return;
 
+    char node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, node_id);
+
     // Check the database for this node to see how many alerts we will need to put in the snapshot
     int cnt = calculate_alert_snapshot_entries(&host->host_id.uuid);
     if (!cnt)
@@ -1084,7 +1095,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
         "ACLK REQ [%s (%s)]: Sending %d alerts snapshot, snapshot_uuid %s",
-        aclk_host_config->node_id, rrdhost_hostname(host),
+        node_id, rrdhost_hostname(host),
         cnt, snapshot_uuid);
 
     uint32_t chunks;
@@ -1094,13 +1105,13 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     struct alarm_snapshot alarm_snap;
     struct alarm_log_entry alarm_log;
 
-    alarm_snap.node_id = aclk_host_config->node_id;
+    alarm_snap.node_id = node_id;
     alarm_snap.claim_id = claim_id.str;
     alarm_snap.snapshot_uuid = snapshot_uuid;
     alarm_snap.chunks = chunks;
     alarm_snap.chunk = 1;
 
-    alarm_log.node_id = aclk_host_config->node_id;
+    alarm_log.node_id = node_id;
     alarm_log.claim_id = claim_id.str;
 
     cnt = 0;
@@ -1142,7 +1153,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         NDLS_ACCESS,
         NDLP_DEBUG,
         "ACLK REQ [%s (%s)]: Created snapshot %s with %d alerts (version = %llu)",
-        aclk_host_config->node_id,
+        node_id,
         rrdhost_hostname(host),
         snapshot_uuid,
         total_count,
