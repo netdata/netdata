@@ -41,9 +41,17 @@ void aclk_update_node_info(struct update_node_info *info, struct aclk_sync_compl
     QUEUE_IF_PAYLOAD_PRESENT(query);
 }
 
-void aclk_update_node_instance_manifest(struct update_node_instance_manifest *manifest)
+// `machine_guid` identifies the host whose config records `suppression_key` once this message is
+// really published; they are carried on the query instead of being applied by the caller, because
+// the caller only enqueues - see aclk_node_manifest_publish_result().
+void aclk_update_node_instance_manifest(
+    struct update_node_instance_manifest *manifest,
+    const char *machine_guid,
+    uint64_t suppression_key)
 {
     aclk_query_t *query = aclk_query_new(UPDATE_NODE_MANIFEST);
+    strncpyz(query->manifest.machine_guid, machine_guid, sizeof(query->manifest.machine_guid) - 1);
+    query->manifest.key = suppression_key;
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_MANIFEST;
     query->data.bin_payload.payload =
         generate_update_node_instance_manifest_message(&query->data.bin_payload.size, manifest);

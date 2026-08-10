@@ -58,11 +58,63 @@ static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UU
     return uuid_parse(dst, parsed) == 0 && !uuid_is_null(parsed);
 }
 
+// Runs under rrd_rdlock() - see rrdhost_apply_by_machine_guid(). Everything it does is an atomic
+// load, store, or CAS, which is all it may do while that lock is held.
+static void manifest_publication_apply(RRDHOST *host, void *data)
+{
+    const struct aclk_manifest_publication *publication = data;
+
+    aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!aclk_host_config)
+        return;
+
+    if (publication->published) {
+        __atomic_store_n(&aclk_host_config->node_manifest_sent_key, publication->key, __ATOMIC_RELEASE);
+        return;
+    }
+
+    // Dropped on the way out, so the cloud never saw this manifest and nothing may be recorded for
+    // it. Re-arm with now, not with the deadline this send was claimed from: a failure that repeats
+    // for the same payload (a manifest the server refuses as too big) would otherwise come due on
+    // every pass and take a pacer slot each time, while arming with now retries one coalescing
+    // window later. aclk_send_timestamp_arm() only ever lowers a pending deadline, so a request
+    // armed meanwhile keeps its earlier one.
+    aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+}
+
+// Applies the outcome of a publication to the host config. Runs on the ACLK query worker that
+// executed the send, or on whichever thread dropped the query before it got that far.
+//
+// The host is resolved rather than carried as a pointer, because the host and its config can be
+// freed between the enqueue and the outcome; and it is resolved through
+// rrdhost_apply_by_machine_guid() rather than any find-then-dereference helper, because only the
+// former holds the host allocated while the callback runs.
+//
+// Resolved by machine_guid, NOT by the node_id this manifest was keyed under at the cloud, even
+// though the node_id is what identifies the message. host->node_id and the ACLK config's node_id are
+// allowed to disagree - command-nodeid.c assigns host->node_id from the parent without touching the
+// config, and set_host_node_id() documents the divergence - so a node_id lookup can miss the host
+// whose config must be written, or find a different one. Missing it would leave the send neither
+// recorded nor re-armed; finding the wrong host would record a manifest that host never published,
+// which is exactly the lost update this whole path exists to prevent. machine_guid is immutable for
+// the host's lifetime, and is also rrdhost_root_index's key, so the lookup is exact.
+//
+// The two drop sites that run before the query is handed off - a payload that failed to generate,
+// and a sync queue that is not accepting - reach this from inside
+// aclk_check_node_info_collectors_and_manifest()'s walk, which holds no rrd lock in its body:
+// build_node_manifest() releases rrd_rdlock() before enqueueing.
+void aclk_node_manifest_publish_result(const struct aclk_manifest_publication *publication)
+{
+    (void)rrdhost_apply_by_machine_guid(publication->machine_guid, manifest_publication_apply, (void *)publication);
+}
+
 // node_id is the caller's validated snapshot, not the shared buffer - see aclk_node_id_snapshot().
 // aclk_host_config is the caller's, already loaded and non-NULL for this host.
 //
-// Returns whether a manifest was actually published, so the caller's per-scan budget is spent on
-// messages rather than on suppressed builds - see MAX_NODE_MANIFESTS_PER_SCAN.
+// Returns whether a manifest was enqueued for publication, so the caller's per-scan budget is spent
+// on messages rather than on suppressed builds - see MAX_NODE_MANIFESTS_PER_SCAN. The budget paces
+// what this pass hands to the mqtt layer, so it is charged here rather than on the publication that
+// follows asynchronously.
 static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config, char *node_id)
 {
     struct update_node_instance_manifest manifest;
@@ -89,20 +141,22 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     // chokepoint compares content instead. The hash covers everything generate_..._message()
     // transmits, including the node_id it is keyed under at the cloud, but not updated_at.
     //
+    // The key is recorded by the publication itself, not here: this function only enqueues, and a
+    // message that is dropped below it must not suppress anything (see node_manifest_sent_key and
+    // aclk_node_manifest_publish_result()). A key of 0 means nothing has been published for this
+    // config yet, so a content that happens to hash to 0 publishes once more than needed - the
+    // direction that costs a message rather than losing one.
+    //
     // Deliberately NOT suppressed: the first manifest of a config, the first manifest of every ACLK
-    // session (see node_manifest_sent_session - a send is only an attempt, it is never acked), and
+    // session (the session is folded into the key, because a publication is still never acked), and
     // empty manifests - an empty list is meaningful to the cloud ("this node has no functions"),
     // not an absence of information.
-    usec_t session = aclk_session_load();
-    uint64_t hash = manifest_dict_hash(manifest.functions, node_id, manifest.claim_id);
-    bool suppressed = aclk_host_config->node_manifest_sent_session == session &&
-                      aclk_host_config->node_manifest_sent_hash == hash;
+    uint64_t key = manifest_publication_key(
+        manifest_dict_hash(manifest.functions, node_id, manifest.claim_id), aclk_session_load());
+    bool suppressed = key && __atomic_load_n(&aclk_host_config->node_manifest_sent_key, __ATOMIC_ACQUIRE) == key;
 
-    if (!suppressed) {
-        aclk_update_node_instance_manifest(&manifest);
-        aclk_host_config->node_manifest_sent_session = session;
-        aclk_host_config->node_manifest_sent_hash = hash;
-    }
+    if (!suppressed)
+        aclk_update_node_instance_manifest(&manifest, host->machine_guid, key);
 
     dictionary_destroy(manifest.functions);
 
@@ -247,8 +301,8 @@ static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
 // sqlite_aclk_node.h so it can be unit tested; see MANIFEST_PACER there for why it exists.
 //
 // Only the alert-push worker reaches this, serialized by alert_push_running, and libuv's threadpool
-// hand-off gives each pass a happens-before edge on the previous one - the same reason
-// node_manifest_sent_hash needs no synchronization.
+// hand-off gives each pass a happens-before edge on the previous one, so the pacer itself needs no
+// synchronization. node_manifest_sent_key does, because the ACLK query workers write it.
 static MANIFEST_PACER manifest_pacer = { 0 };
 
 void aclk_check_node_info_collectors_and_manifest(void)

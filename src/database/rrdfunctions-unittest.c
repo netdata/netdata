@@ -274,8 +274,11 @@ int rrdfunctions_manifest_unittest(void) {
     //    content, independent of dictionary traversal order, and sensitive to every transmitted
     //    field including the node_id and claim_id the manifest is keyed under at the cloud. Local
     //    standalone dictionaries keep this independent of whatever live functions localhost has.
-    //    The other half of the suppression - scoping the record to one ACLK session - lives in
-    //    build_node_manifest(), not in the hash, so it is not covered here.
+    //    The other half of the suppression - scoping the record to one ACLK session - is folded
+    //    into the same value by manifest_publication_key(), covered at the end of this block.
+    //    What is NOT covered here is which side records it: the key is written only by a
+    //    publication that reached the mqtt layer (aclk_node_manifest_publish_result()), which needs
+    //    a live ACLK connection to exercise.
     {
         int hash_errors_before = errors;
         const char *node1 = "11111111-2222-3333-4444-555555555555";
@@ -390,8 +393,24 @@ int rrdfunctions_manifest_unittest(void) {
             errors++;
         }
 
+        // the ACLK session is folded into the same 64-bit value, so that one atomic store carries
+        // the whole suppression key (see node_manifest_sent_key)
+        usec_t s1 = 1700000000000000ULL, s2 = 1700000000000001ULL;
+        if(manifest_publication_key(ha, s1) != manifest_publication_key(ha, s1)) {
+            fprintf(stderr, "  FAILED key: identical content and session produced different keys\n");
+            errors++;
+        }
+        if(manifest_publication_key(ha, s1) == manifest_publication_key(ha, s2)) {
+            fprintf(stderr, "  FAILED key: a new ACLK session did not change the key\n");
+            errors++;
+        }
+        if(manifest_publication_key(ha, s1) == manifest_publication_key(manifest_dict_hash(empty, node1, claim), s1)) {
+            fprintf(stderr, "  FAILED key: content change did not survive folding the session in\n");
+            errors++;
+        }
+
         if(errors == hash_errors_before)
-            fprintf(stderr, "  OK hash: determinism, order independence, field, node_id and claim_id sensitivity\n");
+            fprintf(stderr, "  OK hash: determinism, order independence, field, node_id, claim_id and session sensitivity\n");
 
         dictionary_destroy(a);
         dictionary_destroy(b);

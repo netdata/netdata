@@ -41,6 +41,20 @@ struct aclk_bin_payload {
     const char *msg_name;
 };
 
+// UPDATE_NODE_MANIFEST only: what the host config should record once this message is really
+// published. The producer cannot record it itself - it only enqueues, and the message can still be
+// dropped below it - and recording an unpublished manifest suppresses every later identical build
+// for the rest of the ACLK session. See aclk_node_manifest_publish_result().
+//
+// The host is identified by machine_guid, not by the node_id the manifest is keyed under at the
+// cloud: node_id is mutable and host->node_id can disagree with the ACLK config's copy, so it does
+// not identify the config to write back to. machine_guid is immutable for the host's lifetime.
+struct aclk_manifest_publication {
+    char machine_guid[GUID_LEN + 1]; // the host whose config recorded this send
+    uint64_t key;                    // suppression key of this payload; 0 when not a manifest query
+    bool published;                  // set once the message reached the mqtt layer
+};
+
 // ----------------------------------------------------------------------------
 // Reference-counted completion for safe timed waits
 // Both waiter and query hold a reference; last one to release frees the structure
@@ -108,6 +122,7 @@ typedef struct {
         void *payload;
         char *node_id;
     } data;
+    struct aclk_manifest_publication manifest;
     struct aclk_sync_completion *sync_completion;
 } aclk_query_t;
 
@@ -116,6 +131,11 @@ void aclk_query_free(aclk_query_t *query);
 
 void aclk_execute_query(aclk_query_t *query);
 void aclk_add_job(aclk_query_t *query);
+
+// Applies the outcome of a manifest publication to the host config: records the suppression key
+// when the message went out, re-arms the request when it was dropped. Implemented on the sqlite
+// side (sqlite_aclk_node.c), which owns that state - same split as aclk_execute_query() above.
+void aclk_node_manifest_publish_result(const struct aclk_manifest_publication *publication);
 
 #define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
     do {                                                                                                               \

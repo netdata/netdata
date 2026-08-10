@@ -71,18 +71,21 @@ typedef struct aclk_sync_cfg_t {
     char node_id[UUID_STR_LEN];
 
     // What was last published for this config, so build_node_manifest() can drop an identical
-    // manifest. Written only by the alert-push worker (the single build_node_manifest() caller,
-    // serialized by alert_push_running), read nowhere else - no atomics needed.
+    // manifest. Atomic: written by whichever ACLK query worker published the message, read by the
+    // alert-push worker that builds the next one.
     //
-    // Scoped to the ACLK session it was published in, because publishing is fire-and-forget: the
-    // message can still be dropped after the send call - no mqtt client left by the time the query
-    // executes, or shutdown reached before it ran - and nothing acks it. A new session therefore
-    // re-publishes once, which is also what a cloud that lost the manifest needs.
+    // It is only ever written for a message that reached the mqtt layer. Recording it at build time
+    // would make a dropped manifest - no mqtt client left by the time the query ran, an offline
+    // client, a full mqtt buffer - suppress every later identical build for the rest of the
+    // session, which is a lost update the cloud cannot ask for. A drop re-arms the request instead
+    // (aclk_node_manifest_publish_result()).
     //
-    // callocz() starts the session at 0 and aclk_session_load() is never 0 here (connecting stores
-    // a timestamp before the scan can run at all), so the first manifest of a config always sends.
-    usec_t node_manifest_sent_session; // aclk_session_load() when the last manifest was published
-    uint64_t node_manifest_sent_hash;  // manifest_dict_hash() of the last published manifest
+    // One value rather than a (session, hash) pair so the stamp is a single atomic store: a torn
+    // pair could match a build that neither half came from, and suppress a manifest that was never
+    // published. It folds the ACLK session into the content hash because publishing is still
+    // unacked - a new session re-publishes once, which is also what a cloud that lost the manifest
+    // needs. callocz() starts it at 0, so the first manifest of a config always sends.
+    uint64_t node_manifest_sent_key; // manifest_publication_key() of the last published manifest
 } aclk_sync_cfg_t;
 
 static inline void aclk_node_id_copy(aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])

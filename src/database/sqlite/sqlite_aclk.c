@@ -409,8 +409,10 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
     }
 
     if (ok_to_send) {
+        // aclk_query_free() reports the outcome to whoever tracks what the cloud has been told;
+        // leaving it unset here is what makes a dropped message recoverable.
         if (client)
-            send_bin_msg(client, query);
+            query->manifest.published = (send_bin_msg(client, query) == 0);
         else
             nd_log_daemon(NDLP_ERR, "No client to send message %u", query->type);
     }

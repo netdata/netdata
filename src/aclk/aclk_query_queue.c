@@ -114,6 +114,12 @@ void aclk_query_free(aclk_query_t *query)
             break;
     }
 
+    // Every query reaches this function on every path - executed, dropped before execution, or
+    // dropped during shutdown - so reporting the manifest outcome here covers every way a manifest
+    // can fail to reach the cloud without each of those sites having to know about it.
+    if (query->type == UPDATE_NODE_MANIFEST)
+        aclk_node_manifest_publish_result(&query->manifest);
+
     freez(query->dedup_id);
     freez(query->callback_topic);
     freez(query->msg_id);
