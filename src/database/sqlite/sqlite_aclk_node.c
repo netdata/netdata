@@ -58,6 +58,16 @@ static bool aclk_node_id_snapshot(aclk_sync_cfg_t *aclk_host_config, char dst[UU
     return uuid_parse(dst, parsed) == 0 && !uuid_is_null(parsed);
 }
 
+// Hands out the per-enqueue token that identifies one manifest publication. Monotonic and never
+// reused, so it identifies an ENQUEUE, which the content key cannot: identical content produces an
+// identical key, and content that is published, changed, and changed back records the same key twice.
+// Never returns 0, which node_manifest_sent_token uses to mean "nothing outstanding".
+static uint64_t manifest_publication_token_next(void)
+{
+    static uint64_t seq = 0;
+    return __atomic_add_fetch(&seq, 1, __ATOMIC_RELAXED);
+}
+
 // Undoes the record build_node_manifest() made for a manifest that never went out. Runs under the
 // rrd read lock - see rrdhost_apply_by_machine_guid() - so everything it does is one atomic CAS and
 // one atomic arm, which is all it may do while that lock is held.
@@ -69,24 +79,19 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
     if (!aclk_host_config)
         return;
 
-    // Clear the record only while it still holds the key this publication carried. A manifest
-    // enqueued after this one records a different key and so survives, which is what makes the
-    // outcomes order-insensitive: publications for one host can be in flight together and complete
-    // in any order without a later one losing its record to an earlier drop.
+    // Invalidate the record only while it is still THIS enqueue's, which is what the token is for:
+    // the CAS fails if a later manifest has been enqueued since, whatever its content, so publications
+    // for one host can be in flight together and complete in any order without a later one losing its
+    // record to an earlier drop - including when the later one carries identical content and therefore
+    // an identical key.
     //
-    // The key identifies CONTENT, not a particular enqueue, so this is not a per-enqueue token: if
-    // the content is published, then changed, then changed back, all while the first publication is
-    // still in flight, the later enqueue records the same key and a drop of that first one clears it.
-    // The cost is bounded and is the direction this design accepts everywhere else - a record cleared
-    // to 0 can only cause another publish, never a suppression, so the next build re-sends unchanged
-    // content once and stops. Making the clear exact would mean carrying a per-enqueue token
-    // alongside the key, and a (token, key) pair cannot be stored or cleared in one atomic operation
-    // - it needs a lock on a path that is lock-free today, and packing a generation into this word
-    // instead would shrink the content hash, trading a redundant publish for a worse collision risk
-    // in the direction that loses updates.
-    uint64_t expected = publication->key;
-    (void)__atomic_compare_exchange_n(
-        &aclk_host_config->node_manifest_sent_key, &expected, 0, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+    // Clearing the token, not the key, is what makes this a single atomic operation. The key stays as
+    // it was; a 0 token is what stops it from suppressing anything (see build_node_manifest()), so the
+    // pair never has to be written together and cannot be observed half-updated.
+    uint64_t expected = publication->token;
+    if (!__atomic_compare_exchange_n(
+            &aclk_host_config->node_manifest_sent_token, &expected, 0, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED))
+        return; // a later manifest owns the record - it is the one the cloud needs, and it will report itself
 
     // Re-arm with now, not with the deadline this send was claimed from: a failure that repeats for
     // the same payload (a manifest the server refuses as too big) would otherwise come due on every
@@ -196,8 +201,8 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     // clears this record instead (aclk_node_manifest_publish_result()), so nothing stays suppressed on
     // the strength of a manifest that never went out.
     //
-    // A stored 0 means nothing is recorded for this config, and manifest_publication_key() never
-    // returns 0, so that comparison is unambiguous without a separate guard.
+    // A 0 token means nothing is outstanding for this config - it has published nothing yet, or its
+    // last manifest was dropped and invalidated - so the key beside it must not suppress anything.
     //
     // Deliberately NOT suppressed: the first manifest of a config, the first manifest of every ACLK
     // session (the session is folded into the key, because a publication is still never acked), and
@@ -205,16 +210,22 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     // not an absence of information.
     uint64_t key = manifest_publication_key(
         manifest_dict_hash(manifest.functions, node_id, manifest.claim_id), aclk_session_load());
-    bool suppressed = __atomic_load_n(&aclk_host_config->node_manifest_sent_key, __ATOMIC_ACQUIRE) == key;
+    bool suppressed = __atomic_load_n(&aclk_host_config->node_manifest_sent_token, __ATOMIC_ACQUIRE) != 0 &&
+                      __atomic_load_n(&aclk_host_config->node_manifest_sent_key, __ATOMIC_ACQUIRE) == key;
 
     if (!suppressed) {
-        // Record BEFORE enqueueing, never after: the drop path clears this field with a CAS on this
-        // exact key, and a query that is dropped synchronously (a payload that fails to generate)
-        // completes inside the call below. Storing afterwards would let that CAS run first, find the
-        // old value, change nothing - and then this store would leave the dropped manifest recorded
-        // as sent.
+        // Record BEFORE enqueueing, never after: a query can be dropped SYNCHRONOUSLY inside the call
+        // below (a payload that fails to generate), and its invalidating CAS would then run against a
+        // token this build has not stored yet - it would fail, and the store that followed would leave
+        // the dropped manifest recorded as outstanding.
+        //
+        // Key first, then token: the token is what licenses the key to suppress, so publishing it last
+        // means no reader can act on a key that is not yet in place. Both are written only here, by the
+        // one serialized scan pass; the drop path only ever clears the token.
+        uint64_t token = manifest_publication_token_next();
         __atomic_store_n(&aclk_host_config->node_manifest_sent_key, key, __ATOMIC_RELEASE);
-        aclk_update_node_instance_manifest(&manifest, host->machine_guid, key);
+        __atomic_store_n(&aclk_host_config->node_manifest_sent_token, token, __ATOMIC_RELEASE);
+        aclk_update_node_instance_manifest(&manifest, host->machine_guid, key, token);
     }
 
     dictionary_destroy(manifest.functions);

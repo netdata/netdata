@@ -11,20 +11,16 @@ void send_node_update_with_wait(RRDHOST *host, int live, int queryable);
 // published, so a burst of function registrations becomes one message.
 #define NODE_MANIFEST_WINDOW_S (30)
 
-// Folds the ACLK session into the manifest content hash so one value carries the whole suppression
-// key - see node_manifest_sent_key for why it is one value and not a pair. A collision would
-// suppress a manifest that was never published, at the same ~2^-64 manifest_dict_hash() already
-// accepts for the content itself. Here (rather than beside its caller) so it can be unit tested.
+// Folds the ACLK session into the manifest content hash, so one value describes everything that must
+// force a re-publish. A collision would suppress a manifest the cloud never received, at the same
+// ~2^-64 manifest_dict_hash() already accepts for the content itself. Here (rather than beside its
+// caller) so it can be unit tested.
 //
-// Never returns 0, because 0 is node_manifest_sent_key's "nothing recorded" sentinel. A payload
-// whose digest happened to be 0 would otherwise never compare equal to the stored key, so it would
-// republish on every arm for the rest of the session instead of once. Mapping it to 1 costs nothing:
-// it only makes two digests out of 2^64 share a key, which is the collision the note above already
-// accepts.
+// Every value including 0 is a valid key: what marks a config as having nothing outstanding is
+// node_manifest_sent_token being 0, not the key, so this needs no reserved value.
 static inline uint64_t manifest_publication_key(uint64_t hash, usec_t session)
 {
-    uint64_t key = XXH3_64bits_withSeed(&session, sizeof(session), hash);
-    return key ? key : 1;
+    return XXH3_64bits_withSeed(&session, sizeof(session), hash);
 }
 
 // How many manifests one scan pass may publish. The manifest is the only one of the three messages

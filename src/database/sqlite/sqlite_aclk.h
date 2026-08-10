@@ -71,25 +71,32 @@ typedef struct aclk_sync_cfg_t {
     char node_id[UUID_STR_LEN];
 
     // The newest manifest SENT for this config, so build_node_manifest() can drop an identical one.
-    // Atomic: stored by the alert-push worker as it enqueues, cleared by whichever ACLK query worker
-    // finds that the message was dropped, read by the next build.
     //
-    // "Sent" and not "delivered", deliberately. It is stored when the manifest is handed to the ACLK
-    // queue, because that is the state a later build must compare against: publication is
-    // asynchronous, so a field holding only confirmed publications lags reality for as long as a
-    // message is in flight, and a build inside that window compares against a key the in-flight
-    // message is about to replace. A dropped message clears it again
+    // "Sent" and not "delivered", deliberately. Both fields are written when the manifest is handed to
+    // the ACLK queue, because that is the state a later build must compare against: publication is
+    // asynchronous, so a record holding only confirmed publications lags reality for as long as a
+    // message is in flight, and a build inside that window compares against content the in-flight
+    // message is about to replace. A dropped message invalidates the record instead
     // (aclk_node_manifest_publish_result()), so an unsent manifest never keeps suppressing later
-    // builds - that was the original defect here, and the clear is a CAS on the key it stored, so a
-    // newer manifest enqueued meanwhile keeps its own.
+    // builds - that was the original defect here.
     //
-    // One value rather than a (session, hash) pair so both the store and the clear are single atomic
-    // operations: a torn pair could match a build that neither half came from, and suppress a
-    // manifest that was never sent. It folds the ACLK session into the content hash because
-    // publishing is never acked - a new session re-sends once, which is also what a cloud that lost
-    // the manifest needs. callocz() starts it at 0 and manifest_publication_key() never returns 0, so
-    // 0 unambiguously means "nothing recorded" and the first manifest of a config always sends.
-    uint64_t node_manifest_sent_key; // manifest_publication_key() of the newest manifest enqueued
+    // Atomic, because the writers are on different threads. Both fields are STORED only by the scan
+    // pass in build_node_manifest() (the alert-push worker, one pass at a time), while the token alone
+    // is CLEARED by whichever thread reports a drop - an ACLK query worker for anything the mqtt layer
+    // rejected, the alert-push worker for a drop that happens inside the enqueue call, or the ACLK sync
+    // event loop for a query it could not park and for the shutdown drain.
+    //
+    // The split is what keeps every update a single atomic operation: the key never has to be written
+    // together with the token, so the pair cannot be observed half-updated. The token identifies an
+    // ENQUEUE, which the key cannot - identical content yields an identical key - so invalidating by
+    // token cannot clear a record a later manifest has taken over, whatever its content. A 0 token
+    // means nothing is outstanding, which is what callocz() leaves and what a drop restores, so the
+    // first manifest of a config always sends.
+    //
+    // The key folds the ACLK session into the content hash because publishing is never acked - a new
+    // session re-sends once, which is also what a cloud that lost the manifest needs.
+    uint64_t node_manifest_sent_key;   // manifest_publication_key() of the newest manifest enqueued
+    uint64_t node_manifest_sent_token; // its per-enqueue token; 0 when nothing is outstanding
 } aclk_sync_cfg_t;
 
 static inline void aclk_node_id_copy(aclk_sync_cfg_t *aclk_host_config, char dst[UUID_STR_LEN])

@@ -276,11 +276,14 @@ int rrdfunctions_manifest_unittest(void) {
     //    standalone dictionaries keep this independent of whatever live functions localhost has.
     //    The other half of the suppression - scoping the record to one ACLK session - is folded
     //    into the same value by manifest_publication_key(), covered at the end of this block.
-    //    What is NOT covered here is the recording side: build_node_manifest() stores the key as it
-    //    enqueues, and aclk_node_manifest_publish_result() clears it again if the message was
-    //    dropped. That clear is pure atomics on the host's ACLK config, so it does NOT need a live
-    //    ACLK connection to exercise - it needs a host with a config, which this test has. It is
-    //    untested; see the SOW for the tracked gap.
+    //    What is NOT covered here is the recording side: build_node_manifest() records the key under a
+    //    per-enqueue token as it enqueues, and aclk_node_manifest_publish_result() invalidates that
+    //    token if the message was dropped. Invalidation is pure atomics on the host's ACLK config, so
+    //    it does NOT need a live ACLK connection - but it does need a host that HAS a config, and this
+    //    test's localhost does not: sql_load_node_id() calls set_host_node_id(host, NULL) when there is
+    //    no stored node_id, and that returns before create_aclk_config(), which is the only place
+    //    host->aclk_host_config is ever set. A test would have to call create_aclk_config() itself
+    //    (it is a plain callocz plus a publish CAS, no ACLK thread needed). Untested; tracked in the SOW.
     {
         int hash_errors_before = errors;
         const char *node1 = "11111111-2222-3333-4444-555555555555";
@@ -395,11 +398,9 @@ int rrdfunctions_manifest_unittest(void) {
             errors++;
         }
 
-        // the ACLK session is folded into the same 64-bit value, so that one atomic store carries
-        // the whole suppression key (see node_manifest_sent_key). Determinism for identical inputs is
-        // not asserted: the key is a pure function of them, so such a check cannot fail. The
-        // never-returns-0 sentinel invariant is not asserted either - it would need a digest preimage
-        // of 0, which cannot be constructed here; manifest_publication_key() enforces it directly.
+        // the ACLK session is folded into the same value, so one comparison covers both content and
+        // session (see node_manifest_sent_key). Determinism for identical inputs is not asserted: the
+        // key is a pure function of them, so such a check cannot fail.
         usec_t s1 = 1700000000000000ULL, s2 = 1700000000000001ULL;
         if(manifest_publication_key(ha, s1) == manifest_publication_key(ha, s2)) {
             fprintf(stderr, "  FAILED key: a new ACLK session did not change the key\n");

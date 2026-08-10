@@ -52,6 +52,7 @@ struct aclk_bin_payload {
 struct aclk_manifest_publication {
     char machine_guid[GUID_LEN + 1]; // the host whose config recorded this send
     uint64_t key;                    // suppression key of this payload; 0 when not a manifest query
+    uint64_t token;                  // identifies THIS enqueue, so a drop cannot invalidate a later one
     bool published;                  // set once the message reached the mqtt layer
 };
 
