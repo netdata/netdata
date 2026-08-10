@@ -133,9 +133,10 @@ void aclk_query_free(aclk_query_t *query);
 void aclk_execute_query(aclk_query_t *query);
 void aclk_add_job(aclk_query_t *query);
 
-// Applies the outcome of a manifest publication to the host config: records the suppression key
-// when the message went out, re-arms the request when it was dropped. Implemented on the sqlite
-// side (sqlite_aclk_node.c), which owns that state - same split as aclk_execute_query() above.
+// Applies the outcome of a manifest publication to the host config. A message that went out needs
+// nothing - it was recorded when it was enqueued; a dropped one has that record invalidated and its
+// request re-armed. Implemented on the sqlite side (sqlite_aclk_node.c), which owns that state - same
+// split as aclk_execute_query() above.
 void aclk_node_manifest_publish_result(const struct aclk_manifest_publication *publication);
 
 #define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \

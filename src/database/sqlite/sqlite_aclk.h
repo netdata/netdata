@@ -86,12 +86,16 @@ typedef struct aclk_sync_cfg_t {
     // rejected, the alert-push worker for a drop that happens inside the enqueue call, or the ACLK sync
     // event loop for a query it could not park and for the shutdown drain.
     //
-    // The split is what keeps every update a single atomic operation: the key never has to be written
-    // together with the token, so the pair cannot be observed half-updated. The token identifies an
-    // ENQUEUE, which the key cannot - identical content yields an identical key - so invalidating by
-    // token cannot clear a record a later manifest has taken over, whatever its content. A 0 token
-    // means nothing is outstanding, which is what callocz() leaves and what a drop restores, so the
-    // first manifest of a config always sends.
+    // The split is what keeps the CROSS-THREAD update a single atomic operation: a drop writes only
+    // the token, so it never has to update the pair. The pair IS written together - by the scan pass,
+    // as two stores - which leaves a window where the key is the new one and the token is still the
+    // previous one. Nothing reads the pair in that window: the scan pass is its only reader and is
+    // serialized against itself, and the drop path reads neither field, it only CASes the token.
+    //
+    // The token identifies an ENQUEUE, which the key cannot - identical content yields an identical
+    // key - so invalidating by token cannot clear a record a later manifest has taken over, whatever
+    // its content. A 0 token means nothing is outstanding, which is what callocz() leaves and what a
+    // drop restores, so the first manifest of a config always sends.
     //
     // The key folds the ACLK session into the content hash because publishing is never acked - a new
     // session re-sends once, which is also what a cloud that lost the manifest needs.
