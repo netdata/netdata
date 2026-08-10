@@ -132,7 +132,7 @@ jobs:
         working-directory: ${{ matrix.module }}
       - name: Set up gotestfmt
         if: needs.file-check.outputs.run == 'true'
-        uses: GoTestTools/gotestfmt-action@8b4478c7019be847373babde9300210e7de34bfb # v2.2.0
+        uses: GoTestTools/gotestfmt-action@eba2ac97f623e866e7b1b117c99f18b43cd36d18 # v2.3.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0
@@ -189,7 +189,7 @@ jobs:
         working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
       - name: Set up gotestfmt
         if: needs.file-check.outputs.run == 'true'
-        uses: GoTestTools/gotestfmt-action@8b4478c7019be847373babde9300210e7de34bfb # v2.2.0
+        uses: GoTestTools/gotestfmt-action@eba2ac97f623e866e7b1b117c99f18b43cd36d18 # v2.3.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0
