@@ -353,6 +353,9 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
         case SEND_NODE_INSTANCES:
             worker_is_busy(UV_EVENT_SEND_NODE_INSTANCES);
             aclk_send_node_instances();
+            // the cloud asks for the node instances after connecting, so this is also where the
+            // manifest gets its one request per ACLK session - see aclk_arm_node_manifest_all_hosts()
+            aclk_arm_node_manifest_all_hosts();
             ok_to_send = false;
             break;
         case ALERT_START_STREAMING:
@@ -386,6 +389,9 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
             break;
         case UPDATE_NODE_INFO:
             worker_is_busy(UV_EVENT_UPDATE_NODE_INFO);
+            break;
+        case UPDATE_NODE_MANIFEST:
+            worker_is_busy(UV_EVENT_UPDATE_NODE_MANIFEST);
             break;
         case CTX_SEND_SNAPSHOT:
             worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT);
@@ -536,7 +542,7 @@ static void start_alert_push(uv_work_t *req)
         return;
 
     worker_is_busy(UV_EVENT_ACLK_NODE_INFO);
-    aclk_check_node_info_and_collectors();
+    aclk_check_node_info_collectors_and_manifest();
     worker_is_idle();
 
     worker_is_busy(UV_EVENT_ACLK_ALERT_PUSH);
@@ -763,6 +769,8 @@ static void aclk_synchronization_event_loop(void *arg)
                     aclk_send_timestamp_set(
                         &aclk_host_config->node_info_send_time,
                         (host == localhost || immediate) ? 1 : now_realtime_sec());
+                    // the manifest is re-armed by build_node_info() itself, so every path that
+                    // sends node info re-arms it, not only this opcode
                     break;
                 case ACLK_CANCEL_NODE_UPDATE_TIMER:
                     host = cmd.param[0];
@@ -1020,8 +1028,9 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
 
     struct aclk_sync_cfg_t *aclk_host_config = callocz(1, sizeof(struct aclk_sync_cfg_t));
     spinlock_init(&aclk_host_config->pending_ctx_spinlock);
+    spinlock_init(&aclk_host_config->node_id_spinlock);
     if (node_id && !uuid_is_null(*node_id))
-        uuid_unparse_lower(*node_id, aclk_host_config->node_id);
+        aclk_node_id_set(aclk_host_config, *node_id);
 
     // Initialize every field BEFORE publishing the pointer via CAS; the RELEASE on
     // the CAS pairs with ACQUIRE loads of host->aclk_host_config in readers so they
@@ -1032,6 +1041,12 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     aclk_send_timestamp_set(
         &aclk_host_config->node_info_send_time,
         (host == localhost || NULL == localhost) ? nd_time_t_add_saturating(now, -25) : now);
+    // node_manifest_send_time is deliberately NOT armed here: build_node_info() arms it, so it is
+    // armed after that host's node info was built rather than alongside it. That orders the ARMING
+    // only - both messages are dispatched to parallel query workers, so it is no guarantee of
+    // publish order at the cloud. What keeps the manifest from describing a node the cloud does not
+    // know is the node_id check in aclk_check_node_info_collectors_and_manifest().
+    // (set_host_node_id() also arms right after creating a config, so this is not the only path.)
 
     struct aclk_sync_cfg_t *expected = NULL;
     if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
@@ -1339,4 +1354,74 @@ void destroy_aclk_config(RRDHOST *host)
 void aclk_queue_node_info(RRDHOST *host, bool immediate)
 {
     (void) queue_aclk_sync_cmd(ACLK_QUEUE_NODE_INFO, (void *)host, (void *)(uintptr_t)immediate);
+}
+
+// Requests a refresh of the cloud function manifest for this host.
+//
+// Arming is a single atomic CAS on the host's aclk config, so - unlike node info, which needs
+// the event loop to create a missing config - this does NOT go through the command queue. That
+// keeps a burst of function registrations (a parent's children reconnecting, a plugin
+// restarting) from flooding the ACLK sync command pool, and avoids publishing a borrowed host
+// pointer to another thread.
+//
+// A change made before the arm is always reported: build_node_manifest() reads the live function
+// list rather than a snapshot taken here, so an already-armed request covers this change too,
+// and a change racing with the send re-arms (the claim resets the timestamp to 0).
+void aclk_arm_node_manifest(RRDHOST *host)
+{
+    if (!host)
+        return;
+
+    // No config: nothing to arm. build_node_info() arms the first manifest for every host that
+    // gets one, which covers every function registered until then.
+    //
+    // The load below is lock-free and destroy_aclk_config() frees what it returns, so what keeps
+    // this safe is teardown ordering, not the NULL check. destroy_aclk_config() has exactly one
+    // caller - rrdhost_free_unlinked() - and everything this function's callers depend on is torn
+    // down earlier in it:
+    //   1. rrdhost_index_del_by_guid()          - the host stops being findable
+    //   2. stream_receiver_signal_to_stop_and_wait() - blocks until host->receiver is NULL
+    //   3. rrd_functions_host_destroy()         - host->functions becomes NULL
+    //   4. destroy_aclk_config()                - only now is the config freed
+    // So the function-registry callers (which must first mutate host->functions) and
+    // rrdhost_clear_receiver() (which runs before host->receiver is cleared) cannot still be
+    // running here, and a caller that reached this host through rrdhost_find_by_guid() did so
+    // before step 1. Do NOT "fix" this by routing the arm back through the ACLK event loop: that
+    // publishes a borrowed RRDHOST pointer to another thread (a wider window on a longer-lived
+    // object) and blocks the caller in push_cmd() when the command pool is full, sometimes while
+    // holding the host functions lock.
+    //
+    // One caller does NOT reach the host any of those ways: aclk_arm_node_manifest_all_hosts()
+    // walks rrdhost_root_index. That walk only yields hosts still indexed when it reaches them, so
+    // step 1 bounds it - but the index links the host without owning it, so the walk's reference
+    // does not stop rrdhost_free_unlinked() from freeing a host it already unlinked. That caller
+    // therefore carries the same pre-existing teardown exposure as the alert-push scan, which
+    // dereferences hosts from the same index (see build_node_manifest() in sqlite_aclk_node.c).
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!aclk_host_config)
+        return;
+
+    aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+}
+
+// Re-arms the manifest of every host. Called when the cloud asks the agent to re-announce its node
+// instances (the SendNodeInstances message), which it does after connecting - so this is where the
+// manifest gets its request for a new ACLK session. How often the cloud repeats that ask within one
+// session is server-side behaviour this repository cannot verify, so treat "once per session" as an
+// assumption, not a guarantee; the suppression below is what makes repeats cheap either way.
+//
+// It is needed because publishing is never acked: what the previous session sent may have been
+// dropped after the send call - no mqtt client left by the time the query executed, or shutdown
+// reached before it ran - and the cloud may have lost it. build_node_manifest() scopes its
+// suppression to one session for exactly this reason, so the pair publishes one manifest per host
+// per session. A redundant arm costs one manifest build (rrd_rdlock plus a dictionary of string
+// copies) and one hash; the content hash then drops the publish.
+void aclk_arm_node_manifest_all_hosts(void)
+{
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host)
+    {
+        aclk_arm_node_manifest(host);
+    }
+    dfe_done(host);
 }

@@ -11,8 +11,9 @@ import (
 )
 
 type instanceLabelValue struct {
-	Key   string
-	Value string
+	Key      string
+	Value    string
+	Optional bool
 }
 
 type labelAccessor interface {
@@ -51,11 +52,23 @@ func renderChartInstanceID(identity program.ChartIdentity, labels map[string]str
 	return renderChartInstanceIDWithAccessor(identity, mapLabelAccessor(labels))
 }
 
-func renderChartInstanceIDFromView(identity program.ChartIdentity, labels metrix.LabelView) (string, bool, error) {
-	return renderChartInstanceIDWithAccessor(identity, labelViewAccessor{view: labels})
+func renderChartInstanceIDFromViewWithPlan(
+	identity program.ChartIdentity,
+	plan compiledInstanceLabelPlan,
+	labels metrix.LabelView,
+) (string, bool, error) {
+	return renderChartInstanceIDWithAccessorAndPlan(identity, plan, labelViewAccessor{view: labels})
 }
 
 func renderChartInstanceIDWithAccessor(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {
+	return renderChartInstanceIDWithAccessorAndPlan(identity, compileInstanceLabelPlan(identity), labels)
+}
+
+func renderChartInstanceIDWithAccessorAndPlan(
+	identity program.ChartIdentity,
+	plan compiledInstanceLabelPlan,
+	labels labelAccessor,
+) (string, bool, error) {
 	baseID, ok, err := renderTemplate(identity.IDTemplate, labels)
 	if err != nil {
 		return "", false, err
@@ -64,7 +77,7 @@ func renderChartInstanceIDWithAccessor(identity program.ChartIdentity, labels la
 		return "", false, nil
 	}
 
-	suffix, ok, err := renderInstanceSuffix(identity, labels)
+	suffix, ok, err := renderInstanceSuffix(plan, labels)
 	if err != nil {
 		return "", false, err
 	}
@@ -81,11 +94,8 @@ func renderTemplate(tpl program.Template, _ labelAccessor) (string, bool, error)
 	return tpl.Raw, true, nil
 }
 
-func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {
-	values, ok, err := resolveInstanceLabelValues(identity, labels)
-	if err != nil {
-		return "", false, err
-	}
+func renderInstanceSuffix(plan compiledInstanceLabelPlan, labels labelAccessor) (string, bool, error) {
+	values, ok := resolveInstanceLabelValuesWithPlan(plan, labels, nil)
 	if !ok {
 		return "", false, nil
 	}
@@ -93,9 +103,12 @@ func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) 
 		return "", true, nil
 	}
 
-	parts := make([]string, 0, len(values))
+	parts := make([]string, 0, len(values)*2)
 	hasNonEmpty := false
 	for _, item := range values {
+		if item.Optional {
+			parts = append(parts, sanitizeChartIDLabelValue(item.Key))
+		}
 		part := sanitizeChartIDLabelValue(item.Value)
 		if strings.TrimSpace(part) != "" {
 			hasNonEmpty = true
@@ -114,50 +127,44 @@ func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) 
 	return "_" + strings.Join(parts, "_"), true, nil
 }
 
-func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAccessor) ([]instanceLabelValue, bool, error) {
-	if len(identity.InstanceByLabels) == 0 {
-		return nil, true, nil
-	}
-
-	plan := compileInstanceLabelPlan(identity)
-	out := make([]instanceLabelValue, 0, len(plan.explicitKeys))
+func resolveInstanceLabelValuesWithPlan(
+	plan compiledInstanceLabelPlan,
+	labels labelAccessor,
+	out []instanceLabelValue,
+) ([]instanceLabelValue, bool) {
+	out = out[:0]
 	for _, key := range plan.explicitKeys {
 		value, ok := labels.Get(key)
 		if !ok {
-			// Explicit instance key is required to materialize one instance.
-			return nil, false, nil
+			// Explicit instance keys are required to materialize an instance.
+			return out[:0], false
 		}
-		out = append(out, instanceLabelValue{
-			Key:   key,
-			Value: value,
-		})
+		out = append(out, instanceLabelValue{Key: key, Value: value})
+	}
+	for _, key := range plan.optionalKeys {
+		value, ok := labels.Get(key)
+		if !ok || strings.TrimSpace(value) == "" {
+			continue
+		}
+		out = append(out, instanceLabelValue{Key: key, Value: value, Optional: true})
 	}
 
 	if plan.includeAll {
-		all := make([]string, 0)
-		labels.Range(func(key, _ string) bool {
+		start := len(out)
+		labels.Range(func(key, value string) bool {
 			if _, excluded := plan.excludeSet[key]; excluded {
 				return true
 			}
 			if _, exists := plan.explicitSet[key]; exists {
 				return true
 			}
-			all = append(all, key)
+			out = append(out, instanceLabelValue{Key: key, Value: value})
 			return true
 		})
-		sort.Strings(all)
-		for _, key := range all {
-			value, ok := labels.Get(key)
-			if !ok {
-				return nil, false, nil
-			}
-			out = append(out, instanceLabelValue{
-				Key:   key,
-				Value: value,
-			})
-		}
+		extras := out[start:]
+		sort.Slice(extras, func(i, j int) bool { return extras[i].Key < extras[j].Key })
 	}
-	return out, true, nil
+	return out, true
 }
 
 var chartIDLabelValueSanitizer = strings.NewReplacer(

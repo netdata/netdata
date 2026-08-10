@@ -14,13 +14,13 @@ Netdata ingests the syslog your network devices emit — configuration changes, 
 
 ## How it reaches Netdata
 
-Netdata does not listen for syslog directly. Your devices send syslog to an **OpenTelemetry Collector** with a syslog receiver, which parses each message (RFC 3164 or 5424), normalizes the fields, and forwards them to the Netdata Agent over OTLP; the Agent stores them as structured journal logs in the **Logs** tab. Because the pipeline is the OpenTelemetry Collector, you can filter, transform, and enrich messages — or derive metrics from them — before they reach Netdata.
+Netdata does not listen for syslog directly. Your devices send syslog to an **OpenTelemetry Collector** with a syslog receiver, which parses each message (RFC 3164 or 5424), normalizes the fields, and forwards them to the Netdata Agent over OTLP; the Agent indexes them as structured OpenTelemetry logs for the **Logs** tab. Because the pipeline is the OpenTelemetry Collector, you can filter, transform, and enrich messages — or derive metrics from them — before they reach Netdata.
 
 ## What you get
 
 - **Searchable device logs** — by device, severity, facility, and message content.
 - **Alongside everything else** — run the collector against the same Agent that polls the devices, and their logs sit beside their metrics, topology, and traps.
-- **Retained on your terms** — stored in journal files with the rotation and retention you set.
+- **Retained on your terms** — write-ahead logs rotate and indexed files follow the retention limits you set.
 
 ## Where to start
 
