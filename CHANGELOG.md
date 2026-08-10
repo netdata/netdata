@@ -931,6 +931,10 @@
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.35.2 to 1.35.4 in /src/go ([#23431](https://github.com/netdata/netdata/issues/23431))
 - Build(deps): bump github.com/klauspost/compress from 1.19.1 to 1.19.2 in /src/go ([#23433](https://github.com/netdata/netdata/issues/23433))
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.66.1 to 1.66.3 in /src/go ([#23434](https://github.com/netdata/netdata/issues/23434))
+- Implement function manifest generation and ACLK node manifest handling ([#23303](https://github.com/netdata/netdata/issues/23303))
+- Build(deps): bump GoTestTools/gotestfmt-action from 2.2.0 to 2.3.0 ([#23437](https://github.com/netdata/netdata/issues/23437))
+- Packaging: remove obsolete otel-signal-viewer artifacts on static upgrade ([#23440](https://github.com/netdata/netdata/issues/23440))
+- New OTel documentation. ([#23321](https://github.com/netdata/netdata/issues/23321))
 
 ## [2.10.0] - 2026-04-09
 
