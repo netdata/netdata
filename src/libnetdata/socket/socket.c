@@ -406,10 +406,23 @@ inline int wait_on_socket_or_cancel_with_timeout(
                             pipe_revents = POLLNVAL;
                             break;
                         case ERROR_OPERATION_ABORTED:
-                            errno = ECANCELED;
-                            if(revents)
-                                *revents = 0;
-                            return -1;
+                            // This only says that a Windows I/O operation was aborted. It does not
+                            // establish that Netdata cancelled this worker, so do not tear down a
+                            // live plugin unless the worker's own cancellation flag confirms it.
+                            if(nd_thread_signaled_to_cancel()) {
+                                errno = ECANCELED;
+                                if(revents)
+                                    *revents = 0;
+                                return -1;
+                            }
+
+                            // Keep the same bounded, cancellable polling cadence as an empty pipe.
+                            const DWORD retry_ms = (DWORD)((timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
+                                                          ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms);
+                            Sleep(retry_ms);
+                            if(!forever)
+                                timeout_ms -= (int)retry_ms;
+                            continue;
                         default:
                             errno = EIO;
                             pipe_revents = POLLERR;
