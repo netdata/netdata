@@ -200,12 +200,12 @@ int os_windows_path_translation_unittest(void) {
         // NOSONAR (c:S5813) — expected_prefix and cases[i].expected_suffix are constant string literals; lengths are bounded.
         CLEAN_CHAR_P *expected = mallocz(strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1); // NOSONAR (c:S5813)
         if (cases[i].use_package_prefix)
-            // NOSONAR (c:S5813) — see justification on the mallocz line above.
-            snprintfz(expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
+            snprintfz( // NOSONAR (c:S5813) — see justification on the mallocz line above.
+                      expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
                       "%s%s", expected_prefix, cases[i].expected_suffix);
         else
-            // NOSONAR (c:S5813) — see justification on the mallocz line above.
-            snprintfz(expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
+            snprintfz( // NOSONAR (c:S5813) — see justification on the mallocz line above.
+                      expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
                       "%s", cases[i].expected_suffix);
 
         for (char *p = expected; *p; p++)

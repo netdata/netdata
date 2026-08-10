@@ -215,7 +215,7 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     }
 
     /* Set permissions using chmod() */
-    if (fchmod(fd, 0664) != 0) {
+    if (fchmod(fd, 0660) != 0) {
         close(fd);
         unlink(temp);
         return false;
