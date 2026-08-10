@@ -573,7 +573,7 @@
       The authentication method you select (no auth, basic, or bearer) controls only whether an Authorization header is included in the request. It does not affect the client certificate behavior.
 
       If you want to verify Netdata's client certificate on your end, configure your server to validate it using the Netdata CA certificate below.
-      
+
       The steps to perform this validation are as follows:
 
       - Store Netdata CA certificate on a file in your disk. The content of this file should be:
