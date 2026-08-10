@@ -442,6 +442,12 @@ int rrdfunctions_manifest_unittest(void) {
         // An unregistered host has no ACLK config - sql_load_node_id() only reaches
         // create_aclk_config() for a host the cloud has registered - so make one here. A NULL
         // node_id keeps create_aclk_config() from also writing host->node_id.
+        //
+        // Remember whether this test is the one that created it, so the cleanup below can put the
+        // host back exactly as it was found: this binary runs several tests in-process against the
+        // same localhost, and leaving an ACLK config attached would hand them mutable state (and a
+        // leaked allocation) they never asked for.
+        bool config_created_here = (__atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE) == NULL);
         create_aclk_config(host, &host->host_id.uuid, NULL);
         aclk_sync_cfg_t *cfg = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
@@ -515,11 +521,21 @@ int rrdfunctions_manifest_unittest(void) {
                 errors++;
             }
 
-            // leave nothing recorded or armed behind for the rest of the process
+            // leave nothing recorded or armed behind for the rest of the process. Redundant when the
+            // config is destroyed below, but this is also the path taken when the config pre-existed
+            // and must survive - and after destroy_aclk_config() cfg is freed, so it happens here.
             __atomic_store_n(&cfg->node_manifest_sent_token, 0, __ATOMIC_RELEASE);
             __atomic_store_n(&cfg->node_manifest_sent_key, 0, __ATOMIC_RELEASE);
             aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
         }
+
+        // Detach and free the config if this test created it. With no ACLK sync thread running in the
+        // unittest binary, destroy_aclk_config() skips its event-loop round trip (it is gated on
+        // aclk_sync_config.initialized, set only inside aclk_synchronization_event_loop()) and reduces
+        // to an atomic exchange plus freez - no thread, no timer, no database. cfg is dangling after
+        // this point.
+        if(config_created_here)
+            destroy_aclk_config(host);
 
         if(errors == record_errors_before)
             fprintf(stderr, "  OK record: a drop invalidates its own token, a stale drop does not, "
