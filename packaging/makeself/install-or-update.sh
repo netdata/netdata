@@ -200,6 +200,17 @@ if [ -e "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ] ||
   run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh"
 fi
 
+# The otel-signal-viewer plugin was removed in favour of otel-plugin plus the
+# read-only legacy-otel-logs function. Native packages drop its files via
+# Obsoletes/Replaces, but an overlay upgrade only stops shipping them, so both
+# artifacts linger here. Only stock paths are touched, never user config.
+for x in usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin \
+  usr/lib/netdata/conf.d/otel-signal-viewer.yaml; do
+  if [ -e "${NETDATA_PREFIX}/${x}" ] || [ -L "${NETDATA_PREFIX}/${x}" ]; then
+    run rm -f "${NETDATA_PREFIX}/${x}"
+  fi
+done
+
 # -----------------------------------------------------------------------------
 
 progress "changing plugins ownership and permissions"
