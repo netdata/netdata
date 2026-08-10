@@ -136,9 +136,10 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
 // allowed to disagree - command-nodeid.c assigns host->node_id from the parent without touching the
 // config, and set_host_node_id() documents the divergence - so a node_id lookup can miss the host
 // whose config must be written, or find a different one. Missing it would leave a dropped manifest
-// recorded as sent; finding the wrong host would clear a key that host is still relying on, forcing a
-// redundant publish. machine_guid is immutable for the host's lifetime, and is also
-// rrdhost_root_index's key, so the lookup is exact.
+// recorded as sent; finding the wrong host would invalidate a record that host is still relying on -
+// harmless beyond a redundant publish, since only its token can be cleared and only when the CAS
+// matches. machine_guid is immutable for the host's lifetime, and is also rrdhost_root_index's key,
+// so the lookup is exact.
 //
 // The two drop sites that run before the query is handed off - a payload that failed to generate,
 // and a sync queue that is not accepting - reach this from inside
@@ -372,8 +373,11 @@ static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
 //
 // Only the alert-push worker reaches this, serialized by alert_push_running, and libuv's threadpool
 // hand-off gives each pass a happens-before edge on the previous one, so the pacer itself needs no
-// synchronization. node_manifest_sent_key does: this worker stores it, and the ACLK query workers
-// clear it when a manifest turns out to have been dropped.
+// synchronization. The publication record does: this worker stores both node_manifest_sent_key and
+// node_manifest_sent_token, and the token alone is cleared - by whichever thread reports that a
+// manifest was dropped, which is an ACLK query worker for anything the mqtt layer rejected, this
+// same worker for a drop inside the enqueue call, or the ACLK sync event loop for a query it could
+// not park and for the shutdown drain.
 static MANIFEST_PACER manifest_pacer = { 0 };
 
 void aclk_check_node_info_collectors_and_manifest(void)
