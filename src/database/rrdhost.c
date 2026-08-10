@@ -35,6 +35,61 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
     return ret;
 }
 
+// Runs `cb` on the host with this machine_guid while holding the rrd read lock, so the host and
+// everything hanging off it stay allocated for the duration of the callback. For callers that hold no
+// reference to the host.
+//
+// The rrd read lock - NOT the host index lock - is what provides the lifetime. The index lock does
+// not: dict_item_del() takes only the index write lock, and for an item a traversal is referencing
+// it merely flags it deleted and returns without waiting (dictionary-item.h). rrdhost_root_index is
+// also DICT_OPTION_VALUE_LINK_DONT_CLONE with no delete callback, so the dictionary never owns the
+// RRDHOST and freez(host) is not serialized by it at all.
+//
+// What makes the rrd read lock sufficient is that every teardown removes the host from
+// rrdhost_root_index under rrd_wrlock() before freeing it
+// (rrdhost_unlink___while_having_rrd_wrlock(), then rrdhost_free_unlinked()). So a lookup performed
+// while holding this read lock either happens before the unlink - and then the read lock blocks the
+// writer from unlinking and freeing until `cb` returns - or after it, and finds nothing. That covers
+// rrdhost_free___consume_metadata_lifetime_writelock() too, which frees with no lock held: by the
+// time it gets there the host is already out of the index, so it can no longer be found here.
+//
+// `may_block` selects how the read lock is taken, and a caller that can run on more than one thread
+// MUST decide it per call rather than once:
+//   true  - wait for the lock. Correct for any thread nobody can be waiting on while holding
+//           rrd_wrlock().
+//   false - take it only if it is free, and skip the callback otherwise. Required on a thread that
+//           an rrd_wrlock() holder may be blocked on: the ACLK sync event loop is one, because a host
+//           teardown calls destroy_aclk_config() under rrd_wrlock() and waits for that loop. Waiting
+//           for the read lock there would close the cycle and wedge the agent.
+// With false, "not applied" is a normal outcome the caller MUST tolerate.
+//
+// Keyed by machine_guid, which is immutable for the host's lifetime and is this index's key, so the
+// lookup is exact. Do NOT key such a callback on node_id: host->node_id and the ACLK config's
+// node_id can disagree (command-nodeid.c assigns host->node_id from the parent without touching the
+// config), so a node_id resolves to the wrong host or to none.
+//
+// `cb` runs with the rrd read lock held: keep it short, and do not take a lock from it that an
+// rrd_wrlock() holder may be waiting behind.
+//
+// Returns whether `cb` ran - false when no host matched, and also when the lock was skipped.
+bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block) {
+
+    if (unlikely(!machine_guid || !*machine_guid || !cb))
+        return false;
+
+    if (may_block)
+        rrd_rdlock();
+    else if (rrd_tryrdlock() != 0)
+        return false;
+
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if (host)
+        cb(host, data);
+    rrd_rdunlock();
+
+    return host != NULL;
+}
+
 RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
     if(unlikely(!hostname))
         return NULL;

@@ -37,6 +37,7 @@ static void create_node_instance_result_job(const char *machine_guid, const char
 
 struct aclk_sync_config_s {
     ND_THREAD *thread;
+    pid_t event_loop_tid; // atomic: the event loop publishes it, other threads compare against it
     uv_loop_t loop;
     uv_timer_t timer_req;
     uv_async_t async;
@@ -409,8 +410,10 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
     }
 
     if (ok_to_send) {
+        // aclk_query_free() reports the outcome to whoever tracks what the cloud has been told;
+        // leaving it unset here is what makes a dropped message recoverable.
         if (client)
-            send_bin_msg(client, query);
+            query->manifest.published = (send_bin_msg(client, query) == 0);
         else
             nd_log_daemon(NDLP_ERR, "No client to send message %u", query->type);
     }
@@ -620,6 +623,12 @@ static void aclk_synchronization_event_loop(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
+
+    // published so code that can run on either this thread or a worker can tell which it is on -
+    // this thread must never block on a lock a host teardown may be holding while it waits here
+    // (destroy_aclk_config()). See aclk_sync_on_event_loop_thread().
+    __atomic_store_n(&config->event_loop_tid, gettid_cached(), __ATOMIC_RELEASE);
+
     init_cmd_pool(&config->cmd_pool, CMD_POOL_SIZE);
 
     worker_register("ACLKSYNC");
@@ -1249,6 +1258,19 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
         freez(node_id_dup);
         freez(config_hash_dup);
     }
+}
+
+// Whether the caller is running on the ACLK sync event loop. That thread has one hard constraint the
+// workers do not: a host teardown can be blocked inside destroy_aclk_config() waiting for it while
+// holding rrd_wrlock(), so anything reachable from this thread that waits for rrd_rdlock() closes a
+// cycle. A worker blocking on it is safe - the event loop stays free to satisfy that wait.
+//
+// Returns false before the loop has published its id, which is the safe answer: nothing can be
+// waiting on a loop that has not started.
+bool aclk_sync_on_event_loop_thread(void)
+{
+    pid_t tid = __atomic_load_n(&aclk_sync_config.event_loop_tid, __ATOMIC_ACQUIRE);
+    return tid != 0 && tid == gettid_cached();
 }
 
 void aclk_execute_query(aclk_query_t *query)

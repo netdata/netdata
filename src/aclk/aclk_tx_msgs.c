@@ -26,18 +26,30 @@ static bool aclk_size_add_overflow(size_t *total, size_t add)
 
 #define ACLK_HEADER_VERSION (2)
 
-uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+// Returns MQTT_WSS_OK (0) when the message was handed to the mqtt layer, non-zero otherwise -
+// mqtt_wss_publish5()'s error code where it produced one, and 1 for a message that never reached
+// it. Either way the message has been freed. `packet_id` is optional and reports the assigned id
+// (0 when none was assigned).
+//
+// Callers that must know whether the message really went out MUST test the return code: the send
+// can fail for reasons that carry no packet id at all - an offline or disconnecting client, a full
+// mqtt buffer, a message the server rejects as too big - and a caller that does not want the id
+// passes NULL. The id is informational, for matching a later PUBACK.
+int aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname, uint16_t *packet_id)
 {
 #ifndef ACLK_LOG_CONVERSATION_DIR
     UNUSED(msgname);
 #endif
-    uint16_t packet_id = 0;
+    uint16_t pid = 0;
     const char *topic = aclk_get_topic(subtopic);
+
+    if (packet_id)
+        *packet_id = 0;
 
     if (unlikely(!topic)) {
         netdata_log_error("Couldn't get topic. Aborting message send.");
         freez(msg);
-        return 0;
+        return 1;
     }
 
     if (aclklog_enabled) {
@@ -46,11 +58,14 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         freez(json);
     }
 
-    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &pid);
     if (rc != MQTT_WSS_OK)
-        packet_id = 0;
+        return rc;
 
-    return packet_id;
+    if (packet_id)
+        *packet_id = pid;
+
+    return MQTT_WSS_OK;
 }
 
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
@@ -324,7 +339,8 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         return 0;
     }
 
-    pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
+    // a failed publish leaves pid at 0, which is what this returned before it reported the code
+    (void)aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection", &pid);
     if (claim_id_is_set(previous_claim_id))
         claim_id_clear_previous_working();
 
