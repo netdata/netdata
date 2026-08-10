@@ -58,6 +58,19 @@ static void set_nofile_limit(struct rlimit *rl) {
         netdata_log_error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t)rl->rlim_cur);
 }
 
+static void start_static_thread(struct netdata_static_thread *st) {
+    if(!st->enabled) {
+        netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
+        return;
+    }
+
+    if(st->thread)
+        return;
+
+    netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
+    st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+}
+
 static const struct option_def {
     const char val;
     const char *description;
@@ -1179,11 +1192,26 @@ int netdata_main(int argc, char **argv) {
     nd_web_api_init();
     mcp_initialize_subsystem();
     web_server_threading_selection();
+#ifdef OS_WINDOWS
+    netdata_conf_section_web();
+#endif
 
     delta_startup_time("web server sockets");
     if(web_server_mode != WEB_SERVER_MODE_NONE) {
         web_server_listen_sockets_setup();
     }
+
+#ifdef OS_WINDOWS
+    set_nofile_limit(&rlimit_nofile);
+
+    // Windows does not fork later, so static dashboard files can be served while runtime initialization continues.
+    for (i = 0; static_threads[i].name != NULL; i++) {
+        struct netdata_static_thread *st = &static_threads[i];
+
+        if(st->start_routine == socket_listen_main_static_threaded)
+            start_static_thread(st);
+    }
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("sqlite");
@@ -1210,7 +1238,9 @@ int netdata_main(int argc, char **argv) {
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
+#ifndef OS_WINDOWS
     set_nofile_limit(&rlimit_nofile);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("stop temporary spawn server");
@@ -1321,17 +1351,13 @@ int netdata_main(int argc, char **argv) {
     nd_log_limits_reset();
     get_agent_event_time_median_init();
 
+#ifndef OS_WINDOWS
     netdata_conf_section_web();
+#endif
 
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
-
-        if(st->enabled) {
-            netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
-            st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
-        }
-        else
-            netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
+        start_static_thread(st);
     }
     ml_start_threads();
 

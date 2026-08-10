@@ -1295,20 +1295,28 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
         if(likely(hash == url_hashes->api && strcmp(tok, "api") == 0)) {                           // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
+            if(unlikely(!netdata_ready_load()))
+                return web_client_service_unavailable(w);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
         else if(likely(hash == url_hashes->mcp && strcmp(tok, "mcp") == 0)) {
+            if(unlikely(!netdata_ready_load()))
+                return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_http_handle_request(host, w);
         }
         else if(likely(hash == url_hashes->sse && strcmp(tok, "sse") == 0)) {
+            if(unlikely(!netdata_ready_load()))
+                return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_sse_handle_request(host, w);
         }
         else if(unlikely((hash == url_hashes->host && strcmp(tok, "host") == 0) || (hash == url_hashes->node && strcmp(tok, "node") == 0))) { // host switching
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
+            if(unlikely(!netdata_ready_load()))
+                return web_client_service_unavailable(w);
             return web_client_switch_host(host, w, decoded_url_path, hash == url_hashes->node, web_client_process_url);
         }
         else if(unlikely(hash == url_hashes->v3 && strcmp(tok, "v3") == 0)) {
@@ -1336,6 +1344,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return web_client_process_url(host, w, decoded_url_path);
         }
         else if(unlikely(hash == url_hashes->netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
+            if(unlikely(!netdata_ready_load()))
+                return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1348,6 +1358,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
 #ifdef NETDATA_INTERNAL_CHECKS
         else if(unlikely(hash == url_hashes->exit && strcmp(tok, "exit") == 0)) {
+            if(unlikely(!netdata_ready_load()))
+                return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1364,6 +1376,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == url_hashes->debug && strcmp(tok, "debug") == 0)) {
+            if(unlikely(!netdata_ready_load()))
+                return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1402,6 +1416,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return HTTP_RESP_BAD_REQUEST;
         }
         else if(unlikely(hash == url_hashes->mirror && strcmp(tok, "mirror") == 0)) {
+            if(unlikely(!netdata_ready_load()))
+                return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1480,6 +1496,10 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
             switch(w->mode) {
                 case HTTP_REQUEST_MODE_STREAM:
+                    if(unlikely(!netdata_ready_load())) {
+                        web_client_service_unavailable(w);
+                        return;
+                    }
                     if(unlikely(!http_can_access_stream(w))) {
                         web_client_permission_denied_acl(w);
                         return;
@@ -1490,6 +1510,10 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     return;
                 
                 case HTTP_REQUEST_MODE_WEBSOCKET:
+                    if(unlikely(!netdata_ready_load())) {
+                        web_client_service_unavailable(w);
+                        return;
+                    }
                     // Coarse gate: allow handshake only for clients that can access at least one WebSocket surface.
                     // websocket_handle_handshake() performs the protocol-specific ACL check (MCP vs dashboard).
                     if(unlikely(!http_can_access_dashboard(w) && !http_can_access_mcp(w))) {
