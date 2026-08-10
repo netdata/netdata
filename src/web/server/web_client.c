@@ -1496,8 +1496,13 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
             switch(w->mode) {
                 case HTTP_REQUEST_MODE_STREAM:
+                    // Every STREAM path returns without the common response finalization on
+                    // purpose: the handshake reply is a bare payload that the sender reads with
+                    // a raw recv() and byte-matches (stream_connect_validate_first_response()).
+                    // Emitting an HTTP status line and headers here would make every child fail
+                    // the match and report the parent's answer as not understood.
                     if(unlikely(!netdata_ready_load())) {
-                        web_client_service_unavailable(w);
+                        w->response.code = stream_receiver_response_initializing(w);
                         return;
                     }
                     if(unlikely(!http_can_access_stream(w))) {
@@ -1511,8 +1516,10 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 
                 case HTTP_REQUEST_MODE_WEBSOCKET:
                     if(unlikely(!netdata_ready_load())) {
+                        // Unlike STREAM, the WebSocket handshake is plain HTTP: break so the
+                        // response gets its status line, headers, and a send scheduled.
                         web_client_service_unavailable(w);
-                        return;
+                        break;
                     }
                     // Coarse gate: allow handshake only for clients that can access at least one WebSocket surface.
                     // websocket_handle_handshake() performs the protocol-specific ACL check (MCP vs dashboard).
