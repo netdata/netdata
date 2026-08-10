@@ -388,6 +388,25 @@ static bool web_server_should_stop(void) {
     return !service_running(SERVICE_WEB_SERVER);
 }
 
+static void web_server_resume_startup_requests(POLLJOB *p, void *timer_data __maybe_unused) {
+    for(POLLINFO *pi = p->ll; pi; pi = pi->next) {
+        if(!(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET))
+            continue;
+
+        struct web_client *w = pi->data;
+        if(!web_client_resume_startup_wait(w))
+            continue;
+
+        nd_poll_event_t events = 0;
+        if(web_client_has_wait_receive(w) || web_client_has_ssl_wait_receive(w))
+            events |= ND_POLL_READ;
+        if(web_client_has_wait_send(w) || web_client_has_ssl_wait_send(w))
+            events |= ND_POLL_WRITE;
+
+        pollinfo_set_events(pi, events);
+    }
+}
+
 void socket_listen_main_static_threaded_worker(void *ptr) {
     worker_private = ptr;
     spinlock_lock(&worker_private->spinlock);
@@ -418,7 +437,7 @@ void socket_listen_main_static_threaded_worker(void *ptr) {
                 , web_server_del_callback
                 , web_server_rcv_callback
                 , web_server_snd_callback
-                , NULL
+                , web_server_resume_startup_requests
                 , web_server_should_stop
                 , web_allow_connections_from
                 , web_allow_connections_dns

@@ -246,6 +246,8 @@ struct web_client {
         struct timeval tv_timeout_last_checkpoint; // last checkpoint
     } timings;
 
+    bool startup_waiting;
+
     struct {
         struct web_client *prev;
         struct web_client *next;
@@ -263,6 +265,7 @@ ssize_t web_client_send(struct web_client *w);
 ssize_t web_client_receive(struct web_client *w);
 
 void web_client_process_request_from_web_server(struct web_client *w);
+bool web_client_resume_startup_wait(struct web_client *w);
 void web_client_request_done(struct web_client *w);
 
 void web_client_build_http_header(struct web_client *w);

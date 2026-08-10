@@ -114,6 +114,8 @@ static inline char *strip_control_characters(char *url) {
 }
 
 static void web_client_reset_allocations(struct web_client *w, bool free_all) {
+    w->startup_waiting = false;
+
 
     if(free_all) {
         // the web client is to be destroyed
@@ -1295,8 +1297,18 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
         if(likely(hash == url_hashes->api && strcmp(tok, "api") == 0)) {                           // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
-            if(unlikely(!netdata_ready_load()))
+            if(unlikely(!netdata_ready_load())) {
+                // The local dashboard cannot boot without this response and does not retry a 503.
+                // Keep only its read-only bootstrap request pending until rrd_init() publishes localhost.
+                if(w->mode == HTTP_REQUEST_MODE_GET && http_can_access_dashboard(w) &&
+                   !strcmp(decoded_url_path, "v3/info")) {
+                    w->startup_waiting = true;
+                    web_client_timeout_checkpoint_set(w, web_client_timeout * 1000);
+                    return HTTP_RESP_OK;
+                }
+
                 return web_client_service_unavailable(w);
+            }
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
         else if(likely(hash == url_hashes->mcp && strcmp(tok, "mcp") == 0)) {
@@ -1447,6 +1459,69 @@ static bool web_server_log_transport(BUFFER *wb, void *ptr) {
     return true;
 }
 
+static void web_client_finalize_response(struct web_client *w) {
+    // keep track of the processing time
+    web_client_timeout_checkpoint_response_ready(w, NULL);
+
+    w->response.sent = 0;
+
+    web_client_send_http_header(w);
+
+    // enable sending immediately if we have data
+    if(w->response.data->len) web_client_enable_wait_send(w);
+    else web_client_disable_wait_send(w);
+
+    switch(w->mode) {
+        case HTTP_REQUEST_MODE_STREAM:
+            netdata_log_debug(D_WEB_CLIENT, "%llu: STREAM done.", w->id);
+            break;
+
+        case HTTP_REQUEST_MODE_WEBSOCKET:
+            netdata_log_debug(D_WEB_CLIENT, "%llu: Done preparing the WEBSOCKET response..", w->id);
+            break;
+
+        case HTTP_REQUEST_MODE_OPTIONS:
+            netdata_log_debug(D_WEB_CLIENT,
+                "%llu: Done preparing the OPTIONS response. Sending data (%zu bytes) to client.",
+                w->id, (size_t)w->response.data->len);
+            break;
+
+        case HTTP_REQUEST_MODE_POST:
+        case HTTP_REQUEST_MODE_GET:
+        case HTTP_REQUEST_MODE_PUT:
+        case HTTP_REQUEST_MODE_DELETE:
+            netdata_log_debug(D_WEB_CLIENT,
+                "%llu: Done preparing the response. Sending data (%zu bytes) to client.",
+                w->id, (size_t)w->response.data->len);
+            break;
+
+        default:
+            fatal("%llu: Unknown client mode %u.", w->id, w->mode);
+            break;
+    }
+}
+
+bool web_client_resume_startup_wait(struct web_client *w) {
+    if(!w->startup_waiting)
+        return false;
+
+    if(!netdata_ready_load() && !web_client_timeout_checkpoint_and_check(w, NULL))
+        return false;
+
+    w->startup_waiting = false;
+
+    if(netdata_ready_load()) {
+        char path[FILENAME_MAX + 1];
+        strncpyz(path, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
+        w->response.code = (short)web_client_process_url(localhost, w, path);
+    }
+    else
+        w->response.data->content_type = CT_TEXT_PLAIN;
+
+    web_client_finalize_response(w);
+    return true;
+}
+
 void web_client_process_request_from_web_server(struct web_client *w) {
     // entry point for web server requests
 
@@ -1468,6 +1543,11 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
+
+    if(w->startup_waiting) {
+        web_client_resume_startup_wait(w);
+        return;
+    }
 
     // give a new transaction id to the request
     if(uuid_is_null(w->transaction))
@@ -1611,6 +1691,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     }
 
                     w->response.code = (short)web_client_process_url(localhost, w, path);
+                    if(w->startup_waiting)
+                        return;
                     break;
                 }
 
@@ -1681,45 +1763,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             break;
     }
 
-    // keep track of the processing time
-    web_client_timeout_checkpoint_response_ready(w, NULL);
-
-    w->response.sent = 0;
-
-    web_client_send_http_header(w);
-
-    // enable sending immediately if we have data
-    if(w->response.data->len) web_client_enable_wait_send(w);
-    else web_client_disable_wait_send(w);
-
-    switch(w->mode) {
-        case HTTP_REQUEST_MODE_STREAM:
-            netdata_log_debug(D_WEB_CLIENT, "%llu: STREAM done.", w->id);
-            break;
-
-        case HTTP_REQUEST_MODE_WEBSOCKET:
-            netdata_log_debug(D_WEB_CLIENT, "%llu: Done preparing the WEBSOCKET response..", w->id);
-            break;
-
-        case HTTP_REQUEST_MODE_OPTIONS:
-            netdata_log_debug(D_WEB_CLIENT,
-                "%llu: Done preparing the OPTIONS response. Sending data (%zu bytes) to client.",
-                w->id, (size_t)w->response.data->len);
-            break;
-
-        case HTTP_REQUEST_MODE_POST:
-        case HTTP_REQUEST_MODE_GET:
-        case HTTP_REQUEST_MODE_PUT:
-        case HTTP_REQUEST_MODE_DELETE:
-            netdata_log_debug(D_WEB_CLIENT,
-                "%llu: Done preparing the response. Sending data (%zu bytes) to client.",
-                w->id, (size_t)w->response.data->len);
-            break;
-
-        default:
-            fatal("%llu: Unknown client mode %u.", w->id, w->mode);
-            break;
-    }
+    web_client_finalize_response(w);
 }
 
 static inline ssize_t web_client_send_chunk_frame(struct web_client *w, const char *buf, size_t len, size_t *sent)
