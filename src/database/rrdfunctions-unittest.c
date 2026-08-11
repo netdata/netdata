@@ -277,15 +277,10 @@ int rrdfunctions_manifest_unittest(void) {
     //    standalone dictionaries keep this independent of whatever live functions localhost has.
     //    The other half of the suppression - scoping the record to one ACLK session - is folded
     //    into the same value by manifest_publication_key(), covered at the end of this block.
-    //    What is NOT covered here is the recording side: build_node_manifest() records the key under a
-    //    per-enqueue token as it enqueues, and aclk_node_manifest_publish_result() invalidates that
-    //    token if the message was dropped. Invalidation is pure atomics on the host's ACLK config, so
-    //    it does NOT need a live ACLK connection - but it does need a host that HAS a config, and this
-    //    test's localhost does not: sql_load_node_id() only calls set_host_node_id() when the query
-    //    returns a row, so an unregistered host reaches neither it nor create_aclk_config(), the only
-    //    place host->aclk_host_config is ever set. A test would have to call create_aclk_config()
-    //    itself (a plain callocz plus a publish CAS, no ACLK thread needed) and include
-    //    aclk/aclk_query_queue.h for struct aclk_manifest_publication. Untested; tracked in the SOW.
+    //    The recording side - build_node_manifest() storing the key under a per-enqueue token, and
+    //    aclk_node_manifest_publish_result() invalidating that token when the message was dropped -
+    //    is covered separately by block 5 below, which creates the ACLK config this test's localhost
+    //    does not have.
     {
         int hash_errors_before = errors;
         const char *node1 = "11111111-2222-3333-4444-555555555555";
@@ -459,7 +454,7 @@ int rrdfunctions_manifest_unittest(void) {
             const uint64_t K = 0x0123456789abcdefULL; // any content key; the record is content-blind
             const uint64_t T1 = 1111, T2 = 2222, T3 = 3333;
 
-            struct aclk_manifest_publication pub = { .key = K, .token = T1, .published = false };
+            struct aclk_manifest_publication pub = { .token = T1, .published = false };
             strncpyz(pub.machine_guid, host->machine_guid, sizeof(pub.machine_guid) - 1);
 
             // a dropped manifest invalidates its own record and re-arms, so the content is rebuilt
