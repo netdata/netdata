@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: haproxy
+cases:
+  default:
+    environment:
+      haproxy: {}
+    fixture: fixtures/haproxy_all_metrics.prom
+    coverage: true
+    expected:
+      verdict: PASS

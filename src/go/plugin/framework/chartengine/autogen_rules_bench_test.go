@@ -282,7 +282,7 @@ func BenchmarkResolveAutogenRouteRulesStructuredKinds(b *testing.B) {
 				b.ReportAllocs()
 				b.ResetTimer()
 				for range b.N {
-					routes, _, err := engine.resolveAutogenRoute(nil, test.metricName, labels, test.meta)
+					routes, _, _, _, err := engine.resolveAutogenRouteWithReason(nil, test.metricName, labels, test.meta)
 					if err != nil {
 						b.Fatalf("resolve route: %v", err)
 					}

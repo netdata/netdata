@@ -26,11 +26,15 @@ func sanitizeWireID(value string) string {
 }
 
 func emitChart(api *netdataapi.API, env EmitEnv, chartID string, meta chartengine.ChartMeta, obsolete bool) {
+	api.CHART(prepareChart(env, chartID, meta, obsolete))
+}
+
+func prepareChart(env EmitEnv, chartID string, meta chartengine.ChartMeta, obsolete bool) netdataapi.ChartOpts {
 	opts := ""
 	if obsolete {
 		opts = "obsolete"
 	}
-	api.CHART(netdataapi.ChartOpts{
+	return netdataapi.ChartOpts{
 		TypeID:      sanitizeWireID(env.TypeID),
 		ID:          sanitizeWireID(chartID),
 		Name:        "",
@@ -44,7 +48,7 @@ func emitChart(api *netdataapi.API, env EmitEnv, chartID string, meta chartengin
 		Options:     opts,
 		Plugin:      sanitizeWireValue(env.Plugin),
 		Module:      sanitizeWireValue(env.Module),
-	})
+	}
 }
 
 func emitChartLabels(api *netdataapi.API, env EmitEnv, chartLabels map[string]string) {

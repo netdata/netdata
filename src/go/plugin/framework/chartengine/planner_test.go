@@ -2752,6 +2752,13 @@ func TestDimBuildEntry64BitSizeBudget(t *testing.T) {
 	assert.LessOrEqual(t, unsafe.Sizeof(dimBuildEntry{}), uintptr(80))
 }
 
+func TestRouteBinding64BitSizeBudget(t *testing.T) {
+	if unsafe.Sizeof(uintptr(0)) != 8 {
+		t.Skip("64-bit hot-path size budget")
+	}
+	assert.LessOrEqual(t, unsafe.Sizeof(routeBinding{}), uintptr(256))
+}
+
 func TestDimBuildEntryAggregationDoesNotAllocate(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
@@ -3130,7 +3137,7 @@ groups:
 			require.True(t, created)
 			oldChart.lastSeenSuccessSeq = 1
 
-			removeDims, removeCharts := enforceLifecycleCaps(2, chartsByID, &state)
+			removeDims, removeCharts := enforceLifecycleCapsWithObserver(2, chartsByID, &state, nil)
 			assert.Empty(t, removeDims)
 			require.Len(t, removeCharts, 1)
 			assert.Equal(t, "svc_old", removeCharts[0].ChartID)

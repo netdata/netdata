@@ -94,7 +94,7 @@ func runTestEnforceLifecycleCapsDimensionCapEvictsLRU(t *testing.T) {
 				},
 			}
 
-			removeDims, removeCharts := enforceLifecycleCaps(tc.currentSeq, chartsByID, &state)
+			removeDims, removeCharts := enforceLifecycleCapsWithObserver(tc.currentSeq, chartsByID, &state, nil)
 
 			assert.Empty(t, removeCharts)
 			require.Len(t, removeDims, 1)
@@ -200,7 +200,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 		},
 	}
 
-	removeDims, removeCharts := enforceLifecycleCaps(currentSeq, chartsByID, &state)
+	removeDims, removeCharts := enforceLifecycleCapsWithObserver(currentSeq, chartsByID, &state, nil)
 
 	require.Len(t, removeCharts, 1)
 	assert.Equal(t, "enabled_old", removeCharts[0].ChartID)

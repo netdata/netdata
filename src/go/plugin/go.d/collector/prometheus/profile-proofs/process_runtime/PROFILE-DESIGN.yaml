@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: process_runtime
+match: 'process_*'
+namespace: process_runtime
+composition:
+  supports: {}
+entities:
+  process:
+    grain: collector job process
+    identity:
+      required: []
+      optional: []
+label_policies: {}
+reduction_policies: {}
+normalizations: {}
+exclusions:
+  process_start_timestamp:
+    source: {signal: process_start_time, components: [value]}
+    reason: not_chartable
+    lost_question: How long has the process been running?
+    required_operation: age_from_unix_epoch
+    evidence: [process_lifecycle, process_unit]
+    outcome: drop_before_writer
+limitations: {}
+views:
+  process_cpu:
+    family: Process Runtime
+    question: How much CPU is the process consuming?
+    entity: process
+    inputs:
+      used:
+        signal: cpu_time
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}
+    display:
+      convention: cpu_cores
+      reason: CPU seconds accumulated per second express average core consumption.
+      evidence: [process_cpu_display]
+  process_resident_memory:
+    family: Process Runtime
+    question: How much resident memory does the process occupy?
+    entity: process
+    inputs:
+      resident:
+        signal: resident_memory
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  process_virtual_memory:
+    family: Process Runtime
+    question: How much virtual address space does the process occupy?
+    entity: process
+    inputs:
+      virtual:
+        signal: virtual_memory
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  open_file_descriptors:
+    family: Process Runtime
+    question: How many file descriptors are currently open?
+    entity: process
+    inputs:
+      open:
+        signal: open_file_descriptors
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}
+    display:
+      convention: file_descriptors
+      reason: The established compact unit for a count of file descriptors is fds.
+      evidence: [process_fd_display]
+  file_descriptor_limit:
+    family: Process Runtime
+    question: What file descriptor capacity is available to the process?
+    entity: process
+    inputs:
+      limit:
+        signal: file_descriptor_limit
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}
+    display:
+      convention: file_descriptors
+      reason: The established compact unit for a count of file descriptors is fds.
+      evidence: [process_fd_display]

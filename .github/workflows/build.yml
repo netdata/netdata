@@ -1316,6 +1316,10 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           brew install bash
+      - name: Install ndsudo test dependencies
+        if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        run: |
+          brew install jq smartmontools
       - name: Install netdata dependencies
         id: install-nd-dep
         if: needs.file-check.outputs.run == 'true'
@@ -1325,7 +1329,12 @@ jobs:
         id: build-source
         if: needs.file-check.outputs.run == 'true'
         run: |
-          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --one-time-build --enable-plugin-otel
+          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --one-time-build --enable-plugin-otel --disable-plugin-go --disable-plugin-scripts
+      - name: Test ndsudo argument validation
+        id: test-ndsudo
+        if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        run: |
+          ./tests/ndsudo-macos.sh /usr/local/netdata/usr/libexec/netdata/plugins.d/ndsudo
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
@@ -1349,6 +1358,7 @@ jobs:
               Setup runner: ${{ steps.install-bash.outcome }}
               Install netdata required packages: ${{ steps.install-nd-dep.outcome }}
               Build from source: ${{ steps.build-source.outcome }}
+              Test ndsudo argument validation: ${{ steps.test-ndsudo.outcome }}
               Test Agent runtime: ${{ steps.test-agent.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-

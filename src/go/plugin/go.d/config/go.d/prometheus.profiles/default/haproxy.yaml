@@ -1,1114 +1,1706 @@
-# HAProxy PromEx exporter (USE_PROMEX=1) chart profile.
-#
-# Template-only: groups/charts shape the default scrape (no ?extra-counters) into an
-# operator-oriented menu. Multi-value labels (state/code) become dimensions via
-# name_from_label. Instance identity per scope is set with instances.by_labels.
-# Chart contexts are scope-prefixed so derived chart IDs stay globally unique
-# (chartengine derives the ID from context; same context across scopes would collide).
-# The ?extra-counters H1/H2/SSL/QUIC/H3 families (mod label) are intentionally left to
-# the collector's autogen fallback so the common no-extra-counters menu stays focused.
-match: 'haproxy_*'
-# app: the exporter's application identity — the prometheus.<app>.… Applications section —
-# used when the job's `app` config is not set (by the user, or automatically by service
-# discovery). A configured `app` wins; the job name is the last resort.
+# HAProxy built-in PromEx profile for the default endpoint (without extra-counters).
+match: haproxy_*
 app: haproxy
+autogen:
+  selector:
+    deny:
+    - haproxy_backend_agg_server_check_status
+    - haproxy_process_description
+    - haproxy_process_node
+    - haproxy_process_start_time_seconds
 template:
   family: HAProxy
   context_namespace: haproxy
   groups:
-    # ── Process / global ───────────────────────────────────────────────────────
-    - family: Process
-      groups:
-        - family: Connections
-          metrics:
-            - haproxy_process_current_connections
-            - haproxy_process_connections_total
-            - haproxy_process_requests_total
-            - haproxy_process_current_connection_rate
-            - haproxy_process_pipes_used_total
-            - haproxy_process_pipes_free_total
-          charts:
-            - title: Current Connections
-              context: process_current_connections
-              units: connections
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_current_connections
-                  name: connections
-            - title: Connections
-              context: process_connections
-              units: connections/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_connections_total
-                  name: connections
-            - title: Requests
-              context: process_requests
-              units: requests/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_requests_total
-                  name: requests
-            - title: Connection Rate
-              context: process_connection_rate
-              units: connections/s
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_current_connection_rate
-                  name: connections
-            - title: Pipes
-              context: process_pipes
-              units: pipes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_pipes_used_total
-                  name: used
-                - selector: haproxy_process_pipes_free_total
-                  name: free
-        - family: Sessions
-          metrics:
-            - haproxy_process_current_session_rate
-          charts:
-            - title: Session Rate
-              context: process_session_rate
-              units: sessions/s
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_current_session_rate
-                  name: sessions
-        - family: Traffic
-          metrics:
-            - haproxy_process_bytes_out_total
-            - haproxy_process_spliced_bytes_out_total
-          charts:
-            - title: Traffic
-              context: process_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_bytes_out_total
-                  name: out
-                - selector: haproxy_process_spliced_bytes_out_total
-                  name: spliced_out
-        - family: SSL
-          metrics:
-            - haproxy_process_current_ssl_connections
-            - haproxy_process_ssl_connections_total
-            - haproxy_process_current_ssl_rate
-            - haproxy_process_ssl_cache_lookups_total
-            - haproxy_process_ssl_cache_misses_total
-          charts:
-            - title: SSL Connections
-              context: process_ssl_connections
-              units: connections/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_ssl_connections_total
-                  name: connections
-            - title: Current SSL Connections
-              context: process_current_ssl_connections
-              units: connections
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_current_ssl_connections
-                  name: connections
-            - title: SSL Rate
-              context: process_ssl_rate
-              units: connections/s
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_current_ssl_rate
-                  name: ssl
-            - title: SSL Cache
-              context: process_ssl_cache
-              units: lookups/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_ssl_cache_lookups_total
-                  name: lookups
-                - selector: haproxy_process_ssl_cache_misses_total
-                  name: misses
-        - family: Compression
-          metrics:
-            - haproxy_process_http_comp_bytes_in_total
-            - haproxy_process_http_comp_bytes_out_total
-          charts:
-            - title: HTTP Compression
-              context: process_http_comp
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_http_comp_bytes_in_total
-                  name: in
-                - selector: haproxy_process_http_comp_bytes_out_total
-                  name: out
-        - family: Scheduler
-          metrics:
-            - haproxy_process_current_tasks
-            - haproxy_process_current_run_queue
-            - haproxy_process_idle_time_percent
-            - haproxy_process_jobs
-            - haproxy_process_listeners
-            - haproxy_process_active_peers
-            - haproxy_process_connected_peers
-            - haproxy_process_dropped_logs_total
-            - haproxy_process_recv_logs_total
-            - haproxy_process_total_warnings
-          charts:
-            - title: Tasks
-              context: process_tasks
-              units: tasks
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_current_tasks
-                  name: tasks
-                - selector: haproxy_process_current_run_queue
-                  name: run_queue
-            - title: Idle Time
-              context: process_idle_time
-              units: percentage
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_idle_time_percent
-                  name: idle
-            - title: Jobs
-              context: process_jobs
-              units: jobs
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_jobs
-                  name: jobs
-                - selector: haproxy_process_listeners
-                  name: listeners
-            - title: Peers
-              context: process_peers
-              units: peers
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_process_active_peers
-                  name: active
-                - selector: haproxy_process_connected_peers
-                  name: connected
-            - title: Logs
-              context: process_logs
-              units: logs/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_recv_logs_total
-                  name: received
-                - selector: haproxy_process_dropped_logs_total
-                  name: dropped
-            - title: Warnings
-              context: process_warnings
-              units: warnings/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_process_total_warnings
-                  name: warnings
-
-    # ── Frontends ────────────────────────────────────────────────────────────────
-    - family: Frontends
-      chart_defaults:
-        instances:
-          by_labels:
-            - proxy
-      groups:
-        - family: Status
-          metrics:
-            - haproxy_frontend_status
-          charts:
-            - title: Frontend Status
-              context: frontend_status
-              units: status
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_frontend_status
-                  name_from_label: state
-        - family: Sessions
-          metrics:
-            - haproxy_frontend_current_sessions
-            - haproxy_frontend_sessions_total
-            - haproxy_frontend_current_session_rate
-          charts:
-            - title: Frontend Current Sessions
-              context: frontend_current_sessions
-              units: sessions
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_frontend_current_sessions
-                  name: current
-            - title: Frontend Session Rate
-              context: frontend_sessions
-              units: sessions/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_sessions_total
-                  name: sessions
-            - title: Frontend Current Session Rate
-              context: frontend_current_session_rate
-              units: sessions/s
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_frontend_current_session_rate
-                  name: sessions
-        - family: Connections
-          metrics:
-            - haproxy_frontend_connections_total
-            - haproxy_frontend_denied_connections_total
-            - haproxy_frontend_denied_sessions_total
-          charts:
-            - title: Frontend Connections
-              context: frontend_connections
-              units: connections/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_connections_total
-                  name: connections
-            - title: Frontend Denied
-              context: frontend_denied
-              units: events/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_denied_connections_total
-                  name: connections
-                - selector: haproxy_frontend_denied_sessions_total
-                  name: sessions
-        - family: Traffic
-          metrics:
-            - haproxy_frontend_bytes_in_total
-            - haproxy_frontend_bytes_out_total
-            - haproxy_frontend_req_bytes_in_total
-            - haproxy_frontend_req_bytes_out_total
-            - haproxy_frontend_res_bytes_in_total
-            - haproxy_frontend_res_bytes_out_total
-          charts:
-            - title: Frontend Traffic
-              context: frontend_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_bytes_in_total
-                  name: received
-                - selector: haproxy_frontend_bytes_out_total
-                  name: sent
-            - title: Frontend Request Traffic
-              context: frontend_req_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_req_bytes_in_total
-                  name: received
-                - selector: haproxy_frontend_req_bytes_out_total
-                  name: sent
-            - title: Frontend Response Traffic
-              context: frontend_res_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_res_bytes_in_total
-                  name: received
-                - selector: haproxy_frontend_res_bytes_out_total
-                  name: sent
-        - family: HTTP
-          metrics:
-            - haproxy_frontend_http_requests_total
-            - haproxy_frontend_intercepted_requests_total
-            - haproxy_frontend_http_cache_lookups_total
-            - haproxy_frontend_http_cache_hits_total
-          charts:
-            - title: Frontend HTTP Requests
-              context: frontend_http_requests
-              units: requests/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_http_requests_total
-                  name: requests
-                - selector: haproxy_frontend_intercepted_requests_total
-                  name: intercepted
-            - title: Frontend HTTP Cache
-              context: frontend_http_cache
-              units: lookups/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_http_cache_lookups_total
-                  name: lookups
-                - selector: haproxy_frontend_http_cache_hits_total
-                  name: hits
-        - family: HTTP Responses
-          metrics:
-            - haproxy_frontend_http_responses_total
-          charts:
-            - title: Frontend HTTP Responses
-              context: frontend_http_responses
-              units: responses/s
-              type: stacked
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_http_responses_total
-                  name_from_label: code
-        - family: Errors
-          metrics:
-            - haproxy_frontend_request_errors_total
-            - haproxy_frontend_requests_denied_total
-            - haproxy_frontend_responses_denied_total
-            - haproxy_frontend_failed_header_rewriting_total
-            - haproxy_frontend_internal_errors_total
-          charts:
-            - title: Frontend Errors
-              context: frontend_errors
-              units: errors/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_request_errors_total
-                  name: request
-                - selector: haproxy_frontend_failed_header_rewriting_total
-                  name: header_rewriting
-                - selector: haproxy_frontend_internal_errors_total
-                  name: internal
-            - title: Frontend Denied
-              context: frontend_denied_requests
-              units: events/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_frontend_requests_denied_total
-                  name: requests
-                - selector: haproxy_frontend_responses_denied_total
-                  name: responses
-
-    # ── Listeners ──────────────────────────────────────────────────────────────
-    - family: Listeners
-      chart_defaults:
-        instances:
-          by_labels:
-            - proxy
-            - listener
-      groups:
-        - family: Status
-          metrics:
-            - haproxy_listener_status
-          charts:
-            - title: Listener Status
-              context: listener_status
-              units: status
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_listener_status
-                  name_from_label: state
-        - family: Sessions
-          metrics:
-            - haproxy_listener_current_sessions
-            - haproxy_listener_sessions_total
-          charts:
-            - title: Listener Current Sessions
-              context: listener_current_sessions
-              units: sessions
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_listener_current_sessions
-                  name: current
-            - title: Listener Session Rate
-              context: listener_sessions
-              units: sessions/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_listener_sessions_total
-                  name: sessions
-        - family: Traffic
-          metrics:
-            - haproxy_listener_bytes_in_total
-            - haproxy_listener_bytes_out_total
-            - haproxy_listener_connections_total
-          charts:
-            - title: Listener Traffic
-              context: listener_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_listener_bytes_in_total
-                  name: received
-                - selector: haproxy_listener_bytes_out_total
-                  name: sent
-            - title: Listener Connections
-              context: listener_connections
-              units: connections/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_listener_connections_total
-                  name: connections
-        - family: Errors
-          metrics:
-            - haproxy_listener_request_errors_total
-            - haproxy_listener_requests_denied_total
-            - haproxy_listener_responses_denied_total
-            - haproxy_listener_denied_connections_total
-            - haproxy_listener_denied_sessions_total
-            - haproxy_listener_failed_header_rewriting_total
-            - haproxy_listener_internal_errors_total
-          charts:
-            - title: Listener Errors
-              context: listener_errors
-              units: errors/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_listener_request_errors_total
-                  name: request
-                - selector: haproxy_listener_failed_header_rewriting_total
-                  name: header_rewriting
-                - selector: haproxy_listener_internal_errors_total
-                  name: internal
-            - title: Listener Denied
-              context: listener_denied
-              units: events/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_listener_requests_denied_total
-                  name: requests
-                - selector: haproxy_listener_responses_denied_total
-                  name: responses
-                - selector: haproxy_listener_denied_connections_total
-                  name: connections
-                - selector: haproxy_listener_denied_sessions_total
-                  name: sessions
-
-    # ── Backends ───────────────────────────────────────────────────────────────
-    - family: Backends
-      chart_defaults:
-        instances:
-          by_labels:
-            - proxy
-      groups:
-        - family: Status
-          metrics:
-            - haproxy_backend_status
-            - haproxy_backend_agg_check_status
-            - haproxy_backend_agg_server_check_status
-          charts:
-            - title: Backend Status
-              context: backend_status
-              units: status
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_status
-                  name_from_label: state
-            - title: Backend Aggregated Check Status
-              context: backend_agg_check_status
-              units: servers
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_agg_check_status
-                  name_from_label: state
-            - title: Backend Aggregated Server Check Status
-              context: backend_agg_server_check_status
-              units: servers
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_agg_server_check_status
-                  name_from_label: state
-        - family: Sessions
-          metrics:
-            - haproxy_backend_current_sessions
-            - haproxy_backend_sessions_total
-            - haproxy_backend_current_session_rate
-          charts:
-            - title: Backend Current Sessions
-              context: backend_current_sessions
-              units: sessions
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_current_sessions
-                  name: current
-            - title: Backend Session Rate
-              context: backend_sessions
-              units: sessions/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_sessions_total
-                  name: sessions
-            - title: Backend Current Session Rate
-              context: backend_current_session_rate
-              units: sessions/s
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_current_session_rate
-                  name: sessions
-        - family: Connections
-          metrics:
-            - haproxy_backend_connection_attempts_total
-            - haproxy_backend_connection_reuses_total
-            - haproxy_backend_client_aborts_total
-            - haproxy_backend_server_aborts_total
-          charts:
-            - title: Backend Connections
-              context: backend_connections
-              units: connections/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_connection_attempts_total
-                  name: attempts
-                - selector: haproxy_backend_connection_reuses_total
-                  name: reuses
-            - title: Backend Aborts
-              context: backend_aborts
-              units: aborts/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_client_aborts_total
-                  name: client
-                - selector: haproxy_backend_server_aborts_total
-                  name: server
-        - family: Traffic
-          metrics:
-            - haproxy_backend_bytes_in_total
-            - haproxy_backend_bytes_out_total
-            - haproxy_backend_req_bytes_in_total
-            - haproxy_backend_req_bytes_out_total
-            - haproxy_backend_res_bytes_in_total
-            - haproxy_backend_res_bytes_out_total
-          charts:
-            - title: Backend Traffic
-              context: backend_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_bytes_in_total
-                  name: received
-                - selector: haproxy_backend_bytes_out_total
-                  name: sent
-            - title: Backend Request Traffic
-              context: backend_req_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_req_bytes_in_total
-                  name: received
-                - selector: haproxy_backend_req_bytes_out_total
-                  name: sent
-            - title: Backend Response Traffic
-              context: backend_res_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_res_bytes_in_total
-                  name: received
-                - selector: haproxy_backend_res_bytes_out_total
-                  name: sent
-        - family: HTTP
-          metrics:
-            - haproxy_backend_http_requests_total
-            - haproxy_backend_http_cache_lookups_total
-            - haproxy_backend_http_cache_hits_total
-          charts:
-            - title: Backend HTTP Requests
-              context: backend_http_requests
-              units: requests/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_http_requests_total
-                  name: requests
-            - title: Backend HTTP Cache
-              context: backend_http_cache
-              units: lookups/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_http_cache_lookups_total
-                  name: lookups
-                - selector: haproxy_backend_http_cache_hits_total
-                  name: hits
-        - family: HTTP Responses
-          metrics:
-            - haproxy_backend_http_responses_total
-          charts:
-            - title: Backend HTTP Responses
-              context: backend_http_responses
-              units: responses/s
-              type: stacked
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_http_responses_total
-                  name_from_label: code
-        - family: Queue
-          metrics:
-            - haproxy_backend_current_queue
-          charts:
-            - title: Backend Queue
-              context: backend_queue
-              units: requests
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_current_queue
-                  name: queued
-        - family: Timings
-          metrics:
-            - haproxy_backend_queue_time_average_seconds
-            - haproxy_backend_connect_time_average_seconds
-            - haproxy_backend_response_time_average_seconds
-            - haproxy_backend_total_time_average_seconds
-          charts:
-            - title: Backend Average Response Time
-              context: backend_response_time
-              units: seconds
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_response_time_average_seconds
-                  name: response
-            - title: Backend Average Timings
-              context: backend_timings
-              units: seconds
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_queue_time_average_seconds
-                  name: queue
-                - selector: haproxy_backend_connect_time_average_seconds
-                  name: connect
-                - selector: haproxy_backend_total_time_average_seconds
-                  name: total
-        - family: Health
-          metrics:
-            - haproxy_backend_active_servers
-            - haproxy_backend_backup_servers
-            - haproxy_backend_weight
-            - haproxy_backend_check_up_down_total
-            - haproxy_backend_downtime_seconds_total
-            - haproxy_backend_loadbalanced_total
-          charts:
-            - title: Backend Servers
-              context: backend_servers
-              units: servers
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_active_servers
-                  name: active
-                - selector: haproxy_backend_backup_servers
-                  name: backup
-            - title: Backend Weight
-              context: backend_weight
-              units: weight
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_backend_weight
-                  name: weight
-            - title: Backend Check Transitions
-              context: backend_check_up_down
-              units: events/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_check_up_down_total
-                  name: up_down
-            - title: Backend Downtime
-              context: backend_downtime
-              units: seconds
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_downtime_seconds_total
-                  name: downtime
-            - title: Backend Load Balanced Requests
-              context: backend_loadbalanced
-              units: requests/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_loadbalanced_total
-                  name: requests
-        - family: Errors
-          metrics:
-            - haproxy_backend_response_errors_total
-            - haproxy_backend_connection_errors_total
-            - haproxy_backend_requests_denied_total
-            - haproxy_backend_responses_denied_total
-            - haproxy_backend_retry_warnings_total
-            - haproxy_backend_redispatch_warnings_total
-            - haproxy_backend_failed_header_rewriting_total
-            - haproxy_backend_internal_errors_total
-          charts:
-            - title: Backend Errors
-              context: backend_errors
-              units: errors/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_response_errors_total
-                  name: response
-                - selector: haproxy_backend_connection_errors_total
-                  name: connection
-                - selector: haproxy_backend_failed_header_rewriting_total
-                  name: header_rewriting
-                - selector: haproxy_backend_internal_errors_total
-                  name: internal
-            - title: Backend Warnings
-              context: backend_warnings
-              units: warnings/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_retry_warnings_total
-                  name: retry
-                - selector: haproxy_backend_redispatch_warnings_total
-                  name: redispatch
-            - title: Backend Denied
-              context: backend_denied
-              units: events/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_backend_requests_denied_total
-                  name: requests
-                - selector: haproxy_backend_responses_denied_total
-                  name: responses
-
-    # ── Servers ────────────────────────────────────────────────────────────────
-    - family: Servers
-      chart_defaults:
-        instances:
-          by_labels:
-            - proxy
-            - server
-      groups:
-        - family: Status
-          metrics:
-            - haproxy_server_status
-            - haproxy_server_check_status
-            - haproxy_server_agent_status
-          charts:
-            - title: Server Status
-              context: server_status
-              units: status
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_status
-                  name_from_label: state
-            - title: Server Check Status
-              context: server_check_status
-              units: status
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_check_status
-                  name_from_label: state
-            - title: Server Agent Status
-              context: server_agent_status
-              units: status
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_agent_status
-                  name_from_label: state
-        - family: Sessions
-          metrics:
-            - haproxy_server_current_sessions
-            - haproxy_server_sessions_total
-            - haproxy_server_current_session_rate
-          charts:
-            - title: Server Current Sessions
-              context: server_current_sessions
-              units: sessions
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_current_sessions
-                  name: current
-            - title: Server Session Rate
-              context: server_sessions
-              units: sessions/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_sessions_total
-                  name: sessions
-            - title: Server Current Session Rate
-              context: server_current_session_rate
-              units: sessions/s
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_current_session_rate
-                  name: sessions
-        - family: Connections
-          metrics:
-            - haproxy_server_connection_attempts_total
-            - haproxy_server_connection_reuses_total
-            - haproxy_server_client_aborts_total
-            - haproxy_server_server_aborts_total
-            - haproxy_server_idle_connections_current
-          charts:
-            - title: Server Connections
-              context: server_connections
-              units: connections/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_connection_attempts_total
-                  name: attempts
-                - selector: haproxy_server_connection_reuses_total
-                  name: reuses
-            - title: Server Aborts
-              context: server_aborts
-              units: aborts/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_client_aborts_total
-                  name: client
-                - selector: haproxy_server_server_aborts_total
-                  name: server
-            - title: Server Idle Connections
-              context: server_idle_connections
-              units: connections
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_idle_connections_current
-                  name: idle
-        - family: Traffic
-          metrics:
-            - haproxy_server_bytes_in_total
-            - haproxy_server_bytes_out_total
-            - haproxy_server_req_bytes_in_total
-            - haproxy_server_req_bytes_out_total
-            - haproxy_server_res_bytes_in_total
-            - haproxy_server_res_bytes_out_total
-          charts:
-            - title: Server Traffic
-              context: server_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_bytes_in_total
-                  name: received
-                - selector: haproxy_server_bytes_out_total
-                  name: sent
-            - title: Server Request Traffic
-              context: server_req_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_req_bytes_in_total
-                  name: received
-                - selector: haproxy_server_req_bytes_out_total
-                  name: sent
-            - title: Server Response Traffic
-              context: server_res_traffic
-              units: bytes/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_res_bytes_in_total
-                  name: received
-                - selector: haproxy_server_res_bytes_out_total
-                  name: sent
-        - family: Queue
-          metrics:
-            - haproxy_server_current_queue
-          charts:
-            - title: Server Queue
-              context: server_queue
-              units: requests
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_current_queue
-                  name: queued
-        - family: Timings
-          metrics:
-            - haproxy_server_queue_time_average_seconds
-            - haproxy_server_connect_time_average_seconds
-            - haproxy_server_response_time_average_seconds
-            - haproxy_server_total_time_average_seconds
-          charts:
-            - title: Server Average Response Time
-              context: server_response_time
-              units: seconds
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_response_time_average_seconds
-                  name: response
-            - title: Server Average Timings
-              context: server_timings
-              units: seconds
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_queue_time_average_seconds
-                  name: queue
-                - selector: haproxy_server_connect_time_average_seconds
-                  name: connect
-                - selector: haproxy_server_total_time_average_seconds
-                  name: total
-        - family: Health
-          metrics:
-            - haproxy_server_weight
-            - haproxy_server_check_failures_total
-            - haproxy_server_check_up_down_total
-            - haproxy_server_downtime_seconds_total
-            - haproxy_server_check_duration_seconds
-            - haproxy_server_agent_duration_seconds
-            - haproxy_server_loadbalanced_total
-          charts:
-            - title: Server Weight
-              context: server_weight
-              units: weight
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_weight
-                  name: weight
-            - title: Server Check Failures
-              context: server_check_failures
-              units: failures/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_check_failures_total
-                  name: failures
-            - title: Server Check Transitions
-              context: server_check_up_down
-              units: events/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_check_up_down_total
-                  name: up_down
-            - title: Server Downtime
-              context: server_downtime
-              units: seconds
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_downtime_seconds_total
-                  name: downtime
-            - title: Server Check Duration
-              context: server_check_duration
-              units: seconds
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_server_check_duration_seconds
-                  name: check
-                - selector: haproxy_server_agent_duration_seconds
-                  name: agent
-            - title: Server Load Balanced Requests
-              context: server_loadbalanced
-              units: requests/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_loadbalanced_total
-                  name: requests
-        - family: Errors
-          metrics:
-            - haproxy_server_response_errors_total
-            - haproxy_server_connection_errors_total
-            - haproxy_server_responses_denied_total
-            - haproxy_server_retry_warnings_total
-            - haproxy_server_redispatch_warnings_total
-            - haproxy_server_failed_header_rewriting_total
-            - haproxy_server_internal_errors_total
-          charts:
-            - title: Server Errors
-              context: server_errors
-              units: errors/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_response_errors_total
-                  name: response
-                - selector: haproxy_server_connection_errors_total
-                  name: connection
-                - selector: haproxy_server_failed_header_rewriting_total
-                  name: header_rewriting
-                - selector: haproxy_server_internal_errors_total
-                  name: internal
-            - title: Server Warnings
-              context: server_warnings
-              units: warnings/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_retry_warnings_total
-                  name: retry
-                - selector: haproxy_server_redispatch_warnings_total
-                  name: redispatch
-            - title: Server Denied
-              context: server_denied
-              units: events/s
-              algorithm: incremental
-              dimensions:
-                - selector: haproxy_server_responses_denied_total
-                  name: responses
-
-    # ── Resolvers ────────────────────────────────────────────────────────────────
-    # All resolver families are gauges in source (algorithm: absolute) though semantically
-    # cumulative; type taken from inventory.
-    - family: Resolvers
-      chart_defaults:
-        instances:
-          by_labels:
-            - resolver
-            - nameserver
-      groups:
-        - family: DNS
-          metrics:
-            - haproxy_resolver_sent
-            - haproxy_resolver_valid
-            - haproxy_resolver_update
-            - haproxy_resolver_cname
-            - haproxy_resolver_nx
-            - haproxy_resolver_other
-            - haproxy_resolver_truncated
-            - haproxy_resolver_outdated
-            - haproxy_resolver_send_error
-            - haproxy_resolver_cname_error
-            - haproxy_resolver_any_err
-            - haproxy_resolver_timeout
-            - haproxy_resolver_refused
-            - haproxy_resolver_invalid
-            - haproxy_resolver_too_big
-          charts:
-            - title: Resolver Events
-              context: resolver_events
-              units: events
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_resolver_sent
-                  name: sent
-                - selector: haproxy_resolver_valid
-                  name: valid
-                - selector: haproxy_resolver_update
-                  name: update
-                - selector: haproxy_resolver_cname
-                  name: cname
-                - selector: haproxy_resolver_nx
-                  name: nx
-                - selector: haproxy_resolver_other
-                  name: other
-                - selector: haproxy_resolver_truncated
-                  name: truncated
-                - selector: haproxy_resolver_outdated
-                  name: outdated
-            - title: Resolver Errors
-              context: resolver_errors
-              units: errors
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_resolver_send_error
-                  name: send
-                - selector: haproxy_resolver_cname_error
-                  name: cname
-                - selector: haproxy_resolver_any_err
-                  name: any
-                - selector: haproxy_resolver_timeout
-                  name: timeout
-                - selector: haproxy_resolver_refused
-                  name: refused
-                - selector: haproxy_resolver_invalid
-                  name: invalid
-                - selector: haproxy_resolver_too_big
-                  name: too_big
-
-    # ── Stick Tables ─────────────────────────────────────────────────────────────
-    # local_updates is cumulative but exposed as a gauge by source (algorithm: absolute).
-    - family: Stick Tables
-      chart_defaults:
-        instances:
-          by_labels:
-            - name
-            - type
-      groups:
-        - family: Entries
-          metrics:
-            - haproxy_sticktable_size
-            - haproxy_sticktable_used
-            - haproxy_sticktable_local_updates
-          charts:
-            - title: Stick Table Entries
-              context: sticktable_entries
-              units: entries
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_sticktable_used
-                  name: used
-                - selector: haproxy_sticktable_size
-                  name: size
-            - title: Stick Table Local Updates
-              context: sticktable_local_updates
-              units: updates
-              algorithm: absolute
-              dimensions:
-                - selector: haproxy_sticktable_local_updates
-                  name: local_updates
+  - family: Process
+    groups:
+    - family: Activity
+      metrics:
+      - haproxy_process_nbproc
+      - haproxy_process_nbthread
+      - haproxy_process_recv_logs_total
+      - haproxy_process_relative_process_id
+      - haproxy_process_requests_total
+      charts:
+      - title: Received Logs
+        context: process_recv_logs_total
+        units: logs/s
+        dimensions:
+        - selector: haproxy_process_recv_logs_total
+          name: value
+      - title: Relative Process ID
+        context: process_relative_process_id
+        units: process id
+        dimensions:
+        - selector: haproxy_process_relative_process_id
+          name: value
+      - title: Requests
+        context: process_requests_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_process_requests_total
+          name: value
+      - title: Threads
+        context: process_nbthread
+        units: threads
+        dimensions:
+        - selector: haproxy_process_nbthread
+          name: value
+      - title: Worker Processes
+        context: process_nbproc
+        units: processes
+        dimensions:
+        - selector: haproxy_process_nbproc
+          name: value
+    - family: Compression
+      metrics:
+      - haproxy_process_current_zlib_memory
+      - haproxy_process_limit_http_comp
+      - haproxy_process_max_zlib_memory
+      charts:
+      - title: Current Zlib Memory
+        context: process_current_zlib_memory
+        units: bytes
+        dimensions:
+        - selector: haproxy_process_current_zlib_memory
+          name: value
+      - title: HTTP Compression Limit
+        context: process_limit_http_comp
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_process_limit_http_comp
+          name: value
+      - title: Max Zlib Memory
+        context: process_max_zlib_memory
+        units: bytes
+        dimensions:
+        - selector: haproxy_process_max_zlib_memory
+          name: value
+    - family: Connections
+      metrics:
+      - haproxy_process_connections_total
+      - haproxy_process_current_connection_rate
+      - haproxy_process_current_connections
+      - haproxy_process_hard_max_connections
+      - haproxy_process_limit_connection_rate
+      - haproxy_process_max_connection_rate
+      - haproxy_process_max_connections
+      - haproxy_process_max_fds
+      - haproxy_process_max_pipes
+      - haproxy_process_max_sockets
+      - haproxy_process_pipes_free_total
+      - haproxy_process_pipes_used_total
+      charts:
+      - title: Connections
+        context: process_connections_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_process_connections_total
+          name: value
+      - title: Current Connection Rate
+        context: process_current_connection_rate
+        units: connections/s
+        dimensions:
+        - selector: haproxy_process_current_connection_rate
+          name: value
+      - title: Current Connections
+        context: process_current_connections
+        units: connections
+        dimensions:
+        - selector: haproxy_process_current_connections
+          name: value
+      - title: Hard Max Connections
+        context: process_hard_max_connections
+        units: connections
+        dimensions:
+        - selector: haproxy_process_hard_max_connections
+          name: value
+      - title: Limit Connection Rate
+        context: process_limit_connection_rate
+        units: connections/s
+        dimensions:
+        - selector: haproxy_process_limit_connection_rate
+          name: value
+      - title: Max Connection Rate
+        context: process_max_connection_rate
+        units: connections/s
+        dimensions:
+        - selector: haproxy_process_max_connection_rate
+          name: value
+      - title: Max Connections
+        context: process_max_connections
+        units: connections
+        dimensions:
+        - selector: haproxy_process_max_connections
+          name: value
+      - title: Max FDs
+        context: process_max_fds
+        units: file descriptors
+        dimensions:
+        - selector: haproxy_process_max_fds
+          name: value
+      - title: Max Pipes
+        context: process_max_pipes
+        units: pipes
+        dimensions:
+        - selector: haproxy_process_max_pipes
+          name: value
+      - title: Max Sockets
+        context: process_max_sockets
+        units: sockets
+        dimensions:
+        - selector: haproxy_process_max_sockets
+          name: value
+      - title: Pipes
+        context: process_pipes
+        units: pipes
+        algorithm: absolute
+        dimensions:
+        - selector: haproxy_process_pipes_used_total
+          name: used
+        - selector: haproxy_process_pipes_free_total
+          name: free
+    - family: Errors
+      metrics:
+      - haproxy_process_dropped_logs_total
+      - haproxy_process_failed_resolutions
+      - haproxy_process_total_warnings
+      charts:
+      - title: Dropped Logs
+        context: process_dropped_logs_total
+        units: logs/s
+        dimensions:
+        - selector: haproxy_process_dropped_logs_total
+          name: value
+      - title: Failed Resolutions
+        context: process_failed_resolutions
+        units: errors/s
+        dimensions:
+        - selector: haproxy_process_failed_resolutions
+          name: value
+      - title: Warnings
+        context: process_total_warnings
+        units: warnings/s
+        dimensions:
+        - selector: haproxy_process_total_warnings
+          name: value
+    - family: Health
+      metrics:
+      - haproxy_process_active_peers
+      charts:
+      - title: Active Peers
+        context: process_active_peers
+        units: peers
+        dimensions:
+        - selector: haproxy_process_active_peers
+          name: value
+    - family: Memory
+      metrics:
+      - haproxy_process_max_memory_bytes
+      - haproxy_process_pool_allocated_bytes
+      - haproxy_process_pool_failures_total
+      - haproxy_process_pool_used_bytes
+      charts:
+      - title: Max Memory Bytes
+        context: process_max_memory_bytes
+        units: bytes
+        dimensions:
+        - selector: haproxy_process_max_memory_bytes
+          name: value
+      - title: Pool Allocated Bytes
+        context: process_pool_allocated_bytes
+        units: bytes
+        dimensions:
+        - selector: haproxy_process_pool_allocated_bytes
+          name: value
+      - title: Pool Failures
+        context: process_pool_failures_total
+        units: failures/s
+        dimensions:
+        - selector: haproxy_process_pool_failures_total
+          name: value
+      - title: Pool Used Bytes
+        context: process_pool_used_bytes
+        units: bytes
+        dimensions:
+        - selector: haproxy_process_pool_used_bytes
+          name: value
+    - family: Queue
+      metrics:
+      - haproxy_process_current_run_queue
+      charts:
+      - title: Current Run Queue
+        context: process_current_run_queue
+        units: tasks
+        dimensions:
+        - selector: haproxy_process_current_run_queue
+          name: value
+    - family: SSL
+      metrics:
+      - haproxy_process_current_backend_ssl_key_rate
+      - haproxy_process_current_frontend_ssl_key_rate
+      - haproxy_process_current_ssl_connections
+      - haproxy_process_current_ssl_rate
+      - haproxy_process_frontend_ssl_reuse
+      - haproxy_process_limit_ssl_rate
+      - haproxy_process_max_backend_ssl_key_rate
+      - haproxy_process_max_frontend_ssl_key_rate
+      - haproxy_process_max_ssl_connections
+      - haproxy_process_max_ssl_rate
+      - haproxy_process_ssl_cache_lookups_total
+      - haproxy_process_ssl_cache_misses_total
+      - haproxy_process_ssl_connections_total
+      charts:
+      - title: Current Backend SSL Key Rate
+        context: process_current_backend_ssl_key_rate
+        units: keys/s
+        dimensions:
+        - selector: haproxy_process_current_backend_ssl_key_rate
+          name: value
+      - title: Current Frontend SSL Key Rate
+        context: process_current_frontend_ssl_key_rate
+        units: keys/s
+        dimensions:
+        - selector: haproxy_process_current_frontend_ssl_key_rate
+          name: value
+      - title: Current SSL Connections
+        context: process_current_ssl_connections
+        units: connections
+        dimensions:
+        - selector: haproxy_process_current_ssl_connections
+          name: value
+      - title: Current SSL Rate
+        context: process_current_ssl_rate
+        units: connections/s
+        dimensions:
+        - selector: haproxy_process_current_ssl_rate
+          name: value
+      - title: Frontend SSL Reuse
+        context: process_frontend_ssl_reuse
+        units: percentage
+        dimensions:
+        - selector: haproxy_process_frontend_ssl_reuse
+          name: value
+      - title: Limit SSL Rate
+        context: process_limit_ssl_rate
+        units: connections/s
+        dimensions:
+        - selector: haproxy_process_limit_ssl_rate
+          name: value
+      - title: Max Backend SSL Key Rate
+        context: process_max_backend_ssl_key_rate
+        units: keys/s
+        dimensions:
+        - selector: haproxy_process_max_backend_ssl_key_rate
+          name: value
+      - title: Max Frontend SSL Key Rate
+        context: process_max_frontend_ssl_key_rate
+        units: keys/s
+        dimensions:
+        - selector: haproxy_process_max_frontend_ssl_key_rate
+          name: value
+      - title: Max SSL Connections
+        context: process_max_ssl_connections
+        units: connections
+        dimensions:
+        - selector: haproxy_process_max_ssl_connections
+          name: value
+      - title: Max SSL Rate
+        context: process_max_ssl_rate
+        units: connections/s
+        dimensions:
+        - selector: haproxy_process_max_ssl_rate
+          name: value
+      - title: SSL Cache Lookups
+        context: process_ssl_cache_lookups_total
+        units: lookups/s
+        dimensions:
+        - selector: haproxy_process_ssl_cache_lookups_total
+          name: value
+      - title: SSL Cache Misses
+        context: process_ssl_cache_misses_total
+        units: events/s
+        dimensions:
+        - selector: haproxy_process_ssl_cache_misses_total
+          name: value
+      - title: SSL Connections
+        context: process_ssl_connections_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_process_ssl_connections_total
+          name: value
+    - family: Scheduler
+      metrics:
+      - haproxy_process_connected_peers
+      - haproxy_process_current_tasks
+      - haproxy_process_jobs
+      - haproxy_process_listeners
+      - haproxy_process_unstoppable_jobs
+      charts:
+      - title: Connected Peers
+        context: process_connected_peers
+        units: peers
+        dimensions:
+        - selector: haproxy_process_connected_peers
+          name: value
+      - title: Current Tasks
+        context: process_current_tasks
+        units: tasks
+        dimensions:
+        - selector: haproxy_process_current_tasks
+          name: value
+      - title: Jobs
+        context: process_jobs
+        units: jobs
+        dimensions:
+        - selector: haproxy_process_jobs
+          name: value
+      - title: Listeners
+        context: process_listeners
+        units: listeners
+        dimensions:
+        - selector: haproxy_process_listeners
+          name: value
+      - title: Unstoppable Jobs
+        context: process_unstoppable_jobs
+        units: jobs
+        dimensions:
+        - selector: haproxy_process_unstoppable_jobs
+          name: value
+    - family: Sessions
+      metrics:
+      - haproxy_process_current_session_rate
+      - haproxy_process_limit_session_rate
+      - haproxy_process_max_session_rate
+      charts:
+      - title: Current Session Rate
+        context: process_current_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_process_current_session_rate
+          name: value
+      - title: Limit Session Rate
+        context: process_limit_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_process_limit_session_rate
+          name: value
+      - title: Max Session Rate
+        context: process_max_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_process_max_session_rate
+          name: value
+    - family: Status
+      metrics:
+      - haproxy_process_busy_polling_enabled
+      - haproxy_process_stopping
+      charts:
+      - title: Busy Polling Enabled
+        context: process_busy_polling_enabled
+        units: '{status}'
+        dimensions:
+        - selector: haproxy_process_busy_polling_enabled
+          name: value
+      - title: Stopping
+        context: process_stopping
+        units: '{status}'
+        dimensions:
+        - selector: haproxy_process_stopping
+          name: value
+    - family: Timing
+      metrics:
+      - haproxy_process_idle_time_percent
+      - haproxy_process_uptime_seconds
+      charts:
+      - title: Idle Time Percent
+        context: process_idle_time_percent
+        units: percentage
+        dimensions:
+        - selector: haproxy_process_idle_time_percent
+          name: value
+      - title: Uptime Seconds
+        context: process_uptime_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_process_uptime_seconds
+          name: value
+    - family: Traffic
+      metrics:
+      - haproxy_process_bytes_out_rate
+      - haproxy_process_bytes_out_total
+      - haproxy_process_http_comp_bytes_in_total
+      - haproxy_process_http_comp_bytes_out_total
+      - haproxy_process_spliced_bytes_out_total
+      charts:
+      - title: Bytes Out
+        context: process_bytes_out_total
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_process_bytes_out_total
+          name: value
+      - title: Bytes Out Rate
+        context: process_bytes_out_rate
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_process_bytes_out_rate
+          name: value
+      - title: HTTP Compression Bytes In
+        context: process_http_comp_bytes_in_total
+        units: bytes/s
+        algorithm: absolute
+        dimensions:
+        - selector: haproxy_process_http_comp_bytes_in_total
+          name: value
+      - title: HTTP Compression Bytes Out
+        context: process_http_comp_bytes_out_total
+        units: bytes/s
+        algorithm: absolute
+        dimensions:
+        - selector: haproxy_process_http_comp_bytes_out_total
+          name: value
+      - title: Spliced Bytes Out
+        context: process_spliced_bytes_out_total
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_process_spliced_bytes_out_total
+          name: value
+  - family: Frontends
+    chart_defaults:
+      instances:
+        by_labels:
+        - proxy
+    groups:
+    - family: Compression
+      metrics:
+      - haproxy_frontend_http_comp_responses_total
+      charts:
+      - title: HTTP Compression Responses
+        context: frontend_http_comp_responses_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_frontend_http_comp_responses_total
+          name: value
+    - family: Connections
+      metrics:
+      - haproxy_frontend_connections_rate_max
+      - haproxy_frontend_connections_total
+      - haproxy_frontend_denied_connections_total
+      charts:
+      - title: Connections
+        context: frontend_connections_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_frontend_connections_total
+          name: value
+      - title: Connections Rate Max
+        context: frontend_connections_rate_max
+        units: connections/s
+        dimensions:
+        - selector: haproxy_frontend_connections_rate_max
+          name: value
+      - title: Denied Connections
+        context: frontend_denied_connections_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_frontend_denied_connections_total
+          name: value
+    - family: Errors
+      metrics:
+      - haproxy_frontend_failed_header_rewriting_total
+      - haproxy_frontend_internal_errors_total
+      - haproxy_frontend_request_errors_total
+      - haproxy_frontend_requests_denied_total
+      - haproxy_frontend_responses_denied_total
+      charts:
+      - title: Errors
+        context: frontend_errors
+        units: errors/s
+        dimensions:
+        - selector: haproxy_frontend_request_errors_total
+          name: request
+        - selector: haproxy_frontend_failed_header_rewriting_total
+          name: header_rewriting
+        - selector: haproxy_frontend_internal_errors_total
+          name: internal
+      - title: Requests Denied
+        context: frontend_requests_denied_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_frontend_requests_denied_total
+          name: value
+      - title: Responses Denied
+        context: frontend_responses_denied_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_frontend_responses_denied_total
+          name: value
+    - family: HTTP
+      metrics:
+      - haproxy_frontend_http_cache_hits_total
+      - haproxy_frontend_http_cache_lookups_total
+      - haproxy_frontend_http_requests_rate_max
+      - haproxy_frontend_http_requests_total
+      - haproxy_frontend_http_responses_total
+      - haproxy_frontend_intercepted_requests_total
+      charts:
+      - title: HTTP Cache Hits
+        context: frontend_http_cache_hits_total
+        units: hits/s
+        dimensions:
+        - selector: haproxy_frontend_http_cache_hits_total
+          name: value
+      - title: HTTP Cache Lookups
+        context: frontend_http_cache_lookups_total
+        units: lookups/s
+        dimensions:
+        - selector: haproxy_frontend_http_cache_lookups_total
+          name: value
+      - title: HTTP Requests
+        context: frontend_http_requests_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_frontend_http_requests_total
+          name: value
+      - title: HTTP Requests Rate Max
+        context: frontend_http_requests_rate_max
+        units: requests/s
+        dimensions:
+        - selector: haproxy_frontend_http_requests_rate_max
+          name: value
+      - title: HTTP Responses
+        context: frontend_http_responses_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_frontend_http_responses_total
+          name_from_label: code
+      - title: Intercepted Requests
+        context: frontend_intercepted_requests_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_frontend_intercepted_requests_total
+          name: value
+    - family: Sessions
+      metrics:
+      - haproxy_frontend_current_session_rate
+      - haproxy_frontend_current_sessions
+      - haproxy_frontend_denied_sessions_total
+      - haproxy_frontend_limit_session_rate
+      - haproxy_frontend_limit_sessions
+      - haproxy_frontend_max_session_rate
+      - haproxy_frontend_max_sessions
+      - haproxy_frontend_sessions_total
+      charts:
+      - title: Current Session Rate
+        context: frontend_current_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_frontend_current_session_rate
+          name: value
+      - title: Current Sessions
+        context: frontend_current_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_frontend_current_sessions
+          name: value
+      - title: Denied Sessions
+        context: frontend_denied_sessions_total
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_frontend_denied_sessions_total
+          name: value
+      - title: Limit Session Rate
+        context: frontend_limit_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_frontend_limit_session_rate
+          name: value
+      - title: Limit Sessions
+        context: frontend_limit_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_frontend_limit_sessions
+          name: value
+      - title: Max Session Rate
+        context: frontend_max_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_frontend_max_session_rate
+          name: value
+      - title: Max Sessions
+        context: frontend_max_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_frontend_max_sessions
+          name: value
+      - title: Sessions
+        context: frontend_sessions_total
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_frontend_sessions_total
+          name: value
+    - family: Status
+      metrics:
+      - haproxy_frontend_status
+      charts:
+      - title: Status
+        context: frontend_status
+        units: '{status}'
+        dimensions:
+        - selector: haproxy_frontend_status
+          name_from_label: state
+    - family: Traffic
+      metrics:
+      - haproxy_frontend_bytes_in_total
+      - haproxy_frontend_bytes_out_total
+      - haproxy_frontend_http_comp_bytes_bypassed_total
+      - haproxy_frontend_http_comp_bytes_in_total
+      - haproxy_frontend_http_comp_bytes_out_total
+      charts:
+      - title: HTTP Compression Bytes Bypassed
+        context: frontend_http_comp_bytes_bypassed_total
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_frontend_http_comp_bytes_bypassed_total
+          name: value
+      - title: HTTP Compression Bytes In
+        context: frontend_http_comp_bytes_in_total
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_frontend_http_comp_bytes_in_total
+          name: value
+      - title: HTTP Compression Bytes Out
+        context: frontend_http_comp_bytes_out_total
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_frontend_http_comp_bytes_out_total
+          name: value
+      - title: Traffic
+        context: frontend_traffic
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_frontend_bytes_in_total
+          name: in
+        - selector: haproxy_frontend_bytes_out_total
+          name: out
+  - family: Listeners
+    chart_defaults:
+      instances:
+        by_labels:
+        - proxy
+        - listener
+    groups:
+    - family: Connections
+      metrics:
+      - haproxy_listener_connections_total
+      - haproxy_listener_denied_connections_total
+      charts:
+      - title: Connections
+        context: listener_connections_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_listener_connections_total
+          name: value
+      - title: Denied Connections
+        context: listener_denied_connections_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_listener_denied_connections_total
+          name: value
+    - family: Errors
+      metrics:
+      - haproxy_listener_failed_header_rewriting_total
+      - haproxy_listener_internal_errors_total
+      - haproxy_listener_request_errors_total
+      - haproxy_listener_requests_denied_total
+      - haproxy_listener_responses_denied_total
+      charts:
+      - title: Errors
+        context: listener_errors
+        units: errors/s
+        dimensions:
+        - selector: haproxy_listener_request_errors_total
+          name: request
+        - selector: haproxy_listener_failed_header_rewriting_total
+          name: header_rewriting
+        - selector: haproxy_listener_internal_errors_total
+          name: internal
+      - title: Requests Denied
+        context: listener_requests_denied_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_listener_requests_denied_total
+          name: value
+      - title: Responses Denied
+        context: listener_responses_denied_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_listener_responses_denied_total
+          name: value
+    - family: Sessions
+      metrics:
+      - haproxy_listener_current_sessions
+      - haproxy_listener_denied_sessions_total
+      - haproxy_listener_limit_sessions
+      - haproxy_listener_max_sessions
+      - haproxy_listener_sessions_total
+      charts:
+      - title: Current Sessions
+        context: listener_current_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_listener_current_sessions
+          name: value
+      - title: Denied Sessions
+        context: listener_denied_sessions_total
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_listener_denied_sessions_total
+          name: value
+      - title: Limit Sessions
+        context: listener_limit_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_listener_limit_sessions
+          name: value
+      - title: Max Sessions
+        context: listener_max_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_listener_max_sessions
+          name: value
+      - title: Sessions
+        context: listener_sessions_total
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_listener_sessions_total
+          name: value
+    - family: Status
+      metrics:
+      - haproxy_listener_status
+      charts:
+      - title: Status
+        context: listener_status
+        units: '{status}'
+        dimensions:
+        - selector: haproxy_listener_status
+          name_from_label: state
+    - family: Traffic
+      metrics:
+      - haproxy_listener_bytes_in_total
+      - haproxy_listener_bytes_out_total
+      charts:
+      - title: Traffic
+        context: listener_traffic
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_listener_bytes_in_total
+          name: in
+        - selector: haproxy_listener_bytes_out_total
+          name: out
+  - family: Backends
+    chart_defaults:
+      instances:
+        by_labels:
+        - proxy
+    groups:
+    - family: Compression
+      metrics:
+      - haproxy_backend_http_comp_responses_total
+      charts:
+      - title: HTTP Compression Responses
+        context: backend_http_comp_responses_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_backend_http_comp_responses_total
+          name: value
+    - family: Connections
+      metrics:
+      - haproxy_backend_connection_attempts_total
+      - haproxy_backend_connection_reuses_total
+      charts:
+      - title: Connection Attempts
+        context: backend_connection_attempts_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_backend_connection_attempts_total
+          name: value
+      - title: Connection Reuses
+        context: backend_connection_reuses_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_backend_connection_reuses_total
+          name: value
+    - family: Errors
+      metrics:
+      - haproxy_backend_client_aborts_total
+      - haproxy_backend_connection_errors_total
+      - haproxy_backend_failed_header_rewriting_total
+      - haproxy_backend_internal_errors_total
+      - haproxy_backend_redispatch_warnings_total
+      - haproxy_backend_requests_denied_total
+      - haproxy_backend_response_errors_total
+      - haproxy_backend_responses_denied_total
+      - haproxy_backend_retry_warnings_total
+      - haproxy_backend_server_aborts_total
+      charts:
+      - title: Aborts
+        context: backend_aborts
+        units: aborts/s
+        dimensions:
+        - selector: haproxy_backend_client_aborts_total
+          name: client
+        - selector: haproxy_backend_server_aborts_total
+          name: server
+      - title: Errors
+        context: backend_errors
+        units: errors/s
+        dimensions:
+        - selector: haproxy_backend_response_errors_total
+          name: response
+        - selector: haproxy_backend_connection_errors_total
+          name: connection
+        - selector: haproxy_backend_failed_header_rewriting_total
+          name: header_rewriting
+        - selector: haproxy_backend_internal_errors_total
+          name: internal
+      - title: Requests Denied
+        context: backend_requests_denied_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_backend_requests_denied_total
+          name: value
+      - title: Responses Denied
+        context: backend_responses_denied_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_backend_responses_denied_total
+          name: value
+      - title: Warnings
+        context: backend_warnings
+        units: warnings/s
+        dimensions:
+        - selector: haproxy_backend_retry_warnings_total
+          name: retry
+        - selector: haproxy_backend_redispatch_warnings_total
+          name: redispatch
+    - family: HTTP
+      metrics:
+      - haproxy_backend_http_cache_hits_total
+      - haproxy_backend_http_cache_lookups_total
+      - haproxy_backend_http_requests_total
+      - haproxy_backend_http_responses_total
+      charts:
+      - title: HTTP Cache Hits
+        context: backend_http_cache_hits_total
+        units: hits/s
+        dimensions:
+        - selector: haproxy_backend_http_cache_hits_total
+          name: value
+      - title: HTTP Cache Lookups
+        context: backend_http_cache_lookups_total
+        units: lookups/s
+        dimensions:
+        - selector: haproxy_backend_http_cache_lookups_total
+          name: value
+      - title: HTTP Requests
+        context: backend_http_requests_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_backend_http_requests_total
+          name: value
+      - title: HTTP Responses
+        context: backend_http_responses_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_backend_http_responses_total
+          name_from_label: code
+    - family: Health
+      metrics:
+      - haproxy_backend_active_servers
+      - haproxy_backend_backup_servers
+      - haproxy_backend_check_last_change_seconds
+      - haproxy_backend_check_up_down_total
+      - haproxy_backend_downtime_seconds_total
+      - haproxy_backend_loadbalanced_total
+      - haproxy_backend_uweight
+      - haproxy_backend_weight
+      charts:
+      - title: Available Servers
+        context: backend_servers
+        units: servers
+        dimensions:
+        - selector: haproxy_backend_active_servers
+          name: active
+        - selector: haproxy_backend_backup_servers
+          name: backup
+      - title: Check Last Change Seconds
+        context: backend_check_last_change_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_check_last_change_seconds
+          name: value
+      - title: Downtime Seconds
+        context: backend_downtime_seconds_total
+        units: seconds/s
+        dimensions:
+        - selector: haproxy_backend_downtime_seconds_total
+          name: value
+      - title: Failed Check State Transitions
+        context: backend_check_up_down_total
+        units: transitions/s
+        dimensions:
+        - selector: haproxy_backend_check_up_down_total
+          name: value
+      - title: Load-Balanced Requests
+        context: backend_loadbalanced_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_backend_loadbalanced_total
+          name: value
+      - title: User Weight
+        context: backend_uweight
+        units: weight
+        dimensions:
+        - selector: haproxy_backend_uweight
+          name: value
+      - title: Weight
+        context: backend_weight
+        units: weight
+        dimensions:
+        - selector: haproxy_backend_weight
+          name: value
+    - family: Queue
+      metrics:
+      - haproxy_backend_current_queue
+      - haproxy_backend_max_queue
+      - haproxy_backend_max_queue_time_seconds
+      - haproxy_backend_queue_time_average_seconds
+      charts:
+      - title: Current Queue
+        context: backend_current_queue
+        units: requests
+        dimensions:
+        - selector: haproxy_backend_current_queue
+          name: value
+      - title: Max Queue
+        context: backend_max_queue
+        units: requests
+        dimensions:
+        - selector: haproxy_backend_max_queue
+          name: value
+      - title: Max Queue Time Seconds
+        context: backend_max_queue_time_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_max_queue_time_seconds
+          name: value
+      - title: Queue Time Average Seconds
+        context: backend_queue_time_average_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_queue_time_average_seconds
+          name: value
+    - family: Sessions
+      metrics:
+      - haproxy_backend_current_session_rate
+      - haproxy_backend_current_sessions
+      - haproxy_backend_last_session_seconds
+      - haproxy_backend_limit_sessions
+      - haproxy_backend_max_session_rate
+      - haproxy_backend_max_sessions
+      - haproxy_backend_sessions_total
+      charts:
+      - title: Current Session Rate
+        context: backend_current_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_backend_current_session_rate
+          name: value
+      - title: Current Sessions
+        context: backend_current_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_backend_current_sessions
+          name: value
+      - title: Last Session Seconds
+        context: backend_last_session_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_last_session_seconds
+          name: value
+      - title: Limit Sessions
+        context: backend_limit_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_backend_limit_sessions
+          name: value
+      - title: Max Session Rate
+        context: backend_max_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_backend_max_session_rate
+          name: value
+      - title: Max Sessions
+        context: backend_max_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_backend_max_sessions
+          name: value
+      - title: Sessions
+        context: backend_sessions_total
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_backend_sessions_total
+          name: value
+    - family: Status
+      metrics:
+      - haproxy_backend_agg_check_status
+      - haproxy_backend_agg_server_status
+      - haproxy_backend_status
+      charts:
+      - title: Aggregated Check Status
+        context: backend_agg_check_status
+        units: servers
+        dimensions:
+        - selector: haproxy_backend_agg_check_status
+          name_from_label: state
+      - title: Aggregated Server Status
+        context: backend_agg_server_status
+        units: servers
+        dimensions:
+        - selector: haproxy_backend_agg_server_status
+          name_from_label: state
+      - title: Status
+        context: backend_status
+        units: '{status}'
+        dimensions:
+        - selector: haproxy_backend_status
+          name_from_label: state
+    - family: Timing
+      metrics:
+      - haproxy_backend_connect_time_average_seconds
+      - haproxy_backend_max_connect_time_seconds
+      - haproxy_backend_max_response_time_seconds
+      - haproxy_backend_max_total_time_seconds
+      - haproxy_backend_response_time_average_seconds
+      - haproxy_backend_total_time_average_seconds
+      charts:
+      - title: Average Total Time
+        context: backend_total_time_average_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_total_time_average_seconds
+          name: value
+      - title: Connect Time Average Seconds
+        context: backend_connect_time_average_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_connect_time_average_seconds
+          name: value
+      - title: Max Connect Time Seconds
+        context: backend_max_connect_time_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_max_connect_time_seconds
+          name: value
+      - title: Max Response Time Seconds
+        context: backend_max_response_time_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_max_response_time_seconds
+          name: value
+      - title: Maximum Total Time
+        context: backend_max_total_time_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_max_total_time_seconds
+          name: value
+      - title: Response Time Average Seconds
+        context: backend_response_time_average_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_backend_response_time_average_seconds
+          name: value
+    - family: Traffic
+      metrics:
+      - haproxy_backend_bytes_in_total
+      - haproxy_backend_bytes_out_total
+      - haproxy_backend_http_comp_bytes_bypassed_total
+      - haproxy_backend_http_comp_bytes_in_total
+      - haproxy_backend_http_comp_bytes_out_total
+      charts:
+      - title: HTTP Compression Bytes Bypassed
+        context: backend_http_comp_bytes_bypassed_total
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_backend_http_comp_bytes_bypassed_total
+          name: value
+      - title: HTTP Compression Bytes In
+        context: backend_http_comp_bytes_in_total
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_backend_http_comp_bytes_in_total
+          name: value
+      - title: HTTP Compression Bytes Out
+        context: backend_http_comp_bytes_out_total
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_backend_http_comp_bytes_out_total
+          name: value
+      - title: Traffic
+        context: backend_traffic
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_backend_bytes_in_total
+          name: in
+        - selector: haproxy_backend_bytes_out_total
+          name: out
+  - family: Servers
+    chart_defaults:
+      instances:
+        by_labels:
+        - proxy
+        - server
+    groups:
+    - family: Connections
+      metrics:
+      - haproxy_server_connection_attempts_total
+      - haproxy_server_connection_reuses_total
+      - haproxy_server_idle_connections_current
+      - haproxy_server_idle_connections_limit
+      - haproxy_server_need_connections_current
+      - haproxy_server_safe_idle_connections_current
+      - haproxy_server_unsafe_idle_connections_current
+      - haproxy_server_used_connections_current
+      charts:
+      - title: Connection Attempts
+        context: server_connection_attempts_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_server_connection_attempts_total
+          name: value
+      - title: Connection Reuses
+        context: server_connection_reuses_total
+        units: connections/s
+        dimensions:
+        - selector: haproxy_server_connection_reuses_total
+          name: value
+      - title: Current Idle Connections
+        context: server_idle_connections_current
+        units: connections
+        dimensions:
+        - selector: haproxy_server_idle_connections_current
+          name: value
+      - title: Current Used Connections
+        context: server_used_connections_current
+        units: connections
+        dimensions:
+        - selector: haproxy_server_used_connections_current
+          name: value
+      - title: Idle Connection Limit
+        context: server_idle_connections_limit
+        units: connections
+        dimensions:
+        - selector: haproxy_server_idle_connections_limit
+          name: value
+      - title: Idle Connection Safety
+        context: server_idle_connection_safety
+        units: connections
+        dimensions:
+        - selector: haproxy_server_safe_idle_connections_current
+          name: safe
+        - selector: haproxy_server_unsafe_idle_connections_current
+          name: unsafe
+      - title: Needed Connections
+        context: server_need_connections_current
+        units: connections
+        dimensions:
+        - selector: haproxy_server_need_connections_current
+          name: value
+    - family: Errors
+      metrics:
+      - haproxy_server_check_failures_total
+      - haproxy_server_client_aborts_total
+      - haproxy_server_connection_errors_total
+      - haproxy_server_failed_header_rewriting_total
+      - haproxy_server_internal_errors_total
+      - haproxy_server_redispatch_warnings_total
+      - haproxy_server_response_errors_total
+      - haproxy_server_responses_denied_total
+      - haproxy_server_retry_warnings_total
+      - haproxy_server_server_aborts_total
+      charts:
+      - title: Aborts
+        context: server_aborts
+        units: aborts/s
+        dimensions:
+        - selector: haproxy_server_client_aborts_total
+          name: client
+        - selector: haproxy_server_server_aborts_total
+          name: server
+      - title: Check Failures
+        context: server_check_failures_total
+        units: failures/s
+        dimensions:
+        - selector: haproxy_server_check_failures_total
+          name: value
+      - title: Errors
+        context: server_errors
+        units: errors/s
+        dimensions:
+        - selector: haproxy_server_response_errors_total
+          name: response
+        - selector: haproxy_server_connection_errors_total
+          name: connection
+        - selector: haproxy_server_failed_header_rewriting_total
+          name: header_rewriting
+        - selector: haproxy_server_internal_errors_total
+          name: internal
+      - title: Responses Denied
+        context: server_responses_denied_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_server_responses_denied_total
+          name: value
+      - title: Warnings
+        context: server_warnings
+        units: warnings/s
+        dimensions:
+        - selector: haproxy_server_retry_warnings_total
+          name: retry
+        - selector: haproxy_server_redispatch_warnings_total
+          name: redispatch
+    - family: HTTP
+      metrics:
+      - haproxy_server_http_requests_total
+      - haproxy_server_http_responses_total
+      charts:
+      - title: HTTP Requests
+        context: server_http_requests_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_server_http_requests_total
+          name: value
+      - title: HTTP Responses
+        context: server_http_responses_total
+        units: responses/s
+        dimensions:
+        - selector: haproxy_server_http_responses_total
+          name_from_label: code
+    - family: Health
+      metrics:
+      - haproxy_server_active
+      - haproxy_server_agent_code
+      - haproxy_server_agent_duration_seconds
+      - haproxy_server_backup
+      - haproxy_server_check_code
+      - haproxy_server_check_duration_seconds
+      - haproxy_server_check_last_change_seconds
+      - haproxy_server_check_up_down_total
+      - haproxy_server_current_throttle
+      - haproxy_server_downtime_seconds_total
+      - haproxy_server_loadbalanced_total
+      - haproxy_server_uweight
+      - haproxy_server_weight
+      charts:
+      - title: Agent Code
+        context: server_agent_code
+        units: code
+        dimensions:
+        - selector: haproxy_server_agent_code
+          name: value
+      - title: Agent Duration Seconds
+        context: server_agent_duration_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_agent_duration_seconds
+          name: value
+      - title: Check Code
+        context: server_check_code
+        units: code
+        dimensions:
+        - selector: haproxy_server_check_code
+          name: value
+      - title: Check Duration Seconds
+        context: server_check_duration_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_check_duration_seconds
+          name: value
+      - title: Check Last Change Seconds
+        context: server_check_last_change_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_check_last_change_seconds
+          name: value
+      - title: Current Throttle
+        context: server_current_throttle
+        units: percentage
+        dimensions:
+        - selector: haproxy_server_current_throttle
+          name: value
+      - title: Downtime Seconds
+        context: server_downtime_seconds_total
+        units: seconds/s
+        dimensions:
+        - selector: haproxy_server_downtime_seconds_total
+          name: value
+      - title: Failed Check State Transitions
+        context: server_check_up_down_total
+        units: transitions/s
+        dimensions:
+        - selector: haproxy_server_check_up_down_total
+          name: value
+      - title: Load-Balanced Requests
+        context: server_loadbalanced_total
+        units: requests/s
+        dimensions:
+        - selector: haproxy_server_loadbalanced_total
+          name: value
+      - title: Server Role
+        context: server_role
+        units: servers
+        dimensions:
+        - selector: haproxy_server_active
+          name: active
+        - selector: haproxy_server_backup
+          name: backup
+      - title: User Weight
+        context: server_uweight
+        units: weight
+        dimensions:
+        - selector: haproxy_server_uweight
+          name: value
+      - title: Weight
+        context: server_weight
+        units: weight
+        dimensions:
+        - selector: haproxy_server_weight
+          name: value
+    - family: Queue
+      metrics:
+      - haproxy_server_current_queue
+      - haproxy_server_max_queue
+      - haproxy_server_max_queue_time_seconds
+      - haproxy_server_queue_limit
+      - haproxy_server_queue_time_average_seconds
+      charts:
+      - title: Current Queue
+        context: server_current_queue
+        units: requests
+        dimensions:
+        - selector: haproxy_server_current_queue
+          name: value
+      - title: Max Queue
+        context: server_max_queue
+        units: requests
+        dimensions:
+        - selector: haproxy_server_max_queue
+          name: value
+      - title: Max Queue Time Seconds
+        context: server_max_queue_time_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_max_queue_time_seconds
+          name: value
+      - title: Queue Limit
+        context: server_queue_limit
+        units: requests
+        dimensions:
+        - selector: haproxy_server_queue_limit
+          name: value
+      - title: Queue Time Average Seconds
+        context: server_queue_time_average_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_queue_time_average_seconds
+          name: value
+    - family: Sessions
+      metrics:
+      - haproxy_server_current_session_rate
+      - haproxy_server_current_sessions
+      - haproxy_server_last_session_seconds
+      - haproxy_server_limit_sessions
+      - haproxy_server_max_session_rate
+      - haproxy_server_max_sessions
+      - haproxy_server_sessions_total
+      charts:
+      - title: Current Session Rate
+        context: server_current_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_server_current_session_rate
+          name: value
+      - title: Current Sessions
+        context: server_current_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_server_current_sessions
+          name: value
+      - title: Last Session Seconds
+        context: server_last_session_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_last_session_seconds
+          name: value
+      - title: Limit Sessions
+        context: server_limit_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_server_limit_sessions
+          name: value
+      - title: Max Session Rate
+        context: server_max_session_rate
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_server_max_session_rate
+          name: value
+      - title: Max Sessions
+        context: server_max_sessions
+        units: sessions
+        dimensions:
+        - selector: haproxy_server_max_sessions
+          name: value
+      - title: Sessions
+        context: server_sessions_total
+        units: sessions/s
+        dimensions:
+        - selector: haproxy_server_sessions_total
+          name: value
+    - family: Status
+      metrics:
+      - haproxy_server_agent_status
+      - haproxy_server_check_status
+      - haproxy_server_status
+      charts:
+      - title: Agent Status
+        context: server_agent_status
+        units: '{status}'
+        dimensions:
+        - selector: haproxy_server_agent_status
+          name_from_label: state
+      - title: Check Status
+        context: server_check_status
+        units: '{status}'
+        dimensions:
+        - selector: haproxy_server_check_status
+          name_from_label: state
+      - title: Status
+        context: server_status
+        units: '{status}'
+        dimensions:
+        - selector: haproxy_server_status
+          name_from_label: state
+    - family: Timing
+      metrics:
+      - haproxy_server_connect_time_average_seconds
+      - haproxy_server_max_connect_time_seconds
+      - haproxy_server_max_response_time_seconds
+      - haproxy_server_max_total_time_seconds
+      - haproxy_server_response_time_average_seconds
+      - haproxy_server_total_time_average_seconds
+      charts:
+      - title: Average Total Time
+        context: server_total_time_average_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_total_time_average_seconds
+          name: value
+      - title: Connect Time Average Seconds
+        context: server_connect_time_average_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_connect_time_average_seconds
+          name: value
+      - title: Max Connect Time Seconds
+        context: server_max_connect_time_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_max_connect_time_seconds
+          name: value
+      - title: Max Response Time Seconds
+        context: server_max_response_time_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_max_response_time_seconds
+          name: value
+      - title: Maximum Total Time
+        context: server_max_total_time_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_max_total_time_seconds
+          name: value
+      - title: Response Time Average Seconds
+        context: server_response_time_average_seconds
+        units: seconds
+        dimensions:
+        - selector: haproxy_server_response_time_average_seconds
+          name: value
+    - family: Traffic
+      metrics:
+      - haproxy_server_bytes_in_total
+      - haproxy_server_bytes_out_total
+      charts:
+      - title: Traffic
+        context: server_traffic
+        units: bytes/s
+        dimensions:
+        - selector: haproxy_server_bytes_in_total
+          name: in
+        - selector: haproxy_server_bytes_out_total
+          name: out
+  - family: Resolvers
+    chart_defaults:
+      instances:
+        by_labels:
+        - resolver
+        - nameserver
+    groups:
+    - family: DNS
+      metrics:
+      - haproxy_resolver_any_err
+      - haproxy_resolver_cname
+      - haproxy_resolver_cname_error
+      - haproxy_resolver_invalid
+      - haproxy_resolver_nx
+      - haproxy_resolver_other
+      - haproxy_resolver_outdated
+      - haproxy_resolver_refused
+      - haproxy_resolver_send_error
+      - haproxy_resolver_sent
+      - haproxy_resolver_timeout
+      - haproxy_resolver_too_big
+      - haproxy_resolver_truncated
+      - haproxy_resolver_update
+      - haproxy_resolver_valid
+      charts:
+      - title: Any Errors
+        context: resolver_any_err
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_any_err
+          name: value
+      - title: CNAME
+        context: resolver_cname
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_cname
+          name: value
+      - title: CNAME Error
+        context: resolver_cname_error
+        units: errors/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_cname_error
+          name: value
+      - title: Invalid
+        context: resolver_invalid
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_invalid
+          name: value
+      - title: NX
+        context: resolver_nx
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_nx
+          name: value
+      - title: Other
+        context: resolver_other
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_other
+          name: value
+      - title: Outdated
+        context: resolver_outdated
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_outdated
+          name: value
+      - title: Refused
+        context: resolver_refused
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_refused
+          name: value
+      - title: Send Error
+        context: resolver_send_error
+        units: errors/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_send_error
+          name: value
+      - title: Sent
+        context: resolver_sent
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_sent
+          name: value
+      - title: Timeout
+        context: resolver_timeout
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_timeout
+          name: value
+      - title: Too Big
+        context: resolver_too_big
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_too_big
+          name: value
+      - title: Truncated
+        context: resolver_truncated
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_truncated
+          name: value
+      - title: Update
+        context: resolver_update
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_update
+          name: value
+      - title: Valid
+        context: resolver_valid
+        units: queries/s
+        algorithm: incremental
+        dimensions:
+        - selector: haproxy_resolver_valid
+          name: value
+  - family: Stick Tables
+    chart_defaults:
+      instances:
+        by_labels:
+        - name
+        - type
+    groups:
+    - family: Entries
+      metrics:
+      - haproxy_sticktable_size
+      - haproxy_sticktable_used
+      charts:
+      - title: Size
+        context: sticktable_size
+        units: entries
+        dimensions:
+        - selector: haproxy_sticktable_size
+          name: value
+      - title: Used
+        context: sticktable_used
+        units: entries
+        dimensions:
+        - selector: haproxy_sticktable_used
+          name: value

@@ -119,3 +119,11 @@ Metrics:
 | systemd.service.cachestat_dirties | Number of dirty pages | dirty | page/s |
 | systemd.service.cachestat_hits | Number of accessed files | hit | hits/s |
 | systemd.service.cachestat_misses | Files out of page cache | miss | misses/s |
+| systemd.service.net_conn_ipv4 | TCP v4 outbound connections | connections | connections/s |
+| systemd.service.net_conn_ipv6 | TCP v6 outbound connections | connections | connections/s |
+| systemd.service.net_total_bandwidth | Bandwidth | received, sent | kilobits/s |
+| systemd.service.net_tcp_recv | TCP calls to clean up buffer | calls | calls/s |
+| systemd.service.net_tcp_send | TCP calls to send | calls | calls/s |
+| systemd.service.net_retransmit | TCP retransmits | calls | calls/s |
+| systemd.service.net_udp_send | UDP calls to send | calls | calls/s |
+| systemd.service.net_udp_recv | UDP calls to receive | calls | calls/s |

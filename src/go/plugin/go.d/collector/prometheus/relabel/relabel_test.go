@@ -54,6 +54,20 @@ func TestProcessor_Apply(t *testing.T) {
 			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
 			keep: true,
 		},
+		"labelmap can rewrite __name__ from an application label": {
+			cfgs: []Config{{
+				Regex:       MustNewRegexp("metric_name"),
+				Replacement: commonmodel.MetricNameLabel,
+				Action:      LabelMap,
+			}},
+			in: sample("original_metric", map[string]string{
+				"metric_name": "renamed_metric",
+			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			want: sample("renamed_metric", map[string]string{
+				"metric_name": "renamed_metric",
+			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			keep: true,
+		},
 		"explicit empty separator joins without the default ';'": {
 			cfgs: []Config{{
 				SourceLabels: []string{"a", "b"},
@@ -411,6 +425,71 @@ func TestProcessor_Apply(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProcessorApplyWithObserverReportsActualRuleBoundaries(t *testing.T) {
+	processor, err := New([]Config{
+		{
+			SourceLabels: []string{"code"},
+			Regex:        MustNewRegexp("(.*)"),
+			TargetLabel:  "class",
+			Replacement:  "${1}xx",
+			Action:       Replace,
+		},
+		{
+			SourceLabels: []string{commonmodel.MetricNameLabel},
+			Regex:        MustNewRegexp("app_(.*)"),
+			TargetLabel:  commonmodel.MetricNameLabel,
+			Replacement:  "service_${1}",
+			Action:       Replace,
+		},
+		{
+			SourceLabels: []string{commonmodel.MetricNameLabel},
+			Regex:        MustNewRegexp("service_drop"),
+			Action:       Drop,
+		},
+	})
+	require.NoError(t, err)
+
+	var facts []RuleDiagnostic
+	_, drop := processor.ApplyWithObserver(
+		sample("app_drop", map[string]string{"code": "5"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+		func(fact RuleDiagnostic) { facts = append(facts, fact) },
+	)
+	require.True(t, drop.Dropped())
+	require.Len(t, facts, 3)
+	assert.Equal(t, RuleDiagnostic{
+		RuleIndex:        0,
+		Action:           Replace,
+		InputMetricName:  "app_drop",
+		OutputMetricName: "app_drop",
+		InputLabels:      labels.FromStrings("code", "5"),
+		OutputLabels:     labels.FromStrings("class", "5xx", "code", "5"),
+		Matched:          true,
+	}, facts[0])
+	assert.Equal(t, RuleDiagnostic{
+		RuleIndex:        1,
+		Action:           Replace,
+		InputMetricName:  "app_drop",
+		OutputMetricName: "service_drop",
+		InputLabels:      labels.FromStrings("class", "5xx", "code", "5"),
+		OutputLabels:     labels.FromStrings("class", "5xx", "code", "5"),
+		Matched:          true,
+	}, facts[1])
+	assert.Equal(t, RuleDiagnostic{
+		RuleIndex:        2,
+		Action:           Drop,
+		InputMetricName:  "service_drop",
+		OutputMetricName: "service_drop",
+		InputLabels:      labels.FromStrings("class", "5xx", "code", "5"),
+		OutputLabels:     labels.FromStrings("class", "5xx", "code", "5"),
+		Matched:          true,
+		Dropped:          true,
+	}, facts[2])
+
+	// Callback-owned snapshots must not alias the processor's reused builder.
+	facts[0].OutputLabels[0].Value = "changed"
+	assert.Equal(t, "5xx", facts[1].InputLabels[0].Value)
 }
 
 func TestNew_Validate(t *testing.T) {

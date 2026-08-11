@@ -40,6 +40,9 @@ For `ModuleV2` collectors, the runtime integration expects:
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
 | `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks                                                                                                          |
 | `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.         |
+| `WithPlanRouteDiagnosticObserver(...)`              | Stream complete, synchronous route facts for one plan attempt; intended for validation and tests                                                                        |
+| `ChartTemplateIDAt(...)`                            | Correlate an authored chart position with the compiler-assigned template identity used by route facts                                                                   |
+| `ResolveInstanceLabelPolicy(...)`                   | Inspect `instances.by_labels` through the same parsing and exclusion-precedence rules used by the planner                                                               |
 
 ## End-to-End Example (Single Flow)
 
@@ -111,6 +114,26 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 | Expiry          | Emit removals for stale charts/dimensions                                                      |
 | Sort            | Deterministically sort inferred dimension output                                               |
 
+## Route Diagnostics and Policy Inspection
+
+`WithPlanRouteDiagnosticObserver` is an opt-in validation/test surface. When enabled, the planner synchronously streams
+attempt-local facts for filtering, candidate rejection, chart-identity rejection, resolved routes, accepted routes,
+autogen displacement, collisions, lifecycle rejection, and unmatched series.
+
+- Diagnostic planning bypasses route-cache lookup and storage so every scanned series produces complete facts.
+- The default path is unchanged when no observer is configured; it continues to use the route cache.
+- The callback MUST NOT call back into the same `Engine` and SHOULD aggregate bounded facts rather than retain every event.
+- Resolved facts include the compiler template identity, series identity, rendered chart/dimension names, raw instance
+  identity, ordered instance-label keys, and the label key used for a dynamic dimension name. Accepted facts additionally
+  expose the effective context, family, units, algorithm, aggregation, presentation, series kind, scale, and label-promotion
+  policy. They do not include the full input label set; a rendered chart or dynamic dimension name can itself be derived
+  from label values and must be handled accordingly by consumers.
+- `ChartTemplateIDAt` correlates compiler facts with a decoded template's group/chart position.
+
+`ResolveInstanceLabelPolicy` is the corresponding read-only inspection helper for `instances.by_labels` and
+`instances.optional_by_labels`. It returns the runtime-normalized required keys, optional keys, exclusions, and include-all
+flag, so validation tooling does not reproduce compiler or planner precedence rules.
+
 ## Reader Requirements
 
 | Scenario                                                                       | Required reader mode                                                       |
@@ -165,6 +188,10 @@ format's [aggregation section](../charttpl/README.md#aggregation) for semantics 
   promoted non-identity label can describe the entire chart.
 - A changed intersection emits a complete replacement label set through `UpdateChartLabelsAction`; chart identity and
   dimensions are not recreated.
+
+Authored chart-label promotion is presence-aware. Omitted `label_promotion` uses automatic intersection, a non-empty list
+uses explicit intersection over that allowlist, and an explicit empty list retains only instance identity labels. Group
+defaults preserve the same three states through inheritance.
 
 ### Instance Identity Resolution
 

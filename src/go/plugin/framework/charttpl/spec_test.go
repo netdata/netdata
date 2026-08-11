@@ -155,10 +155,36 @@ groups:
 				leaf := child.Groups[0]
 				require.Len(t, leaf.Charts, 1)
 				assert.Equal(t, "line", leaf.Charts[0].Type)
+				assert.NotNil(t, leaf.Charts[0].LabelPromoted)
 				assert.Empty(t, leaf.Charts[0].LabelPromoted)
 				require.NotNil(t, leaf.Charts[0].Instances)
 				assert.Equal(t, []string{"region"}, leaf.Charts[0].Instances.ByLabels)
 				assert.Empty(t, leaf.Charts[0].Instances.OptionalByLabels)
+			},
+		},
+		"explicit empty group label promotion is inherited without collapsing to omitted": {
+			input: `
+version: v1
+groups:
+  - family: Root
+    metrics: [metric]
+    chart_defaults:
+      label_promotion: []
+    groups:
+      - family: Child
+        charts:
+          - title: Value
+            context: value
+            units: value
+            dimensions:
+              - selector: metric
+                name: value
+`,
+			assert: func(t *testing.T, spec *Spec) {
+				t.Helper()
+				promotion := spec.Groups[0].Groups[0].Charts[0].LabelPromoted
+				assert.NotNil(t, promotion)
+				assert.Empty(t, promotion)
 			},
 		},
 		"rejects unknown yaml field via strict unmarshal": {

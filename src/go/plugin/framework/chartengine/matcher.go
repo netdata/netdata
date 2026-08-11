@@ -84,6 +84,8 @@ func newRouteCache() *routeCache {
 
 func (e *Engine) resolveSeriesRoutes(
 	cache *routeCache,
+	useCache bool,
+	observe func(PlanRouteDiagnostic),
 	identity metrix.SeriesIdentity,
 	name string,
 	labels metrix.LabelView,
@@ -97,8 +99,10 @@ func (e *Engine) resolveSeriesRoutes(
 		return nil, false, fmt.Errorf("chartengine: route cache is not initialized")
 	}
 
-	if cached, ok := cache.Lookup(identity, revision, buildSeq); ok {
-		return cached, true, nil
+	if useCache {
+		if cached, ok := cache.Lookup(identity, revision, buildSeq); ok {
+			return cached, true, nil
+		}
 	}
 
 	candidates := make([]routeCandidate, 0, len(index.byMetricName[name])+len(index.wildcardMatchers))
@@ -118,6 +122,15 @@ func (e *Engine) resolveSeriesRoutes(
 	routes := make([]routeBinding, 0)
 	for _, candidate := range candidates {
 		if !candidate.dimension.Selector.Matcher.Matches(name, labels) {
+			if observe != nil {
+				observe(PlanRouteDiagnostic{
+					Decision:        PlanRouteCandidateSelectorRejected,
+					SeriesIdentity:  identity,
+					MetricName:      name,
+					ChartTemplateID: candidate.chartTemplateID,
+					DimensionIndex:  candidate.dimensionIndex,
+				})
+			}
 			continue
 		}
 		chart, ok := index.chartsByID[candidate.chartTemplateID]
@@ -133,6 +146,16 @@ func (e *Engine) resolveSeriesRoutes(
 			return nil, false, err
 		}
 		if !ok || strings.TrimSpace(chartID) == "" {
+			if observe != nil {
+				observe(PlanRouteDiagnostic{
+					Decision:              PlanRouteChartIdentityRejected,
+					SeriesIdentity:        identity,
+					MetricName:            name,
+					ChartTemplateID:       candidate.chartTemplateID,
+					DimensionIndex:        candidate.dimensionIndex,
+					MissingInstanceLabels: missingChartInstanceLabels(labelPolicy.instancePlan, labels),
+				})
+			}
 			continue
 		}
 		dimName, dimKeyLabel, ok, err := resolveDimensionName(candidate.dimension, name, labels, meta)
@@ -140,7 +163,40 @@ func (e *Engine) resolveSeriesRoutes(
 			return nil, false, err
 		}
 		if !ok {
+			if observe != nil {
+				observe(PlanRouteDiagnostic{
+					Decision:        PlanRouteDimensionRejected,
+					SeriesIdentity:  identity,
+					MetricName:      name,
+					ChartTemplateID: candidate.chartTemplateID,
+					DimensionIndex:  candidate.dimensionIndex,
+					ChartID:         chartID,
+				})
+			}
 			continue
+		}
+		var instanceLabels []string
+		if observe != nil {
+			instanceIdentity, resolvedLabels, ok, err := diagnosticChartInstance(labelPolicy.instancePlan, labels)
+			if err != nil {
+				return nil, false, err
+			}
+			if !ok {
+				return nil, false, fmt.Errorf("chartengine: diagnostic instance identity diverged for chart template %q", candidate.chartTemplateID)
+			}
+			instanceLabels = resolvedLabels
+			observe(PlanRouteDiagnostic{
+				Decision:          PlanRouteResolved,
+				SeriesIdentity:    identity,
+				MetricName:        name,
+				ChartTemplateID:   candidate.chartTemplateID,
+				DimensionIndex:    candidate.dimensionIndex,
+				ChartID:           chartID,
+				DimensionName:     dimName,
+				DimensionKeyLabel: dimKeyLabel,
+				InstanceIdentity:  instanceIdentity,
+				InstanceLabels:    instanceLabels,
+			})
 		}
 		dimensionFloat := candidate.dimension.Float || metricFloat ||
 			candidate.dimension.Aggregation == program.AggregationAvg
@@ -177,6 +233,8 @@ func (e *Engine) resolveSeriesRoutes(
 		return routes[i].DimensionName < routes[j].DimensionName
 	})
 
-	cache.Store(identity, revision, buildSeq, routes)
+	if useCache {
+		cache.Store(identity, revision, buildSeq, routes)
+	}
 	return routes, false, nil
 }

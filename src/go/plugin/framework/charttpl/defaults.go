@@ -2,6 +2,8 @@
 
 package charttpl
 
+import "slices"
+
 const (
 	defaultChartType = "line"
 )
@@ -37,7 +39,7 @@ func applyChartDefaults(chart *Chart, defaults *ChartDefaults) {
 		return
 	}
 	if chart.LabelPromoted == nil && defaults.LabelPromoted != nil {
-		chart.LabelPromoted = append([]string(nil), defaults.LabelPromoted...)
+		chart.LabelPromoted = slices.Clone(defaults.LabelPromoted)
 	}
 	if chart.Instances == nil && defaults.Instances != nil {
 		chart.Instances = cloneInstances(defaults.Instances)
@@ -52,7 +54,7 @@ func inheritChartDefaults(parent, own *ChartDefaults) *ChartDefaults {
 	out := &ChartDefaults{}
 	if parent != nil {
 		if parent.LabelPromoted != nil {
-			out.LabelPromoted = append([]string(nil), parent.LabelPromoted...)
+			out.LabelPromoted = slices.Clone(parent.LabelPromoted)
 		}
 		if parent.Instances != nil {
 			out.Instances = cloneInstances(parent.Instances)
@@ -60,7 +62,7 @@ func inheritChartDefaults(parent, own *ChartDefaults) *ChartDefaults {
 	}
 	if own != nil {
 		if own.LabelPromoted != nil {
-			out.LabelPromoted = append([]string(nil), own.LabelPromoted...)
+			out.LabelPromoted = slices.Clone(own.LabelPromoted)
 		}
 		if own.Instances != nil {
 			out.Instances = cloneInstances(own.Instances)
