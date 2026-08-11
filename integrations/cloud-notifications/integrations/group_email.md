@@ -10,7 +10,7 @@ endmeta-->
 
 # Group Email
 
-<img src="https://netdata.cloud/img/email.png" width="150"/>
+<img src="https://netdata.cloud/img/group_email.svg" width="150"/>
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 

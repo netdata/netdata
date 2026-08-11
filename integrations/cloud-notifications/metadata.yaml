@@ -755,7 +755,7 @@
     link: "https://netdata.cloud"
     categories:
       - notify.cloud
-    icon_filename: "email.png"
+    icon_filename: "group_email.svg"
   keywords:
     - group email
     - mailing list
