@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -311,10 +312,8 @@ func TestPipelineDiagnosticsDistinguishJobAndProfileRelabeling(t *testing.T) {
 
 func assertPipelineFact(t *testing.T, facts []PipelineDiagnostic, matches func(PipelineDiagnostic) bool) {
 	t.Helper()
-	for _, fact := range facts {
-		if matches(fact) {
-			return
-		}
+	if slices.ContainsFunc(facts, matches) {
+		return
 	}
 	t.Fatalf("missing pipeline fact in %#v", facts)
 }
