@@ -1384,7 +1384,8 @@ int netdata_main(int argc, char **argv) {
 #ifdef OS_WINDOWS
     // WMI can block for minutes while connecting. All non-WMI discovery remains
     // before plugin startup; refresh only WMI virtualization after the API is ready.
-    nd_log_info("SYSTEM INFO: collecting Windows WMI virtualization metadata after startup readiness.");
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "SYSTEM INFO: collecting Windows WMI virtualization metadata after startup readiness.");
 
     spinlock_lock(&localhost->rrdhost_update_lock);
     struct rrdhost_system_info *windows_system_info = rrdhost_system_info_dup(localhost->system_info);
