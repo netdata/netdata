@@ -3,6 +3,7 @@
 #include "rrd.h"
 #include "rrdfunctions-internals.h"
 #include "sqlite/sqlite_aclk_node.h"
+#include "aclk/aclk_query_queue.h"
 
 // ----------------------------------------------------------------------------
 // Regression test for GHSA-6628-vxm3-4g8g.
@@ -274,8 +275,17 @@ int rrdfunctions_manifest_unittest(void) {
     //    content, independent of dictionary traversal order, and sensitive to every transmitted
     //    field including the node_id and claim_id the manifest is keyed under at the cloud. Local
     //    standalone dictionaries keep this independent of whatever live functions localhost has.
-    //    The other half of the suppression - scoping the record to one ACLK session - lives in
-    //    build_node_manifest(), not in the hash, so it is not covered here.
+    //    The other half of the suppression - scoping the record to one ACLK session - is folded
+    //    into the same value by manifest_publication_key(), covered at the end of this block.
+    //    What is NOT covered here is the recording side: build_node_manifest() records the key under a
+    //    per-enqueue token as it enqueues, and aclk_node_manifest_publish_result() invalidates that
+    //    token if the message was dropped. Invalidation is pure atomics on the host's ACLK config, so
+    //    it does NOT need a live ACLK connection - but it does need a host that HAS a config, and this
+    //    test's localhost does not: sql_load_node_id() only calls set_host_node_id() when the query
+    //    returns a row, so an unregistered host reaches neither it nor create_aclk_config(), the only
+    //    place host->aclk_host_config is ever set. A test would have to call create_aclk_config()
+    //    itself (a plain callocz plus a publish CAS, no ACLK thread needed) and include
+    //    aclk/aclk_query_queue.h for struct aclk_manifest_publication. Untested; tracked in the SOW.
     {
         int hash_errors_before = errors;
         const char *node1 = "11111111-2222-3333-4444-555555555555";
@@ -390,14 +400,146 @@ int rrdfunctions_manifest_unittest(void) {
             errors++;
         }
 
+        // the ACLK session is folded into the same value, so one comparison covers both content and
+        // session (see node_manifest_sent_key). Determinism for identical inputs is not asserted: the
+        // key is a pure function of them, so such a check cannot fail.
+        usec_t s1 = 1700000000000000ULL, s2 = 1700000000000001ULL;
+        if(manifest_publication_key(ha, s1) == manifest_publication_key(ha, s2)) {
+            fprintf(stderr, "  FAILED key: a new ACLK session did not change the key\n");
+            errors++;
+        }
+        if(manifest_publication_key(ha, s1) == manifest_publication_key(manifest_dict_hash(empty, node1, claim), s1)) {
+            fprintf(stderr, "  FAILED key: content change did not survive folding the session in\n");
+            errors++;
+        }
+
         if(errors == hash_errors_before)
-            fprintf(stderr, "  OK hash: determinism, order independence, field, node_id and claim_id sensitivity\n");
+            fprintf(stderr, "  OK hash: determinism, order independence, field, node_id, claim_id and session sensitivity\n");
 
         dictionary_destroy(a);
         dictionary_destroy(b);
         dictionary_destroy(empty);
         dictionary_destroy(c1);
         dictionary_destroy(c2);
+    }
+
+    // 5. The publication record - what stops a manifest that never reached the mqtt layer from
+    //    suppressing every later identical build. build_node_manifest() records (key, token) as it
+    //    enqueues; aclk_node_manifest_publish_result() invalidates that record when the message was
+    //    dropped, by CASing the TOKEN it carried and never the key. The token is why that is safe:
+    //    a manifest enqueued after this one holds a different token, so it keeps its record even
+    //    when its content - and therefore its key - is identical, which is exactly the case a
+    //    content-keyed clear would get wrong (content published, changed, then changed back while
+    //    the first publication is still in flight).
+    //
+    //    Pinned directly because none of it is observable from the message stream. It needs no ACLK
+    //    connection and no ACLK thread: the invalidation is atomics on the host's ACLK config, and
+    //    with no sync thread running aclk_sync_on_event_loop_thread() is false, so the write-back
+    //    takes an uncontended rrd_rdlock() and resolves localhost from rrdhost_root_index normally.
+    {
+        int record_errors_before = errors;
+
+        // An unregistered host has no ACLK config - sql_load_node_id() only reaches
+        // create_aclk_config() for a host the cloud has registered - so make one here. A NULL
+        // node_id keeps create_aclk_config() from also writing host->node_id.
+        //
+        // Remember whether this test is the one that created it, so the cleanup below can put the
+        // host back exactly as it was found: this binary runs several tests in-process against the
+        // same localhost, and leaving an ACLK config attached would hand them mutable state (and a
+        // leaked allocation) they never asked for.
+        bool config_created_here = (__atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE) == NULL);
+        create_aclk_config(host, &host->host_id.uuid, NULL);
+        aclk_sync_cfg_t *cfg = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+
+        if(!cfg) {
+            fprintf(stderr, "  FAILED record: could not create an ACLK config for localhost\n");
+            errors++;
+        }
+        else {
+            const uint64_t K = 0x0123456789abcdefULL; // any content key; the record is content-blind
+            const uint64_t T1 = 1111, T2 = 2222, T3 = 3333;
+
+            struct aclk_manifest_publication pub = { .key = K, .token = T1, .published = false };
+            strncpyz(pub.machine_guid, host->machine_guid, sizeof(pub.machine_guid) - 1);
+
+            // a dropped manifest invalidates its own record and re-arms, so the content is rebuilt
+            __atomic_store_n(&cfg->node_manifest_sent_key, K, __ATOMIC_RELEASE);
+            __atomic_store_n(&cfg->node_manifest_sent_token, T1, __ATOMIC_RELEASE);
+            aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
+
+            aclk_node_manifest_publish_result(&pub);
+
+            if(__atomic_load_n(&cfg->node_manifest_sent_token, __ATOMIC_ACQUIRE) != 0) {
+                fprintf(stderr, "  FAILED record: a dropped manifest did not invalidate its own token\n");
+                errors++;
+            }
+            if(aclk_send_timestamp_get(&cfg->node_manifest_send_time) == 0) {
+                fprintf(stderr, "  FAILED record: a dropped manifest did not re-arm the request\n");
+                errors++;
+            }
+
+            // the same drop must NOT touch a later enqueue's record, even though the content, and
+            // so the key, is identical - only the token distinguishes them
+            __atomic_store_n(&cfg->node_manifest_sent_key, K, __ATOMIC_RELEASE);
+            __atomic_store_n(&cfg->node_manifest_sent_token, T2, __ATOMIC_RELEASE);
+            aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
+
+            aclk_node_manifest_publish_result(&pub); // still carries the stale T1
+
+            if(__atomic_load_n(&cfg->node_manifest_sent_token, __ATOMIC_ACQUIRE) != T2) {
+                fprintf(stderr, "  FAILED record: a stale drop cleared a later enqueue's token\n");
+                errors++;
+            }
+            if(aclk_send_timestamp_get(&cfg->node_manifest_send_time) != 0) {
+                fprintf(stderr, "  FAILED record: a stale drop re-armed a request it does not own\n");
+                errors++;
+            }
+
+            // a manifest that reached the mqtt layer was already accounted for at enqueue time, so
+            // reporting it must change nothing at all
+            __atomic_store_n(&cfg->node_manifest_sent_token, T3, __ATOMIC_RELEASE);
+            aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
+            pub.token = T3;
+            pub.published = true;
+
+            aclk_node_manifest_publish_result(&pub);
+
+            if(__atomic_load_n(&cfg->node_manifest_sent_token, __ATOMIC_ACQUIRE) != T3 ||
+               aclk_send_timestamp_get(&cfg->node_manifest_send_time) != 0) {
+                fprintf(stderr, "  FAILED record: a published manifest changed the record\n");
+                errors++;
+            }
+
+            // a host that no longer resolves is a no-op, not a crash and not someone else's record
+            pub.published = false;
+            strncpyz(pub.machine_guid, "00000000-0000-0000-0000-000000000000", sizeof(pub.machine_guid) - 1);
+
+            aclk_node_manifest_publish_result(&pub);
+
+            if(__atomic_load_n(&cfg->node_manifest_sent_token, __ATOMIC_ACQUIRE) != T3) {
+                fprintf(stderr, "  FAILED record: a publication for an unknown host touched this config\n");
+                errors++;
+            }
+
+            // leave nothing recorded or armed behind for the rest of the process. Redundant when the
+            // config is destroyed below, but this is also the path taken when the config pre-existed
+            // and must survive - and after destroy_aclk_config() cfg is freed, so it happens here.
+            __atomic_store_n(&cfg->node_manifest_sent_token, 0, __ATOMIC_RELEASE);
+            __atomic_store_n(&cfg->node_manifest_sent_key, 0, __ATOMIC_RELEASE);
+            aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
+        }
+
+        // Detach and free the config if this test created it. With no ACLK sync thread running in the
+        // unittest binary, destroy_aclk_config() skips its event-loop round trip (it is gated on
+        // aclk_sync_config.initialized, set only inside aclk_synchronization_event_loop()) and reduces
+        // to an atomic exchange plus freez - no thread, no timer, no database. cfg is dangling after
+        // this point.
+        if(config_created_here)
+            destroy_aclk_config(host);
+
+        if(errors == record_errors_before)
+            fprintf(stderr, "  OK record: a drop invalidates its own token, a stale drop does not, "
+                            "a publish is a no-op, an unknown host is a no-op\n");
     }
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",

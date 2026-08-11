@@ -1,0 +1,148 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: fastapi
+match: 'http_requests* http_request_duration* http_request_size* http_response_size*'
+namespace: fastapi
+composition:
+  supports: {}
+entities:
+  endpoint:
+    grain: FastAPI HTTP endpoint and method
+    identity:
+      required: [handler, method]
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Per-endpoint charts preserve the route and method grain used for request diagnosis and UI aggregation.
+  handler:
+    grain: FastAPI HTTP route handler
+    identity:
+      required: [handler]
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Per-handler body traffic preserves the source's finest shared request and response identity.
+  service:
+    grain: instrumented FastAPI service
+    identity:
+      required: []
+      optional: []
+  inprogress_scope:
+    grain: FastAPI service, refined to HTTP endpoint and method when in-progress labels are enabled
+    identity:
+      required: []
+      optional: [handler, method]
+    high_cardinality_acceptance:
+      operator_value: Optional endpoint identity preserves the producer's labeled in-progress mode without duplicating the service-wide view.
+label_policies: {}
+reduction_policies: {}
+normalizations:
+  generated_registration_epochs:
+    kind: generated_component_exclusion
+    source:
+      namespace_prefix: http_
+      terminal_suffix: _created
+      component: scalar
+    outcome: drop_before_writer
+    evidence: [created_registration, created_lifecycle, created_unit]
+exclusions:
+  request_size_count:
+    source: {signal: request_size, components: [count]}
+    reason: equivalent_duplicate
+    covering_view: http_endpoints.request_outcomes
+    evidence: [count_projection]
+    outcome: retain_writable_unrendered
+  response_size_count:
+    source: {signal: response_size, components: [count]}
+    reason: equivalent_duplicate
+    covering_view: http_endpoints.request_outcomes
+    evidence: [count_projection]
+    outcome: retain_writable_unrendered
+limitations: {}
+views:
+  http_endpoints.request_outcomes:
+    family: FastAPI/HTTP Endpoints
+    question: At what rate does each endpoint return each producer-configured HTTP status value?
+    entity: endpoint
+    inputs:
+      status:
+        signal: request_outcomes
+        components: [value]
+    labels:
+      dimensions: {status: {render: label_value}}
+      promote: []
+      omit: {}
+  http_endpoints.request_duration:
+    family: FastAPI/HTTP Endpoints
+    question: How is the producer-configured request-duration measurement distributed for each endpoint?
+    entity: endpoint
+    inputs:
+      duration:
+        signal: endpoint_duration
+        components: [bucket]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  http_endpoints.request_measurements:
+    family: FastAPI/HTTP Endpoints
+    question: At what rate are producer-configured endpoint request-duration observations recorded?
+    entity: endpoint
+    inputs:
+      requests:
+        signal: endpoint_duration
+        components: [count]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  http_endpoints.completed_request_time:
+    family: FastAPI/HTTP Endpoints
+    question: At what rate is producer-configured elapsed time from completed requests attributed to each endpoint?
+    entity: endpoint
+    inputs:
+      time:
+        signal: endpoint_duration
+        components: [sum]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  http_service.request_duration:
+    family: FastAPI/HTTP Service
+    question: How is the producer-configured high-resolution request-duration population distributed across the service?
+    entity: service
+    inputs:
+      duration:
+        signal: service_duration
+        components: [bucket]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  http_service.request_measurements:
+    family: FastAPI/HTTP Service
+    question: At what rate are producer-configured service request-duration observations recorded?
+    entity: service
+    inputs:
+      requests:
+        signal: service_duration
+        components: [count]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  http_service.completed_request_time:
+    family: FastAPI/HTTP Service
+    question: At what rate is producer-configured elapsed time from completed requests attributed across the service?
+    entity: service
+    inputs:
+      time:
+        signal: service_duration
+        components: [sum]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  http_inprogress.requests:
+    family: FastAPI/HTTP In Progress
+    question: How many HTTP requests are currently in progress for the available service or endpoint scope?
+    entity: inprogress_scope
+    inputs:
+      requests:
+        signal: requests_in_progress
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  http_body.throughput:
+    family: FastAPI/HTTP Body Traffic
+    question: At what rate does each handler receive and send HTTP body bytes?
+    entity: handler
+    inputs:
+      request:
+        signal: request_size
+        components: [sum]
+      response:
+        signal: response_size
+        components: [sum]
+    labels: {dimensions: {}, promote: [], omit: {}}

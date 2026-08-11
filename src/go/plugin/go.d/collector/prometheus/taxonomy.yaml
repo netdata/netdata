@@ -1,5 +1,15 @@
 taxonomy_version: 1
 plugin_name: go.d.plugin
 module_name: prometheus
-taxonomy_optout:
-  reason: Generic Prometheus jobs define dynamic, endpoint-specific chart contexts at runtime and do not expose stable collector-level metric scopes for dashboard taxonomy placement.
+placements:
+  - id: prometheus
+    section_id: applications
+    title: Prometheus endpoints
+    icon: apps
+    families: true
+    items:
+      - type: selector
+        id: prometheus-contexts
+        title: Prometheus metrics
+        context_prefix:
+          - prometheus.

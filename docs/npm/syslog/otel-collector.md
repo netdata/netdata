@@ -12,11 +12,14 @@ endmeta-->
 
 Network devices send syslog; an OpenTelemetry Collector receives it, normalizes it, and forwards it to Netdata over OTLP. This page walks through a working configuration.
 
+For applications, host metrics, and general file logs, use [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). This page remains the canonical workflow for network-device syslog.
+
 ## What you need
 
 - A Netdata Agent — its OTLP endpoint listens on `127.0.0.1:4317` by default.
 - An [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) binary on the network, typically on the same host as the devices' hub.
 - Devices configured to send syslog to the collector.
+- A Netdata Cloud account and sign-in to verify the records in the access-gated `otel-logs` view.
 
 ## A working configuration
 
@@ -38,8 +41,8 @@ processors:
       - set(resource.attributes["syslog.appname"], log.attributes["appname"])
 
 exporters:
-  otlp:
-    endpoint: localhost:4317
+  otlp_grpc/netdata:
+    endpoint: 127.0.0.1:4317
     tls:
       insecure: true
 
@@ -48,7 +51,7 @@ service:
     logs:
       receivers: [syslog]
       processors: [transform/syslog]
-      exporters: [otlp]
+      exporters: [otlp_grpc/netdata]
 ```
 
 Start it with `otelcol-contrib --config ./otelcol.yaml`, then point your devices' syslog at the collector's host on UDP `53514`.
@@ -62,7 +65,7 @@ To receive over **TCP** instead (common for RFC 5424), replace the `udp:` block 
 
 ## Confirm it's flowing
 
-Open the **Logs** tab in Netdata, select the hub node, and search for one of your devices by hostname. Within a poll cycle you should see its syslog messages with their parsed severity and facility. No messages usually means the devices aren't pointed at the collector, or a firewall is dropping the listener's port.
+Open the **Logs** tab in Netdata, select the hub node, and search for one of your devices by hostname. After the Collector exports a message, it should appear with its parsed severity and facility. No messages usually means the devices aren't pointed at the collector, or a firewall is dropping the listener's port.
 
 ## Make it durable
 
@@ -70,7 +73,7 @@ For production, add a file-backed sending queue so a brief Netdata restart doesn
 
 ## What you get
 
-Each message arrives in Netdata as a structured journal log, searchable and filterable in the **Logs** tab. The configuration above produces these fields:
+Each message arrives in Netdata as a structured OpenTelemetry log, searchable and filterable in the **Logs** tab. The configuration above produces these fields:
 
 - **`resource.attributes.host.name`** — the device that sent the message.
 - **`resource.attributes.syslog.appname`** — the application name.

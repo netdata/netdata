@@ -385,8 +385,7 @@ func walkGroupByLabels(path string, group charttpl.Group, inherited []string, re
 
 // validateChartAlgorithms enforces that every chart sets algorithm: absolute
 // explicitly. CloudWatch returns per-period aggregates (never raw cumulative
-// counters), so absolute is always correct; requiring it also prevents
-// chartengine's suffix-based incremental inference from ever being relied upon.
+// counters), so absolute is always correct rather than the runtime-kind default.
 func validateChartAlgorithms(profilePrefix string, p Profile) error {
 	var errs []error
 	walkChartAlgorithms(profilePrefix+".template", p.Template, &errs)

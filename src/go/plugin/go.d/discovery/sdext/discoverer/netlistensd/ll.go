@@ -4,6 +4,9 @@ package netlistensd
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -11,6 +14,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
+
+// errLocalListenersNotInstalled means the local-listeners helper is not present.
+// It is built only on Linux (ENABLE_PLUGIN_LOCAL_LISTENERS), so on every other
+// platform this is the expected state, not a failure.
+var errLocalListenersNotInstalled = errors.New("local-listeners helper is not installed")
 
 type localListeners interface {
 	discover(ctx context.Context) ([]byte, error)
@@ -37,6 +45,13 @@ type localListenersExec struct {
 }
 
 func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
+	if _, err := os.Stat(e.binPath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("%w ('%s')", errLocalListenersNotInstalled, e.binPath)
+		}
+		return nil, err
+	}
+
 	// TCPv4/6 and UPDv4 sockets in LISTEN state
 	// https://github.com/netdata/netdata/blob/master/src/collectors/utils/local_listeners.c
 	args := []string{

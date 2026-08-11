@@ -43,6 +43,15 @@ type Sample struct {
 	FamilyType model.MetricType
 }
 
+// LabelsWithName returns a detached selector-compatible label set containing
+// __name__ followed by the sample labels.
+func (s Sample) LabelsWithName() labels.Labels {
+	out := make(labels.Labels, 0, len(s.Labels)+1)
+	out = append(out, labels.Label{Name: labels.MetricName, Value: s.Name})
+	out = append(out, s.Labels...)
+	return out
+}
+
 // HelpEntry is a family's HELP text, keyed by family name, carried alongside a
 // SampleBatch (HELP is parsed per family, before assembly).
 type HelpEntry struct {
@@ -57,4 +66,47 @@ type HelpEntry struct {
 type SampleBatch struct {
 	Help    []HelpEntry
 	Samples []Sample
+}
+
+// SampleComponentToken returns the stable physical-component token owned by
+// the parser/assembler model. An unknown kind returns an empty token.
+func SampleComponentToken(kind SampleKind) string {
+	switch kind {
+	case SampleKindScalar:
+		return "scalar"
+	case SampleKindHistogramBucket:
+		return "histogram_bucket"
+	case SampleKindHistogramSum:
+		return "histogram_sum"
+	case SampleKindHistogramCount:
+		return "histogram_count"
+	case SampleKindSummaryQuantile:
+		return "summary_quantile"
+	case SampleKindSummarySum:
+		return "summary_sum"
+	case SampleKindSummaryCount:
+		return "summary_count"
+	default:
+		return ""
+	}
+}
+
+// MetricTypeToken returns the stable source-type token for a parsed sample.
+// Prometheus represents exposition without a TYPE declaration as unknown;
+// the public token calls that source shape untyped.
+func MetricTypeToken(typ model.MetricType) string {
+	switch typ {
+	case model.MetricTypeGauge:
+		return "gauge"
+	case model.MetricTypeCounter:
+		return "counter"
+	case model.MetricTypeHistogram:
+		return "histogram"
+	case model.MetricTypeSummary:
+		return "summary"
+	case model.MetricTypeUnknown:
+		return "untyped"
+	default:
+		return ""
+	}
 }

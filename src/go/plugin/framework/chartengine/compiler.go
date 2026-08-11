@@ -143,7 +143,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 
 	labelMode := program.PromotionModeAutoIntersection
 	promote := normalizeUnique(chart.LabelPromoted)
-	if len(promote) > 0 {
+	if chart.LabelPromoted != nil {
 		labelMode = program.PromotionModeExplicitIntersection
 	}
 
@@ -430,6 +430,21 @@ func composeFamily(parts []string, leaf string) string {
 
 func buildTemplateID(groupPath []int, chartIndex int) string {
 	return fmt.Sprintf("g%s.c%d", pathIndexes(groupPath), chartIndex)
+}
+
+// ChartTemplateIDAt returns the compiler-assigned template ID for a decoded
+// spec chart position. It lets diagnostic consumers correlate route facts with
+// the source spec without reproducing compiler identity formatting.
+func ChartTemplateIDAt(groupPath []int, chartIndex int) (string, bool) {
+	if len(groupPath) == 0 || chartIndex < 0 {
+		return "", false
+	}
+	for _, index := range groupPath {
+		if index < 0 {
+			return "", false
+		}
+	}
+	return buildTemplateID(groupPath, chartIndex), true
 }
 
 func pathIndexes(path []int) string {

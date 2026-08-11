@@ -27,6 +27,7 @@ type engineConfig struct {
 	runtimeStore            metrix.RuntimeStore
 	runtimeStoreSet         bool
 	runtimeObserver         func(PlanRuntimeSample)
+	routeObserver           func(PlanRouteDiagnostic)
 	log                     *logger.Logger
 	seriesSelection         seriesSelectionMode
 	runtimePlanner          bool
@@ -204,6 +205,16 @@ func WithRuntimeStore(store metrix.RuntimeStore) Option {
 func WithRuntimeSampleObserver(fn func(PlanRuntimeSample)) Option {
 	return func(cfg *engineConfig) error {
 		cfg.runtimeObserver = fn
+		return nil
+	}
+}
+
+// WithPlanRouteDiagnosticObserver configures synchronous, attempt-scoped route
+// diagnostics. Diagnostic planning bypasses the route cache so repeated plans
+// report complete facts. The callback must not call back into the Engine.
+func WithPlanRouteDiagnosticObserver(fn func(PlanRouteDiagnostic)) Option {
+	return func(cfg *engineConfig) error {
+		cfg.routeObserver = fn
 		return nil
 	}
 }

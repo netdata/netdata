@@ -474,6 +474,12 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
 RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 
+// lifetime-safe host lookup for callers that hold no reference to the host: resolves by machine_guid
+// and runs `cb` under the rrd read lock. `may_block` false skips the callback instead of waiting for
+// the lock, which threads an rrd_wrlock() holder can be blocked on MUST use - see the definition for
+// the lifetime argument, that constraint, and why this is not keyed on node_id
+bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block);
+
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(
     const char *hostname,

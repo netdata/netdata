@@ -23,6 +23,52 @@ func (m mapLabelView) Get(key string) (string, bool) {
 	return value, ok
 }
 
+func TestCompilePreservesLabelPromotionModes(t *testing.T) {
+	tests := map[string]struct {
+		promotion []string
+		wantMode  program.PromotionMode
+		wantKeys  []string
+	}{
+		"omitted uses automatic intersection": {
+			wantMode: program.PromotionModeAutoIntersection,
+		},
+		"explicit empty promotes no non-identity labels": {
+			promotion: []string{},
+			wantMode:  program.PromotionModeExplicitIntersection,
+		},
+		"explicit allowlist uses explicit intersection": {
+			promotion: []string{"owner", "owner", "region"},
+			wantMode:  program.PromotionModeExplicitIntersection,
+			wantKeys:  []string{"owner", "region"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := &charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{{
+					Family:  "Service",
+					Metrics: []string{"service_value"},
+					Charts: []charttpl.Chart{{
+						Title:         "Value",
+						Context:       "value",
+						Units:         "value",
+						LabelPromoted: tc.promotion,
+						Dimensions:    []charttpl.Dimension{{Selector: "service_value", Name: "value"}},
+					}},
+				}},
+			}
+			compiled, err := Compile(spec, 1)
+			require.NoError(t, err)
+			charts := compiled.Charts()
+			require.Len(t, charts, 1)
+			assert.Equal(t, tc.wantMode, charts[0].Labels.Mode)
+			assert.Equal(t, tc.wantKeys, charts[0].Labels.PromoteKeys)
+		})
+	}
+}
+
 func (m mapLabelView) Range(fn func(key, value string) bool) {
 	keys := make([]string, 0, len(m))
 	for key := range m {
@@ -34,6 +80,17 @@ func (m mapLabelView) Range(fn func(key, value string) bool) {
 			return
 		}
 	}
+}
+
+func TestChartTemplateIDAtUsesCompilerIdentity(t *testing.T) {
+	id, ok := ChartTemplateIDAt([]int{1, 2}, 3)
+	require.True(t, ok)
+	assert.Equal(t, "g1.2.c3", id)
+
+	_, ok = ChartTemplateIDAt(nil, 0)
+	assert.False(t, ok)
+	_, ok = ChartTemplateIDAt([]int{0}, -1)
+	assert.False(t, ok)
 }
 
 func TestCompileScenarios(t *testing.T) {

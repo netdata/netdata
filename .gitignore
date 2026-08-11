@@ -213,8 +213,8 @@ build-*/
 # ignore rules for go plugin code
 src/go/plugin/go.d/bin/
 src/go/plugin/go.d/vendor
-# Test fixtures from https://github.com/netdata/testdata
-# Used by tests with: go test -tags=topology_fixtures ./...
+# External fixtures cloned from https://github.com/netdata/testdata
+# Dedicated workflows populate this path; ordinary tests do not fetch data.
 src/go/testdata
 
 # ignore files used with msi installer
@@ -231,6 +231,9 @@ packaging/tools/agent-events/go.sum
 
 **/.claude/settings.local.json
 .mcp.json
+
+# Go's default output for: cd src/go && go build ./tools/prometheus-profile-validation
+/src/go/prometheus-profile-validation
 .netdata-mcp-build.lock
 .users_cache.json
 .channels_cache_v2.json

@@ -1,0 +1,37 @@
+# Prometheus Python garbage-collector instrumentation shared by exporters.
+
+match: 'python_gc_*'
+template:
+  family: Process Runtime
+  context_namespace: process_runtime
+  groups:
+    - family: Python GC
+      context_namespace: python_gc
+      chart_defaults:
+        instances:
+          by_labels: [generation]
+      metrics:
+        - python_gc_objects_collected_total
+        - python_gc_objects_uncollectable_total
+        - python_gc_collections_total
+      charts:
+        - title: Collected Objects
+          context: collected_objects
+          units: objects/s
+          dimensions:
+            - selector: python_gc_objects_collected_total
+              name: collected
+
+        - title: Uncollectable Objects
+          context: uncollectable_objects
+          units: objects/s
+          dimensions:
+            - selector: python_gc_objects_uncollectable_total
+              name: uncollectable
+
+        - title: Collections
+          context: collections
+          units: collections/s
+          dimensions:
+            - selector: python_gc_collections_total
+              name: collections

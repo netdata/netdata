@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 
@@ -23,15 +22,11 @@ const profilesDirName = "prometheus.profiles"
 
 var log = logger.New().With("component", "prometheus/promprofiles")
 
-// validProfileName constrains a profile's identity (its file basename) and the
-// optional app field.
-var validProfileName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-
 // IsValidProfileName reports whether name satisfies the profile-identity
 // constraint. Callers that reference a profile by name (config entries, for
 // example) use it to reject names no catalog profile can ever have.
 func IsValidProfileName(name string) bool {
-	return validProfileName.MatchString(name)
+	return profilecatalog.DefaultValidName(name)
 }
 
 // NormalizeProfileKey is the canonical (case-insensitive) name transform shared
@@ -84,13 +79,18 @@ func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) 
 		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", baseName, err)
 	}
 
+	app := ""
+	if doc.App != nil {
+		app = *doc.App
+	}
 	p := Profile{
 		Name:            baseName,
 		Match:           doc.Match,
-		App:             doc.App,
+		App:             app,
 		autogenSelector: nil,
 		lazy: &lazyProfile{
 			raw:             bytes.Clone(data),
+			hasApp:          doc.App != nil,
 			hasFallbackType: doc.FallbackType.Kind != 0,
 			hasRelabeling:   doc.Relabeling.Kind != 0,
 		},
