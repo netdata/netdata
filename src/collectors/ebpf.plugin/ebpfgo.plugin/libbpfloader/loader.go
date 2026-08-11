@@ -12,6 +12,8 @@ type BTF struct {
 
 type CachestatRuntime struct{}
 
+type DCStatRuntime struct{}
+
 type SocketRuntime struct{}
 
 func OpenObject(path string) (*Object, error) {
@@ -105,6 +107,59 @@ func (r *CachestatRuntime) Close() {
 func PidIsAlive(pid uint32) bool {
 	_ = pid
 	return true
+}
+
+// DCStatSupportsCore mirrors the libbpf build's probe; without libbpf there are
+// no dcstat CO-RE skeletons compiled in.
+func DCStatSupportsCore() bool {
+	return false
+}
+
+func NewDCStatRuntime(path string, useCore bool) (*DCStatRuntime, error) {
+	return newDisabledRuntime[DCStatRuntime](path, useCore)
+}
+
+func (r *DCStatRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
+	_, _ = pidTableSize, mapsPerCore
+	return ErrDisabled
+}
+
+func (r *DCStatRuntime) Load() error {
+	return ErrDisabled
+}
+
+func (r *DCStatRuntime) Attach(lookupFastTarget, dLookupTarget string) error {
+	_, _ = lookupFastTarget, dLookupTarget
+	return ErrDisabled
+}
+
+func (r *DCStatRuntime) UpdateController(appsEnabled bool, appsLevel int) error {
+	_, _ = appsEnabled, appsLevel
+	return ErrDisabled
+}
+
+func (r *DCStatRuntime) Snapshot(mapsPerCore bool) (DCStatSnapshot, error) {
+	_ = mapsPerCore
+	return DCStatSnapshot{}, ErrDisabled
+}
+
+func (r *DCStatRuntime) SnapshotApps(mapsPerCore bool) ([]DCStatAppSnapshot, error) {
+	_ = mapsPerCore
+	return nil, ErrDisabled
+}
+
+func (r *DCStatRuntime) DeletePid(pid uint32) error {
+	_ = pid
+	return ErrDisabled
+}
+
+func (r *DCStatRuntime) DeletePids(pids []uint32) error {
+	_ = pids
+	return ErrDisabled
+}
+
+func (r *DCStatRuntime) Close() {
+	// No-op in the disabled build because the runtime never acquired native resources.
 }
 
 func NewSocketRuntime(path string, useCore bool) (*SocketRuntime, error) {

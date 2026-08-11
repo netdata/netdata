@@ -38,6 +38,7 @@ struct ebpfgo_shm_header {
 
 #define EBPFGO_SHM_FLAG_CACHESTAT 0x01u /* cachestat per-PID fields are valid */
 #define EBPFGO_SHM_FLAG_SOCKET    0x02u /* socket per-PID fields are valid */
+#define EBPFGO_SHM_FLAG_DCSTAT    0x04u /* dcstat (directory cache) per-PID fields are valid */
 
 struct ebpf_cachestat {
     uint32_t add_to_page_cache_lru;

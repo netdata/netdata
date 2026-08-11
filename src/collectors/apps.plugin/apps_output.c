@@ -4,6 +4,7 @@
 
 #if defined(OS_LINUX)
 static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt);
+static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec_t dt);
 #endif
 
 static inline void send_BEGIN(const char *type, const char *name,const char *metric,  usec_t usec) {
@@ -123,6 +124,8 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 #if defined(OS_LINUX)
         if (apps_ebpf_cachestat_data_ready())
             send_cachestat_data_to_netdata(w, type, dt);
+        if (apps_ebpf_dcstat_data_ready())
+            send_dcstat_data_to_netdata(w, type, dt);
 #endif
 
         if (unlikely(!w->values[PDF_PROCESSES]))
@@ -361,6 +364,67 @@ static void send_cachestat_data_to_netdata(struct target *w, const char *type, u
         send_END();
     }
 }
+
+/* Chart ids, contexts, units, and priorities match the ones the C dcstat module
+ * published, so existing dashboards keep working after the port to ebpf-go. */
+static void send_dcstat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
+    if (strcmp(type, NETDATA_APP_FAMILY) != 0)
+        return;
+
+    static const struct {
+        const char *suffix;
+        const char *title;
+        const char *units;
+        const char *style;
+        int         priority;
+        const char *dim;
+        const char *algo;
+    } charts[] = {
+        { "ebpf_dc_hit",       "Percentage of files inside directory cache.", "%",     "line",    20265, "ratio", "absolute"    },
+        { "ebpf_dc_reference", "Count file access.",                          "files", "stacked", 20266, "files", "incremental" },
+        { "ebpf_dc_not_cache", "Files not present inside directory cache.",    "files", "stacked", 20267, "files", "incremental" },
+        { "ebpf_dc_not_found", "Files not found.",                            "files", "stacked", 20268, "files", "incremental" },
+    };
+
+    const char *name  = string2str(w->clean_name);
+    const char *wname = string2str(w->name);
+    for (size_t i = 0; i < sizeof(charts) / sizeof(charts[0]); i++) {
+        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' directory_cache %s.%s %s %d %d\n",
+                type, name, charts[i].suffix, charts[i].title, charts[i].units,
+                type, charts[i].suffix, charts[i].style, charts[i].priority, update_every);
+        send_CLABEL_COMMIT(lbl_name, wname);
+        fprintf(stdout, "DIMENSION %s '' %s 1 1\n", charts[i].dim, charts[i].algo);
+    }
+}
+
+static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
+    if (strcmp(type, NETDATA_APP_FAMILY) != 0)
+        return;
+
+    static const struct {
+        const char *chart;
+        const char *dim;
+    } entries[] = {
+        { "ebpf_dc_hit",       "ratio" },
+        { "ebpf_dc_reference", "files" },
+        { "ebpf_dc_not_cache", "files" },
+        { "ebpf_dc_not_found", "files" },
+    };
+
+    const kernel_uint_t values[] = {
+        (kernel_uint_t)w->dcstat_totals.ratio,
+        (kernel_uint_t)w->dcstat_totals.reference,
+        (kernel_uint_t)w->dcstat_totals.slow,
+        (kernel_uint_t)w->dcstat_totals.not_found,
+    };
+
+    const char *name = string2str(w->clean_name);
+    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
+        send_BEGIN(type, name, entries[i].chart, dt);
+        send_SET(entries[i].dim, values[i]);
+        send_END();
+    }
+}
 #endif
 
 void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title) {
@@ -478,6 +542,8 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 #if defined(OS_LINUX)
         if (apps_ebpf_cachestat_is_available())
             send_cachestat_charts_to_netdata(w, type, lbl_name);
+        if (apps_ebpf_dcstat_is_available())
+            send_dcstat_charts_to_netdata(w, type, lbl_name);
 #endif
 
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",
@@ -508,6 +574,15 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             send_cachestat_charts_to_netdata(w, type, lbl_name);
         }
         cachestat_charts_announced = true;
+    }
+
+    static bool dcstat_charts_announced = false;
+    if (!dcstat_charts_announced && apps_ebpf_dcstat_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
+        for (w = root; w; w = w->next) {
+            if (!w->exposed) continue;
+            send_dcstat_charts_to_netdata(w, type, lbl_name);
+        }
+        dcstat_charts_announced = true;
     }
 #endif
 }

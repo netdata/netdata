@@ -922,9 +922,9 @@ void ebpf_shm_resume_apps_data()
 }
 
 /**
- * DCstat thread
+ * SHM thread
  *
- * Thread used to generate dcstat charts.
+ * Thread used to generate shm charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *

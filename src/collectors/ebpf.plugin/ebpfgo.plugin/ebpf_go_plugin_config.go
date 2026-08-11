@@ -17,6 +17,7 @@ const pluginPrimaryConfigFile = "ebpf.d.conf"
 // apply() merges a later file on top of an earlier one.
 type pluginConfigFile struct {
 	Cachestat                 *bool // [ebpf programs] cachestat key
+	Dcstat                    *bool // [ebpf programs] dcstat key
 	Socket                    *bool // [ebpf programs] socket key
 	DNS                       *bool // [ebpf programs] dns key
 	UpdateEvery               *int
@@ -148,6 +149,14 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid cachestat %q, using default\n", path, value)
 				} else {
 					cfg.Cachestat = new(b)
+				}
+				found = true
+			case "dcstat":
+				b, ok := parseConfigBool(value)
+				if !ok {
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid dcstat %q, using default\n", path, value)
+				} else {
+					cfg.Dcstat = new(b)
 				}
 				found = true
 			case "socket":
@@ -335,6 +344,9 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	if other.Cachestat != nil {
 		c.Cachestat = other.Cachestat
+	}
+	if other.Dcstat != nil {
+		c.Dcstat = other.Dcstat
 	}
 	if other.Socket != nil {
 		c.Socket = other.Socket

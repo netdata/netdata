@@ -212,7 +212,7 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 // Both the global metric snapshot and the per-PID SHM publish run here
 // sequentially so that only one OS thread is needed for CGO calls.
 // store may be nil when apps/cgroups integration is disabled.
-func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, store *cachestatSharedMemoryStore, updateEvery int) {
+func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, store *ebpfSharedMemoryStore, updateEvery int) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -284,7 +284,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 					}
 				}
 				if handle.SharedMemory != nil {
-					if err := store.Publish(handle.SharedMemory); err != nil {
+					if err := store.Publish(handle.SharedMemory, ebpfgoSHMFlagCachestat); err != nil {
 						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", err)
 					}
 				}
