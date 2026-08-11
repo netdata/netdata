@@ -351,8 +351,9 @@ static void macos_nvme_free_devices(void)
     }
 }
 
-static void macos_nvme_prune_missing_devices(void)
+static unsigned macos_nvme_prune_missing_devices(void)
 {
+    unsigned tracked = 0;
     struct macos_nvme_device **pp = &nvme_devices_root;
     while (*pp) {
         struct macos_nvme_device *d = *pp;
@@ -360,19 +361,20 @@ static void macos_nvme_prune_missing_devices(void)
             *pp = d->next;
             macos_nvme_free_device(d);
         } else {
+            tracked++;
             pp = &d->next;
         }
     }
+
+    return tracked;
 }
 
-static unsigned macos_nvme_discover_devices(void)
+static bool macos_nvme_scan_registry(
+    unsigned *tracked,
+    unsigned *found,
+    bool admission_only,
+    bool *skipped_at_cap)
 {
-    unsigned tracked = 0;
-    for (struct macos_nvme_device *d = nvme_devices_root; d; d = d->next) {
-        d->seen = false;
-        tracked++;
-    }
-
     io_iterator_t iter = IO_OBJECT_NULL;
     IOReturn kr = IORegistryCreateIterator(kIOMainPortDefault, kIOServicePlane, kIORegistryIterateRecursively, &iter);
     if (unlikely(kr != kIOReturnSuccess || iter == IO_OBJECT_NULL)) {
@@ -380,10 +382,9 @@ static unsigned macos_nvme_discover_devices(void)
             collector_error("MACOS: cannot scan IORegistry for NVMe SMART-capable services");
             nvme_logged_registry_error = true;
         }
-        return 0;
+        return false;
     }
 
-    unsigned found = 0;
     io_registry_entry_t entry;
     while ((entry = IOIteratorNext(iter)) != IO_OBJECT_NULL) {
         if (!macos_nvme_service_is_smart_capable(entry)) {
@@ -398,7 +399,14 @@ static unsigned macos_nvme_discover_devices(void)
         }
 
         struct macos_nvme_device *d = macos_nvme_find_device(registry_id);
-        if (!d && tracked >= MACOS_NVME_MAX_DEVICES) {
+        if (admission_only && d) {
+            IOObjectRelease(entry);
+            continue;
+        }
+
+        if (!d && *tracked >= MACOS_NVME_MAX_DEVICES) {
+            if (skipped_at_cap)
+                *skipped_at_cap = true;
             IOObjectRelease(entry);
             continue;
         }
@@ -422,18 +430,38 @@ static unsigned macos_nvme_discover_devices(void)
             d->service = entry;
         } else {
             d = macos_nvme_add_device(registry_id, entry);
-            tracked++;
+            (*tracked)++;
         }
 
         d->seen = true;
-        found++;
+        (*found)++;
 
         if (model[0])
             snprintfz(d->model, sizeof(d->model), "%s", model);
     }
 
     IOObjectRelease(iter);
-    macos_nvme_prune_missing_devices();
+    return true;
+}
+
+static unsigned macos_nvme_discover_devices(void)
+{
+    unsigned tracked = 0;
+    for (struct macos_nvme_device *d = nvme_devices_root; d; d = d->next) {
+        d->seen = false;
+        tracked++;
+    }
+
+    unsigned found = 0;
+    bool skipped_at_cap = false;
+    if (!macos_nvme_scan_registry(&tracked, &found, false, &skipped_at_cap))
+        return 0;
+
+    tracked = macos_nvme_prune_missing_devices();
+
+    // A stale entry can occupy a slot until pruning. Revisit only untracked services if that hid available capacity.
+    if (skipped_at_cap && tracked < MACOS_NVME_MAX_DEVICES)
+        macos_nvme_scan_registry(&tracked, &found, true, NULL);
 
     return found;
 }
