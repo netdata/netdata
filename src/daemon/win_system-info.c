@@ -635,11 +635,9 @@ static const char *netdata_windows_detect_virt(bool with_wmi) {
 static void netdata_windows_detect_virtualization(struct rrdhost_system_info *systemInfo, bool with_wmi) {
     const char *virt = netdata_windows_detect_virt(with_wmi);
 
+    // WMI can refine this after plugin processes start, so it must not be exported as a provisional environment value.
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", virt);
-    nd_setenv("NETDATA_SYSTEM_VIRTUALIZATION", virt, 1);
-
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 const char *netdata_windows_container_from_env(const char *k_host, const char *k_port) {
