@@ -532,6 +532,10 @@ const char *rrdhost_system_info_prebuilt_dist(struct rrdhost_system_info *si) {
     return si->prebuilt_dist;
 }
 
+const char *rrdhost_system_info_host_os_version(struct rrdhost_system_info *si) {
+    return si ? si->host_os_version : NULL;
+}
+
 int16_t rrdhost_system_info_hops(struct rrdhost_system_info *si) {
     if(!si) return 0;
     return si->hops;

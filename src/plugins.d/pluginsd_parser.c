@@ -819,8 +819,16 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     bool labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
     labels_changed |= pluginsd_update_host_ephemerality(host);
 
-    if(!rrdlabels_exist(host->rrdlabels, "_os"))
-        labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
+    if(!rrdlabels_exist(host->rrdlabels, "_os")) {
+        const char *os = string2str(host->os);
+#ifdef OS_WINDOWS
+        char os_version[4096];
+        rrdlabels_get_value_strcpyz(host->rrdlabels, os_version, sizeof(os_version), "_os_version");
+        if (*os_version)
+            os = os_version;
+#endif
+        labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_os", os, RRDLABEL_SRC_AUTO);
+    }
 
     if(!rrdlabels_exist(host->rrdlabels, "_hostname"))
         labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);

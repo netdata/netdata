@@ -209,7 +209,6 @@ static void rrdhost_load_auto_labels(void) {
     struct rrdhost_system_info *system_info = rrdhost_system_info_dup(localhost->system_info);
     spinlock_unlock(&localhost->rrdhost_update_lock);
     rrdhost_system_info_to_rrdlabels(system_info, labels);
-    rrdhost_system_info_free(system_info);
     add_aclk_host_labels();
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
@@ -224,7 +223,14 @@ static void rrdhost_load_auto_labels(void) {
     (void)rrdhost_update_is_parent_label(labels, stream_receivers_currently_connected, true);
 
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
-    rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
+    const char *os = string2str(localhost->os);
+#ifdef OS_WINDOWS
+    const char *os_version = rrdhost_system_info_host_os_version(system_info);
+    if (os_version)
+        os = os_version;
+#endif
+    rrdlabels_add(labels, "_os", os, RRDLABEL_SRC_AUTO);
+    rrdhost_system_info_free(system_info);
 
     if (localhost->stream.snd.destination)
         rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);

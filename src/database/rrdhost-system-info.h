@@ -88,6 +88,7 @@ int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, con
 
 const char *rrdhost_system_info_install_type(struct rrdhost_system_info *si);
 const char *rrdhost_system_info_prebuilt_dist(struct rrdhost_system_info *si);
+const char *rrdhost_system_info_host_os_version(struct rrdhost_system_info *si);
 int16_t rrdhost_system_info_hops(struct rrdhost_system_info *si);
 
 // --------------------------------------------------------------------------------------------------------------------

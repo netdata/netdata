@@ -2501,6 +2501,42 @@ int test_sqlite(void) {
 }
 
 #ifdef OS_WINDOWS
+int unit_test_windows_os_version(void) {
+    static const struct {
+        const char *product_name;
+        const char *expected;
+    } cases[] = {
+        {"Windows Server 2019 Standard", "Microsoft Windows Server 2019 Standard"},
+        {"Windows 11 Pro", "Microsoft Windows 11 Pro"},
+        {"Microsoft Windows Server 2022 Datacenter", "Microsoft Windows Server 2022 Datacenter"},
+        {"", "Microsoft Windows"},
+        {NULL, "Microsoft Windows"},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char os_version[256];
+        netdata_windows_format_os_version(os_version, sizeof(os_version), cases[i].product_name);
+        if(strcmp(os_version, cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_os_version: case '%s' expected '%s' got '%s'\n",
+                    cases[i].product_name ? cases[i].product_name : "(NULL)",
+                    cases[i].expected,
+                    os_version);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_os_version: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_os_version: OK (%zu cases)\n",
+            sizeof(cases) / sizeof(cases[0]));
+    return 0;
+}
+
 int unit_test_windows_virt_normalize(void) {
     static const struct {
         const char *raw;

@@ -212,8 +212,32 @@ static DWORD netdata_windows_get_current_build()
     return version;
 }
 
+void netdata_windows_format_os_version(char *out, size_t length, const char *product_name)
+{
+    if (!length)
+        return;
+
+    if (!product_name || !*product_name) {
+        (void)snprintf(out, length, "Microsoft Windows");
+        return;
+    }
+
+    const char *prefix = strncasecmp(product_name, "Microsoft ", strlen("Microsoft ")) ? "Microsoft " : "";
+    (void)snprintf(out, length, "%s%s", prefix, product_name);
+}
+
 static void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
 {
+    char product_name[256];
+    if (netdata_registry_get_string(product_name,
+                                    sizeof(product_name) - 1,
+                                    HKEY_LOCAL_MACHINE,
+                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                    "ProductName")) {
+        netdata_windows_format_os_version(os, length, product_name);
+        return;
+    }
+
     char versionName[256];
     if (!netdata_registry_get_string(versionName,
                                     255,
