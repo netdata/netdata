@@ -168,23 +168,29 @@ static bool macos_nvme_service_is_smart_capable(io_registry_entry_t entry)
     return capable;
 }
 
-static bool macos_nvme_close_session(struct macos_nvme_session *session)
+static void macos_nvme_close_session(struct macos_nvme_session *session)
 {
     if (!session)
-        return true;
+        return;
 
     if (session->smart) {
         (*session->smart)->Release(session->smart);
         session->smart = NULL;
     }
 
-    bool success = true;
     if (session->plugin) {
-        success = IODestroyPlugInInterface(session->plugin) == kIOReturnSuccess;
+        IOReturn kr = IODestroyPlugInInterface(session->plugin);
+        if (kr != kIOReturnSuccess) {
+            nd_log_limit_static_global_var(erl, 60, 0);
+            nd_log_limit(
+                &erl,
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "MACOS: NVMe SMART IOKit plug-in teardown returned error 0x%x",
+                (unsigned)kr);
+        }
         session->plugin = NULL;
     }
-
-    return success;
 }
 
 static bool macos_nvme_open_session(io_service_t service, struct macos_nvme_session *session)
@@ -246,8 +252,8 @@ static bool macos_nvme_read_device(
         identify_kr = (*session.smart)->GetIdentifyData(session.smart, &identify, 0);
     }
 
-    bool closed = macos_nvme_close_session(&session);
-    if (smart_kr != kIOReturnSuccess || !closed)
+    macos_nvme_close_session(&session);
+    if (smart_kr != kIOReturnSuccess)
         return false;
 
     if (identify_kr == kIOReturnSuccess)
