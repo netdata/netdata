@@ -34,7 +34,7 @@ Group Email sends Space-wide alert notifications to a shared group or mailing-li
 4. Add the Group Email Integration
 5. A modal will be presented to you to enter the required details to enable the integration:
     - **Notification settings**
-      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Configuration name (optional): A name for your configuration to easily refer to it
       - Rooms: A list of Rooms for which you want to be notified
       - Notifications: The notification types you want to receive
     - **Integration configuration**
