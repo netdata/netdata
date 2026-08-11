@@ -16,6 +16,8 @@ long web_client_streaming_rate_t = 0L;
 #define WORKER_JOB_RCV_DATA       6
 #define WORKER_JOB_SND_DATA       7
 #define WORKER_JOB_PROCESS        8
+#define WEB_STARTUP_WAITERS_MAX_PER_WORKER 8
+#define WEB_STARTUP_WAIT_CHECK_MS 100
 
 #if (WORKER_UTILIZATION_MAX_JOB_TYPES < 9)
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least 8
@@ -74,6 +76,7 @@ struct web_server_static_threaded_worker {
     volatile size_t receptions;
     volatile size_t sends;
     volatile size_t max_concurrent;
+    size_t startup_waiters;
 };
 
 static long long static_threaded_workers_count = 1;
@@ -81,11 +84,32 @@ static long long static_threaded_workers_count = 1;
 static struct web_server_static_threaded_worker *static_workers_private_data = NULL;
 static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 
+bool web_server_startup_wait_acquire(void) {
+    if(!worker_private)
+        return false;
+
+    size_t max_waiters = WEB_STARTUP_WAITERS_MAX_PER_WORKER;
+    if(worker_private->max_sockets)
+        max_waiters = MIN(max_waiters, worker_private->max_sockets - 1);
+
+    if(worker_private->startup_waiters >= max_waiters)
+        return false;
+
+    worker_private->startup_waiters++;
+    return true;
+}
+
+void web_server_startup_wait_release(void) {
+    internal_fatal(!worker_private || !worker_private->startup_waiters,
+                   "WEB: startup wait queue accounting is inconsistent");
+    worker_private->startup_waiters--;
+}
+
 // ----------------------------------------------------------------------------
 
 static inline int web_server_check_client_status(struct web_client *w) {
     if(unlikely(web_client_check_dead(w) ||
-                (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w) &&
+                (!w->startup_waiting && !web_client_has_wait_receive(w) && !web_client_has_wait_send(w) &&
                  !web_client_has_ssl_wait_receive(w) && !web_client_has_ssl_wait_send(w))))
         return -1;
 
@@ -388,7 +412,11 @@ static bool web_server_should_stop(void) {
     return !service_running(SERVICE_WEB_SERVER);
 }
 
-static void web_server_resume_startup_requests(POLLJOB *p, void *timer_data __maybe_unused) {
+static void web_server_resume_startup_requests(POLLJOB *p, void *timer_data) {
+    struct web_server_static_threaded_worker *worker = timer_data;
+    if(!worker || !worker->startup_waiters)
+        return;
+
     for(POLLINFO *pi = p->ll; pi; pi = pi->next) {
         if(!(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET))
             continue;
@@ -444,7 +472,12 @@ void socket_listen_main_static_threaded_worker(void *ptr) {
                 , NULL
                 , web_client_first_request_timeout
                 , web_client_timeout
-                , nd_profile.update_every * 1000 // timer_milliseconds
+                ,
+#ifdef OS_WINDOWS
+                  WEB_STARTUP_WAIT_CHECK_MS
+#else
+                  nd_profile.update_every * MSEC_PER_SEC
+#endif
                 , ptr // timer_data
                 , worker_private->max_sockets
     );

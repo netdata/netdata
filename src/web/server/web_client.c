@@ -4,6 +4,7 @@
 #include "web/websocket/websocket.h"
 #include "web/mcp/adapters/mcp-http.h"
 #include "web/mcp/adapters/mcp-sse.h"
+#include "web/server/static/static-threaded.h"
 
 // this is an async I/O implementation of the web server request parser
 // it is used by all netdata web servers
@@ -114,6 +115,10 @@ static inline char *strip_control_characters(char *url) {
 }
 
 static void web_client_reset_allocations(struct web_client *w, bool free_all) {
+    if(w->startup_wait_slot) {
+        web_server_startup_wait_release();
+        w->startup_wait_slot = false;
+    }
     w->startup_waiting = false;
 
 
@@ -1302,6 +1307,10 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 // Keep only its read-only bootstrap request pending until rrd_init() publishes localhost.
                 if(w->mode == HTTP_REQUEST_MODE_GET && http_can_access_dashboard(w) &&
                    !strcmp(decoded_url_path, "v3/info")) {
+                    if(!web_server_startup_wait_acquire())
+                        return web_client_service_unavailable(w);
+
+                    w->startup_wait_slot = true;
                     w->startup_waiting = true;
                     web_client_timeout_checkpoint_set(w, web_client_timeout * 1000);
                     return HTTP_RESP_OK;

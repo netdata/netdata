@@ -247,6 +247,7 @@ struct web_client {
     } timings;
 
     bool startup_waiting;
+    bool startup_wait_slot;
 
     struct {
         struct web_client *prev;

@@ -104,15 +104,6 @@ POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...) {
 }
 
 #if defined(OS_WINDOWS)
-// The shell ships inside the package. It is addressed as a package-relative
-// POSIX path so os_translate_msys_to_windows_path() anchors it to the detected
-// install prefix: CreateProcess() then receives an absolute path and never
-// falls back to the Windows search order (application directory, current
-// directory, System32, PATH) to resolve an unqualified name. netdata runs as
-// LocalSystem, so resolving a program by bare name would let anyone who can
-// write to a directory on the machine PATH choose what SYSTEM executes.
-#define NETDATA_WINDOWS_SHELL_PACKAGE_PATH "/usr/bin/sh.exe"
-
 // The only script plugin we can run on Windows: it is the one with an
 // interpreter we know how to locate.
 #define NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN "python.d.plugin"
@@ -127,31 +118,44 @@ static const char *windows_path_basename(const char *path) {
     return base;
 }
 
-// Absolute path of the bundled shell, or NULL when the package ships none.
-// Resolved once: the answer cannot change while the agent runs.
-static const char *windows_bundled_shell(void) {
-    static const char *shell_path = NULL;
-    static bool resolved = false;
-    static SPINLOCK shell_lock = SPINLOCK_INITIALIZER;
+static bool windows_path_is_explicit(const char *path) {
+    return path && *path &&
+           (path[0] == '/' ||
+            (isalpha((uint8_t)path[0]) && path[1] == ':' && (path[2] == '/' || path[2] == '\\')) ||
+            (path[0] == '\\' && path[1] == '\\'));
+}
 
-    spinlock_lock(&shell_lock);
-    if(!resolved) {
-        CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(NETDATA_WINDOWS_SHELL_PACKAGE_PATH);
+static bool windows_path_is_native_executable(const char *path) {
+    const char *extension = strrchr(path, '.');
+    return extension && (!strcasecmp(extension, ".exe") || !strcasecmp(extension, ".com"));
+}
 
-        if(translated && *translated && access(translated, R_OK) == 0)
-            shell_path = strdupz(translated);
-        else
-            // Warn once per agent lifetime: every shell script that follows is
-            // skipped, and repeating this per spawn would only add noise.
-            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                   "SPAWN: no shell found at '%s' - shell scripts (alarm-notify.sh and friends) will not run",
-                   (translated && *translated) ? translated : NETDATA_WINDOWS_SHELL_PACKAGE_PATH);
-
-        resolved = true;
+static POPEN_INSTANCE *windows_run_direct_command(const char *cmd) {
+    size_t len = strnlen(cmd, PATH_MAX);
+    if(len >= PATH_MAX) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN: command too long");
+        return NULL;
     }
-    spinlock_unlock(&shell_lock);
 
-    return shell_path;
+    char cmd_copy[len + 1];
+    memcpy(cmd_copy, cmd, len + 1);
+
+    char *words[100];
+    size_t num_words = quoted_strings_splitter_whitespace(cmd_copy, words, _countof(words));
+    char *program = get_word(words, num_words, 0);
+    if(!program || !windows_path_is_explicit(program) || !windows_path_is_native_executable(program)) {
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+               "SPAWN: skipping '%s' — Windows commands must name an explicit .exe or .com path",
+               cmd);
+        return NULL;
+    }
+
+    const char *argv[101];
+    for(size_t i = 0; i < num_words; i++)
+        argv[i] = get_word(words, num_words, i);
+    argv[num_words] = NULL;
+
+    return spawn_popen_run_argv(argv);
 }
 #endif
 
@@ -161,8 +165,8 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
 #if defined(OS_WINDOWS)
     // If the command starts with "exec ", strip it and exec the program
     // directly. Native plugins on Windows carry a .plugin.exe suffix; script
-    // plugins are handled by finding their interpreter. Everything else falls
-    // through to the bundled shell below.
+    // plugins are handled by finding their interpreter. Other commands are
+    // accepted below only as explicit native executable paths.
     if(strncmp(cmd, "exec ", 5) == 0) {
         // cmd is built by netdata internally (max ~16 KiB), but bound the
         // scan so a malformed input cannot request an unbounded VLA.
@@ -264,21 +268,16 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
 #endif
 
 #if defined(OS_WINDOWS)
-    const char *shell = windows_bundled_shell();
-    if(!shell) return NULL;
-#endif
-
-    const char *argv[] = {
-#if defined(OS_WINDOWS)
-        shell,
+    return windows_run_direct_command(strncmp(cmd, "exec ", 5) == 0 ? cmd + 5 : cmd);
 #else
+    const char *argv[] = {
         "/bin/sh",
-#endif
         "-c",
         cmd,
         NULL
     };
     return spawn_popen_run_argv(argv);
+#endif
 }
 
 static int spawn_popen_status_rc(int status) {
