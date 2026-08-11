@@ -935,6 +935,9 @@
 - Build(deps): bump GoTestTools/gotestfmt-action from 2.2.0 to 2.3.0 ([#23437](https://github.com/netdata/netdata/issues/23437))
 - Packaging: remove obsolete otel-signal-viewer artifacts on static upgrade ([#23440](https://github.com/netdata/netdata/issues/23440))
 - New OTel documentation. ([#23321](https://github.com/netdata/netdata/issues/23321))
+- Fix(go.d/prometheus): preserve typed counters ending in info ([#23441](https://github.com/netdata/netdata/issues/23441))
+- Fix(nd-run): stop clearing our own environment (fixes macOS SIGSEGV in setenv) ([#23423](https://github.com/netdata/netdata/issues/23423))
+- Improve node manifest delivery reliability and pacing ([#23438](https://github.com/netdata/netdata/issues/23438))
 
 ## [2.10.0] - 2026-04-09
 
