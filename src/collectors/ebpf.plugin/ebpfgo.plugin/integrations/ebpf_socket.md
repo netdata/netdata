@@ -1,5 +1,5 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/integrations/ebpf_socket.md"
 meta_yaml: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/metadata.yaml"
 sidebar_label: "eBPF Socket"
 learn_status: "Published"
@@ -75,7 +75,7 @@ Now follow steps:
 #### Options
 
 The `socket` option in section `[ebpf programs]` controls whether the module is loaded.
-Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object flavor`) belong in `ebpf.d/socket.conf`.
+Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object flavor`, `pid table size`, `socket monitoring table size`, `udp connection table size`) belong in `ebpf.d/socket.conf`.
 
 
 <details open><summary>Config options</summary>
@@ -87,8 +87,11 @@ Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object 
 | socket | Enable (`yes`) or disable (`no`) the socket monitoring module. | no | no |
 | update every | Data collection frequency in seconds. | 10 | no |
 | maps per core | When enabled (`yes`), the plugin allocates one BPF hash table per CPU core instead of a single shared table. Improves throughput on multi-core systems; ignored on kernels older than 4.15. | yes | no |
-| btf path | Path to the directory containing BTF files used for CO-RE (Compile Once, Run Everywhere) loading. | /sys/kernel/btf/ | no |
+| btf path | Path to the directory containing BTF files used for CO-RE (Compile Once, Run Everywhere) loading. | /sys/kernel/btf | no |
 | ebpf object flavor | Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel. | buffer | no |
+| pid table size | Maximum number of PIDs tracked in the per-PID SHM segment shared with `apps.plugin` and `cgroups.plugin`. Increase on hosts with more than 32768 concurrent monitored processes. | 32768 | no |
+| socket monitoring table size | Maximum number of connections tracked in the `tbl_nd_socket` BPF hash map (per-PID TCP/UDP bandwidth). Increase on hosts with many concurrent connections; each entry consumes kernel BPF map memory. | 16384 | no |
+| udp connection table size | Maximum number of UDP connections tracked in the `tbl_nv_udp` BPF hash map. Increase on hosts with high UDP connection rates. | 4096 | no |
 
 
 </details>
@@ -130,9 +133,13 @@ through the on-demand `network-protocols` function (FUNCTIONGLOBAL) consumed by 
 network-viewer. Per-cgroup and per-service socket activity is exported through the
 eBPFGo shared-memory path consumed by `cgroups.plugin`.
 
-> **Migration note** — Per-app charts published by prior versions of `ebpf.plugin` are not
-> republished. The following are permanently removed; use the `network-protocols` function in
-> network-viewer as a replacement.
+> **Migration note** — Per-host and per-app charts published by prior versions of `ebpf.plugin`
+> are not republished. The following are permanently removed; use the `network-protocols` function
+> in network-viewer as a replacement.
+>
+> Removed per-host charts: `ip.inbound_conn`, `ip.tcp_outbound_conn`, `ip.tcp_functions`,
+> `ip.total_tcp_bandwidth`, `ip.tcp_error`, `ip.tcp_retransmit`, `ip.udp_functions`,
+> `ip.total_udp_bandwidth`, `ip.udp_error`.
 >
 > Removed per-app charts: `app.ebpf_call_tcp_v4_connection`, `app.ebpf_call_tcp_v6_connection`,
 > `app.ebpf_sock_total_bandwidth`, `app.ebpf_call_tcp_sendmsg`, `app.ebpf_call_tcp_cleanup_rbuf`,
