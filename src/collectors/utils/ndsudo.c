@@ -10,6 +10,11 @@
 #define ERROR_BUFFER_SIZE 1024
 #define FAIL2BAN_SOCKET_PATH_IN_DOCKER "/host/var/run/fail2ban/fail2ban.sock"
 #define NDSUDO_MACOS_POWERMETRICS_PATH "/usr/bin/powermetrics"
+#ifdef __APPLE__
+// IORegistryEntryGetPath() writes into io_string_t[512], including the terminator.
+#define NDSUDO_MACOS_IOKIT_PATH_MAX 511
+#define NDSUDO_MACOS_IOKIT_PATH_PREFIX "IOService:/"
+#endif
 
 struct command {
     const char *name;
@@ -370,7 +375,7 @@ struct command *find_command(const char *cmd) {
     return NULL;
 }
 
-bool check_string(const char *str, size_t index, char *err, size_t err_size) {
+static bool check_string_with_extra_chars(const char *str, size_t index, const char *extra_chars, char *err, size_t err_size) {
     const char *s = str;
     while(*s) {
         char c = *s++;
@@ -378,7 +383,8 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
              (c >= 'a' && c <= 'z') ||
              (c >= '0' && c <= '9') ||
               c == ' ' || c == '_' || c == '-' || c == '/' || 
-              c == '.' || c == ',' || c == ':' || c == '=')) {
+              c == '.' || c == ',' || c == ':' || c == '=' ||
+              (extra_chars && strchr(extra_chars, c)))) {
             snprintf(err, err_size, "command line argument No %zu includes invalid character '%c'", index, c);
             return false;
         }
@@ -387,10 +393,58 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
     return true;
 }
 
-bool check_params(int argc, char **argv, char *err, size_t err_size) {
-    for(int i = 0 ; i < argc ;i++)
+bool check_string(const char *str, size_t index, char *err, size_t err_size) {
+    return check_string_with_extra_chars(str, index, NULL, err, err_size);
+}
+
+#ifdef __APPLE__
+static bool check_macos_iokit_device_path(const char *str, size_t index, char *err, size_t err_size) {
+    size_t len = strnlen(str, NDSUDO_MACOS_IOKIT_PATH_MAX + 1);
+    if (len > NDSUDO_MACOS_IOKIT_PATH_MAX) {
+        snprintf(err, err_size, "command line argument No %zu exceeds the maximum IOKit path length", index);
+        return false;
+    }
+
+    if (strncmp(str, NDSUDO_MACOS_IOKIT_PATH_PREFIX, sizeof(NDSUDO_MACOS_IOKIT_PATH_PREFIX) - 1) != 0) {
+        snprintf(err, err_size, "command line argument No %zu is not an IOService path", index);
+        return false;
+    }
+
+    return check_string_with_extra_chars(str, index, "@()", err, err_size);
+}
+#endif
+
+bool check_params(const char *cmd, int argc, char **argv, char *err, size_t err_size) {
+#ifdef __APPLE__
+    int macos_iokit_device_path_index = -1;
+    if (strcmp(cmd, "smartctl-json-device-info") == 0) {
+        for (int i = 1; i < argc - 1; i++) {
+            if (strcmp(argv[i], "--deviceName") == 0) {
+                macos_iokit_device_path_index = i + 1;
+                break;
+            }
+        }
+    }
+#else
+    (void)cmd;
+#endif
+
+    for(int i = 0 ; i < argc ;i++) {
+#ifdef __APPLE__
+        if (i == macos_iokit_device_path_index) {
+            if (strncmp(argv[i], NDSUDO_MACOS_IOKIT_PATH_PREFIX, sizeof(NDSUDO_MACOS_IOKIT_PATH_PREFIX) - 1) != 0) {
+                if (!check_string(argv[i], i, err, err_size))
+                    return false;
+                continue;
+            }
+            if (!check_macos_iokit_device_path(argv[i], i, err, err_size))
+                return false;
+            continue;
+        }
+#endif
         if(!check_string(argv[i], i, err, err_size))
             return false;
+    }
 
     return true;
 }
@@ -563,7 +617,10 @@ void show_help() {
     fprintf(stdout, "Variables given as {{variable}} are expected on the command line as:\n");
     fprintf(stdout, "  --variable VALUE\n");
     fprintf(stdout, "\n");
-    fprintf(stdout, "VALUE can include space, A-Z, a-z, 0-9, _, -, /, and .\n");
+    fprintf(stdout, "VALUE can include letters, digits, spaces, underscores, hyphens, slashes, periods, commas, colons, and equals signs.\n");
+#ifdef __APPLE__
+    fprintf(stdout, "For smartctl-json-device-info, --deviceName also accepts @, (, and ) in IOService:/ paths up to 511 bytes.\n");
+#endif
     fprintf(stdout, "\n");
 }
 
@@ -575,20 +632,25 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if(!check_params(argc, argv, error_buffer, sizeof(error_buffer))) {
+    bool test = false;
+    const char *cmd = argv[1];
+    if(strcmp(cmd, "--test") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "a command is required after --test.\n");
+            return 1;
+        }
+        cmd = argv[2];
+        test = true;
+    }
+
+    if(!check_params(cmd, argc, argv, error_buffer, sizeof(error_buffer))) {
         fprintf(stderr, "invalid characters in parameters: %s\n", error_buffer);
         return 2;
     }
 
-    bool test = false;
-    const char *cmd = argv[1];
-    if(strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+    if(!test && (strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0)) {
         show_help();
         exit(0);
-    }
-    else if(strcmp(cmd, "--test") == 0) {
-        cmd = argv[2];
-        test = true;
     }
 
     struct command *command = find_command(cmd);
