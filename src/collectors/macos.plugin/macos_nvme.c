@@ -367,8 +367,11 @@ static void macos_nvme_prune_missing_devices(void)
 
 static unsigned macos_nvme_discover_devices(void)
 {
-    for (struct macos_nvme_device *d = nvme_devices_root; d; d = d->next)
+    unsigned tracked = 0;
+    for (struct macos_nvme_device *d = nvme_devices_root; d; d = d->next) {
         d->seen = false;
+        tracked++;
+    }
 
     io_iterator_t iter = IO_OBJECT_NULL;
     IOReturn kr = IORegistryCreateIterator(kIOMainPortDefault, kIOServicePlane, kIORegistryIterateRecursively, &iter);
@@ -394,6 +397,12 @@ static unsigned macos_nvme_discover_devices(void)
             continue;
         }
 
+        struct macos_nvme_device *d = macos_nvme_find_device(registry_id);
+        if (!d && tracked >= MACOS_NVME_MAX_DEVICES) {
+            IOObjectRelease(entry);
+            continue;
+        }
+
         struct macos_nvme_metrics probe = {0};
         char model[MACOS_NVME_MODEL_MAX + 1] = "";
         if (!macos_nvme_read_device(entry, &probe, model, sizeof(model))) {
@@ -407,16 +416,13 @@ static unsigned macos_nvme_discover_devices(void)
             continue;
         }
 
-        struct macos_nvme_device *d = macos_nvme_find_device(registry_id);
         if (d) {
             if (d->service)
                 IOObjectRelease(d->service);
             d->service = entry;
-        } else if (found < MACOS_NVME_MAX_DEVICES) {
-            d = macos_nvme_add_device(registry_id, entry);
         } else {
-            IOObjectRelease(entry);
-            continue;
+            d = macos_nvme_add_device(registry_id, entry);
+            tracked++;
         }
 
         d->seen = true;
