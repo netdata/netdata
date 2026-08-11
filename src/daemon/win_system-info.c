@@ -212,7 +212,7 @@ static DWORD netdata_windows_get_current_build()
     return version;
 }
 
-void netdata_windows_format_os_version(char *out, size_t length, const char *product_name)
+void netdata_windows_format_os_version(char *out, size_t length, const char *product_name, DWORD build, bool is_server)
 {
     if (!length)
         return;
@@ -222,8 +222,20 @@ void netdata_windows_format_os_version(char *out, size_t length, const char *pro
         return;
     }
 
-    const char *prefix = strncasecmp(product_name, "Microsoft ", strlen("Microsoft ")) ? "Microsoft " : "";
-    (void)snprintf(out, length, "%s%s", prefix, product_name);
+    const char *name = product_name;
+    if (!strncasecmp(name, "Microsoft ", strlen("Microsoft ")))
+        name += strlen("Microsoft ");
+
+    size_t windows_version_length = strlen("Windows 10");
+    if (!is_server && build >= 10240 &&
+        (!strncasecmp(name, "Windows 10", windows_version_length) ||
+         !strncasecmp(name, "Windows 11", windows_version_length)) &&
+        (name[windows_version_length] == '\0' || name[windows_version_length] == ' ')) {
+        (void)snprintf(out, length, "Microsoft Windows %s%s", build >= 22000 ? "11" : "10", name + windows_version_length);
+        return;
+    }
+
+    (void)snprintf(out, length, "Microsoft %s", name);
 }
 
 static void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
@@ -234,7 +246,7 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
                                     HKEY_LOCAL_MACHINE,
                                     "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
                                     "ProductName")) {
-        netdata_windows_format_os_version(os, length, product_name);
+        netdata_windows_format_os_version(os, length, product_name, build, IsWindowsServer());
         return;
     }
 

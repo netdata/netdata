@@ -2504,19 +2504,25 @@ int test_sqlite(void) {
 int unit_test_windows_os_version(void) {
     static const struct {
         const char *product_name;
+        DWORD build;
+        bool is_server;
         const char *expected;
     } cases[] = {
-        {"Windows Server 2019 Standard", "Microsoft Windows Server 2019 Standard"},
-        {"Windows 11 Pro", "Microsoft Windows 11 Pro"},
-        {"Microsoft Windows Server 2022 Datacenter", "Microsoft Windows Server 2022 Datacenter"},
-        {"", "Microsoft Windows"},
-        {NULL, "Microsoft Windows"},
+        {"Windows Server 2019 Standard", 17763, true, "Microsoft Windows Server 2019 Standard"},
+        {"Windows 10 Home", 26200, false, "Microsoft Windows 11 Home"},
+        {"Windows 10 Home", 19045, false, "Microsoft Windows 10 Home"},
+        {"Windows 11 Pro", 26200, false, "Microsoft Windows 11 Pro"},
+        {"Microsoft Windows Server 2022 Datacenter", 20348, true, "Microsoft Windows Server 2022 Datacenter"},
+        {"Microsoft Windows 11 Home", 19045, false, "Microsoft Windows 10 Home"},
+        {"", 26200, false, "Microsoft Windows"},
+        {NULL, 26200, false, "Microsoft Windows"},
     };
 
     int failures = 0;
     for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
         char os_version[256];
-        netdata_windows_format_os_version(os_version, sizeof(os_version), cases[i].product_name);
+        netdata_windows_format_os_version(
+            os_version, sizeof(os_version), cases[i].product_name, cases[i].build, cases[i].is_server);
         if(strcmp(os_version, cases[i].expected) != 0) {
             fprintf(stderr,
                     "unit_test_windows_os_version: case '%s' expected '%s' got '%s'\n",
