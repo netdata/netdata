@@ -21,37 +21,32 @@ Module: otel
 
 ## Overview
 
-This plugin enables the Netdata Agent to receive OpenTelemetry metrics and logs
-via the OTLP/gRPC protocol from any compatible source — collectors, SDKs, or
-instrumented applications.
+Receive OpenTelemetry metrics and logs over OTLP/gRPC from Collectors, SDKs, and instrumented applications. The plugin converts supported metrics into Netdata charts and indexes logs for exploration in the Logs tab.
 
-Metrics are automatically visualized as Netdata charts with full alerting support.
-OpenTelemetry logs received on the same endpoint are covered by the separate
-"OpenTelemetry Logs" integration.
+The plugin accepts gauges, sums, explicit-bucket histograms, and summaries. It does not currently ingest exponential histograms. Monotonic cumulative and delta sums are rate-normalized; non-monotonic cumulative sums behave as gauges.
+
+For a maintained Collector configuration and end-to-end verification steps, see [Ingest OpenTelemetry Metrics and Logs](https://github.com/netdata/netdata/blob/master/docs/opentelemetry/otlp-ingestion.md). The separate [OpenTelemetry Logs integration](https://github.com/netdata/netdata/blob/master/integrations/logs/integrations/opentelemetry_logs.md) explains how received logs appear in Netdata.
 
 
-The plugin listens on a configurable gRPC endpoint for incoming OTLP data.
+The plugin starts automatically and listens on a configurable OTLP/gRPC endpoint. OTLP/HTTP is not supported, so senders must use the gRPC exporter and port `4317`, not the HTTP exporter and port `4318`.
 
-Incoming metrics are mapped to Netdata charts using YAML mapping rules placed in the
-chart configs directory (default `/etc/netdata/otel.d/v1/metrics/`). Each file can
-contain entries that match metrics by instrumentation scope and metric name, and control
-how data point attributes translate to chart instances and dimensions. Per-metric
-overrides for the collection interval and grace period are also supported. Without a
-matching rule, the plugin creates charts using default settings. Charts with no incoming
-data are automatically expired and removed.
+Each metric name becomes a Netdata chart context prefixed with `otel.`. YAML mapping rules can match a metric name and instrumentation scope, select a data point attribute for dimension names, and override chart timing. User mapping files take priority over the stock hostmetrics mappings compiled into the plugin. Metrics without a matching mapping still create charts using default settings.
 
-| Mapping file option | Description |
-|:--------------------|:------------|
-| `instrumentation_scope.name` | Regex to match the instrumentation scope name |
-| `instrumentation_scope.version` | Regex to match the instrumentation scope version |
-| `dimension_attribute_key` | Data point attribute whose value becomes the dimension name |
-| `interval_secs` | Per-metric collection interval override (1–3600 seconds) |
-| `grace_period_secs` | Per-metric grace period override |
+| Mapping file option             | Description                                                   |
+| :------------------------------ | :------------------------------------------------------------ |
+| `instrumentation_scope.name`    | Regular expression matching the instrumentation scope name    |
+| `instrumentation_scope.version` | Regular expression matching the instrumentation scope version |
+| `dimension_attribute_key`       | Data point attribute whose value becomes the dimension name   |
+| `interval_secs`                 | Per-metric chart update interval override                     |
+| `grace_period_secs`             | Per-metric gap-filling grace period override                  |
+
+Invalid user mapping files are logged and skipped without disabling the stock mappings. Charts expire after their configured inactivity period.
 
 
 This collector is only supported on the following platforms:
 
 - Linux
+- macOS
 
 This collector only supports collecting metrics from a single instance of this integration.
 
@@ -60,26 +55,32 @@ This collector only supports collecting metrics from a single instance of this i
 
 #### Auto-Detection
 
-The plugin starts automatically and listens on `127.0.0.1:4317` for incoming OTLP/gRPC connections.
+The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections.
 
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. Log retention is configured per tenant and is bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
+
 
 #### Performance Impact
 
-The default configuration for this integration is not expected to impose a significant performance impact on the system.
+Resource use depends on the number and cardinality of received metrics, log volume, retention, and query activity. Keep unbounded attributes out of metric identities and dimension names.
+
 
 ## Setup
 
 
 ### Prerequisites
 
-#### OpenTelemetry data source
+#### A Netdata installation that includes the OpenTelemetry plugin
 
-An OpenTelemetry Collector, SDK, or instrumented application configured to send OTLP data
-to the Netdata agent's gRPC endpoint.
+Official Linux packages, static builds, containers, and supported macOS packages include the plugin. Linux source installs using `netdata-installer.sh` require a compatible Rust toolchain and `--enable-plugin-otel`; on macOS, the installer enables the plugin automatically when it finds a compatible Rust toolchain.
+
+
+#### An OTLP/gRPC data source
+
+Configure an OpenTelemetry Collector, SDK, or instrumented application to export metrics or logs to the Agent endpoint. Use the gRPC exporter. The default loopback endpoint accepts only senders on the same host.
 
 
 
@@ -87,13 +88,13 @@ to the Netdata agent's gRPC endpoint.
 
 #### Options
 
-The plugin is configured via `otel.yaml` in the Netdata configuration directory.
-Only the fields you want to change need to be specified.
+Edit `otel.yaml` with [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files). A user file can contain only the fields that differ from the stock configuration. Configuration resolves in this order: stock file, user file, then environment variables. Restart the Netdata Agent after changing `otel.yaml` or any `NETDATA_OTEL_CFG_*` environment variable.
 
-Any option can also be overridden via environment variables with the `NETDATA_OTEL_`
-prefix (highest priority). The variable name is the config option in all caps with
-dots replaced by underscores — e.g. `endpoint.tls_cert_path` becomes
-`NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH`.
+The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
+
+Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the default log policies, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`. Named per-tenant policy overrides are YAML-only.
+
+Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
 
 
 <details open><summary>Config options</summary>
@@ -102,51 +103,84 @@ dots replaced by underscores — e.g. `endpoint.tls_cert_path` becomes
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| endpoint.path | gRPC endpoint to listen on for incoming OTLP data. | 127.0.0.1:4317 | no |
-| endpoint.tls_cert_path | Path to TLS certificate file. Enables TLS when provided. |  | no |
-| endpoint.tls_key_path | Path to TLS private key file. Required when TLS certificate is provided. |  | no |
-| endpoint.tls_ca_cert_path | Path to TLS CA certificate file for client authentication. |  | no |
-| [metrics.chart_configs_dir](#option-metrics-chart-configs-dir) | Directory containing metric mapping YAML files. | /etc/netdata/otel.d/v1/metrics/ | no |
-| metrics.interval_secs | Collection interval in seconds (1–3600). Defines the Netdata chart update frequency. | 10 | no |
-| metrics.grace_period_secs | Grace period in seconds. After the last data point, the plugin waits this long before gap-filling. | 60 | no |
-| metrics.expiry_duration_secs | Expiry duration in seconds. Charts with no data for this long are removed. | 900 | no |
-| [metrics.max_new_charts_per_request](#option-metrics-max-new-charts-per-request) | Maximum new charts created per gRPC request. | 100 | no |
-| [base_dir](#option-base-dir) | Directory where OpenTelemetry logs and traces are stored on disk. | /var/log/netdata/otel/v2 | no |
-| logs.rotation.default.max_file_size | File size that triggers log rotation. A new file is started when the current one reaches this size. | 25MB | no |
-| logs.rotation.default.max_entries | Number of log entries that triggers log rotation. A new file is started when the current one reaches this count. | 50000 | no |
-| logs.retention.default.max_files | Maximum number of rotated log files kept on local disk. The oldest files are deleted when exceeded. | 100000 | no |
-| [logs.retention.default.max_total_size](#option-logs-retention-default-max-total-size) | Maximum total disk space used by log files on local disk. The oldest files are deleted when exceeded. | 1GB | no |
-| logs.retention.default.max_age | Maximum age of log files before they are deleted from local disk. | 7 days | no |
+| [endpoint.path](#option-endpoint-path) | OTLP/gRPC endpoint on which the Agent listens. | 127.0.0.1:4317 | no |
+| endpoint.tls_cert_path | Path to the server TLS certificate. Set it together with `endpoint.tls_key_path`. |  | no |
+| endpoint.tls_key_path | Path to the server TLS private key. Set it together with `endpoint.tls_cert_path`. |  | no |
+| [endpoint.tls_ca_cert_path](#option-endpoint-tls-ca-cert-path) | Path to a CA certificate used to verify client certificates. |  | no |
+| [metrics.chart_configs_dir](#option-metrics-chart-configs-dir) | Directory containing user metric mapping YAML files. | /etc/netdata/otel.d/v1/metrics | no |
+| [metrics.interval_secs](#option-metrics-interval-secs) | Default Netdata chart update interval in seconds. | 10 | no |
+| metrics.grace_period_secs | Time after the last data point before the plugin begins filling chart gaps. | 60 | no |
+| metrics.expiry_duration_secs | Time without data after which a chart is removed. | 900 | no |
+| [metrics.max_new_charts_per_request](#option-metrics-max-new-charts-per-request) | Maximum number of new charts one OTLP export request can create. | 100 | no |
+| [base_dir](#option-base-dir) | Absolute root directory for locally stored OpenTelemetry log data. | /var/log/netdata/otel/v2 | no |
+| [remote_storage.enabled](#option-remote-storage-enabled) | Upload retained OpenTelemetry log data to configured remote object storage. | no | no |
+| [remote_storage.uri](#option-remote-storage-uri) | Remote storage URI. Supported schemes are `fs` and `s3`. | fs:///var/log/netdata/otel/v2/remote | no |
+| remote_storage.read_cache_max_size | Maximum local cache size for data fetched back from remote storage during queries. | 1GB | no |
+| [auth.enabled](#option-auth-enabled) | Require the `X-Scope-OrgID` gRPC header to select a log tenant. | no | no |
+| logs.rotation.default.max_file_size | Write-ahead log file size that triggers rotation for tenants without an override. | 25MB | no |
+| logs.rotation.default.max_entries | Write-ahead log entry count that triggers rotation for tenants without an override. | 50000 | no |
+| logs.retention.default.max_files | Maximum retained indexed-file count for each tenant without an override. | 100000 | no |
+| [logs.retention.default.max_total_size](#option-logs-retention-default-max-total-size) | Maximum retained indexed-data size for each tenant without an override. | 1GB | no |
+| logs.retention.default.max_age | Maximum retained indexed-file age for each tenant without an override. | 7 days | no |
+
+<a id="option-endpoint-path"></a>
+##### endpoint.path
+
+The default IPv4 loopback address accepts only local senders. To accept remote senders, bind a non-loopback address and protect the endpoint with TLS or mutual TLS and network access controls.
+
+
+<a id="option-endpoint-tls-ca-cert-path"></a>
+##### endpoint.tls_ca_cert_path
+
+Setting a CA certificate enables mutual TLS and therefore also requires the server certificate and key. Clients must present a certificate signed by this CA.
+
 
 <a id="option-metrics-chart-configs-dir"></a>
 ##### metrics.chart_configs_dir
 
-Each file defines how OTLP metrics are mapped to Netdata charts.
-Files can match metrics by instrumentation scope and name, set the
-dimension attribute key, and override timing parameters. The plugin
-ships stock mappings; user files in this directory take priority.
+User mappings take priority over the stock mappings compiled into the plugin. Files are processed in filename order. An invalid file is logged and skipped.
+
+
+<a id="option-metrics-interval-secs"></a>
+##### metrics.interval_secs
+
+Timing must satisfy `0 < interval <= 3600`, `interval < grace`, and `grace <= expiry`. Because the stock configuration explicitly sets all three values, set compatible values together when changing the global timing. An invalid resolved timing configuration logs a warning and falls back to the plugin's hardcoded chart defaults.
 
 
 <a id="option-metrics-max-new-charts-per-request"></a>
 ##### metrics.max_new_charts_per_request
 
-Limits cardinality explosion from high-cardinality label combinations.
+This limits a single request's cardinality burst. It does not cap the total number of charts that successive requests can create.
 
 
 <a id="option-base-dir"></a>
 ##### base_dir
 
-Must be an absolute path. The default lives under the Netdata log
-directory and is shared by both logs and traces.
+Retention limits govern retained indexed files. Write-ahead logs, catalogs, and remote-read cache can make total usage below this directory exceed `logs.retention.*.max_total_size`.
+
+
+<a id="option-remote-storage-enabled"></a>
+##### remote_storage.enabled
+
+Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it through the bounded remote-read cache.
+
+
+<a id="option-remote-storage-uri"></a>
+##### remote_storage.uri
+
+Put non-secret backend options in the query string. Never put credentials in this file or URI. For S3, use the standard AWS environment, credentials file, or instance-role mechanisms available to the Netdata service account.
+
+
+<a id="option-auth-enabled"></a>
+##### auth.enabled
+
+This is tenant selection, not credential authentication. When disabled, logs use the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
 
 
 <a id="option-logs-retention-default-max-total-size"></a>
 ##### logs.retention.default.max_total_size
 
-Local retention is bounded by whichever limit is reached first:
-total size, file count, or age. With the defaults, logs occupy at
-most 1 GB on the VM and are kept up to 7 days, regardless of
-incoming volume.
+This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
 
 
 
@@ -169,84 +203,61 @@ sudo ./edit-config otel.yaml
 
 ##### Examples
 
-###### Basic configuration
+###### Accept remote senders with mutual TLS
 
-Listen on default endpoint with default settings.
+Bind beyond loopback only when the endpoint is protected. This example requires each sender to present a certificate signed by the configured CA.
+
 
 ```yaml
 endpoint:
-  path: "127.0.0.1:4317"
-metrics:
-  chart_configs_dir: /etc/netdata/otel.d/v1/metrics/
-  interval_secs: 10
-  grace_period_secs: 60
-  expiry_duration_secs: 900
-  max_new_charts_per_request: 100
+  path: "0.0.0.0:4317"
+  tls_cert_path: /etc/netdata/ssl/server-cert.pem
+  tls_key_path: /etc/netdata/ssl/server-key.pem
+  tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
 
 ```
-###### Partial user override
+###### Configure log retention for one tenant
 
-Override only specific fields in the user config. All other settings
-are inherited from the stock config. Unknown fields are ignored for
-forward compatibility.
+Per-tenant entries inherit omitted fields from `default`. The key must match the sender's `X-Scope-OrgID` value when tenant selection is enabled.
 
 
 <details open><summary>Config</summary>
 
 ```yaml
-endpoint:
-  path: "0.0.0.0:4317"
+auth:
+  enabled: true
+logs:
+  rotation:
+    production:
+      max_file_size: "100MB"
+  retention:
+    production:
+      max_total_size: "10GB"
+      max_age: "30 days"
 
 ```
 </details>
 
 ###### Metric mapping file
 
-Place YAML files like this in `/etc/netdata/otel.d/v1/metrics/` to control how
-OTLP metrics are mapped to Netdata charts. This example maps metrics from the
-OpenTelemetry Collector hostmetrics receiver.
+Without a mapping, all data point attributes contribute to chart identity and the dimension is named `value`. A mapping selects one string attribute as the dimension name and removes it from chart identity, grouping data points that differ only by that attribute into one multi-dimension chart. Place user mapping files in `metrics.chart_configs_dir`; omit `instrumentation_scope` when the metric name alone is unambiguous.
 
 
 <details open><summary>Config</summary>
 
 ```yaml
 metrics:
-  "system.network.connections":
-    - instrumentation_scope:
-        name: .*hostmetricsreceiver.*networkscraper$
-      dimension_attribute_key: state
-
-  "system.cpu.utilization":
+  "system.cpu.time":
     - instrumentation_scope:
         name: .*hostmetricsreceiver.*cpuscraper$
       dimension_attribute_key: state
-
-  "system.memory.usage":
-    - instrumentation_scope:
-        name: .*hostmetricsreceiver.*memoryscraper$
-      dimension_attribute_key: state
       interval_secs: 5
-
-```
-</details>
-
-###### TLS-enabled configuration
-
-Listen with TLS enabled for secure connections.
-
-<details open><summary>Config</summary>
-
-```yaml
-endpoint:
-  path: "0.0.0.0:4317"
-  tls_cert_path: /etc/netdata/ssl/cert.pem
-  tls_key_path: /etc/netdata/ssl/key.pem
-metrics:
-  chart_configs_dir: /etc/netdata/otel.d/v1/metrics/
-  interval_secs: 10
-  grace_period_secs: 60
-  expiry_duration_secs: 900
-  max_new_charts_per_request: 100
+  "system.network.io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+  "redis.cpu.time":
+    - dimension_attribute_key: state
 
 ```
 </details>
@@ -261,5 +272,32 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
-Metrics are dynamically created based on the OpenTelemetry data received.
-The specific metrics depend on the OTLP sources sending data to the plugin.
+Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
+
+
+
+## Troubleshooting
+
+### The plugin does not start
+
+Check the Agent journal for `otel-plugin` configuration errors. User YAML and `NETDATA_OTEL_CFG_*` variables are validated strictly, so a typo or an option from the former experimental schema stops startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
+
+
+### The endpoint is reachable but no data appears
+
+A successful TCP connection proves only that something is listening. Confirm that the sender uses OTLP/gRPC on port `4317`; OTLP/HTTP on port `4318` is unsupported. With the default endpoint, use `127.0.0.1` explicitly if `localhost` resolves to IPv6. Then send a real OTLP record and verify the resulting chart or log entry.
+
+
+### A metric does not create the expected chart
+
+Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
+
+
+### Some exported logs are missing
+
+By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. It reports rejected records through OTLP `partial_success`; whether this is visible depends on the sender or exporter. Check the sender's clock, backfill age, sender logs, and Netdata Agent journal.
+
+
+### Logs from the former experimental plugin are not visible
+
+A former-schema `otel.yaml` stops the current plugin and prints a migration guide. Replace it with a partial configuration based on the current stock file. The legacy `logs.journal_dir` key is accepted only to locate the former plugin's read-only journals; it is not part of the current storage layout.

@@ -96,7 +96,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | max_time_series_per_metric | Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped. | 200 | no |
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Job-level fallback type overrides for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Job-owned Prometheus-compatible metric relabeling, applied before profile selection. |  | no |
-|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, normalization, and scoped fallback-chart policy; disable profiles with mode `none`. | auto | no |
+|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`. | auto | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -219,6 +219,8 @@ other block are ignored. Metrics not covered by an authored profile chart keep t
 charts unless an applicable profile `autogen.selector` rejects them. Every selector is limited to its
 profile's `match` scope; when scopes overlap, every applicable selector must accept the series. This
 changes fallback charts only; use `selector` or a relabeling `drop` rule to discard samples.
+Stock profiles leave unknown future families eligible for generic fallback; closed fallback selectors are a
+user-owned deployment policy, not a stock-profile authoring pattern.
 
 ```yaml
 profiles:

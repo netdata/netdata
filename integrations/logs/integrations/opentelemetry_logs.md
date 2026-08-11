@@ -18,8 +18,9 @@ endmeta-->
 
 The OpenTelemetry plugin by Netdata makes viewing, exploring and analyzing OpenTelemetry logs simple and efficient.
 
-It receives OTLP-formatted log data and indexes it for fast querying. The logs are explored from the "Logs"
-tab of the Netdata UI, using the same powerful exploration interface used for systemd journal logs.
+It receives OTLP-formatted log data and indexes it for fast querying. The logs are explored from the "Logs" tab of the Netdata UI, using the same powerful exploration interface used for systemd journal logs.
+
+Follow [Ingest OpenTelemetry Metrics and Logs](https://github.com/netdata/netdata/blob/master/docs/opentelemetry/otlp-ingestion.md) for a maintained Collector configuration and end-to-end verification steps.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -38,13 +39,14 @@ You can start exploring OpenTelemetry logs on the "Logs" tab of the Netdata UI.
 - Uses **fast indexed lookups** with pre-built indexes for performance.
 - Supports **faceted search** across log fields (severity, hostname, service, etc.).
 - In PLAY mode shows new log entries immediately after they are received.
+- Uses `service.namespace` and `service.name` resource attributes to identify log streams.
 
 ## Setup
 
 ### Prerequisites
 
 - A Netdata Cloud account (the `otel-logs` view is access-gated and requires a Netdata Cloud sign-in).
-- The `otel.plugin` enabled, with its OTLP/gRPC endpoint configured in `otel.yaml` (see the plugin's README).
+- The `otel.plugin` enabled, with its OTLP/gRPC endpoint configured in `otel.yaml` (see the [plugin reference](https://github.com/netdata/netdata/blob/master/src/crates/otel-plugin/README.md)).
 - An OpenTelemetry exporter (an OTel Collector or an SDK) pointed at that endpoint to send OTLP logs.
 
 

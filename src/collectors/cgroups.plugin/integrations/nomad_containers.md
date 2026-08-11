@@ -147,6 +147,14 @@ Metrics:
 | cgroup.cachestat_dirties | Number of dirty pages | dirty | page/s |
 | cgroup.cachestat_hits | Number of accessed files | hit | hits/s |
 | cgroup.cachestat_misses | Files out of page cache | miss | misses/s |
+| cgroup.net_conn_ipv4 | TCP v4 outbound connections | connections | connections/s |
+| cgroup.net_conn_ipv6 | TCP v6 outbound connections | connections | connections/s |
+| cgroup.net_total_bandwidth | Bandwidth | received, sent | kilobits/s |
+| cgroup.net_tcp_recv | TCP calls to clean up buffer | calls | calls/s |
+| cgroup.net_tcp_send | TCP calls to send | calls | calls/s |
+| cgroup.net_retransmit | TCP retransmits | calls | calls/s |
+| cgroup.net_udp_send | UDP calls to send | calls | calls/s |
+| cgroup.net_udp_recv | UDP calls to receive | calls | calls/s |
 
 
 ### Per cgroup network device

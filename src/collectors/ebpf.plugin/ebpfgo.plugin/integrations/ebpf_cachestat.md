@@ -1,5 +1,5 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/integrations/ebpf_cachestat.md"
 meta_yaml: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/metadata.yaml"
 sidebar_label: "eBPF Cachestat"
 learn_status: "Published"
@@ -35,8 +35,8 @@ The plugin needs setuid because it loads data inside kernel. Netdata sets necess
 
 eBPF Cachestat can be monitored further using the following other integrations:
 
-- Applications
-- Containers
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [Containers](/src/collectors/cgroups.plugin/integrations/containers.md)
 
 ### Default Behavior
 
@@ -97,6 +97,8 @@ All options are defined inside section `[global]`.
 | ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
 | ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
 | maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | no |
+| btf path | Override the default BTF source directory. The collector checks this path for a vmlinux BTF file used by CO-RE loading. | /sys/kernel/btf | no |
+| collect pid | Controls which PIDs are stored in the BPF hash tables. `real parent` stores only the real parent PID (lowest overhead); `parent` stores the immediate parent PID; `all` stores every PID used by the process (highest overhead). | real parent | no |
 | lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
 
 
