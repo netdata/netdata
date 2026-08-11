@@ -52,11 +52,21 @@ check_go_version() {
 userland_machine() {
   ULM_KERNEL_MACHINE="$(uname -m)"
 
+  # Speak one vocabulary from here on: the Linux archive table below is keyed by
+  # the kernel spellings, so fold the Debian/BSD aliases into them first. A Linux
+  # kernel reports x86_64/aarch64 (i686/armv7l/armv8l for a 32-bit personality),
+  # never these aliases, but folding them once keeps every branch below - the
+  # word-size gate, the 32-bit map, and the messages - consistent.
+  case "${ULM_KERNEL_MACHINE}" in
+    amd64) ULM_KERNEL_MACHINE=x86_64 ;;
+    arm64) ULM_KERNEL_MACHINE=aarch64 ;;
+  esac
+
   # Only 64-bit kernel types that install_go_toolchain can resolve to an archive
   # need the userland check: every other machine type either cannot host a
   # narrower userland, or has no Go archive at all and already fails cleanly.
   case "${ULM_KERNEL_MACHINE}" in
-    x86_64|amd64|aarch64|arm64|ppc64le|riscv64|s390x) ;;
+    x86_64|aarch64|ppc64le|riscv64|s390x) ;;
     *)
       printf '%s\n' "${ULM_KERNEL_MACHINE}"
       return 0
@@ -86,8 +96,8 @@ userland_machine() {
       # s390x or riscv64 userlands) gets a marker that makes the caller fail
       # cleanly, instead of installing a 64-bit toolchain that cannot run here.
       case "${ULM_KERNEL_MACHINE}" in
-        x86_64|amd64) printf '%s\n' i686 ;;
-        aarch64|arm64) printf '%s\n' armv7l ;;
+        x86_64) printf '%s\n' i686 ;;
+        aarch64) printf '%s\n' armv7l ;;
         *) printf '%s\n' "32-bit userland on ${ULM_KERNEL_MACHINE}" ;;
       esac
       ;;
