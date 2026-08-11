@@ -624,16 +624,16 @@ static const char *netdata_windows_detect_via_registry(void) {
     return NULL;
 }
 
-static const char *netdata_windows_detect_virt(void) {
-    const char *wmi = netdata_windows_detect_via_wmi();
+static const char *netdata_windows_detect_virt(bool with_wmi) {
+    const char *wmi = with_wmi ? netdata_windows_detect_via_wmi() : NULL;
     const char *smbios = netdata_windows_detect_via_smbios();
     const char *registry = netdata_windows_detect_via_registry();
 
     return netdata_windows_resolve_virt_detection(wmi, smbios, registry);
 }
 
-static void netdata_windows_detect_virtualization(struct rrdhost_system_info *systemInfo) {
-    const char *virt = netdata_windows_detect_virt();
+static void netdata_windows_detect_virtualization(struct rrdhost_system_info *systemInfo, bool with_wmi) {
+    const char *virt = netdata_windows_detect_virt(with_wmi);
 
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", virt);
     nd_setenv("NETDATA_SYSTEM_VIRTUALIZATION", virt, 1);
@@ -697,12 +697,18 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
 
     netdata_windows_cloud(systemInfo);
     netdata_windows_get_cpu(systemInfo);
-    netdata_windows_detect_virtualization(systemInfo);
+    netdata_windows_detect_virtualization(systemInfo, false);
     container = netdata_windows_detect_container_state(systemInfo);
     netdata_windows_container(systemInfo, container);
     netdata_windows_get_mem(systemInfo);
     netdata_windows_get_total_disk_size(systemInfo);
     netdata_windows_install_type(systemInfo);
     netdata_windows_ip(systemInfo);
+}
+
+void netdata_windows_get_wmi_system_info(struct rrdhost_system_info *systemInfo)
+{
+    if(systemInfo)
+        netdata_windows_detect_virtualization(systemInfo, true);
 }
 #endif

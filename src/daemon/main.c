@@ -1381,6 +1381,28 @@ int netdata_main(int argc, char **argv) {
     cleanup_agent_event_log();
     netdata_ready_store(true);
 
+#ifdef OS_WINDOWS
+    // WMI can block for minutes while connecting. All non-WMI discovery remains
+    // before plugin startup; refresh only WMI virtualization after the API is ready.
+    nd_log_info("SYSTEM INFO: collecting Windows WMI virtualization metadata after startup readiness.");
+
+    spinlock_lock(&localhost->rrdhost_update_lock);
+    struct rrdhost_system_info *windows_system_info = rrdhost_system_info_dup(localhost->system_info);
+    spinlock_unlock(&localhost->rrdhost_update_lock);
+
+    if(windows_system_info) {
+        netdata_windows_get_wmi_system_info(windows_system_info);
+
+        spinlock_lock(&localhost->rrdhost_update_lock);
+        rrdhost_system_info_swap(localhost->system_info, windows_system_info);
+        rrdhost_flag_set(localhost, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
+        spinlock_unlock(&localhost->rrdhost_update_lock);
+
+        rrdhost_system_info_free(windows_system_info);
+        reload_host_labels();
+    }
+#endif
+
     // ----------------------------------------------------------------------------------------------------------------
 
     {
