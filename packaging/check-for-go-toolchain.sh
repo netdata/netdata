@@ -52,8 +52,20 @@ check_go_version() {
 userland_machine() {
   ULM_KERNEL_MACHINE="$(uname -m)"
 
+  # Only 64-bit kernel types that install_go_toolchain can resolve to an archive
+  # need the userland check: every other machine type either cannot host a
+  # narrower userland, or has no Go archive at all and already fails cleanly.
+  case "${ULM_KERNEL_MACHINE}" in
+    x86_64|amd64|aarch64|arm64|ppc64le|riscv64|s390x) ;;
+    *)
+      printf '%s\n' "${ULM_KERNEL_MACHINE}"
+      return 0
+      ;;
+  esac
+
   # Userland word size. getconf is not present everywhere (notably minimal musl
-  # systems), so fall back to the ELF class byte of our own interpreter:
+  # systems), so fall back to the ELF class byte of a userland binary - od's own
+  # executable, which /proc/self/exe resolves to inside the substitution below:
   # byte 4 of the ELF header is 1 for 32-bit objects and 2 for 64-bit ones.
   ULM_BITS=''
   if command -v getconf > /dev/null 2>&1; then
@@ -67,17 +79,28 @@ userland_machine() {
     esac
   fi
 
-  # Unknown word size: keep the historical behaviour rather than guess.
-  if [ "${ULM_BITS}" != "32" ]; then
-    printf '%s\n' "${ULM_KERNEL_MACHINE}"
-    return 0
-  fi
-
-  # 32-bit userland: map 64-bit kernel types to their 32-bit counterparts.
-  case "${ULM_KERNEL_MACHINE}" in
-    x86_64|amd64) printf '%s\n' i686 ;;
-    aarch64|arm64) printf '%s\n' armv7l ;;
-    *) printf '%s\n' "${ULM_KERNEL_MACHINE}" ;;
+  case "${ULM_BITS}" in
+    32)
+      # Map the 64-bit kernel type to the 32-bit userland we are building for. A
+      # kernel type with no 32-bit Go toolchain (Go ships none for ppc64le,
+      # s390x or riscv64 userlands) gets a marker that makes the caller fail
+      # cleanly, instead of installing a 64-bit toolchain that cannot run here.
+      case "${ULM_KERNEL_MACHINE}" in
+        x86_64|amd64) printf '%s\n' i686 ;;
+        aarch64|arm64) printf '%s\n' armv7l ;;
+        *) printf '%s\n' "32-bit userland on ${ULM_KERNEL_MACHINE}" ;;
+      esac
+      ;;
+    64)
+      printf '%s\n' "${ULM_KERNEL_MACHINE}"
+      ;;
+    *)
+      # Word size undetermined (no getconf, and no readable ELF header to fall
+      # back to). Assume the userland matches the kernel, but say so: if it does
+      # not, the toolchain we are about to install will not run.
+      printf '%s\n' "WARNING: cannot determine the userland word size (getconf and od are both unavailable), assuming a 64-bit userland on this ${ULM_KERNEL_MACHINE} kernel. If the userland is 32-bit, install a Go ${GOLANG_MIN_VERSION} toolchain for it manually before building." >&2
+      printf '%s\n' "${ULM_KERNEL_MACHINE}"
+      ;;
   esac
 }
 
@@ -85,19 +108,19 @@ install_go_toolchain() {
   GOLANG_ARCHIVE_NAME="${GOLANG_TEMP_PATH}/golang.tar.gz"
   GOLANG_CHECKSUM_FILE="${GOLANG_TEMP_PATH}/golang.sha256sums"
 
-  # The toolchain we download has to *run* here, so this is the host userland,
-  # spelled the way Linux `uname -m` spells it; only the Linux branch below
-  # consults it. FreeBSD keeps `uname -m` because its case labels
-  # (386/amd64/arm/arm64) are a different vocabulary.
-  #
-  # Deliberately not derived from GOARCH: that is Go's *output* target, and
-  # honouring it here would install a toolchain the builder cannot execute
-  # whenever someone genuinely cross-builds. Once a runnable toolchain exists,
-  # GOARCH does its job unaided.
-  GOLANG_HOST_MACHINE="$(userland_machine)"
-
   case "$(uname -s)" in
     Linux)
+      # The toolchain we download has to *run* here, so this is the host
+      # userland, spelled the way Linux `uname -m` spells it. FreeBSD keeps
+      # `uname -m` because its case labels (386/amd64/arm/arm64) are a different
+      # vocabulary.
+      #
+      # Deliberately not derived from GOARCH: that is Go's *output* target, and
+      # honouring it here would install a toolchain the builder cannot execute
+      # whenever someone genuinely cross-builds. Once a runnable toolchain
+      # exists, GOARCH does its job unaided.
+      GOLANG_HOST_MACHINE="$(userland_machine)"
+
       case "${GOLANG_HOST_MACHINE}" in
         i?86)
           GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.26.5.linux-386.tar.gz"
