@@ -42,7 +42,7 @@ modules:
     setup: &setup
       prerequisites:
         list: [ ]
-      configuration:
+      configuration: &prometheus_configuration
         file:
           name: go.d/prometheus.conf
         options:
@@ -96,7 +96,7 @@ modules:
                 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
                 - Pattern syntax: [selector](/src/go/pkg/prometheus/selector/README.md).
                 - Option syntax:
-                
+
                 ```yaml
                 selector:
                   allow:
@@ -137,7 +137,7 @@ modules:
 
                 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
                 - Option syntax:
-                
+
                 ```yaml
                 fallback_type:
                   counter:
@@ -182,7 +182,7 @@ modules:
                 ```
 
             - name: profiles
-              description: Curated, exporter-specific chart profiles with optional untyped classification, normalization, and scoped fallback-chart policy; disable profiles with mode `none`.
+              description: Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`.
               default_value: auto
               required: false
               group: Customization
@@ -211,6 +211,8 @@ modules:
                 charts unless an applicable profile `autogen.selector` rejects them. Every selector is limited to its
                 profile's `match` scope; when scopes overlap, every applicable selector must accept the series. This
                 changes fallback charts only; use `selector` or a relabeling `drop` rule to discard samples.
+                Stock profiles leave unknown future families eligible for generic fallback; closed fallback selectors are a
+                user-owned deployment policy, not a stock-profile authoring pattern.
 
                 ```yaml
                 profiles:
@@ -352,7 +354,7 @@ modules:
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
                 > **Note**: Change the port of the monitored application on which it provides metrics.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -424,6 +426,11 @@ modules:
 
         **The rest are ignored**.
       availability: [ ]
+      dynamic_context_prefixes:
+        - prefix: prometheus.
+          reason: >-
+            Generic autogen and built-in profiles emit endpoint- and application-specific contexts under the prometheus
+            namespace.
       scopes: [ ]
   - <<: *module
     meta:
@@ -4508,6 +4515,239 @@ modules:
           - title: Install Exporter
             description: |
               Install [Tesla Wall Connector Exporter](https://github.com/benclapp/tesla_wall_connector_exporter) by following the instructions mentioned in the exporter README.
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-prometheus-ceph
+      monitored_instance:
+        name: Ceph Prometheus
+        link: https://docs.ceph.com/en/latest/mgr/prometheus/
+        icon_filename: ceph.svg
+        categories:
+          - data-collection.storage
+      keywords:
+        - ceph
+        - storage
+        - prometheus
+        - ceph-exporter
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor Ceph through its official Prometheus surfaces without narrowing the exporter to the native Ceph collector's
+          different Dashboard REST API.
+
+          The built-in profile separates cluster-wide MGR health, quorum, capacity, placement groups, pools, and OSD metadata
+          from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. Optional branches cover
+          CephFS/MDS and CephFS Mirror, RBD images, RBD Mirror, SMB, NVMe-oF, RGW user/bucket/topic/cache/multisite and dmClock
+          scheduling, RocksDB binned caches, external block devices, and Ceph client I/O across Reef 18.2.8, Squid 19.2.5,
+          and Tentacle 20.2.2. PG state flags and RGW global/user/bucket views are overlapping diagnostic populations and are
+          not additive totals. Profile relabeling turns dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter, RocksDB
+          cache, Finisher, Throttle, KernelDevice, mClock, messenger, RDMA, DPDK, and service-identity family names into stable
+          profile inputs while preserving their source keys as identity labels. The source-complete profile materializes the
+          entire declared release/producer union with zero generic fallback. Unknown future Ceph families remain visible
+          through generic fallback until their source semantics can be curated; generic visibility is a forward-compatibility
+          guard, not evidence that a known source family was fully modeled. The profile drops only the source-proven
+          raw MGR RGW source-zone aliases because the stable normalized family is already charted.
+
+          The chart model follows the producer's source lifecycle rather than relying on Prometheus wire type alone. Current
+          populations that Ceph increments and decrements remain absolute, while cumulative work published through gauges is
+          rendered incrementally so Netdata performs rate calculation and reset detection. Shared charts compare only the same
+          counted or measured population: requests, objects, bytes, reservations, state transitions, and other unlike units
+          remain separate even when their wire type or numeric scale is similar.
+
+          The profile also covers priority-0 daemon counters exposed when `ceph-exporter` is configured with
+          `exporter_prio_limit=0`, conditional exporter process CPU, memory, thread, and page-fault metrics, and the official
+          NVMe-oF gateway's Python process runtime surface.
+        method_description: |
+          Netdata periodically scrapes the Ceph MGR Prometheus module or official `ceph-exporter` endpoint and applies the
+          built-in `ceph` profile.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Enable an official Ceph Prometheus endpoint
+            description: |
+              Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics or
+              deploy the official `ceph-exporter` for host-local daemon performance metrics. The stock profile supports the
+              default priority threshold and the complete priority-0 surface; use `exporter_prio_limit=0` when those diagnostic
+              counters are required and size the job limits for the resulting series count.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Ceph MGR and ceph-exporter
+              folding:
+                enabled: false
+              description: |
+                Collect the cluster-wide MGR endpoint and a local official ceph-exporter endpoint with the automatically
+                matched Ceph and process-runtime profiles. Repeat the exporter job for every exporter endpoint. The Ceph
+                profile preserves source labels that collide with Netdata's Prometheus re-export labels under a `ceph_`
+                prefix, retains opaque dynamic group keys, and normalizes only source families whose suffix grammar is
+                unambiguous.
+              config: |
+                jobs:
+                  - &ceph_job
+                    name: ceph-mgr
+                    url: http://127.0.0.1:9283/metrics
+                    expected_prefix: ceph_
+                    max_time_series: 20000
+                    max_time_series_per_metric: 4000
+                  - <<: *ceph_job
+                    name: ceph-exporter
+                    url: http://127.0.0.1:9926/metrics
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-prometheus-litellm
+      monitored_instance:
+        name: LiteLLM
+        link: https://docs.litellm.ai/docs/proxy/prometheus
+        icon_filename: prometheus.svg
+        categories:
+          - data-collection.applications
+      keywords:
+        - litellm
+        - llm
+        - gateway
+        - inference
+        - prometheus
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor LiteLLM gateway workload, routing, provider performance, usage, cost, governance, and internal dependencies.
+
+          The built-in profile follows requests through proxy admission, in-flight work and queueing, guardrails and LiteLLM
+          overhead, routing and fallback, deployment selection, and the provider API response. Side branches organize response
+          and provider caches, tokens and media, spend and budgets, rate limits, MCP tools, managed batches and files, callback
+          failures, Redis/PostgreSQL operations, spend-update queues, and the single-process Python/process runtime. Optional
+          charts appear when their callbacks, features, or runtime mode export metrics.
+
+          Each context represents one monitored entity type. Labels identifying that entity form chart instances; bounded
+          aspects such as status, stream mode, service tier, and validated rate-limit classification become dimensions;
+          ownership and descriptive details remain filterable chart metadata. When LiteLLM configuration omits a supported
+          optional dimension label, the same context and instance remain available with an `unclassified` dimension.
+
+          Additive counters and histogram components always produce complete service or capability views. Selected additional
+          views break them down by deployment, provider/model, route, accounting entity, guardrail/hook, MCP server/tool,
+          managed batch, or callback when LiteLLM exports the required identity labels. Point-in-time gauges retain their
+          complete exported identity, including multiprocess `pid`, so distinct states, limits, budgets, queues, and last-seen
+          values are not summed together. Deployment-configured custom metadata and `tag_*` labels remain part of complete
+          gauge identity when LiteLLM emits them. Additive service views intentionally roll those deployment-controlled
+          labels up unless a dedicated entity breakdown is defined.
+        method_description: |
+          Netdata periodically scrapes the authenticated LiteLLM Prometheus `/metrics` endpoint and applies the built-in
+          `litellm` profile.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Enable LiteLLM Prometheus metrics
+            description: |
+              Enable the LiteLLM
+              [Prometheus callback](https://docs.litellm.ai/docs/proxy/prometheus) and configure the Netdata job with access to
+              its `/metrics` endpoint. LiteLLM's `prometheus_metrics_config` controls which metrics and labels the endpoint
+              exports. Service views remain complete when optional dimension labels are omitted, and optional entity views
+              appear only when their identity labels are available. Gauge identity follows every non-redundant label required
+              to distinguish the emitted state, including configured custom metadata, custom tags, and the opt-in user
+              email/alias budget labels. Arbitrary configured label names are not turned into dimensions because they are
+              deployment-defined, unbounded classifications rather than one stable bounded aspect. Size `max_time_series` and
+              `max_time_series_per_metric` for the exported surface.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: LiteLLM
+              folding:
+                enabled: false
+              description: |
+                Collect the complete LiteLLM surface with automatically matched application, process-runtime, and Python-GC
+                profiles.
+              config: |
+                jobs:
+                  - name: litellm
+                    url: http://127.0.0.1:4000/metrics
+                    expected_prefix: litellm_
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-prometheus-vllm
+      monitored_instance:
+        name: vLLM
+        link: https://docs.vllm.ai/en/stable/design/metrics/
+        icon_filename: prometheus.svg
+        categories:
+          - data-collection.applications
+      keywords:
+        - vllm
+        - llm
+        - inference
+        - prometheus
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor vLLM inference-serving workload, latency, scheduling, token throughput, cache behavior, connector activity,
+          and runtime health.
+
+          The built-in profiles follow requests through scheduling, prefill, decode, engine execution, and HTTP service
+          boundaries. They separate model-engine, endpoint, parser, service-runtime, and Ray replica-worker identities, and
+          organize KV cache residency and offloading, connector operations, speculative or diffusion decoding, and WebSocket
+          activity under their causal owners. Optional charts appear when the corresponding vLLM features export metrics.
+        method_description: |
+          Netdata periodically scrapes either the vLLM server Prometheus `/metrics` endpoint or the Ray node metrics endpoint.
+          Auto-selection applies one built-in `vllm` profile to native `vllm:*` and Ray `ray_vllm_*` metrics. The profile
+          normalizes Ray metric names into the native vLLM namespace, preserves replica and worker identity, and suppresses
+          Ray 2.48's deprecated unsuffixed counter aliases so each counter is presented once.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Expose the vLLM metrics endpoint
+            description: |
+              Run a vLLM server with a reachable Prometheus `/metrics` endpoint, or configure a Ray deployment whose node
+              metrics endpoint exposes `ray_vllm_*` families. For Ray, configure or discover each node's metrics export port;
+              Ray commonly uses port 8080 when `--metrics-export-port=8080` is set. Ray 2.48 exports an unsuffixed compatibility
+              gauge beside most canonical `_total` counters unless `RAY_EXPORT_COUNTER_AS_GAUGE=0` is set.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Native vLLM
+              folding:
+                enabled: false
+              description: |
+                Collect native vLLM server metrics with automatically matched application, FastAPI, process-runtime, and
+                Python-GC profiles.
+              config: |
+                jobs:
+                  - name: vllm
+                    url: http://127.0.0.1:8000/metrics
+                    expected_prefix: 'vllm:'
+            - name: vLLM on Ray
+              description: |
+                Collect vLLM families from a Ray node metrics endpoint. The automatically matched unified profile normalizes
+                them into the native vLLM namespace, removes Ray 2.48's deprecated unsuffixed compatibility gauges, and
+                removes vLLM's pre-canonical KV-offload duplicates. Other Ray system families remain available for generic
+                collection or another matching profile.
+              config: |
+                jobs:
+                  - name: vllm-ray
+                    url: http://127.0.0.1:8080
+                    expected_prefix: ray_vllm_
+
   - <<: *module
     meta:
       <<: *meta

@@ -46,6 +46,54 @@ func TestSpecMarshalTemplate(t *testing.T) {
 				assert.NotContains(t, out, "by_labels: []")
 			},
 		},
+		"preserves explicit empty chart promotion": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{{
+					Family:  "G",
+					Metrics: []string{"m"},
+					Charts: []Chart{{
+						Title:         "C",
+						Context:       "c",
+						Units:         "u",
+						LabelPromoted: []string{},
+						Dimensions:    []Dimension{{Selector: "m", Name: "d"}},
+					}},
+				}},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, "label_promotion: []")
+				reDecoded, err := DecodeYAML([]byte(out))
+				require.NoError(t, err)
+				promotion := reDecoded.Groups[0].Charts[0].LabelPromoted
+				assert.NotNil(t, promotion)
+				assert.Empty(t, promotion)
+			},
+		},
+		"preserves explicit empty default promotion": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{{
+					Family:        "G",
+					Metrics:       []string{"m"},
+					ChartDefaults: &ChartDefaults{LabelPromoted: []string{}},
+					Charts: []Chart{{
+						Title:      "C",
+						Context:    "c",
+						Units:      "u",
+						Dimensions: []Dimension{{Selector: "m", Name: "d"}},
+					}},
+				}},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, "label_promotion: []")
+				reDecoded, err := DecodeYAML([]byte(out))
+				require.NoError(t, err)
+				promotion := reDecoded.Groups[0].Charts[0].LabelPromoted
+				assert.NotNil(t, promotion)
+				assert.Empty(t, promotion)
+			},
+		},
 		"errors when groups missing": {
 			spec:    Spec{Version: VersionV1},
 			wantErr: true,

@@ -863,6 +863,13 @@ Runtime input skills:
   Trigger: authoring or modifying any Netdata data-collection plugin or module (Go go.d / ibm.d, Rust crates, internal C plugins, external plugins via PLUGINSD). Read before adding a new collector, modifying an existing one, working on NetFlow/sFlow/IPFIX, OTEL ingestion, topology, SNMP profiles, or interactive Functions.
   Status: live. Updates that close gaps or fix outdated pointers must ship in the same PR that exposed the issue.
 
+- `.agents/skills/project-prometheus-profiles/`
+  Trigger: creating, reviewing, validating, iterating, or installing Netdata Prometheus collector chart profiles from
+  Prometheus exposition dumps; diagnosing profile schema/runtime behavior, selector/relabel/fallback policy, coverage,
+  NIDL hierarchy, or profile installation and live verification.
+  Status: live. Reasoning-first dashboard-design guidance, focused metric/schema/application references, a thin
+  validation launcher, and a repository Go validator that exercises the real collector-to-emitter pipeline.
+
 - `.agents/skills/project-create-topology/`
   Trigger: creating or updating Netdata topology producers, topology Function payloads, topology schema fixtures, graph presentation, correlation rules, direction semantics, topology drilldowns, telemetry overlays, or Cloud topology aggregation fixtures.
   Status: live. Developer-facing topology authoring workflow. End-user/operator-facing AI skills belong under `docs/netdata-ai/skills/`; this project skill is the runtime guidance for repository work.

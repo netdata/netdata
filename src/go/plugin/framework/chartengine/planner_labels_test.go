@@ -171,6 +171,24 @@ func TestChartLabelAccumulatorOptionalIdentityLabels(t *testing.T) {
 	}
 }
 
+func TestChartLabelAccumulatorExplicitEmptyKeepsIdentityOnly(t *testing.T) {
+	chart := program.Chart{
+		Identity: program.ChartIdentity{
+			InstanceByLabels: []program.InstanceLabelSelector{{Key: "instance"}},
+		},
+		Labels: program.LabelPolicy{Mode: program.PromotionModeExplicitIntersection},
+	}
+	acc := newChartLabelAccumulator(compileChartLabelPolicy(chart))
+	require.NoError(t, acc.observe(sortedLabelView(map[string]string{
+		collectJobLabel: "service-local",
+		"instance":      "node-1",
+		"owner":         "owner-a",
+		"region":        "region-a",
+	}), ""))
+
+	assert.Equal(t, map[string]string{"instance": "node-1"}, acc.materialize())
+}
+
 func TestCompileInstanceLabelPlanExcludeWinsRegardlessOfTokenOrder(t *testing.T) {
 	tests := map[string]struct {
 		selectors []program.InstanceLabelSelector

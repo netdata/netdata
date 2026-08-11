@@ -3,6 +3,8 @@
 package chartengine
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"sort"
 	"strings"
 
@@ -58,6 +60,62 @@ func renderChartInstanceIDFromViewWithPlan(
 	labels metrix.LabelView,
 ) (string, bool, error) {
 	return renderChartInstanceIDWithAccessorAndPlan(identity, plan, labelViewAccessor{view: labels})
+}
+
+var globalPlanInstanceIdentity = PlanInstanceIdentity(sha256.Sum256(nil))
+
+func diagnosticChartInstance(
+	plan compiledInstanceLabelPlan,
+	labels metrix.LabelView,
+) (PlanInstanceIdentity, []string, bool, error) {
+	if len(plan.explicitKeys) == 0 && len(plan.optionalKeys) == 0 && !plan.includeAll {
+		return globalPlanInstanceIdentity, nil, true, nil
+	}
+	values, ok := resolveInstanceLabelValuesWithPlan(plan, labelViewAccessor{view: labels}, nil)
+	if !ok {
+		return PlanInstanceIdentity{}, nil, false, nil
+	}
+
+	hash := sha256.New()
+	var size [8]byte
+	keys := make([]string, 0, len(values))
+	for _, item := range values {
+		keys = append(keys, item.Key)
+		binary.LittleEndian.PutUint64(size[:], uint64(len(item.Key)))
+		_, _ = hash.Write(size[:])
+		_, _ = hash.Write([]byte(item.Key))
+		binary.LittleEndian.PutUint64(size[:], uint64(len(item.Value)))
+		_, _ = hash.Write(size[:])
+		_, _ = hash.Write([]byte(item.Value))
+	}
+	var out PlanInstanceIdentity
+	_ = hash.Sum(out[:0])
+	return out, keys, true, nil
+}
+
+func diagnosticChartInstanceLabels(plan compiledInstanceLabelPlan, labels metrix.LabelView) ([]string, bool) {
+	if len(plan.explicitKeys) == 0 && len(plan.optionalKeys) == 0 && !plan.includeAll {
+		return nil, true
+	}
+	values, ok := resolveInstanceLabelValuesWithPlan(plan, labelViewAccessor{view: labels}, nil)
+	if !ok {
+		return nil, false
+	}
+	keys := make([]string, 0, len(values))
+	for _, item := range values {
+		keys = append(keys, item.Key)
+	}
+	return keys, true
+}
+
+func missingChartInstanceLabels(plan compiledInstanceLabelPlan, labels metrix.LabelView) []string {
+	var missing []string
+	for _, key := range plan.explicitKeys {
+		if _, ok := labels.Get(key); !ok {
+			missing = append(missing, key)
+		}
+	}
+	return missing
 }
 
 func renderChartInstanceIDWithAccessor(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {

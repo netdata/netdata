@@ -10,6 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestQuoteGlobLiteral(t *testing.T) {
+	value := `literal*?[class]\\tail`
+	matcher, err := NewGlobMatcher(QuoteGlobLiteral(value))
+	assert.NoError(t, err)
+	assert.True(t, matcher.MatchString(value))
+	assert.False(t, matcher.MatchString(`literal-value`))
+}
+
 func TestNewGlobMatcher(t *testing.T) {
 	cases := []struct {
 		expr    string

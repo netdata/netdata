@@ -382,6 +382,25 @@ func TestProfile_FallbackTypeAbsent(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+func TestProfile_HasAppPreservesDocumentPresence(t *testing.T) {
+	withApp := strings.Replace(profileYAML("app_*"), "template:\n", "app: service\ntemplate:\n", 1)
+	cat, err := loadCatalog(t,
+		fileSpec{stock: true, name: "with_app.yaml", content: withApp},
+		fileSpec{stock: true, name: "without_app.yaml", content: profileYAML("app_*")},
+	)
+	require.NoError(t, err)
+
+	profile, ok := cat.Get("with_app")
+	require.True(t, ok)
+	assert.True(t, profile.HasApp())
+	assert.Equal(t, "service", profile.App)
+
+	profile, ok = cat.Get("without_app")
+	require.True(t, ok)
+	assert.False(t, profile.HasApp())
+	assert.Empty(t, profile.App)
+}
+
 func TestLoadFromDirs_userBadFallbackTypeSkippedStockSurvives(t *testing.T) {
 	cat, err := loadCatalog(t,
 		fileSpec{stock: true, name: "app.yaml", content: profileYAML("stock_*")},

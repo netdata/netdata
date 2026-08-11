@@ -6,7 +6,6 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	commonmodel "github.com/prometheus/common/model"
@@ -16,26 +15,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
-// Structural label names and family-name suffixes that bind the components of a
-// typed family (histogram/summary) together. Defined locally because the
-// equivalents in pkg/prometheus are unexported; they mirror the Prometheus
-// exposition format and MUST stay in sync with pkg/prometheus.
-const (
-	labelLE       = "le"
-	labelQuantile = "quantile"
-	suffixSum     = "_sum"
-	suffixCount   = "_count"
-	suffixBucket  = "_bucket"
-)
-
 type relabelStage struct {
-	name       string
-	limiterKey string
+	name            string
+	limiterKey      string
+	diagnosticStage PipelineRelabelStage
 }
 
 var (
-	jobRelabelStage     = relabelStage{name: "job relabeling", limiterKey: "job-relabel-typed-family-corruption"}
-	profileRelabelStage = relabelStage{name: "profile relabeling", limiterKey: "profile-relabel-typed-family-corruption"}
+	jobRelabelStage = relabelStage{
+		name: "job relabeling", limiterKey: "job-relabel-typed-family-corruption", diagnosticStage: PipelineRelabelStageJob,
+	}
+	profileRelabelStage = relabelStage{
+		name: "profile relabeling", limiterKey: "profile-relabel-typed-family-corruption", diagnosticStage: PipelineRelabelStageProfile,
+	}
 )
 
 type relabelResult struct {
@@ -107,6 +99,30 @@ func (c *Collector) finishRelabel(
 		}
 		return processed, mfs, nil
 	}
+	if c.pipelineObserver != nil {
+		rejected := make(map[prompkg.SampleSeriesIdentity]struct{}, len(invalid))
+		for _, sample := range processed.Samples {
+			key, typed := typedFamilyKeyOf(sample)
+			if !typed {
+				continue
+			}
+			if _, bad := invalid[key]; !bad {
+				continue
+			}
+			identity := prompkg.IdentifySampleSeries(sample)
+			if _, seen := rejected[identity]; seen {
+				continue
+			}
+			rejected[identity] = struct{}{}
+			c.observePipeline(PipelineDiagnostic{
+				Decision:     PipelineTypedFamilyRejected,
+				Reason:       PipelineReasonTypedFamilyCorruption,
+				Destination:  identity,
+				MetricName:   identity.Family,
+				RelabelStage: stage.diagnosticStage,
+			})
+		}
+	}
 
 	if checking {
 		return prompkg.SampleBatch{}, nil, fmt.Errorf("%s corrupts typed metric families: %s", stage.name, violations[0])
@@ -140,12 +156,125 @@ func (c *Collector) applyPipelineRelabel(
 	help := newHelpRemap()
 	out := prompkg.SampleBatch{Samples: make([]prompkg.Sample, 0, len(batch.Samples))}
 	for _, raw := range batch.Samples {
-		sample, drop := pipeline.Apply(raw)
+		sample, drop := c.applyObservedPipeline(raw, pipeline, stage, "", true)
 		c.appendRelabelResult(&out, t, help, stage, relabelResult{raw: raw, sample: sample, drop: drop})
 	}
 	out.Help = help.remap(batch.Help)
 	return out, t
 }
+
+func (c *Collector) applyObservedPipeline(
+	raw prompkg.Sample,
+	pipeline *relabel.Pipeline,
+	stage relabelStage,
+	profileName string,
+	observeRaw bool,
+) (prompkg.Sample, relabel.DropInfo) {
+	if c.pipelineObserver == nil {
+		if pipeline == nil {
+			return raw, relabel.DropInfo{}
+		}
+		return pipeline.Apply(raw)
+	}
+
+	source := prompkg.IdentifySampleSeries(raw)
+	rawIdentity := prompkg.IdentifyRawSample(raw.Name, raw.Labels)
+	valueIdentity := PipelineValueIdentity{}
+	scalarValue := raw.Kind == prompkg.SampleKindScalar
+	if scalarValue {
+		valueIdentity = pipelineScalarValueIdentity(raw.Value)
+	}
+	if observeRaw {
+		c.observePipeline(PipelineDiagnostic{
+			Decision:      PipelineRawAccepted,
+			RawIdentity:   rawIdentity,
+			Source:        source,
+			ValueIdentity: valueIdentity,
+			ScalarValue:   scalarValue,
+			MetricName:    raw.Name,
+		})
+	}
+
+	sample := raw
+	drop := relabel.DropInfo{}
+	dropMetricName := sample.Name
+	dropBlockIndex := -1
+	if pipeline != nil {
+		sample, drop = pipeline.ApplyWithObserver(
+			raw,
+			func(fact relabel.BlockDiagnostic) {
+				dropBlockIndex = fact.BlockIndex
+				c.observePipeline(PipelineDiagnostic{
+					Decision:        PipelineRelabelBlockEntered,
+					RawIdentity:     rawIdentity,
+					Source:          source,
+					ValueIdentity:   valueIdentity,
+					ScalarValue:     scalarValue,
+					InputMetricName: fact.InputMetricName,
+					InputLabelNames: fact.InputLabelNames,
+					BlockIndex:      fact.BlockIndex,
+					RelabelStage:    stage.diagnosticStage,
+					ProfileName:     profileName,
+				})
+			},
+			func(blockIndex int, fact relabel.RuleDiagnostic) {
+				dropMetricName = fact.OutputMetricName
+				c.observePipeline(PipelineDiagnostic{
+					Decision:           PipelineRelabelRuleEvaluated,
+					RawIdentity:        rawIdentity,
+					Source:             source,
+					ValueIdentity:      valueIdentity,
+					ScalarValue:        scalarValue,
+					InputMetricName:    fact.InputMetricName,
+					OutputMetricName:   fact.OutputMetricName,
+					InputLabels:        pipelineLabels(fact.InputLabels),
+					OutputLabels:       pipelineLabels(fact.OutputLabels),
+					BlockIndex:         blockIndex,
+					RuleIndex:          fact.RuleIndex,
+					RelabelAction:      fact.Action,
+					RelabelRuleMatched: fact.Matched,
+					RelabelRuleDropped: fact.Dropped,
+					RelabelStage:       stage.diagnosticStage,
+					ProfileName:        profileName,
+				})
+			},
+		)
+	}
+	if drop.Dropped() {
+		c.observePipeline(PipelineDiagnostic{
+			Decision:      PipelineRelabelDropped,
+			RawIdentity:   rawIdentity,
+			Source:        source,
+			ValueIdentity: valueIdentity,
+			ScalarValue:   scalarValue,
+			MetricName:    dropMetricName,
+			BlockIndex:    dropBlockIndex,
+			RuleIndex:     drop.RuleIndex,
+			RelabelAction: drop.Action,
+			RelabelDrop:   drop,
+			RelabelStage:  stage.diagnosticStage,
+			ProfileName:   profileName,
+		})
+		return sample, drop
+	}
+
+	fact := PipelineDiagnostic{
+		Decision:               PipelineRelabelOutput,
+		RawIdentity:            rawIdentity,
+		DestinationRawIdentity: prompkg.IdentifyRawSample(sample.Name, sample.Labels),
+		Source:                 source,
+		Destination:            prompkg.IdentifySampleSeries(sample),
+		MetricName:             sample.Name,
+		OutputLabels:           pipelineLabels(sample.Labels),
+		RelabelStage:           stage.diagnosticStage,
+		ProfileName:            profileName,
+	}
+	fact.ValueIdentity = valueIdentity
+	fact.ScalarValue = scalarValue
+	c.observePipeline(fact)
+	return sample, relabel.DropInfo{}
+}
+
 func (c *Collector) appendRelabelResult(
 	out *prompkg.SampleBatch,
 	t *relabelTracking,
@@ -284,12 +413,12 @@ func (t *relabelTracking) recordKept(rawKey, finalKey typedFamilyKey, raw, sampl
 		if fs.buckets == nil {
 			fs.buckets = make(map[string]int)
 		}
-		fs.buckets[sample.Labels.Get(labelLE)]++
+		fs.buckets[sample.Labels.Get(prompkg.SampleStructuralLabelName(sample.Kind))]++
 	case prompkg.SampleKindSummaryQuantile:
 		if fs.quantiles == nil {
 			fs.quantiles = make(map[string]int)
 		}
-		fs.quantiles[sample.Labels.Get(labelQuantile)]++
+		fs.quantiles[sample.Labels.Get(prompkg.SampleStructuralLabelName(sample.Kind))]++
 	}
 }
 
@@ -422,13 +551,11 @@ func hasDuplicate(counts map[string]int) bool {
 // name; a plain gauge/counter is not typed.
 func typedFamilyKeyOf(s prompkg.Sample) (typedFamilyKey, bool) {
 	switch s.Kind {
-	case prompkg.SampleKindHistogramBucket:
-		return typedFamilyKey{name: trimFamilySuffix(s.Name, s.Kind), hash: hashWithout(s.Labels, labelLE)}, true
-	case prompkg.SampleKindSummaryQuantile:
-		return typedFamilyKey{name: trimFamilySuffix(s.Name, s.Kind), hash: hashWithout(s.Labels, labelQuantile)}, true
-	case prompkg.SampleKindHistogramSum, prompkg.SampleKindHistogramCount,
+	case prompkg.SampleKindHistogramBucket,
+		prompkg.SampleKindSummaryQuantile,
+		prompkg.SampleKindHistogramSum, prompkg.SampleKindHistogramCount,
 		prompkg.SampleKindSummarySum, prompkg.SampleKindSummaryCount:
-		return typedFamilyKey{name: trimFamilySuffix(s.Name, s.Kind), hash: s.Labels.Hash()}, true
+		return typedFamilyKey{name: prompkg.SampleFamilyName(s), hash: prompkg.SampleSeriesHash(s)}, true
 	default:
 		// A summary/histogram base series with neither structural label nor a
 		// _sum/_count suffix (e.g. an empty summary) is still a typed component.
@@ -442,48 +569,18 @@ func typedFamilyKeyOf(s prompkg.Sample) (typedFamilyKey, bool) {
 // helpFamilyName is the family name a sample's HELP belongs to (the base name,
 // suffix trimmed) — the key Prometheus uses for # HELP.
 func helpFamilyName(s prompkg.Sample) string {
-	return trimFamilySuffix(s.Name, s.Kind)
-}
-
-func trimFamilySuffix(name string, kind prompkg.SampleKind) string {
-	switch kind {
-	case prompkg.SampleKindHistogramBucket:
-		return strings.TrimSuffix(name, suffixBucket)
-	case prompkg.SampleKindHistogramSum, prompkg.SampleKindSummarySum:
-		return strings.TrimSuffix(name, suffixSum)
-	case prompkg.SampleKindHistogramCount, prompkg.SampleKindSummaryCount:
-		return strings.TrimSuffix(name, suffixCount)
-	default:
-		return name
-	}
+	return prompkg.SampleFamilyName(s)
 }
 
 // structuralMutated reports whether relabeling changed (or removed) the le or
 // quantile label that defines a bucket boundary or quantile point. Kind is
 // preserved by relabeling, so the raw kind selects the structural label.
 func structuralMutated(raw, sample prompkg.Sample) bool {
-	switch raw.Kind {
-	case prompkg.SampleKindHistogramBucket:
-		return raw.Labels.Get(labelLE) != sample.Labels.Get(labelLE)
-	case prompkg.SampleKindSummaryQuantile:
-		return raw.Labels.Get(labelQuantile) != sample.Labels.Get(labelQuantile)
-	default:
+	labelName := prompkg.SampleStructuralLabelName(raw.Kind)
+	if labelName == "" {
 		return false
 	}
-}
-
-// hashWithout hashes the label set with one label removed, preserving order so
-// the result matches the assembler's base-label grouping (which strips the
-// structural label in place before hashing).
-func hashWithout(lbs labels.Labels, name string) uint64 {
-	filtered := make(labels.Labels, 0, len(lbs))
-	for _, l := range lbs {
-		if l.Name == name {
-			continue
-		}
-		filtered = append(filtered, l)
-	}
-	return filtered.Hash()
+	return raw.Labels.Get(labelName) != sample.Labels.Get(labelName)
 }
 
 // helpRemap maps each source family name to the final family name(s) its samples

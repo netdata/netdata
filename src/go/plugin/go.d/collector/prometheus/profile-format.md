@@ -319,14 +319,62 @@ Example:
 match: 'example_*'
 autogen:
   selector:
-    allow:
-      - 'example_*{environment="production"}'
     deny:
       - example_http_request_duration_seconds
-      - 'example_debug_*'
 template:
   # ...
 ```
+
+> **Stock contribution policy:** the runtime syntax above remains available to
+> user-owned profiles, including `allow` and wildcard selectors. Profiles
+> contributed to Netdata MUST NOT use `autogen.selector.allow` or open-ended
+> `deny` entries: unknown future families matching `match` must remain eligible
+> for generic fallback. Contributed denies name exact family base names present
+> in the source-complete fixture only. A selector containing `{...}` is
+> label-constrained policy, not an exact family name. The objective profile
+> validator enforces this policy separately from its strict zero-fallback check
+> over current source-complete evidence.
+
+Stock profile and recommended-job relabeling follow the same forward-open rule.
+Under a wildcard relabel block, a sample-discarding rule may use only a
+`__name__` `drop` that enumerates finite exact names or one non-empty internal
+entity key between finite exporter prefixes and finite terminal metric
+suffixes. Every finite exact name or prefix/suffix branch must be exercised by
+the source-complete fixture. Open-ended terminal regexes, wildcard
+`dropequal`, inverse `keep`/`keepequal`, and application-label-dependent
+discard are not accepted stock-authoring patterns; runtime support remains
+available for user-owned jobs.
+
+Exact recommended-job selector denies and exact profile/job relabel-block metric
+names must also be present in the source-complete fixture. Every exact-scope
+discard rule must drop
+at least one fixture sample at its real ordered pipeline position. A wildcard
+name-derived rewrite follows the bounded drop grammar and fixture-evidence rule;
+an internal-key rewrite cannot reference its dynamic capture, and every finite
+output must be an authored canonical metric. Before either dynamic form, the
+same block must copy unchanged from `__name__` the capture that encloses the
+entire dynamic entity region into a reserved static non-`__name__` label; a
+nested capture covering only one alternative is incomplete. That target must be
+absent from source-fixture block inputs and preserved through every reachable
+later rule or block. A later label write sourced only from `__name__` is
+harmless when its regex is disjoint from every possible current name. Canonical
+outputs must preserve every finite prefix/suffix branch distinction.
+Capture-bearing replacement reachability also preserves literal prefixes and
+suffixes around the captures. The rewrite may additionally normalize a
+source-proven `<canonical_name>_<non-empty-identity>` family exactly to
+`<canonical_name>`.
+This rewrite-only canonical form does not permit unrelated terminal catches.
+Across exact and wildcard blocks, the complete recommended relabel pipeline
+must also preserve every observed writer-admissible logical identity after
+normal histogram/summary assembly. Distinct source identities may not converge
+on the same final metric name and labels: metric relabeling does not aggregate
+values when a name rewrite or label removal collapses identities.
+Writer-rejected samples such as non-finite scalars do not participate in this
+collision proof.
+Every source-fixture sample reached by a metric-name rewrite must also retain a
+valid non-empty name. Use an explicit bounded, source-evidenced `drop` rule for
+an intentional exclusion instead of relying on invalid replacement output to
+discard the sample.
 
 ### `app`
 
@@ -335,6 +383,10 @@ chart contexts, which the Netdata UI turns into an Applications dashboard sectio
 `app` of its own (set by the user or by service discovery); a configured job `app` always wins, and the job name is the
 last resort. Stock profiles set `app` and `template.context_namespace` to the profile name so contexts stay short and
 aligned; follow that convention.
+
+Stock application metadata examples omit the job `app` when their automatically selected profiles provide one
+unambiguous application identity. Set a job `app` only for an intentional override, to disambiguate selected profiles
+that declare different apps, or when no selected profile supplies an app.
 
 ## Chart template rules
 
@@ -423,6 +475,11 @@ profile keep their generic autogen charts unless an applicable profile `autogen.
 `autogen.selector` to constrain fallback charts while retaining samples; use the job's `selector` or a `relabeling`
 drop rule to discard samples.
 
+Stock application examples rely on the default `auto` mode and omit `profiles`. Their application and reusable
+support profiles must select from their own exporter signatures. Copying the proof bundle's exact
+candidate-plus-support list into the job would make every named optional support namespace mandatory. Exact selection
+remains useful while developing a user profile or when an operator deliberately wants to pin deployment policy.
+
 When selected profiles contain fallback classification or relabeling, the mode also determines policy precedence:
 `auto` uses profile-name order, `exact` uses entry order, and `combined` tries its configured entries first and then the
 remaining auto-selected profiles in profile-name order. Profile fallback uses the first matching classification;
@@ -503,11 +560,39 @@ matches nothing -- so re-run the commands from step 1 and compare the exact seri
 `metrics` lists, selectors, and labels.
 
 To contribute a profile to Netdata, add it under `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`. Stock
-profiles are held to a stricter standard than user profiles: a broken stock profile is not skipped -- an invalid header,
-name, or duplicate fails the whole catalog, and an invalid template fails the check of every job that selects it. The
-collector test suite validates every stock profile before merge:
+profiles are held to a stricter standard than user profiles. They require source-complete, sanitized evidence; a structured
+job policy; an operator model and source-family reconciliation; and an objective validator `PASS` with zero current-source
+fallback and zero unmatched series. A broken stock profile is not skipped -- an invalid header, name, or duplicate fails
+the whole catalog, and an invalid template fails every job that selects it.
+
+Compact proof documents live under
+`src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/`. Bulky generated evidence lives in
+[`netdata/testdata`](https://github.com/netdata/testdata) under `prometheus/profiles/<profile>/`: source semantics,
+optional generated source registries, and sanitized exposition fixtures. Netdata tests clone latest testdata `master`;
+update the profile-owned external evidence and its main-tree semantic design together. Historical Netdata checkouts are
+not guaranteed to validate against later testdata content.
+
+To run the complete stock-profile gate locally, clone testdata into the ignored location, then require external evidence:
 
 ```bash
+git clone --depth=1 --branch master https://github.com/netdata/testdata.git src/go/testdata
 cd src/go
-go test -count=1 ./plugin/go.d/collector/prometheus/...
+NETDATA_PROMETHEUS_TESTDATA_REQUIRED=1 go test -count=1 \
+  ./internal/promprofile/testutil \
+  ./internal/promprofile/validation \
+  ./tools/prometheus-profile-validation \
+  ./plugin/go.d/collector/prometheus/...
 ```
+
+For an existing checkout, shallow-fetch `origin master` and detach at the fetched tip before replay. This preserves any local
+feature branch while making the tested tree exactly the fetched `master`:
+
+```bash
+git -C src/go/testdata fetch --depth=1 origin master
+git -C src/go/testdata switch --detach FETCH_HEAD
+```
+
+Set `NETDATA_TESTDATA_DIR` if the checkout lives elsewhere. Ordinary tests never fetch testdata and skip only the
+external-dependent cases when the checkout root is absent. A present but incomplete or unreadable checkout fails. The
+dedicated CI workflow requires external evidence, verifies exact external layout and generated-registry reproducibility,
+and replays the objective validator and semantic contract for every stock proof.

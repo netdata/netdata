@@ -16,6 +16,7 @@ import (
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
 // profileDocument is the single strict top-level profile shape. Its heavy field
@@ -24,7 +25,7 @@ import (
 // YAML anchors referenced across top-level fields without duplicating this list.
 type profileDocument[F, R, T any] struct {
 	Match        string   `yaml:"match"`
-	App          string   `yaml:"app,omitempty"`
+	App          *string  `yaml:"app,omitempty"`
 	Autogen      *autogen `yaml:"autogen,omitempty"`
 	FallbackType F        `yaml:"fallback_type,omitempty"`
 	Relabeling   R        `yaml:"relabeling,omitempty"`
@@ -70,6 +71,7 @@ type Profile struct {
 // Profile value copies share hydration and sync.Once values are never copied.
 type lazyProfile struct {
 	raw             []byte
+	hasApp          bool
 	hasFallbackType bool
 	hasRelabeling   bool
 
@@ -84,6 +86,11 @@ type lazyProfile struct {
 	relabelingOnce sync.Once
 	blocks         []relabel.Block
 	relabelingErr  error
+}
+
+// HasApp reports whether the profile document explicitly contains app.
+func (p Profile) HasApp() bool {
+	return p.lazy != nil && p.lazy.hasApp
 }
 
 // HasFallbackType reports whether the profile document contains a fallback_type
@@ -186,8 +193,8 @@ func (p *Profile) validateHeader() error {
 	if _, err := matcher.NewSimplePatternsMatcher(p.Match); err != nil {
 		return fmt.Errorf("profile %q: 'match': %w", p.Name, err)
 	}
-	if p.App != "" && !validProfileName.MatchString(p.App) {
-		return fmt.Errorf("profile %q: 'app' %q must match %s", p.Name, p.App, validProfileName.String())
+	if p.App != "" && !IsValidProfileName(p.App) {
+		return fmt.Errorf("profile %q: 'app' %q must match %s", p.Name, p.App, profilecatalog.DefaultValidNamePattern)
 	}
 	if p.autogenSelector != nil {
 		if p.autogenSelector.Empty() {
