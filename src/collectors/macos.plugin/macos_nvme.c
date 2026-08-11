@@ -51,6 +51,11 @@ struct macos_nvme_metrics {
     collected_number critical_warning_persistent_memory;
 };
 
+struct macos_nvme_session {
+    IOCFPlugInInterface **plugin;
+    IONVMeSMARTInterface **smart;
+};
+
 struct macos_nvme_device {
     uint64_t registry_id;
     io_service_t service;
@@ -163,73 +168,90 @@ static bool macos_nvme_service_is_smart_capable(io_registry_entry_t entry)
     return capable;
 }
 
-static bool macos_nvme_open_interface(io_service_t service, IONVMeSMARTInterface ***smart_interface)
+static bool macos_nvme_close_session(struct macos_nvme_session *session)
 {
-    *smart_interface = NULL;
+    if (!session)
+        return true;
 
-    IOCFPlugInInterface **plugin = NULL;
+    if (session->smart) {
+        (*session->smart)->Release(session->smart);
+        session->smart = NULL;
+    }
+
+    bool success = true;
+    if (session->plugin) {
+        success = IODestroyPlugInInterface(session->plugin) == kIOReturnSuccess;
+        session->plugin = NULL;
+    }
+
+    return success;
+}
+
+static bool macos_nvme_open_session(io_service_t service, struct macos_nvme_session *session)
+{
+    if (!session)
+        return false;
+
+    *session = (struct macos_nvme_session){0};
+
     SInt32 score = 0;
     IOReturn kr = IOCreatePlugInInterfaceForService(
         service,
         kIONVMeSMARTUserClientTypeID,
         kIOCFPlugInInterfaceID,
-        &plugin,
+        &session->plugin,
         &score);
-    if (kr != kIOReturnSuccess || !plugin)
+    if (kr != kIOReturnSuccess || !session->plugin) {
+        macos_nvme_close_session(session);
         return false;
+    }
 
-    IONVMeSMARTInterface **smart = NULL;
-    HRESULT hres = (*plugin)->QueryInterface(
-        plugin,
+    HRESULT hres = (*session->plugin)->QueryInterface(
+        session->plugin,
         CFUUIDGetUUIDBytes(kIONVMeSMARTInterfaceID),
-        (LPVOID *)&smart);
+        (LPVOID *)&session->smart);
 
-    (*plugin)->Release(plugin);
-
-    if (hres != S_OK || !smart)
+    if (hres != S_OK || !session->smart) {
+        macos_nvme_close_session(session);
         return false;
+    }
 
-    *smart_interface = smart;
     return true;
 }
 
-static void macos_nvme_close_interface(IONVMeSMARTInterface **smart)
+static bool macos_nvme_read_device(
+    io_service_t service,
+    struct macos_nvme_metrics *metrics,
+    char *model,
+    size_t model_size)
 {
-    if (smart)
-        (*smart)->Release(smart);
-}
-
-static bool macos_nvme_read_model(io_service_t service, char *dst, size_t dst_size)
-{
-    IONVMeSMARTInterface **smart = NULL;
-    if (!macos_nvme_open_interface(service, &smart))
+    if (!metrics)
         return false;
 
-    NVMeIdentifyControllerStruct identify;
-    memset(&identify, 0, sizeof(identify));
-    IOReturn kr = (*smart)->GetIdentifyData(smart, &identify, 0);
-    macos_nvme_close_interface(smart);
+    if (model && model_size)
+        model[0] = '\0';
 
-    if (kr != kIOReturnSuccess)
-        return false;
-
-    macos_nvme_trim_ascii_field(identify.MODEL_NUMBER, sizeof(identify.MODEL_NUMBER), dst, dst_size);
-    return dst && dst[0] != '\0';
-}
-
-static bool macos_nvme_read_metrics(io_service_t service, struct macos_nvme_metrics *metrics)
-{
-    IONVMeSMARTInterface **smart = NULL;
-    if (!macos_nvme_open_interface(service, &smart))
+    struct macos_nvme_session session = {0};
+    if (!macos_nvme_open_session(service, &session))
         return false;
 
     NVMeSMARTData data;
     memset(&data, 0, sizeof(data));
-    IOReturn kr = (*smart)->SMARTReadData(smart, &data);
-    macos_nvme_close_interface(smart);
+    IOReturn smart_kr = (*session.smart)->SMARTReadData(session.smart, &data);
 
-    if (kr != kIOReturnSuccess)
+    NVMeIdentifyControllerStruct identify;
+    IOReturn identify_kr = kIOReturnUnsupported;
+    if (smart_kr == kIOReturnSuccess && model && model_size) {
+        memset(&identify, 0, sizeof(identify));
+        identify_kr = (*session.smart)->GetIdentifyData(session.smart, &identify, 0);
+    }
+
+    bool closed = macos_nvme_close_session(&session);
+    if (smart_kr != kIOReturnSuccess || !closed)
         return false;
+
+    if (identify_kr == kIOReturnSuccess)
+        macos_nvme_trim_ascii_field(identify.MODEL_NUMBER, sizeof(identify.MODEL_NUMBER), model, model_size);
 
     uint16_t kelvin = OSSwapLittleToHostInt16(data.TEMPERATURE);
     uint8_t warnings = data.CRITICAL_WARNING;
@@ -367,7 +389,8 @@ static unsigned macos_nvme_discover_devices(void)
         }
 
         struct macos_nvme_metrics probe = {0};
-        if (!macos_nvme_read_metrics(entry, &probe)) {
+        char model[MACOS_NVME_MODEL_MAX + 1] = "";
+        if (!macos_nvme_read_device(entry, &probe, model, sizeof(model))) {
             if (!nvme_logged_unreadable_service) {
                 collector_error(
                     "MACOS: found an NVMe SMART-capable IORegistry service, but cannot read native SMART data from it; "
@@ -393,8 +416,7 @@ static unsigned macos_nvme_discover_devices(void)
         d->seen = true;
         found++;
 
-        char model[sizeof(d->model)] = "";
-        if (macos_nvme_read_model(d->service, model, sizeof(model)))
+        if (model[0])
             snprintfz(d->model, sizeof(d->model), "%s", model);
     }
 
@@ -744,7 +766,7 @@ int do_macos_nvme_smart(int update_every __maybe_unused, usec_t dt __maybe_unuse
         devices++;
 
         struct macos_nvme_metrics metrics = {0};
-        if (!macos_nvme_read_metrics(d->service, &metrics))
+        if (!macos_nvme_read_device(d->service, &metrics, NULL, 0))
             continue;
 
         macos_nvme_update_charts(d, &metrics, sample_every_s);
