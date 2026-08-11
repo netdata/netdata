@@ -481,11 +481,19 @@ Inheritable chart configuration applied to all descendant charts in the group su
 
 | Field             | Type          | Description                              |
 |-------------------|---------------|------------------------------------------|
-| `label_promotion` | array[string] | Default labels to promote on all charts. |
+| `label_promotion` | array[string] | Default non-identity chart-label policy. |
 | `instances`       | object        | Default instance identity policy.        |
 
 > [!NOTE]
 > **Inheritance rules**: nearest group default wins (child overrides parent), chart-local field overrides inherited default, and list/object fields replace the inherited field wholesale — there is no deep merge or append.
+
+`label_promotion` has three distinct states at either level:
+
+- omitted: automatically promote labels whose values intersect across every series contributing to the chart;
+- non-empty: promote only the listed non-identity labels when their values intersect;
+- `[]`: promote no non-identity labels, leaving only instance identity labels on the chart.
+
+An inherited explicit empty list remains explicit; it does not fall back to automatic intersection.
 
 **Example: Azure Monitor — all charts share the same instance identity**
 
@@ -558,7 +566,7 @@ charts:
 | `aggregation`     | string        | no       | `sum`                  | Reducer applied to every dimension in the chart.                             |
 | `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`. Histogram bucket charts are forced to `heatmap`. |
 | `priority`        | int           | no       | `70000`                | Chart ordering priority in the dashboard (`0` = use engine default `70000`). |
-| `label_promotion` | array[string] | no       | from `chart_defaults`  | Labels to promote as chart labels (for filtering/grouping in UI). Entries must be non-empty label keys. |
+| `label_promotion` | array[string] | no       | from `chart_defaults`  | Non-identity chart-label policy: omitted uses automatic intersection, a non-empty list is an explicit allowlist, and `[]` promotes none. Entries must be non-empty label keys. |
 | `instances`       | object        | no       | from `chart_defaults`  | Instance identity policy (see [instances](#instances)).                      |
 | `lifecycle`       | object        | no       |                        | Instance/dimension cap and expiry (see [lifecycle](#lifecycle)).             |
 | `dimensions`      | array         | **yes**  |                        | At least one dimension required (see [dimensions](#6-dimensions)).           |

@@ -30,6 +30,9 @@ rest of this skill as background:
 - Framework or shared-helper change: stop and satisfy
   `src/go/plugin/framework/docs/changing-framework-code.md` before writing
   code.
+- Prometheus chart-profile authoring or review: read
+  `.agents/skills/project-prometheus-profiles/SKILL.md` and every source it marks as
+  mandatory, then run the repository real-pipeline validator it documents.
 
 Do not use this broad skill as the only implementation guide for go.d work.
 
@@ -417,6 +420,11 @@ Operator controls (profiles documented in `src/go/plugin/go.d/collector/promethe
   applicable profile selector rejects them. Each selector is limited to its profile's `match` scope; when scopes
   overlap, every applicable selector must accept the series. This changes fallback charts only; use the job selector
   or a relabeling `drop` action to discard samples.
+
+Use `.agents/skills/project-prometheus-profiles/SKILL.md` when creating or materially
+reviewing a profile. It teaches the dashboard-design reasoning and the
+real-pipeline validation boundary; schema validity alone is not semantic
+dashboard approval.
 
 ### 3.6 Chart priorities
 

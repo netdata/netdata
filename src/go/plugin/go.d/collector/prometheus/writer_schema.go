@@ -25,64 +25,99 @@ func deriveMetricFamilySchema(
 	mf *prompkg.MetricFamily,
 	typ commonmodel.MetricType,
 	allowUntypedFallback bool,
-) (metricFamilySchema, bool) {
+) (metricFamilySchema, PipelineReason) {
+	invalidValue := false
 	for _, metric := range mf.Metrics() {
-		schema, ok := deriveMetricSchema(metric, typ, allowUntypedFallback)
-		if ok {
-			return schema, true
+		schema, reason := inspectMetricSchema(metric, typ, allowUntypedFallback)
+		if reason == "" {
+			return schema, ""
+		}
+		if reason == PipelineReasonInvalidSeriesValue {
+			invalidValue = true
 		}
 	}
 
-	return metricFamilySchema{}, false
+	if invalidValue {
+		return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
+	}
+	return metricFamilySchema{}, PipelineReasonInvalidFamilySchema
 }
 
-func deriveMetricSchema(
+func (w *metricFamilyWriter) inspectMetricFamilySchema(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, PipelineReason) {
+	if handle, ok := w.handles[mf.Name()]; ok {
+		if handle.typ != typ {
+			return metricFamilySchema{}, PipelineReasonFamilyTypeDrift
+		}
+		return metricFamilySchema{
+			summaryQuantiles: handle.summaryQuantiles,
+			histogramBounds:  handle.histogramBounds,
+		}, ""
+	}
+	return deriveMetricFamilySchema(mf, typ, allowUntypedFallback)
+}
+
+// inspectMetricSchema separates an incompatible metric representation/schema
+// from a structurally valid series whose value cannot be written. The writer
+// uses the distinction only for diagnostics; both outcomes remain unwritable.
+func inspectMetricSchema(
 	metric prompkg.Metric,
 	typ commonmodel.MetricType,
 	allowUntypedFallback bool,
-) (metricFamilySchema, bool) {
+) (metricFamilySchema, PipelineReason) {
 	var schema metricFamilySchema
 
 	switch typ {
 	case commonmodel.MetricTypeGauge:
-		if _, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge, allowUntypedFallback); !ok {
-			return metricFamilySchema{}, false
+		value, ok := metricScalarRawValue(metric, commonmodel.MetricTypeGauge, allowUntypedFallback)
+		if !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		if !isFinite(value) {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
 		}
 	case commonmodel.MetricTypeCounter:
-		if _, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter, allowUntypedFallback); !ok {
-			return metricFamilySchema{}, false
+		value, ok := metricScalarRawValue(metric, commonmodel.MetricTypeCounter, allowUntypedFallback)
+		if !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		if !isFinite(value) {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
 		}
 	case commonmodel.MetricTypeSummary:
 		summary := metric.Summary()
 		if summary == nil {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
 		}
 		qs, ok := summaryQuantiles(summary)
 		if !ok {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
 		}
 		if _, ok := toSummaryPoint(summary); !ok {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
 		}
 		schema.summaryQuantiles = qs
 	case commonmodel.MetricTypeHistogram:
 		histogram := metric.Histogram()
-		if histogram == nil {
-			return metricFamilySchema{}, false
+		if histogram == nil || len(histogram.Buckets()) == 0 {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
 		}
 		bounds, ok := histogramBounds(histogram)
 		if !ok {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
 		}
 		if _, ok := toHistogramPoint(histogram); !ok {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
 		}
 		schema.histogramBounds = bounds
 	default:
-		return metricFamilySchema{}, false
+		return metricFamilySchema{}, PipelineReasonUnsupportedType
 	}
 
-	return schema, true
+	return schema, ""
 }
 
 // metricIsWritable reports whether a series can be written under the family's canonical schema.
@@ -94,22 +129,39 @@ func metricIsWritable(
 	schema metricFamilySchema,
 	allowUntypedFallback bool,
 ) bool {
-	metricSchema, ok := deriveMetricSchema(metric, typ, allowUntypedFallback)
-	if !ok {
-		return false
+	return metricSchemaRejectionReason(metric, typ, schema, allowUntypedFallback) == ""
+}
+
+func metricSchemaRejectionReason(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	schema metricFamilySchema,
+	allowUntypedFallback bool,
+) PipelineReason {
+	metricSchema, reason := inspectMetricSchema(metric, typ, allowUntypedFallback)
+	if reason != "" {
+		return reason
 	}
-	return slices.Equal(schema.summaryQuantiles, metricSchema.summaryQuantiles) &&
-		slices.Equal(schema.histogramBounds, metricSchema.histogramBounds)
+	if !slices.Equal(schema.summaryQuantiles, metricSchema.summaryQuantiles) ||
+		!slices.Equal(schema.histogramBounds, metricSchema.histogramBounds) {
+		return PipelineReasonDistributionSchemaDrift
+	}
+	return ""
 }
 
 func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType, allowUntypedFallback bool) (float64, bool) {
+	value, ok := metricScalarRawValue(metric, typ, allowUntypedFallback)
+	return value, ok && isFinite(value)
+}
+
+func metricScalarRawValue(metric prompkg.Metric, typ commonmodel.MetricType, allowUntypedFallback bool) (float64, bool) {
 	switch typ {
 	case commonmodel.MetricTypeGauge:
-		if gauge := metric.Gauge(); gauge != nil && isFinite(gauge.Value()) {
+		if gauge := metric.Gauge(); gauge != nil {
 			return gauge.Value(), true
 		}
 	case commonmodel.MetricTypeCounter:
-		if counter := metric.Counter(); counter != nil && isFinite(counter.Value()) {
+		if counter := metric.Counter(); counter != nil {
 			return counter.Value(), true
 		}
 	}
@@ -120,7 +172,7 @@ func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType, allowU
 	if !allowUntypedFallback {
 		return 0, false
 	}
-	if untyped := metric.Untyped(); untyped != nil && isFinite(untyped.Value()) {
+	if untyped := metric.Untyped(); untyped != nil {
 		return untyped.Value(), true
 	}
 

@@ -69,23 +69,25 @@ func lessDynamicDimension(lhs, rhs dynamicDimensionOrderEntry) bool {
 	return lhs.name < rhs.name
 }
 
-func enforceLifecycleCaps(
+func enforceLifecycleCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) ([]RemoveDimensionAction, []RemoveChartAction) {
 	if len(chartsByID) == 0 || state == nil {
 		return nil, nil
 	}
-	removeCharts := enforceChartInstanceCaps(currentSuccessSeq, chartsByID, state)
-	removeDims := enforceDimensionCaps(currentSuccessSeq, chartsByID, state)
+	removeCharts := enforceChartInstanceCapsWithObserver(currentSuccessSeq, chartsByID, state, observe)
+	removeDims := enforceDimensionCapsWithObserver(currentSuccessSeq, chartsByID, state, observe)
 	return removeDims, removeCharts
 }
 
-func enforceChartInstanceCaps(
+func enforceChartInstanceCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) []RemoveChartAction {
 	var observedByTemplate map[string][]string
 	for chartID, cs := range chartsByID {
@@ -196,7 +198,20 @@ func enforceChartInstanceCaps(
 			// If all existing instances are active and no new ones were observed, overflow remains
 			// and the soft cap may be temporarily exceeded.
 			for i := len(newObserved) - 1; i >= 0 && overflow > 0; i-- {
-				delete(chartsByID, newObserved[i])
+				chartID := newObserved[i]
+				if observe != nil {
+					cs := chartsByID[chartID]
+					fact := PlanRouteDiagnostic{
+						Decision: PlanRouteLifecycleRejected,
+						Reason:   PlanRouteReasonChartInstanceCap,
+						ChartID:  chartID,
+					}
+					if cs != nil {
+						fact.ChartTemplateID = cs.templateID
+					}
+					observe(fact)
+				}
+				delete(chartsByID, chartID)
 				overflow--
 			}
 		}
@@ -204,10 +219,11 @@ func enforceChartInstanceCaps(
 	return removeCharts
 }
 
-func enforceDimensionCaps(
+func enforceDimensionCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) []RemoveDimensionAction {
 	// Per-chart dimension caps: evict least-recently-seen inactive dims first, then drop new dims.
 	var chartIDs []string
@@ -303,6 +319,15 @@ func enforceDimensionCaps(
 				name := orderedObserved[i]
 				if matChart != nil && matChart.dimensions[name] != nil {
 					continue
+				}
+				if observe != nil {
+					observe(PlanRouteDiagnostic{
+						Decision:        PlanRouteLifecycleRejected,
+						Reason:          PlanRouteReasonDimensionCap,
+						ChartTemplateID: cs.templateID,
+						ChartID:         chartID,
+						DimensionName:   name,
+					})
 				}
 				delete(cs.entries, name)
 				cs.observedCount--

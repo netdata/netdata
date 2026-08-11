@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -132,6 +133,10 @@ func (c Config) clone() Config {
 	}
 	return out
 }
+
+// WithDefaults returns a copy with the same defaults and action normalization
+// that New applies before validation and execution.
+func (c Config) WithDefaults() Config { return withDefaults(c) }
 
 // UnmarshalYAML loads a rule from YAML, starting from the rule defaults and
 // recording which optional fields the document set (so an explicit empty
@@ -472,6 +477,15 @@ func (re Regexp) IsZero() bool {
 // log its name. Value, Kind and FamilyType are passed through unchanged — a
 // relabeled sample is never re-typed.
 func (p *Processor) Apply(sample prompkg.Sample) (prompkg.Sample, DropInfo) {
+	return p.apply(sample, nil)
+}
+
+// ApplyWithObserver is Apply with synchronous rule diagnostics enabled.
+func (p *Processor) ApplyWithObserver(sample prompkg.Sample, observe RuleDiagnosticObserver) (prompkg.Sample, DropInfo) {
+	return p.apply(sample, observe)
+}
+
+func (p *Processor) apply(sample prompkg.Sample, observe RuleDiagnosticObserver) (prompkg.Sample, DropInfo) {
 	if len(p.cfgs) == 0 {
 		return sample, DropInfo{}
 	}
@@ -483,7 +497,25 @@ func (p *Processor) Apply(sample prompkg.Sample) (prompkg.Sample, DropInfo) {
 	p.nameChanged = false
 
 	for i := range p.cfgs {
-		if keep, drop := p.applyConfig(&p.cfgs[i], i); !keep {
+		inputName := p.currentName
+		var inputLabels labels.Labels
+		if observe != nil {
+			inputLabels = slices.Clone(p.builder.Labels())
+		}
+		keep, matched, drop := p.applyConfig(&p.cfgs[i], i)
+		if observe != nil {
+			observe(RuleDiagnostic{
+				RuleIndex:        i,
+				Action:           p.cfgs[i].Action,
+				InputMetricName:  inputName,
+				OutputMetricName: p.currentName,
+				InputLabels:      inputLabels,
+				OutputLabels:     slices.Clone(p.builder.Labels()),
+				Matched:          matched,
+				Dropped:          !keep,
+			})
+		}
+		if !keep {
 			return sample, drop
 		}
 	}
@@ -503,28 +535,36 @@ func (p *Processor) Apply(sample prompkg.Sample) (prompkg.Sample, DropInfo) {
 	return sample, DropInfo{}
 }
 
-func (p *Processor) applyConfig(cfg *Config, idx int) (bool, DropInfo) {
+func (p *Processor) applyConfig(cfg *Config, idx int) (bool, bool, DropInfo) {
 	val := p.joinSourceLabels(cfg.SourceLabels, cfg.Separator)
 
 	switch cfg.Action {
 	case Drop:
-		if cfg.Regex.MatchString(val) {
-			return false, DropInfo{Reason: DropReasonDropRuleMatched, RuleIndex: idx, Action: Drop}
+		matched := cfg.Regex.MatchString(val)
+		if matched {
+			return false, true, DropInfo{Reason: DropReasonDropRuleMatched, RuleIndex: idx, Action: Drop}
 		}
+		return true, false, DropInfo{}
 	case Keep:
-		if !cfg.Regex.MatchString(val) {
-			return false, DropInfo{Reason: DropReasonKeepRuleMismatch, RuleIndex: idx, Action: Keep}
+		matched := cfg.Regex.MatchString(val)
+		if !matched {
+			return false, false, DropInfo{Reason: DropReasonKeepRuleMismatch, RuleIndex: idx, Action: Keep}
 		}
+		return true, true, DropInfo{}
 	case DropEqual:
-		if p.getLabel(cfg.TargetLabel) == val {
-			return false, DropInfo{Reason: DropReasonDropEqualMatched, RuleIndex: idx, Action: DropEqual}
+		matched := p.getLabel(cfg.TargetLabel) == val
+		if matched {
+			return false, true, DropInfo{Reason: DropReasonDropEqualMatched, RuleIndex: idx, Action: DropEqual}
 		}
+		return true, false, DropInfo{}
 	case KeepEqual:
-		if p.getLabel(cfg.TargetLabel) != val {
-			return false, DropInfo{Reason: DropReasonKeepEqualMismatch, RuleIndex: idx, Action: KeepEqual}
+		matched := p.getLabel(cfg.TargetLabel) == val
+		if !matched {
+			return false, false, DropInfo{Reason: DropReasonKeepEqualMismatch, RuleIndex: idx, Action: KeepEqual}
 		}
+		return true, true, DropInfo{}
 	case Replace:
-		p.applyReplace(cfg, val)
+		return true, p.applyReplace(cfg, val), DropInfo{}
 	case Lowercase:
 		p.setLabel(cfg.TargetLabel, strings.ToLower(val), cfg.NameScheme)
 	case Uppercase:
@@ -534,57 +574,67 @@ func (p *Processor) applyConfig(cfg *Config, idx int) (bool, DropInfo) {
 		mod := binary.BigEndian.Uint64(hash[8:]) % cfg.Modulus
 		p.setLabel(cfg.TargetLabel, strconv.FormatUint(mod, 10), cfg.NameScheme)
 	case LabelMap:
+		matched := false
 		p.rangeLabels(func(l labels.Label) {
 			if cfg.Regex.MatchString(l.Name) {
+				matched = true
 				p.setLabel(cfg.Regex.ReplaceAllString(l.Name, cfg.Replacement), l.Value, cfg.NameScheme)
 			}
 		})
+		return true, matched, DropInfo{}
 	case LabelDrop:
+		matched := false
 		p.rangeLabels(func(l labels.Label) {
 			if cfg.Regex.MatchString(l.Name) {
+				matched = true
 				p.delLabel(l.Name)
 			}
 		})
+		return true, matched, DropInfo{}
 	case LabelKeep:
+		matched := false
 		p.rangeLabels(func(l labels.Label) {
 			if !cfg.Regex.MatchString(l.Name) {
+				matched = true
 				p.delLabel(l.Name)
 			}
 		})
+		return true, matched, DropInfo{}
 	default:
 		panic(fmt.Errorf("unknown relabel action %q", cfg.Action))
 	}
 
-	return true, DropInfo{}
+	return true, true, DropInfo{}
 }
 
-func (p *Processor) applyReplace(cfg *Config, val string) {
+func (p *Processor) applyReplace(cfg *Config, val string) bool {
 	if val == "" &&
 		cfg.Regex.String() == defaultConfig.Regex.String() &&
 		!varInRegexTemplate(cfg.TargetLabel) &&
 		!varInRegexTemplate(cfg.Replacement) {
 		p.setLabel(cfg.TargetLabel, cfg.Replacement, cfg.NameScheme)
-		return
+		return true
 	}
 
 	indexes := cfg.Regex.FindStringSubmatchIndex(val)
 	if indexes == nil {
-		return
+		return false
 	}
 
 	p.buf = cfg.Regex.ExpandString(p.buf[:0], cfg.TargetLabel, val, indexes)
 	target := string(p.buf)
 	if !cfg.NameScheme.IsValidLabelName(target) {
-		return
+		return true
 	}
 
 	p.buf = cfg.Regex.ExpandString(p.buf[:0], cfg.Replacement, val, indexes)
 	if len(p.buf) == 0 {
 		p.delLabel(target)
-		return
+		return true
 	}
 
 	p.setLabel(target, string(p.buf), cfg.NameScheme)
+	return true
 }
 
 func (p *Processor) joinSourceLabels(sourceLabels []string, separator string) string {
@@ -653,13 +703,12 @@ func (p *Processor) rangeLabels(fn func(labels.Label)) {
 	// labels (labelmap) does not re-process labels it creates in the same rule. The
 	// scratch buffer is reused across calls.
 	//
-	// __name__ is deliberately excluded: labelmap/labeldrop/labelkeep operate on label
-	// names, and the metric name is never a sensible subject for them — labelmap would
-	// derive a junk label from the name, and labeldrop/labelkeep would strip the name
-	// and invalidate the metric. This diverges from Prometheus, which exposes __name__
-	// to these actions; here a metric is renamed only by a replace rule that targets
-	// __name__. (p.builder never holds __name__ — the name lives in p.currentName — so
-	// not re-adding it here is all it takes.)
+	// __name__ is deliberately excluded as an input: labelmap/labeldrop/labelkeep
+	// operate on application-label names, while the metric name lives separately in
+	// p.currentName. This diverges from Prometheus, which exposes __name__ to these
+	// actions. A labelmap replacement may still produce the destination __name__ and
+	// copy a matching application label's value into p.currentName; labeldrop and
+	// labelkeep cannot remove it because it is not ranged here.
 	p.rangeBuf = p.rangeBuf[:0]
 	p.builder.Range(func(l labels.Label) {
 		p.rangeBuf = append(p.rangeBuf, l)

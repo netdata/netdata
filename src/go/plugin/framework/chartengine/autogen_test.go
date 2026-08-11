@@ -236,7 +236,7 @@ func TestResolveAutogenRouteRulesUseSourceFamily(t *testing.T) {
 				autogenRules: rules,
 			}}}
 
-			routes, ok, err := e.resolveAutogenRoute(nil, test.metricName, sortedLabelView(test.labels), test.meta)
+			routes, ok, _, _, err := e.resolveAutogenRouteWithReason(nil, test.metricName, sortedLabelView(test.labels), test.meta)
 			require.NoError(t, err)
 			assert.False(t, ok)
 			assert.Empty(t, routes)
@@ -250,7 +250,7 @@ func TestResolveAutogenRouteRulesUseSourceFamily(t *testing.T) {
 				}},
 			})
 			require.NoError(t, err)
-			routes, ok, err = e.resolveAutogenRoute(nil, test.metricName, sortedLabelView(test.labels), test.meta)
+			routes, ok, _, _, err = e.resolveAutogenRouteWithReason(nil, test.metricName, sortedLabelView(test.labels), test.meta)
 			require.NoError(t, err)
 			assert.True(t, ok)
 			assert.NotEmpty(t, routes)
@@ -329,7 +329,7 @@ func TestResolveAutogenRouteRuleSemantics(t *testing.T) {
 				autogenRules: rules,
 			}}}
 
-			routes, ok, err := e.resolveAutogenRoute(
+			routes, ok, _, _, err := e.resolveAutogenRouteWithReason(
 				nil,
 				"svc.requests_total",
 				sortedLabelView(nil),

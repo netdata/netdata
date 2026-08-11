@@ -57,11 +57,7 @@ func compileProfileFallbacks(profiles []promprofiles.Profile) ([]profileFallback
 		if err != nil {
 			return nil, fmt.Errorf("profile %q: compile fallback_type.counter: %w", profile.Name, err)
 		}
-		fallbacks = append(fallbacks, profileFallback{
-			root:    root,
-			gauge:   gauge,
-			counter: counter,
-		})
+		fallbacks = append(fallbacks, profileFallback{root: root, gauge: gauge, counter: counter})
 	}
 	return fallbacks, nil
 }
@@ -80,6 +76,7 @@ func (f profileFallback) resolve(name string) (commonmodel.MetricType, bool) {
 }
 
 type profileNormalizer struct {
+	name     string
 	root     matcher.Matcher
 	pipeline *relabel.Pipeline
 }
@@ -102,7 +99,7 @@ func compileProfileNormalizers(profiles []promprofiles.Profile) ([]profileNormal
 		if err != nil {
 			return nil, err
 		}
-		normalizers = append(normalizers, profileNormalizer{root: root, pipeline: pipeline})
+		normalizers = append(normalizers, profileNormalizer{name: profile.Name, root: root, pipeline: pipeline})
 	}
 	return normalizers, nil
 }

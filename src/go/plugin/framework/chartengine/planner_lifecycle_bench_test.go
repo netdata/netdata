@@ -89,7 +89,7 @@ func BenchmarkEnforceLifecycleCaps(b *testing.B) {
 				tc.dimCaps,
 			)
 
-			removeDims, removeCharts := enforceLifecycleCaps(currentSeq, chartsByID, &state)
+			removeDims, removeCharts := enforceLifecycleCapsWithObserver(currentSeq, chartsByID, &state, nil)
 			if len(removeDims) != 0 || len(removeCharts) != 0 {
 				b.Fatalf("unexpected lifecycle removals: dimensions=%d charts=%d", len(removeDims), len(removeCharts))
 			}
@@ -98,7 +98,7 @@ func BenchmarkEnforceLifecycleCaps(b *testing.B) {
 			b.ResetTimer()
 			var removalCount int
 			for range b.N {
-				removeDims, removeCharts := enforceLifecycleCaps(currentSeq, chartsByID, &state)
+				removeDims, removeCharts := enforceLifecycleCapsWithObserver(currentSeq, chartsByID, &state, nil)
 				removalCount = len(removeDims) + len(removeCharts)
 			}
 			benchmarkLifecycleRemovalCount = removalCount
@@ -153,7 +153,7 @@ func TestEnforceLifecycleCapsAllocationEnvelope(t *testing.T) {
 			)
 
 			allocs := testing.AllocsPerRun(25, func() {
-				removeDims, removeCharts := enforceLifecycleCaps(currentSeq, chartsByID, &state)
+				removeDims, removeCharts := enforceLifecycleCapsWithObserver(currentSeq, chartsByID, &state, nil)
 				if len(removeDims) != 0 || len(removeCharts) != 0 {
 					t.Fatalf(
 						"unexpected lifecycle removals: dimensions=%d charts=%d",

@@ -115,6 +115,8 @@ groups:
 		buildSeq := uint64(i/identityBatchSize) + 1
 		routes, cached, err := engine.resolveSeriesRoutes(
 			cache,
+			true,
+			nil,
 			identities[i%identityBatchSize],
 			"bench_metric",
 			view,

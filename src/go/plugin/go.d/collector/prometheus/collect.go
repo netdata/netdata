@@ -92,7 +92,7 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 
 	postJob := batch
 	var postJobFamilies prometheus.MetricFamilies
-	if c.jobRelabel == nil {
+	if c.jobRelabel == nil && c.pipelineObserver == nil {
 		postJobFamilies, err = prometheus.Assemble(postJob)
 	} else {
 		postJob, postJobFamilies, err = c.relabelAndAssemble(postJob, c.jobRelabel, jobRelabelStage, true)
@@ -110,6 +110,12 @@ func (c *Collector) checkRuntimeCandidate(ctx context.Context) (*promRuntime, pr
 	candidate.profiles, err = c.selectProfiles(postJobFamilies)
 	if err != nil {
 		return nil, nil, false, err
+	}
+	for _, profile := range candidate.profiles {
+		c.observePipeline(PipelineDiagnostic{
+			Decision:    PipelineProfileSelected,
+			ProfileName: profile.Name,
+		})
 	}
 	normalizationOrder := profilesInNormalizationOrder(candidate.profiles, c.Profiles)
 	candidate.fallbacks, err = compileProfileFallbacks(normalizationOrder)
@@ -143,7 +149,7 @@ func (c *Collector) scrapeProfilePipeline(
 	if err != nil {
 		return nil, err
 	}
-	if c.jobRelabel != nil {
+	if c.jobRelabel != nil || c.pipelineObserver != nil {
 		batch, err = c.relabelAndValidateBatch(batch, c.jobRelabel, jobRelabelStage, checking)
 		if err != nil {
 			return nil, err
@@ -207,7 +213,7 @@ func (c *Collector) validateExpectedPrefix(mfs prometheus.MetricFamilies) error 
 // classified sample stream and runs the relabel pipeline (relabel, assemble, curate typed
 // families) in relabelAndAssemble.
 func (c *Collector) scrapeMetricFamilies(ctx context.Context, checking bool) (prometheus.MetricFamilies, error) {
-	if c.jobRelabel == nil {
+	if c.jobRelabel == nil && c.pipelineObserver == nil {
 		return c.prom.ScrapeContext(ctx)
 	}
 

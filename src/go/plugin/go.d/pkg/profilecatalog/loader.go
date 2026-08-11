@@ -84,9 +84,11 @@ type Options[P any] struct {
 
 var defaultLog = logger.New().With("component", "go.d/profilecatalog")
 
-// reValidName is the default profile-identity constraint applied to file
-// basenames: lowercase, starting with a letter.
-var reValidName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+// DefaultValidNamePattern is the default profile-identity constraint applied to
+// file basenames: lowercase, starting with a letter.
+const DefaultValidNamePattern = `^[a-z][a-z0-9_]*$`
+
+var reValidName = regexp.MustCompile(DefaultValidNamePattern)
 
 // DefaultValidName reports whether name satisfies the default profile-identity
 // constraint (`^[a-z][a-z0-9_]*$`). Collectors reuse it to reject names that no

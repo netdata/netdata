@@ -43,23 +43,51 @@ func BenchmarkMetricFamilyWriter(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	store := metrix.NewCollectorStore()
-	w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
-	managed, ok := metrix.AsCycleManagedStore(store)
-	if !ok {
-		b.Fatal("store is not cycle-managed")
-	}
-	cc := managed.CycleController()
+	for _, tc := range []struct {
+		name     string
+		observer PipelineDiagnosticObserver
+	}{
+		{name: "diagnostics_disabled"},
+		{name: "diagnostics_enabled", observer: func(PipelineDiagnostic) {}},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			store := metrix.NewCollectorStore()
+			w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{observePipeline: tc.observer}, logger.New())
+			managed, ok := metrix.AsCycleManagedStore(store)
+			if !ok {
+				b.Fatal("store is not cycle-managed")
+			}
+			cc := managed.CycleController()
 
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		cc.BeginCycle()
-		w.writeMetricFamilies(mfs)
-		if err := cc.CommitCycleSuccess(); err != nil {
-			b.Fatal(err)
-		}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				cc.BeginCycle()
+				w.writeMetricFamilies(mfs)
+				if err := cc.CommitCycleSuccess(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
+}
+
+func BenchmarkPipelineDiagnosticDispatch(b *testing.B) {
+	fact := PipelineDiagnostic{Decision: PipelineWriterSeriesAccepted}
+	b.Run("disabled", func(b *testing.B) {
+		collector := New()
+		b.ReportAllocs()
+		for range b.N {
+			collector.observePipeline(fact)
+		}
+	})
+	b.Run("enabled", func(b *testing.B) {
+		collector := NewWithOptions(WithPipelineDiagnosticObserver(func(PipelineDiagnostic) {}))
+		b.ReportAllocs()
+		for range b.N {
+			collector.observePipeline(fact)
+		}
+	})
 }
 
 func buildBenchExposition(n int) string {
