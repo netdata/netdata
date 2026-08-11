@@ -4,6 +4,12 @@
 # Windows counterpart of netdata-support-bundle. Same bundle layout, same MANIFEST
 # schema (netdata-support-bundle/v1), same sanitization rules.
 #
+# Secrets are always redacted, with ONE documented exception: the streaming API
+# key in stream.conf is kept verbatim (netdata/netdata#23448). Collected files
+# keep their original bytes - BOM, line terminators and a missing final newline
+# all survive redaction - and what was observed is recorded per file in
+# MANIFEST.json, so encoding faults stay diagnosable.
+#
 # What is collected and WHY each item is included is documented in
 # packaging/installer/SUPPORT-BUNDLE.md - read it before adding or changing
 # a collection item, and keep it in sync with this script.
@@ -29,7 +35,7 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'SilentlyContinue'
 
-$ToolVersion = '1.0.0'
+$ToolVersion = '1.1.0'
 if ($Version) { Write-Output "netdata-support-bundle $ToolVersion"; exit 0 }
 
 $Obfuscate = -not $NoObfuscate
@@ -55,7 +61,17 @@ $script:PseudoMap = @{}   # original -> pseudonym
 $script:IpCount = 0
 $script:Ip6Count = 0
 $script:FqdnCount = 0
+$script:DomainCount = 0
 $script:SeededHosts = @() # child/mirrored hostnames pre-seeded from the local API
+# encoding facts of the file most recently sanitized; consumed by Add-Manifest.
+# EncNotes keeps only the ANOMALIES, which summary.txt surfaces.
+$script:EncJson = $null
+$script:EncNote = ''
+$script:EncNotes = New-Object System.Collections.ArrayList
+# byte-exact encoding preservation reads the whole file into one string; the
+# Windows perflib dump can be tens of MB, where fidelity is irrelevant (we
+# generated it) and the memory cost is not. Above this, use the line path.
+$script:ByteExactMax = 8MB
 
 function Show-Info([string]$msg) { Write-Host " [*] $msg" }
 
@@ -93,6 +109,23 @@ $HostShort = $env:COMPUTERNAME
 $HostFqdn = try { [System.Net.Dns]::GetHostEntry('').HostName } catch { Write-Verbose "no FQDN: $_"; '' }
 $RunUser = $env:USERNAME
 if ($RunUser -in @('SYSTEM', 'Administrator') -or -not $RunUser -or $RunUser.Length -lt 3) { $RunUser = '' }
+# An Active Directory domain name is a corporate identifier, and the new
+# 09-permissions ACL captures print DOMAIN\user everywhere. Pseudonymize the
+# machine's OWN domain by exact value - the same approach used for the hostname
+# and the invoking user - rather than by pattern: a generic DOMAIN\user regex
+# cannot be told apart from a Windows path segment (C:\Users\Public).
+# POSIX has no counterpart: getfacl there yields local accounts only.
+$UserDomain = $env:USERDOMAIN
+if (-not $UserDomain -or $UserDomain -eq $HostShort -or $UserDomain.Length -lt 3) { $UserDomain = '' }
+$DnsDomain = ''
+try {
+    $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+    if ($cs -and $cs.PartOfDomain -and $cs.Domain) { $DnsDomain = [string]$cs.Domain }
+} catch { Write-Verbose "could not read the computer domain: $_" }
+if ($DnsDomain -in @('WORKGROUP', $HostShort, $HostFqdn) -or $DnsDomain.Length -lt 4) { $DnsDomain = '' }
+# set per file by Invoke-SanitizeLine; "stream" marks stream.conf, the one file
+# whose streaming API key is kept verbatim (netdata/netdata#23448)
+$script:SanCtx = ''
 
 function Test-SecretKey([string]$key) {
     $k = ($key -replace '[-_]', ' ').ToLower().Trim(' ', '#', "`t")
@@ -113,6 +146,19 @@ function Test-DiagnosticKey([string]$key) {
     return $false
 }
 
+function Test-StreamingApiKey([string]$key) {
+    # netdata/netdata#23448: the STREAMING api key is not treated as a secret -
+    # support needs its value to tell whether a child and its parent agree.
+    # Scoped to stream.conf ($script:SanCtx) and to an EXACT key match, so a
+    # third-party "api key" in any other file, and any other secret key inside
+    # stream.conf, is still redacted. Deliberately NOT applied to access logs,
+    # where the same value also appears (stream-receiver-connection.c logs it,
+    # and children send it as a "key=" query parameter).
+    if ($script:SanCtx -ne 'stream') { return $false }
+    $k = ($key -replace '[-_]', ' ').ToLower().Trim(' ', '#', "`t")
+    return ($k -eq 'api key' -or $k -eq 'proxy api key')
+}
+
 function Get-Pseudonym([string]$orig, [string]$prefix) {
     if (-not $script:PseudoMap.ContainsKey($orig)) {
         # cap: past 4096 mappings, use a constant non-correlating placeholder
@@ -127,8 +173,12 @@ function Get-Pseudonym([string]$orig, [string]$prefix) {
 
 function Invoke-RedactSecretLine([string]$line) {
     # pass 1 (always on): credential redaction
-    # stream.conf-style [<uuid>] section headers are api keys
-    if ($line -match '^\s*\[[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\]\s*$') {
+    # [<uuid>] section headers are api keys (or machine GUIDs). In stream.conf
+    # they are KEPT: support needs to see which key each section configures, and
+    # collapsing them all to one placeholder also made per-key settings
+    # unattributable. Everywhere else they are still withheld.
+    if ($script:SanCtx -ne 'stream' -and
+        $line -match '^\s*\[[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\]\s*$') {
         return '[REDACTED-KEY-SECTION]'
     }
     # ini/yaml/env key = value | key: value
@@ -136,7 +186,8 @@ function Invoke-RedactSecretLine([string]$line) {
     # only plausible config keys: short, no sentence/shell punctuation, no path
     # separators (command lines with paths belong to the argv rule below)
     if ($line -notmatch '^\s*"' -and $line -match '^([^=:]{1,64})([=:])(.+)$' -and $Matches[1] -notmatch '["`;|()/]') {
-        if ((Test-SecretKey $Matches[1]) -and $Matches[3].Trim() -ne '' -and -not (Test-DiagnosticKey $Matches[1])) {
+        if ((Test-SecretKey $Matches[1]) -and $Matches[3].Trim() -ne '' -and
+            -not (Test-DiagnosticKey $Matches[1]) -and -not (Test-StreamingApiKey $Matches[1])) {
             $line = $Matches[1] + $Matches[2] + ' [REDACTED]'
         }
     }
@@ -170,7 +221,8 @@ function Invoke-RedactSecretLine([string]$line) {
     # incl. two-word keys ("api key = X"); diagnostic-noun keys are kept
     $line = [regex]::Replace($line, '(?i)(([\w.-]*(token|password|passwd|secret|apikey|api_key|community|bearer)|(api|license|auth|access) key|proxy (user|pass|password)) ?[=:] ?)([^&"\s\[]+)', {
         param($m)
-        if (Test-DiagnosticKey $m.Groups[2].Value) { $m.Value } else { $m.Groups[1].Value + '[REDACTED]' }
+        if ((Test-DiagnosticKey $m.Groups[2].Value) -or (Test-StreamingApiKey $m.Groups[2].Value)) { $m.Value }
+        else { $m.Groups[1].Value + '[REDACTED]' }
     })
     # NOTE: multiline PEM private-key blocks are handled by Invoke-SanitizeFile,
     # which tracks BEGIN/END state across lines and withholds the whole block.
@@ -254,10 +306,20 @@ function Invoke-ObfuscatePiiLine([string]$line) {
         if (-not $script:PseudoMap.ContainsKey($RunUser)) { $script:PseudoMap[$RunUser] = 'redacted-user' }
         $line = $line -ireplace [regex]::Escape($RunUser), 'redacted-user'
     }
+    # the machine's own AD domain (DOMAIN\user in ACL output, and the DNS domain)
+    if ($DnsDomain) {
+        if (-not $script:PseudoMap.ContainsKey($DnsDomain)) { $script:PseudoMap[$DnsDomain] = 'redacted-domain' }
+        $line = $line -ireplace [regex]::Escape($DnsDomain), 'redacted-domain'
+    }
+    if ($UserDomain) {
+        if (-not $script:PseudoMap.ContainsKey($UserDomain)) { $script:PseudoMap[$UserDomain] = 'redacted-domain' }
+        $line = $line -ireplace [regex]::Escape($UserDomain), 'redacted-domain'
+    }
     return $line
 }
 
-function Invoke-SanitizeLine([string]$line, [bool]$secretScan = $true) {
+function Invoke-SanitizeLine([string]$line, [bool]$secretScan = $true, [string]$ctx = '') {
+    $script:SanCtx = $ctx
     # $secretScan can be disabled for content that structurally cannot hold
     # credentials (the Windows perflib dump: counter/instance metadata only), so
     # the expensive per-"key":"value" credential regexes are not run millions of
@@ -267,25 +329,62 @@ function Invoke-SanitizeLine([string]$line, [bool]$secretScan = $true) {
     return $line
 }
 
-function Test-FileHasNul([string]$path) {
-    # a NUL in the first 1 MiB means binary/UTF-16: line-based redaction would
-    # be byte-unsafe, so the caller withholds the file
-    $fs = [System.IO.File]::OpenRead($path)
+function Get-FileEncodingFacts([string]$path) {
+    # Record the encoding of a collected file BEFORE redaction touches it, so
+    # support can tell a genuine source-file encoding fault (a BOM, mixed line
+    # endings, a missing final newline) from an artifact of this tool. The old
+    # ReadAllLines/WriteAllLines pair normalized every one of these away
+    # silently - netdata/netdata#23448.
+    $bytes = [System.IO.File]::ReadAllBytes($path)
+    $bom = 'none'; $bomLen = 0
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        $bom = 'utf-8'; $bomLen = 3
+    } elseif ($bytes.Length -ge 4 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE -and $bytes[2] -eq 0 -and $bytes[3] -eq 0) {
+        $bom = 'utf-32le'; $bomLen = 4
+    } elseif ($bytes.Length -ge 4 -and $bytes[0] -eq 0 -and $bytes[1] -eq 0 -and $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF) {
+        $bom = 'utf-32be'; $bomLen = 4
+    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+        $bom = 'utf-16le'; $bomLen = 2
+    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+        $bom = 'utf-16be'; $bomLen = 2
+    }
+    $lf = 0; $crlf = 0; $crAll = 0; $nonAscii = 0; $nul = $false
+    for ($i = $bomLen; $i -lt $bytes.Length; $i++) {
+        $b = $bytes[$i]
+        if ($b -eq 0) { $nul = $true }
+        elseif ($b -eq 10) { if ($i -gt $bomLen -and $bytes[$i - 1] -eq 13) { $crlf++ } else { $lf++ } }
+        elseif ($b -eq 13) { $crAll++ }
+        if ($b -gt 127) { $nonAscii++ }
+    }
+    $cr = $crAll - $crlf; if ($cr -lt 0) { $cr = 0 }
+    $finalNewline = ($bytes.Length -gt $bomLen -and $bytes[$bytes.Length - 1] -eq 10)
+    # a strict decoder is the cheapest UTF-8 validator available here
+    $utf8Valid = $true
     try {
-        $want = $fs.Length   # staged file is already size-capped before sanitize
-        $probe = New-Object byte[] $want
-        $read = 0
-        while ($read -lt $want) {
-            $n = $fs.Read($probe, $read, $want - $read)
-            if ($n -le 0) { break }
-            $read += $n
+        $strict = New-Object System.Text.UTF8Encoding($false, $true)
+        [void]$strict.GetString($bytes, $bomLen, $bytes.Length - $bomLen)
+    } catch { $utf8Valid = $false }
+    $notes = @()
+    if ($bom -ne 'none') { $notes += "$bom-BOM" }
+    if ($cr -gt 0) { $notes += "CR-only-line-endings($cr)" }
+    if ($crlf -gt 0 -and $lf -gt 0) { $notes += "mixed-line-endings(lf=$lf,crlf=$crlf)" }
+    if (-not $finalNewline -and $bytes.Length -gt 0) { $notes += 'no-final-newline' }
+    if (-not $utf8Valid) { $notes += 'invalid-UTF-8' }
+    return [pscustomobject]@{
+        size  = $bytes.Length
+        bomLen = $bomLen
+        nul   = $nul
+        notes = $notes
+        json  = [ordered]@{
+            bom = $bom; lf = $lf; crlf = $crlf; cr = $cr
+            final_newline = [bool]$finalNewline
+            # the scan starts past the BOM, so its bytes are already excluded
+            non_ascii_bytes = $nonAscii; utf8_valid = [bool]$utf8Valid
         }
-    } finally { $fs.Close() }
-    for ($i = 0; $i -lt $read; $i++) { if ($probe[$i] -eq 0) { return $true } }
-    return $false
+    }
 }
 
-function Convert-SanitizedText([string[]]$lines, [bool]$secretScan = $true) {
+function Convert-SanitizedText([string[]]$lines, [bool]$secretScan = $true, [string]$ctx = '') {
     # per-line redaction, plus whole-block withholding for PEM private keys
     # (clear BEGIN/END markers). Multi-line YAML block scalars are NOT specially
     # withheld - their indentation-based boundary can't be detected robustly by
@@ -304,19 +403,79 @@ function Convert-SanitizedText([string[]]$lines, [bool]$secretScan = $true) {
             [void]$out.Add('[REDACTED PRIVATE KEY BLOCK]')
             continue
         }
-        [void]$out.Add((Invoke-SanitizeLine $l $secretScan))
+        [void]$out.Add((Invoke-SanitizeLine $l $secretScan $ctx))
     }
     return $out
 }
 
-function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true) {
+function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true, [string]$ctx = '') {
     if (-not (Test-Path $path)) { return }
-    if (Test-FileHasNul $path) {
+    $script:EncJson = $null
+    $facts = Get-FileEncodingFacts $path
+    if ($facts.nul) {
+        # a NUL means binary/UTF-16: line-based redaction would be byte-unsafe
         Write-Utf8 $path '[content withheld: file contains NUL bytes (binary or UTF-16?)]'
         return
     }
-    $out = Convert-SanitizedText ([System.IO.File]::ReadAllLines($path)) $secretScan
-    [System.IO.File]::WriteAllLines($path, $out, $script:Utf8NoBom)
+    if ($facts.size -gt $script:ByteExactMax) {
+        # large GENERATED capture (the perflib dump): there is no source encoding
+        # to preserve, and holding tens of MB twice is not worth it
+        $out = Convert-SanitizedText ([System.IO.File]::ReadAllLines($path)) $secretScan $ctx
+        [System.IO.File]::WriteAllLines($path, $out, $script:Utf8NoBom)
+        return
+    }
+    $script:EncJson = $facts.json
+    # Staged for Add-Manifest to commit, NOT recorded here: only COPIED files have
+    # a source encoding worth reporting. A command capture's line endings are this
+    # tool's own artifact (the provenance header is CRLF-joined), so recording
+    # them would fill the report with noise that looks like user-file faults.
+    $script:EncNote = ''
+    if ($facts.notes.Count -gt 0) {
+        $encRel = $path
+        if ($path.StartsWith($Work)) { $encRel = $path.Substring($Work.Length).TrimStart('\', '/').Replace('\', '/') }
+        $script:EncNote = "{0}`t{1}" -f $encRel, ($facts.notes -join ' ')
+    }
+    # byte-exact path: keep the BOM bytes, keep every line's OWN terminator, and
+    # never invent a final newline the source did not have
+    $bytes = [System.IO.File]::ReadAllBytes($path)
+    $text = $script:Utf8NoBom.GetString($bytes, $facts.bomLen, $bytes.Length - $facts.bomLen)
+    $sb = New-Object System.Text.StringBuilder
+    $inPem = $false
+    $pos = 0
+    $breaks = [char[]]@("`r", "`n")
+    while ($pos -lt $text.Length) {
+        $nl = $text.IndexOfAny($breaks, $pos)
+        if ($nl -lt 0) {
+            $lineText = $text.Substring($pos); $term = ''; $pos = $text.Length
+        } else {
+            $lineText = $text.Substring($pos, $nl - $pos)
+            if ($text[$nl] -eq "`r" -and ($nl + 1) -lt $text.Length -and $text[$nl + 1] -eq "`n") {
+                $term = "`r`n"; $pos = $nl + 2
+            } else {
+                $term = [string]$text[$nl]; $pos = $nl + 1
+            }
+        }
+        # PEM private key: withhold BEGIN..END; fail closed if END never comes
+        if ($inPem) {
+            if ($lineText -match '-----END [A-Z0-9 ]*PRIVATE KEY') { $inPem = $false }
+            continue
+        }
+        if ($lineText -match '-----BEGIN [A-Z0-9 ]*PRIVATE KEY') {
+            $inPem = $true
+            [void]$sb.Append('[REDACTED PRIVATE KEY BLOCK]').Append($term)
+            continue
+        }
+        [void]$sb.Append((Invoke-SanitizeLine $lineText $secretScan $ctx)).Append($term)
+    }
+    $body = $script:Utf8NoBom.GetBytes($sb.ToString())
+    if ($facts.bomLen -gt 0) {
+        $outBytes = New-Object byte[] ($facts.bomLen + $body.Length)
+        [System.Array]::Copy($bytes, 0, $outBytes, 0, $facts.bomLen)
+        [System.Array]::Copy($body, 0, $outBytes, $facts.bomLen, $body.Length)
+    } else {
+        $outBytes = $body
+    }
+    [System.IO.File]::WriteAllBytes($path, $outBytes)
 }
 
 # --- sanitizer self-test (-SelfTest) ----------------------------------------------
@@ -326,6 +485,8 @@ if ($SelfTest) {
     $HostShort = 'testhost99'
     $HostFqdn = 'testhost99.example.com'
     $RunUser = 'testuser9'
+    $UserDomain = 'TESTDOM'
+    $DnsDomain = 'testdom.example.com'
     $vectors = @(
         @{ in = 'api key = SENTINEL-1';                                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         # assembled at runtime so secret scanners do not flag the source
@@ -361,6 +522,9 @@ if ($SelfTest) {
         @{ in = 'destination = [2001:db8::77]:19999 unix:/run/nd.sock';            mustNot = @('2001:db8::77');        must = @('ip6-', ']:19999', 'unix:/run/nd.sock') }
         @{ in = 'password: q';                                                     mustNot = @(': q');                 must = @('[REDACTED]') }
         @{ in = '"api_token": 731942';                                             mustNot = @('731942');              must = @('[REDACTED]') }
+        # 09-permissions ACL output: the machine's own AD domain is a corporate
+        # identifier, built-in authorities are not
+        @{ in = 'BUILTIN\Administrators and TESTDOM\svc_netdata have Modify';       mustNot = @('TESTDOM');             must = @('redacted-domain', 'BUILTIN\Administrators') }
     )
     $fails = 0
     foreach ($v in $vectors) {
@@ -370,6 +534,60 @@ if ($SelfTest) {
         foreach ($p in $v.must) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { $ok = $false } }
         if ($ok) { Write-Output "ok:   $result" } else { Write-Output "FAIL: '$($v.in)' -> '$result'"; $fails++ }
     }
+    # --- stream.conf context (netdata/netdata#23448): the STREAMING api key is
+    # --- kept verbatim, while every other secret in the same file is redacted
+    $streamVectors = @(
+        @{ in = '    api key = 11111111-2222-3333-4444-555555555555';       mustNot = @('REDACTED'); must = @('api key = 11111111-2222-3333-4444-555555555555') }
+        @{ in = '    proxy api key = 99999999-8888-7777-6666-555555555555'; mustNot = @('REDACTED'); must = @('proxy api key = 99999999-8888-7777-6666-555555555555') }
+        @{ in = '[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]';                   mustNot = @('REDACTED'); must = @('[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]') }
+        # a NON-api-key secret in the same file is still redacted
+        @{ in = '    password = SENTINEL-STREAM-PW';                        mustNot = @('SENTINEL'); must = @('[REDACTED]') }
+        # PII obfuscation is NOT disabled by the stream context
+        @{ in = '    destination = parent.example.internal:19999';          mustNot = @('parent.example'); must = @('private-host') }
+    )
+    foreach ($v in $streamVectors) {
+        $result = Invoke-SanitizeLine $v.in $true 'stream'
+        $ok = $true
+        foreach ($p in $v.mustNot) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $ok = $false } }
+        foreach ($p in $v.must) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { $ok = $false } }
+        if ($ok) { Write-Output "ok:   [stream] $result" } else { Write-Output "FAIL: [stream] '$($v.in)' -> '$result'"; $fails++ }
+    }
+    # the SAME lines WITHOUT the stream context must still be redacted
+    $noStreamVectors = @(
+        @{ in = '    api key = 11111111-2222-3333-4444-555555555555'; mustNot = @('11111111'); must = @('[REDACTED]') }
+        @{ in = '[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]';             mustNot = @('aaaaaaaa'); must = @('[REDACTED-KEY-SECTION]') }
+    )
+    foreach ($v in $noStreamVectors) {
+        $result = Invoke-SanitizeLine $v.in
+        $ok = $true
+        foreach ($p in $v.mustNot) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $ok = $false } }
+        foreach ($p in $v.must) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { $ok = $false } }
+        if ($ok) { Write-Output "ok:   [no-ctx] $result" } else { Write-Output "FAIL (leak): [no-ctx] '$($v.in)' -> '$result'"; $fails++ }
+    }
+
+    # --- encoding fidelity (netdata/netdata#23448): a BOM, CRLF endings and a
+    # --- missing final newline must all survive redaction, and a BOM must NOT
+    # --- shift the ^-anchored rules (it used to defeat the section redaction)
+    $encTmp = Join-Path $Staging 'enc-test.conf'
+    $encText = "[11111111-2222-3333-4444-555555555555]`r`npassword = SENTINEL-ENC`r`nlast line without newline"
+    [System.IO.File]::WriteAllBytes($encTmp,
+        [byte[]](@(0xEF, 0xBB, 0xBF) + $script:Utf8NoBom.GetBytes($encText)))
+    Invoke-SanitizeFile $encTmp
+    $encOut = [System.IO.File]::ReadAllBytes($encTmp)
+    $encStr = $script:Utf8NoBom.GetString($encOut)
+    $encFails = @()
+    if (-not ($encOut.Length -ge 3 -and $encOut[0] -eq 0xEF -and $encOut[1] -eq 0xBB -and $encOut[2] -eq 0xBF)) {
+        $encFails += 'the UTF-8 BOM was stripped by sanitization'
+    }
+    if ($encStr.IndexOf('[REDACTED-KEY-SECTION]') -lt 0) { $encFails += 'a BOM defeated the [<UUID>] section redaction' }
+    if ($encStr.IndexOf('11111111-2222') -ge 0) { $encFails += 'the BOM-prefixed api key section survived' }
+    if ($encStr.IndexOf('SENTINEL-ENC') -ge 0) { $encFails += 'a secret survived in the encoding vector' }
+    if (@([regex]::Matches($encStr, "`r`n")).Count -lt 2) { $encFails += 'CRLF line endings were lost (including on the redacted line)' }
+    if ($encOut[$encOut.Length - 1] -eq 10) { $encFails += 'a final newline was added to a source that had none' }
+    if ($null -eq $script:EncJson -or $script:EncJson['bom'] -ne 'utf-8') { $encFails += 'source_encoding did not record the BOM' }
+    if ($encFails.Count -gt 0) { foreach ($e in $encFails) { Write-Output "FAIL: $e"; $fails++ } }
+    else { Write-Output 'ok:   encoding preserved (BOM + CRLF + no trailing newline) and the BOM did not defeat redaction' }
+
     # multiline PEM block must be withheld end-to-end by the file-level sanitizer
     $pemTmp = Join-Path $Staging 'pem-test.txt'
     @('before line',
@@ -395,10 +613,24 @@ function Add-Manifest([string]$rel, [string]$kind, [string]$origin, [string]$tit
     $full = Join-Path $Work $rel
     $bytes = 0
     if (Test-Path $full) { $bytes = (Get-Item $full).Length }
-    [void]$script:ManifestRows.Add(@{
+    # source_encoding is recorded for COPIED files only: for command/API captures
+    # the bytes are ours, so the facts would describe this tool, not a source
+    # file. For a capped file it describes the retained tail (see origin).
+    $enc = $script:EncJson
+    $script:EncJson = $null
+    $encNote = $script:EncNote
+    $script:EncNote = ''
+    if ($kind -eq 'file') {
+        if ($encNote) { [void]$script:EncNotes.Add($encNote) }
+    } else {
+        $enc = $null
+    }
+    $row = [ordered]@{
         path = $rel.Replace('\', '/'); kind = $kind; origin = $origin; title = $title
         bytes = [long]$bytes; pii_obfuscated = [bool]$Obfuscate
-    })
+    }
+    if ($enc) { $row['source_encoding'] = $enc }
+    [void]$script:ManifestRows.Add($row)
 }
 
 # --- collectors -------------------------------------------------------------------
@@ -448,7 +680,11 @@ function Invoke-NativeProcess([string]$exe, [string[]]$argList, [int]$timeoutSec
     return $r
 }
 
-function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @()) {
+function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @(), [long]$cap = 0) {
+    # $cap mirrors the POSIX "collect_cmd --cap": journal/event-log captures are
+    # documented at 5 MiB while command output defaults to 2 MiB
+    if ($cap -le 0) { $cap = 2MB }
+    $script:EncJson = $null
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
@@ -470,11 +706,11 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
             Remove-Job $job -Force
         } catch { $result = "ERROR: $_" }
     }
-    if ($result.Length -gt 2MB) {
+    if ($result.Length -gt $cap) {
         # truncate at a LINE boundary so a secret cannot straddle the cut
-        $cut = $result.LastIndexOf("`n", 2MB)
+        $cut = $result.LastIndexOf("`n", [int]$cap)
         if ($cut -lt 0) { $result = '[content withheld: output exceeds the cap without a line break]' }
-        else { $result = $result.Substring(0, $cut + 1) + '### TRUNCATED at 2MB (line-aligned) ###' }
+        else { $result = $result.Substring(0, $cut + 1) + ("### TRUNCATED at {0} bytes (line-aligned) ###" -f $cap) }
     }
     Write-Utf8 $full ($header + "`r`n" + $result)
     Invoke-SanitizeFile $full
@@ -485,6 +721,7 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
     # like Save-Cmd but with NO header/trailer, for commands whose output must
     # stay parseable (JSON). Provenance lives in MANIFEST.json only. The file is
     # removed if the command produced nothing.
+    $script:EncJson = $null
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
@@ -516,9 +753,13 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
 }
 
 function Save-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0) {
+    $script:EncJson = $null
     if (Test-Deadline) { return }
     if ($cap -eq 0) { $cap = $FileCap }
     if (-not (Test-Path $src -PathType Leaf)) { return }
+    # stream.conf is the one file whose streaming API key is kept verbatim; the
+    # context is keyed on the SOURCE name, never on the bundle path
+    $ctx = if ((Split-Path -Leaf $src) -eq 'stream.conf') { 'stream' } else { '' }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     $item = Get-Item $src -Force
@@ -556,13 +797,14 @@ function Save-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0) {
             $origin = "$src (unreadable - withheld)"
         }
     }
-    Invoke-SanitizeFile $full
+    Invoke-SanitizeFile $full $true $ctx
     Add-Manifest $rel 'file' $origin $title
 }
 
 $NdPort = 19999
 $CloudHost = 'app.netdata.cloud'   # reachability probe target
 function Save-Api([string]$rel, [string]$title, [string]$urlPath) {
+    $script:EncJson = $null
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
@@ -700,15 +942,50 @@ if (Test-Path $ConfDir) {
 # 05-logs (Windows: Event Log is the primary destination)
 # ============================================================================
 Show-Info "collecting: logs (last ${SinceHours}h, Event Log + files)"
-Save-Cmd '05-logs\eventlog-netdata.txt' 'Netdata events from Windows Event Log (NetdataWEL + Application)' {
-    $since = (Get-Date).AddHours(-[int]$using:SinceHours)
-    foreach ($logName in @('NetdataWEL', 'Application')) {
-        Get-WinEvent -FilterHashtable @{ LogName = $logName; StartTime = $since } -MaxEvents 2000 -ErrorAction SilentlyContinue |
-            Where-Object { $_.ProviderName -match 'Netdata' } |
-            Select-Object TimeCreated, ProviderName, LevelDisplayName, Message |
-            Format-List
+# Windows builds are ALWAYS compiled with ETW (CMakeLists.txt sets HAVE_ETW
+# unconditionally for OS_WINDOWS) and netdata-conf-logs.c then selects "etw" as
+# the default log method, so the daemon logs into five manifest-declared
+# Operational channels - Netdata/Daemon, /Collectors, /Access, /Health, /Aclk
+# (wevt_netdata_mc_generate.c). Querying only NetdataWEL therefore returned NO
+# daemon logs at all on a default install (netdata/netdata#23448).
+#
+# One merged file, ordered for triage: channel/provider state first, then Daemon
+# and Collectors (what you read first), and Access LAST with the smallest event
+# budget because it is by far the highest volume.
+Save-Cmd '05-logs\eventlog-netdata.txt' 'Netdata events from the Windows Event Log: ETW channels (Netdata/*) + NetdataWEL + Application, plus channel and provider registration state' {
+    # capture $using: into locals once: the $using: modifier is resolved when the
+    # job scriptblock is serialized and must not be relied on inside strings
+    $sinceHours = [int]$using:SinceHours
+    $since = (Get-Date).AddHours(-$sinceHours)
+    '===== channel state (a disabled or full channel loses events) ====='
+    Get-WinEvent -ListLog 'Netdata/*', 'NetdataWEL' -ErrorAction SilentlyContinue |
+        Select-Object LogName, IsEnabled, RecordCount, FileSize | Format-Table -AutoSize
+    # per-channel event budgets: Daemon/Collectors carry the diagnosis, Access is
+    # request noise, so it gets the smallest share of the file
+    $channels = @(
+        @{ Log = 'Netdata/Daemon';     Max = 3000 }
+        @{ Log = 'Netdata/Collectors'; Max = 3000 }
+        @{ Log = 'Netdata/Health';     Max = 1000 }
+        @{ Log = 'Netdata/Aclk';       Max = 1000 }
+        @{ Log = 'NetdataWEL';         Max = 2000 }
+        @{ Log = 'Application';        Max = 2000 }
+        @{ Log = 'Netdata/Access';     Max = 500 }
+    )
+    foreach ($ch in $channels) {
+        "===== channel: $($ch.Log) (max $($ch.Max) events, last ${sinceHours}h) ====="
+        $events = Get-WinEvent -FilterHashtable @{ LogName = $ch.Log; StartTime = $since } `
+                               -MaxEvents $ch.Max -ErrorAction SilentlyContinue
+        # Application is a shared channel: keep only Netdata's own records. The
+        # dedicated channels are already Netdata-only, so filtering them would
+        # drop records whose ProviderName resolves differently under ETW.
+        if ($ch.Log -eq 'Application') { $events = $events | Where-Object { $_.ProviderName -match 'Netdata' } }
+        if ($events) {
+            $events | Select-Object TimeCreated, ProviderName, LevelDisplayName, Message | Format-List
+        } else {
+            '(no events in this window, or the channel does not exist on this system)'
+        }
     }
-} "Get-WinEvent NetdataWEL/Application (Netdata providers, last ${SinceHours}h)"
+} "Get-WinEvent: Netdata/* ETW channels + NetdataWEL + Application (last ${SinceHours}h)" -cap $LogCap
 if (Test-Path $LogDir) {
     Get-ChildItem $LogDir -File -Filter '*.log' | ForEach-Object {
         Save-File "05-logs\$($_.Name)" "Agent log file: $($_.Name)" $_.FullName $LogCap
@@ -843,6 +1120,69 @@ Save-Cmd '08-network\proxy-config.txt' 'System proxy configuration' { netsh winh
 Save-Cmd '08-network\cloud-connectivity.txt' 'Reachability of Netdata Cloud (TCP/TLS only, no data sent)' { Test-NetConnection -ComputerName $using:CloudHost -Port 443 -WarningAction SilentlyContinue | Format-List ComputerName, RemotePort, TcpTestSucceeded, PingSucceeded } "Test-NetConnection ${CloudHost}:443"
 
 # ============================================================================
+# 09-permissions
+# ============================================================================
+Show-Info 'collecting: permissions'
+$PluginsDir = Join-Path $NetdataPrefix 'usr\libexec\netdata\plugins.d'
+Save-Cmd '09-permissions\plugins-d.txt' 'plugins.d: ACLs, ownership, inheritance and integrity-level state for every plugin (a broken ACL here stops a collector dead)' {
+    $d = $using:PluginsDir
+    if (-not (Test-Path $d)) { "(plugins.d not found at $d)"; return }
+    "===== $d ====="
+    Get-Acl $d | Format-List Owner, Group, Access, Sddl
+    '-- contents --'
+    Get-ChildItem $d -Force -ErrorAction SilentlyContinue |
+        Select-Object Mode, LastWriteTime, Length, Name | Format-Table -AutoSize
+    '-- per-file owner and access (non-inherited entries are the interesting ones) --'
+    Get-ChildItem $d -File -Force -ErrorAction SilentlyContinue | Select-Object -First 120 | ForEach-Object {
+        $acl = Get-Acl $_.FullName -ErrorAction SilentlyContinue
+        if ($acl) {
+            $explicit = @($acl.Access | Where-Object { -not $_.IsInherited })
+            "{0}`n    owner={1}" -f $_.Name, $acl.Owner
+            if ($explicit.Count -gt 0) {
+                foreach ($a in $explicit) {
+                    "    explicit: {0} {1} {2}" -f $a.IdentityReference, $a.AccessControlType, $a.FileSystemRights
+                }
+            } else {
+                '    explicit: (none - all access inherited)'
+            }
+        }
+    }
+    '-- alternate data streams (a Zone.Identifier marks a file as downloaded/blocked) --'
+    $ads = Get-ChildItem $d -File -Force -ErrorAction SilentlyContinue |
+        Select-Object -First 120 |
+        ForEach-Object { Get-Item $_.FullName -Stream * -ErrorAction SilentlyContinue } |
+        Where-Object { $_.Stream -ne ':$DATA' }
+    if ($ads) { $ads | Select-Object FileName, Stream, Length | Format-Table -AutoSize }
+    else { '(no alternate data streams)' }
+} "Get-Acl + Get-ChildItem -Stream on $PluginsDir"
+
+$PermPaths = @($NetdataPrefix, $ConfDir, (Join-Path $ConfDir 'netdata.conf'), (Join-Path $ConfDir 'stream.conf'),
+               (Join-Path $ConfDir 'ssl'), $LogDir, $LibDir, (Join-Path $LibDir 'cloud.d'), $CacheDir,
+               $PluginsDir, $NetdataExe) | Where-Object { $_ } | Select-Object -Unique
+Save-Cmd '09-permissions\netdata-paths.txt' 'Ownership, ACLs, inheritance and integrity levels for netdata directories, configs and the binary' {
+    foreach ($p in $using:PermPaths) {
+        if (-not (Test-Path $p)) { continue }
+        "===== $p ====="
+        $acl = Get-Acl $p -ErrorAction SilentlyContinue
+        if ($acl) {
+            "owner: $($acl.Owner)"
+            "group: $($acl.Group)"
+            'access:'
+            $acl.Access | ForEach-Object {
+                "    {0} {1} {2} (inherited={3})" -f $_.IdentityReference, $_.AccessControlType, $_.FileSystemRights, $_.IsInherited
+            }
+            "sddl:  $($acl.Sddl)"
+            if ($acl.AreAccessRulesProtected) { 'NOTE: ACL inheritance is DISABLED on this path' }
+        } else {
+            '(could not read the ACL - insufficient privilege?)'
+        }
+        # mandatory integrity level, when one is explicitly set
+        $il = (icacls $p 2>$null | Select-String -SimpleMatch 'Mandatory Label') -join '; '
+        if ($il) { "integrity: $il" }
+    }
+} 'Get-Acl + icacls for netdata paths'
+
+# ============================================================================
 # summary + manifest + README
 # ============================================================================
 Show-Info 'writing summary and manifest'
@@ -860,6 +1200,18 @@ if (Test-Path $sfPath) {
     } catch { Write-Verbose "status-file.json unparsable: $_" }
 }
 $RuntimeSecs = [int]((Get-Date) - $StartTime).TotalSeconds
+$StreamNote = ''
+if (Test-Path (Join-Path $Work '04-config\stream.conf')) {
+    $StreamNote = 'streaming key:    PRESENT VERBATIM in 04-config\stream.conf (by design - see README.md)'
+}
+$EncNote = ''
+if ($script:EncNotes.Count -gt 0) {
+    $EncNote = "SOURCE FILES WITH NOTABLE ENCODING (preserved as-is in this bundle):`r`n" + ((
+        $script:EncNotes | Sort-Object -Unique | Select-Object -First 40 | ForEach-Object {
+            $parts = $_ -split "`t"
+            '  {0}: {1}' -f $parts[0], $parts[1]
+        }) -join "`r`n")
+}
 
 $summary = @"
 NETDATA SUPPORT BUNDLE SUMMARY
@@ -868,19 +1220,20 @@ tool version:     $ToolVersion (windows)
 runtime seconds:  $RuntimeSecs
 ran elevated:     $IsElevated
 pii obfuscation:  $(if ($Obfuscate) { 'on' } else { 'OFF' })
-
+$StreamNote
 agent version:    $(if ($AgentVersion) { $AgentVersion } else { 'unknown' })
 service status:   $(if ($NetdataSvc) { $NetdataSvc.Status } else { 'NOT INSTALLED' })
 agent process:    $(if ($NetdataProc) { "yes (pid $($NetdataProc.Id))" } else { 'NOT RUNNING' })
 agent api:        $(if ($ApiOk) { 'reachable' } else { 'UNREACHABLE' })
 $(if ($CrashHint) { "last exit reason: $CrashHint   <-- check 06-state\status-file.json" })
-
+$EncNote
 READ ORDER FOR TRIAGE:
   crashes/won't start -> 06-state\status-file.json, 05-logs\eventlog-netdata.txt
-  collector issues    -> 04-config\go.d*, 05-logs\
+  collector issues    -> 04-config\go.d*, 05-logs\, 09-permissions\plugins-d.txt
   streaming issues    -> 04-config\stream.conf, 07-runtime\node-instances.json, 01-system\clock-timesync.txt
   cloud/claiming      -> 06-state\claimed-id.txt, 07-runtime\aclk.json, 08-network\
   performance         -> 03-process\netdata-processes.txt, 06-state\db-disk-usage.txt
+  access denied       -> 09-permissions\ (ACLs, ownership, inheritance, service account)
 "@
 Write-Utf8 (Join-Path $Work 'summary.txt') $summary
 Add-Manifest 'summary.txt' 'file' 'generated' 'Human summary'
@@ -889,14 +1242,28 @@ $readme = @"
 # Netdata Support Bundle (Windows)
 
 Generated by ``netdata-support-bundle.ps1``. Contents are SANITIZED: secrets (tokens, api
-keys, passwords) are always redacted; by default IPs, MACs, emails and
+keys, passwords) are redacted; by default IPs, MACs, emails and
 hostnames are replaced with stable pseudonyms - consistent across all files.
 The pseudonym map stays on this machine, next to the zip - it is NOT in this
 bundle.
 
+**One deliberate exception:** the **streaming API key** is kept VERBATIM in
+``04-config\stream.conf`` (both ``api key`` values and ``[<API_KEY>]`` section
+headers). It is the value support needs to tell whether a child and its parent
+agree, so it is not treated as a secret. If your threat model differs, remove or
+mask it before sending the bundle. The same key IS still redacted where it
+appears in the Access event-log channel.
+
+Collected files keep their original bytes: a byte-order mark, CRLF or CR line
+endings and a missing final newline all survive redaction, so encoding faults
+stay visible. What was observed is recorded per file under ``source_encoding`` in
+MANIFEST.json, and anything notable is listed in summary.txt.
+
 Layout matches the POSIX bundle (see MANIFEST.json for every file):
-01-system, 02-install, 03-process, 04-config, 05-logs (Windows Event Log),
-06-state, 07-runtime, 08-network. Start with summary.txt.
+01-system, 02-install, 03-process, 04-config, 05-logs (Windows Event Log:
+Netdata/* ETW channels + NetdataWEL), 06-state, 07-runtime, 08-network,
+09-permissions (ACLs, ownership, inheritance, service account).
+Start with summary.txt.
 "@
 Write-Utf8 (Join-Path $Work 'README.md') $readme
 Add-Manifest 'README.md' 'file' 'generated' 'Bundle documentation'
@@ -909,12 +1276,15 @@ $manifest = [ordered]@{
     runtime_seconds = $RuntimeSecs
     pii_obfuscated = [bool]$Obfuscate
     secrets_redacted = $true
+    # the one documented exception to secrets_redacted (netdata/netdata#23448)
+    streaming_api_key_redacted = $false
     agent_running = [bool]$NetdataProc
     agent_api_reachable = [bool]$ApiOk
     is_container = $false
     files = $script:ManifestRows
 }
-Write-Utf8 (Join-Path $Work 'MANIFEST.json') (($manifest | ConvertTo-Json -Depth 4) + "`n")
+# depth 6: manifest -> files -> row -> source_encoding must all survive
+Write-Utf8 (Join-Path $Work 'MANIFEST.json') (($manifest | ConvertTo-Json -Depth 6) + "`n")
 
 # ============================================================================
 # zip
