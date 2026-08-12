@@ -598,12 +598,16 @@ sidebar:
       - meta:
           label: Topologies
           edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/topology/README.md
-          description: See how your network is connected — Layer 2 and Layer 3 device topology, live connections, and virtual infrastructure.
+          description: See how your infrastructure is connected — Layer 2 and Layer 3 device topology, application dependencies, and virtual infrastructure.
         items:
           - meta:
               label: Discovery Methods
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/topology/discovery-methods.md
               description: What LLDP, CDP, FDB, ARP, STP, BGP, and OSPF each contribute to the map.
+          - meta:
+              label: Application Dependency Mapping
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/topology/dependency-mapping.md
+              description: Which process, container, and Kubernetes workload talks to which, read from the kernel with no instrumentation.
       # BGP Monitoring
       - meta:
           label: BGP Monitoring
