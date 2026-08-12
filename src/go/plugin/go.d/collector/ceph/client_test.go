@@ -357,6 +357,126 @@ func TestCephClientLogicalOperationUsesSingleDeadline(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
+func TestCephClientDiscoveryWaitHonorsContext(t *testing.T) {
+	requestStarted := make(chan struct{})
+	releaseRequest := make(chan struct{})
+	httpClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			close(requestStarted)
+			<-releaseRequest
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader("")),
+				Request:    req,
+			}, nil
+		}),
+	}
+	client, err := newCephClient(httpClient, web.RequestConfig{
+		URL: "https://ceph.example",
+	}, false, nil)
+	require.NoError(t, err)
+
+	ownerDone := make(chan error, 1)
+	go func() {
+		_, err := client.ensureActiveBase(context.Background())
+		ownerDone <- err
+	}()
+	<-requestStarted
+
+	ctx, cancel := context.WithCancel(context.Background())
+	waiterStarted := make(chan struct{})
+	waiterDone := make(chan error, 1)
+	go func() {
+		close(waiterStarted)
+		_, err := client.ensureActiveBase(ctx)
+		waiterDone <- err
+	}()
+	<-waiterStarted
+	cancel()
+
+	var waiterErr error
+	waitTimedOut := false
+	select {
+	case waiterErr = <-waiterDone:
+	case <-time.After(250 * time.Millisecond):
+		waitTimedOut = true
+	}
+	close(releaseRequest)
+	require.NoError(t, <-ownerDone)
+	if waitTimedOut {
+		waiterErr = <-waiterDone
+		t.Fatalf("discovery waiter ignored its canceled context: %v", waiterErr)
+	}
+	require.ErrorIs(t, waiterErr, context.Canceled)
+}
+
+func TestCephClientLoginWaitHonorsContext(t *testing.T) {
+	requestStarted := make(chan struct{})
+	releaseRequest := make(chan struct{})
+	httpClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			close(requestStarted)
+			<-releaseRequest
+			return &http.Response{
+				StatusCode: http.StatusCreated,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"token":"test-token"}`)),
+				Request:    req,
+			}, nil
+		}),
+	}
+	client, err := newCephClient(httpClient, web.RequestConfig{
+		URL:      "https://ceph.example",
+		Username: "netdata",
+		Password: "test-password",
+	}, false, nil)
+	require.NoError(t, err)
+	base := requireURL(t, "https://ceph.example")
+
+	type tokenResult struct {
+		token string
+		err   error
+	}
+	ownerDone := make(chan tokenResult, 1)
+	go func() {
+		token, _, err := client.tokenForRequest(context.Background(), base)
+		ownerDone <- tokenResult{
+			token: token,
+			err:   err,
+		}
+	}()
+	<-requestStarted
+
+	ctx, cancel := context.WithCancel(context.Background())
+	waiterStarted := make(chan struct{})
+	waiterDone := make(chan error, 1)
+	go func() {
+		close(waiterStarted)
+		_, _, err := client.tokenForRequest(ctx, base)
+		waiterDone <- err
+	}()
+	<-waiterStarted
+	cancel()
+
+	var waiterErr error
+	waitTimedOut := false
+	select {
+	case waiterErr = <-waiterDone:
+	case <-time.After(250 * time.Millisecond):
+		waitTimedOut = true
+	}
+	close(releaseRequest)
+	owner := <-ownerDone
+	require.NoError(t, owner.err)
+	require.Equal(t, "test-token", owner.token)
+	if waitTimedOut {
+		waiterErr = <-waiterDone
+		t.Fatalf("login waiter ignored its canceled context: %v", waiterErr)
+	}
+	require.ErrorIs(t, waiterErr, context.Canceled)
+}
+
 func TestCephClientRuntimeRedirectFailoverValidatesClusterIdentity(t *testing.T) {
 	const originalPath = "/api/pool"
 	tests := map[string]struct {

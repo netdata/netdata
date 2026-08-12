@@ -49,6 +49,32 @@ type activeBaseRef struct {
 	generation uint64
 }
 
+// singleOwnerGate lets request deadlines include time spent waiting for shared client work.
+type singleOwnerGate chan struct{}
+
+func newSingleOwnerGate() singleOwnerGate {
+	gate := make(singleOwnerGate, 1)
+	gate <- struct{}{}
+	return gate
+}
+
+func (g singleOwnerGate) acquire(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-g:
+		if err := ctx.Err(); err != nil {
+			g.release()
+			return err
+		}
+		return nil
+	}
+}
+
+func (g singleOwnerGate) release() {
+	g <- struct{}{}
+}
+
 type cephClient struct {
 	httpClient             *http.Client
 	requestConfig          web.RequestConfig
@@ -60,14 +86,14 @@ type cephClient struct {
 	password        string
 	bearerTokenFile string
 
-	discoveryMu  sync.Mutex
-	authMu       sync.Mutex
-	stateMu      sync.RWMutex
-	activeBase   *url.URL
-	activeGen    uint64
-	validatedGen uint64
-	expectedFSID string
-	jwt          string
+	discoveryGate singleOwnerGate
+	authGate      singleOwnerGate
+	stateMu       sync.RWMutex
+	activeBase    *url.URL
+	activeGen     uint64
+	validatedGen  uint64
+	expectedFSID  string
+	jwt           string
 }
 
 func newCephClient(
@@ -104,6 +130,8 @@ func newCephClient(
 		username:               cfg.Username,
 		password:               cfg.Password,
 		bearerTokenFile:        cfg.BearerTokenFile,
+		discoveryGate:          newSingleOwnerGate(),
+		authGate:               newSingleOwnerGate(),
 	}
 
 	// Dashboard redirects identify the active MGR but do not preserve API paths.
@@ -359,8 +387,10 @@ func (c *cephClient) ensureActiveBase(ctx context.Context) (activeBaseRef, error
 		}, nil
 	}
 
-	c.discoveryMu.Lock()
-	defer c.discoveryMu.Unlock()
+	if err := c.discoveryGate.acquire(ctx); err != nil {
+		return activeBaseRef{}, fmt.Errorf("wait for active-MGR discovery: %w", err)
+	}
+	defer c.discoveryGate.release()
 
 	c.stateMu.RLock()
 	active = cloneURL(c.activeBase)
@@ -537,8 +567,10 @@ func (c *cephClient) tokenForRequest(ctx context.Context, base *url.URL) (token 
 		return token, true, nil
 	}
 
-	c.authMu.Lock()
-	defer c.authMu.Unlock()
+	if err := c.authGate.acquire(ctx); err != nil {
+		return "", true, fmt.Errorf("wait for Dashboard login: %w", err)
+	}
+	defer c.authGate.release()
 	c.stateMu.RLock()
 	token = c.jwt
 	c.stateMu.RUnlock()
