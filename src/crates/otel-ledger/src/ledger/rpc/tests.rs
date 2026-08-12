@@ -1,9 +1,10 @@
-use super::patch_args_into_payload;
+use super::{patch_args_into_payload, patch_traces_args_into_payload};
 use serde_json::{Value, json};
 
-// The shim synthesizes raw JSON bytes; each signal's wire tests cover
+// The shims synthesize raw JSON bytes; each signal's wire tests cover
 // parsing that JSON into its own request type. Here the synthesized
-// object itself is pinned.
+// objects themselves are pinned. `patch_args_into_payload` serves the
+// LOGS pipeline only; traces installs its own strict-shape shim.
 
 fn patched(args: &[&str]) -> Value {
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
@@ -36,4 +37,33 @@ fn no_synthesis_without_args_or_over_an_existing_payload() {
     // or the upstream rt shim's output): must pass through untouched.
     assert!(patch_args_into_payload(&[], None).is_none());
     assert!(patch_args_into_payload(&["info".to_string()], Some(b"{}")).is_none());
+}
+
+#[test]
+fn traces_shim_synthesizes_only_the_strict_info_object() {
+    let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    // The info token — alone or beside any other tokens — synthesizes
+    // exactly the strict empty-object selector.
+    for a in [
+        args(&["info"]),
+        args(&["info", "after:100", "before:200"]),
+        args(&["after:100", "info"]),
+    ] {
+        let bytes = patch_traces_args_into_payload(&a, None).expect("info token present");
+        let v: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, json!({"info": {}}));
+    }
+}
+
+#[test]
+fn traces_shim_synthesizes_nothing_for_data_gets() {
+    let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    // No info token: no payload — the request surfaces as the bridge's
+    // absent-payload client error, never a silent default query.
+    assert!(patch_traces_args_into_payload(&args(&[]), None).is_none());
+    assert!(patch_traces_args_into_payload(&args(&["after:100", "before:200"]), None).is_none());
+    // The payload guard is load-bearing: dispatch gives synthesized
+    // content priority, so an `info` URL arg must never overwrite a
+    // POST body.
+    assert!(patch_traces_args_into_payload(&args(&["info"]), Some(b"{}")).is_none());
 }

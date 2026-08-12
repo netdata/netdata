@@ -108,6 +108,7 @@ pub(crate) fn to_trace_result(
     let t = data.trace;
     let summary_root = t.summary_root();
     TraceResult {
+        mode: "trace",
         version: 1,
         trace_id: trace_id.to_string(),
         coverage,
@@ -366,6 +367,7 @@ pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, Attrib
 /// Shape the key enumeration into the wire result.
 pub(crate) fn to_attributes_result(data: AttributeNamesData) -> AttributesResult {
     AttributesResult {
+        mode: "attributes",
         version: 1,
         status: StatusWire::from(&data.status),
         truncated: data.truncated,
@@ -384,6 +386,7 @@ pub(crate) fn to_attribute_values_result(
     key: String,
 ) -> AttributeValuesResult {
     AttributeValuesResult {
+        mode: "attribute_values",
         version: 1,
         status: StatusWire::from(&data.status),
         truncated: data.truncated,
@@ -423,6 +426,7 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
         None => (None, None),
     };
     OverviewResult {
+        mode: "overview",
         version: 1,
         unit: "traces",
         status: StatusWire::from(&data.status),
@@ -449,6 +453,7 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
 /// truncated to it.
 pub(crate) fn to_slowest_result(data: SlowestData, limit: usize) -> SlowestResult {
     SlowestResult {
+        mode: "slowest",
         version: 1,
         status: StatusWire::from(&data.status),
         items: SearchItems {
@@ -491,7 +496,7 @@ pub(crate) fn to_slowest_result(data: SlowestData, limit: usize) -> SlowestResul
 ///   can't drift between pages);
 /// - carries the AFTER-KEY — the last served trace's (rank, trace_id) —
 ///   and the served count. The next page re-runs the SAME query with
-///   `limit = served + last` and drops everything ranked at-or-above
+///   `limit = served + limit` and drops everything ranked at-or-above
 ///   the key: at a fixed corpus the engine's deterministic total order
 ///   makes the pages an exact partition, tie runs and straddling
 ///   traces included.
@@ -500,16 +505,16 @@ pub(crate) fn to_slowest_result(data: SlowestData, limit: usize) -> SlowestResul
 /// window that ends in the past to avoid them):
 ///
 /// - Late arrivals ranking ABOVE the key are never shown by this walk
-///   AND consume the over-fetch allowance — a burst larger than `last`
-///   can shorten a page below `last` and end the walk early (silently:
+///   AND consume the over-fetch allowance — a burst larger than `limit`
+///   can shorten a page below `limit` and end the walk early (silently:
 ///   indistinguishable from exhaustion). Late arrivals ranking BELOW
 ///   the key appear on later pages normally.
 /// - The cursor freezes the window but NOT the filters: echoing it with
 ///   different selections re-partitions a different result set. The
 ///   client must keep the filters fixed for the walk's lifetime.
 ///
-/// Cost note: each page reruns the query with `limit = served + last`,
-/// so a full walk of N traces does O(N²/last) engine ranking work —
+/// Cost note: each page reruns the query with `limit = served + limit`,
+/// so a full walk of N traces does O(N²/limit) engine ranking work —
 /// acceptable at human paging depths and hard-capped by
 /// [`CURSOR_SERVED_CAP`]; the engine's own ceilings bound any single
 /// request.
@@ -629,7 +634,7 @@ pub(crate) fn resolve_window(
 
 /// Shape one search result page. Drops everything the cursor's walk
 /// already served (the engine re-emits the served prefix first — same
-/// query, same deterministic total order), trims to `last`, and emits
+/// query, same deterministic total order), trims to `limit`, and emits
 /// the next cursor only for a FULL page with a COMPLETE status: a short
 /// page means the walk is exhausted, and a PARTIAL page's continuation
 /// would not be a stable prefix (the engine's work ceilings scale with
@@ -670,6 +675,7 @@ pub(crate) fn to_search_result(
         .flatten();
 
     SearchResult {
+        mode: "search",
         version: 1,
         status: StatusWire::from(&data.status),
         completion_coverage,

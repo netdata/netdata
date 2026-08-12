@@ -11,7 +11,9 @@
 //! `trace`/`search`/`attributes`/`attribute_values`/`overview`/`slowest`
 //! data modes. It shares the logs pipeline's
 //! chunk cache (seqs are process-global, so `(seq, index)` keys never
-//! collide across signals) and the signal-agnostic GET args→payload shim.
+//! collide across signals) but installs its OWN GET shim: the traces
+//! wire is strict (one mode object, no top-level window), so only the
+//! `info` token synthesizes a payload and data calls are POST-only.
 //!
 //! The whole registry/catalog/recovery machinery is reused verbatim through
 //! `build_pipeline`.
@@ -76,9 +78,9 @@ pub(crate) async fn build_traces_pipeline(
                 OtelTracesHandler::new(registries, chunk_cache, CHUNK_MIN_ENTRIES);
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(traces_handler));
-            // The GET shim is signal-agnostic (`info` token + after/before),
-            // shared with logs.
-            (handler, super::rpc::patch_args_into_payload as ArgShim)
+            // The traces-own GET shim: `info` token → `{"info": {}}`,
+            // anything else → no payload (data calls are POST-only).
+            (handler, super::rpc::patch_traces_args_into_payload as ArgShim)
         },
     )
     .await

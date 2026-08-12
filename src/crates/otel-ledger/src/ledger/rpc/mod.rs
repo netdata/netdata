@@ -32,9 +32,12 @@ pub(crate) use traces::OtelTracesHandler;
 /// already produced a payload), in which case the caller falls back
 /// to the original payload.
 ///
-/// Signal-agnostic — `info`/`after`/`before` exist on both signals'
-/// request types — and used as the ArgShim by BOTH the logs and traces
-/// pipelines; a change here changes every otel Function's GET behavior.
+/// LOGS-ONLY: the logs request still carries top-level
+/// `info`/`after`/`before`, so this shim's synthesized shape parses
+/// there. The traces request is strict (one mode object, no top-level
+/// window), so the traces pipeline installs its own
+/// [`patch_traces_args_into_payload`] instead — a change here changes
+/// only the logs Function's GET behavior.
 pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -> Option<Vec<u8>> {
     if args.is_empty() || payload.is_some() {
         return None;
@@ -57,6 +60,24 @@ pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -
     }
 
     serde_json::to_vec(&serde_json::Value::Object(map)).ok()
+}
+
+/// The traces pipeline's GET shim. PRESENCE of the literal `info`
+/// token synthesizes the strict `{"info": {}}` selector regardless of
+/// any other tokens; anything else synthesizes NOTHING — a traces GET
+/// data call has no body to express a mode, so it surfaces as the
+/// bridge's absent-payload client error rather than a silent default
+/// query. Data calls are POST-only by design. The `payload.is_some()`
+/// guard is load-bearing: dispatch gives synthesized content priority,
+/// so without it an `info` URL arg would overwrite a POST body.
+pub(crate) fn patch_traces_args_into_payload(
+    args: &[String],
+    payload: Option<&[u8]>,
+) -> Option<Vec<u8>> {
+    if payload.is_some() || !args.iter().any(|a| a == "info") {
+        return None;
+    }
+    Some(br#"{"info": {}}"#.to_vec())
 }
 
 #[cfg(test)]

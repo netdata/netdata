@@ -3,10 +3,13 @@
 //!
 //! The full mode catalog is implemented: `info` (capability
 //! discovery), `trace` (exact single-trace fetch), `search` (bounded
-//! most-recent-first trace search, the default mode), the enumeration
-//! pair `attributes` / `attribute_values` (the facet rail's
-//! vocabulary), `overview` (the trace-density grid — the UI's default
-//! paint), and `slowest` (the window's duration-ranked top-K traces).
+//! most-recent-first trace search), the enumeration pair `attributes`
+//! / `attribute_values` (the facet rail's vocabulary), `overview` (the
+//! trace-density grid — the UI's default paint), and `slowest` (the
+//! window's duration-ranked top-K traces). Mode selection and every
+//! request-SHAPE validation happen during deserialization (the wire's
+//! typed request — shape errors are transport 400s); this handler owns
+//! only the semantic validation (trace-id shape, zero limit, bounds).
 //! The wire contract lives in [`super::wire`], the engine mapping in
 //! [`super::adapter`], and source resolution in [`super::sources`].
 //!
@@ -41,7 +44,9 @@ use super::adapter::{
 };
 use super::sources::TracesSourceSupplier;
 use super::wire::{
-    CoverageWire, InfoResponse, OtelTracesRequest, OtelTracesResponse, RequestMode, SearchResult,
+    AttributeValuesParams, AttributesParams, CoverageWire, InfoResponse, OtelTracesRequest,
+    OtelTracesResponse, OverviewParams, SearchParams, SearchResult, SlowestParams, TraceParams,
+    TracesMode,
 };
 
 /// Shorthand for the handler-level error every failure path maps to.
@@ -80,11 +85,9 @@ impl OtelTracesHandler {
     async fn trace(
         &self,
         ctx: &FunctionCallContext,
-        req: &OtelTracesRequest,
+        params: &TraceParams,
+        tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
-        let params = req
-            .trace_params()
-            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
         let trace_id = parse_trace_id(&params.id)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
         let mut query = TraceQuery::new(trace_id);
@@ -100,7 +103,7 @@ impl OtelTracesHandler {
             before: capture_range.end,
         };
 
-        let tenant = TenantId::resolve_query(req.tenant.as_deref());
+        let tenant = TenantId::resolve_query(tenant);
         // A cancelled capture returns NO copies; the empty default flows
         // into the engine, which polls the same token up front and
         // reports the Cancelled partial — one consistent cancel path.
@@ -153,31 +156,32 @@ impl OtelTracesHandler {
     async fn search(
         &self,
         ctx: &FunctionCallContext,
-        req: &OtelTracesRequest,
+        params: &SearchParams,
+        tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err =
             |e: String| handler_err(format!("invalid otel-traces request: {e}"));
 
         // Zero must be rejected BEFORE the anchor allowance is added —
-        // `last=0` with a cursor would otherwise sneak a positive engine
+        // `limit=0` with a cursor would otherwise sneak a positive engine
         // limit past the engine's own ZeroLimit check.
-        if req.last == 0 {
+        if params.limit == 0 {
             return Err(client_err(
-                "a zero 'last' would return nothing; search has no unbounded option".into(),
+                "a zero 'limit' would return nothing; search has no unbounded option".into(),
             ));
         }
-        let cursor = req
+        let cursor = params
             .anchor
             .as_deref()
             .map(parse_cursor)
             .transpose()
             .map_err(client_err)?;
         let predicate = build_predicate(
-            &req.selections,
-            req.min_duration_ns,
-            req.max_duration_ns,
-            req.min_trace_duration_ns,
-            req.max_trace_duration_ns,
+            &params.selections,
+            params.min_duration_ns,
+            params.max_duration_ns,
+            params.min_trace_duration_ns,
+            params.max_trace_duration_ns,
         )
         .map_err(client_err)?;
 
@@ -185,7 +189,7 @@ impl OtelTracesHandler {
         // An anchor page reruns the SAME query over the cursor's frozen
         // window (never narrowed — the rank is window-dependent) with an
         // over-fetch covering the served prefix; the adapter drops it.
-        let window = resolve_window(req.after, req.before, now_s, cursor.as_ref())
+        let window = resolve_window(params.after, params.before, now_s, cursor.as_ref())
             .map_err(client_err)?;
 
         let mut query = SearchQuery::new(predicate)
@@ -193,8 +197,8 @@ impl OtelTracesHandler {
                 TimeWindow::new(window.start_ns, window.end_ns)
                     .map_err(|e| client_err(e.to_string()))?,
             )
-            .limit(req.last.saturating_add(cursor.map_or(0, |c| c.served)));
-        if let Some(spt) = req.spans_per_trace {
+            .limit(params.limit.saturating_add(cursor.map_or(0, |c| c.served)));
+        if let Some(spt) = params.spans_per_trace {
             query = query.spans_per_trace(spt);
         }
 
@@ -211,7 +215,7 @@ impl OtelTracesHandler {
             after: completion_range.start,
             before: completion_range.end,
         };
-        let tenant = TenantId::resolve_query(req.tenant.as_deref());
+        let tenant = TenantId::resolve_query(tenant);
         let mut sets = self
             .supplier
             .capture(&tenant, completion_range, 2, &ctx.cancellation)
@@ -253,7 +257,7 @@ impl OtelTracesHandler {
 
         let result: SearchResult = to_search_result(
             data,
-            req.last,
+            params.limit,
             cursor.as_ref(),
             (window.capture.start, window.capture.end),
             completion_coverage,
@@ -263,19 +267,22 @@ impl OtelTracesHandler {
 
     /// Common setup for the windowed fold modes (enumeration, slowest):
     /// canonicalized window + one captured source set + the engine
-    /// window/progress plumbing.
+    /// window/progress plumbing. Callers pass their own params' window
+    /// fields — every mode's window is self-contained on the wire.
     async fn enumeration_setup(
         &self,
         ctx: &FunctionCallContext,
-        req: &OtelTracesRequest,
+        after: u32,
+        before: u32,
+        tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<(Vec<sfsq::traces::TraceSource>, TimeWindow)> {
         let now_s = unix_now_s();
-        let window: ResolvedWindow = resolve_window(req.after, req.before, now_s, None)
+        let window: ResolvedWindow = resolve_window(after, before, now_s, None)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
         let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
 
-        let tenant = TenantId::resolve_query(req.tenant.as_deref());
+        let tenant = TenantId::resolve_query(tenant);
         let sources = self
             .supplier
             .capture(&tenant, window.capture, 1, &ctx.cancellation)
@@ -291,10 +298,10 @@ impl OtelTracesHandler {
     async fn attributes(
         &self,
         ctx: &FunctionCallContext,
-        req: &OtelTracesRequest,
+        params: &AttributesParams,
+        tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        let params = req.attributes_params().map_err(client_err)?;
         let mut query = AttributeNamesQuery::new();
         if let Some(word) = params.owner.as_deref() {
             query = query.owner(parse_owner_word(word).map_err(client_err)?);
@@ -302,7 +309,9 @@ impl OtelTracesHandler {
         if let Some(max) = params.max_keys {
             query = query.max_keys(max);
         }
-        let (sources, window) = self.enumeration_setup(ctx, req).await?;
+        let (sources, window) = self
+            .enumeration_setup(ctx, params.after, params.before, tenant)
+            .await?;
         query = query.window(window);
 
         let done = ctx.progress.done_counter();
@@ -323,21 +332,23 @@ impl OtelTracesHandler {
     async fn attribute_values(
         &self,
         ctx: &FunctionCallContext,
-        req: &OtelTracesRequest,
+        params: &AttributeValuesParams,
+        tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        let params = req.attribute_values_params().map_err(client_err)?;
         let (owner, key) = parse_enumeration_key(&params.key).map_err(client_err)?;
         let mut query = AttributeValuesQuery::new(owner, key);
         if let Some(max) = params.max_values {
             query = query.max_values(max);
         }
-        let (sources, window) = self.enumeration_setup(ctx, req).await?;
+        let (sources, window) = self
+            .enumeration_setup(ctx, params.after, params.before, tenant)
+            .await?;
         query = query.window(window);
 
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
-        let wire_key = params.key;
+        let wire_key = params.key.clone();
         match tokio::task::spawn_blocking(move || attribute_values(sources, query, cancel, done))
             .await
         {
@@ -371,20 +382,20 @@ impl OtelTracesHandler {
     async fn overview(
         &self,
         ctx: &FunctionCallContext,
-        req: &OtelTracesRequest,
+        params: &OverviewParams,
+        tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        let params = req.overview_params().map_err(client_err)?;
 
         let now_s = unix_now_s();
         let window: ResolvedWindow =
-            resolve_window(req.after, req.before, now_s, None).map_err(client_err)?;
+            resolve_window(params.after, params.before, now_s, None).map_err(client_err)?;
         let (grid, aligned_after, aligned_before) =
             super::super::grid::grid_for_window_s(window.capture.start, window.capture.end);
         let query = OverviewQuery::new(grid).root_facets(params.facets.unwrap_or(false));
 
         // Alignment can widen the window; prune files by the widened one.
-        let tenant = TenantId::resolve_query(req.tenant.as_deref());
+        let tenant = TenantId::resolve_query(tenant);
         let sources = self
             .supplier
             .capture(&tenant, aligned_after..aligned_before, 1, &ctx.cancellation)
@@ -414,13 +425,15 @@ impl OtelTracesHandler {
     async fn slowest(
         &self,
         ctx: &FunctionCallContext,
-        req: &OtelTracesRequest,
+        params: &SlowestParams,
+        tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        let params = req.slowest_params().map_err(client_err)?;
         let limit = params.limit.unwrap_or(DEFAULT_SLOWEST_LIMIT);
 
-        let (sources, window) = self.enumeration_setup(ctx, req).await?;
+        let (sources, window) = self
+            .enumeration_setup(ctx, params.after, params.before, tenant)
+            .await?;
         let query = SlowestQuery::new(window).limit(limit);
 
         let done = ctx.progress.done_counter();
@@ -459,17 +472,17 @@ impl FunctionHandler for OtelTracesHandler {
         ctx: FunctionCallContext,
         req: Self::Request,
     ) -> netdata_plugin_error::Result<Self::Response> {
-        let mode = req
-            .mode()
-            .map_err(|conflict| handler_err(format!("invalid otel-traces request: {conflict}")))?;
-        match mode {
-            RequestMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
-            RequestMode::Trace => self.trace(&ctx, &req).await,
-            RequestMode::Search => self.search(&ctx, &req).await,
-            RequestMode::Attributes => self.attributes(&ctx, &req).await,
-            RequestMode::AttributeValues => self.attribute_values(&ctx, &req).await,
-            RequestMode::Overview => self.overview(&ctx, &req).await,
-            RequestMode::Slowest => self.slowest(&ctx, &req).await,
+        let tenant = req.tenant.as_deref();
+        match &req.mode {
+            TracesMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
+            TracesMode::Trace(params) => self.trace(&ctx, params, tenant).await,
+            TracesMode::Search(params) => self.search(&ctx, params, tenant).await,
+            TracesMode::Attributes(params) => self.attributes(&ctx, params, tenant).await,
+            TracesMode::AttributeValues(params) => {
+                self.attribute_values(&ctx, params, tenant).await
+            }
+            TracesMode::Overview(params) => self.overview(&ctx, params, tenant).await,
+            TracesMode::Slowest(params) => self.slowest(&ctx, params, tenant).await,
         }
     }
 

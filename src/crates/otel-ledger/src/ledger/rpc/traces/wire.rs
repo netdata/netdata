@@ -1,11 +1,14 @@
 //! Netdata function wire types for `otel-traces`.
 //!
 //! The transport layer between the netdata function protocol and the
-//! wire-neutral [`sfsq::traces`] engine. One Function, mode-selected by
-//! request shape (the `otel-logs` pattern): `info` for capability
-//! discovery, `trace` / `attributes` / `attribute_values` / `overview`
-//! / `slowest` selected by their sub-objects, and a request with none
-//! of those is a `search`.
+//! wire-neutral [`sfsq::traces`] engine. One Function, seven peer
+//! modes, each selected by exactly one top-level sub-object — `info`,
+//! `trace`, `attributes`, `attribute_values`, `overview`, `slowest`,
+//! `search` — every mode's params self-contained in its object. A
+//! request naming zero or more than one selector is a client error;
+//! there is no implicit default mode. The top level is strict: the
+//! only other accepted key is `tenant`, and unknown keys anywhere are
+//! client errors.
 //!
 //! Nanosecond values (`*_ns`, `time_unix_nano`) go on the wire as JSON
 //! numbers and exceed 2^53: JavaScript consumers read them with ~256 ns
@@ -20,12 +23,11 @@ use sfsq::traces::{PartialReason, QueryStatus};
 // ── Request ─────────────────────────────────────────────────────────
 
 /// Request param names accepted by this function, advertised to the UI
-/// in [`InfoResponse::accepted_params`]. The list's rule (matching the
-/// logs precedent, where `selections` is likewise honored but not
-/// listed): it carries the GENERIC UI params and the MODE SELECTORS;
-/// mode/filter body fields (`selections`, `spans_per_trace`, the
-/// duration bounds) ride the request shape and are documented on the
-/// request type, not advertised individually.
+/// in [`InfoResponse::accepted_params`]. The list's rule: it carries
+/// exactly the TOP-LEVEL keys — the seven mode selectors plus
+/// `tenant`. Per-mode body fields (windows, `limit`, `selections`, …)
+/// live inside their mode objects and are documented on the param
+/// structs, never advertised as top-level params.
 pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
@@ -33,93 +35,223 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "attribute_values",
     "overview",
     "slowest",
+    "search",
     "tenant",
-    "after",
-    "before",
-    "last",
-    "anchor",
 ];
 
-/// Request payload. A flat struct like the logs request: `info` and the
-/// per-mode sub-objects select the mode (see [`OtelTracesRequest::mode`]);
-/// the window/tenant/timeout fields are common to every data mode.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OtelTracesRequest {
-    /// `info: true` requests the capability descriptor. Defaults to
-    /// `false` so data requests (which omit it) reach the data modes.
-    /// Sent as an explicit POST `{"info": true}` or synthesized from the
-    /// literal `info` token in GET URL args by the rt-level shim
-    /// (`patch_args_into_payload`).
+/// The raw top-level shape: the seven mode selectors captured
+/// presence-preserving (see [`present`]) plus `tenant`. Deserialized
+/// only through [`OtelTracesRequest`]'s manual `Deserialize` (which
+/// enforces a top-level JSON object) and immediately converted by
+/// [`TryFrom`] into the typed request — nothing outside this module
+/// sees the raw form.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawOtelTracesRequest {
+    /// The capability-discovery selector. `{"info": {}}` — the strict
+    /// empty object, validated by [`InfoParams`]; the traces GET shim
+    /// synthesizes exactly this for the `info` URL token.
+    #[serde(default, deserialize_with = "present")]
+    info: Option<serde_json::Value>,
+    /// The single-trace mode (dumb span list by trace id).
+    #[serde(default, deserialize_with = "present")]
+    trace: Option<serde_json::Value>,
+    /// Attribute-name enumeration (facet keys).
+    #[serde(default, deserialize_with = "present")]
+    attributes: Option<serde_json::Value>,
+    /// Attribute-value enumeration (facet values).
+    #[serde(default, deserialize_with = "present")]
+    attribute_values: Option<serde_json::Value>,
+    /// The overview grid (time × log-duration density).
+    #[serde(default, deserialize_with = "present")]
+    overview: Option<serde_json::Value>,
+    /// The slowest mode (duration-ranked top-K traces).
+    #[serde(default, deserialize_with = "present")]
+    slowest: Option<serde_json::Value>,
+    /// The search mode (bounded most-recent-first trace summaries).
+    #[serde(default, deserialize_with = "present")]
+    search: Option<serde_json::Value>,
+    /// Tenant whose data the query reads — a scoping selector supplied
+    /// by the caller, not a security boundary; omitted/invalid falls
+    /// back to the default tenant
+    /// ([`file_registry::TenantId::resolve_query`]), never an implicit
+    /// all-tenant union. Top-level because it scopes the CALL the same
+    /// way in every data mode (`info` ignores it — capability
+    /// discovery reads no data).
     #[serde(default)]
-    pub info: bool,
-    /// Selects the single-trace mode (dumb span list by trace id). Kept
-    /// as a raw value so the selector's PRESENCE picks the mode (see
-    /// `present` — a present-but-`null` selector still selects, it does
-    /// NOT fall through to another mode) and the typed parse
-    /// ([`OtelTracesRequest::trace_params`]) turns a malformed body —
-    /// `null` included — into a clean client error.
-    #[serde(default, deserialize_with = "present")]
-    pub trace: Option<serde_json::Value>,
-    /// Selects attribute-name enumeration (facet keys). Typed parse:
-    /// [`OtelTracesRequest::attributes_params`].
-    #[serde(default, deserialize_with = "present")]
-    pub attributes: Option<serde_json::Value>,
-    /// Selects attribute-value enumeration (facet values). Typed parse:
-    /// [`OtelTracesRequest::attribute_values_params`].
-    #[serde(default, deserialize_with = "present")]
-    pub attribute_values: Option<serde_json::Value>,
-    /// Selects the overview grid (time × log-duration density). Typed
-    /// parse: [`OtelTracesRequest::overview_params`].
-    #[serde(default, deserialize_with = "present")]
-    pub overview: Option<serde_json::Value>,
-    /// Selects the slowest mode (duration-ranked top-K traces). Typed
-    /// parse: [`OtelTracesRequest::slowest_params`].
-    #[serde(default, deserialize_with = "present")]
-    pub slowest: Option<serde_json::Value>,
-    /// Query window, unix seconds. Consumed by the WINDOWED data modes
-    /// (search, both enumeration modes, overview, slowest); the
-    /// `trace` mode ignores THESE envelope fields — its own optional
-    /// bounds live inside the `trace` sub-object
-    /// ([`TraceParams::after`]/[`TraceParams::before`]); absent there,
-    /// by-id looks at the full range (see the handler).
+    tenant: Option<String>,
+}
+
+/// Request payload: exactly one mode, its params self-contained, plus
+/// the optional call-scoping `tenant`. Implements `Deserialize`
+/// manually — top level must be a JSON object (arrays and scalars are
+/// client errors; the object streams through [`RawOtelTracesRequest`]'s
+/// derived visitor, preserving duplicate-key and unknown-key
+/// rejection) — and does NOT implement `Serialize` (tests build JSON
+/// bodies directly).
+#[derive(Debug, Clone)]
+pub struct OtelTracesRequest {
+    pub tenant: Option<String>,
+    pub mode: TracesMode,
+}
+
+/// The typed mode: selector identity plus its parsed params.
+#[derive(Debug, Clone)]
+pub enum TracesMode {
+    Info,
+    Trace(TraceParams),
+    Attributes(AttributesParams),
+    AttributeValues(AttributeValuesParams),
+    Overview(OverviewParams),
+    Slowest(SlowestParams),
+    Search(SearchParams),
+}
+
+impl<'de> Deserialize<'de> for OtelTracesRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct TopLevel;
+        impl<'de> serde::de::Visitor<'de> for TopLevel {
+            type Value = OtelTracesRequest;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("an otel-traces request object")
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let raw = RawOtelTracesRequest::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?;
+                OtelTracesRequest::try_from(raw).map_err(serde::de::Error::custom)
+            }
+        }
+        deserializer.deserialize_map(TopLevel)
+    }
+}
+
+impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
+    type Error = String;
+
+    /// Mode resolution then the typed parse, in that order: ALL present
+    /// selectors are counted BEFORE any selector value is decoded, so a
+    /// conflicting body reports the conflict even when one selector is
+    /// also malformed (`{"trace": null, "overview": {}}` is a conflict,
+    /// not an invalid trace selector).
+    fn try_from(raw: RawOtelTracesRequest) -> Result<Self, String> {
+        // Declaration order pins the conflict message's name order.
+        let present: Vec<&'static str> = [
+            ("info", raw.info.is_some()),
+            ("trace", raw.trace.is_some()),
+            ("attributes", raw.attributes.is_some()),
+            ("attribute_values", raw.attribute_values.is_some()),
+            ("overview", raw.overview.is_some()),
+            ("slowest", raw.slowest.is_some()),
+            ("search", raw.search.is_some()),
+        ]
+        .into_iter()
+        .filter_map(|(name, set)| set.then_some(name))
+        .collect();
+
+        match present.as_slice() {
+            [] => {
+                return Err(
+                    "missing mode selector: exactly one of info, trace, attributes, \
+                     attribute_values, overview, slowest, search is required"
+                        .into(),
+                )
+            }
+            [_] => {}
+            names => return Err(format!("conflicting mode selectors: {}", names.join(", "))),
+        }
+
+        /// The typed parse behind an explicit object gate: serde's
+        /// derived struct visitors also accept JSON sequences
+        /// (positional arrays), so `is_object` must be checked before
+        /// delegating or `{"trace": ["id", 7]}` would silently parse.
+        fn typed<T: serde::de::DeserializeOwned>(
+            name: &str,
+            v: &serde_json::Value,
+        ) -> Result<T, String> {
+            if !v.is_object() {
+                return Err(format!("invalid {name} selector: expected an object"));
+            }
+            T::deserialize(v).map_err(|e| format!("invalid {name} selector: {e}"))
+        }
+
+        let mode = if let Some(v) = &raw.info {
+            typed::<InfoParams>("info", v)?;
+            TracesMode::Info
+        } else if let Some(v) = &raw.trace {
+            TracesMode::Trace(typed("trace", v)?)
+        } else if let Some(v) = &raw.attributes {
+            TracesMode::Attributes(typed("attributes", v)?)
+        } else if let Some(v) = &raw.attribute_values {
+            TracesMode::AttributeValues(typed("attribute_values", v)?)
+        } else if let Some(v) = &raw.overview {
+            TracesMode::Overview(typed("overview", v)?)
+        } else if let Some(v) = &raw.slowest {
+            TracesMode::Slowest(typed("slowest", v)?)
+        } else if let Some(v) = &raw.search {
+            TracesMode::Search(typed("search", v)?)
+        } else {
+            unreachable!("exactly one selector was verified present");
+        };
+
+        Ok(Self {
+            tenant: raw.tenant,
+            mode,
+        })
+    }
+}
+
+/// The `info` selector's params: the strict empty object. Anything but
+/// `{}` — bools (both of the old wire's forms), numbers, null, arrays,
+/// or an object with any field — is a client error; a malformed
+/// selector must not silently select.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InfoParams {}
+
+/// The `search` mode's typed parameters.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchParams {
+    /// Match window, unix seconds; `0` means "unspecified" (before 0 →
+    /// now, after 0 → before − 900 — the adapter's `resolve_window`).
+    /// On an ANCHOR page these fields are IGNORED: the cursor carries
+    /// the original page's frozen window (the rank is
+    /// window-dependent, so a narrowed window would re-rank).
     #[serde(default)]
     pub after: u32,
     #[serde(default)]
     pub before: u32,
-    /// Tenant whose data the query reads — the same scoping-selector
-    /// semantics as `otel-logs`: supplied by the caller, not a security
-    /// boundary; omitted/invalid falls back to the default tenant
-    /// ([`file_registry::TenantId::resolve_query`]), never an implicit
-    /// all-tenant union.
-    #[serde(default)]
-    pub tenant: Option<String>,
-    /// Accepted for logs-request shape parity; the ENFORCING timeout is
-    /// the protocol-level one the bridge applies to the whole call
-    /// (`FunctionCall.timeout` → cancellation). Not consulted here.
-    #[serde(default)]
-    pub timeout: Option<u32>,
-    /// Search: result limit (top-K most-recent-first; the logs param
-    /// name). Zero is a client error — search has no unbounded option.
-    #[serde(default = "default_last")]
-    pub last: usize,
-    /// Search: matched spans attached per returned trace (engine default
-    /// 3, hard max 128, 0 = none).
+    /// Result limit (top-K most-recent-first). Zero is a client
+    /// error — search has no unbounded option.
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+    /// Matched spans attached per returned trace (engine default 3,
+    /// hard max 128, 0 = none).
     #[serde(default)]
     pub spans_per_trace: Option<usize>,
-    /// Search: facet selections. Keys are `<owner>.<key>` attributes
+    /// Facet selections. Keys are `<owner>.<key>` attributes
     /// (resource/span/instrumentation/event/link) or bare builtin words
     /// (see the adapter's grammar); values OR within a key, keys AND.
     #[serde(default)]
     pub selections: std::collections::HashMap<String, Vec<String>>,
-    /// Search: inclusive span-duration bounds, nanoseconds.
+    /// Inclusive span-duration bounds, nanoseconds.
     #[serde(default)]
     pub min_duration_ns: Option<i64>,
     #[serde(default)]
     pub max_duration_ns: Option<i64>,
-    /// Search: inclusive TRACE-envelope-duration bounds, nanoseconds —
-    /// the overview strip's cell-click narrowing (the grid bins by
-    /// trace envelope, so span-duration bounds would mismatch it).
-    /// Bin round-trip convention: the overview's duration bins are
+    /// Inclusive TRACE-envelope-duration bounds, nanoseconds — the
+    /// overview strip's cell-click narrowing (the grid bins by trace
+    /// envelope, so span-duration bounds would mismatch it). Bin
+    /// round-trip convention: the overview's duration bins are
     /// HALF-OPEN `[edge, next_edge)`, these bounds are INCLUSIVE — a
     /// cell click sends `min = edge, max = next_edge − 1` or an
     /// exactly-on-edge trace leaks in from the next bin.
@@ -127,13 +259,13 @@ pub struct OtelTracesRequest {
     pub min_trace_duration_ns: Option<i64>,
     #[serde(default)]
     pub max_trace_duration_ns: Option<i64>,
-    /// Search: opaque pagination cursor echoed from a previous
-    /// response's `anchor.next`.
+    /// Opaque pagination cursor echoed from a previous response's
+    /// `anchor.next`.
     #[serde(default)]
     pub anchor: Option<String>,
 }
 
-fn default_last() -> usize {
+fn default_limit() -> usize {
     sfsq::traces::DEFAULT_SEARCH_LIMIT
 }
 
@@ -150,124 +282,16 @@ where
     serde_json::Value::deserialize(d).map(Some)
 }
 
-/// The mode a request resolves to. `Search` is the default data mode (a
-/// request with no selector), mirroring the logs function where a plain
-/// request is a query.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RequestMode {
-    Info,
-    Trace,
-    Attributes,
-    AttributeValues,
-    Overview,
-    Slowest,
-    Search,
-}
-
-/// More than one data-mode selector was set: ambiguous, so a client
-/// error rather than a silent precedence pick. Carries the conflicting
-/// selector names for the error message.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ModeConflict(pub Vec<&'static str>);
-
-impl std::fmt::Display for ModeConflict {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "conflicting mode selectors: {}", self.0.join(", "))
-    }
-}
-
-impl OtelTracesRequest {
-    /// Resolve the request's mode. `info` wins over any data selector
-    /// (the logs `info`-over-`files` precedence — the GET shim always
-    /// synthesizes an `info` field, so it cannot conflict); among the
-    /// data selectors, more than one set is a [`ModeConflict`] error.
-    pub fn mode(&self) -> Result<RequestMode, ModeConflict> {
-        if self.info {
-            return Ok(RequestMode::Info);
-        }
-        let mut set: Vec<(&'static str, RequestMode)> = Vec::new();
-        if self.trace.is_some() {
-            set.push(("trace", RequestMode::Trace));
-        }
-        if self.attributes.is_some() {
-            set.push(("attributes", RequestMode::Attributes));
-        }
-        if self.attribute_values.is_some() {
-            set.push(("attribute_values", RequestMode::AttributeValues));
-        }
-        if self.overview.is_some() {
-            set.push(("overview", RequestMode::Overview));
-        }
-        if self.slowest.is_some() {
-            set.push(("slowest", RequestMode::Slowest));
-        }
-        match set.len() {
-            0 => Ok(RequestMode::Search),
-            1 => Ok(set[0].1),
-            _ => Err(ModeConflict(set.into_iter().map(|(n, _)| n).collect())),
-        }
-    }
-
-    /// Parse the `trace` selector into its typed params. Only called
-    /// after [`mode`](Self::mode) resolved to [`RequestMode::Trace`], so
-    /// the selector is present; anything but a well-formed object —
-    /// `null` included — is a client error.
-    pub fn trace_params(&self) -> Result<TraceParams, String> {
-        let v = self
-            .trace
-            .as_ref()
-            .expect("trace_params is only called on RequestMode::Trace");
-        // &Value is itself a Deserializer — no clone of the selector.
-        TraceParams::deserialize(v).map_err(|e| format!("invalid trace selector: {e}"))
-    }
-
-    /// Parse the `attributes` selector (same contract as
-    /// [`trace_params`](Self::trace_params); an empty object is valid —
-    /// all owners, engine-default cap).
-    pub fn attributes_params(&self) -> Result<AttributesParams, String> {
-        let v = self
-            .attributes
-            .as_ref()
-            .expect("attributes_params is only called on RequestMode::Attributes");
-        AttributesParams::deserialize(v).map_err(|e| format!("invalid attributes selector: {e}"))
-    }
-
-    /// Parse the `attribute_values` selector (same contract).
-    pub fn attribute_values_params(&self) -> Result<AttributeValuesParams, String> {
-        let v = self
-            .attribute_values
-            .as_ref()
-            .expect("attribute_values_params is only called on RequestMode::AttributeValues");
-        AttributeValuesParams::deserialize(v)
-            .map_err(|e| format!("invalid attribute_values selector: {e}"))
-    }
-
-    /// Parse the `overview` selector (same contract; an empty object is
-    /// the default grid — bucket geometry derives from after/before,
-    /// facets stay off).
-    pub fn overview_params(&self) -> Result<OverviewParams, String> {
-        let v = self
-            .overview
-            .as_ref()
-            .expect("overview_params is only called on RequestMode::Overview");
-        OverviewParams::deserialize(v).map_err(|e| format!("invalid overview selector: {e}"))
-    }
-
-    /// Parse the `slowest` selector (same contract; an empty object
-    /// takes the engine default limit).
-    pub fn slowest_params(&self) -> Result<SlowestParams, String> {
-        let v = self
-            .slowest
-            .as_ref()
-            .expect("slowest_params is only called on RequestMode::Slowest");
-        SlowestParams::deserialize(v).map_err(|e| format!("invalid slowest selector: {e}"))
-    }
-}
-
 /// The `slowest` mode's typed parameters.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SlowestParams {
+    /// Rank window, unix seconds; `0` means "unspecified" (the
+    /// adapter's `resolve_window` defaults).
+    #[serde(default)]
+    pub after: u32,
+    #[serde(default)]
+    pub before: u32,
     /// Result limit (top-K). Engine default 20; zero and beyond the
     /// library maximum (1000) are client errors — no unbounded option.
     #[serde(default)]
@@ -277,9 +301,15 @@ pub struct SlowestParams {
 /// The `overview` mode's typed parameters. The time-bucket geometry
 /// derives from `after`/`before` (the shared nice-width grid, like the
 /// logs histogram) and the duration bins are the fixed log-scale set.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OverviewParams {
+    /// Grid window, unix seconds; `0` means "unspecified" (the
+    /// adapter's `resolve_window` defaults).
+    #[serde(default)]
+    pub after: u32,
+    #[serde(default)]
+    pub before: u32,
     /// Also compute the top-root-service/operation facet lists.
     /// OPT-IN: resolving roots costs the sealed
     /// sources' string tables, so the default paint stays cheap and
@@ -290,9 +320,15 @@ pub struct OverviewParams {
 }
 
 /// The `attributes` mode's typed parameters.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AttributesParams {
+    /// Vocabulary window, unix seconds; `0` means "unspecified" (the
+    /// adapter's `resolve_window` defaults).
+    #[serde(default)]
+    pub after: u32,
+    #[serde(default)]
+    pub before: u32,
     /// Restrict to one owner: `resource` / `span` / `instrumentation` /
     /// `event` / `link` / `builtin`. Absent = every owner.
     #[serde(default)]
@@ -303,9 +339,15 @@ pub struct AttributesParams {
 }
 
 /// The `attribute_values` mode's typed parameters.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AttributeValuesParams {
+    /// Vocabulary window, unix seconds; `0` means "unspecified" (the
+    /// adapter's `resolve_window` defaults).
+    #[serde(default)]
+    pub after: u32,
+    #[serde(default)]
+    pub before: u32,
     /// The key, in the selection grammar (`<owner>.<key>` or a bare
     /// builtin word) — exactly what `attributes` returned.
     pub key: String,
@@ -317,7 +359,7 @@ pub struct AttributeValuesParams {
 /// The `trace` mode's typed parameters. Unknown fields are rejected —
 /// a misspelled parameter on a small object is a client error, not a
 /// silent ignore.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TraceParams {
     /// The trace id: 32 hex chars (16 bytes), case-insensitive — the
@@ -342,9 +384,9 @@ pub struct TraceParams {
 
 // ── Response ────────────────────────────────────────────────────────
 
-/// Response shapes, untagged like the logs response: the JSON payload is
-/// just one shape or the other. Data-mode variants join as their modes
-/// land.
+/// Response shapes. The enum is untagged AND serialize-only (no serde
+/// routing exists); every shape self-describes through its leading
+/// `mode` field instead.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum OtelTracesResponse {
@@ -367,6 +409,8 @@ pub enum OtelTracesResponse {
 /// the `rollup_absent` partial — units are never mixed.
 #[derive(Debug, Serialize)]
 pub struct OverviewResult {
+    /// The response's self-description: always `"overview"`.
+    pub mode: &'static str,
     pub version: u32,
     /// What the counts count. Always `"traces"` here — render
     /// verbatim, never hardcode.
@@ -444,6 +488,8 @@ pub struct OverviewTotals {
 /// bounded page by design.
 #[derive(Debug, Serialize)]
 pub struct SlowestResult {
+    /// The response's self-description: always `"slowest"`.
+    pub mode: &'static str,
     pub version: u32,
     pub status: StatusWire,
     pub items: SearchItems,
@@ -484,6 +530,8 @@ pub struct SlowestTraceWire {
 /// `attribute_values` request verbatim.
 #[derive(Debug, Serialize)]
 pub struct AttributesResult {
+    /// The response's self-description: always `"attributes"`.
+    pub mode: &'static str,
     pub version: u32,
     pub status: StatusWire,
     /// Exact: true iff `max_keys` cut the list short.
@@ -496,6 +544,8 @@ pub struct AttributesResult {
 /// `selections` match on.
 #[derive(Debug, Serialize)]
 pub struct AttributeValuesResult {
+    /// The response's self-description: always `"attribute_values"`.
+    pub mode: &'static str,
     pub version: u32,
     pub status: StatusWire,
     /// Exact: true iff `max_values` cut the list short.
@@ -524,6 +574,8 @@ pub struct AttributeValueWire {
 /// coverage declaration is the bound on "canonical".
 #[derive(Debug, Serialize)]
 pub struct SearchResult {
+    /// The response's self-description: always `"search"`.
+    pub mode: &'static str,
     pub version: u32,
     /// Query-level completeness — a work-ceiling breach or a lost
     /// source shows up here, never silently.
@@ -610,6 +662,8 @@ pub struct TraceSummaryWire {
 /// separate derivation from the reachability roots.
 #[derive(Debug, Serialize)]
 pub struct TraceResult {
+    /// The response's self-description: always `"trace"`.
+    pub mode: &'static str,
     pub version: u32,
     /// The queried id, echoed in canonical lowercase hex.
     pub trace_id: String,
@@ -696,6 +750,8 @@ pub struct FieldKindsWire {
 
 #[derive(Debug, Serialize)]
 pub struct InfoResponse {
+    /// The response's self-description: always `"info"`.
+    mode: &'static str,
     version: u32,
     status: u32,
     accepted_params: Vec<&'static str>,
@@ -706,6 +762,7 @@ pub struct InfoResponse {
 impl Default for InfoResponse {
     fn default() -> Self {
         Self {
+            mode: "info",
             version: 1,
             status: 200,
             accepted_params: ACCEPTED_PARAMS.to_vec(),
