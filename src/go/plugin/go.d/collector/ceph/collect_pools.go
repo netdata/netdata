@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"net/url"
-	"sort"
 	"time"
 )
 
@@ -32,7 +31,6 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 		}, &pools); err != nil {
 		return err
 	}
-	sort.SliceStable(pools, func(i, j int) bool { return pools[i].PoolName < pools[j].PoolName })
 	seenPoolNames := make(map[string]bool)
 	for _, pool := range pools {
 		if c.poolMatcher.MatchString(pool.PoolName) {

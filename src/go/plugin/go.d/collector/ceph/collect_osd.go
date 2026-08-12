@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"net/url"
-	"sort"
 	"strconv"
 	"time"
 )
@@ -44,13 +43,6 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 	if err := validateOSDs(osds); err != nil {
 		return err
 	}
-
-	sort.SliceStable(osds, func(i, j int) bool {
-		if osds[i].ID != osds[j].ID {
-			return osds[i].ID < osds[j].ID
-		}
-		return osds[i].UUID < osds[j].UUID
-	})
 
 	selected := make([]osdMetricSample, 0, min(c.MaxOSDs, len(osds)))
 	for _, osd := range osds {
