@@ -99,6 +99,10 @@ VENDOR_ICONS = {
 }
 FALLBACK_ICON = 'SNMP.png'
 
+# Most catalog entries are served by go.d.plugin; the exceptions name their own
+# plugin (network-viewer.plugin, otel.plugin, netdata).
+PLUGIN_GO_D = 'go.d.plugin'
+
 
 def load_profiles():
     """Return {filename: {'extends': [...], 'data': dict, 'text': str}} for every profile/module."""
@@ -414,7 +418,7 @@ TROUBLESHOOTING = {'problems': {'list': []}}
 METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '', 'availability': [], 'scopes': []}
 
 
-def make_entry(name, link, categories, icon, keywords, ov, plugin_name='go.d.plugin', module_name='snmp', metrics=None,
+def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO_D, module_name='snmp', metrics=None,
                setup=None):
     return {
         'meta': {
@@ -758,7 +762,7 @@ def build_topology_modules():
          'Netdata builds the `topology:streaming` view from the live streaming connections between Agents and Parents.',
          'Always available; reflects the live streaming connections of the deployment.',
          STREAMING_SETUP, (), False, '', '', ''),
-        ('vSphere Topology', 'go.d.plugin', 'vsphere', icon_for('vmware'),
+        ('vSphere Topology', PLUGIN_GO_D, 'vsphere', icon_for('vmware'),
          ['vsphere', 'vmware', 'vcenter', 'virtualization', 'topology', 'npm'],
          'Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with '
          'placement links and datastore-utilization overlays; enabling `collect_network_topology` adds the '
@@ -766,7 +770,7 @@ def build_topology_modules():
          'The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.',
          'Built from the configured vCenter inventory.',
          VSPHERE_SETUP, (), True, '', '', ''),
-        ('Cato Networks Topology', 'go.d.plugin', 'cato_networks', 'network-wired.svg',
+        ('Cato Networks Topology', PLUGIN_GO_D, 'cato_networks', 'network-wired.svg',
          ['cato', 'sase', 'sd-wan', 'topology', 'npm'],
          'Map a Cato Networks SASE fabric. The Cato collector renders sites, sockets, and gateways with their tunnel '
          'and '
@@ -784,7 +788,7 @@ def build_topology_modules():
         modules.append(make_entry(
             name=name, link='', categories=[CAT_TOPOLOGY], icon=FALLBACK_ICON,
             keywords=keywords, ov=overview(metrics_desc, method_desc, auto, multi_instance=False),
-            plugin_name='go.d.plugin', module_name='snmp_topology', setup=SNMP_TOPOLOGY_SETUP))
+            plugin_name=PLUGIN_GO_D, module_name='snmp_topology', setup=SNMP_TOPOLOGY_SETUP))
     for (name, plugin, module, icon, keywords, metrics_desc, method_desc, auto, setup, platforms, multi,
          limits, perf, perms) in other:
         modules.append(make_entry(
@@ -865,7 +869,7 @@ def build_trap_modules():
                 f'listener.',
             ),
             metrics=metrics_block(render_trap_coverage_md(entry, display)),
-            plugin_name='go.d.plugin',
+            plugin_name=PLUGIN_GO_D,
             module_name='snmp_traps',
             setup=SNMP_TRAPS_SETUP,
         ))
@@ -979,7 +983,7 @@ def build_trap_enrichment_modules():
     return [make_entry(
         name=name, link='', categories=[CAT_TRAPS], icon=FALLBACK_ICON,
         keywords=keywords, ov=overview(metrics_desc, method_desc, auto),
-        plugin_name='go.d.plugin', module_name='snmp_traps', setup=SNMP_TRAPS_SETUP)
+        plugin_name=PLUGIN_GO_D, module_name='snmp_traps', setup=SNMP_TRAPS_SETUP)
         for name, keywords, metrics_desc, method_desc, auto in enrichment]
 
 
@@ -1012,7 +1016,7 @@ def main():
     trap_enrichment = build_trap_enrichment_modules()
     modules = device + capability + topology + syslog + traps + trap_enrichment
 
-    doc = {'plugin_name': 'go.d.plugin', 'modules': modules}
+    doc = {'plugin_name': PLUGIN_GO_D, 'modules': modules}
 
     yaml = YAML()
     yaml.default_flow_style = False
