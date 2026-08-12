@@ -35,9 +35,9 @@ use sfsq::traces::{
 
 use super::adapter::{
     ResolvedWindow, build_predicate, parse_cursor, parse_enumeration_key, parse_owner_word,
-    parse_trace_id, resolve_window, to_attribute_values_result, to_attributes_result,
-    to_overview_result, to_search_result, to_slowest_result, to_trace_result,
-    validate_trace_bounds,
+    completion_capture_range, parse_trace_id, resolve_window, to_attribute_values_result,
+    to_attributes_result, to_overview_result, to_search_result, to_slowest_result,
+    to_trace_result, validate_trace_bounds,
 };
 use super::sources::TracesSourceSupplier;
 use super::wire::{
@@ -198,13 +198,23 @@ impl OtelTracesHandler {
             query = query.spans_per_trace(spt);
         }
 
-        // ONE capture, two roles: search validates window ⊆ completion
-        // by source id, so both vectors must be copies of the same
-        // captured state.
+        // ONE capture over the COMPLETION range (the match window
+        // widened by the clamped slack), two roles: the engine narrows
+        // the window role internally (SFSTs by summary overlap, tail
+        // spans per-span), so identical copies keep window ⊆ completion
+        // by construction while slack-only files still complete
+        // straddling hits. The cursor keeps freezing the ORIGINAL
+        // window (window.capture) — the completion range re-derives
+        // from it deterministically on every page.
+        let completion_range = completion_capture_range(&window.capture);
+        let completion_coverage = CoverageWire {
+            after: completion_range.start,
+            before: completion_range.end,
+        };
         let tenant = TenantId::resolve_query(req.tenant.as_deref());
         let mut sets = self
             .supplier
-            .capture(&tenant, window.capture.clone(), 2, &ctx.cancellation)
+            .capture(&tenant, completion_range, 2, &ctx.cancellation)
             .await;
         let completion = sets.pop().unwrap_or_default();
         let window_sources = sets.pop().unwrap_or_default();
@@ -246,10 +256,7 @@ impl OtelTracesHandler {
             req.last,
             cursor.as_ref(),
             (window.capture.start, window.capture.end),
-            CoverageWire {
-                after: window.capture.start,
-                before: window.capture.end,
-            },
+            completion_coverage,
         );
         Ok(OtelTracesResponse::Search(Box::new(result)))
     }

@@ -360,9 +360,45 @@ fn search_data(traces: Vec<sfsq::traces::TraceSummary>) -> SearchData {
 
 const WIN: (u32, u32) = (9_000, 10_000);
 const WIN_COVERAGE: CoverageWire = CoverageWire {
-    after: 9_000,
-    before: 10_000,
+    after: 5_400,
+    before: 13_600,
 };
+
+#[test]
+fn completion_capture_range_clamps_and_saturates() {
+    assert_eq!(completion_capture_range(&(9_000..10_000)), 5_400..13_600);
+    assert_eq!(
+        completion_capture_range(&(0..20_000)),
+        0..40_000
+    );
+    let day = 86_400;
+    assert_eq!(
+        completion_capture_range(&(day..day * 3)),
+        0..day * 4
+    );
+    assert_eq!(
+        completion_capture_range(&(u32::MAX - 100..u32::MAX)),
+        u32::MAX - 100 - 3_600..u32::MAX
+    );
+}
+
+#[test]
+fn cursor_freezes_the_original_window_while_coverage_declares_the_widened_range() {
+    let r = to_search_result(
+        search_data(vec![summary(1, 300), summary(2, 200)]),
+        2,
+        None,
+        WIN,
+        WIN_COVERAGE,
+    );
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(
+        v["completion_coverage"],
+        serde_json::json!({"after": 5_400, "before": 13_600})
+    );
+    let cursor = parse_cursor(v["anchor"]["next"].as_str().unwrap()).unwrap();
+    assert_eq!((cursor.after_s, cursor.before_s), WIN);
+}
 
 #[test]
 fn full_page_emits_a_cursor_and_short_page_does_not() {

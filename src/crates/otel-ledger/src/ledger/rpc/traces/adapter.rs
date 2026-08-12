@@ -78,6 +78,25 @@ pub(crate) fn validate_trace_bounds(
     Ok(Some(after..before))
 }
 
+/// Search completion slack, per side, seconds: the completion capture
+/// is the match window widened by `clamp(window_width, 1h, 24h)` on
+/// each side, so a hit whose trace straddles the window edge still
+/// assembles its out-of-window spans. Saturating at the u32 second
+/// boundaries. The window width is the scale hint: a narrow view gets
+/// at least an hour of slack, a wide one at most a day per side.
+pub(crate) const SEARCH_COMPLETION_SLACK_MIN_S: u32 = 3_600;
+pub(crate) const SEARCH_COMPLETION_SLACK_MAX_S: u32 = 86_400;
+
+/// The completion capture range for a match window: window widened by
+/// the clamped per-side slack. Deterministic in the window alone, so a
+/// pagination cursor that freezes the ORIGINAL window re-derives the
+/// same completion range on every page.
+pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::ops::Range<u32> {
+    let slack = (window.end - window.start)
+        .clamp(SEARCH_COMPLETION_SLACK_MIN_S, SEARCH_COMPLETION_SLACK_MAX_S);
+    window.start.saturating_sub(slack)..window.end.saturating_add(slack)
+}
+
 /// Shape one assembled trace into the wire result. `trace_id` is echoed
 /// back in canonical (lowercase) hex regardless of the request's casing.
 /// `coverage` is the capture range assembly actually used.

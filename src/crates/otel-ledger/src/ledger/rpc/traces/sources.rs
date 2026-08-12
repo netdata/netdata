@@ -75,10 +75,12 @@ impl TracesSourceSupplier {
     /// Capture one consistent snapshot of `tenant`'s sources overlapping
     /// `time_range` (unix seconds; window pruning is file-granular) and
     /// materialize `copies` structurally identical source vectors from
-    /// it. Search validates window ⊆ completion by source id, so both of
-    /// its roles must come from the same captured state — hence copies
-    /// from one capture, never two captures. Chunk bytes are
-    /// `Arc`-shared across copies.
+    /// it. Search passes its COMPLETION range (the match window widened
+    /// by the slack) and hands identical copies to both roles — the
+    /// engine narrows the window role itself, and window ⊆ completion
+    /// holds by identity; two captures could observe different
+    /// `valid_up_to` and trip the engine's membership check. Chunk
+    /// bytes are `Arc`-shared across copies.
     ///
     /// The chunk-building phase can be the slow one, so it polls `cancel`
     /// between builds (the logs handler's discipline); a cancelled call

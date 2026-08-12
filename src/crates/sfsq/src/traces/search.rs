@@ -85,10 +85,16 @@ const VISITED_ROWS_CEILING: u64 = 4_000_000;
 /// `window` drives phase-1 candidate discovery, `completion` (its
 /// superset — ENFORCED by [`SourceId`] membership) drives
 /// phase-2 assembly, so a matched trace's spans outside the window still
-/// complete it. Reusing a window source inside `completion` is the
-/// intended shape, not a duplicate; hygiene validates per role. Both
-/// sets share ONE snapshot: every source opens once, a tail decodes
-/// once, and both phases read those objects.
+/// complete it. The completion EXTENT is the caller's choice and is a
+/// BOUNDED range it declares on its wire (window plus a clamped slack —
+/// not all of retention); spans in files beyond that range are unknown
+/// to the assembly, which is honest only because the caller declares
+/// the bound. Passing identical vectors for both roles is valid: the
+/// engine narrows the window role itself (SFSTs by summary overlap,
+/// tail spans per-span). Reusing a window source inside `completion` is
+/// the intended shape, not a duplicate; hygiene validates per role.
+/// Both sets share ONE snapshot: every source opens once, a tail
+/// decodes once, and both phases read those objects.
 pub struct SearchSources {
     pub window: Vec<TraceSource>,
     pub completion: Vec<TraceSource>,

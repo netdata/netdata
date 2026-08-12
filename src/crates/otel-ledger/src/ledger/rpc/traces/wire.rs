@@ -517,9 +517,11 @@ pub struct AttributeValueWire {
 // ── Search mode response ────────────────────────────────────────────
 
 /// One search page: bounded most-recent-first trace summaries. Summary
-/// numbers are EXACT canonical-assembly figures unless a row's `exact`
-/// is false (its assembly was capped or degraded — numbers may
-/// undercount).
+/// numbers are EXACT canonical-assembly figures WITHIN the declared
+/// `completion_coverage` range unless a row's `exact` is false (its
+/// assembly was capped or degraded — numbers may undercount). Spans in
+/// files beyond the declared range are unknown, not counted — the
+/// coverage declaration is the bound on "canonical".
 #[derive(Debug, Serialize)]
 pub struct SearchResult {
     pub version: u32,
@@ -586,7 +588,9 @@ pub struct TraceSummaryWire {
     pub error_count: usize,
     pub matched_count: usize,
     /// False when this trace's assembly was capped or degraded — its
-    /// summary numbers may undercount.
+    /// summary numbers may undercount. "Exact" means exact WITHIN the
+    /// query's declared `completion_coverage`: spans in files beyond
+    /// that range are unknown loss the flag cannot see.
     pub exact: bool,
     /// The matched subset, `min(spans_per_trace, matched_count)` spans
     /// in the combiner's total order.

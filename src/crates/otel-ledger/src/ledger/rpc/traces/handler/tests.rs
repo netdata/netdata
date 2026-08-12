@@ -368,6 +368,49 @@ fn ids(v: &serde_json::Value) -> Vec<String> {
 }
 
 #[tokio::test]
+async fn search_declares_the_widened_completion_coverage() {
+    let h = handler_with_search_corpus().await;
+    let v = serde_json::to_value(call_on(&h, window_body()).await.unwrap()).unwrap();
+    // Window width 100s clamps to the 1h minimum slack per side.
+    assert_eq!(
+        v["completion_coverage"],
+        json!({"after": T_S - 3_600, "before": T_S + 100 + 3_600})
+    );
+}
+
+#[tokio::test]
+async fn search_completion_captures_slack_files_and_skips_beyond_slack() {
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req(0x11, 3, u64::from(T_S) * 1_000_000_000)],
+    )
+    .await;
+    // Tracked, never written: a probe is observable as source_failure.
+    // Inside the slack band (30min past the window edge).
+    install_sfst(&registries, "default", 2, T_S + 1_800, T_S + 1_900).await;
+    let h = make_handler_over(registries);
+    let v = serde_json::to_value(call_on(&h, window_body()).await.unwrap()).unwrap();
+    assert_eq!(v["status"], json!({"partial": ["source_failure"]}));
+
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req(0x11, 3, u64::from(T_S) * 1_000_000_000)],
+    )
+    .await;
+    // Beyond the slack band (2h past a 100s window's 1h slack).
+    install_sfst(&registries, "default", 2, T_S + 7_300, T_S + 7_400).await;
+    let h = make_handler_over(registries);
+    let v = serde_json::to_value(call_on(&h, window_body()).await.unwrap()).unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+}
+
+#[tokio::test]
 async fn search_returns_most_recent_first_with_deterministic_ties() {
     let h = handler_with_search_corpus().await;
     let mut body = window_body();
