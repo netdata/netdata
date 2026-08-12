@@ -97,7 +97,8 @@ func TestLoadDCStatConfigFilesMissingReturnsNotFound(t *testing.T) {
 	if found {
 		t.Fatal("expected no config files to be found")
 	}
-	if cfg.Dcstat != nil || cfg.UpdateEvery != nil || cfg.PidTable != nil || cfg.ObjectFlavor != nil {
+	if cfg.Dcstat != nil || cfg.UpdateEvery != nil || cfg.PidTable != nil || cfg.MapsPerCore != nil ||
+		cfg.BTFPath != nil || cfg.Lifetime != nil || cfg.ObjectFlavor != nil || cfg.CollectPidLevel != nil {
 		t.Fatalf("expected empty config, got %#v", cfg)
 	}
 }

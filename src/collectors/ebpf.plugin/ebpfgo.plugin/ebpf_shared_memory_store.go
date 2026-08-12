@@ -35,6 +35,11 @@ type ebpfModuleIdentity struct {
 	ppid uint32
 }
 
+// isEmpty reports whether this module learned nothing about the process.
+func (i ebpfModuleIdentity) isEmpty() bool {
+	return i.ppid == 0 && i.comm[0] == 0
+}
+
 // ebpfSharedMemoryStore holds one row per PID, merged from every eBPF module
 // that publishes per-PID data (cachestat, dcstat, socket).
 //
@@ -221,13 +226,22 @@ func (s *ebpfSharedMemoryStore) rebuildEntriesLocked() {
 // buildRowLocked assembles one shared-memory row from whichever modules have
 // data for pid.  Identity (comm/ppid) is taken from cachestat first, then
 // dcstat; socket rows carry no identity.
+//
+// Presence in a module's identity map is not enough: a BPF entry created
+// between process start and the first bpf_get_current_comm() carries an empty
+// comm, so an empty cachestat identity must not shadow a populated dcstat one.
 func (s *ebpfSharedMemoryStore) buildRowLocked(pid uint32) ebpfPidStat {
 	row := ebpfPidStat{pid: pid}
 
-	if ident, ok := s.cachestatIdent[pid]; ok {
+	if ident, ok := s.cachestatIdent[pid]; ok && !ident.isEmpty() {
 		row.comm = ident.comm
 		row.ppid = ident.ppid
-	} else if ident, ok := s.dcstatIdent[pid]; ok {
+	} else if ident, ok := s.dcstatIdent[pid]; ok && !ident.isEmpty() {
+		row.comm = ident.comm
+		row.ppid = ident.ppid
+	} else if ident, ok := s.cachestatIdent[pid]; ok {
+		// Both empty (or only cachestat present): keep whatever cachestat had so
+		// the row is unchanged from the single-module behaviour.
 		row.comm = ident.comm
 		row.ppid = ident.ppid
 	}

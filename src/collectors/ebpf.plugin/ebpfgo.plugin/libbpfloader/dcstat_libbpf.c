@@ -23,6 +23,9 @@
 #ifndef LIBBPF_MAJOR_VERSION
 static inline int bpf_program__set_autoload(struct bpf_program *prog, bool autoload)
 {
+    /* No autoload API in old libbpf; all programs load unconditionally.
+     * Legacy .bpf.o files for old kernels do not contain fentry/CO-RE
+     * programs, so missing this call is harmless. */
     (void)prog;
     (void)autoload;
     return 0;
@@ -35,9 +38,9 @@ static inline enum bpf_map_type bpf_map__type(const struct bpf_map *map)
 
 static inline int bpf_map__set_type(struct bpf_map *map, enum bpf_map_type type)
 {
-    (void)map;
-    (void)type;
-    return -1;
+    /* bpf_map__def() is const-qualified but the map is mutable before load */
+    ((struct bpf_map_def *)bpf_map__def(map))->type = type;
+    return 0;
 }
 
 static inline int bpf_map__set_max_entries(struct bpf_map *map, __u32 max_entries)
@@ -892,6 +895,10 @@ int netdata_dcstat_runtime_update_controller(
     return 0;
 }
 
+/* maps_per_core is accepted for signature parity with the sibling runtimes but
+ * is deliberately not consulted: the post-load map type is authoritative.
+ * bpf_map__set_type() can silently fail before load, so trusting the caller's
+ * intent here would size the read buffer wrongly.  Same for snapshot_apps(). */
 int netdata_dcstat_runtime_snapshot(
     struct netdata_ebpf_dcstat_runtime *rt,
     int maps_per_core,

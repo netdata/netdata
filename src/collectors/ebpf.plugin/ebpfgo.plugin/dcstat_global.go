@@ -62,9 +62,11 @@ var dcstatGlobalCharts = []dcstatGlobalChart{
 		},
 	},
 	{
-		id:      "dc_reference",
-		title:   "Variables used to calculate hit ratio.",
-		units:   "files",
+		id:    "dc_reference",
+		title: "Variables used to calculate hit ratio.",
+		// The dimensions are cumulative counters published with the incremental
+		// algorithm, so the database renders them as a rate.
+		units:   "files/s",
 		context: "filesystem.dc_reference",
 		order:   21201,
 		dimensions: []dcstatGlobalDimension{
@@ -77,6 +79,23 @@ var dcstatGlobalCharts = []dcstatGlobalChart{
 
 var dcstatGlobalChartsOnce sync.Once
 
+// dcstatHitRatio converts one interval's directory-cache deltas into the hit
+// ratio percentage.  It is the single definition of dcstat's ratio semantics:
+// the global collector and the per-PID shared-memory rows both call it, so the
+// two can never drift apart.
+//
+// The idle convention is the C collector's: no lookups this interval means a
+// ratio of 0.  cachestat deliberately reports 100 for its idle case; the two
+// metrics are not interchangeable.
+func dcstatHitRatio(reference, notFound int64) int64 {
+	if reference <= 0 {
+		return 0
+	}
+
+	successful := max(reference-notFound, 0)
+	return int64((float64(successful) / float64(reference)) * 100)
+}
+
 // Update computes the publish values for one collection cycle.
 //
 // reference/slow/miss are published as the raw cumulative BPF counters with the
@@ -84,22 +103,18 @@ var dcstatGlobalChartsOnce sync.Once
 // per-interval value (the C collector divided lifetime totals, which barely
 // moves after a few hours of uptime and disagrees with the per-app and
 // per-cgroup ratios computed from interval deltas).
-//
-// The idle convention is the C collector's: no lookups this interval means a
-// ratio of 0.
 func (s *dcstatGlobalState) Update(current dcstatGlobalCounters) (dcstatGlobalPublish, bool) {
-	reference := diffCounters(current.Reference, s.prev.Reference)
-	notFound := diffCounters(current.Miss, s.prev.Miss)
-
 	publish := dcstatGlobalPublish{
 		Reference: int64(current.Reference),
 		Slow:      int64(current.Slow),
 		Miss:      int64(current.Miss),
 	}
 
-	if s.initialized && reference > 0 {
-		successful := max(reference-notFound, 0)
-		publish.Ratio = int64((float64(successful) / float64(reference)) * 100)
+	if s.initialized {
+		publish.Ratio = dcstatHitRatio(
+			diffCounters(current.Reference, s.prev.Reference),
+			diffCounters(current.Miss, s.prev.Miss),
+		)
 	}
 
 	s.prev = current
@@ -221,9 +236,15 @@ func runDCStatGlobalCollector(
 		apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("dcstat.snapshot", "dcstat", "snapshot-apps", err)
-			// No valid per-PID data this cycle: clear the DCSTAT flag so the
-			// consumer does not see dcstat_ok = true with stale rows.
+			// No valid per-PID data this cycle: clear the DCSTAT flag and stamp
+			// it into shared memory, otherwise consumers keep treating the
+			// previous cycle's rows as live.  Mirrors socket's clearSocketApps.
 			store.MarkDCStatInactive()
+			if shouldPublish && handle.SharedMemory != nil {
+				if perr := store.Publish(handle.SharedMemory, ebpfgoSHMFlagDCStat); perr != nil {
+					logPluginErr("dcstat.publish", "dcstat", "shared memory publish", perr)
+				}
+			}
 			return
 		}
 

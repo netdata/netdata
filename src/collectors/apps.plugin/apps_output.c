@@ -380,10 +380,10 @@ static void send_dcstat_charts_to_netdata(struct target *w, const char *type, co
         const char *dim;
         const char *algo;
     } charts[] = {
-        { "ebpf_dc_hit",       "Percentage of files inside directory cache.", "%",     "line",    20265, "ratio", "absolute"    },
-        { "ebpf_dc_reference", "Count file access.",                          "files", "stacked", 20266, "files", "incremental" },
-        { "ebpf_dc_not_cache", "Files not present inside directory cache.",    "files", "stacked", 20267, "files", "incremental" },
-        { "ebpf_dc_not_found", "Files not found.",                            "files", "stacked", 20268, "files", "incremental" },
+        { "ebpf_dc_hit",       "Percentage of files inside directory cache.", "%",       "line",    20265, "ratio", "absolute"    },
+        { "ebpf_dc_reference", "Count file access.",                          "files/s", "stacked", 20266, "files", "incremental" },
+        { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files/s", "stacked", 20267, "files", "incremental" },
+        { "ebpf_dc_not_found", "Files not found.",                            "files/s", "stacked", 20268, "files", "incremental" },
     };
 
     const char *name  = string2str(w->clean_name);

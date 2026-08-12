@@ -123,11 +123,12 @@ func resolveDCStatLegacyConfig() (DCStatLegacyConfig, error) {
 	cfg.KernelVersion = kver
 	cfg.IsRHF = isRHF
 
-	targets, err := resolveDCStatTargets()
-	if err != nil {
-		return DCStatLegacyConfig{}, err
+	// Only touch /proc/kallsyms when dcstat will actually run: this function is
+	// called at startup regardless of the module being enabled, and dcstat must
+	// not influence the collectors sharing this process.
+	if cfg.Enabled {
+		cfg.Targets = resolveDCStatTargets()
 	}
-	cfg.Targets = targets
 
 	return cfg, nil
 }

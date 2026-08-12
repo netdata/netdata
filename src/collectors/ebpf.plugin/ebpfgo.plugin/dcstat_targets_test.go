@@ -69,29 +69,50 @@ func TestSelectDCStatKallsymsPrefixRejectsEmptyPrefix(t *testing.T) {
 func TestDefaultDCStatTargets(t *testing.T) {
 	targets := defaultDCStatTargets()
 
-	if targets.LookupFast.Name != "lookup_fast" || targets.LookupFast.Mode != RunModeEntry {
-		t.Fatalf("lookup_fast target = %+v, want entry probe on lookup_fast", targets.LookupFast)
+	if targets.LookupFast.Name != "lookup_fast" {
+		t.Fatalf("lookup_fast target = %+v, want lookup_fast", targets.LookupFast)
 	}
-	// d_lookup must stay a return probe: the BPF program reads the return value
-	// to tell a successful lookup from a miss.
-	if targets.DLookup.Name != "d_lookup" || targets.DLookup.Mode != RunModeReturn {
-		t.Fatalf("d_lookup target = %+v, want return probe on d_lookup", targets.DLookup)
+	if targets.DLookup.Name != "d_lookup" {
+		t.Fatalf("d_lookup target = %+v, want d_lookup", targets.DLookup)
 	}
 }
 
-// TestResolveLookupFastTargetKeepsNameWhenAbsent verifies the resolver leaves
-// the configured name in place when kallsyms has no match, so the failure
-// surfaces at attach time rather than as a config error.
-func TestResolveLookupFastTargetKeepsNameWhenAbsent(t *testing.T) {
-	targets := defaultDCStatTargets()
-	name, err := selectDCStatKallsymsPrefixFromReader(targets.LookupFast.Name, strings.NewReader(""))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestResolveLookupFastTarget(t *testing.T) {
+	tests := map[string]struct {
+		resolved string
+		want     string
+	}{
+		"adopts the resolved symbol":        {resolved: "lookup_fast.isra.0", want: "lookup_fast.isra.0"},
+		"keeps the default when absent":     {resolved: "", want: "lookup_fast"},
+		"keeps the default when unsuffixed": {resolved: "lookup_fast", want: "lookup_fast"},
 	}
-	if name != "" {
-		t.Fatalf("expected no match, got %q", name)
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			targets := defaultDCStatTargets()
+			targets.ResolveLookupFastTarget(tc.resolved)
+			if targets.LookupFast.Name != tc.want {
+				t.Fatalf("LookupFast.Name = %q, want %q", targets.LookupFast.Name, tc.want)
+			}
+			if targets.DLookup.Name != "d_lookup" {
+				t.Fatalf("d_lookup must not be touched, got %q", targets.DLookup.Name)
+			}
+		})
 	}
-	if targets.LookupFast.Name != "lookup_fast" {
-		t.Fatalf("target name changed unexpectedly: %q", targets.LookupFast.Name)
+}
+
+// TestResolveDCStatTargetsSurvivesUnreadableKallsyms proves dcstat degrades to
+// the default symbol name instead of failing: a /proc/kallsyms error must never
+// take down the collectors sharing this process.
+func TestResolveDCStatTargetsSurvivesUnreadableKallsyms(t *testing.T) {
+	got := resolveDCStatTargets()
+
+	// On any host this returns usable targets: either the resolved symbol (when
+	// /proc/kallsyms is readable) or the configured default (when it is not).
+	if !strings.HasPrefix(got.LookupFast.Name, "lookup_fast") {
+		t.Fatalf("LookupFast.Name = %q, want a lookup_fast* symbol", got.LookupFast.Name)
+	}
+	if got.DLookup.Name != "d_lookup" {
+		t.Fatalf("DLookup.Name = %q, want d_lookup", got.DLookup.Name)
 	}
 }

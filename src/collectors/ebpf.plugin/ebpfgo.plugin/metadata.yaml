@@ -297,7 +297,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics show total number of calls to functions inside kernel."
+          description: "These metrics show how often file lookups were resolved by the kernel directory cache, host-wide."
           labels: []
           metrics:
             - name: filesystem.dc_hit_ratio
@@ -308,7 +308,7 @@ modules:
                 - name: ratio
             - name: filesystem.dc_reference
               description: Variables used to calculate hit ratio.
-              unit: "files"
+              unit: "files/s"
               chart_type: line
               dimensions:
                 - name: reference

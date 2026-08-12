@@ -8,9 +8,12 @@ import (
 	"strings"
 )
 
+// DCStatTarget is the kernel symbol one dcstat probe attaches to.  There is no
+// mode field: which of the two probes is a return probe is fixed by the BPF
+// programs themselves (d_lookup reads PT_REGS_RC), not by configuration, so a
+// mode here would be a setting that cannot actually change anything.
 type DCStatTarget struct {
 	Name string
-	Mode RunMode
 }
 
 type DCStatTargets struct {
@@ -26,40 +29,39 @@ type DCStatTargets struct {
 
 func defaultDCStatTargets() DCStatTargets {
 	return DCStatTargets{
-		LookupFast: DCStatTarget{
-			Name: "lookup_fast",
-			Mode: RunModeEntry,
-		},
-		DLookup: DCStatTarget{
-			Name: "d_lookup",
-			Mode: RunModeReturn,
-		},
+		LookupFast: DCStatTarget{Name: "lookup_fast"},
+		DLookup:    DCStatTarget{Name: "d_lookup"},
 	}
 }
 
-func resolveDCStatTargets() (DCStatTargets, error) {
+// resolveDCStatTargets returns the attach targets for this kernel.
+//
+// A /proc/kallsyms read failure is never fatal: the configured default name is
+// kept and a warning is emitted.  dcstat is disabled by default, and even when
+// enabled it must not take down the collectors sharing this process — if the
+// symbol really is wrong, attach fails and only dcstat is lost.
+func resolveDCStatTargets() DCStatTargets {
 	targets := defaultDCStatTargets()
-	if err := targets.ResolveLookupFastTarget(); err != nil {
-		return DCStatTargets{}, err
+
+	name, err := selectDCStatKallsymsPrefix(targets.LookupFast.Name)
+	if err != nil {
+		rateLimitedStderr("dcstat.kallsyms",
+			fmt.Sprintf("ebpf-go.plugin: dcstat: cannot read /proc/kallsyms (%v); attaching to %q as-is\n",
+				err, targets.LookupFast.Name))
+		return targets
 	}
 
-	return targets, nil
+	targets.ResolveLookupFastTarget(name)
+	return targets
 }
 
-// ResolveLookupFastTarget replaces LookupFast.Name with the concrete kallsyms
-// symbol when a suffixed variant is present.  A missing symbol is not an error:
-// the plain name is kept so attach fails loudly at load time instead of hiding
-// a kallsyms read problem behind a config error.
-func (t *DCStatTargets) ResolveLookupFastTarget() error {
-	name, err := selectDCStatKallsymsPrefix(t.LookupFast.Name)
-	if err != nil {
-		return err
+// ResolveLookupFastTarget adopts a resolved kallsyms symbol name.  An empty
+// name means the symbol was not found, in which case the configured default is
+// kept so the failure surfaces at attach time rather than as a config error.
+func (t *DCStatTargets) ResolveLookupFastTarget(resolved string) {
+	if resolved != "" {
+		t.LookupFast.Name = resolved
 	}
-
-	if name != "" {
-		t.LookupFast.Name = name
-	}
-	return nil
 }
 
 func selectDCStatKallsymsPrefix(prefix string) (string, error) {

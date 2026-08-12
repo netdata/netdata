@@ -50,12 +50,9 @@ typedef struct cgroup_ebpfgo_publish_cachestat {
     cgroup_ebpfgo_cachestat_t prev;
 } cgroup_ebpfgo_publish_cachestat_t;
 
-typedef struct cgroup_ebpfgo_dcstat {
-    uint64_t cache_access;
-    uint64_t file_system;
-    uint64_t not_found;
-} cgroup_ebpfgo_dcstat_t;
-
+/* Per-interval directory-cache totals for one cgroup.  Unlike cachestat, the
+ * raw cumulative counters are not mirrored here: the per-PID deltas are summed
+ * directly from shared memory, so nothing downstream needs them. */
 typedef struct cgroup_ebpfgo_publish_dcstat {
     uint64_t ct;
 
@@ -63,9 +60,6 @@ typedef struct cgroup_ebpfgo_publish_dcstat {
     long long reference;
     long long slow;
     long long not_found;
-
-    cgroup_ebpfgo_dcstat_t current;
-    cgroup_ebpfgo_dcstat_t prev;
 } cgroup_ebpfgo_publish_dcstat_t;
 
 typedef struct cgroup_ebpfgo_socket {

@@ -86,6 +86,11 @@ func TestFormatDCStatGlobalCharts(t *testing.T) {
 	}
 
 	reference := formatDCStatGlobalChart(dcstatGlobalCharts[1], updateEvery)
+	// The counters are published cumulatively with the incremental algorithm, so
+	// the unit must name a rate.
+	if !strings.Contains(reference, "'files/s'") {
+		t.Fatalf("dc_reference chart = %q, want unit 'files/s'", reference)
+	}
 	for _, dim := range []string{"reference", "slow", "miss"} {
 		want := "DIMENSION '" + dim + "' '" + dim + "' 'incremental' '1' '1' ''\n"
 		if !strings.Contains(reference, want) {

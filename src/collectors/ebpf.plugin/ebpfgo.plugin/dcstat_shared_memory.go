@@ -14,31 +14,26 @@ import (
 // only one scalar delta field).  Ratio and CacheAccess are the per-interval
 // values, matching the semantics the C collector gave those two fields.
 //
-// The idle convention is the C collector's: with no directory-cache lookups this
-// interval the ratio is 0, not 100.  cachestat deliberately uses 100 for its
-// idle case; the two metrics are not interchangeable.
+// On the first sample for a PID there is no previous reading, so Prev is set
+// equal to Curr rather than left zero: every consumer derives its deltas as
+// Curr - Prev, and a zero Prev would publish the process's entire pre-existing
+// counter history as one interval's activity.  This also repeats whenever a PID
+// re-enters the BPF map or the producer restarts, so it has to be handled here,
+// once, rather than in each consumer.
 func buildDCStatPublish(current, previous netdataPublishDCStatPid, ct uint64, hasPrevious bool) netdataPublishDCStat {
-	publish := netdataPublishDCStat{
-		Ct:   ct,
-		Curr: current,
-		Prev: previous,
-	}
-
 	if !hasPrevious {
-		return publish
+		return netdataPublishDCStat{Ct: ct, Curr: current, Prev: current}
 	}
 
 	reference := diffCounters(current.CacheAccess, previous.CacheAccess)
-	notFound := diffCounters(current.NotFound, previous.NotFound)
 
-	successful := max(reference-notFound, 0)
-
-	if reference > 0 {
-		publish.Ratio = int64((float64(successful) / float64(reference)) * 100)
+	return netdataPublishDCStat{
+		Ct:          ct,
+		Ratio:       dcstatHitRatio(reference, diffCounters(current.NotFound, previous.NotFound)),
+		CacheAccess: reference,
+		Curr:        current,
+		Prev:        previous,
 	}
-
-	publish.CacheAccess = reference
-	return publish
 }
 
 // UpdateDCStatApps updates the in-memory snapshot from the latest dcstat BPF
@@ -63,15 +58,19 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 
 	for _, app := range apps {
 		lastCt, seen := s.dcstatPrevCt[app.Pid]
+		stale := false
 		if seen && app.Ct == lastCt {
 			miss := s.dcstatMiss[app.Pid] + 1
 			if miss >= ebpfStaleCycles {
+				stale = true
 				stalePIDs = append(stalePIDs, app.Pid)
-				continue
+			} else {
+				s.nextDcstatMs[app.Pid] = miss
 			}
-			s.nextDcstatMs[app.Pid] = miss
 		}
-		// New PID or ct advanced: miss count stays 0 (Go zero-value).
+		// New PID or ct advanced: miss count stays 0 (Go zero-value).  A stale
+		// candidate also resets it, so it is re-flagged every ebpfStaleCycles
+		// instead of forcing a kill() probe on every cycle.
 
 		s.nextDcstatCt[app.Pid] = app.Ct
 
@@ -82,13 +81,24 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 		}
 		previous, hasPrevious := s.dcstatPrev[app.Pid]
 
+		// Carry the counter baseline forward even for a stale candidate.  The
+		// process may simply be idle-but-alive: dropping its previous counters
+		// would make its next burst of activity look like a first sample and be
+		// suppressed entirely.  The state is bounded by the BPF map contents, so
+		// it disappears on its own once the PID is confirmed dead and deleted.
+		s.nextDcstat[app.Pid] = current
+
+		if stale {
+			// No row this cycle: the caller decides whether the PID is dead.
+			continue
+		}
+
 		var ident ebpfModuleIdentity
 		copy(ident.comm[:], app.Comm[:])
 		ident.ppid = app.Ppid
 
 		s.dcstatData[app.Pid] = buildDCStatPublish(current, previous, app.Ct, hasPrevious)
 		s.dcstatIdent[app.Pid] = ident
-		s.nextDcstat[app.Pid] = current
 		pids, ordered = appendAscending(pids, app.Pid, ordered)
 	}
 

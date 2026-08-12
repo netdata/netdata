@@ -33,14 +33,14 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
     uint64_t prev_ct = cg->dcstat.ct;
     uint64_t ct = 0;
 
-    cg->dcstat.prev = cg->dcstat.current;
-    memset(&cg->dcstat.current, 0, sizeof(cg->dcstat.current));
     cg->dcstat.ratio = 0;
     cg->dcstat.reference = 0;
     cg->dcstat.slow = 0;
     cg->dcstat.not_found = 0;
-    cg->dcstat.ct = 0;
 
+    /* Keep the consumed ct when the cgroup momentarily has no PIDs (an empty or
+     * unreadable cgroup.procs).  Resetting it would make the next tick treat
+     * every row as unconsumed and replay the last interval, spiking the charts. */
     if (!cg->ebpf_pids_count)
         return;
 
@@ -57,10 +57,6 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
 
         const struct ebpf_publish_dcstat *dc = &item->dc;
 
-        cg->dcstat.current.cache_access += dc->curr.cache_access;
-        cg->dcstat.current.file_system += dc->curr.file_system;
-        cg->dcstat.current.not_found += dc->curr.not_found;
-
         if (dc->ct > ct)
             ct = dc->ct;
 
@@ -72,7 +68,8 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
         not_found += cgroup_ebpfgo_dcstat_delta(dc->curr.not_found, dc->prev.not_found);
     }
 
-    cg->dcstat.ct = ct;
+    if (ct)
+        cg->dcstat.ct = ct;
     cg->dcstat.reference = (long long)reference;
     cg->dcstat.slow = (long long)slow;
     cg->dcstat.not_found = (long long)not_found;
@@ -84,6 +81,8 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
         cg->dcstat.ratio = (long long)((successful * 100) / reference);
     }
 }
+
+
 
 static void cgroup_ebpfgo_dcstat_update_single_chart(
     struct cgroup *cg,

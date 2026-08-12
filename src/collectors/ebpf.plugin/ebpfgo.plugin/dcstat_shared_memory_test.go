@@ -39,7 +39,10 @@ func TestBuildDCStatPublishIdleRatioIsZero(t *testing.T) {
 	}
 }
 
-func TestBuildDCStatPublishFirstSampleHasNoDeltas(t *testing.T) {
+// TestBuildDCStatPublishFirstSampleSelfBaselines pins the anti-spike rule: with
+// no previous reading, Prev must equal Curr so a consumer computing Curr-Prev
+// sees zero instead of the process's entire pre-existing counter history.
+func TestBuildDCStatPublishFirstSampleSelfBaselines(t *testing.T) {
 	current := netdataPublishDCStatPid{CacheAccess: 1000, FileSystem: 200, NotFound: 50}
 
 	got := buildDCStatPublish(current, netdataPublishDCStatPid{}, 7, false)
@@ -48,6 +51,9 @@ func TestBuildDCStatPublishFirstSampleHasNoDeltas(t *testing.T) {
 	}
 	if got.Curr != current {
 		t.Fatalf("first sample must still carry the raw counters, got %+v", got.Curr)
+	}
+	if got.Prev != current {
+		t.Fatalf("first sample Prev = %+v, want it baselined to Curr %+v", got.Prev, current)
 	}
 }
 
@@ -87,8 +93,8 @@ func TestDCStatStoreUpdateApps(t *testing.T) {
 	if got[0].dc.Curr.CacheAccess != 40 || got[1].dc.Curr.NotFound != 8 {
 		t.Fatalf("Snapshot() raw counters were not copied: %+v / %+v", got[0].dc, got[1].dc)
 	}
-	if got[0].dc.Prev != (netdataPublishDCStatPid{}) {
-		t.Fatalf("Snapshot()[0] previous counters on first update should be zero, got %+v", got[0].dc.Prev)
+	if got[0].dc.Prev != got[0].dc.Curr {
+		t.Fatalf("Snapshot()[0] first update must self-baseline Prev to Curr, got %+v", got[0].dc.Prev)
 	}
 	if store.activeModules&ebpfgoSHMFlagDCStat == 0 {
 		t.Fatal("UpdateDCStatApps did not set the DCSTAT flag")
@@ -223,5 +229,40 @@ func TestMarkDCStatInactiveClearsOnlyDCStat(t *testing.T) {
 	}
 	if store.activeModules&ebpfgoSHMFlagCachestat == 0 {
 		t.Fatal("MarkDCStatInactive cleared the CACHESTAT flag")
+	}
+}
+
+// TestDCStatStoreKeepsBaselineForIdlePID guards the idle-but-alive case: a PID
+// flagged stale must keep its counter baseline, so the first activity after the
+// idle window is reported as a delta instead of being swallowed as a "first
+// sample".
+func TestDCStatStoreKeepsBaselineForIdlePID(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	app := libbpfloader.DCStatAppSnapshot{Pid: 42, Ct: 100, CacheAccess: 1000, NotFound: 100}
+
+	// Baseline, then enough unchanged cycles to be flagged as a stale candidate.
+	for range ebpfStaleCycles + 1 {
+		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+	}
+	if len(store.Snapshot()) != 0 {
+		t.Fatal("a stale candidate must not be published as a live row")
+	}
+
+	// The process was only idle: it wakes up and does 100 more lookups, 10 missed.
+	app.Ct = 200
+	app.CacheAccess = 1100
+	app.NotFound = 110
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+
+	snap := store.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	if snap[0].dc.CacheAccess != 100 {
+		t.Fatalf("cache_access delta = %d, want 100 (baseline must survive the idle window)",
+			snap[0].dc.CacheAccess)
+	}
+	if snap[0].dc.Ratio != 90 {
+		t.Fatalf("ratio = %d, want 90", snap[0].dc.Ratio)
 	}
 }
