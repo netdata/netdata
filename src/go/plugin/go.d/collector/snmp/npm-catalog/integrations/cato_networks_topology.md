@@ -13,7 +13,7 @@ endmeta-->
 # Cato Networks Topology
 
 
-<img src="https://netdata.cloud/img/network-wired.svg" width="150"/>
+<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
 
 
 Plugin: go.d.plugin
@@ -54,7 +54,7 @@ You can configure the **cato_networks** collector in two ways:
 | Method                | Best for                                                                                 | How to                                                                                                                                 |
 |-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **cato_networks**, then click **+** to add a job. |
-| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/cato_networks.conf` and add a job.                                                                        |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/snmp.conf` and add a job.                                                                        |
 
 :::important
 
@@ -65,16 +65,16 @@ UI configuration requires paid Netdata Cloud plan.
 
 ### Prerequisites
 
-#### Cato API access
+#### SNMP access
 
-A Cato Management Application API key with read access to the account you want to map.
+SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site's SNMP hub.
 
 
 ### Configuration
 
 #### Options
 
-Configure the Cato Networks collector with your account ID and API key. See the [Cato Networks collector](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page for all options. `update_every` must be at least 60; `url` defaults to the Cato public GraphQL endpoint and only needs setting for a different region or a proxy.
+Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP collector reference for all options.
 
 
 #### via UI
@@ -93,7 +93,7 @@ Configure the **cato_networks** collector from the Netdata web interface:
 
 #### via File
 
-The configuration file name for this integration is `go.d/cato_networks.conf`.
+The configuration file name for this integration is `go.d/snmp.conf`.
 
 The file format is YAML. Generally, the structure is:
 
@@ -109,7 +109,7 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/cato_networks.conf
+sudo ./edit-config go.d/snmp.conf
 ```
 
 ##### Examples

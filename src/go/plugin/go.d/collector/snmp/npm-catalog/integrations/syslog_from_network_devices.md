@@ -13,7 +13,7 @@ endmeta-->
 # Syslog from Network Devices
 
 
-<img src="https://netdata.cloud/img/syslog.png" width="150"/>
+<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
 
 
 Plugin: otel.plugin
@@ -27,12 +27,9 @@ Ingest syslog from routers, switches, and firewalls into Netdata. An OpenTelemet
 
 Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog receiver pointed at the Agent's OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent's otel plugin writes the records to systemd-compatible journal files.
 
-This integration is only supported on the following platforms:
+This integration is supported on all platforms.
 
-- Linux
-- macOS
-
-This integration runs as a single instance per Netdata Agent.
+This integration supports multiple instances configured side-by-side.
 
 
 ### Default Behavior
@@ -54,30 +51,22 @@ The default configuration for this integration is not expected to impose a signi
 
 ### Prerequisites
 
-#### The OpenTelemetry plugin
+#### SNMP access
 
-The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the OpenTelemetry collector documentation for how it is enabled in each installation method.
-
-#### An OpenTelemetry Collector
-
-An OpenTelemetry Collector with a `syslog` receiver, reachable by your network devices, exporting over OTLP to the Agent's endpoint (`127.0.0.1:4317` by default).
-
-#### Devices pointed at it
-
-The routers, switches, and firewalls must be configured to send syslog to the collector's listener.
+SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site's SNMP hub.
 
 
 ### Configuration
 
 #### Options
 
-The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. A ready-to-use syslog pipeline is in [Syslog via the OpenTelemetry Collector](https://github.com/netdata/netdata/blob/master/docs/npm/syslog/otel-collector.md). The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not authenticate the sender. Prefer keeping the Collector on the same host as the Agent.
+Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP collector reference for all options.
 
 
 
 #### via File
 
-The configuration file name for this integration is `otel.yaml`.
+The configuration file name for this integration is `go.d/snmp.conf`.
 
 
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
@@ -85,7 +74,7 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config otel.yaml
+sudo ./edit-config go.d/snmp.conf
 ```
 
 ##### Examples

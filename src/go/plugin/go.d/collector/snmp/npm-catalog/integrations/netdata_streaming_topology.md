@@ -13,7 +13,7 @@ endmeta-->
 # Netdata Streaming Topology
 
 
-<img src="https://netdata.cloud/img/netdata.png" width="150"/>
+<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
 
 
 Plugin: netdata
@@ -29,7 +29,7 @@ Netdata builds the `topology:streaming` view from the live streaming connections
 
 This integration is supported on all platforms.
 
-This integration runs as a single instance per Netdata Agent.
+This integration supports multiple instances configured side-by-side.
 
 
 ### Default Behavior
@@ -51,22 +51,22 @@ The default configuration for this integration is not expected to impose a signi
 
 ### Prerequisites
 
-#### Streaming configured
+#### SNMP access
 
-At least two Netdata Agents connected through streaming. A standalone Agent renders a single node.
+SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site's SNMP hub.
 
 
 ### Configuration
 
 #### Options
 
-The streaming topology reflects whatever streaming is already configured. Use this file to change how this Agent streams to, or accepts streams from, other Agents.
+Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP collector reference for all options.
 
 
 
 #### via File
 
-The configuration file name for this integration is `stream.conf`.
+The configuration file name for this integration is `go.d/snmp.conf`.
 
 
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
@@ -74,7 +74,7 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config stream.conf
+sudo ./edit-config go.d/snmp.conf
 ```
 
 ##### Examples
