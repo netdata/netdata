@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/url"
 	"sort"
+	"time"
 )
 
 const maxPoolInventoryRecords = 100000
@@ -22,7 +23,6 @@ type poolMetricSample struct {
 	writeOps     int64
 	readBytes    int64
 	writtenBytes int64
-	overflow     bool
 }
 
 func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error {
@@ -36,7 +36,6 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 	}
 
 	sort.SliceStable(pools, func(i, j int) bool { return pools[i].PoolName < pools[j].PoolName })
-	usedChartKeys := make(map[string]bool)
 	seenPoolNames := make(map[string]bool)
 	for _, pool := range pools {
 		if c.poolMatcher.MatchString(pool.PoolName) {
@@ -44,17 +43,10 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 				return fmt.Errorf("list pool statistics returned a duplicate selected pool name")
 			}
 			seenPoolNames[pool.PoolName] = true
-			usedChartKeys[cleanChartID("pool_"+pool.PoolName+"_")] = true
 		}
-	}
-	otherKey := "other"
-	for suffix := 0; usedChartKeys[cleanChartID("pool_"+otherKey+"_")]; suffix++ {
-		otherKey = fmt.Sprintf("other_overflow_%d", suffix+1)
 	}
 
 	selected := make([]poolMetricSample, 0, min(c.MaxPools, len(pools)))
-	other := poolMetricSample{key: otherKey, overflow: true}
-	var overflow int
 	for _, pool := range pools {
 		if !c.poolMatcher.MatchString(pool.PoolName) {
 			continue
@@ -63,17 +55,14 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 		if err != nil {
 			return err
 		}
-		if len(selected) < c.MaxPools {
-			selected = append(selected, sample)
-		} else {
-			if err := aggregatePoolSample(&other, sample); err != nil {
-				return err
-			}
-			overflow++
+		selected = append(selected, sample)
+		if len(selected) > c.MaxPools {
+			c.suppressEntityMetrics("pool", c.seenPools)
+			c.Limit("pool-cardinality", 1, time.Hour).Warningf(
+				"selected pool count exceeds max_pools=%d; no per-pool metrics will be collected; narrow pool_selector or raise max_pools",
+				c.MaxPools)
+			return nil
 		}
-	}
-	if overflow > 0 {
-		selected = append(selected, other)
 	}
 	if err := validatePoolChartKeys(selected); err != nil {
 		return err
@@ -85,7 +74,7 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 		seen[sample.key] = true
 		if _, ok := c.seenPools[sample.key]; !ok {
 			c.seenPools[sample.key] = &entityState{}
-			c.addPoolCharts(sample.key, !sample.overflow)
+			c.addPoolCharts(sample.key)
 		}
 		c.seenPools[sample.key].lastSeen = now
 		emitPoolMetrics(mx, sample)
@@ -140,20 +129,9 @@ func poolSample(pool apiPoolResponse) (poolMetricSample, error) {
 	}, nil
 }
 
-func aggregatePoolSample(dst *poolMetricSample, src poolMetricSample) error {
-	if src.objects > math.MaxInt64-dst.objects {
-		return fmt.Errorf("aggregate pool object count exceeds the supported integer range")
-	}
-	dst.objects += src.objects
-	return nil
-}
-
 func emitPoolMetrics(mx map[string]int64, sample poolMetricSample) {
 	px := "pool_" + sample.key + "_"
 	mx[px+"objects"] = sample.objects
-	if sample.overflow {
-		return
-	}
 	mx[px+"space_used_bytes"] = sample.used
 	mx[px+"space_avail_bytes"] = sample.available
 	mx[px+"space_utilization"] = int64(sample.utilization * 100 * precision)

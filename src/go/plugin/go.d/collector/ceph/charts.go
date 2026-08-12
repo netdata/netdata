@@ -10,10 +10,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-const prioDashboardAPIStatus = collectorapi.Priority - 1
-
 const (
-	prioClusterStatus = collectorapi.Priority + iota
+	prioComponentCollectionStatus = collectorapi.Priority + iota
+	prioClusterStatus
 	prioClusterHostsCount
 	prioClusterMonitorsCount
 	prioClusterOSDsCount
@@ -26,7 +25,8 @@ const (
 	prioClusterPhysCapacityUtilization
 	prioClusterPhysCapacityUsage
 	prioClusterObjectsCount
-	prioClusterObjectsByStatusPercent
+	prioClusterObjectCopiesHealth
+	prioClusterObjectsUnfound
 	prioClusterPoolsCount
 	prioClusterPGsCount
 	prioClusterPGsByStatusCount
@@ -51,7 +51,7 @@ const (
 )
 
 var clusterCharts = collectorapi.Charts{
-	dashboardAPIStatusChart.Copy(),
+	componentCollectionStatusChart.Copy(),
 	clusterStatusChart.Copy(),
 	clusterHostsCountChart.Copy(),
 	clusterMonitorsCountChart.Copy(),
@@ -65,7 +65,8 @@ var clusterCharts = collectorapi.Charts{
 	clusterPhysCapacityUtilizationChart.Copy(),
 	clusterPhysCapacityUsageChart.Copy(),
 	clusterObjectsCountChart.Copy(),
-	clusterObjectsByStatusPercentChart.Copy(),
+	clusterObjectCopiesHealthChart.Copy(),
+	clusterObjectsUnfoundChart.Copy(),
 	clusterPoolsCountChart.Copy(),
 	clusterPGsCountChart.Copy(),
 	clusterPGsByStatusCountChart.Copy(),
@@ -94,17 +95,18 @@ var poolChartsTmpl = collectorapi.Charts{
 }
 
 var (
-	dashboardAPIStatusChart = collectorapi.Chart{
-		ID:       "dashboard_api_status",
-		Title:    "Ceph Dashboard API Status",
+	componentCollectionStatusChart = collectorapi.Chart{
+		ID:       "component_collection_status",
+		Title:    "Ceph Component Collection Status",
 		Fam:      "status",
 		Units:    "status",
-		Ctx:      "ceph.dashboard_api_status",
+		Ctx:      "ceph.component_collection_status",
 		Type:     collectorapi.Line,
-		Priority: prioDashboardAPIStatus,
+		Priority: prioComponentCollectionStatus,
 		Dims: collectorapi.Dims{
-			{ID: "dashboard_api_reachable", Name: "reachable"},
-			{ID: "dashboard_api_unreachable", Name: "unreachable"},
+			{ID: "health_collection_failed", Name: "health"},
+			{ID: "osd_collection_failed", Name: "osds"},
+			{ID: "pool_collection_failed", Name: "pools"},
 		},
 	}
 	clusterStatusChart = collectorapi.Chart{
@@ -262,19 +264,29 @@ var (
 			{ID: "objects_num", Name: "objects"},
 		},
 	}
-	clusterObjectsByStatusPercentChart = collectorapi.Chart{
-		ID:       "cluster_objects_by_status",
-		Title:    "Ceph Cluster Object Health Ratios",
+	clusterObjectCopiesHealthChart = collectorapi.Chart{
+		ID:       "cluster_object_copies_health",
+		Title:    "Ceph Cluster Object Copy Health",
 		Fam:      "capacity",
 		Units:    "percent",
-		Ctx:      "ceph.cluster_objects_by_status_distribution",
-		Type:     collectorapi.Stacked,
-		Priority: prioClusterObjectsByStatusPercent,
+		Ctx:      "ceph.cluster_object_copies_health",
+		Type:     collectorapi.Line,
+		Priority: prioClusterObjectCopiesHealth,
 		Dims: collectorapi.Dims{
-			{ID: "objects_healthy_num", Name: "healthy", Div: precision},
-			{ID: "objects_misplaced_num", Name: "misplaced", Div: precision},
-			{ID: "objects_degraded_num", Name: "degraded", Div: precision},
-			{ID: "objects_unfound_num", Name: "unfound", Div: precision},
+			{ID: "objects_degraded_ratio", Name: "degraded", Div: precision},
+			{ID: "objects_misplaced_ratio", Name: "misplaced", Div: precision},
+		},
+	}
+	clusterObjectsUnfoundChart = collectorapi.Chart{
+		ID:       "cluster_objects_unfound",
+		Title:    "Ceph Cluster Unfound Objects",
+		Fam:      "capacity",
+		Units:    "percent",
+		Ctx:      "ceph.cluster_objects_unfound",
+		Type:     collectorapi.Line,
+		Priority: prioClusterObjectsUnfound,
+		Dims: collectorapi.Dims{
+			{ID: "objects_unfound_ratio", Name: "unfound", Div: precision},
 		},
 	}
 	clusterPoolsCountChart = collectorapi.Chart{
@@ -522,12 +534,7 @@ var (
 )
 
 func (c *Collector) addClusterCharts() {
-	charts := &collectorapi.Charts{}
-	for _, chart := range clusterCharts {
-		if c.clusterChartEnabled(chart.ID) {
-			*charts = append(*charts, chart.Copy())
-		}
-	}
+	charts := clusterCharts.Copy()
 
 	for _, chart := range *charts {
 		chart.Labels = []collectorapi.Label{
@@ -537,43 +544,6 @@ func (c *Collector) addClusterCharts() {
 
 	if err := c.Charts().Add(*charts...); err != nil {
 		c.Warning(err)
-	}
-}
-
-func (c *Collector) clusterChartEnabled(chartID string) bool {
-	switch chartID {
-	case dashboardAPIStatusChart.ID:
-		return c.Metrics.DashboardAPIStatus
-	case clusterStatusChart.ID:
-		return c.Metrics.HealthStatus
-	case clusterHostsCountChart.ID:
-		return c.Metrics.Hosts
-	case clusterMonitorsCountChart.ID:
-		return c.Metrics.Monitors
-	case clusterOsdsCountChart.ID, clusterOsdsByStatusCountChart.ID:
-		return c.Metrics.OSDsSummary
-	case clusterManagersCountChart.ID:
-		return c.Metrics.Managers
-	case clusterObjectGatewaysCountChart.ID:
-		return c.Metrics.ObjectGateways
-	case clusterIScsiGatewaysCountChart.ID, clusterIScsiGatewaysByStatusCountChart.ID:
-		return c.Metrics.ISCSIGateways
-	case clusterPhysCapacityUtilizationChart.ID, clusterPhysCapacityUsageChart.ID:
-		return c.Metrics.Capacity
-	case clusterObjectsCountChart.ID, clusterObjectsByStatusPercentChart.ID:
-		return c.Metrics.Objects
-	case clusterPoolsCountChart.ID:
-		return c.Metrics.PoolsSummary
-	case clusterPGsCountChart.ID, clusterPGsByStatusCountChart.ID, clusterPgsPerOsdCountChart.ID:
-		return c.Metrics.PGs
-	case clusterClientIOChart.ID, clusterClientIOPSChart.ID:
-		return c.Metrics.ClientIO
-	case clusterRecoveryThroughputChart.ID:
-		return c.Metrics.Recovery
-	case clusterScrubStatusChart.ID:
-		return c.Metrics.ScrubStatus
-	default:
-		return false
 	}
 }
 
@@ -587,17 +557,16 @@ func (c *Collector) expireMissingEntities(kind string, states map[string]*entity
 	}
 }
 
-func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string, full bool) {
+func (c *Collector) suppressEntityMetrics(kind string, states map[string]*entityState) {
+	for key := range states {
+		delete(states, key)
+		c.removeEntityCharts(kind, key)
+	}
+}
+
+func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) {
 	c.pruneRemovedCharts(entityChartIDs("osd", osdUuid))
 	charts := osdChartsTmpl.Copy()
-	if !full {
-		charts = &collectorapi.Charts{
-			osdSpaceUsageChartTmpl.Copy(),
-			osdIOChartTmpl.Copy(),
-			osdIOPSChartTmpl.Copy(),
-			osdLatencyChartTmpl.Copy(),
-		}
-	}
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, osdUuid)
@@ -618,14 +587,9 @@ func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string, full bool) {
 	}
 }
 
-func (c *Collector) addPoolCharts(poolName string, full bool) {
+func (c *Collector) addPoolCharts(poolName string) {
 	c.pruneRemovedCharts(entityChartIDs("pool", poolName))
 	charts := poolChartsTmpl.Copy()
-	if !full {
-		charts = &collectorapi.Charts{
-			poolObjectsCountChartTmpl.Copy(),
-		}
-	}
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, poolName)

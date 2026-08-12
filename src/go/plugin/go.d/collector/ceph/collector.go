@@ -60,12 +60,6 @@ func New() *Collector {
 				},
 			},
 		},
-		Metrics: CollectConfig{
-			DashboardAPIStatus: true, HealthStatus: true, Hosts: true, Monitors: true,
-			OSDsSummary: true, Managers: true, ObjectGateways: true, ISCSIGateways: true,
-			Capacity: true, Objects: true, PoolsSummary: true, PGs: true,
-			ClientIO: true, Recovery: true, ScrubStatus: true, OSDs: true, Pools: true,
-		},
 		Functions: FunctionsConfig{
 			Health:  FunctionConfig{Limit: 500},
 			OSDs:    FunctionConfig{Limit: 500},
@@ -92,36 +86,6 @@ type Config struct {
 	PoolSelector           string   `yaml:"pool_selector,omitempty" json:"pool_selector"`
 	MaxPools               int      `yaml:"max_pools,omitempty" json:"max_pools"`
 	web.HTTPConfig         `yaml:",inline" json:""`
-}
-
-type CollectConfig struct {
-	DashboardAPIStatus bool `yaml:"dashboard_api_status" json:"dashboard_api_status"`
-	HealthStatus       bool `yaml:"health_status" json:"health_status"`
-	Hosts              bool `yaml:"hosts" json:"hosts"`
-	Monitors           bool `yaml:"monitors" json:"monitors"`
-	OSDsSummary        bool `yaml:"osds_summary" json:"osds_summary"`
-	Managers           bool `yaml:"managers" json:"managers"`
-	ObjectGateways     bool `yaml:"object_gateways" json:"object_gateways"`
-	ISCSIGateways      bool `yaml:"iscsi_gateways" json:"iscsi_gateways"`
-	Capacity           bool `yaml:"capacity" json:"capacity"`
-	Objects            bool `yaml:"objects" json:"objects"`
-	PoolsSummary       bool `yaml:"pools_summary" json:"pools_summary"`
-	PGs                bool `yaml:"pgs" json:"pgs"`
-	ClientIO           bool `yaml:"client_io" json:"client_io"`
-	Recovery           bool `yaml:"recovery" json:"recovery"`
-	ScrubStatus        bool `yaml:"scrub_status" json:"scrub_status"`
-	OSDs               bool `yaml:"osds" json:"osds"`
-	Pools              bool `yaml:"pools" json:"pools"`
-}
-
-func (c CollectConfig) anyEnabled() bool {
-	return c.DashboardAPIStatus || c.anyHealthEnabled() || c.OSDs || c.Pools
-}
-
-func (c CollectConfig) anyHealthEnabled() bool {
-	return c.HealthStatus || c.Hosts || c.Monitors || c.OSDsSummary || c.Managers ||
-		c.ObjectGateways || c.ISCSIGateways || c.Capacity || c.Objects || c.PoolsSummary ||
-		c.PGs || c.ClientIO || c.Recovery || c.ScrubStatus
 }
 
 type FunctionsConfig struct {
@@ -152,9 +116,7 @@ type entityState struct {
 
 type Collector struct {
 	collectorapi.Base
-	Config `yaml:",inline" json:""`
-	// Staged internal gates are removed with the periodic-runtime rewrite.
-	Metrics   CollectConfig   `yaml:"-" json:"-"`
+	Config    `yaml:",inline" json:""`
 	Functions FunctionsConfig `yaml:"-" json:"-"`
 
 	charts               *collectorapi.Charts

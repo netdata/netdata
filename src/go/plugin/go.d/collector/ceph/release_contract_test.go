@@ -79,12 +79,6 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 			srv := newReleaseContractServer(t, fixture)
 			defer srv.Close()
 			c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-				c.Metrics = CollectConfig{
-					DashboardAPIStatus: true, HealthStatus: true, Hosts: true, Monitors: true,
-					OSDsSummary: true, Managers: true, ObjectGateways: true, ISCSIGateways: true,
-					Capacity: true, Objects: true, PoolsSummary: true, PGs: true,
-					ClientIO: true, Recovery: true, ScrubStatus: true, OSDs: true, Pools: true,
-				}
 				c.Functions.RGWQuotas.Users = []string{"tenant$user-a"}
 				c.Functions.RGWQuotas.Buckets = []string{"bucket-a"}
 				if fixture.RGW.AccountsAPI {
@@ -95,7 +89,7 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 
 			mx, err := c.collect(context.Background())
 			require.NoError(t, err)
-			assert.EqualValues(t, 1, mx["dashboard_api_reachable"])
+			assert.EqualValues(t, 0, mx["health_collection_failed"])
 			assert.EqualValues(t, 250000, mx["raw_capacity_used_bytes"])
 			assert.EqualValues(t, 10250, mx["client_perf_read_bytes_sec"])
 			assert.EqualValues(t, 1024250, mx["osd_00000000-0000-4000-8000-000000000001_read_bytes"])

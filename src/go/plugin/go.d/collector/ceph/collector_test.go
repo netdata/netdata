@@ -57,10 +57,6 @@ func TestCollector_Defaults(t *testing.T) {
 	assert.Equal(t, 100, c.MaxPools)
 	assert.Equal(t, "*", c.OSDSelector)
 	assert.Equal(t, "*", c.PoolSelector)
-	assert.True(t, c.Metrics.DashboardAPIStatus)
-	assert.True(t, c.Metrics.anyHealthEnabled())
-	assert.True(t, c.Metrics.OSDs)
-	assert.True(t, c.Metrics.Pools)
 }
 
 func TestCollector_ConfigSchemaMatchesMetadata(t *testing.T) {
@@ -168,7 +164,7 @@ func TestCollector_DefaultCollectionRequestsFullMetricSet(t *testing.T) {
 		pathsMu.Unlock()
 		switch r.URL.Path {
 		case urlPathApiHealthMinimal:
-			writeJSON(t, w, http.StatusOK, map[string]any{})
+			writeJSON(t, w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
 		case urlPathApiOsd:
 			w.Header().Set("X-Total-Count", "0")
 			writeJSON(t, w, http.StatusOK, []any{})
@@ -266,7 +262,7 @@ func TestCollectorCleanupDoesNotLogout(t *testing.T) {
 	assert.Zero(t, logoutRequests.Load())
 }
 
-func TestCollector_DisabledStatusCachesIdentityInsteadOfPollingIt(t *testing.T) {
+func TestCollector_PeriodicCollectionRevalidatesIdentity(t *testing.T) {
 	var authenticatedFSIDRequests int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -287,14 +283,11 @@ func TestCollector_DisabledStatusCachesIdentityInsteadOfPollingIt(t *testing.T) 
 	}))
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.DashboardAPIStatus = false
-		c.Metrics.Hosts = true
-	})
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 	require.NoError(t, c.Check(context.Background()))
 	assert.EqualValues(t, 3, c.Collect(context.Background())["hosts_num"])
-	assert.Equal(t, 1, authenticatedFSIDRequests)
+	assert.Equal(t, 2, authenticatedFSIDRequests)
 }
 
 func TestCollector_CheckAllowsUnavailableOptionalFeatureWhenStatusWorks(t *testing.T) {
@@ -307,12 +300,12 @@ func TestCollector_CheckAllowsUnavailableOptionalFeatureWhenStatusWorks(t *testi
 	})
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) { c.Metrics.Hosts = true })
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 	require.NoError(t, c.Check(context.Background()))
 }
 
-func TestCollector_HealthFeatureRequestGatingAndMissingSection(t *testing.T) {
+func TestCollector_HealthMissingSection(t *testing.T) {
 	var healthRequests int
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -325,12 +318,10 @@ func TestCollector_HealthFeatureRequestGatingAndMissingSection(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.DashboardAPIStatus = false
-		c.Metrics.Hosts = true
-	})
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
-	mx, err := c.collect(context.Background())
+	mx := make(map[string]int64)
+	err := c.collectHealth(context.Background(), mx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `response section "hosts" is unavailable`)
 	assert.NotContains(t, mx, "hosts_num")
@@ -363,24 +354,19 @@ func TestCollector_HealthSemantics(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.DashboardAPIStatus = false
-		c.Metrics.Capacity = true
-		c.Metrics.Objects = true
-		c.Metrics.PGs = true
-	})
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
-	mx, err := c.collect(context.Background())
-	require.NoError(t, err)
+	mx := make(map[string]int64)
+	_ = c.collectHealth(context.Background(), mx)
 
 	assert.EqualValues(t, 100000, mx["raw_capacity_utilization"])
 	assert.EqualValues(t, 100, mx["raw_capacity_used_bytes"])
 	assert.EqualValues(t, 0, mx["raw_capacity_avail_bytes"])
 	assert.EqualValues(t, 10, mx["objects_num"])
-	assert.EqualValues(t, 80000, mx["objects_healthy_num"])
-	assert.EqualValues(t, 6666, mx["objects_misplaced_num"])
-	assert.EqualValues(t, 10000, mx["objects_degraded_num"])
-	assert.EqualValues(t, 3333, mx["objects_unfound_num"])
+	assert.NotContains(t, mx, "objects_healthy_num")
+	assert.EqualValues(t, 6666, mx["objects_misplaced_ratio"])
+	assert.EqualValues(t, 10000, mx["objects_degraded_ratio"])
+	assert.EqualValues(t, 10000, mx["objects_unfound_ratio"])
 	assert.EqualValues(t, 15, mx["pgs_num"])
 	assert.EqualValues(t, 1, mx["pg_status_category_clean"])
 	assert.EqualValues(t, 8, mx["pg_status_category_working"])
@@ -390,7 +376,7 @@ func TestCollector_HealthSemantics(t *testing.T) {
 	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 }
 
-func TestCollector_OSDWholeListCapAndAggregateOther(t *testing.T) {
+func TestCollector_OSDWholeListCapIsAllOrNone(t *testing.T) {
 	var offsets []int
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != urlPathApiOsd {
@@ -424,24 +410,228 @@ func TestCollector_OSDWholeListCapAndAggregateOther(t *testing.T) {
 	defer srv.Close()
 
 	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.DashboardAPIStatus = false
-		c.Metrics.OSDs = true
 		c.MaxOSDs = 2
 	})
 	defer c.Cleanup(context.Background())
-	mx, err := c.collect(context.Background())
+	mx := make(map[string]int64)
+	err := c.collectOsds(context.Background(), mx)
 	require.NoError(t, err)
 
 	assert.Equal(t, []int{0}, offsets)
-	assert.NotContains(t, mx, "osd_other_status_up")
-	assert.NotContains(t, mx, "osd_other_status_down")
-	assert.NotContains(t, mx, "osd_other_status_in")
-	assert.NotContains(t, mx, "osd_other_status_out")
-	assert.EqualValues(t, 2475, mx["osd_other_space_used_bytes"])
-	assert.EqualValues(t, 99000, mx["osd_other_read_ops"])
-	assert.EqualValues(t, 1250, mx["osd_uuid-000_commit_latency_ms"])
-	assert.Len(t, *c.Charts(), 14)
+	for key := range mx {
+		assert.NotContains(t, key, "osd_")
+	}
+	assert.Empty(t, c.seenOsds)
 	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+}
+
+func TestCollector_PoolCapIsAllOrNone(t *testing.T) {
+	pool := func(name string) apiPoolResponse {
+		var value apiPoolResponse
+		value.PoolName = name
+		value.Stats.Objects.Latest = "1"
+		value.Stats.AvailRaw.Latest = "80"
+		value.Stats.BytesUsed.Latest = "20"
+		value.Stats.PercentUsed.Latest = "0.2"
+		value.Stats.Reads.Latest = "1"
+		value.Stats.ReadBytes.Latest = "2"
+		value.Stats.Writes.Latest = "3"
+		value.Stats.WrittenBytes.Latest = "4"
+		return value
+	}
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == urlPathApiPool {
+			writeJSON(t, w, http.StatusOK, []apiPoolResponse{pool("a"), pool("b"), pool("c")})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
+		c.MaxPools = 2
+	})
+	defer c.Cleanup(context.Background())
+	mx := make(map[string]int64)
+	err := c.collectPools(context.Background(), mx)
+	require.NoError(t, err)
+	for key := range mx {
+		assert.NotContains(t, key, "pool_")
+	}
+	assert.Empty(t, c.seenPools)
+}
+
+func TestCollector_FullyFailedCycleReturnsNoMetrics(t *testing.T) {
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	assert.Nil(t, c.Collect(context.Background()))
+}
+
+func TestCollector_EmptyCycleReturnsNoSyntheticMetrics(t *testing.T) {
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathApiHealthMinimal:
+			_, _ = io.WriteString(w, `{}`)
+		case urlPathApiOsd:
+			w.Header().Set("X-Total-Count", "0")
+			_, _ = io.WriteString(w, `[]`)
+		case urlPathApiPool:
+			_, _ = io.WriteString(w, `[]`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	assert.Nil(t, c.Collect(context.Background()))
+}
+
+func TestCollector_PartialFailureRetainsDataAndReportsComponentStatus(t *testing.T) {
+	health, err := os.ReadFile("testdata/v16.2.15/api_health_minimal.json")
+	require.NoError(t, err)
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathApiHealthMinimal:
+			_, _ = w.Write(health)
+		case urlPathApiOsd:
+			w.WriteHeader(http.StatusInternalServerError)
+		case urlPathApiPool:
+			_, _ = io.WriteString(w, `[]`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	mx := c.Collect(context.Background())
+	require.NotEmpty(t, mx)
+	assert.Contains(t, mx, "health_ok")
+	assert.EqualValues(t, 0, mx["health_collection_failed"])
+	assert.EqualValues(t, 1, mx["osd_collection_failed"])
+	assert.EqualValues(t, 0, mx["pool_collection_failed"])
+}
+
+func TestCollector_HealthCountsSkipUnboundedEntityRequests(t *testing.T) {
+	osds := make([]map[string]any, 101)
+	for i := range osds {
+		osds[i] = map[string]any{"up": 1, "in": 1}
+	}
+	pools := make([]map[string]any, 101)
+	var osdRequests, poolRequests atomic.Int64
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathApiHealthMinimal:
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"health":  map[string]any{"status": "HEALTH_OK"},
+				"osd_map": map[string]any{"osds": osds},
+				"pools":   pools,
+			})
+		case urlPathApiOsd:
+			osdRequests.Add(1)
+			w.WriteHeader(http.StatusInternalServerError)
+		case urlPathApiPool:
+			poolRequests.Add(1)
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	mx := c.Collect(context.Background())
+	require.NotEmpty(t, mx)
+	assert.EqualValues(t, 101, mx["osds_num"])
+	assert.EqualValues(t, 101, mx["pools_num"])
+	assert.Zero(t, osdRequests.Load())
+	assert.Zero(t, poolRequests.Load())
+	assert.EqualValues(t, 0, mx["osd_collection_failed"])
+	assert.EqualValues(t, 0, mx["pool_collection_failed"])
+}
+
+func TestCollector_CustomSelectorFetchesInventoryDespiteHealthCount(t *testing.T) {
+	var osdRequests atomic.Int64
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathApiHealthMinimal:
+			osds := make([]map[string]any, 101)
+			for i := range osds {
+				osds[i] = map[string]any{"up": 1, "in": 1}
+			}
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"health":  map[string]any{"status": "HEALTH_OK"},
+				"osd_map": map[string]any{"osds": osds},
+				"pools":   []any{},
+			})
+		case urlPathApiOsd:
+			osdRequests.Add(1)
+			w.Header().Set("X-Total-Count", "1")
+			writeJSON(t, w, http.StatusOK, []map[string]any{{
+				"id": 1, "uuid": "uuid-1", "up": 1, "in": 1,
+				"tree": map[string]any{"name": "osd.1", "device_class": "ssd"},
+			}})
+		case urlPathApiPool:
+			_, _ = io.WriteString(w, `[]`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
+		c.OSDSelector = "osd.1"
+		c.MaxOSDs = 1
+	})
+	defer c.Cleanup(context.Background())
+	mx := c.Collect(context.Background())
+	require.NotEmpty(t, mx)
+	assert.EqualValues(t, 1, osdRequests.Load())
+	assert.Contains(t, mx, "osd_uuid-1_status_up")
+}
+
+func TestCollector_CapSuppressionImmediatelyObsoletesEntityCharts(t *testing.T) {
+	c := New()
+	c.identityMu.Lock()
+	c.fsid = "synthetic-fsid"
+	c.identityMu.Unlock()
+	c.addOsdCharts("uuid-1", "ssd", "osd.1")
+	c.seenOsds["uuid-1"] = &entityState{lastSeen: time.Now()}
+
+	c.suppressEntityMetrics("osd", c.seenOsds)
+	assert.Empty(t, c.seenOsds)
+	for _, chart := range *c.Charts() {
+		assert.True(t, chart.IsRemoved(), chart.ID)
+	}
+}
+
+func TestCollectObjectHealthAllowsIndependentCopyStates(t *testing.T) {
+	stats := struct {
+		NumObjects          int64 `json:"num_objects"`
+		NumObjectCopies     int64 `json:"num_object_copies"`
+		NumObjectsDegraded  int64 `json:"num_objects_degraded"`
+		NumObjectsMisplaced int64 `json:"num_objects_misplaced"`
+		NumObjectsUnfound   int64 `json:"num_objects_unfound"`
+	}{
+		NumObjects: 10, NumObjectCopies: 30, NumObjectsDegraded: 20,
+		NumObjectsMisplaced: 20, NumObjectsUnfound: 10,
+	}
+	mx := make(map[string]int64)
+	var errs []error
+	collectObjectHealth(stats, mx, &errs)
+	require.Empty(t, errs)
+	assert.EqualValues(t, 66666, mx["objects_degraded_ratio"])
+	assert.EqualValues(t, 66666, mx["objects_misplaced_ratio"])
+	assert.EqualValues(t, 100000, mx["objects_unfound_ratio"])
 }
 
 func TestCollector_ReefOSDUsesSingleWholeListRequest(t *testing.T) {
@@ -541,12 +731,9 @@ func TestCollector_OSDWholeListRejectsInconsistentAdvertisedTotal(t *testing.T) 
 	})
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.DashboardAPIStatus = false
-		c.Metrics.OSDs = true
-	})
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
-	_, err := c.collect(context.Background())
+	_, err := c.fetchAllOSDs(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "advertised 101")
 }
@@ -614,12 +801,10 @@ func TestCollector_PoolAvailableIsNotReducedTwice(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.DashboardAPIStatus = false
-		c.Metrics.Pools = true
-	})
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
-	mx, err := c.collect(context.Background())
+	mx := make(map[string]int64)
+	err := c.collectPools(context.Background(), mx)
 	require.NoError(t, err)
 	assert.EqualValues(t, 80, mx["pool_pool-a_space_avail_bytes"])
 	assert.EqualValues(t, 20, mx["pool_pool-a_space_used_bytes"])
@@ -639,11 +824,9 @@ func TestCollector_PoolInventoryRejectsExcessiveRecordCount(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.Pools = true
-	})
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
-	_, err := c.collect(context.Background())
+	err := c.collectPools(context.Background(), make(map[string]int64))
 	require.ErrorContains(t, err, "record limit")
 }
 
@@ -659,11 +842,9 @@ func TestCollector_HealthRejectsExcessiveSectionRecordCount(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.PoolsSummary = true
-	})
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
-	_, err := c.collect(context.Background())
+	err := c.collectHealth(context.Background(), make(map[string]int64))
 	require.ErrorContains(t, err, "record limit")
 }
 
@@ -672,7 +853,7 @@ func TestCollector_DynamicEntityAbsenceGrace(t *testing.T) {
 	c.identityMu.Lock()
 	c.fsid = "synthetic-fsid"
 	c.identityMu.Unlock()
-	c.addPoolCharts("pool-a", true)
+	c.addPoolCharts("pool-a")
 	base := time.Unix(100, 0)
 	c.seenPools["pool-a"] = &entityState{lastSeen: base}
 
@@ -688,7 +869,7 @@ func TestCollector_DynamicEntityAbsenceGrace(t *testing.T) {
 		assert.True(t, chart.Obsolete)
 	}
 
-	c.addPoolCharts("pool-a", true)
+	c.addPoolCharts("pool-a")
 	require.Len(t, *c.Charts(), len(poolChartsTmpl))
 	for _, chart := range *c.Charts() {
 		assert.False(t, chart.IsRemoved())
@@ -701,8 +882,8 @@ func TestCollector_DynamicEntityLifecycleUsesExactChartIDs(t *testing.T) {
 	c.identityMu.Lock()
 	c.fsid = "synthetic-fsid"
 	c.identityMu.Unlock()
-	c.addPoolCharts("foo", true)
-	c.addPoolCharts("foo_bar", true)
+	c.addPoolCharts("foo")
+	c.addPoolCharts("foo_bar")
 	base := time.Unix(100, 0)
 	c.seenPools["foo"] = &entityState{lastSeen: base}
 	c.seenPools["foo_bar"] = &entityState{lastSeen: base}
@@ -717,42 +898,11 @@ func TestCollector_DynamicEntityLifecycleUsesExactChartIDs(t *testing.T) {
 		assert.False(t, c.Charts().Get(id).IsRemoved(), id)
 	}
 
-	c.addPoolCharts("foo", true)
+	c.addPoolCharts("foo")
 	assert.Len(t, *c.Charts(), 2*len(poolChartsTmpl))
 	for _, id := range entityChartIDs("pool", "foo_bar") {
 		assert.False(t, c.Charts().Get(id).IsRemoved(), id)
 	}
-}
-
-func TestCollector_PoolOverflowEmitsOnlyAdditiveObjects(t *testing.T) {
-	c := New()
-	c.identityMu.Lock()
-	c.fsid = "synthetic-fsid"
-	c.identityMu.Unlock()
-	c.addPoolCharts("other", false)
-
-	require.Len(t, *c.Charts(), 1)
-	for _, chart := range *c.Charts() {
-		assert.Equal(t, poolObjectsCountChartTmpl.Ctx, chart.Ctx)
-		assert.NotEqual(t, poolSpaceUtilizationChartTmpl.Ctx, chart.Ctx)
-		assert.NotEqual(t, poolSpaceUsageChartTmpl.Ctx, chart.Ctx)
-		assert.NotEqual(t, poolIOChartTmpl.Ctx, chart.Ctx)
-		assert.NotEqual(t, poolIOPSChartTmpl.Ctx, chart.Ctx)
-	}
-
-	mx := make(map[string]int64)
-	emitPoolMetrics(mx, poolMetricSample{
-		key: "other", overflow: true, objects: 10, available: 80, used: 20, utilization: 20,
-		readOps: 100, writeOps: 200, readBytes: 300, writtenBytes: 400,
-	})
-	assert.EqualValues(t, 10, mx["pool_other_objects"])
-	assert.NotContains(t, mx, "pool_other_space_used_bytes")
-	assert.NotContains(t, mx, "pool_other_space_avail_bytes")
-	assert.NotContains(t, mx, "pool_other_space_utilization")
-	assert.NotContains(t, mx, "pool_other_read_ops")
-	assert.NotContains(t, mx, "pool_other_read_bytes")
-	assert.NotContains(t, mx, "pool_other_write_ops")
-	assert.NotContains(t, mx, "pool_other_written_bytes")
 }
 
 func TestValidatePoolChartKeysRejectsLegacyNormalizationCollision(t *testing.T) {
@@ -802,66 +952,54 @@ func TestCollector_PoolsRejectDuplicateSelectedNames(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-		c.Metrics.DashboardAPIStatus = false
-		c.Metrics.Pools = true
-	})
+	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
-	_, err := c.collect(context.Background())
+	err := c.collectPools(context.Background(), make(map[string]int64))
 	require.ErrorContains(t, err, "duplicate selected pool name")
 }
 
-func TestCollector_HealthRejectsInvalidEnabledSectionValues(t *testing.T) {
+func TestCollector_HealthRejectsInvalidSectionValues(t *testing.T) {
 	tests := map[string]struct {
-		response  map[string]any
-		configure func(*Collector)
-		want      string
+		response map[string]any
+		want     string
 	}{
 		"hosts": {
-			response:  map[string]any{"hosts": -1},
-			configure: func(c *Collector) { c.Metrics.Hosts = true },
-			want:      "negative host count",
+			response: map[string]any{"hosts": -1},
+			want:     "negative host count",
 		},
 		"OSD summary": {
-			response:  map[string]any{"osd_map": map[string]any{"osds": []map[string]any{{"up": 2, "in": 1}}}},
-			configure: func(c *Collector) { c.Metrics.OSDsSummary = true },
-			want:      "invalid up/in state",
+			response: map[string]any{"osd_map": map[string]any{"osds": []map[string]any{{"up": 2, "in": 1}}}},
+			want:     "invalid up/in state",
 		},
 		"capacity": {
 			response: map[string]any{"df": map[string]any{"stats": map[string]any{
 				"total_bytes": 100, "total_used_raw_bytes": 101, "total_avail_bytes": 0,
 			}}},
-			configure: func(c *Collector) { c.Metrics.Capacity = true },
-			want:      "invalid capacity values",
+			want: "invalid capacity values",
 		},
 		"objects": {
 			response: map[string]any{"pg_info": map[string]any{"object_stats": map[string]any{
 				"num_objects": -1, "num_object_copies": 1,
 			}}},
-			configure: func(c *Collector) { c.Metrics.Objects = true },
-			want:      "invalid object/copy health counters",
+			want: "invalid object/copy health counters",
 		},
 		"PGs": {
 			response: map[string]any{"pg_info": map[string]any{
 				"statuses": map[string]any{"active+clean": -1}, "pgs_per_osd": 1,
 			}},
-			configure: func(c *Collector) { c.Metrics.PGs = true },
-			want:      "invalid PG state counts",
+			want: "invalid PG state counts",
 		},
 		"client IO": {
-			response:  map[string]any{"client_perf": map[string]any{"read_bytes_sec": -1}},
-			configure: func(c *Collector) { c.Metrics.ClientIO = true },
-			want:      "invalid performance value",
+			response: map[string]any{"client_perf": map[string]any{"read_bytes_sec": -1}},
+			want:     "invalid performance value",
 		},
 		"RGW": {
-			response:  map[string]any{"rgw": -1},
-			configure: func(c *Collector) { c.Metrics.ObjectGateways = true },
-			want:      "negative gateway count",
+			response: map[string]any{"rgw": -1},
+			want:     "negative gateway count",
 		},
 		"iSCSI": {
-			response:  map[string]any{"iscsi_daemons": map[string]any{"up": -1, "down": 0}},
-			configure: func(c *Collector) { c.Metrics.ISCSIGateways = true },
-			want:      "invalid gateway counts",
+			response: map[string]any{"iscsi_daemons": map[string]any{"up": -1, "down": 0}},
+			want:     "invalid gateway counts",
 		},
 	}
 
@@ -876,12 +1014,10 @@ func TestCollector_HealthRejectsInvalidEnabledSectionValues(t *testing.T) {
 			})
 			defer srv.Close()
 
-			c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-				c.Metrics.DashboardAPIStatus = false
-				test.configure(c)
-			})
+			c := newInitializedCollector(t, srv.URL, nil)
 			defer c.Cleanup(context.Background())
-			mx, err := c.collect(context.Background())
+			mx := make(map[string]int64)
+			err := c.collectHealth(context.Background(), mx)
 			require.ErrorContains(t, err, test.want)
 			if name == "objects" {
 				assert.NotContains(t, mx, "objects_num")
@@ -891,7 +1027,8 @@ func TestCollector_HealthRejectsInvalidEnabledSectionValues(t *testing.T) {
 }
 
 func TestCollector_ChartAlgorithms(t *testing.T) {
-	assert.Equal(t, collectorapi.Stacked, clusterObjectsByStatusPercentChart.Type)
+	assert.Equal(t, collectorapi.Line, clusterObjectCopiesHealthChart.Type)
+	assert.Equal(t, collectorapi.Line, clusterObjectsUnfoundChart.Type)
 	for _, dim := range osdIOChartTmpl.Dims {
 		assert.Equal(t, string(collectorapi.Absolute), dim.Algo.String())
 	}
@@ -901,14 +1038,16 @@ func TestCollector_ChartAlgorithms(t *testing.T) {
 	for _, dim := range poolIOChartTmpl.Dims {
 		assert.Equal(t, collectorapi.Incremental, dim.Algo)
 	}
-	for _, dim := range clusterObjectsByStatusPercentChart.Dims {
-		assert.EqualValues(t, precision, dim.Div)
+	for _, chart := range []*collectorapi.Chart{&clusterObjectCopiesHealthChart, &clusterObjectsUnfoundChart} {
+		for _, dim := range chart.Dims {
+			assert.EqualValues(t, precision, dim.Div)
+		}
 	}
 }
 
 func TestCollector_PublicChartIdentityContract(t *testing.T) {
 	want := map[string]string{
-		"dashboard_api_status":                   "ceph.dashboard_api_status|status|line|dashboard_api_reachable=reachable,dashboard_api_unreachable=unreachable",
+		"component_collection_status":            "ceph.component_collection_status|status|line|health_collection_failed=health,osd_collection_failed=osds,pool_collection_failed=pools",
 		"cluster_status":                         "ceph.cluster_status|status|line|health_ok=ok,health_err=err,health_warn=warn",
 		"cluster_hosts_count":                    "ceph.cluster_hosts_count|hosts|line|hosts_num=hosts",
 		"cluster_monitors_count":                 "ceph.cluster_monitors_count|monitors|line|monitors_num=monitors",
@@ -921,7 +1060,8 @@ func TestCollector_PublicChartIdentityContract(t *testing.T) {
 		"cluster_physical_capacity_utilization":  "ceph.cluster_physical_capacity_utilization|percent|area|raw_capacity_utilization=utilization",
 		"cluster_physical_capacity_usage":        "ceph.cluster_physical_capacity_usage|bytes|stacked|raw_capacity_avail_bytes=avail,raw_capacity_used_bytes=used",
 		"cluster_objects_count":                  "ceph.cluster_objects_count|objects|line|objects_num=objects",
-		"cluster_objects_by_status":              "ceph.cluster_objects_by_status_distribution|percent|stacked|objects_healthy_num=healthy,objects_misplaced_num=misplaced,objects_degraded_num=degraded,objects_unfound_num=unfound",
+		"cluster_object_copies_health":           "ceph.cluster_object_copies_health|percent|line|objects_degraded_ratio=degraded,objects_misplaced_ratio=misplaced",
+		"cluster_objects_unfound":                "ceph.cluster_objects_unfound|percent|line|objects_unfound_ratio=unfound",
 		"cluster_pools_count":                    "ceph.cluster_pools_count|pools|line|pools_num=pools",
 		"cluster_pgs_count":                      "ceph.cluster_pgs_count|pgs|line|pgs_num=pgs",
 		"cluster_pgs_by_status_count":            "ceph.cluster_pgs_by_status_count|pgs|stacked|pg_status_category_clean=clean,pg_status_category_working=working,pg_status_category_warning=warning,pg_status_category_unknown=unknown",
@@ -958,15 +1098,9 @@ func TestCollector_PublicChartIdentityContract(t *testing.T) {
 	c.identityMu.Lock()
 	c.fsid = "synthetic-fsid"
 	c.identityMu.Unlock()
-	c.Metrics = CollectConfig{
-		DashboardAPIStatus: true, HealthStatus: true, Hosts: true, Monitors: true,
-		OSDsSummary: true, Managers: true, ObjectGateways: true, ISCSIGateways: true,
-		Capacity: true, Objects: true, PoolsSummary: true, PGs: true,
-		ClientIO: true, Recovery: true, ScrubStatus: true,
-	}
 	c.addClusterCharts()
-	c.addOsdCharts("uuid-1", "ssd", "osd.1", true)
-	c.addPoolCharts("pool-a", true)
+	c.addOsdCharts("uuid-1", "ssd", "osd.1")
+	c.addPoolCharts("pool-a")
 	for _, chart := range *c.Charts() {
 		keys := make([]string, 0, len(chart.Labels))
 		for _, label := range chart.Labels {
@@ -1029,7 +1163,6 @@ func newInitializedCollector(t *testing.T, rawURL string, configure func(*Collec
 	c.Username = "netdata"
 	c.Password = "test-password"
 	if configure != nil {
-		c.Metrics = CollectConfig{}
 		configure(c)
 	}
 	require.NoError(t, c.Init(context.Background()))

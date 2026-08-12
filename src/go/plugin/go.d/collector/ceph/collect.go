@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
+	"time"
 )
 
 const precision = 1000
@@ -19,53 +21,63 @@ var (
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	var identityErr error
-	if c.Metrics.DashboardAPIStatus {
-		_, identityErr = c.probeClusterIdentity(ctx)
+	if _, err := c.probeClusterIdentity(ctx); err != nil {
+		return nil, err
+	}
+
+	healthErr := c.collectHealth(ctx, mx)
+
+	var osdErr error
+	if c.shouldSkipEntityCollection("osd", c.OSDSelector, mx["osds_num"], c.MaxOSDs) {
+		c.suppressEntityMetrics("osd", c.seenOsds)
 	} else {
-		_, identityErr = c.ensureClusterIdentity(ctx)
-	}
-	if identityErr != nil {
-		if c.clusterFSID() == "" {
-			return nil, identityErr
-		}
-		if c.Metrics.DashboardAPIStatus {
-			mx["dashboard_api_reachable"] = 0
-			mx["dashboard_api_unreachable"] = 1
-		}
-		return mx, identityErr
+		osdErr = c.collectOsds(ctx, mx)
 	}
 
-	if c.Metrics.DashboardAPIStatus {
-		mx["dashboard_api_reachable"] = 1
-		mx["dashboard_api_unreachable"] = 0
+	var poolErr error
+	if c.shouldSkipEntityCollection("pool", c.PoolSelector, mx["pools_num"], c.MaxPools) {
+		c.suppressEntityMetrics("pool", c.seenPools)
+	} else {
+		poolErr = c.collectPools(ctx, mx)
 	}
 
-	var errs []error
-	if c.Metrics.anyHealthEnabled() {
-		if err := c.collectHealth(ctx, mx); err != nil {
-			errs = append(errs, fmt.Errorf("collect health features: %w", err))
-		}
-	}
-	if c.Metrics.OSDs {
-		if err := c.collectOsds(ctx, mx); err != nil {
-			errs = append(errs, fmt.Errorf("collect OSD features: %w", err))
-		}
-	}
-	if c.Metrics.Pools {
-		if err := c.collectPools(ctx, mx); err != nil {
-			errs = append(errs, fmt.Errorf("collect pool features: %w", err))
-		}
+	err := errors.Join(
+		wrapCollectionError("health", healthErr),
+		wrapCollectionError("OSD", osdErr),
+		wrapCollectionError("pool", poolErr),
+	)
+	if len(mx) == 0 {
+		return nil, err
 	}
 
-	return mx, errors.Join(errs...)
+	mx["health_collection_failed"] = boolInt64(healthErr != nil)
+	mx["osd_collection_failed"] = boolInt64(osdErr != nil)
+	mx["pool_collection_failed"] = boolInt64(poolErr != nil)
+	return mx, err
 }
 
-func (c *Collector) ensureClusterIdentity(ctx context.Context) (string, error) {
-	if fsid := c.clusterFSID(); fsid != "" {
-		return fsid, nil
+func (c *Collector) shouldSkipEntityCollection(kind, selector string, count int64, limit int) bool {
+	if strings.TrimSpace(selector) != "*" || count <= int64(limit) {
+		return false
 	}
-	return c.probeClusterIdentity(ctx)
+	c.Limit(kind+"-cardinality", 1, time.Hour).Warningf(
+		"cluster reports %d %ss, exceeding max_%ss=%d; no per-%s metrics will be collected; narrow %s_selector or raise max_%ss",
+		count, kind, kind, limit, kind, kind, kind)
+	return true
+}
+
+func wrapCollectionError(component string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("collect %s features: %w", component, err)
+}
+
+func boolInt64(value bool) int64 {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func (c *Collector) probeClusterIdentity(ctx context.Context) (string, error) {

@@ -35,8 +35,6 @@ type osdMetricSample struct {
 	writeBytes  float64
 	commitMS    float64
 	applyMS     float64
-	latencyN    int64
-	overflow    bool
 }
 
 func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error {
@@ -55,23 +53,7 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 		return osds[i].UUID < osds[j].UUID
 	})
 
-	usedChartKeys := make(map[string]bool)
-	for _, osd := range osds {
-		name := osd.Tree.Name
-		if name == "" {
-			name = fmt.Sprintf("osd.%d", osd.ID)
-		}
-		if c.osdMatcher.MatchString(name) || c.osdMatcher.MatchString(osd.UUID) {
-			usedChartKeys[cleanChartID("osd_"+osd.UUID+"_")] = true
-		}
-	}
-	otherKey := "other"
-	for suffix := 0; usedChartKeys[cleanChartID("osd_"+otherKey+"_")]; suffix++ {
-		otherKey = fmt.Sprintf("other_overflow_%d", suffix+1)
-	}
-
 	selected := make([]osdMetricSample, 0, min(c.MaxOSDs, len(osds)))
-	other := osdMetricSample{key: otherKey, name: "other", deviceClass: "mixed", overflow: true}
 	for _, osd := range osds {
 		name := osd.Tree.Name
 		if name == "" {
@@ -80,17 +62,14 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 		if !c.osdMatcher.MatchString(name) && !c.osdMatcher.MatchString(osd.UUID) {
 			continue
 		}
-		sample := osdSample(osd, name)
-		if len(selected) < c.MaxOSDs {
-			selected = append(selected, sample)
-		} else {
-			if err := aggregateOSDSample(&other, sample); err != nil {
-				return err
-			}
+		selected = append(selected, osdSample(osd, name))
+		if len(selected) > c.MaxOSDs {
+			c.suppressEntityMetrics("osd", c.seenOsds)
+			c.Limit("osd-cardinality", 1, time.Hour).Warningf(
+				"selected OSD count exceeds max_osds=%d; no per-OSD metrics will be collected; narrow osd_selector or raise max_osds",
+				c.MaxOSDs)
+			return nil
 		}
-	}
-	if other.latencyN > 0 {
-		selected = append(selected, other)
 	}
 	if err := validateOSDChartKeys(selected); err != nil {
 		return err
@@ -102,7 +81,7 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 		seen[sample.key] = true
 		if _, ok := c.seenOsds[sample.key]; !ok {
 			c.seenOsds[sample.key] = &entityState{}
-			c.addOsdCharts(sample.key, sample.deviceClass, sample.name, !sample.overflow)
+			c.addOsdCharts(sample.key, sample.deviceClass, sample.name)
 		}
 		c.seenOsds[sample.key].lastSeen = now
 		emitOSDMetrics(mx, sample)
@@ -210,7 +189,6 @@ func osdSample(osd apiOsdResponse, name string) osdMetricSample {
 		writeBytes:  osd.Stats.OpInBytes,
 		commitMS:    osd.OsdStats.PerfStat.CommitLatencyMs,
 		applyMS:     osd.OsdStats.PerfStat.ApplyLatencyMs,
-		latencyN:    1,
 	}
 	if osd.Up == 1 {
 		sample.up = 1
@@ -225,48 +203,12 @@ func osdSample(osd apiOsdResponse, name string) osdMetricSample {
 	return sample
 }
 
-func aggregateOSDSample(dst *osdMetricSample, src osdMetricSample) error {
-	if src.total > math.MaxInt64-dst.total || src.available > math.MaxInt64-dst.available {
-		return fmt.Errorf("aggregate OSD capacity exceeds the supported integer range")
-	}
-	dst.total += src.total
-	dst.available += src.available
-
-	if err := addOSDMetric(&dst.readOps, src.readOps, "read operations"); err != nil {
-		return err
-	}
-	if err := addOSDMetric(&dst.writeOps, src.writeOps, "write operations"); err != nil {
-		return err
-	}
-	if err := addOSDMetric(&dst.readBytes, src.readBytes, "read bytes"); err != nil {
-		return err
-	}
-	if err := addOSDMetric(&dst.writeBytes, src.writeBytes, "write bytes"); err != nil {
-		return err
-	}
-
-	dst.latencyN++
-	dst.commitMS += (src.commitMS - dst.commitMS) / float64(dst.latencyN)
-	dst.applyMS += (src.applyMS - dst.applyMS) / float64(dst.latencyN)
-	return nil
-}
-
-func addOSDMetric(dst *float64, value float64, name string) error {
-	if value > maxScaledInt64Float-*dst {
-		return fmt.Errorf("aggregate OSD %s exceeds the supported numeric range", name)
-	}
-	*dst += value
-	return nil
-}
-
 func emitOSDMetrics(mx map[string]int64, sample osdMetricSample) {
 	px := "osd_" + sample.key + "_"
-	if !sample.overflow {
-		mx[px+"status_up"] = sample.up
-		mx[px+"status_down"] = sample.down
-		mx[px+"status_in"] = sample.in
-		mx[px+"status_out"] = sample.out
-	}
+	mx[px+"status_up"] = sample.up
+	mx[px+"status_down"] = sample.down
+	mx[px+"status_in"] = sample.in
+	mx[px+"status_out"] = sample.out
 	mx[px+"space_used_bytes"] = sample.total - sample.available
 	mx[px+"space_avail_bytes"] = sample.available
 	mx[px+"read_ops"] = int64(sample.readOps * precision)
