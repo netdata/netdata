@@ -48,10 +48,13 @@ that its view was truncated.
 
 The map redraws around whichever level you want to reason about:
 
-- **By process name** (the default) — all instances of a service treated as one, so a 12-replica deployment is one box,
-  not twelve.
-- **By container** — how your containers and pods relate, with the processes inside them collapsed away.
+- **By process name** (the default) — every process with the same name on that host treated as one, so eight worker
+  processes of the same service are one box, not eight.
+- **By container** — how the host's containers and pods relate, with the processes inside them collapsed away.
 - **By PID** — every individual process, when you need to see which specific worker is responsible.
+
+Grouping applies within the host: actors are identified per node, so identical processes on two different hosts stay
+two boxes.
 
 Start grouped, then drill down. A dependency map that shows every process on a busy host is accurate and unreadable;
 the value is in choosing the altitude that answers your question.
@@ -82,8 +85,9 @@ configuration. On FreeBSD and macOS
 the map is drawn from processes and endpoints only — the cgroup enrichment that supplies container and workload
 identity is Linux-specific.
 
-Windows does not have this map. Netdata monitors Windows network connections through the **Network Connections**
-table function (including SMB), but the `topology:network-connections` graph is not available there.
+Windows does not have this map. Netdata monitors Windows connections through the **Network Connections** table, with
+SMB statistics in the separate **Network Protocols** table, but the `topology:network-connections` graph is not
+available there.
 
 ## How to open it
 
