@@ -48,6 +48,7 @@ The "what is this thing" descriptor used by every per-integration entry.
 | `instance.link`          | string        | yes | URL                                    | learn / www          | Official upstream site.                                                                                                                                            |
 | `instance.categories`    | array<string> | yes | each must match a `categories.yaml` id | learn / www / in-app | Validated; bogus removed (`gen_integrations.py:899-912`). If none survive, falls back to `categories.yaml` entries flagged `collector_default: true` (`:906-908`). |
 | `instance.icon_filename` | string        | yes | --                                     | learn / www / in-app | Path under `${NETDATA_REPOS_DIR}/website/themes/tailwind/static/img/` (icon repo).                                                                                 |
+| `instance.description`   | string        | no  | 50–160 plain-text characters           | learn frontmatter    | Explicit generated-page meta description. Must be unique, one line, and contain no Markdown, HTML, URL, double quote, or backslash. Use only when the mechanical overview result is unsuitable. |
 | `instance.variables`     | object        | no  | values: string / int / bool / number   | all rendered text    | Triggers two-pass Jinja templating; see `pipeline.md`.                                                                                                             |
 
 Do not use `instance.variables` or option/default text to build the
@@ -56,7 +57,9 @@ Monitor Anything table description is extracted from the first
 sentence of the generated overview, usually
 `overview.data_collection.metrics_description`. See
 `description-authoring.md` before writing or reviewing description
-fields.
+fields. For schemas that use this shared instance directly as `meta`,
+the same optional `description` field is the explicit generated-page
+meta override.
 
 ### `$defs.keywords`
 

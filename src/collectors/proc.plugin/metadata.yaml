@@ -230,7 +230,7 @@ modules:
           The `/dev/random` device in Linux is one such source of entropy, and it provides an interface for programs
           to access the pool of entropy. When a program requests random numbers, it reads from the `/dev/random` device,
           which blocks until enough entropy is available to generate the requested numbers. This ensures that the
-          generated numbers are truly random and not predictable. 
+          generated numbers are truly random and not predictable.
 
           However, if the pool of entropy gets depleted, the `/dev/random` device may block indefinitely, causing
           programs that rely on random numbers to slow down or even freeze. This is especially problematic for
@@ -393,6 +393,7 @@ modules:
       module_name: /proc/vmstat
       monitored_instance:
         name: Memory Statistics
+        description: "Monitor Linux virtual memory allocation, paging, swapping, writeback, and page fault activity."
         link: ""
         categories:
           - data-collection.operating-systems
@@ -2637,6 +2638,7 @@ modules:
       module_name: /proc/net/dev
       monitored_instance:
         name: Network interfaces
+        description: "Monitor Linux network interface bandwidth, packet activity, errors, drops, and operational state."
         link: ""
         categories:
           - data-collection.networking
@@ -3688,6 +3690,7 @@ modules:
       module_name: /proc/net/sockstat
       monitored_instance:
         name: Socket statistics
+        description: "Monitor Linux IPv4 socket usage and memory statistics reported through procfs."
         link: ""
         categories:
           - data-collection.networking
@@ -3821,6 +3824,7 @@ modules:
       module_name: /proc/net/sockstat6
       monitored_instance:
         name: IPv6 Socket Statistics
+        description: "Monitor Linux IPv6 socket usage and protocol statistics reported through procfs."
         link: ""
         categories:
           - data-collection.networking

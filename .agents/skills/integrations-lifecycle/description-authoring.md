@@ -56,6 +56,39 @@ Avoid leading with the provider's publication mechanism (`AWS publishes ...`,
 the full page, but the catalog sentence should first tell users what Netdata
 does for them.
 
+## Generated Page Meta Description Contract
+
+`integrations/gen_docs_integrations.py` emits one `description:` frontmatter field for every generated page in all ten
+documentation modes: collector, flows, device, exporter, agent notification, cloud notification, logs, authentication,
+secret store, and service discovery.
+
+The generator resolves each description in this order:
+
+1. Use the explicit override when one exists:
+   - `meta.monitored_instance.description` for collector, flows, and device records;
+   - `meta.description` for every other mode.
+2. Otherwise, derive it mechanically from the first useful prose in the rendered overview.
+   - Markdown and HTML are reduced to plain text.
+   - Sentences are included until the description reaches 50 characters.
+   - Text longer than 160 characters is trimmed at a word boundary.
+3. Fail generation when the result is missing, invalid, or duplicated by another generated page.
+
+An explicit description MUST:
+
+- be 50–160 characters;
+- be one line of plain text with no Markdown, HTML, URL, double quote, or backslash;
+- be unique across every generated integration page;
+- accurately describe the specific integration in active, user-facing language.
+
+Double quotes and backslashes are rejected because Learn's legacy frontmatter parser cannot preserve their escaping. Use unquoted wording
+or Unicode typographic quotation marks when quotation is essential.
+
+Use an explicit description only when the mechanical result is missing, too short, duplicated, or otherwise inaccurate.
+Do not duplicate every overview sentence into metadata: the fallback is the normal path and the override is the exception.
+
+The Monitor Anything catalog deliberately retains its existing overview-first precedence. Adding an explicit meta override
+MUST NOT silently change a catalog table row.
+
 ## Where Details Belong
 
 Use the right metadata field for the job:
@@ -123,12 +156,20 @@ metrics_description: |
 
 Before committing `metadata.yaml` changes:
 
-1. Regenerate `src/collectors/COLLECTORS.md`.
-2. Read the table row description for the integration.
-3. Confirm it answers "what is this integration?" without relying on
+1. Regenerate and validate the integration data:
+
+   ```bash
+   python3 integrations/gen_integrations.py
+   python3 integrations/gen_docs_integrations.py --check
+   python3 -m unittest integrations.tests.test_descriptions
+   ```
+
+2. Regenerate `src/collectors/COLLECTORS.md`.
+3. Read the table row description and generated page frontmatter for the integration.
+4. Confirm both answer "what is this integration?" without relying on
    setup context.
-4. Move option names, defaults, variables, and limits out of the
+5. Move option names, defaults, variables, and limits out of the
    catalog sentence and into the proper setup or default-behavior
    field.
-5. Keep the first sentence useful even when rendered alone in a list,
+6. Keep the first sentence useful even when rendered alone in a list,
    card, search result, or generated catalog.

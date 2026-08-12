@@ -3,6 +3,7 @@
 id: 'export-google-pubsub'
 meta:
   name: 'Google Cloud Pub Sub'
+  description: 'Export Netdata metrics to Google Cloud Pub/Sub for downstream storage, processing, and analysis.'
   link: 'https://cloud.google.com/pubsub'
   categories:
     - export

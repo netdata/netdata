@@ -281,6 +281,23 @@ Repo path: `integrations/gen_docs_integrations.py`.
   string-splitting on `export const categories = ` and
   `export const integrations = ` (`:129-140`). It does NOT
   read `integrations.json`.
+- `integrations/descriptions.py` -- the shared description resolver and validator used by both per-integration page
+  generation and the Monitor Anything catalog.
+
+### Description preflight
+
+Before cleanup or any file write, a full run resolves and validates descriptions for every generated page across all ten
+documentation modes. Generation fails if any description is missing, duplicated, outside 50–160 characters, or contains
+Markdown, HTML, a URL, or a newline. This ordering prevents a description defect from deleting the previous generated tree.
+
+Run the same preflight without changing files:
+
+```bash
+python3 integrations/gen_docs_integrations.py --check
+```
+
+The command prints deterministic counts by documentation mode plus the mechanical and explicit-override totals. With
+`--collector`, it validates only that selected collector, matching scoped-generation behavior.
 
 ### Outputs
 
@@ -309,9 +326,8 @@ After writing, the script:
    (`:466`). Multi-integration directories are NOT
    symlinked.
 
-3. Cleans the corresponding `**/integrations` directories
-   BEFORE writing (`:19-41`), so removed integrations vanish
-   from the tree.
+3. After description preflight succeeds, cleans the corresponding `**/integrations` directories before writing
+   (`:19-41`), so removed integrations vanish from the tree.
 
 ### Scoped regen
 

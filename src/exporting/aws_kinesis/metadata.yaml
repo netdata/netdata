@@ -3,6 +3,7 @@
 id: 'export-aws-kinesis'
 meta:
   name: 'AWS Kinesis'
+  description: 'Export Netdata metrics to Amazon Kinesis Data Streams for downstream storage, processing, and analysis.'
   link: 'https://aws.amazon.com/kinesis/'
   categories:
     - export

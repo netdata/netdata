@@ -15,6 +15,13 @@
           "description": "Integration display name. Use official spelling for applications.",
           "type": "string"
         },
+        "description": {
+          "description": "Optional explicit page description used when the overview cannot produce an accurate, unique 50-160 character summary. Double quotes and backslashes are not supported by Learn's frontmatter parser.",
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 160,
+          "pattern": "^[^\\r\\n\"\\\\]+$"
+        },
         "link": {
           "description": "Link to the instance official website if any.",
           "type": "string"

@@ -6,6 +6,7 @@ modules:
       module_name: dnsdist
       monitored_instance:
         name: DNSdist
+        description: "Monitor DNSdist queries, responses, drops, backend health, cache performance, latency, CPU, and memory."
         link: https://dnsdist.org/
         icon_filename: network-wired.svg
         categories:
@@ -174,7 +175,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -182,7 +183,7 @@ modules:
                     url: http://127.0.0.1:8083
                     headers:
                       X-API-Key: 'your-api-key' # static pre-shared authentication key for access to the REST API (api-key).
-                
+
                   - name: remote
                     url: http://203.0.113.0:8083
                     headers:

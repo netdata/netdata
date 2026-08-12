@@ -6,6 +6,7 @@ modules:
       module_name: k8s_kubelet
       monitored_instance:
         name: Kubelet
+        description: "Monitor Kubernetes Kubelet containers, pods, runtime operations, storage, requests, and process metrics."
         link: https://kubernetes.io/docs/concepts/overview/components/#kubelet
         icon_filename: kubernetes.svg
         categories:

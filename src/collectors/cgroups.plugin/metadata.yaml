@@ -6,6 +6,7 @@ modules:
       module_name: /sys/fs/cgroup
       monitored_instance:
         name: Containers
+        description: "Monitor container and virtual machine CPU, memory, disk I/O, network, and page cache activity through Linux cgroups."
         link: ""
         categories:
           - data-collection.containers-and-vms
@@ -497,6 +498,7 @@ modules:
       <<: *meta
       monitored_instance:
         name: Kubernetes Containers
+        description: "Monitor Kubernetes container CPU, memory, disk I/O, network, and page cache activity through Linux cgroups."
         link: https://kubernetes.io/
         icon_filename: kubernetes.svg
         categories:
@@ -956,6 +958,7 @@ modules:
       <<: *meta
       monitored_instance:
         name: Systemd Services
+        description: "Monitor systemd service CPU, memory, disk I/O, network, and page cache activity through Linux cgroups."
         link: ""
         icon_filename: systemd.svg
         categories:

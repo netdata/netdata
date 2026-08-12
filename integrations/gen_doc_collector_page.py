@@ -16,6 +16,12 @@ import pathlib
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+from descriptions import (
+    extract_description_from_overview,
+    extract_first_sentence,
+    get_description_override,
+)
+
 
 # =============================================================================
 # Data Loading
@@ -127,71 +133,6 @@ class CategoryMapper:
         return None
 
 
-# =============================================================================
-# Text Processing
-# =============================================================================
-
-def extract_first_sentence(text: str) -> str:
-    """Extract the first sentence from text (up to the first period)."""
-    if not text:
-        return text
-
-    # Match first sentence ending with period followed by space/newline
-    match = re.match(r'^(.*?\.)\s', text)
-    if match:
-        return match.group(1).strip()
-
-    # If text ends with period, use all of it
-    if text.endswith('.'):
-        return text.strip()
-
-    # No period found - use all text
-    return text.strip()
-
-
-def extract_description_from_overview(overview: str) -> Optional[str]:
-    """Extract first substantial paragraph from markdown overview section."""
-    # Split by ## Overview heading
-    parts = overview.split('## Overview', 1)
-    if len(parts) <= 1:
-        return None
-
-    # Get text after ## Overview
-    text_after = parts[1].strip()
-
-    # Split into lines and find first substantial paragraph
-    lines = text_after.split('\n')
-    paragraph = []
-
-    for line in lines:
-        line = line.strip()
-
-        # Skip empty lines at start
-        if not line and not paragraph:
-            continue
-
-        # Skip metadata lines (Plugin:, Module:, headings)
-        if line.startswith(('#', 'Plugin:', 'Module:')):
-            if paragraph:  # Stop if we already have content
-                break
-            continue
-
-        # Collect paragraph lines
-        if line:
-            paragraph.append(line)
-        elif paragraph:  # Empty line after content = end of paragraph
-            break
-
-    if not paragraph:
-        return None
-
-    text = ' '.join(paragraph)
-    first_sentence = extract_first_sentence(text)
-
-    # Normalize whitespace
-    return re.sub(r'\s+', ' ', first_sentence) if first_sentence else None
-
-
 def get_integration_description(integ: Dict[str, Any]) -> str:
     """Get user-friendly description for an integration."""
     # Try overview markdown first
@@ -202,15 +143,12 @@ def get_integration_description(integ: Dict[str, Any]) -> str:
             return desc
 
     # Fallback to monitored_instance.description
-    mi = integ.get('meta', {}).get('monitored_instance', {})
-    if isinstance(mi, dict):
-        desc = mi.get('description')
-        if isinstance(desc, str) and desc.strip():
-            first_sentence = extract_first_sentence(desc.strip())
-            if first_sentence:
-                return re.sub(r'\s+', ' ', first_sentence)
+    desc = get_description_override(integ)
+    if desc:
+        return extract_first_sentence(desc)
 
     # Generic fallback
+    mi = integ.get('meta', {}).get('monitored_instance', {})
     name = (mi.get('name') if isinstance(mi, dict) else None) or integ.get('name') or 'this integration'
     return f"Monitor {name}"
 

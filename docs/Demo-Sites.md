@@ -1,7 +1,31 @@
 
 # Live demos
 
-See the live Netdata Cloud demo with Rooms (listed below) for specific use cases at [`https://app.netdata.cloud/spaces/netdata-demo`](https://app.netdata.cloud/spaces/netdata-demo)
+Use the public demos to explore Netdata before installing an Agent. They contain live monitoring data, so chart values,
+active alerts, available nodes, and visible workloads change over time.
+
+There are two kinds of demos on this page:
+
+- **Netdata Cloud Rooms** group nodes and metrics for a particular technology or use case. Use them to explore a unified
+  infrastructure view, switch between nodes, filter metrics, and see how a Room organizes related systems.
+- **Standalone Agent dashboards** connect directly to public Agents in several regions. Use them to inspect the local
+  dashboard and API view of one monitored system without the additional cross-node organization provided by Cloud.
+
+Start with the [Netdata Cloud demo Space](https://app.netdata.cloud/spaces/netdata-demo). Choose **All nodes** for the broad
+view or open a technology-specific Room for a smaller, more focused dataset.
+
+## What to explore
+
+On a demo dashboard, try changing the time window, zooming into a spike, selecting chart dimensions, and comparing nodes.
+Open the Alerts view to see current and historical alert state, and use metric search or navigation to find a familiar
+service. Technology Rooms such as Kubernetes, PostgreSQL, Redis, Windows, and Nginx are useful when you want to see the
+metrics and dashboards available for that workload.
+
+The demos are shared public environments. Their purpose is product exploration, not performance benchmarking: other users,
+background jobs, network latency, and the changing demo workload all influence what you see. Do not enter credentials,
+private hostnames, customer data, or any other sensitive information into a public demo.
+
+## Available demos
 
 | Location            | Netdata Demo URL                                                                                                                                | 60 mins reqs                                                                                                                                                                                                                                                 | VM donated by                                      |
 |:--------------------|:------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------|
@@ -32,3 +56,13 @@ See the live Netdata Cloud demo with Rooms (listed below) for specific use cases
 | Toronto (Canada)    | **[toronto.my-netdata.io](https://toronto.my-netdata.io)**                                                                                      | [![Requests Per Second](https://toronto.my-netdata.io/api/v1/badge.svg?chart=netdata.requests&dimensions=requests&after=-3600&options=unaligned&group=sum&label=reqs&units=empty&value_color=blue&precision=0&v42)](https://toronto.my-netdata.io)           | [DigitalOcean.com](https://m.do.co/c/83dc9f941745) |
 
 Netdata dashboards are mobile- and touch-friendly.
+
+## If a demo is unavailable
+
+A public Agent or workload may be restarted, upgraded, or temporarily removed. If one regional Agent is unavailable, use
+another regional dashboard or return to the Netdata Cloud demo Space. A missing technology Room does not mean that Netdata no
+longer supports that integration; the Room may simply have no active demo node at that moment.
+
+For a reliable evaluation with your own workloads, [install Netdata](/packaging/installer/README.md) on a test system. Your
+own Agent lets you validate collector discovery, metric coverage, alert behavior, resource consumption, and network access
+under the conditions that matter to your infrastructure.
