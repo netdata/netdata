@@ -127,8 +127,8 @@ func poolSample(pool apiPoolResponse) (poolMetricSample, error) {
 		parsed[i] = value
 	}
 	utilization, err := pool.Stats.PercentUsed.Latest.Float64()
-	if err != nil || math.IsNaN(utilization) || math.IsInf(utilization, 0) || utilization < 0 || utilization > 1 {
-		return poolMetricSample{}, fmt.Errorf("list pool statistics returned utilization outside the 0-1 range")
+	if err != nil || math.IsNaN(utilization) || math.IsInf(utilization, 0) || utilization < 0 || utilization > 100 {
+		return poolMetricSample{}, fmt.Errorf("list pool statistics returned utilization outside the 0-100 range")
 	}
 	return poolMetricSample{
 		key:          pool.PoolName,
@@ -148,7 +148,7 @@ func emitPoolMetrics(mx map[string]int64, sample poolMetricSample) {
 	mx[px+"objects"] = sample.objects
 	mx[px+"space_used_bytes"] = sample.used
 	mx[px+"space_avail_bytes"] = sample.available
-	mx[px+"space_utilization"] = int64(sample.utilization * 100 * precision)
+	mx[px+"space_utilization"] = int64(sample.utilization * precision)
 	mx[px+"read_ops"] = sample.readOps
 	mx[px+"read_bytes"] = sample.readBytes
 	mx[px+"write_ops"] = sample.writeOps

@@ -441,7 +441,7 @@ func TestCollector_PoolCapIsAllOrNone(t *testing.T) {
 		value.Stats.Objects.Latest = "1"
 		value.Stats.AvailRaw.Latest = "80"
 		value.Stats.BytesUsed.Latest = "20"
-		value.Stats.PercentUsed.Latest = "0.2"
+		value.Stats.PercentUsed.Latest = "20"
 		value.Stats.Reads.Latest = "1"
 		value.Stats.ReadBytes.Latest = "2"
 		value.Stats.Writes.Latest = "3"
@@ -801,7 +801,7 @@ func TestCollector_PoolAvailableIsNotReducedTwice(t *testing.T) {
 	pool.Stats.Objects.Latest = "5"
 	pool.Stats.AvailRaw.Latest = "80"
 	pool.Stats.BytesUsed.Latest = "20"
-	pool.Stats.PercentUsed.Latest = "0.2"
+	pool.Stats.PercentUsed.Latest = "20"
 	pool.Stats.Reads.Latest = "1"
 	pool.Stats.ReadBytes.Latest = "2"
 	pool.Stats.Writes.Latest = "3"
@@ -976,7 +976,7 @@ func validPoolResponse(name string) apiPoolResponse {
 	value.Stats.Objects.Latest = "5"
 	value.Stats.AvailRaw.Latest = "80"
 	value.Stats.BytesUsed.Latest = "20"
-	value.Stats.PercentUsed.Latest = "0.2"
+	value.Stats.PercentUsed.Latest = "20"
 	value.Stats.Reads.Latest = "1"
 	value.Stats.ReadBytes.Latest = "2"
 	value.Stats.Writes.Latest = "3"
@@ -999,17 +999,17 @@ func TestPoolSampleRejectsInvalidUpstreamValues(t *testing.T) {
 	}{
 		"preserves integers above float precision": {
 			objects:     "9007199254740993",
-			percentUsed: "0.5",
+			percentUsed: "50",
 			wantObjects: 9007199254740993,
 		},
-		"rejects utilization above one": {
+		"rejects utilization above one hundred": {
 			objects:     "0",
-			percentUsed: "1.1",
-			wantError:   "0-1",
+			percentUsed: "100.1",
+			wantError:   "0-100",
 		},
 		"rejects fractional object count": {
 			objects:     "1.5",
-			percentUsed: "0.5",
+			percentUsed: "50",
 			wantError:   "objects",
 		},
 	}
