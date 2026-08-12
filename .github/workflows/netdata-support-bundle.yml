@@ -103,18 +103,9 @@ jobs:
           sc="$root/04-config/stream.conf"
           grep -qF 'api key = 11111111-2222-3333-4444-555555555555' "$sc"
           grep -qF '[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]' "$sc"
-          if grep -q 'SENTINEL-E2E-STREAMPW' "$sc"; then
-            echo 'a non-api-key secret survived in stream.conf' >&2
-            exit 1
-          fi
-          if [ "$(head -c 3 "$sc" | od -An -tx1 | tr -d ' \n')" != "efbbbf" ]; then
-            echo 'the UTF-8 BOM was not preserved in stream.conf' >&2
-            exit 1
-          fi
-          if [ "$(tr -dc '\r' < "$sc" | wc -c)" -lt 4 ]; then
-            echo 'CRLF line endings were not preserved in stream.conf' >&2
-            exit 1
-          fi
+          grep -q 'SENTINEL-E2E-STREAMPW' "$sc" && { echo 'a non-api-key secret survived in stream.conf' >&2; exit 1; }
+          [ "$(head -c 3 "$sc" | od -An -tx1 | tr -d ' \n')" = efbbbf ] || { echo 'the UTF-8 BOM was not preserved' >&2; exit 1; }
+          [ "$(tr -dc '\r' < "$sc" | wc -c)" -ge 4 ] || { echo 'CRLF line endings were not preserved' >&2; exit 1; }
 
   macos-posix:
     name: macOS POSIX sanitization

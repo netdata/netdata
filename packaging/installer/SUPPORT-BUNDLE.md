@@ -153,8 +153,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 |---|---|
 | systemd journal, **including `--namespace=netdata`** | the agent logs to its own journal namespace on systemd installs — plain `journalctl -u netdata` misses almost everything; support asks for "a complete log from start until the problem" |
 | `/var/log/netdata/*.log` tails (size-capped) | non-systemd installs, static builds, macOS/BSD |
-| Windows Event Log: the five **ETW channels** (`Netdata/Daemon`, `Netdata/Collectors`, `Netdata/Health`, `Netdata/Aclk`, `Netdata/Access`) plus `NetdataWEL` and Netdata records from `Application`, in one merged file | Windows builds are always compiled with ETW (`CMakeLists.txt` sets `HAVE_ETW` unconditionally for `OS_WINDOWS`) and `netdata-conf-logs.c` then picks `etw` as the default log method, so the daemon logs into the manifest-declared `Netdata/*` channels (`wevt_netdata_mc_generate.c`). Querying only `NetdataWEL` returned **no daemon logs at all** on a default install. Ordered for triage — channel/provider state first, then Daemon and Collectors, with `Netdata/Access` last and on the smallest event budget because it is by far the highest volume |
-| Windows Event Log **channel configuration and provider registration** | a disabled or full channel silently loses events, and if the ETW publisher was never registered the `Netdata/*` channels do not exist at all — both are indistinguishable from "the agent logged nothing" without this |
+| Windows Event Log: the five **ETW channels** (`Netdata/Daemon`, `Netdata/Collectors`, `Netdata/Health`, `Netdata/Aclk`, `Netdata/Access`) plus `NetdataWEL` and Netdata records from `Application`, in one merged file, with channel state | every `OS_WINDOWS` build defines `HAVE_ETW` (`CMakeLists.txt`) and `netdata-conf-logs.c` then picks `etw`, so the daemon logs into the manifest-declared `Netdata/*` channels (`wevt_netdata_mc_generate.c`). Querying only `NetdataWEL` returned **no daemon logs at all** on a default install. Ordered for triage, with `Netdata/Access` last and on the smallest budget since it is by far the highest volume; channel state is included because a disabled or full channel is otherwise indistinguishable from "the agent logged nothing" |
 | updater service journal | update failures; the updater keeps no persistent log file |
 | **coredump metadata** (`coredumpctl list`, never the dumps) | tells support a dump exists and matches the crash time — the dump itself is fetched later only if needed |
 | docker marker file | in containers the log "files" are symlinks to stdout — history only exists in `docker logs` on the host; the bundle says raw logs must not be attached and gives a private capture/review/redaction workflow using the requested time window |
@@ -198,24 +197,26 @@ proxy, so diagnostic data cannot leave the host through a forced proxy.
 
 ### `09-permissions/` — why the agent cannot read/execute something
 
-Mode bits alone do not explain most permission failures on a netdata install:
-plugins rely on **file capabilities** and setuid bits, distributions apply
-**SELinux/AppArmor** confinement, and packagers use **ACLs**. None of that is
-visible in an `ls -la`.
+Mode bits alone explain almost nothing here: plugins rely on **file
+capabilities** and setuid bits, distributions apply **SELinux/AppArmor**
+confinement, and packagers use **ACLs**. None of that shows in an `ls -la`.
 
 | item | why |
 |---|---|
-| **`plugins.d`**: mode, ownership, setuid/setgid bits and per-file **capabilities** (`getcap`) | a dropped capability or a lost setuid bit is a top cause of "this collector shows no data"; on a stock install seven plugins carry capabilities (`apps.plugin`, `debugfs.plugin`, `go.d.plugin`, `network-viewer.plugin`, `perf.plugin`, `slabinfo.plugin`, `systemd-journal.plugin`) and several more are setuid — none of which an `ls -la` reveals |
-| all netdata paths (config dir, `netdata.conf`, `stream.conf`, `ssl/`, log/lib/cache dirs, `plugins.d`, the binary): mode, owner, **extended attributes**, **security context**, **ACLs**, non-default ext2/3/4 file flags | an immutable (`i`) flag on a state directory silently blocks the agent's own writes, and an SELinux mislabel produces collector failures with no error in the agent log |
-| discovered `plugins.d` locations | derived from the binary prefix, the known install prefixes, **and** the `[directories] plugins` list in `netdata.conf` (a quoted, space-separated list whose default also includes `<config>/custom-plugins.d`), so custom prefixes are not missed |
-| Windows: ACLs with inheritance state, protected-ACL detection, mandatory integrity labels, alternate data streams | a `Zone.Identifier` stream marks a file as downloaded-and-blocked, and a protected (inheritance-disabled) ACL is a common post-restore breakage |
+| **`plugins.d`**: mode, ownership, setuid/setgid bits and per-file **capabilities** (`getcap`) | a dropped capability or lost setuid bit is a top cause of "this collector shows no data" — a stock install has seven capability-bearing plugins (`apps.plugin`, `debugfs.plugin`, `go.d.plugin`, `network-viewer.plugin`, `perf.plugin`, `slabinfo.plugin`, `systemd-journal.plugin`) and several setuid ones |
+| all netdata paths (config dir, `netdata.conf`, `stream.conf`, `ssl/`, log/lib/cache dirs, `plugins.d`, the binary): mode, owner, **extended attributes**, **security context**, **ACLs**, non-default ext2/3/4 file flags | an immutable (`i`) flag on a state directory silently blocks the agent's own writes, and an SELinux mislabel fails collectors with nothing in the agent log |
+| Windows: ACLs with inheritance state, protected-ACL detection, integrity labels, alternate data streams | a `Zone.Identifier` stream marks a file downloaded-and-blocked; a protected (inheritance-disabled) ACL is a common post-restore breakage |
 
-Tools are feature-detected and a missing one is reported, not passed over.
-`getfattr` ships in the `attr` package, which is **not** installed by default on
-Debian/Ubuntu, so when it is absent the collector falls back to `getcap` (for
-`security.capability`) and `lsattr` (for ext file flags) — the attributes that
-actually break netdata — instead of reporting nothing. macOS uses `xattr -l`,
-FreeBSD uses `lsextattr`.
+`plugins.d` locations come from the binary prefix, the known install prefixes
+and `<config>/custom-plugins.d`. A `[directories] plugins` override in
+`netdata.conf` is deliberately not read, so no config-derived value is ever
+handed to a collector.
+
+Tools are feature-detected and a missing one is reported rather than skipped.
+`getfattr` ships in the `attr` package, **not** installed by default on
+Debian/Ubuntu, so without it the collector falls back to `getcap` and `lsattr` —
+the attributes that actually break netdata. macOS uses `xattr -l`, FreeBSD
+`lsextattr`.
 
 ## What is NEVER collected
 
@@ -234,37 +235,26 @@ These are excluded by design. **Do not add them.**
 ## The streaming API key exception
 
 The **streaming API key** is the one credential-shaped value the bundle keeps
-verbatim, in `04-config/stream.conf` only. Both forms are preserved: the
-`api key` / `proxy api key` values and the parent-side `[<API_KEY>]` (and
-`[<MACHINE_GUID>]`) section headers.
+verbatim, in `04-config/stream.conf` only — both the `api key` / `proxy api key`
+values and the parent-side `[<API_KEY>]` / `[<MACHINE_GUID>]` section headers.
+Streaming problems are diagnosed by comparing what the child sends with what the
+parent accepts, and redacting it also collapsed every key section to an
+identical placeholder, making per-key settings unattributable.
 
-Why: streaming problems are diagnosed by comparing what the child sends with
-what the parent accepts. With the key redacted, support cannot tell whether the
-two sides agree, and a parent with several key sections collapsed to identical
-`[REDACTED-KEY-SECTION]` lines also made per-key settings unattributable.
-`[MACHINE_GUID]` sections are documented in `stream.conf` itself as *not* a
-security mechanism, and they were being destroyed by the same rule.
+- **File-scoped and key-exact.** Only when the source file is named
+  `stream.conf` (keyed on the source path, never the bundle path), and only for
+  a key normalizing exactly to `api key` or `proxy api key`. Any other secret in
+  that file, and any `api key` elsewhere, is still redacted.
+- **Not applied to logs.** The parent also logs `api_key:'<key>'`
+  (`src/streaming/stream-receiver-connection.c`) and children send it as a
+  `key=` query parameter (`src/streaming/stream-connector.c`). Those stay
+  redacted — un-redacting them would loosen rules shared with genuinely secret
+  parameters such as `claim_token`.
+- **Disclosed to the recipient.** Stated in the bundle's `README.md` and
+  `summary.txt`, and flagged as `"streaming_api_key_redacted": false` in
+  `MANIFEST.json`.
 
-Scope and limits, all deliberate:
-
-- **File-scoped and key-exact.** The exemption applies only when the source file
-  is named `stream.conf` (keyed on the source path, never the bundle path) and
-  only to a key normalizing exactly to `api key` or `proxy api key`. Any other
-  secret in `stream.conf` — `password`, `token`, a PEM block — is still redacted,
-  as is a third-party `api key` in any other file.
-- **Not applied to logs.** The same key also appears in access logs: the parent
-  logs `api_key:'<key>'` (`src/streaming/stream-receiver-connection.c`) and
-  children send it as a `key=` query parameter
-  (`src/streaming/stream-connector.c`). Those stay redacted — un-redacting there
-  would loosen rules shared with genuinely secret query parameters such as
-  `claim_token`.
-- **Disclosed to the recipient.** The bundle's `README.md` states the exception,
-  `summary.txt` prints a `streaming key:` line when `stream.conf` was collected,
-  and `MANIFEST.json` carries `"streaming_api_key_redacted": false` next to
-  `"secrets_redacted": true`.
-
-If you disagree with this posture, remove or mask `04-config/stream.conf` before
-sending the bundle.
+To opt out, remove or mask `04-config/stream.conf` before sending the bundle.
 
 ## Encoding fidelity
 
