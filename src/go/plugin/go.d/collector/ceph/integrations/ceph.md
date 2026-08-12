@@ -32,8 +32,9 @@ The collector uses the authenticated Ceph Dashboard REST API. It does not read d
 not scrape Prometheus.
 
 The collector verifies the cluster identity, then periodically queries cluster health, OSD, and pool endpoints.
-A JWT obtained through Dashboard's JSON login is cached and renewed after an authorization failure; an externally
-managed bearer-token file is also supported.
+A JWT obtained through Dashboard's JSON login is cached and renewed after an authorization failure. Alternatively,
+the collector rereads an externally managed bearer-token file for every request; the file owner must replace the
+token before it expires.
 
 If a standby MGR redirects to the active MGR, the collector discovers the active origin without credentials,
 validates the destination against `allowed_redirect_origins`, reconstructs the original API path, and then
@@ -125,7 +126,9 @@ reachable from the Netdata node that will run this once-per-cluster job.
 
 Create a dedicated Ceph Dashboard user. Assign the built-in `read-only` role or a custom role with read
 permissions for only the scopes needed by the enabled features. Store its password in a protected Netdata
-configuration file or provide an externally managed bearer token through `bearer_token_file`.
+configuration file or provide an externally managed bearer token through `bearer_token_file`. When using a
+token file, its owner must replace the token before it expires; file updates take effect without restarting
+the collector.
 
 
 #### Place the Dashboard job and optional Prometheus collectors
@@ -162,7 +165,7 @@ Core Functions run on demand with internal execution and response limits.
 |  | timeout | Deadline in seconds for one logical Dashboard operation, including discovery, authentication, retries, and response decoding; must be at least 0.5. | 2 | no |
 | **Auth** | username | Username for Ceph Dashboard JSON login; required with `password` unless a bearer-token file is used. |  | no |
 |  | password | Password for Ceph Dashboard JSON login; required with `username` unless a bearer-token file is used. |  | no |
-|  | bearer_token_file | Externally managed bearer-token file; takes priority over username/password. |  | no |
+|  | bearer_token_file | Externally managed bearer-token file; takes priority over username/password. Its owner must replace the token before it expires. The collector rereads the file for every request, so replacements take effect without a restart. |  | no |
 | **Base** | not_follow_redirects | Reject redirects instead of performing secure active-MGR discovery. | no | no |
 |  | [allowed_redirect_origins](#option-base-allowed-redirect-origins) | Exact trusted active-MGR origins; the configured URL origin is always trusted. | [] | no |
 | **Headers** | headers | Additional HTTP headers; Authorization, Cookie, and Host are rejected. |  | no |

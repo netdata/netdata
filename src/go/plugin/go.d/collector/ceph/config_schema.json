@@ -78,7 +78,7 @@
       },
       "bearer_token_file": {
         "title": "Bearer token file",
-        "description": "Path to an externally managed Dashboard bearer token. Takes priority over username/password and is reread for every request.",
+        "description": "Path to an externally managed Dashboard bearer token. Takes priority over username/password. The file owner must replace the token before it expires; the collector rereads the file for every request, so replacements take effect without a restart.",
         "type": "string",
         "minLength": 1
       },
@@ -191,7 +191,7 @@
       "fullPage": true
     },
     "bearer_token_file": {
-      "ui:help": "The token is sent only after credentialless active-MGR discovery and takes priority over Dashboard JSON login.",
+      "ui:help": "The token is sent only after credentialless active-MGR discovery and takes priority over Dashboard JSON login. Its external owner must replace it before expiry; the file is reread for every request.",
       "ui:widget": "hidden"
     },
     "force_http2": {
