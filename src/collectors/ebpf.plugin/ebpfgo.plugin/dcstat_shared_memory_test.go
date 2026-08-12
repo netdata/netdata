@@ -266,3 +266,64 @@ func TestDCStatStoreKeepsBaselineForIdlePID(t *testing.T) {
 		t.Fatalf("ratio = %d, want 90", snap[0].dc.Ratio)
 	}
 }
+
+// TestClearDCStatAppsDropsRowsAndFlag covers the failed-snapshot path: dcstat's
+// rows and flag must both go away so the module that owns the segment cannot
+// publish last cycle's directory-cache values as live data.
+func TestClearDCStatAppsDropsRowsAndFlag(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ppid: 1, Ct: 100, MarkPageAccessed: 5}})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 10, Ppid: 1, Ct: 100, CacheAccess: 1000, NotFound: 100},
+		{Pid: 20, Ppid: 1, Ct: 100, CacheAccess: 50},
+	})
+
+	store.ClearDCStatApps()
+
+	if store.activeModules&ebpfgoSHMFlagDCStat != 0 {
+		t.Fatal("ClearDCStatApps did not clear the DCSTAT flag")
+	}
+	if store.activeModules&ebpfgoSHMFlagCachestat == 0 {
+		t.Fatal("ClearDCStatApps cleared another module's flag")
+	}
+
+	snap := store.Snapshot()
+	// PID 20 was dcstat-only, so it disappears; PID 10 survives via cachestat but
+	// must carry no directory-cache values.
+	if len(snap) != 1 || snap[0].pid != 10 {
+		t.Fatalf("Snapshot() = %+v, want only PID 10", snap)
+	}
+	if snap[0].dc != (netdataPublishDCStat{}) {
+		t.Fatalf("PID 10 dc data after clear = %+v, want zero", snap[0].dc)
+	}
+	if snap[0].cachestat.Current.MarkPageAccessed != 5 {
+		t.Fatalf("PID 10 lost its cachestat data: %+v", snap[0].cachestat)
+	}
+}
+
+// TestClearDCStatAppsKeepsBaseline verifies a recovered cycle still publishes a
+// real delta: the counter baseline must survive a failed collection cycle.
+func TestClearDCStatAppsKeepsBaseline(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 10, Ct: 100, CacheAccess: 1000, NotFound: 100},
+	})
+
+	store.ClearDCStatApps() // failed cycle
+
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 10, Ct: 200, CacheAccess: 1100, NotFound: 110},
+	})
+
+	snap := store.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	if snap[0].dc.CacheAccess != 100 {
+		t.Fatalf("cache_access delta = %d, want 100 (baseline must survive a failed cycle)",
+			snap[0].dc.CacheAccess)
+	}
+	if snap[0].dc.Ratio != 90 {
+		t.Fatalf("ratio = %d, want 90", snap[0].dc.Ratio)
+	}
+}

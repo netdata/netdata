@@ -68,7 +68,13 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
         not_found += cgroup_ebpfgo_dcstat_delta(dc->curr.not_found, dc->prev.not_found);
     }
 
-    if (ct)
+    /* The consumed marker is a watermark and must only move forward.  It is the
+     * maximum ct of whichever PIDs the cgroup happens to hold this tick, so a
+     * PID leaving the cgroup can lower that maximum; adopting it would move the
+     * boundary back and replay rows already accounted for on the next tick.
+     * ct only ever decreases across a reboot, which restarts the agent and
+     * zeroes this field anyway. */
+    if (ct > cg->dcstat.ct)
         cg->dcstat.ct = ct;
     cg->dcstat.reference = (long long)reference;
     cg->dcstat.slow = (long long)slow;
@@ -81,8 +87,6 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
         cg->dcstat.ratio = (long long)((successful * 100) / reference);
     }
 }
-
-
 
 static void cgroup_ebpfgo_dcstat_update_single_chart(
     struct cgroup *cg,

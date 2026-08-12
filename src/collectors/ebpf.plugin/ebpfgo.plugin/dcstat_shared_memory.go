@@ -36,6 +36,28 @@ func buildDCStatPublish(current, previous netdataPublishDCStatPid, ct uint64, ha
 	}
 }
 
+// ClearDCStatApps drops dcstat's contribution after a failed collection cycle:
+// the flag is cleared and the rows are emptied, so whichever module owns the
+// segment publishes neither a dcstat_ok header nor last cycle's values.
+//
+// It is a separate entry point rather than UpdateDCStatApps(nil) because
+// SnapshotApps returns a nil slice for a successfully-read but empty BPF map,
+// and an empty map is a valid cycle, not a failed one.
+//
+// The counter baselines (dcstatPrev/dcstatPrevCt) are intentionally preserved:
+// the BPF counters keep advancing while collection is broken, so keeping them
+// lets the first recovered cycle publish a real delta instead of re-baselining.
+func (s *ebpfSharedMemoryStore) ClearDCStatApps() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	clear(s.dcstatData)
+	clear(s.dcstatIdent)
+	s.dcstatPIDs = s.dcstatPIDs[:0]
+	s.activeModules &^= ebpfgoSHMFlagDCStat
+	s.rebuildEntriesLocked()
+}
+
 // UpdateDCStatApps updates the in-memory snapshot from the latest dcstat BPF
 // snapshot.  It returns the PIDs whose ct has not advanced for ebpfStaleCycles
 // consecutive cycles; the caller performs the authoritative liveness check

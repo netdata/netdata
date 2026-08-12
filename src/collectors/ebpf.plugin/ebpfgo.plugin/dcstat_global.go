@@ -236,10 +236,13 @@ func runDCStatGlobalCollector(
 		apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("dcstat.snapshot", "dcstat", "snapshot-apps", err)
-			// No valid per-PID data this cycle: clear the DCSTAT flag and stamp
-			// it into shared memory, otherwise consumers keep treating the
-			// previous cycle's rows as live.  Mirrors socket's clearSocketApps.
-			store.MarkDCStatInactive()
+			// No valid per-PID data this cycle.  Drop dcstat's rows as well as its
+			// flag: when another module owns the segment we cannot stamp the header
+			// ourselves, so the cleared state has to already be in the store for
+			// the owner's next publish to carry it.  Consumers gate on the flag,
+			// and the owner publishes on its own interval, so the window in which
+			// they can still see the previous header is bounded by that interval.
+			store.ClearDCStatApps()
 			if shouldPublish && handle.SharedMemory != nil {
 				if perr := store.Publish(handle.SharedMemory, ebpfgoSHMFlagDCStat); perr != nil {
 					logPluginErr("dcstat.publish", "dcstat", "shared memory publish", perr)

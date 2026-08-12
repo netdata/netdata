@@ -34,20 +34,45 @@ func defaultDCStatTargets() DCStatTargets {
 	}
 }
 
+// kallsymsOpener opens the kernel symbol table.  It exists so the degrade path
+// (unreadable or truncated symbol table) is reachable from tests without
+// depending on the host's /proc.
+type kallsymsOpener func() (io.ReadCloser, error)
+
+func openProcKallsyms() (io.ReadCloser, error) {
+	return os.Open("/proc/kallsyms")
+}
+
 // resolveDCStatTargets returns the attach targets for this kernel.
-//
-// A /proc/kallsyms read failure is never fatal: the configured default name is
-// kept and a warning is emitted.  dcstat is disabled by default, and even when
-// enabled it must not take down the collectors sharing this process — if the
-// symbol really is wrong, attach fails and only dcstat is lost.
 func resolveDCStatTargets() DCStatTargets {
+	return resolveDCStatTargetsFrom(openProcKallsyms)
+}
+
+// resolveDCStatTargetsFrom resolves the targets from an arbitrary symbol table.
+//
+// A read failure is never fatal: the configured default name is kept and a
+// warning is emitted.  dcstat is disabled by default, and even when enabled it
+// must not take down the collectors sharing this process — if the symbol really
+// is wrong, attach fails and only dcstat is lost.
+func resolveDCStatTargetsFrom(open kallsymsOpener) DCStatTargets {
 	targets := defaultDCStatTargets()
 
-	name, err := selectDCStatKallsymsPrefix(targets.LookupFast.Name)
-	if err != nil {
+	warn := func(err error) {
 		rateLimitedStderr("dcstat.kallsyms",
-			fmt.Sprintf("ebpf-go.plugin: dcstat: cannot read /proc/kallsyms (%v); attaching to %q as-is\n",
-				err, targets.LookupFast.Name))
+			fmt.Sprintf("ebpf-go.plugin: dcstat: cannot resolve %q from the kernel symbol table (%v); attaching to it as-is\n",
+				targets.LookupFast.Name, err))
+	}
+
+	symbols, err := open()
+	if err != nil {
+		warn(err)
+		return targets
+	}
+	defer symbols.Close()
+
+	name, err := selectDCStatKallsymsPrefixFromReader(targets.LookupFast.Name, symbols)
+	if err != nil {
+		warn(err)
 		return targets
 	}
 
@@ -62,20 +87,6 @@ func (t *DCStatTargets) ResolveLookupFastTarget(resolved string) {
 	if resolved != "" {
 		t.LookupFast.Name = resolved
 	}
-}
-
-func selectDCStatKallsymsPrefix(prefix string) (string, error) {
-	if prefix == "" {
-		return "", fmt.Errorf("no dcstat kallsyms prefix configured")
-	}
-
-	file, err := os.Open("/proc/kallsyms")
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	return selectDCStatKallsymsPrefixFromReader(prefix, file)
 }
 
 // selectDCStatKallsymsPrefixFromReader returns the first probeable symbol whose

@@ -1,6 +1,9 @@
 package main
 
 import (
+	"errors"
+	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -101,14 +104,76 @@ func TestResolveLookupFastTarget(t *testing.T) {
 	}
 }
 
-// TestResolveDCStatTargetsSurvivesUnreadableKallsyms proves dcstat degrades to
-// the default symbol name instead of failing: a /proc/kallsyms error must never
-// take down the collectors sharing this process.
-func TestResolveDCStatTargetsSurvivesUnreadableKallsyms(t *testing.T) {
+// errKallsyms is a symbol table whose read always fails, so the resolver's
+// scanner-error branch is reachable without depending on the host's /proc.
+type errKallsyms struct{ closed bool }
+
+func (e *errKallsyms) Read([]byte) (int, error) { return 0, errors.New("read failed") }
+func (e *errKallsyms) Close() error             { e.closed = true; return nil }
+
+type nopCloser struct{ io.Reader }
+
+func (nopCloser) Close() error { return nil }
+
+func TestResolveDCStatTargetsFrom(t *testing.T) {
+	tests := map[string]struct {
+		open kallsymsOpener
+		want string
+	}{
+		"adopts the suffixed symbol": {
+			open: func() (io.ReadCloser, error) {
+				return nopCloser{strings.NewReader("ffffffff81000000 t lookup_fast.isra.0\n")}, nil
+			},
+			want: "lookup_fast.isra.0",
+		},
+		"keeps the default when the symbol is absent": {
+			open: func() (io.ReadCloser, error) {
+				return nopCloser{strings.NewReader("ffffffff81000000 T d_lookup\n")}, nil
+			},
+			want: "lookup_fast",
+		},
+		"keeps the default when the table cannot be opened": {
+			// The P1 case: /proc/kallsyms missing or permission-denied must not
+			// fail dcstat configuration, because that would take down every other
+			// collector in this process.
+			open: func() (io.ReadCloser, error) { return nil, os.ErrPermission },
+			want: "lookup_fast",
+		},
+		"keeps the default when the table cannot be read": {
+			open: func() (io.ReadCloser, error) { return &errKallsyms{}, nil },
+			want: "lookup_fast",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := resolveDCStatTargetsFrom(tc.open)
+			if got.LookupFast.Name != tc.want {
+				t.Fatalf("LookupFast.Name = %q, want %q", got.LookupFast.Name, tc.want)
+			}
+			if got.DLookup.Name != "d_lookup" {
+				t.Fatalf("DLookup.Name = %q, want d_lookup", got.DLookup.Name)
+			}
+		})
+	}
+}
+
+// TestResolveDCStatTargetsFromClosesTheTable guards against leaking the
+// symbol-table handle on the read-error path.
+func TestResolveDCStatTargetsFromClosesTheTable(t *testing.T) {
+	table := &errKallsyms{}
+	resolveDCStatTargetsFrom(func() (io.ReadCloser, error) { return table, nil })
+	if !table.closed {
+		t.Fatal("resolveDCStatTargetsFrom did not close the symbol table")
+	}
+}
+
+// TestResolveDCStatTargetsLiveHost is a smoke test over the real /proc: it only
+// asserts the resolver returns usable targets on this machine.  The degrade and
+// adopt branches are covered by TestResolveDCStatTargetsFrom above.
+func TestResolveDCStatTargetsLiveHost(t *testing.T) {
 	got := resolveDCStatTargets()
 
-	// On any host this returns usable targets: either the resolved symbol (when
-	// /proc/kallsyms is readable) or the configured default (when it is not).
 	if !strings.HasPrefix(got.LookupFast.Name, "lookup_fast") {
 		t.Fatalf("LookupFast.Name = %q, want a lookup_fast* symbol", got.LookupFast.Name)
 	}
