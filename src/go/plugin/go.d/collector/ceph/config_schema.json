@@ -6,7 +6,7 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Periodic metric collection interval in seconds. This does not control the standalone ceph-exporter 5-second default refresh or the ceph-mgr Prometheus 15-second default cache refresh.",
+        "description": "Periodic metric collection interval in seconds. This does not control the standalone ceph-exporter 5-second default refresh on Reef 18 and later or the ceph-mgr Prometheus 15-second default cache refresh.",
         "type": "integer",
         "minimum": 1,
         "default": 10
