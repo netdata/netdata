@@ -15,7 +15,8 @@ kernel's live socket table and turns it into a dependency map: which process tal
 attributed, on Linux, to the container, image, systemd unit, or Kubernetes pod that owns it.
 
 There is nothing to instrument. No language agents, no sidecars, no code changes, no service mesh. These are the sockets
-your kernel already has, read continuously and drawn as a graph.
+your kernel already has, enumerated fresh each time you open the map and drawn as a graph. It is a live picture of now,
+not a stored history — the map shows what is connected at the moment you ask.
 
 ![Live network connections function](https://www.netdata.cloud/img/dashboard-screens/functions-network-connections.png)
 
@@ -36,8 +37,12 @@ records the matching keys needed to resolve it against the process serving it on
 The result is a graph of your applications rather than a list of sockets: this pod talks to that database, this service
 depends on that queue, this host reaches out to that external address.
 
-Identification is best-effort. A socket whose owning process Netdata cannot see — a permission-restricted process, or
-one that exited between reads — is still drawn, with `[unknown]` where the name or user would be.
+Identification is best-effort. A socket whose owning process Netdata can see but cannot name — one that exited between
+reads, for example — is still drawn, with `[unknown]` where the name or user would be. Enumerating every process's
+sockets needs privileged access, which standard installations grant; where it is missing the map is quietly
+incomplete rather than wrong. In containers the plugin also needs host networking and `SYS_ADMIN`, and on macOS a
+non-privileged or TCC-restricted Agent omits protected processes altogether. The plugin logs a warning when it detects
+that its view was truncated.
 
 ## Group the map the way you think
 

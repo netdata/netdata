@@ -27,9 +27,12 @@ Ingest syslog from routers, switches, and firewalls into Netdata. An OpenTelemet
 
 Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog receiver pointed at the Agent's OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent's otel plugin writes the records to systemd-compatible journal files.
 
-This integration is supported on all platforms.
+This integration is only supported on the following platforms:
 
-This integration supports multiple instances configured side-by-side.
+- Linux
+- macOS
+
+This integration runs as a single instance per Netdata Agent.
 
 
 ### Default Behavior
@@ -51,9 +54,13 @@ The default configuration for this integration is not expected to impose a signi
 
 ### Prerequisites
 
+#### The OpenTelemetry plugin
+
+The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the OpenTelemetry collector documentation for how it is enabled in each installation method.
+
 #### An OpenTelemetry Collector
 
-An OpenTelemetry Collector with a `syslog` receiver, reachable by your network devices, exporting over OTLP to the Netdata Agent.
+An OpenTelemetry Collector with a `syslog` receiver, reachable by your network devices, exporting over OTLP to the Agent's endpoint (`127.0.0.1:4317` by default).
 
 #### Devices pointed at it
 
@@ -64,13 +71,22 @@ The routers, switches, and firewalls must be configured to send syslog to the co
 
 #### Options
 
-Configuration happens on the OpenTelemetry Collector, not in the Agent. See the OpenTelemetry Collector entry in this section for a ready-to-use syslog pipeline.
+The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. The endpoint defaults to loopback, so a Collector running on another host needs it opened explicitly.
 
 
 
 #### via File
 
-There is no configuration file.
+The configuration file name for this integration is `otel.yaml`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config otel.yaml
+```
 
 ##### Examples
 There are no configuration examples.

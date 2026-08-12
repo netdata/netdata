@@ -288,6 +288,10 @@ NETWORK_VIEWER_SETUP = setup_block(
     'netdata.conf',
     'The Function is always available and needs no setup. The only setting is the APPS_LOOKUP cache used to enrich '
     'connections with container and Kubernetes identity.',
+    [('Privileged access to the socket tables',
+      'The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard '
+      'installations grant these. In containers it also needs host networking and `SYS_ADMIN`; on macOS, a '
+      'non-privileged or TCC-restricted run silently omits protected processes.')],
     section_name='[plugin:network-viewer]',
     options=[
         {'name': 'apps lookup cache size',
@@ -324,16 +328,32 @@ CATO_SETUP = setup_block(
 )
 
 # Netdata has no syslog listener: an OpenTelemetry Collector receives syslog and
-# exports it over OTLP to the Agent (docs/npm/syslog/otel-collector.md).
+# exports it over OTLP to the Agent's otel plugin (docs/npm/syslog/otel-collector.md).
+# The plugin's own contract lives in src/crates/otel-plugin/metadata.yaml.
 SYSLOG_SETUP = setup_block(
-    '',
-    'Configuration happens on the OpenTelemetry Collector, not in the Agent. See the OpenTelemetry Collector entry in '
-    'this section for a ready-to-use syslog pipeline.',
-    [('An OpenTelemetry Collector',
+    'otel.yaml',
+    'The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only '
+    'to change the Agent\'s OTLP endpoint or retention. The endpoint defaults to loopback, so a Collector running on '
+    'another host needs it opened explicitly.',
+    [('The OpenTelemetry plugin',
+      'The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the '
+      'OpenTelemetry collector documentation for how it is enabled in each installation method.'),
+     ('An OpenTelemetry Collector',
       'An OpenTelemetry Collector with a `syslog` receiver, reachable by your network devices, exporting over OTLP to '
-      'the Netdata Agent.'),
+      'the Agent\'s endpoint (`127.0.0.1:4317` by default).'),
      ('Devices pointed at it',
       'The routers, switches, and firewalls must be configured to send syslog to the collector\'s listener.')],
+)
+
+# Traps arrive at the Agent's listener; they are not polled. Their configuration is
+# go.d/snmp_traps.conf, never the polling collector's go.d/snmp.conf.
+SNMP_TRAPS_SETUP = setup_block(
+    'go.d/snmp_traps.conf',
+    'Configure the trap listener: the address and port it binds, the SNMP versions and credentials it accepts, and '
+    'the enrichment options. Trap decoding itself needs no configuration — the vendor profiles ship with Netdata.',
+    [('Devices configured to send traps',
+      'The devices must be configured to send SNMP traps to the Netdata Agent acting as the site\'s trap receiver, '
+      'and the trap port must be reachable from them.')],
 )
 
 TROUBLESHOOTING = {'problems': {'list': []}}
@@ -731,6 +751,10 @@ def build_syslog_modules():
             'records to systemd-compatible journal files.',
             'Not auto-detected. Configure an OpenTelemetry Collector syslog receiver to forward to the Agent\'s OTLP '
             'endpoint.',
+            # The otel plugin is built for Linux and macOS only, as a single instance
+            # (src/crates/otel-plugin/metadata.yaml, CMakeLists.txt ENABLE_PLUGIN_OTEL).
+            platforms=['Linux', 'macOS'],
+            multi_instance=False,
         ),
         plugin_name='otel.plugin',
         module_name='otel',
@@ -776,6 +800,7 @@ def build_trap_modules():
             metrics=metrics_block(render_trap_coverage_md(entry, display)),
             plugin_name='go.d.plugin',
             module_name='snmp_traps',
+            setup=SNMP_TRAPS_SETUP,
         ))
     return modules
 
@@ -887,7 +912,7 @@ def build_trap_enrichment_modules():
     return [make_entry(
         name=name, link='', categories=[CAT_TRAPS], icon=FALLBACK_ICON,
         keywords=keywords, ov=overview(metrics_desc, method_desc, auto),
-        plugin_name='go.d.plugin', module_name='snmp_traps')
+        plugin_name='go.d.plugin', module_name='snmp_traps', setup=SNMP_TRAPS_SETUP)
         for name, keywords, metrics_desc, method_desc, auto in enrichment]
 
 

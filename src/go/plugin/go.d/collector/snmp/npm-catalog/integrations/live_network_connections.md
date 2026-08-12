@@ -55,7 +55,10 @@ The default configuration for this integration is not expected to impose a signi
 
 ### Prerequisites
 
-No action required.
+#### Privileged access to the socket tables
+
+The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard installations grant these. In containers it also needs host networking and `SYS_ADMIN`; on macOS, a non-privileged or TCC-restricted run silently omits protected processes.
+
 
 ### Configuration
 
