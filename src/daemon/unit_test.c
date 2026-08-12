@@ -6,6 +6,7 @@
 #include "database/contexts/rrdcontext-internal.h"
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
+#include "database/rrdhost-labels.h"
 #endif
 
 #if defined(OS_LINUX)
@@ -2533,12 +2534,39 @@ int unit_test_windows_os_version(void) {
         }
     }
 
+    RRDLABELS *labels = rrdlabels_create();
+    char os_value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_add(labels, "_os_name", "Microsoft Windows", RRDLABEL_SRC_AUTO);
+    const char *os = rrdhost_os_label_value(labels, "windows", os_value, sizeof(os_value));
+    if(strcmp(os, "windows") != 0) {
+        fprintf(stderr, "unit_test_windows_os_version: missing version fallback expected 'windows' got '%s'\n", os);
+        failures++;
+    }
+
+    rrdlabels_add(labels, "_os_version", "Microsoft Windows 11 Home", RRDLABEL_SRC_AUTO);
+    os = rrdhost_os_label_value(labels, "windows", os_value, sizeof(os_value));
+    if(strcmp(os, "Microsoft Windows 11 Home") != 0) {
+        fprintf(stderr, "unit_test_windows_os_version: Windows version expected 'Microsoft Windows 11 Home' got '%s'\n", os);
+        failures++;
+    }
+    rrdlabels_destroy(labels);
+
+    labels = rrdlabels_create();
+    rrdlabels_add(labels, "_os_name", "Other OS", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_version", "Microsoft Windows 11 Home", RRDLABEL_SRC_AUTO);
+    os = rrdhost_os_label_value(labels, "Netdata Virtual Host 1.0", os_value, sizeof(os_value));
+    if(strcmp(os, "Netdata Virtual Host 1.0") != 0) {
+        fprintf(stderr, "unit_test_windows_os_version: non-Windows host expected fallback got '%s'\n", os);
+        failures++;
+    }
+    rrdlabels_destroy(labels);
+
     if(failures) {
         fprintf(stderr, "unit_test_windows_os_version: %d failure(s)\n", failures);
         return 1;
     }
 
-    fprintf(stderr, "unit_test_windows_os_version: OK (%zu cases)\n",
+    fprintf(stderr, "unit_test_windows_os_version: OK (%zu formatter cases + label selection)\n",
             sizeof(cases) / sizeof(cases[0]));
     return 0;
 }

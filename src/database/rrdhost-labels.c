@@ -65,6 +65,26 @@ void rrdhost_set_is_parent_label(void) {
     }
 }
 
+const char *rrdhost_os_label_value(RRDLABELS *labels, const char *host_os, char *value, size_t value_size) {
+#ifdef OS_WINDOWS
+    if (labels && value && value_size) {
+        char os_name[RRDLABELS_MAX_VALUE_LENGTH + 1];
+        rrdlabels_get_value_strcpyz(labels, os_name, sizeof(os_name), "_os_name");
+        if (!strcmp(os_name, "Microsoft Windows")) {
+            rrdlabels_get_value_strcpyz(labels, value, value_size, "_os_version");
+            if (*value)
+                return value;
+        }
+    }
+#else
+    (void)labels;
+    (void)value;
+    (void)value_size;
+#endif
+
+    return host_os;
+}
+
 // expand ${VAR} and ${VAR:-default} patterns in src, writing result to dst
 static void env_expand_labels_value(const char *src, char *dst, size_t dst_size) {
     if(!src || !dst || dst_size < 1) return;
@@ -209,6 +229,7 @@ static void rrdhost_load_auto_labels(void) {
     struct rrdhost_system_info *system_info = rrdhost_system_info_dup(localhost->system_info);
     spinlock_unlock(&localhost->rrdhost_update_lock);
     rrdhost_system_info_to_rrdlabels(system_info, labels);
+    rrdhost_system_info_free(system_info);
     add_aclk_host_labels();
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
@@ -223,14 +244,9 @@ static void rrdhost_load_auto_labels(void) {
     (void)rrdhost_update_is_parent_label(labels, stream_receivers_currently_connected, true);
 
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
-    const char *os = string2str(localhost->os);
-#ifdef OS_WINDOWS
-    const char *os_version = rrdhost_system_info_host_os_version(system_info);
-    if (os_version)
-        os = os_version;
-#endif
+    char os_value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    const char *os = rrdhost_os_label_value(labels, string2str(localhost->os), os_value, sizeof(os_value));
     rrdlabels_add(labels, "_os", os, RRDLABEL_SRC_AUTO);
-    rrdhost_system_info_free(system_info);
 
     if (localhost->stream.snd.destination)
         rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);

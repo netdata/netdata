@@ -3,6 +3,7 @@
 #include "pluginsd_internals.h"
 #include "streaming/stream-replication-receiver.h"
 #include "database/rrddim-collection.h"
+#include "database/rrdhost-labels.h"
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
@@ -820,13 +821,8 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     labels_changed |= pluginsd_update_host_ephemerality(host);
 
     if(!rrdlabels_exist(host->rrdlabels, "_os")) {
-        const char *os = string2str(host->os);
-#ifdef OS_WINDOWS
-        char os_version[4096];
-        rrdlabels_get_value_strcpyz(host->rrdlabels, os_version, sizeof(os_version), "_os_version");
-        if (*os_version)
-            os = os_version;
-#endif
+        char os_value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+        const char *os = rrdhost_os_label_value(host->rrdlabels, string2str(host->os), os_value, sizeof(os_value));
         labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_os", os, RRDLABEL_SRC_AUTO);
     }
 
