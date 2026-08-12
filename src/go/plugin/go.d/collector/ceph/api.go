@@ -21,6 +21,10 @@ const (
 	hdrContentTypeJson = "application/json"
 )
 
+type authLoginResp struct {
+	Token string `json:"token"`
+}
+
 type apiHealthMinimalResponse struct {
 	Health *struct {
 		Status string `json:"status"`
