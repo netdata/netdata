@@ -192,6 +192,25 @@ async fn bounded_trace_fetch_prunes_non_overlapping_sealed_files() {
 }
 
 #[tokio::test]
+async fn bounds_excluding_every_file_yield_a_complete_empty_trace() {
+    let registries = make_registries();
+    install_sfst(&registries, "default", 1, 1_000, 1_100).await;
+    let h = make_handler_over(registries);
+    let v = serde_json::to_value(
+        call_on(
+            &h,
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 500_000, "before": 500_100}}),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["items"]["returned"], 0);
+    assert_eq!(v["coverage"], json!({"after": 500_000, "before": 500_100}));
+}
+
+#[tokio::test]
 async fn trace_bounds_width_at_the_cap_is_accepted() {
     let h = handler_with_fixture_wal().await;
     let v = serde_json::to_value(
@@ -304,6 +323,10 @@ async fn malformed_trace_selectors_are_clean_client_errors() {
         // Assembly bounds: both-or-neither, ordered, width-capped.
         (
             json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100}}),
+            "both 'after' and 'before'",
+        ),
+        (
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "before": 100}}),
             "both 'after' and 'before'",
         ),
         (

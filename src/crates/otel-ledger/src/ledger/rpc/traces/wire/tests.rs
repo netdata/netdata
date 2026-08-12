@@ -95,6 +95,14 @@ fn trace_params_reject_null_and_malformed_selectors() {
         .unwrap();
     assert_eq!(ok.id, "00ff");
     assert_eq!(ok.span_cap, Some(9));
+    assert_eq!(ok.after, None);
+    assert_eq!(ok.before, None);
+
+    let bounded = req(json!({"trace": {"id": "00ff", "after": 100, "before": 200}}))
+        .trace_params()
+        .unwrap();
+    assert_eq!(bounded.after, Some(100));
+    assert_eq!(bounded.before, Some(200));
 }
 
 #[test]

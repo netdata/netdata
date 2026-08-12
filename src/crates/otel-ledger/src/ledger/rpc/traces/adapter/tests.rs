@@ -84,6 +84,7 @@ fn trace_result_shape_is_pinned() {
 
     assert_eq!(v["version"], 1);
     assert_eq!(v["trace_id"], "11111111111111111111111111111111");
+    assert_eq!(v["coverage"], json!({"after": 0, "before": 4_294_967_295_u32}));
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"], json!({"returned": 2}));
     assert_eq!(v["summary_root"], 0);
